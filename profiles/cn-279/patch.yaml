@@ -1,0 +1,111 @@
+# This development profile uses bounded process-local storage; restarting clears it.
+- replace:
+    id: persistence.mysql
+    disabled: true
+- replace:
+    id: persistence.memory
+    disabled: false
+- replace:
+    id: admin.http
+    config:
+      listen: "${CN_279_ADMIN_HOST:-127.0.0.1}:${CN_279_ADMIN_PORT:-8087}"
+- replace:
+    id: diagnostics.packet-log
+    config:
+      file: logs/{date}/packets-cn-279_{timestamp}.log
+      preview_bytes: 96
+- set:
+    id: protocol
+    config:
+      bootstrap_command_line: ""
+      max_payload_bytes: 65535
+- set:
+    id: lobby
+    config:
+      # This build's complete ShopItem workbook has no audited rename consumable.
+      rename_item_id: 0
+      recording_always_create_character: false
+      # cn-279 reads a one-word request and a reply that ends in a counted vector (cn-279 sub_44C1A0, sub_44EFC0,
+      # sub_453420), not the two strings of the other legacy builds: the player menu's "view info" is not answered.
+      fighter_info: false
+- set:
+    id: dialect.messages
+    config:
+      fighter_info: false
+      server_notices: true
+      # cn-279 sub_664890 stamps 805 and sub_450430 reads item/quantity/parameters; paint is independent of rename.
+      inventory_item_use: true
+      packets_directory: packets
+- set:
+    id: dialect.rooms
+    config:
+      # This early client has no audited consumable revival request.
+      instant_revival: false
+      # Item boxes: this build has the map report, creation, pickup, grant and use packets (cn-279 sub_8205F0,
+      # sub_81FF70, sub_8190C0, sub_820120, sub_81BB50) in its own, shorter envelopes, but no switch packet, no team
+      # box and no direct-effect echo (packets/map-supplies.yaml).
+      supply_items: true
+      horde_lottery: false
+      counted_pve_items: false
+      # Mode 8 builds ZombieModeMgr here too (cn-279 sub_811B90 -> sub_747480): its team-change event 20,
+      # cn-279 sub_7454E0, makes the first seat moved to team 14 the king, and its event 99, cn-279
+      # sub_73DA40, sends gcpRoomChangeTeam (513) on death. The cooperative zombie mode stays off through
+      # zombie_conversion_mode_id: 0.
+      zombie_conversion: true
+      pve_points: false
+      rescue_missions: false
+      # cn-279 sub_7A7300 sends the selected mode; cn-279 sub_7A6420 consumes the search result.
+      quick_matching: true
+      # The native notice sends a play request; route it to the old isTutorial map.
+      tutorial_move_in: true
+      tutorial_use_old_map: true
+- set:
+    id: ingame
+    config:
+      instant_revival_item_id: 0
+      lottery_modes: []
+      counted_item_mode_id: 0
+      counted_item_kinds: []
+      counted_immediate_item_kinds: []
+      zombie_conversion_mode_id: 0
+      # CN2011 has no direct item-effect packet (PveItemUsed excepts cn-279), so the king's ultra cannot be
+      # answered the way the other builds answer it; off until CN2011's own ultra reply is traced.
+      zombie_king_ultra_item_kind: 0
+      pve_point_mode_id: 0
+      rescue_mode_id: 0
+      native_item_slot_count: 1
+      immediate_supply_item_kinds: []
+      # The 2011 client picks its item sheet by room grade (cn-279 sub_885A70: ItemSpec + Junior, Rookie,
+      # Intermediate, ...), not by mode, and its Config/ItemSpec.xml rows carry no enabled flag. The kinds with a
+      # weight in any grade sheet are these seventeen; none of the kinds 136 to 141 exists in this build, so there is
+      # no bazooka, air bomb, turret, machine gun or shield field, and the giant drink (112) is among them.
+      random_supply_item_kinds: [101, 102, 108, 109, 112, 115, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132]
+      # Mode 3 loads no sheet of its own here, so the item mode offers all of them. This build has no team box:
+      # its map report has no team vector and its item box has no team (cn-279 sub_89E0A0, sub_89DD80).
+      item_mode_ids: [3]
+      item_mode_kinds: [101, 102, 108, 109, 112, 115, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132]
+- set:
+    id: shop
+    config:
+      # cn-279 sub_662910 shows the -1 day duration as unlimited; its workbook marks those offers
+      # with stock type 1. Its renewal predicates also predate the function-10001 ownership gate.
+      permanent_day_stock_types: [9, 1]
+      reject_repeat_function_10001: false
+      max_purchase_attempts: ~
+- set:
+    id: inventoryview
+    config:
+      # cn-279 ShopItem.mainCategory uses localized values instead of English tokens.
+      clothing_category: "\uC758 \uC0C1"
+      accessory_category: "\uC7A5 \uC2DD"
+
+# Life-counted items: this build's executable has no "endurance" ShopItem duration type (no item kind 3) and no Life
+# notice text, so the daily life rule and life stock are off (packets/builds.yaml life_items: false).
+- set:
+    id: lobby
+    config:
+      life_items: false
+- set:
+    id: shop
+    config:
+      life_items: false

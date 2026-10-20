@@ -1,0 +1,23 @@
+id: id-1809
+display_names:
+  en: "Indonesia 2015-01-29"
+  zh-Hans: "印尼服 2015-01-29"
+  zh-Hant: "印度尼西亞 2015-01-29"
+  ko: "인도네시아 2015-01-29"
+client_build: id:1809:0
+# Nearest build whose layouts this one reuses when it has no variant of its own; the same
+# base as this build's entry in packets/builds.yaml.
+parent: kr-812
+description: Indonesian 2015 client build, ClientVersion_Major 1809.
+bundles:
+  - core
+  - legacy
+  - inventory-actions
+# What this build differs in; everything else is the legacy bundle's (kr-812).
+vars:
+  LEGACY_PORT: ${ID_1809_GAME_PORT:-7130}
+  LEGACY_PUBLIC_PORT: ${ID_1809_PUBLIC_PORT:-7130}
+patches:
+  - patch.yaml
+  # Optional developer override; git-ignored and skipped when absent.
+  - local.patch.yaml

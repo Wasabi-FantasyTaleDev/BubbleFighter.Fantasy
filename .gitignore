@@ -1,0 +1,71 @@
+# Reference tree (third-party, not part of this project)
+reference/
+
+# Build output
+bin/
+obj/
+artifacts/
+logs/
+
+# Local developer profile overrides
+*local.patch.yaml
+
+# Copies of the game client's own data (not redistributable)
+/client-data/
+
+# Environment secrets
+.env
+
+# IDE
+.vs/
+.idea/
+*.user
+
+# OS
+Thumbs.db
+.DS_Store
+
+# local scratch
+/docs/private/
+AGENTS.local.md
+
+# pre-release archive of the documents that shipped before the rewrite:
+# private originals, kept readable but never published or packed
+/docs_prerelease/
+
+# WorkBuddy AI session metadata
+.workbuddy-ai/
+.qoder/
+
+# private protocol-analysis tooling (not part of the shipped project)
+/docs/protocol/
+/tools/session-capture/
+/tests/BubbleFighter.Fantasy.Tools.SessionCapture.Tests/
+/tests/BubbleFighter.Fantasy.Tools.BffWire.Tests/
+
+# scratch
+/.tmp-*
+/tmp-*
+
+# test runner output
+TestResults/
+
+# Python bytecode from tools/
+__pycache__/
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Agent worktrees (each is its own checkout)
+.claude/worktrees/
+
+# Local installation authority, credentials, generated overlays and database saves.
+**/state/
+
+# Operator-provided narrator images, sounds and glyph atlases are never distributed.
+
+# Build output of the Vue web interface (src/Plugins/BubbleFighter.Fantasy.WebUi/client -> npm run build);
+# the WebUi project builds it before compiling.
+/src/Plugins/BubbleFighter.Fantasy.WebUi/wwwroot/
+/src/Plugins/BubbleFighter.Fantasy.WebUi/client/node_modules/

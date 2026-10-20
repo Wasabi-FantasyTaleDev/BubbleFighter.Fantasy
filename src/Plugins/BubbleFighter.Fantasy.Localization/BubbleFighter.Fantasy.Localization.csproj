@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><Description>Localized game notices with region-specific resources.</Description></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../BubbleFighter.Fantasy.Abstractions/BubbleFighter.Fantasy.Abstractions.csproj" />
+    <ProjectReference Include="../../BubbleFighter.Fantasy.Contracts/BubbleFighter.Fantasy.Contracts.csproj" />
+  </ItemGroup>
+</Project>

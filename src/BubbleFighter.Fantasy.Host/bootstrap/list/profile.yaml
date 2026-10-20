@@ -1,0 +1,4 @@
+id: list
+description: Load configured definition sources for plugin inventory.
+bundles:
+  - loaders

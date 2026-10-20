@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Wear and remove replies (C2S 804 / 805 to S2C 811 / 812). Protocol name and version_major come from the profile row.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\BubbleFighter.Fantasy.Abstractions\BubbleFighter.Fantasy.Abstractions.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\BubbleFighter.Fantasy.Contracts\BubbleFighter.Fantasy.Contracts.csproj" />
+    <ProjectReference Include="..\..\BubbleFighter.Fantasy.Packets\BubbleFighter.Fantasy.Packets.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,128 @@
+version: 1
+structs:
+  # C2S gcpReqFighterInfo, the player menu's "view info" item. Deserializers: kr-812 sub_6DB1B0 (vtable 0xD490C8),
+  # cn-717 sub_538B70, cn-324 sub_408DF0, id-400 sub_782DD0, id-1809 sub_4D7F70, cn-706 sub_733050, cn-406 sub_420FC0,
+  # cn-404 sub_4AF1B0, cn-408 sub_4AF4C0; each is two four-byte reads at +4 and +8. cn-279 sub_44C1A0 reads only +4.
+  # The sender kr-812 sub_6C2EB0 stores its argument at +4; the three callers get that argument from the clicked row's
+  # account id (the room slot or plaza list entry, 288 bytes per entry, number at +7440 in kr-812 sub_806DB0).
+  # kr-1256 sub_9319E0 and cn-774 sub_B277C0 write the same two words; kr-1256's room menu passes the account id
+  # that kr-1256 sub_944C50 copies out of the clicked UserSlot (user_number, +8 of the 320-byte slot).
+  FighterInfoRequest:
+    - target_user_number: u32 # the clicked player's account id
+      offset: 4
+    - unknown_8: u32 # kr-812 sub_6C2EB0 fills it with a session-derived word (a byte of the session object spread over
+      offset: 8      # four bytes XOR a process value); kr-1256 sub_9319E0 writes a word read from the player object.
+      except: [cn-279] # The server never reads it.
+
+  # S2C gspRepFighterInfo of the legacy builds. The handler reads the packet, and when the result is 1 shows the
+  # fighter dialog from the first FighterInfo (kr-812 sub_82C960 calls sub_87DD90 on the block at +8 and copies the
+  # first string to the dialog); any other result opens a notice instead (kr-812 sub_82C960 builds a DlgNotice from
+  # two string-table keys), and the blocks that follow are read all the same, so a failure carries a whole body with
+  # constructor-default blocks. The second FighterInfo and the second string are read and never used by that handler.
+  # Readers: kr-812 sub_83DD00 (vtable 0xD6F174), cn-717 sub_8C6D90, cn-324 sub_6FCD50, id-400 sub_797D00,
+  # id-1809 sub_7BD940, cn-706 sub_7A0050, cn-406 sub_714200, cn-404 sub_7C54C0, cn-408 sub_7C8A40: a u32, two nested
+  # FighterInfo, two strings. Offsets are the kr-812 object's; the builds whose objects differ say so beside each field.
+  # cn-279 sub_44EFC0 reads a u32, one FighterInfo and then a counted vector; it is not tabled.
+  # The modern family reads four words after the second string and is restated below as FighterInfoReply@kr-1256.
+  FighterInfoReply:
+    - result: u32 # 1 shows the dialog; anything else is the failure notice
+      offset: 4
+      except: [cn-279, kr-1256]
+    - fighter: FighterInfo
+      offset: 8
+      except: [cn-279, kr-1256]
+    - partner: FighterInfo # read and unused by the handler
+      offset: 432
+      except: [cn-279, kr-1256]
+      cn-717:
+        - partner: FighterInfo # cn-717 sub_8C6D90 reads it into this[110]
+          offset: 440
+      cn-324:
+        - partner: FighterInfo # cn-324 sub_6FCD50 reads it into this[58]
+          offset: 232
+      id-400:
+        - partner: FighterInfo # id-400 sub_797D00 reads it into this[94]
+          offset: 376
+      id-1809:
+        - partner: FighterInfo # id-1809 sub_7BD940 reads it into this[96]
+          offset: 384
+      cn-406:
+        - partner: FighterInfo # cn-406 sub_714200 reads it into this[68]
+          offset: 272
+    - unknown_856: wstr # the handler copies it into the dialog; its meaning is not proven
+      offset: 856
+      except: [cn-279, kr-1256]
+      cn-717:
+        - unknown_872: wstr
+          offset: 872
+      cn-324:
+        - unknown_456: wstr
+          offset: 456
+      id-400:
+        - unknown_744: wstr
+          offset: 744
+      id-1809:
+        - unknown_760: wstr
+          offset: 760
+      cn-406:
+        - unknown_536: wstr
+          offset: 536
+    - unknown_884: wstr # read and unused by the handler
+      offset: 884
+      except: [cn-279, kr-1256]
+      cn-717:
+        - unknown_900: wstr
+          offset: 900
+      cn-324:
+        - unknown_460: wstr
+          offset: 460
+      id-400:
+        - unknown_772: wstr
+          offset: 772
+      id-1809:
+        - unknown_788: wstr
+          offset: 788
+      cn-406:
+        - unknown_564: wstr
+          offset: 564
+
+  # S2C gspRepFighterInfo of the modern family: the legacy sequence above, then four words. Restated because every
+  # row's position differs and the four words have no row in the legacy table.
+  # Reader kr-1256 sub_99A430: a 4-byte result into object +0, then the two FighterInfo blocks at +8 and +584 through
+  # their own vtable +4 entries (constructor kr-1256 sub_1159720), then two prefixed strings read through the
+  # kr-1256 sub_1119C10 helper into +1160 and +1184, then four 4-byte reads into +1208, +1212, +1216 and +1220. The
+  # handler kr-1256 sub_9BCE60 allocates the 2272-byte fighter dialog (constructor kr-1256 sub_5D19B0) only for result
+  # 1, passes the first block and the four words to the fill kr-1256 sub_5D7BD0, and takes the notice branch for
+  # every other result, so a failure still carries the whole body (dispatcher kr-1256 sub_9D2FF0, jumptable
+  # 009D311E case 133 at 0x9D392B, read as disassembly because Hex-Rays skipped the function).
+  # cn-774 sub_BBA7A0 (dispatcher cn-774 sub_BCF090 jumptable 00BCF218 case 133) reads the same sequence into two
+  # 568-byte stack FighterInfo blocks (constructor cn-774 sub_466960), two strings and four words, and hands the first
+  # block and the four words to cn-774 sub_6C8420. tw-454 sub_A97DD0 (dispatcher tw-454 sub_AACF80 jumptable
+  # 00AAD108 case 131) reads it into two 560-byte stack blocks (constructor tw-454 sub_45E770) and consumes the first
+  # through tw-454 sub_AEBF20 and the second through tw-454 sub_AEFDC0.
+  # cn-774 and tw-454 follow this table (builds.yaml bases them on kr-1256); only kr-1256 keeps a reply object, so
+  # the offsets below are its own and the two stack-local readers state no object offset. Their FighterInfo blocks are
+  # their own rows of packets/user-stat.yaml. tw-454's fighter_info capability stays false: its pre-move reply was a
+  # 36-byte compact body (result, two wstrings, four words), while the reader tw-454 sub_A97DD0 consumes the full
+  # two-block sequence this table states (for the same sample cn-774 resolves 970 bytes found / 954 failure, and
+  # tw-454 resolves the same wire sequence). OPEN ITEM: enabling tw-454 replaces that 36-byte body with the full one;
+  # the change is visible to the owner's client and waits for a real-client test.
+  FighterInfoReply@kr-1256:
+    - result: u32 # 1 shows the dialog; anything else is the failure notice
+      offset: 0
+    - fighter: FighterInfo # shown by the handler
+      offset: 8
+    - partner: FighterInfo # read and unused by the handler
+      offset: 584
+    - unknown_1160: wstr # read into the first string; not shown by the handler
+      offset: 1160
+    - unknown_1184: wstr # read into the second string; not shown by the handler
+      offset: 1184
+    - unknown_1208: u32 # the four words are read after the strings and passed to the dialog fill kr-1256 sub_5D7BD0;
+      offset: 1208    # their purpose is not proven
+    - unknown_1212: u32
+      offset: 1212
+    - unknown_1216: u32
+      offset: 1216
+    - unknown_1220: u32
+      offset: 1220

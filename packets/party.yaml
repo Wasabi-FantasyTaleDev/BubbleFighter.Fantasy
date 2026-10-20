@@ -1,0 +1,259 @@
+version: 1
+structs:
+  # Solo idle member projection: native readers kr-812 sub_415C00, cn-717 sub_8CFA40,
+  # id-400 sub_86D6E0, id-1809 sub_417B00, cn-706 sub_87EBB0,
+  # cn-324 sub_7987C0 and cn-279 sub_44E7E0. Unknown values retain the established solo snapshot zeros.
+  SoloPartyMember:
+    - user_number: u32
+      offset: 4
+    - nickname: wstr
+      offset: 8
+    # kr-1256's member (kr-1256 sub_9064B0) has four words after the nickname, from +32
+    - unknown_32: u32
+      offset: 32
+      only: [kr-1256]
+    - unknown_36: u32
+      offset: 36
+      cn-324:
+        - unknown_12: u32
+          offset: 12
+    - unknown_40: u32
+      offset: 40
+      cn-324:
+        - unknown_16: u32
+          offset: 16
+    - unknown_44: u32
+      offset: 44
+      cn-324:
+        - unknown_20: u32
+          offset: 20
+  # gspUpdateParty readers: kr-812 sub_92B130, cn-717 sub_9CD590, id-400 sub_89DCE0,
+  # id-1809 sub_8C2520, cn-706 sub_8AE390, cn-324 sub_7C6B00 and cn-279 sub_4802A0.
+  # The member list is the whole party, leader first (kr-812 sub_926900 reads no leader flag); a player outside a
+  # party is a party of one. Equipped elements differ by build and are never emitted here.
+  SoloPartySnapshot:
+    - state: u32
+      offset: 4
+      default: 2
+    - members: 'list<SoloPartyMember>'
+      offset: 8
+    - equipped: empty_list
+      offset: 24
+      # kr-1256 sub_9064B0, the only writer of the member vector at dword_18E5660 +8, then writes a profile
+      # record per entry and reaches the spawner kr-1256 sub_920940 for every room seat
+      kr-1256:
+        - profile_entries: "list<RoomProfileEntry>"
+      cn-324:
+        - equipped: empty_list
+          offset: 20
+  # cn-774 gspUpdateParty (S2C 201): dispatcher cn-774 sub_BCF090 case 201 calls the body parser cn-774 sub_B009A0,
+  # which reads the idle state (+4), the member vector at +8 (cn-774 sub_1060BD0, element cn-774 sub_4866C0) and
+  # then an unkeyed vector of equipped records (cn-774 sub_105A3C0, element cn-774 sub_496F40). tw-454 dispatches
+  # case 201 to tw-454 sub_B9C350 with the same three fields; its record differs and is restated below. The vector
+  # fills the kr-1256 keyed map's value slot, but each element carries its own user number (+4) instead of a map
+  # key, so the server names that slot profile_entries for every build and the element table states the difference.
+  SoloPartySnapshot@cn-774:
+    - state: u32                        # +4; cn-774 sub_B009A0 stores the idle word in the session
+      offset: 4
+      default: 2
+    - members: "list<SoloPartyMember>"  # +8; cn-774 sub_1060BD0 fills the session's member vector
+      offset: 8
+    - profile_entries: "list<SoloPartyEquippedItem>" # cn-774 sub_105A3C0 reads the unkeyed vector; the parser keeps no session field
+
+  # The cn-774 equipped record cn-774 sub_105A3C0 reads per vector element (deserializer cn-774 sub_496F40,
+  # applied through cn-774 sub_9B82D0). The room install states the legacy builds' own record as EquippedItemList
+  # in packets/room.yaml; this party record has a different wire, so it is stated here for the cn-774 family only
+  # and tw-454 restates its own shape below. The four leading words mirror the kr-1256 map key and payload head.
+  SoloPartyEquippedItem:
+    - user_number: u32                  # +4: the record's own player number (the kr-1256 map key); cn-774 sub_496F40
+      offset: 4
+      only: [cn-774]
+    - character_id: u32                 # +8: equipped character item; cn-774 sub_496F40 reads it, cn-774 sub_9B5EA0 installs it
+      offset: 8
+      only: [cn-774]
+    - unknown_12: u32                   # +12; cn-774 sub_496F40
+      offset: 12
+      only: [cn-774]
+    - unknown_16: u32                   # +16; cn-774 sub_496F40
+      offset: 16
+      only: [cn-774]
+    - equipped_items: "list<u32>"       # +20; cn-774 sub_456D30 reads four-byte elements, cn-774 sub_9B5EA0 installs them
+      offset: 20
+      only: [cn-774]
+    - unknown_32: "list<u32>"           # +32; cn-774 sub_456D30
+      offset: 32
+      only: [cn-774]
+    - unknown_44: "list<u8>"            # +44; cn-774 sub_48B350 reads one-byte elements
+      offset: 44
+      only: [cn-774]
+    - unknown_56: empty_list            # +56; cn-774 sub_449C80 reads a record vector whose element layout is not stated; sent empty
+      offset: 56
+      only: [cn-774]
+    - unknown_68: "list<ItemExpiredTime>" # +68; cn-774 sub_496F40 reads counted expiry records (equipment-attributes.yaml)
+      offset: 68
+      only: [cn-774]
+
+  # The tw-454 equipped record (tw-454 sub_4A0550, read per element by tw-454 sub_EBC1A0 and applied through
+  # tw-454 sub_C16E30): the same four leading words, then three collections and one counted expiry vector - four
+  # collections where cn-774 has five.
+  SoloPartyEquippedItem@tw-454:
+    - user_number: u32                  # +4; tw-454 sub_4A0550
+      offset: 4
+    - character_id: u32                 # +8; tw-454 sub_4A0550
+      offset: 8
+    - unknown_12: u32                   # +12; tw-454 sub_4A0550
+      offset: 12
+    - unknown_16: u32                   # +16; tw-454 sub_4A0550
+      offset: 16
+    - unknown_20: "list<u32>"           # +20; tw-454 sub_45AA50 reads four-byte elements
+      offset: 20
+    - unknown_32: "list<u8>"            # +32; tw-454 sub_478B30 reads one-byte elements
+      offset: 32
+    - unknown_44: empty_list            # +44; tw-454 sub_44A090 reads a record vector whose element layout is not stated; sent empty
+      offset: 44
+    - unknown_56: "list<ItemExpiredTime>" # +56; tw-454 sub_4A0550 reads counted expiry records (equipment-attributes.yaml)
+      offset: 56
+  # C2S gcpReqInvite: kr-812 writer sub_8456A0 (sender sub_929F40). is_party is repeated in the notice, whose
+  # handler kr-812 sub_81DEA0 shows the party text 0xD6AC78 when it is set and the room text otherwise.
+  PartyInviteRequest:
+    - is_party: bool
+      offset: 4
+    - target: wstr
+      offset: 8
+  # C2S gcpReqMoveToInviter, the accept: kr-812 writer sub_6DA4C0; the constructor kr-812 sub_6DA520 puts a
+  # Lambda::NetAddress at +36. The invitee copies the address of the invitation it answers (kr-812 sub_6D88F0).
+  PartyInviterMoveRequest:
+    - is_party: bool
+      offset: 4
+    - inviter: wstr
+      offset: 8
+    - address: RelayEndpoint
+      offset: 36
+      # cn-324 sub_6FC880 (and cn-279 sub_44EBE0) keep the NetAddress at +12; the wire order is the same
+      cn-324:
+        - address: RelayEndpoint
+          offset: 12
+  # C2S gcpReqMoveToFriendAccept: kr-812 writer sub_9858F0 (sender sub_839E50); the invitation's refuse sends answer 3.
+  PartyInviteAnswer:
+    - inviter: wstr
+      offset: 4
+    - answer: u32
+      offset: 32
+  # One nickname: C2S gcpReqKickFromParty and gcpReqChangePartyLeader (kr-812 writer sub_92ABC0), S2C
+  # gspNotifyMemberLeave, gspNotifyNewMemberJoin and gspNotifyKickFromParty (kr-812 reader sub_5C8FD0).
+  PartyNickname:
+    - nickname: wstr
+      offset: 4
+  # Two nicknames: S2C gspUpdatePartyLeader (leaver, new leader; kr-812 sub_926B90) and gspNotifyKickMember (leader,
+  # kicked; kr-812 sub_929370). kr-812 reader sub_92ACF0.
+  PartyNicknamePair:
+    - first: wstr
+      offset: 4
+    - second: wstr
+      offset: 32
+  # A result code and a nickname: S2C gspRepInvite (kr-812 sub_81CDF0) and gspRepKickFromParty (kr-812 sub_9285D0).
+  # kr-812 reader sub_844570.
+  PartyResult:
+    - result: u32
+      offset: 4
+    - nickname: wstr
+      offset: 8
+  # S2C gspNotifyInvite: kr-812 reader sub_844490, writer sub_844450; +36 is a Lambda::NetAddress the accept sends
+  # back. kr-812 sub_81DEA0 skips the prompt when +48 is set (purpose unproven; sent as 0), and answers by itself
+  # with gcpReqMoveToFriendAccept when the player's option at state +256/+257 refuses invitations.
+  PartyInviteNotice:
+    - is_party: bool
+      offset: 4
+    - inviter: wstr
+      offset: 8
+    - address: RelayEndpoint
+      offset: 36
+    - unknown_48: bool
+      offset: 48
+  # S2C gspRepChangePartyLeader: kr-812 reader sub_80AE00; the handler kr-812 sub_928C50 switches on +60.
+  PartyLeaderChangeReply:
+    - previous: wstr
+      offset: 4
+    - leader: wstr
+      offset: 32
+    - result: u32
+      offset: 60
+
+  # ---- The modern family's invitation packets -------------------------------------------------------------
+  # The modern clients keep the legacy invitation flow but not its bodies. Names follow the legacy classes by
+  # behaviour (kr-812 Packet_gcpReqInvite, gcpReqMoveToInviter, gcpReqMoveToFriendAccept) and the builds' own
+  # S2C labels (gspAskedInvitation, gspInvitationDelivered, gspInvitationFailed). cn-774 follows kr-1256; tw-454
+  # restates what differs.
+
+  # C2S gcpReqInvite (kr-1256 C2S 110): sender kr-1256 sub_90A330, reached from the party invitation UI
+  # (kr-1256 sub_938E00). Name length is capped at 12 before sending. The trailing word is not the legacy is_party
+  # flag: kr-1256 sub_90A330 stores 1, or kr-1256 sub_90AB30(party) < 3 when its stage test holds (feature 304
+  # forces 1). Its purpose is unproven, so it is read and ignored. cn-774 (C2S 111, name only, cn-774 sub_B32AD0)
+  # and tw-454 have no proven invitation sender and no row for this packet.
+  PartyInviteRequest@kr-1256:
+    - target: wstr
+    - unknown_flag: bool
+  # S2C gspAskedInvitation (kr-1256 S2C 121, cn-774 S2C 121): parser kr-1256 sub_99ABC0, consumer kr-1256
+  # sub_9A8DF0; cn-774 reads the same order inline in sub_BA8CD0. The client echoes the word at +24 in its refusal
+  # and puts the endpoint at +28/+32 into its accept (kr-1256 sub_9A8DF0 -> kr-1256 sub_940530); no range check
+  # touches the endpoint. +36 is read and never used (kr-1256 sub_9A8DF0); +40 reaches kr-1256 sub_D99380, which
+  # ignores its arguments. cn-774 sub_E13130 prints both as decimal text in its notice and gates nothing on them.
+  PartyInviteNotice@kr-1256:
+    - inviter: wstr
+      offset: 0
+    - token: u32
+      offset: 24
+    - address: RelayEndpoint
+      offset: 28
+    - unknown_36: u32
+      offset: 36
+    - unknown_40: u32
+      offset: 40
+  # S2C gspNotifyInvite (tw-454 S2C 119): the notice is read inline in tw-454 sub_A86A70. It has no token (the
+  # refusal names the inviter). The word after the port makes the client skip the dialog, the option check and
+  # the refusal rules and accept at once (tw-454 sub_A86A70, branch v62); the server always sends 0 so the
+  # player is asked.
+  PartyInviteNotice@tw-454:
+    - inviter: wstr
+      offset: 0
+    - address: RelayEndpoint
+      offset: 24
+    - auto_accept: bool
+      offset: 32
+  # C2S gcpReqMoveToInviter, the accept (kr-1256 C2S 115 sub_940530, cn-774 C2S 114 sub_B3C0E0). The kind byte
+  # is 1 for the accept of an invitation notice (kr-1256 sub_9A8DF0 sets it before sub_940530). kr-1256 sub_9396F0
+  # sends the same builder with kind 2 and kr-1256 sub_9A9710 with kind 0: those answer other prompts
+  # (visitation) and must not be read as a party accept.
+  PartyInviterMoveRequest@kr-1256:
+    - inviter: wstr
+      offset: 0
+    - address: RelayEndpoint
+      offset: 24
+    - kind: u8
+      offset: 32
+  # tw-454 C2S 110 (sub_8F26F0): the same body without the kind byte.
+  PartyInviterMoveRequest@tw-454:
+    - inviter: wstr
+      offset: 0
+    - address: RelayEndpoint
+      offset: 24
+  # C2S gcpReqMoveToFriendAccept, the refusal (kr-1256 C2S 111 sub_9D7750, cn-774 C2S 110 sub_BD6550): the
+  # one word is the notice's token. The automatic refusals of kr-1256 sub_9A8DF0 send it too.
+  PartyInviteAnswer@kr-1256:
+    - token: u32
+      offset: 0
+  # tw-454 C2S 111 (sub_AB2AE0): the inviter's nickname.
+  PartyInviteAnswer@tw-454:
+    - inviter: wstr
+      offset: 0
+  # S2C gspInvitationFailed (kr-1256 S2C 119 sub_9A7A30, cn-774 S2C 119 sub_BA7CA0): the invited nickname, then
+  # a code that selects the dialog text (kr-1256 sub_9A7D50). Codes 23 and 24 clear the pending member
+  # (kr-1256 sub_90A250), 26 starts the member state events (kr-1256 sub_90A040). The reader of tw-454 S2C 117
+  # (sub_AB4770) has the same two fields.
+  PartyInviteFailure:
+    - nickname: wstr
+      offset: 0
+      only: [kr-1256]
+    - code: u32
+      offset: 24
+      only: [kr-1256]

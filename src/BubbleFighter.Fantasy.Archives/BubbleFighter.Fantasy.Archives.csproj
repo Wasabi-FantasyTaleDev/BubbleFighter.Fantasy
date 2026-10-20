@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Readers and writers for the client's packed data archives: the PKN packs of the current client and the BFZ archives of the older one.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="BubbleFighter.Fantasy.Archives.Tests" />
+    <EmbeddedResource Include="client-data-builds.json" />
+  </ItemGroup>
+</Project>

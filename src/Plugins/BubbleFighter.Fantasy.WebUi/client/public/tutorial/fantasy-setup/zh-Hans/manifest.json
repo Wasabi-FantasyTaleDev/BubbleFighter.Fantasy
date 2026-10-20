@@ -1,0 +1,72 @@
+{
+  "referenceWidth": 1024,
+  "referenceHeight": 768,
+  "textPrintSpeed": 70,
+  "dialogues": [
+    {
+      "stage": "FantasySetup",
+      "progress": 1,
+      "text": "你好，接下来我会协助你\n一步步配置好服务器。\n第一步，先给服务器起个名字吧？",
+      "balloon": "ChatBalloonNew.png",
+      "clickComplete": true,
+      "holdMs": 4500,
+      "sourceProgress": 1,
+      "sourceText": "你好，接下来我会协助你\n一步步配置好服务器。\n第一步，先给服务器起个名字吧？",
+      "part": 1,
+      "parts": 1,
+      "nextProgress": "2"
+    },
+    {
+      "stage": "FantasySetup",
+      "progress": 2,
+      "text": "名字不错呢！接下来，\n请选择要支援的客户端版本。\n导入数据后服务端即可准备就绪。\n如果还没下载的话，可以先跳过，\n后续到设置里重新导入就可以啦！",
+      "balloon": "ChatBalloonNew.png",
+      "clickComplete": true,
+      "holdMs": 4500,
+      "sourceProgress": 2,
+      "sourceText": "名字不错呢！接下来，\n请选择要支援的客户端版本。\n导入数据后服务端即可准备就绪。\n如果还没下载的话，可以先跳过，\n后续到设置里重新导入就可以啦！",
+      "part": 1,
+      "parts": 1,
+      "nextProgress": "3"
+    },
+    {
+      "stage": "FantasySetup",
+      "progress": 3,
+      "text": "接下来，选一种数据存储方式吧。\n想长期对外开放，推荐用 MySQL。\n只是偶尔和朋友玩，\n用 SQLite 会方便一些哦。\nMySQL 的安装方法，帮助页里有。",
+      "balloon": "ChatBalloonNew.png",
+      "clickComplete": true,
+      "holdMs": 4500,
+      "sourceProgress": 3,
+      "sourceText": "接下来，选一种数据存储方式吧。\n想长期对外开放，推荐用 MySQL。\n只是偶尔和朋友玩，\n用 SQLite 会方便一些哦。\nMySQL 的安装方法，帮助页里有。",
+      "part": 1,
+      "parts": 1,
+      "nextProgress": "4"
+    },
+    {
+      "stage": "FantasySetup",
+      "progress": 4,
+      "text": "数据库也配置好啦！\n现在，创建一个管理员账号吧。\n账号和密码要记好哦，\n以后登录管理页面时会用到它们。",
+      "balloon": "ChatBalloonNew.png",
+      "clickComplete": true,
+      "holdMs": 4500,
+      "sourceProgress": 4,
+      "sourceText": "数据库也配置好啦！\n现在，创建一个管理员账号吧。\n账号和密码要记好哦，\n以后登录管理页面时会用到它们。",
+      "part": 1,
+      "parts": 1,
+      "nextProgress": "5"
+    },
+    {
+      "stage": "FantasySetup",
+      "progress": 5,
+      "text": "到这里，服务器就配置完成啦。\n还有不明白的地方，可以看看帮助。\n最后，在启动器里添加这个服务器，\n就可以准备出发啦！\n我们很快就能在泡泡村见面了！",
+      "balloon": "ChatBalloonNew.png",
+      "clickComplete": true,
+      "holdMs": 4500,
+      "sourceProgress": 5,
+      "sourceText": "到这里，服务器就配置完成啦。\n还有不明白的地方，可以看看帮助。\n最后，在启动器里添加这个服务器，\n就可以准备出发啦！\n我们很快就能在泡泡村见面了！",
+      "part": 1,
+      "parts": 1,
+      "nextProgress": "-1"
+    }
+  ]
+}

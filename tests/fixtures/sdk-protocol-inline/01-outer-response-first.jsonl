@@ -1,0 +1,17 @@
+{"ignore":["result.sdk"],"note":"Inline response routing must retain the outer response while the inner callback still waits."}
+{"dir":"h2p","msg":{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocol_version":1,"host_version":"8.11.0.0","contracts":{"BubbleFighter.Fantasy.Abstractions":"8.11.0.0","BubbleFighter.Fantasy.Contracts":"2.15.0.0"},"max_in_flight":2,"max_reentry_depth":2}}}
+{"dir":"p2h","msg":{"jsonrpc":"2.0","id":1,"result":{"protocol_version":1,"sdk":{"name":"ignored","version":"ignored"}}}}
+{"dir":"h2p","msg":{"jsonrpc":"2.0","id":2,"method":"activate","params":{"activation":"a1","row_id":"echo","plugin":"conformance.echo","config":{"protocol":"kr-812/game","greeting":"hello","extra_protocols":[]},"reload":false}}}
+{"dir":"p2h","msg":{"jsonrpc":"2.0","id":1,"method":"messages.on","params":{"activation":"a1","protocol":"kr-812/game","type":"LoginRequested"}}}
+{"dir":"h2p","msg":{"jsonrpc":"2.0","id":1,"result":{"handle":"h1"}}}
+{"dir":"p2h","msg":{"jsonrpc":"2.0","id":2,"result":{}}}
+{"dir":"h2p","msg":{"jsonrpc":"2.0","id":3,"method":"deliver","params":{"activation":"a1","handle":"h1","session":{"id":"s1","protocol":"kr-812/game","player":null,"build":"kr:812:0"},"message":{"type":"LoginRequested","body":{"account":"alice"}}}}}
+{"dir":"p2h","msg":{"jsonrpc":"2.0","method":"log","params":{"activation":"a1","level":"info","message":"hello alice"}}}
+{"dir":"p2h","msg":{"jsonrpc":"2.0","id":2,"method":"messages.send","params":{"activation":"a1","protocol":"kr-812/game","session_id":"s1","type":"LoginAccepted","body":{"user_number":1,"account":"alice","nickname":"alice","server_time":"2026-01-01T00:00:00Z","character_item_id":300001}}}}
+{"dir":"h2p","msg":{"jsonrpc":"2.0","id":4,"method":"deliver","params":{"activation":"a1","handle":"h1","session":{"id":"s1","protocol":"kr-812/game","player":null,"build":"kr:812:0"},"message":{"type":"LoginRequested","body":{"account":"bob"}}}}}
+{"dir":"p2h","msg":{"jsonrpc":"2.0","method":"log","params":{"activation":"a1","level":"info","message":"hello bob"}}}
+{"dir":"p2h","msg":{"jsonrpc":"2.0","id":3,"method":"messages.send","params":{"activation":"a1","protocol":"kr-812/game","session_id":"s1","type":"LoginAccepted","body":{"user_number":1,"account":"bob","nickname":"bob","server_time":"2026-01-01T00:00:00Z","character_item_id":300001}}}}
+{"dir":"h2p","msg":{"jsonrpc":"2.0","id":2,"result":{}}}
+{"dir":"h2p","msg":{"jsonrpc":"2.0","id":3,"result":{}}}
+{"dir":"p2h","msg":{"jsonrpc":"2.0","id":4,"result":{"handled":true}}}
+{"dir":"p2h","msg":{"jsonrpc":"2.0","id":3,"result":{"handled":true}}}

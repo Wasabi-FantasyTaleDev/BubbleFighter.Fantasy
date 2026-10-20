@@ -1,0 +1,36 @@
+# Profile patch for cn-404: applied after the bundle rows (see profiles/kr-1256/patch.yaml
+# for the supported operations). The admin API moves off 8080 so this profile can run
+# beside the other builds on one machine.
+- replace:
+    id: admin.http
+    config:
+      listen: "${CN_404_ADMIN_HOST:-127.0.0.1}:${CN_404_ADMIN_PORT:-8095}"
+- replace:
+    id: diagnostics.packet-log
+    config:
+      file: logs/{date}/packets-cn-404_{timestamp}.log
+      preview_bytes: 96
+# Reward cards stay off until this build has its own reward table: its Config/ShopItem2.xml lacks or
+# changes most Stock and StockSet rows the kr-812 and id-400 reward tables name, so neither validates.
+- set:
+    id: dialect.rooms
+    config:
+      horde_lottery: false
+- set:
+    id: ingame
+    config:
+      # Pirate (horde) rooms start on the native five-second countdown once every seat is taken or
+      # closed: the RoomStage gate cn-404 sub_5887F0 has id-400 sub_626970's body.
+      auto_start_mode_ids: [101, 102]
+      lottery_modes: []
+
+# Life-counted items: this build's executable has no "endurance" ShopItem duration type (no item kind 3) and no Life
+# notice text, so the daily life rule and life stock are off (packets/builds.yaml life_items: false).
+- set:
+    id: lobby
+    config:
+      life_items: false
+- set:
+    id: shop
+    config:
+      life_items: false

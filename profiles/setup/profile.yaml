@@ -1,0 +1,4 @@
+id: setup
+description: Database-independent first-run installation and administration.
+bundles:
+  - setup

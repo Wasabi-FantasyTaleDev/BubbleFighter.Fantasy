@@ -1,0 +1,1 @@
+<TestRun name="Fixture"><Results><UnitTestResult testName="Fixture.Pass" outcome="Passed" /></Results><ResultSummary outcome="Completed"><Counters total="1" executed="1" passed="1" failed="0" notExecuted="0" /></ResultSummary></TestRun>

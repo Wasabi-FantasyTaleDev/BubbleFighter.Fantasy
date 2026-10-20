@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><Description>Profile-driven native definition source plugin.</Description></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../BubbleFighter.Fantasy.Abstractions/BubbleFighter.Fantasy.Abstractions.csproj" />
+    <ProjectReference Include="../../BubbleFighter.Fantasy.Native/BubbleFighter.Fantasy.Native.csproj" />
+  </ItemGroup>
+</Project>

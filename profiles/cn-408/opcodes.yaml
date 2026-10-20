@@ -1,0 +1,3725 @@
+# Opcode assignments for the CN2014 0.2.48.001 client (ClientVersion_Major 408, cn-408 sub_7CDA60).
+# C2S and S2C are separate numeric spaces, and so is the relay connection. Rows are cn-404's reviewed
+# table: this client's own labels (opcode setter cn-408 sub_ADDA90, dispatchers cn-408 sub_7EF9A0,
+# sub_7B2F40, sub_7C50A0, sub_9EE570) put every packet at cn-404's number, with the same case set in all eight
+# dispatchers; addresses are carried through the cn-404 -> cn-408 function pairing and checked.
+# The research catalog for this build is profiles/cn-408/opcode-catalog.yaml.
+opcodes:
+  - value: 508
+    direction: c2s
+    connection: game
+    name: gcpRoomReqChangeMaster
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 sub_7B85A0 selects Packet_gcpRoomReqChangeMaster; cn-408 sub_7BF9E0 stamps508; cn-408 reader sub_7B1F10 consumes the target nickname"
+  - value: 4
+    direction: s2c
+    connection: relay
+    name: rspSendCrtSeedTable
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7C50A0/sub_7EF9A0/sub_7FC1E0 case 4 (Packet_rspSendCrtSeedTable); Packet_rspSendCrtSeedTable reader and writer bodies match cn-404's"
+  - value: 5
+    direction: s2c
+    connection: relay
+    name: rspSendDefSeedTable
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_4B7E50/sub_7C50A0/sub_7EF9A0 case 5 (Packet_rspSendDefSeedTable); Packet_rspSendDefSeedTable reader and writer bodies match cn-404's"
+  - value: 6
+    direction: s2c
+    connection: relay
+    name: rspSendCrtCancelSeedTable
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7C50A0/sub_7EF9A0/sub_7FC1E0 case 6 (Packet_rspSendCrtCancelSeedTable); Packet_rspSendCrtCancelSeedTable reader and writer bodies match cn-404's"
+  - value: 19
+    direction: c2s
+    connection: relay
+    name: rcpCrtSeedTable
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 sender sub_4DA1B0 stamps 19 through sub_ADDA90 (Packet_rcpCrtSeedTable); Packet_rcpCrtSeedTable reader and writer bodies match cn-404's"
+  - value: 20
+    direction: c2s
+    connection: relay
+    name: rcpDefSeedTable
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 sender sub_4DA230/sub_4DA2A0 stamps 20 through sub_ADDA90 (Packet_rcpDefSeedTable); Packet_rcpDefSeedTable reader and writer bodies match cn-404's"
+  - value: 21
+    direction: c2s
+    connection: relay
+    name: rcpCrtCnclSeedTable
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 sender sub_4DA320/sub_4DA390/sub_7DA630 stamps 21 through sub_ADDA90 (Packet_rcpCrtCnclSeedTable); Packet_rcpCrtCnclSeedTable reader and writer bodies match cn-404's"
+  - value: 601
+    direction: s2c
+    connection: game
+    name: gspConnectToRelayServer
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7EF9A0 case 601 (Packet_gspConnectToRelayServer); Packet_gspConnectToRelayServer reader and writer bodies match cn-404's"
+  - value: 1
+    direction: s2c
+    connection: relay
+    name: rspRelayJoinAccepted_
+    name_source: coined
+    evidence: verified
+    source: "cn-408 relay dispatcher sub_7C50A0 case 1 inspects only opcode and connection, as id-400 sub_794200 does; cn-408 sub_7C6190 then reports game 601"
+  - value: 13
+    direction: s2c
+    connection: relay
+    name: rspRelaySceneAccepted_
+    name_source: coined
+    evidence: verified
+    source: "cn-408 relay dispatcher sub_7C50A0 case 0xD reads no body, as id-400 sub_794200 does"
+  - value: 1
+    direction: c2s
+    connection: relay
+    name: rcpReqJoinRelaySession
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_7C4F50/sub_7C5F50/sub_7CDA60 stamps 1 through sub_ADDA90 (Packet_rcpReqJoinRelaySession)"
+  - value: 12
+    direction: c2s
+    connection: relay
+    name: rcpReqReportHackCheckData
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 sub_7C6270 stamps relay 12; writer cn-408 sub_7C4C60, reader cn-408 sub_7C4D00"
+  - value: 12
+    direction: s2c
+    connection: game
+    name: gspNotifyAutoTutorial_
+    name_source: coined
+    evidence: verified
+    source: "cn-408 dispatcher sub_7EF9A0 case 0xC sets byte_E380A6 without reading a body, as id-400 sub_7BF2E0 does"
+  - value: 1
+    direction: c2s
+    name: gcpFirstConnect
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 sub_7CDA60 builds Packet_gcpFirstConnect (ctor cn-408 sub_7C8340), stores ClientVersion_Major 408 at +4 and stamps 1"
+    notes: "u32 ClientVersion_Major 408, 7 wstr, u32, 15 wstr; this build fills the strings (1312 bytes on a local run)"
+  - value: 1
+    direction: s2c
+    name: gspDisconnect
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7C50A0/sub_7EF9A0/sub_7FC1E0 case 1 (Packet_gspDisconnect); Packet_gspDisconnect reader and writer bodies match cn-404's"
+  - value: 2
+    direction: s2c
+    name: gspRepGamePatch
+    name_source: mirrored
+    evidence: verified
+    source: "cn-408 dispatcher sub_7EF9A0/sub_7FC1E0 case 2 (Packet_gspRepGamePatch); Packet_gspRepGamePatch reader and writer bodies match cn-404's"
+    notes: "bool32 requiresPatch, wstr; 0 moves to stage 10, otherwise sub_79D5F0 shows the version-mismatch dialog"
+  - value: 3
+    direction: c2s
+    name: gcpReqLogin
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 sender sub_633C60/sub_7BFA50 stamps 3 through sub_ADDA90 (Packet_gcpReqLogin)"
+    notes: "the lobby's typed login resolves this name; body is the id-400 login shape from dialect.messages"
+  - value: 3
+    direction: s2c
+    name: gspRepLogin
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7C50A0/sub_7EF9A0/sub_7FC1E0 case 3 (Packet_gspRepLogin); Packet_gspRepLogin reader and writer bodies match cn-404's"
+  - value: 17
+    direction: s2c
+    name: gspCenterList
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7EF9A0 case 17 (Packet_gspCenterList); Packet_gspCenterList reader and writer bodies match cn-404's"
+    notes: "same gate list as kr-812; the connect loop sub_86A500 waits for it"
+  - value: 106
+    direction: c2s
+    name: gcpReqGotoLobby
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_63ADD0/sub_7BD270/sub_980AC0 stamps 106 through sub_ADDA90 (Packet_gcpReqGotoLobby)"
+    notes: "empty payload; reply is S2C gspGotoLobby; not gcpReqMatch"
+  - value: 108
+    direction: s2c
+    name: gspGotoMenu
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7EF9A0 case 108 (Packet_gspGotoMenu); Packet_gspGotoMenu reader and writer bodies match cn-404's"
+  - value: 109
+    direction: s2c
+    name: gspGotoLobby
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7EF9A0 case 109 (Packet_gspGotoLobby); Packet_gspGotoLobby reader and writer bodies match cn-404's"
+    notes: "bool32 notice; nonzero shows client string at dword_CB1648; stage 3 when ServerConnection+228 is set (independent of the flag); send 0 for silent enter"
+  - value: 110
+    direction: s2c
+    name: gspGotoRoom
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7EF9A0 case 110 (Packet_gspGotoRoom); layout differences in packets/"
+  - value: 201
+    direction: s2c
+    name: gspUpdateParty
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7EF9A0 case 201 (Packet_gspUpdateParty); Packet_gspUpdateParty reader and writer bodies match cn-404's"
+    notes: "i32 state (stored at Party+4), u32 member count, members (i32 userNum, wstr nick, i32 x3), u32 equipped count; MainMenu plaza gate inside cn-408 sub_79EBF0 (paired with cn-408 sub_79EBF0) needs state 2 and one member whose +4 equals login userNum (inside cn-408 sub_8A24D0, paired with cn-408 sub_8A24D0)"
+  - value: 801
+    direction: c2s
+    name: gcpEnterShop
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 sender sub_679E50 stamps 801 through sub_ADDA90 (Packet_gcpEnterShop); Packet_gcpEnterShop reader and writer bodies match cn-404's"
+    notes: "f64 cache-revision token only - 8 bytes, no main category"
+  - value: 800
+    direction: s2c
+    name: gspRepEnterShop
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7EF9A0 case 800 (Packet_gspRepEnterShop); Packet_gspRepEnterShop reader and writer bodies match cn-404's"
+    notes: "the 812 shape without the trailing vector<i32> and main category: i32 result, bool32 hasData, f64 token, cards, category tree"
+  - value: 808
+    direction: c2s
+    name: gcpReqShopBuy
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 sender sub_8EA780/sub_8EC120/sub_97EEE0 stamps 808 through sub_ADDA90 (Packet_gcpReqShopBuy); Packet_gcpReqShopBuy reader and writer bodies match cn-404's"
+    notes: "i32 catalog key, bool32 unknown2; zero selects ordinary purchase"
+  - value: 813
+    direction: s2c
+    name: gspRepShopBuy
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7EF9A0 case 813 (Packet_gspRepShopBuy); Packet_gspRepShopBuy reader and writer bodies match cn-404's"
+    notes: "i32 catalog key, i32 result; result 1 succeeds"
+  - value: 406
+    direction: c2s
+    name: gcpReqCreateTutorialSession
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 sender sub_63AE40/sub_980710 stamps 406 through sub_ADDA90 (Packet_gcpReqCreateTutorialSession); Packet_gcpReqCreateTutorialSession reader and writer bodies match cn-404's"
+    notes: "empty body; opcode is 406 on this build (not 405); reply is S2C gspGotoRoom kind 5"
+  - value: 920
+    direction: c2s
+    name: gcpReqSingleStageInfo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_686D40/sub_68ECA0 stamps 920 through sub_ADDA90 (Packet_gcpReqSingleStageInfo)"
+    notes: "empty body; reply is S2C gspResSingleStageInfo"
+  - value: 922
+    direction: s2c
+    name: gspResSingleStageInfo
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7EF9A0 case 922 (Packet_gspResSingleStageInfo); Packet_gspResSingleStageInfo reader and writer bodies match cn-404's"
+    notes: "u32 count, then count times (u32, u32, u32), same element shape as kr-812"
+  - value: 107
+    direction: c2s
+    name: gcpReqPlayTutorial
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 sender sub_7F3280 stamps 107 through sub_ADDA90 (Packet_gcpReqPlayTutorial); Packet_gcpReqPlayTutorial reader and writer bodies match cn-404's"
+    notes: "MapMetaData has five trailing bool32 on this build (kr-812 has six); reply is GotoRoom kind 2 then gspRepAutoStart true (no gspUserHostStart / proven RoomEnterGame start body on this path yet)"
+  - value: 117
+    direction: s2c
+    name: gspNotifyMatch
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_629970 case 117 (Packet_gspNotifyMatch); Packet_gspNotifyMatch reader and writer bodies match cn-404's"
+    notes: "u32 unknown0, u32 unknown1 only — no trailing wstr on this build"
+  - value: 520
+    direction: s2c
+    name: gspRepAutoStart
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 RoomStage gate sub_58AD20 returns unless the frame opcode is 520 (same body as id-400 sub_626970)"
+    notes: "bool32; true auto-starts the match from the room lobby (tutorial play after GotoRoom kind 2 + NotifyMatch)"
+  - value: 401
+    direction: c2s
+    name: gcpReqListSession
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 sender sub_62F990 stamps 401 through sub_ADDA90 (Packet_gcpReqListSession); Packet_gcpReqListSession reader and writer bodies match cn-404's"
+    notes: "u16 unknown0, u16 unknown1; reply is S2C gspRepListSession; not a login-time opcode"
+  - value: 101
+    direction: s2c
+    name: gspRepListSession
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_629970 case 101 (Packet_gspRepListSession); layout differences in packets/"
+    notes: "u32 unknown0, bool32 unknown1, u32 count, then count SessionSetting; empty count is valid"
+  - value: 402
+    direction: c2s
+    name: gcpReqCreateSession
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 sender sub_62F520 stamps 402 through sub_ADDA90 (Packet_gcpReqCreateSession); layout differences in packets/"
+    notes: "SessionSetting + wstr password + bool32; reply is S2C gspGotoRoom kind 2"
+  - value: 505
+    direction: c2s
+    name: gcpRoomReqReadyStatus
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_58A510 stamps 505 through sub_ADDA90 (Packet_gcpRoomReqReadyStatus)"
+    notes: "reply used here is S2C gspRoomSetSlot with UserSlot +125 ready"
+  - value: 503
+    direction: s2c
+    name: gspRoomSetSlot
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7B2F40 case 503 (Packet_gspRoomSetSlot); layout differences in packets/"
+    notes: "u32 slot, UserSlot, EquippedItemList; ready flag is UserSlot +125"
+  - value: 503
+    direction: c2s
+    name: gcpRoomReqEnterGame
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_6432B0/sub_728350 stamps 503 through sub_ADDA90 (Packet_gcpRoomReqEnterGame)"
+    notes: "first wstr stored for a later start; gcpUserHostStart has no vtable on this build — plaza host-start / RoomEnterGame S2C start body stay unregistered"
+  - value: 403
+    direction: c2s
+    name: gcpReqJoinSession
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 stamping helper sub_630DE0 sets 403, beside sub_630D70 (113), as id-400 sub_5E7AB0/sub_5E7A40; Packet_gcpReqJoinSession class present"
+    notes: "u32 room number, u32 unknown1, u32 unknown2, wstr password, u16 unknown4; a refusal is S2C gspRepJoinSession, success is S2C gspGotoRoom kind 2"
+  - value: 404
+    direction: c2s
+    name: gcpReqLeaveSession
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 sender sub_6220E0 stamps 404 through sub_ADDA90 (Packet_gcpReqLeaveSession); Packet_gcpReqLeaveSession reader and writer bodies match cn-404's"
+    notes: "empty body; the room answers with the leaver burst (gspRoomLeaveSlot, gspRoomSetSession, gspGotoLobby)"
+  - value: 103
+    direction: s2c
+    name: gspRepJoinSession
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_629970 case 103 (Packet_gspRepJoinSession); Packet_gspRepJoinSession reader and writer bodies match cn-404's"
+    notes: "u32 result code; 0 is success (room entry arrives as gspGotoRoom), nonzero shows a per-code dialog"
+  - value: 501
+    direction: s2c
+    name: gspRoomSetSession
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 room dispatcher sub_7B2F40 handles 501 (body matches id-400 sub_7833E0 except two added cases)"
+    notes: "a bare SessionSetting (reader sub_5DB3C0)"
+  - value: 502
+    direction: s2c
+    name: gspRoomSetMasterSlotIdx
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7B2F40 case 502 (Packet_gspRoomSetMasterSlotIdx); Packet_gspRoomSetMasterSlotIdx reader and writer bodies match cn-404's"
+    notes: "u32 slot index of the new master"
+  - value: 505
+    direction: s2c
+    name: gspRoomChangeGameSetting
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7B2F40 case 505 (Packet_gspRoomChangeGameSetting); Packet_gspRoomChangeGameSetting reader and writer bodies match cn-404's"
+    notes: "a bare GameSetting (reader sub_5DAE00)"
+  - value: 510
+    direction: s2c
+    name: gspRoomEnterGame
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7B2F40 case 510 (Packet_gspRoomEnterGame); layout differences in packets/"
+    notes: "u32, wstr map key, ScoreData (2220 bytes), u32 x3 — no trailing bools on this build; the third u32 is stored as the room state"
+  - value: 511
+    direction: s2c
+    name: gspRoomLeaveSlot
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7B2F40 case 511 (Packet_gspRoomLeaveSlot); layout differences in packets/"
+    notes: "u32 slot index, then the leaver's UserSlot (sub_5F1FF0)"
+  - value: 513
+    direction: c2s
+    name: gcpRoomChangeGameSetting
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 sender sub_58B280 stamps 513 through sub_ADDA90 (Packet_gcpRoomChangeGameSetting); layout differences in packets/"
+    notes: "wstr x4, bool32 x2, u32 x10 — no trailing bool32 on this build; the answer is S2C gspRoomChangeGameSetting to the room"
+  - value: 515
+    direction: c2s
+    name: gcpRoomChangeTeam
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 sender sub_58B0C0/sub_980F70 stamps 515 through sub_ADDA90 (Packet_gcpRoomChangeTeam); Packet_gcpRoomChangeTeam reader and writer bodies match cn-404's"
+    notes: "empty body; the seat moves to the other team"
+  - value: 701
+    direction: c2s
+    name: gcpGameReportMapLoadingComplete
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 sender sub_4BA8A0 stamps 701 through sub_ADDA90 (Packet_gcpGameReportMapLoadingComplete); Packet_gcpGameReportMapLoadingComplete reader and writer bodies match cn-404's"
+    notes: "u32 x4; the round's load report"
+  - value: 701
+    direction: s2c
+    name: gspGameMapLoadingComplete
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7B2F40 case 701 (Packet_gspGameMapLoadingComplete); Packet_gspGameMapLoadingComplete reader and writer bodies match cn-404's"
+    notes: "u32 seat index of the player whose map load finished"
+  - value: 702
+    direction: s2c
+    name: gspGameEverybodyLoadingComplete
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7B2F40 case 702 (Packet_gspGameEverybodyLoadingComplete); layout differences in packets/"
+    notes: "bool32 x2 (kr-812 reads three); all false keeps the client on the game connection"
+  - value: 703
+    direction: s2c
+    name: gspGameCountDown
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7B2F40 case 703 (Packet_gspGameCountDown); Packet_gspGameCountDown reader and writer bodies match cn-404's"
+    notes: "u32 countdown in milliseconds; gspGameStartGame follows after it"
+  - value: 704
+    direction: s2c
+    name: gspGameStartGame
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7B2F40 case 704 (Packet_gspGameStartGame); Packet_gspGameStartGame reader and writer bodies match cn-404's"
+    notes: "u32 x2 (kr-812 reads three); the first is the match clock in ms"
+  - value: 705
+    direction: s2c
+    name: gspGameEndGame
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7B2F40 case 705 (Packet_gspGameEndGame); Packet_gspGameEndGame reader and writer bodies match cn-404's"
+    notes: "u32 x2"
+  - value: 724
+    direction: c2s
+    name: gcpReqEndStage
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 sender sub_4BF930 stamps 724 through sub_ADDA90 (Packet_gcpReqEndStage); Packet_gcpReqEndStage reader and writer bodies match cn-404's"
+    notes: "one u32 whose meaning is unproven"
+  - value: 105
+    direction: s2c
+    name: gspUserStat
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7EF9A0 case 105 (Packet_gspUserStat); Packet_gspUserStat reader and writer bodies match cn-404's"
+    notes: "Full field list and constructor defaults: src/Plugins/BubbleFighter.Fantasy.Dialect.Messages/ShopBinding.cs"
+  - value: 802
+    direction: c2s
+    name: gcpEnterInventory
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_67A140 stamps 802 through sub_ADDA90 (Packet_gcpEnterInventory)"
+    notes: "Empty body; publishes full inventory and wallet"
+  - value: 801
+    direction: s2c
+    name: gspInventoryUpdateAllInventorySlot
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7EF9A0 case 801 (Packet_gspInventoryUpdateAllInventorySlot); Packet_gspInventoryUpdateAllInventorySlot reader and writer bodies match cn-404's"
+    notes: "u32 count, then slots; full field list: src/Plugins/BubbleFighter.Fantasy.Dialect.Messages/ShopBinding.cs"
+  - value: 802
+    direction: s2c
+    name: gspInventoryUpdateInventorySlots
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7EF9A0 case 802 (Packet_gspInventoryUpdateInventorySlots); Packet_gspInventoryUpdateInventorySlots reader and writer bodies match cn-404's"
+    notes: "u32 count, then slots; upserts without resetting the full-inventory time origin"
+  - value: 6
+    direction: c2s
+    name: gcpRepPing
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_7DA5B0 stamps 6 through sub_ADDA90 (Packet_gcpRepPing); Packet_gcpRepPing reader and writer bodies match cn-404's"
+  - value: 9
+    direction: c2s
+    name: gcpReqIDPCRoomAuth
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_633BF0/sub_7C28E0 stamps 9 through sub_ADDA90 (Packet_gcpReqIDPCRoomAuth); Packet_gcpReqIDPCRoomAuth reader and writer bodies match cn-404's"
+  - value: 12
+    direction: c2s
+    name: gcpReqMoveChannel
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_97E7A0 stamps 12 through sub_ADDA90 (Packet_gcpReqMoveChannel); Packet_gcpReqMoveChannel reader and writer bodies match cn-404's"
+  - value: 13
+    direction: c2s
+    name: gcpReqMoveChannelByType
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4DAB30/sub_62B460 stamps 13 through sub_ADDA90 (Packet_gcpReqMoveChannelByType); Packet_gcpReqMoveChannelByType reader and writer bodies match cn-404's"
+  - value: 15
+    direction: c2s
+    name: gcpReqCheckCreateUserName
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4DAD90/sub_4DAE00/sub_82F9C0 stamps 15 through sub_ADDA90 (Packet_gcpReqCheckCreateUserName); Packet_gcpReqCheckCreateUserName reader and writer bodies match cn-404's"
+  - value: 16
+    direction: c2s
+    name: gcpReqCreateUserInfo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4DABB0/sub_4DAC20/sub_82FAB0 stamps 16 through sub_ADDA90 (Packet_gcpReqCreateUserInfo); Packet_gcpReqCreateUserInfo reader and writer bodies match cn-404's"
+  - value: 17
+    direction: c2s
+    name: gcpLoginAfterCreateUserInfo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_7BFAD0/sub_7BFB40/sub_82FCE0 stamps 17 through sub_ADDA90 (Packet_gcpLoginAfterCreateUserInfo); Packet_gcpLoginAfterCreateUserInfo reader and writer bodies match cn-404's"
+  - value: 19
+    direction: c2s
+    name: gcpReportLastCrash
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sub_4DA140 stamps 19 (paired with id-400 sub_4AC350)"
+  - value: 21
+    direction: c2s
+    name: gcpReportBadProgram
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4DA320/sub_4DA390/sub_7DA630 stamps 21 through sub_ADDA90 (Packet_gcpReportBadProgram)"
+  - value: 22
+    direction: c2s
+    name: gcpHsReportLog
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BC980/sub_4DA950/sub_4DA9C0 stamps 22 through sub_ADDA90 (Packet_gcpHsReportLog); Packet_gcpHsReportLog reader and writer bodies match cn-404's"
+  - value: 27
+    direction: c2s
+    name: gcpReqClanMemberLogin
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_43FF90/sub_7F35A0/sub_7F3610 stamps 27 through sub_ADDA90 (Packet_gcpReqClanMemberLogin); Packet_gcpReqClanMemberLogin reader and writer bodies match cn-404's"
+  - value: 101
+    direction: c2s
+    name: gcpRepUserPoll
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_86D7A0 stamps 101 through sub_ADDA90 (Packet_gcpRepUserPoll); Packet_gcpRepUserPoll reader and writer bodies match cn-404's"
+  - value: 108
+    direction: c2s
+    name: gcpReqInvite
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_8DA4B0 stamps 108 through sub_ADDA90 (Packet_gcpReqInvite); Packet_gcpReqInvite reader and writer bodies match cn-404's"
+  - value: 109
+    direction: c2s
+    name: gcpReqMoveToInviter
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sub_68EC30 stamps 109 through sub_ADDA90 after the Packet_gcpReqMoveToInviter constructor cn-408 sub_66C6F0; writer cn-408 sub_66C690"
+  - value: 110
+    direction: c2s
+    name: gcpReqMoveToFriend
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_8DA5C0 stamps 110 through sub_ADDA90 (Packet_gcpReqMoveToFriend); Packet_gcpReqMoveToFriend reader and writer bodies match cn-404's"
+  - value: 111
+    direction: c2s
+    name: gcpReqMoveToFriendAccept
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sub_7F33D0 stamps 111 through sub_ADDA90 for the Packet_gcpReqMoveToFriendAccept built in cn-408 sub_7D7800; writer cn-408 sub_92F820"
+  - value: 112
+    direction: c2s
+    name: gcpReqMatch
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_5B20A0/sub_5B3780 stamps 112 through sub_ADDA90 (Packet_gcpReqMatch); Packet_gcpReqMatch reader and writer bodies match cn-404's"
+  - value: 114
+    direction: c2s
+    name: gcpReqOnlineMatchRankInfo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_81A410 stamps 114 through sub_ADDA90 (Packet_gcpReqOnlineMatchRankInfo); Packet_gcpReqOnlineMatchRankInfo reader and writer bodies match cn-404's"
+  - value: 115
+    direction: c2s
+    name: gcpReqFighterInfo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_6788B0 stamps 115 through sub_ADDA90 (Packet_gcpReqFighterInfo); Packet_gcpReqFighterInfo reader and writer bodies match cn-404's"
+  - value: 118
+    direction: c2s
+    name: gcpReqGotoGuild
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_980430/sub_980570 stamps 118 through sub_ADDA90 (Packet_gcpReqGotoGuild); Packet_gcpReqGotoGuild reader and writer bodies match cn-404's"
+  - value: 119
+    direction: c2s
+    name: gcpReqRecommendSend
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_7F32F0 stamps 119 through sub_ADDA90 (Packet_gcpReqRecommendSend); Packet_gcpReqRecommendSend reader and writer bodies match cn-404's"
+  - value: 202
+    direction: c2s
+    name: gcpReqLeaveParty
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sub_5B3710 stamps 202 through sub_ADDA90 for the Packet_gcpReqLeaveParty built in cn-408 sub_581EA0; empty body"
+  - value: 302
+    direction: c2s
+    name: gcpReqKickFromParty
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_8DA6E0 stamps 302 through sub_ADDA90 (Packet_gcpReqKickFromParty); Packet_gcpReqKickFromParty reader and writer bodies match cn-404's"
+  - value: 303
+    direction: c2s
+    name: gcpReqChangePartyLeader
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_8DA7E0 stamps 303 through sub_ADDA90 (Packet_gcpReqChangePartyLeader); Packet_gcpReqChangePartyLeader reader and writer bodies match cn-404's"
+  - value: 305
+    direction: c2s
+    name: gcpReqPartyRecruiting
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_8AA540/sub_8AB380/sub_980680 stamps 305 through sub_ADDA90 (Packet_gcpReqPartyRecruiting); Packet_gcpReqPartyRecruiting reader and writer bodies match cn-404's"
+  - value: 306
+    direction: c2s
+    name: gcpReqPartyQuickStart
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_63AEB0/sub_6401D0/sub_640A40 stamps 306 through sub_ADDA90 (Packet_gcpReqPartyQuickStart); Packet_gcpReqPartyQuickStart reader and writer bodies match cn-404's"
+  - value: 504
+    direction: c2s
+    name: gcpRoomReqEnterRoundGame
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_58B360 stamps 504 through sub_ADDA90 (Packet_gcpRoomReqEnterRoundGame); Packet_gcpRoomReqEnterRoundGame reader and writer bodies match cn-404's"
+  - value: 517
+    direction: c2s
+    name: gcpReqPingUser
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4B6F80/sub_4DA780/sub_581EA0 stamps 517 through sub_ADDA90 (Packet_gcpReqPingUser); Packet_gcpReqPingUser reader and writer bodies match cn-404's"
+  - value: 519
+    direction: c2s
+    name: gcpReqSelectAward
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_9BFA10 stamps 519 through sub_ADDA90 (Packet_gcpReqSelectAward); Packet_gcpReqSelectAward reader and writer bodies match cn-404's"
+  - value: 607
+    direction: c2s
+    name: gcpReportTableSetHolePunchingEnd
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_7C2E30 stamps 607 through sub_ADDA90 (Packet_gcpReportTableSetHolePunchingEnd); Packet_gcpReportTableSetHolePunchingEnd reader and writer bodies match cn-404's"
+  - value: 704
+    direction: c2s
+    name: gcpRespawn
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BE2D0 stamps 704 through sub_ADDA90 (Packet_gcpRespawn); Packet_gcpRespawn reader and writer bodies match cn-404's"
+  - value: 705
+    direction: c2s
+    name: gcpRequestRespawnIdx
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BE430 stamps 705 through sub_ADDA90 (Packet_gcpRequestRespawnIdx); Packet_gcpRequestRespawnIdx reader and writer bodies match cn-404's"
+  - value: 707
+    direction: c2s
+    name: gcpEatItem
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BA270 stamps 707 through sub_ADDA90 (Packet_gcpEatItem); Packet_gcpEatItem reader and writer bodies match cn-404's"
+  - value: 708
+    direction: c2s
+    name: gcpUseItem
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BA660 stamps 708 through sub_ADDA90 (Packet_gcpUseItem); Packet_gcpUseItem reader and writer bodies match cn-404's"
+  - value: 709
+    direction: c2s
+    name: gcpReqAddObject
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BB0B0 stamps 709 through sub_ADDA90 (Packet_gcpReqAddObject); Packet_gcpReqAddObject reader and writer bodies match cn-404's"
+  - value: 710
+    direction: c2s
+    name: gcpGameUpdateScore
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4B6F80/sub_4BAF60/sub_4CBB20 stamps 710 through sub_ADDA90 (Packet_gcpGameUpdateScore); Packet_gcpGameUpdateScore reader and writer bodies match cn-404's"
+  - value: 711
+    direction: c2s
+    name: gcpGameUpdateDamagePoint
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_732420 stamps 711 through sub_ADDA90 (Packet_gcpGameUpdateDamagePoint); Packet_gcpGameUpdateDamagePoint reader and writer bodies match cn-404's"
+  - value: 714
+    direction: c2s
+    name: gcpGameReqUseRespawnItem
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BAB20 stamps 714 through sub_ADDA90 (Packet_gcpGameReqUseRespawnItem); Packet_gcpGameReqUseRespawnItem reader and writer bodies match cn-404's"
+  - value: 715
+    direction: c2s
+    name: gcpGameReqExtendRespawn
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BABB0 stamps 715 through sub_ADDA90 (Packet_gcpGameReqExtendRespawn); Packet_gcpGameReqExtendRespawn reader and writer bodies match cn-404's"
+  - value: 723
+    direction: c2s
+    name: gcpPangZKInZHE
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_9D9730 stamps 723 through sub_ADDA90 (Packet_gcpPangZKInZHE); Packet_gcpPangZKInZHE reader and writer bodies match cn-404's"
+  - value: 725
+    direction: c2s
+    name: gcpReqEndStageRoundOverReady
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BF8B0 stamps 725 through sub_ADDA90 (Packet_gcpReqEndStageRoundOverReady); Packet_gcpReqEndStageRoundOverReady reader and writer bodies match cn-404's"
+  - value: 726
+    direction: c2s
+    name: gcpReportHackDetectAfterGame
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_97D9A0 stamps 726 through sub_ADDA90 (Packet_gcpReportHackDetectAfterGame); Packet_gcpReportHackDetectAfterGame reader and writer bodies match cn-404's"
+  - value: 727
+    direction: c2s
+    name: gcpReportHackDetectLucciCount
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4D1550 stamps 727 through sub_ADDA90 (Packet_gcpReportHackDetectLucciCount); Packet_gcpReportHackDetectLucciCount reader and writer bodies match cn-404's"
+  - value: 728
+    direction: c2s
+    name: gcpReqCreateItem
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4C0750/sub_4C0830/sub_52B490 stamps 728 through sub_ADDA90 (Packet_gcpReqCreateItem); Packet_gcpReqCreateItem reader and writer bodies match cn-404's"
+  - value: 729
+    direction: c2s
+    name: gcpReqCreateWeaponObject
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4C0900 stamps 729 through sub_ADDA90 (Packet_gcpReqCreateWeaponObject); Packet_gcpReqCreateWeaponObject reader and writer bodies match cn-404's"
+  - value: 730
+    direction: c2s
+    name: gcpPickUpWeapon
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4C09E0 stamps 730 through sub_ADDA90 (Packet_gcpPickUpWeapon); Packet_gcpPickUpWeapon reader and writer bodies match cn-404's"
+  - value: 731
+    direction: c2s
+    name: gcpEatStar
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BA300 stamps 731 through sub_ADDA90 (Packet_gcpEatStar); Packet_gcpEatStar reader and writer bodies match cn-404's"
+  - value: 732
+    direction: c2s
+    name: gcpReqCreateStar
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4C0A70 stamps 732 through sub_ADDA90 (Packet_gcpReqCreateStar); Packet_gcpReqCreateStar reader and writer bodies match cn-404's"
+  - value: 733
+    direction: c2s
+    name: gcpEatEventBox
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BA390 stamps 733 through sub_ADDA90 (Packet_gcpEatEventBox); Packet_gcpEatEventBox reader and writer bodies match cn-404's"
+  - value: 734
+    direction: c2s
+    name: gcpReqCreateEventBox
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4C0B40 stamps 734 through sub_ADDA90 (Packet_gcpReqCreateEventBox); Packet_gcpReqCreateEventBox reader and writer bodies match cn-404's"
+  - value: 735
+    direction: c2s
+    name: gcpEatLucci
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BA420 stamps 735 through sub_ADDA90 (Packet_gcpEatLucci); Packet_gcpEatLucci reader and writer bodies match cn-404's"
+  - value: 736
+    direction: c2s
+    name: gcpReqCreateLucci
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4C0CD0 stamps 736 through sub_ADDA90 (Packet_gcpReqCreateLucci); Packet_gcpReqCreateLucci reader and writer bodies match cn-404's"
+  - value: 737
+    direction: c2s
+    name: gcpEatChocolate
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BA540 stamps 737 through sub_ADDA90 (Packet_gcpEatChocolate); Packet_gcpEatChocolate reader and writer bodies match cn-404's"
+  - value: 738
+    direction: c2s
+    name: gcpReqCreateChocolate
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4C0E70 stamps 738 through sub_ADDA90 (Packet_gcpReqCreateChocolate); Packet_gcpReqCreateChocolate reader and writer bodies match cn-404's"
+  - value: 739
+    direction: c2s
+    name: gcpEatSpawner
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BA5D0 stamps 739 through sub_ADDA90 (Packet_gcpEatSpawner); Packet_gcpEatSpawner reader and writer bodies match cn-404's"
+  - value: 740
+    direction: c2s
+    name: gcpReqCreateSpawner
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4C0C10 stamps 740 through sub_ADDA90 (Packet_gcpReqCreateSpawner); Packet_gcpReqCreateSpawner reader and writer bodies match cn-404's"
+  - value: 741
+    direction: c2s
+    name: gcpEatHeart
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BA4B0 stamps 741 through sub_ADDA90 (Packet_gcpEatHeart); Packet_gcpEatHeart reader and writer bodies match cn-404's"
+  - value: 742
+    direction: c2s
+    name: gcpReqCreateHeart
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4C0DA0 stamps 742 through sub_ADDA90 (Packet_gcpReqCreateHeart); Packet_gcpReqCreateHeart reader and writer bodies match cn-404's"
+  - value: 744
+    direction: c2s
+    name: gcpSwitchItemSlot
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4D1E10 stamps 744 through sub_ADDA90 (Packet_gcpSwitchItemSlot); Packet_gcpSwitchItemSlot reader and writer bodies match cn-404's"
+  - value: 803
+    direction: c2s
+    name: gcpReqInventoryEquip
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_58A170/sub_6672A0/sub_927BD0 stamps 803 through sub_ADDA90 (Packet_gcpReqInventoryEquip); Packet_gcpReqInventoryEquip reader and writer bodies match cn-404's"
+  - value: 805
+    direction: c2s
+    name: gcpReqInventoryUseItem
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_927D90 stamps 805 through sub_ADDA90 (Packet_gcpReqInventoryUseItem); Packet_gcpReqInventoryUseItem reader and writer bodies match cn-404's"
+  - value: 806
+    direction: c2s
+    name: gcpReqInventoryDeleteItem
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_97EB40 stamps 806 through sub_ADDA90 (Packet_gcpReqInventoryDeleteItem); Packet_gcpReqInventoryDeleteItem reader and writer bodies match cn-404's"
+  - value: 810
+    direction: c2s
+    name: gcpReqPresentNewReceive
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_912270/sub_9127F0 stamps 810 through sub_ADDA90 (Packet_gcpReqPresentNewReceive); Packet_gcpReqPresentNewReceive reader and writer bodies match cn-404's"
+  - value: 813
+    direction: c2s
+    name: gcpReqPresentReceiveSubList
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_90FA10/sub_9111B0/sub_912860 stamps 813 through sub_ADDA90 (Packet_gcpReqPresentReceiveSubList); Packet_gcpReqPresentReceiveSubList reader and writer bodies match cn-404's"
+  - value: 816
+    direction: c2s
+    name: gcpReqPresentSend
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_90C4B0 stamps 816 through sub_ADDA90 (Packet_gcpReqPresentSend); Packet_gcpReqPresentSend reader and writer bodies match cn-404's"
+  - value: 819
+    direction: c2s
+    name: gcpReqPresentSendThankMsg
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_914170 stamps 819 through sub_ADDA90 (Packet_gcpReqPresentSendThankMsg); Packet_gcpReqPresentSendThankMsg reader and writer bodies match cn-404's"
+  - value: 824
+    direction: c2s
+    name: gcpReqRealCouponUse
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_8FA390 stamps 824 through sub_ADDA90 (Packet_gcpReqRealCouponUse); Packet_gcpReqRealCouponUse reader and writer bodies match cn-404's"
+  - value: 829
+    direction: c2s
+    name: gcpStopShowTerms
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_91E050 stamps 829 through sub_ADDA90 (Packet_gcpStopShowTerms); Packet_gcpStopShowTerms reader and writer bodies match cn-404's"
+  - value: 830
+    direction: c2s
+    name: gcpReqInventoryChangeWeaponPresetIdx
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_92A240 stamps 830 through sub_ADDA90 (Packet_gcpReqInventoryChangeWeaponPresetIdx); Packet_gcpReqInventoryChangeWeaponPresetIdx reader and writer bodies match cn-404's"
+  - value: 900
+    direction: c2s
+    name: gcpReqGuildLineBoard
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_8A6650/sub_8A6780/sub_9807A0 stamps 900 through sub_ADDA90 (Packet_gcpReqGuildLineBoard); Packet_gcpReqGuildLineBoard reader and writer bodies match cn-404's"
+  - value: 901
+    direction: c2s
+    name: gcpReqGuildLineBoardWrite
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_691790/sub_980850 stamps 901 through sub_ADDA90 (Packet_gcpReqGuildLineBoardWrite); Packet_gcpReqGuildLineBoardWrite reader and writer bodies match cn-404's"
+  - value: 902
+    direction: c2s
+    name: gcpReqGuildLineBoardDelete
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_691870/sub_980960 stamps 902 through sub_ADDA90 (Packet_gcpReqGuildLineBoardDelete); Packet_gcpReqGuildLineBoardDelete reader and writer bodies match cn-404's"
+  - value: 903
+    direction: c2s
+    name: gcpReqStartNewWave
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_9C60C0 stamps 903 through sub_ADDA90 (Packet_gcpReqStartNewWave); Packet_gcpReqStartNewWave reader and writer bodies match cn-404's"
+  - value: 904
+    direction: c2s
+    name: gcpReqEndWave
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_9C6150 stamps 904 through sub_ADDA90 (Packet_gcpReqEndWave); Packet_gcpReqEndWave reader and writer bodies match cn-404's"
+  - value: 905
+    direction: c2s
+    name: gcpReqEndAllWave
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_9C61E0 stamps 905 through sub_ADDA90 (Packet_gcpReqEndAllWave); Packet_gcpReqEndAllWave reader and writer bodies match cn-404's"
+  - value: 906
+    direction: c2s
+    name: gcpReqGameOver
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_9C6270 stamps 906 through sub_ADDA90 (Packet_gcpReqGameOver); Packet_gcpReqGameOver reader and writer bodies match cn-404's"
+  - value: 907
+    direction: c2s
+    name: gcpReqDeleteDeadMobs
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_9C6040 stamps 907 through sub_ADDA90 (Packet_gcpReqDeleteDeadMobs); Packet_gcpReqDeleteDeadMobs reader and writer bodies match cn-404's"
+  - value: 908
+    direction: c2s
+    name: gcpReqWaveAllSpawnMobs
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_9C6300 stamps 908 through sub_ADDA90 (Packet_gcpReqWaveAllSpawnMobs); Packet_gcpReqWaveAllSpawnMobs reader and writer bodies match cn-404's"
+  - value: 909
+    direction: c2s
+    name: gcpCreateUnit
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4DAF90 stamps 909 through sub_ADDA90 (Packet_gcpCreateUnit); Packet_gcpCreateUnit reader and writer bodies match cn-404's"
+  - value: 912
+    direction: c2s
+    name: gcpReqManufactureList
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_7DB650/sub_993DF0 stamps 912 through sub_ADDA90 (Packet_gcpReqManufactureList); Packet_gcpReqManufactureList reader and writer bodies match cn-404's"
+  - value: 913
+    direction: c2s
+    name: gcpReqManufactureStart
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_997230 stamps 913 through sub_ADDA90 (Packet_gcpReqManufactureStart); Packet_gcpReqManufactureStart reader and writer bodies match cn-404's"
+  - value: 914
+    direction: c2s
+    name: gcpReqManufactureGetItem
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_996A30 stamps 914 through sub_ADDA90 (Packet_gcpReqManufactureGetItem); Packet_gcpReqManufactureGetItem reader and writer bodies match cn-404's"
+  - value: 915
+    direction: c2s
+    name: gcpReqManufactureTimeOut
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_9932F0 stamps 915 through sub_ADDA90 (Packet_gcpReqManufactureTimeOut); Packet_gcpReqManufactureTimeOut reader and writer bodies match cn-404's"
+  - value: 916
+    direction: c2s
+    name: gcpReqManufactureImmediate
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_996AD0 stamps 916 through sub_ADDA90 (Packet_gcpReqManufactureImmediate); Packet_gcpReqManufactureImmediate reader and writer bodies match cn-404's"
+  - value: 917
+    direction: c2s
+    name: gcpReqTreasureChestInfo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_68EA50 stamps 917 through sub_ADDA90 (Packet_gcpReqTreasureChestInfo)"
+  - value: 918
+    direction: c2s
+    name: gcpReqOpenTreasureChest
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_74C560/sub_7530C0/sub_7551D0 stamps 918 through sub_ADDA90 (Packet_gcpReqOpenTreasureChest); Packet_gcpReqOpenTreasureChest reader and writer bodies match cn-404's"
+  - value: 919
+    direction: c2s
+    name: gcpReqGuildInfo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_8B23D0 stamps 919 through sub_ADDA90 (Packet_gcpReqGuildInfo); Packet_gcpReqGuildInfo reader and writer bodies match cn-404's"
+  - value: 921
+    direction: c2s
+    name: gcpPveUseCountItem
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BA6E0 stamps 921 through sub_ADDA90 (Packet_gcpPveUseCountItem); Packet_gcpPveUseCountItem reader and writer bodies match cn-404's"
+  - value: 923
+    direction: c2s
+    name: gcpPvePangUnit
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BA770 stamps 923 through sub_ADDA90 (Packet_gcpPvePangUnit); Packet_gcpPvePangUnit reader and writer bodies match cn-404's"
+  - value: 924
+    direction: c2s
+    name: gcpPveCombo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4D5390 stamps 924 through sub_ADDA90 (Packet_gcpPveCombo); Packet_gcpPveCombo reader and writer bodies match cn-404's"
+  - value: 925
+    direction: c2s
+    name: gcpPveUseRevival
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_5DAB50 stamps 925 through sub_ADDA90 (Packet_gcpPveUseRevival); Packet_gcpPveUseRevival reader and writer bodies match cn-404's"
+  - value: 926
+    direction: c2s
+    name: gcpCompensationItemNoti
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_742180 stamps 926 through sub_ADDA90 (Packet_gcpCompensationItemNoti); Packet_gcpCompensationItemNoti reader and writer bodies match cn-404's"
+  - value: 927
+    direction: c2s
+    name: gcpMissionProcess
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BA800 stamps 927 through sub_ADDA90 (Packet_gcpMissionProcess); Packet_gcpMissionProcess reader and writer bodies match cn-404's"
+  - value: 929
+    direction: c2s
+    name: gcpMakeUserTitle
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_83F1A0 stamps 929 through sub_ADDA90 (Packet_gcpMakeUserTitle); Packet_gcpMakeUserTitle reader and writer bodies match cn-404's"
+  - value: 930
+    direction: c2s
+    name: gcpSetUserTitle
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_83F100 stamps 930 through sub_ADDA90 (Packet_gcpSetUserTitle); Packet_gcpSetUserTitle reader and writer bodies match cn-404's"
+  - value: 935
+    direction: c2s
+    name: gcpReqCoupleInviteExpire
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_9B9200 stamps 935 through sub_ADDA90 (Packet_gcpReqCoupleInviteExpire); Packet_gcpReqCoupleInviteExpire reader and writer bodies match cn-404's"
+  - value: 936
+    direction: c2s
+    name: gcpReqCoupleInviteAnswer
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_9BAD50 stamps 936 through sub_ADDA90 (Packet_gcpReqCoupleInviteAnswer); Packet_gcpReqCoupleInviteAnswer reader and writer bodies match cn-404's"
+  - value: 937
+    direction: c2s
+    name: gcpReqCoupleBreakUp
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_9BADC0 stamps 937 through sub_ADDA90 (Packet_gcpReqCoupleBreakUp); Packet_gcpReqCoupleBreakUp reader and writer bodies match cn-404's"
+  - value: 939
+    direction: c2s
+    name: gcpResClientDamageData
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4DAE80/sub_7E9770 stamps 939 through sub_ADDA90 (Packet_gcpResClientDamageData); Packet_gcpResClientDamageData reader and writer bodies match cn-404's"
+  - value: 941
+    direction: c2s
+    name: gcpSynthesisProcess
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_9A8230 stamps 941 through sub_ADDA90 (Packet_gcpSynthesisProcess)"
+  - value: 950
+    direction: c2s
+    name: gcpReqRecheckMap
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_7A76C0 stamps 950 through sub_ADDA90 (Packet_gcpReqRecheckMap); Packet_gcpReqRecheckMap reader and writer bodies match cn-404's"
+  - value: 952
+    direction: c2s
+    name: gcpReqOXQuizAnswer
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_498590 stamps 952 through sub_ADDA90 (Packet_gcpReqOXQuizAnswer); Packet_gcpReqOXQuizAnswer reader and writer bodies match cn-404's"
+  - value: 953
+    direction: c2s
+    name: gcpReqBlueMarbleDice
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_453A10 stamps 953 through sub_ADDA90 (Packet_gcpReqBlueMarbleDice); Packet_gcpReqBlueMarbleDice reader and writer bodies match cn-404's"
+  - value: 2001
+    direction: c2s
+    name: gcpReqCompareSecondPassword
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_68EDD0 stamps 2001 through sub_ADDA90 (Packet_gcpReqCompareSecondPassword); Packet_gcpReqCompareSecondPassword reader and writer bodies match cn-404's"
+  - value: 2004
+    direction: c2s
+    name: gcpReqSeasonLadder
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_5B1BD0/sub_5B3630 stamps 2004 through sub_ADDA90 (Packet_gcpReqSeasonLadder); Packet_gcpReqSeasonLadder reader and writer bodies match cn-404's"
+  - value: 2006
+    direction: c2s
+    name: gcpReqSeasonLadderGetRankListNo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4A1570 stamps 2006 through sub_ADDA90 (Packet_gcpReqSeasonLadderGetRankListNo); Packet_gcpReqSeasonLadderGetRankListNo reader and writer bodies match cn-404's"
+  - value: 2007
+    direction: c2s
+    name: gcpReqNotifyChangeLevelIcon
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_68EE40 stamps 2007 through sub_ADDA90 (Packet_gcpReqNotifyChangeLevelIcon); Packet_gcpReqNotifyChangeLevelIcon reader and writer bodies match cn-404's"
+  - value: 2010
+    direction: c2s
+    name: gcpBombMissionOver
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4D6EA0 stamps 2010 through sub_ADDA90 (Packet_gcpBombMissionOver); Packet_gcpBombMissionOver reader and writer bodies match cn-404's"
+  - value: 2011
+    direction: c2s
+    name: gcpBombState
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4D6960 stamps 2011 through sub_ADDA90 (Packet_gcpBombState); Packet_gcpBombState reader and writer bodies match cn-404's"
+  - value: 2014
+    direction: c2s
+    name: gcpUserState
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4D7150 stamps 2014 through sub_ADDA90 (Packet_gcpUserState); Packet_gcpUserState reader and writer bodies match cn-404's"
+  - value: 2016
+    direction: c2s
+    name: gcpGoMapItemSync
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_7B9460 stamps 2016 through sub_ADDA90 (Packet_gcpGoMapItemSync); Packet_gcpGoMapItemSync reader and writer bodies match cn-404's"
+  - value: 2017
+    direction: c2s
+    name: gcpDropCaptain
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_430150 stamps 2017 through sub_ADDA90 (Packet_gcpDropCaptain); Packet_gcpDropCaptain reader and writer bodies match cn-404's"
+  - value: 2018
+    direction: c2s
+    name: gcpReqClanInfo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_43FEC0 stamps 2018 through sub_ADDA90 (Packet_gcpReqClanInfo); Packet_gcpReqClanInfo reader and writer bodies match cn-404's"
+  - value: 9
+    direction: s2c
+    name: gspRepMoveChannel
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7C50A0/sub_7EF9A0/sub_7FC1E0 case 9 (Packet_gspRepMoveChannel); Packet_gspRepMoveChannel reader and writer bodies match cn-404's"
+  - value: 11
+    direction: s2c
+    name: gspRepMoveInto
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7C50A0/sub_7EF9A0 case 11 (Packet_gspRepMoveInto); Packet_gspRepMoveInto reader and writer bodies match cn-404's"
+  - value: 13
+    direction: s2c
+    name: gspRepCheckCreateUserName
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7C50A0/sub_7EF9A0 case 13 (Packet_gspRepCheckCreateUserName); Packet_gspRepCheckCreateUserName reader and writer bodies match cn-404's"
+  - value: 14
+    direction: s2c
+    name: gspRepCreateUserInfo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7C50A0/sub_7EF9A0 case 14 (Packet_gspRepCreateUserInfo); Packet_gspRepCreateUserInfo reader and writer bodies match cn-404's"
+  - value: 15
+    direction: s2c
+    name: gspQueryBadProgram
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7C50A0/sub_7EF9A0 case 15 (Packet_gspQueryBadProgram); Packet_gspQueryBadProgram reader and writer bodies match cn-404's"
+  - value: 18
+    direction: s2c
+    name: gspRepUniquenessCheck
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 18 (Packet_gspRepUniquenessCheck); Packet_gspRepUniquenessCheck reader and writer bodies match cn-404's"
+  - value: 19
+    direction: s2c
+    name: gspDisconnectOpenWeb
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 19 (Packet_gspDisconnectOpenWeb); Packet_gspDisconnectOpenWeb reader and writer bodies match cn-404's"
+  - value: 20
+    direction: s2c
+    name: gspDisconnectFromRestriction
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 20 (Packet_gspDisconnectFromRestriction); Packet_gspDisconnectFromRestriction reader and writer bodies match cn-404's"
+  - value: 21
+    direction: s2c
+    name: gspDisconnectBlockIP
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 21 (Packet_gspDisconnectBlockIP); Packet_gspDisconnectBlockIP reader and writer bodies match cn-404's"
+  - value: 22
+    direction: s2c
+    name: gspClanPassport
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 22 (Packet_gspClanPassport); Packet_gspClanPassport reader and writer bodies match cn-404's"
+  - value: 24
+    direction: s2c
+    name: gspClanPointAdd
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 24 (Packet_gspClanPointAdd)"
+  - value: 106
+    direction: s2c
+    name: gspOveruseAlarmMsg
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 106 (Packet_gspOveruseAlarmMsg); Packet_gspOveruseAlarmMsg reader and writer bodies match cn-404's"
+  - value: 107
+    direction: s2c
+    name: gspReceiveServerNoticeMsg
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 107 (Packet_gspReceiveServerNoticeMsg); Packet_gspReceiveServerNoticeMsg reader and writer bodies match cn-404's"
+  - value: 111
+    direction: s2c
+    name: gspRepInvite
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 111 (Packet_gspRepInvite); Packet_gspRepInvite reader and writer bodies match cn-404's"
+  - value: 112
+    direction: s2c
+    name: gspNotifyInvite
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 112 (Packet_gspNotifyInvite); Packet_gspNotifyInvite reader and writer bodies match cn-404's"
+  - value: 113
+    direction: s2c
+    name: gspRepMoveToInviter
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 113 (Packet_gspRepMoveToInviter); Packet_gspRepMoveToInviter reader and writer bodies match cn-404's"
+  - value: 114
+    direction: s2c
+    name: gspRepMoveToFriend
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 114 (Packet_gspRepMoveToFriend); Packet_gspRepMoveToFriend reader and writer bodies match cn-404's"
+  - value: 118
+    direction: s2c
+    name: gspEventNotice
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 118 (Packet_gspEventNotice); Packet_gspEventNotice reader and writer bodies match cn-404's"
+  - value: 120
+    direction: s2c
+    name: gspEvent2GuildRanking
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 120 (Packet_gspEvent2GuildRanking); Packet_gspEvent2GuildRanking reader and writer bodies match cn-404's"
+  - value: 124
+    direction: s2c
+    name: gspRepFighterInfo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 124 (Packet_gspRepFighterInfo); Packet_gspRepFighterInfo reader and writer bodies match cn-404's"
+  - value: 125
+    direction: s2c
+    name: gspRepAwardInfo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 125 (Packet_gspRepAwardInfo); Packet_gspRepAwardInfo reader and writer bodies match cn-404's"
+  - value: 126
+    direction: s2c
+    name: gspRepEvent
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 126 (Packet_gspRepEvent); Packet_gspRepEvent reader and writer bodies match cn-404's"
+  - value: 128
+    direction: s2c
+    name: gspNotifyPromotion
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 128 (Packet_gspNotifyPromotion); Packet_gspNotifyPromotion reader and writer bodies match cn-404's"
+  - value: 130
+    direction: s2c
+    name: gspRepRecommendResult
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 130 (Packet_gspRepRecommendResult); Packet_gspRepRecommendResult reader and writer bodies match cn-404's"
+  - value: 202
+    direction: s2c
+    name: gspRepJoinParty
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 202 (Packet_gspRepJoinParty); Packet_gspRepJoinParty reader and writer bodies match cn-404's"
+  - value: 203
+    direction: s2c
+    name: gspUpdatePartyLeader
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 203 (Packet_gspUpdatePartyLeader); Packet_gspUpdatePartyLeader reader and writer bodies match cn-404's"
+  - value: 204
+    direction: s2c
+    name: gspNotifyPartyLeaveSuccess
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 204 (Packet_gspNotifyPartyLeaveSuccess); Packet_gspNotifyPartyLeaveSuccess reader and writer bodies match cn-404's"
+  - value: 205
+    direction: s2c
+    name: gspNotifyMemberLeave
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 205 (Packet_gspNotifyMemberLeave); Packet_gspNotifyMemberLeave reader and writer bodies match cn-404's"
+  - value: 206
+    direction: s2c
+    name: gspNotifyNewMemberJoin
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 206 (Packet_gspNotifyNewMemberJoin); Packet_gspNotifyNewMemberJoin reader and writer bodies match cn-404's"
+  - value: 302
+    direction: s2c
+    name: gspRepKickFromParty
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 302 (Packet_gspRepKickFromParty); Packet_gspRepKickFromParty reader and writer bodies match cn-404's"
+  - value: 303
+    direction: s2c
+    name: gspRepChangePartyLeader
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 303 (Packet_gspRepChangePartyLeader); Packet_gspRepChangePartyLeader reader and writer bodies match cn-404's"
+  - value: 304
+    direction: s2c
+    name: gspNotifyKickFromParty
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 304 (Packet_gspNotifyKickFromParty); Packet_gspNotifyKickFromParty reader and writer bodies match cn-404's"
+  - value: 305
+    direction: s2c
+    name: gspReceivePartyChatMsg
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 305 (Packet_gspReceivePartyChatMsg); Packet_gspReceivePartyChatMsg reader and writer bodies match cn-404's"
+  - value: 307
+    direction: s2c
+    name: gspNotifyKickMember
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 307 (Packet_gspNotifyKickMember); Packet_gspNotifyKickMember reader and writer bodies match cn-404's"
+  - value: 603
+    direction: s2c
+    name: gspConnectToSuperPeer
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 603 (Packet_gspConnectToSuperPeer); Packet_gspConnectToSuperPeer reader and writer bodies match cn-404's"
+  - value: 803
+    direction: s2c
+    name: gspInventoryUpdateInventorySlot
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 803 (Packet_gspInventoryUpdateInventorySlot); Packet_gspInventoryUpdateInventorySlot reader and writer bodies match cn-404's"
+  - value: 805
+    direction: s2c
+    name: gspInventoryViewUpdateView
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 805 (Packet_gspInventoryViewUpdateView); Packet_gspInventoryViewUpdateView reader and writer bodies match cn-404's"
+  - value: 806
+    direction: s2c
+    name: gspCheckExpiredTimeResult
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 806 (Packet_gspCheckExpiredTimeResult); Packet_gspCheckExpiredTimeResult reader and writer bodies match cn-404's"
+  - value: 807
+    direction: s2c
+    name: gspCashInvenUpdateAllInventorySlot
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 807 (Packet_gspCashInvenUpdateAllInventorySlot); Packet_gspCashInvenUpdateAllInventorySlot reader and writer bodies match cn-404's"
+  - value: 808
+    direction: s2c
+    name: gspRepInventoryEquip
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 808 (Packet_gspRepInventoryEquip); Packet_gspRepInventoryEquip reader and writer bodies match cn-404's"
+  - value: 809
+    direction: s2c
+    name: gspRepInventoryUnequip
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 809 (Packet_gspRepInventoryUnequip); Packet_gspRepInventoryUnequip reader and writer bodies match cn-404's"
+  - value: 810
+    direction: s2c
+    name: gspRepInventoryUseItem
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 810 (Packet_gspRepInventoryUseItem); Packet_gspRepInventoryUseItem reader and writer bodies match cn-404's"
+  - value: 811
+    direction: s2c
+    name: gspRepInventoryDeleteItem
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 811 (Packet_gspRepInventoryDeleteItem); Packet_gspRepInventoryDeleteItem reader and writer bodies match cn-404's"
+  - value: 812
+    direction: s2c
+    name: gspRepInventoryThrowItem
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 sub_7EF9A0 case 812 calls sub_7E0A10; named vtable CFBD80 reader sub_4AF4C0 reads item_id:u32 and result:u32 via sub_A1D570; result zero passes the identity to sub_92C0A0"
+  - value: 814
+    direction: s2c
+    name: gspRepShopItemCardInfo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 814 (Packet_gspRepShopItemCardInfo); Packet_gspRepShopItemCardInfo reader and writer bodies match cn-404's"
+  - value: 815
+    direction: s2c
+    name: gspRepPresentNewReceive
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 815 (Packet_gspRepPresentNewReceive); Packet_gspRepPresentNewReceive reader and writer bodies match cn-404's"
+  - value: 816
+    direction: s2c
+    name: gspRepPresentReceiveList
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 816 (Packet_gspRepPresentReceiveList); Packet_gspRepPresentReceiveList reader and writer bodies match cn-404's"
+  - value: 817
+    direction: s2c
+    name: gspRepPresentSendList
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 817 (Packet_gspRepPresentSendList); Packet_gspRepPresentSendList reader and writer bodies match cn-404's"
+  - value: 818
+    direction: s2c
+    name: gspRepPresentReceiveSubList
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 818 (Packet_gspRepPresentReceiveSubList); Packet_gspRepPresentReceiveSubList reader and writer bodies match cn-404's"
+  - value: 819
+    direction: s2c
+    name: gspRepPresentSendSubList
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 819 (Packet_gspRepPresentSendSubList); Packet_gspRepPresentSendSubList reader and writer bodies match cn-404's"
+  - value: 820
+    direction: s2c
+    name: gspRepRefund
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 820 (Packet_gspRepRefund); Packet_gspRepRefund reader and writer bodies match cn-404's"
+  - value: 821
+    direction: s2c
+    name: gspRepPresentSend
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 821 (Packet_gspRepPresentSend); Packet_gspRepPresentSend reader and writer bodies match cn-404's"
+  - value: 822
+    direction: s2c
+    name: gspRepPresentReceive
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 822 (Packet_gspRepPresentReceive); Packet_gspRepPresentReceive reader and writer bodies match cn-404's"
+  - value: 823
+    direction: s2c
+    name: gspRepPresentThrow
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 823 (Packet_gspRepPresentThrow); Packet_gspRepPresentThrow reader and writer bodies match cn-404's"
+  - value: 824
+    direction: s2c
+    name: gspRepPresentSendThankMsg
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 824 (Packet_gspRepPresentSendThankMsg); Packet_gspRepPresentSendThankMsg reader and writer bodies match cn-404's"
+  - value: 825
+    direction: s2c
+    name: gspRepPresentViewThankMsg
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 825 (Packet_gspRepPresentViewThankMsg); Packet_gspRepPresentViewThankMsg reader and writer bodies match cn-404's"
+  - value: 826
+    direction: s2c
+    name: gspRepPresentConfirm
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 826 (Packet_gspRepPresentConfirm); Packet_gspRepPresentConfirm reader and writer bodies match cn-404's"
+  - value: 827
+    direction: s2c
+    name: gspRepPresentDeleteSend
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 827 (Packet_gspRepPresentDeleteSend); Packet_gspRepPresentDeleteSend reader and writer bodies match cn-404's"
+  - value: 828
+    direction: s2c
+    name: gspRepPresentDeleteReceive
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 828 (Packet_gspRepPresentDeleteReceive); Packet_gspRepPresentDeleteReceive reader and writer bodies match cn-404's"
+  - value: 829
+    direction: s2c
+    name: gspRepRealCouponUse
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 829 (Packet_gspRepRealCouponUse); Packet_gspRepRealCouponUse reader and writer bodies match cn-404's"
+  - value: 831
+    direction: s2c
+    name: gspRepPickup
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 831 (Packet_gspRepPickup); Packet_gspRepPickup reader and writer bodies match cn-404's"
+  - value: 832
+    direction: s2c
+    name: gspReqInventoryChangeWeaponPresetIdx
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 832 (Packet_gspReqInventoryChangeWeaponPresetIdx); Packet_gspReqInventoryChangeWeaponPresetIdx reader and writer bodies match cn-404's"
+  - value: 833
+    direction: s2c
+    name: gspReqWeaponPreSetUpdate
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 833 (Packet_gspReqWeaponPreSetUpdate); Packet_gspReqWeaponPreSetUpdate reader and writer bodies match cn-404's"
+  - value: 901
+    direction: s2c
+    name: gspRepGuildLineBoardWrite
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 901 (Packet_gspRepGuildLineBoardWrite); Packet_gspRepGuildLineBoardWrite reader and writer bodies match cn-404's"
+  - value: 902
+    direction: s2c
+    name: gspRepGuildLineBoardDelete
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 902 (Packet_gspRepGuildLineBoardDelete); Packet_gspRepGuildLineBoardDelete reader and writer bodies match cn-404's"
+  - value: 910
+    direction: s2c
+    name: gspMergeCountOrDayItemList
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 910 (Packet_gspMergeCountOrDayItemList); Packet_gspMergeCountOrDayItemList reader and writer bodies match cn-404's"
+  - value: 913
+    direction: s2c
+    name: gspManufactureRecipeInfo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 913 (Packet_gspManufactureRecipeInfo); Packet_gspManufactureRecipeInfo reader and writer bodies match cn-404's"
+  - value: 914
+    direction: s2c
+    name: gspManufactureList
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 914 (Packet_gspManufactureList); Packet_gspManufactureList reader and writer bodies match cn-404's"
+  - value: 915
+    direction: s2c
+    name: gspManufactureStart
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 915 (Packet_gspManufactureStart); Packet_gspManufactureStart reader and writer bodies match cn-404's"
+  - value: 916
+    direction: s2c
+    name: gspManufactureGetItem
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 916 (Packet_gspManufactureGetItem); Packet_gspManufactureGetItem reader and writer bodies match cn-404's"
+  - value: 917
+    direction: s2c
+    name: gspManufactureTimeOut
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 917 (Packet_gspManufactureTimeOut); Packet_gspManufactureTimeOut reader and writer bodies match cn-404's"
+  - value: 918
+    direction: s2c
+    name: gspResTreasureChestInfo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 918 (Packet_gspResTreasureChestInfo); Packet_gspResTreasureChestInfo reader and writer bodies match cn-404's"
+  - value: 919
+    direction: s2c
+    name: gspResOpenTreasureChest
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 919 (Packet_gspResOpenTreasureChest); Packet_gspResOpenTreasureChest reader and writer bodies match cn-404's"
+  - value: 920
+    direction: s2c
+    name: gspCustomizeString
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 920 (Packet_gspCustomizeString); Packet_gspCustomizeString reader and writer bodies match cn-404's"
+  - value: 921
+    direction: s2c
+    name: gspResGuildInfo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 921 (Packet_gspResGuildInfo); Packet_gspResGuildInfo reader and writer bodies match cn-404's"
+  - value: 923
+    direction: s2c
+    name: gspResSingleStageState
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 923 (Packet_gspResSingleStageState); Packet_gspResSingleStageState reader and writer bodies match cn-404's"
+  - value: 933
+    direction: s2c
+    name: gspResMakeUserTitle
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 933 (Packet_gspResMakeUserTitle)"
+  - value: 934
+    direction: s2c
+    name: gspResSetUserTitle
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 934 (Packet_gspResSetUserTitle); Packet_gspResSetUserTitle reader and writer bodies match cn-404's"
+  - value: 935
+    direction: s2c
+    name: gspTitleSyncInfo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 935 (Packet_gspTitleSyncInfo); Packet_gspTitleSyncInfo reader and writer bodies match cn-404's"
+  - value: 936
+    direction: s2c
+    name: gspProvideMedal
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 936 (Packet_gspProvideMedal); Packet_gspProvideMedal reader and writer bodies match cn-404's"
+  - value: 937
+    direction: s2c
+    name: gspCharRankInfo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 937 (Packet_gspCharRankInfo); Packet_gspCharRankInfo reader and writer bodies match cn-404's"
+  - value: 938
+    direction: s2c
+    name: gspResCoupleInvite
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 938 (Packet_gspResCoupleInvite); Packet_gspResCoupleInvite reader and writer bodies match cn-404's"
+  - value: 939
+    direction: s2c
+    name: gspResCoupleInviteResult
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 939 (Packet_gspResCoupleInviteResult); Packet_gspResCoupleInviteResult reader and writer bodies match cn-404's"
+  - value: 940
+    direction: s2c
+    name: gspResCoupleInviteAnswer
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 940 (Packet_gspResCoupleInviteAnswer); Packet_gspResCoupleInviteAnswer reader and writer bodies match cn-404's"
+  - value: 941
+    direction: s2c
+    name: gspResCoupleBreakUp
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 941 (Packet_gspResCoupleBreakUp); Packet_gspResCoupleBreakUp reader and writer bodies match cn-404's"
+  - value: 942
+    direction: s2c
+    name: gspResCoupleNotifyPartner
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 942 (Packet_gspResCoupleNotifyPartner); Packet_gspResCoupleNotifyPartner reader and writer bodies match cn-404's"
+  - value: 947
+    direction: s2c
+    name: gspUpdateCoupleSlot
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 947 (Packet_gspUpdateCoupleSlot); layout differences in packets/"
+  - value: 951
+    direction: s2c
+    name: gspSynthesisProcess
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 951 (Packet_gspSynthesisProcess)"
+  - value: 952
+    direction: s2c
+    name: gspResRandomMissionInfo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 952 (Packet_gspResRandomMissionInfo); Packet_gspResRandomMissionInfo reader and writer bodies match cn-404's"
+  - value: 955
+    direction: s2c
+    name: gspEvolveResult
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 955 (Packet_gspEvolveResult); Packet_gspEvolveResult reader and writer bodies match cn-404's"
+  - value: 958
+    direction: s2c
+    name: gspPortalMove
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 958 (Packet_gspPortalMove); Packet_gspPortalMove reader and writer bodies match cn-404's"
+  - value: 959
+    direction: s2c
+    name: gspNotifyMsg
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 959 (Packet_gspNotifyMsg); Packet_gspNotifyMsg reader and writer bodies match cn-404's"
+  - value: 960
+    direction: s2c
+    name: gspContentConfig
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 960 (Packet_gspContentConfig); Packet_gspContentConfig reader and writer bodies match cn-404's"
+  - value: 961
+    direction: s2c
+    name: gspRepUpdateELoRating
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 961 (Packet_gspRepUpdateELoRating); Packet_gspRepUpdateELoRating reader and writer bodies match cn-404's"
+  - value: 962
+    direction: s2c
+    name: gspOXContollerData
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 962 (Packet_gspOXContollerData); Packet_gspOXContollerData reader and writer bodies match cn-404's"
+  - value: 963
+    direction: s2c
+    name: gspResBlueMarbleDice
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 963 (Packet_gspResBlueMarbleDice); Packet_gspResBlueMarbleDice reader and writer bodies match cn-404's"
+  - value: 966
+    direction: s2c
+    name: gspNotifySecondPassword
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 966 (Packet_gspNotifySecondPassword); Packet_gspNotifySecondPassword reader and writer bodies match cn-404's"
+  - value: 968
+    direction: s2c
+    name: gspSeasonLadderLevelUpNotice
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 968 (Packet_gspSeasonLadderLevelUpNotice); Packet_gspSeasonLadderLevelUpNotice reader and writer bodies match cn-404's"
+  - value: 969
+    direction: s2c
+    name: gspRepSeasonLadderGetRankList
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 969 (Packet_gspRepSeasonLadderGetRankList); Packet_gspRepSeasonLadderGetRankList reader and writer bodies match cn-404's"
+  - value: 970
+    direction: s2c
+    name: gspRepNotifyChangeLevelIcon
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 970 (Packet_gspRepNotifyChangeLevelIcon); layout differences in packets/"
+  - value: 977
+    direction: s2c
+    name: gspReqGameReady
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 977 (Packet_gspReqGameReady); Packet_gspReqGameReady reader and writer bodies match cn-404's"
+  - value: 978
+    direction: s2c
+    name: gspResBaseballBatInfo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 978 (Packet_gspResBaseballBatInfo); Packet_gspResBaseballBatInfo reader and writer bodies match cn-404's"
+  - value: 979
+    direction: s2c
+    name: gspResBaseballHitResult
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 979 (Packet_gspResBaseballHitResult); Packet_gspResBaseballHitResult reader and writer bodies match cn-404's"
+  - value: 105
+    direction: c2s
+    name: gcpReqGotoMenu
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 sender sub_5B1CF0/sub_5B36A0/sub_640AD0 stamps 105 through sub_ADDA90 (Packet_gcpReqGotoMenu)"
+  - value: 116
+    direction: c2s
+    name: gcpReqAwardInfo
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 sender sub_678950 stamps 116 through sub_ADDA90 (Packet_gcpReqAwardInfo)"
+  - value: 117
+    direction: c2s
+    name: gcpReqEvent
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 sender sub_495310/sub_636AE0/sub_6745C0 stamps 117 through sub_ADDA90 (Packet_gcpReqEvent); Packet_gcpReqEvent reader and writer bodies match cn-404's"
+  - value: 509
+    direction: c2s
+    name: gcpRoomReqOpenCloseSlot
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 sender sub_58D610 stamps 509 through sub_ADDA90 (Packet_gcpRoomReqOpenCloseSlot); Packet_gcpRoomReqOpenCloseSlot reader and writer bodies match cn-404's"
+  - value: 713
+    direction: c2s
+    name: gcpGameReqRespawn
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 sender sub_4DA7F0 stamps 713 through sub_ADDA90 (Packet_gcpGameReqRespawn); Packet_gcpGameReqRespawn reader and writer bodies match cn-404's"
+  - value: 825
+    direction: c2s
+    name: gcpReqCheckCash
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 sender sub_907E20 stamps 825 through sub_ADDA90 (Packet_gcpReqCheckCash)"
+  - value: 826
+    direction: c2s
+    name: gcpReqCashInven
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 sender sub_8FF810/sub_9025A0 stamps 826 through sub_ADDA90 (Packet_gcpReqCashInven)"
+  - value: 828
+    direction: c2s
+    name: gcpReqCloseGiftBox
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 sender sub_68EAC0 stamps 828 through sub_ADDA90 (Packet_gcpReqCloseGiftBox)"
+  - value: 911
+    direction: c2s
+    name: gcpReqManufactureRecipeInfo
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 sender sub_686C40 stamps 911 through sub_ADDA90 (Packet_gcpReqManufactureRecipeInfo)"
+  - value: 940
+    direction: c2s
+    name: gcpReqEventProcess
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 sender sub_418290/sub_435B40/sub_578BC0 stamps 940 through sub_ADDA90 (Packet_gcpReqEventProcess)"
+  - value: 943
+    direction: c2s
+    name: gcpReqLotteryRadomMissionCompensation
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 sender sub_678AC0 stamps 943 through sub_ADDA90 (Packet_gcpReqLotteryRadomMissionCompensation)"
+  - value: 944
+    direction: c2s
+    name: gcpReqRandomMissionReward
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 sender sub_678A30 stamps 944 through sub_ADDA90 (Packet_gcpReqRandomMissionReward)"
+  - value: 104
+    direction: s2c
+    name: gspReqUserPoll
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7EF9A0 case 104 (Packet_gspReqUserPoll); Packet_gspReqUserPoll reader and writer bodies match cn-404's"
+  - value: 707
+    direction: s2c
+    name: gspRespawn
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 707 (Packet_gspRespawn); Packet_gspRespawn reader and writer bodies match cn-404's"
+  - value: 708
+    direction: s2c
+    name: gspRequestRespawnIdx
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 708 (Packet_gspRequestRespawnIdx); Packet_gspRequestRespawnIdx reader and writer bodies match cn-404's"
+  - value: 113
+    direction: c2s
+    name: gcpReqOnlineMatchTeamInfoLoad
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 stamping helper sub_630D70 sets 113, as id-400 sub_5E7A40"
+  - value: 502
+    direction: c2s
+    name: gcpRoomSendChatModuleMsg
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_7F31A0 stamps 502 through sub_ADDA90 (Packet_gcpRoomSendChatModuleMsg); Packet_gcpRoomSendChatModuleMsg reader and writer bodies match cn-404's"
+  - value: 506
+    direction: c2s
+    name: gcpRoomReqLeaveGame
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 sender sub_622000 stamps 506 through sub_ADDA90 (Packet_gcpRoomReqLeaveGame); Packet_gcpRoomReqLeaveGame reader and writer bodies match cn-404's"
+    notes: "empty body; the in-game ESC path requests the shared room-leave burst"
+  - value: 510
+    direction: c2s
+    name: gcpReqKickFromSession
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_58B1A0 stamps 510 through sub_ADDA90 (Packet_gcpReqKickFromSession); Packet_gcpReqKickFromSession reader and writer bodies match cn-404's"
+  - value: 514
+    direction: c2s
+    name: gcpRoomChangeRoundSetting
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 stamping helper sub_58B130 sets 514; the Packet_gcpRoomChangeRoundSetting vtable is used in cn-408 sub_582F00"
+  - value: 520
+    direction: c2s
+    name: gcpRoomSendAmpMsg
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_7F3130 stamps 520 through sub_ADDA90 (Packet_gcpRoomSendAmpMsg); Packet_gcpRoomSendAmpMsg reader and writer bodies match cn-404's"
+  - value: 603
+    direction: c2s
+    name: gcpReportHolePunchingEnd
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_7C28E0 stamps 603 through sub_ADDA90 (Packet_gcpReportHolePunchingEnd); Packet_gcpReportHolePunchingEnd reader and writer bodies match cn-404's"
+  - value: 807
+    direction: c2s
+    name: gcpReqInventoryThrowItem
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 sub_934B60 constructs named vtable D15058 after excluding category 6 and confirming expiration; sub_935A90 stamps 807 and sub_9932E0 writes one u32 via sub_A1D400"
+  - value: 809
+    direction: c2s
+    name: gcpReqShopItemCardInfo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_935A20 stamps 809 through sub_ADDA90 (Packet_gcpReqShopItemCardInfo); Packet_gcpReqShopItemCardInfo reader and writer bodies match cn-404's"
+  - value: 814
+    direction: c2s
+    name: gcpReqPresentSendSubList
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_9128D0 stamps 814 through sub_ADDA90 (Packet_gcpReqPresentSendSubList); Packet_gcpReqPresentSendSubList reader and writer bodies match cn-404's"
+  - value: 815
+    direction: c2s
+    name: gcpReqRefund
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_9359B0 stamps 815 through sub_ADDA90 (Packet_gcpReqRefund); Packet_gcpReqRefund reader and writer bodies match cn-404's"
+  - value: 817
+    direction: c2s
+    name: gcpReqPresentReceive
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_8F7690 stamps 817 through sub_ADDA90 (Packet_gcpReqPresentReceive); Packet_gcpReqPresentReceive reader and writer bodies match cn-404's"
+  - value: 818
+    direction: c2s
+    name: gcpReqPresentThrow
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_8F7700 stamps 818 through sub_ADDA90 (Packet_gcpReqPresentThrow); Packet_gcpReqPresentThrow reader and writer bodies match cn-404's"
+  - value: 820
+    direction: c2s
+    name: gcpReqPresentViewThankMsg
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_912780 stamps 820 through sub_ADDA90 (Packet_gcpReqPresentViewThankMsg); Packet_gcpReqPresentViewThankMsg reader and writer bodies match cn-404's"
+  - value: 822
+    direction: c2s
+    name: gcpReqPresentDeleteSend
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_912710 stamps 822 through sub_ADDA90 (Packet_gcpReqPresentDeleteSend); Packet_gcpReqPresentDeleteSend reader and writer bodies match cn-404's"
+  - value: 827
+    direction: c2s
+    name: gcpReqPickup
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_935940 stamps 827 through sub_ADDA90 (Packet_gcpReqPickup); Packet_gcpReqPickup reader and writer bodies match cn-404's"
+  - value: 928
+    direction: c2s
+    name: gcpUserPlayerEnv
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sub_7BFBC0 stamps 928 (paired with id-400 sub_78FA40)"
+  - value: 931
+    direction: c2s
+    name: gcpCheatAddMedal
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_761320 stamps 931 through sub_ADDA90 (Packet_gcpCheatAddMedal); Packet_gcpCheatAddMedal reader and writer bodies match cn-404's"
+  - value: 932
+    direction: c2s
+    name: gcpCheatAddTitle
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_761400 stamps 932 through sub_ADDA90 (Packet_gcpCheatAddTitle); Packet_gcpCheatAddTitle reader and writer bodies match cn-404's"
+  - value: 945
+    direction: c2s
+    name: gcpReqIgnoreMissionSet
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_761390 stamps 945 through sub_ADDA90 (Packet_gcpReqIgnoreMissionSet); Packet_gcpReqIgnoreMissionSet reader and writer bodies match cn-404's"
+  - value: 948
+    direction: c2s
+    name: gcpPortalMove
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4D6270 stamps 948 through sub_ADDA90 (Packet_gcpPortalMove); Packet_gcpPortalMove reader and writer bodies match cn-404's"
+  - value: 951
+    direction: c2s
+    name: gcpReqAddGiftTest
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_7614E0 stamps 951 through sub_ADDA90 (Packet_gcpReqAddGiftTest); Packet_gcpReqAddGiftTest reader and writer bodies match cn-404's"
+  - value: 2002
+    direction: c2s
+    name: gcpReqSetSecondPassword
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_A076A0 stamps 2002 through sub_ADDA90 (Packet_gcpReqSetSecondPassword); Packet_gcpReqSetSecondPassword reader and writer bodies match cn-404's"
+  - value: 2003
+    direction: c2s
+    name: gcpReqDeleteSecondPassword
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_A07710 stamps 2003 through sub_ADDA90 (Packet_gcpReqDeleteSecondPassword); Packet_gcpReqDeleteSecondPassword reader and writer bodies match cn-404's"
+  - value: 2008
+    direction: c2s
+    name: gcpRoomChangeTeamObserver
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_58B210 stamps 2008 through sub_ADDA90 (Packet_gcpRoomChangeTeamObserver); Packet_gcpRoomChangeTeamObserver reader and writer bodies match cn-404's"
+  - value: 2015
+    direction: c2s
+    name: gcpReqGameReady
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_58B2F0 stamps 2015 through sub_ADDA90 (Packet_gcpReqGameReady); Packet_gcpReqGameReady reader and writer bodies match cn-404's"
+  - value: 14
+    direction: c2s
+    name: gcpReqMoveInto
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 sub_7CD100 builds Packet_gcpReqMoveInto and calls the helper cn-408 sub_4DACA0, which stamps 14"
+  - value: 601
+    direction: c2s
+    connection: game
+    name: gcpReportRelayConnected
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 sub_7C6190 stamps game 601 for the relay success report (paired with id-400 sub_7953D0); packets/relay-connection.yaml"
+  - value: 602
+    direction: c2s
+    name: gcpReportSuperPeerConnected
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 sub_7C50A0/sub_7C5030/sub_7C5F50 build Packet_gcpReportSuperPeerConnected and call the helper cn-408 sub_7C6200, which stamps 602"
+  - value: 32772
+    direction: c2s
+    connection: both
+    name: gppSplashDamager
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BCDC0 stamps 32772 through sub_ADDA90 (Packet_gppSplashDamager); Packet_gppSplashDamager reader and writer bodies match cn-404's"
+  - value: 32773
+    direction: c2s
+    connection: both
+    name: gppNearDamager
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BCEF0 stamps 32773 through sub_ADDA90 (Packet_gppNearDamager); Packet_gppNearDamager reader and writer bodies match cn-404's"
+  - value: 32774
+    direction: c2s
+    connection: both
+    name: gppDeleteObject
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BADB0 stamps 32774 through sub_ADDA90 (Packet_gppDeleteObject); Packet_gppDeleteObject reader and writer bodies match cn-404's"
+  - value: 32776
+    direction: c2s
+    connection: both
+    name: gppExplodeBullet
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BAC50 stamps 32776 through sub_ADDA90 (Packet_gppExplodeBullet); Packet_gppExplodeBullet reader and writer bodies match cn-404's"
+  - value: 32777
+    direction: c2s
+    connection: both
+    name: gppDamageObject
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BAD00 stamps 32777 through sub_ADDA90 (Packet_gppDamageObject); Packet_gppDamageObject reader and writer bodies match cn-404's"
+  - value: 32778
+    direction: c2s
+    connection: both
+    name: gppKillObject
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BB020 stamps 32778 through sub_ADDA90 (Packet_gppKillObject); Packet_gppKillObject reader and writer bodies match cn-404's"
+  - value: 32779
+    direction: c2s
+    connection: both
+    name: gppDash
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BB5C0 stamps 32779 through sub_ADDA90 (Packet_gppDash); Packet_gppDash reader and writer bodies match cn-404's"
+  - value: 32780
+    direction: c2s
+    connection: both
+    name: gppRoll
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BB6D0 stamps 32780 through sub_ADDA90 (Packet_gppRoll); Packet_gppRoll reader and writer bodies match cn-404's"
+  - value: 32781
+    direction: c2s
+    connection: both
+    name: gppJump
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BB7E0 stamps 32781 through sub_ADDA90 (Packet_gppJump); Packet_gppJump reader and writer bodies match cn-404's"
+  - value: 32782
+    direction: c2s
+    connection: both
+    name: gppAim
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BB8F0 stamps 32782 through sub_ADDA90 (Packet_gppAim); Packet_gppAim reader and writer bodies match cn-404's"
+  - value: 32783
+    direction: c2s
+    connection: both
+    name: gppSetTargettingObj
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BBA90 stamps 32783 through sub_ADDA90 (Packet_gppSetTargettingObj); Packet_gppSetTargettingObj reader and writer bodies match cn-404's"
+  - value: 32784
+    direction: c2s
+    connection: both
+    name: gppBubbleJump
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BBBC0 stamps 32784 through sub_ADDA90 (Packet_gppBubbleJump); Packet_gppBubbleJump reader and writer bodies match cn-404's"
+  - value: 32785
+    direction: c2s
+    connection: both
+    name: gppWalkFast
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BBC70 stamps 32785 through sub_ADDA90 (Packet_gppWalkFast); Packet_gppWalkFast reader and writer bodies match cn-404's"
+  - value: 32786
+    direction: c2s
+    connection: both
+    name: gppWallAction
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BBD70 stamps 32786 through sub_ADDA90 (Packet_gppWallAction); Packet_gppWallAction reader and writer bodies match cn-404's"
+  - value: 32787
+    direction: c2s
+    connection: both
+    name: gppKnocked
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BE4D0 stamps 32787 through sub_ADDA90 (Packet_gppKnocked); layout differences in packets/"
+  - value: 32788
+    direction: c2s
+    connection: both
+    name: gppStunned
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BE5C0 stamps 32788 through sub_ADDA90 (Packet_gppStunned); Packet_gppStunned reader and writer bodies match cn-404's"
+  - value: 32789
+    direction: c2s
+    connection: both
+    name: gppShocked
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BE700 stamps 32789 through sub_ADDA90 (Packet_gppShocked); Packet_gppShocked reader and writer bodies match cn-404's"
+  - value: 32790
+    direction: c2s
+    connection: both
+    name: gppEndStunned
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BE790 stamps 32790 through sub_ADDA90 (Packet_gppEndStunned); Packet_gppEndStunned reader and writer bodies match cn-404's"
+  - value: 32791
+    direction: c2s
+    connection: both
+    name: gppKickStart
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BEAB0 stamps 32791 through sub_ADDA90 (Packet_gppKickStart); Packet_gppKickStart reader and writer bodies match cn-404's"
+  - value: 32792
+    direction: c2s
+    connection: both
+    name: gppKickFail
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BEB50 stamps 32792 through sub_ADDA90 (Packet_gppKickFail); Packet_gppKickFail reader and writer bodies match cn-404's"
+  - value: 32793
+    direction: c2s
+    connection: both
+    name: gppTryRescued
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BE8E0 stamps 32793 through sub_ADDA90 (Packet_gppTryRescued); Packet_gppTryRescued reader and writer bodies match cn-404's"
+  - value: 32794
+    direction: c2s
+    connection: both
+    name: gppTryKicked
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BE970 stamps 32794 through sub_ADDA90 (Packet_gppTryKicked); Packet_gppTryKicked reader and writer bodies match cn-404's"
+  - value: 32795
+    direction: c2s
+    connection: both
+    name: gppKicked
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BE820 stamps 32795 through sub_ADDA90 (Packet_gppKicked); Packet_gppKicked reader and writer bodies match cn-404's"
+  - value: 32796
+    direction: c2s
+    connection: both
+    name: gppKickedNoPang
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BEA00 stamps 32796 through sub_ADDA90 (Packet_gppKickedNoPang); Packet_gppKickedNoPang reader and writer bodies match cn-404's"
+  - value: 32798
+    direction: c2s
+    connection: both
+    name: gppMeleeReady
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BED00 stamps 32798 through sub_ADDA90 (Packet_gppMeleeReady); Packet_gppMeleeReady reader and writer bodies match cn-404's"
+  - value: 32800
+    direction: c2s
+    connection: both
+    name: gppChangeState
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BEDA0 stamps 32800 through sub_ADDA90 (Packet_gppChangeState); Packet_gppChangeState reader and writer bodies match cn-404's"
+  - value: 32801
+    direction: c2s
+    connection: both
+    name: gppLockInto
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BEEB0 stamps 32801 through sub_ADDA90 (Packet_gppLockInto); Packet_gppLockInto reader and writer bodies match cn-404's"
+  - value: 32805
+    direction: c2s
+    connection: both
+    name: gppDying
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BCFF0 stamps 32805 through sub_ADDA90 (Packet_gppDying); Packet_gppDying reader and writer bodies match cn-404's"
+  - value: 32806
+    direction: c2s
+    connection: both
+    name: gppPopOut
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BD230 stamps 32806 through sub_ADDA90 (Packet_gppPopOut); Packet_gppPopOut reader and writer bodies match cn-404's"
+  - value: 32807
+    direction: c2s
+    connection: both
+    name: gppRescue
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BD360 stamps 32807 through sub_ADDA90 (Packet_gppRescue); Packet_gppRescue reader and writer bodies match cn-404's"
+  - value: 32809
+    direction: c2s
+    connection: both
+    name: gppClimbWall
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BF070 stamps 32809 through sub_ADDA90 (Packet_gppClimbWall); Packet_gppClimbWall reader and writer bodies match cn-404's"
+  - value: 32810
+    direction: c2s
+    connection: both
+    name: gppUpdateWeaponInfo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BD400 stamps 32810 through sub_ADDA90 (Packet_gppUpdateWeaponInfo); Packet_gppUpdateWeaponInfo reader and writer bodies match cn-404's"
+  - value: 32811
+    direction: c2s
+    connection: both
+    name: gppReload
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BEF40 stamps 32811 through sub_ADDA90 (Packet_gppReload); Packet_gppReload reader and writer bodies match cn-404's"
+  - value: 32812
+    direction: c2s
+    connection: both
+    name: gppResetChrAttr
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BF2B0/sub_4C3E90 stamps 32812 through sub_ADDA90 (Packet_gppResetChrAttr); Packet_gppResetChrAttr reader and writer bodies match cn-404's"
+  - value: 32813
+    direction: c2s
+    connection: both
+    name: gppReturnToNormal
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BF170 stamps 32813 through sub_ADDA90 (Packet_gppReturnToNormal); Packet_gppReturnToNormal reader and writer bodies match cn-404's"
+  - value: 32815
+    direction: c2s
+    connection: both
+    name: gppHumiliationStart
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BEBE0 stamps 32815 through sub_ADDA90 (Packet_gppHumiliationStart); Packet_gppHumiliationStart reader and writer bodies match cn-404's"
+  - value: 32816
+    direction: c2s
+    connection: both
+    name: gppHumiliationEnd
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BEC70 stamps 32816 through sub_ADDA90 (Packet_gppHumiliationEnd); Packet_gppHumiliationEnd reader and writer bodies match cn-404's"
+  - value: 32818
+    direction: c2s
+    connection: both
+    name: gppStickGrenadeTo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4C10A0 stamps 32818 through sub_ADDA90 (Packet_gppStickGrenadeTo); Packet_gppStickGrenadeTo reader and writer bodies match cn-404's"
+  - value: 32822
+    direction: c2s
+    connection: both
+    name: gppCreateNPC
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_668950 stamps 32822 through sub_ADDA90 (Packet_gppCreateNPC); Packet_gppCreateNPC reader and writer bodies match cn-404's"
+  - value: 32823
+    direction: c2s
+    connection: both
+    name: gppRespawnNPC
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BF7A0 stamps 32823 through sub_ADDA90 (Packet_gppRespawnNPC); Packet_gppRespawnNPC reader and writer bodies match cn-404's"
+  - value: 32824
+    direction: c2s
+    connection: both
+    name: gppItemUseResult
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BF340 stamps 32824 through sub_ADDA90 (Packet_gppItemUseResult); Packet_gppItemUseResult reader and writer bodies match cn-404's"
+  - value: 32829
+    direction: c2s
+    connection: both
+    name: gppHitByItem
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BF680 stamps 32829 through sub_ADDA90 (Packet_gppHitByItem); Packet_gppHitByItem reader and writer bodies match cn-404's"
+  - value: 32830
+    direction: c2s
+    connection: both
+    name: gppEndMagnet
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BF710 stamps 32830 through sub_ADDA90 (Packet_gppEndMagnet); Packet_gppEndMagnet reader and writer bodies match cn-404's"
+  - value: 32832
+    direction: c2s
+    connection: both
+    name: gppCreateMapItem
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4C0F40 stamps 32832 through sub_ADDA90 (Packet_gppCreateMapItem); Packet_gppCreateMapItem reader and writer bodies match cn-404's"
+  - value: 32833
+    direction: c2s
+    connection: both
+    name: gppStepOnBanana
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4C1000 stamps 32833 through sub_ADDA90 (Packet_gppStepOnBanana); Packet_gppStepOnBanana reader and writer bodies match cn-404's"
+  - value: 32834
+    direction: c2s
+    connection: both
+    name: gppWallState
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BB980 stamps 32834 through sub_ADDA90 (Packet_gppWallState); Packet_gppWallState reader and writer bodies match cn-404's"
+  - value: 32835
+    direction: c2s
+    connection: both
+    name: gppGotKicked
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BD080 stamps 32835 through sub_ADDA90 (Packet_gppGotKicked); Packet_gppGotKicked reader and writer bodies match cn-404's"
+  - value: 32836
+    direction: c2s
+    connection: both
+    name: gppDead
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BD110 stamps 32836 through sub_ADDA90 (Packet_gppDead); Packet_gppDead reader and writer bodies match cn-404's"
+  - value: 32837
+    direction: c2s
+    connection: both
+    name: gppKickEnd
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BD1A0 stamps 32837 through sub_ADDA90 (Packet_gppKickEnd); Packet_gppKickEnd reader and writer bodies match cn-404's"
+  - value: 32840
+    direction: c2s
+    connection: both
+    name: gppPing
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_622150 stamps 32840 through sub_ADDA90 (Packet_gppPing); Packet_gppPing reader and writer bodies match cn-404's"
+  - value: 32841
+    direction: c2s
+    connection: both
+    name: gppIniPacket
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sub_695CD0 stamps 32841 (paired with id-400 sub_65C740)"
+  - value: 32842
+    direction: c2s
+    connection: both
+    name: gppCreateMob
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_696750 stamps 32842 through sub_ADDA90 (Packet_gppCreateMob); Packet_gppCreateMob reader and writer bodies match cn-404's"
+  - value: 32843
+    direction: c2s
+    connection: both
+    name: gppMobFireBullet
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_696950 stamps 32843 through sub_ADDA90 (Packet_gppMobFireBullet); Packet_gppMobFireBullet reader and writer bodies match cn-404's"
+  - value: 32844
+    direction: c2s
+    connection: both
+    name: gppMobFireMelee
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_696C10 stamps 32844 through sub_ADDA90 (Packet_gppMobFireMelee); Packet_gppMobFireMelee reader and writer bodies match cn-404's"
+  - value: 32845
+    direction: c2s
+    connection: both
+    name: gppMobKnocked
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_696D20 stamps 32845 through sub_ADDA90 (Packet_gppMobKnocked); Packet_gppMobKnocked reader and writer bodies match cn-404's"
+  - value: 32846
+    direction: c2s
+    connection: both
+    name: gppMobDie
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_696E70 stamps 32846 through sub_ADDA90 (Packet_gppMobDie); Packet_gppMobDie reader and writer bodies match cn-404's"
+  - value: 32847
+    direction: c2s
+    connection: both
+    name: gppMobPush
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_696F10 stamps 32847 through sub_ADDA90 (Packet_gppMobPush); Packet_gppMobPush reader and writer bodies match cn-404's"
+  - value: 32848
+    direction: c2s
+    connection: both
+    name: gppMobTryKicked
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_6972C0 stamps 32848 through sub_ADDA90 (Packet_gppMobTryKicked); Packet_gppMobTryKicked reader and writer bodies match cn-404's"
+  - value: 32849
+    direction: c2s
+    connection: both
+    name: gppMobKicked
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_6973D0 stamps 32849 through sub_ADDA90 (Packet_gppMobKicked); Packet_gppMobKicked reader and writer bodies match cn-404's"
+  - value: 32852
+    direction: c2s
+    connection: both
+    name: gppMobTryRescued
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_697680 stamps 32852 through sub_ADDA90 (Packet_gppMobTryRescued); Packet_gppMobTryRescued reader and writer bodies match cn-404's"
+  - value: 32853
+    direction: c2s
+    connection: both
+    name: gppMobRescue
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_697790 stamps 32853 through sub_ADDA90 (Packet_gppMobRescue); Packet_gppMobRescue reader and writer bodies match cn-404's"
+  - value: 32857
+    direction: c2s
+    connection: both
+    name: gppCreateMobsFromSpawnGroup
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_694A70/sub_698230 stamps 32857 through sub_ADDA90 (Packet_gppCreateMobsFromSpawnGroup); Packet_gppCreateMobsFromSpawnGroup reader and writer bodies match cn-404's"
+  - value: 32859
+    direction: c2s
+    connection: both
+    name: gppSpawnMobsByTrigger
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_6982C0 stamps 32859 through sub_ADDA90 (Packet_gppSpawnMobsByTrigger); Packet_gppSpawnMobsByTrigger reader and writer bodies match cn-404's"
+  - value: 32860
+    direction: c2s
+    connection: both
+    name: gppCreateNpcBreakableModel
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_698470 stamps 32860 through sub_ADDA90 (Packet_gppCreateNpcBreakableModel); Packet_gppCreateNpcBreakableModel reader and writer bodies match cn-404's"
+  - value: 32861
+    direction: c2s
+    connection: both
+    name: gppRemoveAddableObject
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_698670 stamps 32861 through sub_ADDA90 (Packet_gppRemoveAddableObject); Packet_gppRemoveAddableObject reader and writer bodies match cn-404's"
+  - value: 32862
+    direction: c2s
+    connection: both
+    name: gppCreateSpawnGroupMemberMob
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_6987B0 stamps 32862 through sub_ADDA90 (Packet_gppCreateSpawnGroupMemberMob); Packet_gppCreateSpawnGroupMemberMob reader and writer bodies match cn-404's"
+  - value: 32863
+    direction: c2s
+    connection: both
+    name: gppActivateSpawnObjByTrigger
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_698350 stamps 32863 through sub_ADDA90 (Packet_gppActivateSpawnObjByTrigger); Packet_gppActivateSpawnObjByTrigger reader and writer bodies match cn-404's"
+  - value: 32864
+    direction: c2s
+    connection: both
+    name: gppTriggerLuaEvent
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_698A20 stamps 32864 through sub_ADDA90 (Packet_gppTriggerLuaEvent); Packet_gppTriggerLuaEvent reader and writer bodies match cn-404's"
+  - value: 32865
+    direction: c2s
+    connection: both
+    name: gppMobLuaMessage
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_697A20 stamps 32865 through sub_ADDA90 (Packet_gppMobLuaMessage); Packet_gppMobLuaMessage reader and writer bodies match cn-404's"
+  - value: 32866
+    direction: c2s
+    connection: both
+    name: gppHordeMobReplay
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sub_9DF9A0 stamps 32866 (paired with id-400 sub_9A0310)"
+  - value: 32876
+    direction: c2s
+    connection: both
+    name: gppSetNoTargetByMob
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_983C60 stamps 32876 through sub_ADDA90 (Packet_gppSetNoTargetByMob); Packet_gppSetNoTargetByMob reader and writer bodies match cn-404's"
+  - value: 32877
+    direction: c2s
+    connection: both
+    name: gppMobDropBombOnDead
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4C1150 stamps 32877 through sub_ADDA90 (Packet_gppMobDropBombOnDead); Packet_gppMobDropBombOnDead reader and writer bodies match cn-404's"
+  - value: 32882
+    direction: c2s
+    connection: both
+    name: gppGhost
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4C1280 stamps 32882 through sub_ADDA90 (Packet_gppGhost); Packet_gppGhost reader and writer bodies match cn-404's"
+  - value: 32886
+    direction: c2s
+    connection: both
+    name: gppCommandChat
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BB140 stamps 32886 through sub_ADDA90 (Packet_gppCommandChat); Packet_gppCommandChat reader and writer bodies match cn-404's"
+  - value: 32887
+    direction: c2s
+    connection: both
+    name: gppEmotion
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BB380 stamps 32887 through sub_ADDA90 (Packet_gppEmotion); Packet_gppEmotion reader and writer bodies match cn-404's"
+  - value: 32888
+    direction: c2s
+    connection: both
+    name: gppSyncUseItemSimply
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_9838B0 stamps 32888 through sub_ADDA90 (Packet_gppSyncUseItemSimply); Packet_gppSyncUseItemSimply reader and writer bodies match cn-404's"
+  - value: 32889
+    direction: c2s
+    connection: both
+    name: gppCharactersPlayData
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sub_4CA8F0 stamps 32889 (paired with id-400 sub_49CBB0)"
+  - value: 32890
+    direction: c2s
+    connection: both
+    name: gppRemoveUnit
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4D14C0 stamps 32890 through sub_ADDA90 (Packet_gppRemoveUnit); Packet_gppRemoveUnit reader and writer bodies match cn-404's"
+  - value: 32891
+    direction: c2s
+    connection: both
+    name: gppDummyUnitMotion
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4D13C0 stamps 32891 through sub_ADDA90 (Packet_gppDummyUnitMotion); Packet_gppDummyUnitMotion reader and writer bodies match cn-404's"
+  - value: 32892
+    direction: c2s
+    connection: both
+    name: gppCreateAIObject
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_5FA810 stamps 32892 through sub_ADDA90 (Packet_gppCreateAIObject); Packet_gppCreateAIObject reader and writer bodies match cn-404's"
+  - value: 32893
+    direction: c2s
+    connection: both
+    name: gppAgentMoveTo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4D49B0 stamps 32893 through sub_ADDA90 (Packet_gppAgentMoveTo); Packet_gppAgentMoveTo reader and writer bodies match cn-404's"
+  - value: 32894
+    direction: c2s
+    connection: both
+    name: gppUseItemDirect
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4D19B0 stamps 32894 through sub_ADDA90 (Packet_gppUseItemDirect); Packet_gppUseItemDirect reader and writer bodies match cn-404's"
+  - value: 32895
+    direction: c2s
+    connection: both
+    name: gppChangeTurretState
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4D1CE0 stamps 32895 through sub_ADDA90 (Packet_gppChangeTurretState); Packet_gppChangeTurretState reader and writer bodies match cn-404's"
+  - value: 32896
+    direction: c2s
+    connection: both
+    name: gppCharacterInfo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sub_4BD570 stamps 32896 (paired with id-400 sub_48F860)"
+  - value: 32897
+    direction: c2s
+    connection: both
+    name: gppCitizenHp
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4D5420 stamps 32897 through sub_ADDA90 (Packet_gppCitizenHp); Packet_gppCitizenHp reader and writer bodies match cn-404's"
+  - value: 32898
+    direction: c2s
+    connection: both
+    name: gppAggro
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4D55F0 stamps 32898 through sub_ADDA90 (Packet_gppAggro); Packet_gppAggro reader and writer bodies match cn-404's"
+  - value: 32899
+    direction: c2s
+    connection: both
+    name: gppFireBullet3
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BCAA0 stamps 32899 through sub_ADDA90 (Packet_gppFireBullet3); Packet_gppFireBullet3 reader and writer bodies match cn-404's"
+  - value: 32900
+    direction: c2s
+    connection: both
+    name: gppStormDamager
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BC120 stamps 32900 through sub_ADDA90 (Packet_gppStormDamager); Packet_gppStormDamager reader and writer bodies match cn-404's"
+  - value: 32901
+    direction: c2s
+    connection: both
+    name: gppSplashDamagerByDamager
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BBE80 stamps 32901 through sub_ADDA90 (Packet_gppSplashDamagerByDamager); Packet_gppSplashDamagerByDamager reader and writer bodies match cn-404's"
+  - value: 32902
+    direction: c2s
+    connection: both
+    name: gppFireBulletProper
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BCC30 stamps 32902 through sub_ADDA90 (Packet_gppFireBulletProper); Packet_gppFireBulletProper reader and writer bodies match cn-404's"
+  - value: 32904
+    direction: c2s
+    connection: both
+    name: gppPopOut2
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BD2C0 stamps 32904 through sub_ADDA90 (Packet_gppPopOut2); Packet_gppPopOut2 reader and writer bodies match cn-404's"
+  - value: 32907
+    direction: c2s
+    connection: both
+    name: gppDeleteDamager
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BAED0 stamps 32907 through sub_ADDA90 (Packet_gppDeleteDamager); Packet_gppDeleteDamager reader and writer bodies match cn-404's"
+  - value: 32908
+    direction: c2s
+    connection: both
+    name: gppTeleport
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4D5770 stamps 32908 through sub_ADDA90 (Packet_gppTeleport); Packet_gppTeleport reader and writer bodies match cn-404's"
+  - value: 32910
+    direction: c2s
+    connection: both
+    name: gppStormDamagerItemId
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BC040 stamps 32910 through sub_ADDA90 (Packet_gppStormDamagerItemId); Packet_gppStormDamagerItemId reader and writer bodies match cn-404's"
+  - value: 32911
+    direction: c2s
+    connection: both
+    name: gppShocked2
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BE670 stamps 32911 through sub_ADDA90 (Packet_gppShocked2); Packet_gppShocked2 reader and writer bodies match cn-404's"
+  - value: 32913
+    direction: c2s
+    connection: both
+    name: gppZombieBossState
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4D5860 stamps 32913 through sub_ADDA90 (Packet_gppZombieBossState); Packet_gppZombieBossState reader and writer bodies match cn-404's"
+  - value: 32914
+    direction: c2s
+    connection: both
+    name: gppZombieBossHp
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4D5500 stamps 32914 through sub_ADDA90 (Packet_gppZombieBossHp); Packet_gppZombieBossHp reader and writer bodies match cn-404's"
+  - value: 32916
+    direction: c2s
+    connection: both
+    name: gppDeleteStormDamagerAOE
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BAE40 stamps 32916 through sub_ADDA90 (Packet_gppDeleteStormDamagerAOE); Packet_gppDeleteStormDamagerAOE reader and writer bodies match cn-404's"
+  - value: 32918
+    direction: c2s
+    connection: both
+    name: gppAIState
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4D58F0 stamps 32918 through sub_ADDA90 (Packet_gppAIState); Packet_gppAIState reader and writer bodies match cn-404's"
+  - value: 32919
+    direction: c2s
+    connection: both
+    name: gppCreateAISubordinate
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4D63B0 stamps 32919 through sub_ADDA90 (Packet_gppCreateAISubordinate); Packet_gppCreateAISubordinate reader and writer bodies match cn-404's"
+  - value: 32921
+    direction: c2s
+    connection: both
+    name: gppLifePoint
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4BC410 stamps 32921 through sub_ADDA90 (Packet_gppLifePoint); Packet_gppLifePoint reader and writer bodies match cn-404's"
+  - value: 32772
+    direction: s2c
+    connection: both
+    name: gppSplashDamager
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32772 (Packet_gppSplashDamager); Packet_gppSplashDamager reader and writer bodies match cn-404's"
+  - value: 32773
+    direction: s2c
+    connection: both
+    name: gppNearDamager
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32773 (Packet_gppNearDamager); Packet_gppNearDamager reader and writer bodies match cn-404's"
+  - value: 32774
+    direction: s2c
+    connection: both
+    name: gppDeleteObject
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32774 (Packet_gppDeleteObject); Packet_gppDeleteObject reader and writer bodies match cn-404's"
+  - value: 32776
+    direction: s2c
+    connection: both
+    name: gppExplodeBullet
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32776 (Packet_gppExplodeBullet); Packet_gppExplodeBullet reader and writer bodies match cn-404's"
+  - value: 32777
+    direction: s2c
+    connection: both
+    name: gppDamageObject
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32777 (Packet_gppDamageObject); Packet_gppDamageObject reader and writer bodies match cn-404's"
+  - value: 32778
+    direction: s2c
+    connection: both
+    name: gppKillObject
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32778 (Packet_gppKillObject); Packet_gppKillObject reader and writer bodies match cn-404's"
+  - value: 32779
+    direction: s2c
+    connection: both
+    name: gppDash
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32779 (Packet_gppDash); Packet_gppDash reader and writer bodies match cn-404's"
+  - value: 32780
+    direction: s2c
+    connection: both
+    name: gppRoll
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32780 (Packet_gppRoll); Packet_gppRoll reader and writer bodies match cn-404's"
+  - value: 32781
+    direction: s2c
+    connection: both
+    name: gppJump
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32781 (Packet_gppJump); Packet_gppJump reader and writer bodies match cn-404's"
+  - value: 32782
+    direction: s2c
+    connection: both
+    name: gppAim
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32782 (Packet_gppAim); Packet_gppAim reader and writer bodies match cn-404's"
+  - value: 32783
+    direction: s2c
+    connection: both
+    name: gppSetTargettingObj
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32783 (Packet_gppSetTargettingObj); Packet_gppSetTargettingObj reader and writer bodies match cn-404's"
+  - value: 32784
+    direction: s2c
+    connection: both
+    name: gppBubbleJump
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32784 (Packet_gppBubbleJump); Packet_gppBubbleJump reader and writer bodies match cn-404's"
+  - value: 32785
+    direction: s2c
+    connection: both
+    name: gppWalkFast
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32785 (Packet_gppWalkFast); Packet_gppWalkFast reader and writer bodies match cn-404's"
+  - value: 32786
+    direction: s2c
+    connection: both
+    name: gppWallAction
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32786 (Packet_gppWallAction); Packet_gppWallAction reader and writer bodies match cn-404's"
+  - value: 32787
+    direction: s2c
+    connection: both
+    name: gppKnocked
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32787 (Packet_gppKnocked); layout differences in packets/"
+  - value: 32788
+    direction: s2c
+    connection: both
+    name: gppStunned
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32788 (Packet_gppStunned); Packet_gppStunned reader and writer bodies match cn-404's"
+  - value: 32789
+    direction: s2c
+    connection: both
+    name: gppShocked
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32789 (Packet_gppShocked); Packet_gppShocked reader and writer bodies match cn-404's"
+  - value: 32790
+    direction: s2c
+    connection: both
+    name: gppEndStunned
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32790 (Packet_gppEndStunned); Packet_gppEndStunned reader and writer bodies match cn-404's"
+  - value: 32791
+    direction: s2c
+    connection: both
+    name: gppKickStart
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32791 (Packet_gppKickStart); Packet_gppKickStart reader and writer bodies match cn-404's"
+  - value: 32792
+    direction: s2c
+    connection: both
+    name: gppKickFail
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32792 (Packet_gppKickFail); Packet_gppKickFail reader and writer bodies match cn-404's"
+  - value: 32793
+    direction: s2c
+    connection: both
+    name: gppTryRescued
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32793 (Packet_gppTryRescued); Packet_gppTryRescued reader and writer bodies match cn-404's"
+  - value: 32794
+    direction: s2c
+    connection: both
+    name: gppTryKicked
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32794 (Packet_gppTryKicked); Packet_gppTryKicked reader and writer bodies match cn-404's"
+  - value: 32795
+    direction: s2c
+    connection: both
+    name: gppKicked
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32795 (Packet_gppKicked); Packet_gppKicked reader and writer bodies match cn-404's"
+  - value: 32796
+    direction: s2c
+    connection: both
+    name: gppKickedNoPang
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32796 (Packet_gppKickedNoPang); Packet_gppKickedNoPang reader and writer bodies match cn-404's"
+  - value: 32798
+    direction: s2c
+    connection: both
+    name: gppMeleeReady
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32798 (Packet_gppMeleeReady); Packet_gppMeleeReady reader and writer bodies match cn-404's"
+  - value: 32800
+    direction: s2c
+    connection: both
+    name: gppChangeState
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32800 (Packet_gppChangeState); Packet_gppChangeState reader and writer bodies match cn-404's"
+  - value: 32801
+    direction: s2c
+    connection: both
+    name: gppLockInto
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32801 (Packet_gppLockInto); Packet_gppLockInto reader and writer bodies match cn-404's"
+  - value: 32805
+    direction: s2c
+    connection: both
+    name: gppDying
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32805 (Packet_gppDying); Packet_gppDying reader and writer bodies match cn-404's"
+  - value: 32806
+    direction: s2c
+    connection: both
+    name: gppPopOut
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32806 (Packet_gppPopOut); Packet_gppPopOut reader and writer bodies match cn-404's"
+  - value: 32807
+    direction: s2c
+    connection: both
+    name: gppRescue
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32807 (Packet_gppRescue); Packet_gppRescue reader and writer bodies match cn-404's"
+  - value: 32809
+    direction: s2c
+    connection: both
+    name: gppClimbWall
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32809 (Packet_gppClimbWall); Packet_gppClimbWall reader and writer bodies match cn-404's"
+  - value: 32810
+    direction: s2c
+    connection: both
+    name: gppUpdateWeaponInfo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32810 (Packet_gppUpdateWeaponInfo); Packet_gppUpdateWeaponInfo reader and writer bodies match cn-404's"
+  - value: 32811
+    direction: s2c
+    connection: both
+    name: gppReload
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32811 (Packet_gppReload); Packet_gppReload reader and writer bodies match cn-404's"
+  - value: 32812
+    direction: s2c
+    connection: both
+    name: gppResetChrAttr
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32812 (Packet_gppResetChrAttr); Packet_gppResetChrAttr reader and writer bodies match cn-404's"
+  - value: 32813
+    direction: s2c
+    connection: both
+    name: gppReturnToNormal
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32813 (Packet_gppReturnToNormal); Packet_gppReturnToNormal reader and writer bodies match cn-404's"
+  - value: 32815
+    direction: s2c
+    connection: both
+    name: gppHumiliationStart
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32815 (Packet_gppHumiliationStart); Packet_gppHumiliationStart reader and writer bodies match cn-404's"
+  - value: 32816
+    direction: s2c
+    connection: both
+    name: gppHumiliationEnd
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32816 (Packet_gppHumiliationEnd); Packet_gppHumiliationEnd reader and writer bodies match cn-404's"
+  - value: 32818
+    direction: s2c
+    connection: both
+    name: gppStickGrenadeTo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32818 (Packet_gppStickGrenadeTo); Packet_gppStickGrenadeTo reader and writer bodies match cn-404's"
+  - value: 32822
+    direction: s2c
+    connection: both
+    name: gppCreateNPC
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32822 (Packet_gppCreateNPC); Packet_gppCreateNPC reader and writer bodies match cn-404's"
+  - value: 32823
+    direction: s2c
+    connection: both
+    name: gppRespawnNPC
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32823 (Packet_gppRespawnNPC); Packet_gppRespawnNPC reader and writer bodies match cn-404's"
+  - value: 32824
+    direction: s2c
+    connection: both
+    name: gppItemUseResult
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32824 (Packet_gppItemUseResult); Packet_gppItemUseResult reader and writer bodies match cn-404's"
+  - value: 32829
+    direction: s2c
+    connection: both
+    name: gppHitByItem
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32829 (Packet_gppHitByItem); Packet_gppHitByItem reader and writer bodies match cn-404's"
+  - value: 32830
+    direction: s2c
+    connection: both
+    name: gppEndMagnet
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32830 (Packet_gppEndMagnet); Packet_gppEndMagnet reader and writer bodies match cn-404's"
+  - value: 32832
+    direction: s2c
+    connection: both
+    name: gppCreateMapItem
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32832 (Packet_gppCreateMapItem); Packet_gppCreateMapItem reader and writer bodies match cn-404's"
+  - value: 32833
+    direction: s2c
+    connection: both
+    name: gppStepOnBanana
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32833 (Packet_gppStepOnBanana); Packet_gppStepOnBanana reader and writer bodies match cn-404's"
+  - value: 32834
+    direction: s2c
+    connection: both
+    name: gppWallState
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32834 (Packet_gppWallState); Packet_gppWallState reader and writer bodies match cn-404's"
+  - value: 32835
+    direction: s2c
+    connection: both
+    name: gppGotKicked
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32835 (Packet_gppGotKicked); Packet_gppGotKicked reader and writer bodies match cn-404's"
+  - value: 32836
+    direction: s2c
+    connection: both
+    name: gppDead
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32836 (Packet_gppDead); Packet_gppDead reader and writer bodies match cn-404's"
+  - value: 32837
+    direction: s2c
+    connection: both
+    name: gppKickEnd
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32837 (Packet_gppKickEnd); Packet_gppKickEnd reader and writer bodies match cn-404's"
+  - value: 32840
+    direction: s2c
+    connection: both
+    name: gppPing
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32840 (Packet_gppPing); Packet_gppPing reader and writer bodies match cn-404's"
+  - value: 32841
+    direction: s2c
+    connection: both
+    name: gppIniPacket
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sub_695CD0 stamps 32841 (paired with id-400 sub_65C740); read back under the same number"
+  - value: 32842
+    direction: s2c
+    connection: both
+    name: gppCreateMob
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_6959D0 case 32842 (Packet_gppCreateMob); Packet_gppCreateMob reader and writer bodies match cn-404's"
+  - value: 32843
+    direction: s2c
+    connection: both
+    name: gppMobFireBullet
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_6959D0 case 32843 (Packet_gppMobFireBullet); Packet_gppMobFireBullet reader and writer bodies match cn-404's"
+  - value: 32844
+    direction: s2c
+    connection: both
+    name: gppMobFireMelee
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_6959D0 case 32844 (Packet_gppMobFireMelee); Packet_gppMobFireMelee reader and writer bodies match cn-404's"
+  - value: 32845
+    direction: s2c
+    connection: both
+    name: gppMobKnocked
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_6959D0 case 32845 (Packet_gppMobKnocked); Packet_gppMobKnocked reader and writer bodies match cn-404's"
+  - value: 32846
+    direction: s2c
+    connection: both
+    name: gppMobDie
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_6959D0 case 32846 (Packet_gppMobDie); Packet_gppMobDie reader and writer bodies match cn-404's"
+  - value: 32847
+    direction: s2c
+    connection: both
+    name: gppMobPush
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_6959D0 case 32847 (Packet_gppMobPush); Packet_gppMobPush reader and writer bodies match cn-404's"
+  - value: 32848
+    direction: s2c
+    connection: both
+    name: gppMobTryKicked
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_6959D0 case 32848 (Packet_gppMobTryKicked); Packet_gppMobTryKicked reader and writer bodies match cn-404's"
+  - value: 32849
+    direction: s2c
+    connection: both
+    name: gppMobKicked
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_6959D0 case 32849 (Packet_gppMobKicked); Packet_gppMobKicked reader and writer bodies match cn-404's"
+  - value: 32852
+    direction: s2c
+    connection: both
+    name: gppMobTryRescued
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_6959D0 case 32852 (Packet_gppMobTryRescued); Packet_gppMobTryRescued reader and writer bodies match cn-404's"
+  - value: 32853
+    direction: s2c
+    connection: both
+    name: gppMobRescue
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_6959D0 case 32853 (Packet_gppMobRescue); Packet_gppMobRescue reader and writer bodies match cn-404's"
+  - value: 32857
+    direction: s2c
+    connection: both
+    name: gppCreateMobsFromSpawnGroup
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_6959D0 case 32857 (Packet_gppCreateMobsFromSpawnGroup); Packet_gppCreateMobsFromSpawnGroup reader and writer bodies match cn-404's"
+  - value: 32859
+    direction: s2c
+    connection: both
+    name: gppSpawnMobsByTrigger
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_6959D0 case 32859 (Packet_gppSpawnMobsByTrigger); Packet_gppSpawnMobsByTrigger reader and writer bodies match cn-404's"
+  - value: 32860
+    direction: s2c
+    connection: both
+    name: gppCreateNpcBreakableModel
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_6959D0 case 32860 (Packet_gppCreateNpcBreakableModel); Packet_gppCreateNpcBreakableModel reader and writer bodies match cn-404's"
+  - value: 32861
+    direction: s2c
+    connection: both
+    name: gppRemoveAddableObject
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_6959D0 case 32861 (Packet_gppRemoveAddableObject); Packet_gppRemoveAddableObject reader and writer bodies match cn-404's"
+  - value: 32862
+    direction: s2c
+    connection: both
+    name: gppCreateSpawnGroupMemberMob
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_6959D0 case 32862 (Packet_gppCreateSpawnGroupMemberMob); Packet_gppCreateSpawnGroupMemberMob reader and writer bodies match cn-404's"
+  - value: 32863
+    direction: s2c
+    connection: both
+    name: gppActivateSpawnObjByTrigger
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_6959D0 case 32863 (Packet_gppActivateSpawnObjByTrigger); Packet_gppActivateSpawnObjByTrigger reader and writer bodies match cn-404's"
+  - value: 32864
+    direction: s2c
+    connection: both
+    name: gppTriggerLuaEvent
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_6959D0 case 32864 (Packet_gppTriggerLuaEvent); Packet_gppTriggerLuaEvent reader and writer bodies match cn-404's"
+  - value: 32865
+    direction: s2c
+    connection: both
+    name: gppMobLuaMessage
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_6959D0 case 32865 (Packet_gppMobLuaMessage); Packet_gppMobLuaMessage reader and writer bodies match cn-404's"
+  - value: 32866
+    direction: s2c
+    connection: both
+    name: gppHordeMobReplay
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sub_9DF9A0 stamps 32866 (paired with id-400 sub_9A0310); read back under the same number"
+  - value: 32876
+    direction: s2c
+    connection: both
+    name: gppSetNoTargetByMob
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_9EE570 case 32876 (Packet_gppSetNoTargetByMob); Packet_gppSetNoTargetByMob reader and writer bodies match cn-404's"
+  - value: 32877
+    direction: s2c
+    connection: both
+    name: gppMobDropBombOnDead
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32877 (Packet_gppMobDropBombOnDead); Packet_gppMobDropBombOnDead reader and writer bodies match cn-404's"
+  - value: 32882
+    direction: s2c
+    connection: both
+    name: gppGhost
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32882 (Packet_gppGhost); Packet_gppGhost reader and writer bodies match cn-404's"
+  - value: 32886
+    direction: s2c
+    connection: both
+    name: gppCommandChat
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32886 (Packet_gppCommandChat); Packet_gppCommandChat reader and writer bodies match cn-404's"
+  - value: 32887
+    direction: s2c
+    connection: both
+    name: gppEmotion
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32887 (Packet_gppEmotion); Packet_gppEmotion reader and writer bodies match cn-404's"
+  - value: 32888
+    direction: s2c
+    connection: both
+    name: gppSyncUseItemSimply
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32888 (Packet_gppSyncUseItemSimply); Packet_gppSyncUseItemSimply reader and writer bodies match cn-404's"
+  - value: 32889
+    direction: s2c
+    connection: both
+    name: gppCharactersPlayData
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sub_4CA8F0 stamps 32889; read back under the same number"
+  - value: 32890
+    direction: s2c
+    connection: both
+    name: gppRemoveUnit
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32890 (Packet_gppRemoveUnit); Packet_gppRemoveUnit reader and writer bodies match cn-404's"
+  - value: 32891
+    direction: s2c
+    connection: both
+    name: gppDummyUnitMotion
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32891 (Packet_gppDummyUnitMotion); Packet_gppDummyUnitMotion reader and writer bodies match cn-404's"
+  - value: 32892
+    direction: s2c
+    connection: both
+    name: gppCreateAIObject
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32892 (Packet_gppCreateAIObject); Packet_gppCreateAIObject reader and writer bodies match cn-404's"
+  - value: 32893
+    direction: s2c
+    connection: both
+    name: gppAgentMoveTo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32893 (Packet_gppAgentMoveTo); Packet_gppAgentMoveTo reader and writer bodies match cn-404's"
+  - value: 32894
+    direction: s2c
+    connection: both
+    name: gppUseItemDirect
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32894 (Packet_gppUseItemDirect); Packet_gppUseItemDirect reader and writer bodies match cn-404's"
+  - value: 32895
+    direction: s2c
+    connection: both
+    name: gppChangeTurretState
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32895 (Packet_gppChangeTurretState); Packet_gppChangeTurretState reader and writer bodies match cn-404's"
+  - value: 32896
+    direction: s2c
+    connection: both
+    name: gppCharacterInfo
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sub_4BD570 stamps 32896; read back under the same number"
+  - value: 32897
+    direction: s2c
+    connection: both
+    name: gppCitizenHp
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32897 (Packet_gppCitizenHp); Packet_gppCitizenHp reader and writer bodies match cn-404's"
+  - value: 32898
+    direction: s2c
+    connection: both
+    name: gppAggro
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32898 (Packet_gppAggro); Packet_gppAggro reader and writer bodies match cn-404's"
+  - value: 32899
+    direction: s2c
+    connection: both
+    name: gppFireBullet3
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32899 (Packet_gppFireBullet3); Packet_gppFireBullet3 reader and writer bodies match cn-404's"
+  - value: 32900
+    direction: s2c
+    connection: both
+    name: gppStormDamager
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32900 (Packet_gppStormDamager); Packet_gppStormDamager reader and writer bodies match cn-404's"
+  - value: 32901
+    direction: s2c
+    connection: both
+    name: gppSplashDamagerByDamager
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32901 (Packet_gppSplashDamagerByDamager); Packet_gppSplashDamagerByDamager reader and writer bodies match cn-404's"
+  - value: 32902
+    direction: s2c
+    connection: both
+    name: gppFireBulletProper
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32902 (Packet_gppFireBulletProper); Packet_gppFireBulletProper reader and writer bodies match cn-404's"
+  - value: 32904
+    direction: s2c
+    connection: both
+    name: gppPopOut2
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32904 (Packet_gppPopOut2); Packet_gppPopOut2 reader and writer bodies match cn-404's"
+  - value: 32907
+    direction: s2c
+    connection: both
+    name: gppDeleteDamager
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32907 (Packet_gppDeleteDamager); Packet_gppDeleteDamager reader and writer bodies match cn-404's"
+  - value: 32908
+    direction: s2c
+    connection: both
+    name: gppTeleport
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32908 (Packet_gppTeleport); Packet_gppTeleport reader and writer bodies match cn-404's"
+  - value: 32910
+    direction: s2c
+    connection: both
+    name: gppStormDamagerItemId
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32910 (Packet_gppStormDamagerItemId); Packet_gppStormDamagerItemId reader and writer bodies match cn-404's"
+  - value: 32911
+    direction: s2c
+    connection: both
+    name: gppShocked2
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32911 (Packet_gppShocked2); Packet_gppShocked2 reader and writer bodies match cn-404's"
+  - value: 32913
+    direction: s2c
+    connection: both
+    name: gppZombieBossState
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32913 (Packet_gppZombieBossState); Packet_gppZombieBossState reader and writer bodies match cn-404's"
+  - value: 32914
+    direction: s2c
+    connection: both
+    name: gppZombieBossHp
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32914 (Packet_gppZombieBossHp); Packet_gppZombieBossHp reader and writer bodies match cn-404's"
+  - value: 32916
+    direction: s2c
+    connection: both
+    name: gppDeleteStormDamagerAOE
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32916 (Packet_gppDeleteStormDamagerAOE); Packet_gppDeleteStormDamagerAOE reader and writer bodies match cn-404's"
+  - value: 32918
+    direction: s2c
+    connection: both
+    name: gppAIState
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32918 (Packet_gppAIState); Packet_gppAIState reader and writer bodies match cn-404's"
+  - value: 32919
+    direction: s2c
+    connection: both
+    name: gppCreateAISubordinate
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32919 (Packet_gppCreateAISubordinate); Packet_gppCreateAISubordinate reader and writer bodies match cn-404's"
+  - value: 32921
+    direction: s2c
+    connection: both
+    name: gppLifePoint
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 32921 (Packet_gppLifePoint); Packet_gppLifePoint reader and writer bodies match cn-404's"
+  - value: 509
+    direction: s2c
+    name: gspRoomReceiveChatModuleMsg
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7B2F40 case 509 (Packet_gspRoomReceiveChatModuleMsg); layout differences in packets/"
+  - value: 511
+    direction: c2s
+    name: gcpSendSessionChrPos
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 sub_8E1A30 builds Packet_gcpSendSessionChrPos and calls the helper cn-408 sub_8E3CC0, which stamps 511"
+  - value: 702
+    direction: c2s
+    name: gcpGameReportMapData
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_4B8E90 stamps 702 through sub_ADDA90 (Packet_gcpGameReportMapData); Packet_gcpGameReportMapData reader and writer bodies match cn-404's"
+  - value: 804
+    direction: c2s
+    name: gcpReqInventoryUnequip
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 sender sub_927CD0 stamps 804 through sub_ADDA90 (Packet_gcpReqInventoryUnequip)"
+  - value: 504
+    direction: s2c
+    name: gspRoomChangeTeam
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7B2F40 case 504 (Packet_gspRoomChangeTeam); Packet_gspRoomChangeTeam reader and writer bodies match cn-404's"
+  - value: 506
+    direction: s2c
+    name: gspRoomChangeInventory
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7B2F40 case 506 (Packet_gspRoomChangeInventory); Packet_gspRoomChangeInventory reader and writer bodies match cn-404's"
+  - value: 507
+    direction: s2c
+    name: gspRoomRepChangeMaster
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 sub_7B2F40 case0x1FB -> cn-408 sub_7B8640; Packet_gspRoomRepChangeMaster reader cn-408 sub_7B2100 reads target nickname then result"
+  - value: 508
+    direction: s2c
+    name: gspRoomReceiveChatMsg
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7B2F40 case 508 (Packet_gspRoomReceiveChatMsg); Packet_gspRoomReceiveChatMsg reader and writer bodies match cn-404's"
+  - value: 519
+    direction: s2c
+    name: gspHordeModeRewardList
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7B2F40 case 519 (Packet_gspHordeModeRewardList); Packet_gspHordeModeRewardList reader and writer bodies match cn-404's"
+  - value: 607
+    direction: s2c
+    name: gspTryHolePunching
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7B2F40 case 607 (Packet_gspTryHolePunching); Packet_gspTryHolePunching reader and writer bodies match cn-404's"
+  - value: 609
+    direction: s2c
+    name: gspNotifyUdpToServerReceived
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7B2F40 case 609 (Packet_gspNotifyUdpToServerReceived); Packet_gspNotifyUdpToServerReceived reader and writer bodies match cn-404's"
+  - value: 610
+    direction: s2c
+    name: gspTableSetHolePunching
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7B2F40 case 610 (Packet_gspTableSetHolePunching); Packet_gspTableSetHolePunching reader and writer bodies match cn-404's"
+  - value: 711
+    direction: s2c
+    name: gspGameCreateGameItem
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50/sub_7B2F40 case 711 (Packet_gspGameCreateGameItem); Packet_gspGameCreateGameItem reader and writer bodies match cn-404's"
+  - value: 712
+    direction: s2c
+    name: gspItemEaten
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 712 (Packet_gspItemEaten); Packet_gspItemEaten reader and writer bodies match cn-404's"
+  - value: 713
+    direction: s2c
+    name: gspAddItemToSlot
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 713 (Packet_gspAddItemToSlot); Packet_gspAddItemToSlot reader and writer bodies match cn-404's"
+  - value: 714
+    direction: s2c
+    name: gspItemUsed
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 714 (Packet_gspItemUsed); Packet_gspItemUsed reader and writer bodies match cn-404's"
+  - value: 715
+    direction: s2c
+    name: gspPveItemUsed
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 715 (Packet_gspPveItemUsed); Packet_gspPveItemUsed reader and writer bodies match cn-404's"
+  - value: 718
+    direction: s2c
+    name: gspGameCreateEventBox
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 play dispatcher sub_4B7E50 case 0x2CE -> sub_4C6E00: kind 1 builds GoEventBoxItem (cn-408 sub_5E8220) and kind 3 builds GoHordeAwardBoxItem (cn-408 sub_5E87A0); cn-404 sub_4C7450 handled kind 1 only; vtable CAC740 reader sub_4AE500 has the body of cn-404 sub_4AEA00; packets/lucci-drops.yaml"
+  - value: 720
+    direction: s2c
+    name: gspGameCreateLucci
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 play dispatcher sub_4B7E50 case 0x2D0 -> sub_4C6F30: kind 1 builds GoLucciItem (cn-408 sub_5EA440), 2 GoBigLucciItem (sub_5E6CB0), 3/4/5 GoHordeAward1/5/10LucciItem (sub_5EB0A0/sub_5EB500/sub_5EB970); cn-404 sub_4C7510 returned for 3/4/5; vtable CAC74C reader sub_4AE500; packets/lucci-drops.yaml"
+  - value: 721
+    direction: s2c
+    name: gspLucciEaten
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 play dispatcher sub_4B7E50 case 0x2D1 -> sub_4C2690, body of cn-404 sub_4C2D10; vtable CAC758 reader sub_4AF4C0 has the body of cn-404 sub_4AF1B0; packets/lucci-drops.yaml"
+  - value: 729
+    direction: s2c
+    name: gspGameBroadcastPlayerScoreData
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7B2F40 case 729 (Packet_gspGameBroadcastPlayerScoreData); Packet_gspGameBroadcastPlayerScoreData reader and writer bodies match cn-404's"
+  - value: 730
+    direction: s2c
+    name: gspGameRespawnCharacter
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 730 (Packet_gspGameRespawnCharacter); Packet_gspGameRespawnCharacter reader and writer bodies match cn-404's"
+  - value: 731
+    direction: s2c
+    name: gspGameExtendRespawn
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 731 (Packet_gspGameExtendRespawn); Packet_gspGameExtendRespawn reader and writer bodies match cn-404's"
+  - value: 732
+    direction: s2c
+    name: gspGameTimeOverEnd
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7B2F40 case 732 (Packet_gspGameTimeOverEnd); Packet_gspGameTimeOverEnd reader and writer bodies match cn-404's"
+  - value: 733
+    direction: s2c
+    name: gspGameShowResult_
+    name_source: coined
+    evidence: verified
+    source: "cn-408 room dispatcher sub_7B2F40 case 0x2DD calls cn-408 sub_574080 without reading a body, as id-400 sub_7833E0 case 733"
+    notes: "id-400 sub_6C14C0 requires a nonzero outcome at result-state +944 and moves the reward stage to 3"
+  - value: 734
+    direction: s2c
+    name: gspGameAwardDialog
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7B2F40 case 734 (Packet_gspGameAwardDialog); Packet_gspGameAwardDialog reader and writer bodies match cn-404's"
+  - value: 736
+    direction: s2c
+    name: gspGameReturnAfterAward_
+    name_source: coined
+    evidence: verified
+    source: "cn-408 room dispatcher sub_7B2F40 case 0x2E0 calls cn-408 sub_7BB2A0 without reading a body, as id-400 sub_7833E0 case 736"
+  - value: 737
+    direction: s2c
+    name: gspGamePreCountDown
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 737 (Packet_gspGamePreCountDown); Packet_gspGamePreCountDown reader and writer bodies match cn-404's"
+  - value: 739
+    direction: s2c
+    name: gspGamePrepareLucciEvent
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7B2F40 case 739 (Packet_gspGamePrepareLucciEvent); Packet_gspGamePrepareLucciEvent reader and writer bodies match cn-404's"
+  - value: 740
+    direction: s2c
+    name: gspGamePrepareSoccerEvent
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7B2F40 case 740 (Packet_gspGamePrepareSoccerEvent); Packet_gspGamePrepareSoccerEvent reader and writer bodies match cn-404's"
+  - value: 741
+    direction: s2c
+    name: gspGamePrepareHordeZHEvent
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7B2F40 case 741 (Packet_gspGamePrepareHordeZHEvent); Packet_gspGamePrepareHordeZHEvent reader and writer bodies match cn-404's"
+  - value: 742
+    direction: s2c
+    name: gspGamePrepareMoleEvent
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7B2F40 case 742 (Packet_gspGamePrepareMoleEvent); Packet_gspGamePrepareMoleEvent reader and writer bodies match cn-404's"
+  - value: 743
+    direction: s2c
+    name: gspRepAwardSelectSuccess
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7B2F40 case 743 (Packet_gspRepAwardSelectSuccess); Packet_gspRepAwardSelectSuccess reader and writer bodies match cn-404's"
+  - value: 744
+    direction: s2c
+    name: gspRepAwardSelectFail
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7B2F40 case 744 (Packet_gspRepAwardSelectFail); Packet_gspRepAwardSelectFail reader and writer bodies match cn-404's"
+  - value: 747
+    direction: s2c
+    name: gspSwitchItemSlot
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 dispatcher sub_4B7E50 case 747 (Packet_gspSwitchItemSlot); Packet_gspSwitchItemSlot reader and writer bodies match cn-404's"
+  - value: 748
+    direction: s2c
+    name: gspGameItemSpec
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7B2F40 case 748 (Packet_gspGameItemSpec); Packet_gspGameItemSpec reader and writer bodies match cn-404's"
+  - value: 904
+    direction: s2c
+    name: gspRepStartNewWave
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_9EE570 case 904 (Packet_gspRepStartNewWave); Packet_gspRepStartNewWave reader and writer bodies match cn-404's"
+  - value: 905
+    direction: s2c
+    name: gspRepEndWave
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_9EE570 case 905 (Packet_gspRepEndWave); Packet_gspRepEndWave reader and writer bodies match cn-404's"
+  - value: 908
+    direction: s2c
+    name: Unknown908
+    name_source: none
+    evidence: verified
+    source: "cn-408 sub_9EE570 case 0x38C calls cn-408 sub_9CF670 (paired with id-400 sub_98FF00) without reading a body"
+  - value: 909
+    direction: s2c
+    name: gspRepWaveAllSpawnMobs
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_9EE570 case 909 (Packet_gspRepWaveAllSpawnMobs); Packet_gspRepWaveAllSpawnMobs reader and writer bodies match cn-404's"
+  - value: 924
+    direction: s2c
+    name: gspMapMissionInfo
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7B2F40 case 924 (Packet_gspMapMissionInfo); Packet_gspMapMissionInfo reader and writer bodies match cn-404's"
+  - value: 925
+    direction: s2c
+    name: gspResMissionStart
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7B2F40 case 925 (Packet_gspResMissionStart); Packet_gspResMissionStart reader and writer bodies match cn-404's"
+  - value: 926
+    direction: s2c
+    name: gspResMissionTimeOut
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7B2F40 case 926 (Packet_gspResMissionTimeOut); Packet_gspResMissionTimeOut reader and writer bodies match cn-404's"
+  - value: 927
+    direction: s2c
+    name: gspResMissionOK
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7B2F40 case 927 (Packet_gspResMissionOK); Packet_gspResMissionOK reader and writer bodies match cn-404's"
+  - value: 928
+    direction: s2c
+    name: gspNotifyGamePoint
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7B2F40 case 928 (Packet_gspNotifyGamePoint); Packet_gspNotifyGamePoint reader and writer bodies match cn-404's"
+  - value: 929
+    direction: s2c
+    name: gspNotifyRankInfo
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7B2F40 case 929 (Packet_gspNotifyRankInfo); Packet_gspNotifyRankInfo reader and writer bodies match cn-404's"
+  - value: 930
+    direction: s2c
+    name: gspPveItemInfo
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 dispatcher sub_7B2F40 case 930 (Packet_gspPveItemInfo); Packet_gspPveItemInfo reader and writer bodies match cn-404's"
+  - value: 931
+    direction: s2c
+    name: gspCompensationItemNoti
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-408 dispatcher sub_7B2F40 case 931 (Packet_gspCompensationItemNoti); Packet_gspCompensationItemNoti reader and writer bodies match cn-404's"
+  - value: 514
+    direction: s2c
+    name: gspReceiveSessionChrPos
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 room dispatcher sub_7B2F40 case 0x202 -> handler sub_7BD1D0 builds Packet_gspReceiveSessionChrPos, as id-400 sub_78D300"
+  - value: 523
+    direction: s2c
+    name: gspReceiveSessionInit
+    name_source: label@cn-408
+    evidence: inferred
+    source: "cn-408 room dispatcher sub_7B2F40 case 0x20B -> handler sub_7BD170 reads the packet through its vtable; the build's catalog labels 523 gspReceiveSessionInit (kr-812 has it at 524; id-400 has no such class)"
+  - value: 716
+    direction: s2c
+    name: gspGameCreateStar
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 play dispatcher sub_4B7E50 case 0x2CC -> sub_4C6CD0 builds Packet_gspGameCreateStar (line 162958; vtable CAC71C, reader sub_4AE500 is gspGameCreateLucci's reader, nine words); packets/lucci-drops.yaml"
+  - value: 717
+    direction: s2c
+    name: gspStarEaten
+    name_source: label@cn-408
+    evidence: verified
+    source: "cn-408 play dispatcher sub_4B7E50 case 0x2CD -> sub_4C1530 builds Packet_gspStarEaten (line 158962; vtable CAC728, reader sub_4AF4C0 is gspLucciEaten's reader, two u32); packets/lucci-drops.yaml"
+  - value: 823
+    direction: c2s
+    name: gcpReqPresentDeleteReceive
+    name_source: label@cn-408
+    evidence: inferred
+    source: "Packet_gcpReqPresentDeleteReceive is constructed before the stamping call of cn-408 sub_9111B0 / sub_9126A0: removing a gift from the received list (id); layout in packets/present.yaml"

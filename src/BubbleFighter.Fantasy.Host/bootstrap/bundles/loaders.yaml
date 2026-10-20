@@ -1,0 +1,13 @@
+- id: definitions
+  plugin: loader.native
+  lifecycle:
+    effect_capacity: 64
+    entry_reserve: 0
+    definition_source_reserve: 1
+    definition_reserve: 1024
+  config:
+    roots: '@bootstrap:plugin_roots'
+    excluded_assembly_names: '@bootstrap:seed_modules'
+    source_id: discovered-modules
+    maximum_definitions: 1024
+    maximum_scanned_directories: 4096

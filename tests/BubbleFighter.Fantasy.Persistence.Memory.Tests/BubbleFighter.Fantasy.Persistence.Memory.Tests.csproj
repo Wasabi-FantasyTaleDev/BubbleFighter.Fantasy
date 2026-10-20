@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Persistence.Memory\BubbleFighter.Fantasy.Persistence.Memory.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\BubbleFighter.Fantasy.Contracts\BubbleFighter.Fantasy.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\Shared\PlayerSettingsContractTests.cs" Link="PlayerSettingsContractTests.cs" />
+    <Compile Include="..\Shared\ShopSessionStoreContractGuardTests.cs" Link="ShopSessionStoreContractGuardTests.cs" />
+    <Compile Include="..\Shared\ClanStoreContractGuardTests.cs" Link="ClanStoreContractGuardTests.cs" />
+    <Compile Include="..\Shared\PresentStoreContractTests.cs" Link="PresentStoreContractTests.cs" />
+    <Compile Include="..\Shared\LauncherSessionLimitTests.cs" Link="LauncherSessionLimitTests.cs" />
+  </ItemGroup>
+</Project>

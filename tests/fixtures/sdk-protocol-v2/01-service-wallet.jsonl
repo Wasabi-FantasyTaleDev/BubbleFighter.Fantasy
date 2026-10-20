@@ -1,0 +1,13 @@
+{"ignore":["result.sdk"],"note":"example.services-wallet writes the same wallet snapshot twice and reads it back; the owner id must retain exact int64 precision."}
+{"dir":"h2p","msg":{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocol_version":1,"protocol_versions":[1,2]}}}
+{"dir":"p2h","msg":{"jsonrpc":"2.0","id":1,"result":{"protocol_version":2}}}
+{"dir":"h2p","msg":{"jsonrpc":"2.0","id":2,"method":"activate","params":{"activation":"a1","row_id":"wallet","plugin":"example.services-wallet","config":{},"reload":false}}}
+{"dir":"p2h","msg":{"jsonrpc":"2.0","id":1,"method":"services.call","params":{"activation":"a1","service":"IPlayerWalletRepository","method":"UpsertAsync","args":{"wallet":{"user_num":9007199254740993,"lucci":73,"cash":19}}}}}
+{"dir":"h2p","msg":{"jsonrpc":"2.0","id":1,"result":null}}
+{"dir":"p2h","msg":{"jsonrpc":"2.0","id":2,"method":"services.call","params":{"activation":"a1","service":"IPlayerWalletRepository","method":"UpsertAsync","args":{"wallet":{"user_num":9007199254740993,"lucci":73,"cash":19}}}}}
+{"dir":"h2p","msg":{"jsonrpc":"2.0","id":2,"result":null}}
+{"dir":"p2h","msg":{"jsonrpc":"2.0","id":3,"method":"services.call","params":{"activation":"a1","service":"IPlayerWalletRepository","method":"FindByUserNumAsync","args":{"user_num":9007199254740993}}}}
+{"dir":"h2p","msg":{"jsonrpc":"2.0","id":3,"result":{"user_num":9007199254740993,"lucci":73,"cash":19}}}
+{"dir":"p2h","msg":{"jsonrpc":"2.0","id":2,"result":{}}}
+{"dir":"h2p","msg":{"jsonrpc":"2.0","id":3,"method":"deactivate","params":{"activation":"a1"}}}
+{"dir":"p2h","msg":{"jsonrpc":"2.0","id":3,"result":{}}}

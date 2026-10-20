@@ -1,0 +1,888 @@
+# Rows every legacy client build runs. kr-812 is the baseline: this file is its setup, written
+# once. A build's profile gives the port (vars: LEGACY_PORT) and states only what differs, in its
+# vars and with `set` operations in its patch.yaml. Whatever a profile does not state is kr-812's.
+#
+# Profile vars read here: LEGACY_PORT (required), LEGACY_BOOTSTRAP_STATUS (2), LEGACY_GATE_KEY (0),
+# LEGACY_GATE_SUB_KEY (0), LEGACY_SEATS (12), LEGACY_START_TIMER_MS (4000), LEGACY_SHOP_NAME_COLUMN (name).
+# The build's wire stream. Every legacy build reads the 258-byte greeting and seeds SimpleCipher (0, 1)
+# client-to-server and (5, 3) server-to-client (kr-812 sub_B26AE0); the frame and the cipher table
+# bytes are the build's own data: profile vars WIRE_FRAME (legacy_5: kr-812 lays out the five-byte
+# frame), WIRE_CIPHER_TABLE_A and WIRE_CIPHER_TABLE_B (hexadecimal; empty for the shared pair).
+- id: dialect
+  plugin: dialect
+  config:
+    profile_id: "${BFF_PROFILE_ID}"
+    frame: "${WIRE_FRAME:-legacy_5}"
+    cipher_table_a: "${WIRE_CIPHER_TABLE_A:-}"
+    cipher_table_b: "${WIRE_CIPHER_TABLE_B:-}"
+- id: protocol
+  plugin: protocol
+  config:
+    opcode_table_path: profiles/${BFF_PROFILE_ID}/opcodes.yaml
+    # The dispatcher treats greeting status 2 as a normal connect.
+    bootstrap_status: ${LEGACY_BOOTSTRAP_STATUS:-2}
+    # The address and port the client reaches this listener on.
+    center_gates:
+      - key: ${LEGACY_GATE_KEY:-0}
+        sub_key: ${LEGACY_GATE_SUB_KEY:-0}
+        unknown1: 0
+        address: "${BFF_PUBLIC_HOST:-127.0.0.1}"
+        port: ${LEGACY_PUBLIC_PORT}
+- id: game-listener
+  plugin: net.tcp
+  config:
+    listen: "${BFF_BIND_HOST:-0.0.0.0}:${LEGACY_PORT}"
+    protocol: "${BFF_PROFILE_ID}/game"
+    max_connections: 512
+    idle_timeout_seconds: 0
+- id: dialect.messages
+  plugin: dialect.messages
+  config:
+    protocol: "${BFF_PROFILE_ID}/game"
+    enable_purchases: true
+    max_shop_sessions: 512
+    packets_directory: packets
+    server_notices: true
+    # kr-812 sub_837170 case 0x326 -> sub_6D5890 shows one notice per expired item id; a build without the
+    # packet turns this off with the evidence in its own patch.yaml.
+    expired_item_notices: true
+    # kr-812 sub_825070 consumes the native action-3 result; the request layout is shared.
+    inventory_item_use: true
+    # The gift box: kr-812 sub_837170 cases 815..828 and the client's gift dialogs (kr-812 sub_96F350, sub_960BE0).
+    # Every build of this bundle has the classes (packets/builds.yaml present_box); the shop row below serves them.
+    present_box: true
+    # kr-812 sub_837170 case 12 sets the creation flag that kr-812 sub_681FE0 turns into the creation stage.
+    character_creation: true
+    # Party packets (packets/party.yaml); a build without the party capability or one of its opcode rows turns
+    # this and the party row off in its own patch.yaml.
+    party: true
+    # The player menu's "view info" (packets/fighter-info.yaml): kr-812 sender sub_6C2EB0, reply reader sub_83DD00,
+    # handler sub_82C960. A build without the fighter_info capability turns this and the lobby's switch off in its
+    # own patch.yaml.
+    fighter_info: true
+- id: dialect.rooms
+  plugin: dialect.rooms
+  config:
+    protocol: "${BFF_PROFILE_ID}/game"
+    # The audited legacy family uses the actor request and consumable 100443.
+    instant_revival: true
+    # Native mode/result selectors are audited; dedicated queue stages remain separate.
+    quick_matching: true
+    # Native map reports, double slots and separate direct effects share one round owner.
+    supply_items: true
+    # NPC-kill Lucci: drop requests, item creation, pickup. Layouts in packets/lucci-drops.yaml;
+    # each build's capability and opcodes decide what it sends (packets/lucci-drops.yaml).
+    lucci_drops: true
+    star_items: true
+    horde_lottery: true
+    counted_pve_items: true
+    zombie_conversion: true
+    pve_points: true
+    rescue_missions: true
+    echo_direct_item_effects: true
+    # A finished tutorial-room stage shows the time-over cue, then its own clear or fail panel: the recorded
+    # round sent gspGameTimeOverEnd 3.0 s after gspGameEndGame. The panel then
+    # stays this long before the tutorial room.
+    tutorial_score_ms: 3000
+    tutorial_result_ms: 5000
+# The build's own client data: its archives under data/ at their client paths and loose files under dataraw/,
+# provisioned separately. Isolated so each build in the all-builds profile reads its own files.
+- id: clientdata
+  plugin: clientdata
+  isolated_services:
+    - BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore
+  config:
+    data_directory: "${BFF_CLIENT_DATA:-client-data}/${BFF_PROFILE_ID}/data"
+    raw_directory: "${BFF_CLIENT_DATA:-client-data}/${BFF_PROFILE_ID}/dataraw"
+- id: inventoryview
+  plugin: inventoryview
+  parent_id: clientdata
+  # One fresh service realm per build for the per-build singletons: in the all-builds profile each
+  # build subtree publishes its own copies, and nothing here sees another build's.
+  isolated_services:
+    - BubbleFighter.Fantasy.Contracts.Inventory.IInventoryPushService
+    - BubbleFighter.Fantasy.Contracts.Inventory.IEquipmentSelection
+    - BubbleFighter.Fantasy.Contracts.Inventory.IInventoryExpiry
+    - BubbleFighter.Fantasy.Contracts.Inventory.IInventoryItemRemoval
+    - BubbleFighter.Fantasy.Contracts.Inventory.IEquippedViewPush
+    - BubbleFighter.Fantasy.Contracts.Shop.IShopGiftService
+    - BubbleFighter.Fantasy.Contracts.Inventory.IPaintItemCatalog
+    - BubbleFighter.Fantasy.Contracts.Players.IOnlinePlayers
+    - BubbleFighter.Fantasy.Contracts.Party.IPartyDirectory
+  config:
+    protocol: "${BFF_PROFILE_ID}/game"
+    client_profile: "${BFF_PROFILE_ID}"
+    version_major: ${BFF_BUILD_MAJOR}
+    enabled: true
+    publish_equipped_view_push: true
+    # Clothing parts and accessory slots come from the build's own shop workbook.
+    item_locations_client_path: "Config/ShopItem2.xml"
+    # No legacy client emits a proven inventory-view request packet.
+    view_request: ""
+- id: inventory.paint-catalog
+  plugin: inventory.paint-catalog
+  parent_id: inventoryview
+  config:
+    # kr-812 sub_9A04D0 and sub_981BA0 derive the spray color from ShopItem.function/parameter.
+    shop_item_client_path: "Config/ShopItem2.xml"
+    max_shop_item_bytes: 134217728
+    max_paint_items: 256
+- id: lobby
+  plugin: lobby
+  parent_id: inventoryview
+  config:
+    protocol: "${BFF_PROFILE_ID}/game"
+    auto_create_players: true
+    fallback_username: "guest"
+    # Redeem launcher launch tickets at game login; needs the launcher.http row (BFF_LAUNCHER_TICKETS).
+    launcher_tickets: ${BFF_LAUNCHER_TICKETS:-false}
+    # ticket: every login must redeem a launcher ticket (needs the launcher.http row). open: any account name
+    # logs in, for a trusted LAN only. BFF_LOGIN_AUTHENTICATION sets it for every build at once.
+    authentication: ${BFF_LOGIN_AUTHENTICATION:-ticket}
+    # New accounts, and accounts without an onboarding record, choose a character on the native
+    # creation stage first; existing bags and wallets are kept. Each build's creation notice and
+    # consumers are recorded under the character_creation capability in packets/builds.yaml; a build
+    # without it keeps creation off.
+    character_creation: true
+    # The creation stage's characters and the starter bag come from the build's lobby values in
+    # packets/builds.yaml, inherited through its base.
+    build_values: true
+    # Store-backed login bag with starter seeding; persistence.memory serves it under the all profile.
+    inventory_source: "mysql"
+    # Rewards and shop transactions require the same persisted wallet that login initializes.
+    money_source: "mysql"
+    seed_starter_inventory: true
+    # Login removes ended time-limited items (unwearing them, default character if the worn one ended) before the
+    # bag is sent; the client removes nothing itself (kr-812 sub_6D5890 only shows notices).
+    expire_items: true
+    # Life-counted items lose one life per whole UTC day since the last login and are removed at zero like an
+    # expired item (packets/builds.yaml life_items; packets/inventory-use.yaml). A build without the item
+    # kind turns this off in its own patch.yaml.
+    life_items: true
+    starting_cash: 10000000
+    starting_lucci: 10000000
+    # Native ShopItem function 3 identifies this consumable in the reviewed later builds.
+    rename_item_id: 100104
+    # Native function 1 sends an empty-parameter item-use request; the catalog selects its fixed color.
+    paint_items: true
+    # The build's logged-in players by account and nickname, for the party row (one per build in this subtree).
+    online_players: true
+    # Answers the player menu's "view info" from the build's logged-in players (needs online_players).
+    fighter_info: true
+- id: party
+  plugin: party
+  parent_id: inventoryview
+  config:
+    protocol: "${BFF_PROFILE_ID}/game"
+    # kr-812 sub_8F6A20 compares the party list (48-byte members) with 8.
+    max_members: 8
+    # The inviter's client drops its pending row after 30 s (kr-812 sub_929A40).
+    invite_timeout_ms: 30000
+    max_pending_invites: 1024
+    max_pending_requests: 1024
+- id: equipment
+  plugin: equipment
+  parent_id: inventoryview
+  config:
+    protocol: "${BFF_PROFILE_ID}/game"
+    client_profile: "${BFF_PROFILE_ID}"
+    version_major: ${BFF_BUILD_MAJOR}
+- id: ingame
+  plugin: ingame
+  parent_id: inventoryview
+  config:
+    game_protocol: "${BFF_PROFILE_ID}/game"
+    # No relay listener on the legacy builds yet; the start chain is not bound.
+    relay_protocol: "${BFF_PROFILE_ID}/relay"
+    typed_only: true
+    # A kr-812 room carries twelve slots (gspGotoRoom).
+    max_players_per_match: ${LEGACY_SEATS:-12}
+    # kr-812 sub_7EAB00 displays only remaining-seconds 3/2/1/0; longer waits start blank.
+    # Four seconds retain the final GO interval; see packets/room-start.yaml.
+    start_timer_ms: ${LEGACY_START_TIMER_MS:-4000}
+    max_matches: 64
+    # A player's first clear of a tutorial-room stage grants the Stock or StockSet its MapMeta IsItemAward names,
+    # through the shop row's gift service and that build's own ShopItem2 terms.
+    tutorial_gifts: true
+    instant_revival_item_id: 100443
+    # Item kind a horde-award request creates (C2S 2021 / 2020): 3, 4 or 5 is the award worth 1, 5 or 10
+    # (kr-812 sub_51AD80 cases 3..5). Pickup values per item kind 1..5: Lucci 1, big Lucci 100 and the
+    # three awards (kr-812 sub_638600 adds the item count, sub_6351F0 adds 100).
+    horde_award_kind: 3
+    lucci_kind_values: [1, 100, 1, 5, 10]
+    max_dropped_lucci: 256
+    max_round_lucci: 10000
+    # kr-812 sub_520A20 directly reports kills in these native modes.
+    direct_kill_modes: [13, 14, 18]
+    # In these cooperative modes the master's gcpReqEndStage word decides win (1) or loss (0) instead of
+    # team scores: kr-812 sub_A09190 sends gcpReqEndAllWave then sub_512F80(1), as cn-324 sub_4138E0
+    # does with sub_46C000(1); the failure paths send 0.
+    # Mode 102 (pirate waves) is driven by the same wave manager (kr-812 sub_A087F0, which tests mode 102 itself),
+    # so its clear and failure words end it too; the reward dialog then opens only on the clear word.
+    cooperative_stage_result_modes: [16, 101, 102, 106]
+    # The horde result screen names the winner from the scoreboard's team totals, as cn-324 sub_63B230 ->
+    # sub_455ED0 does (highest strict total, 0 on a tie), not from the stage word. An ID2014 full clear
+    # (gcpReqEndStage 1, gspGameEndGame outcome 3) still showed a loss
+    # because every total in gspGameTimeOverEnd was 0; the players' team is now given the higher total.
+    # The id-400 consumer of the totals is not located yet; CN2012 keeps its own setting.
+    cooperative_score_outcome_modes: [101]
+    # Native Boss mode starts humans on team 2 and revives converted players on team 15.
+    # KR2015 HUD slots 1..3: heal, bazooka and air bomb; other pickups apply directly.
+    counted_item_mode_id: 16
+    counted_item_slot_count: 3
+    counted_item_kinds: [229, 146, 136]
+    counted_immediate_item_kinds: [101, 17]
+    zombie_conversion_mode_id: 16
+    zombie_round_time_limit_ms: 600000
+    # Zombie battle: kr-812 sub_53AB30 builds ZombieModeMgr for mode 8; the server picks the king and decides
+    # the round (kr-812 sub_776870 makes the first seat moved to team 14 the king).
+    zombie_pvp_mode_ids: [8]
+    zombie_king_delay_ms: 5000
+    # The zombie king's ultra: with its gauge full, SHIFT sends gcpEatItem with no object and kind 104
+    # feverDrink (cn-324 sub_508FC0 -> event 55 -> cn-324 sub_667CC0 -> cn-324 sub_4672B0(0x68, -1)); the round
+    # answers only this exact request from this round's king, so a build whose king never sends it is unaffected.
+    zombie_king_ultra_item_kind: 104
+    zombie_pvp_round_time_limit_ms: 180000
+    # Star modes: kr-812 sub_661AF0 starts mode 5 with StarModeSpec +16 stars and mode 6 with +148 (by team);
+    # the server adds up the clients' reports and decides the round when time runs out.
+    star_mode_ids: [5]
+    star_team_mode_ids: [6]
+    star_round_time_limit_ms: 240000
+    # Item mode (client mode 3): the clients keep its rules and the host reports the boxes, so the server relays them
+    # and holds the build's kinds and its team boxes (packets/map-supplies.yaml). Mode 3 loads the sheet
+    # ItemSpecItem (kr-812 sub_63C720 case 3; the same case in cn-324 sub_54DB40, id-400 sub_5A5EC0, id-1809 sub_5F0020,
+    # cn-717 sub_6920E0, cn-706 sub_5CFC30, cn-406 sub_535960, cn-404 sub_5EB6B0, cn-408 sub_5EF160), whose enabled rows
+    # are the same fifteen kinds in every one of those builds: booster, shield, ghost, needle, freezeCannon, medipack,
+    # camouflage, polymorph, banana, teamAngel, airBomb, turret, bazooka, machinegun and shieldField. The build with the
+    # older item sheet states its own list in its patch.yaml.
+    item_mode_ids: [3]
+    item_mode_kinds: [101, 102, 108, 109, 115, 120, 123, 127, 128, 130, 136, 137, 138, 139, 141]
+    # Mission scheduling is configurable; groups and Boss cutoff come from native map resources.
+    rescue_mode_id: 16
+    rescue_start_times_ms: [20000, 45000, 70000, 95000, 120000, 145000]
+    rescue_duration_ms: 25000
+    rescue_cooldown_ms: 25000
+    rescue_stop_time_ms: 185000
+    rescue_mission_ids: [1, 4, 7, 10, 13, 16, 19, 22]
+    rescue_citizen_names: [ms_citizen, ms_citizen1, ms_citizen2, ms_citizen3, ms_citizen4, ms_citizen5, ms_citizen6, ms_citizen7]
+    rescue_map_enemy_counts:
+    - map_key: rel_zombie02_Twobridge
+      enemy_counts: [2, 3, 3, 3, 4, 4]
+    - map_key: rel_zombie03_Circle
+      enemy_counts: [2, 3, 3, 4, 4, 4]
+    - map_key: rel_zombie04_1_Oneway
+      enemy_counts: []
+    - map_key: rel_zombie04_Oneway
+      enemy_counts: [2, 2, 3, 3, 4, 4]
+    - map_key: rel_zombie05_Tear
+      enemy_counts: [2, 2, 3, 3, 4, 4]
+    - map_key: rel_zombie06_Frontal
+      enemy_counts: []
+    - map_key: rel_zombie_01
+      enemy_counts: [2, 3, 3, 3, 4, 4]
+    pve_point_mode_id: 16
+    # Own FighterConfig score-unit indices 0..15; awards reconstructed from confirmed same-era footage.
+    pve_point_unit_values: [4, 3, 10, 11, 15, 15, 20, 20, 15, 15, 20, 20, 15, 15, 20, 20]
+    lottery_modes: [101, 102, 103]
+    lottery_grouped_draw: true
+    lottery_workbook_client_path: "Config/ShopItem2.xml"
+    # Native KR2015 Stock/StockSet identities; variants absent from its workbook are omitted.
+    lottery_items:
+    - group: crew
+      item_id: 100207
+      display_id: 1000711
+      days: 30
+      weight: 3
+      note: crew item 100207, native amount 30
+    - group: crew
+      item_id: 100206
+      display_id: 1000710
+      days: 30
+      weight: 3
+      note: crew item 100206, native amount 30
+    - group: crew
+      item_id: 100204
+      display_id: 1000708
+      days: 30
+      weight: 3
+      note: crew item 100204, native amount 30
+    - group: crew
+      item_id: 100203
+      display_id: 1000707
+      days: 30
+      weight: 3
+      note: crew item 100203, native amount 30
+    - group: crew
+      item_id: 100207
+      display_id: 1000672
+      days: 1
+      weight: 25
+      note: crew item 100207, native amount 1
+    - group: crew
+      item_id: 100206
+      display_id: 1000671
+      days: 1
+      weight: 25
+      note: crew item 100206, native amount 1
+    - group: crew
+      item_id: 100204
+      display_id: 1000669
+      days: 1
+      weight: 25
+      note: crew item 100204, native amount 1
+    - group: crew
+      item_id: 100203
+      display_id: 1000668
+      days: 1
+      weight: 25
+      note: crew item 100203, native amount 1
+    - group: crew
+      item_id: 100207
+      display_id: 1000655
+      days: 7
+      weight: 12
+      note: crew item 100207, native amount 7
+    - group: crew
+      item_id: 100206
+      display_id: 1000654
+      days: 7
+      weight: 12
+      note: crew item 100206, native amount 7
+    - group: crew
+      item_id: 100204
+      display_id: 1000652
+      days: 7
+      weight: 12
+      note: crew item 100204, native amount 7
+    - group: crew
+      item_id: 100203
+      display_id: 1000651
+      days: 7
+      weight: 12
+      note: crew item 100203, native amount 7
+    - group: crew
+      item_id: 100207
+      display_id: 1000924
+      days: 3
+      weight: 60
+      note: crew item 100207, native amount 3
+    - group: crew
+      item_id: 100206
+      display_id: 1000923
+      days: 3
+      weight: 60
+      note: crew item 100206, native amount 3
+    - group: crew
+      item_id: 100204
+      display_id: 1000921
+      days: 3
+      weight: 60
+      note: crew item 100204, native amount 3
+    - group: crew
+      item_id: 100203
+      display_id: 1000920
+      days: 3
+      weight: 60
+      note: crew item 100203, native amount 3
+    - group: small_parts
+      item_id: 100212
+      display_id: 1000716
+      days: 30
+      weight: 3
+      note: small_parts item 100212, native amount 30
+    - group: small_parts
+      item_id: 100211
+      display_id: 1000715
+      days: 30
+      weight: 3
+      note: small_parts item 100211, native amount 30
+    - group: small_parts
+      item_id: 100210
+      display_id: 1000714
+      days: 30
+      weight: 3
+      note: small_parts item 100210, native amount 30
+    - group: small_parts
+      item_id: 100209
+      display_id: 1000713
+      days: 30
+      weight: 3
+      note: small_parts item 100209, native amount 30
+    - group: small_parts
+      item_id: 100208
+      display_id: 1000712
+      days: 30
+      weight: 3
+      note: small_parts item 100208, native amount 30
+    - group: small_parts
+      item_id: 100212
+      display_id: 1000660
+      days: 7
+      weight: 12
+      note: small_parts item 100212, native amount 7
+    - group: small_parts
+      item_id: 100211
+      display_id: 1000659
+      days: 7
+      weight: 12
+      note: small_parts item 100211, native amount 7
+    - group: small_parts
+      item_id: 100210
+      display_id: 1000658
+      days: 7
+      weight: 12
+      note: small_parts item 100210, native amount 7
+    - group: small_parts
+      item_id: 100209
+      display_id: 1000657
+      days: 7
+      weight: 12
+      note: small_parts item 100209, native amount 7
+    - group: small_parts
+      item_id: 100208
+      display_id: 1000656
+      days: 7
+      weight: 12
+      note: small_parts item 100208, native amount 7
+    - group: small_parts
+      item_id: 100212
+      display_id: 1000677
+      days: 1
+      weight: 25
+      note: small_parts item 100212, native amount 1
+    - group: small_parts
+      item_id: 100211
+      display_id: 1000676
+      days: 1
+      weight: 25
+      note: small_parts item 100211, native amount 1
+    - group: small_parts
+      item_id: 100210
+      display_id: 1000675
+      days: 1
+      weight: 25
+      note: small_parts item 100210, native amount 1
+    - group: small_parts
+      item_id: 100209
+      display_id: 1000674
+      days: 1
+      weight: 25
+      note: small_parts item 100209, native amount 1
+    - group: small_parts
+      item_id: 100208
+      display_id: 1000673
+      days: 1
+      weight: 25
+      note: small_parts item 100208, native amount 1
+    - group: mid_parts
+      item_id: 100217
+      display_id: 1000721
+      days: 30
+      weight: 3
+      note: mid_parts item 100217, native amount 30
+    - group: mid_parts
+      item_id: 100216
+      display_id: 1000720
+      days: 30
+      weight: 3
+      note: mid_parts item 100216, native amount 30
+    - group: mid_parts
+      item_id: 100215
+      display_id: 1000719
+      days: 30
+      weight: 3
+      note: mid_parts item 100215, native amount 30
+    - group: mid_parts
+      item_id: 100214
+      display_id: 1000718
+      days: 30
+      weight: 3
+      note: mid_parts item 100214, native amount 30
+    - group: mid_parts
+      item_id: 100213
+      display_id: 1000717
+      days: 30
+      weight: 3
+      note: mid_parts item 100213, native amount 30
+    - group: mid_parts
+      item_id: 100217
+      display_id: 1000665
+      days: 7
+      weight: 12
+      note: mid_parts item 100217, native amount 7
+    - group: mid_parts
+      item_id: 100216
+      display_id: 1000664
+      days: 7
+      weight: 12
+      note: mid_parts item 100216, native amount 7
+    - group: mid_parts
+      item_id: 100215
+      display_id: 1000663
+      days: 7
+      weight: 12
+      note: mid_parts item 100215, native amount 7
+    - group: mid_parts
+      item_id: 100214
+      display_id: 1000662
+      days: 7
+      weight: 12
+      note: mid_parts item 100214, native amount 7
+    - group: mid_parts
+      item_id: 100213
+      display_id: 1000661
+      days: 7
+      weight: 12
+      note: mid_parts item 100213, native amount 7
+    - group: mid_parts
+      item_id: 100217
+      display_id: 1000682
+      days: 1
+      weight: 25
+      note: mid_parts item 100217, native amount 1
+    - group: mid_parts
+      item_id: 100216
+      display_id: 1000681
+      days: 1
+      weight: 25
+      note: mid_parts item 100216, native amount 1
+    - group: mid_parts
+      item_id: 100215
+      display_id: 1000680
+      days: 1
+      weight: 25
+      note: mid_parts item 100215, native amount 1
+    - group: mid_parts
+      item_id: 100214
+      display_id: 1000679
+      days: 1
+      weight: 25
+      note: mid_parts item 100214, native amount 1
+    - group: mid_parts
+      item_id: 100213
+      display_id: 1000678
+      days: 1
+      weight: 25
+      note: mid_parts item 100213, native amount 1
+    - group: common
+      item_id: 100141
+      display_id: 1000428
+      days: 7
+      weight: 12
+      note: common item 100141, native amount 7
+    - group: common
+      item_id: 100144
+      display_id: 1002280
+      days: 3
+      weight: 60
+      note: common item 100144, native amount 3
+    - group: common
+      item_id: 205004
+      display_id: 1000741
+      quantity: 10
+      stackable: true
+      weight: 1
+      note: common item 205004, native amount 10
+    - group: common
+      item_id: 100144
+      display_id: 1000517
+      days: 7
+      weight: 12
+      note: common item 100144, native amount 7
+    - group: common
+      item_id: 100144
+      display_id: 1000516
+      days: 1
+      weight: 25
+      note: common item 100144, native amount 1
+    - group: common
+      item_id: 100044
+      display_id: 1000100
+      days: 1
+      weight: 25
+      note: common item 100044, native amount 1
+    - group: common
+      item_id: 100086
+      display_id: 1000260
+      days: 1
+      weight: 25
+      note: common item 100086, native amount 1
+    - group: common
+      item_id: 100046
+      display_id: 1000112
+      days: 1
+      weight: 25
+      note: common item 100046, native amount 1
+    - group: common
+      item_id: 100086
+      display_id: 1005665
+      days: 3
+      weight: 60
+      note: common item 100086, native amount 3
+    - group: common
+      item_id: 100044
+      display_id: 1000934
+      days: 3
+      weight: 60
+      note: common item 100044, native amount 3
+    - group: common
+      item_id: 205002
+      display_id: 1000936
+      quantity: 10
+      stackable: true
+      weight: 1
+      note: common item 205002, native amount 10
+    - group: common
+      item_id: 100046
+      display_id: 1000928
+      days: 3
+      weight: 60
+      note: common item 100046, native amount 3
+    - group: common
+      item_id: 100141
+      display_id: 1001989
+      days: 3
+      weight: 60
+      note: common item 100141, native amount 3
+    - group: common
+      item_id: 100141
+      display_id: 1000427
+      days: 1
+      weight: 25
+      note: common item 100141, native amount 1
+    - group: common
+      item_id: 100044
+      display_id: 1000101
+      days: 7
+      weight: 12
+      note: common item 100044, native amount 7
+    - group: common
+      item_id: 100046
+      display_id: 1000113
+      days: 7
+      weight: 12
+      note: common item 100046, native amount 7
+    - group: common
+      item_id: 100086
+      display_id: 1000261
+      days: 7
+      weight: 12
+      note: common item 100086, native amount 7
+    - group: crew_set
+      display_id: 2000089
+      weight: 3
+      note: crew_set, 30 days
+      components:
+      - item_id: 100203
+        display_id: 1000707
+        days: 30
+      - item_id: 100204
+        display_id: 1000708
+        days: 30
+      - item_id: 100205
+        display_id: 1000709
+        days: 30
+      - item_id: 100206
+        display_id: 1000710
+        days: 30
+      - item_id: 100207
+        display_id: 1000711
+        days: 30
+    - group: crew_set
+      display_id: 2000143
+      weight: 80
+      note: crew_set, 3 days
+      components:
+      - item_id: 100203
+        display_id: 1000920
+        days: 3
+      - item_id: 100204
+        display_id: 1000921
+        days: 3
+      - item_id: 100205
+        display_id: 1000922
+        days: 3
+      - item_id: 100206
+        display_id: 1000923
+        days: 3
+      - item_id: 100207
+        display_id: 1000924
+        days: 3
+    - group: crew_set
+      display_id: 2000074
+      weight: 17
+      note: crew_set, 7 days
+      components:
+      - item_id: 100203
+        display_id: 1000651
+        days: 7
+      - item_id: 100204
+        display_id: 1000652
+        days: 7
+      - item_id: 100205
+        display_id: 1000653
+        days: 7
+      - item_id: 100206
+        display_id: 1000654
+        days: 7
+      - item_id: 100207
+        display_id: 1000655
+        days: 7
+    - group: small_set
+      display_id: 2000090
+      weight: 3
+      note: small_set, 30 days
+      components:
+      - item_id: 100208
+        display_id: 1000712
+        days: 30
+      - item_id: 100209
+        display_id: 1000713
+        days: 30
+      - item_id: 100210
+        display_id: 1000714
+        days: 30
+      - item_id: 100211
+        display_id: 1000715
+        days: 30
+      - item_id: 100212
+        display_id: 1000716
+        days: 30
+    - group: small_set
+      display_id: 2000076
+      weight: 17
+      note: small_set, 7 days
+      components:
+      - item_id: 100208
+        display_id: 1000656
+        days: 7
+      - item_id: 100209
+        display_id: 1000657
+        days: 7
+      - item_id: 100210
+        display_id: 1000658
+        days: 7
+      - item_id: 100211
+        display_id: 1000659
+        days: 7
+      - item_id: 100212
+        display_id: 1000660
+        days: 7
+    - group: mid_set
+      display_id: 2000091
+      weight: 3
+      note: mid_set, 30 days
+      components:
+      - item_id: 100213
+        display_id: 1000717
+        days: 30
+      - item_id: 100214
+        display_id: 1000718
+        days: 30
+      - item_id: 100215
+        display_id: 1000719
+        days: 30
+      - item_id: 100216
+        display_id: 1000720
+        days: 30
+      - item_id: 100217
+        display_id: 1000721
+        days: 30
+    - group: mid_set
+      display_id: 2000078
+      weight: 17
+      note: mid_set, 7 days
+      components:
+      - item_id: 100213
+        display_id: 1000661
+        days: 7
+      - item_id: 100214
+        display_id: 1000662
+        days: 7
+      - item_id: 100215
+        display_id: 1000663
+        days: 7
+      - item_id: 100216
+        display_id: 1000664
+        days: 7
+      - item_id: 100217
+        display_id: 1000665
+        days: 7
+    - group: coin
+      display_id: 2000063
+      lucci: 500
+      weight: 10
+      note: 500 Lucci
+    - group: coin
+      display_id: 2000062
+      lucci: 300
+      weight: 25
+      note: 300 Lucci
+    - group: coin
+      display_id: 2000061
+      lucci: 100
+      weight: 65
+      note: 100 Lucci
+    native_item_slot_count: 2
+    # ItemSpec4/ItemSpecDefault and ItemSpecZombiePve contain these kinds in the baseline
+    # and the three later gameplay builds. The early CN2012 list excludes kind 229.
+    random_supply_item_kinds: [101, 102, 104, 108, 109, 112, 115, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 134, 135, 136, 137, 138, 139, 141, 142, 143, 144, 145, 146, 147, 201, 203, 204, 207, 208, 209, 210, 211, 212, 213, 214, 215, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229]
+    immediate_supply_item_kinds: [10, 11, 15, 16]
+    # Rewards follow the end by about six seconds.
+    result_reward_delay_ms: 6000
+    result_close_grace_ms: 10000
+    # Deployment reward thresholds, shared with the configured modern round flow.
+    level_exp_table_path: "${BFF_LEVEL_EXP_TABLE:-data/level-experience.csv}"
+    # Provisional sample-based rewards; coefficients can be calibrated without rebuilding.
+    score_based_rewards: true
+    reward_exp_multiplier: ${BFF_REWARD_EXP_MULTIPLIER:-100}
+    reward_lucci_multiplier: ${BFF_REWARD_LUCCI_MULTIPLIER:-100}
+    # Shared scheduling and draw weights; modes, rewards and native item identities stay per build.
+    auto_start_delay_ms: 65000
+    lottery_open_delay_ms: 0
+    lottery_select_time_ms: 7000
+    lottery_reveal_time_ms: 5000
+    lottery_max_duplicates: 3
+    lottery_repeat_weight_percent: 25
+    lottery_crew_count_weights: [70, 25, 5]
+    lottery_coin_count_weights: [45, 30, 18, 7]
+    lottery_group_weights: [{ group: common, weight: 800 }, { group: small_parts, weight: 100 }, { group: mid_parts, weight: 40 }, { group: crew_set, weight: 40 }, { group: small_set, weight: 15 }, { group: mid_set, weight: 5 }]
+- id: shop
+  plugin: shop
+  parent_id: inventoryview
+  config:
+    protocol: "${BFF_PROFILE_ID}/game"
+    client_profile: "${BFF_PROFILE_ID}"
+    version_major: ${BFF_BUILD_MAJOR}
+    catalog_schema: "legacy"
+    catalog_display_column: "${LEGACY_SHOP_NAME_COLUMN:-name}"
+    # The build's own shop workbook, from its client data (kr-812 sub_9A04D0 loads Config/ShopItem2.xml).
+    shop_item_client_path: "Config/ShopItem2.xml"
+    max_shop_item_bytes: 134217728
+    max_enter_shop_frame_bytes: 65000
+    prefer_longest_duration: true
+    prefer_longest_guns: true
+    prefer_longest_clothes: true
+    prefer_longest_grenades: true
+    prefer_longest_hammers: true
+    prefer_longest_packages: true
+    longest_term_item_ids: []
+    send_shop_catalog: true
+    grant_purchased_items: true
+    # ShopItem "endurance" stock sells as a life-counted item (kr-812 sub_993080); see the lobby row's life_items.
+    life_items: true
+    # A shop item can be bought for another player: charged to the sender when the gift is stored, delivered through
+    # the same purchase transaction when the receiver takes it (packets/present.yaml).
+    present_box: true
+    max_presents_per_player: 100
+    # Native reward previews resolve through the build's full workbook, including off-sale stocks and Lucci sets.
+    # Missing or placeholder-only guides grant nothing. Explicit entries override native milestones. Login recovers
+    # every attained, unclaimed milestone, including levels attained before enablement. Example:
+    #   level_rewards:
+    #     - { level: 5, stock_keys: [1001123] }
+    #     - { level: 10, stock_keys: [1001124, 1001125] }
+    #   level_reward_sender: "System"
+    #   level_reward_message: "Level {level} reward"
+    level_reward_client_path: "Config/LevelUpGuide.csv"
+    level_rewards: []
+    max_purchase_attempts: 3

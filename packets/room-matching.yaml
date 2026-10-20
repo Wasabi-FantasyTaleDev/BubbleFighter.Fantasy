@@ -1,0 +1,115 @@
+version: 1
+structs:
+  # kr-812 sub_420EE0 writes and kr-812 sub_420F60 reads; kr-812 sub_5B3640 copies the menu mode to +4.
+  # id-400 sub_567460, id-1809 sub_57E2D0 and cn-706 sub_563F00 supply the annotated differences.
+  RoomMatchRequest:
+    # id-400 sub_5CAB70 and id-1809 sub_57E720 copy menu+200/+256 into the same mode word.
+    - mode_id: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - unknown_16: wstr
+      offset: 16
+    # kr-812 sub_68E450 / sub_68E640 / sub_68E9A0 set this for dedicated PvE entries.
+    - dedicated_queue: bool
+      offset: 44
+    # kr-812 sub_5B3750 sets the second byte independently for the repeat-entry path.
+    - retry_queue: bool
+      offset: 45
+    - unknown_48: u32
+      offset: 48
+    - unknown_52: wstr
+      offset: 52
+      id-400:
+        - unknown_52: u32
+          offset: 52
+      id-1809:
+        - unknown_52: u32
+          offset: 52
+    - unknown_80: u32
+      offset: 80
+      id-400:
+        # id-400 sub_567460 calls the two-byte reader id-400 sub_9DD110.
+        - unknown_56: u16
+          offset: 56
+      id-1809:
+        # id-1809 sub_57E2D0 reads a full word here.
+        - unknown_56: u32
+          offset: 56
+    - unknown_84: u32
+      offset: 84
+      except: [id-400, id-1809]
+  # cn-717 sub_425230 omits the first string and shifts the remaining fields.
+  RoomMatchRequest@cn-717:
+    # cn-717 sub_5F5450 copies menu+268; cn-717 sub_6B8A10 switches on the same mode.
+    - mode_id: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    # cn-717 sub_6E9390 / sub_6E9590 / sub_6E9900 use dedicated modes 101/16/13.
+    - dedicated_queue: bool
+      offset: 16
+    - retry_queue: bool
+      offset: 17
+    - unknown_20: u32
+      offset: 20
+    - unknown_24: wstr
+      offset: 24
+    - unknown_52: u32
+      offset: 52
+    - unknown_56: u32
+      offset: 56
+  # cn-406 sub_56A960 reads only three words, one string and two flags; the id-400 tail is absent.
+  RoomMatchRequest@cn-406:
+    # cn-406 sub_56EEC0 copies menu+192; dedicated entries cn-406 sub_582D10 / sub_582F10 / sub_583250 set 101/16/13.
+    - mode_id: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - unknown_16: wstr
+      offset: 16
+    - dedicated_queue: bool
+      offset: 44
+    - retry_queue: bool
+      offset: 45
+  # cn-324 sub_45EA40; cn-324 sub_580820 sets mode, cn-324 sub_58CF60 sets the final flag.
+  RoomMatchRequest@cn-324:
+    - mode_id: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - dedicated_queue: bool
+      offset: 12
+  # cn-279 sub_7B2A40 selects the mode at menu+132; cn-279 sub_7A7300 copies it here.
+  # cn-279 sub_47E650 reads two words; the second holds the menu's filter selection.
+  RoomMatchRequest@cn-279:
+    - mode_id: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+  # kr-812 sub_8B9660 reads; kr-812 sub_687640 opens waiting for result 0 and refuses for 1.
+  # cn-717 sub_6D6290, id-400 sub_5EF130, id-1809 sub_62E6B0 and cn-406 sub_573350 agree.
+  RoomMatchNotification:
+    - result: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: wstr
+      offset: 12
+      # id-400 sub_782DD0 reads only two words; cn-706 adds the string back.
+      except: [id-400]
+      also: [cn-706]
+  # cn-324 sub_410910 reads one word; cn-324 sub_582880 uses zero for searching, one for refusal.
+  RoomMatchNotification@cn-324:
+    - result: u32
+      offset: 4
+  # cn-279 sub_44C1A0 reads one word; cn-279 sub_7A6420 opens waiting for zero and refuses for one.
+  RoomMatchNotification@cn-279:
+    - result: u32
+      offset: 4

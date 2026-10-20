@@ -1,0 +1,377 @@
+# Profile patch for id-400: applied after the bundle rows (see profiles/kr-1256/patch.yaml
+# for the supported operations). The admin API moves off 8080 so this profile can run
+# beside kr-1256 on one machine.
+- replace:
+    id: admin.http
+    config:
+      listen: "${ID_400_ADMIN_HOST:-127.0.0.1}:${ID_400_ADMIN_PORT:-8082}"
+- replace:
+    id: diagnostics.packet-log
+    config:
+      file: logs/{date}/packets-id-400_{timestamp}.log
+      preview_bytes: 96
+- set:
+    id: shop
+    config:
+      max_purchase_attempts: ~
+
+# Native reward identities and available terms differ from the KR2015 baseline.
+- set:
+    id: ingame
+    config:
+      # Pirate (horde) rooms have no start button: once every seat is taken or closed, the clients run the
+      # native five-second countdown (id-400 sub_627C60, reached from gspRepAutoStart through id-400 sub_626970) and the master's client enters.
+      # The tutorial (mode 103) is not a room of this kind and keeps its own start.
+      auto_start_mode_ids: [101, 102]
+      lottery_items:
+      - group: crew
+        item_id: 100207
+        display_id: 1011331
+        days: 1
+        weight: 25
+        note: crew item 100207, native amount 1
+      - group: crew
+        item_id: 100206
+        display_id: 1011330
+        days: 1
+        weight: 25
+        note: crew item 100206, native amount 1
+      - group: crew
+        item_id: 100204
+        display_id: 1011328
+        days: 1
+        weight: 25
+        note: crew item 100204, native amount 1
+      - group: crew
+        item_id: 100203
+        display_id: 1011327
+        days: 1
+        weight: 25
+        note: crew item 100203, native amount 1
+      - group: crew
+        item_id: 100207
+        display_id: 1011361
+        days: 3
+        weight: 60
+        note: crew item 100207, native amount 3
+      - group: crew
+        item_id: 100206
+        display_id: 1011360
+        days: 3
+        weight: 60
+        note: crew item 100206, native amount 3
+      - group: crew
+        item_id: 100204
+        display_id: 1011358
+        days: 3
+        weight: 60
+        note: crew item 100204, native amount 3
+      - group: crew
+        item_id: 100203
+        display_id: 1011357
+        days: 3
+        weight: 60
+        note: crew item 100203, native amount 3
+      - group: small_parts
+        item_id: 100212
+        display_id: 1011366
+        days: 3
+        weight: 60
+        note: small_parts item 100212, native amount 3
+      - group: small_parts
+        item_id: 100211
+        display_id: 1011365
+        days: 3
+        weight: 60
+        note: small_parts item 100211, native amount 3
+      - group: small_parts
+        item_id: 100210
+        display_id: 1011364
+        days: 3
+        weight: 60
+        note: small_parts item 100210, native amount 3
+      - group: small_parts
+        item_id: 100209
+        display_id: 1011363
+        days: 3
+        weight: 60
+        note: small_parts item 100209, native amount 3
+      - group: small_parts
+        item_id: 100208
+        display_id: 1011362
+        days: 3
+        weight: 60
+        note: small_parts item 100208, native amount 3
+      - group: small_parts
+        item_id: 100212
+        display_id: 1011336
+        days: 1
+        weight: 25
+        note: small_parts item 100212, native amount 1
+      - group: small_parts
+        item_id: 100211
+        display_id: 1011335
+        days: 1
+        weight: 25
+        note: small_parts item 100211, native amount 1
+      - group: small_parts
+        item_id: 100210
+        display_id: 1011334
+        days: 1
+        weight: 25
+        note: small_parts item 100210, native amount 1
+      - group: small_parts
+        item_id: 100209
+        display_id: 1011333
+        days: 1
+        weight: 25
+        note: small_parts item 100209, native amount 1
+      - group: small_parts
+        item_id: 100208
+        display_id: 1011332
+        days: 1
+        weight: 25
+        note: small_parts item 100208, native amount 1
+      - group: mid_parts
+        item_id: 100217
+        display_id: 1011371
+        days: 3
+        weight: 60
+        note: mid_parts item 100217, native amount 3
+      - group: mid_parts
+        item_id: 100216
+        display_id: 1011370
+        days: 3
+        weight: 60
+        note: mid_parts item 100216, native amount 3
+      - group: mid_parts
+        item_id: 100215
+        display_id: 1011369
+        days: 3
+        weight: 60
+        note: mid_parts item 100215, native amount 3
+      - group: mid_parts
+        item_id: 100214
+        display_id: 1011368
+        days: 3
+        weight: 60
+        note: mid_parts item 100214, native amount 3
+      - group: mid_parts
+        item_id: 100213
+        display_id: 1011367
+        days: 3
+        weight: 60
+        note: mid_parts item 100213, native amount 3
+      - group: mid_parts
+        item_id: 100217
+        display_id: 1011341
+        days: 1
+        weight: 25
+        note: mid_parts item 100217, native amount 1
+      - group: mid_parts
+        item_id: 100216
+        display_id: 1011340
+        days: 1
+        weight: 25
+        note: mid_parts item 100216, native amount 1
+      - group: mid_parts
+        item_id: 100215
+        display_id: 1011339
+        days: 1
+        weight: 25
+        note: mid_parts item 100215, native amount 1
+      - group: mid_parts
+        item_id: 100214
+        display_id: 1011338
+        days: 1
+        weight: 25
+        note: mid_parts item 100214, native amount 1
+      - group: mid_parts
+        item_id: 100213
+        display_id: 1011337
+        days: 1
+        weight: 25
+        note: mid_parts item 100213, native amount 1
+      - group: common
+        item_id: 100141
+        display_id: 1010791
+        days: 7
+        weight: 12
+        note: common item 100141, native amount 7
+      - group: common
+        item_id: 100144
+        display_id: 1010811
+        days: 3
+        weight: 60
+        note: common item 100144, native amount 3
+      - group: common
+        item_id: 205004
+        display_id: 1010904
+        quantity: 10
+        stackable: true
+        weight: 1
+        note: common item 205004, native amount 10
+      - group: common
+        item_id: 100144
+        display_id: 1010812
+        days: 7
+        weight: 12
+        note: common item 100144, native amount 7
+      - group: common
+        item_id: 100144
+        display_id: 1010959
+        days: 1
+        weight: 25
+        note: common item 100144, native amount 1
+      - group: common
+        item_id: 100086
+        display_id: 1011440
+        days: 1
+        weight: 25
+        note: common item 100086, native amount 1
+      - group: common
+        item_id: 100086
+        display_id: 1010820
+        days: 3
+        weight: 60
+        note: common item 100086, native amount 3
+      - group: common
+        item_id: 100044
+        display_id: 1010799
+        days: 3
+        weight: 60
+        note: common item 100044, native amount 3
+      - group: common
+        item_id: 205002
+        display_id: 1010931
+        quantity: 10
+        stackable: true
+        weight: 1
+        note: common item 205002, native amount 10
+      - group: common
+        item_id: 100046
+        display_id: 1010778
+        days: 3
+        weight: 60
+        note: common item 100046, native amount 3
+      - group: common
+        item_id: 100141
+        display_id: 1010790
+        days: 3
+        weight: 60
+        note: common item 100141, native amount 3
+      - group: common
+        item_id: 100141
+        display_id: 1010953
+        days: 1
+        weight: 25
+        note: common item 100141, native amount 1
+      - group: common
+        item_id: 100044
+        display_id: 1010800
+        days: 7
+        weight: 12
+        note: common item 100044, native amount 7
+      - group: common
+        item_id: 100046
+        display_id: 1010779
+        days: 7
+        weight: 12
+        note: common item 100046, native amount 7
+      - group: common
+        item_id: 100086
+        display_id: 1010821
+        days: 7
+        weight: 12
+        note: common item 100086, native amount 7
+      - group: crew_set
+        display_id: 2001136
+        weight: 80
+        note: crew_set, 3 days
+        components:
+        - item_id: 100203
+          display_id: 1011357
+          days: 3
+        - item_id: 100204
+          display_id: 1011358
+          days: 3
+        - item_id: 100205
+          display_id: 1011359
+          days: 3
+        - item_id: 100206
+          display_id: 1011360
+          days: 3
+        - item_id: 100207
+          display_id: 1011361
+          days: 3
+      - group: small_set
+        display_id: 2001139
+        weight: 80
+        note: small_set, 3 days
+        components:
+        - item_id: 100208
+          display_id: 1011362
+          days: 3
+        - item_id: 100209
+          display_id: 1011363
+          days: 3
+        - item_id: 100210
+          display_id: 1011364
+          days: 3
+        - item_id: 100211
+          display_id: 1011365
+          days: 3
+        - item_id: 100212
+          display_id: 1011366
+          days: 3
+      - group: mid_set
+        display_id: 2001142
+        weight: 80
+        note: mid_set, 3 days
+        components:
+        - item_id: 100213
+          display_id: 1011367
+          days: 3
+        - item_id: 100214
+          display_id: 1011368
+          days: 3
+        - item_id: 100215
+          display_id: 1011369
+          days: 3
+        - item_id: 100216
+          display_id: 1011370
+          days: 3
+        - item_id: 100217
+          display_id: 1011371
+          days: 3
+
+- set:
+    id: ingame
+    config:
+      # Own Frontal resources enable six missions, unlike the KR2015 baseline.
+      rescue_map_enemy_counts:
+        - map_key: rel_zombie02_Twobridge
+          enemy_counts: [2, 3, 3, 3, 4, 4]
+        - map_key: rel_zombie03_Circle
+          enemy_counts: [2, 3, 3, 4, 4, 4]
+        - map_key: rel_zombie04_1_Oneway
+          enemy_counts: []
+        - map_key: rel_zombie04_Oneway
+          enemy_counts: [2, 2, 3, 3, 4, 4]
+        - map_key: rel_zombie05_Tear
+          enemy_counts: [2, 2, 3, 3, 4, 4]
+        - map_key: rel_zombie06_Frontal
+          enemy_counts: [2, 2, 3, 3, 4, 4]
+        - map_key: rel_zombie_01
+          enemy_counts: [2, 3, 3, 3, 4, 4]
+
+# Life-counted items: this build's executable has no "endurance" ShopItem duration type (no item kind 3) and no Life
+# notice text, so the daily life rule and life stock are off (packets/builds.yaml life_items: false).
+- set:
+    id: lobby
+    config:
+      life_items: false
+- set:
+    id: shop
+    config:
+      life_items: false

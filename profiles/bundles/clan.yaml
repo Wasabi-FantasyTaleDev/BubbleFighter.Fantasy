@@ -1,0 +1,18 @@
+# Clan / guild / crew row. This row handles the typed clan messages; the build's game-connection
+# layouts and opcode numbers are the dialect.messages clan adapter's (packets/clan.yaml), and the
+# typed dispatch scope is the protocol below. Add `clan` to a profile `bundles` list, set `clan: true` on
+# that build's dialect.messages row (it is off in bundles/kr-1256.yaml), and enable one persistence
+# provider. Without the adapter this row fails at activation. The provider must publish IClanStore; no
+# implicit process-local fallback exists.
+#
+# Game-port readers behind the adapter: gspClanPassport kr-1256 sub_99C1D0, gspReqClanMarkInfo
+# kr-1256 sub_99CFA0, gspResGuildInfo kr-1256 sub_9B2690, gspClanAttendanceState
+# kr-1256 sub_10C5590; legacy baselines kr-812 sub_844AB0 / kr-812 sub_844FB0 / kr-812 sub_8407F0
+# and cn-774 sub_BA3C80 / cn-774 sub_BB0F60. Search and roster bodies arrive on the clan-server
+# NxPacket connection, not on this game port, so they are not invented here.
+- id: clan
+  plugin: clan
+  config:
+    protocol: "kr-1256/game"
+    max_snapshot_entries: 4096
+    max_tracked_opens: 512

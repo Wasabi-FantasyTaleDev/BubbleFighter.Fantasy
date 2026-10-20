@@ -1,0 +1,81 @@
+# Room packets whose kr-1256 layout is stated here because the shared tables have no kr-812 layout for them.
+# A structure named after a packet class that kr-812 also has (same opcode in both builds) is that class: its
+# kr-812 layout is not read yet, so only the kr-1256 rows exist. Every row is `only: [kr-1256]` (and so also every
+# build based on it); the baseline table exists because every structure needs one.
+# Every function address names its client build.
+version: 1
+structs:
+  # Packet_gspRoomReceiveChatMsg, S2C 508 in kr-812 (handler kr-812 sub_802170) and in kr-1256 (parser
+  # kr-1256 sub_10C47E0). kr-1256 draws the line with sub_4D6020 under the nickname of seat `slot`.
+  gspRoomReceiveChatMsg:
+    - slot: u16
+      only: [kr-1256]
+    - unknown_n1: u32
+      only: [kr-1256]
+    - unknown_n2: wstr
+      only: [kr-1256]
+    - text: wstr
+      only: [kr-1256]
+    - unknown_n4: u32                   # a colour word
+      only: [kr-1256]
+    - unknown_n5: u32                   # 0 takes the character-bubble branch
+      only: [kr-1256]
+    - unknown_n6: wstr
+      only: [kr-1256]
+    - unknown_n7: u32                   # 0 lets the handler's guard run
+      only: [kr-1256]
+  # Packet_gspReqPingUser, S2C 517 in kr-812 (handler kr-812 sub_807100) and in kr-1256 (handler kr-1256
+  # sub_9DF920). kr-1256 answers a room join with it.
+  gspReqPingUser:
+    - token: u32
+      only: [kr-1256]
+  # Packet_gspRepPingUser, S2C 518: kr-1256 sub_9D9930 case 0x206 reads THREE words and passes the first
+  # as the occupied seat index to kr-1256 sub_978F20. Do not confuse it with C2S 518, whose four-word
+  # builder is kr-1256 sub_9DF920. The existing raw helper retains that historical direction mismatch.
+  gspRepPingUser:
+    - slot: u32
+      only: [kr-1256]
+    - unknown_n1: u32
+      only: [kr-1256]
+    - unknown_n2: u32
+      only: [kr-1256]
+  # kr-1256 sub_978C80 -> sub_9E1580 -> sub_708310 writes the local seat word (or zero) on C2S 517.
+  RoomPingRequest:
+    - unknown_n0: u32
+      only: [kr-1256]
+  # gspRepWaitUserList, S2C 118 (kr-1256 dispatch label 0x15B7118, handler kr-1256 sub_9ACD00). kr-812 has no
+  # such class.
+  gspRepWaitUserList:
+    - users: "list<RoomWaitUser>"
+      only: [kr-1256]
+  RoomWaitUser:
+    - nickname: wstr
+      only: [kr-1256]
+    # kr-1256 sub_EE9550 stores level - 1, so 0 draws no row
+    - level: u32
+      only: [kr-1256]
+      default: 1
+  # kr-1256 S2C 128, parser kr-1256 sub_84F6C0: state 0 opens the waiting wall (kr-1256 sub_858250); 0x14 closes
+  # it and, in the client of the room's first seat, sends the create request again. kr-812's S2C 128 is
+  # Packet_gspNotifyPromotion; whether kr-1256's is the same class is not established, so it keeps its own name.
+  RoomWaitingDialog:
+    - state: u32
+      only: [kr-1256]
+    - unknown_n1: u32
+      only: [kr-1256]
+    - unknown_n2: wstr
+      only: [kr-1256]
+  # The tagged tail of the kr-1256 team label (kr-1256 sub_9DAE50): two words for a ServerTeamInfo.
+  TeamChangeTail:
+    - unknown_n0: u32
+      only: [kr-1256]
+    - unknown_n1: u32
+      only: [kr-1256]
+  # The tagged word that ends the kr-1256 create request (kr-1256 sub_962200).
+  RoomCreateTail:
+    - unknown_n0: u32
+      only: [kr-1256]
+  # First optional block written by kr-1256 sub_4B3AC0; its word's purpose is not established.
+  RoomTeamChangeFirstTail:
+    - unknown_n0: u32
+      only: [kr-1256]

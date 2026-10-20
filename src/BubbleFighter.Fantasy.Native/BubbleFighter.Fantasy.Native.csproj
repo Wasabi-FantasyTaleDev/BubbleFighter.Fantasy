@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><Description>Native module loading and execution backend independent of the runtime kernel.</Description></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../BubbleFighter.Fantasy.Abstractions/BubbleFighter.Fantasy.Abstractions.csproj" /></ItemGroup>
+</Project>

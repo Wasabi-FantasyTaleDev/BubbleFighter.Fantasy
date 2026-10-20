@@ -1,0 +1,39 @@
+<Project>
+  <PropertyGroup>
+    <!-- Plugin directories must be self-contained: every dependency the plugin's load
+         context cannot defer to the default context has to sit next to the plugin dll. -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The host runs on the ASP.NET shared framework, so Microsoft.Extensions.* abstractions
+         resolve from there; referencing the framework keeps their package copies out of
+         every plugin directory. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <!-- Abstractions and Contracts are loaded once by the host and shared with every plugin
+       load context (PluginLoadContext never reads a plugin's own copy), so a copy in a plugin
+       directory is dead weight that can also drift from the deployed contract version. -->
+  <Target Name="DropHostSharedAssemblies" AfterTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <ReferenceCopyLocalPaths Remove="@(ReferenceCopyLocalPaths)"
+                               Condition="'%(Filename)' == 'BubbleFighter.Fantasy.Abstractions' Or '%(Filename)' == 'BubbleFighter.Fantasy.Contracts'" />
+    </ItemGroup>
+  </Target>
+  <Target Name="DropHostSharedAssembliesFromPublish" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+                             Condition="'%(Filename)' == 'BubbleFighter.Fantasy.Abstractions' Or '%(Filename)' == 'BubbleFighter.Fantasy.Contracts'" />
+    </ItemGroup>
+  </Target>
+  <!-- Every plugin's build output is mirrored to artifacts/plugins/<AssemblyName>/ so the
+       host discovers it as one plugin directory per assembly. The directory is rebuilt from
+       the current output, so a dependency the plugin dropped does not linger there. -->
+  <Target Name="CopyPluginToArtifacts" AfterTargets="Build">
+    <ItemGroup>
+      <_PluginOutput Include="$(TargetDir)**\*.*" Exclude="$(TargetDir)BubbleFighter.Fantasy.Abstractions.*;$(TargetDir)BubbleFighter.Fantasy.Contracts.*" />
+    </ItemGroup>
+    <RemoveDir Directories="$(RepoRoot)artifacts\plugins\$(AssemblyName)" />
+    <Copy SourceFiles="@(_PluginOutput)"
+          DestinationFiles="@(_PluginOutput->'$(RepoRoot)artifacts\plugins\$(AssemblyName)\%(RecursiveDir)%(Filename)%(Extension)')" />
+  </Target>
+</Project>

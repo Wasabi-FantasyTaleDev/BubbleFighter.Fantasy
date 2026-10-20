@@ -1,0 +1,233 @@
+version: 1
+structs:
+  SupplyPosition:
+    - x: f32
+      offset: 0
+    - y: f32
+      offset: 4
+    - z: f32
+      offset: 8
+  SupplyMapReport:
+    - unknown_4: u32 # kr-812 sub_5312F0: one word and fifteen counted vectors.
+      offset: 4
+    - unknown_8: list<u32>
+      offset: 8
+    - positions: list<SupplyPosition>
+      offset: 24
+    - kinds: list<u32>
+      offset: 40
+    # One word per point: the team its map name states, 0 for any team, 1 for a name segment "red" and 2 for
+    # "blue" (kr-812 sub_50C840 compares the segment with the wide strings at kr-812 D3A5CC/D3A5D4). The same
+    # classification builds the report in id-400 sub_48B220, id-1809 sub_4E0440, cn-406 sub_428CE0, cn-404
+    # sub_4B9550, cn-408 sub_4B8E90, cn-706 sub_4C4300 and cn-717 sub_541AA0.
+    - team: list<u32>
+      offset: 56
+    - regeneration_max_ms: list<u32> # kr-812 sub_50C840 appends 30000 here and 15000 at offset 88.
+      offset: 72
+    - regeneration_min_ms: list<u32>
+      offset: 88
+    - unknown_104: list<u32>
+      offset: 104
+    - unknown_120: list<SupplyPosition>
+      offset: 120
+    - unknown_136: list<u32>
+      offset: 136
+    - unknown_152: list<u32>
+      offset: 152
+    - unknown_168: list<u32>
+      offset: 168
+    - unknown_184: list<SupplyPosition>
+      offset: 184
+    - unknown_200: list<u32>
+      offset: 200
+    - unknown_216: list<u32>
+      offset: 216
+    - unknown_232: list<wstr>
+      offset: 232
+  SupplyMapReport@cn-324:
+    - unknown_4: u32 # cn-324 sub_45CF00: one word and fifteen counted vectors.
+      offset: 4
+    - unknown_8: list<u32>
+      offset: 8
+    - positions: list<SupplyPosition>
+      offset: 20
+    - kinds: list<u32>
+      offset: 32
+    - team: list<u32> # cn-324 sub_466160 classifies the point name as in kr-812 sub_50C840: 0, 1 for "red", 2 for "blue".
+      offset: 44
+    - regeneration_max_ms: list<u32> # cn-324 sub_466160 appends 30000 here and 15000 at offset 68.
+      offset: 56
+    - regeneration_min_ms: list<u32>
+      offset: 68
+    - unknown_80: list<u32>
+      offset: 80
+    - unknown_92: list<SupplyPosition>
+      offset: 92
+    - unknown_104: list<u32>
+      offset: 104
+    - unknown_116: list<u32>
+      offset: 116
+    - unknown_128: list<u32>
+      offset: 128
+    - unknown_140: list<SupplyPosition>
+      offset: 140
+    - unknown_152: list<u32>
+      offset: 152
+    - unknown_164: list<u32>
+      offset: 164
+    - unknown_176: list<wstr>
+      offset: 176
+  # cn-279 sub_403EA0 reads fourteen vectors. Its builder sub_8205F0 fills the first four from the item points
+  # of the map: the position (sub_885130 and the point's coordinates), the kind (sub_8850B0, the second segment of
+  # the point's name, "random" or an item name) and the fourth and third name segments as numbers (sub_884E40,
+  # sub_884F90). It states no regeneration interval and no team, so the server applies its configured default
+  # interval. The vector at offset 68 and those after it describe the map's other objects (sub_8A8050 classifies
+  # a name as "star"). The object uses twelve-byte vector members.
+  SupplyMapReport@cn-279:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: list<u32>
+      offset: 8
+    - positions: list<SupplyPosition>
+      offset: 20
+    - kinds: list<u32>
+      offset: 32
+    - unknown_44: list<u32> # The fourth segment of the point's name (cn-279 sub_884E40).
+      offset: 44
+    - unknown_56: list<u32> # The third segment of the point's name (cn-279 sub_884F90).
+      offset: 56
+    - unknown_68: list<u32>
+      offset: 68
+    - unknown_80: list<SupplyPosition>
+      offset: 80
+    - unknown_92: list<u32>
+      offset: 92
+    - unknown_104: list<u32>
+      offset: 104
+    - unknown_116: list<u32>
+      offset: 116
+    - unknown_128: list<SupplyPosition>
+      offset: 128
+    - unknown_140: list<u32>
+      offset: 140
+    - unknown_152: list<u32>
+      offset: 152
+    - unknown_164: list<wstr>
+      offset: 164
+  # kr-812 sub_530570 / cn-717 sub_5677F0 / id-400 sub_480290 / id-1809 sub_4D54D0
+  # read the same ten-word envelope. cn-279 sub_403820 ends with three floats instead.
+  SupplyCreate:
+    - object_id: u32 # cn-324 sub_45C7D0
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+      default: 10000
+    - x: f32
+      offset: 12
+    - y: f32
+      offset: 16
+    - z: f32
+      offset: 20
+    - kind: u32 # cn-324 sub_5496C0 stores this kind in the created GoItemBox.
+      offset: 24
+    # Words 28 to 36 are passed on as a three-word vector to the created box (kr-812 sub_519480 hands them to
+    # the box's virtual at +164); the server sends zeros.
+    - unknown_28: u32
+      offset: 28
+      cn-279:
+        - unknown_28: f32
+          offset: 28
+    - unknown_32: u32
+      offset: 32
+      cn-279:
+        - unknown_32: f32
+          offset: 32
+    - unknown_36: u32
+      offset: 36
+      cn-279:
+        - unknown_36: f32
+          offset: 36
+    # The team of a box the host scheduled: the first constructor argument of GoItemBox (kr-812 sub_636F20) is
+    # this word, 1 chooses the model ItemCube_red, 2 ItemCube_blue and 0 ItemCube (only for a random box, the
+    # model of a box with a kind comes from its ItemSpec row), and the box refuses a character of another team
+    # (kr-812 sub_6378A0). The consumers read it the same way in id-400 sub_4979A0 -> sub_5A10F0, id-1809
+    # sub_4ECB60 -> sub_5EA3B0, cn-324 sub_471470 -> sub_5496C0, cn-717 sub_54E4B0 -> sub_68BFB0, cn-406
+    # sub_435110 -> sub_530DB0, cn-404 sub_4C5C40 -> sub_5E68D0, cn-408 sub_4C55C0 -> sub_5E9680 and cn-706
+    # sub_4D23A0 -> sub_5CA280. cn-279 has no team word and no team check (cn-279 sub_89E0A0).
+    - team: u32
+      offset: 40
+      except: [cn-279]
+  SupplyPickup:
+    - object_id: u32 # cn-324 sub_4672B0 emits object reference and item kind.
+      offset: 4
+    - kind: u32
+      offset: 8
+  SupplyDropRequest:
+    # cn-406 sub_41F500/sub_41F480 write/read the same six floats and three words.
+    - x: f32 # cn-324 sub_46D020 writes position, velocity, item kind and two words; reader cn-324 sub_45D320.
+      offset: 4
+    - y: f32
+      offset: 8
+    - z: f32
+      offset: 12
+    - velocity_x: f32
+      offset: 16
+    - velocity_y: f32
+      offset: 20
+    - velocity_z: f32
+      offset: 24
+    - kind: u32
+      offset: 28
+    - unknown_32: u32
+      offset: 32
+      except: [cn-279] # cn-279 sub_404180 reads only six floats and a final kind word.
+    - unknown_36: u32 # cn-324 sub_46D020 supplies 10000; cn-324 sub_46CF40 supplies 20000.
+      offset: 36
+      except: [cn-279]
+  SupplyPicked:
+    - seat: u32 # cn-324 sub_46DBE0 indexes the player array with this seat; reader cn-324 sub_408DF0.
+      offset: 4
+    - object_id: u32
+      offset: 8
+  # S2C gspAddItemToSlot. kr-812 sub_9D95D0 reads three words; cn-717 sub_7F4370, id-400
+  # sub_72E4D0, id-1809 sub_4D8130, cn-706 sub_7A23F0, cn-406 sub_715B70 and cn-324 sub_6EB8B0 match.
+  # cn-324 sub_470180 installs kind in the indicated player's item slot.
+  # cn-279 sub_47E650 reads only two words, the seat and the kind (sub_820120 indexes the player array with the
+  # first and looks the second up in the item sheet); it has one slot, so no slot word.
+  SupplyItemGranted:
+    - seat: u32
+      offset: 4
+    - kind: u32
+      offset: 8
+    - item_slot: u32
+      offset: 12
+      except: [cn-279]
+  # S2C gspItemUsed: the same readers as gspAddItemToSlot in every build above.
+  # cn-324 0x46FE85 passes item_slot to vtable+264; 0x46FEA5/0x46FEB5 use kind for the direct effect sender.
+  # cn-279 sub_81BB50 reads the seat and the kind in the same two words.
+  SupplyItemUsed:
+    - seat: u32
+      offset: 4
+    - kind: u32
+      offset: 8
+    - item_slot: u32
+      offset: 12
+      except: [cn-279]
+  # S2C gspSwitchItemSlot. kr-812 sub_80A400 reads four words; cn-717 sub_8CB120, id-400 sub_481C20,
+  # id-1809 sub_4D6EC0, cn-706 sub_4B9F60, cn-406 sub_7137B0 and cn-324 sub_6FE600 match.
+  # cn-406 sub_440770 uses the empty reader/writer sub_5129E0 for the switch request.
+  # cn-279 has no such packet class.
+  # cn-324 sub_47C140 clears the switch-pending flag even on rejection.
+  SupplyItemSlotChanged:
+    - seat: u32
+      offset: 4
+      except: [cn-279]
+    - item_slot: u32 # cn-324 sub_47C140 writes Character+6512, the current item-slot index.
+      offset: 8
+      except: [cn-279]
+    - kind: u32 # cn-324 sub_47C140 passes this value to Character vtable+272 to refresh the equipped effect.
+      offset: 12
+      except: [cn-279]
+    - result: u32 # Zero accepts the new selection; nonzero leaves it unchanged.
+      offset: 16
+      except: [cn-279]

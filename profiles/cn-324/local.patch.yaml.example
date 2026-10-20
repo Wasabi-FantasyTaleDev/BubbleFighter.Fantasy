@@ -1,0 +1,8 @@
+# Copy to local.patch.yaml to activate. The client is launched with:
+#   BubbleFighter.exe --ip=127.0.0.1 --port=7400 --areaid=6_1 --groupid=1
+# (the unpacked_BubbleFighter.repaired.exe copy also works; BubbleFighterU.exe
+#  hits R6002 unless the VEH recorder is force-loaded).
+# The GPK (GPKitClt) and GameWidget (SDO login widget, CN Lang=2) stubs must be
+# installed in the game directory - see the old workspace's InstallGPKStub.bat and
+# GameWidget.stub.dll; the current GameWidget.dll must be the 3584-byte stub or the
+# client crashes on exit paths (R6002 family).

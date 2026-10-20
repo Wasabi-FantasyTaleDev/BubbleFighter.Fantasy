@@ -1,0 +1,42 @@
+[
+  {
+    "source": "installation",
+    "route": "getting-started/installation"
+  },
+  {
+    "source": "quickstart",
+    "route": "getting-started/quickstart"
+  },
+  {
+    "source": "configuration",
+    "route": "guides/configuration"
+  },
+  {
+    "source": "plugins",
+    "route": "guides/plugins"
+  },
+  {
+    "source": "sdk-protocol",
+    "route": "guides/sdk-protocol"
+  },
+  {
+    "source": "deployment",
+    "route": "guides/deployment"
+  },
+  {
+    "source": "launcher",
+    "route": "guides/launcher"
+  },
+  {
+    "source": "troubleshooting",
+    "route": "guides/troubleshooting"
+  },
+  {
+    "source": "contributing",
+    "route": "project/contributing"
+  },
+  {
+    "source": "changelog",
+    "route": "project/changelog"
+  }
+]

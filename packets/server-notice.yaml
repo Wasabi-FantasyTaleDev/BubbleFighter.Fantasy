@@ -1,0 +1,36 @@
+version: 1
+structs:
+  # cn-279 sub_44FB90 reads u8, u32, wstr; cn-279 sub_6F62C0 forwards them to sub_6D67B0.
+  ServerNotice@cn-279:
+    - unknown_4: u8
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - text: wstr
+      offset: 12
+
+  # kr-1256 sub_99C8A0 reads u8, wstr, then two u32 kept as bytes at +28 and +29. kr-1256 sub_9BE620 hands the
+  # text with the +0 byte to the chat log (kr-1256 sub_4DC260) unless the stage (dword_18E555C+72) is 4 and +28 is
+  # zero, and opens a message box (kr-1256 sub_899850) when +29 is nonzero.
+  ServerNotice@kr-1256:
+    - unknown_0: u8
+      offset: 0
+    - text: wstr
+      offset: 4
+    - unknown_28: bool
+      offset: 28
+      default: 1 # so the line is shown in every stage
+    - unknown_29: bool
+      offset: 29
+
+  # kr-812 sub_845500; id-400 sub_798E60, id-1809 sub_7BEBA0, cn-717 sub_8CFA00,
+  # cn-706 sub_7A13A0 and cn-324 sub_6FDDB0 read the same widths and object offsets.
+  ServerNotice:
+    - unknown_4: u8
+      offset: 4
+    - unknown_5: u8
+      offset: 5
+    - unknown_8: u32
+      offset: 8
+    - text: wstr # kr-812 sub_8176D0 forwards the text and style values to the notice renderer.
+      offset: 12

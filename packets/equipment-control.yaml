@@ -1,0 +1,39 @@
+# Legacy equipment scalar codecs, recovered from own packet vtables and senders.
+version: 1
+structs:
+  # Own equip/unequip readers: kr-812 sub_80A910, cn-717 sub_8C4210,
+  # cn-324 sub_410910, cn-279 sub_44C1A0, id-400 sub_93D120,
+  # id-1809 sub_4D60C0, cn-706 sub_4BBB70. One item ID, not an inventory instance.
+  InventoryEquipmentRequest:
+    - item_id: u32
+      offset: 4
+  # kr-1256 sub_659850 (wear) and sub_805A60 (removal) write one i64 key: below 100000000 a bag item id, from it an
+  # article key (kr-1256 sub_806CE0).
+  InventoryEquipmentRequest@kr-1256:
+    - item_id: u64
+  # kr-1256 sub_9B34D0 / sub_9B3E00 read an i32 result and the request's i64 key, which case 0 hands to
+  # kr-1256 sub_806CE0 to apply the slot.
+  InventoryEquipmentResult@kr-1256:
+    - result: u32
+    - item_id: u64
+  # The own S2C equip/unequip vtables use the same scalar readers listed above.
+  # kr-812 sub_824AC0 and cn-324 sub_70B280 consume zero as success.
+  InventoryEquipmentResult:
+    - result: u32
+      offset: 4
+  # Own readers: kr-812 sub_6DB1B0, cn-717 sub_538B70, cn-324 sub_408DF0,
+  # cn-279 sub_47E650, id-400 sub_782DD0, id-1809 sub_4D7F70, cn-706 sub_733050.
+  # kr-812 sub_827550 consumes the shop key followed by result 1 for success.
+  ShopPurchaseReply:
+    - key: u32
+      offset: 4
+    - result: u32
+      offset: 8
+  # Own readers: kr-812 sub_93C4E0, cn-717 sub_8C4260, cn-324 sub_411530,
+  # cn-279 sub_425AA0, id-400 sub_610D40, id-1809 sub_4D7AD0, cn-706 sub_4BB840.
+  # kr-812 sub_9BCEB0 sends a shop key and a false option; its broader purpose is unproven.
+  ShopPurchaseRequest:
+    - key: u32
+      offset: 4
+    - unknown_8: bool
+      offset: 8

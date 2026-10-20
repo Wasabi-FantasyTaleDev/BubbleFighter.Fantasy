@@ -1,0 +1,37 @@
+NOAH II UI
+==========
+
+The files under this folder are copies of, or adapted from, NOAH II UI (noah-ii-ui) v1.0.0.0,
+the UI framework these admin pages are built with. NOAH II UI is distributed under the MIT
+License:
+
+    MIT License
+
+    Copyright (c) NOAH II UI authors
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy of this
+    software and associated documentation files (the "Software"), to deal in the Software
+    without restriction, including without limitation the rights to use, copy, modify, merge,
+    publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons
+    to whom the Software is furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all copies or
+    substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+    INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+    PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE
+    FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+    OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
+
+Only the pieces the admin interface uses are vendored, with these changes:
+
+- components/ui/NoahTable.vue: the loading text is a `loadingText` prop instead of fixed English.
+- components/ui/NoahModal.vue: the close button label is a `closeLabel` prop.
+- components/icons/NoahIcon.vue: adds the console glyphs (overview, players, rooms, plugins,
+  opcodes, logs, builds, gear, pause, play) and replaces the sun and moon paths.
+- styles/tokens.css: the design tokens of the static edition, plus the scale tokens the Vue
+  components read. No web font is imported; the interface uses system fonts only.
+- styles/base.css: the reset and utility classes from the Vue edition's main.css, without the
+  ambient background wash.

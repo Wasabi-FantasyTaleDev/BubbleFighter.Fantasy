@@ -1,0 +1,12 @@
+# Playable fighter items read from the client's FighterConfig.xml (worksheet FighterConfig,
+# FighterConfig:HorzTable) through the build's clientdata row; kr-1256 keeps it in
+# Packs/Config_00000.pkn. The row publishes IFighterRoster and ISeatCharacterResolver only:
+# native character creation is served by the shared dialect.messages creation binding, so this
+# row has no protocol, client profile or version of its own.
+# Add `fighters` to the profile `bundles` list to activate this row. Doing so does not change the
+# Lobby login send list.
+- id: fighters
+  plugin: fighters
+  config:
+    fighter_config_client_path: "Config/FighterConfig.xml"
+    max_fighter_config_bytes: 134217728

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Plugin runtime for Bubble Fighter Fantasy: service registry, event bus, profile composition, plugin loading.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="YamlDotNet" />
+    <InternalsVisibleTo Include="BubbleFighter.Fantasy.Kernel.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\BubbleFighter.Fantasy.Abstractions\BubbleFighter.Fantasy.Abstractions.csproj" />
+  </ItemGroup>
+  <ItemGroup><ProjectReference Include="../BubbleFighter.Fantasy.Native/BubbleFighter.Fantasy.Native.csproj" /></ItemGroup>
+</Project>

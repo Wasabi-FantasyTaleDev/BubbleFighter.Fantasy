@@ -1,0 +1,7 @@
+# Build this image from a framework-dependent Linux release directory containing server/.
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
+WORKDIR /app
+COPY --chown=1654:1654 server/ ./
+USER 1654:1654
+ENTRYPOINT ["dotnet", "BubbleFighter.Fantasy.Host.dll"]
+CMD ["run", "--profile", "all", "--patch", "profiles/all/deployment.patch.yaml"]

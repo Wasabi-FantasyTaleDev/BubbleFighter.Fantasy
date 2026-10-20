@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>MultiDefinitionModuleFixture</AssemblyName>
+    <RootNamespace>BubbleFighter.Fantasy.TestFixtures.MultiDefinition</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="duplicate\**\*.cs" />
+    <ProjectReference Include="..\..\..\src\BubbleFighter.Fantasy.Abstractions\BubbleFighter.Fantasy.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

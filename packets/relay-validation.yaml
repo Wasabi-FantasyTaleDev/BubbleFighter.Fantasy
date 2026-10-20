@@ -1,0 +1,68 @@
+version: 1
+structs:
+  # Readers/writers: kr-812 sub_8101E0/sub_810140, cn-717 sub_895580/sub_8954D0,
+  # cn-406 sub_710CB0/sub_710C10, id-400 sub_793E60/sub_793DC0,
+  # id-1809 sub_7B97F0/sub_7B9750 and cn-706 sub_79BE50/sub_79BDB0.
+  # kr-812 sub_810C20 builds this report after inbound relay 1 and sends via kr-812 sub_811D50.
+  # Native builders copy the local actor identity, not the login account, into +4:
+  # kr-812 sub_810C20 (+404), cn-717 sub_896050 (+404), cn-324 sub_6FA120 (+384),
+  # cn-406 sub_711050 (+392), id-400 sub_794200 (+392), id-1809 sub_7BA1A0 (+404), cn-706 sub_79C8B0 (+404).
+  # kr-812 sub_818680 establishes the nickname source; the remaining scalar meanings stay unknown.
+  RelayValidationReport:
+    - entity_id: u32
+      offset: 4
+    - nickname: wstr
+      offset: 8
+    - unknown_36: u32
+      offset: 36
+    - equipment: EquippedItemList
+      offset: 40
+    - presets: WeaponPresetList
+      offset: 120
+    - unknown_176: wstr
+      offset: 176
+    - unknown_204: u8
+      offset: 204
+    - unknown_206: u16
+      offset: 206
+    - unknown_208: u16
+      offset: 208
+    - unknown_210: u16
+      offset: 210
+    - signature: SessionSignatureData
+      offset: 212
+    - unknown_236: bool # cn-717 sub_B147C0/sub_B14700 transfers a four-byte boolean.
+      offset: 236
+      only: [cn-717]
+  # cn-324 sub_6F9ED0/sub_6F9E70: equipment only, no preset/signature or later halfword fields.
+  RelayValidationReport@cn-324:
+    - entity_id: u32
+      offset: 4
+    - nickname: wstr
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - equipment: EquippedItemList
+      offset: 16
+    - unknown_56: wstr
+      offset: 56
+    - unknown_60: u8
+      offset: 60
+    - unknown_62: u16
+      offset: 62
+  # cn-279 sub_701270 reports game-side relay success directly on inbound relay 1.
+  # Its native connection path sends no later validation report; the codec rejects this structure there.
+  RelayValidationReport@cn-279: []
+  # Native readers: kr-812 sub_80C2E0, cn-717 sub_891180, cn-406 sub_6FFC00,
+  # id-400 sub_781E00, id-1809 sub_7A52F0 and cn-706 sub_787A80; each writer agrees.
+  # CN2011/CN2012 have no signature in their relay validation path.
+  SessionSignatureData:
+    - unknown_4: u16
+      offset: 4
+      except: [cn-324]
+    - unknown_6: u8
+      offset: 6
+      except: [cn-324]
+    - unknown_8: "list<u8>"
+      offset: 8
+      except: [cn-324]

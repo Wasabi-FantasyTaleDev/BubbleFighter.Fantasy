@@ -1,0 +1,69 @@
+version: 1
+structs:
+  # kr-812 sub_503AD0 / cn-717 sub_538CF0 / cn-324 sub_45EA40 read actor, index and flag.
+  # id-400 sub_482670 / id-1809 sub_4D58D0 / cn-706 sub_4BBBB0 have the same fields.
+  # cn-279 sub_81FAB0 sends actor/index back when this flag is set; reader cn-279 sub_4051F0.
+  # cn-406 sub_4206B0 reads two words and bool32; sub_4397A0 sends acceptance when the flag is set.
+  RoundSpawnOffer:
+    - actor: u32
+      offset: 4
+    - spawn_index: u32
+      offset: 8
+    - request_respawn: bool
+      offset: 12
+      default: 1
+  # C2S shares the offer's reader except cn-279 sub_47E650, whose writer sub_4040E0 sends two words.
+  # cn-406 sub_41EB50/sub_4206B0 also write/read the two words and bool32.
+  RoundSpawnAcceptance:
+    - actor: u32
+      offset: 4
+    - spawn_index: u32
+      offset: 8
+    - unknown_12: bool
+      offset: 12
+      except: [cn-279]
+  # kr-812 sub_503530 / cn-717 sub_538830 read four fields; the final word is mode-specific.
+  # id-400 sub_480720 / id-1809 sub_4D78F0 / cn-706 sub_4BB530 have the same fields.
+  # cn-324 sub_45EA40 ends after the flag; cn-279 sub_47E650 ends after the index.
+  # cn-279 sub_81B470 revives unconditionally and copies the index to Character+16580.
+  # cn-406 sub_4206B0 ends after bool32; sub_4396D0 assigns Character+36716 and revives when set.
+  RoundSpawnConfirmation:
+    - actor: u32
+      offset: 4
+    - spawn_index: u32
+      offset: 8
+    - revive: bool
+      offset: 12
+      default: 1
+      except: [cn-279]
+    - unknown_16: u32
+      offset: 16
+      except: [cn-324, cn-406]
+  # kr-812 sub_6DB1B0 / cn-717 sub_538B70 / cn-324 sub_408DF0 read two words.
+  # cn-279 sub_47E650 / id-400 sub_782DD0 / id-1809 sub_4D7F70 / cn-706 sub_733050 agree.
+  # cn-324 sub_472CA0 adds the signed second word to the character death timer.
+  RoundRespawnWaitChange:
+    - actor: u32
+      offset: 4
+    - delta_ms: u32
+      offset: 8
+  # cn-717 sub_8C4210 / cn-324 sub_410910 / cn-279 sub_44C1A0 read the actor reference.
+  # id-400 sub_93D120 / id-1809 sub_4D60C0 / cn-706 sub_4BBB70 read the same word.
+  # Used only when an audited opcode is registered; kr-812 has no own packet label.
+  # cn-406 sub_436D30 consumes the actor via sub_700770 before native spawn selection.
+  RoundRespawnPrompt:
+    - actor: u32
+      offset: 4
+  # The same two-word readers serve death and index requests in all seven builds (addresses above).
+  # kr-812 sub_50E7B0 reports the death wait; kr-812 sub_511AB0 sends the index request.
+  # cn-406 sub_420FC0 reads both requests; senders sub_4485A0 and sub_42E0D0 stamp 713/705.
+  RoundDeathReport:
+    - actor: u32
+      offset: 4
+    - delay_ms: u32
+      offset: 8
+  RoundSpawnIndexRequest:
+    - actor: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8

@@ -1,0 +1,62 @@
+version: 1
+# Character-creation game-connection bodies. Writers/readers: kr-812 sub_875090/sub_875180/sub_875370 (name
+# check, create submit, replies), kr-812 sub_837170 case 12 (creation opened) and kr-812 sub_681FE0 (stage
+# install); kr-1256 sub_5CCC60 (C2S 31), kr-1256 sub_9A4E90 (S2C 13 and the C2S 32 five-piece body),
+# kr-1256 sub_9A46A0 (S2C 14 and the empty C2S 33) and kr-1256 sub_9D2FF0 case 12 (creation opened). The kr-1256
+# create body is 20+2N bytes: prefixed name, two u32 words from the selected creation record (+748 and +1336),
+# an empty wstring and one zero word; the meaning of the two words is unproven (see the comment on the field).
+structs:
+  # C2S gcpReqCheckCreateUserName. kr-812 sub_5C8FD0 reads one string; cn-717 sub_740F00,
+  # id-400 sub_89DD10, id-1809 sub_68D480 and cn-706 sub_567230 match.
+  CharacterNameRequest:
+    - nickname: wstr # cn-279 sub_6E8880 builds the name; sub_464460 sends C2S 14.
+      offset: 4
+  # C2S gcpReqCreateUserInfo. kr-812 sub_8764A0 reads string, two words, string and a trailing word;
+  # cn-717 sub_901630 matches. id-400 sub_7F7110, id-1809 sub_8177D0 and cn-706 sub_7FDC90 stop
+  # before the trailing word. kr-812 sub_875180 fills +32 from the selected character (this+948) and
+  # +36 from that character's table entry, 1 when absent.
+  CharacterCreateRequest:
+    - nickname: wstr
+      offset: 4
+    - character_type: u32 # kr-1256 sub_9A4E90 takes it from the selected record CreateUserStage+748; meaning unproven.
+      offset: 32
+    - unknown_36: u32 # kr-1256 sub_9A4E90 takes it from the same record +1336; purpose unproven.
+      offset: 36
+    - unknown_40: wstr # kr-1256 sub_9A4E90 writes it empty.
+      offset: 40
+    - unknown_68: u32 # kr-1256 sub_9A4E90 writes one zero word.
+      offset: 68
+      except: [id-400, id-1809]
+  # cn-279 sub_464070 and cn-324 sub_744500 read the same four fields packed after one another.
+  CharacterCreateRequest@cn-324:
+    - nickname: wstr
+      offset: 4
+    - character_type: u32
+      offset: 8
+    - unknown_12: u32 # cn-279 sub_6E8920 supplies character_type == 1; cn-324 sub_747D40 reads sub_748840's +4. Purpose unproven.
+      offset: 12
+    - unknown_16: wstr
+      offset: 16
+  # S2C gspRepCheckCreateUserName. kr-812 sub_844570 reads a word and a string; cn-717 sub_8CEE00,
+  # id-400 sub_798DF0, id-1809 sub_7BE230, cn-706 sub_7A1330, cn-324 sub_6FD230 and cn-279
+  # sub_480550 match. Handlers accept zero.
+  CharacterNameReply:
+    - result: u32
+      offset: 4
+    - nickname: wstr
+      offset: 8
+  # S2C gspRepCreateUserInfo. kr-812 sub_80A910 reads one word; cn-717 sub_8C4210, id-400 sub_93D120,
+  # id-1809 sub_4D60C0, cn-706 sub_4BBB70, cn-324 sub_410910 and cn-279 sub_44C1A0 match.
+  # cn-279 sub_6FCBA0 and cn-324 sub_704680 advance on zero.
+  CharacterCreateReply:
+    - result: u32
+      offset: 4
+
+  # S2C creation opened (gspNotifyCreateUserInfo in kr-1256, gspNotifyAutoTutorial_ in the legacy family): the
+  # client reads no field; kr-1256 sub_9D2FF0 case 12 and kr-812 sub_837170 case 12 set the creation flag without a
+  # read (kr-812 sub_681FE0 then installs the creation stage), so the body is zero bytes.
+  CharacterCreationOpened: []
+
+  # C2S login after create (gcpLoginAfterCreateUserInfo in the legacy family, Unknown33 in kr-1256): the client
+  # stamps the opcode on an empty packet (kr-1256 sub_9A46A0 tail), so the body is zero bytes.
+  CharacterCreationLogin: []

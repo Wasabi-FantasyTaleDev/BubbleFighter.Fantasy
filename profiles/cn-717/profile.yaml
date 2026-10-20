@@ -1,0 +1,25 @@
+id: cn-717
+display_names:
+  en: "China 2015-06-18"
+  zh-Hans: "国服 2015-06-18"
+  zh-Hant: "中國 2015-06-18"
+  ko: "중국 2015-06-18"
+client_build: cn:717:0
+# Nearest build whose layouts this one reuses when it has no variant of its own.
+parent: kr-812
+description: Chinese 2015 client build, ClientVersion_Major 717.
+bundles:
+  - core
+  - legacy
+  - inventory-actions
+# What this build differs in; everything else is the legacy bundle's (kr-812).
+vars:
+  LEGACY_PORT: ${CN_717_GAME_PORT:-7150}
+  LEGACY_PUBLIC_PORT: ${CN_717_PUBLIC_PORT:-7150}
+  LEGACY_GATE_KEY: 6
+  LEGACY_GATE_SUB_KEY: 1
+patches:
+  - patch.yaml
+  - ../bundles/shop-supplement.yaml
+  # Optional developer override; git-ignored and skipped when absent.
+  - local.patch.yaml

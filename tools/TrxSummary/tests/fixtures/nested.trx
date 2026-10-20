@@ -1,0 +1,1 @@
+<TestRun name="Fixture"><Results><UnitTestResult testName="Fixture.Parent" outcome="Passed"><InnerResults><UnitTestResult testName="Fixture.Child" outcome="Passed" /></InnerResults></UnitTestResult></Results></TestRun>

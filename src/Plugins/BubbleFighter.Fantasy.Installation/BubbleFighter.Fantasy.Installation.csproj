@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Durable first-run installation and independent administrator identities.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\BubbleFighter.Fantasy.Contracts\BubbleFighter.Fantasy.Contracts.csproj" />
+    <ProjectReference Include="..\..\BubbleFighter.Fantasy.Archives\BubbleFighter.Fantasy.Archives.csproj" />
+  </ItemGroup>
+</Project>

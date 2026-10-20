@@ -1,0 +1,126 @@
+version: 1
+structs:
+  # kr-812 sub_80AE90: entry selector followed by the MapMeta key.
+  # cn-717 sub_88F570, id-400 sub_782970, id-1809 sub_7A5E80, cn-406 sub_700680 and cn-706 sub_788610 match.
+  # cn-324 sub_6EB6D0 and cn-279 sub_44A110 store the same wire prefix in compact objects.
+  RoomEnterGameHeader:
+    - unknown_4: u32
+      offset: 4
+    - map_key: wstr
+      offset: 8
+  # Only the scalar suffix; existing audited ScoreData blocks are composed between the tables.
+  RoomEnterGameTail:
+    - unknown_36: u32
+      offset: 36
+      except: [cn-324]
+    - unknown_40: u32
+      offset: 40
+      except: [cn-324]
+    - unknown_44: u32
+      offset: 44
+      except: [cn-324]
+    - unknown_48: bool
+      offset: 48
+      except: [cn-324, id-400]
+      also: [cn-706]
+    - unknown_49: bool
+      offset: 49
+      except: [cn-324, id-400, id-1809]
+    - unknown_50: bool
+      offset: 50
+      only: [cn-717]
+  # id-400 sub_782970 reads the suffix after nested ScoreData at +36.
+  RoomEnterGameTail@id-400:
+    - unknown_3204: u32
+      offset: 3204
+    - unknown_3208: u32
+      offset: 3208
+    - unknown_3212: u32
+      offset: 3212
+      # cn-408 sub_7B24D0 reads the three words at +4740 and then one more bool (cn-408 sub_7B2460
+      # writes it from +4752); the nested ScoreData moved them by its twelve 4-byte longer rows.
+      cn-408:
+        - unknown_4748: u32
+          offset: 4748
+        - unknown_4752: bool
+          offset: 4752
+  # cn-406 sub_700680 reads ScoreData at +36 and one suffix word at +3028.
+  # cn-406 sub_703E30 copies that word to session+340 only when the special-entry flag is set.
+  RoomEnterGameTail@cn-406:
+    - unknown_3028: u32
+      offset: 3028
+  # cn-706 sub_788610 has no ScoreData and restores the scalar suffix at +36.
+  RoomEnterGameTail@cn-706:
+    - unknown_36: u32
+      offset: 36
+    - unknown_40: u32
+      offset: 40
+    - unknown_44: u32
+      offset: 44
+    - unknown_48: bool
+      offset: 48
+  # Complete entry composition follows each own reader listed above; offsets stay in nested tables.
+  RoomEnterGame:
+    - header: RoomEnterGameHeader
+    # id-400 sub_786480 -> sub_78C4E0 and cn-406 sub_703E30 -> sub_709830
+    # install this same ScoreData object; occupied rows must survive initial entry.
+    - initial_score: ScoreData
+      only: [id-400]
+      except: [cn-706]
+    - scoreboard: ScoreData
+      only: [cn-324]
+    - tail: RoomEnterGameTail
+      except: [cn-324]
+  # kr-1256 restates the stage record of gspRoomEnterGame: room dispatcher kr-1256 sub_9D9930 case 0x1FE
+  # constructs it (kr-1256 sub_10D1C10), reads it with kr-1256 sub_10D1D70 and copies +72 to session+12
+  # before kr-1256 sub_9E5E70 moves the stage. Three strings, six scalars and three lists, with no field
+  # in common with the kr-812 header and tail, so the whole record is restated.
+  RoomEnterGame@kr-1256:
+    # kr-1256 sub_9E5E70 copies it to session+208 (the MapMeta key slot) and tests its map record for the
+    # mission flags.
+    - map_key: wstr
+      offset: 0
+    # copied to session+232, the key the scene loads from (kr-1256 sub_9E5E70).
+    - stage_key: wstr
+      offset: 24
+    # copied to session+184, the slot kr-1256 sub_9D7570 sends as the master's selection.
+    - map_selection: wstr
+      offset: 48
+    # copied to session+12 by the dispatcher, the room state the room UI tests against 4; the S2C 608
+    # handler later overwrites it with 4.
+    - room_state: u32
+      offset: 72
+    - unknown_76: u32
+      offset: 76
+    - unknown_80: u8
+      offset: 80
+    - unknown_84: u8
+      offset: 84
+    - unknown_88: u32
+      offset: 88
+    - unknown_92: u8
+      offset: 92
+    # kr-1256 sub_10D2CF0
+    - unknown_96: list<RoomStageEntry>
+      offset: 96
+    # kr-1256 sub_10D2220 -> sub_10D30B0
+    - unknown_104: list<RoomStageTriple>
+      offset: 104
+    # kr-1256 sub_10D2B40
+    - unknown_112: list<RoomStageEntry>
+      offset: 112
+  # Elements of the kr-1256 stage record's lists; kr-812's record has no lists.
+  RoomStageEntry:                       # kr-1256 sub_10D2CF0 and sub_10D2B40: one byte and two words
+    - unknown_n0: u8
+      only: [kr-1256]
+    - unknown_n1: u32
+      only: [kr-1256]
+    - unknown_n2: u32
+      only: [kr-1256]
+  RoomStageTriple:                      # kr-1256 sub_10D30B0: three words
+    - unknown_n0: u32
+      only: [kr-1256]
+    - unknown_n1: u32
+      only: [kr-1256]
+    - unknown_n2: u32
+      only: [kr-1256]

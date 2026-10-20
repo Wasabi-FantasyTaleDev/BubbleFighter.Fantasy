@@ -1,0 +1,18 @@
+# Copy this file to local.patch.yaml in the same directory.
+# profiles/*/local.patch.yaml is git-ignored and applied automatically
+# when present (see profile.yaml patches).
+#
+# Disable persistence.mysql for a no-database login test. Player data
+# stays in memory for that process.
+
+- replace:
+    id: persistence.mysql
+    disabled: true
+
+# A replace that carries a `config:` key substitutes the WHOLE row config: it
+# does not merge key by key, so every key the bundle set that this block omits
+# falls back to the plugin's code default and the bundle value is gone. Toggles
+# that only disable a row are safe (`disabled:` above keeps the config), but a
+# config override has to repeat each key it wants to keep at a value other than
+# the code default. Check the effective set with:
+#   dotnet run --project src/BubbleFighter.Fantasy.Host -- run --profile kr-1256 --dump-config

@@ -1,0 +1,74 @@
+version: 1
+# Cash-inventory pickup bodies. These tables do not register routes or grant items.
+structs:
+  # kr-812 CashInvenSlot reader sub_842BC0 and modern readers kr-1256 sub_1142F20,
+  # cn-774 sub_497700 and tw-454 sub_4A0D00 all read 4,4,2,2,4,4,wstr,1 bytes.
+  # Native strides are 56 (kr-812) and 52 (modern), but neither vtables nor string
+  # storage belong on the wire. The +4 key is used by the pickup removal routines.
+  CashInventorySlot:
+    - cash_slot_id: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u16
+      offset: 12
+    - unknown_14: u16
+      offset: 14
+    - unknown_16: u32
+      offset: 16
+    - item_key: u32
+      offset: 20
+    - unknown_24: wstr
+      offset: 24
+    - unknown_52: u8
+      offset: 52
+      kr-1256:
+        - unknown_48: u8
+          offset: 48
+
+  # S2C gspCashInvenUpdateAllInventorySlot. kr-812 sub_842C70 -> kr-812 sub_842C30 reads
+  # a u32 count through kr-812 sub_A56B30, then each CashInvenSlot. Modern readers are
+  # kr-1256 sub_10D8150 (handler sub_9AF590), cn-774 sub_BAE3F0 and tw-454 sub_A8BA40.
+  CashInventoryUpdate:
+    - slots: "list<CashInventorySlot>"
+      offset: 4
+      kr-1256:
+        - slots: "list<CashInventorySlot>"
+          offset: 0
+
+  # C2S gcpReqPickup: kr-812 Packet_gcpReqPickup reader sub_80A910 uses the four-byte
+  # primitive kr-812 sub_A56C10. Modern senders kr-1256 sub_9D79E0, cn-774 sub_DE26E0 and
+  # tw-454 sub_D87B40 also write one word. In all four builds the pickup action supplies
+  # the cash-slot key: the modern card action captures card +100, which is native slot +4;
+  # the kr-812 action uses the matching slot key. This is a selected key, not an
+  # authenticated inventory index.
+  CashPickupRequest:
+    - cash_slot_key: u32
+      offset: 4
+
+  # S2C gspRepPickup: kr-812 Packet_gspRepPickup reader sub_6DB1B0 reads two words.
+  # kr-812 sub_8242E0 looks up the first in the cash-slot map and, on result 1,
+  # calls kr-812 sub_977DE0 to erase the matching record. Its other result codes are not
+  # assigned server-side meanings by this table.
+  CashPickupReply:
+    - cash_slot_id: u32
+      offset: 4
+    - result: u32
+      offset: 8
+
+  # kr-1256 sub_99B0E0 reads three words and a counted UTF-16 string; kr-1256 sub_9B2900
+  # consumes result 1 by calling kr-1256 sub_8055F0 with the first word. The latter removes
+  # the CashInvenSlot whose +4 key matches. cn-774 sub_BB13B0 and tw-454 sub_A8EBB0
+  # independently read the same sequence and call cn-774 sub_9A54D0 / tw-454 sub_C03AD0 to erase
+  # that key. String readers: kr-1256 sub_1126430, cn-774 sub_1093FE0, tw-454 sub_E91B70.
+  # The last word and string have presentation consumers, but their full meanings
+  # remain unproven. Offsets below describe the kr-1256 parser's destination record.
+  CashPickupReply@kr-1256:
+    - cash_slot_id: u32
+      offset: 0
+    - result: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: wstr
+      offset: 12

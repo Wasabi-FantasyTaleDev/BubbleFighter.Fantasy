@@ -1,0 +1,1198 @@
+profile: cn-279
+# Numeric spaces are separate. Only packets traced in this build are listed.
+opcodes:
+  - value: 507
+    direction: c2s
+    connection: game
+    name: gcpRoomReqChangeMaster
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 Packet_gcpRoomReqChangeMaster constructor sub_425E10, reader sub_481C90; cn-279 sub_790750 selects the class and sub_426D90 stamps507"
+  - value: 507
+    direction: s2c
+    connection: game
+    name: gspRoomRepChangeMaster
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_70A0F0 case0x1FB -> cn-279 sub_706E00; Packet_gspRoomRepChangeMaster reader cn-279 sub_449AF0 reads target nickname then result"
+  - value: 710
+    direction: c2s
+    connection: game
+    name: gcpGameUpdateScore
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_818DE0 constructs Packet_gcpGameUpdateScore vtable 9AED44; sub_407530 stamps game 710 and serializes that object. cn-279 sub_403B10/sub_403B60 write/read five words; ordinary kinds 1/2 at cn-279 0x8285B4/0x826DDC pass victim/scorer references."
+  - value: 601
+    direction: s2c
+    connection: game
+    name: gspConnectToRelayServer
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_6FFDE0 dispatches game 601 to cn-279 sub_6F1900, which reads the native endpoint and key and opens the relay; layout in packets/relay-connection.yaml"
+  - value: 601
+    direction: c2s
+    connection: game
+    name: gcpReportRelayConnected
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_44C8F0 stamps game 601 for the native relay success report; complete bool32 layout in packets/relay-connection.yaml"
+  - value: 1
+    direction: s2c
+    connection: relay
+    name: rspRelayJoinAccepted_
+    name_source: coined
+    evidence: verified
+    source: "cn-279 sub_701270 native relay 1 inspects only opcode and connection, with no body read; direct game-side success via cn-279 sub_44C8F0; empty signal recorded in packets/relay-success.yaml"
+  - value: 1
+    direction: c2s
+    connection: relay
+    name: rcpReqJoinRelaySession
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_453E00 stamps relay 1; native Packet_rcpReqJoinRelaySession writer cn-279 sub_44C610 and reader cn-279 sub_44C640; field sequence is recorded in packets/relay-connection.yaml"
+  - value: 501
+    direction: s2c
+    name: gspRoomSetSession
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 dispatcher sub_70A0F0 case 501 calls sub_708E10, which constructs Packet_gspRoomSetSession through sub_449910; vtable 0x9DD92C reader sub_4502B0 invokes only the nested SessionSetting reader sub_41E700"
+    notes: "SessionSetting only, with no scalar prefix; required by the shared departure/reset sender."
+  - value: 511
+    direction: s2c
+    name: gspRoomLeaveSlot
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 dispatcher sub_70A0F0 case 511 calls sub_708040, which constructs Packet_gspRoomLeaveSlot through sub_44A090; reader sub_44A060 reads a seat word and nested UserSlot through sub_4496E0"
+  - value: 403
+    direction: c2s
+    name: gcpReqJoinSession
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_7A7300 constructs Packet_gcpReqJoinSession through sub_41EB00 and passes the same object to sub_41F4F0, which stamps 403; vtable 0x9C1C6C reader sub_41EAC0"
+    notes: "Three words and a counted UTF-16 password, no tail. Distinct from native matching request 111."
+  - value: 502
+    direction: c2s
+    name: gcpRoomSendChatModuleMsg
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_6F9820 constructs Packet_gcpRoomSendChatModuleMsg through sub_44F400 and sends it through sub_454000, which stamps 502; reader sub_480550"
+    notes: "Channel word and counted UTF-16 text."
+  - value: 504
+    direction: c2s
+    name: gcpRoomReqReadyStatus
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_788B30 constructs Packet_gcpRoomReqReadyStatus vtable 0x9C635C and calls sub_426C90, which stamps 504; writer sub_425E60 and reader sub_425EA0"
+    notes: "Three bool32 values; 12 bytes."
+  - value: 508
+    direction: c2s
+    name: gcpRoomReqOpenCloseSlot
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_796FA0 constructs Packet_gcpRoomReqOpenCloseSlot vtable 0x9C5134 and calls sub_425B00, which stamps 508; reader sub_425AA0"
+    notes: "Seat word and bool32; 8 bytes."
+  - value: 509
+    direction: c2s
+    name: gcpReqKickFromSession
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_790750 constructs Packet_gcpReqKickFromSession through sub_425D40 and calls sub_427010, which stamps 509; reader sub_481C90"
+    notes: "One counted UTF-16 nickname."
+  - value: 512
+    direction: c2s
+    name: gcpRoomChangeGameSetting
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_79E7D0 constructs Packet_gcpRoomChangeGameSetting through sub_4208A0 and calls sub_420DC0, which stamps 512; writer sub_420720 and reader sub_4207E0"
+    notes: "Four strings, two bool32 values and ten words, with no later-family trailing flag."
+  - value: 513
+    direction: c2s
+    name: gcpRoomChangeTeam
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_688820 constructs Packet_gcpRoomChangeTeam vtable 0x9C6344 and calls sub_426B90, which stamps 513; empty writer and reader sub_481D60"
+    notes: "Empty body."
+  - value: 103
+    direction: s2c
+    name: gspRepJoinSession
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 dispatcher sub_7A7AF0 case 103 calls sub_7A68C0, which constructs Packet_gspRepJoinSession vtable 0x9C1CA8 and reads the result with sub_44C1A0"
+    notes: "One result word; nonzero selects a native refusal message."
+  - value: 504
+    direction: s2c
+    name: gspRoomChangeTeam
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 dispatcher sub_70A0F0 case 504 calls sub_706B50, which constructs Packet_gspRoomChangeTeam vtable 0x9DD95C; reader sub_47E650 consumes seat and team words"
+  - value: 509
+    direction: s2c
+    name: gspRoomReceiveChatModuleMsg
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 dispatcher sub_70A0F0 case 509 calls sub_707B90, which constructs Packet_gspRoomReceiveChatModuleMsg through sub_449EB0; vtable 0x9DD98C reader sub_449E50"
+    notes: "u16 seat, nickname, channel word, unknown string, text, unknown word and bool32."
+  - value: 512
+    direction: s2c
+    name: gspRoomOpenCloseSlot
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 dispatcher sub_70A0F0 case 512 calls sub_704250, which constructs Packet_gspRoomOpenCloseSlot vtable 0x9DD9E0; reader sub_425AA0 consumes a seat word and bool32"
+  - value: 513
+    direction: s2c
+    name: gspRepKickFromSession
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 dispatcher sub_70A0F0 case 513 calls sub_707090, which constructs Packet_gspRepKickFromSession through sub_4498A0; reader sub_480490 consumes two names and a result word"
+  - value: 725
+    direction: s2c
+    name: gspGameTimeOverEnd
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 dispatcher sub_70A0F0 case 725 calls sub_7069B0; constructor sub_44A360 installs Packet_gspGameTimeOverEnd vtable 0x9DDA1C, reader sub_44A550 delegates to native ScoreData reader sub_448C80"
+  - value: 726
+    direction: s2c
+    name: gspGameShowResult_
+    name_source: coined
+    evidence: verified
+    source: "cn-279 dispatcher sub_70A0F0 case 726 calls sub_708BF0 on the result object at player +340; sub_753C80 checks the nonzero outcome at result state +440 and enters reward stage 3 without reading a packet body"
+  - value: 722
+    direction: s2c
+    name: gspGameBroadcastPlayerScoreData
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 dispatcher sub_70A0F0 case 722 -> sub_706AC0 -> constructor sub_44A420; packet vtable 0x9DDA58 reader sub_44A550 delegates to ScoreData reader sub_448C80"
+    notes: "Full eight-seat ScoreData; not the later builds' 729 or the catalog's conflicting 711. Score-report activation remains separately gated."
+  - value: 111
+    direction: c2s
+    name: gcpReqMatch
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_7A7300 constructs Packet_gcpReqMatch from menu+132/+136 and calls cn-279 sub_41F470, which stamps 111; reader cn-279 sub_47E650"
+    notes: "u32 selected mode, u32 filter selection; 8 bytes"
+  - value: 202
+    direction: c2s
+    name: gcpReqLeaveParty
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 sub_453C00 stamps 202 through sub_56E6E0 for the Packet_gcpReqLeaveParty built in cn-279 sub_688330; empty body"
+  - value: 302
+    direction: c2s
+    name: gcpReqKickFromParty
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 sub_426F10 stamps 302 through sub_56E6E0 after the Packet_gcpReqKickFromParty constructor cn-279 sub_425ED0; writer cn-279 sub_425D30"
+  - value: 303
+    direction: c2s
+    name: gcpReqChangePartyLeader
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 sub_426E10 stamps 303 through sub_56E6E0 after the Packet_gcpReqChangePartyLeader constructor cn-279 sub_425F20; writer cn-279 sub_425D30"
+  - value: 117
+    direction: s2c
+    name: gspNotifyMatch
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_7A7AF0 case 117 dispatches cn-279 sub_7A6420, which reads Packet_gspNotifyMatch through cn-279 sub_44C1A0"
+    notes: "u32 result; 0 opens searching UI, 1 refuses"
+  - value: 805
+    direction: c2s
+    name: gcpReqInventoryUseItem
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_664890 constructs Packet_gcpReqInventoryUseItem through cn-279 sub_4859F0, writes item ID and quantity 1, then stamps 805 with cn-279 sub_56E6E0; reader cn-279 sub_450430"
+  - value: 14
+    direction: c2s
+    name: gcpReqCheckCreateUserName_
+    name_source: coined
+    evidence: verified
+    source: "cn-279 sub_6E8880 supplies the name; sub_464460 stamps 14; reader cn-279 sub_481C90"
+    notes: "wstr nickname"
+  - value: 15
+    direction: c2s
+    name: gcpReqCreateUserInfo
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_6E8920 constructs Packet_gcpReqCreateUserInfo; sub_4644E0 stamps 15; reader cn-279 sub_464070"
+    notes: "wstr nickname, i32 character_type, i32 unknown_12, wstr unknown_16"
+  - value: 16
+    direction: c2s
+    name: gcpLoginAfterCreateUserInfo
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_6E7B70 constructs Packet_gcpLoginAfterCreateUserInfo; sub_464560 stamps 16"
+    notes: "empty payload"
+  - value: 723
+    direction: c2s
+    name: gcpReqEndStage
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_818630 constructs Packet_gcpReqEndStage and stamps 723; reader cn-279 sub_44C1A0"
+    notes: "i32 completion flag; native callers send 0 to leave or 1 to finish; 4 bytes"
+  - value: 1
+    direction: c2s
+    name: gcpFirstConnect
+    name_source: label@cn-279
+    evidence: verified
+    source: "Packet_gcpFirstConnect vtable 0x9E0F38, serializer 0x44E390; sender 0x6F9970 supplies version 279"
+    notes: "u32 version, 7 wstr, u32 unknown1, 15 wstr; each wstr is u32 length in UTF-16 code units followed by UTF-16LE bytes"
+  - value: 2
+    direction: s2c
+    name: gspRepGamePatch
+    name_source: label@cn-279
+    evidence: verified
+    source: "dispatcher 0x6FFDE0 case 2, handler 0x6F61F0, reader 0x4EBFD0"
+    notes: "bool32 requiresPatch, wstr commandLine; 8 bytes for no patch and an empty command line"
+  - value: 3
+    direction: c2s
+    name: gcpReqLogin
+    name_source: label@cn-279
+    evidence: verified
+    source: "Packet_gcpReqLogin vtable 0x9C1E04, serializer 0x420100 and reader 0x420160"
+    notes: "wstr account, wstr unknown1, wstr unknown2, u32 adapter count, count x u32 IPv4; no trailer"
+  - value: 3
+    direction: s2c
+    name: gspRepLogin
+    name_source: label@cn-279
+    evidence: verified
+    source: "Packet_gspRepLogin vtable 0x9E1088, reader 0x44F740, handler 0x6F7FE0"
+    notes: "i32 result, wstr account, u32 userNumber, wstr nickname, i32 characterType, i32 unknown2, i32 unknown3, i32 unknown4, f64 serverTime, wstr unknown5; no trailing unknown6"
+  - value: 16
+    direction: s2c
+    name: gspCenterList
+    name_source: label@cn-279
+    evidence: verified
+    source: "dispatcher 0x6FFDE0 case 16, handler 0x6FA7C0, vector reader 0x453590, GateInfo reader 0x44DBC0; endpoint consumer 0x6D8C20"
+    notes: "u32 count, then 18 bytes per gate: i32 key, i32 subKey, i32 unknown1, u32 IPv4 in network byte order, u16 port"
+  - value: 106
+    direction: c2s
+    name: gcpReqGotoLobby
+    name_source: label@cn-279
+    evidence: verified
+    source: "MainMenu btnMultiplay send 0x420E40; Packet_gcpReqGotoLobby SETOP 106, empty body"
+    notes: "empty payload; reply is S2C gspGotoLobby; not gcpReqMatch"
+  - value: 108
+    direction: s2c
+    name: gspGotoMenu
+    name_source: label@cn-279
+    evidence: verified
+    source: "Packet_gspGotoMenu vtable 0x9E1100, reader 0x44FC80, handler 0x6F3C00"
+    notes: "bool32 notice; handler moves to stage 2"
+  - value: 109
+    direction: s2c
+    name: gspGotoLobby
+    name_source: label@cn-279
+    evidence: verified
+    source: "handler 0x6F3B20 (Packet_gspGotoLobby), reader 0x44FC80 -> 0x4EBFD0"
+    notes: "bool32 notice flag; nonzero shows client string 0x9DECF8; stage 3 when ServerConnection+100 is set (independent of the flag); send 0 for silent enter"
+  - value: 110
+    direction: s2c
+    name: gspGotoRoom
+    name_source: label@cn-279
+    evidence: verified
+    source: "Packet_gspGotoRoom vtable 0x9E1118, reader 0x44FD50, handler 0x6FF6C0; SessionSetting 0x41E700, GameSetting 0x41E380, UserSlot 0x4496E0, EquippedItemList 0x448840"
+    notes: "SessionSetting, GameSetting, i32 local slot, i32 slot index, vector<UserSlot>, vector<EquippedItemList>, bool32 notice; see packets/room.yaml for nested field lists"
+  - value: 201
+    direction: s2c
+    name: gspUpdateParty
+    name_source: label@cn-279
+    evidence: verified
+    source: "dispatcher 0x6FFDE0 case 201, handler 0x8326D0, reader 0x4802A0; PartyMember 0x44E7E0; EquippedItemList 0x448840"
+    notes: "i32 state (handler stores at Party+4), u32 member count, members (i32 userNum, wstr nick, i32 x3), u32 equipped count, EquippedItemList entries; MainMenu plaza gate 0x6F9E50(2) needs state 2 and one member whose +4 equals login userNum"
+  - value: 801
+    direction: c2s
+    name: gcpEnterShop
+    name_source: label@cn-279
+    evidence: verified
+    source: "Packet_gcpEnterShop serializer 0x481D60; sender 0x784390 sets opcode 801"
+    notes: "Empty payload"
+  - value: 800
+    direction: s2c
+    name: gspRepEnterShop
+    name_source: label@cn-279
+    evidence: verified
+    source: "Packet_gspRepEnterShop vtable 0x9E1184, reader 0x450090, handler 0x6FD9F0"
+    notes: "i32 unknown0, vector<ShopItemCardInfo>, ShopCategoryAll; card 0x44D090, 28-byte Stock 0x44CC70, category 0x44D6A0"
+  - value: 808
+    direction: c2s
+    name: gcpReqShopBuy
+    name_source: label@cn-279
+    evidence: verified
+    source: "Packet_gcpReqShopBuy reader 0x425AA0"
+    notes: "i32 catalog key, bool32 unknown2; zero selects ordinary purchase"
+  - value: 807
+    direction: c2s
+    name: gcpReqInventoryThrowItem
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_6618E0 constructs named vtable 9F4E14 after expired-row confirmation; sub_487630 stamps 807 and sub_404F00 writes one u32 via sub_4EB910"
+  - value: 813
+    direction: s2c
+    name: gspRepShopBuy
+    name_source: label@cn-279
+    evidence: verified
+    source: "Packet_gspRepShopBuy reader 0x47E650, consumer 0x6F09D0"
+    notes: "i32 catalog key, i32 result; result 1 succeeds"
+  - value: 105
+    direction: s2c
+    name: gspUserStat
+    name_source: label@cn-279
+    evidence: verified
+    source: "Packet_gspUserStat reader 0x44F8A0 / FighterInfo 0x44E0D0"
+    notes: "Full field list and constructor defaults: src/Plugins/BubbleFighter.Fantasy.Dialect.Messages/ShopBinding.cs"
+  - value: 802
+    direction: c2s
+    name: gcpEnterInventory
+    name_source: label@cn-279
+    evidence: verified
+    source: "Packet_gcpEnterInventory sender 0x784710"
+    notes: "Empty body; publishes full inventory and wallet"
+  - value: 803
+    direction: c2s
+    name: gcpReqInventoryEquip
+    name_source: label@cn-279
+    evidence: verified
+    source: "Packet_gcpReqInventoryEquip sender sub_664210 stamps 803 (cn-279) and passes one u32 item id"
+    notes: "i32 itemId, exactly four bytes; the bag toggles items with this and the 804 removal"
+  - value: 804
+    direction: c2s
+    name: gcpReqInventoryUnequip
+    name_source: label@cn-279
+    evidence: verified
+    source: "sender sub_664170 stamps 804 (cn-279) on the packet whose vtable 0x9F45B4 resolves to Packet_gcpReqInventoryUnequip (type descriptor 0xAB12B0); one u32 item id"
+    notes: "i32 itemId, exactly four bytes"
+  - value: 406
+    direction: c2s
+    name: gcpReqCreateTutorialSession
+    name_source: label@cn-279
+    evidence: inferred
+    source: "generic sender sub_420EC0 stamps 406 (cn-279) for Packet_gcpReqCreateTutorialSession, reached from the lobby tutorial button (sub_7A3F20 button-index branch); the same number as cn-324"
+    notes: "Empty body; the reply is S2C gspGotoRoom so the client loads the tutorial select scene"
+  - value: 920
+    direction: c2s
+    name: gcpReqSingleStageInfo
+    name_source: mirrored
+    evidence: unverified
+    source: "Mirrored from kr-812/cn-324/cn-717, which all stamp 920; the cn-279 stamp site is not located yet, so the live session decides"
+  - value: 107
+    direction: c2s
+    name: gcpReqPlayTutorial
+    name_source: mirrored
+    evidence: unverified
+    source: "Mirrored from kr-812/cn-324/cn-717. The client's own tutorial flow references the rel_Tutorial_01 map key (aRelTutorial01 in the play-tutorial flow sub_6F8B20), the old-tutorial map"
+    notes: "Carries MapMetaData; the request's map key is expected to be rel_Tutorial_01 on this build"
+  - value: 108
+    direction: c2s
+    name: gcpReqInvite
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 sub_426F90 stamps 108 through sub_56E6E0 after the Packet_gcpReqInvite constructor cn-279 sub_425DC0; writer cn-279 sub_44F630"
+  - value: 109
+    direction: c2s
+    name: gcpReqMoveToInviter
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 sub_454300 stamps 109 through sub_56E6E0 after the Packet_gcpReqMoveToInviter constructor cn-279 sub_44EC40; writer cn-279 sub_44EBE0"
+  - value: 922
+    direction: s2c
+    name: gspResSingleStageInfo
+    name_source: mirrored
+    evidence: unverified
+    source: "Mirrored from kr-812/cn-324/cn-717, which all stamp 922; answers gcpReqSingleStageInfo with the cleared-stage list"
+  - value: 510
+    direction: s2c
+    name: gspRoomEnterGame
+    name_source: mirrored
+    evidence: verified
+    source: "cn-279 game dispatcher case 0x1FE -> sub_7091E0 constructs Packet_gspRoomEnterGame (ctor sub_44A140); the same number as cn-324"
+  - value: 701
+    direction: s2c
+    name: gspGameMapLoadingComplete
+    name_source: mirrored
+    evidence: unverified
+    source: "Mirrored from kr-812/cn-324/cn-717; cn-279 dispatcher case 0x2BD -> sub_704220"
+  - value: 702
+    direction: s2c
+    name: gspGameEverybodyLoadingComplete
+    name_source: mirrored
+    evidence: unverified
+    source: "Mirrored from the family; cn-279 dispatcher case 0x2BE -> sub_7045F0"
+  - value: 703
+    direction: s2c
+    name: gspGameCountDown
+    name_source: mirrored
+    evidence: unverified
+    source: "Mirrored from the family; cn-279 dispatcher case 0x2BF -> sub_708270"
+  - value: 704
+    direction: s2c
+    name: gspGameStartGame
+    name_source: mirrored
+    evidence: unverified
+    source: "Mirrored from the family; cn-279 dispatcher case 0x2C0 -> sub_7063D0"
+  - value: 705
+    direction: s2c
+    name: gspGameEndGame
+    name_source: mirrored
+    evidence: unverified
+    source: "Mirrored from the family; cn-279 dispatcher case 0x2C1 -> sub_705DF0"
+  - value: 904
+    direction: s2c
+    name: gspRepStartNewWave
+    name_source: mirrored
+    evidence: unverified
+    source: "Mirrored from the family; cn-279 dispatcher case 0x388 -> sub_644960"
+  - value: 905
+    direction: s2c
+    name: gspRepEndWave
+    name_source: mirrored
+    evidence: unverified
+    source: "Mirrored from the family; cn-279 dispatcher case 0x389 -> sub_644860"
+  - value: 909
+    direction: s2c
+    name: gspRepWaveAllSpawnMobs
+    name_source: mirrored
+    evidence: unverified
+    source: "Mirrored from the family; cn-279 dispatcher case 0x38D -> sub_63F610"
+  - value: 32857
+    direction: s2c
+    connection: both
+    name: gppCreateMobsFromSpawnGroup
+    name_source: mirrored
+    evidence: unverified
+    source: "Mirrored from cn-324; cn-279 gpp dispatcher case 0x8059 -> sub_773920"
+  - value: 32862
+    direction: s2c
+    connection: both
+    name: gppCreateSpawnGroupMemberMob
+    name_source: mirrored
+    evidence: unverified
+    source: "Mirrored from cn-324; cn-279 gpp dispatcher case 0x805E -> sub_776140"
+  - value: 32892
+    direction: s2c
+    connection: both
+    name: gppCreateAIObject
+    name_source: mirrored
+    evidence: unverified
+    source: "Mirrored from cn-324"
+  - value: 701
+    direction: c2s
+    name: gcpGameReportMapLoadingComplete
+    name_source: mirrored
+    evidence: unverified
+    source: "Mirrored from kr-812/cn-324/cn-717; the cn-279 game dispatcher case 0x2BD -> sub_704220 sits in the same family position"
+  - value: 903
+    direction: c2s
+    name: gcpReqStartNewWave
+    name_source: mirrored
+    evidence: unverified
+    source: "Mirrored from kr-812/cn-324/cn-717; the cn-279 message-mode S2C neighbours 0x388/0x389/0x38C/0x38D match the family"
+  - value: 904
+    direction: c2s
+    name: gcpReqEndWave
+    name_source: mirrored
+    evidence: unverified
+    source: "Mirrored from kr-812/cn-324/cn-717"
+  - value: 905
+    direction: c2s
+    name: gcpReqEndAllWave
+    name_source: mirrored
+    evidence: unverified
+    source: "Mirrored from kr-812/cn-324/cn-717"
+  - value: 908
+    direction: c2s
+    name: gcpReqWaveAllSpawnMobs
+    name_source: mirrored
+    evidence: unverified
+    source: "Mirrored from kr-812/cn-324/cn-717; the S2C answers 0x38C/0x38D are cn-279 dispatcher cases"
+  - value: 32857
+    direction: c2s
+    connection: both
+    name: gppCreateMobsFromSpawnGroup
+    name_source: mirrored
+    evidence: unverified
+    source: "Mirrored from cn-324 (0x8059); the cn-279 gpp dispatcher carries a 0x8059 case (sub_773920)"
+  - value: 32862
+    direction: c2s
+    connection: both
+    name: gppCreateSpawnGroupMemberMob
+    name_source: mirrored
+    evidence: unverified
+    source: "Mirrored from cn-324 (0x805E); the cn-279 gpp dispatcher carries a 0x805E case (sub_776140)"
+  - value: 32892
+    direction: c2s
+    connection: both
+    name: gppCreateAIObject
+    name_source: mirrored
+    evidence: unverified
+    source: "Mirrored from cn-324 (0x807C)"
+  - value: 505
+    direction: s2c
+    name: gspRoomChangeGameSetting
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 dispatcher sub_70A0F0 case 505 calls sub_709DF0, which constructs Packet_gspRoomChangeGameSetting through sub_449B70; packet reader sub_44A550 invokes the nested GameSetting reader sub_41E380"
+  - value: 502
+    direction: s2c
+    name: gspRoomSetMasterSlotIdx
+    name_source: mirrored
+    evidence: verified
+    source: "cn-279 game dispatcher case 0x1F6 -> sub_708C10 constructs Packet_gspRoomSetMasterSlotIdx; the same number as cn-324"
+  - value: 503
+    direction: s2c
+    name: gspRoomSetSlot
+    name_source: mirrored
+    evidence: verified
+    source: "cn-279 game dispatcher case 0x1F7 -> sub_708960 constructs Packet_gspRoomSetSlot (ctor sub_4499F0); the same number as cn-324"
+  - value: 801
+    direction: s2c
+    name: gspInventoryUpdateAllInventorySlot
+    name_source: label@cn-279
+    evidence: verified
+    source: "Packet_gspInventoryUpdateAllInventorySlot reader 0x450230 / slot 0x44CD50"
+    notes: "u32 count, then slots; full field list: src/Plugins/BubbleFighter.Fantasy.Dialect.Messages/ShopBinding.cs"
+  - value: 802
+    direction: s2c
+    name: gspInventoryUpdateInventorySlots
+    name_source: label@cn-279
+    evidence: verified
+    source: "Packet_gspInventoryUpdateInventorySlots reader 0x450230 / slot 0x44CD50"
+    notes: "u32 count, then slots; upserts without resetting the full-inventory time origin"
+  - value: 826
+    direction: c2s
+    name: gcpReqCheckCash
+    name_source: label@cn-279
+    evidence: verified
+    source: "Packet_gcpReqCheckCash sender 0x482220; vtable 0x9F1AF4, empty codec 0x481D60"
+    notes: "Empty body; S105 refreshes the cash confirmation dialog"
+
+# Native labels with unambiguous client builders or dispatcher mappings.
+  - value: 1
+    direction: s2c
+    name: gspDisconnect
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 1: Packet_gspDisconnect"
+  - value: 6
+    direction: s2c
+    name: gspRepGPKDynCode
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 6: Packet_gspRepGPKDynCode"
+  - value: 7
+    direction: s2c
+    name: gspRepGPKCSAuth
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 7: Packet_gspRepGPKCSAuth"
+  - value: 8
+    direction: s2c
+    name: gspRepMoveChannel
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 8: Packet_gspRepMoveChannel"
+  - value: 10
+    direction: s2c
+    name: gspRepMoveInto
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 dispatcher sub_6FFDE0 case 10: Packet_gspRepMoveInto; handler cn-279 sub_6F7DC0 reads bool32 then two i32 (stored at session+2244/2248) and sets session+2240"
+  - value: 11
+    direction: s2c
+    name: gspNotifyAutoTutorial_
+    name_source: coined
+    evidence: verified
+    source: "cn-279 dispatcher sub_6FFDE0 case 0xB sets byte_ABB3DF; sub_858480 selects CreateUserStage before login success, and MainMenuStage uses it for the automatic tutorial afterward; empty body"
+  - value: 12
+    direction: s2c
+    name: gspRepCheckCreateUserName
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_480550 reads i32 result and wstr nickname; handler cn-279 sub_6FC5E0"
+  - value: 13
+    direction: s2c
+    name: gspRepCreateUserInfo
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_44C1A0 reads i32 result; handler cn-279 sub_6FCBA0"
+  - value: 14
+    direction: s2c
+    name: gspQueryBadProgram
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 14: Packet_gspQueryBadProgram"
+  - value: 17
+    direction: s2c
+    name: gspRepUniquenessCheck
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 17: Packet_gspRepUniquenessCheck"
+  - value: 104
+    direction: s2c
+    name: gspReqUserPoll
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 104: Packet_gspReqUserPoll"
+  - value: 106
+    direction: s2c
+    name: gspOveruseAlarmMsg
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 106: Packet_gspOveruseAlarmMsg"
+  - value: 107
+    direction: s2c
+    name: gspReceiveServerNoticeMsg
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 107: Packet_gspReceiveServerNoticeMsg"
+  - value: 111
+    direction: s2c
+    name: gspRepInvite
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 111: Packet_gspRepInvite"
+  - value: 112
+    direction: s2c
+    name: gspNotifyInvite
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 112: Packet_gspNotifyInvite"
+  - value: 113
+    direction: s2c
+    name: gspRepMoveToInviter
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 113: Packet_gspRepMoveToInviter"
+  - value: 114
+    direction: s2c
+    name: gspRepMoveToFriend
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 114: Packet_gspRepMoveToFriend"
+  - value: 118
+    direction: s2c
+    name: gspEventNotice
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 118: Packet_gspEventNotice"
+  - value: 120
+    direction: s2c
+    name: gspEvent2GuildRanking
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 120: Packet_gspEvent2GuildRanking"
+  - value: 121
+    direction: s2c
+    name: gspRepFighterInfo
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 121: Packet_gspRepFighterInfo"
+  - value: 122
+    direction: s2c
+    name: gspRepAwardInfo
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 122: Packet_gspRepAwardInfo"
+  - value: 123
+    direction: s2c
+    name: gspRepEvent
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 123: Packet_gspRepEvent"
+  - value: 125
+    direction: s2c
+    name: gspNotifyPromotion
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 125: Packet_gspNotifyPromotion"
+  - value: 126
+    direction: s2c
+    name: gspChangedUserName
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 126: Packet_gspChangedUserName"
+  - value: 202
+    direction: s2c
+    name: gspRepJoinParty
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 202: Packet_gspRepJoinParty"
+  - value: 203
+    direction: s2c
+    name: gspUpdatePartyLeader
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 203: Packet_gspUpdatePartyLeader"
+  - value: 204
+    direction: s2c
+    name: gspNotifyPartyLeaveSuccess
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 204: Packet_gspNotifyPartyLeaveSuccess"
+  - value: 205
+    direction: s2c
+    name: gspNotifyMemberLeave
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 205: Packet_gspNotifyMemberLeave"
+  - value: 206
+    direction: s2c
+    name: gspNotifyNewMemberJoin
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 206: Packet_gspNotifyNewMemberJoin"
+  - value: 302
+    direction: s2c
+    name: gspRepKickFromParty
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 302: Packet_gspRepKickFromParty"
+  - value: 303
+    direction: s2c
+    name: gspRepChangePartyLeader
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 303: Packet_gspRepChangePartyLeader"
+  - value: 304
+    direction: s2c
+    name: gspNotifyKickFromParty
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 304: Packet_gspNotifyKickFromParty"
+  - value: 305
+    direction: s2c
+    name: gspReceivePartyChatMsg
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 305: Packet_gspReceivePartyChatMsg"
+  - value: 307
+    direction: s2c
+    name: gspNotifyKickMember
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 307: Packet_gspNotifyKickMember"
+  - value: 603
+    direction: s2c
+    name: gspConnectToSuperPeer
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 603: Packet_gspConnectToSuperPeer"
+  - value: 803
+    direction: s2c
+    name: gspInventoryUpdateInventorySlot
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 803: Packet_gspInventoryUpdateInventorySlot"
+  - value: 805
+    direction: s2c
+    name: gspInventoryViewUpdateView
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 805: Packet_gspInventoryViewUpdateView"
+  - value: 806
+    direction: s2c
+    name: gspCheckExpiredTimeResult
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 806: Packet_gspCheckExpiredTimeResult"
+  - value: 807
+    direction: s2c
+    name: gspCashInvenUpdateAllInventorySlot
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 807: Packet_gspCashInvenUpdateAllInventorySlot"
+  - value: 808
+    direction: s2c
+    name: gspRepInventoryEquip
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 808: Packet_gspRepInventoryEquip"
+  - value: 809
+    direction: s2c
+    name: gspRepInventoryUnequip
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 809: Packet_gspRepInventoryUnequip"
+  - value: 810
+    direction: s2c
+    name: gspRepInventoryUseItem
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 810: Packet_gspRepInventoryUseItem"
+  - value: 811
+    direction: s2c
+    name: gspRepInventoryDeleteItem
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 811: Packet_gspRepInventoryDeleteItem"
+  - value: 812
+    direction: s2c
+    name: gspRepInventoryThrowItem
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_6FFDE0 case 812 calls sub_6FE9F0; named vtable 9E1214 reader sub_47E650 reads item_id:u32 and result:u32 through sub_4EC030; result zero passes the identity to sub_6642B0"
+  - value: 814
+    direction: s2c
+    name: gspRepShopItemCardInfo
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 814: Packet_gspRepShopItemCardInfo"
+  - value: 816
+    direction: s2c
+    name: gspRepPresentNewReceive
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 816: Packet_gspRepPresentNewReceive"
+  - value: 817
+    direction: s2c
+    name: gspRepPresentReceiveList
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 817: Packet_gspRepPresentReceiveList"
+  - value: 818
+    direction: s2c
+    name: gspRepPresentSendList
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 818: Packet_gspRepPresentSendList"
+  - value: 819
+    direction: s2c
+    name: gspRepPresentReceiveSubList
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 819: Packet_gspRepPresentReceiveSubList"
+  - value: 820
+    direction: s2c
+    name: gspRepPresentSendSubList
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 820: Packet_gspRepPresentSendSubList"
+  - value: 821
+    direction: s2c
+    name: gspRepRefund
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 821: Packet_gspRepRefund"
+  - value: 822
+    direction: s2c
+    name: gspRepPresentSend
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 822: Packet_gspRepPresentSend"
+  - value: 823
+    direction: s2c
+    name: gspRepPresentReceive
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 823: Packet_gspRepPresentReceive"
+  - value: 824
+    direction: s2c
+    name: gspRepPresentThrow
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 824: Packet_gspRepPresentThrow"
+  - value: 825
+    direction: s2c
+    name: gspRepPresentSendThankMsg
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 825: Packet_gspRepPresentSendThankMsg"
+  - value: 826
+    direction: s2c
+    name: gspRepPresentViewThankMsg
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 826: Packet_gspRepPresentViewThankMsg"
+  - value: 827
+    direction: s2c
+    name: gspRepPresentConfirm
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 827: Packet_gspRepPresentConfirm"
+  - value: 828
+    direction: s2c
+    name: gspRepPresentDeleteSend
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 828: Packet_gspRepPresentDeleteSend"
+  - value: 829
+    direction: s2c
+    name: gspRepPresentDeleteReceive
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 829: Packet_gspRepPresentDeleteReceive"
+  - value: 830
+    direction: s2c
+    name: gspRepRealCouponUse
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 830: Packet_gspRepRealCouponUse"
+  - value: 832
+    direction: s2c
+    name: gspRepPickup
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 dispatcher sub_6FFDE0 case 832: Packet_gspRepPickup"
+  - value: 15
+    direction: s2c
+    name: gspRepCenterUserCnt
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_6FFDE0 case 15 -> sub_6F05D0; reader sub_405360"
+  - value: 22
+    direction: c2s
+    name: gcpReqCenterUserCnt
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 center connector constructs Packet_gcpReqCenterUserCnt; sub_453C80 stamps 22"
+  - value: 23
+    direction: c2s
+    name: gcpReqUniquenessCheck
+    name_source: label@cn-279
+    evidence: inferred
+    source: "cn-279 Packet_gcpReqUniquenessCheck reader sub_44EA60; matched center connect chain"
+  - value: 2
+    direction: c2s
+    name: gcpStartGPK
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_6F9CE0 constructs the empty marker; sub_453D80 stamps 2; empty reader at 0x481D60"
+
+  - value: 732
+    direction: c2s
+    connection: game
+    name: gcpEatLucci
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_818F80 stamps 732 and writes the eaten Lucci pair; vtable 9AEE04 writer sub_4040E0, reader sub_47E650; packets/lucci-drops.yaml"
+  - value: 733
+    direction: c2s
+    connection: game
+    name: gcpReqCreateLucci
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_818210 stamps 733; vtable 9AEDF8 writer sub_4042F0, reader sub_404380; packets/lucci-drops.yaml"
+  - value: 717
+    direction: s2c
+    connection: game
+    name: gspGameCreateLucci
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 dispatcher sub_82AB20 case 0x2CD -> sub_8234B0: kind 1 and kind 2 create the Lucci and big Lucci items, any other kind is not built; vtable 9AECFC reader sub_4039D0, writer sub_403A50; packets/lucci-drops.yaml"
+  - value: 718
+    direction: s2c
+    connection: game
+    name: gspLucciEaten
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 dispatcher sub_82AB20 case 0x2CE -> sub_824040; vtable 9AED08 reader sub_47E650; packets/lucci-drops.yaml"
+  - value: 514
+    direction: s2c
+    name: gspReceiveSessionChrPos
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 room dispatcher sub_70A0F0 case 0x202 -> handler sub_707790 builds Packet_gspReceiveSessionChrPos (cn-279)"
+  - value: 401
+    direction: c2s
+    name: gcpReqListSession
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sender sub_41F670 stamps 401 through sub_56E6E0; its caller at 0x7A46F8 passes a Packet_gcpReqListSession (vtable 9C1C54)"
+  - value: 402
+    direction: c2s
+    name: gcpReqCreateSession
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sender sub_41F5F0 stamps 402; its caller sub_7A6290 builds the packet with ctor sub_41EA10 (Packet_gcpReqCreateSession)"
+  - value: 404
+    direction: c2s
+    name: gcpReqLeaveSession
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sender sub_426C10 stamps 404; its caller at 0x6217F2 passes a Packet_gcpReqLeaveSession"
+  - value: 503
+    direction: c2s
+    name: gcpRoomReqEnterGame
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sender sub_425A10 stamps 503; every caller builds the packet with ctor sub_4258F0 (Packet_gcpRoomReqEnterGame)"
+  - value: 505
+    direction: c2s
+    name: gcpRoomReqLeaveGame
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sender sub_407330 stamps 505; its callers at 0x7AAEBB and 0x81EEDB pass a Packet_gcpRoomReqLeaveGame (vtable 9AEC90)"
+  - value: 510
+    direction: c2s
+    name: gcpSendSessionChrPos
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sender sub_4814E0 stamps 510; its caller at 0x684A93 passes a Packet_gcpSendSessionChrPos"
+  - value: 105
+    direction: c2s
+    name: gcpReqGotoMenu
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sender sub_4697E0 stamps 105; its callers at 0x61FA2E, 0x6217D6 and 0x872A44 pass a Packet_gcpReqGotoMenu (vtable 9E81F4)"
+  - value: 704
+    direction: c2s
+    name: gcpRespawn
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sender sub_407630 stamps 704; its six callers pass a Packet_gcpRespawn (vtable 9AED68)"
+  - value: 705
+    direction: c2s
+    name: gcpRequestRespawnIdx
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sender sub_4076B0 stamps 705; its caller at 0x818D6F passes a Packet_gcpRequestRespawnIdx (vtable 9AED74)"
+  - value: 713
+    direction: c2s
+    name: gcpGameReqRespawn
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sender sub_407430 stamps 713; its caller at 0x8199C8 passes a Packet_gcpGameReqRespawn"
+  - value: 724
+    direction: s2c
+    name: gspGameExtendRespawn
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 dispatcher sub_82AB20 case 0x2D4 -> sub_81B620 builds Packet_gspGameExtendRespawn"
+  - value: 32816
+    direction: c2s
+    connection: both
+    name: gppHumiliationEnd
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sender sub_81CAA0 builds Packet_gppHumiliationEnd and stamps 32816 (cn-279)"
+  - value: 731
+    direction: c2s
+    connection: game
+    name: gcpReqCreateStar
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sender sub_8182F0 stamps 731 through sub_56E6E0 (line 843629) and fills the nine LucciDropRequest words from its nine arguments; vtable 9AEDE0 writer sub_4042F0 is gcpReqCreateLucci's writer (COL 9AEDF4); packets/lucci-drops.yaml"
+  - value: 730
+    direction: c2s
+    connection: game
+    name: gcpEatStar
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sender sub_819020 stamps 730 through sub_56E6E0 (line 844263) and writes two u32 (character id, star id); vtable 9AEDEC writer sub_4040E0, reader sub_47E650 is gcpEatLucci's (COL 9AEDE8); packets/lucci-drops.yaml"
+  - value: 715
+    direction: s2c
+    connection: game
+    name: gspGameCreateStar
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 dispatcher sub_82AB20 case 0x2CB -> sub_8235E0 builds Packet_gspGameCreateStar (line 852709; vtable 9AECE4, reader sub_4039D0 is gspGameCreateLucci's reader); this build runs the star pair at 0x2CB/0x2CC, one case below the builds that use 0x2CC/0x2CD, and its own gspGameCreateLucci/gspLucciEaten rows sit at 0x2CD/0x2CE; packets/lucci-drops.yaml"
+  - value: 716
+    direction: s2c
+    connection: game
+    name: gspStarEaten
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 dispatcher sub_82AB20 case 0x2CC -> sub_824660 builds Packet_gspStarEaten (line 853422; vtable 9AECF0, reader sub_47E650 is gspLucciEaten's reader, two u32); packets/lucci-drops.yaml"
+  - value: 702
+    direction: c2s
+    connection: game
+    name: gcpGameReportMapData
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_8205F0 builds Packet_gcpGameReportMapData (vtable sub_403F70) from the map's item points and stamps 702 through sub_56E6E0; fourteen counted vectors, reader sub_403EA0; packets/map-supplies.yaml"
+  - value: 707
+    direction: c2s
+    connection: game
+    name: gcpEatItem
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sender sub_8190C0 stamps 707 through sub_56E6E0 and writes the box's object id and the item kind; its caller is the item box's collision handler sub_89DD80"
+  - value: 708
+    direction: c2s
+    connection: game
+    name: gcpUseItem
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sender sub_818E50 stamps 708 through sub_56E6E0 and writes nothing after the class"
+  - value: 727
+    direction: c2s
+    connection: game
+    name: gcpReqCreateItem
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sender sub_818560 stamps 727 through sub_56E6E0 and writes six floats and the item kind (28 bytes); sub_7C41A0 and sub_7EBEC0 stamp it too; packets/map-supplies.yaml"
+  - value: 711
+    direction: s2c
+    connection: game
+    name: gspGameCreateGameItem
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 dispatcher sub_82AB20 case 0x2C7 -> sub_81FF70 builds Packet_gspGameCreateGameItem (deserializer sub_403820) and constructs the item box with sub_89E0A0; this build's envelope ends in three floats and has no team word"
+  - value: 712
+    direction: s2c
+    connection: game
+    name: gspItemEaten
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 dispatcher sub_82AB20 case 0x2C8 -> sub_81BDA0 reads the seat and the object id (Packet_gspItemEaten) and removes the box"
+  - value: 713
+    direction: s2c
+    connection: game
+    name: gspAddItemToSlot
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 dispatcher sub_82AB20 case 0x2C9 -> sub_820120 reads the seat and the item kind (Packet_gspAddItemToSlot) and installs the kind in that player's only slot"
+  - value: 714
+    direction: s2c
+    connection: game
+    name: gspItemUsed
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 dispatcher sub_82AB20 case 0x2CA -> sub_81BB50 reads the seat and the item kind (Packet_gspItemUsed) and runs the item for that player"
+  - value: 811
+    direction: c2s
+    name: gcpReqPresentNewReceive
+    name_source: label@cn-279
+    evidence: inferred
+    source: "Packet_gcpReqPresentNewReceive is constructed before the stamping call of cn-279 sub_483640: the close of the gift box asks for the new-gift state (empty body); layout in packets/present.yaml"
+  - value: 814
+    direction: c2s
+    name: gcpReqPresentReceiveSubList
+    name_source: label@cn-279
+    evidence: inferred
+    source: "Packet_gcpReqPresentReceiveSubList is constructed before the stamping call of cn-279 sub_4836C0: a page of the received list (start, count); layout in packets/present.yaml"
+  - value: 815
+    direction: c2s
+    name: gcpReqPresentSendSubList
+    name_source: label@cn-279
+    evidence: inferred
+    source: "Packet_gcpReqPresentSendSubList is constructed before the stamping call of cn-279 sub_483740: a page of the sent list (start, count); layout in packets/present.yaml"
+  - value: 817
+    direction: c2s
+    name: gcpReqPresentSend
+    name_source: label@cn-279
+    evidence: inferred
+    source: "Packet_gcpReqPresentSend is constructed before the stamping call of cn-279 sub_482FC0: the gift purchase (recipient, empty string, item key, message); layout in packets/present.yaml"
+  - value: 818
+    direction: c2s
+    name: gcpReqPresentReceive
+    name_source: label@cn-279
+    evidence: inferred
+    source: "Packet_gcpReqPresentReceive is constructed before the stamping call of cn-279 sub_481B40: taking a gift (id); layout in packets/present.yaml"
+  - value: 819
+    direction: c2s
+    name: gcpReqPresentThrow
+    name_source: label@cn-279
+    evidence: inferred
+    source: "Packet_gcpReqPresentThrow is constructed before the stamping call of cn-279 sub_481BC0: throwing a gift away (id); layout in packets/present.yaml"
+  - value: 823
+    direction: c2s
+    name: gcpReqPresentDeleteSend
+    name_source: label@cn-279
+    evidence: inferred
+    source: "Packet_gcpReqPresentDeleteSend is constructed before the stamping call of cn-279 sub_483540: removing a gift from the sent list (id); layout in packets/present.yaml"
+  - value: 824
+    direction: c2s
+    name: gcpReqPresentDeleteReceive
+    name_source: label@cn-279
+    evidence: inferred
+    source: "Packet_gcpReqPresentDeleteReceive is constructed before the stamping call of cn-279 sub_4834C0: removing a gift from the received list (id); layout in packets/present.yaml"

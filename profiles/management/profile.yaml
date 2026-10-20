@@ -1,0 +1,4 @@
+id: management
+description: Administration and durable storage only; no game or relay ports.
+bundles:
+  - core

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Installation\BubbleFighter.Fantasy.Installation.csproj" />
+    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Persistence.Sqlite\BubbleFighter.Fantasy.Persistence.Sqlite.csproj" />
+    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Persistence.MySql\BubbleFighter.Fantasy.Persistence.MySql.csproj" />
+    <ProjectReference Include="..\..\src\BubbleFighter.Fantasy.Kernel\BubbleFighter.Fantasy.Kernel.csproj" />
+    <ProjectReference Include="..\..\src\BubbleFighter.Fantasy.Contracts\BubbleFighter.Fantasy.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.WebUi\BubbleFighter.Fantasy.WebUi.csproj" />
+    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Admin.Http\BubbleFighter.Fantasy.Admin.Http.csproj" />
+  </ItemGroup>
+</Project>

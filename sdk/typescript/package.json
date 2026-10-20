@@ -1,0 +1,32 @@
+{
+  "name": "@bff/plugin",
+  "version": "0.1.0",
+  "description": "Write Bubble Fighter server plugins in TypeScript: the SDK plugin protocols v1 and v2 over stdio.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    }
+  },
+  "files": [
+    "dist/src"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test dist/tests/wire-json.js dist/tests/lifetime.js && node dist/tests/run-conformance.js"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.43",
+    "typescript": "5.9.3"
+  },
+  "dependencies": {
+    "lossless-json": "4.3.1"
+  }
+}

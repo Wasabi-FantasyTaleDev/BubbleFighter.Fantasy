@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Shop\BubbleFighter.Fantasy.Shop.csproj" />
+    <ProjectReference Include="..\..\src\BubbleFighter.Fantasy.Kernel\BubbleFighter.Fantasy.Kernel.csproj" />
+    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Persistence.Memory\BubbleFighter.Fantasy.Persistence.Memory.csproj" />
+    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Lobby\BubbleFighter.Fantasy.Lobby.csproj" />
+    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Dialect.Modern.Messages\BubbleFighter.Fantasy.Dialect.Modern.Messages.csproj" />
+    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Dialect.Messages\BubbleFighter.Fantasy.Dialect.Messages.csproj" />
+    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Protocol\BubbleFighter.Fantasy.Protocol.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\BubbleFighter.Fantasy.Contracts\BubbleFighter.Fantasy.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\Shared\TestTempDirectories.cs" Link="TestTempDirectories.cs" />
+    <Compile Include="..\Shared\TestPlayerSessions.cs" Link="TestPlayerSessions.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\Shared\SyntheticClientTables.cs" Link="SyntheticClientTables.cs" />
+    <Compile Include="..\Shared\TestClientData.cs" Link="TestClientData.cs" />
+    <Compile Include="..\Shared\LocalClientData.cs" Link="LocalClientData.cs" />
+    <Compile Include="..\Shared\SharedDialectRows.cs" Link="SharedDialectRows.cs" />
+    <None Include="..\..\profiles\kr-1256\opcodes.yaml" Link="opcodes.yaml" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\BubbleFighter.Fantasy.Archives\BubbleFighter.Fantasy.Archives.csproj" />
+  </ItemGroup>
+</Project>

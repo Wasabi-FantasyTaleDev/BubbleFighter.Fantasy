@@ -1,0 +1,19 @@
+id: cn-774
+display_names:
+  en: "China 2019-05-30"
+  zh-Hans: "国服 2019-05-30"
+  zh-Hant: "中國 2019-05-30"
+  ko: "중국 2019-05-30"
+client_build: cn:774:0
+experimental: true
+# Nearest build whose layouts this one reuses when it has no variant of its own.
+parent: kr-1256
+description: Chinese 2019 client build, ClientVersion_Major 774.
+bundles:
+  - core
+  - cn-774
+  - player-settings
+patches:
+  - patch.yaml
+  # Optional developer override; git-ignored and skipped when absent.
+  - local.patch.yaml

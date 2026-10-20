@@ -1,0 +1,5 @@
+id: start
+description: Load definition sources and the packaged profile adapter for interactive installation.
+bundles:
+  - loaders
+  - host-profiles

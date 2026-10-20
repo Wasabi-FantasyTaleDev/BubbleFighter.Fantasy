@@ -1,0 +1,27 @@
+id: kr-812
+display_names:
+  en: "Korea 2015-04-22"
+  zh-Hans: "韩服 2015-04-22"
+  zh-Hant: "韓國 2015-04-22"
+  ko: "한국 2015-04-22"
+client_build: kr:812:458
+description: Korean 2015 client build, ClientVersion_Major 812, resource patch 458.
+bundles:
+  - core
+  - legacy
+  - inventory-actions
+  - player-settings
+# What this build differs in; everything else is the legacy bundle's (kr-812).
+vars:
+  LEGACY_PORT: ${KR_812_GAME_PORT:-7110}
+  LEGACY_PUBLIC_PORT: ${KR_812_PUBLIC_PORT:-7110}
+  LEGACY_CENTER_PORT: ${KR_812_CENTER_PORT:-7112}
+  LEGACY_CENTER_PUBLIC_PORT: ${KR_812_CENTER_PUBLIC_PORT:-7112}
+  LEGACY_SHOP_NAME_COLUMN: nameKr
+patches:
+  - patch.yaml
+  - ../bundles/shop-supplement-lucci.yaml
+  # Optional native server selector; uncomment to enable the configured directory.
+  # - ../bundles/center-selector.yaml
+  # Optional developer override; git-ignored and skipped when absent.
+  - local.patch.yaml

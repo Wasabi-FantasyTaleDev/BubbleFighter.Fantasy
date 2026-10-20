@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Provider of one client build's wire dialect, configured by its profile row.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\BubbleFighter.Fantasy.Wire\BubbleFighter.Fantasy.Wire.csproj" />
+  </ItemGroup>
+</Project>

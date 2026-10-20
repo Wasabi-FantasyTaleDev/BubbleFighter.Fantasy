@@ -1,0 +1,18 @@
+<Project>
+  <PropertyGroup>
+    <RepoRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)'))</RepoRoot>
+    <TargetFramework>net10.0</TargetFramework>
+    <Version Condition="'$(Version)' == ''">1.0.0</Version>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <Authors>Fantasy Tale Studio</Authors>
+    <Company>Fantasy Tale Studio</Company>
+    <Product>Bubble Fighter Fantasy</Product>
+    <RepositoryUrl></RepositoryUrl>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+</Project>

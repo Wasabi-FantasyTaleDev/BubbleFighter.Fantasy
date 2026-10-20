@@ -1,0 +1,11 @@
+# Profile patch for tw-454: applied after the bundle rows. The admin API moves off 8080
+# so this profile can run beside other profiles on one machine.
+- replace:
+    id: admin.http
+    config:
+      listen: "${TW_454_ADMIN_HOST:-127.0.0.1}:${TW_454_ADMIN_PORT:-8086}"
+- replace:
+    id: diagnostics.packet-log
+    config:
+      file: logs/{date}/packets-tw-454_{timestamp}.log
+      preview_bytes: 96

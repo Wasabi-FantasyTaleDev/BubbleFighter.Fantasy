@@ -1,0 +1,35 @@
+version: 1
+structs:
+  CenterStatus:
+    - center_id: u32 # cn-324 sub_703640 stores this at ServerConnection +2340; cn-279 sub_6F05D0 at +2328.
+      offset: 4
+    - name: wstr # kr-812 sub_845080; cn-324 sub_6FABB0 / sub_703640; cn-279 sub_405360 omits the name.
+      offset: 8
+      except: [cn-279]
+    - users: u32
+      offset: 36
+      cn-324:
+        - users: u32
+          offset: 12
+      cn-279:
+        - users: u32
+          offset: 8
+    - capacity: u32
+      offset: 40
+      cn-324:
+        - capacity: u32
+          offset: 16
+      cn-279:
+        - capacity: u32
+          offset: 12
+  CenterAvailabilityRequest:
+    - user_num: u32 # cn-324 sub_410910; cn-279 sub_44EA60.
+      offset: 4
+  CenterAvailabilityReply:
+    # Native readers consume four bytes before converting to bool, not the one-byte object storage width.
+    # kr-812 sub_8184B0 -> sub_A56BD0; cn-324 sub_798810 -> sub_8A3680;
+    # cn-279 sub_6F1C10 -> sub_4EBFD0 -> sub_4EBBE0; cn-717 sub_89E600 -> sub_B14700;
+    # id-400 sub_7A15D0 -> sub_9DD0F0; id-1809 sub_7C55C0 -> sub_9F5830;
+    # cn-706 sub_7A9D60 -> sub_9DB800. True removes the auxiliary connection.
+    - unavailable: bool
+      offset: 4

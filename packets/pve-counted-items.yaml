@@ -1,0 +1,40 @@
+version: 1
+structs:
+  # sPVESLOTITEMINFO. kr-812 sub_9D95D0 reads three words; cn-717 sub_7F4370, id-400 sub_72E4D0,
+  # id-1809 sub_4D8130, cn-706 sub_7A23F0 and cn-324 sub_6EB8B0 match. cn-279 has no such class.
+  PveItemSlot:
+    - unknown_4: u32 # Purpose unproven.
+      offset: 4
+      except: [cn-279]
+    - kind: u32 # cn-324 sub_53CAB0 resolves the entry's +8 through ItemSpec and the player's per-kind count.
+      offset: 8
+      except: [cn-279]
+    - item_slot: u32 # cn-324 sub_6F42D0 selects an entry by its +12 native slot index.
+      offset: 12
+      except: [cn-279]
+  # S2C gspPveItemInfo. kr-812 sub_80B420 reads a u32 count, then each 16-byte entry; cn-717 sub_8900F0,
+  # id-400 sub_782B30, id-1809 sub_7A5FB0, cn-706 sub_7886D0 and cn-324 sub_6EB890 match.
+  # cn-324 sub_6F52A0 is the nested vector reader called by that packet entry.
+  # cn-324 sub_6EEB10 replaces the session list.
+  PveItemsPrepared:
+    - items: list<PveItemSlot>
+      offset: 4
+      except: [cn-279]
+  # C2S gcpPveUseCountItem. kr-812 sub_80A910 reads one word; cn-717 sub_8C4210, id-400 sub_93D120,
+  # id-1809 sub_4D60C0, cn-706 sub_4BBB70 and cn-324 sub_410910 match. cn-279 has no such class.
+  PveItemUseRequest:
+    - item_slot: u32 # cn-324 sub_53CAB0 passes the UI slot to sub_467720, which stamps C2S 921.
+      offset: 4
+      except: [cn-279]
+  # S2C gspPveItemUsed. kr-812 sub_9D95D0 reads three words; cn-717 sub_7F4370, id-400 sub_72E4D0,
+  # id-1809 sub_4D8130, cn-706 sub_7A23F0 and cn-324 sub_6EB8B0 match. cn-279 has no such class.
+  PveItemUsed:
+    - seat: u32 # cn-324 sub_46FED0 resolves the first word as a player seat and checks local control.
+      offset: 4
+      except: [cn-279]
+    - kind: u32 # cn-324 sub_46FED0 passes the second word to sub_46FF50 and sub_47BCA0 (confirmed by assembly).
+      offset: 8
+      except: [cn-279]
+    - unknown_12: u32 # cn-324 sub_6EB8B0 reads this word; no consuming purpose is proven.
+      offset: 12
+      except: [cn-279]

@@ -1,0 +1,140 @@
+version: 1
+structs:
+  # Native memory stream kr-812 sub_A5FA60/sub_A5FAC0 copies bytes without conversion.
+  # NetAddress kr-812 sub_5026C0/sub_5026F0; cn-717 sub_537870/sub_5378A0;
+  # cn-324 sub_44CA50/sub_44CA80; cn-279 sub_41DF40/sub_41DF70;
+  # cn-406 sub_41FC70/sub_41FCA0; id-400 sub_5DA620/sub_481950;
+  # id-1809 sub_4D6BC0/sub_4D6BF0; cn-706 sub_4BA840/sub_4BA870.
+  # kr-812 sub_B262B0 copies the IPv4 word to sockaddr and applies ntohs to the port.
+  RelayEndpoint:
+    - ipv4_word: u32
+      offset: 4
+    - port: u16
+      offset: 8
+  # RelaySessionKey kr-812 sub_812240/sub_8122A0; cn-717 sub_897800/sub_897860;
+  # cn-406 sub_710800/sub_710860; id-400 sub_793930/sub_793990;
+  # id-1809 sub_7B9340/sub_7B93A0; cn-706 sub_79B9A0/sub_79BA00; kr-1256 reader sub_11592A0
+  # (the same six fields in the same widths).
+  # The six field meanings remain unproven; a common 20-byte size is not key compatibility.
+  RelaySessionKey:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - unknown_16: u16
+      offset: 16
+      # cn-279 sub_4046D0/sub_405360 stops after the first three words (12 bytes).
+      except: [cn-279]
+    - unknown_18: u16
+      offset: 18
+      # cn-324 sub_6F9D50/sub_6F9DA0 skips this halfword, giving an 18-byte key.
+      except: [cn-324]
+    - unknown_20: u32
+      offset: 20
+      except: [cn-279]
+  # gspConnectToRelayServer delegates to NetAddress then RelaySessionKey:
+  # kr-812 sub_844630/sub_8445A0; cn-717 sub_8CEA40/sub_8CEA70;
+  # cn-324 sub_6FDF40/sub_6FDF70; cn-279 sub_44FF30/sub_44FF60;
+  # cn-406 sub_7152C0/sub_7152F0; id-400 sub_799180/sub_799210;
+  # id-1809 sub_7BEEA0/sub_7BEE10; cn-706 sub_7A1610/sub_7A16A0;
+  # kr-1256 S2C 571 handler sub_9A7250 reads the address word and port, then the key (kr-1256 sub_11592A0).
+  RelayConnectionOffer:
+    - endpoint: RelayEndpoint
+      offset: 4
+    - key: RelaySessionKey
+      offset: 16
+  # rcpReqJoinRelaySession kr-812 sub_8100E0/sub_810110;
+  # cn-717 sub_895470/sub_8954A0; id-1809 sub_7B96F0/sub_7B9720.
+  # Each delegates to the key, then writes a byte and a word (25 bytes).
+  RelayJoinRequest:
+    - key: RelaySessionKey
+      offset: 4
+    - unknown_28: u8
+      offset: 28
+      except: [cn-324, id-400]
+      # cn-706 sub_79BD50/sub_79BD80 restores the byte absent in its ID2014 base.
+      also: [cn-706]
+    - unknown_32: u32
+      offset: 32
+      # cn-324 sub_6F9E10/sub_6F9E40: 18-byte key and one word at +28 (22 bytes).
+      cn-324:
+        - unknown_28: u32
+          offset: 28
+      # cn-279 vtable 0x9DDDE0, sub_44C610/sub_44C640: 12-byte key and word (16 bytes).
+      cn-279:
+        - unknown_20: u32
+          offset: 20
+      # id-400 sub_793D60/sub_793D90: 20-byte key and word at +28 (24 bytes).
+      id-400:
+        - unknown_28: u32
+          offset: 28
+      # cn-406 sub_710BB0/sub_710BE0 independently confirms the same 24-byte body.
+      cn-406:
+        - unknown_28: u32
+          offset: 28
+      cn-706:
+        - unknown_32: u32
+          offset: 32
+    # kr-1256 relay C2S 1 (kr-1256 sub_95FD30) writes the key from the S2C 571 copy at +2500..+2516,
+    # the byte at +2520 and the word at +2524, then a word and a counted string from the profile record
+    # dword_18E56E8 (+48 and the string at +24); their meanings are not traced here.
+    - unknown_n3: u32
+      only: [kr-1256]
+    - unknown_n4: wstr
+      only: [kr-1256]
+  # gcpReportRelayConnected kr-812 sub_844CE0/sub_80C160;
+  # cn-717 sub_AB0B70/sub_8C3780; cn-324 sub_6F9DF0/sub_798810;
+  # cn-279 sub_46DFA0/sub_44FC80; cn-406 sub_713E80/sub_7151D0;
+  # id-1809 sub_5817F0/sub_7BEBE0; cn-706 sub_97D950/sub_87EC00;
+  # kr-1256 builder sub_961C00 (C2S 571) writes the one flag as a word.
+  RelayConnectionReport:
+    # Native success builders set +4=true; id-400 sub_794200 at 0x794551 sets +5=false.
+    # The additional ID2014 flag remains unknown and is not a second success requirement.
+    - unknown_4: bool
+      offset: 4
+    - unknown_5: bool
+      offset: 5
+      # id-400 sub_793C90/sub_793CC0 writes/reads two bool32 fields, unlike descendants.
+      only: [id-400]
+      except: [cn-406, cn-706]
+  # kr-1256 relay C2S 3 (kr-1256 sub_9F02F0): the reconnect/map request. The writer stamps 3 and writes, in
+  # order, the word at its source +0, the byte at +4 widened to a full four-byte word by the client's own
+  # word writer, the string at +8 (length at +24), the word at +32, the string at +36 (length at +52), then
+  # the words at +60 and +64. The first word is the client's own version: the server codec reads it as 1256.
+  # No legacy relay build has a C2S 3 frame, so this structure exists only for kr-1256.
+  RelayReconnectMapRequest:
+    - client_version: u32 # the source word at +0; the codec requires this to be 1256
+      only: [kr-1256]
+    - unknown_n1: u32     # the byte at +4 is written as four bytes
+      only: [kr-1256]
+    - unknown_n2: wstr    # the string at +8; the codec reads it as the map key
+      only: [kr-1256]
+    - unknown_n3: u32     # the word at +32; the codec reads it as the entity id
+      only: [kr-1256]
+    - unknown_n4: wstr    # the string at +36; the codec reads it as the nickname
+      only: [kr-1256]
+    - unknown_n5: u32     # the word at +60; purpose unproven
+      only: [kr-1256]
+    - unknown_n6: u32     # the word at +64; purpose unproven
+      only: [kr-1256]
+  # kr-1256 relay S2C 22 (kr-1256 sub_9601E0 case 22, block 0x96113C): a four-byte word compared to zero,
+  # then six one-byte values. kr-1256 sub_9601E0 at 0x96115F keeps only "the word is not zero" (a true value
+  # enables the optional adaptive sampler) and copies the six bytes into its handshake record. No legacy
+  # build has relay 22, so this structure exists only for kr-1256; ten bytes in all.
+  RelayHandshakeSettings:
+    - unknown_n0: bool    # the four-byte word; only its zero/nonzero result is kept
+      only: [kr-1256]
+    - unknown_n1: u8
+      only: [kr-1256]
+    - unknown_n2: u8
+      only: [kr-1256]
+    - unknown_n3: u8
+      only: [kr-1256]
+    - unknown_n4: u8
+      only: [kr-1256]
+    - unknown_n5: u8
+      only: [kr-1256]
+    - unknown_n6: u8
+      only: [kr-1256]

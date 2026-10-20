@@ -1,0 +1,13 @@
+{"ignore":["result.sdk"],"note":"Initialization rejects invalid limits, then accepts a valid retry without consuming request capacity."}
+{"dir":"h2p","msg":{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocol_versions":[1,2],"max_in_flight":0}}}
+{"dir":"p2h","msg":{"jsonrpc":"2.0","id":1,"error":{"code":-32602,"message":"max_in_flight must be an integer from 1 to 4096"}}}
+{"dir":"h2p","msg":{"jsonrpc":"2.0","id":2,"method":"initialize","params":{"protocol_versions":[1,2],"max_in_flight":4097}}}
+{"dir":"p2h","msg":{"jsonrpc":"2.0","id":2,"error":{"code":-32602,"message":"max_in_flight must be an integer from 1 to 4096"}}}
+{"dir":"h2p","msg":{"jsonrpc":"2.0","id":3,"method":"initialize","params":{"protocol_versions":[1,2],"max_reentry_depth":0}}}
+{"dir":"p2h","msg":{"jsonrpc":"2.0","id":3,"error":{"code":-32602,"message":"max_reentry_depth must be an integer from 1 to 64"}}}
+{"dir":"h2p","msg":{"jsonrpc":"2.0","id":4,"method":"initialize","params":{"protocol_versions":[1,2],"max_reentry_depth":65}}}
+{"dir":"p2h","msg":{"jsonrpc":"2.0","id":4,"error":{"code":-32602,"message":"max_reentry_depth must be an integer from 1 to 64"}}}
+{"dir":"h2p","msg":{"jsonrpc":"2.0","id":5,"method":"initialize","params":{"protocol_versions":[1,2],"max_reentry_depth":null}}}
+{"dir":"p2h","msg":{"jsonrpc":"2.0","id":5,"error":{"code":-32602,"message":"max_reentry_depth must be an integer from 1 to 64"}}}
+{"dir":"h2p","msg":{"jsonrpc":"2.0","id":6,"method":"initialize","params":{"protocol_versions":[1,2],"max_in_flight":2,"max_reentry_depth":2}}}
+{"dir":"p2h","msg":{"jsonrpc":"2.0","id":6,"result":{"protocol_version":2,"sdk":{}}}}

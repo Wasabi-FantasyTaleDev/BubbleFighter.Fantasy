@@ -1,0 +1,52 @@
+# Optional native selector: profiles do not mount this patch by default.
+# Enable by adding this patch to a build profile; remove it to restore single-entry login.
+# Configure advertised endpoints in center_gates and matching titles/occupancy in entries.
+# Each endpoint is a native selector entry; both use the same mounted game protocol.
+- set:
+    id: protocol
+    config:
+      pre_handshake_opcodes: [2, 22, 23]
+      # cn-324 sub_78DA40 promotes an auxiliary socket and sends login without a second patch request.
+      require_patch_handshake_first: false
+      center_gates:
+        - key: ${LEGACY_GATE_KEY:-6}
+          sub_key: 1
+          unknown1: 0
+          address: "${BFF_PUBLIC_HOST:-127.0.0.1}"
+          port: ${LEGACY_PUBLIC_PORT}
+        - key: ${LEGACY_GATE_KEY:-6}
+          sub_key: 2
+          unknown1: 0
+          address: "${BFF_PUBLIC_HOST:-127.0.0.1}"
+          port: ${LEGACY_CENTER_PUBLIC_PORT}
+- replace:
+    id: game-listener
+    parent_id: centers
+- set:
+    id: dialect.messages
+    config:
+      center_directory: true
+- insert:
+    - id: center-listener
+      plugin: net.tcp
+      parent_id: centers
+      config:
+        listen: "${BFF_BIND_HOST:-0.0.0.0}:${LEGACY_CENTER_PORT}"
+        protocol: "${BFF_PROFILE_ID}/game"
+        max_connections: 512
+        idle_timeout_seconds: 0
+    - id: centers
+      plugin: centers
+      config:
+        protocol: "${BFF_PROFILE_ID}/game"
+        entries:
+          - id: 1
+            name: "BF Fantasy"
+            listener_id: game-listener
+            users: 0
+            capacity: 512
+          - id: 2
+            name: "BF Test"
+            listener_id: center-listener
+            users: 0
+            capacity: 512

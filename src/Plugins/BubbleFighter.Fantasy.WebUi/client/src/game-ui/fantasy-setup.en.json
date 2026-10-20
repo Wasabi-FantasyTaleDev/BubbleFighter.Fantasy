@@ -1,0 +1,22 @@
+[
+  {
+    "progress": 1,
+    "text": "Hello! I will help you set up your server, one step at a time.\nFirst, what would you like to name it?"
+  },
+  {
+    "progress": 2,
+    "text": "Nice name! Next, choose the client version to support.\nBefore playing, import its client data.\nStill downloading? You can skip this and import it later in Settings."
+  },
+  {
+    "progress": 3,
+    "text": "Next, choose where to store your data.\nFor longer-term public hosting, I recommend MySQL.\nFor occasional games with friends, SQLite is convenient.\nThe help page explains MySQL installation."
+  },
+  {
+    "progress": 4,
+    "text": "The database is configured!\nNow create an administrator account.\nKeep the username and password safe: you will use them to sign in to the management page."
+  },
+  {
+    "progress": 5,
+    "text": "Your server is now configured.\nIf you need more information, check Help.\nFinally, add this server in Launcher and get ready to go!\nSee you soon in Boom Hill!"
+  }
+]

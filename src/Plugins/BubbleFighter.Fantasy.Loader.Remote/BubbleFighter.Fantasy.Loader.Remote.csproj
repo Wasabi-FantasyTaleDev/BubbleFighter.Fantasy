@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><Description>SDK plugin loaders: serve plugins written in other languages as child processes (loader.process) or sandboxed WebAssembly modules (loader.wasm) over one JSON-lines protocol.</Description></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../BubbleFighter.Fantasy.Abstractions/BubbleFighter.Fantasy.Abstractions.csproj" />
+    <ProjectReference Include="../../BubbleFighter.Fantasy.Contracts/BubbleFighter.Fantasy.Contracts.csproj" />
+    <PackageReference Include="Wasmtime" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="BubbleFighter.Fantasy.Loader.Remote.Tests" />
+  </ItemGroup>
+</Project>

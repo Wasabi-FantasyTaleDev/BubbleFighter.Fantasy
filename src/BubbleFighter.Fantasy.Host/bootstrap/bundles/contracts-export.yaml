@@ -1,0 +1,4 @@
+- id: contracts-export
+  plugin: sdk.contracts.export
+  config:
+    output_path: '@bootstrap:output_path'

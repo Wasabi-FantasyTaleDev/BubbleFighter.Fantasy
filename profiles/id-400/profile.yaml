@@ -1,0 +1,24 @@
+id: id-400
+display_names:
+  en: "Indonesia 2014-01-23"
+  zh-Hans: "印尼服 2014-01-23"
+  zh-Hant: "印度尼西亞 2014-01-23"
+  ko: "인도네시아 2014-01-23"
+client_build: id:400:113
+# Nearest build whose layouts this one reuses when it has no variant of its own.
+parent: kr-812
+description: Indonesian 2014 client build, ClientVersion_Major 400, resource VERSION 113.
+bundles:
+  - core
+  - legacy
+  - inventory-actions
+# What this build differs in; everything else is the legacy bundle's (kr-812).
+vars:
+  LEGACY_PORT: ${ID_400_GAME_PORT:-7120}
+  LEGACY_PUBLIC_PORT: ${ID_400_PUBLIC_PORT:-7120}
+  LEGACY_SEATS: 8
+patches:
+  - patch.yaml
+  - ../bundles/shop-supplement-lucci.yaml
+  # Optional developer override; git-ignored and skipped when absent.
+  - local.patch.yaml

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Bounded local SQLite persistence for independently managed server saves.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\BubbleFighter.Fantasy.Contracts\BubbleFighter.Fantasy.Contracts.csproj" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="SqlSugarCore" />
+    <!-- SqlSugarCore brings Oracle.ManagedDataAccess.Core, which pins
+         System.Security.Cryptography.Pkcs 8.0.1; that release has published
+         advisories and NuGet audit turns them into NU1902/NU1903 build errors.
+         Nothing here uses Oracle or CMS/PKCS#8, so this only raises the
+         transitive floor. The version is declared centrally. -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
+  </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>BubbleFighter.Fantasy.Persistence.Sqlite.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,11 @@
+version: 1
+structs:
+  # kr-812 sub_50E8A0 sends the actor reference; reader kr-812 sub_80A910 reads one word.
+  # cn-717 sub_8C4210, id-400 sub_93D120, id-1809 sub_4D60C0,
+  # cn-706 sub_4BBB70 and cn-324 sub_410910 read the same +4 field.
+  InstantRevivalRequest:
+    - actor: u32
+      offset: 4
+      except: [cn-279]
+  # cn-324 sub_53CEC0 sends an empty packet in PvE modes; identity comes from the connection.
+  PveRevivalRequest: []

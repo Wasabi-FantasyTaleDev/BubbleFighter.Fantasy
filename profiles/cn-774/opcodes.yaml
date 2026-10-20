@@ -1,0 +1,2114 @@
+profile: cn-774
+# Opcode assignments for the Chinese 774 client. C2S and S2C are separate numeric spaces.
+# This build ships without packet class names, but its S2C dispatcher sub_BCF090 stores each
+# case's packet name string (jumptable 00BCF218, the case number is the opcode); S2C names
+# below come from there. See profiles/opcode-policy.md.
+opcodes:
+  - value: 808
+    direction: c2s
+    name: gcpReqInventoryThrowItem
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_9B4BC0 stamps 808 and writes the selected inventory item ID as one u32 after confirmation, rejecting category 6; matches kr-812 sub_984930 / Packet_gcpReqInventoryThrowItem and kr-1256 sub_8136F0; S2C 815 sub_BB4930 reads item ID and result"
+    connection: game
+  - value: 2017
+    direction: c2s
+    name: gcpUserUpdateCustomizedKeyList
+    name_source: label@kr-812
+    evidence: inferred
+    source: "cn-774 sub_761B90 stamps 2017 and serializes a default flag plus control-name/key rows through cn-774 sub_1060600; matched to kr-812 Packet_gcpUserUpdateCustomizedKeyList in kr-812 sub_4EB250 and row serializer kr-812 sub_9858F0"
+  - value: 520
+    direction: c2s
+    connection: game
+    name: gcpRoomSendAmpMsg
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-774 sub_BD61A0 stamps 520 and writes the same four-field body as kr-812 Packet_gcpRoomSendAmpMsg via kr-812 sub_845040; the trailing words remain context-dependent"
+  - value: 513
+    direction: c2s
+    connection: game
+    name: gcpRoomChangeGameSetting
+    name_source: label@kr-812
+    evidence: inferred
+    source: "cn-774 sub_B6A610 submits the map dialog through cn-774 sub_769C70 and builder cn-774 sub_7368B0/sub_1059BB0; matches kr-812 Packet_gcpRoomChangeGameSetting via kr-812 sub_5C8810, with its own four-string/twelve-word body"
+  - value: 514
+    direction: c2s
+    connection: game
+    name: gcpRoomChangeRoundSetting
+    name_source: label@kr-812
+    evidence: inferred
+    source: "cn-774 sub_B6A610 sends round index 0/1/2 and two map-dialog strings after selection; matches kr-812 Packet_gcpRoomChangeRoundSetting in kr-812 sub_5BD770 via kr-812 sub_5C86C0, reader kr-812 sub_5C8FE0"
+  - value: 508
+    direction: c2s
+    connection: game
+    name: gcpRoomReqChangeMaster
+    name_source: label@kr-812
+    evidence: inferred
+    source: "cn-774 sub_8E0220 stamps508 and writes the target nickname; same delegation request as kr-812 Packet_gcpRoomReqChangeMaster via kr-812 sub_801C60/sub_809CB0"
+  - value: 507
+    direction: s2c
+    connection: game
+    name: gspRoomRepChangeMaster
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8D7D20 case0x1FB -> cn-774 sub_8E0350 reads nickname and result; matches kr-812 Packet_gspRoomRepChangeMaster in kr-812 sub_801D00"
+  - value: 506
+    direction: s2c
+    connection: game
+    name: gspRoomChangeInventory
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_8D7D20 case0x1FA -> cn-774 sub_8DCEE0 reads three words and a counted word vector; the first word indexes the room seat"
+  - value: 584
+    direction: s2c
+    name: gspGameMapLoadingComplete
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8D7D20 case 0x248 reads one seat word and marks room+32764+seat; matched to kr-812 Packet_gspGameMapLoadingComplete, sub_80A910 -> sub_802AB0 at S2C 701"
+  - value: 585
+    direction: s2c
+    name: gspGameEverybodyLoadingComplete
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8D7D20 case 0x249 reads three bool32 words: room+32808/+32809 and sub_B58530; matches kr-812 Packet_gspGameEverybodyLoadingComplete, sub_5C8C00 -> sub_802E60 at S2C 702"
+  - value: 1
+    direction: c2s
+    name: gcpFirstConnect
+    name_source: mirrored
+    evidence: captured
+    source: "local run: 96-byte opcode 1 whose first u32 is 774"
+  - value: 19
+    direction: c2s
+    name: gcpReportLastCrash
+    name_source: mirrored
+    evidence: inferred
+    source: "mirrors cn-717"
+  - value: 1500
+    direction: c2s
+    name: gcpReqDynamicConfig
+    name_source: mirrored
+    evidence: captured
+    source: "builders sub_B9E890 and sub_BA4360; local run: 30 bytes sent ahead of gcpFirstConnect"
+    notes: "named after S2C 1500 gspRepDynamicConfig (dispatcher sub_BCF090 case 1500), as on kr-1256"
+  - value: 4
+    direction: c2s
+    name: gcpRepPing
+    name_source: mirrored
+    evidence: inferred
+    source: "builder sub_8EB3D0 writes an empty body"
+    notes: "named after S2C 4 gspReqPing, as on kr-1256 (builder sub_9E9640, also empty)"
+  - value: 53
+    direction: c2s
+    name: Unknown53
+    name_source: none
+    evidence: inferred
+    source: "builder sub_64DCD0 writes one i32; aligned with kr-1256 C2S 53 (sub_56FB50) by label alignment"
+  - value: 521
+    direction: c2s
+    name: Unknown521
+    name_source: none
+    evidence: inferred
+    source: "empty twin builders sub_B2DB20 and sub_B2DF30, the pair kr-1256 has for C2S 521 (sub_937560, sub_937920)"
+  - value: 3
+    direction: c2s
+    name: gcpReqLogin
+    name_source: mirrored
+    evidence: inferred
+    source: "mirrors cn-717"
+  - value: 522
+    direction: s2c
+    name: gspSessionSignatureData
+    evidence: verified
+    source: "sub_8D7D20 case 0x20A constructs RTTI SessionSignatureData and stores it at session+37180"
+    notes: "kr-1256 reads the same class from S2C 521 (sub_9E1EB0 case 0x209)"
+  - value: 2
+    direction: s2c
+    name: gspRepGamePatch
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 2 stores \"gspRepGamePatch\""
+  - value: 3
+    direction: s2c
+    name: gspRepLogin
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 3 stores \"gspRepLogin\""
+  - value: 19
+    direction: s2c
+    name: gspCenterList
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 19 stores \"gspCenterList\""
+  - value: 115
+    direction: s2c
+    name: gspGotoMenu
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 115 stores \"gspGotoMenu\""
+  - value: 117
+    direction: s2c
+    name: gspGotoRoom
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 117 stores \"gspGotoRoom\""
+  # S2C labels recovered from the dispatcher (dispatcher sub_BCF090); layouts are not claimed by these rows.
+  - value: 1
+    direction: s2c
+    name: gspDisconnect
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1 stores \"gspDisconnect\""
+  - value: 4
+    direction: s2c
+    name: gspReqPing
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 4 stores \"gspReqPing\""
+  - value: 5
+    direction: s2c
+    name: gspReqHackShieldCheck
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 5 stores \"gspReqHackShieldCheck\""
+  - value: 6
+    direction: s2c
+    name: gspReqXignCodeCheck
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 6 stores \"gspReqXignCodeCheck\""
+  - value: 10
+    direction: s2c
+    name: gspRepMoveChannel
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 10 stores \"gspRepMoveChannel\""
+  - value: 11
+    direction: s2c
+    name: gspDisconnectingMovedUser
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 11 stores \"gspDisconnectingMovedUser\""
+  - value: 12
+    direction: s2c
+    name: gspDisconnectMovedUser
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 12 stores \"gspDisconnectMovedUser\""
+  - value: 13
+    direction: s2c
+    name: gspRepMoveInto
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 13 stores \"gspRepMoveInto\""
+  - value: 15
+    direction: s2c
+    name: gspRepCheckCreateUserName
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 15 stores \"gspRepCheckCreateUserName\""
+  - value: 16
+    direction: s2c
+    name: gspRepCreateUserInfo
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 16 stores \"gspRepCreateUserInfo\""
+  - value: 17
+    direction: s2c
+    name: gspQueryBadProgram
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 17 stores \"gspQueryBadProgram\""
+  - value: 18
+    direction: s2c
+    name: gspRepCenterUserCnt
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 18 stores \"gspRepCenterUserCnt\""
+  - value: 20
+    direction: s2c
+    name: gspRepUniquenessCheck
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 20 stores \"gspRepUniquenessCheck\""
+  - value: 21
+    direction: s2c
+    name: gspDisconnectOpenWeb
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 21 stores \"gspDisconnectOpenWeb\""
+  - value: 22
+    direction: s2c
+    name: gspDisconnectBlockIP
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 22 stores \"gspDisconnectBlockIP\""
+  - value: 23
+    direction: s2c
+    name: gspClanPassport
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 23 stores \"gspClanPassport\""
+  - value: 25
+    direction: s2c
+    name: gspClanPointAdd
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 25 stores \"gspClanPointAdd\""
+  - value: 26
+    direction: s2c
+    name: gspNotifyCloseProgram
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 26 stores \"gspNotifyCloseProgram\""
+  - value: 105
+    direction: s2c
+    name: gspUserStat
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 105 stores \"gspUserStat\""
+  - value: 106
+    direction: s2c
+    name: gspUserMoneyStat
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 106 stores \"gspUserMoneyStat\""
+  - value: 107
+    direction: s2c
+    name: gspUserLevelExpStat
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 107 stores \"gspUserLevelExpStat\""
+  - value: 108
+    direction: s2c
+    name: gspUserPcroomStat
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 108 stores \"gspUserPcroomStat\""
+  - value: 109
+    direction: s2c
+    name: gspUserLaboratoryState
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 109 stores \"gspUserLaboratoryState\""
+  - value: 110
+    direction: s2c
+    name: gspLaboratoryItems
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 110 stores \"gspLaboratoryItems\""
+  - value: 111
+    direction: s2c
+    name: gspOveruseSync
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 111 stores \"gspOveruseSync\""
+  - value: 112
+    direction: s2c
+    name: gspOveruseAlarmMsg
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 112 stores \"gspOveruseAlarmMsg\""
+  - value: 114
+    direction: s2c
+    name: gspServerChatNoticeMsg
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 114 stores \"gspServerChatNoticeMsg\""
+  - value: 116
+    direction: s2c
+    name: gspGotoLobby
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 116 stores \"gspGotoLobby\""
+  - value: 118
+    direction: s2c
+    name: gspRepWaitUserList
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 118 stores \"gspRepWaitUserList\""
+  - value: 119
+    direction: s2c
+    name: gspInvitationFailed
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 119 stores \"gspInvitationFailed\""
+  - value: 120
+    direction: s2c
+    name: gspInvitationDelivered
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 120 stores \"gspInvitationDelivered\""
+  - value: 121
+    direction: s2c
+    name: gspAskedInvitation
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 121 stores \"gspAskedInvitation\""
+  - value: 122
+    direction: s2c
+    name: gspFailedOnMoveToInviter
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 122 stores \"gspFailedOnMoveToInviter\""
+  - value: 123
+    direction: s2c
+    name: gspVisitationFailed
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 123 stores \"gspVisitationFailed\""
+  - value: 124
+    direction: s2c
+    name: gspAskedVisitation
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 124 stores \"gspAskedVisitation\""
+  - value: 125
+    direction: s2c
+    name: gspVisitationAccepted
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 125 stores \"gspVisitationAccepted\""
+  - value: 133
+    direction: s2c
+    name: gspRepFighterInfo
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 133 stores \"gspRepFighterInfo\""
+  - value: 134
+    direction: s2c
+    name: gspRepAwardInfo
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 134 stores \"gspRepAwardInfo\""
+  - value: 135
+    direction: s2c
+    name: gspRepEvent
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 135 stores \"gspRepEvent\""
+  - value: 137
+    direction: s2c
+    name: gspNotifyPromotion
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 137 stores \"gspNotifyPromotion\""
+  - value: 138
+    direction: s2c
+    name: gspChangedUserName
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 138 stores \"gspChangedUserName\""
+  - value: 139
+    direction: s2c
+    name: gspRepRecommendResult
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 139 stores \"gspRepRecommendResult\""
+  - value: 140
+    direction: s2c
+    name: gspReqClanMarkInfo
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 140 stores \"gspReqClanMarkInfo\""
+  - value: 141
+    direction: s2c
+    name: gspRandomBox
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 141 stores \"gspRandomBox\""
+  - value: 142
+    direction: s2c
+    name: gspRepLmgUserRecord
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 142 stores \"gspRepLmgUserRecord\""
+  - value: 143
+    direction: s2c
+    name: gspNotifySocialCommend
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 143 stores \"gspNotifySocialCommend\""
+  - value: 144
+    direction: s2c
+    name: gspNotifySocialReport
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 144 stores \"gspNotifySocialReport\""
+  - value: 145
+    direction: s2c
+    name: gspNotifySocialReportingResult
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 145 stores \"gspNotifySocialReportingResult\""
+  - value: 146
+    direction: s2c
+    name: gspNotifySocialBanPlay
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 146 stores \"gspNotifySocialBanPlay\""
+  - value: 147
+    direction: s2c
+    name: gspNotifySocialWarning
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 147 stores \"gspNotifySocialWarning\""
+  - value: 148
+    direction: s2c
+    name: gspRepUserMysteryStore
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 148 stores \"gspRepUserMysteryStore\""
+  - value: 149
+    direction: s2c
+    name: gspRepUserBubblePointStore
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 149 stores \"gspRepUserBubblePointStore\""
+  - value: 150
+    direction: s2c
+    name: gspRepUserTwirlingRoulette
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 150 stores \"gspRepUserTwirlingRoulette\""
+  - value: 151
+    direction: s2c
+    name: gspRepCompound
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 151 stores \"gspRepCompound\""
+  - value: 152
+    direction: s2c
+    name: gspRepCompoundUnlimited
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 152 stores \"gspRepCompoundUnlimited\""
+  - value: 153
+    direction: s2c
+    name: gspRepDecompound
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 153 stores \"gspRepDecompound\""
+  - value: 154
+    direction: s2c
+    name: gspRepEnchant
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 154 stores \"gspRepEnchant\""
+  - value: 155
+    direction: s2c
+    name: gspRepPetCompound
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 155 stores \"gspRepPetCompound\""
+  - value: 156
+    direction: s2c
+    name: gspRepMakeItemAdvanced
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 156 stores \"gspRepMakeItemAdvanced\""
+  - value: 157
+    direction: s2c
+    name: gspRepChangeUnlimited
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 157 stores \"gspRepChangeUnlimited\""
+  - value: 158
+    direction: s2c
+    name: gspRepModification
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 158 stores \"gspRepModification\""
+  - value: 159
+    direction: s2c
+    name: gspRepModificationDelete
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 159 stores \"gspRepModificationDelete\""
+  - value: 161
+    direction: s2c
+    name: gspRepExpectationItems
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 161 stores \"gspRepExpectationItems\""
+  - value: 162
+    direction: s2c
+    name: gspRepSciendLabConfig
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 162 stores \"gspRepSciendLabConfig\""
+  - value: 163
+    direction: s2c
+    name: gspNotifyFirstMoveChannel
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 163 stores \"gspNotifyFirstMoveChannel\""
+  - value: 164
+    direction: s2c
+    name: gspJackpotInfo
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 164 stores \"gspJackpotInfo\""
+  - value: 165
+    direction: s2c
+    name: gspJackpotReward
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 165 stores \"gspJackpotReward\""
+  - value: 166
+    direction: s2c
+    name: gspRepFollowerLevelup
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 166 stores \"gspRepFollowerLevelup\""
+  - value: 167
+    direction: s2c
+    name: gspRepFollowerAbilityChange
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 167 stores \"gspRepFollowerAbilityChange\""
+  - value: 168
+    direction: s2c
+    name: gspGachaponNotice
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 168 stores \"gspGachaponNotice\""
+  - value: 169
+    direction: s2c
+    name: gspScienceLabGachaponNotice
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 169 stores \"gspScienceLabGachaponNotice\""
+  - value: 170
+    direction: s2c
+    name: gspRepBlockedUserList
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 170 stores \"gspRepBlockedUserList\""
+  - value: 171
+    direction: s2c
+    name: gspRepAddBlockUser
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 171 stores \"gspRepAddBlockUser\""
+  - value: 172
+    direction: s2c
+    name: gspRepRemoveBlockUser
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 172 stores \"gspRepRemoveBlockUser\""
+  - value: 201
+    direction: s2c
+    name: gspUpdateParty
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 201 stores \"gspUpdateParty\""
+  - value: 203
+    direction: s2c
+    name: gspUpdatePartyLeader
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 203 stores \"gspUpdatePartyLeader\""
+  - value: 204
+    direction: s2c
+    name: gspNotifyPartyLeaveSuccess
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 204 stores \"gspNotifyPartyLeaveSuccess\""
+  - value: 205
+    direction: s2c
+    name: gspNotifyMemberLeave
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 205 stores \"gspNotifyMemberLeave\""
+  - value: 206
+    direction: s2c
+    name: gspNotifyNewMemberJoin
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 206 stores \"gspNotifyNewMemberJoin\""
+  - value: 302
+    direction: s2c
+    name: gspRepKickFromParty
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 302 stores \"gspRepKickFromParty\""
+  - value: 303
+    direction: s2c
+    name: gspRepChangePartyLeader
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 303 stores \"gspRepChangePartyLeader\""
+  - value: 304
+    direction: s2c
+    name: gspNotifyKickFromParty
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 304 stores \"gspNotifyKickFromParty\""
+  - value: 305
+    direction: s2c
+    name: gspReceivePartyChatMsg
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 305 stores \"gspReceivePartyChatMsg\""
+  - value: 306
+    direction: s2c
+    name: gspFailedPartyRecruitingReq
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 306 stores \"gspFailedPartyRecruitingReq\""
+  - value: 307
+    direction: s2c
+    name: gspNotifyKickMember
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 307 stores \"gspNotifyKickMember\""
+  - value: 309
+    direction: s2c
+    name: gspRepPartyRecruitDocument
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 309 stores \"gspRepPartyRecruitDocument\""
+  - value: 527
+    direction: s2c
+    name: gspTestConsoleCommand
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 527 stores \"gspTestConsoleCommand\""
+  - value: 571
+    direction: s2c
+    name: gspConnectToRelayServer
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 571 stores \"gspConnectToRelayServer\""
+  - value: 573
+    direction: s2c
+    name: gspConnectToSuperPeer
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 573 stores \"gspConnectToSuperPeer\""
+  - value: 576
+    direction: s2c
+    name: gspUdpStop
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 576 stores \"gspUdpStop\""
+  - value: 686
+    direction: s2c
+    name: gspArea32GameExit
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 686 stores \"gspArea32GameExit\""
+  - value: 750
+    direction: s2c
+    name: gspChangePirateAssaultAbilityLevel
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 750 stores \"gspChangePirateAssaultAbilityLevel\""
+  - value: 753
+    direction: s2c
+    name: gspHonorUserState
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 753 stores \"gspHonorUserState\""
+  - value: 800
+    direction: s2c
+    name: gspRepEnterShop
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 800 stores \"gspRepEnterShop\""
+  - value: 801
+    direction: s2c
+    name: gspRepEnterTCShop
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 801 stores \"gspRepEnterTCShop\""
+  - value: 802
+    direction: s2c
+    name: gspInventoryUpdateAllInventorySlot
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 802 stores \"gspInventoryUpdateAllInventorySlot\""
+  - value: 803
+    direction: s2c
+    name: gspInventoryUpdateInventorySlots
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 803 stores \"gspInventoryUpdateInventorySlots\""
+  - value: 804
+    direction: s2c
+    name: gspInventoryUpdateInventorySlot
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 804 stores \"gspInventoryUpdateInventorySlot\""
+  - value: 805
+    direction: s2c
+    name: gspInventoryDeleteInventorySlot
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 805 stores \"gspInventoryDeleteInventorySlot\""
+  - value: 806
+    direction: s2c
+    name: gspInventoryViewUpdateView
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 806 stores \"gspInventoryViewUpdateView\""
+  - value: 807
+    direction: s2c
+    name: gspCheckExpiredTimeResult
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 807 stores \"gspCheckExpiredTimeResult\""
+  - value: 808
+    direction: s2c
+    name: gspUpdateAllArticleSlot
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 808 stores \"gspUpdateAllArticleSlot\""
+  - value: 809
+    direction: s2c
+    name: gspUpdateArticleSlots
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 809 stores \"gspUpdateArticleSlots\""
+  - value: 810
+    direction: s2c
+    name: gspCashInvenUpdateAllInventorySlot
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 810 stores \"gspCashInvenUpdateAllInventorySlot\""
+  - value: 811
+    direction: s2c
+    name: gspRepInventoryEquip
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 811 stores \"gspRepInventoryEquip\""
+  - value: 812
+    direction: s2c
+    name: gspRepInventoryUnequip
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 812 stores \"gspRepInventoryUnequip\""
+  - value: 813
+    direction: s2c
+    name: gspRepInventoryUseItem
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 813 stores \"gspRepInventoryUseItem\""
+  - value: 814
+    direction: s2c
+    name: gspRepInventoryDeleteItem
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 814 stores \"gspRepInventoryDeleteItem\""
+  - value: 815
+    direction: s2c
+    name: gspRepInventoryThrowItem
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 815 stores \"gspRepInventoryThrowItem\""
+  - value: 816
+    direction: s2c
+    name: gspRepShopBuy
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 816 stores \"gspRepShopBuy\""
+  - value: 817
+    direction: s2c
+    name: gspRepShopItemCardInfo
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 817 stores \"gspRepShopItemCardInfo\""
+  - value: 818
+    direction: s2c
+    name: gspRepExchangeBubbleCash
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 818 stores \"gspRepExchangeBubbleCash\""
+  - value: 819
+    direction: s2c
+    name: gspRepPresentNewReceive
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 819 stores \"gspRepPresentNewReceive\""
+  - value: 822
+    direction: s2c
+    name: gspRepPresentReceiveSubList
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 822 stores \"gspRepPresentReceiveSubList\""
+  - value: 823
+    direction: s2c
+    name: gspRepPresentSendSubList
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 823 stores \"gspRepPresentSendSubList\""
+  - value: 824
+    direction: s2c
+    name: gspRepRefund
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 824 stores \"gspRepRefund\""
+  - value: 825
+    direction: s2c
+    name: gspRepPresentSend
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 825 stores \"gspRepPresentSend\""
+  - value: 826
+    direction: s2c
+    name: gspRepPresentReceive
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 826 stores \"gspRepPresentReceive\""
+  - value: 827
+    direction: s2c
+    name: gspRepPresentThrow
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 827 stores \"gspRepPresentThrow\""
+  - value: 828
+    direction: s2c
+    name: gspRepPresentSendThankMsg
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 828 stores \"gspRepPresentSendThankMsg\""
+  - value: 829
+    direction: s2c
+    name: gspRepPresentViewThankMsg
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 829 stores \"gspRepPresentViewThankMsg\""
+  - value: 830
+    direction: s2c
+    name: gspRepPresentConfirm
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 830 stores \"gspRepPresentConfirm\""
+  - value: 831
+    direction: s2c
+    name: gspRepPresentDeleteSend
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 831 stores \"gspRepPresentDeleteSend\""
+  - value: 832
+    direction: s2c
+    name: gspRepPresentDeleteReceive
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 832 stores \"gspRepPresentDeleteReceive\""
+  - value: 833
+    direction: s2c
+    name: gspRepRealCouponUse
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 833 stores \"gspRepRealCouponUse\""
+  - value: 834
+    direction: s2c
+    name: gspRepCheckCash
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 834 stores \"gspRepCheckCash\""
+  - value: 835
+    direction: s2c
+    name: gspRepPickup
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 835 stores \"gspRepPickup\""
+  - value: 836
+    direction: s2c
+    name: gspReqInventoryChangeWeaponPresetIdx
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 836 stores \"gspReqInventoryChangeWeaponPresetIdx\""
+  - value: 837
+    direction: s2c
+    name: gspReqWeaponPreSetUpdate
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 837 stores \"gspReqWeaponPreSetUpdate\""
+  - value: 838
+    direction: s2c
+    name: gspRepUseNexonStarCoupon
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 838 stores \"gspRepUseNexonStarCoupon\""
+  - value: 839
+    direction: s2c
+    name: gspRepUseNismsCoupon
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 839 stores \"gspRepUseNismsCoupon\""
+  - value: 900
+    direction: s2c
+    name: gspRepGuildLineBoard
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 900 stores \"gspRepGuildLineBoard\""
+  - value: 901
+    direction: s2c
+    name: gspRepGuildLineBoardWrite
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 901 stores \"gspRepGuildLineBoardWrite\""
+  - value: 902
+    direction: s2c
+    name: gspRepGuildLineBoardDelete
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 902 stores \"gspRepGuildLineBoardDelete\""
+  - value: 903
+    direction: s2c
+    name: gspNotifyZombieApearInPreGame
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 903 stores \"gspNotifyZombieApearInPreGame\""
+  - value: 910
+    direction: s2c
+    name: gspMergeCountOrDayItemList
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 910 stores \"gspMergeCountOrDayItemList\""
+  - value: 913
+    direction: s2c
+    name: gspResTreasureChestInfo
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 913 stores \"gspResTreasureChestInfo\""
+  - value: 914
+    direction: s2c
+    name: gspResOpenTreasureChest
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 914 stores \"gspResOpenTreasureChest\""
+  - value: 915
+    direction: s2c
+    name: gspResOpenTreasureChestSelect
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 915 stores \"gspResOpenTreasureChestSelect\""
+  - value: 916
+    direction: s2c
+    name: gspResTreasureChestDetailViewInfo
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 916 stores \"gspResTreasureChestDetailViewInfo\""
+  - value: 917
+    direction: s2c
+    name: gspCustomizeString
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 917 stores \"gspCustomizeString\""
+  - value: 918
+    direction: s2c
+    name: gspResGuildInfo
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 918 stores \"gspResGuildInfo\""
+  - value: 919
+    direction: s2c
+    name: gspResSingleStageInfo
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 919 stores \"gspResSingleStageInfo\""
+  - value: 920
+    direction: s2c
+    name: gspResSingleStageState
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 920 stores \"gspResSingleStageState\""
+  - value: 930
+    direction: s2c
+    name: gspResMakeUserTitle
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 930 stores \"gspResMakeUserTitle\""
+  - value: 931
+    direction: s2c
+    name: gspResSetUserTitle
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 931 stores \"gspResSetUserTitle\""
+  - value: 932
+    direction: s2c
+    name: gspTitleSyncInfo
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 932 stores \"gspTitleSyncInfo\""
+  - value: 933
+    direction: s2c
+    name: gspNotifyUserTitleInstance
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 933 stores \"gspNotifyUserTitleInstance\""
+  - value: 934
+    direction: s2c
+    name: gspProvideMedal
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 934 stores \"gspProvideMedal\""
+  - value: 935
+    direction: s2c
+    name: gspCharRankInfo
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 935 stores \"gspCharRankInfo\""
+  - value: 936
+    direction: s2c
+    name: gspResCoupleInvite
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 936 stores \"gspResCoupleInvite\""
+  - value: 937
+    direction: s2c
+    name: gspResCoupleInviteResult
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 937 stores \"gspResCoupleInviteResult\""
+  - value: 938
+    direction: s2c
+    name: gspResCoupleInviteAnswer
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 938 stores \"gspResCoupleInviteAnswer\""
+  - value: 939
+    direction: s2c
+    name: gspResCoupleBreakUp
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 939 stores \"gspResCoupleBreakUp\""
+  - value: 940
+    direction: s2c
+    name: gspResCoupleNotifyPartner
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 940 stores \"gspResCoupleNotifyPartner\""
+  - value: 945
+    direction: s2c
+    name: gspUpdateCoupleSlot
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 945 stores \"gspUpdateCoupleSlot\""
+  - value: 946
+    direction: s2c
+    name: gspUpdateCoupleList
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 946 stores \"gspUpdateCoupleList\""
+  - value: 949
+    direction: s2c
+    name: gspEvolveResult
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 949 stores \"gspEvolveResult\""
+  - value: 950
+    direction: s2c
+    name: gspGMConsole
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 950 stores \"gspGMConsole\""
+  - value: 951
+    direction: s2c
+    name: gspNexonGuard
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 951 stores \"gspNexonGuard\""
+  - value: 952
+    direction: s2c
+    name: gspPortalMove
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 952 stores \"gspPortalMove\""
+  - value: 953
+    direction: s2c
+    name: gspNotifyMsg
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 953 stores \"gspNotifyMsg\""
+  - value: 956
+    direction: s2c
+    name: gspOXContollerData
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 956 stores \"gspOXContollerData\""
+  - value: 957
+    direction: s2c
+    name: gspResBlueMarbleDice
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 957 stores \"gspResBlueMarbleDice\""
+  - value: 958
+    direction: s2c
+    name: gspRepRecheckMap
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 958 stores \"gspRepRecheckMap\""
+  - value: 959
+    direction: s2c
+    name: gspNexonGuardHackDetected
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 959 stores \"gspNexonGuardHackDetected\""
+  - value: 960
+    direction: s2c
+    name: gspNotifySecondPassword
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 960 stores \"gspNotifySecondPassword\""
+  - value: 962
+    direction: s2c
+    name: gspSeasonLadderLevelUpNotice
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 962 stores \"gspSeasonLadderLevelUpNotice\""
+  - value: 963
+    direction: s2c
+    name: gspRepSeasonLadderGetRankList
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 963 stores \"gspRepSeasonLadderGetRankList\""
+  - value: 964
+    direction: s2c
+    name: gspRepSeasonLadderGetUserRankInfo
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 964 stores \"gspRepSeasonLadderGetUserRankInfo\""
+  - value: 965
+    direction: s2c
+    name: gspRepClassicLadderGetRankList
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 965 stores \"gspRepClassicLadderGetRankList\""
+  - value: 966
+    direction: s2c
+    name: gspRepNotifyChangeLevelIcon
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 966 stores \"gspRepNotifyChangeLevelIcon\""
+  - value: 968
+    direction: s2c
+    name: gspRepMatchWaitingInfo
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 968 stores \"gspRepMatchWaitingInfo\""
+  - value: 971
+    direction: s2c
+    name: gspSurelyChangeName
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 971 stores \"gspSurelyChangeName\""
+  - value: 974
+    direction: s2c
+    name: gspRepCustomizedKeyList
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 974 stores \"gspRepCustomizedKeyList\""
+  - value: 977
+    direction: s2c
+    name: gspReqGameReady
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 977 stores \"gspReqGameReady\""
+  - value: 978
+    direction: s2c
+    name: gspResBaseballBatInfo
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 978 stores \"gspResBaseballBatInfo\""
+  - value: 979
+    direction: s2c
+    name: gspResBaseballHitResult
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 979 stores \"gspResBaseballHitResult\""
+  - value: 982
+    direction: s2c
+    name: gspResChangeCouplering
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 982 stores \"gspResChangeCouplering\""
+  - value: 983
+    direction: s2c
+    name: gspUpdateClanInfoToClanServer
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 983 stores \"gspUpdateClanInfoToClanServer\""
+  - value: 984
+    direction: s2c
+    name: gspResChangeClanMarkNoty
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 984 stores \"gspResChangeClanMarkNoty\""
+  - value: 986
+    direction: s2c
+    name: gspGetGameAccessToken
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 986 stores \"gspGetGameAccessToken\""
+  - value: 987
+    direction: s2c
+    name: gspGoToFreeMainMenu
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 987 stores \"gspGoToFreeMainMenu\""
+  - value: 989
+    direction: s2c
+    name: gspGMObserver
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 989 stores \"gspGMObserver\""
+  - value: 990
+    direction: s2c
+    name: gspUserHostStart
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 990 stores \"gspUserHostStart\""
+  - value: 991
+    direction: s2c
+    name: gspUserHostSetting
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 991 stores \"gspUserHostSetting\""
+  - value: 992
+    direction: s2c
+    name: gspUserHostDefaultSetting
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 992 stores \"gspUserHostDefaultSetting\""
+  - value: 996
+    direction: s2c
+    name: gspBingoData
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 996 stores \"gspBingoData\""
+  - value: 997
+    direction: s2c
+    name: gspResUpdateBingoNumber
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 997 stores \"gspResUpdateBingoNumber\""
+  - value: 998
+    direction: s2c
+    name: gspResGetBingoItem
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 998 stores \"gspResGetBingoItem\""
+  - value: 1000
+    direction: s2c
+    name: gspAfreeCaTv
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1000 stores \"gspAfreeCaTv\""
+  - value: 1002
+    direction: s2c
+    name: gspResGodOfFighterPlayableTime
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1002 stores \"gspResGodOfFighterPlayableTime\""
+  - value: 1500
+    direction: s2c
+    name: gspRepDynamicConfig
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1500 stores \"gspRepDynamicConfig\""
+  - value: 1501
+    direction: s2c
+    name: gspGameSpecReloadCheck
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1501 stores \"gspGameSpecReloadCheck\""
+  - value: 1502
+    direction: s2c
+    name: gspChampsRuleMainOptionNotify
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1502 stores \"gspChampsRuleMainOptionNotify\""
+  - value: 1503
+    direction: s2c
+    name: gspChampsRuleSubOptionNotify
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1503 stores \"gspChampsRuleSubOptionNotify\""
+  - value: 1504
+    direction: s2c
+    name: gspChampsRuleSetStateNotify
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1504 stores \"gspChampsRuleSetStateNotify\""
+  - value: 1505
+    direction: s2c
+    name: gspResponseEventInfo
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1505 stores \"gspResponseEventInfo\""
+  - value: 1506
+    direction: s2c
+    name: gspClanAttendanceState
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1506 stores \"gspClanAttendanceState\""
+  - value: 1507
+    direction: s2c
+    name: gspClanAttendanceReward
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1507 stores \"gspClanAttendanceReward\""
+  - value: 1508
+    direction: s2c
+    name: gspResponseVoiceSystem
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1508 stores \"gspResponseVoiceSystem\""
+  - value: 1509
+    direction: s2c
+    name: gspDormantAttendance
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1509 stores \"gspDormantAttendance\""
+  - value: 1510
+    direction: s2c
+    name: gspReturnUserAttendance
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1510 stores \"gspReturnUserAttendance\""
+  - value: 1511
+    direction: s2c
+    name: gspPcRoomAttendanceState
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1511 stores \"gspPcRoomAttendanceState\""
+  - value: 1512
+    direction: s2c
+    name: gspPcRoomAttendanceReward
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1512 stores \"gspPcRoomAttendanceReward\""
+  - value: 1513
+    direction: s2c
+    name: gspGraduateNewbieClan
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1513 stores \"gspGraduateNewbieClan\""
+  - value: 1514
+    direction: s2c
+    name: gspLuxuryClubResponse
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1514 stores \"gspLuxuryClubResponse\""
+  - value: 1515
+    direction: s2c
+    name: gspRewardNotice
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1515 stores \"gspRewardNotice\""
+  - value: 1517
+    direction: s2c
+    name: gspChinaProtectMinorTime
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1517 stores \"gspChinaProtectMinorTime\""
+  - value: 1518
+    direction: s2c
+    name: gspRepSendPcRoomPartyGift
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1518 stores \"gspRepSendPcRoomPartyGift\""
+  - value: 1519
+    direction: s2c
+    name: gspRepSendPcRoomPartyGiftNotify
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1519 stores \"gspRepSendPcRoomPartyGiftNotify\""
+  - value: 1520
+    direction: s2c
+    name: gspRepReceivePcRoomPartyGiftNotify
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1520 stores \"gspRepReceivePcRoomPartyGiftNotify\""
+  - value: 1521
+    direction: s2c
+    name: gspReqSelectCustomRandomBox
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1521 stores \"gspReqSelectCustomRandomBox\""
+  - value: 1522
+    direction: s2c
+    name: gspResMagicStickDetailViewInfo
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1522 stores \"gspResMagicStickDetailViewInfo\""
+  - value: 1523
+    direction: s2c
+    name: gspRepPointStoreInfo
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1523 stores \"gspRepPointStoreInfo\""
+  - value: 1524
+    direction: s2c
+    name: gspRepAuctionRegister
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1524 stores \"gspRepAuctionRegister\""
+  - value: 1525
+    direction: s2c
+    name: gspRepAuctionBid
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1525 stores \"gspRepAuctionBid\""
+  - value: 1526
+    direction: s2c
+    name: gspRepAuctionCancel
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1526 stores \"gspRepAuctionCancel\""
+  - value: 1527
+    direction: s2c
+    name: gspRepAuctionReceiveItem
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1527 stores \"gspRepAuctionReceiveItem\""
+  - value: 1528
+    direction: s2c
+    name: gspRepAuctionReceivePrice
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1528 stores \"gspRepAuctionReceivePrice\""
+  - value: 1529
+    direction: s2c
+    name: gspRepAuctionGetList
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1529 stores \"gspRepAuctionGetList\""
+  - value: 1530
+    direction: s2c
+    name: gspRepAuctionDelete
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1530 stores \"gspRepAuctionDelete\""
+  - value: 1531
+    direction: s2c
+    name: gspRepAuctionStats
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1531 stores \"gspRepAuctionStats\""
+  - value: 1532
+    direction: s2c
+    name: gspNotifyAuctionPreference
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1532 stores \"gspNotifyAuctionPreference\""
+  - value: 1533
+    direction: s2c
+    name: gspNotifyAuctionSummary
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1533 stores \"gspNotifyAuctionSummary\""
+  - value: 1534
+    direction: s2c
+    name: gspNotifyAuctionResult
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1534 stores \"gspNotifyAuctionResult\""
+  - value: 1535
+    direction: s2c
+    name: gspRepMileageBehaviorTimer
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1535 stores \"gspRepMileageBehaviorTimer\""
+  - value: 1536
+    direction: s2c
+    name: gspRepMileageBehaviorNotice
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1536 stores \"gspRepMileageBehaviorNotice\""
+  - value: 1537
+    direction: s2c
+    name: gspRepMileageBehaviorEventLog
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1537 stores \"gspRepMileageBehaviorEventLog\""
+  - value: 1538
+    direction: s2c
+    name: gspRepResetMileageData_ForTest
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1538 stores \"gspRepResetMileageData_ForTest\""
+  - value: 1541
+    direction: s2c
+    name: gspPartyLadderLevelUpNotice
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1541 stores \"gspPartyLadderLevelUpNotice\""
+  - value: 1542
+    direction: s2c
+    name: gspRepPartyLadderGetRankList
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1542 stores \"gspRepPartyLadderGetRankList\""
+  - value: 1543
+    direction: s2c
+    name: gspRepPartyLadderGetUserRankInfo
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1543 stores \"gspRepPartyLadderGetUserRankInfo\""
+  - value: 1544
+    direction: s2c
+    name: gspRepPartyLadderOnlyMatching
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1544 stores \"gspRepPartyLadderOnlyMatching\""
+  - value: 1545
+    direction: s2c
+    name: gspNotifyFavoriteWeaponGrade
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1545 stores \"gspNotifyFavoriteWeaponGrade\""
+  - value: 1547
+    direction: s2c
+    name: gspGalleryState
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1547 stores \"gspGalleryState\""
+  - value: 1548
+    direction: s2c
+    name: gspGalleryCommand
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1548 stores \"gspGalleryCommand\""
+  - value: 1549
+    direction: s2c
+    name: gspGalleryReward
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1549 stores \"gspGalleryReward\""
+  - value: 1551
+    direction: s2c
+    name: gspRepGetPirateAssaultTopRanking
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1551 stores \"gspRepGetPirateAssaultTopRanking\""
+  - value: 1552
+    direction: s2c
+    name: gspRepGetPirateAssaultUserRanking
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1552 stores \"gspRepGetPirateAssaultUserRanking\""
+  - value: 1553
+    direction: s2c
+    name: gspReqSelectItemExchangeBox
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1553 stores \"gspReqSelectItemExchangeBox\""
+  - value: 1554
+    direction: s2c
+    name: gspRepOption
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1554 stores \"gspRepOption\""
+  - value: 1555
+    direction: s2c
+    name: gspCustomGameModeSetting
+    name_source: label@cn-774
+    evidence: verified
+    source: "dispatcher sub_BCF090 jumptable case 1555 stores \"gspCustomGameModeSetting\""
+  # C2S names aligned from cn-717 packet classes; the rows claim the opcode and name, not a layout.
+  - value: 31
+    direction: c2s
+    name: gcpReqCheckCreateUserName
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_6BD920 checks CreateUserStage, stamps 31 and writes u32 character count followed by UTF-16LE name; matches kr-1256 sub_5CCC60 and the role of kr-812 C2S 15 Packet_gcpReqCheckCreateUserName"
+  - value: 117
+    direction: c2s
+    name: gcpReqFighterInfo
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_B277C0; name aligned from cn-717 C2S 113 Packet_gcpReqFighterInfo (label alignment, run cn-717 C2S 113..122 -> 117..126, shape [4 4], similarity 1.0)"
+  - value: 119
+    direction: c2s
+    name: gcpReqEvent
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_5F3A10; name aligned from cn-717 C2S 115 Packet_gcpReqEvent (label alignment, run cn-717 C2S 113..122 -> 117..126, shape [4 4 8 S 4 4 4 4 4 4 4 4], similarity 1.0)"
+  - value: 121
+    direction: c2s
+    name: gcpReqRecommendSend
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_BA18F0; name aligned from cn-717 C2S 117 Packet_gcpReqRecommendSend (label alignment, run cn-717 C2S 113..122 -> 117..126, shape [S], similarity 1.0)"
+  - value: 125
+    direction: c2s
+    name: gcpReqSocialSystemCommend
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_EC2180; name aligned from cn-717 C2S 121 Packet_gcpReqSocialSystemCommend (label alignment, run cn-717 C2S 113..122 -> 117..126, shape [4 4 4 4 S], similarity 1.0)"
+  - value: 126
+    direction: c2s
+    name: gcpReqSocialSystemReport
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_EC9250; name aligned from cn-717 C2S 122 Packet_gcpReqSocialSystemReport (label alignment, run cn-717 C2S 113..122 -> 117..126, shape [4 4 4 4 S S], similarity 1.0)"
+  - value: 515
+    direction: c2s
+    name: gcpRoomReqOpenCloseSlot
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_535610; name aligned from cn-717 C2S 509 Packet_gcpRoomReqOpenCloseSlot (label alignment, run cn-717 C2S 502..509 -> 508..515, shape [4 4], similarity 0.8)"
+  - value: 518
+    direction: c2s
+    name: gcpRepPingUser
+    name_source: label@cn-717
+    evidence: verified
+    source: "cn-774 sub_8D7D20 inline case 0x205 (answers S2C 517): reads one u32, then stamps *(_WORD *)(packet + 2) = 518 and writes four u32 on the game connection (line 1090356); same answer as kr-1256 sub_9DF920"
+    notes: "Official legacy class Packet_gcpRepPingUser at the same number (cn-717 sender sub_88E060), matched by role: the answer the client sends to S2C 517 gspReqPingUser. Body is four u32, unnamed."
+  - value: 519
+    direction: c2s
+    name: gcpReqSelectAward
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_739BC0; name aligned from cn-717 C2S 519 Packet_gcpReqSelectAward (label alignment, run cn-717 C2S 517..520 -> 517..520, shape [4 4], similarity 1.0)"
+  - value: 602
+    direction: c2s
+    name: gcpRespawn
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_8A4650; name aligned from cn-717 C2S 704 Packet_gcpRespawn (label alignment, run cn-717 C2S 704..715 -> 602..613, shape [4 4 4], similarity 1.0)"
+  - value: 603
+    direction: c2s
+    name: gcpRequestRespawnIdx
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_8A47C0; name aligned from cn-717 C2S 705 Packet_gcpRequestRespawnIdx (label alignment, run cn-717 C2S 704..715 -> 602..613, shape [4 4], similarity 1.0)"
+  - value: 605
+    direction: c2s
+    name: gcpEatItem
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_89D8D0; name aligned from cn-717 C2S 707 Packet_gcpEatItem (label alignment, run cn-717 C2S 704..715 -> 602..613, shape [4 4], similarity 1.0)"
+  - value: 609
+    direction: c2s
+    name: gcpGameUpdateDamagePoint
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_CBF7F0; name aligned from cn-717 C2S 711 Packet_gcpGameUpdateDamagePoint (label alignment, run cn-717 C2S 704..715 -> 602..613, shape [4 4 4], similarity 1.0)"
+  - value: 613
+    direction: c2s
+    name: gcpGameReqExtendRespawn
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_96F3D0; name aligned from cn-717 C2S 715 Packet_gcpGameReqExtendRespawn (label alignment, run cn-717 C2S 704..715 -> 602..613, shape [4 4], similarity 1.0)"
+  - value: 628
+    direction: c2s
+    name: gcpReqCreateItem
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_8C8140; name aligned from cn-717 C2S 728 Packet_gcpReqCreateItem (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4 4 4 4 4 4 4 4], similarity 0.89)"
+  - value: 629
+    direction: c2s
+    name: gcpReqCreateWeaponObject
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_8C8280; name aligned from cn-717 C2S 729 Packet_gcpReqCreateWeaponObject (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4 4 4 4 4 4 4 4 4], similarity 0.95)"
+  - value: 630
+    direction: c2s
+    name: gcpPickUpWeapon
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_529530; name aligned from cn-717 C2S 730 Packet_gcpPickUpWeapon (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4], similarity 1.0)"
+  - value: 631
+    direction: c2s
+    name: gcpEatStar
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_89DD80; name aligned from cn-717 C2S 731 Packet_gcpEatStar (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4], similarity 1.0)"
+  - value: 632
+    direction: c2s
+    name: gcpReqCreateStar
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_8A8700; name aligned from cn-717 C2S 732 Packet_gcpReqCreateStar (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4 4 4 4 4 4 4 4], similarity 1.0)"
+  - value: 633
+    direction: c2s
+    name: gcpEatEventBox
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_89DE60; name aligned from cn-717 C2S 733 Packet_gcpEatEventBox (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4], similarity 1.0)"
+  - value: 634
+    direction: c2s
+    name: gcpReqCreateEventBox
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_8A88B0; name aligned from cn-717 C2S 734 Packet_gcpReqCreateEventBox (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4 4 4 4 4 4 4 4], similarity 1.0)"
+  - value: 635
+    direction: c2s
+    name: gcpEatLucci
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_89DF40; name aligned from cn-717 C2S 735 Packet_gcpEatLucci (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4], similarity 1.0)"
+  - value: 636
+    direction: c2s
+    name: gcpReqCreateLucci
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_8A8A60; name aligned from cn-717 C2S 736 Packet_gcpReqCreateLucci (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4 4 4 4 4 4 4 4], similarity 1.0)"
+  - value: 637
+    direction: c2s
+    name: gcpEatChocolate
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_D46830; name aligned from cn-717 C2S 737 Packet_gcpEatChocolate (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4], similarity 1.0)"
+  - value: 638
+    direction: c2s
+    name: gcpReqCreateChocolate
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_8BF690; name aligned from cn-717 C2S 738 Packet_gcpReqCreateChocolate (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4 4 4 4 4 4 4 4], similarity 1.0)"
+  - value: 639
+    direction: c2s
+    name: gcpEatSpawner
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_D53250; name aligned from cn-717 C2S 739 Packet_gcpEatSpawner (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4 4], similarity 1.0)"
+  - value: 640
+    direction: c2s
+    name: gcpReqCreateSpawner
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_AF65B0; name aligned from cn-717 C2S 740 Packet_gcpReqCreateSpawner (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4 4 4 4 4 4 4], similarity 1.0)"
+  - value: 641
+    direction: c2s
+    name: gcpEatHeart
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_D4C690; name aligned from cn-717 C2S 741 Packet_gcpEatHeart (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4], similarity 1.0)"
+  - value: 642
+    direction: c2s
+    name: gcpReqCreateHeart
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_512AB0; name aligned from cn-717 C2S 742 Packet_gcpReqCreateHeart (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4 4 4 4 4 4 4 4], similarity 0.88)"
+  - value: 815
+    direction: c2s
+    name: gcpReqPresentReceiveSubList
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_7CAFA0; name aligned from cn-717 C2S 813 Packet_gcpReqPresentReceiveSubList (label alignment, run cn-717 C2S 806..813 -> 808..815, shape [4 4], similarity 1.0)"
+  - value: 903
+    direction: c2s
+    name: gcpReqManufactureStart
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_959650; name aligned from cn-717 C2S 913 Packet_gcpReqManufactureStart (label alignment, run cn-717 C2S 913..916 -> 903..906, shape [4 4 4], similarity 1.0)"
+  - value: 906
+    direction: c2s
+    name: gcpReqManufactureImmediate
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_959650; name aligned from cn-717 C2S 916 Packet_gcpReqManufactureImmediate (label alignment, run cn-717 C2S 913..916 -> 903..906, shape [4 4 4], similarity 1.0)"
+  - value: 922
+    direction: c2s
+    name: gcpCompensationItemNoti
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_CD0B90; name aligned from cn-717 C2S 926 Packet_gcpCompensationItemNoti (label alignment, run cn-717 C2S 918..930 -> 914..926, shape [S], similarity 1.0)"
+  - value: 923
+    direction: c2s
+    name: gcpMissionProcess
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_89E0F0; name aligned from cn-717 C2S 927 Packet_gcpMissionProcess (label alignment, run cn-717 C2S 918..930 -> 914..926, shape [4 4 4], similarity 1.0)"
+  - value: 926
+    direction: c2s
+    name: gcpSetUserTitle
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_6DC650; name aligned from cn-717 C2S 930 Packet_gcpSetUserTitle (label alignment, run cn-717 C2S 918..930 -> 914..926, shape [4 4 4], similarity 1.0)"
+  - value: 941
+    direction: c2s
+    name: gcpReqRecheckMap
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_85D080; name aligned from cn-717 C2S 950 Packet_gcpReqRecheckMap (label alignment, run cn-717 C2S 950..954 -> 941..945, shape [S], similarity 1.0)"
+  - value: 943
+    direction: c2s
+    name: gcpReqOXQuizAnswer
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_7AB2C0; name aligned from cn-717 C2S 952 Packet_gcpReqOXQuizAnswer (label alignment, run cn-717 C2S 950..954 -> 941..945, shape [4 4], similarity 1.0)"
+  - value: 948
+    direction: c2s
+    name: gcpReqChangeClanMark
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_5DF670; name aligned from cn-717 C2S 955 Packet_gcpReqChangeClanMark (label alignment, run cn-717 C2S 955..957 -> 948..950, shape [4 4 4], similarity 1.0)"
+  - value: 2009
+    direction: c2s
+    name: gcpReqNotifyChangeLevelIcon
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_B3C1D0; name aligned from cn-717 C2S 2007 Packet_gcpReqNotifyChangeLevelIcon (label alignment, run cn-717 C2S 2006..2011 -> 2008..2013, shape [4 4 4], similarity 1.0)"
+  - value: 2013
+    direction: c2s
+    name: Unknown2013
+    name_source: none
+    evidence: captured
+    source: "local run 2026-09-27: 44 bytes after an item hover, i32 then a wstr 'shopItemId: 205001'"
+    notes: "the alignment proposed gcpBombMissionOver (shape [4 4 4], similarity 0.8); the body layout contradicts it"
+  - value: 2023
+    direction: c2s
+    name: gcpReqClanInfo
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_5D7FE0; name aligned from cn-717 C2S 2019 Packet_gcpReqClanInfo (label alignment, run cn-717 C2S 2019..2026 -> 2023..2030, shape [4 S 4], similarity 1.0)"
+  - value: 2025
+    direction: c2s
+    name: gcpReqCreateHordeAward
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_975720; name aligned from cn-717 C2S 2021 Packet_gcpReqCreateHordeAward (label alignment, run cn-717 C2S 2019..2026 -> 2023..2030, shape [4 4 4 4 4 4 4 4], similarity 1.0)"
+  - value: 2026
+    direction: c2s
+    name: gcpReqGotoClan
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_5F1D10; name aligned from cn-717 C2S 2022 Packet_gcpReqGotoClan (label alignment, run cn-717 C2S 2019..2026 -> 2023..2030, shape [8 S], similarity 1.0)"
+  - value: 2030
+    direction: c2s
+    name: gcpUserHostSetting
+    name_source: label@cn-717
+    evidence: inferred
+    source: "builder sub_8E8E60; name aligned from cn-717 C2S 2026 Packet_gcpUserHostSetting (label alignment, run cn-717 C2S 2019..2026 -> 2023..2030, shape [4 4], similarity 1.0)"
+
+  - value: 816
+    direction: c2s
+    name: gcpReqPresentSendSubList
+    name_source: label@kr-812
+    evidence: inferred
+    source: "cn-774 sub_7CAFA0 stamps 816; body u32 start, u32 count matches kr-812 C2S 814 gcpReqPresentSendSubList"
+    connection: game
+  - value: 818
+    direction: c2s
+    name: gcpReqPresentSend
+    name_source: label@kr-812
+    evidence: inferred
+    source: "cn-774 sub_7C48B0 stamps 818; body wstr, wstr (empty), u32 item key, wstr message matches kr-812 C2S 816 gcpReqPresentSend"
+    connection: game
+  - value: 819
+    direction: c2s
+    name: gcpReqPresentReceive
+    name_source: label@kr-812
+    evidence: inferred
+    source: "cn-774 sub_6AEEE0 stamps 819; body u32 id matches kr-812 C2S 817 gcpReqPresentReceive"
+    connection: game
+  - value: 820
+    direction: c2s
+    name: gcpReqPresentThrow
+    name_source: label@kr-812
+    evidence: inferred
+    source: "cn-774 sub_6AEEE0 stamps 820; body u32 id matches kr-812 C2S 818 gcpReqPresentThrow"
+    connection: game
+  - value: 821
+    direction: c2s
+    name: gcpReqPresentSendThankMsg
+    name_source: label@kr-812
+    evidence: inferred
+    source: "cn-774 sub_7CCB40 stamps 821; body u32 id, wstr, u32 matches kr-812 C2S 819 gcpReqPresentSendThankMsg"
+    connection: game
+  - value: 822
+    direction: c2s
+    name: gcpReqPresentViewThankMsg
+    name_source: label@kr-812
+    evidence: inferred
+    source: "cn-774 sub_7C6940 stamps 822; body u32 id matches kr-812 C2S 820 gcpReqPresentViewThankMsg"
+    connection: game
+  - value: 824
+    direction: c2s
+    name: gcpReqPresentDeleteSend
+    name_source: label@kr-812
+    evidence: inferred
+    source: "cn-774 sub_7C6940 stamps 824; body u32 id matches kr-812 C2S 822 gcpReqPresentDeleteSend"
+    connection: game
+  - value: 825
+    direction: c2s
+    name: gcpReqPresentDeleteReceive
+    name_source: label@kr-812
+    evidence: inferred
+    source: "cn-774 sub_7CB300 stamps 825; body u32 id matches kr-812 C2S 823 gcpReqPresentDeleteReceive"
+    connection: game
+  - value: 830
+    direction: c2s
+    name: gcpReqCloseGiftBox
+    name_source: label@kr-812
+    evidence: inferred
+    source: "cn-774 sub_B2C7E0 stamps 830; body empty matches kr-812 C2S 828 gcpReqCloseGiftBox"
+    connection: game
+  - value: 110
+    direction: c2s
+    name: gcpReqMoveToFriendAccept
+    name_source: label@kr-812
+    evidence: inferred
+    source: "cn-774 sub_BD6550 stamps 110, called when the gspAskedInvitation prompt (sub_BA8CD0) is refused; same role as kr-1256 C2S 111 sub_9D7750"
+    notes: "one u32: the token of the S2C 121 prompt"
+    connection: game
+  - value: 114
+    direction: c2s
+    name: gcpReqMoveToInviter
+    name_source: label@kr-812
+    evidence: inferred
+    source: "cn-774 sub_B3C0E0 stamps 114 on the accept of the gspAskedInvitation prompt (sub_BA8CD0); same role as kr-1256 C2S 115 sub_940530"
+    notes: "wstr inviter, u32 ip, u16 port, u8 kind (1 accepts the prompt)"
+    connection: game
+  - value: 32792
+    direction: c2s
+    name: gppKickFail
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_AE1400 writer and sub_897E80 -> sub_8B7080 consumer; kr-812 Packet_gppKickFail at sub_51F030 -> sub_562370; same actor and local feedback role"
+    notes: "one i32 actor"
+  - value: 32792
+    direction: s2c
+    name: gppKickFail
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_AE1400 writer and sub_897E80 -> sub_8B7080 consumer; kr-812 Packet_gppKickFail at sub_51F030 -> sub_562370; same actor and local feedback role"
+    notes: "one i32 actor"
+  - value: 32837
+    direction: c2s
+    name: gppKickEnd
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8A3ED0 writer and sub_897E80 -> sub_516570 consumer; kr-812 Packet_gppKickEnd at sub_51EFA0 -> sub_568B50; same actor and local feedback role"
+    notes: "one i32 actor"
+  - value: 32837
+    direction: s2c
+    name: gppKickEnd
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8A3ED0 writer and sub_897E80 -> sub_516570 consumer; kr-812 Packet_gppKickEnd at sub_51EFA0 -> sub_568B50; same actor and local feedback role"
+    notes: "one i32 actor"
+  - value: 32900
+    direction: c2s
+    name: gppSplashDamagerByDamager
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8A0860 writer and sub_897E80 -> sub_8A0B10 consumer; kr-812 Packet_gppSplashDamagerByDamager at sub_50FE10 / sub_50FF40 -> sub_508460; same source-damager lookup, area damager and source retirement"
+    notes: "packets/damagers.yaml SplashDamagerByDamager; relayed unchanged with the damager spawns"
+  - value: 32900
+    direction: s2c
+    name: gppSplashDamagerByDamager
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8A0860 writer and sub_897E80 -> sub_8A0B10 consumer; kr-812 Packet_gppSplashDamagerByDamager at sub_50FE10 / sub_50FF40 -> sub_508460; same source-damager lookup, area damager and source retirement"
+    notes: "packets/damagers.yaml SplashDamagerByDamager; relayed unchanged with the damager spawns"
+  - value: 806
+    direction: c2s
+    name: gcpReqInventoryUseItem
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 builder sub_9ADAC0 stamps 806, string-list writer sub_457530; kr-812 C2S 805 Packet_gcpReqInventoryUseItem (writer kr-812 sub_8B9490) carries the same item, quantity and parameters"
+    notes: "packets/inventory-use.yaml InventoryUseRequest; answered by S2C 813 gspRepInventoryUseItem"
+  - value: 32772
+    direction: c2s
+    name: gppSplashDamager
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8A37B0 writer and sub_897E80 -> sub_8B1C90 consumer; kr-812 Packet_gppSplashDamager at sub_511020 / sub_51C4B0 -> sub_508460; cn-774 Character cast, flag bits, area damager sub_893A50"
+    notes: "packets/damagers.yaml SplashDamager; relayed unchanged with the damager spawns"
+  - value: 32772
+    direction: s2c
+    name: gppSplashDamager
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8A37B0 writer and sub_897E80 -> sub_8B1C90 consumer; kr-812 Packet_gppSplashDamager at sub_511020 / sub_51C4B0 -> sub_508460; cn-774 Character cast, flag bits, area damager sub_893A50"
+    notes: "packets/damagers.yaml SplashDamager; relayed unchanged with the damager spawns"
+  - value: 32877
+    direction: c2s
+    name: gppMobDropBombOnDead
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8A8F60 writer and sub_897E80 -> sub_8BD090 consumer; kr-812 Packet_gppMobDropBombOnDead at sub_514FD0 / sub_524970 -> sub_507CE0; cn-774 Character cast, bullet type 5301, bullet spawner sub_892F50"
+    notes: "packets/damagers.yaml MobDropBombOnDead; relayed unchanged with the damager spawns"
+  - value: 32877
+    direction: s2c
+    name: gppMobDropBombOnDead
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8A8F60 writer and sub_897E80 -> sub_8BD090 consumer; kr-812 Packet_gppMobDropBombOnDead at sub_514FD0 / sub_524970 -> sub_507CE0; cn-774 Character cast, bullet type 5301, bullet spawner sub_892F50"
+    notes: "packets/damagers.yaml MobDropBombOnDead; relayed unchanged with the damager spawns"
+  - value: 32881
+    direction: c2s
+    name: gppDropHumilPrevItem
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_897E80 -> sub_8BD540 consumer (no writer in this build); kr-812 Packet_gppDropHumilPrevItem (no sender) at sub_524AF0 -> sub_507CE0; cn-774 character lookup, rotated direction, bullet spawner sub_892F50"
+    notes: "packets/damagers.yaml DropHumilPrevItem; relayed unchanged with the damager spawns"
+  - value: 32881
+    direction: s2c
+    name: gppDropHumilPrevItem
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_897E80 -> sub_8BD540 consumer (no writer in this build); kr-812 Packet_gppDropHumilPrevItem (no sender) at sub_524AF0 -> sub_507CE0; cn-774 character lookup, rotated direction, bullet spawner sub_892F50"
+    notes: "packets/damagers.yaml DropHumilPrevItem; relayed unchanged with the damager spawns"
+  - value: 32898
+    direction: c2s
+    name: gppFireBullet3
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8A2EB0 writer and sub_897E80 -> sub_8AFE00 consumer; kr-812 Packet_gppFireBullet3 at sub_510BF0 / sub_51B550 -> sub_507CE0; cn-774 Character cast, bullet spawner sub_892F50"
+    notes: "packets/damagers.yaml FireBullet3; relayed unchanged with the damager spawns"
+  - value: 32898
+    direction: s2c
+    name: gppFireBullet3
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8A2EB0 writer and sub_897E80 -> sub_8AFE00 consumer; kr-812 Packet_gppFireBullet3 at sub_510BF0 / sub_51B550 -> sub_507CE0; cn-774 Character cast, bullet spawner sub_892F50"
+    notes: "packets/damagers.yaml FireBullet3; relayed unchanged with the damager spawns"
+  - value: 32899
+    direction: c2s
+    name: gppStormDamager
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8A0EE0 writer and sub_897E80 -> sub_8A2BF0 consumer; kr-812 Packet_gppStormDamager at sub_510100 / sub_510870 -> sub_62FE20; cn-774 builds GoStormDamager"
+    notes: "packets/damagers.yaml StormDamager; relayed unchanged with the damager spawns"
+  - value: 32899
+    direction: s2c
+    name: gppStormDamager
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8A0EE0 writer and sub_897E80 -> sub_8A2BF0 consumer; kr-812 Packet_gppStormDamager at sub_510100 / sub_510870 -> sub_62FE20; cn-774 builds GoStormDamager"
+    notes: "packets/damagers.yaml StormDamager; relayed unchanged with the damager spawns"
+  - value: 32910
+    direction: c2s
+    name: gppStormDamagerItemId
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8A0D40 writer and sub_897E80 -> sub_8A10C0 consumer; kr-812 Packet_gppStormDamagerItemId at sub_510010 / sub_510200 (kr-812 number 32909); cn-774 item lookup, field 26 selects GoStormDamagerAOE else GoStormDamager"
+    notes: "packets/damagers.yaml StormDamagerItemId; relayed unchanged with the damager spawns"
+  - value: 32910
+    direction: s2c
+    name: gppStormDamagerItemId
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8A0D40 writer and sub_897E80 -> sub_8A10C0 consumer; kr-812 Packet_gppStormDamagerItemId at sub_510010 / sub_510200 (kr-812 number 32909); cn-774 item lookup, field 26 selects GoStormDamagerAOE else GoStormDamager"
+    notes: "packets/damagers.yaml StormDamagerItemId; relayed unchanged with the damager spawns"
+  - value: 33278
+    direction: c2s
+    name: gppNearDamager
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8A3B30 writer and sub_897E80 -> sub_8B1EE0 consumer; kr-812 Packet_gppNearDamager at sub_511160 / sub_51C5C0 (kr-812 number 32773); cn-774 builds GoNearDamager, handBell effect"
+    notes: "packets/damagers.yaml NearDamager; relayed unchanged with the damager spawns"
+  - value: 33278
+    direction: s2c
+    name: gppNearDamager
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8A3B30 writer and sub_897E80 -> sub_8B1EE0 consumer; kr-812 Packet_gppNearDamager at sub_511160 / sub_51C5C0 (kr-812 number 32773); cn-774 builds GoNearDamager, handBell effect"
+    notes: "packets/damagers.yaml NearDamager; relayed unchanged with the damager spawns"
+  - value: 829
+    direction: c2s
+    connection: game
+    name: gcpReqPickup
+    name_source: label@kr-812
+    evidence: inferred
+    source: "cn-774 sender sub_DE26E0 stamps C2S 829 and writes one u32 from the purchase confirmation; matched to kr-812 Packet_gcpReqPickup reader sub_80A910 and sender sub_985660 by the one-word purchase pickup path"
+    notes: "Game request only. The selected value is cash_slot_key in packets/cash-inventory.yaml. cn-774 S2C 835 handler sub_BB13B0 consumes the cash-slot key and result, then removes the cash slot through sub_9A54D0 on result 1. No grant route is enabled by this row."

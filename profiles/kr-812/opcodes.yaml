@@ -1,0 +1,4191 @@
+profile: kr-812
+# Opcode assignments for the Korean 812 client. C2S and S2C are separate numeric spaces.
+# Only rows with evidence are listed; see profiles/opcode-policy.md. This build keeps
+# its Packet_gcp*/gsp* class names, so most rows can carry label@kr-812.
+opcodes:
+  - value: 508
+    direction: c2s
+    connection: game
+    name: gcpRoomReqChangeMaster
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_801C60 selects Packet_gcpRoomReqChangeMaster (vtable D691A4); kr-812 sub_809CB0 stamps508; kr-812 sub_92ABC0/sub_5C8FD0 write/read one target nickname"
+  - value: 4
+    direction: s2c
+    connection: relay
+    name: rspSendCrtSeedTable
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_810C20 dispatches relay 4 to the native critical seed reader; kr-812 sub_5021F0/sub_502270, sub_5022A0/sub_5022F0, sub_502340/sub_502390; packets/relay-seeds.yaml"
+  - value: 5
+    direction: s2c
+    connection: relay
+    name: rspSendDefSeedTable
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_810C20 dispatches relay 5 to the native defence seed reader; kr-812 sub_5021F0/sub_502270, sub_5022A0/sub_5022F0, sub_502340/sub_502390; packets/relay-seeds.yaml"
+  - value: 6
+    direction: s2c
+    connection: relay
+    name: rspSendCrtCancelSeedTable
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_810C20 dispatches relay 6 to the native cancellation seed reader; kr-812 sub_5021F0/sub_502270, sub_5022A0/sub_5022F0, sub_502340/sub_502390; packets/relay-seeds.yaml"
+  - value: 19
+    direction: c2s
+    connection: relay
+    name: rcpCrtSeedTable
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_52D500/sub_52D580/sub_52D5F0/sub_52D670/sub_52D6E0 stamps relay 19 in the native critical seed sender; kr-812 sub_5021F0/sub_502270, sub_5022A0/sub_5022F0, sub_502340/sub_502390; packets/relay-seeds.yaml"
+  - value: 20
+    direction: c2s
+    connection: relay
+    name: rcpDefSeedTable
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_52D500/sub_52D580/sub_52D5F0/sub_52D670/sub_52D6E0 stamps relay 20 in the native defence seed sender; kr-812 sub_5021F0/sub_502270, sub_5022A0/sub_5022F0, sub_502340/sub_502390; packets/relay-seeds.yaml"
+  - value: 21
+    direction: c2s
+    connection: relay
+    name: rcpCrtCnclSeedTable
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_52D500/sub_52D580/sub_52D5F0/sub_52D670/sub_52D6E0 stamps relay 21 in the native cancellation seed sender; kr-812 sub_5021F0/sub_502270, sub_5022A0/sub_5022F0, sub_502340/sub_502390; packets/relay-seeds.yaml"
+  - value: 601
+    direction: s2c
+    connection: game
+    name: gspConnectToRelayServer
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_837170 dispatches game 601 to kr-812 sub_81CAB0, which reads the native endpoint and key and opens the relay; layout in packets/relay-connection.yaml"
+  - value: 1
+    direction: s2c
+    connection: relay
+    name: rspRelayJoinAccepted_
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_810C20 native relay 1 inspects only opcode and connection, with no body read; constructs validation report 12 before game-side success via kr-812 sub_811C70; empty signal recorded in packets/relay-success.yaml"
+  - value: 13
+    direction: s2c
+    connection: relay
+    name: rspRelaySceneAccepted_
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_810C20 native relay 13 constructs gcpReportRelayConnected(true) without reading a body; kr-812 sub_811C70 stamps game 601; empty signal recorded in packets/relay-success.yaml"
+  - value: 1
+    direction: c2s
+    connection: relay
+    name: rcpReqJoinRelaySession
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_810AA0 stamps relay 1; native Packet_rcpReqJoinRelaySession writer kr-812 sub_8100E0 and reader kr-812 sub_810110; field sequence is recorded in packets/relay-connection.yaml"
+  - value: 12
+    direction: c2s
+    connection: relay
+    name: rcpReqReportHackCheckData
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_811D50 stamps relay 12; native Packet_rcpReqReportHackCheckData writer kr-812 sub_810140 and reader kr-812 sub_8101E0; complete nested layout is recorded in packets/relay-validation.yaml"
+  - value: 20008
+    direction: c2s
+    connection: relay
+    name: rcpReqLeaveGame
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_896B60 builds Packet_rcpReqLeaveGame on the relay connection; sender kr-812 sub_897850 stamps 20008; vtable 0xD76A3C writer/reader kr-812 sub_5C8FC0 are empty"
+    notes: "empty relay leave; separate from game gcpReqLeaveSession and game gcpRoomReqLeaveGame"
+  - value: 12
+    direction: s2c
+    name: gspNotifyAutoTutorial_
+    name_source: coined
+    evidence: verified
+    connection: game
+    source: "kr-812 sub_837170 case 12 sets byte_E827DB without reading a payload; kr-812 sub_681FE0 selects creation stage and kr-812 sub_685590 consumes the flag for the tutorial offer"
+  - value: 0
+    direction: c2s
+    name: gcpNotifyCloseProgram
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpNotifyCloseProgram is the only class constructed before the calls of the stamping helper sub_8E0150 (kr-812)"
+  - value: 1
+    direction: c2s
+    name: gcpFirstConnect
+    name_source: label@kr-812
+    evidence: captured
+    source: "client builder sub_8136D0 (writes 812 then opcode setter sub_B25E90(1))"
+    notes: "96 bytes; first u32 is ClientVersion_Major 812"
+  - value: 3
+    direction: c2s
+    name: gcpReqLogin
+    name_source: label@kr-812
+    evidence: captured
+    source: "client sender sub_681500 (Packet_gcpReqLogin)"
+    notes: "40 bytes; layout not yet decoded"
+  - value: 7
+    direction: c2s
+    name: gcpRepHackShieldCheck
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpRepHackShieldCheck class and opcode setter sub_B25E90 in sender sub_820580 (kr-812)"
+  - value: 9
+    direction: c2s
+    name: gcpReqIDPCRoomAuth
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqIDPCRoomAuth class and opcode setter sub_B25E90 in sender sub_682260 (kr-812)"
+  - value: 12
+    direction: c2s
+    name: gcpReqMoveChannel
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqMoveChannel is the only class constructed before the calls of the stamping helper sub_811D50 (kr-812)"
+  - value: 13
+    direction: c2s
+    name: gcpReqMoveChannelByType
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqMoveChannelByType class and opcode setter sub_B25E90 in sender sub_679100 (kr-812)"
+  - value: 14
+    direction: c2s
+    name: gcpReqMoveInto
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqMoveInto is the only class constructed before the calls of the stamping helper sub_52DF00 (kr-812)"
+  - value: 15
+    direction: c2s
+    name: gcpReqCheckCreateUserName
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqCheckCreateUserName class and opcode setter sub_B25E90 in sender sub_875090 (kr-812)"
+  - value: 16
+    direction: c2s
+    name: gcpReqCreateUserInfo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqCreateUserInfo class and opcode setter sub_B25E90 in sender sub_875180 (kr-812)"
+  - value: 17
+    direction: c2s
+    name: gcpLoginAfterCreateUserInfo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpLoginAfterCreateUserInfo class and opcode setter sub_B25E90 in sender sub_875370 (kr-812)"
+  - value: 19
+    direction: c2s
+    name: gcpReportLastCrash
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReportLastCrash class and opcode setter sub_B25E90 in sender sub_52D500 (kr-812)"
+  - value: 21
+    direction: c2s
+    name: gcpReportBadProgram
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReportBadProgram class and opcode setter sub_B25E90 in sender sub_8207B0 (kr-812)"
+  - value: 22
+    direction: c2s
+    name: gcpReqCenterUserCnt
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqCenterUserCnt class and opcode setter sub_B25E90 in sender sub_8E7110 (kr-812)"
+  - value: 23
+    direction: c2s
+    name: gcpReqUniquenessCheck
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_839DE0 stamps 23; Packet_gcpReqUniquenessCheck reader kr-812 sub_80A910 reads one user number"
+  - value: 25
+    direction: c2s
+    name: gcpReqClanPassport
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqClanPassport class and opcode setter sub_B25E90 in sender sub_498E70 (kr-812)"
+  - value: 101
+    direction: c2s
+    name: gcpRepUserPoll
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpRepUserPoll class and opcode setter sub_B25E90 in sender sub_8B7FB0 (kr-812)"
+  - value: 102
+    direction: c2s
+    name: Unknown102
+    name_source: none
+    evidence: captured
+    source: "sent from the gspRepLogin handler sub_818680 via sub_B25E90(102)"
+    notes: "32 bytes: user number, then values copied from dword_E827F8+172..+192"
+  - value: 105
+    direction: c2s
+    name: gcpReqGotoMenu
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqGotoMenu class and opcode setter sub_B25E90 in sender sub_5EC0D0 (kr-812)"
+  - value: 106
+    direction: c2s
+    name: gcpReqGotoLobby
+    name_source: label@kr-812
+    evidence: verified
+    source: "MainMenu btnMultiplay send 0x806D00; Packet_gcpReqGotoLobby SETOP 106, empty body"
+    notes: "empty payload; reply is S2C gspGotoLobby; not gcpReqMatch"
+  - value: 107
+    direction: c2s
+    name: gcpReqPlayTutorial
+    name_source: label@kr-812
+    evidence: verified
+    source: "TutorialRoomStage start sub_6B37E0 / sub_6B5810 -> sub_814A70 -> sub_839C90 SETOP 107; reader sub_8455F0"
+    notes: "MapMetaData (13 u32 + 6 bool32) + 3 wstr + u32; prologue reply is GotoRoom kind 2 with mode 103 (kr-812 sub_8E1240 / sub_660D50 NPC context) and map key, followed by gspRoomEnterGame unknown0=0, unknown1=third wstr, unknown4=4"
+  - value: 108
+    direction: c2s
+    name: gcpReqInvite
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqInvite class and opcode setter sub_B25E90 in sender sub_929F40 (kr-812)"
+  - value: 109
+    direction: c2s
+    name: gcpReqMoveToInviter
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_6D88F0 builds Packet_gcpReqMoveToInviter (constructor kr-812 sub_6DA520) and calls the opcode setter sub_B25E90(109); writer kr-812 sub_6DA4C0"
+    notes: "bool32 is_party, wstr inviter, Lambda::NetAddress at +36: the invitee accepts an invitation"
+  - value: 110
+    direction: c2s
+    name: gcpReqMoveToFriend
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqMoveToFriend class and opcode setter sub_B25E90 in sender sub_92A050 (kr-812)"
+  - value: 111
+    direction: c2s
+    name: gcpReqMoveToFriendAccept
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_839E50 builds Packet_gcpReqMoveToFriendAccept and calls the opcode setter sub_B25E90(111); writer kr-812 sub_9858F0"
+    notes: "wstr inviter, u32 answer; the invitation's refuse button sends answer 3"
+  - value: 112
+    direction: c2s
+    name: gcpReqMatch
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 RTTI at vtable D08988 identifies Packet_gcpReqMatch; kr-812 sub_5B3640 constructs that object and sets 112 through kr-812 sub_B25E90; writer kr-812 sub_420EE0"
+  - value: 113
+    direction: c2s
+    name: gcpReqOnlineMatchTeamInfoLoad
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqOnlineMatchTeamInfoLoad is the only class constructed before the calls of the stamping helper sub_67F320 (kr-812)"
+  - value: 114
+    direction: c2s
+    name: gcpReqOnlineMatchRankInfo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqOnlineMatchRankInfo class and opcode setter sub_B25E90 in sender sub_85FED0 (kr-812)"
+  - value: 115
+    direction: c2s
+    name: gcpReqFighterInfo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqFighterInfo class and opcode setter sub_B25E90 in sender sub_6C2EB0 (kr-812)"
+  - value: 116
+    direction: c2s
+    name: gcpReqAwardInfo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqAwardInfo class and opcode setter sub_B25E90 in sender sub_6C2F80 (kr-812)"
+  - value: 117
+    direction: c2s
+    name: gcpReqEvent
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqEvent class and opcode setter sub_B25E90 in sender sub_45C3E0 (kr-812)"
+  - value: 118
+    direction: c2s
+    name: gcpReqGotoGuild
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqGotoGuild class and opcode setter sub_B25E90 in sender sub_9BE480 (kr-812)"
+  - value: 119
+    direction: c2s
+    name: gcpReqRecommendSend
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqRecommendSend class and opcode setter sub_B25E90 in sender sub_839D70 (kr-812)"
+  - value: 121
+    direction: c2s
+    name: gcpReqLmgUserRecord
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqLmgUserRecord class and opcode setter sub_B25E90 in sender sub_471530 (kr-812)"
+  - value: 122
+    direction: c2s
+    name: gcpTeamLeaderCommandLog
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpTeamLeaderCommandLog is the only class constructed before the calls of the stamping helper sub_809E90 (kr-812)"
+  - value: 123
+    direction: c2s
+    name: gcpReqSocialSystemCommend
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqSocialSystemCommend class and opcode setter sub_B25E90 in sender sub_52BA10 (kr-812)"
+  - value: 202
+    direction: c2s
+    name: gcpReqLeaveParty
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_677300 constructs Packet_gcpReqLeaveParty at vtable D2F6EC and calls kr-812 sub_5EDDF0, which sets 202 through kr-812 sub_B25E90; kr-812 sub_5C8FC0 writes an empty body"
+  - value: 302
+    direction: c2s
+    name: gcpReqKickFromParty
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqKickFromParty class and opcode setter sub_B25E90 in sender sub_92A170 (kr-812)"
+  - value: 303
+    direction: c2s
+    name: gcpReqChangePartyLeader
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqChangePartyLeader class and opcode setter sub_B25E90 in sender sub_92A270 (kr-812)"
+  - value: 305
+    direction: c2s
+    name: gcpReqPartyRecruiting
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqPartyRecruiting class and opcode setter sub_B25E90 in sender sub_8F81C0 (kr-812)"
+  - value: 306
+    direction: c2s
+    name: gcpReqPartyQuickStart
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqPartyQuickStart class and opcode setter sub_B25E90 in sender sub_68EF80 (kr-812)"
+  - value: 401
+    direction: c2s
+    name: gcpReqListSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "send helper sub_67F470 SETOP 401; Packet_gcpReqListSession reader sub_67FB80 (vtable D416E0)"
+    notes: "u16 unknown0, u16 unknown1; reply is S2C gspRepListSession"
+  - value: 402
+    direction: c2s
+    name: gcpReqCreateSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "send helper sub_4808E0 SETOP 402; Packet_gcpReqCreateSession serialize sub_480D40 / reader sub_480D80 (vtable D1311C)"
+    notes: "SessionSetting (nested GameSetting) + wstr password + bool32; reply is S2C gspGotoRoom kind 2"
+  - value: 403
+    direction: c2s
+    name: gcpReqJoinSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "sender sub_67F390 stamps 403; Packet_gcpReqJoinSession vtable D416EC: serialize sub_6807C0 / reader sub_680810"
+    notes: "u32 room number (the list row's SessionSetting +8), u32 unknown1, u32 unknown2, wstr password, u32 unknown4; a refusal is S2C gspRepJoinSession, success is S2C gspGotoRoom kind 2"
+  - value: 404
+    direction: c2s
+    name: gcpReqLeaveSession
+    name_source: label@kr-812
+    evidence: inferred
+    source: "sender sub_6A7A50 stamps 404; the gspRoomLeaveSlot handler sub_7FDE50 builds Packet_gcpReqLeaveSession and sends it through that sender"
+    notes: "empty body; sent when the player leaves a room for the lobby"
+  - value: 405
+    direction: c2s
+    name: gcpReqCreateTutorialSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "MainMenu control this+780 in sub_688390 -> sub_689C90; sender sub_9BE750 SETOP 405, Packet_gcpReqCreateTutorialSession vtable D4204C, reader nullsub 0x5C8FC0"
+    notes: "empty body; reply is S2C gspGotoRoom kind 5 (TutorialRoomStage / SetStage 8)"
+  - value: 502
+    direction: c2s
+    name: gcpRoomSendChatModuleMsg
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpRoomSendChatModuleMsg is the only class constructed before the calls of the stamping helper sub_839B40 (kr-812)"
+  - value: 503
+    direction: c2s
+    name: gcpRoomReqEnterGame
+    name_source: label@kr-812
+    evidence: verified
+    source: "Packet_gcpRoomReqEnterGame vtable D2CEBC deserialize sub_5C8D90 (bool32, wstr x3, u32, MapMetaData sub_418CD0: 13 u32 + 6 bool32)"
+    notes: "first wstr is the MapMeta row name stored for later gspRoomEnterGame; not a login-time opcode"
+  - value: 504
+    direction: c2s
+    name: gcpRoomReqEnterRoundGame
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpRoomReqEnterRoundGame class and opcode setter sub_B25E90 in sender sub_5C88F0 (kr-812)"
+  - value: 505
+    direction: c2s
+    name: gcpRoomReqReadyStatus
+    name_source: label@kr-812
+    evidence: verified
+    source: "send helper sub_5C6140 SETOP 505; Packet_gcpRoomReqReadyStatus serialize sub_80A920 / reader sub_5C8C00 (vtable D2CED4)"
+    notes: "bool32 x3; reply used here is S2C gspRoomSetSlot with UserSlot +125 ready"
+  - value: 506
+    direction: c2s
+    name: gcpRoomReqLeaveGame
+    name_source: label@kr-812
+    evidence: verified
+    source: "sender kr-812 sub_6711B0 stamps sub_B25E90(506); Packet_gcpRoomReqLeaveGame constructor sub_B25EA0 has no serialized fields"
+    notes: "empty body; the in-game ESC path requests the shared room-leave burst"
+  - value: 509
+    direction: c2s
+    name: gcpRoomReqOpenCloseSlot
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpRoomReqOpenCloseSlot class and opcode setter sub_B25E90 in sender sub_5CB320 (kr-812)"
+  - value: 510
+    direction: c2s
+    name: gcpReqKickFromSession
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqKickFromSession is the only class constructed before the calls of the stamping helper sub_5C8730 (kr-812)"
+  - value: 511
+    direction: c2s
+    name: gcpSendSessionChrPos
+    name_source: label@kr-812
+    evidence: verified
+    source: "Packet_gcpSendSessionChrPos vtable 0xD856A0, serializer sub_934030, referenced only by the sender chain at 0x931DC3 (kr-812)"
+    notes: "u32 unknown0 (always 6), f32 x, f32 y, f32 z, u8 unknown4, u8 unknown5, f32 yaw; 22 bytes"
+  - value: 513
+    direction: c2s
+    name: gcpRoomChangeGameSetting
+    name_source: label@kr-812
+    evidence: verified
+    source: "sender sub_5C8810 stamps 513; Packet_gcpRoomChangeGameSetting vtable D2CEA4: serialize sub_5C8DE0 / reader sub_5C8ED0"
+    notes: "wstr x4 (GameSetting +16, +44, +72, +100), bool32 x2 (+4, +5), u32 x10 (the ninth and tenth are mode and sub-mode), bool32; the answer is S2C gspRoomChangeGameSetting to the room"
+  - value: 514
+    direction: c2s
+    name: gcpRoomChangeRoundSetting
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpRoomChangeRoundSetting is the only class constructed before the calls of the stamping helper sub_5C86C0 (kr-812)"
+  - value: 515
+    direction: c2s
+    name: gcpRoomChangeTeam
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpRoomChangeTeam class and opcode setter sub_B25E90 in sender sub_9BEF70 (kr-812)"
+  - value: 517
+    direction: c2s
+    name: gcpReqPingUser
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqPingUser class and opcode setter sub_B25E90 in sender sub_690F50 (kr-812)"
+  - value: 519
+    direction: c2s
+    name: gcpReqSelectAward
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqSelectAward class and opcode setter sub_B25E90 in sender sub_A02980 (kr-812)"
+  - value: 520
+    direction: c2s
+    name: gcpRoomSendAmpMsg
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpRoomSendAmpMsg is the only class constructed before the calls of the stamping helper sub_839AD0 (kr-812)"
+  - value: 521
+    direction: c2s
+    name: gcpSendSessionInit
+    name_source: label@kr-812
+    evidence: captured
+    notes: "empty body"
+  - value: 522
+    direction: c2s
+    name: gcpHsReportLog
+    name_source: label@kr-812
+    evidence: captured
+    source: "live session 2026-09-26 (kr-812 client on our server)"
+    notes: "carries the anti-cheat module's report text; not parsed"
+  - value: 601
+    direction: c2s
+    connection: game
+    name: gcpReportRelayConnected
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_811C70 stamps game 601 for the native relay success report; complete bool32 layout in packets/relay-connection.yaml"
+  - value: 602
+    direction: c2s
+    name: gcpReportSuperPeerConnected
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReportSuperPeerConnected is the only class constructed before the calls of the stamping helper sub_811CE0 (kr-812)"
+  - value: 603
+    direction: c2s
+    name: gcpReportHolePunchingEnd
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReportHolePunchingEnd is the only class constructed before the calls of the stamping helper sub_80E070 (kr-812)"
+  - value: 607
+    direction: c2s
+    name: gcpReportTableSetHolePunchingEnd
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReportTableSetHolePunchingEnd class and opcode setter sub_B25E90 in sender sub_80E630 (kr-812)"
+  - value: 701
+    direction: c2s
+    name: gcpGameReportMapLoadingComplete
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpGameReportMapLoadingComplete class and opcode setter sub_B25E90 in sender sub_50E670 (kr-812)"
+  - value: 702
+    direction: c2s
+    name: gcpGameReportMapData
+    name_source: label@kr-812
+    evidence: inferred
+    source: "sender sub_50C840 (kr-812) stamps 702 with opcode setter sub_B25E90; the body is the 128-byte map report of class Packet_gcpGameReportMapData"
+    notes: "The old Optimze label here was a misattribution: the Optimze class is stamped 2023."
+  - value: 704
+    direction: c2s
+    name: gcpRespawn
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpRespawn class and opcode setter sub_B25E90 in sender sub_511910 (kr-812)"
+  - value: 705
+    direction: c2s
+    name: gcpRequestRespawnIdx
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpRequestRespawnIdx class and opcode setter sub_B25E90 in sender sub_511AB0 (kr-812)"
+  - value: 707
+    direction: c2s
+    name: gcpEatItem
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpEatItem class and opcode setter sub_B25E90 in sender sub_50DD70 (kr-812)"
+  - value: 708
+    direction: c2s
+    name: gcpUseItem
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpUseItem class and opcode setter sub_B25E90 in sender sub_50E430 (kr-812)"
+  - value: 709
+    direction: c2s
+    name: gcpReqAddObject
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqAddObject class and opcode setter sub_B25E90 in sender sub_50EE70 (kr-812)"
+  - value: 710
+    direction: c2s
+    name: gcpGameUpdateScore
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpGameUpdateScore is the only class constructed before the calls of the stamping helper sub_52D970 (kr-812)"
+  - value: 711
+    direction: c2s
+    name: gcpGameUpdateDamagePoint
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpGameUpdateDamagePoint class and opcode setter sub_B25E90 in sender sub_77A910 (kr-812)"
+  - value: 713
+    direction: c2s
+    name: gcpGameReqRespawn
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpGameReqRespawn class and opcode setter sub_B25E90 in sender sub_50E7B0 (kr-812)"
+  - value: 714
+    direction: c2s
+    name: gcpGameReqUseRespawnItem
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpGameReqUseRespawnItem class and opcode setter sub_B25E90 in sender sub_50E8A0 (kr-812)"
+  - value: 715
+    direction: c2s
+    name: gcpGameReqExtendRespawn
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpGameReqExtendRespawn class and opcode setter sub_B25E90 in sender sub_50E930 (kr-812)"
+  - value: 723
+    direction: c2s
+    name: gcpPangZKInZHE
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpPangZKInZHE class and opcode setter sub_B25E90 in sender sub_A1C640 (kr-812)"
+  - value: 724
+    direction: c2s
+    name: gcpReqEndStage
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqEndStage class and opcode setter sub_B25E90 in sender sub_512F80 (kr-812)"
+  - value: 725
+    direction: c2s
+    name: gcpReqEndStageRoundOverReady
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqEndStageRoundOverReady class and opcode setter sub_B25E90 in sender sub_512F00 (kr-812)"
+  - value: 727
+    direction: c2s
+    name: gcpReportHackDetectLucciCount
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReportHackDetectLucciCount class and opcode setter sub_B25E90 in sender sub_525130 (kr-812)"
+  - value: 728
+    direction: c2s
+    name: gcpReqCreateItem
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqCreateItem class and opcode setter sub_B25E90 in sender sub_514510 (kr-812)"
+  - value: 729
+    direction: c2s
+    name: gcpReqCreateWeaponObject
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqCreateWeaponObject class and opcode setter sub_B25E90 in sender sub_5146C0 (kr-812)"
+  - value: 730
+    direction: c2s
+    name: gcpPickUpWeapon
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpPickUpWeapon class and opcode setter sub_B25E90 in sender sub_5147A0 (kr-812)"
+  - value: 731
+    direction: c2s
+    name: gcpEatStar
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sender sub_50E0D0 builds Packet_gcpEatStar and stamps 731 with sub_B25E90; two u32 (character id, star id), the bytes of LucciPickup"
+  - value: 732
+    direction: c2s
+    name: gcpReqCreateStar
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sender sub_514830 builds Packet_gcpReqCreateStar and stamps 732 with sub_B25E90; serializer sub_530870 is gcpReqCreateLucci's, so the body is LucciDropRequest"
+  - value: 733
+    direction: c2s
+    name: gcpEatEventBox
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpEatEventBox class and opcode setter sub_B25E90 in sender sub_50E160 (kr-812)"
+  - value: 734
+    direction: c2s
+    name: gcpReqCreateEventBox
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqCreateEventBox class and opcode setter sub_B25E90 in sender sub_514900 (kr-812)"
+  - value: 735
+    direction: c2s
+    name: gcpEatLucci
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpEatLucci class and opcode setter sub_B25E90 in sender sub_50E1F0 (kr-812)"
+  - value: 736
+    direction: c2s
+    name: gcpReqCreateLucci
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqCreateLucci class and opcode setter sub_B25E90 in sender sub_514A90 (kr-812)"
+  - value: 737
+    direction: c2s
+    name: gcpEatChocolate
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpEatChocolate class and opcode setter sub_B25E90 in sender sub_50E310 (kr-812)"
+  - value: 738
+    direction: c2s
+    name: gcpReqCreateChocolate
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqCreateChocolate class and opcode setter sub_B25E90 in sender sub_514CF0 (kr-812)"
+  - value: 739
+    direction: c2s
+    name: gcpEatSpawner
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpEatSpawner class and opcode setter sub_B25E90 in sender sub_50E3A0 (kr-812)"
+  - value: 740
+    direction: c2s
+    name: gcpReqCreateSpawner
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqCreateSpawner class and opcode setter sub_B25E90 in sender sub_5149D0 (kr-812)"
+  - value: 741
+    direction: c2s
+    name: gcpEatHeart
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpEatHeart class and opcode setter sub_B25E90 in sender sub_50E280 (kr-812)"
+  - value: 742
+    direction: c2s
+    name: gcpReqCreateHeart
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqCreateHeart class and opcode setter sub_B25E90 in sender sub_514C20 (kr-812)"
+  - value: 744
+    direction: c2s
+    name: gcpSwitchItemSlot
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpSwitchItemSlot class and opcode setter sub_B25E90 in sender sub_525DC0 (kr-812)"
+  - value: 745
+    direction: c2s
+    name: gcpBFRunnerOver
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpBFRunnerOver class and opcode setter sub_B25E90 in sender sub_50DEA0 (kr-812)"
+  - value: 746
+    direction: c2s
+    name: gcpBFRunnerCheckPoint
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpBFRunnerCheckPoint class and opcode setter sub_B25E90 in sender sub_50DF30 (kr-812)"
+  - value: 747
+    direction: c2s
+    name: gcpBFRunnerCheckPointValue
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpBFRunnerCheckPointValue class and opcode setter sub_B25E90 in sender sub_50DFC0 (kr-812)"
+  - value: 748
+    direction: c2s
+    name: gcpBFRunnerEatItem
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpBFRunnerEatItem class and opcode setter sub_B25E90 in sender sub_50DE00 (kr-812)"
+  - value: 801
+    direction: c2s
+    name: gcpEnterShop
+    name_source: label@kr-812
+    evidence: verified
+    source: "send site 0x6C3A20 -> writer 0x6DA560, reader 0x6DAF50"
+    notes: "i64 cache-revision token + i32 mainCategory (the live request carried 1000); the reply is S2C 800"
+  - value: 802
+    direction: c2s
+    name: gcpEnterInventory
+    name_source: label@kr-812
+    evidence: verified
+    source: "0x6C3D20 sends an empty request"
+  - value: 803
+    direction: c2s
+    name: gcpReqInventoryEquip
+    name_source: label@kr-812
+    evidence: captured
+    source: "0x977E70 sends C803; reader 0x80A910"
+    notes: "i32 itemId; exactly four bytes"
+  - value: 804
+    direction: c2s
+    name: gcpReqInventoryUnequip
+    name_source: label@kr-812
+    evidence: verified
+    source: "0x977F60 sends C804; reader 0x80A910"
+    notes: "i32 itemId; exactly four bytes"
+  - value: 805
+    direction: c2s
+    name: gcpReqInventoryUseItem
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 rename confirmation sub_95A140 calls kr-812 sub_978020, whose obfuscated stamping path contains literal 805 and calls kr-812 sub_B25E90; request RTTI resolves vtable D8A088 to Packet_gcpReqInventoryUseItem, writer kr-812 sub_8B9490 and reader kr-812 sub_8B9660"
+    notes: "Number inferred from the native rename sender's obfuscated data flow; confirm the setter argument in the client before upgrading to verified. S2C 805 is a separate inventory-view packet."
+  - value: 806
+    direction: c2s
+    name: gcpReqInventoryDeleteItem
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqInventoryDeleteItem class and opcode setter sub_B25E90 in sender sub_9BCB10 (kr-812)"
+  - value: 807
+    direction: c2s
+    name: gcpReqInventoryThrowItem
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqInventoryThrowItem is the only class constructed before the calls of the stamping helper sub_9857B0 (kr-812)"
+  - value: 808
+    direction: c2s
+    name: gcpReqShopBuy
+    name_source: label@kr-812
+    evidence: inferred
+    source: "UI sub_93A5F0 builds Packet_gcpReqShopBuy and sub_B25E90(808); writer sub_503440 is u32 + bool32"
+  - value: 809
+    direction: c2s
+    name: gcpReqShopItemCardInfo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqShopItemCardInfo is the only class constructed before the calls of the stamping helper sub_985740 (kr-812)"
+  - value: 810
+    direction: c2s
+    name: gcpReqPresentNewReceive
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqPresentNewReceive class and opcode setter sub_B25E90 in sender sub_962090 (kr-812)"
+  - value: 813
+    direction: c2s
+    name: gcpReqPresentReceiveSubList
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqPresentReceiveSubList class and opcode setter sub_B25E90 in sender sub_95F790 (kr-812)"
+  - value: 814
+    direction: c2s
+    name: gcpReqPresentSendSubList
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqPresentSendSubList is the only class constructed before the calls of the stamping helper sub_962810 (kr-812)"
+  - value: 815
+    direction: c2s
+    name: gcpReqRefund
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqRefund is the only class constructed before the calls of the stamping helper sub_9856D0 (kr-812)"
+  - value: 816
+    direction: c2s
+    name: gcpReqPresentSend
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqPresentSend class and opcode setter sub_B25E90 in sender sub_95C150 (kr-812)"
+  - value: 817
+    direction: c2s
+    name: gcpReqPresentReceive
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqPresentReceive is the only class constructed before the calls of the stamping helper sub_948600 (kr-812)"
+  - value: 818
+    direction: c2s
+    name: gcpReqPresentThrow
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqPresentThrow is the only class constructed before the calls of the stamping helper sub_948670 (kr-812)"
+  - value: 819
+    direction: c2s
+    name: gcpReqPresentSendThankMsg
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqPresentSendThankMsg class and opcode setter sub_B25E90 in sender sub_964090 (kr-812)"
+  - value: 820
+    direction: c2s
+    name: gcpReqPresentViewThankMsg
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqPresentViewThankMsg is the only class constructed before the calls of the stamping helper sub_9626C0 (kr-812)"
+  - value: 822
+    direction: c2s
+    name: gcpReqPresentDeleteSend
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqPresentDeleteSend is the only class constructed before the calls of the stamping helper sub_962650 (kr-812)"
+  - value: 824
+    direction: c2s
+    name: gcpReqRealCouponUse
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqRealCouponUse class and opcode setter sub_B25E90 in sender sub_94B340 (kr-812)"
+  - value: 825
+    direction: c2s
+    name: gcpReqCheckCash
+    name_source: label@kr-812
+    evidence: captured
+    source: "0x839EC0 selects C825; Packet_gcpReqCheckCash vtable 0xD6F60C uses empty codec 0x5C8FC0"
+    notes: "Empty body. Reply S105 refreshes the wallet and enables the waiting cash purchase dialog through 0x81A820 -> 0x96FB40 -> 0x96F710."
+  - value: 826
+    direction: c2s
+    name: gcpReqCashInven
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqCashInven class and opcode setter sub_B25E90 in sender sub_950870 (kr-812)"
+  - value: 827
+    direction: c2s
+    name: gcpReqPickup
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqPickup is the only class constructed before the calls of the stamping helper sub_985660 (kr-812)"
+  - value: 828
+    direction: c2s
+    name: gcpReqCloseGiftBox
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqCloseGiftBox class and opcode setter sub_B25E90 in sender sub_6D8620 (kr-812)"
+  - value: 829
+    direction: c2s
+    name: gcpStopShowTerms
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpStopShowTerms class and opcode setter sub_B25E90 in sender sub_96E6D0 (kr-812)"
+  - value: 830
+    direction: c2s
+    name: gcpReqInventoryChangeWeaponPresetIdx
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqInventoryChangeWeaponPresetIdx class and opcode setter sub_B25E90 in sender sub_97A8D0 (kr-812)"
+  - value: 900
+    direction: c2s
+    name: gcpReqGuildLineBoard
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqGuildLineBoard class and opcode setter sub_B25E90 in sender sub_8F4560 (kr-812)"
+  - value: 901
+    direction: c2s
+    name: gcpReqGuildLineBoardWrite
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqGuildLineBoardWrite class and opcode setter sub_B25E90 in sender sub_9BE880 (kr-812)"
+  - value: 902
+    direction: c2s
+    name: gcpReqGuildLineBoardDelete
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqGuildLineBoardDelete class and opcode setter sub_B25E90 in sender sub_9BE990 (kr-812)"
+  - value: 903
+    direction: c2s
+    name: gcpReqStartNewWave
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqStartNewWave class and opcode setter sub_B25E90 in sender sub_A09070 (kr-812)"
+  - value: 904
+    direction: c2s
+    name: gcpReqEndWave
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqEndWave class and opcode setter sub_B25E90 in sender sub_A09100 (kr-812)"
+  - value: 905
+    direction: c2s
+    name: gcpReqEndAllWave
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqEndAllWave class and opcode setter sub_B25E90 in sender sub_A09190 (kr-812)"
+  - value: 906
+    direction: c2s
+    name: gcpReqGameOver
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqGameOver class and opcode setter sub_B25E90 in sender sub_A09220 (kr-812)"
+  - value: 907
+    direction: c2s
+    name: gcpReqDeleteDeadMobs
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqDeleteDeadMobs class and opcode setter sub_B25E90 in sender sub_A08FF0 (kr-812)"
+  - value: 908
+    direction: c2s
+    name: gcpReqWaveAllSpawnMobs
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqWaveAllSpawnMobs class and opcode setter sub_B25E90 in sender sub_A092B0 (kr-812)"
+  - value: 909
+    direction: c2s
+    name: gcpCreateUnit
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpCreateUnit class and opcode setter sub_B25E90 in sender sub_52E110 (kr-812)"
+  - value: 911
+    direction: c2s
+    name: gcpReqManufactureRecipeInfo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqManufactureRecipeInfo class and opcode setter sub_B25E90 in sender sub_6CD9C0 (kr-812)"
+  - value: 912
+    direction: c2s
+    name: gcpReqManufactureList
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqManufactureList class and opcode setter sub_B25E90 in sender sub_8218B0 (kr-812)"
+  - value: 913
+    direction: c2s
+    name: gcpReqManufactureStart
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqManufactureStart class and opcode setter sub_B25E90 in sender sub_9D5FB0 (kr-812)"
+  - value: 914
+    direction: c2s
+    name: gcpReqManufactureGetItem
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqManufactureGetItem class and opcode setter sub_B25E90 in sender sub_9D57E0 (kr-812)"
+  - value: 915
+    direction: c2s
+    name: gcpReqManufactureTimeOut
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqManufactureTimeOut class and opcode setter sub_B25E90 in sender sub_9D20B0 (kr-812)"
+  - value: 916
+    direction: c2s
+    name: gcpReqManufactureImmediate
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqManufactureImmediate class and opcode setter sub_B25E90 in sender sub_9D5880 (kr-812)"
+  - value: 917
+    direction: c2s
+    name: gcpReqTreasureChestInfo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqTreasureChestInfo class and opcode setter sub_B25E90 in sender sub_6D85B0 (kr-812)"
+  - value: 918
+    direction: c2s
+    name: gcpReqOpenTreasureChest
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqOpenTreasureChest class and opcode setter sub_B25E90 in sender sub_794BE0 (kr-812)"
+  - value: 919
+    direction: c2s
+    name: gcpReqGuildInfo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqGuildInfo class and opcode setter sub_B25E90 in sender sub_900760 (kr-812)"
+  - value: 920
+    direction: c2s
+    name: gcpReqSingleStageInfo
+    name_source: label@kr-812
+    evidence: verified
+    source: "TutorialRoomStage ctor sub_6B0BE0 calls sub_6CDAE0; SETOP 920, Packet_gcpReqSingleStageInfo vtable D49110, reader nullsub 0x5C8FC0"
+    notes: "empty body; reply is S2C gspResSingleStageInfo"
+  - value: 921
+    direction: c2s
+    name: gcpPveUseCountItem
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpPveUseCountItem class and opcode setter sub_B25E90 in sender sub_50E4B0 (kr-812)"
+  - value: 923
+    direction: c2s
+    name: gcpPvePangUnit
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpPvePangUnit class and opcode setter sub_B25E90 in sender sub_50E540 (kr-812)"
+  - value: 924
+    direction: c2s
+    name: gcpPveCombo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpPveCombo class and opcode setter sub_B25E90 in sender sub_528F10 (kr-812)"
+  - value: 925
+    direction: c2s
+    name: gcpPveUseRevival
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpPveUseRevival class and opcode setter sub_B25E90 in sender sub_43BE70 (kr-812)"
+  - value: 926
+    direction: c2s
+    name: gcpCompensationItemNoti
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpCompensationItemNoti class and opcode setter sub_B25E90 in sender sub_78A0B0 (kr-812)"
+  - value: 927
+    direction: c2s
+    name: gcpMissionProcess
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpMissionProcess class and opcode setter sub_B25E90 in sender sub_50E5D0 (kr-812)"
+  - value: 929
+    direction: c2s
+    name: gcpMakeUserTitle
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpMakeUserTitle class and opcode setter sub_B25E90 in sender sub_886040 (kr-812)"
+  - value: 930
+    direction: c2s
+    name: gcpSetUserTitle
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpSetUserTitle class and opcode setter sub_B25E90 in sender sub_885F80 (kr-812)"
+  - value: 931
+    direction: c2s
+    name: gcpCheatAddMedal
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpCheatAddMedal is the only class constructed before the calls of the stamping helper sub_7A9EB0 (kr-812)"
+  - value: 932
+    direction: c2s
+    name: gcpCheatAddTitle
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpCheatAddTitle is the only class constructed before the calls of the stamping helper sub_7A9F90 (kr-812)"
+  - value: 935
+    direction: c2s
+    name: gcpReqCoupleInviteExpire
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqCoupleInviteExpire class and opcode setter sub_B25E90 in sender sub_9FBD20 (kr-812)"
+  - value: 936
+    direction: c2s
+    name: gcpReqCoupleInviteAnswer
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqCoupleInviteAnswer class and opcode setter sub_B25E90 in sender sub_9FDCE0 (kr-812)"
+  - value: 937
+    direction: c2s
+    name: gcpReqCoupleBreakUp
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqCoupleBreakUp class and opcode setter sub_B25E90 in sender sub_9FDD50 (kr-812)"
+  - value: 939
+    direction: c2s
+    name: gcpResClientDamageData
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpResClientDamageData class and opcode setter sub_B25E90 in sender sub_82E480 (kr-812)"
+  - value: 940
+    direction: c2s
+    name: gcpReqEventProcess
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqEventProcess class and opcode setter sub_B25E90 in sender sub_421180 (kr-812)"
+  - value: 941
+    direction: c2s
+    name: gcpSynthesisProcess
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpSynthesisProcess class and opcode setter sub_B25E90 in sender sub_9EA920 (kr-812)"
+  - value: 943
+    direction: c2s
+    name: gcpReqLotteryRadomMissionCompensation
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqLotteryRadomMissionCompensation class and opcode setter sub_B25E90 in sender sub_6C30F0 (kr-812)"
+  - value: 944
+    direction: c2s
+    name: gcpReqRandomMissionReward
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqRandomMissionReward class and opcode setter sub_B25E90 in sender sub_6C3060 (kr-812)"
+  - value: 945
+    direction: c2s
+    name: gcpReqIgnoreMissionSet
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqIgnoreMissionSet is the only class constructed before the calls of the stamping helper sub_7A9F20 (kr-812)"
+  - value: 946
+    direction: c2s
+    name: gcpGMConsole
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpGMConsole class and opcode setter sub_B25E90 in sender sub_7A9630 (kr-812)"
+  - value: 948
+    direction: c2s
+    name: gcpPortalMove
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpPortalMove is the only class constructed before the calls of the stamping helper sub_529E80 (kr-812)"
+  - value: 950
+    direction: c2s
+    name: gcpReqRecheckMap
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqRecheckMap class and opcode setter sub_B25E90 in sender sub_7F1F10 (kr-812)"
+  - value: 951
+    direction: c2s
+    name: gcpReqAddGiftTest
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqAddGiftTest is the only class constructed before the calls of the stamping helper sub_7AA070 (kr-812)"
+  - value: 952
+    direction: c2s
+    name: gcpReqOXQuizAnswer
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqOXQuizAnswer class and opcode setter sub_B25E90 in sender sub_4EEEC0 (kr-812)"
+  - value: 953
+    direction: c2s
+    name: gcpReqBlueMarbleDice
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqBlueMarbleDice class and opcode setter sub_B25E90 in sender sub_4A3F40 (kr-812)"
+  - value: 954
+    direction: c2s
+    name: gcpReqChangeCouplering
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqChangeCouplering class and opcode setter sub_B25E90 in sender sub_4CC410 (kr-812)"
+  - value: 955
+    direction: c2s
+    name: gcpReqChangeClanMark
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqChangeClanMark class and opcode setter sub_B25E90 in sender sub_494E00 (kr-812)"
+  - value: 956
+    direction: c2s
+    name: gcpReqChangeClanMarkNoty
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqChangeClanMarkNoty class and opcode setter sub_B25E90 in sender sub_49FB30 (kr-812)"
+  - value: 957
+    direction: c2s
+    name: gcpReqNewMemberClanInfo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqNewMemberClanInfo class and opcode setter sub_B25E90 in sender sub_494EB0 (kr-812)"
+  - value: 958
+    direction: c2s
+    name: gcpReqTESTAddStockAndStockSet
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqTESTAddStockAndStockSet is the only class constructed before the calls of the stamping helper sub_7AA0E0 (kr-812)"
+  - value: 2001
+    direction: c2s
+    name: gcpReqCompareSecondPassword
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqCompareSecondPassword class and opcode setter sub_B25E90 in sender sub_6D8A90 (kr-812)"
+  - value: 2002
+    direction: c2s
+    name: gcpReqSetSecondPassword
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqSetSecondPassword is the only class constructed before the calls of the stamping helper sub_A49570 (kr-812)"
+  - value: 2003
+    direction: c2s
+    name: gcpReqDeleteSecondPassword
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqDeleteSecondPassword is the only class constructed before the calls of the stamping helper sub_A495E0 (kr-812)"
+  - value: 2004
+    direction: c2s
+    name: gcpReqSeasonLadder
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqSeasonLadder class and opcode setter sub_B25E90 in sender sub_5EBFC0 (kr-812)"
+  - value: 2006
+    direction: c2s
+    name: gcpReqSeasonLadderGetRankListNo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqSeasonLadderGetRankListNo class and opcode setter sub_B25E90 in sender sub_4F5B70 (kr-812)"
+  - value: 2007
+    direction: c2s
+    name: gcpReqNotifyChangeLevelIcon
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqNotifyChangeLevelIcon class and opcode setter sub_B25E90 in sender sub_6D0280 (kr-812)"
+  - value: 2008
+    direction: c2s
+    name: gcpReqArena
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqArena is the only class constructed before the calls of the stamping helper sub_420DF0 (kr-812)"
+  - value: 2009
+    direction: c2s
+    name: gcpRoomChangeTeamObserver
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpRoomChangeTeamObserver is the only class constructed before the calls of the stamping helper sub_5C87A0 (kr-812)"
+  - value: 2011
+    direction: c2s
+    name: gcpBombMissionOver
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpBombMissionOver class and opcode setter sub_B25E90 in sender sub_52AAC0 (kr-812)"
+  - value: 2012
+    direction: c2s
+    name: gcpBombState
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpBombState class and opcode setter sub_B25E90 in sender sub_52A590 (kr-812)"
+  - value: 2013
+    direction: c2s
+    name: gcpUserUpdateCustomizedKeyList
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpUserUpdateCustomizedKeyList class and opcode setter sub_B25E90 in sender sub_4EB250 (kr-812)"
+  - value: 2014
+    direction: c2s
+    name: gcpRoomReqIntrudeGame
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpRoomReqIntrudeGame class and opcode setter sub_B25E90 in sender sub_5C60B0 (kr-812)"
+  - value: 2015
+    direction: c2s
+    name: gcpUserState
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpUserState class and opcode setter sub_B25E90 in sender sub_52AE50 (kr-812)"
+  - value: 2016
+    direction: c2s
+    name: gcpReqGameReady
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqGameReady is the only class constructed before the calls of the stamping helper sub_5C8880 (kr-812)"
+  - value: 2017
+    direction: c2s
+    name: gcpGoMapItemSync
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpGoMapItemSync class and opcode setter sub_B25E90 in sender sub_802AB0 (kr-812)"
+  - value: 2018
+    direction: c2s
+    name: gcpDropCaptain
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpDropCaptain class and opcode setter sub_B25E90 in sender sub_439B10 (kr-812)"
+  - value: 2019
+    direction: c2s
+    name: gcpReqClanInfo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqClanInfo class and opcode setter sub_B25E90 in sender sub_48F9F0 (kr-812)"
+  - value: 2020
+    direction: c2s
+    name: gcpReportData
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReportData class and opcode setter sub_B25E90 in sender sub_50DC50 (kr-812)"
+  - value: 2021
+    direction: c2s
+    name: gcpReqCreateHordeAward
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqCreateHordeAward class and opcode setter sub_B25E90 in sender sub_514B60 (kr-812)"
+  - value: 2022
+    direction: c2s
+    name: gcpReqGotoClan
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqGotoClan class and opcode setter sub_B25E90 in sender sub_4428F0 (kr-812)"
+  - value: 2023
+    direction: c2s
+    name: gcpGameUpdateScoreOptimze
+    name_source: label@kr-812
+    evidence: verified
+    source: "Packet_gcpGameUpdateScoreOptimze is built and stamped 2023 with opcode setter sub_B25E90"
+    notes: "6 bytes: u8 kind, u32 killer serial, u8 killer seat. Kind 2 is the finishing blow."
+  - value: 2024
+    direction: c2s
+    name: gcpGetGameAccessToken
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpGetGameAccessToken class and opcode setter sub_B25E90 in sender sub_83A140 (kr-812)"
+  - value: 2025
+    direction: c2s
+    name: gcpUserHostStart
+    name_source: label@kr-812
+    evidence: verified
+    source: "RoomStage start sub_5BD770 builds Packet_gcpUserHostStart and calls send helper sub_5C85E0 SETOP 2025; deserialize nullsub sub_5C8FC0 (vtable D2CEF8)"
+    notes: "empty body; plaza reply is S2C gspRoomEnterGame, not gspUserHostStart"
+  - value: 2026
+    direction: c2s
+    name: gcpUserHostSetting
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpUserHostSetting class and opcode setter sub_B25E90 in sender sub_809110 (kr-812)"
+  - value: 2027
+    direction: c2s
+    name: gcpRoomSendRecMsgTo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpRoomSendRecMsgTo class and opcode setter sub_B25E90 in sender sub_839BB0 (kr-812)"
+
+# Requests built by the caller of a shared send helper: the class the callers construct before the call.
+  - value: 32772
+    direction: c2s
+    connection: both
+    name: gppSplashDamager
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppSplashDamager class and opcode setter sub_B25E90 in sender sub_511020 (kr-812)"
+  - value: 32773
+    direction: c2s
+    connection: both
+    name: gppNearDamager
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppNearDamager class and opcode setter sub_B25E90 in sender sub_511160 (kr-812)"
+  - value: 32774
+    direction: c2s
+    connection: both
+    name: gppDeleteObject
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppDeleteObject class and opcode setter sub_B25E90 in sender sub_50EB50 (kr-812)"
+  - value: 32777
+    direction: c2s
+    connection: both
+    name: gppDamageObject
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppDamageObject class and opcode setter sub_B25E90 in sender sub_50EAA0 (kr-812)"
+  - value: 32778
+    direction: c2s
+    connection: both
+    name: gppKillObject
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppKillObject class and opcode setter sub_B25E90 in sender sub_50EDE0 (kr-812)"
+  - value: 32779
+    direction: c2s
+    connection: both
+    name: gppDash
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppDash class and opcode setter sub_B25E90 in sender sub_50F510 (kr-812)"
+  - value: 32780
+    direction: c2s
+    connection: both
+    name: gppRoll
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppRoll class and opcode setter sub_B25E90 in sender sub_50F630 (kr-812)"
+  - value: 32781
+    direction: c2s
+    connection: both
+    name: gppJump
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppJump class and opcode setter sub_B25E90 in sender sub_50F750 (kr-812)"
+  - value: 32782
+    direction: c2s
+    connection: both
+    name: gppAim
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppAim class and opcode setter sub_B25E90 in sender sub_50F860 (kr-812)"
+  - value: 32783
+    direction: c2s
+    connection: both
+    name: gppSetTargettingObj
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppSetTargettingObj class and opcode setter sub_B25E90 in sender sub_50FA00 (kr-812)"
+  - value: 32784
+    direction: c2s
+    connection: both
+    name: gppBubbleJump
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppBubbleJump class and opcode setter sub_B25E90 in sender sub_50FB30 (kr-812)"
+  - value: 32785
+    direction: c2s
+    connection: both
+    name: gppWalkFast
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppWalkFast class and opcode setter sub_B25E90 in sender sub_50FBE0 (kr-812)"
+  - value: 32786
+    direction: c2s
+    connection: both
+    name: gppWallAction
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppWallAction class and opcode setter sub_B25E90 in sender sub_50FCF0 (kr-812)"
+  - value: 32787
+    direction: c2s
+    connection: both
+    name: gppKnocked
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppKnocked class and opcode setter sub_B25E90 in sender sub_511B50 (kr-812)"
+  - value: 32788
+    direction: c2s
+    connection: both
+    name: gppStunned
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppStunned class and opcode setter sub_B25E90 in sender sub_511C40 (kr-812)"
+  - value: 32789
+    direction: c2s
+    connection: both
+    name: gppShocked
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppShocked class and opcode setter sub_B25E90 in sender sub_511D80 (kr-812)"
+  - value: 32790
+    direction: c2s
+    connection: both
+    name: gppEndStunned
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppEndStunned class and opcode setter sub_B25E90 in sender sub_511E10 (kr-812)"
+  - value: 32791
+    direction: c2s
+    connection: both
+    name: gppKickStart
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppKickStart class and opcode setter sub_B25E90 in sender sub_512130 (kr-812)"
+  - value: 32792
+    direction: c2s
+    connection: both
+    name: gppKickFail
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppKickFail class and opcode setter sub_B25E90 in sender sub_5121D0 (kr-812)"
+  - value: 32793
+    direction: c2s
+    connection: both
+    name: gppTryRescued
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppTryRescued class and opcode setter sub_B25E90 in sender sub_511F60 (kr-812)"
+  - value: 32794
+    direction: c2s
+    connection: both
+    name: gppTryKicked
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppTryKicked class and opcode setter sub_B25E90 in sender sub_511FF0 (kr-812)"
+  - value: 32795
+    direction: c2s
+    connection: both
+    name: gppKicked
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppKicked class and opcode setter sub_B25E90 in sender sub_511EA0 (kr-812)"
+  - value: 32796
+    direction: c2s
+    connection: both
+    name: gppKickedNoPang
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppKickedNoPang class and opcode setter sub_B25E90 in sender sub_512080 (kr-812)"
+  - value: 32798
+    direction: c2s
+    connection: both
+    name: gppMeleeReady
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppMeleeReady class and opcode setter sub_B25E90 in sender sub_512380 (kr-812)"
+  - value: 32800
+    direction: c2s
+    connection: both
+    name: gppChangeState
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppChangeState class and opcode setter sub_B25E90 in sender sub_512420 (kr-812)"
+  - value: 32801
+    direction: c2s
+    connection: both
+    name: gppLockInto
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppLockInto class and opcode setter sub_B25E90 in sender sub_512540 (kr-812)"
+  - value: 32805
+    direction: c2s
+    connection: both
+    name: gppDying
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppDying class and opcode setter sub_B25E90 in sender sub_511260 (kr-812)"
+  - value: 32806
+    direction: c2s
+    connection: both
+    name: gppPopOut
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppPopOut class and opcode setter sub_B25E90 in sender sub_5114A0 (kr-812)"
+  - value: 32807
+    direction: c2s
+    connection: both
+    name: gppRescue
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppRescue class and opcode setter sub_B25E90 in sender sub_5115D0 (kr-812)"
+  - value: 32809
+    direction: c2s
+    connection: both
+    name: gppClimbWall
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppClimbWall class and opcode setter sub_B25E90 in sender sub_5126F0 (kr-812)"
+  - value: 32810
+    direction: c2s
+    connection: both
+    name: gppUpdateWeaponInfo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppUpdateWeaponInfo class and opcode setter sub_B25E90 in sender sub_511670 (kr-812)"
+  - value: 32811
+    direction: c2s
+    connection: both
+    name: gppReload
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppReload class and opcode setter sub_B25E90 in sender sub_5125D0 (kr-812)"
+  - value: 32812
+    direction: c2s
+    connection: both
+    name: gppResetChrAttr
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppResetChrAttr class and opcode setter sub_B25E90 in sender sub_512950 (kr-812)"
+  - value: 32813
+    direction: c2s
+    connection: both
+    name: gppReturnToNormal
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppReturnToNormal class and opcode setter sub_B25E90 in sender sub_512800 (kr-812)"
+  - value: 32815
+    direction: c2s
+    connection: both
+    name: gppHumiliationStart
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppHumiliationStart class and opcode setter sub_B25E90 in sender sub_512260 (kr-812)"
+  - value: 32816
+    direction: c2s
+    connection: both
+    name: gppHumiliationEnd
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppHumiliationEnd class and opcode setter sub_B25E90 in sender sub_5122F0 (kr-812)"
+  - value: 32818
+    direction: c2s
+    connection: both
+    name: gppStickGrenadeTo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppStickGrenadeTo class and opcode setter sub_B25E90 in sender sub_514F20 (kr-812)"
+  - value: 32822
+    direction: c2s
+    connection: both
+    name: gppCreateNPC
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppCreateNPC class and opcode setter sub_B25E90 in sender sub_6B6450 (kr-812)"
+  - value: 32823
+    direction: c2s
+    connection: both
+    name: gppRespawnNPC
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppRespawnNPC class and opcode setter sub_B25E90 in sender sub_512DF0 (kr-812)"
+  - value: 32824
+    direction: c2s
+    connection: both
+    name: gppItemUseResult
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppItemUseResult class and opcode setter sub_B25E90 in sender sub_5129E0 (kr-812)"
+  - value: 32829
+    direction: c2s
+    connection: both
+    name: gppHitByItem
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppHitByItem class and opcode setter sub_B25E90 in sender sub_512B20 (kr-812)"
+  - value: 32830
+    direction: c2s
+    connection: both
+    name: gppEndMagnet
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppEndMagnet class and opcode setter sub_B25E90 in sender sub_512BB0 (kr-812)"
+  - value: 32831
+    direction: c2s
+    connection: both
+    name: gppEndFreezeCannon
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppEndFreezeCannon class and opcode setter sub_B25E90 in sender sub_512D60 (kr-812)"
+  - value: 32832
+    direction: c2s
+    connection: both
+    name: gppCreateMapItem
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppCreateMapItem class and opcode setter sub_B25E90 in sender sub_514DC0 (kr-812)"
+  - value: 32833
+    direction: c2s
+    connection: both
+    name: gppStepOnBanana
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppStepOnBanana class and opcode setter sub_B25E90 in sender sub_514E80 (kr-812)"
+  - value: 32834
+    direction: c2s
+    connection: both
+    name: gppWallState
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppWallState class and opcode setter sub_B25E90 in sender sub_50F8F0 (kr-812)"
+  - value: 32835
+    direction: c2s
+    connection: both
+    name: gppGotKicked
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppGotKicked class and opcode setter sub_B25E90 in sender sub_5112F0 (kr-812)"
+  - value: 32836
+    direction: c2s
+    connection: both
+    name: gppDead
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppDead class and opcode setter sub_B25E90 in sender sub_511380 (kr-812)"
+  - value: 32837
+    direction: c2s
+    connection: both
+    name: gppKickEnd
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppKickEnd class and opcode setter sub_B25E90 in sender sub_511410 (kr-812)"
+  - value: 32840
+    direction: c2s
+    connection: both
+    name: gppPing
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppPing class and opcode setter sub_B25E90 in sender sub_671300 (kr-812)"
+  - value: 32841
+    direction: c2s
+    connection: both
+    name: gppIniPacket
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppIniPacket class and opcode setter sub_B25E90 in sender sub_6DEE10 (kr-812)"
+  - value: 32842
+    direction: c2s
+    connection: both
+    name: gppCreateMob
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppCreateMob class and opcode setter sub_B25E90 in sender sub_6DF880 (kr-812)"
+  - value: 32843
+    direction: c2s
+    connection: both
+    name: gppMobFireBullet
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppMobFireBullet class and opcode setter sub_B25E90 in sender sub_6DFA80 (kr-812)"
+  - value: 32844
+    direction: c2s
+    connection: both
+    name: gppMobFireMelee
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppMobFireMelee class and opcode setter sub_B25E90 in sender sub_6DFD50 (kr-812)"
+  - value: 32845
+    direction: c2s
+    connection: both
+    name: gppMobKnocked
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppMobKnocked class and opcode setter sub_B25E90 in sender sub_6DFE70 (kr-812)"
+  - value: 32846
+    direction: c2s
+    connection: both
+    name: gppMobDie
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppMobDie class and opcode setter sub_B25E90 in sender sub_6DFFC0 (kr-812)"
+  - value: 32847
+    direction: c2s
+    connection: both
+    name: gppMobPush
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppMobPush class and opcode setter sub_B25E90 in sender sub_6E006F (kr-812)"
+  - value: 32848
+    direction: c2s
+    connection: both
+    name: gppMobTryKicked
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppMobTryKicked class and opcode setter sub_B25E90 in sender sub_6E0410 (kr-812)"
+  - value: 32849
+    direction: c2s
+    connection: both
+    name: gppMobKicked
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppMobKicked class and opcode setter sub_B25E90 in sender sub_6E0520 (kr-812)"
+  - value: 32852
+    direction: c2s
+    connection: both
+    name: gppMobTryRescued
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppMobTryRescued class and opcode setter sub_B25E90 in sender sub_6E07D0 (kr-812)"
+  - value: 32853
+    direction: c2s
+    connection: both
+    name: gppMobRescue
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppMobRescue class and opcode setter sub_B25E90 in sender sub_6E08E0 (kr-812)"
+  - value: 32857
+    direction: c2s
+    connection: both
+    name: gppCreateMobsFromSpawnGroup
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppCreateMobsFromSpawnGroup class and opcode setter sub_B25E90 in sender sub_6E1350 (kr-812)"
+  - value: 32859
+    direction: c2s
+    connection: both
+    name: gppSpawnMobsByTrigger
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppSpawnMobsByTrigger class and opcode setter sub_B25E90 in sender sub_6E13E0 (kr-812)"
+  - value: 32860
+    direction: c2s
+    connection: both
+    name: gppCreateNpcBreakableModel
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppCreateNpcBreakableModel class and opcode setter sub_B25E90 in sender sub_6E15F0 (kr-812)"
+  - value: 32861
+    direction: c2s
+    connection: both
+    name: gppRemoveAddableObject
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppRemoveAddableObject class and opcode setter sub_B25E90 in sender sub_6E17F0 (kr-812)"
+  - value: 32862
+    direction: c2s
+    connection: both
+    name: gppCreateSpawnGroupMemberMob
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppCreateSpawnGroupMemberMob class and opcode setter sub_B25E90 in sender sub_6E1930 (kr-812)"
+  - value: 32863
+    direction: c2s
+    connection: both
+    name: gppActivateSpawnObjByTrigger
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppActivateSpawnObjByTrigger class and opcode setter sub_B25E90 in sender sub_6E1470 (kr-812)"
+  - value: 32864
+    direction: c2s
+    connection: both
+    name: gppTriggerLuaEvent
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppTriggerLuaEvent class and opcode setter sub_B25E90 in sender sub_6E1BA0 (kr-812)"
+  - value: 32865
+    direction: c2s
+    connection: both
+    name: gppMobLuaMessage
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppMobLuaMessage class and opcode setter sub_B25E90 in sender sub_6E0B70 (kr-812)"
+  - value: 32866
+    direction: c2s
+    connection: both
+    name: gppHordeMobReplay
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppHordeMobReplay class and opcode setter sub_B25E90 in sender sub_A225A0 (kr-812)"
+  - value: 32873
+    direction: c2s
+    connection: both
+    name: gppWaveSetMobSpawnGroup
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppWaveSetMobSpawnGroup class and opcode setter sub_B25E90 in sender sub_A25B40 (kr-812)"
+  - value: 32876
+    direction: c2s
+    connection: both
+    name: gppSetNoTargetByMob
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppSetNoTargetByMob class and opcode setter sub_B25E90 in sender sub_9C1C20 (kr-812)"
+  - value: 32877
+    direction: c2s
+    connection: both
+    name: gppMobDropBombOnDead
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppMobDropBombOnDead class and opcode setter sub_B25E90 in sender sub_514FD0 (kr-812)"
+  - value: 32882
+    direction: c2s
+    connection: both
+    name: gppGhost
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppGhost class and opcode setter sub_B25E90 in sender sub_515100 (kr-812)"
+  - value: 32884
+    direction: c2s
+    connection: both
+    name: gppWatchingOnMe
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppWatchingOnMe class and opcode setter sub_B25E90 in sender sub_80D8A0 (kr-812)"
+  - value: 32886
+    direction: c2s
+    connection: both
+    name: gppCommandChat
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppCommandChat class and opcode setter sub_B25E90 in sender sub_50EF00 (kr-812)"
+  - value: 32887
+    direction: c2s
+    connection: both
+    name: gppEmotion
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppEmotion class and opcode setter sub_B25E90 in sender sub_50F150 (kr-812)"
+  - value: 32888
+    direction: c2s
+    connection: both
+    name: gppSyncUseItemSimply
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppSyncUseItemSimply class and opcode setter sub_B25E90 in sender sub_9C1870 (kr-812)"
+  - value: 32889
+    direction: c2s
+    connection: both
+    name: gppCharactersPlayData
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppCharactersPlayData class and opcode setter sub_B25E90 in sender sub_51EA10 (kr-812)"
+  - value: 32890
+    direction: c2s
+    connection: both
+    name: gppRemoveUnit
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppRemoveUnit class and opcode setter sub_B25E90 in sender sub_5250A0 (kr-812)"
+  - value: 32891
+    direction: c2s
+    connection: both
+    name: gppDummyUnitMotion
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppDummyUnitMotion class and opcode setter sub_B25E90 in sender sub_524F90 (kr-812)"
+  - value: 32892
+    direction: c2s
+    connection: both
+    name: gppCreateAIObject
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppCreateAIObject class and opcode setter sub_B25E90 in sender sub_647CD0 (kr-812)"
+  - value: 32893
+    direction: c2s
+    connection: both
+    name: gppAgentMoveTo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppAgentMoveTo class and opcode setter sub_B25E90 in sender sub_5285E0 (kr-812)"
+  - value: 32894
+    direction: c2s
+    connection: both
+    name: gppUseItemDirect
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppUseItemDirect class and opcode setter sub_B25E90 in sender sub_525670 (kr-812)"
+  - value: 32895
+    direction: c2s
+    connection: both
+    name: gppChangeTurretState
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppChangeTurretState class and opcode setter sub_B25E90 in sender sub_525C80 (kr-812)"
+  - value: 32896
+    direction: c2s
+    connection: both
+    name: gppCitizenHp
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppCitizenHp class and opcode setter sub_B25E90 in sender sub_528FA0 (kr-812)"
+  - value: 32897
+    direction: c2s
+    connection: both
+    name: gppAggro
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppAggro class and opcode setter sub_B25E90 in sender sub_529140 (kr-812)"
+  - value: 32898
+    direction: c2s
+    connection: both
+    name: gppFireBullet3
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppFireBullet3 class and opcode setter sub_B25E90 in sender sub_510BF0 (kr-812)"
+  - value: 32899
+    direction: c2s
+    connection: both
+    name: gppStormDamager
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppStormDamager class and opcode setter sub_B25E90 in sender sub_510100 (kr-812)"
+  - value: 32900
+    direction: c2s
+    connection: both
+    name: gppSplashDamagerByDamager
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppSplashDamagerByDamager class and opcode setter sub_B25E90 in sender sub_50FE10 (kr-812)"
+  - value: 32903
+    direction: c2s
+    connection: both
+    name: gppPopOut2
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppPopOut2 class and opcode setter sub_B25E90 in sender sub_511530 (kr-812)"
+  - value: 32906
+    direction: c2s
+    connection: both
+    name: gppDeleteDamager
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppDeleteDamager class and opcode setter sub_B25E90 in sender sub_50EC70 (kr-812)"
+  - value: 32907
+    direction: c2s
+    connection: both
+    name: gppTeleport
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppTeleport class and opcode setter sub_B25E90 in sender sub_5292C0 (kr-812)"
+  - value: 32908
+    direction: c2s
+    connection: both
+    name: gppEndBreath
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppEndBreath class and opcode setter sub_B25E90 in sender sub_512CD0 (kr-812)"
+  - value: 32909
+    direction: c2s
+    connection: both
+    name: gppStormDamagerItemId
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppStormDamagerItemId class and opcode setter sub_B25E90 in sender sub_510010 (kr-812)"
+  - value: 32910
+    direction: c2s
+    connection: both
+    name: gppShocked2
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppShocked2 class and opcode setter sub_B25E90 in sender sub_511CF0 (kr-812)"
+  - value: 32912
+    direction: c2s
+    connection: both
+    name: gppZombieBossState
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppZombieBossState class and opcode setter sub_B25E90 in sender sub_5293B0 (kr-812)"
+  - value: 32913
+    direction: c2s
+    connection: both
+    name: gppZombieBossHp
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppZombieBossHp class and opcode setter sub_B25E90 in sender sub_529040 (kr-812)"
+  - value: 32914
+    direction: c2s
+    connection: both
+    name: gppEndDarkCircle
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppEndDarkCircle class and opcode setter sub_B25E90 in sender sub_512C40 (kr-812)"
+  - value: 32915
+    direction: c2s
+    connection: both
+    name: gppDeleteStormDamagerAOE
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppDeleteStormDamagerAOE class and opcode setter sub_B25E90 in sender sub_50EBE0 (kr-812)"
+  - value: 32917
+    direction: c2s
+    connection: both
+    name: gppAIState
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppAIState class and opcode setter sub_B25E90 in sender sub_529440 (kr-812)"
+  - value: 32918
+    direction: c2s
+    connection: both
+    name: gppCreateAISubordinate
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppCreateAISubordinate class and opcode setter sub_B25E90 in sender sub_529FC0 (kr-812)"
+  - value: 32920
+    direction: c2s
+    connection: both
+    name: gppLifePoint
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppLifePoint class and opcode setter sub_B25E90 in sender sub_5103B0 (kr-812)"
+  - value: 32921
+    direction: c2s
+    connection: both
+    name: gppTeleportPortal
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppTeleportPortal class and opcode setter sub_B25E90 in sender sub_50FA90 (kr-812)"
+  - value: 32923
+    direction: c2s
+    connection: both
+    name: gppExplodeBulletLean
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppExplodeBulletLean class and opcode setter sub_B25E90 in sender sub_50E9D0 (kr-812)"
+  - value: 32925
+    direction: c2s
+    connection: both
+    name: gppRelayedRespawn
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppRelayedRespawn class and opcode setter sub_B25E90 in sender sub_51E2C0 (kr-812)"
+  - value: 32926
+    direction: c2s
+    connection: both
+    name: gppFakeLagFrame
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppFakeLagFrame class and opcode setter sub_B25E90 in sender sub_50F3F0 (kr-812)"
+  - value: 32927
+    direction: c2s
+    connection: both
+    name: gppFakeSyncFrame
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppFakeSyncFrame class and opcode setter sub_B25E90 in sender sub_50F480 (kr-812)"
+  - value: 32928
+    direction: c2s
+    connection: both
+    name: gppTeamLeadCommand
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppTeamLeadCommand class and opcode setter sub_B25E90 in sender sub_52B970 (kr-812)"
+  - value: 32929
+    direction: c2s
+    connection: both
+    name: gppUseItemDirectAtPos
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppUseItemDirectAtPos class and opcode setter sub_B25E90 in sender sub_5255C0 (kr-812)"
+  - value: 1
+    direction: s2c
+    name: gspDisconnect
+    name_source: label@kr-812
+    evidence: inferred
+    source: "dispatcher sub_837170 case 1"
+  - value: 2
+    direction: s2c
+    name: gspRepGamePatch
+    name_source: label@kr-812
+    evidence: captured
+    source: "dispatcher sub_837170 case 2 -> sub_8178B0"
+    notes: "i32 requiresPatch, u32-prefixed UTF-16LE command line; 8 bytes when (0, \"\")"
+  - value: 3
+    direction: s2c
+    name: gspRepLogin
+    name_source: label@kr-812
+    evidence: captured
+    source: "dispatcher sub_837170 case 3 -> sub_818680"
+    notes: "111 bytes; layout not yet decoded"
+  - value: 5
+    direction: s2c
+    name: gspReqHackShieldCheck
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 5: Packet_gspReqHackShieldCheck constructor path"
+  - value: 9
+    direction: s2c
+    name: gspRepMoveChannel
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 9: Packet_gspRepMoveChannel constructor path"
+  - value: 11
+    direction: s2c
+    name: gspRepMoveInto
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 11: Packet_gspRepMoveInto constructor path"
+  - value: 13
+    direction: s2c
+    name: gspRepCheckCreateUserName
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 13: Packet_gspRepCheckCreateUserName constructor path"
+  - value: 14
+    direction: s2c
+    name: gspRepCreateUserInfo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 14: Packet_gspRepCreateUserInfo constructor path"
+  - value: 15
+    direction: s2c
+    name: gspQueryBadProgram
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 15: Packet_gspQueryBadProgram constructor path"
+  - value: 16
+    direction: s2c
+    name: gspRepCenterUserCnt
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_837170 case 16 calls sub_817A00; Packet_gspRepCenterUserCnt reader kr-812 sub_845080 reads identity, name, users and capacity"
+  - value: 17
+    direction: s2c
+    name: gspCenterList
+    name_source: label@kr-812
+    evidence: captured
+    source: "dispatcher sub_837170 case 0x11 -> sub_817960 (Packet_gspCenterList); gates read by sub_845430"
+    notes: "u32 count, then per gate u32 key, u32 subKey, u32 unknown1, u32 IPv4, u16 port; the connect loop sub_8F3970 waits for it"
+  - value: 18
+    direction: s2c
+    name: gspRepUniquenessCheck
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 18: Packet_gspRepUniquenessCheck constructor path"
+  - value: 20
+    direction: s2c
+    name: gspDisconnectFromRestriction
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 20: Packet_gspDisconnectFromRestriction constructor path"
+  - value: 21
+    direction: s2c
+    name: gspDisconnectBlockIP
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 21: Packet_gspDisconnectBlockIP constructor path"
+  - value: 22
+    direction: s2c
+    name: gspClanPassport
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 22: Packet_gspClanPassport constructor path"
+  - value: 24
+    direction: s2c
+    name: gspClanPointAdd
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 24: Packet_gspClanPointAdd constructor path"
+  - value: 101
+    direction: s2c
+    name: gspRepListSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "LobbyStage dispatcher sub_677210 case 101 ('e') -> sub_679670; Packet_gspRepListSession reader sub_680780 / serialize sub_680140"
+    notes: "u32 unknown0, bool32 unknown1, u32 count, then count SessionSetting (stride 672); empty count is valid"
+  - value: 103
+    direction: s2c
+    name: gspRepJoinSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "LobbyStage dispatcher sub_677210 case 103 ('g') -> sub_67AE80; Packet_gspRepJoinSession vtable D41740 reader sub_80A910"
+    notes: "u32 result; the handler shows a fixed message per value: 1 round already started, 2 award ceremony, 3 room full, 4 wrong password, 5 no matching room, 6 kicked from this room, 7 game ended; 0 shows nothing"
+  - value: 104
+    direction: s2c
+    name: gspReqUserPoll
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 104: Packet_gspReqUserPoll constructor path"
+  - value: 105
+    direction: s2c
+    name: gspUserStat
+    name_source: label@kr-812
+    evidence: verified
+    source: "0x844920 reads the full status including FighterInfo at 0x40BA50; consumer 0x81A820"
+  - value: 106
+    direction: s2c
+    name: gspOveruseAlarmMsg
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 106: Packet_gspOveruseAlarmMsg constructor path"
+  - value: 107
+    direction: s2c
+    name: gspReceiveServerNoticeMsg
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 107: Packet_gspReceiveServerNoticeMsg constructor path"
+  - value: 108
+    direction: s2c
+    name: gspGotoMenu
+    name_source: label@kr-812
+    evidence: verified
+    source: "dispatcher sub_837170 case 108 -> sub_81FDA0 (Packet_gspGotoMenu), reader sub_80C160"
+    notes: "bool notice; moves the client to stage 2, MainMenuStage"
+  - value: 109
+    direction: s2c
+    name: gspGotoLobby
+    name_source: label@kr-812
+    evidence: verified
+    source: "dispatcher sub_837170 case 109 -> sub_81FF00 (Packet_gspGotoLobby), reader sub_80C160"
+    notes: "bool32 notice; nonzero shows client string at dword_D6B144; stage 3 when ServerConnection+266 is set (independent of the flag); send 0 for silent enter"
+  - value: 110
+    direction: s2c
+    name: gspGotoRoom
+    name_source: label@kr-812
+    evidence: verified
+    source: "dispatcher sub_837170 case 110 -> sub_820060 (Packet_gspGotoRoom), reader sub_692A40"
+    notes: "SessionSetting, u32, u32, vector<UserSlot>, vector<EquippedItemList>, bool, u32; kind 1 at SessionSetting +76 moves to MainMenuStage (stage 2); kind 2 moves to stage 4"
+  - value: 111
+    direction: s2c
+    name: gspRepInvite
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 111: Packet_gspRepInvite constructor path"
+  - value: 112
+    direction: s2c
+    name: gspNotifyInvite
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 112: Packet_gspNotifyInvite constructor path"
+  - value: 113
+    direction: s2c
+    name: gspRepMoveToInviter
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 113: Packet_gspRepMoveToInviter constructor path"
+  - value: 114
+    direction: s2c
+    name: gspRepMoveToFriend
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 114: Packet_gspRepMoveToFriend constructor path"
+  - value: 117
+    direction: s2c
+    name: gspNotifyMatch
+    name_source: label@kr-812
+    evidence: verified
+    source: "handler gate sub_6875C0 opcode 117 -> sub_687640; Packet_gspNotifyMatch reader sub_8B9660 (vtable D41704)"
+    notes: "u32 unknown0, u32 unknown1, wstr unknown2; unknown0 == 0 opens DlgWaiting"
+  - value: 124
+    direction: s2c
+    name: gspRepFighterInfo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 124: Packet_gspRepFighterInfo constructor path"
+  - value: 125
+    direction: s2c
+    name: gspRepAwardInfo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 125: Packet_gspRepAwardInfo constructor path"
+  - value: 126
+    direction: s2c
+    name: gspRepEvent
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 126: Packet_gspRepEvent constructor path"
+  - value: 128
+    direction: s2c
+    name: gspNotifyPromotion
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 128: Packet_gspNotifyPromotion constructor path"
+  - value: 130
+    direction: s2c
+    name: gspRepRecommendResult
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 130: Packet_gspRepRecommendResult constructor path"
+  - value: 131
+    direction: s2c
+    name: gspReqClanMarkInfo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 131: Packet_gspReqClanMarkInfo constructor path"
+  - value: 132
+    direction: s2c
+    name: gspRandomBox
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 132: Packet_gspRandomBox constructor path"
+  - value: 133
+    direction: s2c
+    name: gspRepLmgUserRecord
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 133: Packet_gspRepLmgUserRecord constructor path"
+  - value: 134
+    direction: s2c
+    name: gspNotifySocialSystem
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 134: Packet_gspNotifySocialSystem constructor path"
+  - value: 201
+    direction: s2c
+    name: gspUpdateParty
+    name_source: label@kr-812
+    evidence: verified
+    source: "dispatcher sub_837170 case 0xC9 -> sub_926900; reader 0x92B130; PartyMember 0x415C00"
+    notes: "i32 state (stored at Party+4 / dword_E82838+4), u32 member count, members (i32 userNum, wstr nick, i32 x3), u32 equipped count; MainMenu plaza gate 0x812AD0(2) needs state 2 and self member (0x926540)"
+  - value: 202
+    direction: s2c
+    name: gspRepJoinParty
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 202: Packet_gspRepJoinParty constructor path"
+  - value: 203
+    direction: s2c
+    name: gspUpdatePartyLeader
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 203: Packet_gspUpdatePartyLeader constructor path"
+  - value: 204
+    direction: s2c
+    name: gspNotifyPartyLeaveSuccess
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 204: Packet_gspNotifyPartyLeaveSuccess constructor path"
+  - value: 205
+    direction: s2c
+    name: gspNotifyMemberLeave
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 205: Packet_gspNotifyMemberLeave constructor path"
+  - value: 206
+    direction: s2c
+    name: gspNotifyNewMemberJoin
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 206: Packet_gspNotifyNewMemberJoin constructor path"
+  - value: 302
+    direction: s2c
+    name: gspRepKickFromParty
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 302: Packet_gspRepKickFromParty constructor path"
+  - value: 303
+    direction: s2c
+    name: gspRepChangePartyLeader
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 303: Packet_gspRepChangePartyLeader constructor path"
+  - value: 304
+    direction: s2c
+    name: gspNotifyKickFromParty
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 304: Packet_gspNotifyKickFromParty constructor path"
+  - value: 305
+    direction: s2c
+    name: gspReceivePartyChatMsg
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 305: Packet_gspReceivePartyChatMsg constructor path"
+  - value: 307
+    direction: s2c
+    name: gspNotifyKickMember
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 307: Packet_gspNotifyKickMember constructor path"
+  - value: 501
+    direction: s2c
+    name: gspRoomSetSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "room dispatcher sub_7FBBB0 case 501 -> sub_7FD310; Packet_gspRoomSetSession reader sub_83C040 (vtable D691E4)"
+    notes: "one SessionSetting"
+  - value: 502
+    direction: s2c
+    name: gspRoomSetMasterSlotIdx
+    name_source: label@kr-812
+    evidence: verified
+    source: "room dispatcher sub_7FBBB0 case 502 -> sub_7FD460; Packet_gspRoomSetMasterSlotIdx vtable D691EC reader sub_80A910"
+    notes: "u32 slot index of the room master"
+  - value: 503
+    direction: s2c
+    name: gspRoomSetSlot
+    name_source: label@kr-812
+    evidence: verified
+    source: "room dispatcher sub_7FBBB0 case 503 -> sub_7FD800; Packet_gspRoomSetSlot reader sub_80C1B0 (vtable D691F8)"
+    notes: "u32 slot, UserSlot (sub_4196F0), EquippedItemList (sub_532650); ready flag is UserSlot +125"
+  - value: 504
+    direction: s2c
+    name: gspRoomChangeTeam
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 504 -> handler sub_7FDC70 builds Packet_gspRoomChangeTeam (kr-812)"
+  - value: 505
+    direction: s2c
+    name: gspRoomChangeGameSetting
+    name_source: label@kr-812
+    evidence: captured
+    source: "room dispatcher sub_7FBBB0 case 505 -> sub_7FE410; Packet_gspRoomChangeGameSetting"
+    notes: "full GameSetting body; sent before EnterGame; not yet emitted by the plaza handler"
+  - value: 506
+    direction: s2c
+    name: gspRoomChangeInventory
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 506 -> handler sub_7FE650 builds Packet_gspRoomChangeInventory (kr-812)"
+  - value: 507
+    direction: s2c
+    name: gspRoomRepChangeMaster
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 507 -> handler sub_801D00 builds Packet_gspRoomRepChangeMaster (kr-812)"
+  - value: 508
+    direction: s2c
+    name: gspRoomReceiveChatMsg
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 508 -> handler sub_802170 builds Packet_gspRoomReceiveChatMsg (kr-812)"
+  - value: 509
+    direction: s2c
+    name: gspRoomReceiveChatModuleMsg
+    name_source: label@kr-812
+    evidence: verified
+    source: "room dispatcher handler sub_8023E0 builds Packet_gspRoomReceiveChatModuleMsg; reader sub_80ACB0 (vtable 0xD6924C)"
+    notes: "u16 slot, wstr nickname, u32 channel, wstr unknown3, wstr text, u32 unknown5, u32 unknown6, bool32 unknown7"
+  - value: 510
+    direction: s2c
+    name: gspRoomEnterGame
+    name_source: label@kr-812
+    evidence: verified
+    source: "dispatcher case 0x1FE -> sub_7FF340; Packet_gspRoomEnterGame reader sub_80AE90 (vtable D692A0): u32, wstr, u32 x3, bool32 x2"
+    notes: "tutorial play sends unknown0=0, unknown1=PlayTutorial third wstr (MapMeta row name from sub_814A70), unknown4=4 (room+12); prologue GameSetting carries mode 103 and map key at room+188 for kr-812 sub_806550; mode 15 selects SinglePlayGameStage instead of the prologue NPC context"
+  - value: 511
+    direction: s2c
+    name: gspRoomLeaveSlot
+    name_source: label@kr-812
+    evidence: verified
+    source: "room dispatcher sub_7FBBB0 case 511 -> sub_7FDE50; Packet_gspRoomLeaveSlot vtable D69294: serialize sub_840500 / reader sub_8104E0"
+    notes: "u32 slot index, then the leaving player's UserSlot"
+  - value: 512
+    direction: s2c
+    name: gspRoomOpenCloseSlot
+    name_source: label@kr-812
+    evidence: verified
+    source: "room dispatcher handler sub_8010F0; Packet_gspRoomOpenCloseSlot vtable 0xD692B8, reader sub_93C4E0"
+    notes: "u32 slot, bool32 closed"
+  - value: 513
+    direction: s2c
+    name: gspRepKickFromSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "room dispatcher handler sub_8014B0; Packet_gspRepKickFromSession vtable 0xD69180, reader sub_80AE00"
+    notes: "wstr master nickname (compared with the local nickname), wstr removed nickname, u32 result (0 announces the removal)"
+
+# Replies handled by the session dispatcher sub_7FBBB0 (plaza and room), named by the class each handler builds.
+  - value: 514
+    direction: s2c
+    name: gspReceiveSessionChrPos
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 514 -> handler sub_806C40 builds Packet_gspReceiveSessionChrPos (kr-812)"
+  - value: 516
+    direction: s2c
+    name: gspRoomReceiveRecruitMsg
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 516 -> handler sub_8028C0 builds Packet_gspRoomReceiveRecruitMsg (kr-812)"
+  - value: 517
+    direction: s2c
+    name: gspReqPingUser
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 517 -> handler sub_807100 builds Packet_gspReqPingUser (kr-812)"
+  - value: 518
+    direction: s2c
+    name: gspRepPingUser
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 518 -> handler sub_806EE0 builds Packet_gspRepPingUser (kr-812)"
+  - value: 519
+    direction: s2c
+    name: gspHordeModeRewardList
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 519 -> handler sub_8055C0 builds Packet_gspHordeModeRewardList (kr-812)"
+  - value: 520
+    direction: s2c
+    name: gspGameSetTeamLeader
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 520 -> handler sub_805690 builds Packet_gspGameSetTeamLeader (kr-812)"
+  - value: 521
+    direction: s2c
+    name: gspRepAutoStart
+    name_source: label@kr-812
+    evidence: verified
+    source: "RoomStage8vs8 gate sub_5C69E0 opcode 521 -> sub_5C6A10; Packet_gspRepAutoStart reader sub_80C160 (vtable D2CF10); true and room flag bit1 clear calls sub_5C6890"
+    notes: "bool32; RoomStage-local; tutorial play uses gspRoomEnterGame instead"
+  - value: 522
+    direction: s2c
+    name: gspSetSessionSigData
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 522 -> handler sub_8071A0 builds Packet_gspSetSessionSigData (kr-812)"
+  - value: 523
+    direction: s2c
+    name: gspResClientDamageSyncData
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 523 -> handler sub_801240 builds Packet_gspResClientDamageSyncData (kr-812)"
+  - value: 524
+    direction: s2c
+    name: gspReceiveSessionInit
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 524 -> handler sub_806B90 builds Packet_gspReceiveSessionInit (kr-812)"
+  - value: 603
+    direction: s2c
+    name: gspConnectToSuperPeer
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 603: Packet_gspConnectToSuperPeer constructor path"
+  - value: 607
+    direction: s2c
+    name: gspTryHolePunching
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 607 -> handler sub_8069D0 builds Packet_gspTryHolePunching (kr-812)"
+  - value: 609
+    direction: s2c
+    name: gspNotifyUdpToServerReceived
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 609 -> handler sub_806A30 builds Packet_gspNotifyUdpToServerReceived (kr-812)"
+  - value: 610
+    direction: s2c
+    name: gspTableSetHolePunching
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 610 -> handler sub_80E910 builds Packet_gspTableSetHolePunching (kr-812)"
+  - value: 701
+    direction: s2c
+    name: gspGameMapLoadingComplete
+    name_source: label@kr-812
+    evidence: verified
+    source: "room dispatcher sub_7FBBB0 case 701 -> sub_802AB0; Packet_gspGameMapLoadingComplete vtable D6939C reader sub_80A910"
+    notes: "u32 seat index of the player whose map load finished; the handler creates that seat's character"
+  - value: 702
+    direction: s2c
+    name: gspGameEverybodyLoadingComplete
+    name_source: label@kr-812
+    evidence: verified
+    source: "room dispatcher sub_7FBBB0 case 702 -> sub_802E60; Packet_gspGameEverybodyLoadingComplete vtable D693B4 reader sub_5C8C00"
+    notes: "bool32 x3; the first two are the relay and super-peer gates, all false keeps the client on the game connection"
+  - value: 703
+    direction: s2c
+    name: gspGameCountDown
+    name_source: label@kr-812
+    evidence: verified
+    source: "room dispatcher sub_7FBBB0 case 703 -> sub_802F40; Packet_gspGameCountDown vtable D693C0 reader sub_80A910"
+    notes: "u32 countdown in milliseconds; gspGameStartGame follows after it"
+  - value: 704
+    direction: s2c
+    name: gspGameStartGame
+    name_source: label@kr-812
+    evidence: verified
+    source: "room dispatcher sub_7FBBB0 case 704 -> sub_803590; Packet_gspGameStartGame vtable D693CC reader sub_9D95D0"
+  - value: 705
+    direction: s2c
+    name: gspGameEndGame
+    name_source: label@kr-812
+    evidence: verified
+    source: "room dispatcher sub_7FBBB0 case 705 -> sub_803DF0; Packet_gspGameEndGame vtable D693F0 reader sub_6DB1B0"
+    notes: "u32 outcome code (1 and 2 clear the win flag, 3 sets it), u32 unknown1 (never read); the handler moves the client to state 5 and shows the result"
+  - value: 707
+    direction: s2c
+    name: gspRespawn
+    name_source: label@kr-812
+    evidence: verified
+    source: "battle dispatcher sub_50B8C0 case 707 -> sub_51E2C0 revives the handle's character; Packet_gspRespawn vtable D1EA88 reader sub_503530"
+  - value: 708
+    direction: s2c
+    name: gspRequestRespawnIdx
+    name_source: label@kr-812
+    evidence: verified
+    source: "battle dispatcher sub_50B8C0 case 708 -> sub_51E4F0 whose flag makes the client answer gcpRespawn; Packet_gspRequestRespawnIdx vtable D1EA94 reader sub_503AD0"
+    notes: "u32 match time limit in milliseconds, u32 unknown1, u32 unknown2; the only packet that moves the client to state 4"
+  - value: 711
+    direction: s2c
+    name: gspGameCreateGameItem
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 play dispatcher sub_50B8C0 case 711 builds Packet_gspGameCreateGameItem"
+  - value: 712
+    direction: s2c
+    name: gspItemEaten
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 play dispatcher sub_50B8C0 case 712 builds Packet_gspItemEaten"
+  - value: 713
+    direction: s2c
+    name: gspAddItemToSlot
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 play dispatcher sub_50B8C0 case 713 builds Packet_gspAddItemToSlot"
+  - value: 714
+    direction: s2c
+    name: gspItemUsed
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 play dispatcher sub_50B8C0 case 714 builds Packet_gspItemUsed"
+  - value: 715
+    direction: s2c
+    name: gspPveItemUsed
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 play dispatcher sub_50B8C0 case 715 builds Packet_gspPveItemUsed"
+  - value: 729
+    direction: s2c
+    name: gspGameBroadcastPlayerScoreData
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 729 -> handler sub_804620 builds Packet_gspGameBroadcastPlayerScoreData (kr-812)"
+  - value: 731
+    direction: s2c
+    name: gspGameExtendRespawn
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 play dispatcher sub_50B8C0 case 731 builds Packet_gspGameExtendRespawn"
+  - value: 732
+    direction: s2c
+    name: gspGameTimeOverEnd
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 732 -> handler sub_804B10 builds Packet_gspGameTimeOverEnd (kr-812)"
+  - value: 733
+    direction: s2c
+    name: gspGameShowResult_
+    name_source: coined
+    evidence: verified
+    source: "session dispatcher sub_7FBBB0 case 733 (0x2DD) calls sub_5AD030 on the result object at dword_E82730 +820 (kr-812); no packet class is built"
+    notes: "No body. Moves the result scene to its reward stage; sent about 6 s after gspGameEndGame."
+  - value: 734
+    direction: s2c
+    name: gspGameAwardDialog
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_7FBBB0 case 734 (0x2DE) builds Packet_gspGameAwardDialog (vtable D69384), calls its empty reader off_D69388 and raises event 176"
+  - value: 736
+    direction: s2c
+    name: gspGameReturnAfterAward_
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_7FBBB0 case 736 (0x2E0) calls kr-812 sub_804D00 without reading a body; it raises event 177, which closes the award dialog and restores the room stage"
+  - value: 737
+    direction: s2c
+    name: gspGamePreCountDown
+    name_source: label@kr-812
+    evidence: captured
+    source: "Packet_gspGamePreCountDown class (kr-812); sent between gspGameEverybodyLoadingComplete and gspGameCountDown"
+    notes: "u32 (2500 as sent)"
+  - value: 739
+    direction: s2c
+    name: gspGamePrepareLucciEvent
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 739 -> handler sub_804FE0 builds Packet_gspGamePrepareLucciEvent (kr-812)"
+  - value: 740
+    direction: s2c
+    name: gspGamePrepareSoccerEvent
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 740 -> handler sub_8050A0 builds Packet_gspGamePrepareSoccerEvent (kr-812)"
+  - value: 741
+    direction: s2c
+    name: gspGamePrepareHordeZHEvent
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 741 -> handler sub_805140 builds Packet_gspGamePrepareHordeZHEvent (kr-812)"
+  - value: 742
+    direction: s2c
+    name: gspGamePrepareMoleEvent
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 742 -> handler sub_805200 builds Packet_gspGamePrepareMoleEvent (kr-812)"
+  - value: 743
+    direction: s2c
+    name: gspRepAwardSelectSuccess
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 743 -> handler sub_806E20 builds Packet_gspRepAwardSelectSuccess (kr-812)"
+  - value: 744
+    direction: s2c
+    name: gspRepAwardSelectFail
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_7FBBB0 case 744 (0x2E8) builds Packet_gspRepAwardSelectFail (vtable D69438) and calls its reader off_D6943C, which is the empty kr-812 nullsub_2 (5C8FC0)"
+  - value: 747
+    direction: s2c
+    name: gspSwitchItemSlot
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 play dispatcher sub_50B8C0 case 747 builds Packet_gspSwitchItemSlot"
+  - value: 748
+    direction: s2c
+    name: gspGameItemSpec
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 748 -> handler sub_8029A0 builds Packet_gspGameItemSpec (kr-812)"
+  - value: 749
+    direction: s2c
+    name: gspEventAwardDialog
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 749 -> handler sub_8052C0 builds Packet_gspEventAwardDialog (kr-812)"
+  - value: 800
+    direction: s2c
+    name: gspRepEnterShop
+    name_source: label@kr-812
+    evidence: verified
+    source: "reader 0x843BB0, handler 0x820CA0, vtable D6F474, 35256-byte frame parsed field-complete"
+    notes: "i32 result(0), bool32 hasData, f64 cacheRevision, vector<ShopItemCardInfo>, ShopCategoryAll, vector<i32>, i32 mainCategory; card and category counts are variable; mainCategory identifies the requested category"
+  - value: 801
+    direction: s2c
+    name: gspInventoryUpdateAllInventorySlot
+    name_source: label@kr-812
+    evidence: verified
+    source: "0x821130 reads the vector through 0x843420 and resets the time origin"
+  - value: 802
+    direction: s2c
+    name: gspInventoryUpdateInventorySlots
+    name_source: label@kr-812
+    evidence: verified
+    source: "0x8211F0 and machine code 0x821250 upsert slots read by 0x843420"
+  - value: 803
+    direction: s2c
+    name: gspInventoryUpdateInventorySlot
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 803: Packet_gspInventoryUpdateInventorySlot constructor path"
+  - value: 805
+    direction: s2c
+    name: gspInventoryViewUpdateView
+    name_source: label@kr-812
+    evidence: captured
+    source: "vtable 0xD6F4A4, reader 0x80A4F0 / EquippedItemList 0x532650"
+    notes: "i32 userNumber, i32 characterItemId, i32 unknown3, vector<i32> equippedItemIds, vector<u8> unknown5, vector<ItemAttr> unknown6, vector unknown7; see packets/equipment-attributes.yaml"
+
+# Native labels with unambiguous client builders or dispatcher mappings.
+  - value: 807
+    direction: s2c
+    name: gspCashInvenUpdateAllInventorySlot
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 807: Packet_gspCashInvenUpdateAllInventorySlot constructor path"
+  - value: 808
+    direction: s2c
+    name: gspRepInventoryEquip
+    name_source: label@kr-812
+    evidence: verified
+    source: "Packet_gspRepInventoryEquip vtable 0xD6F4EC, reader 0x80A910, consumer 0x824AC0"
+    notes: "i32 result; zero is success; no echoed key"
+  - value: 809
+    direction: s2c
+    name: gspRepInventoryUnequip
+    name_source: label@kr-812
+    evidence: verified
+    source: "Packet_gspRepInventoryUnequip vtable 0xD6F4F8, reader 0x80A910, consumer 0x824F00"
+    notes: "i32 result; zero is success; no echoed key"
+  - value: 810
+    direction: s2c
+    name: gspRepInventoryUseItem
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 810: Packet_gspRepInventoryUseItem constructor path"
+  - value: 811
+    direction: s2c
+    name: gspRepInventoryDeleteItem
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 811: Packet_gspRepInventoryDeleteItem constructor path"
+  - value: 812
+    direction: s2c
+    name: gspRepInventoryThrowItem
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 812: Packet_gspRepInventoryThrowItem constructor path"
+  - value: 813
+    direction: s2c
+    name: gspRepShopBuy
+    name_source: label@kr-812
+    evidence: inferred
+    source: "dispatcher sub_837170 case 0x32D -> sub_827550; reader sub_6DB1B0 is u32 key + u32 result, result 1 succeeds"
+  - value: 814
+    direction: s2c
+    name: gspRepShopItemCardInfo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 814: Packet_gspRepShopItemCardInfo constructor path"
+  - value: 815
+    direction: s2c
+    name: gspRepPresentNewReceive
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 815: Packet_gspRepPresentNewReceive constructor path"
+  - value: 820
+    direction: s2c
+    name: gspRepRefund
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 820: Packet_gspRepRefund constructor path"
+  - value: 821
+    direction: s2c
+    name: gspRepPresentSend
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 821: Packet_gspRepPresentSend constructor path"
+  - value: 822
+    direction: s2c
+    name: gspRepPresentReceive
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 822: Packet_gspRepPresentReceive constructor path"
+  - value: 823
+    direction: s2c
+    name: gspRepPresentThrow
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 823: Packet_gspRepPresentThrow constructor path"
+  - value: 824
+    direction: s2c
+    name: gspRepPresentSendThankMsg
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 824: Packet_gspRepPresentSendThankMsg constructor path"
+  - value: 825
+    direction: s2c
+    name: gspRepPresentViewThankMsg
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 825: Packet_gspRepPresentViewThankMsg constructor path"
+  - value: 826
+    direction: s2c
+    name: gspRepPresentConfirm
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 826: Packet_gspRepPresentConfirm constructor path"
+  - value: 827
+    direction: s2c
+    name: gspRepPresentDeleteSend
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 827: Packet_gspRepPresentDeleteSend constructor path"
+  - value: 828
+    direction: s2c
+    name: gspRepPresentDeleteReceive
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 828: Packet_gspRepPresentDeleteReceive constructor path"
+  - value: 829
+    direction: s2c
+    name: gspRepRealCouponUse
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 829: Packet_gspRepRealCouponUse constructor path"
+  - value: 831
+    direction: s2c
+    name: gspRepPickup
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 831: Packet_gspRepPickup constructor path"
+  - value: 832
+    direction: s2c
+    name: gspReqInventoryChangeWeaponPresetIdx
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 dispatcher sub_837170 case 832 (0x340): Packet_gspReqInventoryChangeWeaponPresetIdx RTTI class, reader sub_83B880 (u8 slot + i32 player-map key), handler sub_832BD0 unlatches the C2S 830 sender at dword_E8283C+196"
+  - value: 833
+    direction: s2c
+    name: gspReqWeaponPreSetUpdate
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 833: Packet_gspReqWeaponPreSetUpdate constructor path"
+  - value: 901
+    direction: s2c
+    name: gspRepGuildLineBoardWrite
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 901: Packet_gspRepGuildLineBoardWrite constructor path"
+  - value: 902
+    direction: s2c
+    name: gspRepGuildLineBoardDelete
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 902: Packet_gspRepGuildLineBoardDelete constructor path"
+  - value: 904
+    direction: s2c
+    name: gspRepStartNewWave
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_A301C0 case 0x388 calls kr-812 sub_A092B0, which builds Packet_gspRepStartNewWave and answers with gcpReqWaveAllSpawnMobs"
+  - value: 905
+    direction: s2c
+    name: gspRepEndWave
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_A301C0 case 0x389 calls kr-812 sub_A09790, which builds Packet_gspRepEndWave"
+  - value: 908
+    direction: s2c
+    name: Unknown908
+    name_source: none
+    evidence: verified
+    source: "kr-812 sub_A301C0 case 0x38C calls kr-812 sub_A12410(wave manager, 1) without reading a body"
+  - value: 909
+    direction: s2c
+    name: gspRepWaveAllSpawnMobs
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_A301C0 case 0x38D calls kr-812 sub_A07E90, which builds Packet_gspRepWaveAllSpawnMobs through kr-812 sub_A40840"
+  - value: 913
+    direction: s2c
+    name: gspManufactureRecipeInfo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 913: Packet_gspManufactureRecipeInfo constructor path"
+  - value: 914
+    direction: s2c
+    name: gspManufactureList
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 914: Packet_gspManufactureList constructor path"
+  - value: 915
+    direction: s2c
+    name: gspManufactureStart
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 915: Packet_gspManufactureStart constructor path"
+  - value: 916
+    direction: s2c
+    name: gspManufactureGetItem
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 916: Packet_gspManufactureGetItem constructor path"
+  - value: 917
+    direction: s2c
+    name: gspManufactureTimeOut
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 917: Packet_gspManufactureTimeOut constructor path"
+  - value: 918
+    direction: s2c
+    name: gspResTreasureChestInfo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 918: Packet_gspResTreasureChestInfo constructor path"
+  - value: 919
+    direction: s2c
+    name: gspResOpenTreasureChest
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 919: Packet_gspResOpenTreasureChest constructor path"
+  - value: 920
+    direction: s2c
+    name: gspCustomizeString
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 920: Packet_gspCustomizeString constructor path"
+  - value: 921
+    direction: s2c
+    name: gspResGuildInfo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 921: Packet_gspResGuildInfo constructor path"
+  - value: 922
+    direction: s2c
+    name: gspResSingleStageInfo
+    name_source: label@kr-812
+    evidence: verified
+    source: "dispatcher case 0x39A -> sub_824200; Packet_gspResSingleStageInfo reader sub_840770; element sSINGLESTAGECLOEARINFO reader sub_9D95D0"
+    notes: "u32 count, then count times (u32 unknown0, u32 unknown1, u32 unknown2); TutorialRoomStage keys unknown0 as difficulty + 10 * stageIndex"
+  - value: 923
+    direction: s2c
+    name: gspResSingleStageState
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 923: Packet_gspResSingleStageState constructor path"
+  - value: 924
+    direction: s2c
+    name: gspMapMissionInfo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 924 -> handler sub_7FE790 builds Packet_gspMapMissionInfo (kr-812)"
+  - value: 925
+    direction: s2c
+    name: gspResMissionStart
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 925 -> handler sub_7FEA40 builds Packet_gspResMissionStart (kr-812)"
+  - value: 926
+    direction: s2c
+    name: gspResMissionTimeOut
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 926 -> handler sub_7FEB50 builds Packet_gspResMissionTimeOut (kr-812)"
+  - value: 927
+    direction: s2c
+    name: gspResMissionOK
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 927 -> handler sub_7FEC60 builds Packet_gspResMissionOK (kr-812)"
+  - value: 928
+    direction: s2c
+    name: gspNotifyGamePoint
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 928 -> handler sub_7FED80 builds Packet_gspNotifyGamePoint (kr-812)"
+  - value: 929
+    direction: s2c
+    name: gspNotifyRankInfo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 929 -> handler sub_7FEE30 builds Packet_gspNotifyRankInfo (kr-812)"
+  - value: 930
+    direction: s2c
+    name: gspPveItemInfo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 930 -> handler sub_7FF100 builds Packet_gspPveItemInfo (kr-812)"
+  - value: 931
+    direction: s2c
+    name: gspCompensationItemNoti
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 931 -> handler sub_7FF1C0 builds Packet_gspCompensationItemNoti (kr-812)"
+  - value: 933
+    direction: s2c
+    name: gspResMakeUserTitle
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 933: Packet_gspResMakeUserTitle constructor path"
+  - value: 934
+    direction: s2c
+    name: gspResSetUserTitle
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 934: Packet_gspResSetUserTitle constructor path"
+  - value: 936
+    direction: s2c
+    name: gspProvideMedal
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 936: Packet_gspProvideMedal constructor path"
+  - value: 937
+    direction: s2c
+    name: gspCharRankInfo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 937: Packet_gspCharRankInfo constructor path"
+  - value: 938
+    direction: s2c
+    name: gspResCoupleInvite
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 938: Packet_gspResCoupleInvite constructor path"
+  - value: 939
+    direction: s2c
+    name: gspResCoupleInviteResult
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 939: Packet_gspResCoupleInviteResult constructor path"
+  - value: 940
+    direction: s2c
+    name: gspResCoupleInviteAnswer
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 940: Packet_gspResCoupleInviteAnswer constructor path"
+  - value: 941
+    direction: s2c
+    name: gspResCoupleBreakUp
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 941: Packet_gspResCoupleBreakUp constructor path"
+  - value: 942
+    direction: s2c
+    name: gspResCoupleNotifyPartner
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 942: Packet_gspResCoupleNotifyPartner constructor path"
+  - value: 949
+    direction: s2c
+    name: gspNotifyRankInfo2
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 949 -> handler sub_7FEFF0 builds Packet_gspNotifyRankInfo2 (kr-812)"
+  - value: 951
+    direction: s2c
+    name: gspSynthesisProcess
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 951: Packet_gspSynthesisProcess constructor path"
+  - value: 952
+    direction: s2c
+    name: gspResRandomMissionInfo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 952: Packet_gspResRandomMissionInfo constructor path"
+  - value: 955
+    direction: s2c
+    name: gspEvolveResult
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 955: Packet_gspEvolveResult constructor path"
+  - value: 956
+    direction: s2c
+    name: gspGMConsole
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 956: Packet_gspGMConsole constructor path"
+  - value: 958
+    direction: s2c
+    name: gspPortalMove
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 958: Packet_gspPortalMove constructor path"
+  - value: 959
+    direction: s2c
+    name: gspNotifyMsg
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 959: Packet_gspNotifyMsg constructor path"
+  - value: 963
+    direction: s2c
+    name: gspResBlueMarbleDice
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 963: Packet_gspResBlueMarbleDice constructor path"
+  - value: 966
+    direction: s2c
+    name: gspNotifySecondPassword
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 966: Packet_gspNotifySecondPassword constructor path"
+  - value: 968
+    direction: s2c
+    name: gspSeasonLadderLevelUpNotice
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 968: Packet_gspSeasonLadderLevelUpNotice constructor path"
+  - value: 969
+    direction: s2c
+    name: gspRepSeasonLadderGetRankList
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 969: Packet_gspRepSeasonLadderGetRankList constructor path"
+  - value: 970
+    direction: s2c
+    name: gspRepNotifyChangeLevelIcon
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 970: Packet_gspRepNotifyChangeLevelIcon constructor path"
+  - value: 971
+    direction: s2c
+    name: gspRepArena
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 971: Packet_gspRepArena constructor path"
+  - value: 973
+    direction: s2c
+    name: gspBombState
+    name_source: label@kr-812
+    evidence: verified
+    source: "in-game dispatcher kr-812 sub_50B8C0 `else if ( v4 == 973 )` constructs Packet_gspBombState and calls its deserialize slot 0xD1ED08 = kr-812 sub_52FB40; six four-byte words, layout packets/mode-control.yaml"
+    notes: "writer kr-812 sub_52FAE0; handler kr-812 sub_4245B0 switches on the second word (state, cases 0..6); no send-side stamp for 973 in kr-812"
+  - value: 974
+    direction: s2c
+    name: gspObserver
+    name_source: label@kr-812
+    evidence: verified
+    source: "in-game dispatcher kr-812 sub_50B8C0 branch `v6 = v4 - 974` calls handler kr-812 sub_52A640, which constructs Packet_gspObserver and calls its deserialize slot 0xD1ED14 = kr-812 sub_80A910; one four-byte word, layout packets/mode-control.yaml"
+    notes: "writer kr-812 sub_844A30; the handler compares the word with -1 and resolves a player object; reader kr-812 sub_80A910 is a folded one-word reader shared with gspCreateCaptain and gcpDropCaptain; no send-side stamp for 974 in kr-812"
+  - value: 975
+    direction: s2c
+    name: gspRepCustomizedKeyList
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 975: Packet_gspRepCustomizedKeyList constructor path"
+  - value: 977
+    direction: s2c
+    name: gspRoomIntrudeGame
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 977 -> handler sub_808BC0 builds Packet_gspRoomIntrudeGame (kr-812)"
+  - value: 978
+    direction: s2c
+    name: gspReqGameReady
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 978: Packet_gspReqGameReady constructor path"
+  - value: 979
+    direction: s2c
+    name: gspResBaseballBatInfo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 979: Packet_gspResBaseballBatInfo constructor path"
+  - value: 980
+    direction: s2c
+    name: gspResBaseballHitResult
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 980: Packet_gspResBaseballHitResult constructor path"
+  - value: 982
+    direction: s2c
+    name: gspCreateCaptain
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 982 -> handler sub_7FDBA0 builds Packet_gspCreateCaptain (kr-812)"
+  - value: 983
+    direction: s2c
+    name: gspResChangeCouplering
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 983: Packet_gspResChangeCouplering constructor path"
+  - value: 984
+    direction: s2c
+    name: gspUpdateClanInfoToClanServer
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 984: Packet_gspUpdateClanInfoToClanServer constructor path"
+  - value: 985
+    direction: s2c
+    name: gspResChangeClanMarkNoty
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 985: Packet_gspResChangeClanMarkNoty constructor path"
+  - value: 986
+    direction: s2c
+    name: gspUpdateScoreData
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 986 -> handler sub_8046C0 builds Packet_gspUpdateScoreData (kr-812)"
+  - value: 987
+    direction: s2c
+    name: gspGetGameAccessToken
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 987: Packet_gspGetGameAccessToken constructor path"
+  - value: 989
+    direction: s2c
+    name: gspGameScoreData
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 989 -> handler sub_7FF280 builds Packet_gspGameScoreData (kr-812)"
+  - value: 990
+    direction: s2c
+    name: gspGMObserver
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 990: Packet_gspGMObserver constructor path"
+  - value: 991
+    direction: s2c
+    name: gspUserHostStart
+    name_source: label@kr-812
+    evidence: verified
+    source: "dispatcher case 0x3DF -> sub_836150; Packet_gspUserHostStart reader sub_80A910 (vtable D6F750); case 0 casts RoomStage8vs8 and calls sub_5C6890"
+    notes: "i32 unknown0; same host-ready gate family as cn-717; tutorial play uses gspRoomEnterGame instead"
+  - value: 992
+    direction: s2c
+    name: gspUserHostSetting
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 992: Packet_gspUserHostSetting constructor path"
+  - value: 993
+    direction: s2c
+    name: gspUserHostDefaultSetting
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 993: Packet_gspUserHostDefaultSetting constructor path"
+  - value: 994
+    direction: s2c
+    name: gspCaptainEvent
+    name_source: label@kr-812
+    evidence: inferred
+    source: "session dispatcher sub_7FBBB0 case 994 -> handler sub_7FDC20 builds Packet_gspCaptainEvent (kr-812)"
+  - value: 997
+    direction: s2c
+    name: gspBingoData
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 997: Packet_gspBingoData constructor path"
+  - value: 998
+    direction: s2c
+    name: gspResUpdateBingoNumber
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 998: Packet_gspResUpdateBingoNumber constructor path"
+  - value: 999
+    direction: s2c
+    name: gspResGetBingoItem
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 999: Packet_gspResGetBingoItem constructor path"
+  - value: 32772
+    direction: s2c
+    connection: both
+    name: gppSplashDamager
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppSplashDamager class, stamped 32772 in sender sub_511020 (kr-812); read back under the same number"
+  - value: 32773
+    direction: s2c
+    connection: both
+    name: gppNearDamager
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppNearDamager class, stamped 32773 in sender sub_511160 (kr-812); read back under the same number"
+  - value: 32774
+    direction: s2c
+    connection: both
+    name: gppDeleteObject
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppDeleteObject class, stamped 32774 in sender sub_50EB50 (kr-812); read back under the same number"
+  - value: 32777
+    direction: s2c
+    connection: both
+    name: gppDamageObject
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppDamageObject class, stamped 32777 in sender sub_50EAA0 (kr-812); read back under the same number"
+  - value: 32778
+    direction: s2c
+    connection: both
+    name: gppKillObject
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppKillObject class, stamped 32778 in sender sub_50EDE0 (kr-812); read back under the same number"
+  - value: 32779
+    direction: s2c
+    connection: both
+    name: gppDash
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppDash class, stamped 32779 in sender sub_50F510 (kr-812); read back under the same number"
+  - value: 32780
+    direction: s2c
+    connection: both
+    name: gppRoll
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppRoll class, stamped 32780 in sender sub_50F630 (kr-812); read back under the same number"
+  - value: 32781
+    direction: s2c
+    connection: both
+    name: gppJump
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppJump class, stamped 32781 in sender sub_50F750 (kr-812); read back under the same number"
+  - value: 32782
+    direction: s2c
+    connection: both
+    name: gppAim
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppAim class, stamped 32782 in sender sub_50F860 (kr-812); read back under the same number"
+  - value: 32783
+    direction: s2c
+    connection: both
+    name: gppSetTargettingObj
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppSetTargettingObj class, stamped 32783 in sender sub_50FA00 (kr-812); read back under the same number"
+  - value: 32784
+    direction: s2c
+    connection: both
+    name: gppBubbleJump
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppBubbleJump class, stamped 32784 in sender sub_50FB30 (kr-812); read back under the same number"
+  - value: 32785
+    direction: s2c
+    connection: both
+    name: gppWalkFast
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppWalkFast class, stamped 32785 in sender sub_50FBE0 (kr-812); read back under the same number"
+  - value: 32786
+    direction: s2c
+    connection: both
+    name: gppWallAction
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppWallAction class, stamped 32786 in sender sub_50FCF0 (kr-812); read back under the same number"
+  - value: 32787
+    direction: s2c
+    connection: both
+    name: gppKnocked
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppKnocked class, stamped 32787 in sender sub_511B50 (kr-812); read back under the same number"
+  - value: 32788
+    direction: s2c
+    connection: both
+    name: gppStunned
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppStunned class, stamped 32788 in sender sub_511C40 (kr-812); read back under the same number"
+  - value: 32789
+    direction: s2c
+    connection: both
+    name: gppShocked
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppShocked class, stamped 32789 in sender sub_511D80 (kr-812); read back under the same number"
+  - value: 32790
+    direction: s2c
+    connection: both
+    name: gppEndStunned
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppEndStunned class, stamped 32790 in sender sub_511E10 (kr-812); read back under the same number"
+  - value: 32791
+    direction: s2c
+    connection: both
+    name: gppKickStart
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppKickStart class, stamped 32791 in sender sub_512130 (kr-812); read back under the same number"
+  - value: 32792
+    direction: s2c
+    connection: both
+    name: gppKickFail
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppKickFail class, stamped 32792 in sender sub_5121D0 (kr-812); read back under the same number"
+  - value: 32793
+    direction: s2c
+    connection: both
+    name: gppTryRescued
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppTryRescued class, stamped 32793 in sender sub_511F60 (kr-812); read back under the same number"
+  - value: 32794
+    direction: s2c
+    connection: both
+    name: gppTryKicked
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppTryKicked class, stamped 32794 in sender sub_511FF0 (kr-812); read back under the same number"
+  - value: 32795
+    direction: s2c
+    connection: both
+    name: gppKicked
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppKicked class, stamped 32795 in sender sub_511EA0 (kr-812); read back under the same number"
+  - value: 32796
+    direction: s2c
+    connection: both
+    name: gppKickedNoPang
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppKickedNoPang class, stamped 32796 in sender sub_512080 (kr-812); read back under the same number"
+  - value: 32798
+    direction: s2c
+    connection: both
+    name: gppMeleeReady
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppMeleeReady class, stamped 32798 in sender sub_512380 (kr-812); read back under the same number"
+  - value: 32800
+    direction: s2c
+    connection: both
+    name: gppChangeState
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppChangeState class, stamped 32800 in sender sub_512420 (kr-812); read back under the same number"
+  - value: 32801
+    direction: s2c
+    connection: both
+    name: gppLockInto
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppLockInto class, stamped 32801 in sender sub_512540 (kr-812); read back under the same number"
+  - value: 32805
+    direction: s2c
+    connection: both
+    name: gppDying
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppDying class, stamped 32805 in sender sub_511260 (kr-812); read back under the same number"
+  - value: 32806
+    direction: s2c
+    connection: both
+    name: gppPopOut
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppPopOut class, stamped 32806 in sender sub_5114A0 (kr-812); read back under the same number"
+  - value: 32807
+    direction: s2c
+    connection: both
+    name: gppRescue
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppRescue class, stamped 32807 in sender sub_5115D0 (kr-812); read back under the same number"
+  - value: 32809
+    direction: s2c
+    connection: both
+    name: gppClimbWall
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppClimbWall class, stamped 32809 in sender sub_5126F0 (kr-812); read back under the same number"
+  - value: 32810
+    direction: s2c
+    connection: both
+    name: gppUpdateWeaponInfo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppUpdateWeaponInfo class, stamped 32810 in sender sub_511670 (kr-812); read back under the same number"
+  - value: 32811
+    direction: s2c
+    connection: both
+    name: gppReload
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppReload class, stamped 32811 in sender sub_5125D0 (kr-812); read back under the same number"
+  - value: 32812
+    direction: s2c
+    connection: both
+    name: gppResetChrAttr
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppResetChrAttr class, stamped 32812 in sender sub_512950 (kr-812); read back under the same number"
+  - value: 32813
+    direction: s2c
+    connection: both
+    name: gppReturnToNormal
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppReturnToNormal class, stamped 32813 in sender sub_512800 (kr-812); read back under the same number"
+  - value: 32815
+    direction: s2c
+    connection: both
+    name: gppHumiliationStart
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppHumiliationStart class, stamped 32815 in sender sub_512260 (kr-812); read back under the same number"
+  - value: 32816
+    direction: s2c
+    connection: both
+    name: gppHumiliationEnd
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppHumiliationEnd class, stamped 32816 in sender sub_5122F0 (kr-812); read back under the same number"
+  - value: 32818
+    direction: s2c
+    connection: both
+    name: gppStickGrenadeTo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppStickGrenadeTo class, stamped 32818 in sender sub_514F20 (kr-812); read back under the same number"
+  - value: 32822
+    direction: s2c
+    connection: both
+    name: gppCreateNPC
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppCreateNPC class, stamped 32822 in sender sub_6B6450 (kr-812); read back under the same number"
+  - value: 32823
+    direction: s2c
+    connection: both
+    name: gppRespawnNPC
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppRespawnNPC class, stamped 32823 in sender sub_512DF0 (kr-812); read back under the same number"
+  - value: 32824
+    direction: s2c
+    connection: both
+    name: gppItemUseResult
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppItemUseResult class, stamped 32824 in sender sub_5129E0 (kr-812); read back under the same number"
+  - value: 32829
+    direction: s2c
+    connection: both
+    name: gppHitByItem
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppHitByItem class, stamped 32829 in sender sub_512B20 (kr-812); read back under the same number"
+  - value: 32830
+    direction: s2c
+    connection: both
+    name: gppEndMagnet
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppEndMagnet class, stamped 32830 in sender sub_512BB0 (kr-812); read back under the same number"
+  - value: 32831
+    direction: s2c
+    connection: both
+    name: gppEndFreezeCannon
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppEndFreezeCannon class, stamped 32831 in sender sub_512D60 (kr-812); read back under the same number"
+  - value: 32832
+    direction: s2c
+    connection: both
+    name: gppCreateMapItem
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppCreateMapItem class, stamped 32832 in sender sub_514DC0 (kr-812); read back under the same number"
+  - value: 32833
+    direction: s2c
+    connection: both
+    name: gppStepOnBanana
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppStepOnBanana class, stamped 32833 in sender sub_514E80 (kr-812); read back under the same number"
+  - value: 32834
+    direction: s2c
+    connection: both
+    name: gppWallState
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppWallState class, stamped 32834 in sender sub_50F8F0 (kr-812); read back under the same number"
+  - value: 32835
+    direction: s2c
+    connection: both
+    name: gppGotKicked
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppGotKicked class, stamped 32835 in sender sub_5112F0 (kr-812); read back under the same number"
+  - value: 32836
+    direction: s2c
+    connection: both
+    name: gppDead
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppDead class, stamped 32836 in sender sub_511380 (kr-812); read back under the same number"
+  - value: 32837
+    direction: s2c
+    connection: both
+    name: gppKickEnd
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppKickEnd class, stamped 32837 in sender sub_511410 (kr-812); read back under the same number"
+  - value: 32840
+    direction: s2c
+    connection: both
+    name: gppPing
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppPing class, stamped 32840 in sender sub_671300 (kr-812); read back under the same number"
+  - value: 32841
+    direction: s2c
+    connection: both
+    name: gppIniPacket
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppIniPacket class, stamped 32841 in sender sub_6DEE10 (kr-812); read back under the same number"
+  - value: 32842
+    direction: s2c
+    connection: both
+    name: gppCreateMob
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppCreateMob class, stamped 32842 in sender sub_6DF880 (kr-812); read back under the same number"
+  - value: 32843
+    direction: s2c
+    connection: both
+    name: gppMobFireBullet
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppMobFireBullet class, stamped 32843 in sender sub_6DFA80 (kr-812); read back under the same number"
+  - value: 32844
+    direction: s2c
+    connection: both
+    name: gppMobFireMelee
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppMobFireMelee class, stamped 32844 in sender sub_6DFD50 (kr-812); read back under the same number"
+  - value: 32845
+    direction: s2c
+    connection: both
+    name: gppMobKnocked
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppMobKnocked class, stamped 32845 in sender sub_6DFE70 (kr-812); read back under the same number"
+  - value: 32846
+    direction: s2c
+    connection: both
+    name: gppMobDie
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppMobDie class, stamped 32846 in sender sub_6DFFC0 (kr-812); read back under the same number"
+  - value: 32847
+    direction: s2c
+    connection: both
+    name: gppMobPush
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppMobPush class, stamped 32847 in sender sub_6E006F (kr-812); read back under the same number"
+  - value: 32848
+    direction: s2c
+    connection: both
+    name: gppMobTryKicked
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppMobTryKicked class, stamped 32848 in sender sub_6E0410 (kr-812); read back under the same number"
+  - value: 32849
+    direction: s2c
+    connection: both
+    name: gppMobKicked
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppMobKicked class, stamped 32849 in sender sub_6E0520 (kr-812); read back under the same number"
+  - value: 32852
+    direction: s2c
+    connection: both
+    name: gppMobTryRescued
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppMobTryRescued class, stamped 32852 in sender sub_6E07D0 (kr-812); read back under the same number"
+  - value: 32853
+    direction: s2c
+    connection: both
+    name: gppMobRescue
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppMobRescue class, stamped 32853 in sender sub_6E08E0 (kr-812); read back under the same number"
+  - value: 32857
+    direction: s2c
+    connection: both
+    name: gppCreateMobsFromSpawnGroup
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppCreateMobsFromSpawnGroup class, stamped 32857 in sender sub_6E1350 (kr-812); read back under the same number"
+  - value: 32859
+    direction: s2c
+    connection: both
+    name: gppSpawnMobsByTrigger
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppSpawnMobsByTrigger class, stamped 32859 in sender sub_6E13E0 (kr-812); read back under the same number"
+  - value: 32860
+    direction: s2c
+    connection: both
+    name: gppCreateNpcBreakableModel
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppCreateNpcBreakableModel class, stamped 32860 in sender sub_6E15F0 (kr-812); read back under the same number"
+  - value: 32861
+    direction: s2c
+    connection: both
+    name: gppRemoveAddableObject
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppRemoveAddableObject class, stamped 32861 in sender sub_6E17F0 (kr-812); read back under the same number"
+  - value: 32862
+    direction: s2c
+    connection: both
+    name: gppCreateSpawnGroupMemberMob
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppCreateSpawnGroupMemberMob class, stamped 32862 in sender sub_6E1930 (kr-812); read back under the same number"
+  - value: 32863
+    direction: s2c
+    connection: both
+    name: gppActivateSpawnObjByTrigger
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppActivateSpawnObjByTrigger class, stamped 32863 in sender sub_6E1470 (kr-812); read back under the same number"
+  - value: 32864
+    direction: s2c
+    connection: both
+    name: gppTriggerLuaEvent
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppTriggerLuaEvent class, stamped 32864 in sender sub_6E1BA0 (kr-812); read back under the same number"
+  - value: 32865
+    direction: s2c
+    connection: both
+    name: gppMobLuaMessage
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppMobLuaMessage class, stamped 32865 in sender sub_6E0B70 (kr-812); read back under the same number"
+  - value: 32866
+    direction: s2c
+    connection: both
+    name: gppHordeMobReplay
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppHordeMobReplay class, stamped 32866 in sender sub_A225A0 (kr-812); read back under the same number"
+  - value: 32873
+    direction: s2c
+    connection: both
+    name: gppWaveSetMobSpawnGroup
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppWaveSetMobSpawnGroup class, stamped 32873 in sender sub_A25B40 (kr-812); read back under the same number"
+  - value: 32876
+    direction: s2c
+    connection: both
+    name: gppSetNoTargetByMob
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppSetNoTargetByMob class, stamped 32876 in sender sub_9C1C20 (kr-812); read back under the same number"
+  - value: 32877
+    direction: s2c
+    connection: both
+    name: gppMobDropBombOnDead
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppMobDropBombOnDead class, stamped 32877 in sender sub_514FD0 (kr-812); read back under the same number"
+  - value: 32882
+    direction: s2c
+    connection: both
+    name: gppGhost
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppGhost class, stamped 32882 in sender sub_515100 (kr-812); read back under the same number"
+  - value: 32884
+    direction: s2c
+    connection: both
+    name: gppWatchingOnMe
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppWatchingOnMe class, stamped 32884 in sender sub_80D8A0 (kr-812); read back under the same number"
+  - value: 32886
+    direction: s2c
+    connection: both
+    name: gppCommandChat
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppCommandChat class, stamped 32886 in sender sub_50EF00 (kr-812); read back under the same number"
+  - value: 32887
+    direction: s2c
+    connection: both
+    name: gppEmotion
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppEmotion class, stamped 32887 in sender sub_50F150 (kr-812); read back under the same number"
+  - value: 32888
+    direction: s2c
+    connection: both
+    name: gppSyncUseItemSimply
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppSyncUseItemSimply class, stamped 32888 in sender sub_9C1870 (kr-812); read back under the same number"
+  - value: 32889
+    direction: s2c
+    connection: both
+    name: gppCharactersPlayData
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppCharactersPlayData class, stamped 32889 in sender sub_51EA10 (kr-812); read back under the same number"
+  - value: 32890
+    direction: s2c
+    connection: both
+    name: gppRemoveUnit
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppRemoveUnit class, stamped 32890 in sender sub_5250A0 (kr-812); read back under the same number"
+  - value: 32891
+    direction: s2c
+    connection: both
+    name: gppDummyUnitMotion
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppDummyUnitMotion class, stamped 32891 in sender sub_524F90 (kr-812); read back under the same number"
+  - value: 32892
+    direction: s2c
+    connection: both
+    name: gppCreateAIObject
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppCreateAIObject class, stamped 32892 in sender sub_647CD0 (kr-812); read back under the same number"
+  - value: 32893
+    direction: s2c
+    connection: both
+    name: gppAgentMoveTo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppAgentMoveTo class, stamped 32893 in sender sub_5285E0 (kr-812); read back under the same number"
+  - value: 32894
+    direction: s2c
+    connection: both
+    name: gppUseItemDirect
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppUseItemDirect class, stamped 32894 in sender sub_525670 (kr-812); read back under the same number"
+  - value: 32895
+    direction: s2c
+    connection: both
+    name: gppChangeTurretState
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppChangeTurretState class, stamped 32895 in sender sub_525C80 (kr-812); read back under the same number"
+  - value: 32896
+    direction: s2c
+    connection: both
+    name: gppCitizenHp
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppCitizenHp class, stamped 32896 in sender sub_528FA0 (kr-812); read back under the same number"
+  - value: 32897
+    direction: s2c
+    connection: both
+    name: gppAggro
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppAggro class, stamped 32897 in sender sub_529140 (kr-812); read back under the same number"
+  - value: 32898
+    direction: s2c
+    connection: both
+    name: gppFireBullet3
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppFireBullet3 class, stamped 32898 in sender sub_510BF0 (kr-812); read back under the same number"
+  - value: 32899
+    direction: s2c
+    connection: both
+    name: gppStormDamager
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppStormDamager class, stamped 32899 in sender sub_510100 (kr-812); read back under the same number"
+  - value: 32900
+    direction: s2c
+    connection: both
+    name: gppSplashDamagerByDamager
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppSplashDamagerByDamager class, stamped 32900 in sender sub_50FE10 (kr-812); read back under the same number"
+  - value: 32903
+    direction: s2c
+    connection: both
+    name: gppPopOut2
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppPopOut2 class, stamped 32903 in sender sub_511530 (kr-812); read back under the same number"
+  - value: 32906
+    direction: s2c
+    connection: both
+    name: gppDeleteDamager
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppDeleteDamager class, stamped 32906 in sender sub_50EC70 (kr-812); read back under the same number"
+  - value: 32907
+    direction: s2c
+    connection: both
+    name: gppTeleport
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppTeleport class, stamped 32907 in sender sub_5292C0 (kr-812); read back under the same number"
+  - value: 32908
+    direction: s2c
+    connection: both
+    name: gppEndBreath
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppEndBreath class, stamped 32908 in sender sub_512CD0 (kr-812); read back under the same number"
+  - value: 32909
+    direction: s2c
+    connection: both
+    name: gppStormDamagerItemId
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppStormDamagerItemId class, stamped 32909 in sender sub_510010 (kr-812); read back under the same number"
+  - value: 32910
+    direction: s2c
+    connection: both
+    name: gppShocked2
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppShocked2 class, stamped 32910 in sender sub_511CF0 (kr-812); read back under the same number"
+  - value: 32912
+    direction: s2c
+    connection: both
+    name: gppZombieBossState
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppZombieBossState class, stamped 32912 in sender sub_5293B0 (kr-812); read back under the same number"
+  - value: 32913
+    direction: s2c
+    connection: both
+    name: gppZombieBossHp
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppZombieBossHp class, stamped 32913 in sender sub_529040 (kr-812); read back under the same number"
+  - value: 32914
+    direction: s2c
+    connection: both
+    name: gppEndDarkCircle
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppEndDarkCircle class, stamped 32914 in sender sub_512C40 (kr-812); read back under the same number"
+  - value: 32915
+    direction: s2c
+    connection: both
+    name: gppDeleteStormDamagerAOE
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppDeleteStormDamagerAOE class, stamped 32915 in sender sub_50EBE0 (kr-812); read back under the same number"
+  - value: 32917
+    direction: s2c
+    connection: both
+    name: gppAIState
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppAIState class, stamped 32917 in sender sub_529440 (kr-812); read back under the same number"
+  - value: 32918
+    direction: s2c
+    connection: both
+    name: gppCreateAISubordinate
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppCreateAISubordinate class, stamped 32918 in sender sub_529FC0 (kr-812); read back under the same number"
+  - value: 32920
+    direction: s2c
+    connection: both
+    name: gppLifePoint
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppLifePoint class, stamped 32920 in sender sub_5103B0 (kr-812); read back under the same number"
+  - value: 32921
+    direction: s2c
+    connection: both
+    name: gppTeleportPortal
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppTeleportPortal class, stamped 32921 in sender sub_50FA90 (kr-812); read back under the same number"
+  - value: 32923
+    direction: s2c
+    connection: both
+    name: gppExplodeBulletLean
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppExplodeBulletLean class, stamped 32923 in sender sub_50E9D0 (kr-812); read back under the same number"
+  - value: 32925
+    direction: s2c
+    connection: both
+    name: gppRelayedRespawn
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppRelayedRespawn class, stamped 32925 in sender sub_51E2C0 (kr-812); read back under the same number"
+  - value: 32926
+    direction: s2c
+    connection: both
+    name: gppFakeLagFrame
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppFakeLagFrame class, stamped 32926 in sender sub_50F3F0 (kr-812); read back under the same number"
+  - value: 32927
+    direction: s2c
+    connection: both
+    name: gppFakeSyncFrame
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppFakeSyncFrame class, stamped 32927 in sender sub_50F480 (kr-812); read back under the same number"
+  - value: 32928
+    direction: s2c
+    connection: both
+    name: gppTeamLeadCommand
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppTeamLeadCommand class, stamped 32928 in sender sub_52B970 (kr-812); read back under the same number"
+  - value: 32929
+    direction: s2c
+    connection: both
+    name: gppUseItemDirectAtPos
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gppUseItemDirectAtPos class, stamped 32929 in sender sub_5255C0 (kr-812); read back under the same number"
+  - value: 716
+    direction: s2c
+    name: gspGameCreateStar
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 play dispatcher sub_50B8C0 case 0x2CC -> sub_51AB40: type 1 GoStarItem (sub_75C810), 2 GoBigStarItem (sub_75BFF0), other types create nothing; reader sub_5302A0 is gspGameCreateLucci's, so the body is LucciCreate"
+  - value: 717
+    direction: s2c
+    name: gspStarEaten
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 play dispatcher sub_50B8C0 case 0x2CD -> sub_5153D0 builds Packet_gspStarEaten, plays the pickup on the character (+4) and destroys the star (+8); the body is LucciPicked"
+  - value: 718
+    direction: s2c
+    name: gspGameCreateEventBox
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 play dispatcher sub_50B8C0 case 0x2CE -> sub_51AC60: kind 1 creates a GoEventBoxItem, kind 3 a GoHordeAwardBoxItem; reader sub_5302A0 (the nine-word Lucci body); packets/lucci-drops.yaml"
+  - value: 720
+    direction: s2c
+    name: gspGameCreateLucci
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 play dispatcher sub_50B8C0 case 0x2D0 -> sub_51AD80: kind 1 GoLucciItem, 2 GoBigLucciItem, 3/4/5 GoHordeAward1/5/10LucciItem; vtable D1EA28 reader sub_5302A0, writer sub_530320; packets/lucci-drops.yaml"
+  - value: 721
+    direction: s2c
+    name: gspLucciEaten
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 play dispatcher sub_50B8C0 case 0x2D1 -> sub_516570 resolves +4 to the Character and +8 to the item it destroys; vtable D1EA34 reader sub_6DB1B0; packets/lucci-drops.yaml"
+  - value: 806
+    direction: s2c
+    name: gspCheckExpiredTimeResult
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 dispatcher sub_837170 case 0x326 -> sub_821620: reader sub_840820 (vtable slot D6F4B4) reads one counted u32 list, then sub_6D5890 shows one notice per id; packets/inventory.yaml ExpiredItems"
+  - value: 823
+    direction: c2s
+    name: gcpReqPresentDeleteReceive
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpReqPresentDeleteReceive is constructed before the stamping call of kr-812 sub_960FC0 / sub_9625E0: removing a gift from the received list (id); layout in packets/present.yaml"
+  - value: 818
+    direction: s2c
+    name: gspRepPresentReceiveSubList
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 818: Packet_gspRepPresentReceiveSubList constructor path; reader sub_83F640; layout in packets/present.yaml"
+  - value: 819
+    direction: s2c
+    name: gspRepPresentSendSubList
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 819: Packet_gspRepPresentSendSubList constructor path; reader sub_83F590; layout in packets/present.yaml"

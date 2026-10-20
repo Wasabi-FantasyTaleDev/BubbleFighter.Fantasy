@@ -1,0 +1,43 @@
+version: 1
+structs:
+  # kr-812 request RTTI at vtable D8A088 and reply at D6F510 share
+  # kr-812 sub_8B9490 / kr-812 sub_8B9660: two words followed by a wide string.
+  # cn-717 sub_8C9E10, cn-324 sub_7FD750, cn-279 sub_450430,
+  # id-400 sub_799620, id-1809 sub_912F50, cn-406 sub_85DD10 and cn-706 sub_7A1B40 match.
+  InventoryUseRequest:
+    - item_id: u32 # cn-324 sub_7FE160 and id-400 sub_8EAC70 supply item ID and quantity.
+      offset: 4
+      except: [cn-735]
+    - quantity: u32
+      offset: 8
+      except: [cn-735]
+    # kr-1256 builder sub_80DA80 writes a counted wstr list here (writer kr-1256 sub_429D10), as does cn-774
+    # (sub_9ADAC0, writer sub_457530); a spray sends it empty (kr-1256 sub_D407C0 case 1 -> sub_5F5FF0).
+    # tw-454 builder sub_C0AE70 keeps the single wstr.
+    - parameters: wstr
+      offset: 12
+      except: [cn-735]
+      kr-1256:
+        - parameters: "list<wstr>"
+          offset: 8
+      tw-454:
+        - parameters: wstr
+          offset: 8
+  InventoryUseReply:
+    - result: u32 # kr-812 sub_825070 and cn-324 sub_70B770 case 3: zero=success, 9=name taken, 11=length, 12=characters.
+      offset: 4
+      except: [cn-735]
+    - item_id: u32 # kr-812 sub_825070 passes +8 to kr-812 sub_992C60; the item's action selects the result dialog.
+      offset: 8
+      except: [cn-735]
+    - parameters: wstr # cn-324 sub_70B770 splits comma-separated key=value pairs; changeUserName installs the new name.
+      offset: 12
+      except: [cn-735]
+      # kr-1256 reader sub_9B4100 (S2C 813) reads a counted wstr list with sub_429E00, as does cn-774 (sub_BB28D0,
+      # reader sub_457390); tw-454 sub_A901A0 reads one wstr (reader sub_E91B70).
+      kr-1256:
+        - parameters: "list<wstr>"
+          offset: 8
+      tw-454:
+        - parameters: wstr
+          offset: 8

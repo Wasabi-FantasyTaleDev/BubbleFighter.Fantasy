@@ -1,0 +1,484 @@
+# Generated research catalog; do not edit by hand.
+# Every C2S opcode the cn-742 client stamps on a packet and every S2C opcode its
+# dispatcher handles, with the best known name. This is a research catalog, not the
+# server's table: rows move into opcodes.yaml only after review (profiles/opcode-policy.md).
+# connection_hint is a guess from the name prefix (gpp) or the value (>= 32768); opcodes.yaml decides.
+# Grades:
+#   label: the build's own Packet_* class or dispatcher label
+#   strong: matched sender function and kept opcode order (two independent signals)
+#   ordered: opcode order between two strong neighbours only; review before use
+#   weak: matched sender function only; review before use
+#   conflict: sources disagree; see votes
+#   none: no name known
+profile: cn-742
+opcode_setter: null
+dispatcher: null
+summary:
+  c2s_conflict: 4
+  c2s_none: 128
+  c2s_ordered: 88
+  c2s_strong: 45
+  c2s_weak: 4
+  s2c_label: 192
+opcodes:
+  - {value: 0, direction: c2s, name: Unknown0, grade: none, name_source: none, connection_hint: game, senders: [5EAA40, 97A410, A806C0]}
+  - {value: 1, direction: c2s, name: Unknown1, grade: none, name_source: none, connection_hint: game, senders: [97E360, 97E880, 9B5A70]}
+  - {value: 3, direction: c2s, name: rcpReportUseRelay, grade: strong, name_source: label@cn-717, connection_hint: relay, senders: [796C50, 971990, 971A40], via: cn-738>cn-742, from_op: 3}
+  - {value: 4, direction: c2s, name: rcpReportGameClosed, grade: ordered, name_source: label@cn-717, connection_hint: relay, senders: [971E50, 971EF0], via: cn-738>cn-742, from_op: 4}
+  - {value: 6, direction: c2s, name: gcpRepHackShieldCheck, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [97E640], via: cn-738>cn-742, from_op: 6}
+  - {value: 8, direction: c2s, name: rcpReqRegisterPeer, grade: strong, name_source: label@cn-717, connection_hint: relay, senders: [97C4E0], via: cn-717>...>cn-742, from_op: 8}
+  - {value: 9, direction: c2s, name: Unknown9, grade: none, name_source: none, connection_hint: game, senders: [796BB0, 97A410]}
+  - {value: 11, direction: c2s, name: Unknown11, grade: none, name_source: none, connection_hint: game, senders: [5EF7F0, 614970, 614A20]}
+  - {value: 12, direction: c2s, name: Unknown12, grade: none, name_source: none, connection_hint: game, senders: [97E590]}
+  - {value: 13, direction: c2s, name: Unknown13, grade: none, name_source: none, connection_hint: game, senders: [614FB0, 615060]}
+  - {value: 14, direction: c2s, name: Unknown14, grade: none, name_source: none, connection_hint: game, senders: [615280, 615360]}
+  - {value: 15, direction: c2s, name: Unknown15, grade: none, name_source: none, connection_hint: game, senders: [616130]}
+  - {value: 16, direction: c2s, name: Unknown16, grade: none, name_source: none, connection_hint: game, senders: [615110, 6151C0]}
+  - {value: 17, direction: c2s, name: Unknown17, grade: none, name_source: none, connection_hint: game, senders: [971AF0, 971B90]}
+  - {value: 18, direction: c2s, name: Unknown18, grade: none, name_source: none, connection_hint: game, senders: [613BB0, 613CA0, A806C0]}
+  - {value: 19, direction: c2s, name: rcpCrtSeedTable, grade: strong, name_source: label@cn-717, connection_hint: relay, senders: [613DA0, 613E70, 9B5F90], via: cn-738>cn-742, from_op: 19}
+  - {value: 20, direction: c2s, name: rcpDefSeedTable, grade: strong, name_source: label@cn-717, connection_hint: relay, senders: [613F40, 614000], via: cn-717>...>cn-742, from_op: 20}
+  - {value: 21, direction: c2s, name: Unknown21, grade: none, name_source: none, connection_hint: game, senders: [6140C0, 614180, 9B6680]}
+  - {value: 22, direction: c2s, name: Unknown22, grade: none, name_source: none, connection_hint: game, senders: [612780, 614AD0, 614BB0, 9B58F0]}
+  - {value: 23, direction: c2s, name: Unknown23, grade: none, name_source: none, connection_hint: game, senders: [614240, 614300, 9B61C0]}
+  - {value: 24, direction: c2s, name: Unknown24, grade: none, name_source: none, connection_hint: game, senders: [614C90, 614D60]}
+  - {value: 25, direction: c2s, name: Unknown25, grade: none, name_source: none, connection_hint: game, senders: [55F290, 9B68A0, 9B6980]}
+  - {value: 26, direction: c2s, name: Unknown26, grade: none, name_source: none, connection_hint: game, senders: [5526F0, 615A00, 615AE0]}
+  - {value: 27, direction: c2s, name: Unknown27, grade: none, name_source: none, connection_hint: game, senders: [9B6A60, 9B6B10]}
+  - {value: 29, direction: c2s, name: Unknown29, grade: none, name_source: none, connection_hint: game, senders: [97E6E0]}
+  - {value: 31, direction: c2s, name: Unknown31, grade: none, name_source: none, connection_hint: game, senders: [9FF300]}
+  - {value: 32, direction: c2s, name: Unknown32, grade: none, name_source: none, connection_hint: game, senders: [9B6410]}
+  - {value: 33, direction: c2s, name: Unknown33, grade: none, name_source: none, connection_hint: game, senders: [9B6370]}
+  - {value: 41, direction: c2s, name: Unknown41, grade: none, name_source: none, connection_hint: game, senders: [9B65E0]}
+  - {value: 46, direction: c2s, name: Unknown46, grade: none, name_source: none, connection_hint: game, senders: [894C50]}
+  - {value: 47, direction: c2s, name: Unknown47, grade: none, name_source: none, connection_hint: game, senders: [894D10]}
+  - {value: 48, direction: c2s, name: Unknown48, grade: none, name_source: none, connection_hint: game, senders: [527130]}
+  - {value: 52, direction: c2s, name: Unknown52, grade: none, name_source: none, connection_hint: game, senders: [B91E50]}
+  - {value: 53, direction: c2s, name: Unknown53, grade: none, name_source: none, connection_hint: game, senders: [794490]}
+  - {value: 54, direction: c2s, name: Unknown54, grade: none, name_source: none, connection_hint: game, senders: [9B5990]}
+  - {value: 55, direction: c2s, name: Unknown55, grade: none, name_source: none, connection_hint: game, senders: [9B64B0]}
+  - {value: 101, direction: c2s, name: Unknown101, grade: none, name_source: none, connection_hint: game, senders: [A51E40]}
+  - {value: 102, direction: c2s, name: Unknown102, grade: none, name_source: none, connection_hint: game, senders: [9B6280]}
+  - {value: 103, direction: c2s, name: Unknown103, grade: none, name_source: none, connection_hint: game, senders: [971DA0]}
+  - {value: 105, direction: c2s, name: gcpReqGotoMenu, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [704800], via: cn-717>...>cn-742, from_op: 105}
+  - {value: 106, direction: c2s, name: gcpReqGotoLobby, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [6D6620], via: cn-738>cn-742, from_op: 106}
+  - {value: 107, direction: c2s, name: Unknown107, grade: none, name_source: none, connection_hint: game, senders: [9B5E80]}
+  - {value: 108, direction: c2s, name: Unknown108, grade: none, name_source: none, connection_hint: game, senders: [D26A00]}
+  - {value: 109, direction: c2s, name: Unknown109, grade: none, name_source: none, connection_hint: game, senders: [AD7000]}
+  - {value: 110, direction: c2s, name: Unknown110, grade: none, name_source: none, connection_hint: game, senders: [7F9720]}
+  - {value: 111, direction: c2s, name: Unknown111, grade: none, name_source: none, connection_hint: game, senders: [AD70B0]}
+  - {value: 112, direction: c2s, name: Unknown112, grade: none, name_source: none, connection_hint: game, senders: [9B6C30]}
+  - {value: 113, direction: c2s, name: Unknown113, grade: none, name_source: none, connection_hint: game, senders: [51B020]}
+  - {value: 114, direction: c2s, name: Unknown114, grade: none, name_source: none, connection_hint: game, senders: [6BD900]}
+  - {value: 115, direction: c2s, name: Unknown115, grade: none, name_source: none, connection_hint: game, senders: [51B190]}
+  - {value: 116, direction: c2s, name: Unknown116, grade: none, name_source: none, connection_hint: game, senders: [51B0D0]}
+  - {value: 117, direction: c2s, name: Unknown117, grade: none, name_source: none, connection_hint: game, senders: [7F8DA0]}
+  - {value: 118, direction: c2s, name: Unknown118, grade: none, name_source: none, connection_hint: game, senders: [7F8E80]}
+  - {value: 119, direction: c2s, name: gcpReqEvent, grade: strong, name_source: label@kr-812, connection_hint: game, senders: [4608A0, 462F90, 464C50, 465030, 5CDAB0, 79B3F0], via: cn-738>cn-742, from_op: 119}
+  - {value: 120, direction: c2s, name: gcpReqGotoGuild, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [7FC550], via: kr-812>...>cn-742, from_op: 118}
+  - {value: 121, direction: c2s, name: gcpReqRecommendSend, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [9B60E0], via: cn-738>cn-742, from_op: 121}
+  - {value: 123, direction: c2s, name: gcpReqLmgUserRecord, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [CA8580], via: cn-738>cn-742, from_op: 123}
+  - {value: 124, direction: c2s, name: Unknown124, grade: none, name_source: none, connection_hint: game, senders: [971CE0]}
+  - {value: 125, direction: c2s, name: Unknown125, grade: none, name_source: none, connection_hint: game, senders: [D17250]}
+  - {value: 126, direction: c2s, name: Unknown126, grade: none, name_source: none, connection_hint: game, senders: [D1F2E0]}
+  - {value: 127, direction: c2s, name: Unknown127, grade: none, name_source: none, connection_hint: game, senders: [CC1FD0]}
+  - {value: 128, direction: c2s, name: Unknown128, grade: none, name_source: none, connection_hint: game, senders: [C49A10]}
+  - {value: 129, direction: c2s, name: Unknown129, grade: none, name_source: none, connection_hint: game, senders: [D09620]}
+  - {value: 130, direction: c2s, name: Unknown130, grade: none, name_source: none, connection_hint: game, senders: [CCEF30]}
+  - {value: 131, direction: c2s, name: Unknown131, grade: none, name_source: none, connection_hint: game, senders: [CD3750]}
+  - {value: 132, direction: c2s, name: Unknown132, grade: none, name_source: none, connection_hint: game, senders: [CD6020]}
+  - {value: 133, direction: c2s, name: Unknown133, grade: none, name_source: none, connection_hint: game, senders: [CCA500]}
+  - {value: 134, direction: c2s, name: Unknown134, grade: none, name_source: none, connection_hint: game, senders: [CC7C10]}
+  - {value: 136, direction: c2s, name: Unknown136, grade: none, name_source: none, connection_hint: game, senders: [CEB1B0]}
+  - {value: 137, direction: c2s, name: Unknown137, grade: none, name_source: none, connection_hint: game, senders: [C6E1A0]}
+  - {value: 202, direction: c2s, name: Unknown202, grade: none, name_source: none, connection_hint: game, senders: [7048A0]}
+  - {value: 301, direction: c2s, name: Unknown301, grade: none, name_source: none, connection_hint: game, senders: [AE2440]}
+  - {value: 302, direction: c2s, name: gcpReqKickFromParty, grade: strong, name_source: label@kr-812, connection_hint: game, senders: [AD7190], via: kr-812>...>cn-742, from_op: 302}
+  - {value: 303, direction: c2s, name: Unknown303, grade: none, name_source: none, connection_hint: game, senders: [AD7270]}
+  - {value: 305, direction: c2s, name: Unknown305, grade: none, name_source: none, connection_hint: game, senders: [AA2410]}
+  - {value: 401, direction: c2s, name: Unknown401, grade: none, name_source: none, connection_hint: game, senders: [794550]}
+  - {value: 402, direction: c2s, name: Unknown402, grade: none, name_source: none, connection_hint: game, senders: [53E800]}
+  - {value: 403, direction: c2s, name: Unknown403, grade: none, name_source: none, connection_hint: game, senders: [7943E0]}
+  - {value: 404, direction: c2s, name: gcpReqLeaveSession, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [971760], via: cn-717>...>cn-742, from_op: 404}
+  - {value: 405, direction: c2s, name: gcpReqCreateTutorialSession, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [79FEA0], via: cn-738>cn-742, from_op: 405}
+  - {value: 501, direction: c2s, name: gcpRoomSendChatMsg, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [9B6C90], via: kr-812>...>cn-742, from_op: 501}
+  - {value: 502, direction: c2s, name: gcpRoomSendChatModuleMsg, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [9B6D00], via: kr-812>...>cn-742, from_op: 502}
+  - {value: 503, direction: c2s, name: gcpRoomReqEnterGame, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [9B6030], via: kr-812>...>cn-742, from_op: 503}
+  - {value: 504, direction: c2s, name: gcpRoomReqEnterRoundGame, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [6D6BA0], via: kr-812>...>cn-742, from_op: 504}
+  - {value: 505, direction: c2s, name: gcpRoomReqReadyStatus, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [6D6E50], via: kr-812>...>cn-742, from_op: 505}
+  - {value: 506, direction: c2s, name: gcpRoomReqLeaveGame, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [784070], via: cn-738>cn-742, from_op: 506}
+  - {value: 508, direction: c2s, name: gcpRoomReqChangeMaster, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [971800], via: cn-738>cn-742, from_op: 508}
+  - {value: 509, direction: c2s, name: gcpRoomReqOpenCloseSlot, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [6DB440], via: cn-717>...>cn-742, from_op: 509}
+  - {value: 510, direction: c2s, name: Unknown510, grade: none, name_source: none, connection_hint: game, senders: [6D68B0]}
+  - {value: 511, direction: c2s, name: Unknown511, grade: none, name_source: none, connection_hint: game, senders: [AE2390]}
+  - {value: 513, direction: c2s, name: gcpRoomChangeGameSetting, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [6D6A30], via: cn-717>...>cn-742, from_op: 513}
+  - {value: 514, direction: c2s, name: gcpReqInventoryEquip, grade: conflict, name_source: label@cn-717, connection_hint: game, senders: [6D6800], via: cn-738>cn-742, from_op: 803, votes: {gcpReqInventoryEquip: 1, gcpRoomChangeRoundSetting: 1}}
+  - {value: 515, direction: c2s, name: gcpRoomChangeTeam, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [6D6760], via: kr-812>...>cn-742, from_op: 515}
+  - {value: 516, direction: c2s, name: gcpRoomSendRecMsg, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [9B5DA0], via: cn-738>cn-742, from_op: 516}
+  - {value: 517, direction: c2s, name: gcpReqPingUser, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [614420], via: kr-812>...>cn-742, from_op: 517}
+  - {value: 518, direction: c2s, name: gcpRepPingUser, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [971F90], via: kr-812>...>cn-742, from_op: 518}
+  - {value: 519, direction: c2s, name: gcpReqSelectAward, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [BDC4B0], via: kr-812>...>cn-742, from_op: 519}
+  - {value: 520, direction: c2s, name: gcpRoomSendAmpMsg, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [9B5BC0], via: cn-717>...>cn-742, from_op: 520}
+  - {value: 521, direction: c2s, name: gcpSendSessionInit, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [7F9680], via: cn-717>...>cn-742, from_op: 521}
+  - {value: 523, direction: c2s, name: gcpHsReportLog, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [79FDF0], via: cn-738>cn-742, from_op: 523}
+  - {value: 601, direction: c2s, name: gcpReportRelayConnected, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [97E410], via: cn-738>cn-742, from_op: 601}
+  - {value: 602, direction: c2s, name: gcpReportSuperPeerConnected, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [97E4D0], via: cn-738>cn-742, from_op: 602}
+  - {value: 603, direction: c2s, name: gcpReportHolePunchingEnd, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [97A410], via: cn-717>...>cn-742, from_op: 603}
+  - {value: 604, direction: c2s, name: gcpReportSuperPeerPingFail, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [784110], via: cn-717>...>cn-742, from_op: 604}
+  - {value: 607, direction: c2s, name: gcpReportTableSetHolePunchingEnd, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [97A9D0], via: cn-717>...>cn-742, from_op: 607}
+  - {value: 701, direction: c2s, name: gcpGameReportMapLoadingComplete, grade: strong, name_source: label@kr-812, connection_hint: game, senders: [5EC4C0], via: kr-812>...>cn-742, from_op: 701}
+  - {value: 702, direction: c2s, name: gcpGameReportMapData, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [5EAA40], via: cn-717>...>cn-742, from_op: 702}
+  - {value: 704, direction: c2s, name: gcpGameUpdateScoreOptimze, grade: conflict, name_source: label@kr-812, connection_hint: game, senders: [5E8640, 609A50, 616070], via: kr-812>...>cn-742, from_op: 2023, votes: {gcpGameUpdateScoreOptimze: 1, gppRelayedRespawn: 1, gcpRespawn: 1}}
+  - {value: 705, direction: c2s, name: gcpRequestRespawnIdx, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [614ED0], via: cn-738>cn-742, from_op: 705}
+  - {value: 707, direction: c2s, name: gcpEatItem, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [5EB740], via: cn-717>...>cn-742, from_op: 707}
+  - {value: 708, direction: c2s, name: gcpUseItem, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [5EC130], via: cn-717>...>cn-742, from_op: 708}
+  - {value: 709, direction: c2s, name: gcpReqAddObject, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [6148B0], via: cn-717>...>cn-742, from_op: 709}
+  - {value: 710, direction: c2s, name: gcpGameUpdateScore, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [614760], via: cn-717>...>cn-742, from_op: 710}
+  - {value: 711, direction: c2s, name: Unknown711, grade: none, name_source: none, connection_hint: game, senders: [8B6940]}
+  - {value: 713, direction: c2s, name: Unknown713, grade: none, name_source: none, connection_hint: game, senders: [6144E0]}
+  - {value: 714, direction: c2s, name: Unknown714, grade: none, name_source: none, connection_hint: game, senders: [6145C0]}
+  - {value: 715, direction: c2s, name: Unknown715, grade: none, name_source: none, connection_hint: game, senders: [614680]}
+  - {value: 723, direction: c2s, name: gcpPangZKInZHE, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [BF9180], via: cn-738>cn-742, from_op: 723}
+  - {value: 724, direction: c2s, name: Unknown724, grade: none, name_source: none, connection_hint: game, senders: [C75F80]}
+  - {value: 725, direction: c2s, name: gcpReqEndStage, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [5F2B30], via: cn-717>...>cn-742, from_op: 724}
+  - {value: 726, direction: c2s, name: gcpReqEndStageRoundOverReady, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [5F2A90], via: cn-717>...>cn-742, from_op: 725}
+  - {value: 728, direction: c2s, name: gcpReportHackDetectLucciCount, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [609750], via: cn-717>...>cn-742, from_op: 727}
+  - {value: 729, direction: c2s, name: gcpReqCreateItem, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [5F45E0, 5F4770], via: cn-738>cn-742, from_op: 729}
+  - {value: 730, direction: c2s, name: gcpReqCreateWeaponObject, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [5F4880], via: cn-738>cn-742, from_op: 730}
+  - {value: 731, direction: c2s, name: gcpPickUpWeapon, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [5F49A0], via: cn-717>...>cn-742, from_op: 730}
+  - {value: 732, direction: c2s, name: gcpEatStar, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [5EBC10], via: cn-717>...>cn-742, from_op: 731}
+  - {value: 733, direction: c2s, name: gcpReqCreateStar, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [5F50D0], via: cn-717>...>cn-742, from_op: 732}
+  - {value: 734, direction: c2s, name: gcpEatEventBox, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [5EBCF0], via: cn-717>...>cn-742, from_op: 733}
+  - {value: 735, direction: c2s, name: gcpReqCreateEventBox, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [5F51C0], via: cn-717>...>cn-742, from_op: 734}
+  - {value: 736, direction: c2s, name: gcpEatLucci, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [5EBDD0], via: cn-738>cn-742, from_op: 736}
+  - {value: 737, direction: c2s, name: gcpReqCreateLucci, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [5F53A0], via: cn-738>cn-742, from_op: 737}
+  - {value: 738, direction: c2s, name: gcpEatChocolate, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [5EBF90], via: cn-717>...>cn-742, from_op: 737}
+  - {value: 739, direction: c2s, name: gcpReqCreateChocolate, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [5F5670], via: cn-738>cn-742, from_op: 739}
+  - {value: 740, direction: c2s, name: gcpEatSpawner, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [612520], via: cn-717>...>cn-742, from_op: 739}
+  - {value: 741, direction: c2s, name: gcpReqCreateSpawner, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [5F52B0], via: cn-738>cn-742, from_op: 741}
+  - {value: 742, direction: c2s, name: gcpEatHeart, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [5EBEB0], via: cn-717>...>cn-742, from_op: 741}
+  - {value: 743, direction: c2s, name: gcpReqCreateHeart, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [5F5580], via: cn-738>cn-742, from_op: 743}
+  - {value: 745, direction: c2s, name: gcpSwitchItemSlot, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [60A780], via: cn-717>...>cn-742, from_op: 744}
+  - {value: 747, direction: c2s, name: Unknown747, grade: none, name_source: none, connection_hint: game, senders: [5F4FF0]}
+  - {value: 748, direction: c2s, name: Unknown748, grade: none, name_source: none, connection_hint: game, senders: [5ED050]}
+  - {value: 749, direction: c2s, name: Unknown749, grade: none, name_source: none, connection_hint: game, senders: [5ED4C0]}
+  - {value: 750, direction: c2s, name: Unknown750, grade: none, name_source: none, connection_hint: game, senders: [615580]}
+  - {value: 751, direction: c2s, name: Unknown751, grade: none, name_source: none, connection_hint: game, senders: [615670]}
+  - {value: 752, direction: c2s, name: Unknown752, grade: none, name_source: none, connection_hint: game, senders: [615DD0]}
+  - {value: 753, direction: c2s, name: Unknown753, grade: none, name_source: none, connection_hint: game, senders: [615E90]}
+  - {value: 754, direction: c2s, name: Unknown754, grade: none, name_source: none, connection_hint: game, senders: [5EB8D0]}
+  - {value: 755, direction: c2s, name: Unknown755, grade: none, name_source: none, connection_hint: game, senders: [5EB9A0]}
+  - {value: 756, direction: c2s, name: Unknown756, grade: none, name_source: none, connection_hint: game, senders: [5EBA60]}
+  - {value: 757, direction: c2s, name: Unknown757, grade: none, name_source: none, connection_hint: game, senders: [6124C0]}
+  - {value: 801, direction: c2s, name: gcpEnterShop, grade: strong, name_source: label@kr-812, connection_hint: game, senders: [7DDB60], via: kr-812>...>cn-742, from_op: 801}
+  - {value: 802, direction: c2s, name: gcpEnterInventory, grade: strong, name_source: label@kr-812, connection_hint: game, senders: [7DDF30, 7DE090], via: kr-812>...>cn-742, from_op: 802}
+  - {value: 803, direction: c2s, name: gcpReqInventoryEquip, grade: conflict, name_source: label@cn-717, connection_hint: game, senders: [6D2F00, B2DD70], via: cn-717>...>cn-742, from_op: 803}
+  - {value: 804, direction: c2s, name: gcpReqInventoryUnequip, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [B2DE90], via: cn-738>cn-742, from_op: 804}
+  - {value: 806, direction: c2s, name: gcpReqInventoryDeleteItem, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [B89A90], via: kr-812>...>cn-742, from_op: 806}
+  - {value: 807, direction: c2s, name: gcpReqInventoryThrowItem, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [B3EB20], via: cn-738>cn-742, from_op: 807}
+  - {value: 808, direction: c2s, name: gcpReqShopBuy, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [AE8040, B89E80], via: cn-738>cn-742, from_op: 808}
+  - {value: 809, direction: c2s, name: gcpReqShopItemCardInfo, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [B3EA60], via: cn-738>cn-742, from_op: 809}
+  - {value: 813, direction: c2s, name: gcpReqPresentDeleteReceive, grade: weak, name_source: label@kr-812, connection_hint: game, senders: [B131C0], via: cn-738>cn-742, from_op: 813}
+  - {value: 814, direction: c2s, name: gcpReqPresentReceiveSubList, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [B132A0], via: cn-738>cn-742, from_op: 814}
+  - {value: 815, direction: c2s, name: gcpReqPresentSendSubList, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [B3EBE0], via: cn-738>cn-742, from_op: 815}
+  - {value: 816, direction: c2s, name: gcpReqPresentSend, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [B0BA00], via: cn-738>cn-742, from_op: 816}
+  - {value: 817, direction: c2s, name: gcpReqPresentReceive, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [AF5C40], via: cn-738>cn-742, from_op: 817}
+  - {value: 818, direction: c2s, name: gcpReqPresentThrow, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [AF5D00], via: cn-738>cn-742, from_op: 818}
+  - {value: 819, direction: c2s, name: gcpReqPresentSendThankMsg, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [B15030], via: cn-738>cn-742, from_op: 819}
+  - {value: 820, direction: c2s, name: gcpReqPresentViewThankMsg, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [B13100], via: cn-738>cn-742, from_op: 820}
+  - {value: 822, direction: c2s, name: gcpReqPresentDeleteSend, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [B13040], via: cn-738>cn-742, from_op: 822}
+  - {value: 823, direction: c2s, name: gcpReqPresentDeleteReceive, grade: weak, name_source: label@kr-812, connection_hint: game, senders: [B12F80], via: cn-738>cn-742, from_op: 823}
+  - {value: 824, direction: c2s, name: gcpReqRealCouponUse, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [AF9860], via: cn-738>cn-742, from_op: 824}
+  - {value: 825, direction: c2s, name: gcpReqCheckCash, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [9B6760], via: cn-717>...>cn-742, from_op: 825}
+  - {value: 826, direction: c2s, name: gcpReqCashInven, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [B06770], via: cn-738>cn-742, from_op: 826}
+  - {value: 827, direction: c2s, name: gcpReqPickup, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [B3E910], via: cn-738>cn-742, from_op: 827}
+  - {value: 828, direction: c2s, name: gcpReqCloseGiftBox, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [7F92A0], via: cn-738>cn-742, from_op: 828}
+  - {value: 829, direction: c2s, name: gcpStopShowTerms, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [B294A0], via: cn-738>cn-742, from_op: 829}
+  - {value: 830, direction: c2s, name: Unknown830, grade: none, name_source: none, connection_hint: game, senders: [B31620]}
+  - {value: 831, direction: c2s, name: gcpReqRealCouponUse, grade: weak, name_source: label@kr-812, connection_hint: game, senders: [AF9940], via: cn-738>cn-742, from_op: 824}
+  - {value: 900, direction: c2s, name: Unknown900, grade: none, name_source: none, connection_hint: game, senders: [7FC290]}
+  - {value: 901, direction: c2s, name: Unknown901, grade: none, name_source: none, connection_hint: game, senders: [7FC370]}
+  - {value: 902, direction: c2s, name: Unknown902, grade: none, name_source: none, connection_hint: game, senders: [7FC470]}
+  - {value: 903, direction: c2s, name: Unknown903, grade: none, name_source: none, connection_hint: game, senders: [BE2940]}
+  - {value: 904, direction: c2s, name: Unknown904, grade: none, name_source: none, connection_hint: game, senders: [BE2A00]}
+  - {value: 905, direction: c2s, name: Unknown905, grade: none, name_source: none, connection_hint: game, senders: [BE2AC0]}
+  - {value: 906, direction: c2s, name: Unknown906, grade: none, name_source: none, connection_hint: game, senders: [BE2B70]}
+  - {value: 907, direction: c2s, name: Unknown907, grade: none, name_source: none, connection_hint: game, senders: [BE2890]}
+  - {value: 908, direction: c2s, name: gcpReqWaveAllSpawnMobs, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [BE2C20], via: cn-717>...>cn-742, from_op: 908}
+  - {value: 909, direction: c2s, name: gcpCreateUnit, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [6157E0], via: cn-717>...>cn-742, from_op: 909}
+  - {value: 911, direction: c2s, name: gcpReqManufactureRecipeInfo, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [7EB770], via: cn-738>cn-742, from_op: 911}
+  - {value: 912, direction: c2s, name: gcpReqManufactureList, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [9911F0, 9B6800], via: cn-738>cn-742, from_op: 912}
+  - {value: 913, direction: c2s, name: gcpReqManufactureStart, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [BAA850], via: cn-738>cn-742, from_op: 913}
+  - {value: 914, direction: c2s, name: gcpReqManufactureGetItem, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [BA5C70], via: cn-738>cn-742, from_op: 914}
+  - {value: 915, direction: c2s, name: gcpReqManufactureTimeOut, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [BA1950], via: cn-738>cn-742, from_op: 915}
+  - {value: 916, direction: c2s, name: Unknown916, grade: none, name_source: none, connection_hint: game, senders: [BAA8B0]}
+  - {value: 917, direction: c2s, name: Unknown917, grade: none, name_source: none, connection_hint: game, senders: [7F9200]}
+  - {value: 918, direction: c2s, name: Unknown918, grade: none, name_source: none, connection_hint: game, senders: [8DE620]}
+  - {value: 919, direction: c2s, name: gcpReqOpenTreasureChest, grade: strong, name_source: label@kr-812, connection_hint: game, senders: [8DE9D0], via: cn-738>cn-742, from_op: 919}
+  - {value: 921, direction: c2s, name: gcpReqGuildInfo, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [7F9830], via: cn-738>cn-742, from_op: 921}
+  - {value: 922, direction: c2s, name: gcpReqSingleStageInfo, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [5EC1D0], via: cn-717>...>cn-742, from_op: 920}
+  - {value: 924, direction: c2s, name: gcpPveUseCountItem, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [5EC340], via: cn-738>cn-742, from_op: 924}
+  - {value: 925, direction: c2s, name: gcpPvePangUnit, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [615890], via: cn-738>cn-742, from_op: 925}
+  - {value: 926, direction: c2s, name: gcpPveCombo, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [4ADF30], via: cn-717>...>cn-742, from_op: 924}
+  - {value: 927, direction: c2s, name: gcpPveUseRevival, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [8C7E10], via: cn-738>cn-742, from_op: 927}
+  - {value: 928, direction: c2s, name: gcpCompensationItemNoti, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [6125E0], via: cn-717>...>cn-742, from_op: 926}
+  - {value: 929, direction: c2s, name: gcpMissionProcess, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [971C30], via: cn-717>...>cn-742, from_op: 927}
+  - {value: 930, direction: c2s, name: gcpMakeUserTitle, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [A128A0], via: cn-717>...>cn-742, from_op: 929}
+  - {value: 931, direction: c2s, name: gcpSetUserTitle, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [A186C0], via: cn-717>...>cn-742, from_op: 930}
+  - {value: 934, direction: c2s, name: gcpCharRankInfo, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [7F8F40], via: cn-717>...>cn-742, from_op: 933}
+  - {value: 935, direction: c2s, name: gcpReqCoupleInviteExpire, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [BD4C60], via: cn-717>...>cn-742, from_op: 935}
+  - {value: 936, direction: c2s, name: gcpReqCoupleInviteExpire, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [BD4DA0], via: cn-738>cn-742, from_op: 936}
+  - {value: 937, direction: c2s, name: gcpReqCoupleBreakUp, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [BD4D00], via: cn-717>...>cn-742, from_op: 937}
+  - {value: 938, direction: c2s, name: gcpResClientDamageData, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [BD4E60], via: cn-717>...>cn-742, from_op: 939}
+  - {value: 941, direction: c2s, name: gcpReqEventProcess, grade: strong, name_source: label@kr-812, connection_hint: game, senders: [464E00, A1A410, A567D0], via: kr-812>...>cn-742, from_op: 940}
+  - {value: 942, direction: c2s, name: gcpSynthesisProcess, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [BBD020], via: cn-717>...>cn-742, from_op: 941}
+  - {value: 943, direction: c2s, name: Unknown943, grade: none, name_source: none, connection_hint: game, senders: [A4F2D0]}
+  - {value: 944, direction: c2s, name: Unknown944, grade: none, name_source: none, connection_hint: game, senders: [7F90C0]}
+  - {value: 945, direction: c2s, name: Unknown945, grade: none, name_source: none, connection_hint: game, senders: [7F9000]}
+  - {value: 947, direction: c2s, name: Unknown947, grade: none, name_source: none, connection_hint: game, senders: [4EDB30]}
+  - {value: 948, direction: c2s, name: Unknown948, grade: none, name_source: none, connection_hint: game, senders: [A9A2E0]}
+  - {value: 949, direction: c2s, name: Unknown949, grade: none, name_source: none, connection_hint: game, senders: [615950]}
+  - {value: 951, direction: c2s, name: Unknown951, grade: none, name_source: none, connection_hint: game, senders: [951660]}
+  - {value: 953, direction: c2s, name: Unknown953, grade: none, name_source: none, connection_hint: game, senders: [5D2E40, 5D6380]}
+  - {value: 954, direction: c2s, name: Unknown954, grade: none, name_source: none, connection_hint: game, senders: [56F1A0]}
+  - {value: 955, direction: c2s, name: Unknown955, grade: none, name_source: none, connection_hint: game, senders: [5A89F0]}
+  - {value: 956, direction: c2s, name: gcpReqChangeClanMark, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [55A6E0], via: cn-738>cn-742, from_op: 956}
+  - {value: 957, direction: c2s, name: gcpReqChangeClanMarkNoty, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [5690D0], via: cn-738>cn-742, from_op: 957}
+  - {value: 958, direction: c2s, name: Unknown958, grade: none, name_source: none, connection_hint: game, senders: [55AA60]}
+  - {value: 960, direction: c2s, name: Unknown960, grade: none, name_source: none, connection_hint: game, senders: [4E7E10]}
+  - {value: 961, direction: c2s, name: Unknown961, grade: none, name_source: none, connection_hint: game, senders: [4E7EF0]}
+  - {value: 2001, direction: c2s, name: Unknown2001, grade: none, name_source: none, connection_hint: game, senders: [7F99A0]}
+  - {value: 2002, direction: c2s, name: gcpReqSetSecondPassword, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [C29FE0], via: cn-738>cn-742, from_op: 2002}
+  - {value: 2003, direction: c2s, name: gcpReqDeleteSecondPassword, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [C2A0C0], via: cn-738>cn-742, from_op: 2003}
+  - {value: 2004, direction: c2s, name: gcpReqSeasonLadder, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [704740], via: cn-738>cn-742, from_op: 2004}
+  - {value: 2006, direction: c2s, name: gcpReqSeasonLadderGetRankListNo, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [5DC440], via: cn-738>cn-742, from_op: 2006}
+  - {value: 2007, direction: c2s, name: gcpReqNotifyChangeLevelIcon, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [7F9D30], via: cn-738>cn-742, from_op: 2007}
+  - {value: 2008, direction: c2s, name: gcpReqArena, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [51AF60], via: cn-738>cn-742, from_op: 2008}
+  - {value: 2009, direction: c2s, name: Unknown2009, grade: none, name_source: none, connection_hint: game, senders: [4D0C20]}
+  - {value: 2010, direction: c2s, name: gcpRoomChangeTeamObserver, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [6D6990], via: cn-738>cn-742, from_op: 2009}
+  - {value: 2011, direction: c2s, name: gcpReportHacking, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [6AE940], via: cn-738>cn-742, from_op: 2010}
+  - {value: 2013, direction: c2s, name: gcpBombMissionOver, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [6160D0], via: cn-738>cn-742, from_op: 2012}
+  - {value: 2014, direction: c2s, name: gcpBombState, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [60FB30], via: cn-738>cn-742, from_op: 2013}
+  - {value: 2015, direction: c2s, name: gcpUserUpdateCustomizedKeyList, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [5D0D40], via: cn-738>cn-742, from_op: 2014}
+  - {value: 2016, direction: c2s, name: gcpRoomChangeRoundSetting, grade: conflict, name_source: label@kr-812, connection_hint: game, senders: [6D6C50], via: cn-738>cn-742, from_op: 514, votes: {gcpRoomChangeRoundSetting: 1, gcpRoomReqIntrudeGame: 1}}
+  - {value: 2017, direction: c2s, name: gcpUserState, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [615D20], via: cn-717>...>cn-742, from_op: 2015}
+  - {value: 2018, direction: c2s, name: gcpReqGameReady, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [6D6AE0], via: cn-717>...>cn-742, from_op: 2016}
+  - {value: 2019, direction: c2s, name: gcpGoMapItemSync, grade: strong, name_source: label@kr-812, connection_hint: game, senders: [9718E0], via: cn-738>cn-742, from_op: 2018}
+  - {value: 2020, direction: c2s, name: gcpDropCaptain, grade: ordered, name_source: label@kr-812, connection_hint: game, senders: [4A43D0], via: cn-738>cn-742, from_op: 2019}
+  - {value: 2021, direction: c2s, name: gcpReqClanInfo, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [5525D0], via: cn-717>...>cn-742, from_op: 2019}
+  - {value: 2023, direction: c2s, name: gcpReqCreateHordeAward, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [5F5490], via: cn-738>cn-742, from_op: 2022}
+  - {value: 2024, direction: c2s, name: gcpReqGotoClan, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [4B7730], via: cn-738>cn-742, from_op: 2023}
+  - {value: 2025, direction: c2s, name: gcpUserHostStart, grade: ordered, name_source: label@cn-717, connection_hint: game, senders: [616010], via: cn-738>cn-742, from_op: 2026}
+  - {value: 2027, direction: c2s, name: gcpUserHostSetting, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [6D66C0], via: cn-738>cn-742, from_op: 2027}
+  - {value: 2028, direction: c2s, name: gcpRoomReqIntrudeGame, grade: weak, name_source: label@kr-812, connection_hint: game, senders: [972150], via: cn-738>cn-742, from_op: 2015}
+  - {value: 2029, direction: c2s, name: Unknown2029, grade: none, name_source: none, connection_hint: game, senders: [612580]}
+  - {value: 2030, direction: c2s, name: Unknown2030, grade: none, name_source: none, connection_hint: game, senders: [9B6D60]}
+  - {value: 2031, direction: c2s, name: Unknown2031, grade: none, name_source: none, connection_hint: game, senders: [615C60]}
+  - {value: 2032, direction: c2s, name: Unknown2032, grade: none, name_source: none, connection_hint: game, senders: [A980A0]}
+  - {value: 2033, direction: c2s, name: Unknown2033, grade: none, name_source: none, connection_hint: game, senders: [C5A2F0]}
+  - {value: 2034, direction: c2s, name: Unknown2034, grade: none, name_source: none, connection_hint: game, senders: [70FCC0]}
+  - {value: 2035, direction: c2s, name: Unknown2035, grade: none, name_source: none, connection_hint: game, senders: [70FD80]}
+  - {value: 2036, direction: c2s, name: Unknown2036, grade: none, name_source: none, connection_hint: game, senders: [52C200]}
+  - {value: 2037, direction: c2s, name: Unknown2037, grade: none, name_source: none, connection_hint: game, senders: [5A0550]}
+  - {value: 2038, direction: c2s, name: Unknown2038, grade: none, name_source: none, connection_hint: game, senders: [5A05F0]}
+  - {value: 2039, direction: c2s, name: Unknown2039, grade: none, name_source: none, connection_hint: game, senders: [D39700]}
+  - {value: 2040, direction: c2s, name: Unknown2040, grade: none, name_source: none, connection_hint: game, senders: [464F70]}
+  - {value: 2041, direction: c2s, name: Unknown2041, grade: none, name_source: none, connection_hint: game, senders: [4650E0]}
+  - {value: 2043, direction: c2s, name: Unknown2043, grade: none, name_source: none, connection_hint: game, senders: [CB3C90]}
+  - {value: 20005, direction: c2s, name: Unknown20005, grade: none, name_source: none, connection_hint: game, senders: [97E2C0]}
+  - {value: 20006, direction: c2s, name: Unknown20006, grade: none, name_source: none, connection_hint: game, senders: [97E7C0]}
+  - {value: 20007, direction: c2s, name: Unknown20007, grade: none, name_source: none, connection_hint: game, senders: [7841D0]}
+  - {value: 20009, direction: c2s, name: Unknown20009, grade: none, name_source: none, connection_hint: game, senders: [97C400]}
+  - {value: 20010, direction: c2s, name: rcpReqHackCheckType, grade: ordered, name_source: label@cn-717, connection_hint: relay, senders: [734260], via: cn-738>cn-742, from_op: 20010}
+  - {value: 1, direction: s2c, name: gspDisconnect, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 2, direction: s2c, name: gspRepGamePatch, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 3, direction: s2c, name: gspRepLogin, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 4, direction: s2c, name: gspReqPing, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 5, direction: s2c, name: gspReqHackShieldCheck, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 6, direction: s2c, name: gspReqXignCodeCheck, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 7, direction: s2c, name: gspRepGPKDynCode, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 8, direction: s2c, name: gspRepGPKCSAuth, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 10, direction: s2c, name: gspRepMoveChannel, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 11, direction: s2c, name: gspDisconnectingMovedUser, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 12, direction: s2c, name: gspDisconnectMovedUser, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 13, direction: s2c, name: gspRepMoveInto, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 15, direction: s2c, name: gspRepCheckCreateUserName, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 16, direction: s2c, name: gspRepCreateUserInfo, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 17, direction: s2c, name: gspQueryBadProgram, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 18, direction: s2c, name: gspRepCenterUserCnt, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 19, direction: s2c, name: gspCenterList, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 20, direction: s2c, name: gspRepUniquenessCheck, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 21, direction: s2c, name: gspDisconnectOpenWeb, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 22, direction: s2c, name: gspDisconnectBlockIP, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 23, direction: s2c, name: gspClanPassport, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 25, direction: s2c, name: gspClanPointAdd, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 105, direction: s2c, name: gspUserStat, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 106, direction: s2c, name: gspOveruseSync, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 107, direction: s2c, name: gspOveruseAlarmMsg, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 109, direction: s2c, name: gspServerChatNoticeMsg, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 110, direction: s2c, name: gspGotoMenu, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 111, direction: s2c, name: gspGotoLobby, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 112, direction: s2c, name: gspGotoRoom, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 113, direction: s2c, name: gspRepWaitUserList, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 114, direction: s2c, name: gspRepInvite, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 115, direction: s2c, name: gspNotifyInvite, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 116, direction: s2c, name: gspRepMoveToInviter, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 117, direction: s2c, name: gspRepMoveToFriend, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 121, direction: s2c, name: gspEventNotice, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 122, direction: s2c, name: gspEventNotice2, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 123, direction: s2c, name: gspEventNoticeCustom, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 125, direction: s2c, name: gspRepFighterInfo, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 126, direction: s2c, name: gspRepAwardInfo, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 127, direction: s2c, name: gspRepEvent, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 129, direction: s2c, name: gspNotifyPromotion, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 130, direction: s2c, name: gspChangedUserName, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 131, direction: s2c, name: gspRepRecommendResult, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 132, direction: s2c, name: gspReqClanMarkInfo, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 133, direction: s2c, name: gspRandomBox, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 134, direction: s2c, name: gspRepLmgUserRecord, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 135, direction: s2c, name: gspNotifySocialCommend, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 136, direction: s2c, name: gspNotifySocialReport, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 137, direction: s2c, name: gspNotifySocialReportingResult, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 138, direction: s2c, name: gspNotifySocialBanPlay, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 139, direction: s2c, name: gspNotifySocialWarning, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 140, direction: s2c, name: gspRepUserMysteryStore, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 141, direction: s2c, name: gspRepUserBubblePointStore, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 142, direction: s2c, name: gspRepUserTwirlingRoulette, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 143, direction: s2c, name: gspRepCompound, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 144, direction: s2c, name: gspRepDecompound, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 145, direction: s2c, name: gspRepEnchant, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 146, direction: s2c, name: gspRepPetCompound, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 147, direction: s2c, name: gspRepChangeUnlimited, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 149, direction: s2c, name: gspRepExpectationItems, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 150, direction: s2c, name: gspRepSciendLabConfig, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 151, direction: s2c, name: gspRepEventZoneConfig, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 152, direction: s2c, name: gspNotifyFirstMoveChannel, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 201, direction: s2c, name: gspUpdateParty, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 202, direction: s2c, name: gspRepJoinParty, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 203, direction: s2c, name: gspUpdatePartyLeader, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 204, direction: s2c, name: gspNotifyPartyLeaveSuccess, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 205, direction: s2c, name: gspNotifyMemberLeave, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 206, direction: s2c, name: gspNotifyNewMemberJoin, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 302, direction: s2c, name: gspRepKickFromParty, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 303, direction: s2c, name: gspRepChangePartyLeader, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 304, direction: s2c, name: gspNotifyKickFromParty, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 305, direction: s2c, name: gspReceivePartyChatMsg, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 306, direction: s2c, name: gspRepPartyRecruiting, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 307, direction: s2c, name: gspNotifyKickMember, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 601, direction: s2c, name: gspConnectToRelayServer, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 603, direction: s2c, name: gspConnectToSuperPeer, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 606, direction: s2c, name: gspUdpStop, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 757, direction: s2c, name: gspArea32GameExit, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 800, direction: s2c, name: gspRepEnterShop, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 801, direction: s2c, name: gspInventoryUpdateAllInventorySlot, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 802, direction: s2c, name: gspInventoryUpdateInventorySlots, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 803, direction: s2c, name: gspInventoryUpdateInventorySlot, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 805, direction: s2c, name: gspInventoryViewUpdateView, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 806, direction: s2c, name: gspCheckExpiredTimeResult, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 807, direction: s2c, name: gspCashInvenUpdateAllInventorySlot, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 808, direction: s2c, name: gspRepInventoryEquip, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 809, direction: s2c, name: gspRepInventoryUnequip, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 810, direction: s2c, name: gspRepInventoryUseItem, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 811, direction: s2c, name: gspRepInventoryDeleteItem, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 812, direction: s2c, name: gspRepInventoryThrowItem, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 813, direction: s2c, name: gspRepShopBuy, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 814, direction: s2c, name: gspRepShopItemCardInfo, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 815, direction: s2c, name: gspRepPresentNewReceive, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 816, direction: s2c, name: gspRepPresentReceiveList, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 817, direction: s2c, name: gspRepPresentSendList, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 818, direction: s2c, name: gspRepPresentReceiveSubList, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 819, direction: s2c, name: gspRepPresentSendSubList, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 820, direction: s2c, name: gspRepRefund, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 821, direction: s2c, name: gspRepPresentSend, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 822, direction: s2c, name: gspRepPresentReceive, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 823, direction: s2c, name: gspRepPresentThrow, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 824, direction: s2c, name: gspRepPresentSendThankMsg, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 825, direction: s2c, name: gspRepPresentViewThankMsg, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 826, direction: s2c, name: gspRepPresentConfirm, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 827, direction: s2c, name: gspRepPresentDeleteSend, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 828, direction: s2c, name: gspRepPresentDeleteReceive, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 829, direction: s2c, name: gspRepRealCouponUse, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 831, direction: s2c, name: gspRepPickup, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 832, direction: s2c, name: gspReqInventoryChangeWeaponPresetIdx, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 833, direction: s2c, name: gspReqWeaponPreSetUpdate, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 834, direction: s2c, name: gspRepUseNexonStarCoupon, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 901, direction: s2c, name: gspRepGuildLineBoardWrite, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 902, direction: s2c, name: gspRepGuildLineBoardDelete, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 903, direction: s2c, name: gspNotifyZombieApearInPreGame, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 910, direction: s2c, name: gspMergeCountOrDayItemList, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 913, direction: s2c, name: gspManufactureRecipeInfo, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 914, direction: s2c, name: gspManufactureList, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 915, direction: s2c, name: gspManufactureStart, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 916, direction: s2c, name: gspManufactureGetItem, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 917, direction: s2c, name: gspManufactureTimeOut, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 918, direction: s2c, name: gspResTreasureChestInfo, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 919, direction: s2c, name: gspResOpenTreasureChest, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 920, direction: s2c, name: gspResTreasureChestDetailViewInfo, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 921, direction: s2c, name: gspCustomizeString, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 922, direction: s2c, name: gspResGuildInfo, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 923, direction: s2c, name: gspResSingleStageInfo, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 924, direction: s2c, name: gspResSingleStageState, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 934, direction: s2c, name: gspResMakeUserTitle, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 935, direction: s2c, name: gspResSetUserTitle, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 936, direction: s2c, name: gspTitleSyncInfo, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 937, direction: s2c, name: gspProvideMedal, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 938, direction: s2c, name: gspCharRankInfo, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 939, direction: s2c, name: gspResCoupleInvite, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 940, direction: s2c, name: gspResCoupleInviteResult, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 941, direction: s2c, name: gspResCoupleInviteAnswer, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 942, direction: s2c, name: gspResCoupleBreakUp, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 943, direction: s2c, name: gspResCoupleNotifyPartner, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 948, direction: s2c, name: gspUpdateCoupleSlot, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 949, direction: s2c, name: gspUpdateCoupleList, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 950, direction: s2c, name: gspReqClientDamageData, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 952, direction: s2c, name: gspSynthesisProcess, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 953, direction: s2c, name: gspResRandomMissionInfo, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 956, direction: s2c, name: gspEvolveResult, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 957, direction: s2c, name: gspGMConsole, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 958, direction: s2c, name: gspNexonGuard, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 959, direction: s2c, name: gspPortalMove, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 960, direction: s2c, name: gspNotifyMsg, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 961, direction: s2c, name: gspContentConfig, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 963, direction: s2c, name: gspOXContollerData, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 964, direction: s2c, name: gspResBlueMarbleDice, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 965, direction: s2c, name: gspRepRecheckMap, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 966, direction: s2c, name: gspNexonGuardHackDetected, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 967, direction: s2c, name: gspNotifySecondPassword, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 969, direction: s2c, name: gspSeasonLadderLevelUpNotice, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 970, direction: s2c, name: gspRepSeasonLadderGetRankList, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 971, direction: s2c, name: gspRepNotifyChangeLevelIcon, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 972, direction: s2c, name: gspRepArena, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 973, direction: s2c, name: gspRepMatchWaitingInfo, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 974, direction: s2c, name: gspRepEventZone, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 975, direction: s2c, name: gspSurelyChangeName, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 978, direction: s2c, name: gspRepCustomizedKeyList, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 981, direction: s2c, name: gspReqGameReady, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 982, direction: s2c, name: gspResBaseballBatInfo, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 983, direction: s2c, name: gspResBaseballHitResult, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 986, direction: s2c, name: gspResChangeCouplering, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 987, direction: s2c, name: gspUpdateClanInfoToClanServer, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 988, direction: s2c, name: gspResChangeClanMarkNoty, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 990, direction: s2c, name: gspGetGameAccessToken, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 991, direction: s2c, name: gspGoToFreeMainMenu, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 993, direction: s2c, name: gspGMObserver, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 994, direction: s2c, name: gspUserHostStart, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 995, direction: s2c, name: gspUserHostSetting, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 996, direction: s2c, name: gspUserHostDefaultSetting, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 1000, direction: s2c, name: gspBingoData, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 1001, direction: s2c, name: gspResUpdateBingoNumber, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 1002, direction: s2c, name: gspResGetBingoItem, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 1004, direction: s2c, name: gspAfreeCaTv, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 1005, direction: s2c, name: gspResGodOfFighterPlayableTime, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 1006, direction: s2c, name: gspQueryGuidUserName, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 1501, direction: s2c, name: gspChampsRuleMainOptionNotify, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 1502, direction: s2c, name: gspChampsRuleSubOptionNotify, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 1503, direction: s2c, name: gspChampsRuleSetStateNotify, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 1504, direction: s2c, name: gspResponseEventInfo, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 1505, direction: s2c, name: gspClanAttendanceState, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 1506, direction: s2c, name: gspClanAttendanceReward, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 1507, direction: s2c, name: gspResponseVoiceSystem, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 1508, direction: s2c, name: gspDormantAttendance, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 1509, direction: s2c, name: gspPcRoomAttendanceState, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 1510, direction: s2c, name: gspPcRoomAttendanceReward, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 1511, direction: s2c, name: gspGraduateNewbieClan, grade: label, name_source: label@cn-742, connection_hint: game}
+  - {value: 1512, direction: s2c, name: gspLuxuryClubResponse, grade: label, name_source: label@cn-742, connection_hint: game}

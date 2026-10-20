@@ -1,0 +1,250 @@
+version: 1
+# The legacy gift box ("Present"): gifts bought in the shop for another player, listed in the task-bar gift box,
+# taken into the bag, thrown away or removed. Rules and flows: packets/present.yaml.
+#
+# Every structure is read by the class named in its comment. kr-812 reads them through the packet class readers
+# (vtable slot 1) and cn-717 / id-400 / id-1809 / cn-324 / cn-279 / cn-706 / cn-406 / cn-404 / cn-408 read the same
+# classes with their own primitives. Two families differ and are written once as `except`:
+#   badge family     kr-812, cn-717      the task-bar badge count rides the packets that change the gift count
+#   no-badge family  id-400, id-1809, cn-324 and the builds based on them
+#                                        the count is not on the wire; the new-gift word alone drives the icon
+# The three u32 results that can be negative (sent, received) are written as their 32-bit two's complement.
+structs:
+  # A gift as the receiver's list shows it. Reader kr-812 sub_840340; cn-717 sub_8C9AE0, id-400 sub_795B70, id-1809
+  # sub_7BBD00, cn-324 sub_6FAEA0, cn-279 sub_44D7C0, cn-706 sub_79DF80, cn-406 sub_712340, cn-404 sub_7C3400 and cn-408
+  # sub_7C6930 make the same seven reads. Row filler kr-812 sub_95EB70.
+  PresentReceive:
+    - id: u32 # kr-812 sub_95EB70 stores it at row +764; kr-812 sub_960FC0 finds the record by it.
+      offset: 4
+    - sent_date: f64 # An OLE date: kr-812 sub_44C0B0 passes it to VariantTimeToSystemTime, shown as year/month/day.
+      offset: 8
+    # kr-812 sub_95EB70 keeps it at row +776 and kr-812 sub_960FC0 branches on it: -999 and -899 are reward kinds
+    # (-899 shows "Pirate Battle reward item"), a positive value is an ordinary gift whose accept dialog offers a
+    # thank-you message, anything else is refused with a failure box. The server sends 1; the meaning of other
+    # positive values is unproven.
+    - unknown_16: u32
+      offset: 16
+      default: 1
+    - sender_nickname: wstr # Copied to row +780 and trimmed of spaces and line breaks.
+      offset: 20
+    - item_key: u32 # A Stock or StockSet key: kr-812 sub_4FB720 sorts it (1000000.. stock, 2000000.. set) and kr-812 sub_992C60 / sub_992AF0 name it.
+      offset: 48
+    - opened: u16 # Zero shows the item row, nonzero the opened row that also shows the message (kr-812 sub_95EB70). The server sets it once the gift was taken.
+      offset: 52
+    - message: wstr # Row +836.
+      offset: 56
+
+  # A gift as the sender's list shows it. Reader kr-812 sub_83FBF0 (cn-717 sub_8C9300, id-400 sub_795C70, cn-324
+  # sub_6FB070 and the others make the same ten reads), row filler kr-812 sub_95F1C0.
+  PresentSend:
+    - id: u32
+      offset: 4
+    - sent_date: f64
+      offset: 8
+    - unknown_16: f64 # Not read by kr-812 sub_95F1C0; another consumer is not found.
+      offset: 16
+    - unknown_24: u32 # The slot of PresentReceive +16; kr-812 sub_95F1C0 does not read it.
+      offset: 24
+      default: 1
+    - receiver_nickname: wstr # Row +780.
+      offset: 28
+    - item_key: u32 # Row +768.
+      offset: 56
+    - opened: u16 # Nonzero once the receiver took it: kr-812 sub_95F1C0 then shows the receiver and the thank-you.
+      offset: 60
+    - thanks_state: u16 # Row +924 and the state at row +928 (1 sends the thank-you view, 2 and above are read separately). Always 0 here: the thank-you messages are not implemented.
+      offset: 62
+    - message: wstr # Row +836.
+      offset: 64
+    - thanks_message: wstr # Row +896, shown with the opened row.
+      offset: 92
+
+  # S2C gspRepPresentNewReceive (kr-812 815, cn-324 816). Reader kr-812 sub_6DB1B0, cn-717 sub_538B70 (two words);
+  # cn-324 sub_410910, cn-279 sub_44C1A0, id-400 sub_93D120, id-1809 sub_4D60C0, cn-706 sub_4BBB70, cn-406 sub_700770,
+  # cn-404 sub_7C7870 and cn-408 sub_7B1F60 (one word). Handler kr-812 sub_828B10 stores `word == 1` as a byte of the
+  # task bar (UiTaskBar +884) and its only reader kr-812 sub_A48C40 blinks the "present_notice.png" sprite at 500 ms
+  # intervals while it is set; the second word is stored at session +1488 and printed on the bar when above zero.
+  # cn-717 sub_8AF950 is the same; cn-324 sub_70D2C0 and the other one-word builds store `word == 1` as a byte of the
+  # task bar and keep no count. Nothing else writes that byte, so a later packet with 0 clears the icon.
+  PresentNotice:
+    - has_new: u32
+      offset: 4
+    - pending_count: u32
+      offset: 8
+      except: [id-400, id-1809, cn-324]
+
+  # S2C gspRepPresentReceiveSubList (kr-812 818, cn-324 819): one page of the receiver's list. Reader kr-812 sub_83F640
+  # with the 88-byte record loop kr-812 sub_8403A0 (cn-717 sub_8C8B30; cn-324 sub_6FE200 and the other one-pair builds
+  # read two words). kr-812 sub_828E00 acts only when the status is 1; the second word is stored at box +804 and
+  # kr-812 sub_960BE0 turns it into the page count (total - 1) / 4 + 1, the third is the task-bar count.
+  PresentReceiveSubList:
+    - status: u32
+      offset: 4
+    - total: u32
+      offset: 8
+    - pending_count: u32
+      offset: 12
+      except: [id-400, id-1809, cn-324]
+    - presents: "list<PresentReceive>"
+      offset: 16
+
+  # S2C gspRepPresentSendSubList (kr-812 819, cn-324 820): one page of the sender's list. Reader kr-812 sub_83F590 with
+  # the 120-byte record loop kr-812 sub_83FC70; handler kr-812 sub_828F40 stores the total at box +804 the same way.
+  PresentSendSubList:
+    - status: u32
+      offset: 4
+    - total: u32
+      offset: 8
+    - presents: "list<PresentSend>"
+      offset: 12
+
+  # S2C gspRepPresentSend (kr-812 821, cn-324 822): the result of the purchase. Reader kr-812 sub_80A910, handler
+  # kr-812 sub_829EC0: 1 shows "sent", the codes in packets/present.yaml pick the failure texts.
+  PresentSendReply:
+    - result: u32
+      offset: 4
+
+  # S2C gspRepPresentReceive (kr-812 822, cn-324 823): the result of taking a gift. Reader kr-812 sub_80A400 (four
+  # words), cn-324 sub_6EB8B0 and the other one-pair builds read three. Handler kr-812 sub_82A9A0: a negative result
+  # shows the failure box; otherwise kr-812 sub_960FC0(box, id, item_key) finds the record by the second word, shows
+  # the item named by the third in the accept dialog and offers a thank-you message, and the last word is the
+  # task-bar count. The client code shows the call with the id and key as the last two stack arguments; the mode is
+  # in a register.
+  PresentReceiveReply:
+    - result: u32
+      offset: 4
+    - id: u32
+      offset: 8
+    - item_key: u32
+      offset: 12
+    - pending_count: u32
+      offset: 16
+      except: [id-400, id-1809, cn-324]
+
+  # S2C gspRepPresentThrow (kr-812 823, cn-324 824): the result of throwing a gift away. Reader kr-812 sub_6DB1B0,
+  # handler kr-812 sub_82AD40: status 1 shows "discarded" and then sends the delete request for the id.
+  PresentThrowReply:
+    - status: u32
+      offset: 4
+    - id: u32
+      offset: 8
+    - pending_count: u32 # kr-1256 sub_9BB3A0 (S2C 827) reads a third word and stores it in the session's gift count (+904) as kr-1256 sub_9BC940 does; cn-774 sub_BB8940 reads three as well.
+      offset: 12
+      only: [kr-1256]
+
+  # S2C gspRepPresentDeleteSend (kr-812 827, cn-324 828): a gift left the sender's list. Reader kr-812 sub_6DB1B0,
+  # handler kr-812 sub_82BC70: status 1 asks for the sent list again.
+  PresentDeleteSentReply:
+    - status: u32
+      offset: 4
+    - id: u32
+      offset: 8
+
+  # S2C gspRepPresentDeleteReceive (kr-812 828, cn-324 829): a gift left the receiver's list. Reader kr-812 sub_9D95D0
+  # (three words), cn-324 two. Handler kr-812 sub_82C040: status 1 asks for the received list again and stores the
+  # third word as the task-bar count.
+  PresentDeleteReceivedReply:
+    - status: u32
+      offset: 4
+    - id: u32
+      offset: 8
+    - pending_count: u32
+      offset: 12
+      except: [id-400, id-1809, cn-324]
+
+  # C2S gcpReqPresentSend (kr-812 816, cn-324 817): buy a shop item as a gift. Writer kr-812 sub_95C1C0 (cn-717, id-400,
+  # id-1809, cn-324, cn-279 write the same four fields). The caller kr-812 sub_96F350 fills the recipient from the
+  # dialog's EdtReceiverUserName, the second string with the empty string, the key from the shop card and the message
+  # from EdtSendMsg.
+  PresentSendRequest:
+    - receiver_nickname: wstr
+      offset: 4
+    - unknown_32: wstr # Always empty: kr-812 sub_96F350 passes the empty string.
+      offset: 32
+    - item_key: u32
+      offset: 60
+    - message: wstr
+      offset: 64
+
+  # C2S gcpReqPresentReceiveSubList (kr-812 813) and gcpReqPresentSendSubList (kr-812 814): the first gift to list and
+  # the page size. Writer kr-812 sub_840530; the dialog kr-812 sub_960BE0 always asks for 4.
+  PresentListRequest:
+    - start: u32
+      offset: 4
+    - count: u32
+      offset: 8
+
+  # C2S gcpReqPresentReceive (817), gcpReqPresentThrow (818), gcpReqPresentDeleteSend (822) and
+  # gcpReqPresentDeleteReceive (823): one gift. Writer kr-812 sub_844A30.
+  PresentIdRequest:
+    - id: u32
+      offset: 4
+
+  # The modern family (kr-1256 and the builds based on it). Its client classes are the same ones, but the object
+  # offsets moved (a shorter string object), so the two records are restated; the wire order is the legacy one, with
+  # one added field at the end of the received record. The serializers are the readers named below.
+
+  # kr-1256 sub_114DBA0 (vtable slot 1 of PresentReceive, reached from the vector reader kr-1256 sub_10D0350):
+  # id, an eight-byte date, a status word, the sender, the key, a half-word, the message, then eight bytes the legacy
+  # record does not have. The cn-774 writer cn-774 sub_497B30 and reader cn-774 sub_497C30 have the same order and
+  # offsets; the tw-454 record is not read yet.
+  PresentReceive@kr-1256:
+    - id: u32
+      offset: 4
+    - sent_date: f64
+      offset: 8
+    - unknown_16: u32 # Compared with -999 and -899 by kr-1256 sub_E488C0, as kr-812 sub_960FC0 does.
+      offset: 16
+      default: 1
+    - sender_nickname: wstr
+      offset: 20
+    - item_key: u32
+      offset: 44
+    - opened: u16
+      offset: 48
+    - message: wstr
+      offset: 52
+    - unknown_80: u64 # Copied as eight bytes by kr-1256 sub_E4AA70; no reader tests it.
+      offset: 80
+
+  # kr-1256 sub_114DEF0 (vtable slot 1 of PresentSend): the legacy order; cn-774 writer cn-774 sub_497D10 has the same
+  # offsets.
+  PresentSend@kr-1256:
+    - id: u32
+      offset: 4
+    - sent_date: f64
+      offset: 8
+    - unknown_16: f64
+      offset: 16
+    - unknown_24: u32
+      offset: 24
+      default: 1
+    - receiver_nickname: wstr
+      offset: 28
+    - item_key: u32
+      offset: 52
+    - opened: u16
+      offset: 56
+    - thanks_state: u16
+      offset: 58
+    - message: wstr
+      offset: 60
+    - thanks_message: wstr
+      offset: 84
+
+  # S2C gspRepPresentSend (kr-1256 825). Its handler kr-1256 sub_9B9A40 reads the shop purchase reply struct through
+  # kr-1256 sub_99B580, not one result word as the legacy builds do: a string, the result word (the switch on it names
+  # -77, -76, -51, -18, -17, -15, -11, -3, -2, -1, 2, 4, 8, 9, 27, 30, 301, 302, 303, 501 and 502 and has no -21, -22
+  # or -23), a word, and two more strings. The meaning of the other fields is not proven. The cn-774 and tw-454
+  # handlers are not read yet.
+  PresentSendReply@kr-1256:
+    - unknown_0: wstr
+      offset: 0
+    - result: u32
+      offset: 24
+    - unknown_28: u32
+      offset: 28
+    - unknown_32: wstr
+      offset: 32
+    - unknown_56: wstr
+      offset: 56

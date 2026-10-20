@@ -1,0 +1,52 @@
+version: 1
+structs:
+  # Native relay 4 rspSendCrtSeedTable readers and writers:
+  # kr-812 sub_502270/sub_5021F0; cn-717 sub_537370/sub_5372F0;
+  # cn-324 sub_45D900/sub_45D880; cn-406 sub_41F790/sub_41F710;
+  # id-400 sub_481420/sub_4813A0; id-1809 sub_4D66C0/sub_4D6640.
+  # kr-1256 relay 4 reader kr-1256 sub_6CD590 reads the entity word and then two counted word vectors
+  # (kr-1256 sub_10C7280), which is this layout.
+  # The two variable-length word vectors are kept unknown because the client
+  # consumes them as seed data but the individual bit meanings are unproven.
+  RelayCriticalSeedTable:
+    - entity_id: u32
+      offset: 4
+    - unknown_8: list<u32>
+      offset: 8
+    - unknown_24: list<u32>
+      offset: 24
+      cn-324:
+        - unknown_20: list<u32>
+          offset: 20
+  # CN2011 has no own Packet_rspSendCrtSeedTable vtable or relay dispatcher
+  # case for this family; it is deliberately left unsupported there.
+  RelayCriticalSeedTable@cn-279: []
+
+  # Native relay 5 rspSendDefSeedTable readers and writers:
+  # kr-812 sub_5022F0/sub_5022A0; cn-717 sub_5373F0/sub_5373A0;
+  # cn-324 sub_45D980/sub_45D930; cn-406 sub_41F810/sub_41F7C0;
+  # id-400 sub_4814A0/sub_481450; id-1809 sub_4D6740/sub_4D66F0.
+  # kr-1256 relay 5 reader kr-1256 sub_6CD810 reads the entity word and then one counted byte vector
+  # (kr-1256 sub_10BE7B0), which is this layout.
+  # The payload is a counted byte vector; its values are seed data, not a
+  # proven item or score list.
+  RelayDefenceSeedTable:
+    - entity_id: u32
+      offset: 4
+    - unknown_8: list<u8>
+      offset: 8
+  RelayDefenceSeedTable@cn-279: []
+
+  # Native relay 6 rspSendCrtCancelSeedTable readers and writers:
+  # kr-812 sub_502390/sub_502340; cn-717 sub_537490/sub_537440;
+  # cn-324 sub_45D9B0/sub_6EA6A0; cn-406 sub_41F8B0/sub_41F860;
+  # id-400 sub_481540/sub_4814F0; id-1809 sub_4D67E0/sub_4D6790.
+  # kr-1256 relay 6 reader kr-1256 sub_6CDA20 reads the entity word and then one counted word vector
+  # (kr-1256 sub_10C7280), which is this layout.
+  # The payload is a counted word vector whose semantic values remain unknown.
+  RelayCriticalSeedCancelTable:
+    - entity_id: u32
+      offset: 4
+    - unknown_8: list<u32>
+      offset: 8
+  RelayCriticalSeedCancelTable@cn-279: []

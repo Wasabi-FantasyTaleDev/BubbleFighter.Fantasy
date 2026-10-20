@@ -1,0 +1,27 @@
+version: 1
+structs:
+  # Native ItemAttr readers: kr-812 sub_5325A0, cn-717 sub_569DC0,
+  # cn-406 sub_41CDD0, id-400 sub_47E800, id-1809 sub_4D46D0 and cn-706 sub_4B81E0.
+  # Each writer agrees: two words, counted word vector, word and prefixed UTF-16 string.
+  # CN2011/CN2012 EquippedItemList has no ItemAttr vector; this structure is not used there.
+  # The class label establishes the object type; individual field purposes remain unproven.
+  ItemAttr:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: "list<u32>"
+      offset: 12
+    - unknown_28: u32
+      offset: 28
+    - unknown_32: wstr
+      offset: 32
+  # Native ItemExpiredTime readers: kr-812 sub_531F90, cn-717 sub_569610,
+  # cn-406 sub_41CE80, id-400 sub_47E8B0, id-1809 sub_4D4780 and cn-706 sub_4B8290.
+  # Writers transfer four bytes at +4 and eight bytes at +8; no inferred lifetime units.
+  # CN2011/CN2012 EquippedItemList has no ItemExpiredTime vector.
+  ItemExpiredTime:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: f64
+      offset: 8

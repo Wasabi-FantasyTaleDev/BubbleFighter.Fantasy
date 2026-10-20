@@ -1,0 +1,69 @@
+- set:
+    id: protocol
+    config:
+      # Gameplay assignments are audited in opcodes.yaml; catalog guesses remain diagnostic only.
+      use_catalog_candidates: false
+- set:
+    id: admin.http
+    config:
+      listen: ${CN_406_ADMIN_HOST:-127.0.0.1}:${CN_406_ADMIN_PORT:-8094}
+- set:
+    id: diagnostics.packet-log
+    config:
+      file: logs/{date}/packets-cn-406_{timestamp}.log
+- set:
+    id: dialect.messages
+    config:
+      server_notices: false
+- set:
+    id: dialect.rooms
+    config:
+      menu_only: false
+      browser_only: false
+      supply_items: true
+      horde_lottery: false
+      counted_pve_items: false
+      # The zombie battle's team change (S2C 504) reaches cn-406 sub_682280, the counterpart of kr-812
+      # sub_776870; the cooperative zombie mode stays off through zombie_conversion_mode_id: 0.
+      zombie_conversion: true
+      pve_points: false
+      rescue_missions: false
+      # Matching is enabled separately after its native selectors are audited.
+      quick_matching: false
+      instant_revival: false
+      tutorial_move_in: false
+- set:
+    id: ingame
+    config:
+      # No native instant-revival binding is enabled for this build.
+      instant_revival_item_id: 0
+      lottery_modes: []
+      counted_item_mode_id: 0
+      counted_item_kinds: []
+      counted_immediate_item_kinds: []
+      zombie_conversion_mode_id: 0
+      pve_point_mode_id: 0
+      rescue_mode_id: 0
+      # The shop row is inventory-only here, so nothing can grant the tutorial first-clear gift yet.
+      tutorial_gifts: false
+- set:
+    id: shop
+    config:
+      inventory_only: true
+
+# Life-counted items: this build's executable has no "endurance" ShopItem duration type (no item kind 3) and no Life
+# notice text, so the daily life rule and life stock are off (packets/builds.yaml life_items: false).
+- set:
+    id: lobby
+    config:
+      life_items: false
+- set:
+    id: shop
+    config:
+      life_items: false
+# No party opcode row is reviewed into this build's table: the party packets stay unbound.
+- remove: party
+- set:
+    id: dialect.messages
+    config:
+      party: false

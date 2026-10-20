@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <ApplicationIcon>$(RepoRoot)src\BubbleFighter.Fantasy.Host\icon_odteam.ico</ApplicationIcon>
+    <AssemblyName>bffarchive</AssemblyName>
+    <RootNamespace>BubbleFighter.Fantasy.Archives.Tool</RootNamespace>
+    <Description>Lists, extracts, verifies and builds the client's PKN and BFZ archives.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\BubbleFighter.Fantasy.Archives\BubbleFighter.Fantasy.Archives.csproj" />
+  </ItemGroup>
+</Project>

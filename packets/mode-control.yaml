@@ -1,0 +1,131 @@
+version: 1
+# Bomb Mission (round mode 19) and Captain mode (round mode 20): the bodies the server sends or reads.
+#
+# The baseline is kr-812 and a plain row is the kr-812 object's shape. Every field is four bytes and the
+# reader/writer order below is the wire order. The cn-717 readers were also read: same Packet_ class names,
+# its own addresses, and the same widths (gspBombState five words plus a boolean, gcpBombState five,
+# gcpBombMissionOver three, gspCaptainEvent one boolean, the other three one word), so a plain row is also
+# cn-717's reader shape; its senders were located but their writer bodies were not read. id-400 carries the
+# same class names with shifted numbers; only its dispatch cases, class references and vtable reader slots
+# were read there, not the reader bodies, so its rows are inherited by the table model and not verified in
+# this file. kr-1256 and the builds based on it do not name these packets at all (no Packet_gsp/Packet_gcp
+# class in its RTTI or strings), so their shape was NOT read: do not resolve these structures for the modern
+# family until its own dispatch path is read.
+#
+# Wire sizes: gspBombState 24, gcpBombState 20, gcpBombMissionOver 12, gspObserver 4, gspCreateCaptain 4,
+# gcpDropCaptain 4, gspCaptainEvent 4 bytes. Opcode numbers live in profiles/*/opcodes.yaml (kr-812 below).
+#
+# Direction is read, not guessed: 973, 974, 982 and 994 have dispatch cases and no send-side stamp in
+# kr-812; 2011, 2012 and 2018 have exactly one sender each and no dispatch case.
+structs:
+
+  # S2C gspBombState (kr-812 973): six four-byte words = 24 bytes. The bomb's state and the triple the
+  # handler stores in the mode manager.
+  # Reader (deserialize) kr-812 sub_52FB40, vtable Packet_gspBombState 0xD1ED04 slot 0xD1ED08; writer
+  # kr-812 sub_52FAE0. Dispatcher kr-812 sub_50B8C0 `else if ( v4 == 973 )`,
+  # handler kr-812 sub_4245B0. cn-717 reader cn-717 sub_5385C0 (same five reads plus one boolean), id-400 reader
+  # id-400 sub_481340.
+  # The handler receives the words as (second word = switch key, first word, pointer to the three floats,
+  # boolean): the switch has cases 0..6 on the second word, so +8 is the state word; the three floats are
+  # stored at mode manager +5400/+5404/+5408 (kr-812 sub_4245B0) and the same block
+  # is what the gcpBombState sender passes as its three tail words, which is why they are read as three f32.
+  gspBombState:
+    - unknown_4: u32 # the handler copies it into the mode manager (+5388 and +5392); purpose unknown
+      offset: 4
+    - state: u32 # the handler's switch key, cases 0..6; the meaning of each case is not tabled here
+      offset: 8
+    - unknown_12: f32 # stored by the handler at mode manager +5400 as the first of three floats
+      offset: 12
+    - unknown_16: f32 # second float, mode manager +5404
+      offset: 16
+    - unknown_20: f32 # third float, mode manager +5408
+      offset: 20
+    - unknown_24: bool # a four-byte boolean (reader converts a nonzero word); the handler gates paths on it
+      offset: 24
+
+  # C2S gcpBombState (kr-812 2012): the acting client's report, five four-byte words = 20 bytes.
+  # The wire body is produced by the writer (serialize) kr-812 sub_503840, vtable 0xD1ECF8 slot 0, called
+  # from the sender kr-812 sub_52A590, which stamps 2012. The class's
+  # deserialize kr-812 sub_52FBA0 reads the same five words but the client never receives this number; it is
+  # recorded here as the mirror that confirms the order, not as the direction.
+  # The first two words are the sender's two arguments written as dwords; the last three are three floats
+  # from a pointer argument (two call sites pass the mode manager's +5400 block, one passes +1350).
+  # cn-717 sender cn-717 sub_560640 stamps 2012 (its writer body was not read); reader cn-717 sub_5390D0.
+  # id-400: sender id-400 sub_4A8960 stamps 2011; reader id-400 sub_482500.
+  gcpBombState:
+    - unknown_4: u32 # sender argument written as a dword
+      offset: 4
+    - unknown_8: u32 # second sender argument
+      offset: 8
+    - unknown_12: f32 # first of three floats taken from the sender's pointer argument
+      offset: 12
+    - unknown_16: f32 # second float
+      offset: 16
+    - unknown_20: f32 # third float
+      offset: 20
+
+  # C2S gcpBombMissionOver (kr-812 2011): the report that ends the round, three four-byte words = 12 bytes.
+  # Writer (serialize) kr-812 sub_7AA780, vtable 0xD1ECEC slot 0, called from the sender kr-812 sub_52AAC0,
+  # which stamps 2011. The sender fills the object as +4 = its third argument,
+  # +8 = its first argument, +12 = its second argument, so the wire order is arg3, arg1, arg2. One caller
+  # passes the mode manager's +5396 word as the first argument. The class's
+  # deserialize kr-812 sub_9D95D0 reads the same three words and is not a receive path.
+  # cn-717 sender cn-717 sub_560CB0 stamps 2011; reader cn-717 sub_7F4370. id-400 sender id-400 sub_4A8E80
+  # stamps 2010; reader id-400 sub_72E4D0.
+  gcpBombMissionOver:
+    - unknown_4: u32 # sender's third argument
+      offset: 4
+    - unknown_8: u32 # sender's first argument; one call site copies the mode manager's +5396 word here
+      offset: 8
+    - unknown_12: u32 # sender's second argument
+      offset: 12
+
+  # S2C gspObserver (kr-812 974): one four-byte word = 4 bytes. The bomb mission's respawn limit turns a
+  # player into an observer; this is the packet that does it.
+  # Reader (deserialize) kr-812 sub_80A910, vtable Packet_gspObserver 0xD1ED10 slot 0xD1ED14; writer
+  # kr-812 sub_844A30. Dispatcher kr-812 sub_50B8C0: the `v6 = v4 - 974` branch calls handler
+  # kr-812 sub_52A640, which constructs the packet and reads the
+  # single word; the handler compares it with -1 and otherwise resolves a player object through the manager
+  # (+784), so the word is a player reference. cn-717 reader cn-717 sub_8C4210, handler cn-717 sub_5606F0;
+  # id-400 number 973, reader id-400 sub_93D120.
+  # kr-812 sub_80A910 is a folded one-word reader shared with gspCreateCaptain and gcpDropCaptain (and
+  # gspUserHostStart); the address alone does not identify a class, the dispatcher case and vtable do.
+  gspObserver:
+    - unknown_4: u32 # compared with -1 by the handler, then resolved to a player object; meaning not proven
+      offset: 4
+
+  # S2C gspCreateCaptain (kr-812 982): one four-byte word = 4 bytes. The server chooses the captain; the
+  # client has no request packet.
+  # Reader (deserialize) kr-812 sub_80A910, vtable Packet_gspCreateCaptain 0xD692DC slot 0xD692E0; writer
+  # kr-812 sub_844A30. Session dispatcher kr-812 sub_7FBBB0 `case 0x3D6:` (982) calls handler
+  # kr-812 sub_7FDBA0, which constructs the packet, copies the word, stores it
+  # through kr-812 sub_697690 at mode manager +20 and calls a manager virtual with 309
+  #. cn-717: case 0x3D6 in cn-717 sub_87EFE0 -> handler cn-717 sub_881080,
+  # reader cn-717 sub_8C4210. id-400: number 981, case 0x3D5 -> handler id-400 sub_784DE0, reader
+  # id-400 sub_93D120.
+  gspCreateCaptain:
+    - unknown_4: u32 # copied to mode manager +20 by the handler; a captain seat is suspected, not proven
+      offset: 4
+
+  # C2S gcpDropCaptain (kr-812 2018): one four-byte word = 4 bytes, sent for the local player's death.
+  # Writer (serialize) kr-812 sub_844A30, vtable 0xD0BCBC slot 0; the sender kr-812 sub_439B10 stamps 2018
+  #. The packet object is prepared by kr-812 sub_42BCE0
+  #: the word is whatever the character object's vtable slot 16 returns, and the
+  # send happens when that character is the local player's. Whether the word is a seat index or a character
+  # id is not proven. cn-717 class exists (packet vftable set in cn-717 sub_431430) but its number was not
+  # confirmed; reader cn-717 sub_8C4210. id-400 class exists (id-400 sub_41E150), reader id-400 sub_93D120.
+  gcpDropCaptain:
+    - unknown_4: u32 # the dying local character's vtable slot 16 value; seat or character id, not proven
+      offset: 4
+
+  # S2C gspCaptainEvent (kr-812 994): one four-byte boolean = 4 bytes.
+  # Reader (deserialize) kr-812 sub_80C160 (four bytes, converted to a boolean), vtable
+  # Packet_gspCaptainEvent 0xD692E8 slot 0xD692EC; writer kr-812 sub_844CE0. Session dispatcher
+  # kr-812 sub_7FBBB0 `case 0x3E2:` (994) calls handler kr-812 sub_7FDC20,
+  # which calls the deserialize slot directly and then a dynamic-cast path; no
+  # vftable label is stored, so the class identity is the vtable at kr-812 0xD692E8 plus that slot.
+  # cn-717: case 0x3E2 in cn-717 sub_87EFE0 -> handler cn-717 sub_881100, reader cn-717 sub_8C3780.
+  # id-400 has no such class (no vtable, no reference); absent there.
+  gspCaptainEvent:
+    - unknown_4: bool # a four-byte boolean; the handler's use of it was not read further
+      offset: 4

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <ApplicationIcon>$(RepoRoot)src\BubbleFighter.Fantasy.Host\icon_odteam.ico</ApplicationIcon>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>TrxSummary</AssemblyName>
+    <RootNamespace>BubbleFighter.Fantasy.Tools.TrxSummary</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+</Project>

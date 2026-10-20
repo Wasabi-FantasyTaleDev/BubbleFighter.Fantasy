@@ -1,0 +1,19 @@
+id: cn-735
+display_names:
+  en: "China 2016-06-20"
+  zh-Hans: "国服 2016-06-20"
+  zh-Hant: "中國 2016-06-20"
+  ko: "중국 2016-06-20"
+client_build: cn:735:0
+setup_enabled: false
+activation_enabled: false
+# Nearest build whose layouts this one reuses when it has no variant of its own.
+parent: cn-717
+description: Chinese 2016 client build 0.2.70.4, ClientVersion_Major 735.
+bundles:
+  - core
+  - cn-735
+patches:
+  - patch.yaml
+  # Optional developer override; git-ignored and skipped when absent.
+  - local.patch.yaml

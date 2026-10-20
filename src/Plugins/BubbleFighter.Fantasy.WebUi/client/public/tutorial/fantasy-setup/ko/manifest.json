@@ -1,0 +1,85 @@
+{
+  "referenceWidth": 1024,
+  "referenceHeight": 768,
+  "textPrintSpeed": 70,
+  "dialogues": [
+    {
+      "stage": "FantasySetup",
+      "progress": 1,
+      "text": "안녕하세요! 서버 설정을\n차근차근 도와드릴게요.\n먼저 서버 이름을 정해 볼까요?",
+      "balloon": "ChatBalloonNew.png",
+      "clickComplete": true,
+      "holdMs": 4500,
+      "sourceProgress": 1,
+      "sourceText": "안녕하세요! 서버 설정을\n차근차근 도와드릴게요.\n먼저 서버 이름을 정해 볼까요?",
+      "part": 1,
+      "parts": 1,
+      "nextProgress": "2"
+    },
+    {
+      "stage": "FantasySetup",
+      "progress": 2,
+      "text": "멋진 이름이네요! 이제 지원할\n클라이언트 버전을 선택하세요.\n시작하려면 클라이언트 데이터가 필요해요.\n아직 다운로드 중인가요? 건너뛰고\n나중에 설정에서 가져와도 괜찮아요!",
+      "balloon": "ChatBalloonNew.png",
+      "clickComplete": true,
+      "holdMs": 4500,
+      "sourceProgress": 2,
+      "sourceText": "멋진 이름이네요! 이제 지원할\n클라이언트 버전을 선택하세요.\n시작하려면 클라이언트 데이터가 필요해요.\n아직 다운로드 중인가요? 건너뛰고\n나중에 설정에서 가져와도 괜찮아요!",
+      "part": 1,
+      "parts": 1,
+      "nextProgress": "3"
+    },
+    {
+      "stage": "FantasySetup",
+      "progress": 3,
+      "text": "이제 데이터 저장 방식을 골라 보세요.\n장기간 공개 운영에는 MySQL을 추천해\n요.\n가끔 친구들과 즐길 때는\nSQLite가 간편해요.",
+      "balloon": "ChatBalloonNew.png",
+      "clickComplete": true,
+      "holdMs": 4500,
+      "sourceProgress": 3,
+      "sourceText": "이제 데이터 저장 방식을 골라 보세요.\n장기간 공개 운영에는 MySQL을 추천해요.\n가끔 친구들과 즐길 때는\nSQLite가 간편해요.\nMySQL 설치 방법은 도움말에 있어요.",
+      "part": 1,
+      "parts": 2,
+      "nextProgress": "4"
+    },
+    {
+      "stage": "FantasySetup",
+      "progress": 4,
+      "text": "MySQL 설치 방법은 도움말에 있어요.",
+      "balloon": "ChatBalloonNew.png",
+      "clickComplete": true,
+      "holdMs": 4500,
+      "sourceProgress": 3,
+      "sourceText": "이제 데이터 저장 방식을 골라 보세요.\n장기간 공개 운영에는 MySQL을 추천해요.\n가끔 친구들과 즐길 때는\nSQLite가 간편해요.\nMySQL 설치 방법은 도움말에 있어요.",
+      "part": 2,
+      "parts": 2,
+      "nextProgress": "5"
+    },
+    {
+      "stage": "FantasySetup",
+      "progress": 5,
+      "text": "데이터베이스도 준비됐어요!\n이제 관리자 계정을 만들어 보세요.\n아이디와 비밀번호를 잘 기억해 주세요.\n관리 화면에 로그인할 때 필요해요.",
+      "balloon": "ChatBalloonNew.png",
+      "clickComplete": true,
+      "holdMs": 4500,
+      "sourceProgress": 4,
+      "sourceText": "데이터베이스도 준비됐어요!\n이제 관리자 계정을 만들어 보세요.\n아이디와 비밀번호를 잘 기억해 주세요.\n관리 화면에 로그인할 때 필요해요.",
+      "part": 1,
+      "parts": 1,
+      "nextProgress": "6"
+    },
+    {
+      "stage": "FantasySetup",
+      "progress": 6,
+      "text": "이제 서버 설정이 끝났어요.\n궁금한 점은 도움말에서 확인해 보세요.\n마지막으로 런처에 이 서버를 추가하면\n출발할 준비가 돼요!\n곧 붐힐에서 만나요!",
+      "balloon": "ChatBalloonNew.png",
+      "clickComplete": true,
+      "holdMs": 4500,
+      "sourceProgress": 5,
+      "sourceText": "이제 서버 설정이 끝났어요.\n궁금한 점은 도움말에서 확인해 보세요.\n마지막으로 런처에 이 서버를 추가하면\n출발할 준비가 돼요!\n곧 붐힐에서 만나요!",
+      "part": 1,
+      "parts": 1,
+      "nextProgress": "-1"
+    }
+  ]
+}

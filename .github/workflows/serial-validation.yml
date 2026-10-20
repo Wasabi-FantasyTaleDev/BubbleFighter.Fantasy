@@ -1,0 +1,73 @@
+name: Serial validation
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: serial-validation
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: [self-hosted, Windows, X64, bff-validation]
+    timeout-minutes: 90
+    env:
+      CI: 'true'
+      BFF_MYSQL_PASSWORD: isolated-memory-unused
+      BFF_CI_FIXTURE_ROOT: ${{ vars.BFF_CI_FIXTURE_ROOT }}
+      BF_KR1256_UNPACKED_CONFIG: ${{ vars.BF_KR1256_UNPACKED_CONFIG }}
+      BF_KR1256_FIGHTER_CONFIG: ${{ vars.BF_KR1256_FIGHTER_CONFIG }}
+      BFF_CI_CHECKOUT: validation-${{ github.run_id }}-${{ github.run_attempt }}
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+    steps:
+      - name: Reserve a fresh checkout for this attempt
+        shell: pwsh
+        run: |
+          $checkout = Join-Path $env:GITHUB_WORKSPACE $env:BFF_CI_CHECKOUT
+          if (Test-Path -LiteralPath $checkout) { throw 'Attempt checkout already exists; refusing to clean or reuse it.' }
+          $manifest = Join-Path $env:RUNNER_TEMP "fixture-links-${{ github.run_id }}-${{ github.run_attempt }}.json"
+          if (Test-Path -LiteralPath $manifest) { throw 'Attempt ownership manifest already exists.' }
+          "BFF_CI_LINK_MANIFEST=$manifest" | Add-Content -LiteralPath $env:GITHUB_ENV
+      - uses: actions/checkout@v4
+        with:
+          path: ${{ env.BFF_CI_CHECKOUT }}
+          clean: false
+      - name: Verify gate report validation
+        shell: pwsh
+        working-directory: ${{ env.BFF_CI_CHECKOUT }}
+        run: |
+          python -m unittest discover -s tools/ci -p 'test_*.py'
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          ./tools/ci/test-fixture-links.ps1
+      - name: Link local validation fixtures
+        shell: pwsh
+        working-directory: ${{ env.BFF_CI_CHECKOUT }}
+        run: |
+          ./tools/ci/fixture-links.ps1 -Action Link -CheckoutRoot $PWD -FixtureRoot $env:BFF_CI_FIXTURE_ROOT -Manifest $env:BFF_CI_LINK_MANIFEST
+      - name: Release and serial gates
+        shell: pwsh
+        working-directory: ${{ env.BFF_CI_CHECKOUT }}
+        run: |
+          python tools/ci/serial-gates.py --results-directory artifacts/ci/${{ github.run_id }}-${{ github.run_attempt }}
+          exit $LASTEXITCODE
+      - name: Preserve gate reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: serial-gates-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.BFF_CI_CHECKOUT }}/artifacts/ci/${{ github.run_id }}-${{ github.run_attempt }}/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Remove only fixture links created for this checkout
+        if: always()
+        shell: pwsh
+        run: |
+          $checkout = Join-Path $env:GITHUB_WORKSPACE $env:BFF_CI_CHECKOUT
+          if ($env:BFF_CI_LINK_MANIFEST -and (Test-Path -LiteralPath $env:BFF_CI_LINK_MANIFEST)) {
+            & (Join-Path $checkout 'tools/ci/fixture-links.ps1') -Action Cleanup -CheckoutRoot $checkout -Manifest $env:BFF_CI_LINK_MANIFEST
+          }

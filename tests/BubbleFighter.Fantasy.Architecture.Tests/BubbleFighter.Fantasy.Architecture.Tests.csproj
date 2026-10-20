@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <ProjectReference Include="..\..\src\BubbleFighter.Fantasy.Kernel\BubbleFighter.Fantasy.Kernel.csproj" />
+    <ProjectReference Include="..\..\src\BubbleFighter.Fantasy.Contracts\BubbleFighter.Fantasy.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\BubbleFighter.Fantasy.Wire\BubbleFighter.Fantasy.Wire.csproj" />
+    <ProjectReference Include="..\..\src\Plugins\*\*.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\profiles\kr-1256\opcodes.yaml" Link="opcodes.yaml" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="CopyArchitectureFixtures" AfterTargets="Build">
+    <ItemGroup>
+      <_FixtureFiles Include="$(RepoRoot)artifacts\plugins\**\*.*" />
+    </ItemGroup>
+    <!-- Mirror the current plugin set so renamed adapters cannot survive in test discovery. -->
+    <RemoveDir Directories="$(OutDir)plugins" />
+    <Copy SourceFiles="@(_FixtureFiles)"
+          DestinationFiles="@(_FixtureFiles->'$(OutDir)plugins\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+  <ItemGroup>
+    <Compile Include="..\Shared\TestTempDirectories.cs" Link="TestTempDirectories.cs" />
+    <Compile Include="..\Shared\TestWireDialects.cs" Link="TestWireDialects.cs" />
+    <Compile Include="..\Shared\SharedDialectRows.cs" Link="SharedDialectRows.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\Shared\SyntheticClientTables.cs" Link="SyntheticClientTables.cs" />
+    <Compile Include="..\Shared\TestClientData.cs" Link="TestClientData.cs" />
+    <Compile Include="..\Shared\LocalClientData.cs" Link="LocalClientData.cs" />
+    <ProjectReference Include="..\..\src\BubbleFighter.Fantasy.Archives\BubbleFighter.Fantasy.Archives.csproj" />
+  </ItemGroup>
+</Project>

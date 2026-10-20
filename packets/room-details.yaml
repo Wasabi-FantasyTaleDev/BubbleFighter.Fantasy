@@ -1,0 +1,121 @@
+version: 1
+structs:
+  # C2S gcpRoomChangeRoundSetting (514), distinct from the S2C position packet.
+  # kr-812 vtable D2CEB0/D2CEB4 uses writer sub_503410 and reader sub_5C8FE0:
+  # one four-byte word and two counted UTF-16 strings; sender sub_5C86C0 stamps514.
+  # kr-1256 sub_969730, cn-774 sub_B6A610 and tw-454 sub_7E2FC0 directly
+  # stamp514 and write the same fields. kr-812 sub_5BD770 and kr-1256 sub_969730
+  # select round 0/1/2 from the three map buttons; cn-774 sub_B6A610 and
+  # tw-454 sub_7D2450 preserve that selection. The two string roles stay unknown.
+  RoomRoundSettingChangeRequest:
+    - round_index: u32
+      offset: 4
+      kr-1256:
+        - round_index: u32
+          offset: 0
+    - unknown_8: wstr
+      offset: 8
+      kr-1256:
+        - unknown_4: wstr
+          offset: 4
+    - unknown_36: wstr
+      offset: 36
+      kr-1256:
+        - unknown_28: wstr
+          offset: 28
+
+  # C2S gcpRoomReqChangeMaster (508): kr-812 sub_801C60 selects native class
+  # Packet_gcpRoomReqChangeMaster; kr-812 sub_809CB0 stamps 508 and
+  # kr-812 sub_92ABC0/sub_5C8FD0 write/read its target nickname.
+  # kr-1256 sub_9DD790, cn-774 sub_8E0220 and tw-454 sub_A5FBD0 each
+  # stamp 508 and write the nickname as a u32 count plus UTF-16 units.
+  RoomMasterChangeRequest:
+    - nickname: wstr
+      offset: 4
+  # S2C gspRoomRepChangeMaster (507): kr-812 sub_801D00 uses reader
+  # kr-812 sub_4EC0B0. kr-1256 sub_9DD950, cn-774 sub_8E0350 and
+  # tw-454 sub_A5FD30 read the same string followed by one four-byte result.
+  # Legacy readers: cn-279 sub_449AF0, cn-324 sub_6EB240, cn-406 sub_866440,
+  # cn-404 sub_7C52C0, cn-408 sub_7B2100, cn-706 sub_7882E0, cn-717 sub_8CE8A0,
+  # id-400 sub_799F60 and id-1809 sub_4B6FF0 consume the same two wire fields.
+  # kr-812 sub_801D00's notices use the requested target nickname.
+  RoomMasterChangeReply:
+    - nickname: wstr
+      offset: 4
+    - result: u32
+      offset: 32
+      # Compact native string objects: cn-324 sub_6EB240 and cn-279 sub_449AF0.
+      cn-324:
+        - result: u32
+          offset: 8
+
+  # S2C gspRoomChangeInventory (506): kr-812 sub_7FE650 uses reader
+  # kr-812 sub_80C100: three words, then a counted word vector. Their meanings
+  # are unresolved. The modern consumers use their first word as the room seat.
+  # kr-1256 sub_9D9930 case 0x1FA reads only two four-byte words.
+  # cn-774 sub_8D7D20 case 0x1FA -> cn-774 sub_8DCEE0 and tw-454
+  # sub_A578B0 case 0x1FA -> tw-454 sub_A5CA10 restore the longer form.
+  # The modern CN/TW consumers index their seat arrays with the first word;
+  # their remaining words and counted vector are read but have no proven
+  # application in the accepted paths.
+  RoomInventoryChanged:
+    - unknown_4: u32
+      offset: 4
+      kr-1256:
+        - slot: u32
+      cn-774:
+        - slot: u32
+      tw-454:
+        - slot: u32
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+      except: [kr-1256]
+      also: [cn-774]
+    # cn-774 sub_456D30 and tw-454 sub_45AA50 explicitly read a four-byte
+    # count and that many four-byte elements. These are not proven item IDs.
+    - unknown_16: "list<u32>"
+      offset: 16
+      except: [kr-1256]
+      also: [cn-774]
+
+  # C2S gcpRoomSendAmpMsg (520): the baseline writer kr-812 sub_845040 and
+  # the modern writers kr-1256 sub_9D7350, cn-774 sub_BD61A0 and tw-454
+  # sub_AB1F70 emit one u32, one counted UTF-16 string, and two u32 words.
+  # The native objects place those values at +0, +4, +28 and +32. The first
+  # word is accepted as kinds 101/102/103 by kr-812 sub_8146C0; the two
+  # trailing words have different contextual uses in the audited producers,
+  # so they remain unknown rather than being called a cost or a colour.
+  RoomAmplifierRequest:
+    - kind: u32
+      offset: 0
+    - message: wstr
+      offset: 4
+    - unknown_28: u32
+      offset: 28
+    - unknown_32: u32
+      offset: 32
+
+  # Legacy kr-812 recruitment request: writer sub_845640 and reader
+  # sub_845670 serialize one counted UTF-16 message followed by one byte;
+  # sender sub_839BB0 stamps C2S 2027. The byte's purpose is not proven.
+  RoomRecruitRequest@kr-812:
+    - message: wstr
+      offset: 4
+    - unknown_32: u8
+      offset: 32
+
+  # Legacy kr-812 recruitment notification: reader sub_80AC10 and writer
+  # sub_80ABE0 consume a u16 member identifier followed by a counted UTF-16
+  # message; handler sub_8028C0 resolves the identifier against room members.
+  RoomRecruitReply@kr-812:
+    - member_id: u16
+      offset: 4
+    - message: wstr
+      offset: 8
+
+  # Legacy kr-812 observer-team request: the constructor/sender path
+  # sub_5C87A0 stamps C2S 2009 and its serializer is a no-op. The client-side
+  # menu gate is separate; this empty body does not enable observer behavior.
+  RoomObserverTeamChangeRequest@kr-812: []

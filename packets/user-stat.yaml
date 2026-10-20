@@ -1,0 +1,437 @@
+version: 1
+structs:
+  # S2C gspUserStat (105): the player's counters and FighterInfo. The server sends it with the shop and
+  # bag publications and as the cash-check reply; kr-812 sub_81A820 copies +20/+24 into the wallet and
+  # kr-812 sub_968C90 checks purchases against them. kr-812 sub_844920 reads it; the defaults are the
+  # constructor's (kr-812 sub_A49FB0 for these counters, kr-812 sub_40B3F0 for FighterInfo).
+  # The same reader is id-400 sub_798CD0, id-1809 sub_7BE8B0, cn-717 sub_8CECB0, cn-324 sub_6FDB90
+  # and cn-279 sub_44F8A0.
+  UserStat:
+    # kr-812 sub_81A820 stores +4 at user state +100, then applies it through the actor color setter.
+    # cn-717 sub_8A0CC0, id-400 sub_7A38E0, id-1809 sub_7C7A30, cn-324 sub_704F60 and cn-279 sub_6F5F90 match.
+    - color_index: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - unknown_16: u32
+      offset: 16
+    - lucci: u32 # kr-812 sub_81A820 copies it to the wallet's Lucci (manager +120).
+      offset: 20
+    - cash: u32 # kr-812 sub_81A820 copies it to the wallet's Cash (manager +124).
+      offset: 24
+    - unknown_28: u32 # kr-812 sub_844920 reads a u32; the caller keeps only whether it is non-zero.
+      offset: 28
+      cn-279:
+        - unknown_28: bool # cn-279 sub_44F8A0 reads it with the bool reader cn-279 sub_4EBFD0.
+          offset: 28
+    - unknown_32: u32
+      offset: 32
+      cn-279: []
+    - unknown_36: wstr
+      offset: 36
+      cn-279: []
+    - unknown_64: u32
+      offset: 64
+      cn-324:
+        - unknown_40: u32 # cn-324 sub_6FDB90 reads it right after the string.
+          offset: 40
+      cn-279: []
+    - fighter: FighterInfo # read through its own vtable entry
+      offset: 72
+      cn-324:
+        - fighter: FighterInfo
+          offset: 48
+      cn-279:
+        - fighter: FighterInfo
+          offset: 32
+
+  # kr-1256 gspUserStat (S2C 105): reader kr-1256 sub_9D8030 into a stack object without a vtable, so the offsets
+  # start at 0; handler kr-1256 sub_9A5C40. Restated because the word after the string is a u16 and the fighter
+  # sits at +64. cn-774 reads one more word after the u16 (cn-774 sub_BD8270).
+  UserStat@kr-1256:
+    # kr-1256 sub_9A5C40 stores it at user state +56; a change reaches the local actor through kr-1256 sub_938A90
+    # -> sub_5F5070, which passes it to the color selector kr-1256 sub_4C13B0.
+    - color_index: u32
+      offset: 0
+    - unknown_4: u32 # user state +68
+      offset: 4
+    - unknown_8: u32 # user state +64
+      offset: 8
+    - unknown_12: u32 # user state +72
+      offset: 12
+    # kr-1256 sub_9A5C40 stores +16 and +20 at user state +76 and +80, the two words S2C gspUserMoneyStat's
+    # fifth and sixth fields also fill; kr-812 sub_844920 has Lucci and Cash in the same two places.
+    - lucci: u32
+      offset: 16
+    - cash: u32
+      offset: 20
+    - unknown_24: u32 # user state +84
+      offset: 24
+    - unknown_28: u32 # user state +88
+      offset: 28
+    - unknown_32: wstr # kr-1256 sub_9A5C40 frees it without storing it
+      offset: 32
+    - unknown_56: u16 # user state +92
+      offset: 56
+    - unknown_60: u32
+      offset: 60
+      only: [cn-774] # cn-774 sub_BD8270 reads a word after the u16
+    - fighter: FighterInfo
+      offset: 64
+
+  # FighterInfo as kr-812 sub_40BA50 reads it. cn-717 reads the same bytes (cn-717 sub_40D620; its
+  # constructor cn-717 sub_40CF80 has the same defaults), although its social object is larger in memory.
+  FighterInfo:
+    - unknown_4: u32
+      offset: 4
+    - nickname: wstr # kr-812 sub_87DD90 shows +8 as lblTab1Name.
+      offset: 8
+    - unknown_36: u32
+      offset: 36
+    - level: u32 # kr-812 sub_87DD90 shows +40 as lblTab1Level.
+      offset: 40
+    - unknown_44: u32
+      offset: 44
+    - unknown_48: u64 # eight raw bytes (kr-812 sub_A56C30)
+      offset: 48
+    - unknown_56: u32
+      offset: 56
+    - unknown_64: u64
+      offset: 64
+    - unknown_72: u32
+      offset: 72
+    - unknown_76: bool # kr-812 sub_A56BD0
+      offset: 76
+    - unknown_80: "u32[49]" # 49 separate u32 reads, +80 to +272
+      offset: 80
+    - unknown_284: "list<EloRating>" # elements are 12 bytes in memory, 8 on the wire
+      offset: 284
+    - unknown_276: u32
+      offset: 276
+      default: 1000
+    - unknown_280: u32
+      offset: 280
+      default: 1
+    - unknown_300: u32
+      offset: 300
+    - unknown_304: u32 # a one-u32 object; kr-812 sub_503BA0 stores it at its +4
+      offset: 304
+    - unknown_312: u32 # ArenaRating; kr-812 sub_401830 stores the four bytes at its +4
+      offset: 312
+    - unknown_320: "u32[8]" # SocialSystemInfo, kr-812 sub_41A4D0
+      offset: 320
+    - unknown_360: "u32[8]" # +360 to +388
+      offset: 360
+    - unknown_392: wstr
+      offset: 392
+    - unknown_356: u32 # read last although it sits before +360
+      offset: 356
+
+  # One EloRatingData element, kr-812 sub_6DB1B0.
+  EloRating:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+
+  # id-400 sub_796CC0: kr-812's fields up to the rating list, which sits at +288; then three u32 whose
+  # constructor (id-400 sub_7966E0) sets 1000, 0 and 1, a bool, eight u32 and a string.
+  FighterInfo@id-400:
+    - unknown_4: u32
+      offset: 4
+    - nickname: wstr
+      offset: 8
+    - unknown_36: u32
+      offset: 36
+    - level: u32 # id-400 sub_7A38E0 reads +40 as the level.
+      offset: 40
+    - unknown_44: u32
+      offset: 44
+    - unknown_48: u64
+      offset: 48
+    - unknown_56: u32
+      offset: 56
+    - unknown_64: u64
+      offset: 64
+    - unknown_72: u32
+      offset: 72
+    - unknown_76: bool
+      offset: 76
+    - unknown_80: "u32[49]"
+      offset: 80
+    - unknown_288: "list<EloRating>"
+      offset: 288
+    - unknown_276: u32
+      offset: 276
+      default: 1000
+    - unknown_280: u32
+      offset: 280
+    - unknown_284: u32
+      offset: 284
+      default: 1
+    - unknown_304: bool # id-400 sub_9DD0F0, the bool reader
+      offset: 304
+    - unknown_308: "u32[8]" # +308 to +336
+      offset: 308
+    - unknown_340: wstr
+      offset: 340
+
+  # cn-324 sub_6FBD60, constructor cn-324 sub_6FB9A0 (all zero).
+  FighterInfo@cn-324:
+    - unknown_4: u32
+      offset: 4
+    - nickname: wstr
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - level: u32 # cn-324 sub_704F60 reads +16 as the level.
+      offset: 16
+    - unknown_20: u32
+      offset: 20
+    - unknown_24: u64 # cn-324 sub_8A36E0, eight raw bytes
+      offset: 24
+    - unknown_32: u64
+      offset: 32
+    - unknown_40: u32
+      offset: 40
+    - unknown_44: bool # cn-324 sub_8A3680
+      offset: 44
+    - unknown_48: "u32[43]" # +48 to +216
+      offset: 48
+
+  # cn-279 sub_44E0D0, constructor cn-279 sub_44DE60 (all zero).
+  FighterInfo@cn-279:
+    - unknown_4: u32
+      offset: 4
+    - nickname: wstr
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - level: u32 # cn-279 sub_6F5F90 reads +16 as the level.
+      offset: 16
+    - unknown_20: "u32[31]" # +20 to +140
+      offset: 20
+
+  # id-1809 sub_7BCA50 (builds.yaml bases id-1809 on kr-812, so this restates it): id-400's fields up to
+  # the three u32 after the rating list (+276/+280/+284, same defaults); then +304 as a u32 (the u32
+  # reader id-1809 sub_9F5870, where id-400 has a bool), eight u32 at +312, the string at +344, and
+  # +308 read last.
+  FighterInfo@id-1809:
+    - unknown_4: u32
+      offset: 4
+    - nickname: wstr
+      offset: 8
+    - unknown_36: u32
+      offset: 36
+    - level: u32
+      offset: 40
+    - unknown_44: u32
+      offset: 44
+    - unknown_48: u64
+      offset: 48
+    - unknown_56: u32
+      offset: 56
+    - unknown_64: u64
+      offset: 64
+    - unknown_72: u32
+      offset: 72
+    - unknown_76: bool # id-1809 sub_9F5830, the bool reader
+      offset: 76
+    - unknown_80: "u32[49]"
+      offset: 80
+    - unknown_288: "list<EloRating>"
+      offset: 288
+    - unknown_276: u32
+      offset: 276
+      default: 1000
+    - unknown_280: u32
+      offset: 280
+    - unknown_284: u32
+      offset: 284
+      default: 1
+    - unknown_304: u32
+      offset: 304
+    - unknown_312: "u32[8]" # +312 to +340
+      offset: 312
+    - unknown_344: wstr
+      offset: 344
+    - unknown_308: u32
+      offset: 308
+
+  # cn-406 sub_713260 reads only the prefix, 44 words and the final word; constructor sub_712E40 sets the final word to 1000.
+  FighterInfo@cn-406:
+  - unknown_4: u32
+    offset: 4
+  - nickname: wstr
+    offset: 8
+  - unknown_36: u32
+    offset: 36
+  - level: u32
+    offset: 40
+  - unknown_44: u32
+    offset: 44
+  - unknown_48: u64
+    offset: 48
+  - unknown_56: u32
+    offset: 56
+  - unknown_64: u64
+    offset: 64
+  - unknown_72: u32
+    offset: 72
+  - unknown_76: bool
+    offset: 76
+  - unknown_80: u32[44]
+    offset: 80
+  - unknown_256: u32
+    offset: 256
+    default: 1000
+
+  # kr-1256 FighterInfo: reader kr-1256 sub_115A6D0, constructor kr-1256 sub_1159720 (its defaults). The modern
+  # object differs from kr-812's in most of its rows, so it is restated. cn-774 and tw-454 follow it with the
+  # differences beside the rows (cn-774 reader cn-774 sub_4682B0, tw-454 reader tw-454 sub_45F700).
+  FighterInfo@kr-1256:
+    - unknown_4: u32
+      offset: 4
+    - nickname: wstr
+      offset: 8
+    - unknown_32: u32
+      offset: 32
+    - level: u32 # kr-1256 sub_9A5C40 reads FighterInfo +36 into the local player's level.
+      offset: 36
+    - unknown_40: u32
+      offset: 40
+    # kr-1256 sub_10E1CF0 reads the block only after the tag 0x3A.
+    - unknown_48: "optional<0x3A,FighterInfoTail48>"
+      offset: 48
+      cn-774:
+        # cn-774 sub_4682B0 reads one more word, then eight plain bytes without a tag, then two words.
+        - unknown_44: u32
+          offset: 44
+        - unknown_48: u64
+          offset: 48
+        - unknown_56: u32
+          offset: 56
+        - unknown_60: u32
+          offset: 60
+    - unknown_80: "u32[54]" # 54 separate u32 reads, +80 to +292
+      offset: 80
+      cn-774:
+        - unknown_64: "u32[55]" # +64 to +280
+          offset: 64
+    # kr-1256 sub_115B060: u32 count, then 20-byte elements.
+    - unknown_304: "list<FighterInfoEntry304>"
+      offset: 304
+    - unknown_296: u32
+      offset: 296
+      default: 1000
+    - unknown_300: u32
+      offset: 300
+      default: 1
+    - unknown_316: u32
+      offset: 316
+    - unknown_320: u8
+      offset: 320
+    - unknown_324: u32
+      offset: 324
+      except: [tw-454] # tw-454 sub_45F700 reads no word here
+    # kr-1256 sub_10DA840: one byte; after 0x3A a second byte follows and the value is that byte | 0x100.
+    - unknown_328: "optional<0x3A,FighterInfoByte328>"
+      offset: 328
+    - unknown_332: u32
+      offset: 332
+    - unknown_336: u8
+      offset: 336
+    - unknown_340: u32
+      offset: 340
+    - social: SocialSystemInfo # kr-1256 sub_113F700, through the object's own vtable
+      offset: 344
+    # tw-454 sub_460390 ends its social block with a bit vector: a u32 bit count, then one u32 per 32 bits.
+    # Only the empty form is sent.
+    - unknown_380: empty_list
+      only: [tw-454]
+    - unknown_404: "u32[8]" # +404 to +432
+      offset: 404
+    - unknown_436: "list<FighterInfoMapRank>" # the Area32 map ranks
+      offset: 436
+    - unknown_444: "u32[3]" # +444 to +452
+      offset: 444
+    - unknown_456: "list<FighterInfoMapRank>" # the ZombieEscape map ranks
+      offset: 456
+    - unknown_504: wstr # kr-1256 sub_10C7410
+      offset: 504
+    - unknown_400: u32
+      offset: 400
+    - unknown_464: u32
+      offset: 464
+    - unknown_472: u32 # read before +468
+      offset: 472
+    - unknown_468: u32
+      offset: 468
+    - unknown_476: "u32[7]" # +476 to +500
+      offset: 476
+    # kr-1256 sub_11522D0 (UserSkillSlotInfos); only the empty form is sent, so its entries are not stated.
+    - unknown_528: empty_list
+      offset: 528
+    - unknown_540: "list<FighterInfoAbility>" # kr-1256 sub_11529A0 (UserAbilityInfos)
+      offset: 540
+    # kr-1256 sub_10CF510: three words, then a list (kr-1256 sub_113B180) sent empty.
+    - unknown_552: "u32[3]"
+      offset: 552
+    - unknown_564: empty_list
+      offset: 564
+
+  # kr-1256 sub_10E1CF0: the block after FighterInfo +48's tag.
+  FighterInfoTail48:
+    - unknown_48: u64
+      offset: 48
+      only: [kr-1256]
+    - unknown_56: u32
+      offset: 56
+      only: [kr-1256]
+    - unknown_60: u32
+      offset: 60
+      only: [kr-1256]
+    - unknown_64: bool # stored as a byte flag
+      offset: 64
+      only: [kr-1256]
+
+  # kr-1256 sub_10DA840: the second byte after FighterInfo +328's tag.
+  FighterInfoByte328:
+    - unknown_328: u8
+      offset: 328
+      only: [kr-1256]
+
+  # One FighterInfo +304 element (kr-1256 sub_115B060): five words; the reader's stack defaults before each
+  # read are 0, 1000, -1, 0x42C80000 and 0.
+  FighterInfoEntry304:
+    - unknown_0: u32
+      only: [kr-1256]
+    - unknown_4: u32
+      only: [kr-1256]
+      default: 1000
+    - unknown_8: u32
+      only: [kr-1256]
+      default: -1
+    - unknown_12: u32 # 100.0f
+      only: [kr-1256]
+      default: 1120403456
+    - unknown_16: u32
+      only: [kr-1256]
+
+  # One map-rank element of FighterInfo +436 and +456: the key word, then kr-1256 sub_92A630's two words.
+  FighterInfoMapRank:
+    - unknown_key: u32
+      only: [kr-1256]
+    - unknown_4: u32
+      only: [kr-1256]
+    - unknown_8: u32
+      only: [kr-1256]
+
+  # One UserAbilityInfos element (kr-1256 sub_11529A0): a u16 key and a u32 value.
+  FighterInfoAbility:
+    - unknown_key: u16
+      only: [kr-1256]
+    - unknown_value: u32
+      only: [kr-1256]

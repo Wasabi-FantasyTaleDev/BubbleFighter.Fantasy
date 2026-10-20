@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.MatchConnection\BubbleFighter.Fantasy.MatchConnection.csproj" />
+    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Dialect.Modern.Messages\BubbleFighter.Fantasy.Dialect.Modern.Messages.csproj" />
+    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Protocol\BubbleFighter.Fantasy.Protocol.csproj" />
+    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.InGame\BubbleFighter.Fantasy.InGame.csproj" />
+    <ProjectReference Include="..\..\src\BubbleFighter.Fantasy.Kernel\BubbleFighter.Fantasy.Kernel.csproj" />
+  </ItemGroup>
+</Project>

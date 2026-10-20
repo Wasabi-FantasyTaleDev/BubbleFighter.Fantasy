@@ -1,0 +1,147 @@
+# Rows for the Korean 1256 client profile: the protocol plugin plus one game listener
+# and one relay listener.
+# The 1256 stream: the server's 258-byte plaintext greeting, then SimpleCipher over the shared tables
+# carrying the eight-byte frame.
+- id: dialect
+  plugin: dialect
+  config:
+    profile_id: "${BFF_PROFILE_ID}"
+    frame: modern_8
+- id: dialect.modern.messages
+  plugin: dialect.modern.messages
+  config:
+    # Rooms, plaza and rounds run on the shared typed messages (the room and round logic of the ingame row), with
+    # the kr-1256 bodies in packets/*.yaml. profiles/kr-1256/raw.patch.yaml restores the older packet path.
+    room_binding: typed
+    typed_rounds: true
+    # The S2C 585 loading words the round start has always sent (kr-1256 start words 1, 0, 1).
+    round_loading_flags: [1, 0, 1]
+# The message adapters every build shares: the login burst, the main-menu install and the features moved
+# here so far. The build's sequence is its login values in packets/builds.yaml.
+- id: dialect.messages
+  plugin: dialect.messages
+  config:
+    protocol: kr-1256/game
+    # The login burst, reply and main-menu install are the build's login values in packets/builds.yaml; the
+    # burst order and the modern reply values live there, not in this row.
+    login: true
+    # The empty C2S 521 main-menu probe is answered with the empty gspSessionSignatureData body.
+    main_menu_init: true
+    # Party invitation, accept, refusal and membership packets (packets/party.yaml): the invitation prompt is
+    # S2C 121 gspAskedInvitation (reader kr-1256 sub_99ABC0), the result is S2C 120/119 (handler
+    # kr-1256 sub_9A7A30) and the list is S2C 201 (handler kr-1256 sub_9064B0); needs the party capability
+    # of packets/builds.yaml and the party row. Leave, kick and leader requests stay off until audited.
+    party: true
+    server_notices: true
+    # Wear and removal requests and their results; turn this off together with the equipment row.
+    equipment: true
+    # The equipped view and its preset publications.
+    equipment_view: true
+    # The bag family (S2C 802/803/808/810 through the shared inventory senders). The readers are
+    # kr-1256 sub_9AE4A0 (802), sub_9AEB10 (803) and dispatch case 808, the envelope is
+    # kr-1256 sub_FA5520 and the record kr-1256 sub_10D8550; the publication order and envelope
+    # are the build's inventory values in packets/builds.yaml.
+    inventory: true
+    # Item use (C2S 806 / S2C 813) and the user-state refresh (S2C 105) for the lobby's paint sprays.
+    # The request and reply parameters are the counted string list packets/inventory-use.yaml states
+    # for this build (builder kr-1256 sub_80DA80, reader kr-1256 sub_9B4100).
+    inventory_item_use: true
+    # The expiry notice (S2C 807): the reader is kr-1256 sub_999C00 (dispatch case 807 through
+    # kr-1256 sub_998FB0: a u32 count, then that many 4-byte ids) and the consumer kr-1256 sub_93C6E0
+    # shows one notice per removed id. The ids come from the lobby's sweep at login, and the burst in
+    # packets/builds.yaml places the notice last, after the menu.
+    expired_item_notices: true
+    # The center selector stays off: the login gate list (S2C 17 gspCenterList) is already the table-driven
+    # empty list of the burst, while gspRepCenterUserCnt/gspRepUniquenessCheck and their client requests
+    # belong to the legacy multi-endpoint selector (the optional center-selector patch, never mounted here).
+    # The kr-1256 center requests are unread, so no modern CenterStatus layout is invented.
+    center_directory: false
+    # The gift box stays off. Its client readers are in packets/present.yaml, but the kr-1256 shop row's
+    # catalog branch (ShopPlugin, catalog_schema kr1256) does not mount PresentService, and the three
+    # kr-1256 present requests gcpReqPresentNewReceive/gcpReqPresentReceive/gcpReqPresentThrow have no
+    # opcode rows yet. Both belong to the S6 shop task (Claude); turning the option on before them would
+    # fail every present route at activation.
+    # The player menu's "view info" (packets/fighter-info.yaml): kr-1256 sender sub_9319E0 (C2S 118),
+    # reader sub_99A430, handler sub_9BCE60 (S2C 133). Needs the lobby row's fighter_info.
+    fighter_info: true
+    # The clan game-connection messages (packets/clan.yaml): the three empty client requests and the empty
+    # passport/mark/guild/attendance snapshots (readers kr-1256 sub_99C1D0, kr-1256 sub_99CFA0,
+    # kr-1256 sub_9B2690, kr-1256 sub_10C5590). Off here because no kr-1256 profile mounts the clan row:
+    # routes without that row's typed handlers would fail every C2S 2040 the client sends when the clan
+    # dialog opens (kr-1256 sub_5A9410) and at session start (kr-1256 sub_516EE0). A profile that lists
+    # bundles/clan.yaml sets clan: true on this row in its patch.
+    clan: false
+    # Native character creation (packets/character-creation.yaml): kr-1256 sub_9D2FF0 case 12 opens the stage,
+    # kr-1256 sub_5CCC60 builds C2S 31, sub_9A4E90 S2C 13 / C2S 32 and sub_9A46A0 S2C 14 / C2S 33.
+    character_creation: true
+- id: protocol
+  plugin: protocol
+  config:
+    opcode_table_path: profiles/kr-1256/opcodes.yaml
+- id: game-listener
+  plugin: net.tcp
+  config:
+    listen: "${BFF_BIND_HOST:-0.0.0.0}:${KR_1256_GAME_PORT:-7100}"
+    protocol: "kr-1256/game"
+    max_connections: 512
+    idle_timeout_seconds: 0
+- id: relay-listener
+  plugin: net.tcp
+  config:
+    listen: "${BFF_BIND_HOST:-0.0.0.0}:${KR_1256_RELAY_PORT:-7101}"
+    protocol: "kr-1256/relay"
+    max_connections: 512
+    idle_timeout_seconds: 0
+# The client's own data (map metadata, random-map pools, specs), read straight from its
+# archives. data/ holds copies of the client archives the server needs at their original client
+# paths; dataraw/ holds loose unpacked files by client path that override the archives. Both are
+# filled by tools/client-data; BFF_CLIENT_DATA is the directory holding every build's folder.
+- id: clientdata
+  plugin: clientdata
+  config:
+    data_directory: "${BFF_CLIENT_DATA:-client-data}/kr-1256/data"
+    raw_directory: "${BFF_CLIENT_DATA:-client-data}/kr-1256/dataraw"
+- id: inventory.paint-catalog
+  plugin: inventory.paint-catalog
+  config:
+    # kr-1256 sub_D407C0 case 1 accepts ShopItem2 rows in the native Spray sub-category.
+    shop_item_client_path: "Config/ShopItem2.xml"
+    max_shop_item_bytes: 134217728
+    max_paint_items: 256
+- id: lobby
+  plugin: lobby
+  config:
+    protocol: "kr-1256/game"
+    auto_create_players: true
+    fallback_username: "guest"
+    # Redeem launcher launch tickets at game login; needs the launcher.http row (BFF_LAUNCHER_TICKETS).
+    launcher_tickets: ${BFF_LAUNCHER_TICKETS:-false}
+    # ticket: every login must redeem a launcher ticket (needs the launcher.http row). open: any account name
+    # logs in, for a trusted LAN only. BFF_LOGIN_AUTHENTICATION sets it for every build at once.
+    authentication: ${BFF_LOGIN_AUTHENTICATION:-ticket}
+    # The build's logged-in players by account and nickname, for the party row.
+    online_players: true
+    # Native kr-1256 sub_D407C0 case 1 accepts only the ShopItem2 Spray sub-category;
+    # the catalog applies that category guard before using the parameter as a color index.
+    paint_items: true
+    # Answers the player menu's "view info" from the build's logged-in players.
+    fighter_info: true
+    # The first login of a fresh account creates its character through the native creation stage; needs the
+    # dialect.messages character_creation option and inventory_source mysql (profiles/kr-1256/patch.yaml).
+    character_creation: true
+- id: party
+  plugin: party
+  config:
+    protocol: "kr-1256/game"
+    # Operator-selected party size; this build's native UI upper bound is not proven.
+    max_members: 12
+    # kr-812 sub_929A40 drops its pending row after 30 s; kr-1256's own timer is not read.
+    invite_timeout_ms: 30000
+    max_pending_invites: 1024
+    max_pending_requests: 1024
+- id: equipment
+  plugin: equipment
+  config:
+    protocol: "kr-1256/game"
+    client_profile: "kr-1256"
+    version_major: 1256

@@ -1,0 +1,74 @@
+# Profile patch for cn-706: applied after the bundle rows (see profiles/kr-1256/patch.yaml
+# for the supported operations). The admin API moves off 8080 so this profile can run
+# beside the other builds on one machine.
+- replace:
+    id: admin.http
+    config:
+      listen: "${CN_706_ADMIN_HOST:-127.0.0.1}:${CN_706_ADMIN_PORT:-8092}"
+- replace:
+    id: diagnostics.packet-log
+    config:
+      file: logs/{date}/packets-cn-706_{timestamp}.log
+      preview_bytes: 96
+- set:
+    id: lobby
+    config:
+      # Resource identity and rename consumer activation remain a separate research audit.
+      rename_item_id: 0
+- set:
+    id: dialect.messages
+    config:
+      # cn-706 sub_8FFFF0 sends the named use request; dispatcher sub_7C8720 case 810 owns the reply.
+      inventory_item_use: true
+- set:
+    id: dialect.rooms
+    config:
+      # Ordinary matching activation is deferred while this build remains a research target.
+      quick_matching: false
+      supply_items: false
+      horde_lottery: false
+      counted_pve_items: false
+      # The zombie battle's team change (S2C 504) reaches cn-706 sub_7033C0, the counterpart of kr-812
+      # sub_776870, and cn-706 sub_6F89C0 sends gcpRoomChangeTeam on death as kr-812 sub_76C090 does; the
+      # cooperative zombie mode stays off through zombie_conversion_mode_id: 0.
+      zombie_conversion: true
+      pve_points: false
+      rescue_missions: false
+- set:
+    id: ingame
+    config:
+      native_item_slot_count: 1
+      lottery_modes: []
+      counted_item_mode_id: 0
+      counted_item_kinds: []
+      counted_immediate_item_kinds: []
+      zombie_conversion_mode_id: 0
+      # Its direct item-effect surface is off (packets/builds.yaml direct_supply_effects), so the king's ultra
+      # has no reply here yet.
+      zombie_king_ultra_item_kind: 0
+      pve_point_mode_id: 0
+      rescue_mode_id: 0
+      immediate_supply_item_kinds: []
+      random_supply_item_kinds: []
+      # No boxes are scheduled here (supply_items is off), so no mode offers any.
+      item_mode_ids: []
+      item_mode_kinds: []
+# The shop opens with id-400's request (cn-706 sub_656D60 sends only the cache token) and reads id-1809's
+# catalog: reader cn-706 sub_7A17F0, card sub_481A40, stock sub_481810, categories sub_79DEE0 / sub_64C780 /
+# sub_79FCF0 and tab filter sub_8FA020 match id-1809 sub_7BEFF0, sub_497860, sub_497630, sub_7BBC60 /
+# sub_66BF90 / sub_66BE50 and sub_90DD50.
+- set:
+    id: shop
+    config:
+      max_purchase_attempts: ~
+
+# Life-counted items: this build's executable has no "endurance" ShopItem duration type (no item kind 3) and no Life
+# notice text, so the daily life rule and life stock are off (packets/builds.yaml life_items: false).
+- set:
+    id: lobby
+    config:
+      life_items: false
+- set:
+    id: shop
+    config:
+      life_items: false

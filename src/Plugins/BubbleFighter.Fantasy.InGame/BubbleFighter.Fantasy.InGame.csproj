@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Plaza enter, room create/join/ready, and combat. Protocol names and version_major come from the profile row.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\BubbleFighter.Fantasy.Abstractions\BubbleFighter.Fantasy.Abstractions.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Test seam: the InGame.Tests project drives the internal handler loops
+         (CombatLoop / RoomLoop) directly, because the start chain has no
+         client-visible trigger to reach them through the router. -->
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>BubbleFighter.Fantasy.InGame.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\BubbleFighter.Fantasy.Contracts\BubbleFighter.Fantasy.Contracts.csproj" />
+    <ProjectReference Include="..\..\BubbleFighter.Fantasy.RoomCore\BubbleFighter.Fantasy.RoomCore.csproj" />
+    <ProjectReference Include="..\..\BubbleFighter.Fantasy.InGame.Wire\BubbleFighter.Fantasy.InGame.Wire.csproj" />
+  </ItemGroup>
+</Project>

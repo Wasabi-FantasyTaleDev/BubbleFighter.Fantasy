@@ -1,0 +1,865 @@
+# Score structures of the legacy client builds: what the scoreboard of a round carries for one seat.
+#
+# The format of this file is described in packets/README.md and at the top of room.yaml.
+#
+# ScoreData, the block gspGameBroadcastPlayerScoreData carries, is in kr-812 (reader kr-812 sub_417720,
+# constructor kr-812 sub_416910, handler kr-812 sub_804620):
+#
+#   u32 team_count                      (+4; 17 as sent)
+#   list<u32>, list<u32>                (+304, +320; both empty as sent)
+#   u32 winner_team                     (+296; -1 when built, the leading team when sent)
+#   bool                                (+300)
+#   team_count x (u32, u32, u32, u32)   (+12, +84, +156, +228, indexed by team from 1; the second is the
+#                                        team's total, which kr-812 sub_805F90 compares between teams)
+#   16 x ScoreRow                       (+336, 380 bytes each in the client's object)
+#   16 x (u32, u32)                     (+6416, +6480; 0 and -1 as sent)
+#
+# The complete block and its fixed runs are tables below. Every row is always sent:
+# a seat nobody sits in is written with the `vacant` values.
+#
+# A 4524-byte body (before the rewards) and a 4710-byte body (with them) are both consumed to the
+# last byte by this layout.
+version: 1
+structs:
+  # Existing scoreboard envelope, pinned by byte-length tests
+  # and seven-build preservation fixtures. Row differences remain separate.
+  # cn-406 sub_6FF0A0 / sub_6FEA10 prove sixteen teams and eight shorter rows;
+  # cn-406 sub_708710 and sub_7087A0 consume the same object for live/result updates.
+  ScoreData:
+    - team_count: u32
+      offset: 4
+      default: 17
+      cn-324:
+        - team_count: u32
+          offset: 4
+          default: 16
+      cn-279:
+        - team_count: u32
+          offset: 4
+          default: 15
+      cn-406:
+        - team_count: u32
+          offset: 4
+          default: 16
+    - unknown_304: empty_list
+      offset: 304
+      # cn-717 sub_4195B0 reads the winner immediately after team_count, without vectors.
+      except: [cn-324, cn-717]
+      also: [cn-735]
+      id-400:
+        - unknown_288: empty_list
+          offset: 288
+      cn-406:
+        - unknown_272: empty_list
+          offset: 272
+      cn-706:
+        - unknown_304: empty_list
+          offset: 304
+    - unknown_320: empty_list
+      offset: 320
+      except: [cn-324, cn-717]
+      also: [cn-735]
+      id-400:
+        - unknown_304: empty_list
+          offset: 304
+      cn-406:
+        - unknown_288: empty_list
+          offset: 288
+      cn-706:
+        - unknown_320: empty_list
+          offset: 320
+    - winner_team: u32
+      offset: 296
+      default: -1
+      except: [cn-324]
+      id-400:
+        - winner_team: u32
+          offset: 280
+          default: -1
+      cn-406:
+        - winner_team: u32
+          offset: 264
+          default: -1
+      cn-706:
+        - winner_team: u32
+          offset: 296
+          default: -1
+    - unknown_300: bool
+      offset: 300
+      except: [cn-324]
+      id-400:
+        - unknown_284: bool
+          offset: 284
+      cn-406:
+        - unknown_268: bool
+          offset: 268
+      cn-706:
+        - unknown_300: bool
+          offset: 300
+    - teams: "ScoreTeam[17]"
+      offset: 12
+      cn-324:
+        - teams: "ScoreTeam[16]"
+          offset: 12
+      cn-279:
+        - teams: "ScoreTeam[15]"
+          offset: 12
+      cn-406:
+        - teams: "ScoreTeam[16]"
+          offset: 12
+    - rows: "ScoreRow[16]"
+      offset: 336
+      id-400:
+        - rows: "ScoreRow[8]"
+          offset: 320
+      cn-406:
+        - rows: "ScoreRow[8]"
+          offset: 304
+      cn-706:
+        - rows: "ScoreRow[12]"
+          offset: 336
+      # cn-404 sub_7AD7F0 reads twelve of id-400's rows, 356 bytes apart, from +336.
+      cn-404:
+        - rows: "ScoreRow[12]"
+          offset: 336
+      cn-324:
+        - rows: "ScoreRow[8]"
+          offset: 200
+      cn-279:
+        - rows: "ScoreRow[8]"
+          offset: 188
+    - tails: "ScoreTail[16]"
+      offset: 6416
+      id-400:
+        - tails: "ScoreTail[8]"
+          offset: 3136
+      cn-406:
+        - tails: "ScoreTail[8]"
+          offset: 2960
+      id-1809:
+        - tails: "ScoreTail[16]"
+          offset: 6096
+      cn-706:
+        - tails: "ScoreTail[12]"
+          offset: 4656
+      cn-404:
+        - tails: "ScoreTail[12]"
+          offset: 4608
+      cn-324:
+        - tails: "ScoreTail[8]"
+          offset: 2440
+      cn-279:
+        - tails: "ScoreTail[8]"
+          offset: 1596
+
+  # Interleaved team arrays: kr-812 sub_417720; cn-324 sub_6E9EF0;
+  # cn-279 sub_448C80; cn-406 sub_6FF0A0 (consumer cn-406 sub_709830).
+  # Only the second value is filled with the team total.
+  ScoreTeam:
+    - unknown_12: u32
+      offset: 12
+    - total: u32
+      offset: 84
+      id-400:
+        - total: u32
+          offset: 80
+      cn-406:
+        - total: u32
+          offset: 76
+      cn-706:
+        - total: u32
+          offset: 84
+      cn-324:
+        - total: u32
+          offset: 76
+      cn-279:
+        - total: u32
+          offset: 72
+    - unknown_156: u32
+      offset: 156
+      id-400:
+        - unknown_148: u32
+          offset: 148
+      cn-406:
+        - unknown_140: u32
+          offset: 140
+      cn-706:
+        - unknown_156: u32
+          offset: 156
+      cn-324:
+        - unknown_140: u32
+          offset: 140
+      cn-279:
+        - unknown_132: u32
+          offset: 132
+    - unknown_228: u32
+      offset: 228
+      except: [cn-324]
+      id-400:
+        - unknown_216: u32
+          offset: 216
+      cn-406:
+        - unknown_204: u32
+          offset: 204
+      cn-706:
+        - unknown_228: u32
+          offset: 228
+
+  # Per-seat tails: kr-812 sub_417720 reads two words, early CN readers one.
+  ScoreTail:
+    - unknown_0: u32
+      offset: 0
+    - unknown_4: u32
+      offset: 4
+      default: -1
+      except: [cn-324, id-400]
+      also: [cn-706]
+
+  # ScoreRow: one seat of the scoreboard. Offsets are from the start of the row object.
+  # Reader: the 16-pass loop of kr-812 sub_417720; constructor kr-812 sub_4169D0.
+  ScoreRow:
+    - slot: u32                         # seat index; -1 on a seat nobody sits in
+      offset: 0
+      vacant: -1
+      id-1809:
+        - slot: u32
+          offset: 0
+          default: -1
+          vacant: -1
+    - unknown_4: u32
+      offset: 4
+    - nickname: wstr
+      offset: 8
+    - team: u32                         # 1 or 2
+      offset: 36
+    - level: u32
+      offset: 40
+    - knock_downs: u32                  # the count gspUpdateScoreData reports as kind 0
+      offset: 44
+    - kills: u32                        # the count gspUpdateScoreData reports as kind 24
+      offset: 48
+    - unknown_52: u32
+      offset: 52
+    - unknown_56: u32
+      offset: 56
+    - unknown_60: u32
+      offset: 60
+    - score: u32                        # the personal score gspUpdateScoreData reports as kind 29
+      offset: 64
+    - unknown_68: u32
+      offset: 68
+    - unknown_72: u32
+      offset: 72
+    - unknown_76: u32
+      offset: 76
+    - unknown_80: u32
+      offset: 80
+    - unknown_84: u32
+      offset: 84
+    - unknown_88: u32
+      offset: 88
+    - unknown_92: u32
+      offset: 92
+    - unknown_96: u32
+      offset: 96
+    # The seat's star count in the star modes: the live stat 35 writes this field (kr-812 sub_804850 case 0x23)
+    # and the HUD reads the local seat's value from it and marks every seat holding the most (kr-812 sub_5521F0).
+    - stars: u32
+      offset: 112
+    - unknown_116: u32
+      offset: 116
+    - unknown_120: u32
+      offset: 120
+    - unknown_124: u32
+      offset: 124
+    - unknown_128: u32
+      offset: 128
+    - unknown_132: u32
+      offset: 132
+    - unknown_136: u32
+      offset: 136
+      # kr-812 sub_5ACB20 and cn-717 sub_5ECD30 select star-rank decoration here, not the round outcome.
+    - unknown_140: u32
+      offset: 140
+    # The three experience values kr-812 sub_805F90 copies from the local player's row into the profile
+    # (+108, +112, +116 of the profile object): where the current level starts, the player's experience
+    # and where the next level starts. The recorded row carries 1737, 1763, 2004 before the rewards and
+    # 1737, 1879, 2004 with them.
+    - exp_level_start: u32
+      offset: 144
+    - exp_total: u32
+      offset: 148
+    - exp_next_level: u32
+      offset: 152
+    - exp_gained: u32                   # experience earned this round (recorded 116 = 1879 - 1763); 0 before the rewards
+      offset: 156
+    - lucci_gained: u32                 # Lucci earned this round (recorded 588); 0 before the rewards
+      offset: 160
+    # 1 in a seated player's row and 0 in the rows nobody sat in. The room-intrude handlers
+    # set it for a seat that joins the round (id-400 sub_78EE50, id-1809 sub_7B3300, cn-706 sub_7957F0),
+    # and the result screen leaves a row without it out as absent (id-400 sub_6DE480).
+    - unknown_164: bool
+      offset: 164
+      default: 1
+      vacant: 0
+    - unknown_165: bool
+      offset: 165
+    - unknown_166: bool
+      offset: 166
+    - unknown_167: bool
+      offset: 167
+    - unknown_220: bool
+      offset: 220
+    - unknown_221: bool
+      offset: 221
+    - unknown_222: u8
+      offset: 222
+    - unknown_172: u32
+      offset: 172
+    # Image files drawn as bonus badges beside the rewards (recorded: two files under
+    # Images/GameStage/GameResult/). Empty before the rewards.
+    - badge_images: "list<wstr>"
+      offset: 204
+    - unknown_176: wstr
+      offset: 176
+    - unknown_244: u32
+      offset: 244
+    - unknown_224: u32
+      offset: 224
+    - unknown_232: u32
+      offset: 232
+    - unknown_236: u32
+      offset: 236
+      except: [id-1809]
+    - unknown_228: u32
+      offset: 228
+    - unknown_304: u32
+      offset: 304
+    - unknown_308: bool
+      offset: 308
+    - unknown_312: u32
+      offset: 312
+    - unknown_316: u32                  # 2 in a seated player's row, -1 in the rows nobody sat in
+      offset: 316
+      default: 2
+      vacant: -1
+      id-1809:
+        - unknown_316: u32
+          offset: 316
+          default: -1
+    - unknown_320: u32                  # -1 in every recorded row
+      offset: 320
+      default: -1
+      id-1809:
+        - unknown_320: u32
+          offset: 320
+    - unknown_324: bool
+      offset: 324
+    - unknown_325: bool
+      offset: 325
+    - unknown_328: u32
+      offset: 328
+    - unknown_332: u32
+      offset: 332
+    - unknown_336: bool
+      offset: 336
+    - unknown_340: u32
+      offset: 340
+    - unknown_344: u32
+      offset: 344
+    - unknown_348: u32
+      offset: 348
+    - unknown_352: u32
+      offset: 352
+    - unknown_356: u32
+      offset: 356
+    - unknown_360: u32
+      offset: 360
+      except: [id-1809]
+    - unknown_364: u16
+      offset: 364
+      except: [id-1809]
+    # A nested object with its own reader (vtable kr-812 off_CB9F3C, set by kr-812 sub_4169D0); it takes
+    # four bytes, 0 in every recorded row.
+    - unknown_368: u32
+      offset: 368
+      except: [id-1809]
+
+  # cn-279 sub_448C80 reads eight rows at a 176-byte object stride; offsets here are
+  # relative to the row's slot at ScoreData+188. Defaults come from cn-279 sub_448900.
+  # A row has no cn-324 unknown_4 before nickname and no vectors or strings at its end.
+  ScoreRow@cn-279:
+    - slot: u32
+      offset: 0
+      vacant: -1
+    - nickname: wstr
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - unknown_16: u32
+      offset: 16
+    - unknown_20: u32
+      offset: 20
+    - unknown_24: u32
+      offset: 24
+    - unknown_28: u32
+      offset: 28
+    - unknown_32: u32
+      offset: 32
+    - unknown_36: u32
+      offset: 36
+    - unknown_40: u32
+      offset: 40
+    - unknown_44: u32
+      offset: 44
+    - unknown_48: u32
+      offset: 48
+    - unknown_52: u32
+      offset: 52
+    - unknown_56: u32
+      offset: 56
+    - unknown_60: u32
+      offset: 60
+    - unknown_64: u32
+      offset: 64
+    - unknown_68: u32
+      offset: 68
+    - unknown_72: u32
+      offset: 72
+    - unknown_76: u32
+      offset: 76
+    - unknown_80: f32                   # cn-279 sub_448900 initializes this as 0.0f
+      offset: 80
+    - unknown_84: f32                   # cn-279 sub_448900 initializes this as 0.0f
+      offset: 84
+    - unknown_88: u32
+      offset: 88
+    - exp_level_start: u32             # cn-279 sub_739D60 uses (+96 - +92) / (+100 - +92) for the EXP bar.
+      offset: 92
+    - exp_total: u32                   # cn-279 sub_704800 copies +96 to the local progress manager +32.
+      offset: 96
+    - exp_next_level: u32              # cn-279 sub_676FB0 displays progress manager +32 / +36.
+      offset: 100
+    - unknown_104: u32
+      offset: 104
+    - unknown_108: u32
+      offset: 108
+    - stats_visible: bool              # cn-279 sub_739D60 gates counters and the EXP bar on this byte.
+      offset: 112
+    - leveled_up: bool                 # cn-279 sub_757950 tests row +113 before the levelUpgrade animation.
+      offset: 113
+    - unknown_114: bool
+      offset: 114
+    - unknown_115: bool
+      offset: 115
+    - unknown_120: bool
+      offset: 120
+    - unknown_121: bool
+      offset: 121
+    - unknown_122: u8
+      offset: 122
+    - unknown_116: u32
+      offset: 116
+    - unknown_132: u32
+      offset: 132
+    - unknown_124: u32
+      offset: 124
+
+  # ScoreRow of cn-324: the same fields in the same order as kr-812's, without one of the five u32 after
+  # the second string and without everything after the last bool. The row object is 280 bytes.
+  # Reader: the 8-pass loop of cn-324 sub_6E9EF0; constructor cn-324 sub_6EA290, reset cn-324 sub_6E99A0.
+  # The names are kr-812's, carried over by position: the reader takes the fields in kr-812's order, and
+  # the one consumer read for this build, cn-324 sub_6F30B0, uses +124 as kr-812 uses its exp_total.
+  # No recorded cn-324 scoreboard exists, so the values of unknown_140 and unknown_256 are kr-812's.
+  #
+  # ScoreData of cn-324 around the rows (reader cn-324 sub_6E9EF0): u32 team_count (16), team_count x
+  # (u32, u32, u32) of which the second is the team's total, 8 rows, 8 x u32.
+  ScoreRow@cn-324:
+    - slot: u32                         # seat index; -1 on a seat nobody sits in (set by cn-324 sub_6E99A0)
+      offset: 0
+      vacant: -1
+    - unknown_4: u32
+      offset: 4
+    - nickname: wstr
+      offset: 8
+    - team: u32
+      offset: 12
+    - level: u32
+      offset: 16
+    - knock_downs: u32
+      offset: 20
+    - kills: u32
+      offset: 24
+    - unknown_28: u32
+      offset: 28
+    - unknown_32: u32
+      offset: 32
+    - unknown_36: u32
+      offset: 36
+    - score: u32
+      offset: 40
+    - unknown_44: u32
+      offset: 44
+    - unknown_48: u32
+      offset: 48
+    - unknown_52: u32
+      offset: 52
+    - unknown_56: u32
+      offset: 56
+    - unknown_60: u32
+      offset: 60
+    - unknown_64: u32
+      offset: 64
+    - unknown_68: u32
+      offset: 68
+    - unknown_72: u32
+      offset: 72
+    - unknown_88: u32
+      offset: 88
+    - unknown_92: u32
+      offset: 92
+    - unknown_96: u32
+      offset: 96
+    - unknown_100: u32
+      offset: 100
+    - unknown_104: u32
+      offset: 104
+    - unknown_108: u32
+      offset: 108
+    - unknown_112: u32
+      offset: 112
+    # cn-324 sub_63B230 selects star-rank or star-rank-other here; this is not the outcome.
+    - unknown_116: u32
+      offset: 116
+    - exp_level_start: u32
+      offset: 120
+    - exp_total: u32                    # cn-324 sub_6F30B0 copies the local player's into the profile (+32)
+      offset: 124
+    - exp_next_level: u32
+      offset: 128
+    - exp_gained: u32
+      offset: 132
+    - lucci_gained: u32
+      offset: 136
+    - unknown_140: bool                 # the flag a seated row carries as 1 in kr-812 (kr-812 +164)
+      offset: 140
+      default: 1
+      vacant: 0
+    - unknown_141: bool
+      offset: 141
+    - unknown_142: bool
+      offset: 142
+    - unknown_143: bool
+      offset: 143
+    - unknown_164: bool
+      offset: 164
+    - unknown_165: bool
+      offset: 165
+    - unknown_166: u8
+      offset: 166
+    - unknown_144: u32
+      offset: 144
+    - badge_images: "list<wstr>"        # reader cn-324 sub_481410
+      offset: 152
+    - unknown_148: wstr
+      offset: 148
+    - unknown_184: u32
+      offset: 184
+    # cn-324 sub_40B550/sub_40BAD0 read ScoreData row +168 for the primary reward card (Stock/StockSet identity).
+    - award_display_id: u32
+      offset: 168
+    - unknown_176: u32
+      offset: 176
+    - unknown_172: u32
+      offset: 172
+    - unknown_244: u32
+      offset: 244
+    - unknown_248: bool
+      offset: 248
+    - unknown_252: u32
+      offset: 252
+    - unknown_256: u32                  # -1 when built (cn-324 sub_6E99A0); kr-812 carries 2 here for a seated row (kr-812 +316)
+      offset: 256
+      default: 2
+      vacant: -1
+    - unknown_260: u32
+      offset: 260
+    - unknown_264: bool
+      offset: 264
+    - unknown_265: bool
+      offset: 265
+    - unknown_268: u32
+      offset: 268
+    - unknown_272: u32
+      offset: 272
+    - unknown_276: bool
+      offset: 276
+
+  # Native row order: id-400 sub_781180; defaults: id-400 sub_780A20.
+  # cn-406 sub_6FF0A0 matches through +328, with no five-word Indonesian extension.
+  ScoreRow@id-400:
+    - slot: "u32"
+      offset: 0
+      default: -1
+      vacant: -1
+    - unknown_4: "u32"
+      offset: 4
+    - nickname: "wstr"
+      offset: 8
+    - team: "u32"
+      offset: 36
+    - level: "u32"
+      offset: 40
+    - knock_downs: "u32"
+      offset: 44
+    - kills: "u32"
+      offset: 48
+    - unknown_52: "u32"
+      offset: 52
+    - unknown_56: "u32"
+      offset: 56
+    - unknown_60: "u32"
+      offset: 60
+    - score: "u32"
+      offset: 64
+    - unknown_68: "u32"
+      offset: 68
+    - unknown_72: "u32"
+      offset: 72
+    - unknown_76: "u32"
+      offset: 76
+    - unknown_80: "u32"
+      offset: 80
+    - unknown_84: "u32"
+      offset: 84
+    - unknown_88: "u32"
+      offset: 88
+    - unknown_92: "u32"
+      offset: 92
+    - unknown_96: "u32"
+      offset: 96
+    - unknown_112: "u32"
+      offset: 112
+    - unknown_116: "u32"
+      offset: 116
+    - unknown_120: "u32"
+      offset: 120
+    - unknown_124: "u32"
+      offset: 124
+    - unknown_128: "u32"
+      offset: 128
+    - unknown_132: "u32"
+      offset: 132
+    - unknown_136: "u32"
+      offset: 136
+    - unknown_140: "u32"
+      offset: 140
+    - exp_level_start: "u32"
+      offset: 144
+    - exp_total: "u32"
+      offset: 148
+    - exp_next_level: "u32"
+      offset: 152
+    - exp_gained: "u32"
+      offset: 156
+    - lucci_gained: "u32"
+      offset: 160
+    - unknown_164: "bool"               # set for a seat in the round; see ScoreRow (id-400 sub_78EE50)
+      offset: 164
+      default: 1
+      vacant: 0
+    - unknown_165: "bool"
+      offset: 165
+    - unknown_166: "bool"
+      offset: 166
+    - unknown_167: "bool"
+      offset: 167
+    - unknown_216: "bool"
+      offset: 216
+    - unknown_217: "bool"
+      offset: 217
+    - unknown_218: "u8"
+      offset: 218
+    - unknown_168: "u32"
+      offset: 168
+    - badge_images: "list<wstr>"
+      offset: 200
+    - unknown_172: "wstr"
+      offset: 172
+    - unknown_236: "u32"
+      offset: 236
+    - unknown_220: "u32"
+      offset: 220
+    - unknown_228: "u32"
+      offset: 228
+    - unknown_224: "u32"
+      offset: 224
+    - unknown_296: "u32"
+      offset: 296
+    - unknown_300: "bool"
+      offset: 300
+    - unknown_304: "u32"
+      offset: 304
+    - unknown_308: "u32"
+      offset: 308
+      default: -1
+    - unknown_312: "u32"
+      offset: 312
+    - unknown_316: "bool"
+      offset: 316
+    - unknown_317: "bool"
+      offset: 317
+    - unknown_320: "u32"
+      offset: 320
+    - unknown_324: "u32"
+      offset: 324
+    - unknown_328: "bool"
+      offset: 328
+    - unknown_332: "u32"
+      offset: 332
+      except: [cn-406]
+    - unknown_336: "u32"
+      offset: 336
+      except: [cn-406]
+    - unknown_340: "u32"
+      offset: 340
+      except: [cn-406]
+    - unknown_344: "u32"
+      offset: 344
+      except: [cn-406]
+    - unknown_348: "u32"
+      offset: 348
+      except: [cn-406]
+  # Native row order: cn-706 sub_786E90; defaults: cn-706 sub_786770.
+  ScoreRow@cn-706:
+    - slot: "u32"
+      offset: 0
+      default: -1
+      vacant: -1
+    - unknown_4: "u32"
+      offset: 4
+    - nickname: "wstr"
+      offset: 8
+    - team: "u32"
+      offset: 36
+    - level: "u32"
+      offset: 40
+    - knock_downs: "u32"
+      offset: 44
+    - kills: "u32"
+      offset: 48
+    - unknown_52: "u32"
+      offset: 52
+    - unknown_56: "u32"
+      offset: 56
+    - unknown_60: "u32"
+      offset: 60
+    - score: "u32"
+      offset: 64
+    - unknown_68: "u32"
+      offset: 68
+    - unknown_72: "u32"
+      offset: 72
+    - unknown_76: "u32"
+      offset: 76
+    - unknown_80: "u32"
+      offset: 80
+    - unknown_84: "u32"
+      offset: 84
+    - unknown_88: "u32"
+      offset: 88
+    - unknown_92: "u32"
+      offset: 92
+    - unknown_96: "u32"
+      offset: 96
+    - unknown_112: "u32"
+      offset: 112
+    - unknown_116: "u32"
+      offset: 116
+    - unknown_120: "u32"
+      offset: 120
+    - unknown_124: "u32"
+      offset: 124
+    - unknown_128: "u32"
+      offset: 128
+    - unknown_132: "u32"
+      offset: 132
+    - unknown_136: "u32"
+      offset: 136
+    - unknown_140: "u32"
+      offset: 140
+    - exp_level_start: "u32"
+      offset: 144
+    - exp_total: "u32"
+      offset: 148
+    - exp_next_level: "u32"
+      offset: 152
+    - exp_gained: "u32"
+      offset: 156
+    - lucci_gained: "u32"
+      offset: 160
+    - unknown_164: "bool"               # set for a seat in the round; see ScoreRow (id-400 sub_78EE50)
+      offset: 164
+      default: 1
+      vacant: 0
+    - unknown_165: "bool"
+      offset: 165
+    - unknown_166: "bool"
+      offset: 166
+    - unknown_167: "bool"
+      offset: 167
+    - unknown_220: "bool"
+      offset: 220
+    - unknown_221: "bool"
+      offset: 221
+    - unknown_222: "u8"
+      offset: 222
+    - unknown_172: "u32"
+      offset: 172
+    - badge_images: "list<wstr>"
+      offset: 204
+    - unknown_176: "wstr"
+      offset: 176
+    - unknown_244: "u32"
+      offset: 244
+    - unknown_224: "u32"
+      offset: 224
+    - unknown_232: "u32"
+      offset: 232
+    - unknown_236: "u32"
+      offset: 236
+    - unknown_228: "u32"
+      offset: 228
+    - unknown_304: "u32"
+      offset: 304
+    - unknown_308: "bool"
+      offset: 308
+    - unknown_312: "u32"
+      offset: 312
+    - unknown_316: "u32"
+      offset: 316
+      default: -1
+    - unknown_320: "u32"
+      offset: 320
+    - unknown_324: "bool"
+      offset: 324
+    - unknown_325: "bool"
+      offset: 325
+    - unknown_328: "u32"
+      offset: 328
+    - unknown_332: "u32"
+      offset: 332
+    - unknown_336: "bool"
+      offset: 336
+    - unknown_340: "u32"
+      offset: 340
+    - unknown_344: "u32"
+      offset: 344
+    - unknown_348: "u32"
+      offset: 348
+    - unknown_352: "u32"
+      offset: 352
+    - unknown_356: "u32"
+      offset: 356

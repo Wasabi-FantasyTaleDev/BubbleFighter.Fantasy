@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <InternalsVisibleTo Include="BubbleFighter.Fantasy.Launcher.Http.Tests" />
+    <ProjectReference Include="../../BubbleFighter.Fantasy.Abstractions/BubbleFighter.Fantasy.Abstractions.csproj" />
+    <ProjectReference Include="../../BubbleFighter.Fantasy.Contracts/BubbleFighter.Fantasy.Contracts.csproj" />
+  </ItemGroup>
+</Project>

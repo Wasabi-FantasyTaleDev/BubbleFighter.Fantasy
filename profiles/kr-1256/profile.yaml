@@ -1,0 +1,25 @@
+id: kr-1256
+display_names:
+  en: "Korea 2026-05-08"
+  zh-Hans: "韩服 2026-05-08"
+  zh-Hant: "韓國 2026-05-08"
+  ko: "한국 2026-05-08"
+client_build: kr:1256:1304
+experimental: true
+# The build its packet layouts are based on (packets/builds.yaml); the profile states its own rows.
+parent: kr-812
+# Head of the modern family: builds without recoverable packet class names; cn-774 and tw-454 inherit it.
+family: modern
+description: Korean client build, ClientVersion_Major 1256, resource patch 1304.
+bundles:
+  - core
+  - kr-1256
+  - ingame
+  - shop
+  - inventory-actions
+  - player-settings
+patches:
+  - patch.yaml
+  - ../bundles/shop-supplement-lucci.yaml
+  # Optional developer override; git-ignored and skipped when absent.
+  - local.patch.yaml

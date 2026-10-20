@@ -1,0 +1,48 @@
+# Profile patch for the all-builds server. It starts without any external service: players
+# live in memory until a MySQL connection is configured (local.patch.yaml or the web UI).
+- replace:
+    id: persistence.mysql
+    disabled: true
+- replace:
+    id: persistence.memory
+    disabled: false
+- replace:
+    id: launcher.http
+    disabled: false
+    config:
+      # The all-builds deployment exposes the catalog through its configured reverse proxy.
+      # Game endpoints are data; the launcher still decides whether to use native login.
+      supports_instances: true
+      instances:
+        - id: cn-774
+          build: cn-774
+          name:
+            - language: en
+              text: CN2019
+            - language: zh-CN
+              text: 国服 2019
+          release_version: "0.2.98.3"
+          client_languages: [zh-CN]
+          host: "${BFF_CN_774_HOST:-127.0.0.1}"
+          port: ${CN_774_GAME_PORT:-7190}
+          launcher_login: optional
+        - id: tw-454
+          build: tw-454
+          name:
+            - language: en
+              text: TW2019
+            - language: zh-TW
+              text: 台灣 2019
+          release_version: "2018.12.11"
+          client_languages: [zh-TW]
+          host: "${BFF_TW_454_HOST:-127.0.0.1}"
+          port: ${TW_454_GAME_PORT:-7200}
+          launcher_login: optional
+- replace:
+    id: diagnostics.packet-log
+    config:
+      file: logs/{date}/packets-all_{timestamp}.log
+      capture_enabled: ${BFF_PACKET_CAPTURE:-false}
+      preview_bytes: 96
+      console_packets: false
+      preview_handled_opcodes: [502, 503, 702, 704, 705, 707, 713, 803, 804, 805, 901, 903, 904, 908, 923, 924, 32862, 32892, 32920]

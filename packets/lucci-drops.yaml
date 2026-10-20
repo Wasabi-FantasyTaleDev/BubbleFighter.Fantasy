@@ -1,0 +1,94 @@
+version: 1
+# Lucci (coin) drops of killed NPCs in the cooperative modes, and their pickup.
+#
+# Every build that has the packets reads and writes the same bodies, so there is no per-build
+# annotation. The readers of the S2C and C2S objects were checked in every build:
+#   kr-812   C2S sub_530870 writes LucciDropRequest, sub_530670 writes HordeAwardRequest;
+#            S2C reader sub_5302A0 (sub_530320 writes the same fields); eat/eaten pair sub_50E1F0.
+#   cn-717   C2S sub_5678F0 / sub_567980; S2C reader sub_567530; eat sender sub_542C50.
+#   cn-706   C2S sub_4BA110 / sub_4BA020; S2C reader sub_4B9510; eat sender sub_4C5CB0.
+#   id-400   C2S sub_481050; S2C reader sub_4804E0; eat sub_48C7B0 (no award request in this build).
+#   id-1809  C2S sub_4D6430; S2C reader sub_4D5680; eat sub_4E1DF0 (no award request in this build).
+#   cn-406   C2S sub_41F500 (no award request in this build); S2C reader sub_41EA60; eat sender sub_42A260.
+#   cn-324   C2S sub_45D1D0 (no award request in this build); S2C reader sub_45CA20; eat sender sub_467460.
+#   cn-279   C2S sub_4042F0 (no award request in this build); S2C reader sub_4039D0; eat sender sub_818F80.
+# Opcode numbers are in each profile's opcodes.yaml. Where the client reads the S2C kind (+8) is
+# documented in packets/lucci-drops.yaml.
+structs:
+  # C2S gcpReqCreateLucci: the killing player's client asks for a Lucci at the NPC's position.
+  # kr-812 sub_514A90 fills it from the death handler sub_A1C640 (position, velocity, kind 1 or 2,
+  # the constant 5, then the value sub_53BAF0 returns for the killer).
+  LucciDropRequest:
+    - x: f32
+      offset: 4
+    - y: f32
+      offset: 8
+    - z: f32
+      offset: 12
+    - velocity_x: f32
+      offset: 16
+    - velocity_y: f32
+      offset: 20
+    - velocity_z: f32
+      offset: 24
+    - kind: u32 # 1 plain Lucci, 2 big Lucci (kr-812 sub_51AD80 cases 1 and 2).
+      offset: 28
+    - unknown_32: u32 # 5 on the death path (kr-812 sub_A1C640), 1 on the mode 7/13/14/17/18 paths of id-400 sub_4E1F40.
+      offset: 32
+    - unknown_36: u32 # kr-812 sub_53BAF0(killer); the server echoes it, the S2C object keeps it at +36.
+      offset: 36
+  # C2S gcpReqCreateHordeAward: the same request without a kind; kr-812 sub_514B60 writes the
+  # constant 5 at +28 and sub_53BAF0(killer) at +32. The server picks the award item kind.
+  HordeAwardRequest:
+    - x: f32
+      offset: 4
+    - y: f32
+      offset: 8
+    - z: f32
+      offset: 12
+    - velocity_x: f32
+      offset: 16
+    - velocity_y: f32
+      offset: 20
+    - velocity_z: f32
+      offset: 24
+    - unknown_28: u32 # Always 5 (kr-812 sub_514B60, cn-717 sub_549840, cn-706 sub_4CD8A0).
+      offset: 28
+    - unknown_32: u32 # kr-812 sub_53BAF0(killer); echoed into LucciCreate.unknown_36.
+      offset: 32
+  # S2C gspGameCreateLucci: creates one item in every client. kr-812 sub_51AD80 switches on kind:
+  # 1 GoLucciItem, 2 GoBigLucciItem, 3/4/5 GoHordeAward1/5/10LucciItem; the id is the object id
+  # the later pickup reports back (the item's +404 field in kr-812 sub_6351F0 / sub_638600).
+  LucciCreate:
+    - object_id: u32
+      offset: 4
+    - kind: u32
+      offset: 8
+    - x: f32
+      offset: 12
+    - y: f32
+      offset: 16
+    - z: f32
+      offset: 20
+    - velocity_x: f32 # kr-812 sub_51AD80 passes these three to the item through vtable slot 41.
+      offset: 24
+    - velocity_y: f32
+      offset: 28
+    - velocity_z: f32
+      offset: 32
+    - unknown_36: u32 # kr-812 sub_51AD80 hands it to the item through vtable slot 60 (and to the big Lucci constructor).
+      offset: 36
+  # C2S gcpEatLucci: the touching player's client reports its own character and the item
+  # (kr-812 sub_6351F0 and sub_638600 call sub_50E1F0(character +404, item +404)).
+  LucciPickup:
+    - character_id: u32
+      offset: 4
+    - object_id: u32
+      offset: 8
+  # S2C gspLucciEaten: kr-812 sub_516570 resolves +4 to the Character that plays the pickup
+  # effect and +8 to the item it destroys.
+  LucciPicked:
+    - character_id: u32
+      offset: 4
+    - object_id: u32
+      offset: 8

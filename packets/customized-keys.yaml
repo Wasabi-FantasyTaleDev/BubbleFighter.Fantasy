@@ -1,0 +1,29 @@
+version: 1
+structs:
+  # kr-812 sub_4EBCF0 / kr-812 sub_4EC080; modern builders kr-1256 sub_60B150,
+  # cn-774 sub_761B90 and tw-454 sub_6F5B50 write the same flag and counted rows.
+  CustomizedKeysUpdate:
+    - use_defaults: bool # True when the sender found no nondefault mappings.
+      offset: 4
+    - mappings: "list<CustomizedKey>"
+      offset: 8
+
+  # Consumers kr-812 sub_8357D0, kr-1256 sub_9C9BF0, cn-774 sub_BC5A20
+  # and tw-454 sub_AA49B0 apply the vector only when this flag is nonzero.
+  CustomizedKeysReply:
+    - apply_mappings: bool # This is not the outgoing use_defaults flag.
+      offset: 4
+    - mappings: "list<CustomizedKey>"
+      offset: 8
+
+  # kr-812 sub_9858F0 / kr-812 sub_4EC0B0: prefixed UTF-16 name, then a four-byte key.
+  # Modern pairs: kr-1256 sub_10D60F0 / kr-1256 sub_10D6150,
+  # cn-774 sub_1060600 / cn-774 sub_1060660, tw-454 sub_ECCE70 / tw-454 sub_ECCED0.
+  CustomizedKey:
+    - name: wstr
+      offset: 4
+    - key: u32
+      offset: 32
+      kr-1256:
+        - key: u32
+          offset: 28

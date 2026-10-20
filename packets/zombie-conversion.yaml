@@ -1,0 +1,14 @@
+version: 1
+structs:
+  # S2C gspRoomChangeTeam. kr-812 sub_6DB1B0 reads two words; cn-717 sub_538B70, id-400 sub_782DD0,
+  # id-1809 sub_4D7F70, cn-706 sub_733050, cn-324 sub_408DF0 and cn-279 sub_47E650 match.
+  ZombieTeamChange:
+    - seat: u32 # cn-324 sub_6ED8B0 resolves the first word as a player seat.
+      offset: 4
+    - team: u32 # cn-324 sub_68C290 consumes event 20: team 2 is human, team 15 triggers zombie conversion.
+      offset: 8
+      # kr-1256 sub_9DAE50 reads a byte it writes to seat +4 through sub_9E4C80 (36 returns early), then a
+      # tagged tail for a ServerTeamInfo
+      kr-1256:
+        - team: u8
+        - unknown_n2: "optional<0x3A,TeamChangeTail>"

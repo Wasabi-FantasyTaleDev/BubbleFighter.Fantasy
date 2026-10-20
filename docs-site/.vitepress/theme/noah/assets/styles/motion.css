@@ -1,0 +1,32 @@
+:root {
+  --noah-motion-fast: 150ms;
+  --noah-motion-enter: 650ms;
+  --noah-motion-ease: cubic-bezier(.16, 1, .3, 1);
+  --noah-reveal-distance: 18px;
+}
+
+.noah-reveal {
+  opacity: 1;
+  transform: none;
+  transition: opacity var(--noah-motion-enter) var(--noah-motion-ease), transform var(--noah-motion-enter) var(--noah-motion-ease);
+  transition-delay: var(--noah-reveal-delay, 0ms);
+}
+
+.noah-reveal-pending {
+  opacity: 0;
+  transform: translateY(var(--noah-reveal-distance));
+}
+
+.noah-reveal:focus-within {
+  opacity: 1;
+  transform: none;
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .noah-reveal, .noah-reveal-pending { opacity: 1; transform: none; transition: none; }
+}
+
+@media print {
+  .noah-reveal, .noah-reveal-pending { opacity: 1; transform: none; transition: none; }
+}

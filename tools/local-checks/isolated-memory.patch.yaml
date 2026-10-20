@@ -1,0 +1,9 @@
+# Pass with `run --profile <id> --patch tools/local-checks/isolated-memory.patch.yaml` for local
+# checks. CLI patches apply last, so this overrides a local.patch.yaml or .env that points
+# persistence.mysql at a real database: players live in memory and nothing durable is touched.
+- replace:
+    id: persistence.mysql
+    disabled: true
+- replace:
+    id: persistence.memory
+    disabled: false

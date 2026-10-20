@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Administration web interface for Bubble Fighter Fantasy: the built client embedded as resources.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\BubbleFighter.Fantasy.Abstractions\BubbleFighter.Fantasy.Abstractions.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\BubbleFighter.Fantasy.Contracts\BubbleFighter.Fantasy.Contracts.csproj" />
+  </ItemGroup>
+  <!-- The Vue client is compiled from client/ into wwwroot/ (git-ignored build output) before this project builds,
+       and only when a client source is newer than the last build. Building therefore needs Node.js 20.19 or newer
+       on PATH. A build that already has wwwroot (the Docker image builds it in a Node stage) passes
+       -p:SkipWebUiClientBuild=true. -->
+  <ItemGroup>
+    <WebUiClientInput Include="client\src\**\*;client\public\**\*;client\index.html;client\package.json;client\package-lock.json;client\vite.config.*;client\tsconfig*.json" />
+  </ItemGroup>
+  <Target Name="BuildWebUiClient" BeforeTargets="BeforeBuild" Inputs="@(WebUiClientInput)" Outputs="wwwroot\index.html"
+          Condition="'$(SkipWebUiClientBuild)' != 'true'">
+    <Exec Command="npm ci --no-audit --no-fund" WorkingDirectory="client" Condition="!Exists('client\node_modules')" />
+    <Exec Command="npm run build" WorkingDirectory="client" />
+  </Target>
+  <!-- The files are embedded after the client build, so a fresh checkout picks up what the build produced.
+       The logical name keeps the folder layout. -->
+  <Target Name="EmbedWebUiClient" AfterTargets="BuildWebUiClient" BeforeTargets="BeforeBuild">
+    <Error Condition="!Exists('wwwroot\index.html')"
+           Text="The web interface is not built: wwwroot\index.html is missing. Install Node.js 20.19 or newer, or build the client in client/ with npm run build." />
+    <ItemGroup>
+      <_WebUiClientFile Include="wwwroot\**\*" Exclude="wwwroot\**\*.map" />
+      <EmbeddedResource Include="@(_WebUiClientFile)"
+                        LogicalName="wwwroot/%(_WebUiClientFile.RecursiveDir)%(_WebUiClientFile.Filename)%(_WebUiClientFile.Extension)" />
+    </ItemGroup>
+  </Target>
+  <ItemGroup>
+    <InternalsVisibleTo Include="BubbleFighter.Fantasy.WebUi.Tests" />
+  </ItemGroup>
+</Project>

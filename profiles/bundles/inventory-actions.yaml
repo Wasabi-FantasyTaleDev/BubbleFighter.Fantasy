@@ -1,0 +1,13 @@
+# Selected by profiles with audited action consumers and stored equipment services.
+- id: dialect.inventory-actions
+  plugin: dialect.inventory-actions
+  config:
+    protocol: "${BFF_PROFILE_ID}/game"
+    packets_directory: packets
+
+- id: inventory.throw
+  plugin: inventory.throw
+  parent_id: inventoryview
+  config:
+    protocol: "${BFF_PROFILE_ID}/game"
+    packets_directory: packets

@@ -1,0 +1,50 @@
+name: bff
+
+services:
+  bff:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    env_file:
+      - ../../.env
+    environment:
+      BFF_MYSQL_HOST: mysql
+      # Port mapping reaches the container from outside its loopback, so first-run setup asks for this token.
+      BFF_ADMIN_HOST: 0.0.0.0
+      BFF_SETUP_TOKEN: ${BFF_SETUP_TOKEN:?set BFF_SETUP_TOKEN in .env to at least 32 random characters}
+    ports:
+      - "7100:7100"
+      - "7101:7101"
+      - "8080:8080"
+    volumes:
+      # Client data is provisioned separately on the host.
+      - ${BFF_CLIENT_DATA_HOST:-../../client-data}:/app/client-data:ro
+      # The saved installation: administrator account, database choice and selected clients.
+      - bff-state:/app/state
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${BFF_MYSQL_PASSWORD:?set BFF_MYSQL_PASSWORD in .env}
+      MYSQL_DATABASE: ${BFF_MYSQL_DATABASE:-bf_game_db}
+      MYSQL_USER: ${BFF_MYSQL_USER:-bff}
+      MYSQL_PASSWORD: ${BFF_MYSQL_PASSWORD:?set BFF_MYSQL_PASSWORD in .env}
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    ports:
+      - "${BFF_MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
+  bff-state:

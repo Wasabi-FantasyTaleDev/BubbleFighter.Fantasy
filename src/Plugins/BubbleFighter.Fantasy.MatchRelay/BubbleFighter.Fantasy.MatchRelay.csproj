@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>In-round traffic between players: movement, actions, damager spawns, lives and weapon-preset swaps.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The relay handlers are driven directly by the in-game tests, which seat players through
+         the rooms row's registry and read the per-round state this row keeps. -->
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>BubbleFighter.Fantasy.InGame.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\BubbleFighter.Fantasy.Abstractions\BubbleFighter.Fantasy.Abstractions.csproj" />
+    <ProjectReference Include="..\..\BubbleFighter.Fantasy.Contracts\BubbleFighter.Fantasy.Contracts.csproj" />
+    <ProjectReference Include="..\..\BubbleFighter.Fantasy.InGame.Wire\BubbleFighter.Fantasy.InGame.Wire.csproj" />
+  </ItemGroup>
+</Project>

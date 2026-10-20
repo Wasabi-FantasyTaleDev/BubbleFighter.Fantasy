@@ -1,0 +1,146 @@
+version: 1
+structs:
+  # S2C gspInventoryUpdateAllInventorySlot (801) and gspInventoryUpdateInventorySlots (802): the whole bag
+  # or the changed slots, as one counted list. Readers: kr-812 sub_843420, cn-717 sub_8CD130,
+  # id-400 sub_7993D0, cn-324 sub_6FE0C0, cn-279 sub_450230.
+  InventoryUpdate:
+    - slots: "list<InventorySlot>"
+
+  # The whole-bag packet of the builds whose bag record is the modern one. kr-1256 sub_9AE4A0
+  # unwraps the compressed envelope (kr-1256 sub_FA5520) and reads this counted list through
+  # kr-1256 sub_10D7C50 -> sub_10D8550; cn-774 sub_BAD820 -> sub_1063790 reads the count straight
+  # off the stream, and tw-454 writes the cn-774 plain body.
+  InventoryUpdate@kr-1256:
+    - slots: "list<InventorySlot>"
+
+  # One modern bag slot, read by kr-1256 sub_10D8550: item id, count, eight bytes stored at record
+  # +8, the text emptied at +36, an empty attribute vector at +24, and the packed flag byte whose bits
+  # fill +16..+23 (worn is bit 0). cn-774 sub_1063790 and tw-454 sub_4440C0 read the same record.
+  InventorySlot@kr-1256:
+    - item_id: u32
+      offset: 0
+    - quantity: u32
+      offset: 4
+    - unknown_8: u64 # the stored slot's identity is written here; the client's use of record +8 is not read
+      offset: 8
+    - unknown_36: wstr
+      offset: 36
+    - attributes: empty_list
+      offset: 24
+    - flags: u8 # worn is bit 0; the client expands the byte into the record's +16..+23 booleans
+      offset: 16
+
+  # One bag slot as kr-812 sub_843510 reads it; cn-717 sub_8CD8C0 and id-400 sub_795860 read the same.
+  # kr-812 sub_977AA0 keys the bag by item id; kr-812 sub_977E70 and sub_977F60 test the equipped flag.
+  InventorySlot:
+    - item_id: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - remaining_days: f64 # days left, counted from the connection's inventory time origin (kr-812 sub_978920)
+      offset: 16
+    - equipped: bool # four bytes on the wire, one in the object (kr-812 sub_A56BD0)
+      offset: 24
+    - unknown_25: bool
+      offset: 25
+    - unknown_26: bool
+      offset: 26
+    - unknown_27: bool
+      offset: 27
+    - unknown_28: bool
+      offset: 28
+    - unknown_48: wstr
+      offset: 48
+      except: [cn-324] # cn-324 sub_6FA8E0 and cn-279 sub_44CD50 stop after +28
+    - unknown_32: empty_list # a nested vector (kr-812 sub_532610); the server always sends it empty
+      offset: 32
+      except: [cn-324]
+
+  # kr-812 C2S gcpReqInventoryDeleteItem (806) and gcpReqInventoryThrowItem (807)
+  # each carry the selected item identity as one u32. Writers: kr-812 sub_9BCB10
+  # and sub_9857B0; the throw UI selects that identity in kr-812 sub_984930.
+  # The expired-item confirmation sends the same word on C2S 808 in
+  # kr-1256 sub_8136F0, cn-774 sub_9B4BC0 and tw-454 sub_C12C40.
+  # Legacy throw writers: cn-279 sub_404F00, cn-324 sub_45D490,
+  # id-400 sub_8F2850 and id-1809 sub_4D7E40 each write one four-byte value.
+  # Stamping helpers: cn-279 sub_487630, cn-324 sub_804440,
+  # id-400 sub_8F8790 and id-1809 sub_921060 explicitly select C2S 807.
+  # Further named requests use the same word: cn-717 sub_88E6C0, cn-406 sub_420D90,
+  # cn-404 sub_929C90, cn-408 sub_9932E0 and cn-706 sub_4BBD50. Their send helpers
+  # cn-717 sub_A30890, cn-406 sub_86BFB0, cn-404 sub_92FBC0, cn-408 sub_935A90
+  # and cn-706 sub_90D350 all explicitly stamp 807.
+  InventoryActionRequest:
+    - item_id: u32
+      offset: 4
+      only: [kr-812]
+
+  # kr-812 S2C gspRepInventoryDeleteItem (811), vtable D6F51C reader
+  # kr-812 sub_6DB1B0: item identity followed by result. kr-812 sub_826F70
+  # removes the identity through kr-812 sub_97BFD0 when result is zero.
+  InventoryDeleteReply:
+    - item_id: u32
+      offset: 4
+      only: [kr-812]
+    - result: u32
+      offset: 8
+      only: [kr-812]
+
+  # kr-812 S2C gspRepInventoryThrowItem (812), vtable D6F528 reader
+  # kr-812 sub_6DB1B0. kr-812 sub_827180 consumes the same identity/result
+  # pair and calls kr-812 sub_97BFD0 for result zero before refreshing the UI.
+  # Modern S2C 815 readers kr-1256 sub_9B6250, cn-774 sub_BB4930 and
+  # tw-454 sub_A92020 also read identity:u32 then result:u32; zero removes
+  # that identity via kr-1256 sub_933190, cn-774 sub_B29100 or tw-454 sub_8DAC80.
+  # S2C 812 readers cn-279 sub_47E650, cn-324 sub_408DF0, id-400 sub_782DD0
+  # and id-1809 sub_4D7F70 also read two u32 values. Their zero-result consumers
+  # erase the first value through cn-279 sub_6642B0 (call site 006FEA38),
+  # cn-324 sub_7FDEF0 (call site 0070C497), id-400 sub_8EF1E0 and id-1809 sub_917760.
+  # Two-word readers also confirmed in cn-717 sub_538B70, cn-406 sub_420FC0,
+  # cn-404 sub_4AF1B0, cn-408 sub_4AF4C0 and cn-706 sub_733050. Their S2C 812
+  # success consumers remove the first word through cn-717 sub_A21A30,
+  # cn-406 sub_862D60, cn-404 sub_926470, cn-408 sub_92C0A0 and cn-706 sub_903A20.
+  InventoryThrowReply:
+    - item_id: u32
+      offset: 4
+      only: [kr-812]
+    - result: u32
+      offset: 8
+      only: [kr-812]
+
+  # S2C gspCheckExpiredTimeResult (806 legacy, 807 modern): the ids of items whose time ran out, as one counted
+  # u32 list. kr-812 sub_840820 (dispatcher kr-812 sub_837170 case 0x326 -> sub_821620) reads a count and then
+  # that many u32; cn-324 sub_6EB680 -> sub_4020A0, cn-717 sub_88EDC0 and the cn-279 constructor sub_450320
+  # (vector at +4) have the same shape. The modern build reads the same way: dispatcher case 807 in
+  # kr-1256 sub_9D2FF0 goes through kr-1256 sub_998FB0 into kr-1256 sub_999C00, which reads a u32 count and
+  # then that many 4-byte ids. The handler (kr-812 sub_6D5890) only shows notices: it looks each id up in the
+  # item table (kr-812 sub_992C60), skips items tagged "Hide", and picks the "used up" or "period expired" text
+  # by the item's kind (item object +248: 1 or 2). It removes nothing, so the server restates the bag itself.
+  ExpiredItems:
+    - item_ids: "list<u32>"
+      offset: 4
+
+  # S2C gspInventoryUpdateInventorySlots of the legacy builds: the bag again, as one counted slot
+  # list (kr-812 sub_843420's family). The modern builds restate it below, because their packet
+  # carries three containers.
+  InventorySlots:
+    - slots: "list<InventorySlot>"
+
+  # The modern three containers read by kr-1256 sub_9AEB10: sub_10D7C50 reads the bag slots,
+  # sub_10D7CE0 the equipped-article slots and sub_10D7E90 a counted word list that
+  # kr-1256 sub_933190 uses to remove bag nodes. The server sends the last two empty, so their
+  # element records are not stated. cn-774 sub_BADC50 -> sub_1063790 reads only the first
+  # container (the reader stops after it), so the cn-774 body is restated below.
+  InventorySlots@kr-1256:
+    - slots: "list<InventorySlot>"
+    - articles: empty_list # kr-1256 sub_10D7CE0; the server always sends it empty
+    - removed_item_ids: "list<u32>" # kr-1256 sub_10D7E90; the server always sends it empty
+
+  InventorySlots@cn-774:
+    - slots: "list<InventorySlot>"
+
+  # S2C gspUpdateAllArticleSlot: the equipped-article table, a counted list the server always
+  # sends empty. kr-1256 dispatch case 808 and its reader kr-1256 sub_10D7CE0 -> sub_10D8370;
+  # the kr-1256 body is inside the compressed envelope (kr-1256 sub_FA5520), while cn-774
+  # sub_BAE150 -> sub_1063970 reads the count directly and tw-454 writes the cn-774 body.
+  ArticleSlots:
+    - articles: empty_list

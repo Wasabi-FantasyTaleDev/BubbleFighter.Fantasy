@@ -1,0 +1,295 @@
+# Native waiting-room requests, flattened for the bounded scalar reader.
+# Offsets are destinations in the complete request object, including its nested MapMetaData.
+version: 1
+structs:
+  # Readers: kr-812 sub_5C8ED0, cn-717 sub_60CF60, id-400 sub_5EAC20,
+  # id-1809 sub_581580, cn-706 sub_567320. Four strings, two bool32, ten u32;
+  # kr-812/cn-717/id-1809 additionally consume a trailing bool32.
+  # cn-406 sub_578810/sub_5788F0 match ID400 exactly and have no trailing bool32.
+  RoomGameSettingChangeRequest:
+    - map_directory: wstr
+      offset: 4
+    - current_map: wstr
+      offset: 32
+    - unknown_60: wstr
+      offset: 60
+    - map_key: wstr
+      offset: 88
+    - unknown_116: bool
+      offset: 116
+    - unknown_117: bool
+      offset: 117
+    - unknown_120: u32
+      offset: 120
+    - unknown_124: u32
+      offset: 124
+    - unknown_128: u32
+      offset: 128
+    - unknown_132: u32
+      offset: 132
+    - unknown_136: u32
+      offset: 136
+    - unknown_140: u32
+      offset: 140
+    - unknown_144: u32
+      offset: 144
+    - unknown_148: u32
+      offset: 148
+    - mode: u32
+      offset: 152
+    - sub_mode: u32
+      offset: 156
+    - unknown_160: bool
+      offset: 160
+      except: [id-400]
+
+  # Readers cn-324 sub_586150 and cn-279 sub_4207E0 use compact string objects
+  # and omit the trailing bool32. The four strings still use counted UTF-16 on the wire.
+  RoomGameSettingChangeRequest@cn-324:
+    - map_directory: wstr
+      offset: 4
+    - current_map: wstr
+      offset: 8
+    - unknown_12: wstr
+      offset: 12
+    - map_key: wstr
+      offset: 16
+    - unknown_20: bool
+      offset: 20
+    - unknown_21: bool
+      offset: 21
+    - unknown_24: u32
+      offset: 24
+    - unknown_28: u32
+      offset: 28
+    - unknown_32: u32
+      offset: 32
+    - unknown_36: u32
+      offset: 36
+    - unknown_40: u32
+      offset: 40
+    - unknown_44: u32
+      offset: 44
+    - unknown_48: u32
+      offset: 48
+    - unknown_52: u32
+      offset: 52
+    - mode: u32
+      offset: 56
+    - sub_mode: u32
+      offset: 60
+
+  # kr-1256 sub_5E1490 stamps C2S 513 and delegates to kr-1256 sub_10D3F80:
+  # three counted UTF-16 strings and thirteen four-byte words. Four words are
+  # widened object bytes (+72/+73/+112/+113), not one-byte wire fields.
+  # No legacy field aliases are assumed for these words. The word at +104 is the room's mode:
+  # kr-1256 sub_96CF30 copies the room's mode word (**(session+152)) there before calling sub_5E1490.
+  RoomGameSettingChangeRequest@kr-1256:
+    - unknown_0: wstr
+      offset: 0
+    - unknown_24: wstr
+      offset: 24
+    - unknown_48: wstr
+      offset: 48
+    - unknown_72: u32
+      offset: 72
+    - unknown_73: u32
+      offset: 73
+    - unknown_76: u32
+      offset: 76
+    - unknown_80: u32
+      offset: 80
+    - unknown_84: u32
+      offset: 84
+    - unknown_88: u32
+      offset: 88
+    - unknown_92: u32
+      offset: 92
+    - unknown_96: u32
+      offset: 96
+    - unknown_100: u32
+      offset: 100
+    - mode: u32
+      offset: 104
+    - unknown_108: u32
+      offset: 108
+    - unknown_112: u32
+      offset: 112
+    - unknown_113: u32
+      offset: 113
+
+  # cn-774 sub_7368B0 -> cn-774 sub_1059BB0 and tw-454 sub_7E3120 ->
+  # tw-454 sub_EBBB40 stamp C2S 513 but write FOUR strings and TWELVE words.
+  # Object bytes +96/+97/+136 are widened to four bytes on the wire.
+  # TW inherits this audited shape through cn-774; no handler is enabled here.
+  RoomGameSettingChangeRequest@cn-774:
+    - unknown_0: wstr
+      offset: 0
+    - unknown_24: wstr
+      offset: 24
+    - unknown_48: wstr
+      offset: 48
+    - unknown_72: wstr
+      offset: 72
+    - unknown_96: u32
+      offset: 96
+    - unknown_97: u32
+      offset: 97
+    - unknown_100: u32
+      offset: 100
+    - unknown_104: u32
+      offset: 104
+    - unknown_108: u32
+      offset: 108
+    - unknown_112: u32
+      offset: 112
+    - unknown_116: u32
+      offset: 116
+    - unknown_120: u32
+      offset: 120
+    - unknown_124: u32
+      offset: 124
+    - unknown_128: u32
+      offset: 128
+    - unknown_132: u32
+      offset: 132
+    - unknown_136: u32
+      offset: 136
+
+  # Three bool32 fields in every audited reader: kr-812 sub_5C8C00, cn-717 sub_88EE40,
+  # cn-324 sub_5A6520, cn-279 sub_425EA0, id-400 sub_613F80, id-1809 sub_7A6290,
+  # cn-706 sub_788970. kr-812 sub_5C5F10 case 1 -> kr-812 sub_5C6140 sets only the first flag.
+  RoomReadyRequest:
+    # cn-406 sub_59E0E0/sub_59E120 read and write the same three bool32 fields.
+    - ready: bool
+      offset: 4
+    - unknown_5: bool
+      offset: 5
+    - unknown_6: bool
+      offset: 6
+
+  # Readers: kr-812 sub_5C8D90, cn-717 sub_60CDA0, id-400 sub_567520,
+  # id-1809 sub_5816C0, cn-406 sub_57EA90, cn-706 sub_567480. kr-812 sub_816300 copies session+132
+  # to the first string and session+188 to the third: physical directory and waiting selection.
+  # Nested MapMetaData readers: kr-812 sub_418CD0, cn-717 sub_41A850,
+  # id-400 sub_567300, id-1809 sub_416C60, cn-406 sub_57E4D0, cn-706 sub_567120.
+  # The nested block starts at request+96. All readers consume thirteen u32 values,
+  # then bool32 in object-offset order 56,57,59,60,58,61; id-400 and cn-406 omit the last bool.
+  RoomEnterGameRequest:
+    - unknown_4: bool
+      offset: 4
+    - map_key: wstr
+      offset: 8
+    - unknown_36: wstr
+      offset: 36
+    - unknown_64: wstr
+      offset: 64
+    - unknown_92: u32
+      offset: 92
+    # The thirteen MapMetaData words are the map's rule record: kr-1256 sub_AADD50 fills the same record
+    # from the map keys EndGameTimeOverTick, EndGameNotifyWinOrLoseTickTeam, EndGameNotifyWinOrLoseTickStar,
+    # EndGameNotifyResultTick, FeverTimeDuration, StarDropTimeDuration, DeathMatchKillLimit, then
+    # DeathMatchTimeLimit, TimeAttackTimeLimit, ConquerTimeLimit and StarModeTimeLimit times 1000, in this
+    # order; the last two words come from keys not resolved here.
+    - end_game_time_over_tick: u32
+      offset: 100
+    - end_game_notify_win_or_lose_tick_team: u32
+      offset: 104
+    - end_game_notify_win_or_lose_tick_star: u32
+      offset: 108
+    - end_game_notify_result_tick: u32
+      offset: 112
+    - fever_time_duration: u32
+      offset: 116
+    - star_drop_time_duration: u32
+      offset: 120
+    - death_match_kill_limit: u32
+      offset: 124
+    - death_match_time_limit_ms: u32
+      offset: 128
+    - time_attack_time_limit_ms: u32
+      offset: 132
+    - conquer_time_limit_ms: u32
+      offset: 136
+    - star_mode_time_limit_ms: u32
+      offset: 140
+    - unknown_144: u32
+      offset: 144
+    - unknown_148: u32
+      offset: 148
+    - unknown_152: bool
+      offset: 152
+      # kr-1256 ends the request with one byte and one word after the fourteen words (create and start alike)
+      kr-1256:
+        - unknown_n18: u8
+        - unknown_n19: u32
+    - unknown_153: bool
+      offset: 153
+      except: [kr-1256]
+    - unknown_155: bool
+      offset: 155
+      except: [kr-1256]
+    - unknown_156: bool
+      offset: 156
+      except: [kr-1256]
+    - unknown_154: bool
+      offset: 154
+      except: [kr-1256]
+    - unknown_157: bool
+      offset: 157
+      except: [id-400, kr-1256]
+      also: [cn-706] # cn-706 sub_567120 has six bools, unlike its id-400 layout base.
+
+  # Early strings occupy one word each; MapMetaData starts at request+24.
+  # Readers: cn-324 sub_410590 -> cn-324 sub_40FBF0,
+  # cn-279 sub_4258A0 -> cn-279 sub_425780. Both end with four sequential bool32 fields.
+  RoomEnterGameRequest@cn-324:
+    - unknown_4: bool
+      offset: 4
+    - map_key: wstr
+      offset: 8
+    - unknown_12: wstr
+      offset: 12
+    - unknown_16: wstr
+      offset: 16
+    - unknown_20: u32
+      offset: 20
+    # As above, the thirteen MapMetaData words are the map's rule record: kr-1256 sub_AADD50 fills the same record
+    # from the map keys EndGameTimeOverTick, EndGameNotifyWinOrLoseTickTeam, EndGameNotifyWinOrLoseTickStar,
+    # EndGameNotifyResultTick, FeverTimeDuration, StarDropTimeDuration, DeathMatchKillLimit, then
+    # DeathMatchTimeLimit, TimeAttackTimeLimit, ConquerTimeLimit and StarModeTimeLimit times 1000, in this
+    # order; the last two words come from keys not resolved here.
+    - end_game_time_over_tick: u32
+      offset: 28
+    - end_game_notify_win_or_lose_tick_team: u32
+      offset: 32
+    - end_game_notify_win_or_lose_tick_star: u32
+      offset: 36
+    - end_game_notify_result_tick: u32
+      offset: 40
+    - fever_time_duration: u32
+      offset: 44
+    - star_drop_time_duration: u32
+      offset: 48
+    - death_match_kill_limit: u32
+      offset: 52
+    - death_match_time_limit_ms: u32
+      offset: 56
+    - time_attack_time_limit_ms: u32
+      offset: 60
+    - conquer_time_limit_ms: u32
+      offset: 64
+    - star_mode_time_limit_ms: u32
+      offset: 68
+    - unknown_72: u32
+      offset: 72
+    - unknown_76: u32
+      offset: 76
+    - unknown_80: bool
+      offset: 80
+    - unknown_81: bool
+      offset: 81
+    - unknown_82: bool
+      offset: 82
+    - unknown_83: bool
+      offset: 83

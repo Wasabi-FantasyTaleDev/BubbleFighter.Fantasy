@@ -1,0 +1,250 @@
+# Room controls audited through each client's own packet vtable reader and writer.
+# Chat: kr-812 sub_80ACB0/sub_80AC40; cn-717 sub_88F380;
+# cn-324 sub_6EB4D0/sub_6EB470; cn-279 sub_449E50/sub_449DF0;
+# id-400 sub_7827E0/sub_782780; id-1809 sub_7A5D30; cn-706 sub_7884F0.
+# Byte-length tests pin the baseline default suffix.
+version: 1
+structs:
+  # gspGotoMenu/gspGotoLobby own readers: kr-812 sub_80C160, cn-717 sub_8C3780,
+  # cn-324 sub_798810, cn-279 sub_44FC80, id-400 sub_63B780,
+  # id-1809 sub_7BEBE0, cn-706 sub_87EC00 and cn-406 sub_7151D0. All read one four-byte bool.
+  # kr-812 sub_81FDA0 and kr-812 sub_81FF00 show a notice when set, then select the scene.
+  # Modern consumers likewise read one bool32: kr-1256 sub_9AC0F0/sub_9AC2C0,
+  # cn-774 sub_BAB710/sub_BAB880 and tw-454 sub_A88E20/sub_A88F90.
+  RoomSceneTransition:
+    - notice: bool
+      offset: 4
+  # Own list readers: kr-812 sub_680780, cn-717 sub_6D98E0, cn-324 sub_57DF10,
+  # cn-279 sub_41EBB0, id-400 sub_5DBAA0, id-1809 sub_623930, cn-706 sub_603710.
+  # cn-406 sub_56AAA0 also consumes these scalars and the SessionSetting vector.
+  # Their vector readers consume a u32 count and each SessionSetting via its vtable.
+  RoomListReply:
+    # kr-1256 (read on the lobby stage by kr-1256 sub_853CF0 through sub_84F550) has three header words
+    - page: u32
+      offset: 4
+      kr-1256:
+        - unknown_0: u32
+        - unknown_4: u32
+        - unknown_8: u32
+    - more: bool
+      offset: 8
+      except: [kr-1256]
+    - rooms: "list<SessionSetting>"
+      offset: 12
+  # Slot readers: kr-812 sub_80C1B0, cn-717 sub_890F70, cn-324 sub_6EB1B0,
+  # cn-279 sub_4499B0, id-400 sub_782540, id-1809 sub_7A5A30, cn-706 sub_788190.
+  RoomSeatUpdate:
+    - slot: u32
+      offset: 4
+    - user: UserSlot
+      offset: 8
+    - equipment: EquippedItemList
+      offset: 296
+      # kr-1256 sub_9DA720 (dispatcher kr-1256 sub_9D9930 case 0x1F7) reads profile entries and applies them
+      # before its kind switch, as the room install does, then a second keyed map and the team panel
+      kr-1256:
+        - profile_entries: "list<RoomProfileEntry>"
+        - unknown_n3: empty_list        # kr-1256 sub_10C3D80; sent empty
+        - team_info: ServerTeamInfo
+      cn-324:
+        - equipment: EquippedItemList
+          offset: 152
+      cn-279:
+        - equipment: EquippedItemList
+          offset: 136
+      id-400:
+        - equipment: EquippedItemList
+          offset: 200
+      cn-406:
+        - equipment: EquippedItemList # cn-406 sub_7002D0 reads the nested equipment at +184.
+          offset: 184
+      id-1809:
+        - equipment: EquippedItemList
+          offset: 248
+      cn-706:
+        - equipment: EquippedItemList
+          offset: 248
+  # Leave readers: kr-812 sub_8104E0, cn-717 sub_8C9DB0, cn-324 sub_6FE130,
+  # cn-279 sub_44A060, id-400 sub_7828E0, id-1809 sub_7A5E00, cn-706 sub_4BA810.
+  RoomSeatLeave:
+    - slot: u32
+      offset: 4
+    - user: UserSlot
+      offset: 8
+    # kr-1256 sub_9DB1E0 (case 0x1FF) reads a team panel after the record; a vacated record removes the seat's
+    # character, and kr-1256 sends this packet for an occupied seat as well
+    - team_info: ServerTeamInfo
+      only: [kr-1256]
+  # Scene move: kr-812 sub_8446F0/sub_8446C0 and corresponding own readers in
+  # cn-717 sub_8CEB90, cn-324 sub_6FDEB0, cn-279 sub_44FF00,
+  # id-400 sub_799150, id-1809 sub_7BEDE0 and cn-706 sub_7A15E0.
+  RoomMoveInto:
+    - moved: bool
+      offset: 4
+    - scene: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+  # User number: kr-812 sub_80A910, cn-717 sub_8C4210, id-1809 sub_4D60C0
+  # and cn-706 sub_4BBB70
+  RoomSessionInit:
+    - user_number: u32
+      offset: 4
+  # Result readers: kr-812 sub_80A910, cn-717 sub_8C4210, cn-324 sub_410910,
+  # cn-279 sub_44C1A0, id-400 sub_93D120, id-1809 sub_4D60C0, cn-706 sub_4BBB70.
+  RoomJoinResult:
+    - result: u32
+      offset: 4
+    # kr-1256 sub_853E90 case 0x67 reads a second word; sub_857990 shows 1 started, 3 full, 4 wrong password,
+    # 5 no such room
+    - unknown_4: u32
+      only: [kr-1256]
+  # Two u16 words: kr-812 sub_67FB80, cn-717 sub_6D91E0, cn-324 sub_57DCC0,
+  # cn-279 sub_41E960, id-400 sub_5DB860, id-1809 sub_623770, cn-706 sub_603550.
+  RoomListRequest:
+    - unknown_4: u16
+      offset: 4
+    - unknown_6: u16
+      offset: 6
+  # Join readers: kr-812 sub_680810, cn-717 sub_6D9970, cn-324 sub_57DE30,
+  # cn-279 sub_41EAC0, id-400 sub_5DB960, id-1809 sub_6237F0, cn-706 sub_6035D0.
+  # Own writers confirm no early-CN tail, a u16 ID400/CN706 tail and a u32 later tail.
+  # cn-406 sub_56A880/sub_56A8C0 consume only three words and the password, with no tail.
+  # gcpReqCreateSession (C2S 402): the creator's session setting, the room password and one more word (kr-812
+  # serializer sub_480D40; the legacy room dialect reads it with the build's session layout).
+  RoomCreateRequest:
+    - session_setting: SessionSetting
+    - password: wstr
+    - unknown_n2: bool
+      # kr-1256 sub_962200 writes a tag instead, with one word after 0x3A; a live client also ends the body right
+      # after the password, which the room binding reads as the absent tag
+      kr-1256:
+        - unknown_n2: "optional<0x3A,RoomCreateTail>"
+  RoomJoinRequest:
+    # kr-1256 sub_854C90 writes the clicked row's room id and the typed password only
+    - room_id: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+      except: [kr-1256]
+    - unknown_12: u32
+      offset: 12
+      except: [kr-1256]
+    - password: wstr
+      offset: 16
+    - unknown_44: u32
+      offset: 44
+      except: [cn-324, kr-1256]
+      cn-406: []
+      id-400:
+        - unknown_44: u16
+          offset: 44
+  RoomChatReceived:
+    # cn-406 sub_700510 matches the ID400 suffix, including bool32 at object+100.
+    - slot: u16
+      offset: 4
+    - nickname: wstr
+      offset: 8
+    - channel: u32
+      offset: 36
+      cn-324:
+        - channel: u32
+          offset: 12
+    # kr-1256 sub_10C4A50 reads one more word after the channel
+    - unknown_n3: u32
+      only: [kr-1256]
+    - unknown_40: wstr
+      offset: 40
+      cn-324:
+        - unknown_16: wstr
+          offset: 16
+    - text: wstr
+      offset: 68
+      cn-324:
+        - text: wstr
+          offset: 20
+    - unknown_96: u32
+      offset: 96
+      default: -1
+      cn-324:
+        - unknown_24: u32
+          offset: 24
+          default: -1
+    - unknown_100: u32
+      offset: 100
+      except: [cn-324, id-400]
+      # cn-404 sub_7AEE40 reads cn-706's u32 at +100 and bool at +104.
+      also: [cn-706, cn-404]
+    - unknown_104: bool
+      offset: 104
+      cn-324:
+        - unknown_28: bool
+          offset: 28
+      id-400:
+        - unknown_100: bool
+          offset: 100
+      cn-706:
+        - unknown_104: bool
+          offset: 104
+      cn-404:
+        - unknown_104: bool
+          offset: 104
+    # kr-1256 sub_10C4A50 ends with one more string and one more bool
+    - unknown_n9: wstr
+      only: [kr-1256]
+    - unknown_n10: bool
+      only: [kr-1256]
+  # C2S readers: kr-812 sub_844570, cn-717 sub_8CEE00, cn-324 sub_6FD230,
+  # cn-279 sub_480550, id-400 sub_798DF0, id-1809 sub_7BE230, cn-706 sub_7A1330.
+  RoomChatRequest:
+    # cn-406 sub_713EA0 reads the channel word and the counted text at object+8.
+    - channel: u32
+      offset: 4
+    - text: wstr
+      offset: 8
+    # kr-1256 sends a second string after the text
+    - unknown_n2: wstr
+      only: [kr-1256]
+  # C2S and S2C share the slot word and bool32. Readers: kr-812 sub_93C4E0,
+  # cn-717 sub_8C4260, cn-324 sub_411530, cn-279 sub_425AA0,
+  # id-400 sub_610D40, id-1809 sub_4D7AD0, cn-706 sub_4BB840.
+  RoomSeatLock:
+    # cn-406 sub_8EFAE0 reads the seat word followed by bool32.
+    - slot: u32
+      offset: 4
+    - closed: bool
+      offset: 8
+  # kr-812 sub_9BEF70 sends Packet_gcpRoomChangeTeam with no fields.
+  RoomTeamChangeRequest: []
+  # kr-1256 sub_962A60 binds the blue/red controls at +0x638/+0x63C; kr-1256 sub_969730 dispatches
+  # both to kr-1256 sub_971140. Its ordinary-seat branch clears both optional blocks before calling
+  # kr-1256 sub_4B3AC0 (opcode 515), which writes the first tag/word and delegates the second tag/pair
+  # to kr-1256 sub_10C3E90. The ordinary click therefore writes BA BA; qualifier purposes remain unknown.
+  RoomTeamChangeRequest@kr-1256:
+    - unknown_n0: "optional<0x3A,RoomTeamChangeFirstTail>"
+      default: 186
+    - unknown_n1: "optional<0x3A,TeamChangeTail>"
+      default: 186
+  # C2S nickname readers: kr-812 sub_5C8FD0, cn-717 sub_740F00,
+  # cn-324 sub_6FDDF0, cn-279 sub_481C90, id-400 sub_89DD10,
+  # id-1809 sub_68D480, cn-706 sub_567230.
+  RoomKickRequest:
+    # cn-406 sub_75A200 reads one counted UTF-16 nickname.
+    - nickname: wstr
+      offset: 4
+  # S2C readers: kr-812 sub_80AE00, cn-717 sub_88F4D0, cn-324 sub_7C6C10,
+  # cn-279 sub_480490, id-400 sub_782430, id-1809 sub_8C2580, cn-706 sub_8AE3F0.
+  RoomMemberKicked:
+    # cn-406 sub_700220 reads two counted UTF-16 names and one result word.
+    - by_nickname: wstr
+      offset: 4
+    - nickname: wstr
+      offset: 32
+      cn-324:
+        - nickname: wstr
+          offset: 8
+    - result: u32
+      offset: 60
+      cn-324:
+        - result: u32
+          offset: 12

@@ -1,0 +1,12 @@
+# Profile patch for cn-735: applied after the bundle rows. The admin API moves off 8080
+# so this profile can run beside other profiles on one machine.
+# This login/menu profile has no room or match rows to configure.
+- replace:
+    id: admin.http
+    config:
+      listen: "${CN_735_ADMIN_HOST:-127.0.0.1}:${CN_735_ADMIN_PORT:-8088}"
+- replace:
+    id: diagnostics.packet-log
+    config:
+      file: logs/{date}/packets-cn-735_{timestamp}.log
+      preview_bytes: 96

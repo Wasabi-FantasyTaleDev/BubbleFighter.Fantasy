@@ -1,0 +1,13 @@
+# Enable only in profiles whose update builder and login consumer have been audited.
+# Separate scopes preserve native control names until cross-build compatibility is established.
+- id: dialect.customized-keys
+  plugin: dialect.customized-keys
+  config:
+    protocol: "${BFF_PROFILE_ID}/game"
+    packets_directory: packets
+
+- id: player.settings
+  plugin: player.settings
+  config:
+    protocol: "${BFF_PROFILE_ID}/game"
+    scope: "${BFF_PROFILE_ID}"

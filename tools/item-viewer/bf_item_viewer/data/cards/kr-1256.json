@@ -1,0 +1,114 @@
+{
+  "build": "kr-1256",
+  "status": "preview rect proven; other rects measured from the client's card art",
+  "card_size": [
+    181,
+    182
+  ],
+  "grid": {
+    "columns": 3,
+    "rows": 3,
+    "slot_size": [
+      182,
+      183
+    ],
+    "origins_x": [
+      7,
+      187,
+      367
+    ],
+    "origins_y": [
+      47,
+      233,
+      419
+    ],
+    "source": "kr-1256 Ui/DlgShop7.ui mrkItemSlot markers inside pnlShopItemCardParent",
+    "status": "proven"
+  },
+  "frames": {
+    "atlas_folder": "Images/Shop2/item_box",
+    "by_money": {
+      "lucci": "item_slot01",
+      "cash": "item_slot02",
+      "mileage": "item_slot03",
+      "default": "item_slot01"
+    },
+    "frame_index": {
+      "normal": 0,
+      "selected": 1
+    },
+    "source": "kr-1256 sub_9FAF80 frame kind 100 -> item_slot01; sub_821890 maps 101 -> item_slot02, 102 -> item_slot03, flag 1 -> item_slot11; cash/lucci choice by kind is inferred"
+  },
+  "title": {
+    "rect": [
+      24,
+      7,
+      150,
+      17
+    ],
+    "font_size": 12,
+    "colour": "0xFF282828",
+    "status": "rect measured from card art; colour inferred (kr-1256 sub_9FAF80 field +912)"
+  },
+  "badge": {
+    "pos": [
+      9,
+      30
+    ],
+    "atlas": {
+      "Hot": "item_hot",
+      "Event": "item_event",
+      "New": "item_new",
+      "Combo": "item_combo"
+    }
+  },
+  "preview": {
+    "rect": [
+      9,
+      27,
+      164,
+      120
+    ],
+    "corner": 5,
+    "status": "proven",
+    "source": "kr-1256 sub_820CF0 (kinds 100/300) via sub_FB6600"
+  },
+  "price": {
+    "rect": [
+      9,
+      151,
+      126,
+      21
+    ],
+    "font_size": 13,
+    "colour": "0xFF282828",
+    "suffix": {
+      "cash": "캐시",
+      "lucci": "루찌",
+      "mileage": "마일리지"
+    },
+    "suffix_status": "cash/lucci proven (kr-1256 sub_9FBA00 format strings '%s캐시', '%s루찌'); mileage suffix not found"
+  },
+  "buy_button": {
+    "pos": [
+      141,
+      150
+    ],
+    "atlas": "item_buyBTN",
+    "frame": 0
+  },
+  "fonts": [
+    "Data/NanumGothicBold.ttf",
+    "Data/NexonGothicB.otf"
+  ],
+  "detail_preview": {
+    "rect": [
+      1,
+      1,
+      410,
+      360
+    ],
+    "source": "kr-1256 Ui/DlgShop7.ui mrkPreview",
+    "status": "proven"
+  }
+}

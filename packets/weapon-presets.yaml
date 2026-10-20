@@ -1,0 +1,125 @@
+version: 1
+structs:
+  # Own C2S readers: kr-812 sub_97F4F0, cn-717 sub_537810, id-400 sub_71CCC0,
+  # id-1809 sub_73F470, cn-706 sub_8FF190. kr-812 sub_97A8D0 supplies the context.
+  WeaponPresetChangeRequest:
+    - context: u32
+      offset: 4
+      except: [cn-324]
+    - slot: u8
+      offset: 8
+      except: [cn-324]
+  # kr-812 sub_83B880; cn-717 sub_8C4380, id-400 sub_7995F0,
+  # id-1809 sub_7BF370 and cn-706 sub_7A1AE0 read the same byte and word.
+  WeaponPresetChangeReply:
+    - active_slot: u8
+      offset: 4
+      except: [cn-324]
+    # kr-812 sub_832BD0, cn-717 sub_8BB110, id-400 sub_7BC6A0,
+    # id-1809 sub_7DFE10 and cn-706 sub_7C5CD0 clear the latch before testing zero.
+    - status: u32 # Zero applies the slot; any nonzero value leaves the active slot unchanged.
+      offset: 8
+      except: [cn-324]
+
+  # kr-812 sub_83B820; cn-717 sub_8C4320, id-400 sub_799590,
+  # id-1809 sub_7BF310 and cn-706 sub_7A1A80 read the byte then the nested list.
+  WeaponPresetUpdate:
+    - active_slot: u8
+      offset: 4
+      except: [cn-324]
+    - presets: WeaponPresetList
+      offset: 8
+      except: [cn-324]
+
+  # kr-812 sub_812190 reads an identity and three independently counted vectors.
+  # cn-717 sub_897750, id-400 sub_793A80, id-1809 sub_7B95F0 and cn-706 sub_79BAF0 match it.
+  WeaponPresetList:
+    - user_number: u32
+      offset: 4
+      except: [cn-324]
+    - item_ids: "list<u32>"
+      offset: 8
+      except: [cn-324]
+    - bound_flags: "list<u8>" # kr-812 sub_956300 tests record+4 before offering the hotkey.
+      offset: 24
+      except: [cn-324]
+    - unknown_40: "list<u8>"
+      offset: 40
+      except: [cn-324]
+
+  # kr-1256 sub_808F10, cn-774 sub_9A9700 and tw-454 sub_C07A40 each write
+  # the context word and requested slot byte. The opaque context is not an entitlement.
+  WeaponPresetChangeRequest@kr-1256:
+    - context: u32
+    - slot: u8
+
+  # kr-1256 sub_9D2FF0 case 836, cn-774 sub_BC0F00 and tw-454 sub_A9E030 read
+  # a byte and word into locals, clear the send latch, then apply only on status zero.
+  WeaponPresetChangeReply@kr-1256:
+    - active_slot: u8
+    - status: u32
+
+  # kr-1256 sub_9C3880, cn-774 sub_BC1040 and tw-454 sub_A9E170 each read one u8
+  # active slot before the nested list.
+  # This restatement prevents modern builds from inheriting the parallel legacy vectors.
+  WeaponPresetUpdate@kr-1256:
+    - active_slot: u8
+    - presets: WeaponPresetList
+
+  # kr-1256 sub_9C3880 reads the identity; kr-1256 sub_115C000 reads entries and
+  # kr-1256 sub_10BE7B0 reads bytes. cn-774 sub_498040 / cn-774 sub_48B350 and
+  # tw-454 sub_4A1690 / tw-454 sub_478B30 match the envelope, not the entry shape.
+  WeaponPresetList@kr-1256:
+    - user_number: u32
+      offset: 0
+      cn-774:
+        - user_number: u32
+          offset: 4
+    - entries: "list<WeaponPresetInfo>"
+      offset: 4
+      cn-774:
+        - entries: "list<WeaponPresetInfo>"
+          offset: 8
+    - unknown_16: "list<u8>"
+      offset: 16
+      cn-774:
+        - unknown_20: "list<u8>"
+          offset: 20
+
+  # Legacy presets use parallel scalar vectors, so there is no nested entry layout.
+  WeaponPresetInfo: []
+
+  # kr-1256 sub_115C000 reads three words and advances the entry by twelve bytes.
+  WeaponPresetInfo@kr-1256:
+    - unknown_0: u32
+      offset: 0
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+
+  # cn-774 sub_497F70 reads 1, 1, 4, 4, 4 bytes: fourteen wire bytes, not the
+  # twenty-byte native object stride used by cn-774 sub_498040.
+  WeaponPresetInfo@cn-774:
+    - unknown_4: u8
+      offset: 4
+    - unknown_5: u8
+      offset: 5
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - unknown_16: u32
+      offset: 16
+
+  # tw-454 sub_4A1690 calls pointer 0x1312228 -> tw-454 sub_4A1570, which reads
+  # 1, 1, 4, 4 bytes. tw-454 sub_4A1500 writes that same ten-byte sequence.
+  WeaponPresetInfo@tw-454:
+    - unknown_4: u8
+      offset: 4
+    - unknown_5: u8
+      offset: 5
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12

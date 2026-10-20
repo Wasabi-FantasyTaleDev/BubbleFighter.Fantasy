@@ -1,0 +1,1 @@
+<TestRun name="Fixture"><Results><TestResultAggregation testName="Fixture.Aggregate" outcome="Passed"><InnerResults><UnitTestResult testName="Fixture.Pass" outcome="Passed" /></InnerResults></TestResultAggregation></Results></TestRun>

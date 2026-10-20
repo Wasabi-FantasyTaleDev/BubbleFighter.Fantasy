@@ -1,0 +1,255 @@
+/* Shell, layout and page styles built only from the NOAH II tokens. The framework's Vue edition
+   has no app shell of its own, so the sidebar follows its Sider pattern. Where a NOAH II component
+   styles itself in a scoped block, the overrides below use one extra class of specificity. */
+
+@font-face {
+  font-family: "Bff Display";
+  src: url("../assets/fonts/bff-geist-regular.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "Bff Latin UI";
+  src: url("../assets/fonts/bff-oppo-en-variable.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 200 800;
+}
+
+@font-face {
+  font-family: "Bff Simplified Chinese UI";
+  src: url("../assets/fonts/bff-oppo-cn-regular.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "Bff Simplified Chinese UI";
+  src: url("../assets/fonts/bff-oppo-cn-medium.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 500;
+}
+
+@font-face {
+  font-family: "Bff Simplified Chinese UI";
+  src: url("../assets/fonts/bff-oppo-cn-bold.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 700;
+}
+
+@font-face {
+  font-family: "Bff Traditional Chinese UI";
+  src: url("../assets/fonts/bff-oppo-tc-regular.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "Bff Traditional Chinese UI";
+  src: url("../assets/fonts/bff-oppo-tc-medium.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 500;
+}
+
+@font-face {
+  font-family: "Bff Traditional Chinese UI";
+  src: url("../assets/fonts/bff-oppo-tc-bold.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 700;
+}
+
+@font-face {
+  font-family: "Bff Korean UI";
+  src: url("../assets/fonts/bff-korean-ui-light.otf") format("opentype");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 300;
+}
+
+@font-face {
+  font-family: "Bff Korean UI";
+  src: url("../assets/fonts/bff-korean-ui-regular.otf") format("opentype");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "Bff Korean UI";
+  src: url("../assets/fonts/bff-korean-ui-medium.otf") format("opentype");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 500;
+}
+
+@font-face {
+  font-family: "Bff Korean UI";
+  src: url("../assets/fonts/bff-korean-ui-bold.otf") format("opentype");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 700;
+}
+
+:root {
+  --font-ui-en: "Bff Latin UI", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  --font-ui-hans: "Bff Simplified Chinese UI", "Microsoft YaHei", "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
+  --font-ui-hant: "Bff Traditional Chinese UI", "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", system-ui, sans-serif;
+  --font-ui-ko: "Bff Korean UI", "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+  --font-ui: var(--font-ui-en);
+  --font: var(--font-ui);
+  --sider-w: 232px;
+}
+/* Han glyph variants differ per locale, so each language lists its own fonts first. */
+:root:lang(zh-Hant) { --font-ui: var(--font-ui-hant); }
+:root:lang(zh-Hans) { --font-ui: var(--font-ui-hans); }
+:root:lang(ko) { --font-ui: var(--font-ui-ko); }
+/* Language names keep their own script's typeface, independent of the active UI language. */
+.language-name[lang="en"] { font-family: var(--font-ui-en); }
+.language-name[lang="zh-Hans"] { font-family: var(--font-ui-hans); }
+.language-name[lang="zh-Hant"] { font-family: var(--font-ui-hant); }
+.language-name[lang="ko"] { font-family: var(--font-ui-ko); }
+/* 11px CJK is hard to read; captions stay at 12px for those scripts. */
+:root:lang(zh-Hant), :root:lang(zh-Hans), :root:lang(ko) { --text-caption: 12px; --text-micro: 11px; }
+
+html, body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: var(--text-body); }
+
+.shell { display: flex; min-height: 100vh; }
+
+/* Sidebar */
+.sider { width: var(--sider-w); flex: none; position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column;
+  border-right: 1px solid var(--border); background: var(--glass-rail);
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); z-index: 20; }
+.sider-brand { height: 56px; display: flex; align-items: center; gap: 10px; padding: 0 18px; border-bottom: 1px solid var(--border-soft);
+  font-size: var(--text-control); letter-spacing: .01em; white-space: nowrap; }
+.brand-mark { width: 22px; height: 22px; flex: none; display: block; }
+.brand-text b { font-weight: 650; }
+.nav { padding: 12px 10px; display: flex; flex-direction: column; gap: 2px; flex: 1; overflow-y: auto; }
+.nav-group-title { font-size: var(--text-caption); color: var(--text-faint); padding: 14px 12px 6px; text-transform: uppercase; letter-spacing: .06em; }
+.nav-group-title:first-child { padding-top: 4px; }
+:root:lang(zh-Hant) .nav-group-title, :root:lang(zh-Hans) .nav-group-title, :root:lang(ko) .nav-group-title { text-transform: none; letter-spacing: 0; }
+.nav a { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: var(--radius-sm);
+  color: var(--text-muted); text-decoration: none; font-size: var(--text-control); transition: background .15s, color .15s; }
+.nav a:hover { background: var(--hover); color: var(--text); }
+.nav a.is-active { background: var(--accent-soft); color: var(--text); font-weight: 550; }
+.nav a:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 1px; }
+.nav-badge { margin-left: auto; font-size: var(--text-caption); color: var(--text-muted); }
+.sider-footer { display: flex; align-items: center; gap: 8px; padding: 14px 18px; border-top: 1px solid var(--border-soft); }
+
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-faint); flex: none; }
+.status-dot.is-ok { background: var(--green); box-shadow: 0 0 0 3px var(--green-soft); }
+.status-dot.is-warn { background: var(--amber); box-shadow: 0 0 0 3px var(--amber-soft); }
+.status-dot.is-err { background: var(--red); box-shadow: 0 0 0 3px var(--red-soft); }
+
+/* Main column */
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.topbar { position: sticky; top: 0; z-index: 10; height: 56px; display: flex; align-items: center; gap: 12px; padding: 0 28px;
+  border-bottom: 1px solid var(--border-soft); background: var(--glass-panel);
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
+.page-title { font-size: var(--text-subtitle); font-weight: 600; margin: 0; flex: 1; min-width: 0; }
+.topbar-tools { display: flex; align-items: center; gap: 8px; }
+.topbar .lang-select { width: 150px; }
+.shell .topbar .lang-select .noah-select-trigger { height: 30px; font-size: var(--text-control); background-color: var(--surface-raised); }
+.topbar .icon-btn.noah-btn.noah-btn-sm { width: 30px; }
+.topbar .menu-btn.noah-btn { display: none; }
+
+.view { padding: 28px; display: flex; flex-direction: column; gap: 20px; max-width: 1240px; width: 100%; box-sizing: border-box; }
+.view .noah-card.noah-card-surface { box-shadow: var(--shadow-sm); }
+.view .noah-card.noah-card-surface:hover { box-shadow: var(--shadow); }
+.section-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 12px; margin-bottom: 14px; }
+.section-head > div:first-child { flex: 1 1 240px; min-width: 0; }
+.section-title { font-size: var(--text-subtitle); font-weight: 600; margin: 0; }
+.section-sub { font-size: var(--text-control); color: var(--text-muted); margin: 4px 0 0; }
+.section-extra { flex: 0 1 auto; max-width: 100%; }
+
+/* Metrics: the NOAH II metric card, with the icon ahead of the label and the value in display size. */
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
+.metrics .noah-metric-card { padding: 20px; gap: 10px; box-shadow: var(--shadow-sm); }
+.view .metrics .noah-metric-card:hover { border-color: var(--border); box-shadow: var(--shadow); }
+.metrics .noah-metric-card .noah-metric-header { flex-direction: row-reverse; justify-content: flex-end; gap: 8px; }
+.metrics .noah-metric-card .noah-metric-label { font-size: var(--text-label); font-weight: 400; }
+.metrics .noah-metric-card .noah-metric-value { font-family: var(--font-code); font-size: var(--text-display); font-weight: 650; line-height: 1; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.metrics .noah-metric-card .noah-metric-subtext { font-size: var(--text-caption); }
+.metrics .noah-metric-card.is-warn .noah-metric-subtext { color: var(--amber); }
+
+/* Tables: the NOAH II table without its outer frame, at the interface's text size. */
+.table-wrap { overflow-x: auto; margin: 0 -4px; }
+.view .table-wrap .noah-table-container { border: 0; background: transparent; }
+.view .table-wrap .noah-table { font-size: var(--text-control); }
+.view .table-wrap .noah-table th { font-weight: 500; }
+/* Tag pills in table cells keep the static edition's metrics (3px 9px at caption size). */
+.view .noah-table .noah-tag.noah-tag-sm { padding: 3px 9px; font-size: var(--text-caption); }
+.cell-strong { font-weight: 550; }
+.cell-sub { display: block; font-size: var(--text-caption); color: var(--text-muted); margin-top: 2px; }
+.cell-error { max-width: 340px; font-size: var(--text-caption); color: var(--red); overflow: hidden; text-overflow: ellipsis;
+  display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word; }
+.table-note { margin: 12px 4px 0; }
+.error-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; }
+
+/* Toolbars above tables: controls sit at the static edition's 32px control height. */
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
+.toolbar-build { width: 280px; }
+.toolbar-filter { width: 280px; }
+.view .toolbar .noah-select .noah-select-trigger,
+.view .toolbar .noah-input-wrap { height: 32px; font-size: var(--text-control); background-color: var(--surface-raised); }
+
+/* Settings */
+.setting { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 16px 0; border-bottom: 1px solid var(--border-soft); }
+.setting:last-child { border-bottom: 0; padding-bottom: 4px; }
+.setting:first-of-type { padding-top: 4px; }
+.setting-text { min-width: 0; }
+.setting-name { font-weight: 550; font-size: var(--text-body); }
+.setting-desc { font-size: var(--text-control); color: var(--text-muted); margin-top: 4px; max-width: 62ch; line-height: 1.55; }
+.setting-note { color: var(--amber); }
+.setting-control { flex: none; display: flex; align-items: center; gap: 10px; }
+.setting-control .noah-select { width: 180px; }
+.view .setting-control .noah-select .noah-select-trigger { height: 32px; font-size: var(--text-control); background-color: var(--surface-raised); }
+
+/* Sign-in: a centred card in place of the shell. */
+.signin { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 16px; box-sizing: border-box; }
+.signin-card { width: 100%; max-width: 380px; box-shadow: var(--shadow); }
+.signin-form { display: flex; flex-direction: column; gap: 14px; }
+.signin-brand { display: flex; align-items: center; gap: 10px; font-size: var(--text-control); white-space: nowrap; }
+.signin-title { font-size: var(--text-subtitle); font-weight: 600; margin: 6px 0 0; }
+.signin-desc { font-size: var(--text-control); color: var(--text-muted); margin: -6px 0 4px; line-height: 1.55; }
+.signin-error { font-size: var(--text-control); color: var(--red); margin: -4px 0 0; }
+.signin-form .noah-btn { align-self: stretch; }
+
+/* Plugins confirm */
+.confirm-text { font-size: var(--text-control); color: var(--text-muted); line-height: 1.55; }
+
+/* Logs: level-coloured lines in the NOAH II terminal. */
+.log-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.log-level { width: 170px; }
+/* The filter sits beside size-sm buttons, so its trigger keeps their 26px height. */
+.log-tools .log-level .noah-select .noah-select-trigger { height: 26px; font-size: var(--text-label); }
+.log-terminal .noah-terminal-body { max-height: 60vh; overflow-y: auto; }
+.log-terminal .noah-terminal-pre { font-size: var(--text-label); line-height: 1.6; overflow-x: hidden; }
+/* Hanging indent: a wrapped line continues under the message, not at the left edge, so it still reads as part of its entry. */
+.log-line { white-space: pre-wrap; word-break: break-word; padding-left: 2.5ch; text-indent: -2.5ch; }
+.log-line span { margin-right: 10px; }
+.log-time { color: #8f8f8f; }
+.log-level-tag { display: inline-block; min-width: 5ch; font-weight: 600; text-indent: 0; }
+.log-cat { color: #8f8f8f; }
+.log-line.is-debug .log-level-tag { color: #8f8f8f; }
+.log-line.is-info .log-level-tag { color: #7aa2ff; }
+.log-line.is-warn .log-level-tag, .log-line.is-warn .log-msg { color: #fbbf24; }
+.log-line.is-error .log-level-tag, .log-line.is-error .log-msg { color: #f87171; }
+.log-line.is-gap { color: #8f8f8f; font-style: italic; }
+
+@media (max-width: 860px) {
+  .sider { position: fixed; left: 0; top: 0; transform: translateX(-100%); transition: transform .2s; box-shadow: var(--shadow-lg); }
+  .sider.is-open { transform: none; }
+  .topbar .menu-btn.noah-btn { display: inline-flex; }
+  .topbar, .view { padding-left: 16px; padding-right: 16px; }
+  .setting { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .toolbar-build, .toolbar-filter { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }

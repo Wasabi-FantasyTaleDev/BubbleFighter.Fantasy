@@ -1,0 +1,139 @@
+/* NOAH II UI design tokens (light and dark). Values follow the framework's static edition, which the admin interface design was drawn against. */
+
+:root {
+  color-scheme: light dark;
+
+  /* Default theme values (Light mode) */
+  --bg: #ffffff;
+  --rail: #f9f9f9;
+  --surface: #ffffff;
+  --surface-raised: #f4f4f4;
+  --surface-hover: #ececec;
+  --border: #e6e6e6;
+  --border-soft: #f0f0f0;
+  --hover: rgba(13, 13, 13, 0.04);
+  --backdrop-overlay: rgba(0, 0, 0, 0.45);
+
+  --text: #0d0d0d;
+  --text-muted: #6e6e6e;
+  --text-faint: #8f8f8f;
+
+  /* High-Contrast Monochrome Accent */
+  --accent: #0d0d0d;
+  --accent-hover: #262626;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(13, 13, 13, 0.06);
+  --accent-ring: rgba(0, 0, 0, 0.25);
+
+  /* Status Hues */
+  --green: #0a7d5c;
+  --green-soft: rgba(16, 163, 127, 0.10);
+  --red: #b91c1c;
+  --red-soft: rgba(185, 28, 28, 0.09);
+  --amber: #9a4a08;
+  --amber-soft: rgba(180, 83, 9, 0.10);
+  --blue: #1d4ed8;
+  --blue-soft: rgba(29, 78, 216, 0.10);
+
+  /* Liquid Glass Tokens */
+  --glass-rail: rgba(249, 249, 249, 0.72);
+  --glass-panel: rgba(255, 255, 255, 0.85);
+  --glass-blur: saturate(1.6) blur(24px);
+
+  /* Geometry & Radii */
+  --radius-2xs: 4px;
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* Typography */
+  --font-ui: "Geist", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  --font-code: "JetBrains Mono", ui-monospace, "SFMono-Regular", "Cascadia Code", Menlo, Consolas, monospace;
+  --font: var(--font-ui);
+  --mono: var(--font-code);
+
+  --text-micro: 10px;
+  --text-caption: 11px;
+  --text-label: 12px;
+  --text-control: 13px;
+  --text-body: 14px;
+  --text-subtitle: 16px;
+  --text-title: 20px;
+  --text-display: 28px;
+  --text-hero: 44px;
+
+  /* Shadows */
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 10px 28px rgba(16, 24, 40, 0.07);
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.12);
+}
+
+/* Dark Mode Tokens */
+:root[data-theme="dark"],
+html.dark {
+  color-scheme: dark;
+
+  --bg: #191919;
+  --rail: #131313;
+  --surface: #212121;
+  --surface-raised: #2a2a2a;
+  --surface-hover: #333333;
+  --border: #333333;
+  --border-soft: #282828;
+  --hover: rgba(255, 255, 255, 0.06);
+  --backdrop-overlay: rgba(0, 0, 0, 0.7);
+
+  --text: #ececec;
+  --text-muted: #a6a6a6;
+  --text-faint: #757575;
+
+  --accent: #ececec;
+  --accent-hover: #ffffff;
+  --accent-ink: #0d0d0d;
+  --accent-soft: rgba(255, 255, 255, 0.10);
+  --accent-ring: rgba(255, 255, 255, 0.38);
+
+  --green: #4ecb9d;
+  --green-soft: rgba(78, 203, 157, 0.14);
+  --red: #f87171;
+  --red-soft: rgba(248, 113, 113, 0.14);
+  --amber: #fbbf24;
+  --amber-soft: rgba(251, 191, 36, 0.14);
+  --blue: #7aa2ff;
+  --blue-soft: rgba(122, 162, 255, 0.16);
+
+  --glass-rail: rgba(19, 19, 19, 0.72);
+  --glass-panel: rgba(33, 33, 33, 0.88);
+  --glass-blur: saturate(1.6) blur(24px);
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.6), 0 10px 28px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.55);
+}
+
+/* Scale tokens the Vue components read that the static edition does not define. */
+:root {
+  --space-0-5: 2px;
+  --space-1: 4px;
+  --space-1-5: 6px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --radius-round: 50%;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --leading-tight: 1.2;
+  --leading-ui: 1.35;
+  --leading-body: 1.5;
+  --leading-relaxed: 1.6;
+}

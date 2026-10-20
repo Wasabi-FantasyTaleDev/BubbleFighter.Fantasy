@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Main-menu room session and tutorial select/start adapters between wire opcodes and shared contracts.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\BubbleFighter.Fantasy.Contracts\BubbleFighter.Fantasy.Contracts.csproj" />
+    <ProjectReference Include="..\..\BubbleFighter.Fantasy.RoomCore\BubbleFighter.Fantasy.RoomCore.csproj" />
+    <ProjectReference Include="..\..\BubbleFighter.Fantasy.Packets\BubbleFighter.Fantasy.Packets.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="BubbleFighter.Fantasy.Dialect.Messages.Tests" />
+  </ItemGroup>
+</Project>

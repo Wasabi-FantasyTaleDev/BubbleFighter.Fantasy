@@ -1,0 +1,24 @@
+{
+  "name": "bff-admin-webui",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Administration web interface of Bubble Fighter Fantasy (Vue 3, NOAH II UI).",
+  "type": "module",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "pinia": "3.0.4",
+    "vue": "3.5.43",
+    "vue-router": "4.6.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "5.2.4",
+    "vite": "6.4.3"
+  }
+}

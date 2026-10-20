@@ -1,0 +1,33 @@
+{
+  "_comment": "Known client builds and the rules bfdata.py uses to fill client-data/<build>/data and dataraw. Dates are the client executable's link date.",
+  "builds": [
+    {"id": "cn-279", "label": "CN2011 0.1.5.005", "date": "2011-04-08"},
+    {"id": "cn-324", "label": "CN2012", "date": "2012-09-22"},
+    {"id": "cn-406", "label": "CN2013 0.2.35.001", "date": "2013-06-28"},
+    {"id": "id-400", "label": "ID2014", "date": "2014-01-23"},
+    {"id": "cn-404", "label": "CN2014 0.2.46.001", "date": "2014-04-03"},
+    {"id": "cn-408", "label": "CN2014 0.2.48.001", "date": "2014-05-26"},
+    {"id": "cn-706", "label": "CN2014 0.2.51.002", "date": "2014-09-23"},
+    {"id": "id-1809", "label": "ID2015", "date": "2015-01-29"},
+    {"id": "kr-812", "label": "KR2015", "date": "2015-04-22"},
+    {"id": "cn-717", "label": "CN2015", "date": "2015-06-18"},
+    {"id": "cn-735", "label": "CN2016 0.2.70.4", "date": "2016-06-20"},
+    {"id": "cn-738", "label": "CN2016 0.2.72.01", "date": "2016-08-19"},
+    {"id": "cn-742", "label": "CN2017 0.2.74.01", "date": "2016-11-16"},
+    {"id": "tw-454", "label": "TW2019", "date": "2018-12-11"},
+    {"id": "cn-774", "label": "CN2019 0.2.98.3", "date": "2019-05-30"},
+    {"id": "kr-1256", "label": "KR final", "date": "2026-05-08",
+     "required": ["Config/ShopItem2.xml", "Config/FighterConfig.xml", "ServerShared/MapMeta.xml",
+                  "ServerShared/HotRandomMapList.csv", "ServerShared/HotRandomDifficultyMapList.csv"]}
+  ],
+  "rules": {
+    "_comment": "An archive whose members all sit under copy_folders is copied whole into data/. From any other archive, members under a raw_folders folder with one of its extensions are unpacked into dataraw/. Models, textures, sounds and UI are left out.",
+    "copy_folders": ["Config", "ServerShared", "StringTable", "Lub", "Mapbound"],
+    "raw_folders": {
+      "Maps": [".xml", ".ini", ".csv", ".wb", ".txt"],
+      "NpcMode": [".xml", ".lua", ".gpp", ".ini", ".csv", ".txt"],
+      "Scenes": [".xml", ".ini", ".csv", ".txt"]
+    },
+    "required": ["Config/ShopItem2.xml"]
+  }
+}

@@ -1,0 +1,17 @@
+{"ignore":["result.sdk"],"note":"The middleware fixture verifies that every SDK rejects a second continuation while keeping the invocation usable for normal teardown."}
+{"dir":"h2p","msg":{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocol_version":1,"protocol_versions":[1,2]}}}
+{"dir":"p2h","msg":{"jsonrpc":"2.0","id":1,"result":{"protocol_version":2}}}
+{"dir":"h2p","msg":{"jsonrpc":"2.0","id":2,"method":"activate","params":{"activation":"a1","row_id":"middleware","plugin":"conformance.middleware","config":{"protocol":"test/game","behavior":"twice"},"reload":false}}}
+{"dir":"p2h","msg":{"jsonrpc":"2.0","id":1,"method":"messages.use","params":{"activation":"a1","protocol":"test/game","type":"LoginRequested","priority":7}}}
+{"dir":"h2p","msg":{"jsonrpc":"2.0","id":1,"result":{"handle":"mw1"}}}
+{"dir":"p2h","msg":{"jsonrpc":"2.0","id":2,"result":{}}}
+{"dir":"h2p","msg":{"jsonrpc":"2.0","id":3,"method":"messages.invoke","params":{"activation":"a1","invocation":"inv1","handle":"mw1","protocol":"test/game","session":{"id":"s1","protocol":"test/game","player":42,"build":"test:1:0"},"message":{"type":"LoginRequested","body":{"account":"alice"}}}}}
+{"dir":"p2h","msg":{"jsonrpc":"2.0","id":2,"method":"messages.send","params":{"activation":"a1","protocol":"test/game","session_id":"s1","type":"LoginAccepted","body":{"user_number":1,"account":"middleware:alice","nickname":"alice","server_time":"2026-01-01T00:00:00Z","character_item_id":300001}}}}
+{"dir":"h2p","msg":{"jsonrpc":"2.0","id":2,"result":{}}}
+{"dir":"p2h","msg":{"jsonrpc":"2.0","id":3,"method":"messages.next","params":{"activation":"a1","invocation":"inv1"}}}
+{"dir":"h2p","msg":{"jsonrpc":"2.0","id":3,"result":{}}}
+{"dir":"p2h","msg":{"jsonrpc":"2.0","id":3,"result":{}}}
+{"dir":"h2p","msg":{"jsonrpc":"2.0","id":4,"method":"deactivate","params":{"activation":"a1"}}}
+{"dir":"p2h","msg":{"jsonrpc":"2.0","id":4,"method":"effect.dispose","params":{"activation":"a1","handle":"mw1"}}}
+{"dir":"h2p","msg":{"jsonrpc":"2.0","id":4,"result":{}}}
+{"dir":"p2h","msg":{"jsonrpc":"2.0","id":4,"result":{}}}

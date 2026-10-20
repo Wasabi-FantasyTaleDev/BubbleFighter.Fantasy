@@ -1,0 +1,38 @@
+id: cn-324
+display_names:
+  en: "China 2012-09-23"
+  zh-Hans: "国服 2012-09-23"
+  zh-Hant: "中國 2012-09-23"
+  ko: "중국 2012-09-23"
+client_build: cn:324:0
+# Nearest build whose layouts this one reuses when it has no variant of its own; the same
+# base as this build's entry in packets/builds.yaml.
+parent: kr-812
+description: Chinese 2012 client build, ClientVersion_Major 324.
+bundles:
+  - core
+  - legacy
+  - inventory-actions
+# What this build differs in; everything else is the legacy bundle's (kr-812).
+vars:
+  LEGACY_PORT: ${CN_324_GAME_PORT:-7140}
+  LEGACY_PUBLIC_PORT: ${CN_324_PUBLIC_PORT:-7140}
+  # The binary ships its own SimpleCipher tables (the five-byte frame and the seeds are shared), so the
+  # frames of a cn-324 client do not decrypt under the shared pair. _wWinMain passes 324 as the client
+  # version (cn-324 sub_8B8C60(324, 1)).
+  WIRE_CIPHER_TABLE_A: 3A153E32C14866775D2E294E6879866CB53B59F38D4E588D560CCD80E8E2FEFE425F67597E5F7588337647613162729243
+  WIRE_CIPHER_TABLE_B: "730023003200250032003300730064003200330061002300"
+  LEGACY_CENTER_PORT: ${CN_324_CENTER_PORT:-7142}
+  LEGACY_CENTER_PUBLIC_PORT: ${CN_324_CENTER_PUBLIC_PORT:-7142}
+  LEGACY_GATE_KEY: 6
+  LEGACY_GATE_SUB_KEY: 1
+  LEGACY_SEATS: 8
+  # This client counts 4000 ms down once the countdown packet arrives (sub_6F0BB0).
+  LEGACY_START_TIMER_MS: 4000
+patches:
+  - patch.yaml
+  # Optional native server selector; uncomment to enable the configured directory.
+  # - ../bundles/center-selector.yaml
+  - ../bundles/shop-supplement.yaml
+  # Optional developer override; git-ignored and skipped when absent.
+  - local.patch.yaml

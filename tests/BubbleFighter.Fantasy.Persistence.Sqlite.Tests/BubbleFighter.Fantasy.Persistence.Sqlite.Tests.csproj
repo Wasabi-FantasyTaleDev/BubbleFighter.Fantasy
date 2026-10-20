@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Persistence.Sqlite\BubbleFighter.Fantasy.Persistence.Sqlite.csproj" />
+    <ProjectReference Include="..\fixtures\SqliteSaveFixture\SqliteSaveFixture.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\Shared\PlayerSettingsContractTests.cs" Link="PlayerSettingsContractTests.cs" />
+    <Compile Include="..\Shared\PresentStoreContractTests.cs" Link="PresentStoreContractTests.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\Shared\LauncherSessionLimitTests.cs" Link="LauncherSessionLimitTests.cs" />
+  </ItemGroup>
+</Project>

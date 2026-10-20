@@ -1,0 +1,14 @@
+{
+  "profile": "all",
+  "bind_host": "0.0.0.0",
+  "public_host": "127.0.0.1",
+  "game_port": 7140,
+  "public_game_port": 7140,
+  "admin_host": "127.0.0.1",
+  "admin_port": 8083,
+  "mysql_host": "127.0.0.1",
+  "mysql_port": 3306,
+  "mysql_user": "bff",
+  "mysql_password": "",
+  "mysql_database": "bf_game_db"
+}

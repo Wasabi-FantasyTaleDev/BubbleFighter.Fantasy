@@ -1,0 +1,114 @@
+# Inbound score envelopes, independent of admission of any event kind.
+# kr-812 sub_530960/sub_5309D0 and cn-717 sub_567BE0/sub_567C50 write/read
+# the mixed-width report; id-1809 sub_4D5900/sub_4D5970 has the same fields.
+# Unnamed auxiliary fields remain unknown because different kinds reuse the envelope.
+version: 1
+structs:
+  RoundScoreReport:
+    - kind: u8
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - unknown_16: u8
+      offset: 16
+    - reporter_slot: u8
+      offset: 17
+      # Kind 3 uses this byte for a side code (kr-812 sub_528550), not attribution.
+      # The direct-kill adapter resolves the scorer from the character word at offset 12.
+    - unknown_18: u8
+      offset: 18
+    - unknown_20: u16
+      offset: 20
+    - unknown_22: u16
+      offset: 22
+
+  # cn-324 sub_45CB30/sub_45CBA0, sender cn-324 sub_467E00:
+  # victim/reporter seats and combo are interpreted only for the admitted score kinds.
+  RoundScoreReport@cn-324:
+    - kind: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - victim_slot: u32
+      offset: 16
+    - reporter_slot: u32
+      offset: 20
+    - unknown_24: u32
+      offset: 24
+    - combo: u32
+      offset: 28
+    - unknown_32: u32
+      offset: 32
+
+  # id-400 sub_480790/sub_480800 and cn-406 sub_41EB80/sub_41EBF0
+  # prove eight words. id-400 sub_49DF40/sub_4A0390 -> sub_48D2F0 and
+  # cn-406 sub_43AEA0/sub_43CF70 -> sub_42ADA0 admit kinds 1/2/3 through
+  # exact victim/scorer references at offsets 8/12. Side words stay unknown;
+  # the shared logic checks scorer ownership independently of those words.
+  RoundScoreReport@id-400:
+    - kind: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - unknown_16: u32
+      offset: 16
+    - unknown_20: u32
+      offset: 20
+    - unknown_24: u32
+      offset: 24
+    - unknown_28: u32
+      offset: 28
+    - unknown_32: u32
+      offset: 32
+
+  # cn-279 sub_403B10/sub_403B60 carries five words, not the CN2012 eight.
+  # cn-279 sub_827A30/sub_8268D0 -> sub_818DE0 independently admit ordinary
+  # kinds 1/2 through offsets 8/12, without interpreting the auxiliary words.
+  RoundScoreReport@cn-279:
+    - kind: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - unknown_16: u32
+      offset: 16
+    - unknown_20: u32
+      offset: 20
+
+  # cn-706 sub_4B9630/sub_4B96A0 restores the mixed-width envelope despite
+  # inheriting other layouts from id-400. This research table enables no routes.
+  RoundScoreReport@cn-706:
+    - kind: u8
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - unknown_16: u8
+      offset: 16
+    - reporter_slot: u8
+      offset: 17
+    - unknown_18: u8
+      offset: 18
+    - unknown_20: u16
+      offset: 20
+    - unknown_22: u16
+      offset: 22
+
+  # kr-812 sub_530900/sub_530930, cn-717 sub_567B80/sub_567BB0,
+  # id-1809 sub_4D59E0/sub_4D5A10. Mounted only when the build exposes this opcode.
+  # cn-706 sub_4B9710/sub_4B9740 has the same three fields (research only).
+  RoundOptimizedScoreReport:
+    - kind: u8
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - reporter_slot: u8
+      offset: 12

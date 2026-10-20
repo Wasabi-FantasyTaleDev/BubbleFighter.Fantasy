@@ -1,0 +1,47 @@
+version: 1
+structs:
+  # gcpReqAddObject: kr-812 sub_50EE70 (Packet_gcpReqAddObject, C2S 709) and kr-1256 sub_6DDE20 (C2S 607) write
+  # one word, the local character's scene object (kr-812 character+404 from sub_661AF0, kr-1256 character+448
+  # from sub_755330).
+  RoundObjectAddRequest:
+    - object_id: u32
+      offset: 4
+  # One seat word: kr-812 sub_80A910, cn-717 sub_8C4210, cn-324 sub_410910,
+  # cn-279 sub_44C1A0, id-400 sub_93D120, id-1809 sub_4D60C0, cn-406 sub_700770, cn-706 sub_4BBB70.
+  # Modern S2C 584 reads that seat directly: kr-1256 sub_9E1EB0 case 0x248, cn-774 sub_8D7D20
+  # case 0x248, tw-454 sub_A578B0 case 0x248 -> sub_A61700. All write a byte in the room's loaded-seat array.
+  RoundMapLoadingComplete:
+    - seat: u32
+      offset: 4
+  # kr-812 sub_5C8C00, cn-717 sub_88EE40, id-1809 sub_7A6290 and cn-706 sub_788970; kr-1256 sub_9E1EB0
+  # case 0x249 reads the same three bool32 words.
+  # cn-774 sub_8D7D20 and tw-454 sub_A578B0 case 0x249 retain all three flags; these are separate from S2C 584.
+  RoundEverybodyLoadingComplete:
+    - unknown_4: bool
+      offset: 4
+    - unknown_5: bool
+      offset: 5
+    - unknown_6: bool
+      offset: 6
+      # cn-324 sub_6EBA80, cn-279 sub_44A3F0, id-400 sub_793CC0 and cn-406 sub_7009B0 stop after two flags;
+      # cn-404 sub_579B70 reads the third again.
+      except: [cn-324, id-400]
+      also: [cn-706, cn-404]
+  # Same one-word readers as RoundMapLoadingComplete. Old CN uses gspGamePreCountDown:
+  # cn-324 sub_410910 and cn-279 sub_44C1A0; the count-down notification itself consumes no body.
+  # kr-1256 sub_9E7080 (S2C 607) reads the same one word.
+  RoundCountdown:
+    - milliseconds: u32
+      offset: 4
+  # kr-812 sub_9D95D0, cn-717 sub_7F4370, id-1809 sub_4D8130 and cn-706 sub_7A23F0.
+  RoundStartGame:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+      # cn-324 sub_408DF0, cn-279 sub_47E650, id-400 sub_782DD0 and cn-406 sub_420FC0 consume two words, and so
+      # does kr-1256 sub_9E7570 (the first word goes to the round-duration setter kr-1256 sub_6FEFC0).
+      except: [cn-324, id-400, kr-1256]
+      also: [cn-706]

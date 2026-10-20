@@ -1,0 +1,83 @@
+# The shop C2S request bodies the shop row parses by hand, stated as the layouts the packet
+# tables read. Where a legacy packet class exists the plain row is the kr-812 shape and the
+# modern build's difference is a restatement; where no legacy class exists the modern sender is
+# named and the row is modern-only.
+#
+# Every address below is build-qualified. Wire widths are payload widths: the opcode word lives
+# in the transport header the client builders stamp, never in these bodies.
+version: 1
+structs:
+
+  # C2S gcpEnterShop. kr-812: reader kr-812 sub_6DAF50 reads the class's +8 (8 bytes) and +16
+  # (4 bytes), and writer kr-812 sub_6DA560 appends 8 then 4 bytes (kr-812 sub_A56AA0 /
+  # kr-812 sub_A56A80). kr-1256 sends the same 12 bytes from builder kr-1256 sub_9328B0: an i64
+  # token copied from dword_18E56E8 (qword index 37, byte +0x128), then its u16 argument widened
+  # to a 4-byte word. The legacy request differs per build: id-400 (and cn-404/406/408/706) send
+  # the token alone, cn-324 (and cn-279) send no body, and kr-812/cn-717 append the main tab.
+  gcpEnterShop:
+    - token: u64
+      offset: 8
+      except: [cn-324]
+    - unknown_16: u32 # kr-812 sends its main tab here; kr-1256 sends a widened u16 whose meaning is not proven
+      offset: 16
+      except: [id-400, id-1809, cn-324]
+
+  # C2S gcpEnterTCShop_. No legacy class exists: kr-812 has no such vtable, and its C2S 802 is
+  # gcpEnterInventory with an empty body. Builder kr-1256 sub_64DAB0 appends one 8-byte token
+  # copied from dword_18E56E8 (qword index 38, byte +0x130) and nothing else. The trailing
+  # underscore stays: the name is coined, because this build lost its packet labels.
+  gcpEnterTCShop_@kr-1256:
+    - token: u64
+
+  # C2S gcpReqShopBuy for the modern build. Builder kr-1256 sub_E1D720 writes a 4-byte key and
+  # then a 4-byte word whose source is one byte, zero-extended (both live call sites write 0).
+  # The legacy class Packet_gcpReqShopBuy sends the same two words at C2S 808 (reader
+  # kr-812 sub_93C4E0 reads +4 as a word and +8 as a bool), and that shape is the existing
+  # ShopPurchaseRequest row in packets/equipment-control.yaml. The modern object starts at +0, so
+  # the fields are restated rather than annotated.
+  ShopPurchaseRequest@kr-1256:
+    - key: u32
+      offset: 0
+    - unknown_4: u32
+      offset: 4
+
+  # C2S gcpReqShopItemCardInfo: one 4-byte key. kr-812 reader kr-812 sub_80A910 reads one word
+  # (class Packet_gcpReqShopItemCardInfo; the reader is folded with other one-word classes, so the
+  # class and its number carry the identity, not the address). kr-1256 builder kr-1256 sub_814490
+  # writes one word from its source object, whose offset is +0 rather than the legacy class's +4.
+  gcpReqShopItemCardInfo:
+    - unknown_4: u32
+      offset: 4
+  gcpReqShopItemCardInfo@kr-1256:
+    - unknown_0: u32
+
+  # C2S gcpReqRealCouponUse: one prefixed wide string (u32 character count, then UTF-16LE with no
+  # terminator). kr-812 reader kr-812 sub_5C8FD0 reads it at +4; kr-1256 builder kr-1256 sub_E30E70
+  # appends it through kr-1256 sub_40DF60 on feature 1010. Both builds send the same encoding, so
+  # only the object offset differs.
+  gcpReqRealCouponUse:
+    - unknown_4: wstr
+      offset: 4
+  gcpReqRealCouponUse@kr-1256:
+    - unknown_0: wstr
+
+  # C2S 834 Unknown834: one prefixed wide string of the same encoding. Builder kr-1256 sub_E30E70
+  # appends it on feature 1018 for a code of 17 to 20 characters and refuses to send anything that
+  # is not exactly 20 characters, so the only body it emits is 44 bytes. The legacy check-cash
+  # request (kr-812 C2S 825, Packet_gcpReqCheckCash) has an empty body and is a different packet,
+  # so this row is modern-only and the name stays Unknown.
+  Unknown834@kr-1256:
+    - unknown_0: wstr
+
+  # C2S 2059 Unknown2059: one byte and one 4-byte word, 5 bytes. Builder kr-1256 sub_92F6C0 appends
+  # them; the shop entry sends (0x0D, 0) once and latches at dword_18E566C+984. No legacy class and
+  # no reply path, so the name stays Unknown.
+  Unknown2059@kr-1256:
+    - unknown_0: u8
+    - unknown_4: u32
+
+  # Baselines for the modern-only rows above. An empty baseline records that no legacy class is
+  # described here; the precedent is gspCenterList and GateInfo in packets/login.yaml.
+  gcpEnterTCShop_: []
+  Unknown834: []
+  Unknown2059: []

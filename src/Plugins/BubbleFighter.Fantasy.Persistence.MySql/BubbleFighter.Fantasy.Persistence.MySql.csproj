@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>MySQL persistence plugin for Bubble Fighter Fantasy.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="SqlSugarCore" />
+    <PackageReference Include="MySqlConnector" />
+    <!-- See the note in the SQLite persistence project: this raises the
+         System.Security.Cryptography.Pkcs floor that SqlSugarCore's Oracle
+         dependency pins to a version with published advisories. -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\BubbleFighter.Fantasy.Abstractions\BubbleFighter.Fantasy.Abstractions.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="BubbleFighter.Fantasy.Persistence.MySql.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Migrations\*.sql" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\BubbleFighter.Fantasy.Contracts\BubbleFighter.Fantasy.Contracts.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,7 @@
+# Mount one shared database provider for the all-builds deployment.
+- replace:
+    id: persistence.mysql
+    disabled: false
+- replace:
+    id: persistence.memory
+    disabled: true

@@ -1,0 +1,22 @@
+id: all
+description: Every brought-up client build in one process, each on its own listener port.
+bundles:
+  - core
+builds:
+  - kr-1256
+  - kr-812
+  - id-400
+  - id-1809
+  - cn-324
+  - cn-717
+  - cn-774
+  - tw-454
+  - cn-279
+  - cn-406
+  - cn-706
+  - cn-404
+  - cn-408
+patches:
+  - patch.yaml
+  # Optional developer override; git-ignored and skipped when absent.
+  - local.patch.yaml

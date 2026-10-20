@@ -1,0 +1,335 @@
+version: 1
+structs:
+  # gppSplashDamagerByDamager (in-round 32900, both directions): an existing damager turns into an area damager.
+  # Sender kr-812 sub_50FE10 fills the class from its arguments and stamps 32900; serializer kr-812 sub_5030A0 and
+  # reader kr-812 sub_503150 move twelve 4-byte words at object offsets 4..48. Consumer kr-812 sub_50FF40 resolves
+  # the first word in the scene's damager table (kr-812 sub_72C530), builds the area damager with
+  # kr-812 sub_508460 from the three triples and the new key, then retires the source through its virtual +48.
+  # The same twelve-word serializer pair is in cn-324 sub_45E350/sub_45E400, cn-717 sub_538200/sub_5382B0,
+  # id-400 sub_4821F0/sub_4822A0, id-1809 sub_4D75E0/sub_4D7690, cn-406 sub_420500/sub_4205B0,
+  # cn-404 sub_4B0590/sub_4B0640, cn-408 sub_4AFE70/sub_4AFF20 and cn-706 sub_4BB1D0/sub_4BB280.
+  # cn-279, cn-735, cn-738 and cn-742 are not audited for this packet.
+  # The server relays the body unchanged; this table describes it, it does not register the number.
+  SplashDamagerByDamager:
+    # The damager being replaced; its quotient by 100000 is the owning seat (kr-812 sub_50FE10 picks the seat's
+    # damager counter at scene+644 with it).
+    - source_damager_key: u32
+      offset: 4
+    # Three groups of three words passed to kr-812 sub_508460; their meaning is not proven.
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - unknown_16: u32
+      offset: 16
+    - unknown_20: u32
+      offset: 20
+    - unknown_24: u32
+      offset: 24
+    - unknown_28: u32
+      offset: 28
+    - unknown_32: u32
+      offset: 32
+    - unknown_36: u32
+      offset: 36
+    - unknown_40: u32
+      offset: 40
+    # The new damager's key: the owning seat's counter, post-incremented by the sender (kr-812 sub_50FE10).
+    - damager_key: u32
+      offset: 44
+    # The sender merges the low 24 bits of a scene value (kr-812 sub_A5FD10) into this word; not proven further.
+    - unknown_48: u32
+      offset: 48
+
+  # The modern builds keep the twelve words and their roles, read into a plain structure from +0 (no class
+  # table), so every offset differs from kr-812. kr-1256 adds a counted word list: writer kr-1256 sub_708820 writes
+  # the twelve words and kr-1256 sub_10F4640 the count and its words; reader kr-1256 sub_6CAB40 reads the twelve and
+  # kr-1256 sub_1137C30 the list, reserving its storage from the count before reading the words. Consumer
+  # kr-1256 sub_6D55D0 -> sub_6DF570 resolves the source damager, builds the area damager (kr-1256 sub_6D1010) and
+  # retires the source through its virtual +76. A nonempty list is valid; its words' meaning is not proven.
+  # cn-774 writer sub_8A0860 and reader sub_8A0B10 (consumer case at 0x89A2A2) and tw-454 writer sub_713910 and
+  # reader sub_713BB0 (sub_70B3F0 case 0x8084) move only the twelve words.
+  SplashDamagerByDamager@kr-1256:
+    - source_damager_key: u32
+      offset: 0
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - unknown_16: u32
+      offset: 16
+    - unknown_20: u32
+      offset: 20
+    - unknown_24: u32
+      offset: 24
+    - unknown_28: u32
+      offset: 28
+    - unknown_32: u32
+      offset: 32
+    - unknown_36: u32
+      offset: 36
+    - damager_key: u32
+      offset: 40
+    - unknown_44: u32
+      offset: 44
+    - unknown_48: "list<u32>"
+      offset: 48
+      except: [cn-774]
+
+  # The other in-round damager spawns, relayed unchanged like SplashDamagerByDamager. Each body starts with the key of
+  # the character that fires it (the seat is (key - 1000000) / 100000) and, where the sender stamps one, carries the seat's
+  # damager counter (post-incremented by the sender) and the low 24 bits of a scene value merged by the sender
+  # (kr-812 sub_A5FD10 on scene+1748; the kr-1256 writers mask with 0xFFFFFF). The class names are the kr-812 RTTI names;
+  # each is proven by a consumer that does the same thing in kr-1256, cn-774 and tw-454 (packets/damagers.yaml).
+  # The modern builds' readers are inline in their consumers (no object), so they share the kr-812 table; the counted list
+  # that kr-1256 appends to four of the bodies is a row only kr-1256 has (cn-774 and tw-454 stop before it).
+
+  # gppSplashDamager (in-round 32772): a character fires an area damager. Sender kr-812 sub_511020, serializer
+  # kr-812 sub_502F20, reader kr-812 sub_502FF0, consumer kr-812 sub_51C4B0: resolves the key as a Character, picks the
+  # flag bits (2 for character type 2xx, 8 and 0x10 from two feature switches) and builds the area damager with
+  # kr-812 sub_508460, the builder of the 32900 consumer. kr-1256 reader sub_10F3D50 and consumer sub_6F23D0 do the same
+  # with sub_6D1010; cn-774 consumer sub_8B1C90 calls sub_893A50 and tw-454 consumer sub_725E50 calls sub_7073E0, the
+  # builders of their 32900 consumers. Writers: kr-1256 sub_6E24D0, cn-774 sub_8A37B0, tw-454 sub_716AE0.
+  SplashDamager:
+    - character_key: u32
+      offset: 4
+    - unknown_8: u16
+      offset: 8
+    - unknown_10: u8
+      offset: 10
+    - unknown_12: u32
+      offset: 12
+    - unknown_16: u32
+      offset: 16
+    - unknown_20: u32
+      offset: 20
+    - unknown_24: u32
+      offset: 24
+    - unknown_28: u32
+      offset: 28
+    - unknown_32: u32
+      offset: 32
+    - unknown_36: u32
+      offset: 36
+    - unknown_40: u32
+      offset: 40
+    - unknown_44: u32
+      offset: 44
+    # The seat's damager counter, post-incremented by the sender (kr-812 sub_511020).
+    - damager_key: u32
+      offset: 48
+    # The sender merges the low 24 bits of a scene value into this word; not proven further.
+    - unknown_52: u32
+      offset: 52
+
+  # kr-1256 reads the body into a plain structure from +0 and appends a counted word list (reader kr-1256 sub_10F3D50 and
+  # kr-1256 sub_1137C30, writer kr-1256 sub_10F3BE0 and kr-1256 sub_10F4640). cn-774 and tw-454 have no list.
+  SplashDamager@kr-1256:
+    - character_key: u32
+      offset: 0
+    - unknown_4: u16
+      offset: 4
+    - unknown_8: u8
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - unknown_16: u32
+      offset: 16
+    - unknown_20: u32
+      offset: 20
+    - unknown_24: u32
+      offset: 24
+    - unknown_28: u32
+      offset: 28
+    - unknown_32: u32
+      offset: 32
+    - unknown_36: u32
+      offset: 36
+    - unknown_40: u32
+      offset: 40
+    - unknown_44: u32
+      offset: 44
+    - damager_key: u32
+      offset: 48
+    - unknown_52: u32
+      offset: 52
+    - unknown_56: "list<u32>"
+      offset: 56
+      except: [cn-774]
+
+  # gppMobDropBombOnDead (in-round 32877): a character drops a bomb when a monster dies. Sender kr-812 sub_514FD0, reader
+  # kr-812 sub_6DB120, consumer kr-812 sub_524970: Character cast, bullet type 5301 unless character data gives another,
+  # then the bullet spawner kr-812 sub_507CE0. kr-1256 consumer sub_6FD050 (inline reader, no list) does the same with
+  # sub_6D0650; cn-774 consumer sub_8BD090 and tw-454 consumer sub_730FA0 read the same 41 bytes and use the constant 5301.
+  # Writers: kr-1256 sub_6E9700, cn-774 sub_8A8F60, tw-454 sub_71CAA0. The reader is shared with kr-812 gppMobFireBullet,
+  # whose consumer casts MobBase instead; the Character cast and 5301 identify this class.
+  MobDropBombOnDead:
+    - character_key: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u8
+      offset: 12
+    - unknown_16: u32
+      offset: 16
+    - unknown_20: u32
+      offset: 20
+    - unknown_24: u32
+      offset: 24
+    - unknown_28: u32
+      offset: 28
+    - unknown_32: u32
+      offset: 32
+    - unknown_36: u32
+      offset: 36
+    - damager_key: u32
+      offset: 40
+    - unknown_44: u32
+      offset: 44
+
+  # gppDropHumilPrevItem (in-round 32881): a bullet is spawned from a character along a rotated direction. kr-812 has the
+  # class (reader kr-812 sub_9D95D0, consumer kr-812 sub_524AF0) and no sender; kr-1256 consumer sub_6FD690, cn-774 consumer
+  # sub_8BD540 and tw-454 consumer sub_731310 do the same rotation (axis rotation, normalize, scale) and call the bullet
+  # spawner (kr-1256 sub_6D0650, cn-774 sub_892F50, tw-454 sub_706B00). No build has a writer for it. kr-1256 reads the
+  # third word as the low 24 bits and then a counted list (kr-1256 sub_1137C30); cn-774 and tw-454 stop after three words.
+  DropHumilPrevItem:
+    - character_key: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - unknown_16: "list<u32>"
+      only: [kr-1256]
+      except: [cn-774]
+
+  # gppFireBullet3 (in-round 32898): a character fires a bullet. Sender kr-812 sub_510BF0, reader kr-812 sub_502A80,
+  # consumer kr-812 sub_51B550: Character cast, a character virtual (+696), then the bullet spawner kr-812 sub_507CE0 or
+  # kr-812 sub_51B7C0 when the scene flag at +1700 is set. kr-1256 consumer sub_6F02C0 calls character virtual +416 and then
+  # sub_6D0650 or sub_6F0940 (scene byte +489). Writers: kr-1256 sub_7089C0, cn-774 sub_8A2EB0, tw-454 sub_7162C0;
+  # cn-774 consumer sub_8AFE00 and tw-454 consumer sub_7245F0 read the same 44 bytes.
+  FireBullet3:
+    - character_key: u32
+      offset: 4
+    - unknown_8: u16
+      offset: 8
+    - unknown_10: u8
+      offset: 10
+    - unknown_12: u32
+      offset: 12
+    - unknown_16: u32
+      offset: 16
+    - unknown_20: u32
+      offset: 20
+    - unknown_24: u32
+      offset: 24
+    - unknown_28: u32
+      offset: 28
+    - unknown_32: u32
+      offset: 32
+    - unknown_36: u32
+      offset: 36
+    - unknown_40: u8
+      offset: 40
+    - damager_key: u32
+      offset: 44
+    - unknown_48: u32
+      offset: 48
+
+  # kr-1256 reader kr-1256 sub_10F3570 and kr-1256 sub_1137C30 (writer kr-1256 sub_7089C0 and kr-1256 sub_10F4640): a plain
+  # structure from +0 and a counted word list at the end. cn-774 and tw-454 have no list.
+  FireBullet3@kr-1256:
+    - character_key: u32
+      offset: 0
+    - unknown_4: u16
+      offset: 4
+    - unknown_8: u8
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - unknown_16: u32
+      offset: 16
+    - unknown_20: u32
+      offset: 20
+    - unknown_24: u32
+      offset: 24
+    - unknown_28: u32
+      offset: 28
+    - unknown_32: u32
+      offset: 32
+    - unknown_36: u32
+      offset: 36
+    - unknown_40: u8
+      offset: 40
+    - damager_key: u32
+      offset: 44
+    - unknown_48: u32
+      offset: 48
+    - unknown_52: "list<u32>"
+      offset: 52
+      except: [cn-774]
+
+  # gppStormDamager (in-round 32899): a character creates a GoStormDamager. Sender kr-812 sub_510100, reader kr-812
+  # sub_502E30, consumer kr-812 sub_510870 (kr-812 sub_62FE20 builds the damager and the word at +12 is kept in it unless
+  # -1). kr-1256 consumer sub_6E1860 (inline reader) builds it with sub_7A59E0 and keeps the same word unless -1; cn-774
+  # consumer sub_8A2BF0 (sub_94E7E0) and tw-454 consumer sub_715BB0 (sub_8454A0) do the same. Writers: kr-1256 sub_6DF9B0,
+  # cn-774 sub_8A0EE0, tw-454 sub_713EA0. No build has a list here.
+  StormDamager:
+    - character_key: u32
+      offset: 4
+    - unknown_8: u16
+      offset: 8
+    - unknown_10: u8
+      offset: 10
+    - unknown_12: u32
+      offset: 12
+    - damager_key: u32
+      offset: 16
+    - unknown_20: u32
+      offset: 20
+
+  # gppStormDamagerItemId (in-round 32910 in the modern builds, 32909 in kr-812): as gppStormDamager, but the consumer looks
+  # the fifth word up in an item table and builds a GoStormDamagerAOE when the entry's field equals 26, else a
+  # GoStormDamager. Sender kr-812 sub_510010, reader kr-812 sub_502E30 (shared with gppStormDamager), consumer kr-812
+  # sub_510200 (field +412, kr-812 sub_630380). kr-1256 writer sub_6DF7E0, consumer sub_6DFBC0 (table dword_18E55E0, field
+  # +380); cn-774 writer sub_8A0D40, consumer sub_8A10C0 (sub_9BFC80, field +384); tw-454 writer sub_713D10, consumer
+  # sub_714080 (sub_83D820, field +384). Not gppShocked2: that kr-812 class (number 32910 there) is two words and sets a
+  # character field.
+  StormDamagerItemId:
+    - character_key: u32
+      offset: 4
+    - unknown_8: u16
+      offset: 8
+    - unknown_10: u8
+      offset: 10
+    # Every sender writes -1 here (kr-812 sub_510010, kr-1256 sub_6DF7E0); the consumers keep it in the damager unless it is -1.
+    - unknown_12: u32
+      offset: 12
+    # Looked up in an item table by every consumer; an entry whose field equals 26 selects the area variant.
+    - item_id: u32
+      offset: 16
+    - damager_key: u32
+      offset: 20
+
+  # gppNearDamager (in-round 33278 in the modern builds, 32773 in kr-812): a character creates a GoNearDamager, and for the
+  # ids 7029..7036 (the modern builds also 7964..7971) plays the "handBell" effect on the character. Sender kr-812 sub_511160,
+  # reader kr-812 sub_502ED0, consumer kr-812 sub_51C5C0 (kr-812 sub_62EC90). kr-1256 writer sub_6E2990 (list written
+  # inline), consumer sub_6F2700 (inline reader, sub_445040 lookup, GoNearDamager by sub_7A1270); cn-774 writer sub_8A3B30,
+  # consumer sub_8B1EE0 (sub_948150); tw-454 writer sub_716E50, consumer sub_726000 (sub_8425D0). kr-1256 appends a counted
+  # list (kr-1256 sub_1137C30); cn-774 and tw-454 have none.
+  NearDamager:
+    - character_key: u32
+      offset: 4
+    - unknown_8: u16
+      offset: 8
+    - unknown_10: u8
+      offset: 10
+    - damager_key: u32
+      offset: 12
+    - unknown_16: u32
+      offset: 16
+    - unknown_20: "list<u32>"
+      only: [kr-1256]
+      except: [cn-774]

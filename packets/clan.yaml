@@ -1,0 +1,91 @@
+version: 1
+# Clan game-connection bodies. The structures below are stated as the enabled build (kr-1256) sends and
+# reads them today; the legacy baseline's own readers differ and are stated beside each modern table.
+#
+# Open question, recorded here instead of smoothed over: every clan passport reader listed below consumes
+# five pieces, the first of them a leading 32-bit word before the name, so an empty passport would be
+# 20 bytes. The server has always written the 16-byte body this table states (name, word, word, byte list)
+# and the enabled build keeps that body until a real session is read against it, so the leading word is
+# NOT stated as a body field in ClanPassport@kr-1256. The kr-1256 reader's export carries the
+# "bad sp value at call has been detected, the output may be wrong" warning, which is why the five-piece
+# reading is a question and not a proven field. Resolve it before the body changes.
+#
+# Readers, build-qualified:
+#   ClanPassport         kr-812 sub_844AB0, kr-1256 sub_99C1D0, cn-774 sub_BA3C80
+#   ClanMarkInfo         kr-812 sub_844FB0, kr-1256 sub_99CFA0 (entered through kr-1256 sub_9A2190)
+#   ClanGuildInfo        kr-812 sub_8407F0, kr-1256 sub_9B2690, cn-774 sub_BB0F60
+#   ClanAttendanceState  kr-1256 sub_10C5590 (entered through kr-1256 sub_9CD440); kr-812 has no such packet
+# The empty client requests at the end name the writers that stamp each opcode without a body.
+structs:
+  # kr-812 passport (S2C 22). The packet object starts with its vtable at +0 and the reader fills +4 onwards.
+  ClanPassport:
+    - unknown_4: u32        # kr-812 sub_844AB0 reads 4 bytes at +4 (kr-812 sub_A56C10); purpose unproven
+      offset: 4
+    - clan_name: wstr       # kr-812 sub_844AB0 -> kr-812 sub_A56D70: u32 character count, then UTF-16LE
+      offset: 8
+    - unknown_36: u32       # kr-812 sub_844AB0 reads 4 bytes at +36; purpose unproven
+      offset: 36
+    - unknown_40: u32       # kr-812 sub_844AB0 reads 4 bytes at +40; purpose unproven
+      offset: 40
+    - unknown_44: list<u8>  # u32 count (kr-812 sub_A56B30), then that many 1-byte entries (kr-812 sub_A56BB0); always sent empty
+      offset: 44
+  # The enabled build's passport (S2C 21). This is the 16-byte body the server sends today when empty:
+  # empty name (4), word (4), word (4), empty byte list (4). See the open question at the top of this file:
+  # kr-1256 sub_99C1D0 fills the same pieces at +4, +28, +32 and a byte vector at +36, and the client may
+  # read one leading word before the name that this body does not carry. cn-774 sub_BA3C80 reads the same
+  # five pieces in this order (with the leading word), so cn-774 inherits this table and carries the same
+  # question; tw-454's reader was not read.
+  ClanPassport@kr-1256:
+    - clan_name: wstr       # kr-1256 sub_99C1D0 reads the prefixed wide name at +4 (u32 character count, then UTF-16LE)
+      offset: 4
+    - unknown_28: u32       # kr-1256 sub_99C1D0 reads 4 bytes at +28; purpose unproven
+      offset: 28
+    - unknown_32: u32       # kr-1256 sub_99C1D0 reads 4 bytes at +32; purpose unproven
+      offset: 32
+    - unknown_36: list<u8>  # kr-1256 sub_10BE7B0 -> kr-1256 sub_10BE840: u32 count, then that many bytes; always sent empty
+      offset: 36
+  # kr-812 mark info (S2C 131): one word, then two counted tables. Each record is a 16-byte object the
+  # reader enters through the record's own vtable slot +4, so the record layout is not established and the
+  # server writes count 0 in both tables.
+  ClanMarkInfo:
+    - unknown_4: u32        # kr-812 sub_844FB0 reads 4 bytes at +4; purpose unproven
+      offset: 4
+    - unknown_8: empty_list # kr-812 sub_844FB0 reads a u32 count at +8, then that many 16-byte records; always sent empty
+      offset: 8
+    - unknown_24: empty_list # the second table: u32 count at +24, then the same 16-byte records; always sent empty
+      offset: 24
+  # The enabled build's mark info (S2C 140): 8 bytes when empty, one word and ONE counted table.
+  # kr-1256 sub_99CFA0 reads the word at +0 and the count at +4; each record is read through the function
+  # pointer off_156C4A0 (its default target kr-1256 sub_113F540), so the record layout is not established and
+  # the server writes count 0.
+  ClanMarkInfo@kr-1256:
+    - unknown_0: u32        # kr-1256 sub_99CFA0 reads 4 bytes at +0; purpose unproven
+      offset: 0
+    - unknown_4: empty_list # kr-1256 sub_99CFA0 reads a u32 count at +4, then the counted records; always sent empty
+      offset: 4
+  # Guild info (S2C 921 in kr-812, S2C 918 in kr-1256, cn-774 and tw-454). The three verified readers agree
+  # on the order and the widths: 8 bytes, then two 4-byte words compared to zero and kept as booleans.
+  # kr-1256 sub_9B2690 keeps the 8-byte value at dword_18E57A4+80; cn-774 sub_BB0F60 keeps both dwords at
+  # dword_177BA74+264/+268. Body length is 16 bytes when empty.
+  ClanGuildInfo:
+    - unknown_8: u64        # kr-812 sub_8407F0 reads 8 bytes at +8 (kr-812 sub_A56C30) and keeps both dwords
+      offset: 8
+    - unknown_16: bool      # kr-812 sub_8407F0 -> kr-812 sub_A56BD0 reads 4 bytes at +16 and keeps "not zero"
+      offset: 16
+    - unknown_17: bool      # the same 4-byte read at +17; kr-1256 sub_9B2690 and cn-774 sub_BB0F60 read it second
+      offset: 17
+  # Attendance state (S2C 1508 in kr-1256, 1506 in cn-774, 1505 in tw-454). kr-812 has no attendance packet:
+  # it has no opcode row and no attendance class or string in its export, so the field is stated only for the
+  # builds that read it (a structure still needs a baseline table, hence the row exists with no kr-812 field).
+  # kr-1256 sub_10C5590 reads a u32 count into a local (there is no packet object; it builds a map keyed by the
+  # first word of each card) and then the cards, whose reader is not established. Body length is 4 bytes when
+  # empty, which is what the server writes today.
+  ClanAttendanceState:
+    - cards: empty_list     # kr-1256 sub_10C5590: u32 count, then cards (4-byte key, wide string, word, 2-byte word; the card layout is not established); always sent empty
+      only: [kr-1256, cn-774, tw-454]
+  # Empty client requests. The three clan frames the server handles carry no body: the client stamps the
+  # opcode on a TcpPacket and sends it without writing a field. A structure with no fields is legal here and
+  # writes zero bytes, so the empty bodies are stated as such rather than left to a code-side assumption.
+  ClanPassportRequest: []   # C2S 25; kr-812 sub_498E70 builds Packet_gcpReqClanPassport and writes no field before the send
+  Unknown2040Request: []    # C2S 2040; writers kr-1256 sub_5A9410 (the DlgClanMain click) and kr-1256 sub_516EE0 (session init, only when local key 196 resolves)
+  Unknown2041Request: []    # C2S 2041; writer kr-1256 sub_57F010 (the FrmClanAttendance check-in, card word +1468 = 1)

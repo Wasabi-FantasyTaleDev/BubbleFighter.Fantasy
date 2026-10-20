@@ -1,0 +1,37 @@
+# Live score vectors: kr-812 sub_80A8B0/sub_80A560 and sub_80A840/sub_80A750
+# are the envelope and element readers/writers. Lists use u32 counts (kr-812 sub_80A870).
+# The same widths and object offsets are independently present in cn-717
+# sub_88ECB0/sub_88E790, id-1809 sub_7A6440/sub_7A63A0 and cn-706 sub_788AE0/sub_788A40.
+# The counters are absolute and sent in this order.
+# kr-812 sub_8046C0 constructs Packet_gspUpdateScoreData with a nested
+# UpdateScoreData (vtable 0xD69450); the wrapper reader kr-812 sub_80A4F0
+# delegates to kr-812 sub_80A8B0. Machine code at 0x80474C-0x8047A7 writes
+# the team total and each seat's vector into a ScoreData copy before the HUD refresh.
+# kr-812 sub_804850 assigns stat 0/24/10/29 to row offsets 44/48/56/64;
+# these are absolute replacements, not additive score events.
+# cn-279, cn-324 and id-400 retain their whole-scoreboard update path; this table
+# does not enable a packet that their reviewed opcode tables do not expose.
+version: 1
+structs:
+  RoundLiveScore:
+    - team: u8
+      offset: 4
+    - total: u16
+      offset: 6
+    - scorer_slot: u8
+      offset: 8
+      default: 255
+    - victim_slot: u8
+      offset: 9
+      default: 255
+    - scorer_stats: "list<RoundLiveScoreStat>"
+      offset: 12
+    - victim_stats: "list<RoundLiveScoreStat>"
+      offset: 28
+  # Element readers/writers: cn-717 sub_88EC40/sub_88EB20,
+  # id-1809 sub_7A6370/sub_7A6340 and cn-706 sub_788A10/sub_7889E0.
+  RoundLiveScoreStat:
+    - kind: u8
+      offset: 4
+    - value: u16
+      offset: 6

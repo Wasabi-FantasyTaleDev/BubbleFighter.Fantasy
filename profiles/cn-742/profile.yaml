@@ -1,0 +1,19 @@
+id: cn-742
+display_names:
+  en: "China 2016-11-16"
+  zh-Hans: "国服 2016-11-16"
+  zh-Hant: "中國 2016-11-16"
+  ko: "중국 2016-11-16"
+client_build: cn:742:0
+setup_enabled: false
+activation_enabled: false
+# Nearest build whose layouts this one reuses when it has no variant of its own.
+parent: cn-738
+description: Chinese 2017 client build 0.2.74.01, ClientVersion_Major 742.
+bundles:
+  - core
+  - cn-742
+patches:
+  - patch.yaml
+  # Optional developer override; git-ignored and skipped when absent.
+  - local.patch.yaml

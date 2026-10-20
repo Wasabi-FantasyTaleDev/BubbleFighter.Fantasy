@@ -1,0 +1,12 @@
+[package]
+name = "bff-plugin"
+version = "1.0.0"
+edition = "2021"
+description = "Out-of-process plugins for the BubbleFighter Fantasy host (SDK plugin protocol v1)."
+publish = false
+
+[dependencies]
+serde_json = "1"
+
+[[example]]
+name = "conformance"

@@ -1,0 +1,4 @@
+id: run
+description: Load configured definition sources before admitting the server profile.
+bundles:
+  - loaders

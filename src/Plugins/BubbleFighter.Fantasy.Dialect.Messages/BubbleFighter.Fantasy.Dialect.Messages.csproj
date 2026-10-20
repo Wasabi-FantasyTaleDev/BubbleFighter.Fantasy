@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Korean 812 client message adapters between wire opcodes and shared message contracts.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\BubbleFighter.Fantasy.Packets\BubbleFighter.Fantasy.Packets.csproj" />
+    <ProjectReference Include="..\..\BubbleFighter.Fantasy.Contracts\BubbleFighter.Fantasy.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="BubbleFighter.Fantasy.Dialect.Messages.Tests" />
+    <InternalsVisibleTo Include="BubbleFighter.Fantasy.Lobby.Tests" />
+  </ItemGroup>
+</Project>

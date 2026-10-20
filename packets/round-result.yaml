@@ -1,0 +1,18 @@
+version: 1
+structs:
+  # Two u32: kr-812 sub_6DB1B0, cn-717 sub_538B70, cn-324 sub_408DF0,
+  # cn-279 sub_47E650, id-400 sub_782DD0, cn-406 sub_420FC0,
+  # id-1809 sub_4D7F70, cn-706 sub_733050.
+  # The result policy supplies the outcome word; this table does not infer win/loss semantics.
+  RoundEndGame:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+  # Two byte totals: kr-812 sub_80A530, cn-717 sub_88E760,
+  # id-1809 sub_7A61E0 and cn-706 sub_788900. Nested ScoreData builds use another envelope.
+  RoundTimeOverTotals:
+    - red_total: u8
+      offset: 4
+    - blue_total: u8
+      offset: 5

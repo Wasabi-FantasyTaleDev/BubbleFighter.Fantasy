@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Bounded serial execution primitives for room plugins.</Description>
+  </PropertyGroup>
+</Project>

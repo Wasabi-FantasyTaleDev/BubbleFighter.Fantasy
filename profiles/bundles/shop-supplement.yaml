@@ -1,0 +1,505 @@
+# Unpacked ShopItem2.xml workbooks contain these items and their original sale terms.
+# Existing visible sale terms take precedence. Supplements set price and currency while retaining duration.
+- set:
+    id: shop
+    config:
+      supplemental_offers:
+        - item_id: 100224
+          note: "强制起跳手镯 / Frontal jump bracelet"
+          price: 1000
+          money_type: cash
+        - item_id: 300007
+          note: "葱头 / Etti character"
+          price: 1000
+          money_type: cash
+        - item_id: 100443
+          note: "即时复活 / Instant respawn consumable"
+          price: 1000
+          money_type: lucci
+        # Native currencies and durations differ between client builds.
+        - item_id: 100611
+          note: "Angry Zombie King helmet"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 100567
+          note: "Zombie Stein upper garment"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 100568
+          note: "Zombie Stein lower garment"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 100569
+          note: "Zombie Stein gloves"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 100570
+          note: "Zombie Stein shoes"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - stock_set_id: 2100535
+          note: "Raccoon disguise set, five equipment pieces for 30 days"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 202207
+          note: "Raccoon HC rifle"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 203103
+          note: "Raccoon HC shotgun"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 100222
+          note: "Black Fire primary booster"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 100254
+          note: "Black Fire auxiliary booster"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - stock_set_id: 2100745
+          note: "Tiger HC outfit, four native pieces for 30 days"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 204108
+          note: "Superior sniper, non-HC variant; CN2012 name Zhuoyue"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 204109
+          note: "Superior HC sniper; CN2012 name Zhuoyue-HC"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 201014
+          note: "Native HC/Dragon weapon 201014: 코튼 피스톨 L3 HC"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 201024
+          note: "Native HC/Dragon weapon 201024: 버스트 피스톨 L3 HC"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 201044
+          note: "Native HC/Dragon weapon 201044: 브루트 피스톨 L3 HC"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 202016
+          note: "Native HC/Dragon weapon 202016: 코튼 라이플 L3 HC"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 202025
+          note: "Native HC/Dragon weapon 202025: 버스트 라이플 L3 HC"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 202044
+          note: "Native HC/Dragon weapon 202044: 브루트 라이플 L3 HC"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 202309
+          note: "Native HC/Dragon weapon 202309: 슈페리얼 라이플"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 202310
+          note: "Native HC/Dragon weapon 202310: 슈페리얼 라이플 HC"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 203016
+          note: "Native HC/Dragon weapon 203016: 코튼 샷건 L3 HC"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 203024
+          note: "Native HC/Dragon weapon 203024: 버스트 샷건 L3 HC"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 203044
+          note: "Native HC/Dragon weapon 203044: 브루트 샷건 L3 HC"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 203207
+          note: "Native HC/Dragon weapon 203207: 슈페리얼 샷건"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 203208
+          note: "Native HC/Dragon weapon 203208: 슈페리얼 샷건 HC"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 204015
+          note: "Native HC/Dragon weapon 204015: 코튼 스나이퍼 L3 HC"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 204026
+          note: "Native HC/Dragon weapon 204026: 버스트 스나이퍼 L3 HC"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 204044
+          note: "Native HC/Dragon weapon 204044: 브루트 스나이퍼 L3 HC"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 201075
+          note: "Native HC/Dragon weapon 201075: 세이버 피스톨 S3 HC"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 201102
+          note: "Native HC/Dragon weapon 201102: 드래곤 피스톨 L1"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 201112
+          note: "Native HC/Dragon weapon 201112: 드래곤 피스톨 HC"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 201113
+          note: "Native HC/Dragon weapon 201113: 슈퍼 드래곤 피스톨 HC"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 202034
+          note: "Native HC/Dragon weapon 202034: 세이버 라이플 S3 HC"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 202303
+          note: "Native HC/Dragon weapon 202303: 드래곤 라이플 L1"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 202316
+          note: "Native HC/Dragon weapon 202316: 드래곤 라이플 HC"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 202317
+          note: "Native HC/Dragon weapon 202317: 슈퍼 드래곤 라이플 HC"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 203034
+          note: "Native HC/Dragon weapon 203034: 세이버 샷건 S3 HC"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 203201
+          note: "Native HC/Dragon weapon 203201: 드래곤 샷건 L1"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 203210
+          note: "Native HC/Dragon weapon 203210: 드래곤 샷건 HC"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 203211
+          note: "Native HC/Dragon weapon 203211: 슈퍼 드래곤 샷건 HC"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 204034
+          note: "Native HC/Dragon weapon 204034: 세이버 스나이퍼 S3 HC"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 204101
+          note: "Native HC/Dragon weapon 204101: 드래곤 스나이퍼 라이플 L1"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 204113
+          note: "Native HC/Dragon weapon 204113: 드래곤 스나이퍼 라이플 HC"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 204114
+          note: "Native HC/Dragon weapon 204114: 슈퍼 드래곤 스나이퍼 HC"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 201402
+          note: "Cotton color variant 201402; original native sale terms"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 201903
+          note: "Cotton color variant 201903; original native sale terms"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 201904
+          note: "Cotton color variant 201904; original native sale terms"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 201905
+          note: "Cotton color variant 201905; original native sale terms"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 202402
+          note: "Cotton color variant 202402; original native sale terms"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 202904
+          note: "Cotton color variant 202904; original native sale terms"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 202905
+          note: "Cotton color variant 202905; original native sale terms"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 202906
+          note: "Cotton color variant 202906; original native sale terms"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 203402
+          note: "Cotton color variant 203402; original native sale terms"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 203904
+          note: "Cotton color variant 203904; original native sale terms"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 203905
+          note: "Cotton color variant 203905; original native sale terms"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 203906
+          note: "Cotton color variant 203906; original native sale terms"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 204402
+          note: "Cotton color variant 204402; original native sale terms"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 204903
+          note: "Cotton color variant 204903; original native sale terms"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 204904
+          note: "Cotton color variant 204904; original native sale terms"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 204905
+          note: "Cotton color variant 204905; original native sale terms"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 100003
+          note: "Closed beta commemorative shoes; native client sale terms"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 100006
+          note: "Closed beta commemorative shirt; native client sale terms"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 205004
+          note: "Sticky grenade E01-S; native client sale terms"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 205006
+          note: "Candy grenade; native client sale terms"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 205030
+          note: "Snowman grenade; native client sale terms"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 205031
+          note: "Dragon grenade; native client sale terms"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 205035
+          note: "Super red-star grenade; native client sale terms"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 207012
+          note: "Native melee weapon 207012: 플로럴 꽃망치"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 207013
+          note: "Native melee weapon 207013: 버닝헤드 뿅망치"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 207016
+          note: "Native melee weapon 207016: 아이언마이트 뿅망치"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 207017
+          note: "Native melee weapon 207017: 달토끼 절구공이"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 207018
+          note: "Native melee weapon 207018: 아몬드 초코봉 뿅망치"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 207019
+          note: "Native melee weapon 207019: 딸기 초코봉 뿅망치"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 207020
+          note: "Native melee weapon 207020: 바닐라 초코봉 뿅망치"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 207021
+          note: "Native melee weapon 207021: 롤리폴 초코봉 뿅망치"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 207022
+          note: "Native melee weapon 207022: 발렌타인 초코 뿅망치"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 207026
+          note: "Native melee weapon 207026: 인더스트 뿅망치"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 207028
+          note: "Native melee weapon 207028: 세이버 임팩트 해머"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 207029
+          note: "Native melee weapon 207029: X-MAS멜로디종<낮은도>"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 207030
+          note: "Native melee weapon 207030: X-MAS 멜로디종 <레>"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 207031
+          note: "Native melee weapon 207031: X-MAS 멜로디종 <미>"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 207032
+          note: "Native melee weapon 207032: X-MAS 멜로디종 <파>"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 207033
+          note: "Native melee weapon 207033: X-MAS 멜로디종 <솔>"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 207034
+          note: "Native melee weapon 207034: X-MAS 멜로디종 <라>"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 207035
+          note: "Native melee weapon 207035: X-MAS 멜로디종 <시>"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 207036
+          note: "Native melee weapon 207036: X-MAS멜로디종<높은도>"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 207037
+          note: "Native melee weapon 207037: 드래곤 해머"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 207044
+          note: "Native melee weapon 207044: 드래곤 해머 HC"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 207045
+          note: "Native melee weapon 207045: 워킹 좀비의 삽"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 207046
+          note: "Native melee weapon 207046: 제이쑨 좀비의 해머"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 207047
+          note: "Native melee weapon 207047: 아누비스의 지팡이"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 207049
+          note: "Native melee weapon 207049: 하트 커플 망치"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 207050
+          note: "Native melee weapon 207050: 언월도"
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 207201
+          note: "Zombie minion hammer; native player usability pending verification"
+          client_profiles: [cn-324]
+          stock_id: 1999201
+          duration_days: 30
+          price: 1000
+          money_type: client
+          skip_if_missing: true
+        - item_id: 204912
+          note: "Gold Cotton sniper rifle L3-HC; server-defined sale"
+          client_profiles: [cn-324]
+          stock_id: 1994912
+          duration_days: 30
+          price: 1000
+          money_type: client
+          skip_if_missing: true

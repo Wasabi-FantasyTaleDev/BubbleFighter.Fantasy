@@ -1,0 +1,200 @@
+# The kr-1256 shop replies the shop row writes by hand, stated as layouts the packet tables can
+# write. The legacy shop writers keep their own bodies: the legacy catalog's per-build differences
+# live in the shop.catalog values of packets/builds.yaml, not here, and this file states only the
+# modern build's bodies, whose readers are cited beside each structure.
+#
+# An address in this file is the function that proves the field order; every one names its build.
+version: 1
+structs:
+  # gspRepCheckCash (S2C 834). The kr-1256 dispatcher kr-1256 sub_9D2FF0, jumptable 0x9D48B5,
+  # case 834 at 0x9D4C62 reads three 4-byte words through the stream's read slot and branches on
+  # none of them. The second word is stored to dword_18E56E8+0x50, the same slot the
+  # gspUserMoneyStat case 106 writes its cash field to, so it is the in-plugin cash balance. The
+  # first word is only passed to kr-1256 sub_56DF00 when the kr-1256 sub_10E3420(0x3EE) probe
+  # passes, and the third word is read and dropped; neither purpose is proven, so they stay
+  # unknown. The case reads into stack locals, so there is no object offset to state.
+  CheckCashReply@kr-1256:
+    - unknown_0: u32
+    - cash: u32
+    - unknown_8: u32
+
+  # gspRepRealCouponUse. The kr-812 baseline (S2C 829): dispatcher kr-812 sub_837170 case 0x33D
+  # reaches the class reader kr-812 sub_9D95D0, which reads three 4-byte words into object +4, +8
+  # and +12. The kr-1256 case 0x9D4E88 of kr-1256 sub_9D2FF0 reads the same three words inline and
+  # pushes them to kr-1256 sub_6489C0, whose first argument is 1 on the only success path and one of
+  # -33, -32, -31, -12, -11, -3, -2 or -1 for the coupon error dialogs, so the first word is the
+  # result. The two layouts are identical, so the kr-1256 reply inherits this row; its offsets are
+  # the kr-812 object's, because the kr-1256 case keeps the words in stack locals.
+  RealCouponUseReply:
+    - result: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+
+  # gspRepShopBuy for the modern build (S2C 816). Dispatcher case 816 at 0x9D4BE5 of
+  # kr-1256 sub_9D2FF0 reaches kr-1256 sub_9B6730, whose parser kr-1256 sub_99B260 reads: a 4-byte
+  # key into +0 (the first reply field, which the success dialog looks the purchased Stock or
+  # StockSet up by), a 4-byte result into +4 (kr-1256 sub_9B6730 keeps only 1 as success and sends
+  # the rest to kr-1256 sub_934D40), a wide string into +8 (a 4-byte character count, then UTF-16LE;
+  # its display purpose is unproven), one byte into +32, three 4-byte words into +36, +40 and +44.
+  # The word at +40 reaches the dialog constructor kr-1256 sub_E4D6A0; +44 is parsed and never read.
+  # The kr-812 baseline row in packets/equipment-control.yaml is the two-word legacy reply
+  # (kr-812 sub_6DB1B0), so all seven positions differ and the modern body is restated here.
+  ShopPurchaseReply@kr-1256:
+    - key: u32
+      offset: 0
+    - result: u32
+      offset: 4
+    - unknown_8: wstr
+      offset: 8
+    - unknown_32: u8
+      offset: 32
+    - unknown_36: u32
+      offset: 36
+    - unknown_40: u32
+      offset: 40
+    - unknown_44: u32
+      offset: 44
+
+  # One Stock of kr-1256's ShopItemCardInfo, read by kr-1256 sub_113EF70 (serializer
+  # kr-1256 sub_113EEC0) and by the counted vector reader kr-1256 sub_11404D0: two 4-byte words, a
+  # 4-byte word read as a boolean, a 2-byte word, then three 4-byte words. A default-constructed
+  # card leaves the 2-byte word at 1 (constructor kr-1256 sub_11400D0), which is why the empty card
+  # is 74 bytes rather than 72; every other field of this record is written from the catalog.
+  Stock@kr-1256:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: bool
+      offset: 12
+    - unknown_14: u16
+      offset: 14
+    - unknown_16: u32
+      offset: 16
+    - unknown_20: u32
+      offset: 20
+    - unknown_24: u32
+      offset: 24
+
+  # One ShopItemCardInfo, read by kr-1256 sub_1140350 and written by kr-1256 sub_1140210 (the
+  # class vtable 0x157355C holds the writer in slot 0 and the reader in slot 1). The copy
+  # constructor kr-1256 sub_5F55D0 confirms every offset: two 4-byte words, a wide string, three
+  # 4-byte words, a 4-byte word read as a boolean, two 8-byte values, one inline Stock and then a
+  # counted stock vector. The 8-byte values are typeless in this build (the legacy clients read the
+  # same two positions as f64), so they stay raw words. A default card is 74 bytes:
+  # 4+4+4+4+4+4+4+8+8+26+4.
+  ShopItemCardInfo@kr-1256:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: wstr
+      offset: 12
+    - unknown_36: u32
+      offset: 36
+    - unknown_40: u32
+      offset: 40
+    - unknown_44: u32
+      offset: 44
+    - unknown_48: bool
+      offset: 48
+    - unknown_56: u64
+      offset: 56
+    - unknown_64: u64
+      offset: 64
+    - stock: Stock
+      offset: 72
+    - extra_stocks: "list<Stock>"
+      offset: 100
+
+  # gspRepShopItemCardInfo (S2C 817). Dispatcher case 817 at 0x9D4BFF of kr-1256 sub_9D2FF0
+  # reaches kr-1256 sub_9B7AE0, which reads a 4-byte result and then the whole ShopItemCardInfo
+  # before it tests the result. The card is unconditional: result 1 hands it to kr-1256 sub_5F52D0,
+  # while -1 and -2 build a dialog from constants and never read it, so the failure reply still
+  # carries the 74-byte default card and is 78 bytes in all.
+  ShopItemCardInfoReply@kr-1256:
+    - result: u32
+    - card: ShopItemCardInfo
+
+  # gspRepEnterTCShop (S2C 801). Dispatcher case 801 at 0x9D48D6 of kr-1256 sub_9D2FF0 reaches
+  # kr-1256 sub_9AE0D0: a 4-byte word read into a local and never used again, a 4-byte has-data
+  # value, an 8-byte token stored to dword_18E56E8+0x130 only when has-data is set, and a counted
+  # card vector always read before the has-data branch. An empty body is 20 bytes.
+  CashShopReply@kr-1256:
+    - unknown_0: u32
+    - has_data: bool
+    - token: u64
+    - cards: "list<ShopItemCardInfo>"
+
+  # One ShopMainCategory of gspRepEnterShop's counted category vector, read by kr-1256 sub_1141B00
+  # and turned into one tab per row by kr-1256 sub_646600: a 4-byte id, a wide string, a 4-byte
+  # display order, then the counted subcategory vector (kr-1256 sub_1141C00).
+  ShopMainCategory@kr-1256:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: wstr
+      offset: 8
+    - unknown_32: u32
+      offset: 32
+    - subcategories: "list<ShopSubCategory>"
+      offset: 36
+
+  # One ShopSubCategory of that vector, read by kr-1256 sub_1141910: a 4-byte id, a wide string, a
+  # 4-byte display order and the page type the page fill selects its algorithm from
+  # (kr-1256 sub_64E210).
+  ShopSubCategory@kr-1256:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: wstr
+      offset: 8
+    - unknown_32: u32
+      offset: 32
+    - page_type: u32
+      offset: 36
+
+  # gspRepEnterShop (S2C 800). Dispatcher case 800 at 0x9D48BC of kr-1256 sub_9D2FF0 reaches the
+  # handler kr-1256 sub_9ADA00, whose parser kr-1256 sub_99B9A0 reads, in this order: a 4-byte word
+  # tested against 1; a 4-byte has-data value; an 8-byte token stored to dword_18E56E8+0x128; the
+  # counted card vector (kr-1256 sub_10D3780, elements read by kr-1256 sub_1140350); an 8-byte word
+  # read unconditionally; the counted main category vector (kr-1256 sub_10D3AA0, elements read by
+  # kr-1256 sub_1141B00); a second counted vector of 4-byte words (kr-1256 sub_998FB0 ->
+  # kr-1256 sub_999C00); and the trailing 4-byte main category the handler passes to the dialog
+  # fill. The parser has no result branch of its own: has-data only gates the handler's copy of the
+  # vector and the token store, so both values are wire choices, not layout. An empty body is
+  # 40 bytes: 4+4+8+4+8+4+4+4.
+  EnterShopReply@kr-1256:
+    - result: u32
+      offset: 0
+    - has_data: bool
+      offset: 4
+    - token: u64
+      offset: 8
+    - cards: "list<ShopItemCardInfo>"
+      offset: 16
+    - unknown_32: u64
+      offset: 32
+    - categories: "list<ShopMainCategory>"
+      offset: 40
+    - unknown_56: "list<u32>"
+      offset: 56
+    - main_category: u32
+      offset: 68
+
+  # Baselines for the structures above that the legacy family does not state here. The legacy shop
+  # replies are still written by their own hand-written bodies (gspRepShopItemCardInfo S2C 814,
+  # gspRepEnterShop S2C 800 and their records are named in packets/equipment-control.yaml and the
+  # legacy opcode rows), and the legacy catalog's per-build differences live in the shop.catalog
+  # values of packets/builds.yaml, so the legacy objects are not audited in this file. An empty
+  # baseline row records exactly that: no table here describes the legacy body, and no shipped row
+  # resolves one of these names for a legacy build.
+  CheckCashReply: []
+  Stock: []
+  ShopItemCardInfo: []
+  ShopItemCardInfoReply: []
+  CashShopReply: []
+  ShopMainCategory: []
+  ShopSubCategory: []
+  EnterShopReply: []

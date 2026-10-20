@@ -1,0 +1,21 @@
+version: 1
+structs:
+  # Native relay 1 consumers inspect the connection/opcode and never read a body:
+  # kr-812 sub_810C20, cn-717 sub_896050, cn-324 sub_6FA120,
+  # cn-279 sub_701270, cn-406 sub_711050, id-400 sub_794200, id-1809 sub_7BA1A0.
+  # This empty signal is not the labelled game-side rspRepJoinRelaySession object.
+  # Six consumers construct report 12; CN2011 sends game-side success directly.
+  RelayJoinAcceptedSignal: []
+  # The kr-1256 reply is not empty on the wire: the server answers with one four-byte word, and
+  # kr-1256 sub_9601E0 case 1 (block 0x960278) reads no stream field at all and starts the C2S 12
+  # exchange, so the client ignores that word. The body is stated because it is sent, not because
+  # the client consumes it.
+  RelayJoinAcceptedSignal@kr-1256:
+    - unknown_n0: u32
+  # Native relay 13 consumers do not deserialize a reply or read an actor field.
+  # They construct gcpReportRelayConnected(true), then send game 601 through:
+  # kr-812 sub_811C70, cn-717 sub_8971B0, cn-324 sub_6FA710,
+  # cn-406 sub_711C10, id-400 sub_7953D0 and id-1809 sub_7BB040.
+  # These signals do not initialize seed tables or acknowledge scene departure.
+  # kr-1256 sub_9601E0 case 13 (block 0x960880) also reads no stream field and only reports success.
+  RelaySceneAcceptedSignal: []

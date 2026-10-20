@@ -1,0 +1,171 @@
+{
+  "build": "kr-1256",
+  "family": "pkn",
+  "detect": {
+    "any_file": [
+      "Packs/ConfigSh_00000.pkn"
+    ]
+  },
+  "preview": {
+    "camera_table": "Config/ShopItemCamera.csv",
+    "camera_table_columns": [
+      "shopItemId",
+      "position",
+      "quaternion",
+      "zoom",
+      "stillcut",
+      "noiconize"
+    ],
+    "missing_record": {
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "quaternion": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "zoom": 40.0,
+      "source": "kr-1256 sub_81FE60 (zoom 0x42200000, quaternion xmmword_154FB64)",
+      "status": "proven"
+    },
+    "projection": {
+      "kind": "orthographic_off_center_lh",
+      "canvas_width": 800.0,
+      "near": -5000.0,
+      "far": 5000.0,
+      "source": "kr-1256 sub_A29C30; dword_1641C60 = 800.0, 0xC59C4000 / 0x459C4000",
+      "status": "proven"
+    },
+    "view": {
+      "eye": [
+        0,
+        0,
+        -100
+      ],
+      "at": [
+        0,
+        0,
+        -1
+      ],
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "source": "kr-1256 sub_A29C30 D3DXMatrixLookAtLH",
+      "status": "proven"
+    },
+    "model_yaw": {
+      "radians": 3.1415927,
+      "source": "kr-1256 sub_A29C30 RotationYawPitchRoll(0x40490FDB)",
+      "status": "proven"
+    },
+    "centre": {
+      "x": 400.0,
+      "y_per_aspect": -400.0,
+      "z": -100.0,
+      "source": "kr-1256 sub_A29C30 translation (0x43C80000, aspect * dword_1641E50, 0xC2C80000)",
+      "status": "proven"
+    },
+    "world_order": "R(item quaternion) * R(user) * T(position) * S(zoom) * Yaw * T(centre)",
+    "lighting": {
+      "mode": "unlit",
+      "status": "inferred",
+      "source": "preview draw sets no device light (kr-1256 sub_A29C30); dye blend stage-0 uses TEXTURE and TFACTOR only (cn-324 sub_902A80)"
+    }
+  },
+  "catalog": {
+    "shop_workbook": "Config/ShopItem2.xml",
+    "pet_workbook": "Config/ShopItemPet.xml",
+    "fighter_workbook": "Config/FighterConfig.xml",
+    "display_name_column": "displayName",
+    "item_icon_folder": "Images/Shop2/ItemIcons"
+  },
+  "paint": {
+    "palette": {
+      "1": "0xFF1379DB",
+      "3": "0xFF7C5DFF",
+      "4": "0xFF30DB02",
+      "5": "0xFFBFE836",
+      "6": "0xFFF6A822",
+      "7": "0xFFF145A6",
+      "8": "0xFF858689",
+      "10": "0xFF00EBDE",
+      "11": "0xFF4B9A34",
+      "12": "0xFF383838",
+      "13": "0xFFFF9DBD",
+      "14": "0xFFFF8C43",
+      "15": "0xFFFFDF62",
+      "16": "0xFFEEE4D4",
+      "17": "0xFF4B4141",
+      "18": "0xFF7A761F",
+      "19": "0xFFCE2900"
+    },
+    "default": "0xFFE82706",
+    "source": "kr-1256 sub_4C13B0 (switch with the same shape and constants as kr-812 sub_58D970)",
+    "status": "inferred",
+    "unsprayed_tint": {
+      "argb": "0xFFE82706",
+      "status": "inferred",
+      "source": "the palette's default arm; the cn-324 shop screenshot shows unsprayed characters in this red"
+    },
+    "dyed_parts": {
+      "names": [
+        "Head",
+        "Face",
+        "BodyU",
+        "BodyD",
+        "Feet",
+        "Legs",
+        "ArmL",
+        "HandL",
+        "ArmR",
+        "HandR"
+      ],
+      "status": "inferred",
+      "source": "kr-812 sub_58B020 calls sub_589760 with part slots 1,2,7,8,10,9,3,5,4,6 (every PartLocation part except Eyebrow 11); sub_589760 resolves slots 1-11 by part name; kr-1256 apply path not yet traced"
+    },
+    "blend": {
+      "rule": "rgb = tex.rgb * tex.a + tint * (1 - tex.a)",
+      "source": "cn-324 sub_902A80 (D3DTOP_BLENDTEXTUREALPHA with TFACTOR)",
+      "status": "proven for cn-324"
+    }
+  },
+  "shading": {
+    "base": {
+      "mode": "unlit",
+      "status": "proven",
+      "source": "Shader/Shader.vsh: diffuse lighting commented out ('디퓨즈 라이팅 연산을 안하고 있다')"
+    },
+    "toon": {
+      "enabled": true,
+      "ramp": "Models/Characters/common/toon.png",
+      "ramp_row": 16,
+      "light_world": [
+        0,
+        -1,
+        0
+      ],
+      "u_formula": "(1 - dot(N, -L_model)) / 2",
+      "status": "inferred",
+      "source": "ramp on stage 1 MODULATE/point/clamp kr-1256 sub_1097F90; light (0,-1,0) kr-1256 sub_10975D0; model-space light kr-1256 sub_1098120 from preview kr-1256 sub_A29C30; coordinate formula not found"
+    },
+    "specular": {
+      "enabled": true,
+      "table": "Models/Characters/common/highlight.xml",
+      "status": "inferred",
+      "source": "Shader/Shader.vsh VS_SkinnedSpecularMesh: Specular.rgb*pow(max(0,N.H),Specular.a), H=normalize(V-L); material specular = colour*brightness, power (kr-1256 sub_1080320)"
+    },
+    "outline": {
+      "enabled": true,
+      "thickness": 0.1,
+      "colour": "0xFF000000",
+      "status": "inferred",
+      "source": "Shader/Shader.vsh VS_SkinnedOutlineMesh (inverted hull, fOutlineThickness 0.1); colour from material meshOutlineColor, value not traced"
+    }
+  }
+}

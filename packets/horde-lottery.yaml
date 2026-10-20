@@ -1,0 +1,32 @@
+version: 1
+structs:
+  # kr-812 sub_840530 writes card and seat; reader kr-812 sub_6DB1B0 reads two words.
+  # cn-717 sub_891C60/sub_538B70, id-400 sub_7990F0/sub_782DD0,
+  # id-1809 sub_7BF3A0/sub_4D7F70, cn-706 sub_4B9600/sub_733050 and
+  # cn-324 sub_40B470/sub_45D1A0 match; cn-279 gcpReqSelectAward (vtable 9F8878)
+  # uses the two-word cn-279 sub_47E650.
+  HordeLotteryRequest:
+    - card: u32
+      offset: 4
+    - seat: u32
+      offset: 8
+  # kr-812 sub_7AA780/sub_9D95D0 reads three words; cn-324 sub_420900 consumes card,
+  # seat and the optional second card. cn-717 sub_8C8880/sub_7F4370, cn-324
+  # sub_45F060/sub_6EB8B0, id-400 sub_72E4A0/sub_72E4D0, id-1809 sub_96E460/sub_4D8130
+  # and cn-706 sub_733020/sub_7A23F0 match. cn-279 gspRepAwardSelectSuccess
+  # (vtable 9DDA94) reads only card and seat through cn-279 sub_47E650.
+  HordeLotterySelected:
+    - card: u32
+      offset: 4
+    - seat: u32
+      offset: 8
+    - second_card: u32
+      offset: 12
+      default: -1
+      except: [cn-279]
+  # kr-812 sub_840820 reads a counted vector and each u32; cn-717 sub_88EDC0,
+  # cn-324 sub_6EB680, cn-279 sub_48E8E0, id-400 sub_799E30,
+  # id-1809 sub_7BF1A0 and cn-706 sub_7A2420 match.
+  HordeLotteryRevealed:
+    - items: "list<u32>"
+      offset: 4

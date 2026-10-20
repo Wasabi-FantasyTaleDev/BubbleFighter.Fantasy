@@ -1,0 +1,21 @@
+id: tw-454
+display_names:
+  en: "Taiwan 2018-12-11"
+  zh-Hans: "台服 2018-12-11"
+  zh-Hant: "台灣 2018-12-11"
+  ko: "대만 2018-12-11"
+client_build: tw:454:0
+setup_enabled: true
+activation_enabled: true
+experimental: true
+# Nearest build whose layouts this one reuses when it has no variant of its own.
+parent: cn-774
+description: Taiwanese 2019 client build, ClientVersion_Major 454.
+bundles:
+  - core
+  - tw-454
+  - player-settings
+patches:
+  - patch.yaml
+  # Optional developer override; git-ignored and skipped when absent.
+  - local.patch.yaml

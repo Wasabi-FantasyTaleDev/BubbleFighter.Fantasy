@@ -1,0 +1,603 @@
+# Generated research catalog; do not edit by hand.
+# Research catalog only; runtime promotion requires object-flow review.
+# label: direct local binding; candidate: heuristic or cross-build proposal.
+# runtime: original table evidence; conflict: incompatible local names.
+# none: unresolved; connection_hint is not a proven connection scope.
+profile: cn-279
+opcode_setter: 56E6E0
+setter_store_offset: 8
+dispatchers:
+- 82AB20
+- 6FFDE0
+- 70A0F0
+- '776820'
+- '645040'
+- 6EFAF0
+- 7A7AF0
+summary:
+  c2s_candidate: 125
+  c2s_conflict: 12
+  c2s_label: 104
+  c2s_none: 8
+  c2s_runtime: 6
+  s2c_candidate: 218
+  s2c_conflict: 37
+  s2c_none: 16
+  s2c_runtime: 5
+unmapped_classes:
+- name: gcpFirstConnect
+  refs:
+  - 44E5D0
+  note: 'no opcode site: see references'
+- name: gcpRepPing
+  refs:
+  - 6F05B0
+  note: 'no opcode site: see references'
+- name: gcpReqJoinSession
+  refs:
+  - 41EB00
+  note: 'no opcode site: see references'
+- name: gcpReqMoveToInviter
+  refs:
+  - 44EC40
+  note: 'no opcode site: see references'
+- name: gcpReqRefund
+  refs:
+  - '487360'
+  note: 'no opcode site: see references'
+- name: gcpReqWaveAllSpawnMobs
+  refs:
+  - 48F260
+  note: 'no opcode site: see references'
+- name: gcpRoomSendChatModuleMsg
+  refs:
+  - 44F400
+  note: 'no opcode site: see references'
+- name: gspConnectToRelayServer
+  refs:
+  - 44FF90
+  note: 'no opcode site: see references'
+- name: gspDisconnect
+  refs:
+  - 44F5B0
+  note: 'no opcode site: see references'
+- name: gspRepGuildLineBoard
+  refs:
+  - 450A70
+  note: 'no opcode site: see references'
+- name: gspRoomSetSession
+  refs:
+  - '449910'
+  note: 'no opcode site: see references'
+opcodes:
+  - {value: 1, direction: c2s, name: gcpFirstConnect, name_source: label@cn-279, evidence: verified, source: 'Packet_gcpFirstConnect vtable 0x9E0F38, serializer 0x44E390; sender 0x6F9970 supplies version 279', notes: 'u32 version, 7 wstr, u32 unknown1, 15 wstr; each wstr is u32 length in UTF-16 code units followed by UTF-16LE bytes', connection: game, grade: runtime, method: own-runtime-table, connection_hint: game}
+  - {value: 1, direction: c2s, name: Unknown1, grade: none, method: unnamed-site, name_source: none, connection_hint: unknown}
+  - {value: 2, direction: c2s, name: gcpStartGPK, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [453D80], channels: [(int)this]}
+  - {value: 2, direction: c2s, name: rcpReqEcho, grade: candidate, method: caller-construct, name_source: label@cn-279, connection_hint: relay, senders: [45B5E0], channels: [v4]}
+  - {value: 3, direction: c2s, name: gcpReqLogin, grade: candidate, method: sibling-init, name_source: label@cn-279, connection_hint: game, senders: [4203B0], channels: [dword_ABBEE4]}
+  - {value: 3, direction: c2s, name: rcpReportUseRelay, grade: candidate, method: sibling-init, name_source: label@cn-279, connection_hint: relay, senders: [44B3A0, 44B420], channels: [v9]}
+  - {value: 3, direction: c2s, name: Unknown3, grade: none, method: unnamed-site, name_source: none, connection_hint: unknown}
+  - {value: 4, direction: c2s, name: rcpReportGameClosed, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: relay, senders: [44B530, 44B5B0], channels: [(void (__thiscall ***)(_DWORD, dword_ABBED8]}
+  - {value: 6, direction: c2s, name: rcpRepPing, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: relay, senders: [44CA70], channels: [(void (__thiscall ***)(_DWORD]}
+  - {value: 6, direction: c2s, name: Unknown6, grade: none, method: unnamed-site, name_source: none, connection_hint: unknown}
+  - {value: 8, direction: c2s, name: gcpRepGPKCSAuth, grade: candidate, method: sibling-init, name_source: label@cn-279, connection_hint: game, senders: ['454380'], channels: [this]}
+  - {value: 8, direction: c2s, name: rcpReqRegisterPeer, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: ['702370']}
+  - {value: 9, direction: c2s, name: gcpReportHolePunchingEnd, grade: conflict, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: [701E00], alternative_values: [603], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 11, direction: c2s, name: gcpReqMoveChannel, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [47E740], channels: [dword_ABBEE4]}
+  - {value: 12, direction: c2s, name: gcpReqMoveChannelByType, grade: candidate, method: caller-construct, name_source: label@cn-279, connection_hint: game, senders: [41F570], channels: [dword_ABBEE4]}
+  - {value: 13, direction: c2s, name: gcpReqMoveInto, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [453D00], channels: [(int)this]}
+  - {value: 14, direction: c2s, name: gcpReqCheckCreateUserName, grade: conflict, method: sibling-init, name_source: label@cn-279, connection_hint: game, senders: ['464460'], channels: [dword_ABBEE4], alternatives: [gcpReqCheckCreateUserName_], note: local slot has incompatible names; inspect packet object flow}
+  - {value: 14, direction: c2s, name: gcpReqCheckCreateUserName_, name_source: coined, evidence: verified, source: cn-279 sub_6E8880 supplies the name; sub_464460 stamps 14; reader cn-279 sub_481C90, notes: wstr nickname, connection: game, grade: conflict, method: own-runtime-table, connection_hint: game, alternatives: [gcpReqCheckCreateUserName], note: local slot has incompatible names; inspect packet object flow}
+  - {value: 15, direction: c2s, name: gcpReqCreateUserInfo, grade: candidate, method: sibling-init, name_source: label@cn-279, connection_hint: game, senders: [4644E0], channels: [dword_ABBEE4]}
+  - {value: 16, direction: c2s, name: gcpLoginAfterCreateUserInfo, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: ['464560'], channels: [dword_ABBEE4]}
+  - {value: 17, direction: c2s, name: gcpNotifyCloseProgram, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: [6D91D0]}
+  - {value: 18, direction: c2s, name: gcpReportLastCrash, grade: candidate, method: sibling-init, name_source: label@cn-279, connection_hint: game, senders: ['454180'], channels: [a1]}
+  - {value: 19, direction: c2s, name: gcpCustomLog, grade: candidate, method: caller-construct, name_source: label@cn-279, connection_hint: game, senders: [421B20], channels: [dword_ABBEE4]}
+  - {value: 20, direction: c2s, name: gcpReportBadProgram, grade: candidate, method: sibling-init, name_source: label@cn-279, connection_hint: game, senders: ['454400'], channels: [(int)v17]}
+  - {value: 21, direction: c2s, name: gcpHsReportLog, grade: candidate, method: sibling-init, name_source: label@cn-279, connection_hint: game, senders: [46BEE0], channels: [dword_ABBEE4]}
+  - {value: 22, direction: c2s, name: gcpReqCenterUserCnt, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [453C80], channels: [dword_ABBEE4]}
+  - {value: 23, direction: c2s, name: gcpReqUniquenessCheck, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: ['454200'], channels: ['*v10++']}
+  - {value: 101, direction: c2s, name: gcpRepUserPoll, grade: candidate, method: sibling-init, name_source: label@cn-279, connection_hint: game, senders: ['468680'], channels: [dword_ABBEE4]}
+  - {value: 102, direction: c2s, name: gcpInitialInfo, grade: candidate, method: sibling-init, name_source: label@cn-279, connection_hint: game, senders: ['454280'], channels: [a1]}
+  - {value: 103, direction: c2s, name: gcpReportUserTracking, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [44B4B0], channels: [dword_ABBEE4]}
+  - {value: 105, direction: c2s, name: gcpReqGotoMenu, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [4697E0], channels: [dword_ABBEE4]}
+  - {value: 106, direction: c2s, name: gcpReqGotoLobby, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [420E40], channels: [dword_ABBEE4]}
+  - {value: 107, direction: c2s, name: gcpReqPlayTutorial, grade: candidate, method: sibling-init, name_source: label@cn-279, connection_hint: game, senders: ['454100'], channels: [a1]}
+  - {value: 108, direction: c2s, name: gcpReqInvite, grade: candidate, method: sibling-init, name_source: label@cn-279, connection_hint: game, senders: [426F90], channels: [dword_ABBEE4]}
+  - {value: 109, direction: c2s, name: Unknown109, grade: none, method: unnamed-site, name_source: none, connection_hint: unknown}
+  - {value: 110, direction: c2s, name: gcpReqMoveToFriend, grade: candidate, method: sibling-init, name_source: label@cn-279, connection_hint: game, senders: [42A6A0], channels: [dword_ABBEE4]}
+  - {value: 111, direction: c2s, name: gcpReqMatch, grade: conflict, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [41F470], channels: [dword_ABBEE4], alternative_values: [403], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 112, direction: c2s, name: gcpReqFighterInfo, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [426E90], channels: [dword_ABBEE4]}
+  - {value: 114, direction: c2s, name: gcpReqEvent, grade: candidate, method: caller-construct, name_source: label@cn-279, connection_hint: game, senders: [68C950, 6D1D70, 6E0530, 6E0640, 77D050]}
+  - {value: 115, direction: c2s, name: gcpReqGotoGuild, grade: candidate, method: sibling-init, name_source: label@cn-279, connection_hint: game, senders: [42BF00], channels: [dword_ABBEE4]}
+  - {value: 202, direction: c2s, name: gcpReqLeaveParty, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [453C00], channels: [dword_ABBEE4]}
+  - {value: 301, direction: c2s, name: gcpSendPartyChrPos, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: ['481560'], channels: [dword_ABBEE4]}
+  - {value: 302, direction: c2s, name: gcpReqKickFromParty, grade: candidate, method: sibling-init, name_source: label@cn-279, connection_hint: game, senders: [426F10], channels: [dword_ABBEE4]}
+  - {value: 303, direction: c2s, name: gcpReqChangePartyLeader, grade: candidate, method: sibling-init, name_source: label@cn-279, connection_hint: game, senders: [426E10], channels: [dword_ABBEE4]}
+  - {value: 304, direction: c2s, name: gcpSendPartyChatMsg, grade: candidate, method: sibling-init, name_source: label@cn-279, connection_hint: game, senders: [480BD0], channels: [dword_ABBEE4]}
+  - {value: 305, direction: c2s, name: gcpReqPartyRecruiting, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [46E850], channels: [dword_ABBEE4]}
+  - {value: 401, direction: c2s, name: gcpReqListSession, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [41F670], channels: [dword_ABBEE4]}
+  - {value: 402, direction: c2s, name: gcpReqCreateSession, grade: candidate, method: caller-construct, name_source: label@cn-279, connection_hint: game, senders: [41F5F0], channels: [dword_ABBEE4]}
+  - {value: 403, direction: c2s, name: gcpReqMatch, grade: conflict, method: unique-in-callers, name_source: label@cn-279, connection_hint: game, senders: [41F4F0], channels: [dword_ABBEE4], alternative_values: [111], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 404, direction: c2s, name: gcpReqLeaveSession, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [426C10], channels: [dword_ABBEE4]}
+  - {value: 406, direction: c2s, name: gcpReqCreateTutorialSession, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [420EC0], channels: [dword_ABBEE4]}
+  - {value: 501, direction: c2s, name: gcpRoomSendChatMsg, grade: candidate, method: sibling-init, name_source: label@cn-279, connection_hint: game, senders: [453F00], channels: [a1]}
+  - {value: 502, direction: c2s, name: gcpRoomSendChatModuleMsg, grade: candidate, method: cross-extraction, name_source: 'consensus@cn-717,id-1809,id-400,kr-812', connection_hint: game}
+  - {value: 502, direction: c2s, name: Unknown502, grade: none, method: unnamed-site, name_source: none, connection_hint: unknown}
+  - {value: 503, direction: c2s, name: gcpRoomReqEnterGame, grade: candidate, method: sibling-init, name_source: label@cn-279, connection_hint: game, senders: [425A10], channels: [dword_ABBEE4]}
+  - {value: 504, direction: c2s, name: gcpRoomReqReadyStatus, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [426C90], channels: [dword_ABBEE4]}
+  - {value: 505, direction: c2s, name: gcpRoomReqLeaveGame, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: ['407330'], channels: [dword_ABBEE4]}
+  - {value: 506, direction: c2s, name: gcpRoomReqAddDummy, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [426D10], channels: [dword_ABBEE4]}
+  - {value: 507, direction: c2s, name: gcpRoomReqChangeMaster, grade: candidate, method: sibling-init, name_source: label@cn-279, connection_hint: game, senders: [426D90], channels: [dword_ABBEE4]}
+  - {value: 508, direction: c2s, name: gcpRoomReqOpenCloseSlot, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [425B00], channels: [dword_ABBEE4]}
+  - {value: 509, direction: c2s, name: gcpReqKickFromSession, grade: candidate, method: sibling-init, name_source: label@cn-279, connection_hint: game, senders: ['427010'], channels: [dword_ABBEE4]}
+  - {value: 510, direction: c2s, name: gcpSendSessionChrPos, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [4814E0], channels: [dword_ABBEE4]}
+  - {value: 511, direction: c2s, name: gcpRoomChangeInventory, grade: candidate, method: sibling-init, name_source: label@cn-279, connection_hint: game, senders: ['422720'], channels: [dword_ABBEE4]}
+  - {value: 512, direction: c2s, name: gcpRoomChangeGameSetting, grade: candidate, method: sibling-init, name_source: label@cn-279, connection_hint: game, senders: [420DC0], channels: [dword_ABBEE4]}
+  - {value: 513, direction: c2s, name: gcpRoomChangeTeam, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [426B90], channels: [dword_ABBEE4]}
+  - {value: 514, direction: c2s, name: gcpRoomSendRecMsg, grade: candidate, method: sibling-init, name_source: label@cn-279, connection_hint: game, senders: ['454080'], channels: [a1]}
+  - {value: 515, direction: c2s, name: gcpReqPingUser, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [4073B0], channels: [dword_ABBEE4]}
+  - {value: 516, direction: c2s, name: gcpRepPingUser, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [44B6C0], channels: [dword_ABBEE4]}
+  - {value: 517, direction: c2s, name: gcpReqSelectAward, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [48EEA0], channels: [dword_ABBEE4]}
+  - {value: 518, direction: c2s, name: gcpRoomSendAmpMsg, grade: candidate, method: sibling-init, name_source: label@cn-279, connection_hint: game, senders: [453F80], channels: [(int)this]}
+  - {value: 601, direction: c2s, name: gcpReportRelayConnected, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [44C8F0], channels: [dword_ABBEE4]}
+  - {value: 602, direction: c2s, name: gcpReportSuperPeerConnected, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [44C970], channels: [dword_ABBEE4]}
+  - {value: 603, direction: c2s, name: gcpReportHolePunchingEnd, grade: conflict, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: [701E00], alternative_values: [9], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 604, direction: c2s, name: gcpReportSuperPeerPingFail, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [41CB00], channels: [dword_ABBEE4]}
+  - {value: 607, direction: c2s, name: gcpReportTableSetHolePunchingEnd, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: [7018A0]}
+  - {value: 701, direction: c2s, name: gcpGameReportMapLoadingComplete, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: [824D70], channels: ['*v18']}
+  - {value: 702, direction: c2s, name: gcpGameReportMapData, grade: candidate, method: caller-construct, name_source: label@cn-279, connection_hint: game, senders: [8205F0]}
+  - {value: 704, direction: c2s, name: gcpRespawn, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: ['407630'], channels: [dword_ABBEE4]}
+  - {value: 705, direction: c2s, name: gcpRequestRespawnIdx, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [4076B0], channels: [dword_ABBEE4]}
+  - {value: 707, direction: c2s, name: gcpEatItem, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: [8190C0], channels: [v7]}
+  - {value: 708, direction: c2s, name: gcpUseItem, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: [818E50]}
+  - {value: 709, direction: c2s, name: gcpReqAddObject, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [4075B0], channels: [dword_ABBEE4]}
+  - {value: 710, direction: c2s, name: gcpGameUpdateScore, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: ['407530'], channels: [dword_ABBEE4]}
+  - {value: 711, direction: c2s, name: gcpGameUpdateDamagePoint, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: ['440790'], channels: [dword_ABBEE4]}
+  - {value: 713, direction: c2s, name: gcpGameReqRespawn, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: ['407430'], channels: [dword_ABBEE4]}
+  - {value: 714, direction: c2s, name: gcpGameReqExtendRespawn, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [4074B0], channels: [dword_ABBEE4]}
+  - {value: 716, direction: c2s, name: gcpGameDebugPassCountDown, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [41C900], channels: [dword_ABBEE4]}
+  - {value: 717, direction: c2s, name: gcpGameDebugPassGameOver, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [41C980], channels: [dword_ABBEE4]}
+  - {value: 718, direction: c2s, name: gcpGameDebugPassResult, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [41CA00], channels: [dword_ABBEE4]}
+  - {value: 719, direction: c2s, name: gcpGameDebugPassLevelUp, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [41CA80], channels: [dword_ABBEE4]}
+  - {value: 720, direction: c2s, name: gcpGameReportPerfLog, grade: candidate, method: sibling-init, name_source: label@cn-279, connection_hint: game, senders: [44B640], channels: [dword_ABBEE4]}
+  - {value: 721, direction: c2s, name: gcpGameAwardResult, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: [64D430]}
+  - {value: 722, direction: c2s, name: gcpPangZKInZHE, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: ['630980']}
+  - {value: 723, direction: c2s, name: gcpReqEndStage, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: ['818630']}
+  - {value: 724, direction: c2s, name: gcpReqEndStageRoundOverReady, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: [8186D0], channels: [a1]}
+  - {value: 725, direction: c2s, name: gcpReportHackDetectAfterGame, grade: candidate, method: caller-construct, name_source: label@cn-279, connection_hint: game, senders: [64D870]}
+  - {value: 726, direction: c2s, name: gcpReportHackDetectLucciCount, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: [817F90], channels: [v36]}
+  - {value: 727, direction: c2s, name: gcpReqCreateItem, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: [7C41A0, 7EBEC0, '818560'], channels: ['3', v23, 'v8[1]']}
+  - {value: 728, direction: c2s, name: gcpReqCreateWeaponObject, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: ['818470'], channels: [LODWORD(v11)]}
+  - {value: 729, direction: c2s, name: gcpPickUpWeapon, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: [8183D0]}
+  - {value: 730, direction: c2s, name: gcpEatStar, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: ['819020'], channels: ['*(void **)(v5 + 360)']}
+  - {value: 731, direction: c2s, name: gcpReqCreateStar, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: [8182F0], channels: ['1']}
+  - {value: 732, direction: c2s, name: gcpEatLucci, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: [818F80], channels: ['*(void **)(v5 + 360)']}
+  - {value: 733, direction: c2s, name: gcpReqCreateLucci, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: ['818210'], channels: ['2']}
+  - {value: 734, direction: c2s, name: gcpEatChocolate, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: [818EE0], channels: ['*(void **)(v5 + 360)']}
+  - {value: 735, direction: c2s, name: gcpReqCreateChocolate, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: ['818130'], channels: [v65]}
+  - {value: 801, direction: c2s, name: gcpEnterShop, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: ['784390']}
+  - {value: 802, direction: c2s, name: gcpEnterInventory, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: ['784710']}
+  - {value: 803, direction: c2s, name: gcpReqInventoryEquip, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: ['664210', 7889F0, 78C5D0]}
+  - {value: 804, direction: c2s, name: gcpReqInventoryUnequip, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: ['664170']}
+  - {value: 805, direction: c2s, name: gcpReqInventoryUseItem, grade: candidate, method: caller-construct, name_source: label@cn-279, connection_hint: game, senders: ['664890'], channels: [v30]}
+  - {value: 807, direction: c2s, name: gcpReqInventoryThrowItem, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: ['487630'], channels: [dword_ABBEE4]}
+  - {value: 808, direction: c2s, name: gcpReqShopBuy, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: ['481660', 688A80], channels: [dword_ABBEE4]}
+  - {value: 809, direction: c2s, name: gcpReqShopItemCardInfo, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [4875B0], channels: [dword_ABBEE4]}
+  - {value: 810, direction: c2s, name: gcpReqShopItemCardInfos, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: [6889F0]}
+  - {value: 811, direction: c2s, name: gcpReqPresentNewReceive, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: ['483640'], channels: [dword_ABBEE4]}
+  - {value: 814, direction: c2s, name: gcpReqPresentReceiveSubList, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [4836C0], channels: [dword_ABBEE4]}
+  - {value: 815, direction: c2s, name: gcpReqPresentSendSubList, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: ['483740'], channels: [dword_ABBEE4]}
+  - {value: 816, direction: c2s, name: gcpReqPickup, grade: conflict, method: unique-in-callers, name_source: label@cn-279, connection_hint: game, senders: ['487530'], channels: [dword_ABBEE4], alternative_values: [828], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 817, direction: c2s, name: gcpReqPresentSend, grade: candidate, method: sibling-init, name_source: label@cn-279, connection_hint: game, senders: [482FC0], channels: [dword_ABBEE4]}
+  - {value: 818, direction: c2s, name: gcpReqPresentReceive, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [481B40], channels: [dword_ABBEE4]}
+  - {value: 819, direction: c2s, name: gcpReqPresentThrow, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [481BC0], channels: [dword_ABBEE4]}
+  - {value: 820, direction: c2s, name: gcpReqPresentSendThankMsg, grade: candidate, method: sibling-init, name_source: label@cn-279, connection_hint: game, senders: [483BC0], channels: [dword_ABBEE4]}
+  - {value: 821, direction: c2s, name: gcpReqPresentViewThankMsg, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [4835C0], channels: [dword_ABBEE4]}
+  - {value: 823, direction: c2s, name: gcpReqPresentDeleteSend, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: ['483540'], channels: [dword_ABBEE4]}
+  - {value: 824, direction: c2s, name: gcpReqPresentDeleteReceive, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [4834C0], channels: [dword_ABBEE4]}
+  - {value: 825, direction: c2s, name: gcpReqRealCouponUse, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [481CD0], channels: [dword_ABBEE4]}
+  - {value: 826, direction: c2s, name: gcpReqCheckCash, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: ['482220'], channels: [dword_ABBEE4]}
+  - {value: 827, direction: c2s, name: gcpReqCashInven, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [4822A0], channels: [dword_ABBEE4]}
+  - {value: 828, direction: c2s, name: gcpReqPickup, grade: conflict, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [4874B0], channels: [dword_ABBEE4], alternative_values: [816], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 829, direction: c2s, name: gcpReqCloseGiftBox, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [42A330], channels: [dword_ABBEE4]}
+  - {value: 881, direction: c2s, name: gcpReqDebugBegItem, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: [688C00]}
+  - {value: 882, direction: c2s, name: gcpReqDebugSetItemExpireTime, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: [688B60]}
+  - {value: 900, direction: c2s, name: gcpReqGuildLineBoard, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [42BD80], channels: [dword_ABBEE4]}
+  - {value: 901, direction: c2s, name: gcpReqGuildLineBoardWrite, grade: candidate, method: sibling-init, name_source: label@cn-279, connection_hint: game, senders: [42BE00], channels: [dword_ABBEE4]}
+  - {value: 902, direction: c2s, name: gcpReqGuildLineBoardDelete, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: game, senders: [42BE80], channels: [dword_ABBEE4]}
+  - {value: 903, direction: c2s, name: gcpReqStartNewWave, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: ['624940']}
+  - {value: 904, direction: c2s, name: gcpReqEndWave, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: [6248A0]}
+  - {value: 905, direction: c2s, name: gcpReqEndAllWave, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: [626FF0]}
+  - {value: 906, direction: c2s, name: gcpReqGameOver, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: [626F50]}
+  - {value: 907, direction: c2s, name: gcpReqDeleteDeadMobs, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: game, senders: [6249E0]}
+  - {value: 908, direction: c2s, name: gcpReqWaveAllSpawnMobs, name_source: mirrored, evidence: unverified, source: Mirrored from kr-812/cn-324/cn-717; the S2C answers 0x38C/0x38D are cn-279 dispatcher cases, connection: game, grade: runtime, method: own-runtime-table, connection_hint: game}
+  - {value: 908, direction: c2s, name: Unknown908, grade: none, method: unnamed-site, name_source: none, connection_hint: unknown}
+  - {value: 920, direction: c2s, name: gcpReqSingleStageInfo, name_source: mirrored, evidence: unverified, source: 'Mirrored from kr-812/cn-324/cn-717, which all stamp 920; the cn-279 stamp site is not located yet, so the live session decides', connection: game, grade: runtime, method: own-runtime-table, connection_hint: game}
+  - {value: 32770, direction: c2s, name: gppSplashDamager, grade: conflict, method: relay-mirror, name_source: label@cn-279, connection_hint: relay, senders: [], alternative_values: [32772], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 32771, direction: c2s, name: gppDebugCommand, grade: candidate, method: sibling-init, name_source: label@cn-279, connection_hint: relay, senders: [453E80], channels: [a1]}
+  - {value: 32772, direction: c2s, name: gppSplashDamager, grade: conflict, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81D940], channels: ['5201'], alternative_values: [32770], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 32773, direction: c2s, name: gppNearDamager, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81D890]}
+  - {value: 32774, direction: c2s, name: gppDeleteObject, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81EB30]}
+  - {value: 32775, direction: c2s, name: gppFireBullet, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81DAE0], channels: [v25]}
+  - {value: 32776, direction: c2s, name: gppExplodeBullet, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81ECC0]}
+  - {value: 32777, direction: c2s, name: gppDamageObject, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81EBE0], channels: [v4]}
+  - {value: 32778, direction: c2s, name: gppKillObject, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81EA80]}
+  - {value: 32779, direction: c2s, name: gppDash, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81E520], channels: [dword_ABB390]}
+  - {value: 32780, direction: c2s, name: gppRoll, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81E400]}
+  - {value: 32781, direction: c2s, name: gppJump, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81E2F0]}
+  - {value: 32782, direction: c2s, name: gppAim, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81E240]}
+  - {value: 32783, direction: c2s, name: gppSetTargettingObj, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81E080]}
+  - {value: 32784, direction: c2s, name: gppBubbleJump, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81DFC0], channels: ['*(_DWORD *)(a1 + 360)']}
+  - {value: 32785, direction: c2s, name: gppWalkFast, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81DEB0]}
+  - {value: 32786, direction: c2s, name: gppWallAction, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81DDA0]}
+  - {value: 32787, direction: c2s, name: gppKnocked, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81D280], channels: [a3]}
+  - {value: 32788, direction: c2s, name: gppStunned, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81D1B0], channels: [a4]}
+  - {value: 32789, direction: c2s, name: gppShocked, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81D100]}
+  - {value: 32790, direction: c2s, name: gppEndStunned, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81D050]}
+  - {value: 32791, direction: c2s, name: gppKickStart, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81CCB0]}
+  - {value: 32792, direction: c2s, name: gppKickFail, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81CC00]}
+  - {value: 32793, direction: c2s, name: gppTryRescued, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81CED0]}
+  - {value: 32794, direction: c2s, name: gppTryKicked, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81CE20]}
+  - {value: 32795, direction: c2s, name: gppKicked, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81CF80], channels: ['&a3']}
+  - {value: 32796, direction: c2s, name: gppKickedNoPang, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81CD60]}
+  - {value: 32798, direction: c2s, name: gppMeleeReady, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81C9F0]}
+  - {value: 32800, direction: c2s, name: gppChangeState, grade: candidate, method: relay-mirror, name_source: label@cn-279, connection_hint: relay, senders: []}
+  - {value: 32801, direction: c2s, name: gppLockInto, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81C940]}
+  - {value: 32805, direction: c2s, name: gppDying, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81D7E0]}
+  - {value: 32806, direction: c2s, name: gppPopOut, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81D520]}
+  - {value: 32807, direction: c2s, name: gppRescue, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81D470]}
+  - {value: 32809, direction: c2s, name: gppClimbWall, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81C730]}
+  - {value: 32810, direction: c2s, name: gppUpdateWeaponInfo, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81D360]}
+  - {value: 32811, direction: c2s, name: gppReload, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81C840]}
+  - {value: 32812, direction: c2s, name: gppResetChrAttr, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [818CB0]}
+  - {value: 32813, direction: c2s, name: gppReturnToNormal, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81C5C0], channels: [dword_ABB390]}
+  - {value: 32814, direction: c2s, name: gppToNormalShootWeapon, grade: candidate, method: relay-mirror, name_source: label@cn-279, connection_hint: relay, senders: []}
+  - {value: 32815, direction: c2s, name: gppHumiliationStart, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81CB50]}
+  - {value: 32816, direction: c2s, name: gppHumiliationEnd, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81CAA0]}
+  - {value: 32817, direction: c2s, name: gppDamageByMap, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81A380]}
+  - {value: 32818, direction: c2s, name: gppStickGrenadeTo, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81C030]}
+  - {value: 32820, direction: c2s, name: gppFireItemBullet, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81DA20], channels: [v38]}
+  - {value: 32821, direction: c2s, name: gppCreateNPC, grade: conflict, method: relay-mirror, name_source: label@cn-279, connection_hint: relay, senders: [], alternative_values: [32822], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 32822, direction: c2s, name: gppCreateNPC, grade: conflict, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: ['857740'], alternative_values: [32821], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 32823, direction: c2s, name: gppRespawnNPC, grade: candidate, method: caller-construct, name_source: label@cn-279, connection_hint: relay, senders: ['820520']}
+  - {value: 32824, direction: c2s, name: gppItemUseResult, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [818C00], channels: [a5]}
+  - {value: 32825, direction: c2s, name: gppTargetLocked, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [818B50], channels: [v13]}
+  - {value: 32826, direction: c2s, name: gppCreateItemBullet, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [818AA0], channels: [v5]}
+  - {value: 32827, direction: c2s, name: gppLockableUsed, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [8189E0]}
+  - {value: 32828, direction: c2s, name: gppSetAttribute, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: ['818940'], channels: ['15']}
+  - {value: 32829, direction: c2s, name: gppHitByItem, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [8188A0], channels: ['*(void **)(a1 + 4)']}
+  - {value: 32830, direction: c2s, name: gppEndMagnet, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: ['818800']}
+  - {value: 32831, direction: c2s, name: gppEndFreezeCannon, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: ['818760']}
+  - {value: 32832, direction: c2s, name: gppCreateMapItem, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81C1A0], channels: ['0']}
+  - {value: 32833, direction: c2s, name: gppStepOnBanana, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81C0F0], channels: ['*(_DWORD *)(v5 + 360)']}
+  - {value: 32834, direction: c2s, name: gppWallState, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81E130]}
+  - {value: 32835, direction: c2s, name: gppGotKicked, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81D730]}
+  - {value: 32836, direction: c2s, name: gppDead, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81D680]}
+  - {value: 32837, direction: c2s, name: gppKickEnd, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81D5D0]}
+  - {value: 32838, direction: c2s, name: gppResultState, grade: candidate, method: relay-mirror, name_source: label@cn-279, connection_hint: relay, senders: []}
+  - {value: 32839, direction: c2s, name: gppLuaEventCharacterState, grade: candidate, method: relay-mirror, name_source: label@cn-279, connection_hint: relay, senders: []}
+  - {value: 32840, direction: c2s, name: gppPing, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: relay, senders: [41CB80]}
+  - {value: 32841, direction: c2s, name: gppIniPacket, grade: candidate, method: caller-construct, name_source: label@cn-279, connection_hint: relay, senders: [7733C0]}
+  - {value: 32842, direction: c2s, name: gppCreateMob, grade: candidate, method: caller-construct, name_source: label@cn-279, connection_hint: relay, senders: [7732C0]}
+  - {value: 32843, direction: c2s, name: gppMobFireBullet, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [7758B0], channels: [(int *)&v20]}
+  - {value: 32844, direction: c2s, name: gppMobFireMelee, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [7730D0], channels: [a2]}
+  - {value: 32845, direction: c2s, name: gppMobKnocked, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [772F80], channels: [v12]}
+  - {value: 32846, direction: c2s, name: gppMobDie, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [772E40], channels: [v14]}
+  - {value: 32847, direction: c2s, name: gppMobPush, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [772D80], channels: [v14]}
+  - {value: 32848, direction: c2s, name: gppMobTryKicked, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [772BD0], channels: ['*(void **)(a1 + 360)']}
+  - {value: 32849, direction: c2s, name: gppMobKicked, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [772A80], channels: ['this[90]']}
+  - {value: 32850, direction: c2s, name: gppMobPopOut, grade: candidate, method: relay-mirror, name_source: label@cn-279, connection_hint: relay, senders: []}
+  - {value: 32851, direction: c2s, name: gppMobHelp, grade: candidate, method: relay-mirror, name_source: label@cn-279, connection_hint: relay, senders: []}
+  - {value: 32852, direction: c2s, name: gppMobTryRescued, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [7728E0], channels: ['*(void **)(this + 360)']}
+  - {value: 32853, direction: c2s, name: gppMobRescue, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [7727B0], channels: [a2]}
+  - {value: 32854, direction: c2s, name: gppMobPang, grade: candidate, method: relay-mirror, name_source: label@cn-279, connection_hint: relay, senders: []}
+  - {value: 32855, direction: c2s, name: gppMobKickStart, grade: candidate, method: relay-mirror, name_source: label@cn-279, connection_hint: relay, senders: []}
+  - {value: 32856, direction: c2s, name: gppMobKickFail, grade: candidate, method: relay-mirror, name_source: label@cn-279, connection_hint: relay, senders: []}
+  - {value: 32857, direction: c2s, connection: both, name: gppCreateMobsFromSpawnGroup, name_source: mirrored, evidence: unverified, source: Mirrored from cn-324 (0x8059); the cn-279 gpp dispatcher carries a 0x8059 case (sub_773920), grade: runtime, method: own-runtime-table, connection_hint: both}
+  - {value: 32857, direction: c2s, name: gppCreateMobsFromSpawnGroup, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [7720E0]}
+  - {value: 32859, direction: c2s, name: gppSpawnMobsByTrigger, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: ['772030']}
+  - {value: 32860, direction: c2s, name: gppCreateNpcBreakableModel, grade: candidate, method: caller-construct, name_source: label@cn-279, connection_hint: relay, senders: [771DD0]}
+  - {value: 32861, direction: c2s, name: gppRemoveAddableObject, grade: candidate, method: relay-mirror, name_source: label@cn-279, connection_hint: relay, senders: []}
+  - {value: 32861, direction: c2s, name: Unknown32861, grade: none, method: unnamed-site, name_source: none, connection_hint: unknown}
+  - {value: 32862, direction: c2s, connection: both, name: gppCreateSpawnGroupMemberMob, name_source: mirrored, evidence: unverified, source: Mirrored from cn-324 (0x805E); the cn-279 gpp dispatcher carries a 0x805E case (sub_776140), grade: runtime, method: own-runtime-table, connection_hint: both}
+  - {value: 32862, direction: c2s, name: gppCreateSpawnGroupMemberMob, grade: candidate, method: caller-construct, name_source: label@cn-279, connection_hint: relay, senders: [771C20], channels: [v10 + 6]}
+  - {value: 32863, direction: c2s, name: gppActivateSpawnObjByTrigger, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [771F80]}
+  - {value: 32864, direction: c2s, name: gppTriggerLuaEvent, grade: candidate, method: caller-construct, name_source: label@cn-279, connection_hint: relay, senders: [771B60]}
+  - {value: 32865, direction: c2s, name: gppMobLuaMessage, grade: candidate, method: caller-construct, name_source: label@cn-279, connection_hint: relay, senders: [7723E0], channels: [v2]}
+  - {value: 32866, direction: c2s, name: gppHordeMobReplay, grade: candidate, method: caller-construct, name_source: label@cn-279, connection_hint: relay, senders: ['628070']}
+  - {value: 32866, direction: c2s, name: Unknown32866, grade: none, method: unnamed-site, name_source: none, connection_hint: unknown}
+  - {value: 32872, direction: c2s, name: gppWaveKeyMobGroupData, grade: candidate, method: relay-mirror, name_source: label@cn-279, connection_hint: relay, senders: []}
+  - {value: 32873, direction: c2s, name: gppWaveSetMobSpawnGroup, grade: candidate, method: caller-nearest, name_source: label@cn-279, connection_hint: relay, senders: [495E70], channels: [(void (__thiscall ***)(void *]}
+  - {value: 32874, direction: c2s, name: gppSetNoDamaged, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [6894B0], channels: ['*(_DWORD *)(result + 360)']}
+  - {value: 32875, direction: c2s, name: gppSetForcedInvincible, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: ['689400'], channels: ['*(_DWORD *)(result + 360)']}
+  - {value: 32876, direction: c2s, name: gppSetNoTargetByMob, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: ['689350'], channels: ['*(_DWORD *)(result + 360)']}
+  - {value: 32877, direction: c2s, name: gppMobDropBombOnDead, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81BF50], channels: [v3]}
+  - {value: 32878, direction: c2s, name: gppSoccerModeGoal, grade: candidate, method: sender-block, name_source: label@cn-279, connection_hint: relay, senders: [81C280]}
+  - {value: 32879, direction: c2s, name: gppSoccerModeCountDown, grade: candidate, method: sender-block, name_source: label@cn-279, connection_hint: relay, senders: [81C280]}
+  - {value: 32880, direction: c2s, name: gppSoccerModeContinueGame, grade: candidate, method: sender-block, name_source: label@cn-279, connection_hint: relay, senders: [81C280]}
+  - {value: 32881, direction: c2s, name: gppDropHumilPrevItem, grade: candidate, method: relay-mirror, name_source: label@cn-279, connection_hint: relay, senders: []}
+  - {value: 32882, direction: c2s, name: gppGhost, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: [81BEA0]}
+  - {value: 32883, direction: c2s, name: gppFireBullet2, grade: candidate, method: relay-mirror, name_source: label@cn-279, connection_hint: relay, senders: []}
+  - {value: 32884, direction: c2s, name: gppWatchingOnMe, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: ['701940'], channels: [dword_ABB390]}
+  - {value: 32885, direction: c2s, name: gppWanderLean, grade: candidate, method: unique-in-callers, name_source: label@cn-279, connection_hint: relay, senders: ['703600', 7038F0], channels: [(int)v18]}
+  - {value: 32886, direction: c2s, name: gppCommandChat, grade: candidate, method: caller-construct, name_source: label@cn-279, connection_hint: relay, senders: [81E870]}
+  - {value: 32887, direction: c2s, name: gppEmotion, grade: candidate, method: caller-construct, name_source: label@cn-279, connection_hint: relay, senders: [81E660], channels: ['*(_DWORD *)(v2 + 360)']}
+  - {value: 32888, direction: c2s, name: gppSyncUseItemSimply, grade: label, method: sender-inline, name_source: label@cn-279, connection_hint: relay, senders: ['689610'], channels: [a1]}
+  - {value: 32892, direction: c2s, connection: both, name: gppCreateAIObject, name_source: mirrored, evidence: unverified, source: Mirrored from cn-324 (0x807C), grade: runtime, method: own-runtime-table, connection_hint: both}
+  - {value: 1, direction: s2c, name: gspDisconnect, name_source: label@cn-279, evidence: inferred, source: 'cn-279 dispatcher sub_6FFDE0 case 1: Packet_gspDisconnect', connection: game, grade: conflict, method: own-runtime-table, connection_hint: game, alternatives: [gspRepGuildLineBoardDelete], note: local slot has incompatible names; inspect packet object flow}
+  - {value: 1, direction: s2c, name: gspRepGuildLineBoardDelete, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6EFAF0, 6FFDE0], alternatives: [gspDisconnect], note: local slot has incompatible names; inspect packet object flow}
+  - {value: 1, direction: s2c, name: rspRepJoinRelaySession, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [6EFAF0, 6FFDE0]}
+  - {value: 2, direction: s2c, name: gspRepGamePatch, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6EFAF0, 6FFDE0]}
+  - {value: 2, direction: s2c, name: rspReqPing, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [6EFAF0, 6FFDE0], alternative_values: [9], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 3, direction: s2c, name: gspRepLogin, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6EFAF0, 6FFDE0]}
+  - {value: 3, direction: s2c, name: rspRepEcho, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [6EFAF0, 6FFDE0], alternative_values: [4, 5], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 4, direction: s2c, name: gspRepGPKDynCode, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6EFAF0, 6FFDE0], alternative_values: [5, 6], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 4, direction: s2c, name: rspRepEcho, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [6EFAF0, 6FFDE0], alternative_values: [3, 5], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 5, direction: s2c, name: gspRepGPKDynCode, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6EFAF0, 6FFDE0], alternative_values: [4, 6], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 5, direction: s2c, name: rspRepEcho, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [6EFAF0, 6FFDE0], alternative_values: [3, 4], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 6, direction: s2c, name: gspRepGPKDynCode, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0], alternative_values: [4, 5], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 7, direction: s2c, name: gspRepGPKCSAuth, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 8, direction: s2c, name: gspRepMoveChannel, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 9, direction: s2c, name: gspRepMoveInto, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0, reader-chain], alternative_values: [10], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 9, direction: s2c, name: rspReqPing, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [6FFDE0, reader-chain], alternative_values: [2], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 10, direction: s2c, name: gspRepMoveInto, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0], alternative_values: [9], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 11, direction: s2c, name: gspNotifyAutoTutorial_, name_source: coined, evidence: verified, source: 'cn-279 dispatcher sub_6FFDE0 case 0xB sets byte_ABB3DF; sub_858480 selects CreateUserStage before login success, and MainMenuStage uses it for the automatic tutorial afterward; empty body', connection: game, grade: conflict, method: own-runtime-table, connection_hint: game, alternatives: [gspRepCheckCreateUserName], note: local slot has incompatible names; inspect packet object flow}
+  - {value: 11, direction: s2c, name: gspRepCheckCreateUserName, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0], alternatives: [gspNotifyAutoTutorial_], note: class appears under multiple numbers; inspect packet object flow, alternative_values: [12]}
+  - {value: 12, direction: s2c, name: gspRepCheckCreateUserName, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0], alternative_values: [11], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 13, direction: s2c, name: gspRepCreateUserInfo, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 14, direction: s2c, name: gspQueryBadProgram, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 15, direction: s2c, name: gspRepCenterUserCnt, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 16, direction: s2c, name: gspCenterList, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 17, direction: s2c, name: gspRepUniquenessCheck, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 101, direction: s2c, name: gspRepListSession, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [7A7AF0]}
+  - {value: 102, direction: s2c, name: gspRepCreateSession, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [7A7AF0]}
+  - {value: 103, direction: s2c, name: gspRepJoinSession, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [7A7AF0]}
+  - {value: 104, direction: s2c, name: gspReqUserPoll, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 105, direction: s2c, name: gspUserStat, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 106, direction: s2c, name: gspOveruseAlarmMsg, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 107, direction: s2c, name: gspReceiveServerNoticeMsg, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 108, direction: s2c, name: gspGotoMenu, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 109, direction: s2c, name: gspGotoLobby, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 110, direction: s2c, name: gspGotoRoom, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 111, direction: s2c, name: gspRepInvite, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 112, direction: s2c, name: gspNotifyInvite, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 113, direction: s2c, name: gspRepMoveToInviter, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 114, direction: s2c, name: gspRepMoveToFriend, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 117, direction: s2c, name: gspNotifyMatch, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [7A7AF0]}
+  - {value: 118, direction: s2c, name: gspEventNotice, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 120, direction: s2c, name: gspEvent2GuildRanking, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 121, direction: s2c, name: gspRepFighterInfo, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 122, direction: s2c, name: gspRepAwardInfo, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 123, direction: s2c, name: gspRepEvent, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 125, direction: s2c, name: gspNotifyPromotion, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 126, direction: s2c, name: gspChangedUserName, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 201, direction: s2c, name: gspUpdateParty, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 202, direction: s2c, name: gspRepJoinParty, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 203, direction: s2c, name: gspUpdatePartyLeader, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 204, direction: s2c, name: gspNotifyPartyLeaveSuccess, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 205, direction: s2c, name: gspNotifyMemberLeave, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 206, direction: s2c, name: gspNotifyNewMemberJoin, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0, reader-chain], alternatives: [gspReceivePartyChrPos], note: local slot has incompatible names; inspect packet object flow}
+  - {value: 206, direction: s2c, name: gspReceivePartyChrPos, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0, reader-chain], alternatives: [gspNotifyNewMemberJoin], note: local slot has incompatible names; inspect packet object flow}
+  - {value: 302, direction: s2c, name: gspRepKickFromParty, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 303, direction: s2c, name: gspRepChangePartyLeader, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 304, direction: s2c, name: gspNotifyKickFromParty, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 305, direction: s2c, name: gspReceivePartyChatMsg, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0], alternative_values: [903], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 306, direction: s2c, name: gspNotifyKickMember, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0], alternative_values: [307], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 307, direction: s2c, name: gspNotifyKickMember, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0], alternative_values: [306], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 502, direction: s2c, name: gspRoomSetMasterSlotIdx, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 503, direction: s2c, name: gspRoomSetSlot, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 504, direction: s2c, name: gspRoomChangeTeam, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 505, direction: s2c, name: gspRoomChangeGameSetting, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 506, direction: s2c, name: gspRoomChangeInventory, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 507, direction: s2c, name: gspRoomRepChangeMaster, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 508, direction: s2c, name: gspRoomReceiveChatMsg, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 509, direction: s2c, name: gspRoomReceiveChatModuleMsg, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 510, direction: s2c, name: gspRoomEnterGame, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 511, direction: s2c, name: gspRoomLeaveSlot, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 512, direction: s2c, name: gspRoomOpenCloseSlot, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 513, direction: s2c, name: gspRepKickFromSession, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 514, direction: s2c, name: gspReceiveSessionChrPos, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 516, direction: s2c, name: gspRoomReceiveRecruitMsg, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 517, direction: s2c, name: gspReqPingUser, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 518, direction: s2c, name: gspRepPingUser, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 519, direction: s2c, name: gspHordeModeRewardList, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 601, direction: s2c, name: gspConnectToRelayServer, grade: candidate, method: cross-extraction, name_source: 'consensus@cn-324,cn-717,id-1809,id-400,kr-812', connection_hint: game}
+  - {value: 602, direction: s2c, name: Unknown602, grade: none, method: unnamed-case, name_source: none, connection_hint: unknown}
+  - {value: 603, direction: s2c, name: gspConnectToSuperPeer, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 604, direction: s2c, name: Unknown604, grade: none, method: unnamed-case, name_source: none, connection_hint: unknown}
+  - {value: 606, direction: s2c, name: gspRepEnterShop, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0], alternative_values: [800], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 607, direction: s2c, name: gspTryHolePunching, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 608, direction: s2c, name: Unknown608, grade: none, method: unnamed-case, name_source: none, connection_hint: unknown}
+  - {value: 609, direction: s2c, name: gspNotifyUdpToServerReceived, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 610, direction: s2c, name: gspTableSetHolePunching, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 611, direction: s2c, name: Unknown611, grade: none, method: unnamed-case, name_source: none, connection_hint: unknown}
+  - {value: 612, direction: s2c, name: Unknown612, grade: none, method: unnamed-case, name_source: none, connection_hint: unknown}
+  - {value: 613, direction: s2c, name: Unknown613, grade: none, method: unnamed-case, name_source: none, connection_hint: unknown}
+  - {value: 701, direction: s2c, name: gspGameMapLoadingComplete, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 702, direction: s2c, name: gspGameEverybodyLoadingComplete, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 703, direction: s2c, name: gspGameCountDown, name_source: mirrored, evidence: unverified, source: Mirrored from the family; cn-279 dispatcher case 0x2BF -> sub_708270, connection: game, grade: runtime, method: own-runtime-table, connection_hint: game}
+  - {value: 703, direction: s2c, name: Unknown703, grade: none, method: unnamed-case, name_source: none, connection_hint: unknown}
+  - {value: 704, direction: s2c, name: gspGameStartGame, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 705, direction: s2c, name: gspGameEndGame, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 707, direction: s2c, name: gspRespawn, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [82AB20]}
+  - {value: 708, direction: s2c, name: gspRequestRespawnIdx, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [82AB20]}
+  - {value: 709, direction: s2c, name: Unknown709, grade: none, method: unnamed-case, name_source: none, connection_hint: unknown}
+  - {value: 710, direction: s2c, name: Unknown710, grade: none, method: unnamed-case, name_source: none, connection_hint: unknown}
+  - {value: 711, direction: s2c, name: gspGameBroadcastPlayerScoreData, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0, 82AB20], alternatives: [gspGameCreateGameItem], note: class appears under multiple numbers; inspect packet object flow, alternative_values: [722]}
+  - {value: 711, direction: s2c, name: gspGameCreateGameItem, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0, 82AB20], alternatives: [gspGameBroadcastPlayerScoreData], note: local slot has incompatible names; inspect packet object flow}
+  - {value: 712, direction: s2c, name: gspItemEaten, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [82AB20]}
+  - {value: 713, direction: s2c, name: gspAddItemToSlot, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [82AB20]}
+  - {value: 714, direction: s2c, name: gspItemUsed, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [82AB20]}
+  - {value: 715, direction: s2c, name: gspGameCreateStar, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [82AB20]}
+  - {value: 716, direction: s2c, name: gspStarEaten, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [82AB20]}
+  - {value: 717, direction: s2c, name: gspGameCreateLucci, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [82AB20]}
+  - {value: 718, direction: s2c, name: gspLucciEaten, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [82AB20]}
+  - {value: 719, direction: s2c, name: gspGameCreateChocolate, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [82AB20]}
+  - {value: 720, direction: s2c, name: gspChocolateEaten, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [82AB20]}
+  - {value: 722, direction: s2c, name: gspGameBroadcastPlayerScoreData, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0], alternative_values: [711], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 723, direction: s2c, name: gspGameRespawnCharacter, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [82AB20]}
+  - {value: 724, direction: s2c, name: gspGameExtendRespawn, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [82AB20]}
+  - {value: 725, direction: s2c, name: gspGameTimeOverEnd, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 726, direction: s2c, name: Unknown726, grade: none, method: unnamed-case, name_source: none, connection_hint: unknown}
+  - {value: 727, direction: s2c, name: gspGameAwardDialog, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 728, direction: s2c, name: Unknown728, grade: none, method: unnamed-case, name_source: none, connection_hint: unknown}
+  - {value: 729, direction: s2c, name: Unknown729, grade: none, method: unnamed-case, name_source: none, connection_hint: unknown}
+  - {value: 730, direction: s2c, name: gspGamePreCountDown, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [82AB20]}
+  - {value: 731, direction: s2c, name: Unknown731, grade: none, method: unnamed-case, name_source: none, connection_hint: unknown}
+  - {value: 732, direction: s2c, name: gspGamePrepareLucciEvent, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 733, direction: s2c, name: gspGamePrepareSoccerEvent, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 734, direction: s2c, name: gspGamePrepareHordeZHEvent, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 735, direction: s2c, name: gspRepAwardSelectSuccess, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 736, direction: s2c, name: gspRepAwardSelectFail, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [70A0F0]}
+  - {value: 737, direction: s2c, name: gspGameCreateWeaponObject, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [82AB20]}
+  - {value: 738, direction: s2c, name: gspPickUpWeapon, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [82AB20]}
+  - {value: 800, direction: s2c, name: gspRepEnterShop, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0], alternative_values: [606], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 801, direction: s2c, name: gspInventoryUpdateAllInventorySlot, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 802, direction: s2c, name: gspInventoryUpdateInventorySlots, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 803, direction: s2c, name: gspInventoryUpdateInventorySlot, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 805, direction: s2c, name: gspInventoryViewUpdateView, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 806, direction: s2c, name: gspCheckExpiredTimeResult, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 807, direction: s2c, name: gspCashInvenUpdateAllInventorySlot, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 808, direction: s2c, name: gspRepInventoryEquip, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 809, direction: s2c, name: gspRepInventoryUnequip, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 810, direction: s2c, name: gspRepInventoryUseItem, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 811, direction: s2c, name: gspRepInventoryDeleteItem, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 812, direction: s2c, name: gspRepInventoryThrowItem, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 813, direction: s2c, name: gspRepShopBuy, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 814, direction: s2c, name: gspRepShopItemCardInfo, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 815, direction: s2c, name: gspRepPresentNewReceive, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0], alternative_values: [816], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 816, direction: s2c, name: gspRepPresentNewReceive, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0], alternative_values: [815], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 817, direction: s2c, name: gspRepPresentReceiveList, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 818, direction: s2c, name: gspRepPresentSendList, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 819, direction: s2c, name: gspRepPresentReceiveSubList, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 820, direction: s2c, name: gspRepPresentSendSubList, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 821, direction: s2c, name: gspRepRefund, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 822, direction: s2c, name: gspRepPresentSend, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 823, direction: s2c, name: gspRepPresentReceive, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 824, direction: s2c, name: gspRepPresentThrow, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 825, direction: s2c, name: gspRepPresentSendThankMsg, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 826, direction: s2c, name: gspRepPresentViewThankMsg, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 827, direction: s2c, name: gspRepPresentConfirm, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 828, direction: s2c, name: gspRepPresentDeleteSend, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 829, direction: s2c, name: gspRepPresentDeleteReceive, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 830, direction: s2c, name: gspRepRealCouponUse, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 832, direction: s2c, name: gspRepPickup, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0]}
+  - {value: 900, direction: s2c, name: gspRepGuildLineBoard, grade: candidate, method: cross-extraction, name_source: 'consensus@cn-324,id-1809,id-400', connection_hint: game}
+  - {value: 903, direction: s2c, name: gspReceivePartyChatMsg, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0, reader-chain], alternatives: [gspRepGuildLineBoardWrite], note: class appears under multiple numbers; inspect packet object flow, alternative_values: [305]}
+  - {value: 903, direction: s2c, name: gspRepGuildLineBoardWrite, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: [6FFDE0, reader-chain], alternatives: [gspReceivePartyChatMsg], note: local slot has incompatible names; inspect packet object flow}
+  - {value: 904, direction: s2c, name: gspRepStartNewWave, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: ['645040']}
+  - {value: 905, direction: s2c, name: gspRepEndWave, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: ['645040']}
+  - {value: 906, direction: s2c, name: Unknown906, grade: none, method: unnamed-case, name_source: none, connection_hint: unknown}
+  - {value: 907, direction: s2c, name: Unknown907, grade: none, method: unnamed-case, name_source: none, connection_hint: unknown}
+  - {value: 908, direction: s2c, name: Unknown908, grade: none, method: unnamed-case, name_source: none, connection_hint: unknown}
+  - {value: 909, direction: s2c, name: gspRepWaveAllSpawnMobs, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: game, dispatchers: ['645040']}
+  - {value: 922, direction: s2c, name: gspResSingleStageInfo, name_source: mirrored, evidence: unverified, source: 'Mirrored from kr-812/cn-324/cn-717, which all stamp 922; answers gcpReqSingleStageInfo with the cleared-stage list', connection: game, grade: runtime, method: own-runtime-table, connection_hint: game}
+  - {value: 32770, direction: s2c, name: gppSplashDamager, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20], alternative_values: [32772], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 32772, direction: s2c, name: gppSplashDamager, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20], alternative_values: [32770], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 32773, direction: s2c, name: gppNearDamager, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32774, direction: s2c, name: gppDeleteObject, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32775, direction: s2c, name: gppExplodeBullet, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20], alternative_values: [32776], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 32776, direction: s2c, name: gppExplodeBullet, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20], alternative_values: [32775], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 32777, direction: s2c, name: gppDamageObject, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32778, direction: s2c, name: gppKillObject, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32779, direction: s2c, name: gppDash, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32780, direction: s2c, name: gppRoll, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32781, direction: s2c, name: gppJump, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32782, direction: s2c, name: gppAim, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32783, direction: s2c, name: gppSetTargettingObj, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32784, direction: s2c, name: gppBubbleJump, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32785, direction: s2c, name: gppWalkFast, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32786, direction: s2c, name: gppWallAction, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32787, direction: s2c, name: gppKnocked, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32788, direction: s2c, name: gppStunned, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32789, direction: s2c, name: gppShocked, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32790, direction: s2c, name: gppEndStunned, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32791, direction: s2c, name: gppKickStart, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32792, direction: s2c, name: gppKickFail, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32793, direction: s2c, name: gppTryRescued, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32794, direction: s2c, name: gppTryKicked, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32795, direction: s2c, name: gppKicked, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32796, direction: s2c, name: gppKickedNoPang, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32798, direction: s2c, name: gppMeleeReady, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32800, direction: s2c, name: gppChangeState, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32801, direction: s2c, name: gppLockInto, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32805, direction: s2c, name: gppDying, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32806, direction: s2c, name: gppPopOut, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32807, direction: s2c, name: gppRescue, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32809, direction: s2c, name: gppClimbWall, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32810, direction: s2c, name: gppUpdateWeaponInfo, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32811, direction: s2c, name: gppReload, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32812, direction: s2c, name: gppResetChrAttr, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32813, direction: s2c, name: gppReturnToNormal, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32814, direction: s2c, name: gppToNormalShootWeapon, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32815, direction: s2c, name: gppHumiliationStart, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32816, direction: s2c, name: gppHumiliationEnd, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32817, direction: s2c, name: gppDamageByMap, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32818, direction: s2c, name: gppStickGrenadeTo, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32820, direction: s2c, name: gppFireItemBullet, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32821, direction: s2c, name: gppCreateNPC, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20], alternative_values: [32822], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 32822, direction: s2c, name: gppCreateNPC, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20], alternative_values: [32821], note: class appears under multiple numbers; inspect packet object flow}
+  - {value: 32823, direction: s2c, name: gppRespawnNPC, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32824, direction: s2c, name: gppItemUseResult, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32825, direction: s2c, name: gppTargetLocked, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32826, direction: s2c, name: gppCreateItemBullet, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32827, direction: s2c, name: gppLockableUsed, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32828, direction: s2c, name: gppSetAttribute, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32829, direction: s2c, name: gppHitByItem, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32830, direction: s2c, name: gppEndMagnet, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32831, direction: s2c, name: gppEndFreezeCannon, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32832, direction: s2c, name: gppCreateMapItem, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32833, direction: s2c, name: gppStepOnBanana, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32834, direction: s2c, name: gppWallState, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32835, direction: s2c, name: gppGotKicked, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32836, direction: s2c, name: gppDead, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32837, direction: s2c, name: gppKickEnd, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32838, direction: s2c, name: gppResultState, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32839, direction: s2c, name: gppLuaEventCharacterState, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32840, direction: s2c, name: gppPing, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32841, direction: s2c, name: gppIniPacket, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: ['776820']}
+  - {value: 32842, direction: s2c, name: gppCreateMob, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: ['776820']}
+  - {value: 32843, direction: s2c, name: gppMobFireBullet, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: ['776820']}
+  - {value: 32844, direction: s2c, name: gppMobFireMelee, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: ['776820']}
+  - {value: 32845, direction: s2c, name: gppMobKnocked, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: ['776820']}
+  - {value: 32846, direction: s2c, name: gppMobDie, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: ['776820']}
+  - {value: 32847, direction: s2c, name: gppMobPush, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: ['776820']}
+  - {value: 32848, direction: s2c, name: gppMobTryKicked, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: ['776820']}
+  - {value: 32849, direction: s2c, name: gppMobKicked, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: ['776820']}
+  - {value: 32850, direction: s2c, name: gppMobPopOut, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: ['776820']}
+  - {value: 32851, direction: s2c, name: gppMobHelp, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: ['776820']}
+  - {value: 32852, direction: s2c, name: gppMobTryRescued, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: ['776820']}
+  - {value: 32853, direction: s2c, name: gppMobRescue, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: ['776820']}
+  - {value: 32854, direction: s2c, name: gppMobPang, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: ['776820']}
+  - {value: 32855, direction: s2c, name: gppMobKickStart, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: ['776820']}
+  - {value: 32856, direction: s2c, name: gppMobKickFail, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: ['776820']}
+  - {value: 32857, direction: s2c, connection: both, name: gppCreateMobsFromSpawnGroup, name_source: mirrored, evidence: unverified, source: Mirrored from cn-324; cn-279 gpp dispatcher case 0x8059 -> sub_773920, grade: runtime, method: own-runtime-table, connection_hint: both}
+  - {value: 32857, direction: s2c, name: gppCreateMobsFromSpawnGroup, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: ['776820']}
+  - {value: 32859, direction: s2c, name: gppSpawnMobsByTrigger, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: ['776820']}
+  - {value: 32860, direction: s2c, name: gppCreateNpcBreakableModel, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: ['776820']}
+  - {value: 32861, direction: s2c, name: gppRemoveAddableObject, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: ['776820']}
+  - {value: 32862, direction: s2c, connection: both, name: gppCreateSpawnGroupMemberMob, name_source: mirrored, evidence: unverified, source: Mirrored from cn-324; cn-279 gpp dispatcher case 0x805E -> sub_776140, grade: runtime, method: own-runtime-table, connection_hint: both}
+  - {value: 32862, direction: s2c, name: gppCreateSpawnGroupMemberMob, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: ['776820']}
+  - {value: 32863, direction: s2c, name: gppActivateSpawnObjByTrigger, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: ['776820']}
+  - {value: 32864, direction: s2c, name: gppTriggerLuaEvent, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: ['776820']}
+  - {value: 32865, direction: s2c, name: gppMobLuaMessage, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: ['776820']}
+  - {value: 32872, direction: s2c, name: gppWaveKeyMobGroupData, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: ['645040']}
+  - {value: 32873, direction: s2c, name: gppWaveSetMobSpawnGroup, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: ['645040']}
+  - {value: 32874, direction: s2c, name: gppSetNoDamaged, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32875, direction: s2c, name: gppSetForcedInvincible, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32876, direction: s2c, name: gppSetNoTargetByMob, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: ['645040']}
+  - {value: 32877, direction: s2c, name: gppMobDropBombOnDead, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32878, direction: s2c, name: gppSoccerModeGoal, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32879, direction: s2c, name: gppSoccerModeCountDown, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32880, direction: s2c, name: gppSoccerModeContinueGame, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32881, direction: s2c, name: gppDropHumilPrevItem, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32882, direction: s2c, name: gppGhost, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32883, direction: s2c, name: gppFireBullet2, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: ['645040']}
+  - {value: 32884, direction: s2c, name: gppWatchingOnMe, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32885, direction: s2c, name: gppWander2, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20], alternatives: [gppWanderLean], note: local slot has incompatible names; inspect packet object flow}
+  - {value: 32885, direction: s2c, name: gppWanderLean, grade: conflict, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20], alternatives: [gppWander2], note: local slot has incompatible names; inspect packet object flow}
+  - {value: 32886, direction: s2c, name: gppCommandChat, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32887, direction: s2c, name: gppEmotion, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32888, direction: s2c, name: gppSyncUseItemSimply, grade: candidate, method: dispatcher-case, name_source: label@cn-279, connection_hint: relay, dispatchers: [82AB20]}
+  - {value: 32892, direction: s2c, connection: both, name: gppCreateAIObject, name_source: mirrored, evidence: unverified, source: Mirrored from cn-324, grade: runtime, method: own-runtime-table, connection_hint: both}

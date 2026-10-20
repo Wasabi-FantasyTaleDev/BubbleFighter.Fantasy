@@ -1,0 +1,4 @@
+id: contracts
+description: Export shared contract metadata without starting game services.
+bundles:
+  - contracts-export

@@ -1,0 +1,41 @@
+version: 1
+structs:
+  # Own readers: kr-812 sub_80A910, cn-717 sub_8C4210, id-400 sub_93D120,
+  # id-1809 sub_4D60C0, cn-406 sub_700770 and cn-324 sub_410910.
+  # The NPC property selects a server score unit, not a character or player identity.
+  PvePangUnit:
+    - unit_index: u32
+      offset: 4
+  # Readers kr-812 sub_9D95D0, cn-717 sub_7F4370, id-400 sub_72E4D0,
+  # id-1809 sub_4D8130, cn-406 sub_715B70 and cn-324 sub_6EB8B0 read three words.
+  # Delta consumers: kr-812 sub_7FED80, cn-717 sub_882530, id-400 sub_785FC0,
+  # id-1809 sub_7A9650, cn-406 sub_703930 and cn-324 sub_6EE7A0.
+  PveGamePoint:
+    - seat: u32
+      offset: 4
+    - subtract: u32
+      offset: 8
+    - amount: u32
+      offset: 12
+  # kr-812 sub_80BD70 / cn-324 sub_6EA940 read five words; native 24-byte stride includes the vtable.
+  PveRankRow:
+    - seat: u32
+      offset: 4
+    - unknown_8: u32 # First summed component; its independent category is unproven.
+      offset: 8
+    - unknown_12: u32 # Second summed component; its independent category is unproven.
+      offset: 12
+    - unknown_16: u32 # Third summed component; its independent category is unproven.
+      offset: 16
+    - rank: u32
+      offset: 20
+  # Own entries: kr-812 sub_80BE00, cn-717 sub_890BC0, id-400 sub_782C00,
+  # id-1809 sub_7A6080, cn-406 sub_700810 and cn-324 sub_6EB940.
+  # kr-812 sub_80BDC0 and cn-324 sub_6F5300 read the nested row vector.
+  PveRankInfo:
+    - unknown_4: u32 # Native result-state field; zero is provisional until a consumer is found.
+      offset: 4
+    - unknown_8: empty_list # Native u32 vector, consumed separately by presentation code.
+      offset: 8
+    - rows: list<PveRankRow>
+      offset: 20

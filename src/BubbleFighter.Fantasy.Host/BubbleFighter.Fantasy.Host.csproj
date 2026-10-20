@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <ApplicationIcon>icon_odteam.ico</ApplicationIcon>
+    <Description>Console host for the Bubble Fighter Fantasy server.</Description>
+    <AssemblyName>BubbleFighter.Fantasy.Host</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The ASP.NET shared framework supplies Microsoft.Extensions.Logging(.Console). -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\BubbleFighter.Fantasy.Kernel\BubbleFighter.Fantasy.Kernel.csproj" />
+    <ProjectReference Include="..\BubbleFighter.Fantasy.Contracts\BubbleFighter.Fantasy.Contracts.csproj" />
+    <ProjectReference Include="..\BubbleFighter.Fantasy.Packets\BubbleFighter.Fantasy.Packets.csproj" />
+    <ProjectReference Include="..\Plugins\BubbleFighter.Fantasy.Loader.Native\BubbleFighter.Fantasy.Loader.Native.csproj" />
+    <ProjectReference Include="..\Plugins\*\*.csproj"
+                      Exclude="..\Plugins\BubbleFighter.Fantasy.Loader.Native\BubbleFighter.Fantasy.Loader.Native.csproj" ReferenceOutputAssembly="false" />
+    <Content Include="bootstrap\**\*.yaml" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="$(RepoRoot)profiles\**\*.yaml" Exclude="$(RepoRoot)profiles\**\local.patch.yaml" Link="profiles\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="$(RepoRoot)packets\**\*.yaml" Link="packets\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="$(RepoRoot)data\level-experience.csv" Link="data\level-experience.csv" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="$(RepoRoot)data\locales\*.json" Link="data\locales\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <!-- Make locally built plugins under artifacts/plugins visible to the default "plugins"
+       root relative to the host base directory. The folder is replaced, not merged, so a
+       plugin or dependency that no longer exists is not loaded from a stale copy. -->
+  <Target Name="CopyPluginsToOutput" AfterTargets="Build" Condition="Exists('$(RepoRoot)artifacts\plugins')">
+    <ItemGroup>
+      <_PluginFiles Include="$(RepoRoot)artifacts\plugins\**\*.*" />
+    </ItemGroup>
+    <RemoveDir Directories="$(OutDir)plugins" />
+    <Copy SourceFiles="@(_PluginFiles)"
+          DestinationFiles="@(_PluginFiles->'$(OutDir)plugins\%(RecursiveDir)%(Filename)%(Extension)')" />
+  </Target>
+  <Target Name="PublishAllPlugins" AfterTargets="Publish">
+    <ItemGroup>
+      <_PluginProjects Include="$(RepoRoot)src\Plugins\*\*.csproj" />
+    </ItemGroup>
+    <MSBuild Projects="@(_PluginProjects)" Targets="Publish"
+             Properties="Configuration=$(Configuration);PublishDir=$([System.IO.Path]::GetFullPath('$(PublishDir)'))plugins/%(_PluginProjects.Filename)/;SelfContained=false" />
+  </Target>
+</Project>

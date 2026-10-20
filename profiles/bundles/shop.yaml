@@ -1,0 +1,30 @@
+# Item shop / cash shop row. Protocol name and version_major select the dialect.
+# The workbook is Config/ShopItem2.xml from Packs/ConfigSh_00000.pkn (loader
+# sub_9FE8F0), read through the build's clientdata row.
+# Add `shop` to the profile `bundles` list and enable a provider of IShopSessionStore.
+# The memory and MySQL persistence rows both provide this required contract.
+- id: shop
+  plugin: shop
+  config:
+    protocol: "kr-1256/game"
+    client_profile: "kr-1256"
+    version_major: 1256
+    shop_item_client_path: "Config/ShopItem2.xml"
+    max_shop_item_bytes: 134217728
+    # S2C 800 is the only packet that carries shop content and nothing
+    # client-local fills the dialog, so a stocked shop needs it and it is ON.
+    # The earlier OFF was justified by a crash theory that the client code walk
+    # disproved: the value the handler reads at sub_9ADA00 is not an
+    # uninitialised stack vector but the parse target sub_99B9A0 zeroes and then
+    # fills, so no client hook is required and the reply cannot crash there. The
+    # blank shop that was measured with this on was our own missing field - the
+    # counted i32 vector before the trailing selected-category - now written.
+    send_shop_catalog: true
+    catalog_card_limit: 0
+    # The tab tree by SubCategory id range: ShopItem2 has no parent column and repeats page names
+    # (801 and 1003 are both "Packages"), so pages linked through card names land under the wrong tab.
+    # The reply echoes the category C2S 801 asks for (1000 from the task bar) when it is published,
+    # otherwise the first tab by display order, and carries a non-zero content revision.
+    catalog_tree: id_ranges
+    starting_lucci: 100000
+    starting_cash: 0

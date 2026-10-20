@@ -1,0 +1,70 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\..\src\BubbleFighter.Fantasy.Host\OwnedShutdownSignal.cs" Link="Host\OwnedShutdownSignal.cs" />
+    <Compile Include="..\..\src\BubbleFighter.Fantasy.Host\ManagedStdioSession.cs" Link="Host\ManagedStdioSession.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\BubbleFighter.Fantasy.Kernel\BubbleFighter.Fantasy.Kernel.csproj" />
+    <ProjectReference Include="..\fixtures\ModuleOwnershipFixture\ModuleOwnershipFixture.csproj"
+                      ReferenceOutputAssembly="false" OutputItemType="_ModuleOwnershipFixture" />
+    <ProjectReference Include="..\fixtures\MultiDefinitionModuleFixture\MultiDefinitionModuleFixture.csproj"
+                      ReferenceOutputAssembly="false" OutputItemType="_MultiDefinitionModuleFixture" />
+    <ProjectReference Include="..\fixtures\MultiDefinitionModuleFixture\duplicate\DuplicateDefinitionModuleFixture.csproj"
+                      ReferenceOutputAssembly="false" OutputItemType="_DuplicateDefinitionModuleFixture" />
+    <ProjectReference Include="..\fixtures\ExternalModuleSourceFixture\ExternalModuleSourceFixture.csproj"
+                      ReferenceOutputAssembly="false" OutputItemType="_ExternalModuleSourceFixture" />
+    <ProjectReference Include="..\fixtures\RunBootstrapFixture\RunBootstrapFixture.csproj"
+                      ReferenceOutputAssembly="false" OutputItemType="_RunBootstrapFixture" />
+  </ItemGroup>
+  <Target Name="CopyModuleOwnershipFixture" AfterTargets="CopyFilesToOutputDirectory"
+          Condition="'$(DesignTimeBuild)' != 'true'">
+    <Error Condition="'@(_ModuleOwnershipFixture)' == ''"
+           Text="Module ownership fixture output is missing; build the tests with project references enabled." />
+    <Copy SourceFiles="@(_ModuleOwnershipFixture)" DestinationFolder="$(TargetDir)fixtures\module-ownership" SkipUnchangedFiles="true">
+      <Output TaskParameter="CopiedFiles" ItemName="FileWrites" />
+    </Copy>
+  </Target>
+  <Target Name="CopyMultiDefinitionModuleFixtures" AfterTargets="CopyFilesToOutputDirectory"
+          Condition="'$(DesignTimeBuild)' != 'true'">
+    <Error Condition="'@(_MultiDefinitionModuleFixture)' == '' or '@(_DuplicateDefinitionModuleFixture)' == ''"
+           Text="Multi-definition fixture outputs are missing; build tests with project references enabled." />
+    <Copy SourceFiles="@(_MultiDefinitionModuleFixture)" DestinationFolder="$(TargetDir)fixtures\multi-definition" SkipUnchangedFiles="true">
+      <Output TaskParameter="CopiedFiles" ItemName="FileWrites" />
+    </Copy>
+    <Copy SourceFiles="@(_MultiDefinitionModuleFixture)" DestinationFiles="$(TargetDir)fixtures\multi-definition-copies\left\left.dll" SkipUnchangedFiles="true">
+      <Output TaskParameter="CopiedFiles" ItemName="FileWrites" />
+    </Copy>
+    <Copy SourceFiles="@(_MultiDefinitionModuleFixture)" DestinationFiles="$(TargetDir)fixtures\multi-definition-copies\right\right.dll" SkipUnchangedFiles="true">
+      <Output TaskParameter="CopiedFiles" ItemName="FileWrites" />
+    </Copy>
+    <Copy SourceFiles="@(_DuplicateDefinitionModuleFixture)" DestinationFolder="$(TargetDir)fixtures\multi-definition-duplicate" SkipUnchangedFiles="true">
+      <Output TaskParameter="CopiedFiles" ItemName="FileWrites" />
+    </Copy>
+  </Target>
+  <Target Name="CopyRunBootstrapFixture" AfterTargets="CopyFilesToOutputDirectory"
+          Condition="'$(DesignTimeBuild)' != 'true'">
+    <Error Condition="'@(_RunBootstrapFixture)' == ''"
+           Text="Run bootstrap fixture output is missing; build tests with project references enabled." />
+    <Copy SourceFiles="@(_RunBootstrapFixture)" DestinationFolder="$(TargetDir)fixtures\run-bootstrap" SkipUnchangedFiles="true">
+      <Output TaskParameter="CopiedFiles" ItemName="FileWrites" />
+    </Copy>
+  </Target>
+  <Target Name="CopyExternalModuleSourceFixture" AfterTargets="CopyFilesToOutputDirectory"
+          Condition="'$(DesignTimeBuild)' != 'true'">
+    <Error Condition="'@(_ExternalModuleSourceFixture)' == ''"
+           Text="External module source fixture output is missing; build tests with project references enabled." />
+    <Copy SourceFiles="@(_ExternalModuleSourceFixture)" DestinationFolder="$(TargetDir)fixtures\external-module-source" SkipUnchangedFiles="true">
+      <Output TaskParameter="CopiedFiles" ItemName="FileWrites" />
+    </Copy>
+  </Target>
+</Project>

@@ -1,0 +1,12 @@
+# Profile patch for kr-812: applied after the bundle rows (see profiles/kr-1256/patch.yaml
+# for the supported operations). The admin API moves off 8080 so this profile can run
+# beside kr-1256 on one machine.
+- replace:
+    id: admin.http
+    config:
+      listen: "${KR_812_ADMIN_HOST:-127.0.0.1}:${KR_812_ADMIN_PORT:-8081}"
+- replace:
+    id: diagnostics.packet-log
+    config:
+      file: logs/{date}/packets-kr-812_{timestamp}.log
+      preview_bytes: 96

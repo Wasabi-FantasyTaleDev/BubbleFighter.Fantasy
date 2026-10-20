@@ -1,0 +1,73 @@
+# Rows for the Chinese 774 client profile (the 2019 build). The game listener answers
+# gcpFirstConnect with the patch reply and the center list, and the lobby logs players in.
+# 258-byte plaintext greeting (cn-774 sub_1046FC0), five-byte frame (receive loop cn-774 sub_1047420 frames
+# on u16 length + 5), the shared cipher tables with seeds (0, 1) and (5, 3).
+- id: dialect
+  plugin: dialect
+  config:
+    profile_id: "${BFF_PROFILE_ID}"
+    frame: legacy_5
+- id: protocol
+  plugin: protocol
+  config:
+    opcode_table_path: profiles/cn-774/opcodes.yaml
+    # The greeting handler treats status 2 as a normal connect, as in the other legacy builds.
+    bootstrap_status: 2
+    # A crash report (19) after a crashed session, and a 30-byte opcode 1500 on every
+    # launch (local run), arrive ahead of gcpFirstConnect.
+    pre_handshake_opcodes: [19, 1500]
+    bootstrap_command_line: "http://bf.dn.nexoncdn.co.kr/PatchData"
+    # The address and port the client reaches this listener on (its login.ini or launch
+    # arguments). The gate values follow cn-324, the same client family.
+    center_gates:
+      - key: 6
+        sub_key: 1
+        unknown1: 0
+        address: "${BFF_PUBLIC_HOST:-127.0.0.1}"
+        port: ${CN_774_PUBLIC_PORT:-7190}
+- id: game-listener
+  plugin: net.tcp
+  config:
+    listen: "${BFF_BIND_HOST:-0.0.0.0}:${CN_774_GAME_PORT:-7190}"
+    protocol: "cn-774/game"
+    max_connections: 512
+    idle_timeout_seconds: 0
+- id: dialect.modern.messages
+  plugin: dialect.modern.messages
+  config:
+    protocol: "cn-774/game"
+    relay_protocol: "cn-774/relay"
+# The message adapters every build shares: the login burst, the main-menu install and the bag publication.
+# The build's sequence is its login values in packets/builds.yaml (it omits the gate list and the option sync,
+# which this profile's protocol row and client do not read).
+- id: dialect.messages
+  plugin: dialect.messages
+  config:
+    protocol: cn-774/game
+    login: true
+    main_menu_init: true
+    inventory: true
+    # The player menu's "view info": cn-774 sender sub_B277C0 (C2S 117), reader sub_BBA7A0, S2C 133
+    # (packets/fighter-info.yaml). Needs the lobby row's fighter_info.
+    fighter_info: true
+- id: lobby
+  plugin: lobby
+  # In the all-builds profile kr-1256's lobby already publishes IOnlinePlayers; this build's players are its own.
+  isolated_services:
+    - BubbleFighter.Fantasy.Contracts.Players.IOnlinePlayers
+  config:
+    protocol: "cn-774/game"
+    # cn-774 inherits the kr-1256 login codec (dialect.modern.messages) through its lineage.
+    # Known limitation: the password of gcpReqLogin is not checked, so any password logs in
+    # as the named account, and auto_create_players creates an unknown account on first login.
+    # authentication: ticket (the default) admits only redeemed launcher tickets; open admits any account name.
+    auto_create_players: true
+    fallback_username: "guest"
+    # Redeem launcher launch tickets at game login; needs the launcher.http row (BFF_LAUNCHER_TICKETS).
+    launcher_tickets: ${BFF_LAUNCHER_TICKETS:-false}
+    # ticket: every login must redeem a launcher ticket (needs the launcher.http row). open: any account name
+    # logs in, for a trusted LAN only. BFF_LOGIN_AUTHENTICATION sets it for every build at once.
+    authentication: ${BFF_LOGIN_AUTHENTICATION:-ticket}
+    # The build's logged-in players by account, for the player menu's "view info" (one realm per build in `all`).
+    online_players: true
+    fighter_info: true

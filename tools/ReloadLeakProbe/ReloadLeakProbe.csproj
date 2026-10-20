@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <ApplicationIcon>$(RepoRoot)src\BubbleFighter.Fantasy.Host\icon_odteam.ico</ApplicationIcon>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>ReloadLeakProbe</AssemblyName>
+    <RootNamespace>BubbleFighter.Fantasy.Tools.ReloadLeakProbe</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <!-- Measurement stability: the GC mode is part of the recorded environment and is
+         identical for every run of the matrix, so slopes are comparable across runs. -->
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Build fixture dependencies without referencing their types in the probe assembly. -->
+    <Compile Remove="fixtures\**\*.cs" />
+    <None Remove="fixtures\**\*" />
+    <ProjectReference Include="fixtures\pure\PureFixture.csproj"
+                      ReferenceOutputAssembly="false" OutputItemType="_PureProbeFixture" />
+    <ProjectReference Include="fixtures\leaky\LeakyFixture.csproj"
+                      ReferenceOutputAssembly="false" OutputItemType="_LeakyProbeFixture" />
+  </ItemGroup>
+
+  <Target Name="CopyProbeFixtures" AfterTargets="CopyFilesToOutputDirectory"
+          Condition="'$(DesignTimeBuild)' != 'true'">
+    <Error Condition="'@(_PureProbeFixture)' == '' or '@(_LeakyProbeFixture)' == ''"
+           Text="Fixture project outputs are missing; build the probe with its project references enabled." />
+    <Copy SourceFiles="@(_PureProbeFixture)" DestinationFolder="$(TargetDir)fixtures\pure" SkipUnchangedFiles="true">
+      <Output TaskParameter="CopiedFiles" ItemName="FileWrites" />
+    </Copy>
+    <Copy SourceFiles="@(_LeakyProbeFixture)" DestinationFolder="$(TargetDir)fixtures\leaky" SkipUnchangedFiles="true">
+      <Output TaskParameter="CopiedFiles" ItemName="FileWrites" />
+    </Copy>
+  </Target>
+
+</Project>

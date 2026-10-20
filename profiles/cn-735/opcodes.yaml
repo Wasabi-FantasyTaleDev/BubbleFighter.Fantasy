@@ -1,0 +1,71 @@
+profile: cn-735
+# Opcode assignments for the Chinese 735 client (CN2016 0.2.70.4). C2S and S2C are
+# separate numeric spaces. Login plus main-menu GotoRoom/GotoMenu are wired; shop,
+# tutorial, and plaza are not claimed here. See profiles/opcode-policy.md.
+opcodes:
+  - value: 1
+    direction: c2s
+    name: gcpFirstConnect
+    name_source: label@cn-735
+    evidence: verified
+    source: "UTF-16 name in BubbleFighterU.exe; ClientVersion_Major 735 from CrashReporter init sub_CE6140(735, 0, 0, ...)"
+    notes: "u32 ClientVersion_Major 735 first; remaining handshake fields shared with the legacy family"
+  - value: 19
+    direction: c2s
+    name: gcpReportLastCrash
+    name_source: label@cn-735
+    evidence: verified
+    source: "packet factory sub_A5D790 registers UTF-16 name length 0x12 through sub_419A20(..., 19)"
+    notes: "sent ahead of gcpFirstConnect after a crashed session; logged, not answered"
+  - value: 3
+    direction: c2s
+    name: gcpReqLogin
+    name_source: label@cn-735
+    evidence: verified
+    source: "serializer sub_835270: three wstr, adapter vector, u32 unknown3, u32 unknown4; UTF-16 gcpReqLogin"
+  - value: 2
+    direction: s2c
+    name: gspRepGamePatch
+    name_source: label@cn-735
+    evidence: verified
+    source: "packet factory sub_A5D3B0 registers UTF-16 name length 0xF through sub_419A20(..., 2)"
+  - value: 3
+    direction: s2c
+    name: gspRepLogin
+    name_source: label@cn-735
+    evidence: verified
+    source: "packet factory sub_A5C630 registers opcode 3; LoginResponse deserialize sub_A5C370, LoginNational sub_A5C570"
+    notes: "LoginResponse + LoginNational; success body ends with national flag 1 (no national wstr)"
+  - value: 17
+    direction: s2c
+    name: gspCenterList
+    name_source: label@cn-735
+    evidence: verified
+    source: "packet factory sub_A07F70 registers opcode 17; UTF-16 gspCenterList"
+  - value: 110
+    direction: s2c
+    name: gspGotoMenu
+    name_source: label@cn-735
+    evidence: verified
+    source: "packet factory sub_A5B160 registers opcode 110 with UTF-16 gspGotoMenu (off_1193A08, length 0xB); handler sub_A23050 reads bool32 notice then SetStage(2) when the post-login flag is set"
+    notes: "sent after gspGotoRoom so MainMenuStage opens; body false = 4 zero bytes"
+  - value: 111
+    direction: s2c
+    name: gspGotoLobby
+    name_source: label@cn-735
+    evidence: verified
+    source: "packet factory sub_A5B080 registers opcode 111 with UTF-16 gspGotoLobby (off_1193A20, length 0xC)"
+    notes: "number reserved; plaza path not wired for this profile"
+  - value: 112
+    direction: s2c
+    name: gspGotoRoom
+    name_source: label@cn-735
+    evidence: verified
+    source: "packet factory sub_A5AF50 registers opcode 112 with UTF-16 gspGotoRoom (off_1193A3C, length 0xB); reader sub_A4D6F0 embeds SessionSetting sub_4254D0, GameSetting sub_424D40, UserSlot sub_425A50, EquippedItemList sub_686EF0; handler sub_A23390 kind 1 SetStage(2) only when already past stage 2"
+    notes: "kind 1 SessionSetting installs the character session; gspGotoMenu then opens MainMenuStage after login"
+  - value: 106
+    direction: c2s
+    name: gcpReqGotoLobby
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-735 senders sub_7474C0 and sub_9FE720 stamp 106 through sub_DCE5D0 with an empty body, as cn-717 gcpReqGotoLobby does; the build has no class labels"

@@ -1,0 +1,922 @@
+# The client builds the packet tables are written for, and what each is based on.
+#
+# kr-812 is the baseline: it states every value. Every other build names a `base` and states only the
+# values that differ from it; a build that states nothing more is exactly its base. The same bases
+# decide which rows of the structure files (room.yaml, ...) a build follows: a row's `except`, `only`,
+# `also` or build-named replacement applies to the named build and to every build based on it.
+#
+# A build here is named after the profile that serves it (profiles/<build>/). The `base` is about
+# packet layouts only and may differ from the profile's own `parent:`.
+#
+#   needs_idle_party   whether the main menu's plaza gate needs the solo idle gspUpdateParty before
+#                      gcpReqGotoLobby can leave. Every legacy build's does unless shown otherwise.
+#   play               how the build's tutorial and play rooms differ in packets that are still written
+#                      in code. Each value is described where the baseline states it.
+#
+# Every function address names its client build.
+version: 1
+builds:
+
+  # KR 2015. The baseline of every build whose packet classes keep their names.
+  kr-812:
+    # kr-812 sub_6A0E10 selects the three maps and their accompanying strings;
+    # kr-812 sub_5BD770 sends the accompanying string before the selected map.
+    # cn-406 sub_595C70, cn-408 sub_652440, cn-706 sub_632A80,
+    # id-400 sub_60A550 and id-1809 sub_652530 copy the same grouped pairs
+    # from SessionSetting+88. cn-717 sub_6FE570 uses the corresponding
+    # fields after the omitted earlier members; the inherited field names stay stable.
+    room_round_setting_fields:
+      request_strings: [unknown_8, unknown_36]
+      target_strings: [unknown_340, unknown_256, unknown_368, unknown_284, unknown_396, unknown_312]
+    # Request scalar names at the native offsets; aliases do not assign field meaning.
+    # Readers kr-812 sub_5C8ED0 and cn-324 sub_586150 carry these values into GameSetting.
+    room_setting_change_fields:
+      third_string: unknown_60
+      first_flag: unknown_116
+      second_flag: unknown_117
+    capabilities:
+      # kr-812 sub_984930 rejects category 6 before confirming an expired-item discard.
+      # The same guard is in kr-1256 sub_8136F0, cn-774 sub_9B4BC0 and tw-454 sub_C12C40.
+      inventory_throw_excludes_category6: true
+      # Parties: kr-812 senders sub_929F40 (invite), sub_6D88F0 (accept), sub_839E50 (answer), sub_5EDDF0 (leave),
+      # sub_92A170 (kick), sub_92A270 (leader); S2C handlers sub_81CDF0, sub_81DEA0, sub_926900, sub_926B90,
+      # sub_9270C0, sub_926D90, sub_927290, sub_9285D0, sub_929180, sub_929370, sub_928C50. Layouts in
+      # packets/party.yaml. A build without one of the opcode rows turns this off.
+      party: true
+      # The player menu's "view info": gcpReqFighterInfo in, gspRepFighterInfo out (packets/fighter-info.yaml,
+      # packets/fighter-info.yaml). kr-812 sender sub_6C2EB0, reply reader sub_83DD00, handler sub_82C960
+      # (S2C 124 in kr-812 sub_837170). A build without the class turns this off.
+      fighter_info: true
+      # Clan game-connection frames are read in this build: kr-812 sub_844AB0 (passport), kr-812 sub_844FB0
+      # (mark info) and kr-812 sub_8407F0 (guild info). Its bodies differ from the modern table (the passport
+      # carries a leading word before the name and the mark info two counted tables), and no clan row runs on
+      # the legacy builds, so the capability stays off until a legacy profile states that shape; the legacy
+      # shapes are written beside the modern ones in packets/clan.yaml.
+      clan: false
+      # Map supply layouts and build-specific readers are in packets/map-supplies.yaml.
+      map_supplies: true
+      # Enables the award lottery and its event 176/177 consumers.
+      horde_lottery: true
+      # kr-812 sub_7FED80 updates live rows; sub_806790 sorts the HUD locally.
+      pve_points: true
+      # Mission consumers and resource groups are in packets/pve-rescue-missions.yaml.
+      rescue_missions: true
+      # kr-812 sub_7FEE30 retains result presentation data but does not install live point rows.
+      pve_rank_updates: false
+      direct_supply_effects: true
+      # NPC-kill Lucci: kr-812 sub_A1C640 sends C2S 736 / 2021, sub_50E1F0 sends the C2S 735 pickup;
+      # S2C 720 (sub_51AD80) creates and S2C 721 (sub_516570) removes the item. Layouts in
+      # packets/lucci-drops.yaml, rules in packets/lucci-drops.yaml.
+      lucci_drops: true
+      # Star modes 5 and 6: kr-812 sub_514830 sends C2S 732 and sub_50E0D0 the C2S 731 claim; S2C 716 (sub_51AB40)
+      # creates and S2C 717 (sub_5153D0) removes the star, all with the Lucci packets' serializers; the client
+      # reports its own count in gcpGameUpdateScoreOptimze kinds 6/15/7/16 (sub_75CE60, sub_75C680, sub_520A20).
+      # Rules in packets/builds.yaml.
+      star_items: true
+      # kr-812 sub_51AD80 builds GoHordeAward1/5/10LucciItem for S2C 720 kinds 3/4/5. A build whose
+      # 720 handler ignores or mishandles those kinds says false and never receives them.
+      horde_award_items: true
+      # kr-812 sub_525670 sends through sub_463080. The native selector chooses between
+      # local queue plus transport and transport-only modes; the server must not add a
+      # blanket self-echo without establishing the selected mode.
+      direct_item_effect_echo: true
+      # kr-812 sub_810C20 sends the nested validation report after inbound relay 1.
+      # This native support flag does not mount a listener or enable relay admission.
+      relay_validation_report: true
+      # Own seed-table readers, writers and relay dispatch cases are proven in
+      # the six post-CN2011 legacy clients; this does not mount a relay route.
+      native_scene_seed_tables: true
+      # kr-812 sub_804620 / sub_804B10 / sub_5AD030 install score and reward stages.
+      round_results: true
+      # kr-812 sub_51F780 -> sub_520A20 reports direct kills using both character references.
+      direct_kill_reports: true
+      # Baseline ordinary score admission uses the separately audited narrow reports.
+      character_reference_score_reports: false
+      # kr-812 sub_845500, dispatcher kr-812 sub_837170 case 107.
+      server_notice: true
+      # kr-812 sub_837170 case 0x326 -> sub_821620 -> sub_6D5890: a counted list of expired item ids, shown as
+      # notices only (the client removes nothing). Layout in packets/inventory.yaml ExpiredItems.
+      expired_item_notice: true
+      # The gift box. kr-812 sub_837170 cases 815..828 are the Present replies (RTTI Packet_gspRepPresent*), sent by the
+      # client's DlgSendPresent (kr-812 sub_96F350 -> sub_95C150 stamps C2S 816), DlgPresentList (kr-812 sub_960BE0 stamps
+      # C2S 813 / 814) and the accept path (kr-812 sub_960FC0). Layouts in packets/present.yaml, rules in
+      # packets/present.yaml. cn-324 and cn-279 number the family one higher; every build but the cn-735
+      # family has the same classes (the task-bar count words differ and are annotated in the table).
+      present_box: true
+      # Life-counted items. kr-812 sub_993080 (called by the ShopItem loader sub_9A04D0) maps durationType
+      # "endurance" to item kind 3 when feature switch 1210 is on, and sub_A62430 case 0, the default region,
+      # turns 1210 on. A kind 3 bag slot carries its life in the slot count (+8): kr-812 sub_6D6480 announces
+      # "[ Life xN ] remaining" from it for slots above zero, and kr-812 sub_978350 allows buying the item again
+      # only when that count is 0 or less. kr-812 sub_6D5890 has a "Life used up" notice for kind 3. cn-717
+      # follows (cn-717 sub_A3E550 parser, sub_A22020 buying check, sub_739E10 notice). The daily rule itself
+      # is the server's: the client has no per-login decrement. Rules in packets/inventory-use.yaml.
+      life_items: true
+      weapon_presets: true
+      instant_revival: true
+      # kr-812 sub_5B3640 and sub_687640 supply the ordinary matching selectors and result.
+      quick_matching: true
+      # kr-812 sub_837170 case 12 sets byte_E827DB; kr-812 sub_681FE0 selects CreateUserStage.
+      # The same flag drives the post-creation tutorial offer in kr-812 sub_685590.
+      character_creation: true
+      # kr-812 sub_839EC0 sends the empty gcpReqCheckCash (C2S 825); the S105 reply enables the
+      # waiting cash purchase dialog through kr-812 sub_81A820 -> sub_96FB40 -> sub_96F710.
+      cash_check_request: true
+      # kr-812's 802 repaints the bag cells (kr-812 sub_8211F0 -> sub_951810) and its recorded
+      # session carries no S2C 808/809 wear/removal result.
+      equip_result_reply: false
+    # Whether the wear and removal result (where equip_result_reply is on) follows the restated bag and view:
+    # cn-324 sub_70B280 rebuilds the room inventory from the bag it already holds when the result arrives.
+    equipment:
+      result_after_inventory: true
+      # The equipped view body (gspInventoryViewUpdateView): kr-812 sub_80A4F0 reads EquippedItemList.
+      view: EquippedItemList
+      # A local view publication: the view, then the preset bar (kr-812 sub_987BA0 stores the bar after the view).
+      local_view: [view, preset_update]
+    needs_idle_party: true
+    # The gcpReqLogin request and gspRepLogin reply layouts the legacy messages row reads and writes:
+    #   request_trailer     true: two u32 follow the adapter list (kr-812 sub_682370); false stops there
+    #   request_token       true: one more u32 follows the adapter list (read and ignored)
+    #   request_extra_wstr  true: one more wstr ends the request
+    #   login_response      true: the reply is LoginResponse then LoginNational instead of the legacy reply
+    login:
+      request_trailer: true
+      request_token: false
+      request_extra_wstr: false
+      login_response: false
+      # How the reply is written and the order of the publications a successful login sends. A build
+      # that differs states its own values; the burst below is the order every kr-812-based row sent
+      # before the sequence became data.
+      reply: legacy
+      main_menu: sender
+      burst: [login_reply, user_stat, inventory, equipment_view, main_menu, expired_items]
+    # The item shop's C2S 801 request and the S2C gspRepEnterShop catalog layout the shop row writes.
+    #   enter_request  empty (no body), token (u64), token_main (u64, then the u32 main tab)
+    #   catalog        the reply after its result word, then the card vector, an i64 and the category tree:
+    #     token          true: a has-data bool32 and the request's cache token follow the result
+    #     stock_type     u16 or u32: the width of each card stock's type field
+    #     tree           ordered (the workbook's card-linked mains in displayOrder), landing (the open
+    #                    main 1000 added when it has no card) or landing_defaults (also each main's
+    #                    default subcategory rows)
+    #     page_type      sheet (each subcategory's workbook page mode) or main (2: cards of the selected
+    #                    main, for clients whose sheet mode ignores the card vector)
+    #     trailer        none, ids (an empty counted u32 vector) or ids_main (that vector, then the
+    #                    echoed main category)
+    # kr-812's request writer kr-812 sub_6DA560 sends the token and the main tab; the reply echoes the main,
+    # which kr-812 sub_820CA0 hands to the dialog, and tab widgets are made in tree order (kr-812 sub_96DB90).
+    shop:
+      enter_request: token_main
+      catalog:
+        token: true
+        stock_type: u16
+        tree: ordered
+        page_type: sheet
+        trailer: ids_main
+    # What the lobby seeds and offers (lists replace the base's whole list):
+    #   creation_character_types  the native creation stage's characters; the created character is item
+    #                             300000 + type
+    #   starter_item_ids          the new bag, in bag order; every id must exist in the build's ShopItem table
+    #   starter_worn_ids          the worn subset of the starter bag
+    # kr-812's creation stage offers Dao (1) and Dizni (2); its ShopItem table carries these starter ids.
+    lobby:
+      creation_character_types: [1, 2]
+      starter_item_ids: [300001, 201001, 201003, 201004, 202001, 202003, 202004, 203001, 203003, 203004, 204001, 204003, 204004, 205001, 207001]
+      starter_worn_ids: [300001, 202001, 201001, 205001, 207001]
+    play:
+      tutorial:
+        # The prologue is the tutorial room's only wave map: in ServerShared/MapMeta.xml it alone has stageNum 0
+        # and no AIScriptFileName (its pirates come from NpcMode/rel_prologue_01*.lua); every sin_mission_* row
+        # is a numbered stage with its own goals. kr-812 sub_8E1240 builds SinglePlayGameStage only for mode 15,
+        # and that stage reads goalPangCount, goalHelpCount, goalPointArrive and the rest from the MapMeta row of
+        # the room's map key (kr-812 sub_6FF040); mode 103 builds the wave game stage, which a mission map
+        # cannot run. The same holds for every legacy build's own MapMeta.
+        wave_map_key: rel_prologue_01
+        # gspGotoRoom already sets the room master (kr-812 sub_68EAD0 -> sub_689F80, the same store as the 502 handler
+        # kr-812 sub_7FD460), and a gspRoomSetMasterSlotIdx that lands after the switch to the room stage shows the
+        # room-master notice (kr-812 sub_7FD460 -> sub_8E2A80), so the tutorial start does not send it.
+        master_slot_packet: false
+      # What starts a tutorial match: RoomEnterGame (the server sends gspRoomEnterGame itself) or
+      # RepAutoStart (the server sends gspRepAutoStart and the client asks to enter).
+      match_start: RoomEnterGame
+      wire:
+        # kr-812 sub_6E1350 -> sub_463080 -> sub_4620A0 has explicit local-only,
+        # local-plus-transport, and transport-only branches. The common room path
+        # does not establish which branch is selected, so preserve the host reply
+        # until a matching native scenario proves a sender exclusion.
+        spawn_group_applies_locally: false
+        # The server brings a dead player back when the wait ends (gspGameRespawnCharacter), instead
+        # of the client asking on its own.
+        server_revives: false
+        # gspGamePreCountDown is sent before gspGameCountDown.
+        pre_count_down_first: false
+        # A room whose creator chose no map is shown as the all-random entry: the key it has and the theme it
+        # sits under. Empty leaves such a room as the creator's client sent it.
+        # Every create path copies the startup map of Config/Lambient.xml (kr-812 sub_480730 and sub_480860
+        # through sub_480700), so a create never carries a choice; kr-812 sub_5C1080 passes session+188 to the
+        # thumbnail, and the host's start (kr-812 sub_5C3F80) draws a map for Random itself (sub_6A23A0).
+        unchosen_map_key: Random
+        unchosen_map_theme: All
+        # The pirate battle's all-random entry is its first difficulty's marker: a mode-101 create carries
+        # Random_Hot_Dif1 in the three map strings and All as the theme. kr-812 sub_C674B0 holds the literal; the host's start
+        # resolves it to one of that difficulty's maps (kr-812 sub_415D30 / sub_415F30 from sub_5C3F80).
+        unchosen_difficulty_mode: 101
+        unchosen_difficulty_map_key: Random_Hot_Dif1
+        # The leaver's gspRoomSetSession keeps the main-menu kind but restates the room just left: its title,
+        # open seats and GameSetting, with room number and state 0 and the leaver as the only occupant.
+        # kr-812 sub_7FD310 -> sub_6808C0 copies it whole into
+        # the session object the plaza seats and avatars are then built from (kr-812 sub_6CBFF0).
+        restate_left_room: true
+        # The plaza entry follows gspGotoLobby by about 120 ms on return from a room. The client switches
+        # stages on a later frame (kr-812 sub_8E1240 sets the pending stage, sub_A8B050 builds LobbyStage after the
+        # network pump), LobbyStage builds the plaza avatars once while it is constructed (kr-812 sub_672110 ->
+        # sub_6C7450 -> sub_6CC6F0), and leaving the room deletes the own avatar (kr-812 sub_7FDE50 -> sub_6CBF40).
+        plaza_entry_settle_ms: 150
+      # The room master starts the match with gcpUserHostStart.
+      host_start: true
+      # kr-812 sub_7FF340 / sub_806550 select stage 5 for isSinglePlayTutorial;
+      # kr-812 sub_8E1240 / sub_660D50 require mode 103 for the prologue NPC context.
+      # Its load report must release the one-seat loading gate before native waves run.
+      one_seat_waves: true
+      # Ordinary NPC waves use the same native exchange independently of tutorial entry.
+      # id-400 sub_986B20 / sub_985620 and id-1809 sub_9A5720 / sub_9A4220 prove the host/peer gate.
+      npc_waves: true
+      # Only inbound kill-credit codecs are gated here. Native result output is independently
+      # selected by capabilities.round_results so unaudited reports do not suppress rewards.
+      score_reports: true
+      # How the score packets are shaped. The seat rows are the ScoreRow table of score.yaml.
+      score:
+        # One gcpGameUpdateScore of eight u32 carries both the knock-down and the finishing blow, instead
+        # of the 16-byte gcpGameUpdateScore and a separate gcpGameUpdateScoreOptimze.
+        wide_report: false
+        # The build has gspUpdateScoreData; without it the whole scoreboard is sent after every report.
+        live_score_packet: true
+        # ScoreData field order, defaults and fixed counts live in score.yaml.
+        # gspGameEndGame carries the outcome in its first word instead of its second.
+        outcome_first: false
+        npc_team_outcome: true # kr-812 sub_5ACB20 compares local UserSlot+124 with the end word.
+        # Star modes: the client reports its own count in gcpGameUpdateScoreOptimze (kr-812 sub_52D9E0) with
+        # kind 6 for a small star taken or started with (sub_75CE60, sub_661AF0), 15 for a big one (sub_75C680),
+        # 7 and 16 for each small or big star dropped (sub_520A20, sub_5632F0).
+        star_report: Optimized
+        star_small_gained: 6
+        star_big_gained: 15
+        star_small_lost: 7
+        star_big_lost: 16
+        # What gspGameTimeOverEnd carries; its handler opens the score stage of the result scene.
+        # TeamTotals: two bytes, the totals of teams 1 and 2 (reader kr-812 sub_80A530), sent 3 s after
+        # gspGameEndGame when the time limit ended the round.
+        # Scoreboard: the whole ScoreData block, sent at every end.
+        time_over_end: TeamTotals
+
+  # CN2013: own login, room-entry and result readers use the shared ID2014 lineage.
+  # KR final client. The baseline of the modern family, whose packet classes lost their names; its room and
+  # round layouts are restated as `Name@kr-1256` where they differ. Nothing below kr-812's capabilities is
+  # audited for it yet, so each is off until its consumer is read in this build.
+  kr-1256:
+    # kr-1256 sub_6141A0 copies the selected pair; sub_89BA30/sub_113C770
+    # locate the retained GameSetting. sub_96BA90 displays selections +144/+192/+240.
+    room_round_setting_fields:
+      request_strings: [unknown_4, unknown_28]
+      target_strings: [unknown_168, unknown_144, unknown_216, unknown_192, unknown_264, unknown_240]
+    # A room whose master has not picked a map shows the all-random entry. The create request carries the startup
+    # map (kr-1256 sub_9620B0 copies it from the startup configuration into the builder kr-1256 sub_962200), never a
+    # choice. The room screen kr-1256 sub_96BA90 compares the three round-map keys (GameSetting +144, +192, +240, read
+    # at session +284, +332, +380) with the client's Random literal (kr-1256 sub_1135A50) and then shows the
+    # all-random picture; kr-1256 sub_9EB6C0 makes the same test on the start block's first string (+44). The start
+    # block's resolved strings (+68, +92, +116) and each round's second string are emptied, so the host's start
+    # carries no startup map and the server draws the round's map.
+    room_unchosen_map:
+      unknown_44: Random
+      unknown_68: ""
+      unknown_92: ""
+      unknown_116: ""
+      unknown_144: Random
+      unknown_168: ""
+      unknown_192: Random
+      unknown_216: ""
+      unknown_240: Random
+      unknown_264: ""
+    # The pirate battle's own all-random entry: a mode-101 create carries the first difficulty's marker in its round
+    # keys (the client's own create request), so that room shows the marker in place of Random and the host's start
+    # resolves it to one of that difficulty's missions.
+    room_unchosen_difficulty:
+      mode: "101"
+      key: Random_Hot_Dif1
+    # The master's map change, C2S gcpRoomChangeGameSetting: kr-1256 sub_96CF30 fills the request and kr-1256
+    # sub_5E1490 sends it (display name, map key, scene key, then the room's mode at +104). The room shows the map in
+    # the start block's four strings; a pirate mission (scene npc_...) stays in every map string, because the mission
+    # key is what loads the mission's stage. The room's GameSetting reaches every member through
+    # gspRoomChangeGameSetting (kr-1256 sub_9DB8A0 reads it whole and redraws the room through sub_96BA90).
+    room_setting_change_map:
+      request: { name: unknown_0, key: unknown_24, scene: unknown_48, mode: mode }
+      targets: { selection: unknown_44, key: unknown_68, current: unknown_92, name: unknown_116 }
+      mission_prefix: npc_
+    # The custom AI-war rooms (modes 38 and 39, wgtNoItemCustomAiWar and wgtTeamSurvivalCustomAiWar) let the master
+    # add computer players: kr-1256 sub_9681C0 builds the add panel only while the room's session byte +72 is set,
+    # and sub_9D9250 copies that byte from the install's SessionSetting (sub_63EE00). The create request carries 0.
+    room_ai_seat:
+      field: unknown_72
+      modes: ["38", "39"]
+    # The launcher login body ends with one more wstring (kr-1256 sub_10C6A00: prefixed session, HWID,
+    # empty platform string, adapter list, two words, old-platform string). The reply is the modern table
+    # form: a server session identity, the Dao character type, channel 99 (a nonzero channel arms the
+    # room-list poll, kr-1256 sub_8530C0) and a zero server time. The menu is the table-driven kind-1
+    # gspGotoRoom install (kr-1256 sub_10D4520, handler sub_9AC490), and the burst is the modern sequence
+    # with the empty gate table and option sync.
+    login:
+      request_trailer: true
+      request_extra_wstr: true
+      reply: modern
+      main_menu: table
+      channel_id: 99
+      # The expiry notice is the last publication: the bag above already lacks the removed rows and the
+      # client shows one notice per id once the menu exists (kr-1256 sub_93C6E0).
+      burst: [login_reply, user_stat, user_money_stat, user_pcroom_stat, center_list, update_party, option_sync, inventory, main_menu, equipment_view, first_move_channel, expired_items]
+
+    base: kr-812
+    # Its rooms and rounds are served by the modern family's own room binding, which reads these tables;
+    # the legacy room writer does not take this build or the builds based on it.
+    # The result goes ahead of the bag: kr-1256 sub_9B34D0 applies the slot itself through sub_806CE0.
+    equipment:
+      result_after_inventory: false
+      # gspInventoryViewUpdateView is the player's profile record (kr-1256 sub_9AF2F0 -> sub_81CCE0), the same record
+      # the room install carries as RoomProfileEntry.
+      view: RoomProfileEntry
+      # The view handler rewrites the profile record the preset packets fill (kr-1256 sub_9C3880 -> sub_81B820), so
+      # the preset reply and list come first.
+      local_view: [preset_reply, preset_update, view]
+      # Preset records written into the list, one per page; the shipped bar carries three.
+      preset_pages: 3
+    family: modern
+    # The modern bag family. kr-1256 sub_FA5520 unwraps a u32 compressed length and one zlib stream
+    # before the 802/803/808 readers run (kr-1256 sub_9AE4A0, kr-1256 sub_9AEB10, dispatch case 808);
+    # the 810 cash inventory is never enveloped (kr-1256 sub_10D8150 reads the count itself). The slot
+    # record is InventorySlot@kr-1256 in packets/inventory.yaml.
+    inventory:
+      envelope: zlib
+      # `mirror` publishes the stored slots in their stored order, with their own identity fields.
+      # `ranked` (the legacy baseline) sorts ascending by item id, drops empty rows on a restatement
+      # and needs the connection's inventory time origin for the remaining-day counts.
+      rows: mirror
+      # The packets a whole-bag restatement sends, in order: bag = gspInventoryUpdateAllInventorySlot
+      # over the character bag, equipped = gspInventoryUpdateInventorySlots over the equipped bag,
+      # articles = gspUpdateAllArticleSlot (empty), cash = gspCashInvenUpdateAllInventorySlot (empty).
+      replaced: [bag, equipped, articles, cash]
+      # After a purchase: the character bag, then the same bag as the slots packet's first container.
+      purchase: [bag, slots]
+      # A changed-slot publication.
+      changed: [changed]
+    capabilities:
+      # Party invitation packets are bound for this build (packets/party.yaml).
+      # Native invitation and member-appearance acceptance remain outstanding.
+      party: true
+      # Clan bodies are stated for this build in packets/clan.yaml: readers kr-1256 sub_99C1D0 (passport),
+      # kr-1256 sub_99CFA0 (mark info), kr-1256 sub_9B2690 (guild info) and kr-1256 sub_10C5590 (attendance
+      # state, a modern-only packet). The empty client requests are the writers that stamp C2S 25, 2040 and
+      # 2041 without a body. One open question is recorded in that file: the passport body may need a leading
+      # word (16 bytes as sent today, 20 if the client reads it).
+      clan: true
+      # kr-1256 sender sub_9319E0 (C2S 118), reader sub_99A430, handler sub_9BCE60 (S2C 133); the reply layout is
+      # FighterInfoReply@kr-1256 in packets/fighter-info.yaml.
+      fighter_info: true
+      life_items: false # The modern family's item kinds are not audited.
+      map_supplies: false
+      horde_lottery: false
+      pve_points: false
+      rescue_missions: false
+      pve_rank_updates: false
+      direct_supply_effects: false
+      lucci_drops: false
+      star_items: false
+      horde_award_items: false
+      direct_item_effect_echo: false
+      relay_validation_report: false
+      native_scene_seed_tables: false
+      round_results: false
+      direct_kill_reports: false
+      character_reference_score_reports: false
+      # kr-1256 sub_9D2FF0 case 114 gspServerChatNoticeMsg -> sub_9BE620 (reader sub_99C8A0) shows the text in the chat
+      # log; layout ServerNotice@kr-1256 in packets/server-notice.yaml.
+      server_notice: true
+      # kr-1256 sub_9D2FF0 case 836 and sub_9C3880 (837) read the tabled reply and list (packets/weapon-presets.yaml).
+      weapon_presets: true
+      instant_revival: false
+      quick_matching: false
+      # kr-1256 sub_9D2FF0 case 12 sets the creation flag (S2C 12 gspNotifyCreateUserInfo, no body);
+      # kr-1256 sub_5CCC60 builds C2S 31, kr-1256 sub_9A4E90 the S2C 13 name reply and the C2S 32 body, and
+      # kr-1256 sub_9A46A0 S2C 14 plus the empty C2S 33 login-after - packets/character-creation.yaml.
+      character_creation: true
+      cash_check_request: false
+      # kr-1256 sub_9B34D0 (S2C 811) and sub_9B3E00 (S2C 812) apply the slot and show the result text.
+      equip_result_reply: true
+      # S2C 807 gspCheckExpiredTimeResult: dispatch case 807 (kr-1256 sub_9D2FF0) runs kr-1256 sub_998FB0
+      # into the reader kr-1256 sub_999C00 (u32 count, then that many 4-byte ids) and the consumer
+      # kr-1256 sub_93C6E0, so the row can send it. Layout is ExpiredItems in packets/inventory.yaml.
+      expired_item_notice: true
+      # The gift box stays off until the kr-1256 shop row mounts it; the mount is the S6 shop task
+      # (ShopPlugin's kr1256 catalog branch), not this slice. The client readers are in packets/present.yaml.
+      present_box: false
+
+  # CN 2019 (ClientVersion_Major 774), kr-1256's lineage. Named so a capability can be stated for it; its layouts are
+  # kr-1256's unless a table says otherwise.
+  cn-774:
+    # cn-774 sub_492EB0 has a distinct GameSetting; selector destinations and consumer gates are still pending.
+    room_round_setting_fields:
+      target_strings: []
+    # Its GameSetting is restated with other fields; which ones the room screen tests for Random is not read yet.
+    room_unchosen_map: ~
+    room_unchosen_difficulty: ~
+    # Its map change request and session words are laid out differently and not yet read.
+    room_setting_change_map: ~
+    room_ai_seat: ~
+    base: kr-1256
+    # The protocol row already sends the gate list after the patch reply and the bundle reads no option
+    # sync, so the login burst omits those two publications; the rest is kr-1256's sequence.
+    login:
+      burst: [login_reply, user_stat, user_money_stat, user_pcroom_stat, update_party, inventory, main_menu, equipment_view, first_move_channel]
+    # cn-774 sub_1063790 (802) and sub_1063970 (803/808) read the count straight off the stream; no
+    # zlib unwrap exists on that path, and the 803 reader stops after the slots container (restated
+    # as InventorySlots@cn-774). tw-454 writes the same plain bodies.
+    inventory:
+      envelope: plain
+    capabilities:
+      present_box: false # Its gift packets are read (packets/present.yaml), but no modern shop path serves them.
+      # The invitation, accept and refusal packets are tabled, but the inviter sender (C2S 111) and the member list's
+      # profile collection (cn-774 sub_105A3C0) are not proven, so no party row runs here.
+      party: false
+      # The clan passport (cn-774 sub_BA3C80) and guild info (cn-774 sub_BB0F60) readers agree with kr-1256, but the
+      # mark-info and attendance bodies are parsed through container objects (cn-774 sub_105B970) and are not
+      # established, so the inherited capability is turned off here until they are read (packets/clan.yaml).
+      clan: false
+      # cn-774 sender sub_B277C0 (C2S 117), reader sub_BBA7A0 (S2C 133: a result, two FighterInfo, two strings and
+      # four words, the kr-1256 shape with cn-774's own FighterInfo).
+      fighter_info: true
+      # cn-774 sub_BCF090 case 114 (gspServerChatNoticeMsg) calls cn-774 sub_4BEE30, which only returns 1; tw-454
+      # sub_AACF80 case 112 calls the same empty tw-454 sub_4AE240. The notice is not shown, so none is sent.
+      server_notice: false
+      # The preset envelope matches kr-1256 but its entry shape is not proven (packets/weapon-presets.yaml).
+      weapon_presets: false
+      # Creation is kr-1256's by inheritance only; cn-774's own C2S 32 record words and S2C 12/14 users are not
+      # read, so the inherited capability is turned off here until they are (packets/character-creation.yaml).
+      character_creation: false
+
+  # TW 2019 (ClientVersion_Major 454), cn-774's lineage.
+  tw-454:
+    # tw-454 sub_48ADF0 has a distinct GameSetting; selector destinations and consumer gates are still pending.
+    room_round_setting_fields:
+      target_strings: []
+    base: cn-774
+    capabilities:
+      present_box: false # As cn-774.
+      # As cn-774; the failure codes of S2C 117 are also unproven.
+      party: false
+      # As cn-774: its clan readers were not read, so this build does not inherit the enabled capability.
+      clan: false
+      # tw-454 sender sub_8D91C0 (C2S 117) is read; the reply reader S2C 131 was located as sub_A97DD0 (dispatcher
+      # sub_AACF80, disassembly fallback), but the body it reads replaces this build's pre-move compact reply, so the
+      # capability stays off until that byte change is accepted.
+      fighter_info: false
+      # As cn-774: the creation packets are not audited for this build either.
+      character_creation: false
+
+  cn-406:
+    base: id-400
+    # No weapon preset packets in this build's table: the equipped view is published alone.
+    equipment:
+      local_view: [view]
+    # The 2012-era starter set of cn-324, which this build's ShopItem table carries.
+    lobby:
+      starter_item_ids: [300001, 201001, 202001, 203001, 204001, 207001]
+      starter_worn_ids: [300001, 202001, 201001, 207001]
+    capabilities:
+      party: false # No party opcode row is reviewed into this build's table yet.
+      # No gcpReqCheckCash row is reviewed into this build's opcode table yet.
+      cash_check_request: false
+      # cn-406 sub_43AEA0 -> sub_42ADA0 reports victim/scorer words in modes 13/14/18.
+      direct_kill_reports: true
+      rescue_missions: false # Native mission-resource activation is still under audit.
+      # cn-406 sub_41F480 reads nine drop words; sub_7137B0 reads four switch words.
+      map_supplies: true
+      horde_lottery: false
+      # cn-406 sub_440310 -> sub_428AE0 queues the direct effect locally.
+      direct_supply_effects: true
+      # cn-406 sub_708710 / sub_7087A0 install ScoreData; sub_645500 advances rewards.
+      round_results: true
+      server_notice: false
+      weapon_presets: false
+      instant_revival: false
+      # cn-406 sub_738290 sets its creation flag on S2C 11; the creation codecs are not reviewed yet.
+      character_creation: false
+    play:
+      npc_waves: false # Browser-only acceptance; native NPC rounds remain unaudited.
+      one_seat_waves: false # Its prologue stage consumers are not audited; keeps the mode-15 entry.
+      match_start: RepAutoStart # Its room-enter consumer is not audited; keeps the client-driven start.
+      wire:
+        # No caller of the gcpRespawn sender cn-406 sub_42DF70 times the death on its own: the callers are
+        # the gspGameRespawnCharacter handler cn-406 sub_436D30 (case 730), the gspRequestRespawnIdx handler
+        # cn-406 sub_4397A0 and round-start or team paths, as on id-400. The round brings the player back.
+        server_revives: true
+        # The executable holds no Random_Hot_Dif marker, so the pirate battle shows the plain all-random entry.
+        unchosen_difficulty_map_key: ""
+      # The inherited ID2014 local-spawn policy is independently confirmed:
+      # cn-406 sub_5E4840 -> sub_428AE0 copies while session+9494 is clear;
+      # cn-406 sub_428BA0 dispatches through GameContext virtual slot +28.
+
+  # China 2014 0.2.46.001 (cn-404 sub_7CA490 sends ClientVersion_Major 404). Its packet classes are
+  # id-400's: of 604 classes with a reader or writer, the normalised bodies differ only in GameSetting's
+  # tail, UserSlot's +180 block, the twelve-seat ScoreData, the third loading flag and the chat suffix,
+  # which the structure files annotate. The values below are id-400's; the functions id-400's entry
+  # cites have matching bodies here (cn-404 sub_6946D0, sub_4B9410, sub_5D8330, sub_4C78B0, sub_88E720,
+  # sub_5887F0, sub_7B7AA0; cn-404 sub_7AF3F0 reads the nested ScoreData of gspGameTimeOverEnd).
+  cn-404:
+    base: id-400
+    # Native creation stays off, as on cn-706: the creation codecs match id-400's, but which character
+    # pair this build's creation stage offers is not reviewed (cn-404 sub_82C350 names 1, 2, 11 and 12
+    # alike), and a pair the lobby does not list is refused.
+    capabilities:
+      character_creation: false
+    # The starter bag this build was brought up with (kr-812's); its ShopItem table is not audited
+    # against id-400's smaller set.
+    lobby:
+      starter_item_ids: [300001, 201001, 201003, 201004, 202001, 202003, 202004, 203001, 203003, 203004, 204001, 204003, 204004, 205001, 207001]
+      starter_worn_ids: [300001, 202001, 201001, 205001, 207001]
+
+  # China 2014 0.2.48.001 (cn-408 sub_7CDA60 sends ClientVersion_Major 408). Its eight dispatchers have
+  # cn-404's case sets, and of 595 packet classes the derived wire shapes differ in three: UserSlot reads
+  # one more bool (+209), gspRoomEnterGame ends with one more bool, and gppKnocked ends with one more
+  # bool (cn-408 sub_4B0470; relayed as the peer sent it). ScoreData keeps its wire order and only moves
+  # in memory (cn-408 sub_7B0C60). The values are cn-404's.
+  cn-408:
+    base: cn-404
+    capabilities:
+      # cn-408 sub_934B60 adds the category-6 guard through sub_4A5930 before confirmation.
+      inventory_throw_excludes_category6: true
+
+  # Indonesia 2014.
+  id-400:
+    base: kr-812
+    # id-400 sub_5E8B10 writes three strings and the adapter list and stops; its reply reader id-400
+    # sub_798BB0 stops after u32 unknown6.
+    login:
+      request_trailer: false
+    # id-400's request writer id-400 sub_63B750 sends only the token. Its reader id-400 sub_799330 stops after
+    # the tree; the dialog id-400 sub_7A9A90 opens main 1000 and the tab click id-400 sub_8E1F40 needs it in
+    # the tree, sub_8E4BB0 reads each main's default subcategory, and sub_8E4C00 filters by main on page 2.
+    shop:
+      enter_request: token
+      catalog:
+        tree: landing_defaults
+        page_type: main
+        trailer: none
+    # The Indonesian creation stage offers Leo (item 300011) and Lavi (300012); id-400 sub_7FBB80 handles
+    # selections 11 and 12 beside 1 and 2. This build's ShopItem table carries six of the starter ids.
+    lobby:
+      creation_character_types: [11, 12]
+      starter_item_ids: [300001, 201003, 202003, 203003, 204003, 207001]
+      starter_worn_ids: [300001, 202003, 201003, 207001]
+    capabilities:
+      # id-400 sub_8F7880 goes directly from the expired-row guard to confirmation and sub_8F8790.
+      inventory_throw_excludes_category6: false
+      # The id-400 executable has no "endurance" duration type and no Life notice text, so the lineage
+      # (cn-406, cn-404, cn-408, cn-706) has no life items.
+      life_items: false
+      # id-400 sub_9068A0 calls sub_8CB4D0, which stamps C2S 825 on an empty packet. The S105
+      # handler id-400 sub_7A38E0 refreshes the open shop's cash dialog through sub_8E2E40, as
+      # kr-812 sub_81A820 does through sub_96FB40.
+      cash_check_request: true
+      # id-400 sub_49DF40 -> sub_48D2F0 uses victim/scorer words in the wide report.
+      direct_kill_reports: true
+      # id-400 sub_49DF40/sub_4A0390 emit ordinary kinds 1/2 with victim/scorer words.
+      # cn-406 sub_43AEA0/sub_43CF70 -> sub_42ADA0 prove the inherited interpretation.
+      character_reference_score_reports: true
+      # id-400 sub_786070 installs summed points and ranks in the native live rows.
+      pve_rank_updates: true
+      # id-400 sub_4A3C40 -> sub_48B020 queues a local copy when the native relay gate is clear.
+      direct_item_effect_echo: false
+      # id-400 sub_4992A0 builds only kinds 1 and 2 of S2C 720 and returns for 3/4/5; the
+      # build has no GoHordeAward*LucciItem class and no C2S horde-award request.
+      horde_award_items: false
+    play:
+      wire:
+        # id-400 sub_65EC10 -> sub_48B020 sends and queues a copy while session+10214 is clear;
+        # id-400 sub_48B0E0 dispatches that copy through GameContext virtual slot +28.
+        spawn_group_applies_locally: true
+        # A pirate death sends gcpPveUseRevival at zero HP (id-400 sub_592B00, modes 101 and 16), and the
+        # death-timer end (id-400 sub_499640) then sends neither gcpRespawn nor gcpRequestRespawnIdx, so the
+        # round brings the player back with gspGameRespawnCharacter (dispatcher id-400 sub_48A090 case 730),
+        # as cn-324 does. Where the client times its own respawn, its revival clears the round's wait first.
+        server_revives: true
+      # The prologue keeps kr-812's horde-tutor mode 103: the stage-5 factory id-400 sub_858ED0 builds
+      # the ordinary game stage for it, and the GameStage ctor id-400 sub_5CB050 (0x5CB557) arms the NPC
+      # context for modes 9/101/102/103 as kr-812 sub_660D50 does. Mode 15 selects SinglePlayGameStage.
+      score:
+        npc_team_outcome: false # Pending this build's horde result consumer audit.
+        rescue_credit: false # Pending this build's rescue score report audit.
+        live_score_packet: false # id-400 sub_78B430 installs the complete ScoreData block.
+        # The star touch handlers id-400 sub_6E8A60 / sub_6E82A0 report through gcpGameUpdateScore (id-400 sub_48D2F0).
+        star_report: Full
+        # id-400 sub_782D30 reads nested ScoreData; id-400 sub_78B4D0 passes it to id-400 sub_78C4E0.
+        time_over_end: Scoreboard
+      # No gcpUserHostStart class in this build (gspRepAutoStart gate id-400 sub_626970). The tutorial
+      # still starts the kr-812 way: the room dispatcher id-400 sub_7833E0 case 0x1FE -> sub_786480 takes
+      # gspRoomEnterGame case 0 without an armed automatic start, so the server sends it itself.
+      # gspRepAutoStart would run the room's five-second automatic-start countdown first.
+      host_start: false
+      score_reports: false          # Inbound score-report layout is not yet audited.
+
+  # Indonesia 2015. Its packets are kr-812's almost everywhere; only the seat is closer to id-400's.
+  id-1809:
+    base: kr-812
+    # id-400's request plus one u32 after the adapter list: id-1809 sub_632220 writes this[26], which the login
+    # routine id-1809 sub_633060 fills from a four-byte key; the reply reader id-1809 sub_7BE790 is id-400's.
+    login:
+      request_trailer: false
+      request_token: true
+    # id-1809's request writer id-1809 sub_676990 sends only the token; id-1809 sub_90DD50 filters a
+    # main tab as id-400 sub_8E4C00 does, with its own card layout.
+    # Its reader id-1809 sub_7BEFF0 reads id-400's catalog and then one counted u32 vector of unproven content.
+    shop:
+      enter_request: token
+      catalog:
+        tree: landing_defaults
+        page_type: main
+        trailer: ids
+    # The Indonesian creation stage offers Leo (item 300011) and Lavi (300012); id-1809 sub_81BD80
+    # handles selections 11 and 12 beside 1 and 2, as id-400 sub_7FBB80 does.
+    lobby:
+      creation_character_types: [11, 12]
+    capabilities:
+      # The id-1809 executable has no "endurance" duration type and no Life notice text.
+      life_items: false
+      # id-1809 sub_7E66F0 sends C2S 825 from the gspRepEnterShop handler sub_7CE2C0, as id-400 does.
+      cash_check_request: true
+      # id-1809 sub_4F3E50 constructs kind 3 at 0x4F4999 before sub_501890.
+      direct_kill_reports: true
+      # id-1809 sub_7A9700 installs summed points and ranks in the native live rows.
+      pve_rank_updates: true
+    play:
+      wire:
+        # The round brings a pirate death back with gspGameRespawnCharacter (dispatcher id-1809 sub_4DF530
+        # case 730), as on id-400.
+        server_revives: true
+      # id-1809 sub_693260 -> sub_448A10 retains the baseline network-mode spawn policy;
+      # it does not use ID2014's unconditional timestamped local copy.
+      # The prologue keeps kr-812's mode 103: the stage-5 factory id-1809 sub_87F800 and the GameStage
+      # ctor id-1809 sub_613FE0 (0x6144C5, modes 9/101/102/103) match kr-812 sub_8E1240 / sub_660D50.
+      score:
+        npc_team_outcome: false # Pending this build's horde result consumer audit.
+        live_score_packet: false # id-1809 sub_7AEF50 installs the complete ScoreData block.
+      # No gcpUserHostStart class (gspRepAutoStart gate id-1809 sub_63ED50); the tutorial starts on the
+      # server's gspRoomEnterGame as on kr-812 and id-400.
+      # MapMetaData keeps six bools (reader id-1809 sub_416C60, packet pair id-1809 sub_7BD770 / id-1809 sub_7BD7C0).
+      host_start: false
+      # id-1809 sub_4F3510 -> sub_4E2900 emits kind 1; sub_4F5160 emits optimized kind 2.
+      score_reports: true
+
+  # China 2015.
+  cn-717:
+    base: kr-812
+    # This build's ShopItem table carries ten of kr-812's starter ids.
+    lobby:
+      starter_item_ids: [300001, 201001, 201004, 202001, 202004, 203001, 203004, 204001, 204004, 207001]
+      starter_worn_ids: [300001, 202001, 201001, 207001]
+    play:
+      score:
+        npc_team_outcome: false # Pending this build's horde result consumer audit.
+
+  # China 2016 (0.2.70.4). cn-738 and cn-742 share these layouts through their profiles' lineage.
+  cn-735:
+    capabilities:
+      fighter_info: false # The export carries no Packet_gcpReqFighterInfo or Packet_gspRepFighterInfo class; the modern shape is not located.
+      direct_kill_reports: false # Modern score-event semantics are outside this legacy audit.
+      rescue_missions: false # The modern mission lifecycle is outside this legacy audit.
+      pve_points: false # The modern cooperative point consumer is outside this legacy audit.
+      pve_rank_updates: false
+      map_supplies: false
+      horde_lottery: false
+      direct_supply_effects: false
+      direct_item_effect_echo: false
+      native_scene_seed_tables: false # The modern family has not been audited for native seed exchange.
+      lucci_drops: false # The modern family's drop packets are outside this legacy audit.
+      horde_award_items: false
+      # This modern family is not part of the legacy notice audit yet.
+      server_notice: false
+      expired_item_notice: false
+      # No Packet_gspRepPresent* or Packet_gcpReqPresent* class is labelled in cn-735, whose packets are the modern family's.
+      present_box: false
+      life_items: false # The modern family's item kinds are not audited.
+      weapon_presets: false
+      instant_revival: false
+      character_creation: false
+      quick_matching: false
+    base: cn-717
+    # gcpReqLogin matches cn-717 (serializers cn-735 sub_835270, cn-738 sub_862510, cn-742 sub_796D70);
+    # gspRepLogin is LoginResponse + LoginNational (deserializers cn-735 sub_A5C370, cn-738 sub_A7E660,
+    # cn-742 sub_9C6420). cn-738 and cn-742 follow it through their profiles' lineage.
+    login:
+      login_response: true
+      # The response pair carries the user state itself, so no separate stat publication is sent.
+      burst: [login_reply, inventory, equipment_view, main_menu, expired_items]
+    # No party gate has been proven for this build's main menu.
+    needs_idle_party: false
+    play:
+      npc_waves: false # Modern-family NPC exchange remains outside this audit.
+      wire:
+        # Modern map presentation has not been included in the legacy consumer audit.
+        unchosen_map_key: ""
+        unchosen_map_theme: ""
+        restate_left_room: false # The modern leave path is outside the legacy audit.
+        plaza_entry_settle_ms: 0
+
+  # China 2012.
+  cn-324:
+    # No weapon preset packets in this build's table: the equipped view is published alone.
+    equipment:
+      local_view: [view]
+    # cn-324's request writer cn-324 sub_5C7C90 sends no body, so every open gets the same catalog.
+    # Packet_gcpReqLogin (cn-324 reader sub_583DD0) stops after the adapter list, as id-400's; cn-279's
+    # writer cn-279 0x420100 is the same.
+    login:
+      request_trailer: false
+    # Its reader cn-324 0x6FE040 has no has-data, token or trailer; the tab click cn-324 sub_7F82B0 needs the
+    # open main 1000 (cn-324 sub_7087A0) in the tree, and cn-324 sub_7FA680 uses the sheet's page modes.
+    shop:
+      enter_request: empty
+      catalog:
+        token: false
+        tree: landing_defaults
+        trailer: none
+    # The 2012 ShopItem table carries six of kr-812's starter ids; cn-279's 2011 table carries the same six.
+    lobby:
+      starter_item_ids: [300001, 201001, 202001, 203001, 204001, 207001]
+      starter_worn_ids: [300001, 202001, 201001, 207001]
+    room_setting_change_fields:
+      third_string: unknown_12
+      first_flag: unknown_20
+      second_flag: unknown_21
+    capabilities:
+      # cn-324 sub_803EF0 and cn-279 sub_6618E0 confirm expired rows without the later category-6 guard.
+      inventory_throw_excludes_category6: false
+      # The cn-324 and cn-279 executables have no "endurance" duration type and no Life notice text.
+      life_items: false
+      direct_kill_reports: false # Preserve the existing CN2012 wide kind-3 admission.
+      # cn-324 sub_4729E0 handles only kinds 1 and 2 of S2C 720 and then calls through a null item
+      # for any other kind, so kinds 3/4/5 must never be sent; the build has no horde-award request.
+      horde_award_items: false
+      # cn-324 sub_6EE890 installs native live points and ranks from the row vector.
+      pve_rank_updates: true
+      # No reviewed weapon-preset packet family is mounted for this early client.
+      weapon_presets: false
+      # cn-324 sub_714540 case 11 / cn-279 sub_6FFDE0 case 11 select the creation stage before login success.
+      character_creation: true
+      # cn-324's 801/802 (cn-324 sub_7089E0 / sub_708AC0) only update the slot model; its 808
+      # handler cn-324 sub_70B280 drives the bag UI from the one-i32 result. cn-279 carries both
+      # classes at 808/809 in its own label map.
+      equip_result_reply: true
+    base: kr-812
+    play:
+      tutorial:
+        old_map_key: rel_Tutorial_01
+        old_mode: 1                   # cn-324 sub_45C480 / cn-324 sub_45C3F0 require a team mode for blue and #spawn_T
+        master_slot_packet: true      # cn-324 sub_6ED2D0 takes the master seat only from gspRoomSetMasterSlotIdx
+      # The tutorial match starts the way cn-717's does: the server sends gspRoomEnterGame itself, so
+      # the player never sees the room. This build has no gcpUserHostStart class, and a live session
+      # showed the client ignoring S2C 520 gspRepAutoStart in the one-seat tutorial room, so the
+      # client-driven route had nothing to answer. gspRoomEnterGame is case 0x1FE (cn-324 sub_6EED20),
+      # Reader cn-324 sub_6EB6D0 delegates to ScoreData::Deserialize (cn-324 sub_6E9EF0).
+      match_start: RoomEnterGame
+      wire:
+        server_revives: true
+        pre_count_down_first: true
+        # cn-324 sub_5E2CD0 -> sub_465EA0 queues the request locally when the relay gate is false;
+        # cn-324 sub_465F90 consumes that queue through the same game dispatcher as incoming packets.
+        spawn_group_applies_locally: true
+        # The create request leaves key and theme empty and the room screen then draws no map (cn-324 sub_59F940);
+        # the map dialog writes 'Random' and the first theme for its all-random entry (cn-324 sub_59E1C0, literal at
+        # 0xACD3C8; ServerShared/Theme.ini Theme-0), and the host's start resolves the entry to a map by itself
+        # (cn-324 sub_5AE9A0 0x5AF988).
+        # The executable holds no Random_Hot_Dif marker (cn-324 and cn-279 alike), so every mode, the pirate battle
+        # included, shows the plain all-random entry.
+        unchosen_difficulty_map_key: ""
+        # Its plaza shows the leaver with the bare main-menu session; nothing restates the room here.
+        restate_left_room: false
+        plaza_entry_settle_ms: 0 # Its plaza already shows the leaver with the burst sent at once.
+      host_start: false
+      score_reports: true
+      score:
+        wide_report: true             # reader cn-324 sub_45CBA0, sender cn-324 sub_467E00
+        star_report: Full             # cn-324 sub_6608F0 / sub_660210 report stars through sub_467E00
+        rescue_credit: true           # cn-324 sub_4767C0 calls sub_467E00 with kind 4 at 0x476B7A.
+        live_score_packet: false      # no gspUpdateScoreData class in this build
+        outcome_first: false          # cn-324 sub_408DF0 returns with ret 4; 0x6F1AE0 reads object +8 after ESP changes.
+        npc_team_outcome: false # cn-324 sub_5705C0 copies mode unchanged; sub_63B230's team branch is mode 10, not horde 101.
+        horde_stage_outcome: true # cn-324 sub_438500: empty S2C 906/907 sets HordeModeMgr+5328; sub_43A4C0 selects the result banner.
+        time_over_end: Scoreboard     # handler cn-324 sub_6F2280 is the only caller of the scene's start cn-324 sub_63B230
+
+  # China 2011 (0.1.5.005). Most room packets of this build are not named yet; it runs cn-324's values.
+  cn-279:
+    # cn-279's request writer cn-279 sub_481D60 sends no body (inherited); its catalog is its own.
+    # Its reader cn-279 0x450090 reads cn-324's segments with 28-byte stocks (cn-279 0x44CC70: a u32 type),
+    # needs only the open main (cn-279 sub_66B830), and its page-1 mode cn-279 sub_66AB50 skips the cards.
+    shop:
+      catalog:
+        stock_type: u32
+        tree: landing
+        page_type: main
+    capabilities:
+      # cn-279 sub_44C1A0 reads a one-word request, and its reply reader sub_44EFC0 ends in a counted vector of
+      # three-word records (sub_453420) where every later legacy build has two strings: not read to the end.
+      fighter_info: false
+      rescue_missions: false
+      pve_points: false # No reviewed native score-unit report or live cooperative point consumer.
+      pve_rank_updates: false
+      # cn-279 reads fourteen map vectors (sub_403EA0), a 36-byte creation envelope (sub_403820) and a 28-byte drop
+      # request (sub_404180), takes the seat and kind in two-word grant and use packets (sub_820120, sub_81BB50) and
+      # has no switch packet and no team box; packets/map-supplies.yaml names each difference.
+      map_supplies: true
+      horde_lottery: false # The early native selection/close cycle is not reviewed yet.
+      direct_supply_effects: false # No gspPveItemUsed class in this build's dispatcher.
+      direct_item_effect_echo: false
+      native_scene_seed_tables: false # CN2011 has no own seed-table vtables or relay cases.
+      relay_validation_report: false # cn-279 sub_701270 sends game-side success on relay 1, without a validation report.
+      round_results: true # cn-279 sub_7069B0 / sub_753C80 install nested scores and reward stage 3.
+      # cn-279 sub_827A30/sub_8268D0 -> sub_818DE0 emit ordinary kinds 1/2 with two character references.
+      character_reference_score_reports: true
+      # No reviewed consumable revival packet is mounted for this early client.
+      instant_revival: false
+    base: cn-324
+    play:
+      wire:
+        spawn_group_applies_locally: false # Pending the cn-279 native local dispatch audit.
+      score_reports: false            # not read for this build yet
+      score:
+        npc_team_outcome: false # Pending this build's horde result consumer audit.
+        rescue_credit: false # Pending this build's rescue score report audit.
+        outcome_first: false          # cn-279 sub_705DF0 reads Packet_gspGameEndGame's second word
+        # cn-279 sub_88ED00 reports a big star taken with kind 14 and its drop path a big star lost with 15.
+        star_big_gained: 14
+        star_big_lost: 15
+      tutorial:
+        old_mode: 1 # cn-279 sub_41E220 initializes GameSetting+8 to 1 for the old tutorial.
+        master_slot_packet: true # kept as on cn-324: its own gspGotoRoom master store is not audited.
+        # The select flow's second entry (Shift-click, cn-279 sub_6F8B20) sends an empty map key;
+        # the server names the old-tutorial map itself (its #spawn_npc01..03 markers feed
+        # NPCTutorial, and the stage strings rel_Tutorial_01/02 + Stage1/Stage2 ride in the exe).
+        old_map_key: rel_Tutorial_01
+        # select_kind stays 5 (the practice-mode select scene, live-verified and stable). Kind 8
+        # (TutorialRoomStage, cn-279 sub_6DA4E0 case 8) exits the client at stage entry with both
+        # an empty and a rel_Tutorial_01 room body; its own GotoRoom reader needs pinning before
+        # another attempt. The stage's UI (Ui/TutorialRoomStage.ui) exists in Ui0000.pkn.
+
+  # China 2014 (0.2.51.002). Uses id-400's layout base with audited differences below.
+  cn-706:
+    base: id-400
+    # id-400's request plus one trailing u32 (writer cn-706 sub_611A60, reader cn-706 sub_611AD0); the reply
+    # reader cn-706 sub_7A0FA0 is id-400's field for field.
+    login:
+      request_token: true
+    # cn-706's reader cn-706 sub_7A17F0, card cn-706 sub_481A40, stock cn-706 sub_481810, category
+    # cn-706 sub_79DEE0 / sub_64C780 / sub_79FCF0 and tab filter cn-706 sub_8FA020 match id-1809's
+    # id-1809 sub_7BEFF0, sub_497860, sub_497630, sub_7BBC60 / sub_66BF90 / sub_66BE50 and sub_90DD50.
+    # Request writer cn-706 sub_656D60 sends the token.
+    shop:
+      catalog:
+        trailer: ids
+    # The starter bag this build was brought up with (kr-812's); its ShopItem table is not audited
+    # against id-400's smaller set.
+    lobby:
+      starter_item_ids: [300001, 201001, 201003, 201004, 202001, 202003, 202004, 203001, 203003, 203004, 204001, 204003, 204004, 205001, 207001]
+      starter_worn_ids: [300001, 202001, 201001, 205001, 207001]
+    capabilities:
+      # cn-706 sub_90C430 rejects category 6 through sub_4B1770 before confirmation.
+      inventory_throw_excludes_category6: true
+      direct_kill_reports: false # Research build; direct-kill producers remain unaudited.
+      character_reference_score_reports: false # Research build; ordinary event producers remain unaudited.
+      rescue_missions: false
+      pve_points: false # Research build; its native live-point consumer is not reviewed here.
+      pve_rank_updates: false
+      map_supplies: false # Preserve the research build's disabled supply surface.
+      horde_lottery: false
+      direct_supply_effects: false
+      native_scene_seed_tables: false # Research build; its seed exchange is not proven by this audit.
+      # cn-706 sub_4D3D80 builds kinds 1..5 of S2C 720 as kr-812 sub_51AD80 does and sub_4CD8A0 sends
+      # the horde-award request (C2S 2020), so the id-400 setting does not apply.
+      horde_award_items: true
+      round_results: false # Preserve the research build's disabled result surface.
+      # Native creation entry is not included in the current legacy creation audit.
+      character_creation: false
+    play:
+      npc_waves: false # Preserve the research build's existing disabled NPC exchange.
+      one_seat_waves: false # Its prologue stage consumers are not audited; keeps the mode-15 entry.
+      match_start: RepAutoStart # Its room-enter consumer is not audited; keeps the client-driven start.
+      wire:
+        # cn-706 sub_674110 uses another gated queue path (sub_434C70), not ID2014's copy.
+        # Keep the prior echo policy until that research build's queue consumer is audited.
+        spawn_group_applies_locally: false
+        # The client times its own respawn: cn-706 sub_5BDC90 (GameContext vtable entry) sends gcpRespawn
+        # through cn-706 sub_4C99F0 when the death wait ends, as kr-812 sub_43DD80 does.
+        server_revives: false
+      score:
+        # cn-706 sub_788900 reads two u8, unlike its ID2014 layout base.
+        # cn-706 sub_6ED650 / sub_6ECE70 report stars in gcpGameUpdateScoreOptimze (stamp helper sub_4E7590).
+        star_report: Optimized
+        time_over_end: TeamTotals

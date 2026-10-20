@@ -1,0 +1,19 @@
+version: 1
+structs:
+  # Readers cn-279 sub_6F7DC0 and cn-324 sub_705B20: bool32 and two i32.
+  # cn-324 sub_452520 rejects channel 0; channel 50 is accepted without a level gate.
+  # kr-812 sub_81C6F0 reads the same fields; kr-812 sub_A4A440 accepts channel 50 through
+  # byte table 0xA4A4D8 index 40 (value 4, unconditional success).
+  TutorialMoveInto:
+    - accepted: bool
+      offset: 4
+      default: 1
+    - channel: u32
+      offset: 8
+      default: 50
+      cn-279:
+        - channel: u32
+          offset: 8
+          default: 0
+    - unknown_12: u32
+      offset: 12

@@ -1,0 +1,24 @@
+# Profile patch: applied after the bundle rows. Supported operations are
+#   - replace: {id, plugin?, disabled?, config}   (config, when present, replaces the whole row config)
+#   - insert: [row, ...]
+#   - remove: <id>
+#
+# Example: move the game listener to a different port.
+# - replace:
+#     id: game-listener
+#     config:
+#       listen: "0.0.0.0:7200"
+#       protocol: "kr-1256/game"
+#
+# Example: run without MySQL for offline development.
+# - replace:
+#     id: persistence.mysql
+#     disabled: true
+- set:
+    id: lobby
+    config:
+      inventory_source: mysql
+      money_source: mysql
+      seed_starter_inventory: true
+      starting_lucci: 10000000
+      starting_cash: 10000000

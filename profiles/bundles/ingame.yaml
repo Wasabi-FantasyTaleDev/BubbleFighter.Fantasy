@@ -1,0 +1,122 @@
+# Inventory view row, listed BEFORE the in-game row so the room path finds the
+# IEquippedViewPush service it consumes. The S2C 806 equipped view is the write
+# that puts a player's equipped character and weapons into the profile map the
+# in-room spawner and the appearance rebuilder read; without it a room's
+# character has no equipped set to build from.
+- id: inventoryview
+  plugin: inventoryview
+  config:
+    protocol: "kr-1256/game"
+    client_profile: "kr-1256"
+    version_major: 1256
+    enabled: true
+    publish_equipped_view_push: true
+- id: match-connection
+  plugin: match-connection
+  config:
+    protocol: "kr-1256/relay"
+    max_connections: 1024
+    handshake_timeout_ms: 15000
+    # The typed round admits the relay by the round's key, as the shared native path does for the other builds.
+    capability_authentication: true
+    require_capability_scene_report: true
+# In-session play row (plaza enter, room create/join/ready, battle).
+# Protocol names and version_major select the dialect. Profile already
+# lists `- ingame`. Do not send these packets on the login 3 to 163 chain.
+- id: ingame
+  plugin: ingame
+  config:
+    game_protocol: "kr-1256/game"
+    relay_protocol: "kr-1256/relay"
+    version_major: 1256
+    relay_advertise_ipv4: "${BFF_PUBLIC_HOST:-127.0.0.1}"
+    relay_advertise_port: ${KR_1256_RELAY_PUBLIC_PORT:-7101}
+    max_matches: 64
+    max_players_per_match: 16
+    # Countdown carried by the second S2C 607 (the first carries 0); the round's
+    # S2C 608 follows 7 s later. The
+    # client drops the waiting wall at <=4000 ms remaining (sub_75B870).
+    start_timer_ms: 7000
+    # Round rewards. The client ships no level table or reward formula; these totals are the
+    # level starts observed in result rows (levels 1-11, 13, 14, 24, 25, 43-45),
+    # with the levels in between interpolated. Replace them with the real table when found.
+    level_exp_table_path: "${BFF_LEVEL_EXP_TABLE:-data/level-experience.csv}"
+    reward_base_exp: 150
+    reward_exp_per_kill: 0
+    reward_win_multiplier: 2
+    reward_lucci_percent: 35
+    score_based_rewards: true
+    reward_exp_multiplier: ${BFF_REWARD_EXP_MULTIPLIER:-100}
+    reward_lucci_multiplier: ${BFF_REWARD_LUCCI_MULTIPLIER:-100}
+    # Server-driven room-to-match start chain. Off leaves
+    # the start click with no S2C 510/585/584/602-608 burst after ready.
+    start_matches: true
+    # Plaza enter (C2S 106) needs the S2C 117 kind-3 snapshot on top of S2C 116
+    # Without that snapshot, the plaza stays empty.
+    send_plaza_snapshot: true
+    # C2S 401 -> S2C 101 room-list reply; live path needs it.
+    send_room_list: true
+    # C2S 517 join re-publish of S2C 118 + per-seat S2C 511 after the stage is
+    # live; otherwise the member list stays blank.
+    republish_room_ui_on_join: true
+    # First seated C2S 511 position report re-publishes room UI.
+    republish_room_ui_on_position: true
+    # Room chat C2S 502/520 broadcast as S2C 508.
+    broadcast_room_chat: true
+    # Relay C2S 301/511 position reports as S2C 301/514.
+    relay_character_positions: true
+    # Scene loading publishes team assignments before stage creation. Match
+    # authentication and per-entity table initialization belong to match-connection.
+    # A C2S 515 team change re-sends the whole room push (S2C 117 with it) so the
+    # new label reaches RoomPlayerInfo.unknown4. Off: the 117's kind-2 arm calls
+    # SetStage, so with this on every team click tears the room down and the
+    # client leaves and re-enters it. Off means the click publishes only the
+    # seatless S2C 118 wait list, which cannot touch the stage.
+    republish_full_room_on_team_change: false
+    # The kr-1256 install handler replaces the held session before applying
+    # the parsed setting (sub_9AC490; sub_9D9250). The start click requires
+    # state 2 (sub_970590), so the waiting-room install uses that state.
+    room_install_state: 2
+    # A prior S2C 501 would write the session that the install replaces.
+    # Keep the optional extra state write disabled for the default path.
+    prime_session_state_before_install: false
+    start_flag0: 1
+    start_flag1: 0
+    start_flag2: 1
+    result_close: 0
+    # Captured result stages: scoreboard at +1s, reward stage at +6s, waiting room at +16s.
+    # C2S 103 is emitted immediately by the 612 consumer, not when results are dismissed.
+    result_scoreboard_delay_ms: 1000
+    result_reward_delay_ms: 5000
+    result_close_grace_ms: 10000
+    # The typed room and round path (room_binding: typed on dialect.modern.messages): the ingame row registers no
+    # packet handlers of its own and plays rounds over the native match transport.
+    typed_only: true
+    native_match_relay: true
+    # A seat whose relay reports failure (kr-1256 sub_960050) plays over its game connection.
+    match_transport_fallback: true
+    server_map_draw: true
+    assign_spawn_teams_on_start: true
+    # The timed score mode's lives follow the clients' bubble, pop and death reports, and a dead player's reset
+    # request is granted after its death presentation (kr-1256 sub_6F5E50).
+    native_life_mode_ids: [1]
+    plaza_enter_requires_finished_login: true
+    plaza_replay_positions_on_enter: false
+    plaza_echo_positions: false
+    plaza_vacate_peers_on_menu_return: false
+    # The room install (S2C 117 kind 2) rebuilds the room stage (kr-1256 sub_9AC490 -> sub_9D9250), so installing
+    # it again on the client's first room probe replays the room-entry animation. The probe is still acknowledged
+    # and the member list republished.
+    reinstall_room_on_first_probe: false
+# In-round traffic between the players: movement, actions, damager spawns, lives
+# and weapon-preset swaps. It reads the rooms through the ingame row's roster
+# and adds team points through its scoreboard, so it is listed after that row.
+- id: match-relay
+  plugin: match-relay
+  # The older packet relay, used only by profiles/kr-1256/raw.patch.yaml.
+  disabled: true
+  config:
+    game_protocol: "kr-1256/game"
+    relay_protocol: "kr-1256/relay"
+    # Merge per-seat motion and send it to the other authenticated match transports.
+    broadcast_movement_samples: true

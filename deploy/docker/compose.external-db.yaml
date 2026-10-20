@@ -1,0 +1,36 @@
+# Linux release root: compose.yaml, Dockerfile, .env, server/ and logs/.
+# Host networking preserves all configured game/relay ports and reaches an existing local database.
+name: bf-fantasy
+services:
+  bff:
+    image: bf-fantasy:${BFF_RELEASE:?Set BFF_RELEASE in .env}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    network_mode: host
+    env_file:
+      - .env
+    environment:
+      BFF_BIND_HOST: 0.0.0.0
+      BFF_MYSQL_HOST: 127.0.0.1
+      BFF_ADMIN_HOST: 127.0.0.1
+      BFF_ADMIN_PORT: 8080
+    volumes:
+      - ./logs:/app/logs
+      # Client data stays on the host, outside the image: <build>/data archives and <build>/dataraw loose
+      # files, provisioned separately. BFF_CLIENT_DATA_HOST moves it elsewhere.
+      - ${BFF_CLIENT_DATA_HOST:-./client-data}:/app/client-data:ro
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=128m,uid=1654,gid=1654
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 30s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"

@@ -1,0 +1,56 @@
+/* ============================================================================
+   Noah II UI Liquid-Glass & Surface Utility Classes
+   ============================================================================ */
+
+.glass-rail {
+  background-color: var(--glass-rail);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+
+.glass-panel {
+  background-color: var(--glass-panel);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.glass-pill {
+  background-color: var(--glass-panel);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--motion-fast, 150ms), background-color var(--motion-fast, 150ms);
+}
+
+.glass-pill:hover {
+  border-color: var(--text-faint);
+}
+
+.surface-card {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.surface-card-raised {
+  background-color: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.surface-card-interactive:hover {
+  background-color: var(--surface-hover);
+  border-color: var(--text-faint);
+  transform: translateY(-1px);
+}
+
+/* Hairline borders */
+.border-b { border-bottom: 1px solid var(--border); }
+.border-t { border-top: 1px solid var(--border); }
+.border-l { border-left: 1px solid var(--border); }
+.border-r { border-right: 1px solid var(--border); }

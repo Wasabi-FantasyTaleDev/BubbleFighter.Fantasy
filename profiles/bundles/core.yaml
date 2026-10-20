@@ -1,0 +1,116 @@
+# Core rows every profile wants: the kernel built-ins (replaceable like any other row),
+# diagnostics, the admin API with its web interface, and persistence.
+- id: core.protocol-registry
+  plugin: core.protocol-registry
+- id: core.session-registry
+  plugin: core.session-registry
+- id: core.packet-router
+  plugin: core.packet-router
+- id: core.message-router
+  plugin: core.message-router
+- id: core.client-profiles
+  plugin: core.client-profiles
+- id: core.opcode-tables
+  plugin: core.opcode-tables
+- id: core.wire-dialects
+  plugin: core.wire-dialects
+- id: localization
+  plugin: localization
+  config:
+    resources_path: data/locales/game-messages.json
+    default_language: en
+    region_languages:
+      - region: cn
+        language: zh-Hans
+      - region: tw
+        language: zh-Hant
+      - region: kr
+        language: ko
+      - region: id
+        language: id
+    # Wording that one build's client spells differently from its region (only the differing keys).
+    profile_languages:
+      - profile: cn-774
+        language: zh-Hans:cn-774
+      - profile: id-400
+        language: id:id-400
+- id: diagnostics.packet-log
+  plugin: diagnostics.packet-log
+  config:
+    file: logs/{date}/packets_{timestamp}.log
+    capture_enabled: ${BFF_PACKET_CAPTURE:-false}
+    preview_bytes: 96
+    console_packets: false
+- id: admin.http
+  plugin: admin.http
+  config:
+    listen: "${BFF_ADMIN_HOST:-127.0.0.1}:${BFF_ADMIN_PORT:-8080}"
+# The admin web interface: embedded files that admin.http serves at its root. Disable the row
+# to keep the HTTP API without the page. The release names are what operators know each build
+# by; a build left out shows its id alone.
+- id: webui
+  plugin: webui
+  config:
+    releases:
+      - build: kr-1256
+        release: "KR final"
+      - build: kr-812
+        release: "KR2015"
+      - build: id-400
+        release: "ID2014"
+      - build: id-1809
+        release: "ID2015"
+      - build: cn-279
+        release: "CN2011 0.1.5.005"
+      - build: cn-324
+        release: "CN2012"
+      - build: cn-706
+        release: "CN2014 0.2.51.002"
+      - build: cn-717
+        release: "CN2015"
+      - build: cn-735
+        release: "CN2016 0.2.70.4"
+      - build: cn-738
+        release: "CN2016 0.2.72.01"
+      - build: cn-742
+        release: "CN2017 0.2.74.01"
+      - build: cn-774
+        release: "CN2019 0.2.98.3"
+      - build: tw-454
+        release: "TW2019"
+- id: persistence.mysql
+  plugin: persistence.mysql
+  config:
+    # SslMode is pinned to none: the reachable MariaDB host resets the TLS
+    # handshake mid-frame (socket 10054) while the plain MySQL protocol
+    # answers, so negotiating SSL makes every connection fail. Deployments that
+    # do require TLS override the whole connection_string in a patch.
+    connection_string: "Server=${BFF_MYSQL_HOST:-127.0.0.1};Port=${BFF_MYSQL_PORT:-3306};User ID=${BFF_MYSQL_USER:-bff};Password=${BFF_MYSQL_PASSWORD};Database=${BFF_MYSQL_DATABASE:-bf_game_db};SslMode=none"
+    auto_migrate: true
+# Process-local persistence for deployments whose database is not reachable:
+# the same repository interfaces the MySQL row publishes (fighters, inventory,
+# money, create-user submits), backed by bounded in-process dictionaries. State
+# resets on restart. Mutually exclusive with persistence.mysql - the registry
+# refuses a second registration of the same interface - so exactly one of the
+# two rows is enabled. Enable with a patch (disabled: false) and point the
+# lobby row's inventory_source / money_source at "mysql" (the value selects the
+# store-backed resolver, not a database) to make purchases reach the bag with
+# grant_purchased_items: true.
+- id: persistence.memory
+  plugin: persistence.memory
+  disabled: true
+
+# Explicit durable local mode; enabling it requires an absolute database_path.
+# Disable both other providers in the same overlay; shared repository collisions fail activation.
+- id: persistence.sqlite
+  plugin: persistence.sqlite
+  disabled: true
+
+# Public launcher service is opt-in and separate from administration.
+- id: launcher.http
+  plugin: launcher.http
+  disabled: true
+  config:
+    listen: "${BFF_LAUNCHER_LISTEN:-127.0.0.1:8090}"
+    host_policy: "${BFF_LAUNCHER_HOST_POLICY:-auto}"
+    region: "${BFF_LAUNCHER_REGION:-}"

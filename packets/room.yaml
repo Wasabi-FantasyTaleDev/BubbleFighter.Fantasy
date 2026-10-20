@@ -1,0 +1,2348 @@
+# Room structures of the legacy client builds: the structures gspGotoRoom, gspRoomSetSlot,
+# gspRoomSetSession, gcpReqCreateSession and the room list carry.
+#
+# HOW TO READ THIS FILE (the full format is described in packets/README.md)
+#
+#   - name: type          # what the field is
+#     offset: 44          # where the client's reader stores it in the object (for reading the client code)
+#     default: 8          # written when the server has no value of its own (0 or "" when absent)
+#     vacant: 1           # what an empty seat carries instead
+#     menu: 8             # what the one-seat room of the main menu carries, where that differs
+#
+#   Each structure is a list of fields in the order they travel on the wire. A structure is written
+#   once, as the baseline build (kr-812) has it. Every other build has the same fields unless a row
+#   says otherwise:
+#
+#     except: [id-400]          the listed builds (and the builds based on them) do not have this field
+#     only: [id-1809]           only the listed builds (and the builds based on them) have this field
+#     also: [id-1809]           a build has the field again although the build it is based on does not
+#     id-400:                   the listed build has these fields here instead of the row's own
+#       - unknown_180: u32
+#         default: 1000
+#
+#   A build that differs in many places restates the whole structure as `Name@build`; the builds
+#   based on it then follow that table. Which build is based on which is in builds.yaml.
+#
+#   name      what the server puts in the field. A name the server knows (nickname, room_id, ...) is
+#             filled from the room; any other name is written with the default. A field whose purpose
+#             is not known is called unknown_<offset> (unknown_n<position> where the reader could not
+#             be lined up). Names use lower-case letters, digits and underscores only: no spaces.
+#   type      u8 u16 u32 bool(4 bytes) f32 f64 wstr(u32 character count + UTF-16LE)
+#             list<T> (u32 count + that many T), empty_list (a list the server always sends empty),
+#             or the name of another structure of this folder.
+#   menu      a number, another field's name, or `empty` for a list.
+#   offset    in a restated table or under a build's name, the offset is that build's own.
+#
+# Meanings come from the client code; every function address below names its client build.
+version: 1
+structs:
+  # kr-812 sub_80C160 and cn-324 sub_5B5D00 consume one bool32; true arms the native room timer.
+  gspRepAutoStart:
+    - enabled: bool
+      offset: 4
+      default: 1
+
+  # SessionSetting: one room (or the main-menu session) as the room list, the room and the create dialog
+  # describe it. Nested in gspGotoRoom, gspRoomSetSession and gcpReqCreateSession.
+  # Readers: kr-812 sub_4191A0 (writer kr-812 sub_4190A0), id-400 sub_5DB3C0 (writer id-400 sub_5DB2D0),
+  # id-1809 sub_4173B0 (writer id-1809 sub_4172B0), cn-717 sub_41AD80, cn-735 sub_4254D0, cn-324 sub_57D9F0,
+  # cn-279 0x41E700, cn-706 sub_43A410.
+  # Who uses what (cn-717, the build whose consumers were all read): the lobby row builder
+  # cn-717 sub_6D3770 shows +4 as the state, +12 as the title, (+40 - +42) as the player count, +44 as the
+  # maximum and +46 as the lock; the join builder cn-717 sub_6D1830 sends +8 as the room to join and asks
+  # for a password only when +46 is set; the gspGotoRoom handler (kr-812 sub_820060, cn-717 sub_6E9A40)
+  # switches on +76.
+  SessionSetting:
+    # 2 while the receiver is seated in a play room, 0 otherwise; the lobby row shows it as the room state
+    - session_state: u32
+      offset: 4
+      also: [cn-279]
+      except: [cn-735]
+      cn-324:
+        - session_state: u32
+          offset: 4
+          menu: 1
+    - room_id: u16                      # room number; the join request sends it back
+      offset: 8
+    - unknown_4: u32
+      offset: 4
+      only: [cn-735]
+    - title: wstr                       # room title
+      offset: 12
+    - occupants: u16                    # seated players
+      offset: 40
+    # subtracted from occupants for the list's player count (cn-717 sub_6D3770); the server sends 0
+    - unknown_42: u16
+      offset: 42
+      except: [cn-324]
+    - open_seats: u16                   # seats that are not closed; the list shows it as the maximum
+      offset: 44
+      except: [id-400]
+    - has_password: bool                # joining asks for a password when set
+      offset: 46
+    # The lobby row builder copies this string into the row beside the title (cn-717 sub_6D3770 reads
+    # +12, +48 and the map name at +96 into the row's three strings). The room list fills it with the
+    # room master's nickname; every other use of the structure sends it empty. That it is the master's name rests on the
+    # row's column.
+    - master_nickname: wstr
+      offset: 48
+    - kind: u32                         # 1 main menu / plaza, 2 play room, 5 tutorial select
+      offset: 76
+    - game_setting: GameSetting         # the room's mode, map and options
+      offset: 80
+    - unknown_608: u32                  # reset value -1 (kr-812 sub_419030); no consumer found
+      offset: 608
+      default: -1
+      menu: 0
+      cn-735:
+        - unknown_608: u32
+          offset: 76
+      cn-279:
+        - unknown_608: u32              # cn-279 sub_41E5F0 resets +104 to -1; menu preserves that value
+          offset: 104
+          default: -1
+      cn-706:
+        - unknown_608: u32
+          offset: 584
+          default: -1
+          menu: 0
+    # first half of one 8-byte read (kr-812 sub_A56C30); the constructor leaves both halves -1
+    - unknown_616: u32
+      offset: 616
+      default: -1
+      menu: 0
+      cn-735:
+        - unknown_80: f64
+          offset: 80
+      cn-706:
+        # cn-706 sub_43A410 reads eight raw bytes; sub_43A2A0 resets both words to -1.
+        # Preserve the sentinel bits as two words rather than converting them to a floating-point value.
+        - unknown_592: u32
+          offset: 592
+          default: -1
+          menu: 0
+        - unknown_596: u32
+          offset: 596
+          default: -1
+          menu: 0
+    - unknown_620: u32                  # second half of the 8-byte read at +616
+      offset: 620
+      default: -1
+      menu: 0
+      except: [cn-735, cn-706]
+    - unknown_624: wstr                 # no consumer found; sent empty
+      offset: 624
+    - unknown_652: u32
+      offset: 652
+      except: [cn-324]
+    - unknown_656: u32
+      offset: 656
+      except: [cn-324]
+    - unknown_660: u32
+      offset: 660
+      except: [cn-324]
+    - unknown_664: u32
+      offset: 664
+      except: [cn-324]
+    - unknown_668: bool                 # no consumer found
+      offset: 668
+      also: [cn-706]
+      except: [id-400, cn-324]
+
+  # GameSetting: the mode, map and options of a room. Nested in SessionSetting at +80; cn-324 and cn-279
+  # send a second, standalone copy in gspGotoRoom.
+  # Readers: kr-812 sub_4188F0 (writer kr-812 sub_4185C0), id-400 sub_5DAE00 (writer id-400 sub_5DAB70),
+  # id-1809 sub_4168C0 (writer id-1809 sub_4165E0), cn-717 sub_41A510, cn-735 sub_424D40 (writer cn-735 sub_424B10),
+  # cn-324 sub_57D5E0, cn-279 0x41E380, cn-706 sub_439F50.
+  # A play room is sent the block its creator's client wrote, unchanged, so the unknown fields below
+  # matter only where the server builds the block itself (main menu, tutorial, an unchosen map).
+  GameSetting:
+    # Reset defaults: kr-812 sub_4183A0, cn-717 sub_41A130, id-400 sub_5DA9A0,
+    # id-1809 sub_4163D0 and cn-706 sub_439A80. Menu overrides preserve the existing login envelope.
+    # game mode (room +96). Modes 101/102/103 need current_map (kr-812 sub_6EB170)
+    - mode: u32
+      offset: 8
+      default: 1
+    - unknown_12: u32
+      offset: 12
+    # first map string (room +104): the tutorial request's Directory; the create dialog stores the localized map
+    # name here
+    - map_directory: wstr
+      offset: 16
+    # second map string (room +132): the map table's Directory column; gspRoomEnterGame overwrites it at match
+    # start
+    - current_map: wstr
+      offset: 44
+    # Historical field spelling retained for byte-compatible role migration: kr-812 sub_40EE80
+    # reads Theme here. kr-812 sub_A128A0 supplies the NPC Lua map name from session+132 instead.
+    - npc_table_key: wstr
+      offset: 72
+    # the map key the player chose (room +188); 'Random' when none was chosen; the tutorial's map row name
+    - map_name: wstr
+      offset: 100
+    - unknown_128: u32
+      offset: 128
+    - unknown_132: u32
+      offset: 132
+    - unknown_136: u32
+      offset: 136
+    - unknown_140: u32
+      offset: 140
+    - unknown_144: u32
+      offset: 144
+    - unknown_4: bool
+      offset: 4
+      default: 1
+      menu: 0
+    - unknown_5: bool
+      offset: 5
+      default: 1
+      menu: 0
+    - unknown_148: u32
+      offset: 148
+    - unknown_152: u32
+      offset: 152
+    - unknown_156: u32
+      offset: 156
+    - unknown_160: u32
+      offset: 160
+    # Lua difficulty: kr-812 sub_A31410, cn-717 sub_AE8A60, id-400 sub_9B0160,
+    # id-1809 sub_9CD450 copy GameSetting+164 into their own HordeModeMgr fields.
+    - difficulty: u32
+      offset: 164
+      default: 1
+    - unknown_168: u32
+      offset: 168
+      default: -1
+      menu: 0
+    - unknown_172: u32
+      offset: 172
+    - unknown_176: wstr
+      offset: 176
+      except: [cn-717]
+    - unknown_204: empty_list
+      offset: 204
+      except: [cn-717]
+    - unknown_220: empty_list
+      offset: 220
+      except: [cn-717]
+    - unknown_236: empty_list
+      offset: 236
+      except: [cn-717]
+    - unknown_252: u32
+      offset: 252
+    - unknown_256: wstr
+      offset: 256
+    - unknown_284: wstr
+      offset: 284
+    - unknown_312: wstr
+      offset: 312
+    - unknown_340: wstr
+      offset: 340
+    - unknown_368: wstr
+      offset: 368
+    - unknown_396: wstr
+      offset: 396
+    - unknown_424: u32
+      offset: 424
+    - unknown_428: empty_list
+      offset: 428
+      except: [id-400, id-1809]
+    - unknown_444: bool
+      offset: 444
+    - unknown_448: u32
+      offset: 448
+    - unknown_452: bool
+      offset: 452
+      except: [id-400]
+    - unknown_453: bool
+      offset: 453
+    - unknown_456: u32
+      offset: 456
+      except: [id-400]
+    - unknown_460: u32
+      offset: 460
+      except: [id-400]
+    - unknown_464: wstr
+      offset: 464
+      except: [id-400]
+    - unknown_492: wstr
+      offset: 492
+      except: [id-400]
+    - unknown_520: bool
+      offset: 520
+    # cn-404 sub_620470 ends with the same four fields as cn-706 (at +440, +444, +448, +476).
+    - unknown_524: u32
+      offset: 524
+      also: [cn-706, cn-404]
+      except: [id-400]
+    - unknown_444_cn706: u32
+      offset: 444
+      only: [cn-706, cn-404]
+    - unknown_448_cn706: wstr
+      offset: 448
+      only: [cn-706, cn-404]
+    - unknown_476: wstr
+      offset: 476
+      only: [cn-706, cn-404]
+
+  # cn-735 (also cn-738 and cn-742, which are based on it): the block starts with three u32 and three
+  # bools, then the four map strings, and flattens the nested block cn-735 sub_406590 as bool + empty
+  # pair list + bool + empty u32/wstr list (reader cn-735 sub_424D40, writer cn-735 sub_424B10).
+  # No field of this build's block has been given a meaning yet, so every name is its wire position.
+  GameSetting@cn-735:
+    - unknown_n0: u32
+    - unknown_n1: u32
+    - unknown_n2: u32
+    - unknown_n3: bool
+    - unknown_n4: bool
+    - unknown_n5: bool
+    - unknown_n6: u32
+    - unknown_n7: u32
+    - unknown_n8: u32
+    - unknown_n9: u32
+    - unknown_n10: u32
+    - unknown_n11: wstr
+    - unknown_n12: wstr
+    - unknown_n13: wstr
+    - unknown_n14: wstr
+    - unknown_n15: u32
+    - unknown_n16: wstr
+    - unknown_n17: wstr
+    - unknown_n18: wstr
+    - unknown_n19: wstr
+    - unknown_n20: wstr
+    - unknown_n21: wstr
+    - unknown_n22: u32
+    - unknown_n23: u32
+    - unknown_n24: bool
+    - unknown_n25: empty_list
+    - unknown_n26: bool
+    - unknown_n27: empty_list
+    - unknown_n28: bool
+    - unknown_n29: bool
+    - unknown_n30: bool
+    - unknown_n31: bool
+    - unknown_n32: bool
+    - unknown_n33: bool
+    - unknown_n34: bool
+    - unknown_n35: u8
+    - unknown_n36: bool
+    - unknown_n37: empty_list
+    - unknown_n38: u32
+    - unknown_n39: u32
+    - unknown_n40: u32
+    - unknown_n41: wstr
+    - unknown_n42: wstr
+    - unknown_n43: u32
+
+  # cn-324 and cn-279 (reader cn-324 sub_57D5E0, cn-279 0x41E380): the same leading fields as kr-812 in
+  # the same order (mode, then the four map strings), and nothing after the run of u32.
+  GameSetting@cn-324:
+    - mode: u32                         # game mode
+      offset: 8
+      cn-279:
+        # cn-279 sub_7A6290 writes its selected-mode argument at packet+48:
+        # cn-279 sub_41EA10 nests SessionSetting at +8, whose GameSetting starts at +32.
+        - mode: u32
+          offset: 8
+          default: 1
+          menu: 1
+    - unknown_12: u32
+      offset: 12
+    # The four map strings are the ones the map dialog writes for the entry it was given (cn-324 sub_59E1C0): the
+    # display name, the map's directory (or the key itself for the all-random entry), the theme tab and the key.
+    # The create request fills only the first two, from the startup configuration (cn-324 sub_582C00), and the room
+    # screen draws no map while the key is empty (cn-324 sub_59F940), so the server shows an unchosen map as the
+    # all-random entry (builds.yaml unchosen_map_key).
+    - map_directory: wstr               # first map string: the map's display name
+      offset: 16
+    - current_map: wstr                 # second map string: the map's directory, which names the thumbnail
+      offset: 20
+    # third map string: the theme tab the key sits under, an entry of ServerShared/Theme.ini (cn-324 sub_59DE30
+    # looks it up in the list cn-324 sub_59B4F0 reads from that file); the map dialog writes the first theme, 'All',
+    # for the all-random entry
+    - map_theme: wstr
+      offset: 24
+    - map_name: wstr                    # the map key the player chose; 'Random' for the all-random entry
+      offset: 28
+      # cn-279 sub_7091E0 requires room+68 (GameSetting+28) != "Random" through
+      # cn-279 sub_401730, then cn-279 sub_706750 tests isTutorial on that map key.
+    # Defaults below are what the client's own create request carries, so a room the server opens itself (quick
+    # match) matches a hand-made one. cn-324 sub_582C00 copies LambientStartupConfig+44 (Lambient.xml KillLimit,
+    # read by cn-324 sub_729CF0) into +32 and +40 (TimeLimit) into +36..+48; the reset
+    # cn-324 sub_57D470 sets the bools to 1, +68 to 1 and +72 to -1. The CN2012 Lambient.xml ships KillLimit 20
+    # and TimeLimit 240000. cn-324 sub_43A3F0 copies the signal argument's +68 into manager+5400,
+    # read by Lua GetDifficulty (cn-324 sub_410E50); the callback is present in the executable
+    # but omitted from the consolidated export. cn-324 sub_416520 registers it for signal 299.
+    # cn-279 keeps its previous zeros until its own create path is read.
+    - unknown_32: u32
+      offset: 32
+      default: 20
+      cn-279:
+        - unknown_32: u32
+          offset: 32
+    - unknown_36: u32
+      offset: 36
+      default: 240000
+      cn-279:
+        - unknown_36: u32
+          offset: 36
+    - unknown_40: u32
+      offset: 40
+      default: 240000
+      cn-279:
+        - unknown_40: u32
+          offset: 40
+    - unknown_44: u32
+      offset: 44
+      default: 240000
+      cn-279:
+        - unknown_44: u32
+          offset: 44
+    - unknown_48: u32
+      offset: 48
+      default: 240000
+      cn-279:
+        - unknown_48: u32
+          offset: 48
+    - unknown_4: bool
+      offset: 4
+      default: 1
+    - unknown_5: bool
+      offset: 5
+      default: 1
+    - unknown_52: u32
+      offset: 52
+      except: [cn-279]
+    - unknown_56: u32
+      offset: 56
+    - unknown_60: u32
+      offset: 60
+    - unknown_64: u32
+      offset: 64
+    - unknown_68: u32
+      offset: 68
+      default: 1
+      cn-279:
+        - unknown_68: u32
+          offset: 68
+    - unknown_72: u32
+      offset: 72
+      default: -1
+      cn-279:
+        - unknown_72: u32
+          offset: 68
+          default: 1
+
+  # UserSlot: one seat of a room. Sent as a list in gspGotoRoom and one at a time in gspRoomSetSlot,
+  # gspRoomLeaveSlot and gspRepNotifyChangeLevelIcon.
+  # kr-812: reader kr-812 sub_4196F0, a 288-byte object built by kr-812 sub_419290 / kr-812 sub_419360. The values the server
+  # does not source are those of a room with one seated player, three open and eight closed seats.
+  # cn-717: reader cn-717 sub_41B2C0, reset cn-717 sub_41AF40, constructor cn-717 sub_41AE70; no ArenaRating float.
+  # cn-735: reader cn-735 sub_425A50.
+  UserSlot:
+    # a player sits here; the client builds an avatar only for a seat with it set (kr-812 sub_6CBC60)
+    - occupied: bool
+      offset: 4
+      menu: 1
+    - closed: bool                      # the room master closed this empty seat (the S2C 512 handler flips it)
+      offset: 5
+      menu: 1
+    # set together with occupied for a seated player; cleared in the record gspRoomLeaveSlot carries
+    - seated: bool
+      offset: 6
+      menu: 1
+    # start position: the position table is indexed with (12 - value); 0xFF until the round is set up
+    - spawn_index: u8
+      offset: 129
+      menu: 255
+      also: [cn-735]
+      cn-717:
+        - spawn_index: u8               # 0 on the main menu
+          offset: 129
+    # the player's number; the client finds its own seat by it (kr-812 sub_7FCDA0)
+    - user_number: u32
+      offset: 8
+    - nickname: wstr                    # the player's nickname
+      offset: 12
+    # FighterConfig key = character item id - 300000 (kr-812 sub_6CBFF0 hands it to the actor builder
+    # kr-812 sub_92B160)
+    - character_type: u16
+      offset: 40
+      cn-717:
+        - character_type: u16
+          offset: 40
+          menu: 10
+    - color_index: u16 # kr-812 sub_6C6DE0 and kr-812 sub_9BFC10 use the actor color-index setter; cn-717 sub_729940 matches.
+      offset: 42
+    # the player's team (the S2C 504 handler writes it, kr-812 sub_7FCF50); 0 on the main menu
+    - team: u8
+      offset: 124
+      cn-717:
+        - team: u8
+          offset: 124
+          menu: character_type
+    # a per-player number with no proven reader; the level is sent here (inferred)
+    - level: u32
+      offset: 44
+      vacant: 1
+      menu: 8
+    - ready: bool                       # ready mark; changing team is refused while it is set
+      offset: 125
+    - unknown_126: bool
+      offset: 126
+      menu: 1
+    - unknown_127: bool
+      offset: 127
+      menu: 1
+    - unknown_128: bool
+      offset: 128
+      menu: 1
+    - unknown_60: u32
+      offset: 60
+    - unknown_64: u32
+      offset: 64
+    - equipped_items: "list<u32>"       # item ids the player wears
+      offset: 68
+    - unknown_84: u32
+      offset: 84
+    - unknown_88: u32
+      offset: 88
+    - unknown_108: u32                  # constructor value -1
+      offset: 108
+      default: -1
+    - unknown_114: bool
+      offset: 114
+    - unknown_136: u32
+      offset: 136
+    # 1 for a seated player in a play room, 0 on an empty seat and on the main menu
+    - unknown_140: bool
+      offset: 140
+      default: 1
+      vacant: 0
+      menu: 0
+    - unknown_144: u32                  # constructor value -1
+      offset: 144
+      default: -1
+    - unknown_48: u16                   # five u16 read in a loop from +48; constructor value 0xFFFF
+      offset: 48
+      default: 65535
+    - unknown_50: u16
+      offset: 50
+      default: 65535
+    - unknown_52: u16
+      offset: 52
+      default: 65535
+    - unknown_54: u16
+      offset: 54
+      default: 65535
+    - unknown_56: u16
+      offset: 56
+      default: 65535
+    - unknown_156: u32
+      offset: 156
+    - unknown_160: u32
+      offset: 160
+    - unknown_148: bool
+      offset: 148
+    - unknown_176: u32                  # constructor value -1
+      offset: 176
+      default: -1
+    - unknown_180: wstr                 # a wstr no consumer was found for (id-400 has a u32 here)
+      offset: 180
+    - unknown_208: bool
+      offset: 208
+    - unknown_209: bool
+      offset: 209
+    - unknown_212: u32
+      offset: 212
+    # 1 or 2 per seated player: a per-player counter, meaning not proven
+    - unknown_216: u32
+      offset: 216
+      default: 1
+    - unknown_224: u32                  # the one u32 of the nested object at +220
+      offset: 224
+    # ArenaRating: the float of the nested object at +228 (kr-812 sub_401830); 500 for a seated player. cn-717 has
+    # no such object
+    - unknown_232: f32
+      offset: 232
+      default: 500
+      vacant: 0
+      except: [cn-717]
+    # SocialSystemInfo: eight u32 of the nested object at +236 (kr-812 sub_41A4D0, cn-717 sub_41BEF0)
+    - unknown_240: u32
+      offset: 240
+    - unknown_244: u32
+      offset: 244
+    - unknown_248: u32
+      offset: 248
+    - unknown_252: u32
+      offset: 252
+    - unknown_256: u32
+      offset: 256
+    - unknown_260: u32
+      offset: 260
+    - unknown_264: u32
+      offset: 264
+    - unknown_268: u32
+      offset: 268
+      cn-735:
+        - unknown_n46: bool
+    - unknown_132: u32
+      offset: 132
+    - unknown_152: u32
+      offset: 152
+    - unknown_276: u32
+      offset: 276
+    - unknown_280: u32                  # constructor value -1 (recorded with the level icon update)
+      offset: 280
+      default: -1
+      cn-735:
+        - unknown_280: u32
+          default: -1
+          menu: 0
+    - unknown_272: u32
+      offset: 272
+
+  # id-400: reader id-400 sub_5F1FF0, a 192-byte object reset by id-400 sub_5F1D20. Against kr-812 it has one flag
+  # fewer after the level, a u32 where kr-812 has the wstr at +180, and none of kr-812's tail
+  # (no ArenaRating, no SocialSystemInfo). The actor builder id-400 sub_6918C0 takes the character type
+  # from the u16 at +40 and the team from the u8 at +124.
+  UserSlot@id-400:
+    # a player sits here; the client builds an avatar only for a seat with it set (kr-812 sub_6CBC60)
+    - occupied: bool
+      offset: 4
+      menu: 1
+    - closed: bool                      # the room master closed this empty seat (the S2C 512 handler flips it)
+      offset: 5
+      menu: 1
+    # set together with occupied for a seated player; cleared in the record gspRoomLeaveSlot carries
+    - seated: bool
+      offset: 6
+      menu: 1
+    # Start position byte consumed by the Indonesian room-stage path. The ID2014 packet reader
+    # stores it at +128; the ID2015 movement return path (sub_8CCD40 -> sub_7A7B30) indexes
+    # the native position table with 12 minus this byte. Waiting-room records retain 0xFF.
+    - spawn_index: u8
+      offset: 128
+      default: 255
+    # the player's number; the client finds its own seat by it (kr-812 sub_7FCDA0)
+    - user_number: u32
+      offset: 8
+    - nickname: wstr                    # the player's nickname
+      offset: 12
+    # FighterConfig key = character item id - 300000 (kr-812 sub_6CBFF0 hands it to the actor builder
+    # kr-812 sub_92B160)
+    - character_type: u16
+      offset: 40
+    - color_index: u16 # id-400 sub_64A1B0 passes seat +42 to the actor color-index setter.
+      offset: 42
+    # the player's team (the S2C 504 handler writes it, kr-812 sub_7FCF50); 0 on the main menu
+    - team: u8
+      offset: 124
+    # a per-player number with no proven reader; the level is sent here (inferred)
+    - level: u32
+      offset: 44
+      vacant: 0
+      menu: 8
+    - ready: bool                       # ready mark; changing team is refused while it is set
+      offset: 125
+    - unknown_126: bool
+      offset: 126
+      menu: 1
+    - unknown_127: bool
+      offset: 127
+      menu: 1
+    - unknown_60: u32
+      offset: 60
+    - unknown_64: u32
+      offset: 64
+    - equipped_items: "list<u32>"       # item ids the player wears
+      offset: 68
+    - unknown_84: u32
+      offset: 84
+    - unknown_88: u32
+      offset: 88
+    - unknown_108: u32
+      offset: 108
+      default: -1
+    - unknown_114: bool
+      offset: 114
+    - unknown_136: u32
+      offset: 136
+    - unknown_140: bool
+      offset: 140
+    - unknown_144: u32
+      offset: 144
+      default: -1
+    - unknown_48: u16
+      offset: 48
+      default: 65535
+    - unknown_50: u16
+      offset: 50
+      default: 65535
+    - unknown_52: u16
+      offset: 52
+      default: 65535
+    - unknown_54: u16
+      offset: 54
+      default: 65535
+    - unknown_56: u16
+      offset: 56
+      default: 65535
+    - unknown_156: u32
+      offset: 156
+    - unknown_160: u32                  # constructor value 1
+      offset: 160
+      default: 1
+      menu: 0
+    - unknown_148: bool
+      offset: 148
+    - unknown_176: u32
+      offset: 176
+      default: -1
+    - unknown_180: u32                  # constructor value 1000: a u32 where kr-812 has a wstr
+      offset: 180
+      default: 1000
+      menu: 0
+      # cn-404 sub_637E20 reads a wstr here and the 1000 word later, at +212 (reset cn-404 sub_637B10).
+      cn-404:
+        - unknown_180: wstr
+          offset: 180
+    - unknown_184: bool
+      offset: 184
+      cn-404:
+        - unknown_208: bool
+          offset: 208
+        - unknown_212: u32
+          offset: 212
+          default: 1000
+          menu: 0
+        - unknown_216: bool
+          offset: 216
+      # cn-408 sub_63B560 reads one more bool after +208, stored at +209 (cn-408 sub_63B350 writes it).
+      cn-408:
+        - unknown_208: bool
+          offset: 208
+        - unknown_209: bool
+          offset: 209
+        - unknown_212: u32
+          offset: 212
+          default: 1000
+          menu: 0
+        - unknown_216: bool
+          offset: 216
+    # cn-408 sub_63B560 moves past this word with the stream's write slot (cn-408 sub_A1D400 at
+    # 0x63B736), which copies four bytes at the cursor and advances it as a read does, so the
+    # word stays on the wire and the client keeps its constructor value.
+    - unknown_188: u32                  # constructor value 1
+      offset: 188
+      default: 1
+      menu: 0
+      cn-404:
+        - unknown_220: u32
+          offset: 220
+          default: 1
+          menu: 0
+    - unknown_132: u32
+      offset: 132
+    - unknown_152: u32
+      offset: 152
+
+  # id-1809: reader id-1809 sub_417880, reset id-1809 sub_417520 (constructor id-1809 sub_4174A0). id-400's fields up to +176,
+  # then kr-812's wstr and two bools, then eight u32 read in the order +212, +220, +216, +132, +152,
+  # +228, +232, +224. The defaults are the reset's: 1 at +160 and +216, 1000 at +212, -1 at +108, +144,
+  # +176 and +232.
+  UserSlot@id-1809:
+    # a player sits here; the client builds an avatar only for a seat with it set (kr-812 sub_6CBC60)
+    - occupied: bool
+      offset: 4
+      menu: 1
+    - closed: bool                      # the room master closed this empty seat (the S2C 512 handler flips it)
+      offset: 5
+      menu: 1
+    # set together with occupied for a seated player; cleared in the record gspRoomLeaveSlot carries
+    - seated: bool
+      offset: 6
+      menu: 1
+    # Start position byte consumed by the Indonesian room-stage path. ID2015 sub_8CCD40 reads
+    # this value from the slot returned by sub_7A7B30; waiting-room records retain 0xFF.
+    - spawn_index: u8
+      offset: 128
+      default: 255
+    # the player's number; the client finds its own seat by it (kr-812 sub_7FCDA0)
+    - user_number: u32
+      offset: 8
+    - nickname: wstr                    # the player's nickname
+      offset: 12
+    # FighterConfig key = character item id - 300000 (kr-812 sub_6CBFF0 hands it to the actor builder
+    # kr-812 sub_92B160)
+    - character_type: u16
+      offset: 40
+    - color_index: u16 # id-1809 sub_679EA0 passes seat +42 to the actor color-index setter.
+      offset: 42
+    # the player's team (the S2C 504 handler writes it, kr-812 sub_7FCF50); 0 on the main menu
+    - team: u8
+      offset: 124
+    # a per-player number with no proven reader; the level is sent here (inferred)
+    - level: u32
+      offset: 44
+      vacant: 0
+      menu: 8
+    - ready: bool                       # ready mark; changing team is refused while it is set
+      offset: 125
+    - unknown_126: bool
+      offset: 126
+      menu: 1
+    - unknown_127: bool
+      offset: 127
+      menu: 1
+    - unknown_60: u32
+      offset: 60
+    - unknown_64: u32
+      offset: 64
+    - equipped_items: "list<u32>"       # item ids the player wears
+      offset: 68
+    - unknown_84: u32
+      offset: 84
+    - unknown_88: u32
+      offset: 88
+    - unknown_108: u32
+      offset: 108
+      default: -1
+    - unknown_114: bool
+      offset: 114
+    - unknown_136: u32
+      offset: 136
+    - unknown_140: bool
+      offset: 140
+    - unknown_144: u32
+      offset: 144
+      default: -1
+    - unknown_48: u16
+      offset: 48
+      default: 65535
+    - unknown_50: u16
+      offset: 50
+      default: 65535
+    - unknown_52: u16
+      offset: 52
+      default: 65535
+    - unknown_54: u16
+      offset: 54
+      default: 65535
+    - unknown_56: u16
+      offset: 56
+      default: 65535
+    - unknown_156: u32
+      offset: 156
+    - unknown_160: u32                  # reset value 1
+      offset: 160
+      default: 1
+      menu: 0
+    - unknown_148: bool
+      offset: 148
+    - unknown_176: u32
+      offset: 176
+      default: -1
+    - unknown_180: wstr
+      offset: 180
+    - unknown_208: bool
+      offset: 208
+    - unknown_209: bool
+      offset: 209
+    - unknown_212: u32                  # reset value 1000
+      offset: 212
+      default: 1000
+      menu: 0
+    - unknown_220: u32
+      offset: 220
+    - unknown_216: u32                  # reset value 1
+      offset: 216
+      default: 1
+      menu: 0
+    - unknown_132: u32
+      offset: 132
+    - unknown_152: u32
+      offset: 152
+    - unknown_228: u32
+      offset: 228
+    - unknown_232: u32                  # reset value -1
+      offset: 232
+      default: -1
+      menu: 0
+    - unknown_224: u32
+      offset: 224
+
+  # cn-324: reader cn-324 sub_58A4D0, a 144-byte object reset by cn-324 sub_58A270. The character type is the u16
+  # consumed at +16 by cn-324 sub_5B1F00 and cn-324 sub_60A640. The closed mark is +5 (the S2C 512 handler
+  # writes it), the u8 reset to 0xFF is the start position, the u8 at +96 is the team (the S2C 504
+  # handler writes it). cn-324 sub_5A5030 passes +20 to cn-324 sub_5D32D0, which selects the level badge.
+  UserSlot@cn-324:
+    # a player sits here; the client builds an avatar only for a seat with it set (kr-812 sub_6CBC60)
+    - occupied: bool
+      offset: 4
+      menu: 1
+    - closed: bool                      # the room master closed this empty seat (the S2C 512 handler flips it)
+      offset: 5
+    # set together with occupied for a seated player; cleared in the record gspRoomLeaveSlot carries
+    - seated: bool
+      offset: 6
+    # start position: the position table is indexed with (12 - value); 0xFF until the round is set up
+    - spawn_index: u8
+      offset: 100
+    # the player's number; the client finds its own seat by it (kr-812 sub_7FCDA0)
+    - user_number: u32
+      offset: 8
+    - nickname: wstr                    # the player's nickname
+      offset: 12
+    - character_type: u16              # cn-324 sub_5B1F00 / cn-324 sub_60A640 build the actor from this type
+      offset: 16
+    - color_index: u16 # cn-324 sub_5D3FE0 passes seat +18 to the actor color-index setter.
+      offset: 18
+    # the player's team (the S2C 504 handler writes it, kr-812 sub_7FCF50); 0 on the main menu
+    - team: u8
+      offset: 96
+    - level: u32                       # cn-324 sub_5A5030 -> cn-324 sub_5D32D0 selects badge level - 1
+      offset: 20
+      vacant: 1
+      menu: 1
+    - ready: bool                       # ready mark; changing team is refused while it is set
+      offset: 97
+    - unknown_98: bool
+      offset: 98
+    - unknown_99: bool
+      offset: 99
+    - unknown_36: u32
+      offset: 36
+    - unknown_40: u32
+      offset: 40
+    - equipped_items: "list<u32>"       # item ids the player wears
+      offset: 44
+      menu: empty
+    - unknown_56: u32
+      offset: 56
+    - unknown_60: u32
+      offset: 60
+    - unknown_80: u32
+      offset: 80
+      default: -1
+      menu: 0
+    - unknown_86: bool
+      offset: 86
+    - unknown_104: u32
+      offset: 104
+    - unknown_108: bool
+      offset: 108
+      # cn-324 sub_5B6270 selects frame 0/1 of the PartyMark resource with this flag.
+      vacant: 0
+      menu: 0
+    - party_marker_index: u32
+      offset: 112
+      # cn-324 sub_58A270 resets this to -1; cn-324 sub_5B6270 draws only nonnegative indices.
+      # cn-324 sub_5C8060 loads Images/Party/PartyMark01.smf into the indexed resource vector.
+      default: -1
+    - unknown_24: u16
+      offset: 24
+      default: 65535
+      menu: 0
+    - unknown_26: u16
+      offset: 26
+      default: 65535
+      menu: 0
+    - unknown_28: u16
+      offset: 28
+      default: 65535
+      menu: 0
+    - unknown_30: u16
+      offset: 30
+      default: 65535
+      menu: 0
+    - unknown_32: u16
+      offset: 32
+      default: 65535
+      menu: 0
+    - unknown_120: u32
+      offset: 120
+    - unknown_124: u32
+      offset: 124
+      default: 1
+      menu: 0
+    - unknown_116: bool
+      offset: 116
+    - unknown_136: u32
+      offset: 136
+      default: -1
+      menu: 0
+
+  # cn-279: reader 0x4496E0. The occupied flag and a matching user number let cn-279 0x77F3F0 create the
+  # local actor; cn-279 0x870BC0 installs its equipment. Roles are placed as in cn-324 (inferred).
+  UserSlot@cn-279:
+    # cn-279 sub_4496E0 reads this row inside GotoRoom's list (cn-279 sub_453640).
+    # cn-279 sub_4EBFF0 reads two bytes; sub_4EBFD0 reads bool32 through sub_4EBBE0.
+    # a player sits here; the client builds an avatar only for a seat with it set (kr-812 sub_6CBC60)
+    - occupied: bool
+      offset: 4
+      menu: 1
+    - closed: bool                      # the room master closed this empty seat (the S2C 512 handler flips it)
+      offset: 5
+    # set together with occupied for a seated player; cleared in the record gspRoomLeaveSlot carries
+    - seated: bool
+      offset: 6
+    # start position: the position table is indexed with (12 - value); 0xFF until the round is set up
+    - spawn_index: u8
+      offset: 96
+      menu: 255
+    # the player's number; the client finds its own seat by it (kr-812 sub_7FCDA0)
+    - user_number: u32
+      offset: 8
+    - nickname: wstr                    # the player's nickname
+      offset: 12
+    - unknown_16: u16
+      offset: 16
+    - color_index: u16 # cn-279 sub_777C30 passes seat +18 to the actor color-index setter.
+      offset: 18
+    # the player's team (the S2C 504 handler writes it, kr-812 sub_7FCF50); 0 on the main menu
+    - team: u8
+      offset: 92
+    # FighterConfig key = character item id - 300000 (kr-812 sub_6CBFF0 hands it to the actor builder
+    # kr-812 sub_92B160)
+    - character_type: u32
+      offset: 20
+    - ready: bool                       # ready mark; changing team is refused while it is set
+      offset: 93
+    - unknown_94: bool
+      offset: 94
+    - unknown_95: bool
+      offset: 95
+    # a per-player number with no proven reader; the level is sent here (inferred)
+    - level: u32
+      offset: 32
+      vacant: 1
+    - unknown_36: u32
+      offset: 36
+    - unknown_40: empty_list            # cn-279 sub_420350 reads the count and four-byte elements
+      offset: 40
+    - unknown_52: u32                   # reader step 17
+      offset: 52
+    - unknown_56: u32                   # reader step 18
+      offset: 56
+    - unknown_76: u32
+      offset: 76
+      default: -1
+    - unknown_82: bool
+      offset: 82
+    - unknown_100: u32
+      offset: 100
+    - unknown_104: bool
+      offset: 104
+    - unknown_108: u32
+      offset: 108
+      default: -1
+    - unknown_24: u16                   # cn-279 sub_4496E0 advances the destination by two bytes
+      offset: 24
+      default: 65535
+    - unknown_26: u16
+      offset: 26
+      default: 65535
+    - unknown_28: u16
+      offset: 28
+      default: 65535
+    - unknown_30: u16
+      offset: 30
+      default: 65535
+    - unknown_113: bool
+      offset: 113
+    - unknown_112: bool
+      offset: 112
+
+  UserSlot@cn-706:
+    # a player sits here; the client builds an avatar only for a seat with it set (kr-812 sub_6CBC60)
+    - occupied: bool
+      offset: 4
+      menu: 1
+    - closed: bool                      # the room master closed this empty seat (the S2C 512 handler flips it)
+      offset: 5
+      menu: 1
+    # set together with occupied for a seated player; cleared in the record gspRoomLeaveSlot carries
+    - seated: bool
+      offset: 6
+      menu: 1
+    - unknown_128: u8
+      offset: 128
+      default: 255
+    # the player's number; the client finds its own seat by it (kr-812 sub_7FCDA0)
+    - user_number: u32
+      offset: 8
+    - nickname: wstr                    # the player's nickname
+      offset: 12
+    # FighterConfig key = character item id - 300000 (kr-812 sub_6CBFF0 hands it to the actor builder
+    # kr-812 sub_92B160)
+    - character_type: u16
+      offset: 40
+      menu: 10
+    - color_index: u16 # cn-706 sub_65A180 passes seat +42 to the actor color-index setter.
+      offset: 42
+    # the player's team (the S2C 504 handler writes it, kr-812 sub_7FCF50); 0 on the main menu
+    - team: u8
+      offset: 124
+      menu: character_type
+    # a per-player number with no proven reader; the level is sent here (inferred)
+    - level: u32
+      offset: 44
+      vacant: 0
+      menu: 8
+    - ready: bool                       # ready mark; changing team is refused while it is set
+      offset: 125
+    - unknown_126: bool
+      offset: 126
+      default: 1
+    - unknown_127: bool
+      offset: 127
+      default: 1
+    - unknown_60: u32
+      offset: 60
+    - unknown_64: u32
+      offset: 64
+    - equipped_items: "list<u32>"       # item ids the player wears
+      offset: 68
+    - unknown_84: u32
+      offset: 84
+    - unknown_88: u32
+      offset: 88
+    - unknown_108: u32
+      offset: 108
+      default: -1
+    - unknown_114: bool
+      offset: 114
+    - unknown_136: u32
+      offset: 136
+    - unknown_140: bool
+      offset: 140
+    - unknown_144: u32
+      offset: 144
+      default: -1
+    - unknown_48: u16
+      offset: 48
+      default: 65535
+    - unknown_50: u16
+      offset: 50
+      default: 65535
+    - unknown_52: u16
+      offset: 52
+      default: 65535
+    - unknown_54: u16
+      offset: 54
+      default: 65535
+    - unknown_56: u16
+      offset: 56
+      default: 65535
+    - unknown_156: u32
+      offset: 156
+    - unknown_160: u32
+      offset: 160
+      default: 1
+      menu: 0
+    - unknown_148: bool
+      offset: 148
+    - unknown_176: u32
+      offset: 176
+      default: -1
+    - unknown_180: wstr
+      offset: 180
+    - unknown_208: bool
+      offset: 208
+    - unknown_209: bool
+      offset: 209
+    - unknown_212: u32
+      offset: 212
+      default: 1000
+      menu: 0
+    - unknown_220: bool
+      offset: 220
+    - unknown_216: u32
+      offset: 216
+      default: 1
+      menu: 0
+    - unknown_132: u32
+      offset: 132
+    - unknown_152: u32
+      offset: 152
+    - unknown_228: u32
+      offset: 228
+    - unknown_232: u32
+      offset: 232
+      default: -1
+      menu: 0
+
+  # EquippedItemList: what one seat's player wears. Sent as a list in gspGotoRoom and after the seat in
+  # gspRoomSetSlot.
+  # Readers: kr-812 sub_532650, id-400 sub_47EA90, id-1809 sub_4D4960, cn-717 sub_569E70,
+  # cn-324 sub_45B640 (u32, u32, u32, a u32 list and a u8 list), cn-279 sub_448840,
+  # cn-406 sub_41D060 and cn-706 sub_4B8470. Full vectors are needed for native relay validation;
+  # the current outbound room/equipment projections retain empty flags, attributes and expiry vectors.
+  EquippedItemList:
+    - user_number: u32                  # whose items these are
+      offset: 4
+    - character_item: u32               # the character item id (300000 on an empty seat)
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+      except: [cn-279]
+    - equipped_items: "list<u32>"       # item ids the player wears
+      offset: 16
+      cn-279:
+        - equipped_items: "list<u32>"
+          offset: 12 # cn-279 sub_4487F0/sub_448840: two words then this vector, with no tail vectors.
+    - unknown_32: "list<u8>"
+      offset: 32
+      except: [cn-324]
+    - unknown_48: "list<ItemAttr>" # kr-812 sub_532610 constructs 60-byte ItemAttr objects before virtual reads.
+      offset: 48
+      except: [cn-324]
+    - unknown_64: "list<ItemExpiredTime>" # kr-812 sub_531FC0 constructs 16-byte expiry objects before virtual reads.
+      offset: 64
+      except: [cn-279]
+      cn-324:
+        - unknown_28: "list<u8>" # cn-324 sub_45B5B0/sub_45B640: byte vector after equipped items, not expiry objects.
+          offset: 28
+
+  # gspGotoRoom (S2C): puts the client into a session - the main menu (kind 1), a play room (kind 2) or
+  # the tutorial select scene (kind 5).
+  # Readers: kr-812 sub_692A40 (handler kr-812 sub_820060), id-400 sub_5F22C0, id-1809 sub_63B950,
+  # cn-717 sub_6EDE80 (handler cn-717 sub_6E9A40), cn-735 sub_A4D6F0, cn-324 sub_58A6E0, cn-279 0x44FD50,
+  # cn-706 sub_61BC60.
+  gspGotoRoom:
+    - session_setting: SessionSetting   # the session being entered
+    - game_setting: GameSetting         # a standalone copy, written over the session's (cn-324 sub_57DB50)
+      offset: 136
+      only: [cn-324]
+    - master_slot: u32                  # seat index of the room master (kr-812 +680, read by kr-812 sub_68EAD0)
+    - local_slot: u32                   # the receiver's own seat index (kr-812 +684, room context +840)
+    - user_slots: "list<UserSlot>"      # every seat of the room; the main menu sends the local player alone
+    - equipped_item_lists: "list<EquippedItemList>"  # one entry per seat, in seat order
+      also: [cn-279]
+      cn-324:
+        - equipped_item_lists: "list<EquippedItemList>"
+          offset: 232
+          menu: empty
+    # kr-812 sub_820060 tests object +720 before kr-812 sub_47ADE0 builds the party transition notice.
+    - party_transition: bool
+    - unknown_n6: u32
+      except: [cn-324]
+
+  # cn-406 readers: SessionSetting sub_56A160, GameSetting sub_569BE0, UserSlot sub_57E8A0, gspGotoRoom sub_57EBC0.
+  SessionSetting@cn-406:
+  - session_state: u32
+    offset: 4
+  - room_id: u16
+    offset: 8
+  - title: wstr
+    offset: 12
+  - occupants: u16
+    offset: 40
+  - unknown_42: u16
+    offset: 42
+  - has_password: bool
+    offset: 44
+  - master_nickname: wstr
+    offset: 48
+  - kind: u32
+    offset: 76
+  - game_setting: GameSetting
+    offset: 80
+  - unknown_504: u32
+    offset: 504
+    default: -1
+    menu: 0
+  - unknown_512: u32
+    offset: 512
+    default: -1
+    menu: 0
+  - unknown_516: u32
+    offset: 516
+    default: -1
+    menu: 0
+  - unknown_520: wstr
+    offset: 520
+  - unknown_548: u32
+    offset: 548
+  - unknown_552: u32
+    offset: 552
+  - unknown_556: u32
+    offset: 556
+  - unknown_560: u32
+    offset: 560
+  GameSetting@cn-406:
+  - mode: u32
+    offset: 8
+    default: 1
+  - unknown_12: u32
+    offset: 12
+  - map_directory: wstr
+    offset: 16
+  - current_map: wstr
+    offset: 44
+  - npc_table_key: wstr
+    offset: 72
+  - map_name: wstr
+    offset: 100
+  - unknown_128: u32
+    offset: 128
+  - unknown_132: u32
+    offset: 132
+  - unknown_136: u32
+    offset: 136
+  - unknown_140: u32
+    offset: 140
+  - unknown_144: u32
+    offset: 144
+  - unknown_4: bool
+    offset: 4
+    default: 1
+    menu: 0
+  - unknown_5: bool
+    offset: 5
+    default: 1
+    menu: 0
+  - unknown_148: u32
+    offset: 148
+  - unknown_152: u32
+    offset: 152
+  - unknown_156: u32
+    offset: 156
+  - unknown_160: u32
+    offset: 160
+  - difficulty: u32
+    offset: 164
+    default: 1
+  - unknown_168: u32
+    offset: 168
+    default: -1
+    menu: 0
+  - unknown_172: u32
+    offset: 172
+  - unknown_176: wstr
+    offset: 176
+  - unknown_204: empty_list
+    offset: 204
+  - unknown_220: empty_list
+    offset: 220
+  - unknown_236: empty_list
+    offset: 236
+  - unknown_252: u32
+    offset: 252
+  - unknown_256: wstr
+    offset: 256
+  - unknown_284: wstr
+    offset: 284
+  - unknown_312: wstr
+    offset: 312
+  - unknown_340: wstr
+    offset: 340
+  - unknown_368: wstr
+    offset: 368
+  - unknown_396: wstr
+    offset: 396
+  UserSlot@cn-406:
+  - occupied: bool
+    offset: 4
+    menu: 1
+  - closed: bool
+    offset: 5
+    menu: 1
+  - seated: bool
+    offset: 6
+    menu: 1
+  - unknown_128: u8
+    offset: 128
+    default: 255
+  - user_number: u32
+    offset: 8
+  - nickname: wstr
+    offset: 12
+  - character_type: u16
+    offset: 40
+  - color_index: u16 # cn-406 sub_5D1830 passes seat +42 to the actor color-index setter; cn-404 sub_679B50 and cn-408 sub_67D3D0 match.
+    offset: 42
+  - team: u8
+    offset: 124
+  - level: u32
+    offset: 44
+    menu: 8
+    vacant: 0
+  - ready: bool
+    offset: 125
+  - unknown_126: bool
+    offset: 126
+    default: 1
+  - unknown_127: bool
+    offset: 127
+    default: 1
+  - unknown_60: u32
+    offset: 60
+  - unknown_64: u32
+    offset: 64
+  - equipped_items: list<u32>
+    offset: 68
+  - unknown_84: u32
+    offset: 84
+  - unknown_88: u32
+    offset: 88
+  - unknown_108: u32
+    offset: 108
+    default: -1
+  - unknown_114: bool
+    offset: 114
+  - unknown_132: u32
+    offset: 132
+  - unknown_136: bool
+    offset: 136
+  - unknown_140: u32
+    offset: 140
+    default: -1
+  - unknown_48: u16
+    offset: 48
+    default: 65535
+  - unknown_50: u16
+    offset: 50
+    default: 65535
+  - unknown_52: u16
+    offset: 52
+    default: 65535
+  - unknown_54: u16
+    offset: 54
+    default: 65535
+  - unknown_56: u16
+    offset: 56
+    default: 65535
+  - unknown_148: u32
+    offset: 148
+  - unknown_152: u32
+    offset: 152
+    default: 1
+  - unknown_144: bool
+    offset: 144
+  - unknown_168: u32
+    offset: 168
+    default: -1
+  - unknown_172: u32
+    offset: 172
+    default: 1000
+  gspGotoRoom@cn-406:
+  - session_setting: SessionSetting
+    offset: 8
+  - master_slot: u32
+    offset: 576
+  - local_slot: u32
+    offset: 580
+  - user_slots: list<UserSlot>
+    offset: 584
+  - equipped_item_lists: list<EquippedItemList>
+    offset: 600
+  - party_transition: bool
+    offset: 616
+
+  # kr-1256 (the modern family's baseline). Reader kr-1256 sub_113BD20, writer kr-1256 sub_113BAB0. The fields
+  # through `kind` are kr-812's in another order (the room number leads, the state follows); the game setting
+  # sits at +132 in the object but on the wire right after `kind`, and the tail is the build's own.
+  SessionSetting@kr-1256:
+  # the client returns a room-list row's value as the join request's room id (kr-1256 sub_854C90)
+  - room_id: u16
+    offset: 0
+  - session_state: u32
+    offset: 4
+  - title: wstr
+    offset: 8
+  - occupants: u16
+    offset: 32
+  # subtracted from occupants for the list's player count, as kr-812's +42
+  - unknown_34: u16
+    offset: 34
+  - open_seats: u16
+    offset: 36
+  # set by the create dialog for a non-empty password (kr-1256 sub_962200); a row click then asks for it
+  - has_password: bool
+    offset: 38
+  # bound to the room's master label (kr-1256 0x63C240)
+  - master_nickname: wstr
+    offset: 40
+  - kind: u32
+    offset: 64
+  - game_setting: GameSetting
+    offset: 132
+  - unknown_68: u32
+    offset: 68
+  # three flag bytes from one word: bits 0, 1 and 2 go to +72, +73 and +74
+  - unknown_72: u32
+    offset: 72
+  # three flag bytes from one word: bits 0, 1 and 2 go to +75, +76 and +77
+  - unknown_75: u32
+    offset: 75
+  - unknown_80: u64
+    offset: 80
+    # The main-menu install carries -1 here; the room install forwards the word the creator's client sent.
+    menu: -1
+  - unknown_88: wstr
+    offset: 88
+  - unknown_112: bool
+    offset: 112
+  - unknown_116: u32
+    offset: 116
+  - unknown_120: u32
+    offset: 120
+  - unknown_124: u32
+    offset: 124
+  - unknown_128: u16
+    offset: 128
+
+  # kr-1256 game setting (its MapMeta). Reader kr-1256 sub_113D030, writer kr-1256 sub_113CCE0; +144..+264 are
+  # read by kr-1256 sub_113C1B0 and +296..+328 by kr-1256 sub_10D24B0, sub_10D2520 and sub_10D25E0.
+  GameSetting@kr-1256:
+  # flags word: kr-1256 sub_97C610 and sub_9201D0 need bits 0x2, 0x8, 0x10, 0x40, 0x400, 0x800, 0x1000, 0x2000,
+  # 0x8000 and 0x20000 clear before they build the member panel and the seat avatar
+  - unknown_0: u32
+    offset: 0
+    # The main menu carries bit 0x8, which routes the kind-1 session to the main-menu stage (kr-1256 sub_9AC490).
+    menu: 8
+  # the room's mode; the main-menu install compares it with 40 (training room)
+  - mode: u16
+    offset: 4
+  # with the local seat on the seat holder's distinguished seat, kr-1256 sub_96F3A0 disables the team and
+  # ready buttons when it is set, and kr-1256 sub_980730 shows the referee mark
+  - unknown_8: bool
+    offset: 8
+  # both gates above also need this word zero; a room-list row carries the channel key here
+  - unknown_20: u32
+    offset: 20
+  - unknown_24: u32
+    offset: 24
+  - unknown_28: u32
+    offset: 28
+  - unknown_32: u32
+    offset: 32
+  - unknown_36: u32
+    offset: 36
+  - unknown_40: u32
+    offset: 40
+  # the four map keys; the round loads the scene from +68's copy at session +232 (kr-1256 0x6CC7F5)
+  - unknown_44: wstr
+    offset: 44
+  - unknown_68: wstr
+    offset: 68
+  - unknown_92: wstr
+    offset: 92
+  - unknown_116: wstr
+    offset: 116
+  - unknown_140: u32
+    offset: 140
+  - unknown_144: wstr
+    offset: 144
+  - unknown_168: wstr
+    offset: 168
+  - unknown_192: wstr
+    offset: 192
+  - unknown_216: wstr
+    offset: 216
+  - unknown_240: wstr
+    offset: 240
+  - unknown_264: wstr
+    offset: 264
+  - unknown_288: u32
+    offset: 288
+  - unknown_292: u32
+    offset: 292
+  - unknown_296: bool
+    offset: 296
+  - unknown_297: list<GameSettingPair>
+    offset: 297
+  - unknown_309: bool
+    offset: 309
+  - unknown_310: list<GameSettingKeyedText>
+    offset: 310
+  - unknown_322: "bool[5]"
+    offset: 322
+  - unknown_328: list<GameSettingCountedRow>
+    offset: 328
+  - unknown_340: bool
+    offset: 340
+  - unknown_341: bool
+    offset: 341
+  - unknown_344: u8
+    offset: 344
+  - unknown_348: u32
+    offset: 348
+  - unknown_352: u32
+    offset: 352
+  - unknown_356: wstr
+    offset: 356
+  - unknown_380: wstr
+    offset: 380
+  - unknown_404: u32
+    offset: 404
+
+  # cn-774 sub_492EB0 reads this order; cn-774 sub_494560, cn-774 sub_4945D0 and cn-774 sub_494610 read the nested groups.
+  # The +392 value is eight bytes; cn-774 sub_494CF0 reads a counted string list at +400. No +428 word is read.
+  GameSetting@cn-774:
+  - unknown_0: u32
+    offset: 0
+    # The main menu carries bit 0x8, which keeps the kind-1 session in the main-menu stage (cn-774 sub_BAB9F0).
+    menu: 8
+  - unknown_4: u16
+    offset: 4
+  - unknown_8: u32
+    offset: 8
+  - unknown_12: bool
+    offset: 12
+  - unknown_24: u32
+    offset: 24
+  - unknown_28: bool
+    offset: 28
+  - unknown_32: u32
+    offset: 32
+  - unknown_36: u32
+    offset: 36
+  - unknown_40: u32
+    offset: 40
+  - unknown_44: u32
+    offset: 44
+  - unknown_48: u32
+    offset: 48
+  - unknown_52: wstr
+    offset: 52
+  - unknown_76: wstr
+    offset: 76
+  - unknown_100: wstr
+    offset: 100
+  - unknown_124: wstr
+    offset: 124
+  - unknown_148: wstr
+    offset: 148
+  - unknown_172: u32
+    offset: 172
+  - unknown_176: wstr
+    offset: 176
+  - unknown_200: wstr
+    offset: 200
+  - unknown_224: wstr
+    offset: 224
+  - unknown_248: wstr
+    offset: 248
+  - unknown_272: wstr
+    offset: 272
+  - unknown_296: wstr
+    offset: 296
+  - unknown_320: u32
+    offset: 320
+  - unknown_324: u32
+    offset: 324
+  - unknown_328: bool
+    offset: 328
+  - unknown_329: list<GameSettingPair>
+    offset: 329
+  - unknown_341: bool
+    offset: 341
+  - unknown_342: list<GameSettingKeyedText>
+    offset: 342
+  - unknown_354: "bool[5]"
+    offset: 354
+  - unknown_360: list<GameSettingCountedRow>
+    offset: 360
+  - unknown_372: bool
+    offset: 372
+  - unknown_373: bool
+    offset: 373
+  - unknown_376: u8
+    offset: 376
+  - unknown_384: u32
+    offset: 384
+  - unknown_392: u64
+    offset: 392
+  - unknown_400: list<wstr>
+    offset: 400
+  - unknown_412: u32
+    offset: 412
+  - unknown_416: u32
+    offset: 416
+  - unknown_420: u32
+    offset: 420
+  - unknown_424: u32
+    offset: 424
+  - unknown_432: u32
+    offset: 432
+  - unknown_436: u32
+    offset: 436
+  - unknown_440: wstr
+    offset: 440
+  - unknown_464: wstr
+    offset: 464
+  - unknown_488: u32
+    offset: 488
+
+  # tw-454 sub_48ADF0 reads this order; tw-454 sub_48C510 and tw-454 sub_48C580 read the two nested groups.
+  # There is no counted-row group. The +368 value is eight bytes; tw-454 sub_48CBA0 reads the strings at +376.
+  GameSetting@tw-454:
+  - unknown_0: u32
+    offset: 0
+  - unknown_4: u32
+    offset: 4
+  # The main menu carries 0x8 here: the mode flags tw-454 sub_A89100 tests for kind 2. Any of 0x18, 0x40 or
+  # 0x1000 keeps the client out of the waiting-room branch (stage 4); without them gspGotoRoom opens a room screen.
+  - unknown_8: u32
+    offset: 8
+    menu: 8
+  - unknown_12: bool
+    offset: 12
+  - unknown_13: bool
+    offset: 13
+  - unknown_14: bool
+    offset: 14
+  - unknown_16: u32
+    offset: 16
+  - unknown_20: u32
+    offset: 20
+  - unknown_24: u32
+    offset: 24
+  - unknown_28: u32
+    offset: 28
+  - unknown_32: u32
+    offset: 32
+  - unknown_36: wstr
+    offset: 36
+  - unknown_60: wstr
+    offset: 60
+  - unknown_84: wstr
+    offset: 84
+  - unknown_108: wstr
+    offset: 108
+  - unknown_132: wstr
+    offset: 132
+  - unknown_156: u32
+    offset: 156
+  - unknown_160: wstr
+    offset: 160
+  - unknown_184: wstr
+    offset: 184
+  - unknown_208: wstr
+    offset: 208
+  - unknown_232: wstr
+    offset: 232
+  - unknown_256: wstr
+    offset: 256
+  - unknown_280: wstr
+    offset: 280
+  - unknown_304: u32
+    offset: 304
+  - unknown_308: u32
+    offset: 308
+  - unknown_312: bool
+    offset: 312
+  - unknown_313: list<GameSettingPair>
+    offset: 313
+  - unknown_325: bool
+    offset: 325
+  - unknown_326: list<GameSettingKeyedText>
+    offset: 326
+  - unknown_338: "bool[5]"
+    offset: 338
+  - unknown_343: bool
+    offset: 343
+  - unknown_344: bool
+    offset: 344
+  - unknown_348: u8
+    offset: 348
+  - unknown_352: bool
+    offset: 352
+  - unknown_360: u32
+    offset: 360
+  - unknown_368: u64
+    offset: 368
+  - unknown_376: list<wstr>
+    offset: 376
+  - unknown_388: u32
+    offset: 388
+  - unknown_392: u32
+    offset: 392
+  - unknown_396: u32
+    offset: 396
+  - unknown_400: u32
+    offset: 400
+  - unknown_404: u32
+    offset: 404
+  - unknown_408: wstr
+    offset: 408
+  - unknown_432: wstr
+    offset: 432
+  - unknown_456: u32
+    offset: 456
+
+  # Shared element shapes: cn-774 sub_452BF0, cn-774 sub_452CC0, tw-454 sub_452A10 and tw-454 sub_452AE0.
+  # Each reads a word pair or a word followed by a counted UTF-16 string, respectively.
+  GameSettingPair:                      # kr-1256 sub_113FE90
+  - unknown_0: u32
+    only: [kr-1256]
+  - unknown_4: u32
+    only: [kr-1256]
+  GameSettingKeyedText:                 # kr-1256 sub_10C9350
+  - unknown_0: u32
+    only: [kr-1256]
+  - unknown_4: wstr
+    only: [kr-1256]
+  # cn-774 sub_494610 reads the same u16 key and counted word list through cn-774 sub_456D30.
+  GameSettingCountedRow:                # kr-1256 sub_10D2EA0, the list read by kr-1256 sub_998FB0
+  - unknown_0: u16
+    only: [kr-1256]
+  - unknown_4: list<u32>
+    only: [kr-1256]
+
+  # kr-1256 seat record (its RoomPlayerInfo, a 296-byte object): reader kr-1256 sub_1143710 with the tails
+  # kr-1256 sub_1143B10 and sub_10E1B20. The wire order is not the offset order (+96..+98 come before +44).
+  UserSlot@kr-1256:
+  # the room's occupancy scan kr-1256 sub_9EE100 reads it; a vacated seat's record carries 0
+  - occupied: bool
+    offset: 0
+  # a nonzero value makes kr-1256 sub_980730 hide the slot's children through sub_980540(slot, 1)
+  - unknown_1: bool
+    offset: 1
+  - unknown_2: bool
+    offset: 2
+  - unknown_3: u8                       # 0xFF in a vacated seat's record
+    offset: 3
+  # the key kr-1256 sub_980730's team board switches on: 0 unassigned, 1 and 2 the teams
+  - team: u8
+    offset: 4
+  - user_number: u32
+    offset: 8
+  - nickname: wstr
+    offset: 12
+  - unknown_36: u16
+    offset: 36
+  # colour selector: kr-1256 sub_9201D0 reads seat +40 and passes it to sub_4C13B0, then refreshes the materials
+  - color_index: u16 # kr-1256 sub_9201D0 passes seat +40 to kr-1256 sub_4C13B0 before refreshing materials.
+    offset: 40
+  - ready: bool                         # checked by kr-1256 sub_96DD20
+    offset: 96
+  # reported with the ready flag by the room status request (kr-1256 sub_9785E0)
+  - unknown_97: bool
+    offset: 97
+  - unknown_98: bool
+    offset: 98
+  - unknown_44: u32
+    offset: 44
+  - unknown_48: u32
+    offset: 48
+  - unknown_52: "list<u32>"
+    offset: 52
+  - unknown_64: u32
+    offset: 64
+  - unknown_68: u32
+    offset: 68
+  - unknown_88: u32                     # -1 in a vacated seat's record
+    offset: 88
+    default: -1
+  - unknown_94: bool
+    offset: 94
+  - unknown_100: u32
+    offset: 100
+  - unknown_104: bool
+    offset: 104
+  - unknown_108: u32                    # -1 in a vacated seat's record
+    offset: 108
+    default: -1
+  - unknown_112: bool
+    offset: 112
+  - unknown_116: wstr
+    offset: 116
+  - unknown_140: u32
+    offset: 140
+  - unknown_144: wstr
+    offset: 144
+  - unknown_168: bool
+    offset: 168
+  - unknown_169: bool
+    offset: 169
+  # every level icon reader takes the level from here (kr-1256 sub_912A00, sub_783D90, sub_65B190) and
+  # kr-1256 sub_EE9550 stores level - 1, so 0 shows no level
+  - level: u32
+    offset: 172
+    default: 1
+  - unknown_176: u32
+    offset: 176
+  - unknown_180: u32                    # constructor value 1
+    offset: 180
+    default: 1
+  - unknown_184: u8
+    offset: 184
+  - unknown_185: bool
+    offset: 185
+  - unknown_188: u32
+    offset: 188
+  - unknown_192: u32
+    offset: 192
+  - unknown_196: u32
+    offset: 196
+  - unknown_200: u32
+    offset: 200
+  # kr-1256 sub_1143710 reads the block only after the tag 0x3A; a vacated seat's record carries 0xBA
+  - unknown_204: "optional<0x3A,UserSlotTail204>"
+    offset: 204
+  - unknown_232: bool
+    offset: 232
+  - social: SocialSystemInfo
+    offset: 240
+
+  # The kr-1256 seat record's optional tails and its social block; kr-812's seat record has none of them.
+  UserSlotTail204:
+  - unknown_204: u32
+    offset: 204
+    only: [kr-1256]
+  - unknown_208: u32
+    offset: 208
+    only: [kr-1256]
+  # a second tag right after the +208 word (kr-1256 sub_1143710)
+  - unknown_212: "optional<0x3A,UserSlotTail212>"
+    offset: 212
+    only: [kr-1256]
+  UserSlotTail212:
+  - unknown_212: u32
+    offset: 212
+    only: [kr-1256]
+  - unknown_216: u32
+    offset: 216
+    only: [kr-1256]
+  # The seat record's +240 object; reader kr-1256 sub_113F700.
+  SocialSystemInfo:
+  - unknown_4: u32
+    offset: 4
+    only: [kr-1256]
+  - unknown_8: u32
+    offset: 8
+    only: [kr-1256]
+  - unknown_12: u32
+    offset: 12
+    only: [kr-1256]
+  - unknown_16: u32
+    offset: 16
+    only: [kr-1256]
+  - unknown_20: u32
+    offset: 20
+    only: [kr-1256]
+  - unknown_24: u32
+    offset: 24
+    only: [kr-1256]
+  - unknown_28: u32
+    offset: 28
+    only: [kr-1256]
+  - unknown_32: bool
+    offset: 32
+    only: [kr-1256]
+  - unknown_40: u64
+    offset: 40
+    only: [kr-1256]
+  - unknown_48: bool
+    offset: 48
+    only: [kr-1256]
+  - unknown_49: bool
+    offset: 49
+    only: [kr-1256]
+
+  # kr-1256 gspGotoRoom: parser kr-1256 sub_10D4520 (handler kr-1256 sub_9AC490). It installs the room or plaza
+  # session object the seat records are written into; kind 2 moves to the room stage, kind 3 to the plaza.
+  gspGotoRoom@kr-1256:
+  - session_setting: SessionSetting
+    offset: 0
+  # the room master's seat, installed at session +0x228 (kr-1256 0x9D9448)
+  - master_slot: u32
+    offset: 544
+  - unknown_548: u32
+    offset: 548
+  # kr-1256 sub_9D9250 copies record i into seat i, so a gap is written as an empty seat
+  - user_slots: "list<UserSlot>"
+    offset: 552
+  # the profile map the avatar gate reads (applied by kr-1256 sub_81D060 before the kind switch)
+  - profile_entries: "list<RoomProfileEntry>"
+    offset: 564
+  # the second profile map (element reader kr-1256 sub_10C4010): the main-menu install repeats the
+  # entry written at +564 here, and every room install sends the map empty
+  - unknown_588: "list<RoomProfileEntry>"
+    offset: 588
+  - team_info: ServerTeamInfo
+    offset: 612
+  # tag of an optional block kr-1256 sub_10D4E40 reads into +648. The room install sends the absent tag (the
+  # field default 0); the main-menu install sends 0x3A and the block that routes the kind-1 session.
+  - unknown_648: "optional<0x3A,MainMenuOptional>"
+    offset: 648
+    default: 0
+  # the receiver's own seat, installed at session +0x244 (kr-1256 0x9D93C2)
+  - local_slot: u32
+    offset: 728
+  # kr-1256 sub_9AC490: packet base [ebp-370h], notice test [ebp-94h] (+732) calls kr-1256 sub_8F4ED0.
+  # kr-1256 sub_10D4520 reads a four-byte word here; +720 is the optional +648 object's presence bit.
+  - party_transition: bool
+    offset: 732
+
+  # One profile-map entry of the kr-1256 room install (element reader kr-1256 sub_10C4290); kr-812's install
+  # has no profile map. The record's own offsets are not traced yet, so its unknown fields are numbered in order.
+  RoomProfileEntry:
+  - user_number: u32                    # the map key: the seat's player number
+    only: [kr-1256]
+  # the equipped character item id (300000..301999), which the avatar gate requires
+  - character_id: u32
+    only: [kr-1256]
+  # equipment ids; kr-1256 sub_817DF0 clears the equipment and replays this list on every install
+  - equipped_items: "list<u32>"
+    only: [kr-1256]
+  - unknown_n3: "list<u32>"
+    only: [kr-1256]
+  - unknown_n4: "list<u32>"
+    only: [kr-1256]
+  # a byte blob (kr-1256 sub_10BE7B0: a byte count, then that many bytes)
+  - unknown_n5: "list<u8>"
+    only: [kr-1256]
+  - unknown_n6: empty_list              # kr-1256 sub_10D9050; sent empty
+    only: [kr-1256]
+
+  # kr-1256 ServerTeamInfo, reader kr-1256 sub_1159550; kr-812's install has none.
+  ServerTeamInfo:
+  - team_slots: "list<ServerTeamSlots>"  # kr-1256 sub_11595A0
+    offset: 4
+    only: [kr-1256]
+  - unknown_12: "list<u32>"
+    offset: 12
+    only: [kr-1256]
+  - unknown_24: "list<u32>"
+    offset: 24
+    only: [kr-1256]
+  ServerTeamSlots:
+  - team: u8
+    only: [kr-1256]
+  - slots: "list<u32>"
+    only: [kr-1256]
+
+  # The kr-1256 main-menu record the gspGotoRoom +648 tag announces; reader kr-1256 sub_10D4E40. Only the
+  # main-menu install writes it: the tag 0x3A is followed by these fields, whose +0, +8 and +48..+64 offsets are
+  # the reader's. The counted string vector and the second tag between them keep position names because their
+  # destinations were not traced.
+  MainMenuOptional:
+  - unknown_0: u32
+    offset: 0
+    only: [kr-1256]
+  - unknown_8: u64
+    offset: 8
+    only: [kr-1256]
+  # a counted string vector; every install sends it empty
+  - unknown_n2: empty_list
+    only: [kr-1256]
+  # second tag byte: any value other than 0x3A leaves the nested record absent, as every install sends it
+  - unknown_n3: u8
+    only: [kr-1256]
+  - unknown_48: u32
+    offset: 48
+    only: [kr-1256]
+  - unknown_52: u32
+    offset: 52
+    only: [kr-1256]
+  - unknown_56: u32
+    offset: 56
+    only: [kr-1256]
+  - unknown_60: u32
+    offset: 60
+    only: [kr-1256]
+  - unknown_64: u32
+    offset: 64
+    only: [kr-1256]
+
+  # cn-774 SessionSetting, reader cn-774 sub_493650: the kr-1256 head (u16, i32, wstr, three u16, bool, wstr,
+  # i32 kind) unchanged, the map object at session +128, then i32, i64, wstr, bool, three i32 and a u16. The
+  # i64 carries the kr-1256 (+72, +75) pair as one value. tw-454 reads the same session; only its nested map
+  # object is the build's own (GameSetting@tw-454).
+  SessionSetting@cn-774:
+  - room_id: u16
+    offset: 0
+  - session_state: u32
+    offset: 4
+  - title: wstr
+    offset: 8
+  - occupants: u16
+    offset: 32
+  - unknown_34: u16
+    offset: 34
+  - open_seats: u16
+    offset: 36
+  - has_password: bool
+    offset: 38
+  - master_nickname: wstr
+    offset: 40
+  - kind: u32
+    offset: 64
+  - game_setting: GameSetting
+    offset: 128
+  - unknown_68: u32
+    offset: 68
+  - unknown_72: u64
+    offset: 72
+  # the main-menu install sends an empty string here; the room install forwards the creator's session word
+  - unknown_80: wstr
+    offset: 80
+    menu: empty
+  - unknown_104: bool
+    offset: 104
+  - unknown_108: u32
+    offset: 108
+  - unknown_112: u32
+    offset: 112
+  - unknown_116: u32
+    offset: 116
+  - unknown_120: u16
+    offset: 120
+
+  # cn-774 seat record (vtable 0x13FBA8C, reader cn-774 sub_493E20): i32-as-bool x3 (+4..+6), u8 (+7; the kr-1256
+  # +3 slot byte), i32 (+8; identity), wstring (+12; nickname), u16 (+36), u16 (+38), u8 (sign-extended to +116),
+  # i32 (+40; FighterConfig field id), i32-as-bool x4 (+120..+123), i32 (+56), i32 (+60), vector i32 (+64,
+  # cn-774 sub_494810), i32 (+76), i32 (+80), i32 (+100), i32-as-bool (+106), i32 (+124), i32-as-bool (+128),
+  # i32 (+132), u16 x6 (+44), i32 (+164), i32 (+168), i32-as-bool (+136), wstring (+140), i32 (+172), wstring
+  # (+176), i32-as-bool x2 (+200, +201), i32 (+204), i32 (+208), u8 (+212), i32-as-bool (+213), SocialSystemInfo
+  # (+216), i32 (+276), i32 (+272), i32-as-bool (+280), i32 x3 (+284..+292). The kr-1256 values carry over where
+  # the reads line up: the u8 slot, the identity and nickname, and the level at +172.
+  UserSlot@cn-774:
+  - occupied: bool
+    offset: 4
+    menu: 1
+  - unknown_5: bool
+    offset: 5
+  - unknown_6: bool
+    offset: 6
+  - unknown_7: u8
+    offset: 7
+  - user_number: u32
+    offset: 8
+  - nickname: wstr
+    offset: 12
+  - unknown_36: u16
+    offset: 36
+  - unknown_38: u16
+    offset: 38
+  # the main-menu seat carries 2 (kept as sent today), sign-extended into the word at +116
+  - unknown_116: u8
+    offset: 116
+    menu: 2
+  # FighterConfig field id = character item id - 300000, read by the main-menu actor path
+  - character_type: u32
+    offset: 40
+  - unknown_120: bool
+    offset: 120
+  - unknown_121: bool
+    offset: 121
+  - unknown_122: bool
+    offset: 122
+  - unknown_123: bool
+    offset: 123
+  - unknown_56: u32
+    offset: 56
+  - unknown_60: u32
+    offset: 60
+  - unknown_64: empty_list
+    offset: 64
+  - unknown_76: u32
+    offset: 76
+  - unknown_80: u32
+    offset: 80
+  - unknown_100: u32
+    offset: 100
+  - unknown_106: bool
+    offset: 106
+  - unknown_124: u32
+    offset: 124
+  - unknown_128: bool
+    offset: 128
+  - unknown_132: u32
+    offset: 132
+  # six u16 read in a loop from +44
+  - unknown_44: "u16[6]"
+    offset: 44
+  - unknown_164: u32
+    offset: 164
+  - unknown_168: u32
+    offset: 168
+  - unknown_136: bool
+    offset: 136
+  - unknown_140: wstr
+    offset: 140
+  - level: u32
+    offset: 172
+  - unknown_176: wstr
+    offset: 176
+  - unknown_200: bool
+    offset: 200
+  - unknown_201: bool
+    offset: 201
+  - unknown_204: u32
+    offset: 204
+  - unknown_208: u32
+    offset: 208
+  - unknown_212: u8
+    offset: 212
+  - unknown_213: bool
+    offset: 213
+  - social: SocialSystemInfo
+    offset: 216
+  - unknown_276: u32
+    offset: 276
+  - unknown_272: u32
+    offset: 272
+  - unknown_280: bool
+    offset: 280
+  - unknown_284: u32
+    offset: 284
+  - unknown_288: u32
+    offset: 288
+  - unknown_292: u32
+    offset: 292
+
+  # tw-454 seat (reader tw-454 sub_48BD60): the cn-774 UserSlot through i32 +132, then u16 x5 (+44), i32 +144,
+  # i32 +148, i32-as-bool +136, i32 +152, wstring +156, i32-as-bool x2 (+180, +181), i32 +184, i32 +188, u8
+  # +192, u8 +193, SocialSystemInfo +200, i32 +140, i32 +252, i32 +248, i32-as-bool +256, i32 +260.
+  UserSlot@tw-454:
+  - occupied: bool
+    offset: 4
+    menu: 1
+  - unknown_5: bool
+    offset: 5
+  - unknown_6: bool
+    offset: 6
+  - unknown_7: u8
+    offset: 7
+  - user_number: u32
+    offset: 8
+  - nickname: wstr
+    offset: 12
+  - unknown_36: u16
+    offset: 36
+  - unknown_38: u16
+    offset: 38
+  # the main-menu seat carries 2 (kept as sent today), as on cn-774
+  - unknown_116: u8
+    offset: 116
+    menu: 2
+  # FighterConfig field id = character item id - 300000, read by the main-menu actor path
+  - character_type: u32
+    offset: 40
+  - unknown_120: bool
+    offset: 120
+  - unknown_121: bool
+    offset: 121
+  - unknown_122: bool
+    offset: 122
+  - unknown_123: bool
+    offset: 123
+  - unknown_56: u32
+    offset: 56
+  - unknown_60: u32
+    offset: 60
+  - unknown_64: empty_list
+    offset: 64
+  - unknown_76: u32
+    offset: 76
+  - unknown_80: u32
+    offset: 80
+  - unknown_100: u32
+    offset: 100
+  - unknown_106: bool
+    offset: 106
+  - unknown_124: u32
+    offset: 124
+  - unknown_128: bool
+    offset: 128
+  - unknown_132: u32
+    offset: 132
+  # five u16 read in a loop from +44
+  - unknown_44: "u16[5]"
+    offset: 44
+  - unknown_144: u32
+    offset: 144
+  - unknown_148: u32
+    offset: 148
+  - unknown_136: bool
+    offset: 136
+  - level: u32
+    offset: 152
+  - unknown_156: wstr
+    offset: 156
+  - unknown_180: bool
+    offset: 180
+  - unknown_181: bool
+    offset: 181
+  - unknown_184: u32
+    offset: 184
+  - unknown_188: u32
+    offset: 188
+  - unknown_192: u8
+    offset: 192
+  - unknown_193: u8
+    offset: 193
+  - social: SocialSystemInfo
+    offset: 200
+  - unknown_140: u32
+    offset: 140
+  - unknown_252: u32
+    offset: 252
+  - unknown_248: u32
+    offset: 248
+  - unknown_256: bool
+    offset: 256
+  - unknown_260: u32
+    offset: 260
+
+  # One element of the cn-774/tw-454 equipped-object vector: the 201-style equipped record cn-774 sub_496F40
+  # writes and cn-774 sub_9B82D0 consumes per element. The first two words repeat the seat's identity and
+  # character roles (+4/+8); the collections after them are sent empty. tw-454 sub_4A0550 reads four collections,
+  # cn-774 reads five.
+  EquippedObjectEntry:
+  - user_number: u32
+    offset: 4
+    only: [cn-774]
+  - character_id: u32
+    offset: 8
+    only: [cn-774]
+  - unknown_12: u32
+    offset: 12
+    only: [cn-774]
+  - unknown_16: u32
+    offset: 16
+    only: [cn-774]
+  - unknown_n4: empty_list
+    only: [cn-774]
+  - unknown_n5: empty_list
+    only: [cn-774]
+  - unknown_n6: empty_list
+    only: [cn-774]
+  - unknown_n7: empty_list
+    only: [cn-774]
+  # the cn-774 object's fifth collection (its expiry vector); tw-454 sub_4A0550 has four
+  - unknown_n8: empty_list
+    only: [cn-774]
+    except: [tw-454]
+
+  # cn-774 gspGotoRoom (reader cn-774 sub_BAB9F0, dispatcher label gspGotoRoom): the session object, two words,
+  # the seat vector, one equipped-object vector, an i32-as-bool that makes the client generate the session name
+  # for the kind, one i32 and the kr-1256-shaped ServerTeamInfo (cn-774 sub_494220). There is no profile map, no
+  # +648 optional and no own-slot word. tw-454 reads the same body with its own nested GameSetting and UserSlot.
+  gspGotoRoom@cn-774:
+  - session_setting: SessionSetting
+  # v70+0: the first of the two words the reader takes before the seat vector. The kr-1256 +544 master-slot
+  # role is inferred; every main-menu install sends 0.
+  - master_slot: u32
+    offset: 0
+  - unknown_4: u32                    # v70+4: no consumer read yet
+    offset: 4
+  # v70+8: the seat vector (cn-774 sub_1054EC0, UserSlot elements) that cn-774 sub_8D6590 builds the seats from
+  - user_slots: "list<UserSlot>"
+    offset: 8
+  # one 201-style equipped-item object: cn-774 sub_105A3C0 reads the vector, cn-774 sub_9B82D0 each element
+  - equipped_objects: "list<EquippedObjectEntry>"
+  # i32-as-bool: true makes the client generate the session name for the kind
+  - generate_session_name: bool
+  - unknown_n1: u32                   # the word after the generate-name flag; no consumer read yet
+  - team_info: ServerTeamInfo
+

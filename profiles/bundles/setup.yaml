@@ -1,0 +1,36 @@
+- id: persistence.sqlite.setup
+  plugin: persistence.sqlite.setup
+  config:
+    busy_timeout_ms: 5000
+- id: persistence.mysql.setup
+  plugin: persistence.mysql.setup
+  config:
+    connect_timeout_seconds: 15
+    command_timeout_seconds: 30
+- id: installation
+  plugin: installation
+  # The kernel fixes its budget from these startup rows, and every installation is admitted inside it later.
+  # Each row costs 1 + its effect capacity (4096 by default); all selectable builds compose about 200 rows,
+  # and a reconfiguration holds the old and new rows at once. SetupRuntimeBudgetTests checks the sum.
+  lifecycle:
+    entry_reserve: 512
+    service_metadata_reserve: 2000000
+  config:
+    state_directory: "${BFF_STATE_DIR}"
+    bootstrap_token: "${BFF_SETUP_TOKEN:-}"
+    database_timeout_seconds: 30
+    session_capacity: 32
+    session_minutes: 60
+    login_attempts: 5
+    login_window_seconds: 30
+- id: webui
+  plugin: webui
+  config:
+    tutorial_directory: "${BFF_TUTORIAL_DIR:-}"
+- id: admin.http
+  plugin: admin.http
+  config:
+    listen: "${BFF_ADMIN_HOST:-127.0.0.1}:${BFF_ADMIN_PORT:-8080}"
+    allowed_hosts: "${BFF_ADMIN_ALLOWED_HOSTS:-}"
+    # The host sets this when the executable was started without arguments from an interactive Windows console.
+    open_browser: ${BFF_OPEN_BROWSER:-false}

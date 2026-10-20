@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <ProjectReference Include="..\..\src\BubbleFighter.Fantasy.Kernel\BubbleFighter.Fantasy.Kernel.csproj" />
+    <ProjectReference Include="..\..\src\BubbleFighter.Fantasy.Contracts\BubbleFighter.Fantasy.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\BubbleFighter.Fantasy.Packets\BubbleFighter.Fantasy.Packets.csproj" />
+    <ProjectReference Include="..\..\src\BubbleFighter.Fantasy.Wire\BubbleFighter.Fantasy.Wire.csproj" />
+    <ProjectReference Include="..\..\src\Plugins\*\*.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\profiles\kr-1256\opcodes.yaml" Link="opcodes.yaml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\profiles\cn-279\opcodes.yaml" Link="cn-279-opcodes.yaml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fixtures\client-requests.jsonl" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="CopyScenarioPlugins" AfterTargets="Build">
+    <ItemGroup>
+      <_PluginFiles Include="$(RepoRoot)artifacts\plugins\**\*.*" />
+    </ItemGroup>
+    <!-- Replace the generated test deployment so removed plugins cannot survive contract upgrades. -->
+    <RemoveDir Directories="$(OutDir)plugins" />
+    <Copy SourceFiles="@(_PluginFiles)"
+          DestinationFiles="@(_PluginFiles->'$(OutDir)plugins\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+  <ItemGroup>
+    <Compile Include="..\Shared\TestTempDirectories.cs" Link="TestTempDirectories.cs" />
+    <Compile Include="..\Shared\TestWireDialects.cs" Link="TestWireDialects.cs" />
+    <Compile Include="..\Shared\SharedDialectRows.cs" Link="SharedDialectRows.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\Shared\SyntheticClientTables.cs" Link="SyntheticClientTables.cs" />
+    <Compile Include="..\Shared\TestClientData.cs" Link="TestClientData.cs" />
+  </ItemGroup>
+</Project>

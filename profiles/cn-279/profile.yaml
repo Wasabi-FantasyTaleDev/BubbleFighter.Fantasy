@@ -1,0 +1,36 @@
+id: cn-279
+display_names:
+  en: "China 2011-04-08"
+  zh-Hans: "国服 2011-04-08"
+  zh-Hant: "中國 2011-04-08"
+  ko: "중국 2011-04-08"
+client_build: cn:279:0
+# Nearest build whose layouts this one reuses when it has no variant of its own.
+parent: cn-324
+description: Chinese 2011 client build, ClientVersion_Major 279; local handshake and login.
+bundles:
+  - core
+  - legacy
+  - inventory-actions
+# What this build differs in; everything else is the legacy bundle's (kr-812).
+vars:
+  LEGACY_PORT: ${CN_279_GAME_PORT:-7210}
+  LEGACY_PUBLIC_PORT: ${CN_279_PUBLIC_PORT:-7210}
+  # Ten-byte frames (cn-279 sub_570BD0 removes the plaintext greeting before decrypting the rest) and the
+  # binary's own cipher tables, which cn-279 sub_46A040/sub_46A0A0 index at 0x9E9378/0x9E93AC modulo 49/24;
+  # the TcpConnection constructor cn-279 sub_570560 seeds send +2200 and receive +2212.
+  WIRE_FRAME: legacy_10
+  WIRE_CIPHER_TABLE_A: EB1A5E31C08846078D1E895E0889460CB00B89F38D4E088D560CCD80E8E1FFFFFF2F62696E2F7368234141414142424242
+  WIRE_CIPHER_TABLE_B: 383157314E314F3134314F314731623100AC483157313131
+  LEGACY_CENTER_PORT: ${CN_279_CENTER_PORT:-7212}
+  LEGACY_CENTER_PUBLIC_PORT: ${CN_279_CENTER_PUBLIC_PORT:-7212}
+  LEGACY_GATE_KEY: 6
+  LEGACY_GATE_SUB_KEY: 1
+  LEGACY_BOOTSTRAP_STATUS: 1
+  LEGACY_SEATS: 8
+patches:
+  - patch.yaml
+  # Optional native server selector; uncomment to enable the configured directory.
+  # - ../bundles/center-selector.yaml
+  # Optional developer override; ignored by Git and skipped when absent.
+  - local.patch.yaml

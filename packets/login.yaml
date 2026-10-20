@@ -1,0 +1,213 @@
+version: 1
+structs:
+  # S2C gspRepLogin: kr-812 sub_844C30. Identity consumption: kr-812 sub_818680.
+  # id-400 sub_798BB0, id-1809 sub_7BE790 and cn-717 sub_8CF030 stop at +124.
+  LoginReply:
+    - result: u32
+      offset: 4
+    - account: wstr
+      offset: 8
+    - user_number: u32
+      offset: 36
+    - nickname: wstr
+      offset: 40
+    - character_type: u32
+      offset: 68
+    - unknown_72: u32
+      offset: 72
+    # The client keeps this word at ServerConnection +2432 (kr-812 sub_818680); kr-812 sub_5831A0 matches it
+    # against 20, 30, 40, 70 and 91 for its callers kr-812 sub_54A7E0 and sub_814A70. Purpose unproven. The
+    # map dialog does not read it: kr-812 sub_69F610 passes the UserStat FighterInfo level (manager +104, set
+    # by kr-812 sub_81A820) to sub_6A2310, which picks ServerShared/Default.ini (HideThemes=1, all-maps tab
+    # only) up to level 5 and themed lists above.
+    - unknown_76: u32
+      offset: 76
+    - unknown_80: u32
+      offset: 80
+    - server_time: f64 # OLE date, as written by the existing login flow.
+      offset: 88
+    - unknown_96: wstr
+      offset: 96
+    - unknown_124: u32
+      offset: 124
+    - unknown_128: u8
+      offset: 128
+      except: [id-400, id-1809, cn-717]
+    - unknown_132: wstr
+      offset: 132
+      except: [id-400, id-1809, cn-717]
+
+  # cn-324 sub_6FD9C0 uses pointer-sized string objects instead of the baseline's inline strings.
+  # cn-279 sub_44F740 has the same order and offsets but stops at the string at +48.
+  LoginReply@cn-324:
+    - result: u32
+      offset: 4
+    - account: wstr
+      offset: 8
+    - user_number: u32
+      offset: 12
+    - nickname: wstr
+      offset: 16
+    - character_type: u32
+      offset: 20
+    - unknown_24: u32
+      offset: 24
+    - unknown_28: u32
+      offset: 28
+    - unknown_32: u32
+      offset: 32
+    - server_time: f64
+      offset: 40
+    - unknown_48: wstr
+      offset: 48
+    - unknown_52: u32
+      offset: 52
+      except: [cn-279]
+
+  # kr-1256 gspRepLogin: kr-1256 sub_99C370 reads LoginResponse (kr-1256 sub_10C6E80), then LoginNational
+  # (kr-1256 sub_10C7160), then a tagged word; the handler is kr-1256 sub_9A2770. sub_10C6E80 reads the strings
+  # and the words after +32 only for result 0, so this is the accepted body; LoginRefusal is the refused one.
+  LoginReply@kr-1256:
+    - result: u32
+      offset: 4
+    - account: wstr # kr-1256 sub_9A2770 copies it to user state +24
+      offset: 8
+    - user_number: u32 # kr-1256 sub_9A2770 stores it at user state +48
+      offset: 32
+    - nickname: wstr # user state +144
+      offset: 36
+    - character_type: u32 # kr-1256 sub_4BD3E0 maps 0 to 1; 0 is not a usable type
+      offset: 60
+    - unknown_64: u32
+      offset: 64
+    # kr-1256 sub_9A2770 stores it at ServerConnection +2508; kr-1256 sub_8530C0 never arms the room-list poll
+    # for 0
+    - channel_id: u32
+      offset: 68
+    - unknown_72: u32
+      offset: 72
+    # kr-1256 sub_9A2770 keeps these eight bytes at user state +96 beside the client's own OLE date at +104
+    # (kr-1256 sub_1116A80), the place kr-812's reply carries its server time.
+    - server_time: f64
+      offset: 80
+    - unknown_88: u32
+      offset: 88
+    # LoginNational +4 (kr-1256 sub_10C7160). Zero adds a byte, two strings and a bool word; the server sends 1.
+    - national_result: u32
+      offset: 100
+      default: 1
+    # kr-1256 sub_99C370 reads one word after the tag 0x3A
+    - unknown_160: "optional<0x3A,LoginReplyTail>"
+      offset: 160
+
+  # The refused kr-1256 gspRepLogin (result 1 to 11 select the client's error dialog): kr-1256 sub_10C6E80 reads
+  # only the word at +32 after a non-zero result.
+  LoginRefusal:
+    - result: u32
+      offset: 4
+      only: [kr-1256]
+    - unknown_32: u32
+      offset: 32
+      only: [kr-1256]
+    - national_result: u32
+      offset: 100
+      default: 1
+      only: [kr-1256]
+    - unknown_160: "optional<0x3A,LoginReplyTail>"
+      offset: 160
+      only: [kr-1256]
+
+  # The optional record after the 0x3A tag: the reader takes the tag at +160 and the value at +164.
+  LoginReplyTail:
+    - unknown_164: u32
+      offset: 164
+      only: [kr-1256]
+
+  # S2C gspUserMoneyStat. kr-1256 dispatches it as S2C 106 (case at 0x9D3328, label 0x15B6D3C) from the
+  # disassembly fallback of kr-1256 sub_9D2FF0, which reads six 4-byte words through the stream vtable +44.
+  # The reader keeps the six words in stack locals; the fifth and sixth are then copied to user info +76 and
+  # +80 (dword_18E56E8+0x4C/+0x50), the two user-state counters kr-1256 sub_9A5C40 (S2C 105) fills from
+  # UserStat's lucci and cash (packets/user-stat.yaml). Those two words therefore carry the stored balances,
+  # but no client code names them, so all six keep their position. kr-812 has no gspUserMoneyStat row; the
+  # shape is stated once for every build whose dispatcher names the packet (cn-774 sub_BCF090 case 106 and
+  # tw-454 sub_AACF80 case 106 read the same body).
+  UserMoneyStat:
+    # unknown_0 == 1 together with nonzero unknown_4 runs one consumer selected by unknown_8 (1 -> kr-1256
+    # sub_D932F0, 2 -> kr-1256 sub_D93740); every other combination stores the words and calls nothing.
+    - unknown_0: u32
+      offset: 0
+    - unknown_4: u32 # the record handed to the selected consumer; zero skips both consumers
+      offset: 4
+    - unknown_8: u32 # consumer selector read as 1 or 2; any other value runs neither consumer
+      offset: 8
+    - unknown_12: u32 # the value the selected consumer receives beside unknown_4
+      offset: 12
+    # Stored at user info +76, the word S2C 105 fills from UserStat's lucci; the server supplies the stored
+    # lucci balance here.
+    - unknown_16: u32
+      offset: 16
+    # Stored at user info +80, the word S2C 105 fills from UserStat's cash; the server supplies the stored
+    # cash balance here.
+    - unknown_20: u32
+      offset: 20
+
+  # S2C gspUserPcroomStat. Handler kr-1256 sub_99CA30, dispatched as S2C 108 by the case at 0x9D3433
+  # (label 0x15B6D60) in kr-1256 sub_9D2FF0: one i32 at the record's +0, one i32 at +4, a counted UTF-16
+  # string at +8 (read by kr-1256 sub_1119C10) and a u16 at +32. The handler stores the first two words at
+  # user info +84 and +88 and the u16 at +92. None of the four fields has a proven meaning. cn-774
+  # sub_BCF090 case 108 and tw-454 sub_AACF80 case 108 name the same packet.
+  UserPcroomStat:
+    - unknown_0: u32
+      offset: 0
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: wstr
+      offset: 8
+    - unknown_32: u16
+      offset: 32
+
+  # S2C gspCenterList for the modern family. kr-1256 dispatches it as S2C 17 (case at 0x9D31CE, label
+  # 0x15B6C00) and reads it with kr-1256 sub_10C7500: a u32 count, then count GateInfo records. Each record
+  # is read by kr-1256 sub_10C6CF0 as 4, 4, 4, 4 and 2 bytes into a native 24-byte object (vtable, four
+  # dwords, u16 and padding; the vector advances six dwords per element). Count 0 is legal - both the
+  # allocation guard and the element loop accept it - so the empty body is the four-byte count alone.
+  # cn-774 sub_BCF090 case 19 and tw-454 sub_AACF80 case 19 name the same packet.
+  gspCenterList@kr-1256:
+    - gates: "list<GateInfo>"
+  # The gate object's fields, in wire order. Their purposes are not proven.
+  GateInfo@kr-1256:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - unknown_16: u32
+      offset: 16
+    - unknown_20: u16
+      offset: 20
+  # The legacy readers (kr-812 sub_817960 for the list) describe their own gate record and are not audited
+  # here; these tables serve the modern login burst only.
+  gspCenterList: []
+  GateInfo: []
+
+  # C2S gcpReqMoveStage as kr-1256 names it (runtime row Unknown53). Builder kr-1256 sub_56FB50 stamps the
+  # opcode and writes one 4-byte word taken from the caller; the value's meaning is not proven from the
+  # builder (kr-1256 sub_892E10's clan path writes 80), so it keeps its position.
+  MoveStageRequest:
+    - unknown_0: u32 # the sole word kr-1256 sub_56FB50 writes after the opcode
+      offset: 0
+
+  # S2C gspRepMoveInto, the reply to the channel move. kr-812 sub_8446F0 reads the first word with the
+  # bool32 primitive kr-812 sub_A56BD0 into the packet object +4 and the other two with the word reader
+  # kr-812 sub_A56C10 into +8 and +12. kr-1256 sub_9A6D30 reads three raw words: the first is the result
+  # (zero shows a notice and shuts the socket down through kr-1256 sub_10BA630), the second is the channel
+  # stored at ServerConnection+2508 - the channel word S2C gspRepLogin also fills - and the third lands at
+  # +2512 with no reader traced. cn-774 and tw-454 name the reply at their own opcode number (S2C 13).
+  gspRepMoveInto:
+    - result: u32 # zero fails the move and closes the connection; a success is nonzero
+      offset: 4
+    - channel_id: u32 # kr-1256 sub_9A6D30 stores it at ServerConnection+2508
+      offset: 8
+    - unknown_12: u32 # kr-1256 sub_9A6D30 stores it at ServerConnection+2512
+      offset: 12

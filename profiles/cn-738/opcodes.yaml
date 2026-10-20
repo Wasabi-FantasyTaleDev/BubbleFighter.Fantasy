@@ -1,0 +1,69 @@
+profile: cn-738
+# Opcode assignments for the Chinese 738 client (CN2016 0.2.72.01). C2S and S2C are
+# separate numeric spaces. Login plus main-menu GotoRoom/GotoMenu are wired; shop,
+# tutorial, and plaza are not claimed here. See profiles/opcode-policy.md.
+opcodes:
+  - value: 1
+    direction: c2s
+    name: gcpFirstConnect
+    name_source: mirrored
+    evidence: verified
+    source: "ClientVersion_Major 738 from version init sub_D07300(738, 0, 0, ...); handshake number shared with cn-735"
+  - value: 19
+    direction: c2s
+    name: gcpReportLastCrash
+    name_source: mirrored
+    evidence: inferred
+    source: "mirrors cn-735 sub_A5D790 / opcode 19; same pre-handshake role on the mid-CN family"
+  - value: 3
+    direction: c2s
+    name: gcpReqLogin
+    name_source: mirrored
+    evidence: verified
+    source: "serializer sub_862510: three wstr, adapter vector, u32 unknown3, u32 unknown4 (same shape as cn-735 sub_835270)"
+  - value: 2
+    direction: s2c
+    name: gspRepGamePatch
+    name_source: label@cn-738
+    evidence: verified
+    source: "UTF-16 gspRepGamePatch in BubbleFighterU.exe; number shared with cn-735"
+  - value: 3
+    direction: s2c
+    name: gspRepLogin
+    name_source: label@cn-738
+    evidence: verified
+    source: "UTF-16 gspRepLogin; LoginResponse deserialize sub_A7E660, LoginNational sub_A7E860"
+    notes: "LoginResponse + LoginNational; success body ends with national flag 1"
+  - value: 17
+    direction: s2c
+    name: gspCenterList
+    name_source: mirrored
+    evidence: inferred
+    source: "mirrors cn-735 opcode 17; mid-CN family shares the gate-list number"
+  - value: 110
+    direction: s2c
+    name: gspGotoMenu
+    name_source: mirrored
+    evidence: inferred
+    source: "mirrors cn-735 sub_A5B160 / opcode 110; mid-CN family shares the menu number"
+    notes: "sent after gspGotoRoom so MainMenuStage opens"
+  - value: 111
+    direction: s2c
+    name: gspGotoLobby
+    name_source: mirrored
+    evidence: inferred
+    source: "mirrors cn-735 sub_A5B080 / opcode 111"
+    notes: "number reserved; plaza path not wired for this profile"
+  - value: 112
+    direction: s2c
+    name: gspGotoRoom
+    name_source: label@cn-738
+    evidence: verified
+    source: "UTF-16 gspGotoRoom; send path uses opcode 112 (sub_CF9460(..., 112)); SessionSetting sub_429050, GameSetting sub_4288C0, UserSlot sub_4295D0 match cn-735 wire"
+    notes: "kind 1 SessionSetting opens the character session before gspGotoMenu"
+  - value: 106
+    direction: c2s
+    name: gcpReqGotoLobby
+    name_source: mirrored
+    evidence: inferred
+    source: "cn-738 senders sub_776690 and sub_A2B8F0 stamp 106 through sub_DFC670 with an empty body, as cn-717 gcpReqGotoLobby does; the build has no class labels"

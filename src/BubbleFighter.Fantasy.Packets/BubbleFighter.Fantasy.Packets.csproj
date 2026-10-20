@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Reads the packet structure tables under packets/: one named field list per structure, with each client build's differences written beside the field they change.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\BubbleFighter.Fantasy.Abstractions\BubbleFighter.Fantasy.Abstractions.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="YamlDotNet" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="BubbleFighter.Fantasy.Kernel.Tests" />
+  </ItemGroup>
+</Project>

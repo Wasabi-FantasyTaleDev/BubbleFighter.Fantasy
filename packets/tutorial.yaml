@@ -1,0 +1,165 @@
+# Small tutorial control packets whose native readers consume one u32.
+version: 1
+structs:
+  # Own list readers: kr-812 sub_840770, cn-717 sub_8CA190, cn-324 sub_6FE8F0
+  # -> cn-324 sub_718330, id-400 sub_799F20, id-1809 sub_7BFD20, cn-706 sub_7A2510.
+  TutorialStageInfo:
+    - cleared: list<TutorialStageClear>
+      offset: 4
+      cn-279:
+        # No own list/element reader is proven; retain only the existing zero-count reply.
+        - cleared: empty_list
+          offset: 4
+  # Own element readers: kr-812 sub_9D95D0, cn-717 sub_7F4370, cn-324 sub_6EB8B0,
+  # id-400 sub_72E4D0, id-1809 sub_4D8130, cn-706 sub_7A23F0: three consecutive u32.
+  # kr-812 sub_824200 stores each element in a map keyed by the first word; the TutorialRoomStage looks a row up as
+  # row plus ten times its difficulty tab (kr-812 sub_6B3AC0, sub_6B4110), the MapMeta stageNum numbering, and
+  # marks the row cleared when the key is present (kr-812 sub_6B50E0).
+  TutorialStageClear:
+    - stage: u32 # MapMeta stageNum of the cleared stage.
+      offset: 4
+      except: [cn-279]
+    - best_count: u32 # kr-812 sub_6B4110 shows it as the record when above 0.
+      offset: 8
+      except: [cn-279]
+    - best_seconds: u32 # kr-812 sub_6B4110 formats it as %02d:%02d (seconds / 60, seconds % 60) otherwise.
+      offset: 12
+      except: [cn-279]
+  # Own gcpGameReportMapLoadingComplete readers: kr-812 sub_80A400, cn-717 sub_8CB120,
+  # cn-324 sub_6FE600, cn-279 sub_403BF0, id-400 sub_481C20,
+  # id-1809 sub_4D6EC0, cn-406 sub_7137B0, cn-706 sub_4B9F60. The second word is not a seat index.
+  RoundMapLoadingReport:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - unknown_16: u32
+      offset: 16
+  # Readers: kr-812 sub_80A910, cn-717 sub_8C4210, cn-324 sub_410910,
+  # cn-279 sub_44C1A0, id-400 sub_93D120, id-1809 sub_4D60C0, cn-706 sub_4BBB70.
+  TutorialMasterSlot:
+    - master_slot: u32
+      offset: 4
+  # Start/end wave requests and replies use the scalar readers listed above.
+  TutorialWave:
+    - wave: u32
+      offset: 4
+  # Each build's own gppCreateMobsFromSpawnGroup class uses the scalar reader above.
+  TutorialSpawnGroup:
+    - spawn_group: u32
+      offset: 4
+  # Each build's own gcpReqEndStage class uses the scalar reader above.
+  # cn-279 sub_818630 sends 0/1 for incomplete/completed; validation stays in the codec.
+  TutorialEndStage:
+    - completed: u32
+      offset: 4
+  # Readers: kr-812 sub_80A910, cn-717 sub_8C4210 and id-1809 sub_4D60C0.
+  # Other legacy builds have no audited native host-start packet class.
+  TutorialHostStart:
+    - unknown_4: u32
+      offset: 4
+      only: [kr-812, cn-717, id-1809]
+      except: [cn-324, id-400]
+
+  # Tutorial request wrappers: kr-812 sub_8455F0, cn-717 sub_8CFAF0, id-400 sub_797B80,
+  # id-1809 sub_7BD7C0 and cn-706 sub_79FED0. MapMetaData is nested at object +4.
+  # Inner readers: kr-812 sub_418CD0, cn-717 sub_41A850, id-400 sub_567300,
+  # id-1809 sub_416C60, cn-706 sub_567120; the bool offsets below include the +4 nesting.
+  # The thirteen MapMetaData words are the map's rule record, named from the keys kr-1256 sub_AADD50 fills it
+  # from (see RoomEnterGameRequest in room-start.yaml).
+  TutorialPlayRequest:
+    - end_game_time_over_tick: u32
+      offset: 8
+    - end_game_notify_win_or_lose_tick_team: u32
+      offset: 12
+    - end_game_notify_win_or_lose_tick_star: u32
+      offset: 16
+    - end_game_notify_result_tick: u32
+      offset: 20
+    - fever_time_duration: u32
+      offset: 24
+    - star_drop_time_duration: u32
+      offset: 28
+    - death_match_kill_limit: u32
+      offset: 32
+    - death_match_time_limit_ms: u32
+      offset: 36
+    - time_attack_time_limit_ms: u32
+      offset: 40
+    - conquer_time_limit_ms: u32
+      offset: 44
+    - star_mode_time_limit_ms: u32
+      offset: 48
+    - unknown_52: u32
+      offset: 52
+    - unknown_56: u32
+      offset: 56
+    - unknown_60: bool
+      offset: 60
+    - unknown_61: bool
+      offset: 61
+    - unknown_63: bool
+      offset: 63
+    - unknown_64: bool
+      offset: 64
+    - unknown_62: bool
+      offset: 62
+    - unknown_65: bool
+      offset: 65
+      except: [id-400]
+      also: [cn-706]
+    - unknown_68: wstr
+      offset: 68
+    - unknown_96: wstr
+      offset: 96
+    - map_key: wstr
+      offset: 124
+    - difficulty: u32
+      offset: 152
+  # cn-324 sub_6FCB70 -> cn-324 sub_40FBF0; cn-279 sub_44EDF0 -> cn-279 sub_425780.
+  # Early strings occupy one object word and the four nested bools are sequential.
+  TutorialPlayRequest@cn-324:
+    - end_game_time_over_tick: u32
+      offset: 8
+    - end_game_notify_win_or_lose_tick_team: u32
+      offset: 12
+    - end_game_notify_win_or_lose_tick_star: u32
+      offset: 16
+    - end_game_notify_result_tick: u32
+      offset: 20
+    - fever_time_duration: u32
+      offset: 24
+    - star_drop_time_duration: u32
+      offset: 28
+    - death_match_kill_limit: u32
+      offset: 32
+    - death_match_time_limit_ms: u32
+      offset: 36
+    - time_attack_time_limit_ms: u32
+      offset: 40
+    - conquer_time_limit_ms: u32
+      offset: 44
+    - star_mode_time_limit_ms: u32
+      offset: 48
+    - unknown_52: u32
+      offset: 52
+    - unknown_56: u32
+      offset: 56
+    - unknown_60: bool
+      offset: 60
+    - unknown_61: bool
+      offset: 61
+    - unknown_62: bool
+      offset: 62
+    - unknown_63: bool
+      offset: 63
+    - unknown_64: wstr
+      offset: 64
+    - unknown_68: wstr
+      offset: 68
+    - map_key: wstr
+      offset: 72
+    - difficulty: u32
+      offset: 76

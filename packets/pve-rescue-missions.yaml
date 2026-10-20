@@ -1,0 +1,79 @@
+version: 1
+structs:
+  # sMissionInfo_From_Svr. kr-812 sub_7A38E0 reads six words, a counted string vector and a bool32;
+  # cn-717 sub_81FAB0, id-400 sub_7273D0, id-1809 sub_74A140, cn-706 sub_72BDF0 and cn-324 sub_69CE90
+  # read the same wire fields (cn-324's object is four bytes shorter). cn-279 has no such class.
+  PveRescueMission:
+    - mission_id: u32 # cn-324 sub_69E6B0 matches this value to MissionInfo_Clt.xml's mission_id.
+      offset: 4
+      except: [cn-279]
+    - unknown_8: u32 # Consuming purpose unproven.
+      offset: 8
+      except: [cn-279]
+      default: 0 # Provisional outbound value; no consumer establishes it yet.
+    - unknown_12: u32 # Consuming purpose unproven.
+      offset: 12
+      except: [cn-279]
+      default: 0 # Provisional outbound value; no consumer establishes it yet.
+    - unknown_16: u32 # Consuming purpose unproven.
+      offset: 16
+      except: [cn-279]
+      default: 0 # Provisional outbound value; no consumer establishes it yet.
+    - start_time_ms: u32 # cn-324 sub_6D7F90 subtracts +20 from the native game elapsed timer.
+      offset: 20
+      except: [cn-279]
+    - duration_ms: u32 # cn-324 sub_6D7F90 divides elapsed-since-start by +24 to draw mission progress.
+      offset: 24
+      except: [cn-279]
+    - arguments: list<wstr> # cn-324 sub_8B3590 consumes killmonster arguments.
+      offset: 28
+      except: [cn-279]
+    - unknown_44: bool
+      offset: 44
+      except: [cn-279]
+      default: 0 # Provisional outbound value; no consumer establishes it yet.
+      cn-324:
+        - unknown_40: bool
+          offset: 40
+          default: 0
+  # S2C gspMapMissionInfo. Own entries kr-812 sub_80C080, cn-717 sub_890E40,
+  # id-400 sub_782B10, id-1809 sub_7A5F90 and cn-324 sub_6EB830 delegate to vector readers.
+  # kr-812 sub_80C040 reads a count then each 48-byte entry; cn-717 sub_890E00,
+  # id-400 sub_78F7A0, id-1809 sub_7B42B0 and cn-706 sub_796770 match.
+  # cn-324 sub_6F50A0 uses 44-byte entries. These are object strides, not wire padding.
+  PveRescueMissionsPrepared:
+    - missions: list<PveRescueMission>
+      offset: 4
+      except: [cn-279]
+  # S2C gspResMissionStart. kr-812 sub_80A910 reads one word; cn-717 sub_8C4210, id-400 sub_93D120,
+  # id-1809 sub_4D60C0, cn-706 sub_4BBB70 and cn-324 sub_410910 match.
+  PveRescueMissionStarted:
+    - mission_index: u32 # cn-324 sub_6EE410 selects this list index and calls sub_69D400 to spawn the mission.
+      offset: 4
+      except: [cn-279]
+  # S2C gspResMissionTimeOut: the same one-word readers as gspResMissionStart.
+  PveRescueMissionTimedOut:
+    - next_mission_index: u32 # cn-324 sub_6EE540 fails the active mission, then stores this next list index.
+      offset: 4
+      except: [cn-279]
+  # S2C gspResMissionOK. kr-812 sub_6DB1B0 reads two words; cn-717 sub_538B70, id-400 sub_782DD0,
+  # id-1809 sub_4D7F70, cn-706 sub_733050 and cn-324 sub_408DF0 match.
+  PveRescueMissionSucceeded:
+    - unknown_4: u32 # cn-324 sub_6EE670 executes native success only when this word equals zero.
+      offset: 4
+      except: [cn-279]
+    - mission_index: u32 # cn-324 sub_6EE670 advances to this index plus one after success.
+      offset: 8
+      except: [cn-279]
+  # C2S gcpMissionProcess. kr-812 sub_9D95D0 reads three words; cn-717 sub_7F4370, id-400 sub_72E4D0,
+  # id-1809 sub_4D8130, cn-706 sub_7A23F0 and cn-324 sub_6EB8B0 match.
+  PveRescueMissionProgress:
+    - mission_index: u32 # cn-324 sub_467840 writes the NPC's mission reference to C927's first word.
+      offset: 4
+      except: [cn-279]
+    - character_type: u32 # cn-324 sub_52F630 and sub_532330 pass NPC object +652 as the second word.
+      offset: 8
+      except: [cn-279]
+    - unknown_12: u32 # cn-324 sub_467840 writes zero here; a consuming purpose remains unproven.
+      offset: 12
+      except: [cn-279]
