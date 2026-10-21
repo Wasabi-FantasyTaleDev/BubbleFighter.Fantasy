@@ -136,6 +136,7 @@
     "mode.19": "爆炸模式",
     "mode.20": "大長戰",
     "mode.21": "瘋狂馬拉松",
+    "mode.22": "AOS",
     "mode.23": "生存模式",
     "mode.24": "極限模式",
     "mode.25": "生存模式",
@@ -239,7 +240,9 @@
     "mode.19": "Bomb mission",
     "mode.20": "Champion Mode",
     "mode.31": "ShotGun",
-    "mode.101": "Pirate Battle"
+    "mode.101": "Pirate Battle",
+    "mode.102": "Pirate Battle - Zombi Mini halloween Event",
+    "mode.103": "Single Play"
   },
   "zh-Hans:cn-774": {
     "mode.6": "星星争夺战",
@@ -247,6 +250,7 @@
   },
   "id:id-400": {
     "mode.14": "Survival Team Mode",
-    "mode.15": "Main Sendiri"
+    "mode.15": "Main Sendiri",
+    "mode.103": "Main Sendiri"
   }
 }

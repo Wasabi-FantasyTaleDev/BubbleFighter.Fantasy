@@ -412,8 +412,8 @@ builds:
       # into the reader kr-1256 sub_999C00 (u32 count, then that many 4-byte ids) and the consumer
       # kr-1256 sub_93C6E0, so the row can send it. Layout is ExpiredItems in packets/inventory.yaml.
       expired_item_notice: true
-      # The gift box stays off until the kr-1256 shop row mounts it; the mount is the S6 shop task
-      # (ShopPlugin's kr1256 catalog branch), not this slice. The client readers are in packets/present.yaml.
+      # The gift box stays off until the kr-1256 shop row mounts it (ShopPlugin's kr1256 catalog branch).
+      # The client readers are in packets/present.yaml.
       present_box: false
 
   # CN 2019 (ClientVersion_Major 774), kr-1256's lineage. Named so a capability can be stated for it; its layouts are

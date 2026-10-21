@@ -1,0 +1,542 @@
+version: 1
+structs:
+  # The in-round gameplay feed: the frames the server relays unchanged between the players of a round
+  # (src/Plugins/BubbleFighter.Fantasy.Dialect.Modern.Messages/Play/ModernFeedBinding.cs). The server never
+  # writes them; the tables pin their bodies and give the fields a place to be named.
+  #
+  # Naming rule used here: a structure carries the kr-812 class name (without the gpp prefix, as
+  # packets/damagers.yaml does) only for the frames where the kr-812 class at the same number has the same
+  # body length and the same reader shape as the kr-1256 reader; 20 of the 26 same-number classes qualify.
+  # The other six are stated as Unknown<number>, because a kr-1256 body that is 24 bytes where the kr-812
+  # class reads 16 is a different packet even at the same number. The 13 frames that have no kr-812 row at
+  # their number are Unknown<number> with every field marked only: [kr-1256].
+  #
+  # Sources: the kr-1256 user-action readers named in each comment (dispatched by kr-1256 sub_6D55D0 and
+  # reused by the round flow), and the kr-812 packet-class deserializers, resolved by their vtables
+  # (the `Packet_<class>` vftable slot). The width proof on the kr-812
+  # side is the helper each deserializer calls: kr-812 sub_A56C10 reads 4 bytes, kr-812 sub_A56BB0 reads 1
+  # byte, kr-812 sub_A56BD0 reads 4 bytes into a byte field (the bool32 case).
+  #
+  # Not tabled here: the eight damager-spawn frames (32772, 32877, 32881, 32898, 32899, 32900, 32910,
+  # 33278) are already in packets/damagers.yaml with their kr-1256 restatements; and the two relay motion
+  # frames 20003 / 20004 (InGameOpcodes.RelayMotion / RelayWander, writer kr-1256 sub_95FAE0) have no row in
+  # profiles/kr-1256/opcodes.yaml and no reader evidence, so they get no structure until that is filled in.
+  #
+  # No build other than kr-1256 and kr-812 was read for these frames: cn-324, cn-279, cn-404, cn-406, cn-408,
+  # cn-706, cn-717, cn-735, cn-738, cn-742, id-400 and id-1809 are not audited here. The kr-812 shapes are
+  # the baseline; a modern build that differs must say so beside the field.
+  #
+  # Offsets are the client's own object offsets where the reader stores the field (the kr-812 classes start
+  # their fields at +4 because +0 is the vtable) and the wire offset for the kr-1256 inline readers, which
+  # build no object. Actor offsets match MatchAction1256 in
+  # src/BubbleFighter.Fantasy.InGame.Wire/Dialects/MatchAction1256.cs.
+
+  # ---------------------------------------------------------------------------------------------------
+  # Frames whose kr-812 class at the same number reads the same body (20).
+  # ---------------------------------------------------------------------------------------------------
+
+  # 32779: kr-1256 reader kr-1256 sub_6D6765 (i32 actor, bool32). kr-812 Packet_gppDash, deserializer
+  # kr-812 sub_93C4E0: kr-812 sub_A56C10 (+4) then kr-812 sub_A56BD0 (+8), so 8 bytes.
+  Dash:
+    - actor: u32
+      offset: 4
+    - unknown_8: bool
+      offset: 8
+
+  # 32780: kr-1256 reader kr-1256 sub_6D67D8 (i32 actor, i32, u8, u8). kr-812 Packet_gppRoll,
+  # deserializer kr-812 sub_5034B0: 4, 4, 1, 1 bytes.
+  Roll:
+    - actor: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u8
+      offset: 12
+    - unknown_13: u8
+      offset: 13
+
+  # 32781: kr-1256 reader kr-1256 sub_6D8E90 (i32 actor, i32, bool32 - the class reader stores the third
+  # word plainly, so it is pinned as a word). kr-812 Packet_gppJump, deserializer kr-812 sub_503AD0: 3 words.
+  Jump:
+    - actor: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+
+  # 32782: kr-1256 reader kr-1256 sub_6D686F (i32 actor). kr-812 Packet_gppAim, deserializer
+  # kr-812 sub_80A910: one word. The same deserializer serves gppEndStunned, gppKickFail,
+  # gppReturnToNormal, gppGotKicked, gppDead and gppKickEnd below - a shared deserializer is a width proof,
+  # not a name proof.
+  Aim:
+    - actor: u32
+      offset: 4
+
+  # 32783: kr-1256 reader kr-1256 sub_6FC8E0 (i32 unknown0 - a target, may be -1 - then i32 actor, so the
+  # actor word is the second). kr-812 Packet_gppSetTargettingObj, deserializer kr-812 sub_6DB1B0: 2 words.
+  SetTargettingObj:
+    - unknown_4: u32
+      offset: 4
+    - actor: u32
+      offset: 8
+
+  # 32784: kr-1256 reader kr-1256 sub_6D6994 (i32 actor, i32, bool32, i32). kr-812 Packet_gppBubbleJump,
+  # deserializer kr-812 sub_503530: 4, 4, 4-into-a-byte, 4 - the third word is the bool32.
+  BubbleJump:
+    - actor: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: bool
+      offset: 12
+    - unknown_16: u32
+      offset: 16
+
+  # 32786: kr-1256 reader kr-1256 sub_6D6AA1 (i32 actor, i32, u8). kr-812 Packet_gppWallAction,
+  # deserializer kr-812 sub_503890: 4, 4, 1 bytes.
+  WallAction:
+    - actor: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u8
+      offset: 12
+
+  # 32788: kr-1256 reader kr-1256 sub_6FA7B0 (affected actor, source, three floats that the consumer feeds
+  # to a position setter, then a word; stun/knockback). kr-812 Packet_gppStunned, deserializer
+  # kr-812 sub_503710: six words. The float reading comes from the consumer; the pinned fact is four bytes
+  # per word.
+  Stunned:
+    - actor: u32
+      offset: 4
+    - source: u32
+      offset: 8
+    - position_x: f32
+      offset: 12
+    - position_y: f32
+      offset: 16
+    - position_z: f32
+      offset: 20
+    - unknown_24: u32
+      offset: 24
+
+  # 32790: kr-1256 reader kr-1256 sub_6D6D35 (affected actor; the character's virtual +664 enters
+  # sub-state 107). kr-812 Packet_gppEndStunned, deserializer kr-812 sub_80A910: one word.
+  EndStunned:
+    - actor: u32
+      offset: 4
+
+  # 32791: kr-1256 reader kr-1256 sub_6D6ED8 (i32 actor, i32 target, i32). kr-812 Packet_gppKickStart,
+  # deserializer kr-812 sub_9D95D0: three words. That deserializer is also kr-812 Packet_?
+  # RoundStartGame in packets/round-start.yaml, so it proves only the width.
+  KickStart:
+    - actor: u32
+      offset: 4
+    - target: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+
+  # 32792: the one frame of this group that already has a kr-812 label in profiles/kr-1256/opcodes.yaml
+  # (label@kr-812): kr-1256 writer kr-1256 sub_8F0EF0, consumer kr-1256 sub_6F7600 (i32 actor; only the
+  # local actor gets the failure feedback). kr-812 Packet_gppKickFail, deserializer kr-812 sub_80A910.
+  KickFail:
+    - actor: u32
+      offset: 4
+
+  # 32811: kr-1256 reader kr-1256 sub_6D7153 (i32 actor, u32 packed word). kr-812 Packet_gppReload,
+  # deserializer kr-812 sub_6DB1B0: two words.
+  Reload:
+    - actor: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+
+  # 32813: kr-1256 reader kr-1256 sub_6D6E22 (i32 actor; the character's virtual +0x1CC). kr-812
+  # Packet_gppReturnToNormal, deserializer kr-812 sub_80A910: one word.
+  ReturnToNormal:
+    - actor: u32
+      offset: 4
+
+  # 32815: kr-1256 reader kr-1256 sub_6D6C0A (i32 actor, i32). kr-812 Packet_gppHumiliationStart,
+  # deserializer kr-812 sub_6DB1B0: two words.
+  HumiliationStart:
+    - actor: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+
+  # 32816: kr-1256 reader kr-1256 sub_6F7780 (i32 actor, i32). kr-812 Packet_gppHumiliationEnd,
+  # deserializer kr-812 sub_6DB1B0: two words.
+  HumiliationEnd:
+    - actor: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+
+  # 32834: kr-1256 reader kr-1256 sub_6D68BC (i32 actor, i32; writer kr-1256 sub_6DED10). kr-812
+  # Packet_gppWallState, deserializer kr-812 sub_6DB1B0: two words.
+  WallState:
+    - actor: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+
+  # 32835: kr-1256 reader kr-1256 sub_6D6B1B (i32 actor; death presentation stage). kr-812
+  # Packet_gppGotKicked, deserializer kr-812 sub_80A910: one word.
+  GotKicked:
+    - actor: u32
+      offset: 4
+
+  # 32836: kr-1256 reader kr-1256 sub_6F6900 (i32 actor). kr-812 Packet_gppDead, deserializer
+  # kr-812 sub_80A910: one word.
+  Dead:
+    - actor: u32
+      offset: 4
+
+  # 32837: kr-1256 writer kr-1256 sub_6E2EC0, consumer kr-1256 sub_6D55D0 -> kr-1256 sub_4AE3F0 (i32 actor;
+  # a local-only flash effect). kr-812 Packet_gppKickEnd, deserializer kr-812 sub_80A910: one word.
+  KickEnd:
+    - actor: u32
+      offset: 4
+
+  # 32884: kr-1256 reader kr-1256 sub_6F0100 (i32 actor, i32 target, bool32, i32). kr-812
+  # Packet_gppWatchingOnMe, deserializer kr-812 sub_503530: 4, 4, 4-into-a-byte, 4.
+  WatchingOnMe:
+    - actor: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: bool
+      offset: 12
+    - unknown_16: u32
+      offset: 16
+
+  # ---------------------------------------------------------------------------------------------------
+  # Same number, different body: the kr-812 class at that number reads a different length, so it is not the
+  # same packet and gets no name. kr-1256 only (4).
+  # ---------------------------------------------------------------------------------------------------
+
+  # 32810: kr-1256 reader kr-1256 sub_6F65A0, six words, actor word at +8 (kr-1256 sub_6D55D0 case
+  # 0x6F65A0). The kr-812 class at 32810 is gppUpdateWeaponInfo and its deserializer kr-812 sub_80A400
+  # reads four words - 16 bytes, not 24. The difference is the packet, not a reading error.
+  Unknown32810:
+    - unknown_0: u32
+      offset: 0
+      only: [kr-1256]
+    - unknown_4: u32
+      offset: 4
+      only: [kr-1256]
+    - actor: u32
+      offset: 8
+      only: [kr-1256]
+    - unknown_12: u32
+      offset: 12
+      only: [kr-1256]
+    - unknown_16: bool
+      offset: 16
+      only: [kr-1256]
+    - unknown_20: bool
+      offset: 20
+      only: [kr-1256]
+
+  # 32882: kr-1256 reader kr-1256 sub_6D783F (i32 actor, bool32, bool32). The kr-812 class at 32882 is
+  # gppGhost and its deserializer kr-812 sub_93C4E0 reads two words - 8 bytes, one bool, not two.
+  Unknown32882:
+    - actor: u32
+      offset: 0
+      only: [kr-1256]
+    - unknown_4: bool
+      offset: 4
+      only: [kr-1256]
+    - unknown_8: bool
+      offset: 8
+      only: [kr-1256]
+
+  # 32907: kr-1256 reader kr-1256 sub_6D6577 (one word, the damager key the round flow echoes to the sender;
+  # there is no actor word, which is why MatchAction1256 gives it no actor offset). The kr-812 class at 32907
+  # is gppTeleport and its deserializer kr-812 sub_503EE0 was not decoded, so this stays kr-1256 only.
+  Unknown32907:
+    - unknown_0: u32
+      offset: 0
+      only: [kr-1256]
+
+  # 32921: kr-1256 reader kr-1256 sub_6DFE40 (i32 actor, i32, i32). The kr-812 class at 32921 is
+  # gppTeleportPortal and its deserializer kr-812 sub_6DB300 reads four words - 16 bytes, not 12.
+  Unknown32921:
+    - actor: u32
+      offset: 0
+      only: [kr-1256]
+    - unknown_4: u32
+      offset: 4
+      only: [kr-1256]
+    - unknown_8: u32
+      offset: 8
+      only: [kr-1256]
+
+  # 32925: kr-1256 reader kr-1256 sub_10F3990, 32 bytes: word, byte, six 2-byte values, word, byte, word,
+  # word, 2-byte value, then the counted word list appended by kr-1256 sub_1137C30 (the list shape is the one
+  # packets/damagers.yaml already states for the damager bodies; it is not restated here because a list after
+  # a fixed record is the only part that differs between those bodies and this frame is not a damager).
+  # The kr-812 class at 32925 is gppRelayedRespawn and its deserializer kr-812 sub_6DB1B0 reads two words.
+  Unknown32925:
+    - actor: u32
+      offset: 0
+      only: [kr-1256]
+    - unknown_4: u8
+      offset: 4
+      only: [kr-1256]
+    - unknown_5: u16
+      offset: 5
+      only: [kr-1256]
+    - unknown_7: u16
+      offset: 7
+      only: [kr-1256]
+    - unknown_9: u16
+      offset: 9
+      only: [kr-1256]
+    - unknown_11: u16
+      offset: 11
+      only: [kr-1256]
+    - unknown_13: u16
+      offset: 13
+      only: [kr-1256]
+    - unknown_15: u16
+      offset: 15
+      only: [kr-1256]
+    - unknown_17: u32
+      offset: 17
+      only: [kr-1256]
+    - unknown_21: u8
+      offset: 21
+      only: [kr-1256]
+    - unknown_22: u32
+      offset: 22
+      only: [kr-1256]
+    - unknown_26: u32
+      offset: 26
+      only: [kr-1256]
+    - unknown_30: u16
+      offset: 30
+      only: [kr-1256]
+
+  # 32926: the tagged frame. kr-1256 reader kr-1256 sub_6F6200, tag grammar kr-1256 sub_10C04D0 and
+  # kr-1256 sub_10C0640: a word, then two tagged optional words (tag 0x3A carries the word, tag 0xBA does
+  # not), then a byte and a bool32 - 11, 15 or 19 bytes. The table system can say that as optional<0x3A,u32>
+  # only if the reader proves both tag values and the absent-tag default can be 0xBA; that was not verified
+  # in this pass, so the frame is left out rather than guessed. It stays untabled until the tag reader is
+  # read.
+  # Unknown32926: (deferred - see comment above)
+
+  # ---------------------------------------------------------------------------------------------------
+  # No kr-812 row at this number: kr-1256 only (13).
+  # ---------------------------------------------------------------------------------------------------
+
+  # 32821: kr-1256 reader kr-1256 sub_6D7EBC (i32 actor, u8, u8). No kr-812 row for 32821.
+  Unknown32821:
+    - actor: u32
+      offset: 0
+      only: [kr-1256]
+    - unknown_4: u8
+      offset: 4
+      only: [kr-1256]
+    - unknown_5: u8
+      offset: 5
+      only: [kr-1256]
+
+  # 33286: kr-1256 reader kr-1256 sub_6D81CE (i32 actor, i32, i32). No kr-812 row for 33286.
+  Unknown33286:
+    - actor: u32
+      offset: 0
+      only: [kr-1256]
+    - unknown_4: u32
+      offset: 4
+      only: [kr-1256]
+    - unknown_8: u32
+      offset: 8
+      only: [kr-1256]
+
+  # 33301: kr-1256 reader kr-1256 sub_6F4EF0 (writer kr-1256 sub_706840): a word, three float-position
+  # words, the actor word, then a word. No kr-812 row for 33301.
+  Unknown33301:
+    - unknown_0: u32
+      offset: 0
+      only: [kr-1256]
+    - position_x: f32
+      offset: 4
+      only: [kr-1256]
+    - position_y: f32
+      offset: 8
+      only: [kr-1256]
+    - position_z: f32
+      offset: 12
+      only: [kr-1256]
+    - actor: u32
+      offset: 16
+      only: [kr-1256]
+    - unknown_20: u32
+      offset: 20
+      only: [kr-1256]
+
+  # 38271: kr-1256 reader kr-1256 sub_6FAAF0: victim word then the reporting participant; either
+  # participant may report contact, which is why the actor offset is 4 and the alternate is 0. No kr-812 row
+  # for 38271.
+  Unknown38271:
+    - victim: u32
+      offset: 0
+      only: [kr-1256]
+    - actor: u32
+      offset: 4
+      only: [kr-1256]
+
+  # 38272: kr-1256 reader kr-1256 sub_6F7B30: actor word, then the other actor or -1/-2 for a self release.
+  # No kr-812 row for 38272.
+  Unknown38272:
+    - actor: u32
+      offset: 0
+      only: [kr-1256]
+    - other: u32
+      offset: 4
+      only: [kr-1256]
+
+  # 38273: kr-1256 reader kr-1256 sub_6D97D0: victim word (the actor), rescuer word, one float, one byte.
+  # No kr-812 row for 38273.
+  Unknown38273:
+    - victim: u32
+      offset: 0
+      only: [kr-1256]
+    - rescuer: u32
+      offset: 4
+      only: [kr-1256]
+    - distance: f32
+      offset: 8
+      only: [kr-1256]
+    - unknown_12: u8
+      offset: 12
+      only: [kr-1256]
+
+  # 38274: kr-1256 reader kr-1256 sub_6D8743 (writer kr-1256 sub_6E2CA0): one actor word; a bubble timer
+  # expiry. The opcodes.yaml row for 38274 is graded verified. No kr-812 row for 38274.
+  Unknown38274:
+    - actor: u32
+      offset: 0
+      only: [kr-1256]
+
+  # 38277: kr-1256 reader kr-1256 sub_6FAC30: a bool, the victim, the reporting participant, three float
+  # position words, a bool and a word. No kr-812 row for 38277.
+  Unknown38277:
+    - unknown_0: bool
+      offset: 0
+      only: [kr-1256]
+    - victim: u32
+      offset: 4
+      only: [kr-1256]
+    - actor: u32
+      offset: 8
+      only: [kr-1256]
+    - position_x: f32
+      offset: 12
+      only: [kr-1256]
+    - position_y: f32
+      offset: 16
+      only: [kr-1256]
+    - position_z: f32
+      offset: 20
+      only: [kr-1256]
+    - unknown_24: bool
+      offset: 24
+      only: [kr-1256]
+    - unknown_28: u32
+      offset: 28
+      only: [kr-1256]
+
+  # 38280: kr-1256 reader kr-1256 sub_6F7C50: two words and a byte; the reporting participant is the second
+  # word (actor offset 4, alternate 0). No kr-812 row for 38280.
+  Unknown38280:
+    - unknown_0: u32
+      offset: 0
+      only: [kr-1256]
+    - actor: u32
+      offset: 4
+      only: [kr-1256]
+    - unknown_8: u8
+      offset: 8
+      only: [kr-1256]
+
+  # 38281: kr-1256 reader kr-1256 sub_6D88D9 (one actor word; the consumer enters the locked-in dead
+  # sub-state). No kr-812 row for 38281.
+  Unknown38281:
+    - actor: u32
+      offset: 0
+      only: [kr-1256]
+
+  # 38282: kr-1256 reader kr-1256 sub_6F8280: victim word, source word, three float position words, a word,
+  # two bools, a word, a bool. No kr-812 row for 38282.
+  Unknown38282:
+    - victim: u32
+      offset: 0
+      only: [kr-1256]
+    - source: u32
+      offset: 4
+      only: [kr-1256]
+    - position_x: f32
+      offset: 8
+      only: [kr-1256]
+    - position_y: f32
+      offset: 12
+      only: [kr-1256]
+    - position_z: f32
+      offset: 16
+      only: [kr-1256]
+    - unknown_20: u32
+      offset: 20
+      only: [kr-1256]
+    - unknown_24: bool
+      offset: 24
+      only: [kr-1256]
+    - unknown_28: bool
+      offset: 28
+      only: [kr-1256]
+    - unknown_32: u32
+      offset: 32
+      only: [kr-1256]
+    - unknown_36: bool
+      offset: 36
+      only: [kr-1256]
+
+  # 38283: kr-1256 reader kr-1256 sub_6D8679: the damager key, the target object id, three 2-byte hit
+  # coordinates, one mode byte and a word collapsed to a bool. The damager key is minted by the client's own
+  # simulation, which is why the server relays the body rather than rebuilding it. No kr-812 row for 38283.
+  Unknown38283:
+    - unknown_0: u32
+      offset: 0
+      only: [kr-1256]
+    - target: u32
+      offset: 4
+      only: [kr-1256]
+    - unknown_8: u16
+      offset: 8
+      only: [kr-1256]
+    - unknown_10: u16
+      offset: 10
+      only: [kr-1256]
+    - unknown_12: u16
+      offset: 12
+      only: [kr-1256]
+    - unknown_14: u8
+      offset: 14
+      only: [kr-1256]
+    - unknown_15: bool
+      offset: 15
+      only: [kr-1256]
+
+  # 38284: kr-1256 reader kr-1256 sub_6D8832 (i32 actor, bool32 render flag, not a release command). No
+  # kr-812 row for 38284.
+  Unknown38284:
+    - actor: u32
+      offset: 0
+      only: [kr-1256]
+    - unknown_4: bool
+      offset: 4
+      only: [kr-1256]

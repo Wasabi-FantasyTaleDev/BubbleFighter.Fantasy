@@ -3,7 +3,7 @@ using BubbleFighter.Fantasy.Contracts.Inventory;
 namespace BubbleFighter.Fantasy.InventoryView;
 
 /// <summary>Resolves the native character and weapon positions independently of UI category selection.</summary>
-internal sealed class EquipmentSelection1256(IInventoryRepository inventory, IReadOnlyList<InventoryWearGroup>? wearableLocations = null) : IEquipmentSelection
+internal sealed class EquipmentSelection(IInventoryRepository inventory, IReadOnlyList<InventoryWearGroup>? wearableLocations = null) : IEquipmentSelection
 {
     // 0x808F10 / 0x81B9C0: primary and special preset positions; ShopItem2 identifies
     // 202/203/204 as rifle/sniper/shotgun, 201 as sidearm, 205 as special, 207 as melee.

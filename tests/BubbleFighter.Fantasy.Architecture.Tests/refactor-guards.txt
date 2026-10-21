@@ -24,9 +24,6 @@ build_name src/Plugins/BubbleFighter.Fantasy.Dialect.Modern.Messages/Play/Modern
 build_name src/Plugins/BubbleFighter.Fantasy.Dialect.Modern.Messages/Play/ModernRoundBinding.cs:ModernRelayCapabilityBinding
 build_name src/Plugins/BubbleFighter.Fantasy.Dialect.Modern.Messages/Play/ModernRoundBinding.cs:ModernRoundBinding
 build_name src/Plugins/BubbleFighter.Fantasy.Dialect.Modern.Messages/Play/ModernRoutes.cs:ModernRoutes
-build_name src/Plugins/BubbleFighter.Fantasy.InventoryView/EquipmentSelection1256.cs:EquipmentSelection1256
-build_name src/Plugins/BubbleFighter.Fantasy.Shop/Data/ItemTermsLoader_Legacy.cs:ItemTermsLoader_Legacy
-build_name src/Plugins/BubbleFighter.Fantasy.Shop/Data/ItemTermsLoader_Legacy.cs:ItemTerms_Legacy
 build_name src/Plugins/BubbleFighter.Fantasy.Shop/Dialects/LegacyShopCatalogHandler.cs:LegacyShopCatalogHandler
 build_name src/Plugins/BubbleFighter.Fantasy.Shop/Dialects/LegacyShopShape.cs:LegacyShopShape
 build_name src/Plugins/BubbleFighter.Fantasy.Shop/Wire/LegacyCatalogLayout.cs:LegacyCatalogLayout

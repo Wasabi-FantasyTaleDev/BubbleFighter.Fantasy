@@ -60,7 +60,7 @@ public sealed class ShopPurchaseTests
         var stock = new ShopStockRow(1234, 200001, true, 1, 7, 100, 100, 0, 0);
         var card = LucciCard with { StockSetId = 0, Stocks = [stock], SellPrice = 999 };
         var catalog = new ShopCatalog("test.xml", [card], []);
-        var terms = new ItemTerms_Legacy(200001, "day", 360, 0, 0);
+        var terms = new ItemTerms(200001, "day", 360, 0, 0);
         var purchaser = new ShopPurchaser(new ShopOptions { ShopItemClientPath = "test.xml", StartingLucci = 1000 },
             catalog, store, null, NullLogger.Instance)
         {

@@ -287,9 +287,9 @@ public sealed class MessagesPlugin : IPlugin
                     }));
             }
         }
-        // The kr-1256 family's main-menu probe (C2S 521, builders sub_937560 / sub_937920, empty body) is
+        // The kr-1256 family's main-menu probe (C2S 521, builders kr-1256 sub_937560 / kr-1256 sub_937920, empty body) is
         // answered with the empty gspSessionSignatureData body; the lobby's main-menu handler publishes the
-        // reply through this row, exactly as the modern row answered it before this slice. The probe is not
+        // reply through this row, with the same bytes the former modern row sent. The probe is not
         // the legacy gcpReqGotoLobby request: the client's 521 is an anonymous empty packet with no main-menu
         // role, and the legacy request keeps its own handler below.
         if (options.MainMenuInit)

@@ -34,7 +34,7 @@ public sealed class ShopGiftServiceTests
                 [1999999] = new(1999999, 0, 0, [new ShopStockRow(1999999, 999999, false, 1, 7, 0, 0, 0, 0)]),
             },
         };
-        var terms = new Dictionary<int, ItemTerms_Legacy>
+        var terms = new Dictionary<int, ItemTerms>
         {
             [205002] = new(205002, "count", 300, 0, 0),
         };

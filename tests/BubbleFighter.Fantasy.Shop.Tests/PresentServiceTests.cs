@@ -79,7 +79,7 @@ public sealed partial class PresentServiceTests
             foreach (var stock in Card.Stocks.Concat(CashCard.Stocks))
                 RewardGifts[stock.StockId] = new(stock.StockId, 0, 0, [stock]);
             var catalog = new ShopCatalog("test.xml", [Card, CashCard], []) { Gifts = RewardGifts };
-            var terms = new Dictionary<int, ItemTerms_Legacy>
+            var terms = new Dictionary<int, ItemTerms>
             {
                 [200001] = new(200001, "day", 30, 0, 0),
                 [200002] = new(200002, "day", 365, 0, 0),

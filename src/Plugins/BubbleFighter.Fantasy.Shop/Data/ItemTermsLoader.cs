@@ -3,7 +3,7 @@ using BubbleFighter.Fantasy.Shop.Purchasing;
 
 namespace BubbleFighter.Fantasy.Shop.Data;
 
-internal sealed record ItemTerms_Legacy(int ItemId, string DurationType, int MaxDuration, int BuyAgain, int Function)
+internal sealed record ItemTerms(int ItemId, string DurationType, int MaxDuration, int BuyAgain, int Function)
 {
     internal PurchaseGrantTerm ForStock(ShopStockRow stock) => ForStock(stock, ItemTermRules.Baseline);
 
@@ -30,12 +30,12 @@ internal sealed record ItemTerms_Legacy(int ItemId, string DurationType, int Max
 
 /// <summary>Reads ShopItem columns without treating buyAgain as a boolean: KR812 0x9A04D0,
 /// CN717 0xA4DBB0, ID400 0x91A540, CN324 0x821DE0, CN279 0x659E00.</summary>
-internal static class ItemTermsLoader_Legacy
+internal static class ItemTermsLoader
 {
-    internal static IReadOnlyDictionary<int, ItemTerms_Legacy> Load(WorkbookFile file, long maxBytes) =>
+    internal static IReadOnlyDictionary<int, ItemTerms> Load(WorkbookFile file, long maxBytes) =>
         Parse(SpreadsheetWorkbook.Load(file, maxBytes, ["ShopItem"])["ShopItem"]);
 
-    internal static IReadOnlyDictionary<int, ItemTerms_Legacy> Parse(IReadOnlyList<IReadOnlyList<string>> rows)
+    internal static IReadOnlyDictionary<int, ItemTerms> Parse(IReadOnlyList<IReadOnlyList<string>> rows)
     {
         if (rows.Count == 0)
             throw new InvalidOperationException("ShopItem terms have no header.");
@@ -58,7 +58,7 @@ internal static class ItemTermsLoader_Legacy
             return result;
         }
 
-        var result = new Dictionary<int, ItemTerms_Legacy>();
+        var result = new Dictionary<int, ItemTerms>();
         foreach (var row in rows.Skip(1))
         {
             var key = Cell(row, "itemId");
@@ -73,7 +73,7 @@ internal static class ItemTermsLoader_Legacy
             var maximum = Number(row, "maxDuration");
             if (maximum <= 0)
                 throw new InvalidOperationException($"ShopItem {id} has a nonpositive maxDuration.");
-            var terms = new ItemTerms_Legacy(id, durationType, maximum, Number(row, "buyAgain"), Number(row, "function"));
+            var terms = new ItemTerms(id, durationType, maximum, Number(row, "buyAgain"), Number(row, "function"));
             if (!result.TryAdd(id, terms))
                 throw new InvalidOperationException($"ShopItem terms repeat itemId {id}.");
         }

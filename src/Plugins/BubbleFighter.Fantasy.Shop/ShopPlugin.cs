@@ -136,7 +136,7 @@ public sealed class ShopPlugin : IPlugin
                 if (options.LifeItems && !tables.CapabilityOf(options.ClientProfile, "life_items"))
                     throw new ConfigException($"life_items requires a build with the life_items capability; '{options.ClientProfile}' has none.");
                 var termRules = new ItemTermRules(options.PermanentDayStockTypes, options.RejectRepeatFunction10001, options.LifeItems);
-                var terms = ItemTermsLoader_Legacy.Load(workbook, options.MaxShopItemBytes);
+                var terms = ItemTermsLoader.Load(workbook, options.MaxShopItemBytes);
                 var purchaseStoreLegacy = context.Services.Get<IShopPurchaseStore>();
                 var inventoryLegacy = context.Services.Get<IInventoryRepository>();
                 var ready = new ShopOpenScope(options.MaxOpenSessions);
@@ -291,7 +291,7 @@ public sealed class ShopPlugin : IPlugin
         if (options.LifeItems)
             throw new ConfigException("life_items is not established for the kr1256 catalog schema.");
         var rules = new ItemTermRules(options.PermanentDayStockTypes, options.RejectRepeatFunction10001);
-        var terms = ItemTermsLoader_Legacy.Load(workbook, options.MaxShopItemBytes);
+        var terms = ItemTermsLoader.Load(workbook, options.MaxShopItemBytes);
         var conditional = new Purchasing.ConditionalShopPurchaser(purchases, inventory, TimeProvider.System,
             options.MaxPurchaseAttempts);
         return new(conditional, stock => terms.TryGetValue(stock.ItemId, out var term)

@@ -53,7 +53,7 @@ public sealed class InventoryViewPlugin : IPlugin
             IEquipmentSelection? selection = null;
             if (context.Services.TryGet<IInventoryRepository>(out var inventory) && inventory is not null)
             {
-                selection = new EquipmentSelectionPolicy(new EquipmentSelection1256(inventory, WearLocations(context, options)), context.Events, protocol, context.Logger);
+                selection = new EquipmentSelectionPolicy(new EquipmentSelection(inventory, WearLocations(context, options)), context.Events, protocol, context.Logger);
                 context.Effect(context.Services.Register<IEquipmentSelection>(selection));
                 context.Effect(context.Events.Intercept<EquipmentSelectionReadRequested, IReadOnlyList<InventorySlotRecord>>(
                     (request, next, ct) => request.Protocol == protocol ? selection.ReadAsync(request.UserNum, ct) : next(ct)));

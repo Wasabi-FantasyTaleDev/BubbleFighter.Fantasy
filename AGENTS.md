@@ -104,3 +104,14 @@ dotnet run --project src/BubbleFighter.Fantasy.Host -- run --profile kr-1256 --d
 - Never commit credentials or secrets. Use `${VAR}`/`${VAR:-default}` placeholders in
   profiles and document variables in `.env.example`.
 - `profiles/*/local.patch.yaml` is the git-ignored developer override slot; do not commit it.
+
+## Before you start a session
+
+- If your checkout has the git-ignored maintainer notes, read them first: `AGENTS.local.md`, then
+  `docs/private/README.md`. They hold the current work board, the shared log, the review checklist and the
+  deploy and release procedures. They are not part of the public tree; never copy their contents into
+  tracked files, commit messages, pull requests or code comments.
+- Check what other contributors pushed since your last session (`git fetch` and the newest remote
+  branches) and read the shared log before taking new work.
+- Before anything leaves the private repository (a public export, release notes, the documentation site),
+  follow the maintainer release procedure. Only the owner changes a repository's visibility.

@@ -25,7 +25,7 @@ public sealed class LifeItemTermsTests
     [Fact]
     public void EnduranceStockGrantsItsDurationAsLifeOnlyWhereTheBuildHasTheKind()
     {
-        var terms = new ItemTerms_Legacy(201350, "endurance", 2000, 0, 0);
+        var terms = new ItemTerms(201350, "endurance", 2000, 0, 0);
 
         var term = terms.ForStock(Stock(15), LifeRules);
 

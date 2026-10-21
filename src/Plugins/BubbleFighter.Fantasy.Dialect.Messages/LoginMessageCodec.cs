@@ -167,7 +167,7 @@ internal static class LoginMessageCodec
     /// <summary>
     /// Writes an accepted <c>gspRepLogin</c> in the kr-1256 family's table form: the fields come from the
     /// build's <c>LoginReply</c> row (kr-1256 resolves <c>LoginReply@kr-1256</c>), and the values are the ones
-    /// the modern login codec wrote before this slice: a server-issued session identity string, the Dao
+    /// the former modern login codec wrote: a server-issued session identity string, the Dao
     /// character type, the initial channel that arms the client's room-list polling (<c>kr-1256 sub_8530C0</c>
     /// never arms it for zero) and a zero server time.
     /// </summary>

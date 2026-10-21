@@ -138,7 +138,7 @@ public sealed class ItemPurchasePlannerTests
     public void CatalogUsageSelectsCountDaysOrExplicitPermanent(string usage, ushort type, int duration,
         int expected, int amount)
     {
-        var term = new ItemTerms_Legacy(1, usage, 360, 0, 0)
+        var term = new ItemTerms(1, usage, 360, 0, 0)
             .ForStock(new(123, 1, true, type, duration, 10, 10, 0, 0));
         Assert.Equal((PurchaseGrantKind)expected, term.Kind);
         Assert.Equal(amount, term.Amount);
