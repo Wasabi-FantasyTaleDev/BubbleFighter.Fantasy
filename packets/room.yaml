@@ -2231,11 +2231,16 @@ structs:
   # cn-774 sub_B6A610 tests +280 before removing bots; cn-774 sub_E4E6D0 resolves their controlling account at +284.
   - is_ai: bool
     offset: 280
+  # cn-774 sub_493760 constructs a seat with -1 here. cn-774 sub_52E090 takes any value above -1 as a bot seat and
+  # controls the actor only when it equals the local account (seat +8), so a player seat carries -1, never 0.
   - ai_controller_user_number: u32
     offset: 284
+    default: -1
   # cn-774 sub_E4E610 returns +288 as bot difficulty; cn-774 sub_B7DFA0 compares +288/+292 with popup selectors.
+  # cn-774 sub_493760 constructs it as -1.
   - ai_difficulty: u32
     offset: 288
+    default: -1
   - ai_preset: u32
     offset: 292
 
@@ -2333,8 +2338,11 @@ structs:
     offset: 248
   - unknown_256: bool
     offset: 256
-  - unknown_260: u32
+  # tw-454 sub_48B730 constructs a seat with -1 here. tw-454 sub_791C10 takes any value above -1 as a bot seat and
+  # controls the actor only when it equals the local account (seat +8), so a player seat carries -1, never 0.
+  - ai_controller_user_number: u32
     offset: 260
+    default: -1
 
   # One element of the cn-774/tw-454 equipped-object vector: the 201-style equipped record cn-774 sub_496F40
   # writes and cn-774 sub_9B82D0 consumes per element. The first two words repeat the seat's identity and
