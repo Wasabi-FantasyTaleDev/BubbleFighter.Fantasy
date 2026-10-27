@@ -1,0 +1,34 @@
+version: 1
+structs:
+  # C2S gcpRoomReqIntrudeGame (game connection): ask to join a round already in progress.
+  # The inspected kr-812 and cn-717 request bodies are empty. The empty serializer address is
+  # shared with other empty requests through code folding, so the class vtable and the sender that
+  # stamps 2014 are the identifying evidence, not the nullsub alone.
+  #   kr-812  Packet_gcpRoomReqIntrudeGame vtable kr-812 0xD2CEE0; sender kr-812 sub_5C60B0 stamps 2014 and
+  #           writes no field.
+  #   cn-717  Packet_gcpRoomReqIntrudeGame vtable cn-717 0xE54488; sender cn-717 sub_609BA0 stamps 2014;
+  #           serializer cn-717 nullsub_5 is empty.
+  # kr-1256 and cn-324/cn-279 carry no packet class of this name; the modern client's C2S 2014 is
+  # still an unnamed request and is not claimed here.
+  RoomIntrudeRequest: []
+
+  # S2C gspRoomIntrudeGame (game connection): the answer to the request above.
+  # Two four-byte words, read into object +4 and +8:
+  #   kr-812  Packet_gspRoomIntrudeGame vtable kr-812 0xD691BC slot 1 is kr-812 sub_6DB1B0 (two four-byte
+  #           reads). Consumer kr-812 sub_808BC0 passes the first word to the room handler, and
+  #           when that handler accepts it treats a second word of -1 as "show a message", so the
+  #           field meanings are not established by this observation and both stay unknown_<offset>.
+  #   cn-717  Packet_gspRoomIntrudeGame vtable cn-717 0xE91DC4 slot 1 is cn-717 sub_538B70, which reads the
+  #           same two four-byte words into +4 and +8.
+  # The same number is not this reply in every build: kr-1256 977 is gspReqGameReady, cn-774 977 is
+  # gspReqGameReady and tw-454 977 is gspResBaseballBatInfo, so those three builds resolve this
+  # structure empty (a build inherits a row from its base, and a row that excluded a build gives it
+  # no fields). The shape above is the read order of the two readers that were read; the other
+  # legacy builds inherit it until their own reply reader is read.
+  RoomIntrudeReply:
+    - unknown_4: u32
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_8: u32
+      offset: 8
+      except: [kr-1256, cn-774, tw-454]

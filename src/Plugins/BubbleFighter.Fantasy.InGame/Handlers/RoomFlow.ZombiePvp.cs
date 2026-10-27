@@ -22,21 +22,25 @@ internal sealed partial class RoomFlow
 
     internal bool IsZombiePvp(PlayRoom room) => _options?.ZombiePvpModeIds.Contains(room.ModeId) == true;
 
-    /// <summary>Turns a random human into the zombie king once the configured opening of the round has passed.</summary>
+    /// <summary>
+    /// Turns a random human into the zombie king once the configured opening of the round has passed. The wait
+    /// runs on <see cref="PlayRoom.ZombieKingTask"/> so its end is observable; the delay delegate is the one the
+    /// room flow was built with, which is the real-time wait outside tests.
+    /// </summary>
     /// <param name="room">The room whose round just started.</param>
     /// <param name="generation">The round's start generation; a later round cancels this one's pick.</param>
     internal void ScheduleZombieKing(PlayRoom room, int generation)
     {
         if (!IsZombiePvp(room))
             return;
-        _ = BackgroundWork.Detached(() => PickZombieKingAsync(room, generation));
+        room.ZombieKingTask = BackgroundWork.Detached(() => PickZombieKingAsync(room, generation));
     }
 
     private async Task PickZombieKingAsync(PlayRoom room, int generation)
     {
         try
         {
-            await Task.Delay(_options!.ZombieKingDelayMs, _lifetime).ConfigureAwait(false);
+            await _zombieKingDelay(TimeSpan.FromMilliseconds(_options!.ZombieKingDelayMs), _lifetime).ConfigureAwait(false);
             await room.Executor.ExecuteAsync(async operationCt =>
             {
                 RoomSeat[] members;

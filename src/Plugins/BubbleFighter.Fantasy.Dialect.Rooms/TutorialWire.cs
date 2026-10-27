@@ -1,4 +1,5 @@
 using System.Buffers;
+using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Match;
 using BubbleFighter.Fantasy.Packets;
@@ -158,6 +159,7 @@ internal static class TutorialWire
     /// <summary>Reads cn-279 sub_44C1A0's single stage-completion word, sent by cn-279 sub_818630.</summary>
     public static bool ReadEndStage(PacketTables tables, string build, ReadOnlySpan<byte> payload)
     {
+        ValidateLayouts(tables, build);
         var value = (int)PacketCodec.ReadScalars(tables, build, "TutorialEndStage", payload)["completed"];
         if (value is not (0 or 1))
             throw new PacketFormatException($"gcpReqEndStage has unsupported completion flag {value}.", 0);
@@ -174,6 +176,7 @@ internal static class TutorialWire
     /// <returns>The S2C body.</returns>
     public static byte[] WriteSingleStageInfo(PacketTables tables, string build, IReadOnlyList<SingleStageClearInfo> cleared)
     {
+        ValidateLayouts(tables, build);
         if (cleared.Count != 0 && tables.Resolve(build, "TutorialStageInfo").Single().Type == "empty_list")
             throw new InvalidOperationException("This build has no audited nonempty tutorial stage list.");
         return PacketCodec.Write(tables, build, "TutorialStageInfo", new Dictionary<string, object?>
@@ -199,22 +202,28 @@ internal static class TutorialWire
     /// <param name="build">Client build whose layout is selected.</param>
     /// <param name="seat">The seat index of the room master.</param>
     /// <returns>The S2C body (exactly four bytes).</returns>
-    public static byte[] WriteMasterSlot(PacketTables tables, string build, int seat) =>
-        PacketCodec.Write(tables, build, "TutorialMasterSlot",
+    public static byte[] WriteMasterSlot(PacketTables tables, string build, int seat)
+    {
+        ValidateLayouts(tables, build);
+        return PacketCodec.Write(tables, build, "TutorialMasterSlot",
             new Dictionary<string, object?> { ["master_slot"] = seat });
+    }
 
     /// <summary>
     /// Writes <c>gspUserHostStart</c> (cn-717 reader <c>sub_8C4210</c>): one i32. Kept for
-    /// byte-length pins; tutorial play no longer sends this — handler <c>sub_8BEDF0</c> returns
+    /// byte-length pins; tutorial play no longer sends this — handler <c>cn-717 sub_8BEDF0</c> returns
     /// early unless capability 23 is on and room+532 (host-ready UI) is non-zero.
     /// </summary>
     /// <param name="tables">Audited packet layouts.</param>
     /// <param name="build">Client build whose layout is selected.</param>
     /// <param name="unknown0">Result switch.</param>
     /// <returns>The S2C body (exactly four bytes).</returns>
-    public static byte[] WriteUserHostStart(PacketTables tables, string build, int unknown0) =>
-        PacketCodec.Write(tables, build, "TutorialHostStart",
+    public static byte[] WriteUserHostStart(PacketTables tables, string build, int unknown0)
+    {
+        ValidateLayouts(tables, build);
+        return PacketCodec.Write(tables, build, "TutorialHostStart",
             new Dictionary<string, object?> { ["unknown_4"] = unknown0 });
+    }
 
     /// <summary>Writes the complete native entry envelope through its nested packet tables.</summary>
     /// <param name="tables">Audited packet layouts.</param>
@@ -267,6 +276,7 @@ internal static class TutorialWire
     /// <returns>The three wide strings, difficulty, and MapMeta TimeAttack ms.</returns>
     public static PlayTutorialRequest ReadPlayTutorial(PacketTables tables, string build, ReadOnlySpan<byte> payload)
     {
+        ValidateLayouts(tables, build);
         var fields = PacketCodec.ReadScalars(tables, build, "TutorialPlayRequest", payload,
             maxStringCharacters: (ushort.MaxValue - 4) / 2);
         var strings = tables.Resolve(build, "TutorialPlayRequest").Where(field => field.Type == "wstr").ToArray();
@@ -296,9 +306,12 @@ internal static class TutorialWire
     /// <param name="build">Client build whose layout is selected.</param>
     /// <param name="spawnGroup">Spawn-group index (prologue host sends 1).</param>
     /// <returns>The body (exactly four bytes).</returns>
-    public static byte[] WriteCreateMobsFromSpawnGroup(PacketTables tables, string build, int spawnGroup) =>
-        PacketCodec.Write(tables, build, "TutorialSpawnGroup",
+    public static byte[] WriteCreateMobsFromSpawnGroup(PacketTables tables, string build, int spawnGroup)
+    {
+        ValidateLayouts(tables, build);
+        return PacketCodec.Write(tables, build, "TutorialSpawnGroup",
             new Dictionary<string, object?> { ["spawn_group"] = spawnGroup });
+    }
 
     /// <summary>
     /// Consumes <c>gppCreateMobsFromSpawnGroup</c>: one u32, no trailing bytes.
@@ -307,8 +320,11 @@ internal static class TutorialWire
     /// <param name="tables">Audited packet layouts.</param>
     /// <param name="build">Client build whose layout is selected.</param>
     /// <returns>The spawn-group index.</returns>
-    public static int ReadCreateMobsFromSpawnGroup(PacketTables tables, string build, ReadOnlySpan<byte> payload) =>
-        (int)PacketCodec.ReadScalars(tables, build, "TutorialSpawnGroup", payload)["spawn_group"];
+    public static int ReadCreateMobsFromSpawnGroup(PacketTables tables, string build, ReadOnlySpan<byte> payload)
+    {
+        ValidateLayouts(tables, build);
+        return (int)PacketCodec.ReadScalars(tables, build, "TutorialSpawnGroup", payload)["spawn_group"];
+    }
 
     /// <summary>
     /// Writes <c>gspRepStartNewWave</c> (cn-717 case <c>0x388</c> / <c>sub_ABD9A0</c>):
@@ -319,9 +335,12 @@ internal static class TutorialWire
     /// <param name="build">Client build whose layout is selected.</param>
     /// <param name="wave">Wave index the host requested (prologue starts at 1).</param>
     /// <returns>The body (exactly four bytes).</returns>
-    public static byte[] WriteStartNewWave(PacketTables tables, string build, int wave) =>
-        PacketCodec.Write(tables, build, "TutorialWave",
+    public static byte[] WriteStartNewWave(PacketTables tables, string build, int wave)
+    {
+        ValidateLayouts(tables, build);
+        return PacketCodec.Write(tables, build, "TutorialWave",
             new Dictionary<string, object?> { ["wave"] = wave });
+    }
 
     /// <summary>
     /// Consumes <c>gcpReqStartNewWave</c>: one u32 wave index, no trailing bytes.
@@ -330,8 +349,11 @@ internal static class TutorialWire
     /// <param name="tables">Audited packet layouts.</param>
     /// <param name="build">Client build whose layout is selected.</param>
     /// <returns>The wave index.</returns>
-    public static int ReadStartNewWave(PacketTables tables, string build, ReadOnlySpan<byte> payload) =>
-        (int)PacketCodec.ReadScalars(tables, build, "TutorialWave", payload)["wave"];
+    public static int ReadStartNewWave(PacketTables tables, string build, ReadOnlySpan<byte> payload)
+    {
+        ValidateLayouts(tables, build);
+        return (int)PacketCodec.ReadScalars(tables, build, "TutorialWave", payload)["wave"];
+    }
 
     /// <summary>
     /// Checks C2S <c>gcpReqWaveAllSpawnMobs</c>: opaque wave table, size-bounded only.
@@ -395,4 +417,37 @@ internal static class TutorialWire
         {
             ["unknown_4"] = unknown0, ["unknown_8"] = unknown1, ["unknown_12"] = unknown2,
         });
+
+    /// <summary>
+    /// Checks every structure this helper reads or writes: the one-word bodies, the one-stage-completion request, the
+    /// counted select list (which one build states as an empty list, so both shapes are accepted), its row, and the
+    /// entry request's three consumed fields. The helper has no bind step of its own, so the check runs before each
+    /// use instead of once at mount.
+    /// </summary>
+    /// <param name="tables">Audited packet layouts.</param>
+    /// <param name="build">Client build whose layout is selected.</param>
+    private static void ValidateLayouts(PacketTables tables, string build)
+    {
+        PacketLayoutContract.RequireFields(tables, build, "TutorialEndStage", "Tutorial", ("completed", "u32"));
+        var stageInfo = PacketLayoutContract.Signature(tables, build, "TutorialStageInfo");
+        if (stageInfo is not ("cleared:list<TutorialStageClear>" or "cleared:empty_list"))
+            throw new ConfigException($"Tutorial cannot use the TutorialStageInfo layout of '{build}': {stageInfo}.");
+        // The row structure is stated only where the select list exists; the one build that sends the list empty
+        // states no row fields at all, so it is not required there.
+        if (stageInfo == "cleared:list<TutorialStageClear>")
+            PacketLayoutContract.RequireFields(tables, build, "TutorialStageClear", "Tutorial",
+                ("stage", "u32"), ("best_count", "u32"), ("best_seconds", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "TutorialMasterSlot", "Tutorial", ("master_slot", "u32"));
+        // The host-start word is stated only where the audited reader carries it (kr-812, cn-717 and
+        // id-1809 in tutorial.yaml); every other build's TutorialHostStart is empty and the writer is
+        // kept only for the four-byte pins of those three, so the word is required only when the build's
+        // table states it, the same conditional shape the inventory extension uses.
+        if (tables.Resolve(build, "TutorialHostStart").Any(field => field.Name == "unknown_4"))
+            PacketLayoutContract.RequireFields(tables, build, "TutorialHostStart", "Tutorial", ("unknown_4", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "TutorialSpawnGroup", "Tutorial", ("spawn_group", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "TutorialWave", "Tutorial", ("wave", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "TutorialPlayRequest", "Tutorial",
+            ("map_key", "wstr"), ("difficulty", "u32"), ("time_attack_time_limit_ms", "u32"));
+    }
+
 }

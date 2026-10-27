@@ -124,7 +124,7 @@ public sealed class LegacyShopCatalogTests
             Assert.Equal("lucci", purchase.MoneyType);
             Assert.Equal(-1, Assert.Single(purchase.Stocks).Duration);
             Assert.Equal(100001, Assert.Single(purchase.Stocks).ItemId);
-            var bounded = BubbleFighter.Fantasy.Shop.Wire.ShopWire.SelectBoundedCards(catalog.Cards, 10000, maxCards: 1);
+            var bounded = ShopWire.SelectBoundedCards(catalog.Cards, 10000, maxCards: 1);
             Assert.Equal(100001, Assert.Single(bounded.Selected).PrimaryItemId);
             Assert.Equal(0, catalog.FindPurchase(4000001)!.Price);
             Assert.Equal(0, catalog.FindPurchase(3000001)!.Price);

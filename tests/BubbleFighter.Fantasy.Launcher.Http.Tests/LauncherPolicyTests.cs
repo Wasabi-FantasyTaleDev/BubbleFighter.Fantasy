@@ -210,7 +210,7 @@ public sealed class LauncherPolicyTests
     }
 
     [Fact]
-    public async Task PublicCatalogAndSessionEnvelopesExposeMergedIdentityOnlyPolicy()
+    public async Task PublicCatalogAndSessionEnvelopesPreserveEachIdentityPolicyScope()
     {
         LauncherPluginRecommendation[] recommendations =
         [
@@ -231,14 +231,44 @@ public sealed class LauncherPolicyTests
         {
             Assert.Equal("1.0.0", envelope.GetProperty("minimumLauncherVersion").GetString());
             var plugins = envelope.GetProperty("pluginRecommendations").EnumerateArray().ToArray();
-            Assert.Equal(2, plugins.Length);
-            var scoped = Assert.Single(plugins, p => p.GetProperty("id").GetString() == "plugin.scoped");
+            Assert.Equal(4, plugins.Length);
+            var scoped = Assert.Single(plugins, p => p.GetProperty("id").GetString() == "plugin.scoped" && p.GetProperty("required").GetBoolean());
             Assert.Equal(["build-a", "build-z"], scoped.GetProperty("builds").EnumerateArray().Select(b => b.GetString()));
             Assert.True(scoped.GetProperty("required").GetBoolean());
-            var global = Assert.Single(plugins, p => p.GetProperty("id").GetString() == "plugin.global");
+            var global = Assert.Single(plugins, p => p.GetProperty("id").GetString() == "plugin.global" && !p.GetProperty("required").GetBoolean());
             Assert.Empty(global.GetProperty("builds").EnumerateArray());
-            Assert.True(global.GetProperty("required").GetBoolean());
-            Assert.All(plugins, p => Assert.Equal(["id", "builds", "required"], p.EnumerateObject().Select(v => v.Name)));
+            Assert.False(global.GetProperty("required").GetBoolean());
+            var scopedGlobal = Assert.Single(plugins, p => p.GetProperty("id").GetString() == "plugin.global" && p.GetProperty("required").GetBoolean());
+            Assert.Equal(["build-a"], scopedGlobal.GetProperty("builds").EnumerateArray().Select(build => build.GetString()));
+            Assert.All(plugins, p => Assert.Equal(["id", "builds", "required", "disabled"], p.EnumerateObject().Select(v => v.Name)));
+            Assert.All(plugins, p => Assert.False(p.GetProperty("disabled").GetBoolean()));
+        }
+    }
+
+    [Fact]
+    public async Task DisjointRequiredAndDisabledScopesSurviveCatalogLoginAndRefresh()
+    {
+        await using var fixture = await Fixture.StartAsync(recommendations:
+        [
+            new() { Id = "plugin.scoped", Builds = ["build-a"], Required = true },
+            new() { Id = "plugin.scoped", Builds = ["build-b"], Disabled = true },
+            new() { Id = "plugin.scoped", Builds = ["build-c"], Disabled = true },
+        ]);
+        var catalog = await fixture.Http.GetFromJsonAsync<JsonElement>("v1/catalog");
+        var login = await fixture.LoginAsync(null);
+        using var refresh = await fixture.Http.PostAsJsonAsync("v1/auth/refresh", new { refreshToken = login.GetProperty("refreshToken").GetString() });
+        Assert.Equal(HttpStatusCode.OK, refresh.StatusCode);
+        var renewed = await refresh.Content.ReadFromJsonAsync<JsonElement>();
+        foreach (var envelope in new[] { catalog, login, renewed })
+        {
+            var policies = envelope.GetProperty("pluginRecommendations").EnumerateArray().ToArray();
+            Assert.Equal(2, policies.Length);
+            var required = Assert.Single(policies, policy => policy.GetProperty("required").GetBoolean());
+            Assert.False(required.GetProperty("disabled").GetBoolean());
+            Assert.Equal(["build-a"], required.GetProperty("builds").EnumerateArray().Select(build => build.GetString()));
+            var disabled = Assert.Single(policies, policy => policy.GetProperty("disabled").GetBoolean());
+            Assert.False(disabled.GetProperty("required").GetBoolean());
+            Assert.Equal(["build-b", "build-c"], disabled.GetProperty("builds").EnumerateArray().Select(build => build.GetString()));
         }
     }
 
@@ -258,6 +288,10 @@ public sealed class LauncherPolicyTests
     [InlineData("too-many-entries")]
     [InlineData("too-many-builds")]
     [InlineData("merged-builds")]
+    [InlineData("required-disabled")]
+    [InlineData("overlap")]
+    [InlineData("required-wildcard")]
+    [InlineData("disabled-wildcard")]
     public async Task InvalidPolicyFailsBeforeListenerBinding(string scenario)
     {
         var options = Fixture.Options();
@@ -279,6 +313,10 @@ public sealed class LauncherPolicyTests
             case "too-many-entries": options.PluginRecommendations = Enumerable.Range(0, 65).Select(i => new LauncherPluginRecommendation { Id = $"plugin.{i}" }).ToArray(); break;
             case "too-many-builds": options.PluginRecommendations[0].Builds = Enumerable.Range(0, 65).Select(i => $"build-{i}").ToArray(); break;
             case "merged-builds": options.PluginRecommendations = [new() { Id = "same", Builds = Enumerable.Range(0, 64).Select(i => $"build-{i}").ToArray() }, new() { Id = "same", Builds = ["build-64"] }]; break;
+            case "required-disabled": options.PluginRecommendations[0].Required = true; options.PluginRecommendations[0].Disabled = true; break;
+            case "overlap": options.PluginRecommendations = [new() { Id = "same", Builds = ["build-a", "build-b"], Required = true }, new() { Id = "same", Builds = ["build-b", "build-c"], Disabled = true }]; break;
+            case "required-wildcard": options.PluginRecommendations = [new() { Id = "same", Required = true }, new() { Id = "same", Builds = ["build-a"], Disabled = true }]; break;
+            case "disabled-wildcard": options.PluginRecommendations = [new() { Id = "same", Builds = ["build-a"], Required = true }, new() { Id = "same", Disabled = true }]; break;
         }
         await Assert.ThrowsAsync<ValidationException>(() => LauncherServer.StartAsync(options, new MemoryLauncherAccounts(10), new LauncherSessions(options, new MemoryLauncherSessions(10))));
     }

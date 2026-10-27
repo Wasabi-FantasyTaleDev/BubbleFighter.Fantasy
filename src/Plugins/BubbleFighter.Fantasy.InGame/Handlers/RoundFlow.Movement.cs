@@ -10,8 +10,12 @@ internal sealed partial class RoundFlow
 {
     /// <summary>
     /// Merges a player's movement report into its seat's record and sends the complete record to the other players'
-    /// relay connections of this round. The client drops a record that names its own character, so the sender gets
-    /// none; a partial report before any full one is dropped rather than filled with made-up coordinates.
+    /// relay connections of this round. The relayed reader is kr-1256 <c>sub_709700</c>
+    /// (packets/round-movement.yaml <c>MovementReport@kr-1256</c>), and its caller kr-1256 <c>sub_95DEA0</c>
+    /// skips the remote-scene application only when the record's object id equals the local character's
+    /// (session +2452) and its tick matches the locally sampled one (+2536) — so the sender receives nothing
+    /// for its own current sample, but a stale tick of its own is still applied. A partial report before any
+    /// full one is dropped rather than filled with made-up coordinates.
     /// </summary>
     public async ValueTask HandleMovementReportedAsync(ISession session, RoundMovementReported report,
         IMessageSender<RoundMovementRelayed> sender, CancellationToken ct)
@@ -29,18 +33,21 @@ internal sealed partial class RoundFlow
             var seat = room.Seats.FirstOrDefault(seat => seat.Game.Id == session.Id || seat.Relay?.Id == session.Id);
             if (seat is null)
                 return;
-            if (report.ActorId != RoomRegistry.SceneEntity(seat.Slot))
+            if (!room.ControlsActor(seat, report.ActorId))
             {
                 _logger.LogWarning("Session {Id} slot {Slot} reported movement for actor {Actor}, which is not its own; dropped.",
                     session.Id, seat.Slot, report.ActorId);
                 return;
             }
-            if (Merge(seat.Movement, report) is not { } next)
+            var bot = room.Bots.FirstOrDefault(candidate => RoomRegistry.SceneEntity(candidate.Appearance.Slot) == report.ActorId);
+            if (Merge(bot is null ? seat.Movement : bot.Movement, report) is not { } next)
             {
                 _logger.LogDebug("Session {Id} slot {Slot} sent partial movement before a full record; dropped.", session.Id, seat.Slot);
                 return;
             }
-            seat.Movement = merged = next;
+            merged = next;
+            if (bot is null) seat.Movement = next;
+            else bot.Movement = next;
             targets = [.. room.Seats.Where(other => other != seat).Select(other => MatchLink(room, other)).OfType<ISession>()];
         }
         var relayed = new RoundMovementRelayed(report.ActorId, merged, report.Tick);

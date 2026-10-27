@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using BubbleFighter.Fantasy.Contracts.ClientData;
 using System.Text;
 using BubbleFighter.Fantasy.Shop.Data;
 using BubbleFighter.Fantasy.Tests;

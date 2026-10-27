@@ -1,0 +1,23 @@
+# Shared native waiting-room computer-player structures; per-build opcode registrations enable the bindings.
+version: 1
+structs:
+  # kr-1256 sub_DBDFB0 and cn-774 sub_8EA170 read the old owner's account followed by the new human's slot.
+  RoomAiControllerChange:
+    - previous_user_number: u32
+    - controller_slot: u32
+  # kr-1256 sub_DBD9A0 writes tag 0x3A plus one team byte, or 0xBA without it, then three words.
+  RoomAiAddRequest:
+    - team: "optional<0x3A,RoomAiTeam>"
+      # cn-774 sub_E4E740 writes a direct team byte and operation before the same three selector words.
+      # cn-774 sub_E4E870/sub_E4E8B0 use operation 0/1 and three -1 values; cn-774 sub_E4E8F0 uses 2.
+      cn-774:
+        - team: u8
+        - selection_mode: u32
+    - slot: u32
+    - difficulty: u32
+    - preset: u32
+  RoomAiTeam:
+    - team: u8
+  # kr-1256 sub_DBDC80 and cn-774 sub_E4EA50 write only the selected slot word.
+  RoomAiRemoveRequest:
+    - slot: u32

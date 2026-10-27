@@ -76,11 +76,57 @@ internal static class PresetWire
         });
     }
 
+    /// <summary>
+    /// Writes S2C 833/837 (<c>gspReqWeaponPreSetUpdate</c>) from the player's persisted preset pages, the
+    /// form the <c>persist_preset_pages</c> switch publishes. The build's table picks its own shape for the
+    /// same five pages: kr-1256 carries every page as its three-word record (<c>kr-1256 sub_115C000</c>,
+    /// keyed by list position in <c>kr-1256 sub_81B820</c>), so a record exists for pages 3-4 and
+    /// <c>kr-1256 sub_5FB4F0</c> enables them; the legacy parallel vectors carry each page's first word as
+    /// its item id with flag one when it is nonzero, the projection <c>kr-812 sub_97A8D0</c>'s
+    /// <c>/1000 == 204</c> gate reads and <c>kr-812 sub_987BA0</c> materializes at player+6032..6068.
+    /// </summary>
+    /// <param name="tables">The packet tables.</param>
+    /// <param name="build">The build whose layout is written.</param>
+    /// <param name="activeSlot">The persisted active slot; the leading byte every reader applies.</param>
+    /// <param name="userNumber">The player the bar belongs to.</param>
+    /// <param name="pages">The persisted pages; exactly <see cref="WeaponPresetSlots.Count"/> entries.</param>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="pages"/> does not carry exactly
+    /// <see cref="WeaponPresetSlots.Count"/> pages or holds a null entry.</exception>
+    internal static byte[] WriteUpdate(PacketTables tables, string build, byte activeSlot, int userNumber,
+        IReadOnlyList<WeaponPresetPage> pages)
+    {
+        ArgumentNullException.ThrowIfNull(pages);
+        if (pages.Count != WeaponPresetSlots.Count || pages.Any(page => page is null))
+            throw new ArgumentException(
+                $"The persisted preset bar carries exactly {WeaponPresetSlots.Count} pages.", nameof(pages));
+        RequirePresets(tables, build);
+        var owned = pages.ToArray();
+        return PacketCodec.Write(tables, build, "WeaponPresetUpdate", new Dictionary<string, object?>
+        {
+            ["active_slot"] = activeSlot,
+            ["user_number"] = userNumber,
+            // The legacy page is the record's first word alone; a page without a weapon stays unbound,
+            // the same nonzero-means-bound flag the derived bar writes.
+            ["item_ids"] = owned.Select(page => page.Unknown0).ToArray(),
+            ["bound_flags"] = owned.Select(page => page.Unknown0 != 0 ? (byte)1 : (byte)0).ToArray(),
+            ["unknown_40"] = new byte[owned.Length],
+            ["entries"] = owned.Select(page => new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["unknown_0"] = page.Unknown0, ["unknown_4"] = page.Unknown4, ["unknown_8"] = page.Unknown8,
+            }).ToArray(),
+        });
+    }
+
     /// <summary>Rejects preset routes before activation when their build lacks reviewed layouts.</summary>
     internal static void RequirePresets(PacketTables tables, string build)
     {
         if (!tables.CapabilityOf(build, "weapon_presets"))
             throw new ConfigException($"Build '{build}' has no audited weapon-preset capability.");
-        _ = tables.Resolve(build, "WeaponPresetChangeRequest");
+        PacketLayoutContract.RequireFields(tables, build, "WeaponPresetChangeRequest", "Weapon presets",
+            ("context", "u32"), ("slot", "u8"));
+        PacketLayoutContract.RequireFields(tables, build, "WeaponPresetChangeReply", "Weapon presets",
+            ("active_slot", "u8"), ("status", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "WeaponPresetUpdate", "Weapon presets",
+            ("active_slot", "u8"), ("presets", "WeaponPresetList"));
     }
 }

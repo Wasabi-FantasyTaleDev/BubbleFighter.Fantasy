@@ -11,7 +11,6 @@ description: Chinese 2011 client build, ClientVersion_Major 279; local handshake
 bundles:
   - core
   - legacy
-  - inventory-actions
 # What this build differs in; everything else is the legacy bundle's (kr-812).
 vars:
   LEGACY_PORT: ${CN_279_GAME_PORT:-7210}

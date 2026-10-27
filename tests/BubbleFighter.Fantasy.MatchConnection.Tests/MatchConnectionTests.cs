@@ -1,14 +1,15 @@
 using System.Buffers;
+using BubbleFighter.Fantasy.RoomCore;
 using System.Collections.Concurrent;
 using System.IO.Pipelines;
 using System.Net;
 using BubbleFighter.Fantasy.Abstractions.Net;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Match;
-using BubbleFighter.Fantasy.Dialect.Modern.Messages;
+using BubbleFighter.Fantasy.Dialect.Messages;
 using BubbleFighter.Fantasy.InGame;
 using BubbleFighter.Fantasy.InGame.Sessions;
-using BubbleFighter.Fantasy.InGame.Wire;
+using BubbleFighter.Fantasy.Packets;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -16,6 +17,11 @@ namespace BubbleFighter.Fantasy.MatchConnection.Tests;
 
 public sealed class MatchConnectionTests
 {
+    private const string Build = "kr-1256";
+
+    private static readonly PacketTables Tables =
+        PacketTables.Load(Path.Combine(RelayHandshakeTableParityTests.RepositoryDirectory(), "packets"));
+
     [Theory]
     [InlineData(0)]
     [InlineData(1)]
@@ -23,7 +29,7 @@ public sealed class MatchConnectionTests
     [InlineData(65535)]
     public void SessionSignaturePinsModeAndCompleteSevenByteBody(ushort mode)
     {
-        var payload = ModernMatchCodec.WriteSessionSignature(mode);
+        var payload = LoginBurstWire.WriteSessionSignature(Tables, Build, mode);
         Assert.Equal(7, payload.Length);
         var reader = new PacketReader(payload);
         Assert.Equal(mode, reader.ReadUInt16());
@@ -165,18 +171,18 @@ public sealed class MatchConnectionTests
             w.WriteUInt16(0); w.WriteByte(0); w.WriteInt32(0); w.WriteInt32(0);
         });
         Assert.Equal(92, bytes.Length);
-        Assert.Equal(new MatchSceneRegistered(7, 1000000, "host"), ModernMatchCodec.ReadScene(bytes));
+        Assert.Equal(new MatchSceneRegistered(7, 1000000, "host"), RelayHandshakeWire.ReadScene(Tables, Build, bytes));
         for (var length = 0; length < bytes.Length; length++)
-            Assert.Throws<PacketFormatException>(() => ModernMatchCodec.ReadScene(bytes.AsSpan(0, length)));
-        Assert.Throws<PacketFormatException>(() => ModernMatchCodec.ReadScene([.. bytes, 0]));
+            Assert.Throws<PacketFormatException>(() => RelayHandshakeWire.ReadScene(Tables, Build, bytes.AsSpan(0, length)));
+        Assert.Throws<PacketFormatException>(() => RelayHandshakeWire.ReadScene(Tables, Build, [.. bytes, 0]));
         BitConverter.GetBytes(uint.MaxValue).CopyTo(bytes, 28);
-        Assert.Throws<PacketFormatException>(() => ModernMatchCodec.ReadScene(bytes));
+        Assert.Throws<PacketFormatException>(() => RelayHandshakeWire.ReadScene(Tables, Build, bytes));
     }
 
     [Fact]
     public void AuthenticationCodecConsumesTheTwentyByteTicketBodyAndRejectsMalformed()
     {
-        // 0x95FD30: 20-byte key, u8 unknown20, i32 unknown21, i32 account, wstring nickname.
+        // kr-1256 sub_95FD30: 20-byte key, u8 unknown20, i32 unknown21, i32 account, wstring nickname.
         var body = Bytes(w =>
         {
             w.WriteBytes(new byte[20]);
@@ -188,20 +194,20 @@ public sealed class MatchConnectionTests
         Assert.Equal(20 + 1 + 4 + 4 + 4 + (2 * 4), body.Length);
         Assert.Equal(41, body.Length);
 
-        var parsed = ModernMatchCodec.ReadAuthentication(body);
+        var parsed = RelayHandshakeWire.ReadAccountJoin(Tables, Build, body);
         Assert.Equal(20, parsed.Ticket.Length);
         Assert.Equal(7, parsed.UserNumber);
         Assert.Equal("host", parsed.Nickname);
 
         for (var length = 0; length < body.Length; length++)
-            Assert.Throws<PacketFormatException>(() => ModernMatchCodec.ReadAuthentication(body.AsSpan(0, length)));
-        Assert.Throws<PacketFormatException>(() => ModernMatchCodec.ReadAuthentication([.. body, 0]));
+            Assert.Throws<PacketFormatException>(() => RelayHandshakeWire.ReadAccountJoin(Tables, Build, body.AsSpan(0, length)));
+        Assert.Throws<PacketFormatException>(() => RelayHandshakeWire.ReadAccountJoin(Tables, Build, [.. body, 0]));
     }
 
     [Fact]
     public void MapCodecRequiresThe1256MarkerAndConsumesExactly()
     {
-        // 0x9F02F0: i32 version, i32 flag, wstring map, i32 entity, wstring nickname,
+        // kr-1256 sub_9F02F0: i32 version, i32 flag, wstring map, i32 entity, wstring nickname,
         // i32 scene id, i32 mode.
         var body = Bytes(w =>
         {
@@ -216,15 +222,15 @@ public sealed class MatchConnectionTests
         Assert.Equal(4 + 4 + (4 + 2 * 3) + 4 + (4 + 2 * 4) + 4 + 4, body.Length);
         Assert.Equal(42, body.Length);
 
-        Assert.Equal(new MatchMapNamed(1000000, "host", "map"), ModernMatchCodec.ReadMap(body));
+        Assert.Equal(new MatchMapNamed(1000000, "host", "map"), RelayHandshakeWire.ReadMap(Tables, Build, 1256, body));
 
         var wrongVersion = (byte[])body.Clone();
         BitConverter.GetBytes(812).CopyTo(wrongVersion, 0);
-        Assert.Throws<PacketFormatException>(() => ModernMatchCodec.ReadMap(wrongVersion));
+        Assert.Throws<PacketFormatException>(() => RelayHandshakeWire.ReadMap(Tables, Build, 1256, wrongVersion));
 
         for (var length = 0; length < body.Length; length++)
-            Assert.Throws<PacketFormatException>(() => ModernMatchCodec.ReadMap(body.AsSpan(0, length)));
-        Assert.Throws<PacketFormatException>(() => ModernMatchCodec.ReadMap([.. body, 0]));
+            Assert.Throws<PacketFormatException>(() => RelayHandshakeWire.ReadMap(Tables, Build, 1256, body.AsSpan(0, length)));
+        Assert.Throws<PacketFormatException>(() => RelayHandshakeWire.ReadMap(Tables, Build, 1256, [.. body, 0]));
     }
 
     [Fact]
@@ -313,11 +319,31 @@ public sealed class MatchConnectionTests
     }
     private static MatchConnectionLifecycle Lifecycle(RoomRegistry registry, MatchConnectionOptions? options = null) =>
         new(registry, new Sender(), new Sender(), options ?? new(), NullLogger.Instance);
+    // The lifecycle's replies through the tables, the frames dialect.match-replies sends on kr-1256: the
+    // accept pair (S2C 22 settings then S2C 1 accepted) and the scene accept (S2C 4/5/6 seeds, then S2C 13).
     private sealed class Sender : IMessageSender<MatchAuthenticationAccepted>, IMessageSender<MatchSceneAccepted>
     {
         public string Protocol => "kr-1256/relay";
-        public ValueTask SendAsync(ISession session, MatchAuthenticationAccepted message, CancellationToken ct) => ModernMatchCodec.SendAuthenticationAsync(session, ct);
-        public ValueTask SendAsync(ISession session, MatchSceneAccepted message, CancellationToken ct) => ModernMatchCodec.SendSceneAsync(session, message.EntityId, ct);
+
+        public async ValueTask SendAsync(ISession session, MatchAuthenticationAccepted message, CancellationToken ct)
+        {
+            await session.SendAsync(22, PacketCodec.Write(Tables, Build, "RelayHandshakeSettings", new Dictionary<string, object?>()), ct);
+            await session.SendAsync(1, PacketCodec.Write(Tables, Build, "RelayJoinAcceptedSignal", new Dictionary<string, object?>()), ct);
+        }
+
+        public async ValueTask SendAsync(ISession session, MatchSceneAccepted message, CancellationToken ct)
+        {
+            var seeds = new Dictionary<string, object?> { ["entity_id"] = (uint)message.EntityId };
+            await session.SendAsync(4, PacketCodec.Write(Tables, Build, "RelayCriticalSeedTable",
+                new Dictionary<string, object?>(seeds) { ["unknown_8"] = Zeros(32), ["unknown_24"] = Zeros(32) }), ct);
+            await session.SendAsync(5, PacketCodec.Write(Tables, Build, "RelayDefenceSeedTable",
+                new Dictionary<string, object?>(seeds) { ["unknown_8"] = Zeros(1000) }), ct);
+            await session.SendAsync(6, PacketCodec.Write(Tables, Build, "RelayCriticalSeedCancelTable",
+                new Dictionary<string, object?>(seeds) { ["unknown_8"] = Zeros(32) }), ct);
+            await session.SendAsync(13, PacketCodec.Write(Tables, Build, "RelaySceneAcceptedSignal", new Dictionary<string, object?>()), ct);
+        }
+
+        private static object?[] Zeros(int count) => Enumerable.Repeat<object?>(0u, count).ToArray();
     }
     private sealed class Session(long id) : ISession
     {

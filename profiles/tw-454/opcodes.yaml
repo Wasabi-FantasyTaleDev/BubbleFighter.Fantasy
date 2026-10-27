@@ -4,6 +4,62 @@ profile: tw-454
 # packet name through an address into the image (dispatcher sub_AACF80
 # --exe). See profiles/opcode-policy.md.
 opcodes:
+  - value: 510
+    direction: s2c
+    connection: game
+    name: gspRoomEnterGame
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A578B0 case 0x1FE -> tw-454 sub_A5D750 -> tw-454 sub_EBE3C0 reads three strings, state and the native stage lists; matched to kr-812 gspRoomEnterGame"
+  - value: 502
+    direction: c2s
+    connection: game
+    name: gcpRoomSendChatModuleMsg
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_AB20D0 stamps 502 and writes channel plus two counted UTF-16 strings; matched to kr-812 gcpRoomSendChatModuleMsg"
+  - value: 509
+    direction: s2c
+    connection: game
+    name: gspRoomReceiveChatModuleMsg
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A578B0 case 509 calls tw-454 sub_A604B0, which reads the native chat record and displays the line; matched to kr-812 gspRoomReceiveChatModuleMsg"
+  - value: 105
+    direction: c2s
+    connection: game
+    name: gcpReqGotoMenu
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_510B00 stamps 105 and sends no body; matches kr-812 gcpReqGotoMenu's empty menu-return request"
+  - value: 106
+    direction: c2s
+    connection: game
+    name: gcpReqGotoLobby
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_8A9850 invokes tw-454 sub_7E2EE0 for BtnMultiPlay after local guards; sub_7E2EE0 stamps empty 106, matching kr-812 gcpReqGotoLobby"
+  - value: 301
+    direction: c2s
+    connection: game
+    name: gcpSendPartyChrPos
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_BAB9A0 stamps 301: u32 sequence, XYZ, two bytes and f32; matches kr-812 sub_934030 gcpSendPartyChrPos"
+  - value: 301
+    direction: s2c
+    connection: game
+    name: gspReceivePartyChrPos
+    name_source: label@cn-774
+    evidence: verified
+    source: "tw-454 sub_AACF80 equality branch for 301 calls tw-454 sub_B9D330; identity, sequence, XYZ, two bytes and f32 match cn-774 sub_B01A60 gspReceivePartyChrPos"
+  - value: 511
+    direction: s2c
+    connection: game
+    name: gspRoomLeaveSlot
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A578B0 case 511 calls tw-454 sub_A5BED0: u32 slot, UserSlot and ServerTeamInfo; applies occupied seats or removes unoccupied ones, matching kr-812 gspRoomLeaveSlot"
   - value: 808
     direction: c2s
     name: gcpReqInventoryThrowItem
@@ -43,15 +99,15 @@ opcodes:
     connection: game
     name: gcpRoomReqChangeMaster
     name_source: label@kr-812
-    evidence: inferred
-    source: "tw-454 sub_A5FBD0 stamps508 and writes the target nickname; same delegation request as kr-812 Packet_gcpRoomReqChangeMaster via kr-812 sub_801C60/sub_809CB0"
+    evidence: verified
+    source: "tw-454 sub_A5FBD0 stamps 508 and writes counted UTF-16 target nickname; matched to kr-812 gcpRoomReqChangeMaster"
   - value: 507
     direction: s2c
     connection: game
     name: gspRoomRepChangeMaster
     name_source: label@kr-812
     evidence: verified
-    source: "tw-454 sub_A578B0 case0x1FB -> tw-454 sub_A5FD30 reads nickname and result; matches kr-812 Packet_gspRoomRepChangeMaster in kr-812 sub_801D00"
+    source: "tw-454 sub_A5FD30 reads nickname and result; matched to kr-812 gspRoomRepChangeMaster"
   - value: 506
     direction: s2c
     connection: game
@@ -1724,6 +1780,7 @@ opcodes:
     connection: game
   - value: 32792
     direction: c2s
+    connection: both
     name: gppKickFail
     name_source: label@kr-812
     evidence: verified
@@ -1731,6 +1788,7 @@ opcodes:
     notes: "one i32 actor"
   - value: 32792
     direction: s2c
+    connection: both
     name: gppKickFail
     name_source: label@kr-812
     evidence: verified
@@ -1738,6 +1796,7 @@ opcodes:
     notes: "one i32 actor"
   - value: 32837
     direction: c2s
+    connection: both
     name: gppKickEnd
     name_source: label@kr-812
     evidence: verified
@@ -1745,6 +1804,7 @@ opcodes:
     notes: "one i32 actor"
   - value: 32837
     direction: s2c
+    connection: both
     name: gppKickEnd
     name_source: label@kr-812
     evidence: verified
@@ -1752,6 +1812,7 @@ opcodes:
     notes: "one i32 actor"
   - value: 32900
     direction: c2s
+    connection: both
     name: gppSplashDamagerByDamager
     name_source: label@kr-812
     evidence: verified
@@ -1759,11 +1820,36 @@ opcodes:
     notes: "packets/damagers.yaml SplashDamagerByDamager; relayed unchanged with the damager spawns"
   - value: 32900
     direction: s2c
+    connection: both
     name: gppSplashDamagerByDamager
     name_source: label@kr-812
     evidence: verified
     source: "tw-454 sub_713910 writer and sub_70B3F0 case 0x8084 -> sub_713BB0 consumer; kr-812 Packet_gppSplashDamagerByDamager at sub_50FE10 / sub_50FF40 -> sub_508460; same source-damager lookup, area damager and source retirement"
     notes: "packets/damagers.yaml SplashDamagerByDamager; relayed unchanged with the damager spawns"
+  - value: 32885
+    direction: c2s
+    connection: both
+    name: gppWanderLean
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A75450 writes the full movement frame with opcode 32885; tw-454 sub_70B3F0 dispatches 32885 to the native movement consumer"
+    notes: "MovementReport: i32 actor, three f32 coordinates, u8 yaw, u8 pitch, u8 state and u16 tick (21 bytes); the same record is sent on game and match TCP"
+  - value: 32923
+    direction: c2s
+    connection: both
+    name: gppWanderLeanOptimize
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A75450 writes OptimizeWanderInfo with opcode 32923; tw-454 sub_A78010 serializes the optimized movement object"
+    notes: "MovementSample: i32 actor, u16 tick, u8 mask, then only the fields selected by mask bits; the optimized frame is an input on either TCP connection"
+  - value: 32885
+    direction: s2c
+    connection: both
+    name: gppWanderLean
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_70B3F0 dispatches 32885 to the native complete-movement consumer; the relay dispatcher uses the same native opcode"
+    notes: "Relayed movement is the complete 21-byte record; optimized input is normalized before the server sends this S2C form"
   - value: 806
     direction: c2s
     name: gcpReqInventoryUseItem
@@ -1773,6 +1859,7 @@ opcodes:
     notes: "packets/inventory-use.yaml InventoryUseRequest; answered by S2C 813 gspRepInventoryUseItem"
   - value: 32772
     direction: c2s
+    connection: both
     name: gppSplashDamager
     name_source: label@kr-812
     evidence: verified
@@ -1780,6 +1867,7 @@ opcodes:
     notes: "packets/damagers.yaml SplashDamager; relayed unchanged with the damager spawns"
   - value: 32772
     direction: s2c
+    connection: both
     name: gppSplashDamager
     name_source: label@kr-812
     evidence: verified
@@ -1787,6 +1875,7 @@ opcodes:
     notes: "packets/damagers.yaml SplashDamager; relayed unchanged with the damager spawns"
   - value: 32877
     direction: c2s
+    connection: both
     name: gppMobDropBombOnDead
     name_source: label@kr-812
     evidence: verified
@@ -1794,6 +1883,7 @@ opcodes:
     notes: "packets/damagers.yaml MobDropBombOnDead; relayed unchanged with the damager spawns"
   - value: 32877
     direction: s2c
+    connection: both
     name: gppMobDropBombOnDead
     name_source: label@kr-812
     evidence: verified
@@ -1801,6 +1891,7 @@ opcodes:
     notes: "packets/damagers.yaml MobDropBombOnDead; relayed unchanged with the damager spawns"
   - value: 32881
     direction: c2s
+    connection: both
     name: gppDropHumilPrevItem
     name_source: label@kr-812
     evidence: verified
@@ -1808,6 +1899,7 @@ opcodes:
     notes: "packets/damagers.yaml DropHumilPrevItem; relayed unchanged with the damager spawns"
   - value: 32881
     direction: s2c
+    connection: both
     name: gppDropHumilPrevItem
     name_source: label@kr-812
     evidence: verified
@@ -1815,6 +1907,7 @@ opcodes:
     notes: "packets/damagers.yaml DropHumilPrevItem; relayed unchanged with the damager spawns"
   - value: 32898
     direction: c2s
+    connection: both
     name: gppFireBullet3
     name_source: label@kr-812
     evidence: verified
@@ -1822,6 +1915,7 @@ opcodes:
     notes: "packets/damagers.yaml FireBullet3; relayed unchanged with the damager spawns"
   - value: 32898
     direction: s2c
+    connection: both
     name: gppFireBullet3
     name_source: label@kr-812
     evidence: verified
@@ -1829,6 +1923,7 @@ opcodes:
     notes: "packets/damagers.yaml FireBullet3; relayed unchanged with the damager spawns"
   - value: 32899
     direction: c2s
+    connection: both
     name: gppStormDamager
     name_source: label@kr-812
     evidence: verified
@@ -1836,6 +1931,7 @@ opcodes:
     notes: "packets/damagers.yaml StormDamager; relayed unchanged with the damager spawns"
   - value: 32899
     direction: s2c
+    connection: both
     name: gppStormDamager
     name_source: label@kr-812
     evidence: verified
@@ -1843,6 +1939,7 @@ opcodes:
     notes: "packets/damagers.yaml StormDamager; relayed unchanged with the damager spawns"
   - value: 32910
     direction: c2s
+    connection: both
     name: gppStormDamagerItemId
     name_source: label@kr-812
     evidence: verified
@@ -1850,6 +1947,7 @@ opcodes:
     notes: "packets/damagers.yaml StormDamagerItemId; relayed unchanged with the damager spawns"
   - value: 32910
     direction: s2c
+    connection: both
     name: gppStormDamagerItemId
     name_source: label@kr-812
     evidence: verified
@@ -1857,6 +1955,7 @@ opcodes:
     notes: "packets/damagers.yaml StormDamagerItemId; relayed unchanged with the damager spawns"
   - value: 33278
     direction: c2s
+    connection: both
     name: gppNearDamager
     name_source: label@kr-812
     evidence: verified
@@ -1864,6 +1963,7 @@ opcodes:
     notes: "packets/damagers.yaml NearDamager; relayed unchanged with the damager spawns"
   - value: 33278
     direction: s2c
+    connection: both
     name: gppNearDamager
     name_source: label@kr-812
     evidence: verified
@@ -1877,3 +1977,897 @@ opcodes:
     evidence: inferred
     source: "tw-454 sender sub_D87B40 stamps C2S 829 and writes one u32 from the purchase confirmation; matched to kr-812 Packet_gcpReqPickup reader sub_80A910 and sender sub_985660 by the one-word purchase pickup path"
     notes: "Game request only. The selected value remains unknown_4 in packets/cash-inventory.yaml. tw-454 S2C 835 handler sub_A8EBB0 consumes the cash-slot key and result, then removes the cash slot through sub_C03AD0 on result 1. No grant route is enabled by this row."
+
+  - value: 801
+    direction: c2s
+    connection: game
+    name: gcpEnterShop
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_8DA460 writes u64 cached catalog token then u32 main category; matched to kr-812 gcpEnterShop"
+  - value: 803
+    direction: c2s
+    connection: game
+    name: gcpEnterInventory
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_8DA850 writes empty inventory-dialog entry; matched to kr-812 gcpEnterInventory"
+  - value: 809
+    direction: c2s
+    connection: game
+    name: gcpReqShopBuy
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_C59210 writes u32 stock key then zero-extended byte as u32; matched to kr-812 gcpReqShopBuy"
+  - value: 810
+    direction: c2s
+    connection: game
+    name: gcpReqShopItemCardInfo
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_C13860 writes one u32 card key; matched to kr-812 gcpReqShopItemCardInfo"
+  - value: 833
+    direction: c2s
+    connection: game
+    name: gcpReqRealCouponUse
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_BC00E0 writes u32 UTF-16 character count followed by the code; matched to kr-812 gcpReqRealCouponUse"
+  - value: 800
+    direction: s2c
+    connection: game
+    name: gspRepEnterShop
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 dispatcher sub_AACF80 case 800 reaches sub_A8A780; result, has-data, token, card vector, category tree, ids and selected category match kr-812 gspRepEnterShop"
+  - value: 804
+    direction: c2s
+    connection: game
+    name: gcpReqInventoryEquip
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_C03F70 writes one i64 inventory/article key; matched to kr-812 gcpReqInventoryEquip by the wear/removal path"
+  - value: 805
+    direction: c2s
+    connection: game
+    name: gcpReqInventoryUnequip
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_C040B0 writes one i64 inventory/article key; matched to kr-812 gcpReqInventoryUnequip by the wear/removal path"
+
+  - value: 401
+    direction: c2s
+    connection: game
+    name: gcpReqListSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_8A0E00 stamps 401 and writes two u16 list cursor words; matched to kr-812 gcpReqListSession"
+  - value: 402
+    direction: c2s
+    connection: game
+    name: gcpReqCreateSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_668EB0 stamps 402 and writes SessionSetting and password; matched to kr-812 gcpReqCreateSession"
+  - value: 403
+    direction: c2s
+    connection: game
+    name: gcpReqJoinSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_89CD60 stamps 403 and writes room id and counted UTF-16 password; matched to kr-812 gcpReqJoinSession"
+  - value: 404
+    direction: c2s
+    connection: game
+    name: gcpReqLeaveSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A6B600 stamps 404 and writes empty leave request; matched to kr-812 gcpReqLeaveSession"
+  - value: 505
+    direction: c2s
+    connection: game
+    name: gcpRoomReqReadyStatus
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_7E0420 stamps 505 and writes three four-byte ready/shop/inventory booleans; matched to kr-812 gcpRoomReqReadyStatus"
+  - value: 503
+    direction: c2s
+    connection: game
+    name: gcpRoomReqEnterGame
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_AB2680 stamps 503 and writes the full map and thirteen-word rule record; matched to kr-812 gcpRoomReqEnterGame"
+  - value: 515
+    direction: c2s
+    connection: game
+    name: gcpRoomChangeTeam
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_796FB0 stamps 515 and writes three ordinary team-toggle words (-1,0,0); matched to kr-812 gcpRoomChangeTeam"
+  - value: 509
+    direction: c2s
+    connection: game
+    name: gcpRoomReqOpenCloseSlot
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_5F7D80 stamps 509 and writes seat word and four-byte closed flag; matched to kr-812 gcpRoomReqOpenCloseSlot"
+  - value: 517
+    direction: c2s
+    connection: game
+    name: gcpReqPingUser
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_73B220 stamps 517 and writes one local-seat probe word; matched to kr-812 gcpReqPingUser"
+  - value: 101
+    direction: s2c
+    connection: game
+    name: gspRepListSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_89BD50 handles 101 through the native SessionSetting vector reader; matched to kr-812 gspRepListSession"
+  - value: 103
+    direction: s2c
+    connection: game
+    name: gspRepJoinSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_89BD50 handles 103 as result and an additional word; matched to kr-812 gspRepJoinSession"
+  - value: 501
+    direction: s2c
+    connection: game
+    name: gspRoomSetSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A5AC80 installs a complete native SessionSetting; matched to kr-812 gspRoomSetSession"
+  - value: 502
+    direction: s2c
+    connection: game
+    name: gspRoomSetMasterSlotIdx
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A5AEA0 reads the master slot word; matched to kr-812 gspRoomSetMasterSlotIdx"
+  - value: 503
+    direction: s2c
+    connection: game
+    name: gspRoomSetSlot
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A5B220 reads slot, native UserSlot, one equipped object and ServerTeamInfo; matched to kr-812 gspRoomSetSlot"
+  - value: 504
+    direction: s2c
+    connection: game
+    name: gspRoomChangeTeam
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A5BA70 reads seat, signed team byte, two qualifier words and ServerTeamInfo; matched to kr-812 gspRoomChangeTeam"
+  - value: 505
+    direction: s2c
+    connection: game
+    name: gspRoomChangeGameSetting
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A5C7A0 reads one native GameSetting; matched to kr-812 gspRoomChangeGameSetting"
+  - value: 517
+    direction: s2c
+    connection: game
+    name: gspReqPingUser
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A66BE0 reads one token and answers with C2S 518; matched to kr-812 gspReqPingUser"
+  - value: 518
+    direction: s2c
+    connection: game
+    name: gspRepPingUser
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A66A70 reads three words for the seat ping history; matched to kr-812 gspRepPingUser"
+  - value: 126
+    direction: s2c
+    connection: game
+    name: gspRoomWaitingDialog_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_89BD50 handles 126 as the native waiting-wall control with two words and a counted UTF-16 string"
+
+  # Native relay handshake; game and relay directions use independent numeric spaces.
+  - value: 1
+    direction: c2s
+    connection: relay
+    name: rcpReqJoinRelaySession
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A7B050 stamps relay 1 and writes the nested key, byte, word, account and nickname; matched to kr-812 Packet_rcpReqJoinRelaySession"
+  - value: 3
+    direction: c2s
+    connection: relay
+    name: rcpReqRelayReconnectMap_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_A6B6E0 stamps relay 3 and writes the native version, widened byte, map string, entity, nickname and two words"
+  - value: 12
+    direction: c2s
+    connection: relay
+    name: rcpReqReportSceneData_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_A79210 case 1 starts relay 12; tw-454 sub_475C20 writes its identity, equipped objects, presets, signature and tail"
+    notes: "Complete nested body: RelaySceneReport in packets/relay-scene.yaml."
+  - value: 1
+    direction: s2c
+    connection: relay
+    name: rspRelayJoinAccepted_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_A79210 case 1 consumes no body and starts the relay 12 scene upload"
+    notes: "The inherited ignored result word does not affect the native consuming path."
+  - value: 4
+    direction: s2c
+    connection: relay
+    name: rspSendCrtSeedTable
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_703EF0 reads the entity and two counted word vectors; matched to kr-812 Packet_rspSendCrtSeedTable"
+  - value: 5
+    direction: s2c
+    connection: relay
+    name: rspSendDefSeedTable
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_704180 reads the entity and a counted byte vector; matched to kr-812 Packet_rspSendDefSeedTable"
+  - value: 6
+    direction: s2c
+    connection: relay
+    name: rspSendCrtCancelSeedTable
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_704360 reads the entity and a counted word vector; matched to kr-812 Packet_rspSendCrtCancelSeedTable"
+  - value: 13
+    direction: s2c
+    connection: relay
+    name: rspRelaySceneAccepted_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_A79210 case 13 consumes no body and reports game-side connection success"
+  - value: 22
+    direction: s2c
+    connection: relay
+    name: rspRelayHandshakeSettings_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_A79210 case 22 reads one bool32 and six bytes into the handshake record"
+  - value: 571
+    direction: c2s
+    connection: game
+    name: gcpReportRelayConnected
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A7B1B0 writes a bool32 and stamps game 571; matched to kr-812 Packet_gcpReportRelayConnected"
+  - value: 601
+    direction: s2c
+    connection: game
+    name: gspGameCountDown
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A61C00 reads the one-word countdown and starts native reconnect-map reporting; matched to kr-812 Packet_gspGameCountDown"
+  - value: 602
+    direction: s2c
+    connection: game
+    name: gspGameStartGame
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A62210 reads the round-start words and enters state 4; matched to kr-812 Packet_gspGameStartGame"
+  - value: 638
+    direction: s2c
+    connection: game
+    name: gspGameClockUnbounded_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_A578B0 case 0x27E consumes no body and resets the round duration to 0x3FFFFFFF"
+
+  - value: 605
+    direction: s2c
+    connection: game
+    name: gspRespawn
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_70B3F0 case 0x25D calls tw-454 sub_729D30; matched to the kr-812 reset grant by its actor/spawn/state-clear consumer"
+  - value: 602
+    direction: c2s
+    connection: game
+    name: gcpRespawn
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_717A20 writes actor, one caller word and one widened byte; matched to the kr-812 respawn sender and tw-454 sub_729D30 grant consumer"
+  - value: 603
+    direction: s2c
+    connection: game
+    name: gspRoundResultOpen_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_A58BB0 case 603 reads two words before opening the result scene"
+  - value: 627
+    direction: s2c
+    connection: game
+    name: gspRoundScoreboard_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_A58BB0 case 627 invokes tw-454 sub_A72D50 to read the complete masked scoreboard"
+  - value: 630
+    direction: s2c
+    connection: game
+    name: gspRoundResultBanner_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_A64460 consumes two words and two bytes and advances the result banner phase"
+  - value: 631
+    direction: s2c
+    connection: game
+    name: gspRoundRewardStage_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_A64A80 consumes the low bit of one byte and enters the reward stage"
+  - value: 634
+    direction: s2c
+    connection: game
+    name: gspRoundStageReset_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_A65310 consumes no stream field and returns the session to its waiting stage"
+  - value: 984
+    direction: s2c
+    connection: game
+    name: gspUpdateScoreData
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A63910 reads the team total, two slots and three stat vectors; matched to kr-812 gspUpdateScoreData"
+  - value: 625
+    direction: c2s
+    connection: game
+    name: gcpReqEndStage_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_7191E0 stamps 625 with no payload writes; the completion and elimination paths invoke it once their stage is over"
+
+  # Native action feed; shared packet data selects reporting identities and life events.
+  - value: 32779
+    direction: c2s
+    connection: both
+    name: Unknown32779
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_712F20 writes actor and Boolean word"
+  - value: 32779
+    direction: s2c
+    connection: both
+    name: Unknown32779
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_70B3F0 consumes actor and Boolean word in case 32779"
+  - value: 32780
+    direction: c2s
+    connection: both
+    name: Unknown32780
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_80BB80 writes actor, word and two bytes"
+  - value: 32780
+    direction: s2c
+    connection: both
+    name: Unknown32780
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_70B3F0 consumes actor, word and two bytes in case 32780"
+  - value: 32781
+    direction: c2s
+    connection: both
+    name: Unknown32781
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_7130B0 writes actor, word and Boolean word in signed case -32755"
+  - value: 32781
+    direction: s2c
+    connection: both
+    name: Unknown32781
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_70D9E0 consumes actor, word and Boolean word in signed case -32755"
+  - value: 32782
+    direction: c2s
+    connection: both
+    name: Unknown32782
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_93F3A0 writes one-word actor"
+  - value: 32782
+    direction: s2c
+    connection: both
+    name: Unknown32782
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_70B3F0 consumes one-word actor in case 32782"
+  - value: 32783
+    direction: c2s
+    connection: both
+    name: Unknown32783
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_93ED90 writes target word before the actor word"
+  - value: 32783
+    direction: s2c
+    connection: both
+    name: Unknown32783
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_730490 consumes target word before the actor word"
+  - value: 32784
+    direction: c2s
+    connection: both
+    name: Unknown32784
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_713520 writes four words with a Boolean third word"
+  - value: 32784
+    direction: s2c
+    connection: both
+    name: Unknown32784
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_70B3F0 consumes four words with a Boolean third word in case 32784"
+  - value: 32786
+    direction: c2s
+    connection: both
+    name: Unknown32786
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_7137A0 writes two words followed by one byte"
+  - value: 32786
+    direction: s2c
+    connection: both
+    name: Unknown32786
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_70B3F0 consumes two words followed by one byte in case 32786"
+  - value: 32788
+    direction: c2s
+    connection: both
+    name: Unknown32788
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_717FE0 writes actor, source, position triple and word"
+  - value: 32788
+    direction: s2c
+    connection: both
+    name: Unknown32788
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_72E870 consumes actor, source, position triple and word"
+  - value: 32790
+    direction: c2s
+    connection: both
+    name: Unknown32790
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_812310 writes one-word actor and state-107 transition"
+  - value: 32790
+    direction: s2c
+    connection: both
+    name: Unknown32790
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_70B3F0 consumes one-word actor and state-107 transition in case 32790"
+  - value: 32791
+    direction: c2s
+    connection: both
+    name: Unknown32791
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_7188F0 writes actor, target and word"
+  - value: 32791
+    direction: s2c
+    connection: both
+    name: Unknown32791
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_70B3F0 consumes actor, target and word in case 32791"
+  - value: 32810
+    direction: c2s
+    connection: both
+    name: Unknown32810
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_717530 writes six words with the actor third and two Boolean suffixes"
+  - value: 32810
+    direction: s2c
+    connection: both
+    name: Unknown32810
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_72A500 consumes six words with the actor third and two Boolean suffixes"
+  - value: 32811
+    direction: c2s
+    connection: both
+    name: Unknown32811
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_718C00 writes actor and packed reload word"
+  - value: 32811
+    direction: s2c
+    connection: both
+    name: Unknown32811
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_730990 consumes actor and packed reload word"
+  - value: 32813
+    direction: c2s
+    connection: both
+    name: Unknown32813
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_718DA0 writes one-word actor return"
+  - value: 32813
+    direction: s2c
+    connection: both
+    name: Unknown32813
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_70B3F0 consumes one-word actor return in case 32813"
+  - value: 32815
+    direction: c2s
+    connection: both
+    name: Unknown32815
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_718A10 writes actor and target words"
+  - value: 32815
+    direction: s2c
+    connection: both
+    name: Unknown32815
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_72B590 consumes actor and target words"
+  - value: 32816
+    direction: c2s
+    connection: both
+    name: Unknown32816
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_813DB0 writes actor and target words"
+  - value: 32816
+    direction: s2c
+    connection: both
+    name: Unknown32816
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_72B7A0 consumes actor and target words"
+  - value: 32821
+    direction: c2s
+    connection: both
+    name: Unknown32821
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_822EE0 writes actor and two bytes"
+  - value: 32821
+    direction: s2c
+    connection: both
+    name: Unknown32821
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_730400 consumes actor and two bytes"
+  - value: 32834
+    direction: c2s
+    connection: both
+    name: Unknown32834
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_713280 writes two-word wall-state record"
+  - value: 32834
+    direction: s2c
+    connection: both
+    name: Unknown32834
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_70B3F0 consumes two-word wall-state record in case 32834"
+  - value: 32835
+    direction: c2s
+    connection: both
+    name: Unknown32835
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_7F98B0 writes one-word actor and state-403 transition"
+  - value: 32835
+    direction: s2c
+    connection: both
+    name: Unknown32835
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_70B3F0 consumes one-word actor and state-403 transition in case 32835"
+  - value: 32836
+    direction: c2s
+    connection: both
+    name: Unknown32836
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_717100 writes one-word death-cleanup actor"
+  - value: 32836
+    direction: s2c
+    connection: both
+    name: Unknown32836
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_72A820 consumes one-word death-cleanup actor"
+  - value: 32882
+    direction: c2s
+    connection: both
+    name: Unknown32882
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_71CF30 writes actor and two Boolean words"
+  - value: 32882
+    direction: s2c
+    connection: both
+    name: Unknown32882
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_731520 consumes actor and two Boolean words"
+  - value: 32884
+    direction: c2s
+    connection: both
+    name: Unknown32884
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_A75020 writes actor, target, Boolean word and word"
+  - value: 32884
+    direction: s2c
+    connection: both
+    name: Unknown32884
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_724420 consumes actor, target, Boolean word and word"
+  - value: 32907
+    direction: c2s
+    connection: both
+    name: Unknown32907
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_711B60 writes one-word damager key"
+  - value: 32907
+    direction: s2c
+    connection: both
+    name: Unknown32907
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_70B3F0 consumes one-word damager key in case 32907"
+  - value: 32921
+    direction: c2s
+    connection: both
+    name: Unknown32921
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_76A4C0 writes actor followed by two words"
+  - value: 32921
+    direction: s2c
+    connection: both
+    name: Unknown32921
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_7142D0 consumes actor followed by two words"
+  - value: 32925
+    direction: c2s
+    connection: both
+    name: Unknown32925
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_7167C0 writes 32-byte packed motion via tw-454 sub_476080 / tw-454 sub_4761B0"
+  - value: 32925
+    direction: s2c
+    connection: both
+    name: Unknown32925
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_724920 consumes 32-byte packed motion via tw-454 sub_476080 / tw-454 sub_4761B0"
+  - value: 32926
+    direction: c2s
+    connection: both
+    name: Unknown32926
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_729D30 writes 13-byte native reset confirmation"
+  - value: 32926
+    direction: s2c
+    connection: both
+    name: Unknown32926
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_72A000 consumes 13-byte native reset confirmation"
+  - value: 33286
+    direction: c2s
+    connection: both
+    name: Unknown33286
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_714590 writes actor followed by two words"
+  - value: 33286
+    direction: s2c
+    connection: both
+    name: Unknown33286
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_715100 consumes actor followed by two words"
+  - value: 33301
+    direction: c2s
+    connection: both
+    name: Unknown33301
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_711690 / tw-454 sub_8408F0 writes 20-byte damager contact with full position floats"
+  - value: 33301
+    direction: s2c
+    connection: both
+    name: Unknown33301
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_728CC0 consumes 20-byte damager contact with full position floats"
+  - value: 32794
+    direction: c2s
+    connection: both
+    name: Unknown32794
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_718600 writes two participant words"
+  - value: 32794
+    direction: s2c
+    connection: both
+    name: Unknown32794
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_70B3F0 consumes two participant words in case 32794"
+  - value: 32806
+    direction: c2s
+    connection: both
+    name: Unknown32806
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_7172E0 writes actor and other participant or sentinel"
+  - value: 32806
+    direction: s2c
+    connection: both
+    name: Unknown32806
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_72BA30 consumes actor and other participant or sentinel"
+  - value: 33282
+    direction: c2s
+    connection: both
+    name: Unknown33282
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_7FE6C0 writes victim, rescuer, clock word and byte"
+  - value: 33282
+    direction: s2c
+    connection: both
+    name: Unknown33282
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_70E250 consumes victim, rescuer, clock word and byte in case 33282"
+  - value: 32805
+    direction: c2s
+    connection: both
+    name: Unknown32805
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_717010 writes one-word actor and state-402 transition"
+  - value: 32805
+    direction: s2c
+    connection: both
+    name: Unknown32805
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_70B3F0 consumes one-word actor and state-402 transition in case 32805"
+  - value: 32795
+    direction: c2s
+    connection: both
+    name: Unknown32795
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_718340 writes 32-byte finishing record: victim before attacker"
+  - value: 32795
+    direction: s2c
+    connection: both
+    name: Unknown32795
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_72EAA0 consumes 32-byte finishing record: victim before attacker"
+  - value: 33281
+    direction: c2s
+    connection: both
+    name: Unknown33281
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_7FE6C0 writes rescuer, victim and byte"
+  - value: 33281
+    direction: s2c
+    connection: both
+    name: Unknown33281
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_70E250 consumes rescuer, victim and byte in case 33281"
+  - value: 32789
+    direction: c2s
+    connection: both
+    name: Unknown32789
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_718250 writes one-word actor and state-121 transition"
+  - value: 32789
+    direction: s2c
+    connection: both
+    name: Unknown32789
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_72EA40 consumes one-word actor and state-121 transition"
+  - value: 32787
+    direction: c2s
+    connection: both
+    name: Unknown32787
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_717DD0 writes 40-byte knocked record"
+  - value: 32787
+    direction: s2c
+    connection: both
+    name: Unknown32787
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_72BEE0 consumes 40-byte knocked record"
+  - value: 33274
+    direction: c2s
+    connection: both
+    name: Unknown33274
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_C5F0B0 writes actor and Boolean render word"
+  - value: 33274
+    direction: s2c
+    connection: both
+    name: Unknown33274
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_70E250 consumes actor and Boolean render word in case 33274"
+  - value: 32796
+    direction: c2s
+    connection: both
+    name: Unknown32796
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_718700 writes two object identities, three position floats, word and Boolean word"
+  - value: 32796
+    direction: s2c
+    connection: both
+    name: Unknown32796
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_72F6F0 consumes two object identities, three position floats, word and Boolean word"
+
+  - value: 578
+    direction: c2s
+    connection: game
+    name: gcpGameReportMapLoadingComplete
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_7110D0 stamps 578 and writes four words after stage loading; matched to the corresponding kr-812 packet builder"
+
+  - value: 607
+    direction: c2s
+    connection: game
+    name: gcpReqAddObject
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_7127C0 stamps 607 and writes the local scene object as one word; matched to the corresponding kr-812 packet builder"
+
+  - value: 579
+    direction: c2s
+    connection: game
+    name: gcpGameReportMapData
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_70F410 stamps 579 and serializes the native map-data report; recorded without parsing; matched to the corresponding kr-812 packet builder"

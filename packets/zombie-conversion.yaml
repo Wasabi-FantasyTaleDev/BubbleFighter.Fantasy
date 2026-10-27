@@ -12,3 +12,9 @@ structs:
       kr-1256:
         - team: u8
         - unknown_n2: "optional<0x3A,TeamChangeTail>"
+      # cn-774 sub_8DBEA0 / tw-454 sub_A5BA70 consume two qualifier words and a complete team panel.
+      cn-774:
+        - team: u8
+        - unknown_n2: u32
+        - unknown_n3: u32
+        - team_info: ServerTeamInfo

@@ -17,7 +17,7 @@ namespace BubbleFighter.Fantasy.Protocol.Tests;
 
 /// <summary>
 /// In-process handshake tests: plaintext 258-byte greeting, then C2S/S2C ciphers
-/// (<c>sub_10B9720</c>) and the <c>gcpReqGamePatch</c>/<c>gspRepGamePatch</c> exchange.
+/// (kr-1256 <c>sub_10B9720</c>) and the <c>gcpReqGamePatch</c>/<c>gspRepGamePatch</c> exchange.
 /// </summary>
 public sealed class ProtocolHandshakeTests
 {
@@ -231,7 +231,7 @@ public sealed class ProtocolHandshakeTests
 
     private static byte[] EncryptFrame(SimpleCipher cipher, ushort opcode, byte[] payload)
     {
-        var frame = WireFrame.Encode(opcode, payload);
+        var frame = PacketFrame_8Bytes.Encode(opcode, payload);
         cipher.EncryptInPlace(frame);
         return frame;
     }
@@ -315,7 +315,7 @@ public sealed class ProtocolHandshakeTests
             Assert.True(await WaitForAsync(() => harness.Sessions.All.Count == 1));
             session = Assert.IsAssignableFrom<ISessionWithFeatures>(Assert.Single(harness.Sessions.All));
             registration = session.RegisterFeature(new object());
-            var frame = WireFrame.Encode(WireOpcodes.C2S.GamePatch, WirePins.GamePatchPayload());
+            var frame = PacketFrame_8Bytes.Encode(WirePins.PatchRequestOpcode, WirePins.GamePatchPayload());
             frame[7] ^= 0xFF;
             SimpleCipher.ClientToServer().EncryptInPlace(frame);
             await connection.SendAsync(frame, ct);
@@ -370,6 +370,95 @@ public sealed class ProtocolHandshakeTests
         });
     }
 
+    /// <summary>The first-frame gate, handler and reply all follow the game table after its numbers change.</summary>
+    [Theory]
+    [InlineData("gcpReqGamePatch")]
+    [InlineData("gcpFirstConnect")]
+    public async Task GameHandshakeFollowsConfiguredNamesAndRemappedNumbers(string requestName)
+    {
+        var path = WriteRemappedHandshakeTable(requestName);
+        try
+        {
+            await using var harness = await ProtocolHarness.StartAsync(new()
+            {
+                ["opcode_table_path"] = path, ["patch_request_name"] = requestName,
+                ["use_catalog_candidates"] = false,
+            });
+            await WithProtocolAsync(harness.Game, async (connection, ct) =>
+            {
+                _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
+                await connection.SendAsync(EncryptFrame(SimpleCipher.ClientToServer(), 30001, WirePins.GamePatchPayload()), ct);
+                var reply = await connection.ReceiveExactlyAsync(WirePins.RepGamePatchFrameSize, ct);
+                SimpleCipher.ServerToClient().DecryptInPlace(reply);
+                Assert.Equal(PacketFrame_8Bytes.Encode(30002, new byte[WirePins.RepGamePatchPayloadSize]), reply);
+                Assert.False(connection.IsClosed);
+            });
+        }
+        finally { File.Delete(path); }
+    }
+
+    /// <summary>A packet at the former numeric slot cannot satisfy a handshake remapped by the profile.</summary>
+    [Fact]
+    public async Task RemappedHandshakeRejectsTheFormerRequestNumber()
+    {
+        var path = WriteRemappedHandshakeTable("gcpFirstConnect");
+        try
+        {
+            await using var harness = await ProtocolHarness.StartAsync(new()
+            {
+                ["opcode_table_path"] = path, ["patch_request_name"] = "gcpFirstConnect",
+                ["use_catalog_candidates"] = false,
+            });
+            await WithProtocolAsync(harness.Game, async (connection, ct) =>
+            {
+                _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
+                await connection.SendAsync(EncryptFrame(SimpleCipher.ClientToServer(), WirePins.PatchRequestOpcode, WirePins.GamePatchPayload()), ct);
+                Assert.True(await WaitForAsync(() => connection.IsClosed));
+                Assert.Contains("first packet must be gcpFirstConnect", connection.CloseReason);
+                Assert.Empty(harness.Sent);
+            });
+        }
+        finally { File.Delete(path); }
+    }
+
+    /// <summary>Both bootstrap directions must resolve before the protocol row can become active.</summary>
+    [Theory]
+    [InlineData("gcpReqGamePatch")]
+    [InlineData("gspRepGamePatch")]
+    public async Task MissingHandshakeNameFailsAtActivation(string missingName)
+    {
+        var path = WriteRemappedHandshakeTable("gcpReqGamePatch");
+        try
+        {
+            File.WriteAllText(path, File.ReadAllText(path).Replace(missingName, "MissingBootstrap", StringComparison.Ordinal));
+            var error = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            {
+                await using var harness = await ProtocolHarness.StartAsync(new()
+                {
+                    ["opcode_table_path"] = path, ["use_catalog_candidates"] = false,
+                });
+            });
+            Assert.IsType<ConfigException>(error.InnerException);
+            Assert.Contains(missingName, error.InnerException!.Message);
+        }
+        finally { File.Delete(path); }
+    }
+
+    private static string WriteRemappedHandshakeTable(string requestName)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"bff-handshake-{Guid.NewGuid():N}.yaml");
+        // Synthetic assignments differ from every pinned bootstrap number; relay names must not shadow game names.
+        File.WriteAllText(path, $$"""
+            profile: kr-1256
+            opcodes:
+              - { value: 30001, direction: c2s, name: {{requestName}}, connection: game, evidence: unverified }
+              - { value: 30002, direction: s2c, name: gspRepGamePatch, connection: game, evidence: unverified }
+              - { value: 30003, direction: c2s, name: {{requestName}}, connection: relay, evidence: unverified }
+              - { value: 30004, direction: s2c, name: gspRepGamePatch, connection: relay, evidence: unverified }
+            """);
+        return path;
+    }
+
     [Fact]
     public async Task GameHandshakePinsGreeting258AndReply16()
     {
@@ -383,7 +472,7 @@ public sealed class ProtocolHandshakeTests
 
             var cipher = SimpleCipher.ClientToServer();
             await connection.SendAsync(
-                EncryptFrame(cipher, WireOpcodes.C2S.GamePatch, WirePins.GamePatchPayload()),
+                EncryptFrame(cipher, WirePins.PatchRequestOpcode, WirePins.GamePatchPayload()),
                 ct);
 
             var reply = await connection.ReceiveExactlyAsync(WirePins.RepGamePatchFrameSize, ct);
@@ -397,24 +486,24 @@ public sealed class ProtocolHandshakeTests
             var sent = await WaitForAsync(() =>
             {
                 lock (harness.Sent)
-                    return harness.Sent.Any(e => e.Opcode == WireOpcodes.S2C.RepGamePatch && e.PayloadLength == WirePins.RepGamePatchPayloadSize);
+                    return harness.Sent.Any(e => e.Opcode == WirePins.PatchReplyOpcode && e.PayloadLength == WirePins.RepGamePatchPayloadSize);
             });
             Assert.True(sent, "no PacketSentEvent for gspRepGamePatch with an 8-byte payload");
             lock (harness.Sent)
             {
-                var packet = Assert.Single(harness.Sent, e => e.Opcode == WireOpcodes.S2C.RepGamePatch);
+                var packet = Assert.Single(harness.Sent, e => e.Opcode == WirePins.PatchReplyOpcode);
                 Assert.Equal(plain[8..], packet.Payload.ToArray());
             }
 
             // Post-handshake dispatch is the observable stand-in for Mark: Unknown521
             // must be accepted without closing (the gate stays open after the reply).
             await connection.SendAsync(
-                EncryptFrame(cipher, WireOpcodes.C2S.Unknown521, [1, 2, 3]),
+                EncryptFrame(cipher, WirePins.PreHandshakeOpcode, [1, 2, 3]),
                 ct);
             var received = await WaitForAsync(() =>
             {
                 lock (harness.Received)
-                    return harness.Received.Any(e => e.Packet.Opcode == WireOpcodes.C2S.Unknown521 && !e.HasHandler);
+                    return harness.Received.Any(e => e.Packet.Opcode == WirePins.PreHandshakeOpcode && !e.HasHandler);
             });
             Assert.True(received, "Unknown521 was not dispatched after the handshake");
             Assert.False(connection.IsClosed);
@@ -450,7 +539,7 @@ public sealed class ProtocolHandshakeTests
         {
             _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
             await connection.SendAsync(
-                EncryptFrame(SimpleCipher.ClientToServer(), WireOpcodes.C2S.GamePatch, new byte[3]),
+                EncryptFrame(SimpleCipher.ClientToServer(), WirePins.PatchRequestOpcode, new byte[3]),
                 ct);
 
             await Task.Delay(200, ct);
@@ -470,7 +559,7 @@ public sealed class ProtocolHandshakeTests
             var wrong = new byte[WirePins.GamePatchPayloadSize];
             WirePins.WrongVersion.CopyTo(wrong, 0);
             await connection.SendAsync(
-                EncryptFrame(SimpleCipher.ClientToServer(), WireOpcodes.C2S.GamePatch, wrong),
+                EncryptFrame(SimpleCipher.ClientToServer(), WirePins.PatchRequestOpcode, wrong),
                 ct);
 
             Assert.True(await WaitForAsync(() => connection.IsClosed), "wrong version did not close");
@@ -488,7 +577,7 @@ public sealed class ProtocolHandshakeTests
             var payload = WirePins.GamePatchPayload(9999);
             Assert.Equal(WirePins.GamePatchPayloadSize, payload.Length);
             await connection.SendAsync(
-                EncryptFrame(SimpleCipher.ClientToServer(), WireOpcodes.C2S.GamePatch, payload),
+                EncryptFrame(SimpleCipher.ClientToServer(), WirePins.PatchRequestOpcode, payload),
                 ct);
 
             Assert.True(await WaitForAsync(() => connection.IsClosed), "version mismatch did not close");
@@ -506,10 +595,10 @@ public sealed class ProtocolHandshakeTests
         {
             _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
             var cipher = SimpleCipher.ClientToServer();
-            await connection.SendAsync(EncryptFrame(cipher, WireOpcodes.C2S.Unknown521, [1, 2, 3]), ct);
+            await connection.SendAsync(EncryptFrame(cipher, WirePins.PreHandshakeOpcode, [1, 2, 3]), ct);
             await Task.Delay(200, ct);
             Assert.False(connection.IsClosed, "a pre-handshake opcode closed the connection");
-            await connection.SendAsync(EncryptFrame(cipher, WireOpcodes.C2S.Unknown521, [1, 2, 3]), ct);
+            await connection.SendAsync(EncryptFrame(cipher, WirePins.PreHandshakeOpcode, [1, 2, 3]), ct);
             await connection.SendAsync(EncryptFrame(cipher, 7, [1]), ct);
             Assert.True(await WaitForAsync(() => connection.IsClosed), "another opcode before the handshake did not close");
             Assert.Contains("gcpReqGamePatch", connection.CloseReason);
@@ -524,7 +613,7 @@ public sealed class ProtocolHandshakeTests
         {
             _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
             await connection.SendAsync(
-                EncryptFrame(SimpleCipher.ClientToServer(), WireOpcodes.C2S.Unknown521, [1, 2, 3]),
+                EncryptFrame(SimpleCipher.ClientToServer(), WirePins.PreHandshakeOpcode, [1, 2, 3]),
                 ct);
 
             Assert.True(await WaitForAsync(() => connection.IsClosed), "non-patch first packet did not close");
@@ -548,7 +637,7 @@ public sealed class ProtocolHandshakeTests
         {
             _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
             await connection.SendAsync(
-                EncryptFrame(SimpleCipher.ClientToServer(), WireOpcodes.C2S.Unknown521, [1, 2, 3]),
+                EncryptFrame(SimpleCipher.ClientToServer(), WirePins.PreHandshakeOpcode, [1, 2, 3]),
                 ct);
 
             await Task.Delay(300, ct);
@@ -568,13 +657,13 @@ public sealed class ProtocolHandshakeTests
             Assert.Equal(WirePins.GreetingSize, greeting.Length);
 
             await connection.SendAsync(
-                EncryptFrame(SimpleCipher.ClientToServer(), WireOpcodes.C2S.Unknown521, [1, 2, 3]),
+                EncryptFrame(SimpleCipher.ClientToServer(), WirePins.PreHandshakeOpcode, [1, 2, 3]),
                 ct);
 
             var received = await WaitForAsync(() =>
             {
                 lock (harness.Received)
-                    return harness.Received.Any(e => e.Packet.Opcode == WireOpcodes.C2S.Unknown521 && !e.HasHandler);
+                    return harness.Received.Any(e => e.Packet.Opcode == WirePins.PreHandshakeOpcode && !e.HasHandler);
             });
             Assert.True(received, "relay did not dispatch Unknown521");
             Assert.False(connection.IsClosed);
@@ -593,7 +682,7 @@ public sealed class ProtocolHandshakeTests
             Assert.Equal(WirePins.GamePatchPayloadSize, payload.Length);
 
             await connection.SendAsync(
-                EncryptFrame(SimpleCipher.ClientToServer(), WireOpcodes.C2S.GamePatch, payload),
+                EncryptFrame(SimpleCipher.ClientToServer(), WirePins.PatchRequestOpcode, payload),
                 ct);
 
             var reply = await connection.ReceiveExactlyAsync(WirePins.RepGamePatchFrameSize, ct);
@@ -613,7 +702,7 @@ public sealed class ProtocolHandshakeTests
         {
             _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
             await connection.SendAsync(
-                EncryptFrame(SimpleCipher.ClientToServer(), WireOpcodes.C2S.GamePatch, WirePins.GamePatchPayload(1)),
+                EncryptFrame(SimpleCipher.ClientToServer(), WirePins.PatchRequestOpcode, WirePins.GamePatchPayload(1)),
                 ct);
 
             var reply = await connection.ReceiveExactlyAsync(WirePins.RepGamePatchFrameSize, ct);
@@ -635,7 +724,7 @@ public sealed class ProtocolHandshakeTests
         {
             _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
             await connection.SendAsync(
-                EncryptFrame(SimpleCipher.ClientToServer(), WireOpcodes.C2S.GamePatch, WirePins.GamePatchPayload()),
+                EncryptFrame(SimpleCipher.ClientToServer(), WirePins.PatchRequestOpcode, WirePins.GamePatchPayload()),
                 ct);
 
             Assert.True(await WaitForAsync(() => connection.IsClosed), "oversize frame did not close");
@@ -650,7 +739,7 @@ public sealed class ProtocolHandshakeTests
         await WithProtocolAsync(harness.Game, async (connection, ct) =>
         {
             _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
-            var frame = WireFrame.Encode(WireOpcodes.C2S.GamePatch, WirePins.GamePatchPayload());
+            var frame = PacketFrame_8Bytes.Encode(WirePins.PatchRequestOpcode, WirePins.GamePatchPayload());
             frame[7] ^= 0xFF;
             SimpleCipher.ClientToServer().EncryptInPlace(frame);
             await connection.SendAsync(frame, ct);
@@ -667,8 +756,8 @@ public sealed class ProtocolHandshakeTests
         await WithProtocolAsync(harness.Game, async (connection, ct) =>
         {
             _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
-            var frame = WireFrame.Encode(WireOpcodes.C2S.GamePatch, WirePins.GamePatchPayload());
-            frame[WireFrame.HeaderSize] ^= 0xFF;
+            var frame = PacketFrame_8Bytes.Encode(WirePins.PatchRequestOpcode, WirePins.GamePatchPayload());
+            frame[PacketFrame_8Bytes.HeaderSize] ^= 0xFF;
             SimpleCipher.ClientToServer().EncryptInPlace(frame);
             await connection.SendAsync(frame, ct);
 
@@ -686,7 +775,7 @@ public sealed class ProtocolHandshakeTests
             _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
             var wire = EncryptFrame(
                 SimpleCipher.ClientToServer(),
-                WireOpcodes.C2S.GamePatch,
+                WirePins.PatchRequestOpcode,
                 WirePins.GamePatchPayload());
             Assert.Equal(WirePins.GamePatchFrameSize, wire.Length);
 
@@ -709,18 +798,18 @@ public sealed class ProtocolHandshakeTests
             _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
             var cipher = SimpleCipher.ClientToServer();
             await connection.SendAsync(
-                EncryptFrame(cipher, WireOpcodes.C2S.GamePatch, WirePins.GamePatchPayload()),
+                EncryptFrame(cipher, WirePins.PatchRequestOpcode, WirePins.GamePatchPayload()),
                 ct);
             _ = await connection.ReceiveExactlyAsync(WirePins.RepGamePatchFrameSize, ct);
 
             await connection.SendAsync(
-                EncryptFrame(cipher, WireOpcodes.C2S.Unknown521, [1, 2, 3]),
+                EncryptFrame(cipher, WirePins.PreHandshakeOpcode, [1, 2, 3]),
                 ct);
 
             var received = await WaitForAsync(() =>
             {
                 lock (harness.Received)
-                    return harness.Received.Any(e => e.Packet.Opcode == WireOpcodes.C2S.Unknown521 && !e.HasHandler);
+                    return harness.Received.Any(e => e.Packet.Opcode == WirePins.PreHandshakeOpcode && !e.HasHandler);
             });
             Assert.True(received, "Unknown521 was not dispatched after the handshake");
             Assert.False(connection.IsClosed);
@@ -735,12 +824,12 @@ public sealed class ProtocolHandshakeTests
         {
             _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
             var cipher = SimpleCipher.ClientToServer();
-            var first = EncryptFrame(cipher, WireOpcodes.C2S.GamePatch, WirePins.GamePatchPayload());
-            var second = EncryptFrame(cipher, WireOpcodes.C2S.Unknown521, [9, 8, 7]);
+            var first = EncryptFrame(cipher, WirePins.PatchRequestOpcode, WirePins.GamePatchPayload());
+            var second = EncryptFrame(cipher, WirePins.PreHandshakeOpcode, [9, 8, 7]);
             var blob = new byte[first.Length + second.Length];
             first.CopyTo(blob, 0);
             second.CopyTo(blob, first.Length);
-            Assert.Equal(WirePins.GamePatchFrameSize + WireFrame.HeaderSize + 3, blob.Length);
+            Assert.Equal(WirePins.GamePatchFrameSize + PacketFrame_8Bytes.HeaderSize + 3, blob.Length);
 
             await connection.SendAsync(blob, ct);
             var reply = await connection.ReceiveExactlyAsync(WirePins.RepGamePatchFrameSize, ct);
@@ -749,7 +838,7 @@ public sealed class ProtocolHandshakeTests
             var received = await WaitForAsync(() =>
             {
                 lock (harness.Received)
-                    return harness.Received.Any(e => e.Packet.Opcode == WireOpcodes.C2S.Unknown521);
+                    return harness.Received.Any(e => e.Packet.Opcode == WirePins.PreHandshakeOpcode);
             });
             Assert.True(received, "second frame in the same write was not dispatched");
         });

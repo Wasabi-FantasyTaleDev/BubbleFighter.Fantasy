@@ -1,14 +1,16 @@
 using System.Buffers;
+using BubbleFighter.Fantasy.RoomCore;
+using System.Buffers.Binary;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Inventory;
+using BubbleFighter.Fantasy.Contracts.Lobby;
 using BubbleFighter.Fantasy.Contracts.Match;
 using BubbleFighter.Fantasy.Contracts.Party;
 using BubbleFighter.Fantasy.Contracts.Rooms;
 using BubbleFighter.Fantasy.Contracts.Sessions;
-using BubbleFighter.Fantasy.Dialect.Modern.Messages.Play;
+using BubbleFighter.Fantasy.Dialect.Rooms;
 using BubbleFighter.Fantasy.InGame.Sessions;
-using BubbleFighter.Fantasy.InGame.Wire;
 using BubbleFighter.Fantasy.Kernel;
 using BubbleFighter.Fantasy.Packets;
 using BubbleFighter.Fantasy.Protocol;
@@ -20,8 +22,93 @@ using Xunit;
 namespace BubbleFighter.Fantasy.InGame.Tests;
 
 /// <summary>Mounted modern requests must reach shared room ownership and retain native recipient sequences.</summary>
-public sealed class ModernRoomBindingTests
+public sealed partial class RoomCommandsBindingTests
 {
+    /// <summary>Native bot requests reserve seats and publish controller metadata plus both appearance maps.</summary>
+    [Fact]
+    public async Task AiPopupAddsUpdatesAndRemovesAReservedSeat()
+    {
+        using var harness = await Harness.CreateAsync(ai: true);
+        await harness.Dispatch(harness.Host, 402, CreateBody());
+        harness.Room.ModeId = 38;
+        var body = Request("RoomAiAddRequest", new()
+        {
+            ["team"] = new Dictionary<string, object?> { ["team"] = (byte)2 },
+            ["slot"] = 1, ["difficulty"] = 1, ["preset"] = 2,
+        });
+        Assert.Equal(14, body.Length);
+        await harness.Dispatch(harness.Host, 2076, body);
+        Assert.Single(harness.Room.Seats);
+        Assert.Equal(2, harness.Room.OccupantCount);
+        var bot = Assert.Single(harness.Room.Bots).Appearance;
+        Assert.Equal(1, bot.Slot);
+        Assert.Equal(new RoomAiIdentity(0, 11, 1, 2), bot.Ai);
+        var update = PacketCodec.Read(Tables, "kr-1256", "RoomSeatUpdate", harness.Host.Body(503));
+        var user = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(update["user"]);
+        Assert.Equal((byte)0, user["unknown_3"]);
+        Assert.Equal(11, user["user_number"]);
+        var outer = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(user["unknown_204"]);
+        Assert.Equal(11, outer["unknown_204"]);
+        var nested = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(outer["unknown_212"]);
+        Assert.Equal(1, nested["unknown_212"]);
+        Assert.Equal(2, nested["unknown_216"]);
+        var slots = Assert.IsAssignableFrom<IReadOnlyList<object?>>(update["profile_entries"]);
+        Assert.Equal(new[] { 0, 1 }, slots.Select(row => (int)((IReadOnlyDictionary<string, object?>)row!)["user_number"]!));
+        var humans = Assert.IsAssignableFrom<IReadOnlyList<object?>>(update["unknown_n3"]);
+        Assert.Equal(11, ((IReadOnlyDictionary<string, object?>)Assert.Single(humans)!)["user_number"]);
+
+        await harness.Dispatch(harness.Guest, 403, Request("RoomJoinRequest", new() { ["room_id"] = harness.Room.Id, ["password"] = "pw" }));
+        Assert.Equal(2, harness.Room.FindByGame(harness.Guest.Id)!.Slot);
+        var install = PacketCodec.Read(Tables, "kr-1256", "gspGotoRoom", harness.Guest.Body(117));
+        Assert.Equal(3, Assert.IsAssignableFrom<IReadOnlyList<object?>>(install["profile_entries"]).Count);
+        Assert.Equal(2, Assert.IsAssignableFrom<IReadOnlyList<object?>>(install["unknown_588"]).Count);
+        await harness.Dispatch(harness.Guest, 2077, Request("RoomAiRemoveRequest", new() { ["slot"] = 1 }));
+        Assert.Single(harness.Room.Bots);
+        await harness.Dispatch(harness.Host, 2077, Request("RoomAiRemoveRequest", new() { ["slot"] = 1 }));
+        Assert.Empty(harness.Room.Bots);
+        Assert.Equal(2, harness.Room.Seats.Count);
+    }
+
+    /// <summary>Only complete native optional forms are decoded, and malformed requests leave the roster unchanged.</summary>
+    [Fact]
+    public async Task AiPopupRejectsMalformedAndUnauthorizedSelections()
+    {
+        using var harness = await Harness.CreateAsync(ai: true);
+        await harness.Dispatch(harness.Host, 402, CreateBody());
+        var absent = Request("RoomAiAddRequest", new() { ["team"] = (byte)0xBA, ["slot"] = 1, ["difficulty"] = 1, ["preset"] = 2 });
+        Assert.Equal(13, absent.Length);
+        await harness.Dispatch(harness.Host, 2076, absent);
+        Assert.Empty(harness.Room.Bots);
+        harness.Room.ModeId = 38;
+        foreach (var bad in new[] { absent[..^1], absent.Concat(new byte[] { 0 }).ToArray(), new byte[] { 0 }.Concat(absent[1..]).ToArray() })
+            await Assert.ThrowsAsync<PacketFormatException>(() => harness.Dispatch(harness.Host, 2076, bad));
+        await harness.Dispatch(harness.Host, 2076, Request("RoomAiAddRequest", new() { ["team"] = (byte)0xBA, ["slot"] = 0, ["difficulty"] = 1, ["preset"] = 2 }));
+        await harness.Dispatch(harness.Host, 2076, Request("RoomAiAddRequest", new() { ["team"] = (byte)0xBA, ["slot"] = 1, ["difficulty"] = 1, ["preset"] = 99 }));
+        Assert.Empty(harness.Room.Bots);
+        await harness.Dispatch(harness.Host, 2076, absent);
+        Assert.Single(harness.Room.Bots);
+        await harness.Dispatch(harness.Host, 2076, absent);
+        Assert.Single(harness.Room.Bots);
+        Assert.Equal(4, Request("RoomAiRemoveRequest", new() { ["slot"] = 1 }).Length);
+    }
+
+    /// <summary>Native ownership migration changes the real controller while preserving bot seat and preset.</summary>
+    [Fact]
+    public async Task AiOwnershipMovesWithExplicitAndDisconnectMasterChanges()
+    {
+        using var harness = await Harness.CreateAsync(ai: true);
+        await harness.Dispatch(harness.Host, 402, CreateBody());
+        harness.Room.ModeId = 38;
+        await harness.Dispatch(harness.Host, 2076, Request("RoomAiAddRequest", new() { ["team"] = (byte)0xBA, ["slot"] = 1, ["difficulty"] = 1, ["preset"] = 2 }));
+        await harness.Dispatch(harness.Guest, 403, Request("RoomJoinRequest", new() { ["room_id"] = harness.Room.Id, ["password"] = "pw" }));
+        await harness.Dispatch(harness.Host, 508, Request("RoomMasterChangeRequest", new() { ["nickname"] = "guest" }));
+        Assert.Equal(new RoomAiIdentity(2, 22, 1, 2), Assert.Single(harness.Room.Bots).Appearance.Ai);
+        Assert.Equal(new byte[] { 11, 0, 0, 0, 2, 0, 0, 0 }, harness.Host.Body(1549));
+        await harness.Dispatch(harness.Guest, 404, []);
+        Assert.Equal(new RoomAiIdentity(0, 11, 1, 2), Assert.Single(harness.Room.Bots).Appearance.Ai);
+        Assert.Equal(new byte[] { 22, 0, 0, 0, 0, 0, 0, 0 }, harness.Host.Body(1549));
+    }
+
     /// <summary>The native round-map selector uses shared authority and broadcasts only the updated settings block.</summary>
     [Fact]
     public async Task RoundMapSelectionUpdatesItsPairWithoutReinstallingTheRoom()
@@ -38,7 +125,13 @@ public sealed class ModernRoomBindingTests
         await harness.Dispatch(harness.Host, 514, body);
         Assert.Equal(new ushort[] { 505 }, harness.Host.Opcodes.Skip(count));
         Assert.Equal(new ushort[] { 505 }, harness.Guest.Opcodes.Skip(guestCount));
-        var expected = Source().Map with { Unknown0 = 0, Unknown8 = 0, Unknown20 = 0, Unknown192 = "second", Unknown216 = "first" };
+        var expected = Source().Map with
+        {
+            Unknown0 = 0, Unknown8 = 0, Unknown20 = 0,
+            Unknown44 = "Random", Unknown68 = "", Unknown92 = "", Unknown116 = "",
+            Unknown144 = "Random", Unknown168 = "", Unknown192 = "second", Unknown216 = "first",
+            Unknown240 = "Random", Unknown264 = "",
+        };
         Assert.Equal(Raw(expected.Write), harness.Host.Body(505));
         Assert.Equal(harness.Host.Body(505), harness.Guest.Body(505));
         var selection = Assert.Single(harness.Room.BuildSettings!.RoundSelections);
@@ -90,7 +183,7 @@ public sealed class ModernRoomBindingTests
                 await harness.Sender<PlazaEntered>().SendAsync(recipient, new(member, []), default);
             else
             {
-                var settings = ModernRoomProjection.Create(Tables, "kr-1256", CreateBody()).BuildSettings;
+                var settings = RoomProjection.Create(Tables, "kr-1256", CreateBody()).BuildSettings;
                 var room = new RoomView(1, "party", 3, "rel_Map", 4, self.Slot, true, [], [self], settings);
                 await harness.Sender<RoomEntered>().SendAsync(recipient, new(room, self.Slot), default);
             }
@@ -115,7 +208,7 @@ public sealed class ModernRoomBindingTests
         Assert.Equal(new ushort[] { 507, 502 }, harness.Host.Opcodes.Skip(hostCount));
         Assert.Equal(new ushort[] { 502 }, harness.Guest.Opcodes.Skip(guestCount));
         Assert.Equal(Raw(writer => { writer.WriteWideStringPrefixed("guest"); writer.WriteInt32(0); }), harness.Host.Body(507));
-        Assert.Equal(GameToClient.MasterChanged(1), harness.Guest.Body(502));
+        Assert.Equal(Table("TutorialMasterSlot", new() { ["master_slot"] = 1 }), harness.Guest.Body(502));
 
         hostCount = harness.Host.Opcodes.Count();
         guestCount = harness.Guest.Opcodes.Count();
@@ -134,7 +227,7 @@ public sealed class ModernRoomBindingTests
     {
         using var harness = await Harness.CreateAsync();
         await harness.Dispatch(harness.Host, 402, CreateBody());
-        var source = ModernRoomProjection.Create(Tables, "kr-1256", CreateBody()).BuildSettings!;
+        var source = RoomProjection.Create(Tables, "kr-1256", CreateBody()).BuildSettings!;
         var original = source.Bytes.ToArray();
         var room = new RoomView(harness.Room.Id, "renamed", 4, "rel_Map", 4, 0, true, [], [], source);
         var count = harness.Host.Opcodes.Count();
@@ -250,24 +343,64 @@ public sealed class ModernRoomBindingTests
         Assert.Equal(PacketCodec.Write(Tables, "kr-1256", structure, PacketCodec.Read(Tables, "kr-1256", structure, raw)), actual);
     }
 
+    private static byte[] Table(string structure, Dictionary<string, object?> fields) =>
+        PacketCodec.Write(Tables, "kr-1256", structure, fields);
+
+    /// <summary>The UserSlot row one seat occupies, spelled from the fields the client's own reader consumes
+    /// (kr-1256 sub_1143710 truth, sub_EE9550's level-1 icon word).</summary>
+    private static Dictionary<string, object?> SeatRow(RoomSeat seat) => new()
+    {
+        ["occupied"] = true, ["unknown_3"] = checked((byte)seat.Slot), ["team"] = checked((byte)seat.Team),
+        ["user_number"] = seat.UserNum, ["nickname"] = seat.Nickname, ["unknown_36"] = 1,
+        ["ready"] = seat.Ready, ["unknown_97"] = seat.InShop, ["unknown_98"] = seat.InInventory,
+        ["level"] = Math.Max(1, seat.Level),
+    };
+
+    /// <summary>The vacated row: kr-1256 sub_9DB1E0 removes the seat, sub_980730 hides a closed one's children.</summary>
+    private static Dictionary<string, object?> VacatedRow(bool closed) => new()
+    {
+        ["occupied"] = false, ["unknown_1"] = closed, ["unknown_3"] = byte.MaxValue,
+        ["level"] = 0, ["unknown_204"] = (byte)0xBA,
+    };
+
+    /// <summary>One profile-map entry (element reader kr-1256 sub_10C4290): the opaque stamp names the actor,
+    /// the position in the vector and the character, plus the worn items the view retains.</summary>
+    private static Dictionary<string, object?> ProfileRow(RoomSeat seat, int position)
+    {
+        var stamp = new byte[16];
+        BinaryPrimitives.WriteInt32LittleEndian(stamp, seat.UserNum);
+        BinaryPrimitives.WriteInt32LittleEndian(stamp.AsSpan(4), position);
+        BinaryPrimitives.WriteInt32LittleEndian(stamp.AsSpan(8), seat.CharacterId);
+        BinaryPrimitives.WriteInt32LittleEndian(stamp.AsSpan(12), seat.UserNum ^ seat.CharacterId ^ position);
+        return new Dictionary<string, object?>
+        {
+            ["user_number"] = seat.UserNum, ["character_id"] = seat.CharacterId,
+            ["equipped_items"] = (seat.EquippedItemIds ?? []).Where(id => id != seat.CharacterId).ToArray(),
+            ["unknown_n5"] = stamp,
+        };
+    }
+
+    private static Dictionary<string, object?>[] ProfileRows(System.Collections.Generic.IReadOnlyList<RoomSeat> seats) =>
+        seats.Select((seat, position) => ProfileRow(seat, position)).ToArray();
+
     /// <summary>The creator's opaque fields survive while ordinary-room gate words and identity are overlaid.</summary>
     [Fact]
     public void CreateProjectionRetainsNativeSettingsWithoutUsingTheClientRoomId()
     {
-        var request = ModernRoomProjection.Create(Tables, "kr-1256", CreateBody());
+        var request = RoomProjection.Create(Tables, "kr-1256", CreateBody());
         Assert.Equal(("room", "pw", 3, "rel_Map"), (request.Name, request.Password, request.ModeId, request.MapKey));
         Assert.True(request.UpdateExistingTitle);
         var source = Assert.IsType<RoomBuildSettings>(request.BuildSettings);
         Assert.Equal(Raw(Source().Write), source.SessionPrefix.ToArray());
         var room = new RoomView(12, "renamed", 4, "rel_Map", 4, 0, true, [], [], source);
-        var actual = PacketCodec.Write(Tables, "kr-1256", "SessionSetting", ModernRoomProjection.Session(Tables, "kr-1256", room));
+        var actual = PacketCodec.Write(Tables, "kr-1256", "SessionSetting", RoomProjection.Session(Tables, "kr-1256", room));
         var expected = SessionSettingBlob.ForRoom(Source(), 2) with
         {
             Unknown0 = 12, Unknown8 = "renamed", Map = Unchosen(MapMetaBlob.ForRoom(Source().Map) with { Unknown4 = 4 }),
         };
         Assert.Equal(Raw(expected.Write), actual);
-        Assert.Throws<InvalidOperationException>(() => ModernRoomProjection.Session(Tables, "kr-1256", room with { BuildSettings = null }));
-        Assert.Throws<InvalidOperationException>(() => ModernRoomProjection.Session(Tables, "kr-1256", room with { BuildSettings = source with { Lineage = "kr-812" } }));
+        Assert.Throws<InvalidOperationException>(() => RoomProjection.Session(Tables, "kr-1256", room with { BuildSettings = null }));
+        Assert.Throws<InvalidOperationException>(() => RoomProjection.Session(Tables, "kr-1256", room with { BuildSettings = source with { Lineage = "kr-812" } }));
     }
 
     /// <summary>Two native requests install only the entrant and announce the newcomer to existing occupants.</summary>
@@ -281,20 +414,36 @@ public sealed class ModernRoomBindingTests
         var baseline = SessionSettingBlob.ForRoom(Source(), 2);
         var setting = baseline with { Unknown0 = checked((ushort)room.Id), Map = Unchosen(baseline.Map) };
         Assert.Equal(Raw(setting.Write), harness.Host.Body(501));
-        Assert.Equal(RoomSessionBlob.UpdatePartySolo(11, "host", 300001, []), harness.Host.Body(201));
+        Assert.Equal(Table("SoloPartySnapshot", new()
+        {
+            ["members"] = new object[] { new Dictionary<string, object?> { ["user_number"] = 11, ["nickname"] = "host" } },
+            ["profile_entries"] = new object[] { new Dictionary<string, object?> { ["user_number"] = 11, ["character_id"] = 300001, ["equipped_items"] = Array.Empty<int>() } },
+        }), harness.Host.Body(201));
         Assert.Equal(new[] { (101L, 11, false) }, harness.Views.Sent);
         var hostCount = harness.Host.Opcodes.Count();
         await harness.Dispatch(harness.Guest, 403, Request("RoomJoinRequest", new() { ["room_id"] = room.Id, ["password"] = "pw" }));
         Assert.Equal(new ushort[] { 128, 117, 501, 201, 806, 806, 503, 503, 118 }, harness.Guest.Opcodes);
         Assert.Equal(new ushort[] { 503, 806, 118 }, harness.Host.Opcodes.Skip(hostCount));
         Assert.Equal(new[] { (101L, 11, false), (102L, 22, false), (102L, 11, true), (101L, 22, true) }, harness.Views.Sent);
-        Assert.Equal(GameToClient.WaitingDialog(0, 0), harness.Guest.Body(128));
-        var profiles = room.Seats.Select((seat, index) => new ProfileMapEntry(seat.UserNum, seat.CharacterId, index, EquippedItemIds: seat.EquippedItemIds ?? [])).ToArray();
-        Parity("gspGotoRoom", RoomSessionBlob.GotoRoom(setting, room.Seats.Select(seat => seat.ToIdentity()).ToArray(), profiles, localSlot: 1), harness.Guest.Body(117));
+        Assert.Equal(Table("RoomWaitingDialog", new() { ["state"] = 0 }), harness.Guest.Body(128));
+        // The install announces the joiner's own seat last (kr-1256 sub_9D9250 installs by vector position).
+        var install = PacketCodec.Read(Tables, "kr-1256", "gspGotoRoom", harness.Guest.Body(117));
+        Assert.Equal(0, (int)install["master_slot"]!);
+        Assert.Equal(1, (int)install["local_slot"]!);
+        Assert.Equal(2, ((System.Collections.Generic.IReadOnlyList<object>)install["user_slots"]!).Count);
         var guestRecords = harness.Guest.Bodies(503);
-        Parity("RoomSeatUpdate", GameToClient.CreateRoomReply(1, room.Seats[1].ToPlayerInfo(), profiles), guestRecords[0]);
-        Parity("RoomSeatUpdate", GameToClient.CreateRoomReply(0, room.Seats[0].ToPlayerInfo(), profiles), guestRecords[1]);
-        Parity("RoomSeatUpdate", GameToClient.CreateRoomReply(1, room.Seats[1].ToPlayerInfo(), profiles), harness.Host.Body(503));
+        Parity("RoomSeatUpdate", Table("RoomSeatUpdate", new()
+        {
+            ["slot"] = 1, ["user"] = SeatRow(room.Seats[1]), ["profile_entries"] = ProfileRows(room.Seats),
+        }), guestRecords[0]);
+        Parity("RoomSeatUpdate", Table("RoomSeatUpdate", new()
+        {
+            ["slot"] = 0, ["user"] = SeatRow(room.Seats[0]), ["profile_entries"] = ProfileRows(room.Seats),
+        }), guestRecords[1]);
+        Parity("RoomSeatUpdate", Table("RoomSeatUpdate", new()
+        {
+            ["slot"] = 1, ["user"] = SeatRow(room.Seats[1]), ["profile_entries"] = ProfileRows(room.Seats),
+        }), harness.Host.Body(503));
     }
 
     /// <summary>Presence, team, chat, seat locks and refusal use native payloads without reinstalling the room.</summary>
@@ -305,24 +454,31 @@ public sealed class ModernRoomBindingTests
         await harness.Dispatch(harness.Host, 402, CreateBody());
         await harness.Dispatch(harness.Guest, 403, Request("RoomJoinRequest", new() { ["room_id"] = harness.Room.Id, ["password"] = "wrong" }));
         Assert.Equal(new ushort[] { 103 }, harness.Guest.Opcodes);
-        Assert.Equal(GameToClient.JoinResult(4), harness.Guest.Body(103));
+        Assert.Equal(Table("RoomJoinResult", new() { ["result"] = 4 }), harness.Guest.Body(103));
         await harness.Dispatch(harness.Guest, 403, Request("RoomJoinRequest", new() { ["room_id"] = harness.Room.Id, ["password"] = "pw" }));
         var installs = harness.Host.Bodies(117).Length;
         await harness.Dispatch(harness.Guest, 505, Request("RoomReadyRequest", new() { ["unknown_5"] = true }));
         Assert.True(harness.Room.Seats[1].InShop);
         await harness.Dispatch(harness.Guest, 515, new byte[] { 0xBA, 0xBA });
-        Assert.Equal(GameToClient.SeatTeamLabel(1, harness.Room.Seats[1].Team), harness.Host.Body(504));
+        Assert.Equal(Table("ZombieTeamChange", new() { ["seat"] = 1, ["team"] = checked((byte)harness.Room.Seats[1].Team) }), harness.Host.Body(504));
         await harness.Dispatch(harness.Guest, 502, Request("RoomChatRequest", new() { ["channel"] = 0, ["text"] = "hello" }));
         // The raw chat-module reply: S2C 509 with kind 0 and colour -1 for an open line, the team colour for channel 1.
-        Assert.Equal(GameToClient.ChatPanel(1, "guest", 0, 0, "hello", -1, 0, 0, string.Empty, 0), harness.Host.Body(509));
+        Assert.Equal(Table("RoomChatReceived", new()
+        {
+            ["slot"] = checked((ushort)1), ["nickname"] = "guest", ["channel"] = 0, ["text"] = "hello", ["unknown_96"] = -1,
+        }), harness.Host.Body(509));
         await harness.Dispatch(harness.Guest, 502, Request("RoomChatRequest", new() { ["channel"] = 1, ["text"] = "team" }));
-        Assert.Equal(GameToClient.ChatPanel(1, "guest", 0, 0, "team", unchecked((int)0xFFFFA1A1), 0, 0, string.Empty, 0), harness.Host.Body(509));
+        Assert.Equal(Table("RoomChatReceived", new()
+        {
+            ["slot"] = checked((ushort)1), ["nickname"] = "guest", ["channel"] = 0, ["text"] = "team",
+            ["unknown_96"] = unchecked((int)0xFFFFA1A1),
+        }), harness.Host.Body(509));
         await harness.Dispatch(harness.Host, 509, Request("RoomSeatLock", new() { ["slot"] = 3, ["closed"] = true }));
-        Assert.Equal(GameToClient.SeatClosed(3, true), harness.Guest.Body(511));
+        Assert.Equal(Table("RoomSeatLeave", new() { ["slot"] = 3, ["user"] = VacatedRow(true) }), harness.Guest.Body(511));
         Assert.Equal(installs, harness.Host.Bodies(117).Length);
         await harness.Dispatch(harness.Host, 404, []);
-        Assert.Equal(GameToClient.SeatVacated(0), harness.Guest.Body(511));
-        Assert.Equal(GameToClient.MasterChanged(1), harness.Guest.Body(502));
+        Assert.Equal(Table("RoomSeatLeave", new() { ["slot"] = 0, ["user"] = VacatedRow(false) }), harness.Guest.Body(511));
+        Assert.Equal(Table("TutorialMasterSlot", new() { ["master_slot"] = 1 }), harness.Guest.Body(502));
     }
 
     /// <summary>A validated native start is inert; malformed requests never reach room mutation.</summary>
@@ -358,14 +514,48 @@ public sealed class ModernRoomBindingTests
         using var harness = await Harness.CreateAsync();
         await harness.Dispatch(harness.Host, 106, []);
         Assert.Equal(new ushort[] { 117, 201, 116 }, harness.Host.Opcodes);
-        Parity("gspGotoRoom", RoomSessionBlob.GotoRoom(SessionSettingBlob.ForPlaza(), [new(11, "host", 0)],
-            [new(11, 300001, 0, EquippedItemIds: [300001])]), harness.Host.Body(117));
-        Assert.Equal(RoomSessionBlob.UpdatePartySolo(11, "host", 300001, [300001]), harness.Host.Body(201));
+        // The plaza install carries the client's own session initializer words (kr-1256 sub_113BFA0
+        // sets the map difficulty to 1; sub_113C3E0 enables +324, +340 and +341 and initializes the
+        // +404 sentinel to -1), is a canonical table encoding, and seats the host alone at slot 0.
+        void PlazaInstall(int kind)
+        {
+            var body = harness.Host.Body(117);
+            Assert.Equal(PacketCodec.Write(Tables, "kr-1256", "gspGotoRoom",
+                PacketCodec.Read(Tables, "kr-1256", "gspGotoRoom", body)), body);
+            var install = PacketCodec.Read(Tables, "kr-1256", "gspGotoRoom", body);
+            var setting = (System.Collections.Generic.IReadOnlyDictionary<string, object?>)install["session_setting"]!;
+            Assert.Equal(kind, (int)setting["kind"]!);
+            var game = (System.Collections.Generic.IReadOnlyDictionary<string, object?>)setting["game_setting"]!;
+            Assert.Equal(1, (int)game["unknown_140"]!);
+            // The +324/+340/+341 flags read as the table's bool words.
+            Assert.True((bool)game["unknown_324"]!);
+            Assert.True((bool)game["unknown_340"]!);
+            Assert.True((bool)game["unknown_341"]!);
+            Assert.Equal(-1, (int)game["unknown_404"]!);
+            Assert.Equal(0, (int)install["master_slot"]!);
+            Assert.Single((System.Collections.Generic.IReadOnlyList<object>)install["user_slots"]!);
+        }
+        PlazaInstall(3);
+        Assert.Equal(Table("SoloPartySnapshot", new()
+        {
+            ["members"] = new object[] { new Dictionary<string, object?> { ["user_number"] = 11, ["nickname"] = "host" } },
+            ["profile_entries"] = new object[] { new Dictionary<string, object?> { ["user_number"] = 11, ["character_id"] = 300001, ["equipped_items"] = Array.Empty<int>() } },
+        }), harness.Host.Body(201));
         var hostCount = harness.Host.Opcodes.Count();
         await harness.Dispatch(harness.Guest, 106, []);
         Assert.Equal(new ushort[] { 117, 201, 116 }, harness.Guest.Opcodes);
         Assert.Equal(new ushort[] { 806, 511 }, harness.Host.Opcodes.Skip(hostCount));
-        Parity("RoomSeatLeave", GameToClient.SeatRecord(1, RoomPlayerInfo.ForSeat(22, "guest", 1)), harness.Host.Body(511));
+        // The plaza has no RoomView yet, so the guest row is spelled: seat 1, user 22, "guest".
+        Parity("RoomSeatLeave", Table("RoomSeatLeave", new()
+        {
+            ["slot"] = 1,
+            ["user"] = new Dictionary<string, object?>
+            {
+                ["occupied"] = true, ["unknown_3"] = (byte)1, ["team"] = (byte)0, ["user_number"] = 22,
+                ["nickname"] = "guest", ["unknown_36"] = 1, ["ready"] = false, ["unknown_97"] = false,
+                ["unknown_98"] = false, ["level"] = 1,
+            },
+        }), harness.Host.Body(511));
         var position = Request("PlazaPositionUpload", new()
         {
             ["unknown_4"] = 77, ["x"] = 1.5f, ["y"] = 2.5f, ["z"] = 3.5f,
@@ -376,7 +566,7 @@ public sealed class ModernRoomBindingTests
         Assert.Equal(guestCount, harness.Guest.Opcodes.Count());
         Assert.Equal(new byte[] { 22, 0, 0, 0 }.Concat(position), harness.Host.Body(301));
         await harness.Dispatch(harness.Host, 402, CreateBody());
-        Assert.Equal(GameToClient.SeatVacated(0), harness.Guest.Body(511));
+        Assert.Equal(Table("RoomSeatLeave", new() { ["slot"] = 0, ["user"] = VacatedRow(false) }), harness.Guest.Body(511));
         hostCount = harness.Host.Opcodes.Count();
         await harness.Dispatch(harness.Host, 404, []);
         Assert.Equal(new ushort[] { 117, 201, 116 }, harness.Host.Opcodes.Skip(hostCount));
@@ -386,8 +576,7 @@ public sealed class ModernRoomBindingTests
         await harness.Dispatch(harness.Host, 105, []);
         Assert.Equal(new ushort[] { 117, 201, 806 }, harness.Host.Opcodes.Skip(hostCount));
         Assert.Equal(new ushort[] { 511 }, harness.Guest.Opcodes.Skip(guestCount));
-        Parity("gspGotoRoom", RoomSessionBlob.GotoRoom(SessionSettingBlob.ForPlaza() with { Kind = 1 },
-            [new(11, "host", 0)], [new(11, 300001, 0, EquippedItemIds: [300001])]), harness.Host.Body(117));
+        PlazaInstall(1);
         await harness.Dispatch(harness.Host, 402, CreateBody());
         Assert.NotNull(harness.Registry.TryGet(harness.Host.Id));
     }
@@ -423,7 +612,7 @@ public sealed class ModernRoomBindingTests
     public async Task PlazaEnterBeforeTheLoginBurstEndsSendsNothing()
     {
         using var harness = await Harness.CreateAsync();
-        var early = new RoomPushTests.RecordingSession(104);
+        var early = new RecordingSession(104);
         early.SetLobbyPlayer(44, "early", pastLoginBurst: false);
         await harness.Dispatch(early, 106, []);
         Assert.Empty(early.Opcodes);
@@ -439,7 +628,7 @@ public sealed class ModernRoomBindingTests
         using var harness = await Harness.CreateAsync();
         await harness.Dispatch(harness.Host, 402, CreateBody());
         var id = harness.Room.Id;
-        var third = new RoomPushTests.RecordingSession(103);
+        var third = new RecordingSession(103);
         third.SetLobbyPlayer(33, "third");
         var join = Request("RoomJoinRequest", new() { ["room_id"] = id, ["password"] = "pw" });
         await harness.Dispatch(harness.Guest, 403, join);
@@ -447,19 +636,20 @@ public sealed class ModernRoomBindingTests
         await harness.Dispatch(harness.Guest, 404, []);
         await harness.Dispatch(harness.Guest, 403, join);
         Assert.Equal(new[] { 0, 2, 1 }, harness.Room.Seats.Select(seat => seat.Slot));
-        var baseline = SessionSettingBlob.ForRoom(Source(), 2);
-        var setting = baseline with { Unknown0 = checked((ushort)id), Map = Unchosen(baseline.Map) };
-        var profiles = harness.Room.Seats.Select((seat, index) => new ProfileMapEntry(seat.UserNum, seat.CharacterId, index,
-            EquippedItemIds: seat.EquippedItemIds ?? [])).ToArray();
-        Parity("gspGotoRoom", RoomSessionBlob.GotoRoom(setting, harness.Room.Seats.Select(seat => seat.ToIdentity()).ToArray(),
-            profiles, localSlot: 1), harness.Guest.Body(117));
+        // The install carries the three refilled seats in vector order and names the joiner's slot.
+        var install = PacketCodec.Read(Tables, "kr-1256", "gspGotoRoom", harness.Guest.Body(117));
+        Assert.Equal(1, (int)install["local_slot"]!);
+        Assert.Equal(3, ((System.Collections.Generic.IReadOnlyList<object>)install["user_slots"]!).Count);
         var replies = harness.Guest.Bodies(503)[^3..];
         Assert.Equal(new[] { 1, 0, 2 }, replies.Select(body => (int)PacketCodec.Read(Tables, "kr-1256", "RoomSeatUpdate", body)["slot"]!));
         foreach (var body in replies)
         {
             var slot = (int)PacketCodec.Read(Tables, "kr-1256", "RoomSeatUpdate", body)["slot"]!;
             var seat = harness.Room.Seats.Single(member => member.Slot == slot);
-            Parity("RoomSeatUpdate", GameToClient.CreateRoomReply(slot, seat.ToPlayerInfo(), profiles), body);
+            Parity("RoomSeatUpdate", Table("RoomSeatUpdate", new()
+            {
+                ["slot"] = slot, ["user"] = SeatRow(seat), ["profile_entries"] = ProfileRows(harness.Room.Seats),
+            }), body);
         }
     }
 
@@ -483,28 +673,60 @@ public sealed class ModernRoomBindingTests
         private readonly EventBus _events = new(NullLogger.Instance);
         private readonly List<PluginContext> _contexts = [];
         internal Views Views { get; } = new();
-        internal RoomPushTests.RecordingSession Host { get; } = Player(101, 11, "host");
-        internal RoomPushTests.RecordingSession Guest { get; } = Player(102, 22, "guest");
+        private string _protocol = "kr-1256/game";
+        internal RecordingSession Host { get; private set; } = Player(101, 11, "host");
+        internal RecordingSession Guest { get; private set; } = Player(102, 22, "guest");
         internal RoomRegistry Registry => (RoomRegistry)_services.GetAll<IMatchCapabilityDirectory>().Single();
         internal PlayRoom Room => Registry.TryGet(Host.Id) ?? Registry.TryGet(Guest.Id)!;
 
         internal IMessageSender<T> Sender<T>() where T : IMessage => _services.GetAll<IMessageSender<T>>().Single();
 
-        internal static async Task<Harness> CreateAsync()
+        internal static async Task<Harness> CreateAsync(bool ai = false, IGameText? texts = null, string nicknameKey = "", int level = 1,
+            object[]? itemAttributes = null, bool roundsBound = false, string build = "kr-1256")
         {
             var h = new Harness();
+            h._protocol = build + "/game";
+            if (build != "kr-1256")
+            {
+                h.Host = new RecordingSession(101, TestWireDialects.Get(build).Profile);
+                h.Host.SetLobbyPlayer(11, "host");
+                h.Guest = new RecordingSession(102, TestWireDialects.Get(build).Profile);
+                h.Guest.SetLobbyPlayer(22, "guest");
+            }
             try
             {
                 var root = h.Context("router");
+                if (texts is not null) root.Effect(h._services.Register<IGameText>(texts));
                 await new PacketRouterPlugin().ActivateAsync(root, default);
                 await new MessageRouterPlugin().ActivateAsync(h.Context("messages"), default);
-                root.Effect(h._services.Register<IEquippedViewPush>(h.Views));
-                var table = OpcodeTableLoader.Load(Path.Combine(Root, "profiles", "kr-1256", "opcodes.yaml"), TestWireDialects.Get("kr-1256").Profile);
-                new ModernRoomBinding("kr-1256/game", table, Tables, "kr-1256", NullLogger.Instance).Mount(h.Context("binding"));
-                new ModernPlazaBinding("kr-1256/game", table, Tables, "kr-1256", NullLogger.Instance).Mount(h.Context("plaza"));
+                root.Effect(h._events.Intercept<EquipmentViewRequested, bool>(async (request, next, ct) =>
+                {
+                    if (request.Protocol != h._protocol)
+                        return await next(ct);
+                    if (request.Remote)
+                        await h.Views.SendRemoteAsync(request.Session, request.UserNum, request.CharacterItemId, request.EquippedItemIds, ct);
+                    else
+                        await h.Views.SendAsync(request.Session, request.UserNum, request.CharacterItemId, request.EquippedItemIds, ct);
+                    return true;
+                }));
+                var table = OpcodeTableLoader.Load(Path.Combine(Root, "profiles", build, "opcodes.yaml"), TestWireDialects.Get(build).Profile);
+                new RoomCommandsBinding(h._protocol, table, Tables, build, NullLogger.Instance,
+                    roundsBound: roundsBound || !string.IsNullOrEmpty(nicknameKey)).Mount(h.Context("binding"));
+                if (ai) new RoomAiBinding(h._protocol, table, Tables, build, NullLogger.Instance).Mount(h.Context("ai"));
+                new PlazaSceneBinding(h._protocol, table, Tables, build, NullLogger.Instance).Mount(h.Context("plaza"));
+                new RoomListCodec(h._protocol, table.C2S("gcpReqListSession"), table.S2C("gspRepListSession"), Tables, build, NullLogger.Instance).Mount(h.Context("list"));
                 await new InGamePlugin().ActivateAsync(h.Context("ingame", new()
                 {
-                    ["typed_only"] = true, ["max_players_per_match"] = 4, ["plaza_enter_requires_finished_login"] = true, ["plaza_replay_positions_on_enter"] = false,
+                    ["game_protocol"] = h._protocol, ["relay_protocol"] = build + "/relay",
+                    ["ai_mode_ids"] = ai ? new[] { 38, 39 } : Array.Empty<int>(),
+                    ["ai_presets"] = ai ? new object[] { new Dictionary<string, object?>
+                    {
+                        ["difficulty"] = 1, ["preset"] = 2, ["nickname"] = "test bot",
+                        ["nickname_key"] = nicknameKey, ["level"] = level,
+                        ["character_item_id"] = 300025, ["equipped_item_ids"] = new[] { 203108 },
+                        ["item_attributes"] = itemAttributes ?? [],
+                    } } : Array.Empty<object>(),
+                    ["max_players_per_match"] = 4, ["plaza_enter_requires_finished_login"] = true, ["plaza_replay_positions_on_enter"] = false,
                     ["plaza_echo_positions"] = false, ["plaza_vacate_peers_on_menu_return"] = false,
                 }), default);
                 return h;
@@ -519,12 +741,19 @@ public sealed class ModernRoomBindingTests
             return context;
         }
 
-        internal async Task Dispatch(RoomPushTests.RecordingSession session, int opcode, byte[] body) =>
-            await _services.Get<IPacketRouter>().DispatchAsync("kr-1256/game", session, new((ushort)opcode, body), default);
-
-        private static RoomPushTests.RecordingSession Player(long sessionId, int user, string name)
+        internal void MountRoundNames()
         {
-            var session = new RoomPushTests.RecordingSession(sessionId);
+            var table = OpcodeTableLoader.Load(Path.Combine(Root, "profiles", "kr-1256", "opcodes.yaml"), TestWireDialects.Get("kr-1256").Profile);
+            new RoundStartBinding("kr-1256/game", table, Tables, "kr-1256", [1, 0, 1], NullLogger.Instance).Mount(Context("start-names"));
+            new RoundResultBinding("kr-1256/game", table, Tables, "kr-1256", [38], NullLogger.Instance).Mount(Context("result-names"));
+        }
+
+        internal async Task Dispatch(RecordingSession session, int opcode, byte[] body) =>
+            await _services.Get<IPacketRouter>().DispatchAsync(_protocol, session, new((ushort)opcode, body), default);
+
+        private static RecordingSession Player(long sessionId, int user, string name)
+        {
+            var session = new RecordingSession(sessionId);
             session.SetLobbyPlayer(user, name);
             return session;
         }

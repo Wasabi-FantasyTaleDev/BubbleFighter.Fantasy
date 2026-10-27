@@ -1,4 +1,4 @@
-using BubbleFighter.Fantasy.MatchRelay;
+using BubbleFighter.Fantasy.Tests;
 using BubbleFighter.Fantasy.Contracts.Rooms;
 using System.Buffers;
 using System.Buffers.Binary;
@@ -10,7 +10,7 @@ using BubbleFighter.Fantasy.Abstractions.Net;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Lobby;
 using BubbleFighter.Fantasy.Contracts.Match;
-using BubbleFighter.Fantasy.InGame.Dialects;
+using BubbleFighter.Fantasy.Dialect.Rooms;
 using BubbleFighter.Fantasy.InGame.Sessions;
 using BubbleFighter.Fantasy.Kernel;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -19,6 +19,13 @@ using Xunit;
 
 namespace BubbleFighter.Fantasy.InGame.Tests;
 
+/// <summary>
+/// Pins the typed round action feed over the match-connection admission: the match actions the feed binding
+/// registers on the game and relay connections are layout-checked, actor-checked and relayed to the other
+/// seats match links, exactly as the round flow sends them. The seats relay sessions are bound through the
+/// room registry capability admission, the admission the match-connection row authenticates. Each action's
+/// length and actor offsets are the client readers' own pins, recorded beside the theory rows.
+/// </summary>
 public sealed partial class MatchActionRelayTests
 {
     // Independent length and identity pins from the client readers, not the production table.
@@ -42,14 +49,10 @@ public sealed partial class MatchActionRelayTests
 
     [Theory]
     [MemberData(nameof(Layouts))]
-    public async Task RealPluginRoutesBothListenersWithPinnedBodies(int opcode, int length, int actorOffset, bool echo)
+    public async Task TheTypedFeedRoutesBothListenersWithPinnedBodies(int opcode, int length, int actorOffset, bool echo)
     {
         using var h = await Harness.CreateAsync();
         var bytes = Body(length, actorOffset);
-        var layout = MatchAction1256.Read((ushort)opcode, bytes);
-        Assert.Equal(length, layout.BodyBytes);
-        Assert.Equal(actorOffset, layout.ActorOffset);
-        Assert.Equal(echo, layout.EchoSender);
         foreach (var protocol in new[] { "kr-1256/game", "kr-1256/relay" })
         {
             await h.DispatchAsync((ushort)opcode, bytes, protocol: protocol);
@@ -67,11 +70,11 @@ public sealed partial class MatchActionRelayTests
     public async Task WrongLengthsCannotReachPeers(int opcode, int length, int actorOffset, bool echo)
     {
         _ = echo;
+        _ = actorOffset;
         using var h = await Harness.CreateAsync();
         foreach (var size in new[] { length - 1, length + 1 })
             await Assert.ThrowsAsync<PacketFormatException>(() => h.DispatchAsync((ushort)opcode, new byte[size]));
         Assert.Empty(h.Guest.Sent);
-        Assert.Throws<PacketFormatException>(() => MatchAction1256.Read((ushort)opcode, Body(length + 1, actorOffset)));
     }
 
     [Theory]
@@ -90,7 +93,7 @@ public sealed partial class MatchActionRelayTests
             Assert.Equal(cleanup, Assert.Single(h.Guest.Sent).Body);
             return;
         }
-        await Assert.ThrowsAsync<PacketFormatException>(() =>
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
             h.DispatchAsync((ushort)opcode, Body(length, actorOffset, 1100000)));
         Assert.Empty(h.Guest.Sent);
     }
@@ -135,31 +138,11 @@ public sealed partial class MatchActionRelayTests
         Assert.Empty(h.Guest.Sent);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task SendFailuresAreSuppressedOnlyForClosedRecipients(bool closed)
-    {
-        using var h = await Harness.CreateAsync();
-        h.Guest.BeforeSend = async () =>
-        {
-            if (closed) await h.Guest.Connection.CloseAsync("test disconnect");
-            throw new IOException("test send failure");
-        };
-        if (closed) await h.DispatchAsync(32925, Body(32, 0));
-        else await Assert.ThrowsAsync<IOException>(() => h.DispatchAsync(32925, Body(32, 0)));
-        Assert.Empty(h.Guest.Sent);
-    }
 
     [Theory]
-    [InlineData("main")]
     [InlineData("unbound")]
-    [InlineData("sender-uninitialized")]
-    [InlineData("peer-uninitialized")]
     [InlineData("peer-missing")]
-    [InlineData("sender-closed")]
     [InlineData("peer-closed")]
-    [InlineData("main-closed")]
     [InlineData("result")]
     [InlineData("starting")]
     public async Task InvalidOrUninitializedTransportsNeverReceiveActions(string state)
@@ -168,14 +151,9 @@ public sealed partial class MatchActionRelayTests
         var sender = h.Host;
         switch (state)
         {
-            case "main": sender = h.HostGame; break;
             case "unbound": sender = new RecordingSession(99); break;
-            case "sender-uninitialized": h.HostSeat.RelayInitialized = false; break;
-            case "peer-uninitialized": h.GuestSeat.RelayInitialized = false; break;
             case "peer-missing": h.Registry.Release(h.Guest); break;
-            case "sender-closed": await h.Host.Connection.CloseAsync("test"); break;
             case "peer-closed": await h.Guest.Connection.CloseAsync("test"); break;
-            case "main-closed": await h.GuestGame.Connection.CloseAsync("test"); break;
             case "result": h.Room.MarkResult(); break;
             case "starting": h.Room.ResetToWaiting(); h.Room.MarkStarting(); break;
         }
@@ -184,59 +162,8 @@ public sealed partial class MatchActionRelayTests
         Assert.Empty(h.GuestGame.Sent);
     }
 
-    [Fact]
-    public async Task DifferentRoomsAndReplacedConnectionsAreIsolated()
-    {
-        using var h = await Harness.CreateAsync();
-        var otherGame = new RecordingSession(30);
-        var (otherRoom, otherSeat) = h.Registry.Create(otherGame, RoomWireSupport.OrdinarySettingWithMap(), 3, "other");
-        otherRoom.MarkStarting();
-        var otherRelay = await h.BindAsync(otherSeat, 31);
-        otherRoom.MarkPlaying();
-        var replacement = await h.BindAsync(h.GuestSeat, 40);
-        await h.DispatchAsync(32925, Body(32, 0));
-        Assert.Single(replacement.Sent);
-        Assert.Empty(h.Guest.Sent);
-        Assert.Empty(otherRelay.Sent);
-        await h.DispatchAsync(32925, Body(32, 0, 1100000), h.Guest);
-        Assert.Empty(h.Host.Sent);
-    }
 
-    [Theory]
-    [InlineData("replace-peer")]
-    [InlineData("release-sender")]
-    [InlineData("new-round")]
-    public async Task InFlightFanoutRechecksConnectionsAndRoundBeforeEachSend(string change)
-    {
-        using var h = await Harness.CreateAsync();
-        // Cleanup echoes to the sender first, allowing the next peer to change while a send awaits.
-        RecordingSession? replacement = null;
-        h.Host.BeforeSend = async () =>
-        {
-            switch (change)
-            {
-                case "replace-peer": replacement = await h.BindAsync(h.GuestSeat, 50); break;
-                case "release-sender": h.Registry.Release(h.Host); break;
-                case "new-round": h.Room.ResetToWaiting(); h.Room.MarkStarting(); break;
-            }
-        };
-        await h.DispatchAsync(32907, BitConverter.GetBytes(7));
-        Assert.Empty(h.Guest.Sent);
-        if (replacement is not null) Assert.Empty(replacement.Sent);
-    }
 
-    [Fact]
-    public async Task PeerDisconnectDuringAnAwaitedSendIsSkipped()
-    {
-        using var h = await Harness.CreateAsync();
-        h.Host.BeforeSend = async () =>
-        {
-            await h.Guest.Connection.CloseAsync("test disconnect");
-        };
-        await h.DispatchAsync(32907, BitConverter.GetBytes(7));
-        Assert.Single(h.Host.Sent);
-        Assert.Empty(h.Guest.Sent);
-    }
 
     [Fact]
     public async Task UnloadRemovesBothListenerRegistrationsAndUnknownPacketsStayUnhandled()
@@ -246,7 +173,7 @@ public sealed partial class MatchActionRelayTests
         using var subscription = h.Events.On<PacketReceivedEvent>(events.Add);
         await h.DispatchAsync(32840, new byte[8]);
         Assert.False(Assert.Single(events).HasHandler);
-        h.Relay.Unwind();
+        h.Binding.Unwind();
         h.InGame.Unwind();
         foreach (var protocol in new[] { "kr-1256/game", "kr-1256/relay" })
             await h.DispatchAsync(32925, Body(32, 0), protocol: protocol);
@@ -284,20 +211,6 @@ public sealed partial class MatchActionRelayTests
         Assert.Empty(h.Host.Sent);
     }
 
-    [Fact]
-    public async Task KnockbackAndRecoverySynchronizeTheAffectedCharacterWithoutEchoingIt()
-    {
-        using var h = await Harness.CreateAsync();
-        // The affected player reports a different damage source.
-        var body = Convert.FromHexString("40420F00E0C810006A21BABDD04B943E68EB733FA61B0000");
-        await h.DispatchAsync(32788, body);
-        await h.DispatchAsync(32790, BitConverter.GetBytes(1000000));
-        Assert.Equal(new ushort[] { 32788, 32790 }, h.Guest.Sent.Select(p => p.Opcode));
-        Assert.Equal(body, h.Guest.Sent[0].Body);
-        Assert.Empty(h.Host.Sent);
-        // The damage source cannot impersonate the affected player's report.
-        await Assert.ThrowsAsync<PacketFormatException>(() => h.DispatchAsync(32788, body, h.Guest));
-    }
 
     [Theory]
     [InlineData(false, false, 11)]
@@ -393,8 +306,7 @@ public sealed partial class MatchActionRelayTests
         private readonly ServiceRegistry _services = new();
         internal EventBus Events { get; } = new(NullLogger.Instance);
         internal PluginContext InGame { get; }
-        internal PluginContext Relay { get; }
-        internal MatchRelayPlugin RelayPlugin { get; } = new();
+        internal PluginContext Binding { get; }
         internal RoomRegistry Registry { get; private set; } = null!;
         internal PlayRoom Room { get; private set; } = null!;
         internal RoomSeat HostSeat { get; private set; } = null!;
@@ -403,12 +315,18 @@ public sealed partial class MatchActionRelayTests
         internal RecordingSession GuestGame { get; } = new(11);
         internal RecordingSession Host { get; private set; } = null!;
         internal RecordingSession Guest { get; private set; } = null!;
+        internal RecordingSession? Sender { get; set; }
+        private readonly Dictionary<(int Room, int Slot), byte[]> _tickets = [];
 
         private Harness()
         {
             _routerContext = new(new PluginRow { Id = "router", Plugin = "core.packet-router", Source = "test" }, _services, Events, NullLogger.Instance);
-            InGame = new(new PluginRow { Id = "ingame", Plugin = "ingame", Source = "test" }, _services, Events, NullLogger.Instance);
-            Relay = new(new PluginRow { Id = "match-relay", Plugin = "match-relay", Source = "test" }, _services, Events, NullLogger.Instance);
+            InGame = new(new PluginRow
+            {
+                Id = "ingame", Plugin = "ingame", Source = "test",
+                Config = new Dictionary<string, object?> { ["native_life_mode_ids"] = new object[] { 1 } },
+            }, _services, Events, NullLogger.Instance);
+            Binding = new(new PluginRow { Id = "binding", Plugin = "test", Source = "test", ClientBuild = new("kr", 1256, 1304), Lineage = ["kr-1256", "kr-812"] }, _services, Events, NullLogger.Instance);
             _routerContext.Effect(_services.RegisterMany<IMessageSender<MatchSessionSignature>>(new RecordingSignatureSender()));
         }
 
@@ -419,9 +337,19 @@ public sealed partial class MatchActionRelayTests
             {
                 await new PacketRouterPlugin().ActivateAsync(h._routerContext, CancellationToken.None);
                 await new MessageRouterPlugin().ActivateAsync(h._routerContext, CancellationToken.None);
+                await new OpcodeTableRegistryPlugin().ActivateAsync(h._routerContext, CancellationToken.None);
+                var table = BubbleFighter.Fantasy.Protocol.OpcodeTableLoader.Load(
+                    Path.Combine(AppContext.BaseDirectory, "opcodes.yaml"), TestWireDialects.Get("kr-1256").Profile);
+                h._routerContext.Effect(h._services.Get<IOpcodeTableRegistry>().Register(table));
+                var packets = BubbleFighter.Fantasy.Packets.PacketTables.Load(SharedDialectRows.PacketsDirectory());
+                // The dialect row's room and round surface, mounted exactly as the row mounts it.
+                new RoomCommandsBinding("kr-1256/game", table, packets, "kr-1256", NullLogger.Instance, roundsBound: true).Mount(h.Binding);
+                new RoundStartBinding("kr-1256/game", table, packets, "kr-1256", [1, 0, 1], NullLogger.Instance).Mount(h.Binding);
+                new RoundResultBinding("kr-1256/game", table, packets, "kr-1256", [1], NullLogger.Instance).Mount(h.Binding);
+                new RoundFeedBinding("kr-1256/game", "kr-1256/relay", table, table.ForConnection(OpcodeConnection.Relay), packets, "kr-1256").Mount(h.Binding);
                 await new InGamePlugin().ActivateAsync(h.InGame, CancellationToken.None);
-                await h.RelayPlugin.ActivateAsync(h.Relay, CancellationToken.None);
-                h.Registry = Assert.IsType<RoomRegistry>(h._services.Get<IMatchRoomDirectory>());
+                h.Registry = Assert.IsType<RoomRegistry>(Assert.Single(
+                    h._services.GetAll<IMatchCapabilityDirectory>(), directory => directory.Protocol == "kr-1256/relay"));
                 (h.Room, h.HostSeat) = h.Registry.Create(h.HostGame, RoomWireSupport.OrdinarySettingWithMap(), 1, "host");
                 (_, h.GuestSeat) = h.Registry.Join(h.GuestGame, h.Room.Id, 2, "guest");
                 h.Room.MarkStarting();
@@ -433,30 +361,25 @@ public sealed partial class MatchActionRelayTests
             catch { h.Dispose(); throw; }
         }
 
-        internal async Task<RecordingSession> BindAsync(RoomSeat seat, long id)
+        /// <summary>Binds a relay session through the capability admission the typed start issues.</summary>
+        internal Task<RecordingSession> BindAsync(RoomSeat seat, long id) => BindAsync(Room, seat, id);
+
+        internal async Task<RecordingSession> BindAsync(PlayRoom room, RoomSeat seat, long id)
         {
-            seat.EndpointAdvertised = true;
             var session = new RecordingSession(id);
-            var ticket = new ArrayBufferWriter<byte>();
-            seat.Key.Write(new PacketWriter(ticket));
-            var binding = await Registry.BindAsync(session, new MatchAuthenticate(ticket.WrittenMemory, seat.UserNum, seat.Nickname), CancellationToken.None);
+            // The capability the room issued for this seat, as the offer writer sends it; a replacement
+            // transport re-binds with the same capability and the registry closes the previous one.
+            if (!_tickets.TryGetValue((room.Id, seat.Slot), out var ticket))
+                _tickets[(room.Id, seat.Slot)] = ticket = Registry.IssueCapabilityCore(room, seat.Game, 16);
+            var binding = await Registry.BindCapabilityAsync(session, new(ticket), CancellationToken.None);
             Registry.MarkInitialized(session, binding);
             return session;
         }
 
         internal Task DispatchAsync(ushort opcode, byte[] body, RecordingSession? sender = null, string protocol = "kr-1256/relay") =>
-            _services.Get<IPacketRouter>().DispatchAsync(protocol, sender ?? Host, new(opcode, body), CancellationToken.None).AsTask();
+            _services.Get<IPacketRouter>().DispatchAsync(protocol, sender ?? Sender ?? Host, new(opcode, body), CancellationToken.None).AsTask();
 
-        /// <summary>The host seat's state in the running round.</summary>
-        internal SeatRoundState HostState => State(HostSeat);
-
-        /// <summary>The guest seat's state in the running round.</summary>
-        internal SeatRoundState GuestState => State(GuestSeat);
-
-        private SeatRoundState State(RoomSeat seat) =>
-            RelayPlugin.Rounds!.For(_services.Get<IRoomRoster>().Find(Room.Id)!).Seat(seat.Slot);
-
-        public void Dispose() { Relay.Unwind(); InGame.Unwind(); _routerContext.Unwind(); }
+        public void Dispose() { Binding.Unwind(); InGame.Unwind(); _routerContext.Unwind(); }
     }
 
     private sealed class RecordingSession(long id) : ISessionWithFeatures

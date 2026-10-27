@@ -72,7 +72,7 @@ public sealed class EndToEndTests
         public ValueTask ActivateAsync(IPluginContext context, CancellationToken cancellationToken)
         {
             context.Effect(context.Services.Get<IPacketRouter>().Register(
-                ProtocolPlugin.GameProtocolName, WireOpcodes.C2S.Unknown521,
+                ProtocolPlugin.GameProtocolName, WirePins.PreHandshakeOpcode,
                 (session, packet, ct) => throw new InvalidOperationException("boom")));
             return ValueTask.CompletedTask;
         }
@@ -161,7 +161,7 @@ public sealed class EndToEndTests
 
     private static async Task SendFrameAsync(Socket socket, SimpleCipher cipher, ushort opcode, byte[] payload)
     {
-        var frame = WireFrame.Encode(opcode, payload);
+        var frame = PacketFrame_8Bytes.Encode(opcode, payload);
         cipher.EncryptInPlace(frame);
         await socket.SendAsync(frame);
     }
@@ -196,18 +196,18 @@ public sealed class EndToEndTests
             Assert.Equal(4, BinaryPrimitives.ReadUInt16LittleEndian(greeting));
             Assert.All(greeting[2..], b => Assert.Equal(0, b));
 
-            await SendFrameAsync(socket, SimpleCipher.ClientToServer(), WireOpcodes.C2S.GamePatch, PatchPayload(1256));
+            await SendFrameAsync(socket, SimpleCipher.ClientToServer(), WirePins.PatchRequestOpcode, PatchPayload(1256));
 
             var reply = await ReceiveExactlyAsync(socket, WirePins.RepGamePatchFrameSize);
             Assert.Equal(WirePins.RepGamePatchFrameSize, reply.Length);
             Assert.Equal(WirePins.RepGamePatchS2CFrameCipherHex, Convert.ToHexString(reply));
             SimpleCipher.ServerToClient().DecryptInPlace(reply);
             Assert.Equal(WirePins.RepGamePatchPlainFrameHex, Convert.ToHexString(reply));
-            Assert.True(WireFrame.TryReadHeader(reply, out var header));
+            Assert.True(PacketFrame_8Bytes.TryReadHeader(reply, out var header));
             Assert.Equal(WirePins.RepGamePatchPayloadSize, header.PayloadLength);
-            Assert.Equal(WireOpcodes.S2C.RepGamePatch, header.Opcode);
-            Assert.True(WireFrame.ValidatePayload(header, reply.AsSpan(WireFrame.HeaderSize)));
-            Assert.All(reply[WireFrame.HeaderSize..], b => Assert.Equal(0, b));
+            Assert.Equal(WirePins.PatchReplyOpcode, header.Opcode);
+            Assert.True(PacketFrame_8Bytes.ValidatePayload(header, reply.AsSpan(PacketFrame_8Bytes.HeaderSize)));
+            Assert.All(reply[PacketFrame_8Bytes.HeaderSize..], b => Assert.Equal(0, b));
         }
         finally
         {
@@ -231,7 +231,7 @@ public sealed class EndToEndTests
 
             var payload = PatchPayload(9999);
             Assert.Equal(WirePins.GamePatchPayloadSize, payload.Length);
-            await SendFrameAsync(socket, SimpleCipher.ClientToServer(), WireOpcodes.C2S.GamePatch, payload);
+            await SendFrameAsync(socket, SimpleCipher.ClientToServer(), WirePins.PatchRequestOpcode, payload);
 
             var buffer = new byte[16];
             var received = await socket.ReceiveAsync(buffer, CancellationToken.None);
@@ -268,7 +268,7 @@ public sealed class EndToEndTests
             var greeting = await ReceiveExactlyAsync(socket, BootstrapGreeting.Size);
             Assert.Equal(4, BinaryPrimitives.ReadUInt16LittleEndian(greeting));
 
-            await SendFrameAsync(socket, SimpleCipher.ClientToServer(), WireOpcodes.C2S.Unknown521, [1, 2, 3]);
+            await SendFrameAsync(socket, SimpleCipher.ClientToServer(), WirePins.PreHandshakeOpcode, [1, 2, 3]);
 
             var buffer = new byte[16];
             var received = await socket.ReceiveAsync(buffer, CancellationToken.None);
@@ -303,11 +303,11 @@ public sealed class EndToEndTests
             Assert.Equal(4, BinaryPrimitives.ReadUInt16LittleEndian(greeting));
 
             var cipher = SimpleCipher.ClientToServer();
-            await SendFrameAsync(socket, cipher, WireOpcodes.C2S.GamePatch, PatchPayload(1256));
-            var reply = await ReceiveExactlyAsync(socket, WireFrame.HeaderSize + 8);
+            await SendFrameAsync(socket, cipher, WirePins.PatchRequestOpcode, PatchPayload(1256));
+            var reply = await ReceiveExactlyAsync(socket, PacketFrame_8Bytes.HeaderSize + 8);
             SimpleCipher.ServerToClient().DecryptInPlace(reply);
 
-            await SendFrameAsync(socket, cipher, WireOpcodes.C2S.Unknown521, [1, 2, 3]);
+            await SendFrameAsync(socket, cipher, WirePins.PreHandshakeOpcode, [1, 2, 3]);
 
             var buffer = new byte[16];
             var received = await socket.ReceiveAsync(buffer, CancellationToken.None);
@@ -374,7 +374,7 @@ public sealed class EndToEndTests
             Assert.Equal(WirePins.GreetingSize, greeting.Length);
             Assert.Equal(4, BinaryPrimitives.ReadUInt16LittleEndian(greeting));
 
-            await SendFrameAsync(socket, SimpleCipher.ClientToServer(), WireOpcodes.C2S.Unknown521, [1, 2, 3]);
+            await SendFrameAsync(socket, SimpleCipher.ClientToServer(), WirePins.PreHandshakeOpcode, [1, 2, 3]);
             await Task.Delay(400);
 
             var closed = socket.Poll(0, SelectMode.SelectRead) && socket.Available == 0;

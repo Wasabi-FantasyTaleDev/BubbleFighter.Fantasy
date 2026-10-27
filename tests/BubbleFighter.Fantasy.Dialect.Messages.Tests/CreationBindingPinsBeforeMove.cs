@@ -58,7 +58,8 @@ public sealed class CreationBindingPinsBeforeMove
         Assert.Null(modernTable.Find(PacketDirection.ServerToClient, "gspNotifyAutoTutorial_"));
         var modernSession = new RecordingSession(Profile("kr-1256"));
         await modern.SendAsync(modernSession, new CharacterCreationOpened(), default);
-        var modernFrame = Assert.Single(modernSession.Sent);
+        Assert.Equal(new ushort[] { modernTable.S2C("gspRepDynamicConfig"), 12 }, modernSession.Sent.Select(frame => frame.Opcode));
+        var modernFrame = modernSession.Sent[1];
         Assert.Equal((ushort)12, modernFrame.Opcode);
         Assert.Empty(modernFrame.Payload);
     }

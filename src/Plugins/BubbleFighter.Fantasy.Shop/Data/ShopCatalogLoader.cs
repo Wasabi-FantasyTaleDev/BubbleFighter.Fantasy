@@ -1,3 +1,6 @@
+using BubbleFighter.Fantasy.Contracts.ClientData;
+using BubbleFighter.Fantasy.Contracts.Shop;
+
 namespace BubbleFighter.Fantasy.Shop.Data;
 
 /// <summary>
@@ -7,6 +10,12 @@ namespace BubbleFighter.Fantasy.Shop.Data;
 /// </summary>
 public static class ShopCatalogLoader
 {
+    /// <summary>
+    /// The snake_case row option that owns the workbook size cap, named in the workbook reader's size error.
+    /// The shop and paint-catalog rows both spell their cap this way.
+    /// </summary>
+    internal const string LimitKey = "max_shop_item_bytes";
+
     private static readonly string[] RequiredSheets =
     [
         "Stock", "StockSet", "ShopItem", "MainCategory", "SubCategory",
@@ -72,7 +81,7 @@ public static class ShopCatalogLoader
                 diagnostic?.Invoke($"Shop catalog {sheet} name '{key}' has no category row; the client lookup stores 0.");
         }
 
-        var sheets = SpreadsheetWorkbook.Load(file, maxBytes, RequiredSheets);
+        var sheets = SpreadsheetWorkbook.Load(file, maxBytes, LimitKey, RequiredSheets);
         var stocks = ParseStocks(RequireSheet(sheets, "Stock"), secondaryCashColumns);
         if (stocks.Count == 0)
             throw new InvalidOperationException($"Shop catalog {path} Stock sheet has no data rows.");

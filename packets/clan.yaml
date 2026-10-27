@@ -89,3 +89,66 @@ structs:
   ClanPassportRequest: []   # C2S 25; kr-812 sub_498E70 builds Packet_gcpReqClanPassport and writes no field before the send
   Unknown2040Request: []    # C2S 2040; writers kr-1256 sub_5A9410 (the DlgClanMain click) and kr-1256 sub_516EE0 (session init, only when local key 196 resolves)
   Unknown2041Request: []    # C2S 2041; writer kr-1256 sub_57F010 (the FrmClanAttendance check-in, card word +1468 = 1)
+
+  # The game-port records the clan window reads after its open snapshots. The records are stated so the
+  # server can bind them explicitly; adding these tables does not enable a sender.
+  #
+  # kr-812 S2C gspClanPointAdd (24), reader kr-812 sub_5039A0: three words then a boolean word.
+  # The kr-1256 S2C 23 handler kr-1256 sub_9A3C90 reads the same four 4-byte values in this order.
+  ClanPointAdd:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - unknown_16: bool
+      offset: 16
+
+  # kr-812 S2C gspUpdateClanInfoToClanServer (984), deserialize kr-812 sub_6DB1B0: two words.
+  # Handler kr-812 sub_835B60 gates the mark change on the clan level and the clan-card grade it finds here.
+  ClanUpdateInfo:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+
+  # The kr-1256 S2C 983 handler kr-1256 sub_9CA450 reads three words, so the modern body is restated
+  # rather than annotated. The handler keeps the values in locals; the offsets here are wire positions.
+  # cn-774 and tw-454 inherit this shape: their own 983 and 982 readers were not read, so a binding for
+  # them must verify the body first.
+  ClanUpdateInfo@kr-1256:
+    - unknown_0: u32
+    - unknown_4: u32
+    - unknown_8: u32
+
+  # kr-812 S2C gspResChangeClanMarkNoty (985) and the kr-1256 S2C 984 handler kr-1256 sub_9CA910:
+  # reader kr-812 sub_6DB1B0 reads two words; the kr-1256 handler reads the same two 4-byte values.
+  ClanMarkChangedNoty:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+
+  # kr-812 C2S gcpReqChangeClanMark (955), deserialize kr-812 sub_9D95D0: three words.
+  # No modern sender correspondence is established, so modern builds are explicitly excluded.
+  ClanMarkChangeRequest:
+    - unknown_4: u32
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_8: u32
+      offset: 8
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_12: u32
+      offset: 12
+      except: [kr-1256, cn-774, tw-454]
+
+  # kr-812 C2S gcpReqClanInfo (2019), deserialize kr-812 sub_503BF0: word, wide string, word.
+  # The kr-1256 C2S 2025 builder kr-1256 sub_519160 writes the same three pieces in this order.
+  ClanInfoRequest:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: wstr
+      offset: 8
+    - unknown_36: u32
+      offset: 36

@@ -1,7 +1,7 @@
 version: 1
 structs:
   # The in-round gameplay feed: the frames the server relays unchanged between the players of a round
-  # (src/Plugins/BubbleFighter.Fantasy.Dialect.Modern.Messages/Play/ModernFeedBinding.cs). The server never
+  # (src/Plugins/BubbleFighter.Fantasy.Dialect.Rooms/RoundFeedBinding.cs). The server never
   # writes them; the tables pin their bodies and give the fields a place to be named.
   #
   # Naming rule used here: a structure carries the kr-812 class name (without the gpp prefix, as
@@ -19,8 +19,8 @@ structs:
   #
   # Not tabled here: the eight damager-spawn frames (32772, 32877, 32881, 32898, 32899, 32900, 32910,
   # 33278) are already in packets/damagers.yaml with their kr-1256 restatements; and the two relay motion
-  # frames 20003 / 20004 (InGameOpcodes.RelayMotion / RelayWander, writer kr-1256 sub_95FAE0) have no row in
-  # profiles/kr-1256/opcodes.yaml and no reader evidence, so they get no structure until that is filled in.
+  # UDP envelopes 20003 / 20004 are emitted by kr-1256 sub_95B910 -> kr-1256 sub_95FAE0,
+  # cn-774 sub_B58DB0 and tw-454 sub_A78CC0. They have no audited TCP consumer and are not TCP routes.
   #
   # No build other than kr-1256 and kr-812 was read for these frames: cn-324, cn-279, cn-404, cn-406, cn-408,
   # cn-706, cn-717, cn-735, cn-738, cn-742, id-400 and id-1809 are not audited here. The kr-812 shapes are
@@ -30,6 +30,10 @@ structs:
   # their fields at +4 because +0 is the vtable) and the wire offset for the kr-1256 inline readers, which
   # build no object. Actor offsets match MatchAction1256 in
   # src/BubbleFighter.Fantasy.InGame.Wire/Dialects/MatchAction1256.cs.
+  #
+  # The file's last section holds a different direction of the same traffic: the client's own C2S report
+  # frames (518, 25, 624, 608, 2029, 578, 103, 506) the in-game flow parses through the payload helpers of
+  # src/BubbleFighter.Fantasy.InGame.Wire/Wire and never relays.
 
   # ---------------------------------------------------------------------------------------------------
   # Frames whose kr-812 class at the same number reads the same body (20).
@@ -276,9 +280,8 @@ structs:
       only: [kr-1256]
 
   # 32925: kr-1256 reader kr-1256 sub_10F3990, 32 bytes: word, byte, six 2-byte values, word, byte, word,
-  # word, 2-byte value, then the counted word list appended by kr-1256 sub_1137C30 (the list shape is the one
-  # packets/damagers.yaml already states for the damager bodies; it is not restated here because a list after
-  # a fixed record is the only part that differs between those bodies and this frame is not a damager).
+  # word, 2-byte value. cn-774 sub_489090 / cn-774 sub_488F60 and tw-454 sub_4761B0 /
+  # tw-454 sub_476080 read/write the same fixed 32-byte record, without a counted suffix.
   # The kr-812 class at 32925 is gppRelayedRespawn and its deserializer kr-812 sub_6DB1B0 reads two words.
   Unknown32925:
     - actor: u32
@@ -321,13 +324,9 @@ structs:
       offset: 30
       only: [kr-1256]
 
-  # 32926: the tagged frame. kr-1256 reader kr-1256 sub_6F6200, tag grammar kr-1256 sub_10C04D0 and
-  # kr-1256 sub_10C0640: a word, then two tagged optional words (tag 0x3A carries the word, tag 0xBA does
-  # not), then a byte and a bool32 - 11, 15 or 19 bytes. The table system can say that as optional<0x3A,u32>
-  # only if the reader proves both tag values and the absent-tag default can be 0xBA; that was not verified
-  # in this pass, so the frame is left out rather than guessed. It stays untabled until the tag reader is
-  # read.
-  # Unknown32926: (deferred - see comment above)
+  # Reset confirmation 32926 is defined by RoundResetConfirmation in round-life.yaml:
+  # kr-1256 sub_10C0640 consumes tagged pairs; cn-774 sub_8B5960 and tw-454 sub_72A000
+  # consume plain words. The gameplay feed validates it with that build's full structure.
 
   # ---------------------------------------------------------------------------------------------------
   # No kr-812 row at this number: kr-1256 only (13).
@@ -540,3 +539,141 @@ structs:
     - unknown_4: bool
       offset: 4
       only: [kr-1256]
+
+  # ---------------------------------------------------------------------------------------------------
+  # The client's own reports the in-game flow parses and never relays: the kr-1256 frames whose bodies the
+  # payload helpers of src/BubbleFighter.Fantasy.InGame.Wire/Wire read. kr-812 has no frame at these numbers
+  # (its C2S 25 is the clan passport, see PostSwapReport below), so every row is only: [kr-1256] and each
+  # structure's baseline table is empty; gcpRoomReqLeaveGame is the one exception, empty in both builds. The
+  # relay motion frames 20003 / 20004 stay the stop stated at the top of this file.
+  #
+  # Small scalar shapes that deliberately get no structure here: the empty C2S 17 (kr-1256 sub_9E7570, sent
+  # after S2C 608), the empty C2S 577 (kr-1256 sub_9E1EB0 case 0x245 writes only the opcode) and the empty
+  # C2S 625 (kr-1256 sub_6E5740) have no name in profiles/kr-1256/opcodes.yaml (the 625 row is Unknown625),
+  # and a structure is stated only where a row names the packet. The one-word C2S 517 is room-modern.yaml
+  # RoomPingRequest, the one-word C2S 607 is round-start.yaml RoundObjectAddRequest and the one-word C2S 571
+  # flag is relay-connection.yaml RelayConnectionReport, so none of them is restated.
+  # ---------------------------------------------------------------------------------------------------
+
+  # C2S 518, the answer to S2C 517 gspReqPingUser: builder kr-1256 sub_9DF920 (reached from the room dispatcher
+  # kr-1256 sub_9D9930) writes constant 0, then the u32 token it read from the S2C 517 frame, then the globals
+  # dword_18E8F00 and *(dword_18E6844+72). The client's own reader of the server's S2C 518 is
+  # kr-1256 sub_978F20, which takes a seat word and a trailing word it stores verbatim - that is the
+  # three-word body packets/room-modern.yaml gspRepPingUser states, together with the raw helper's historical
+  # direction mismatch this file does not contradict. kr-812 has no C2S 518 row.
+  PingSample:
+    - unknown_0: u32              # kr-1256 sub_9DF920 writes constant 0
+      offset: 0
+      only: [kr-1256]
+    - token: u32                  # the u32 kr-1256 sub_9DF920 read from the S2C 517 frame
+      offset: 4
+      only: [kr-1256]
+    - unknown_8: u32              # kr-1256 sub_9DF920 writes dword_18E8F00; purpose not traced
+      offset: 8
+      only: [kr-1256]
+    - unknown_12: u32             # kr-1256 sub_9DF920 writes *(dword_18E6844+72); purpose not traced
+      offset: 12
+      only: [kr-1256]
+
+  # C2S 25 of the game dialect, the weapon-preset post-swap report: builder kr-1256 sub_6DA420 (reached from
+  # the S2C 836 apply path of the dispatcher kr-1256 sub_9D2FF0) writes the model's +448 dword, then its second
+  # argument as one byte, and sends on the match connection (dword_18E7DAC). The byte is the preset slot the
+  # status-zero S2C 836 apply landed on. The clan form at the same number is a different packet: the clan-server
+  # dispatcher's kr-1256 sub_525170 stamps an empty C2S 25 (packets/clan.yaml ClanPassportRequest, the kr-812
+  # gcpReqClanPassport of kr-812 sub_498E70), and this five-byte body never carries a clan meaning.
+  PostSwapReport:
+    - actor: u32                  # kr-1256 sub_6DA420 writes the model's +448 dword
+      offset: 0
+      only: [kr-1256]
+    - slot: u8                    # kr-1256 sub_6DA420's second argument, the S2C 836 apply's preset slot
+      offset: 4
+      only: [kr-1256]
+
+  # C2S 624, the death report: the wrapper kr-1256 sub_6E5840 builds the local record {argument dword, 0} and
+  # the builder kr-1256 sub_708B60 writes it as two words, the second zero-extended from the record's byte. The
+  # death path kr-1256 sub_B38850 passes 1, right after the empty C2S 625 (kr-1256 sub_6E5740); the timer paths
+  # pass 0. Neither word's meaning is traced. This is not respawn.yaml RoundDeathReport: that is the kr-812
+  # C2S 713 actor+delay shape, a different packet read by kr-812 sub_50E7B0.
+  DeathReport:
+    - unknown_0: u32              # kr-1256 sub_708B60 writes the wrapper's source dword; live senders write 1 or 0
+      offset: 0
+      only: [kr-1256]
+    - unknown_4: u32              # kr-1256 sub_708B60 writes the source byte zero-extended; the wrapper always passes 0
+      offset: 4
+      only: [kr-1256]
+
+  # C2S 608, the fixed gameplay-action family: builder kr-1256 sub_6DDBA0 (35 callers) writes this 16-byte body
+  # for the type bytes 1, 2, 3, 4, 5, 6, 7, 23, 42, 44, 45, 46, 47, 71, 72, 73, 74, 75, 103, 106, 107, 108 and
+  # 110 - the switch's first family; other type bytes are not this layout, so the table states the fixed family
+  # and no other. The alternate-action sibling below is built by a callee of this builder.
+  GameplayAction:
+    - type: u8                    # the switch value kr-1256 sub_6DDBA0 writes first
+      offset: 0
+      only: [kr-1256]
+    - unknown_1: u32
+      offset: 1
+      only: [kr-1256]
+    - unknown_5: u32
+      offset: 5
+      only: [kr-1256]
+    - unknown_9: u8
+      offset: 9
+      only: [kr-1256]
+    - unknown_10: u8
+      offset: 10
+      only: [kr-1256]
+    - unknown_11: u8
+      offset: 11
+      only: [kr-1256]
+    - unknown_12: u16
+      offset: 12
+      only: [kr-1256]
+    - unknown_14: u16
+      offset: 14
+      only: [kr-1256]
+
+  # C2S 2029, the alternate action: builder kr-1256 sub_708660 (called from the 608 builder kr-1256 sub_6DDBA0
+  # and from kr-1256 sub_CF1780) writes one byte, one word and one byte from its source record - 6 bytes; the
+  # record keeps the word at +4 and the byte at +8, but the wire packs them without padding. No field's purpose
+  # is traced.
+  AlternateAction:
+    - unknown_0: u8
+      offset: 0
+      only: [kr-1256]
+    - unknown_1: u32
+      offset: 1
+      only: [kr-1256]
+    - unknown_5: u8
+      offset: 5
+      only: [kr-1256]
+
+  # C2S 578: builder kr-1256 sub_6DC970, called once from the stage loop kr-1256 sub_75B3E0 after its one-second
+  # wait, writes 3000 when the room flag at +173 is set, else 5000 for the modes 7, 11, 17 and 21, else 0; then
+  # its own argument; then two zero words. profiles/kr-1256/opcodes.yaml names the row
+  # gcpGameReportMapLoadingComplete after kr-812's C2S 701 role; no word's purpose is traced here.
+  RelayEndpointRequest:
+    - unknown_0: u32              # kr-1256 sub_6DC970 writes 3000, 5000 or 0 from the room flag and the mode
+      offset: 0
+      only: [kr-1256]
+    - unknown_4: u32              # kr-1256 sub_6DC970's argument
+      offset: 4
+      only: [kr-1256]
+    - unknown_8: u32              # kr-1256 sub_6DC970 writes constant 0
+      offset: 8
+      only: [kr-1256]
+    - unknown_12: u32             # kr-1256 sub_6DC970 writes constant 0
+      offset: 12
+      only: [kr-1256]
+
+  # C2S 103, the result statistics: builder kr-1256 sub_113F230 (caller kr-1256 sub_9E80F0, the game-over flow)
+  # writes thirty consecutive words from its source record and nothing else. No word's purpose is traced, so
+  # they stay one run; the S2C 103 gspRepJoinSession at the same number is a different numeric space.
+  GameResultStats:
+    - unknown_0: "u32[30]"
+      offset: 0
+      only: [kr-1256]
+
+  # C2S 506 gcpRoomReqLeaveGame: the kr-812 sender kr-812 sub_6711B0 and the kr-1256 sender kr-1256 sub_75F3F0
+  # stamp the opcode and write no field, so the body is empty in both builds and the structure has no build
+  # annotations.
+  gcpRoomReqLeaveGame: []

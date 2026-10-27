@@ -1,7 +1,7 @@
 ---
 title: "런처"
 description: "Bubble Fighter Fantasy의 동반 런처: 클라이언트 빌드, 세션, 로그인 티켓, 서버 런처 API."
-updated: 2026-10-18
+updated: 2026-10-23
 ---
 
 Bubble Fighter Fantasy의 동반 데스크톱 애플리케이션 **Fantasy Tale Launcher**는 게임 클라이언트를 설치하고 실행하며 플레이어가 선택한 서버에 연결하는 것을 목표로 개발 중입니다. 이 애플리케이션은 별도 프로젝트인 [FantasyTale.Launcher](https://github.com/Wasabi-FantasyTaleDev/FantasyTale.Launcher)이며 MIT 라이선스로 배포됩니다. 이 서버 저장소에는 포함되어 있지 않고, 어느 프로젝트도 게임 클라이언트나 그 데이터를 배포하지 않습니다.
@@ -65,9 +65,13 @@ Bubble Fighter Fantasy의 동반 데스크톱 애플리케이션 **Fantasy Tale 
 | `kr-812` | stand-in | nmco | 7110 |
 | `cn-279` | forward | gamewidget | 7210 |
 | `cn-324` | forward | gamewidget | 7140 |
+| `cn-404` | forward | gamewidget-ticket | 7240 |
+| `cn-406` | forward | gamewidget-ticket | 7230 |
+| `tw-454` | stand-in | nmco | 7200 |
 | `cn-706` | forward | unverified | — |
 | `cn-717` | forward | unverified | — |
 | `cn-735` | forward | unverified | — |
+| `cn-774` | forward | gamewidget-ticket | 7190 |
 | `id-400` | stand-in | nmco | 7120 |
 | `id-1809` | stand-in | nmco | 7130 |
 
@@ -132,7 +136,7 @@ UI가 아직 실행을 시작할 수 없지만, 설계와 구현된 코드는 �
 
 이 가이드가 구분하는 두 가지 경우입니다.
 
-- **런처 티켓 로그인.** 플레이어가 런처(서버 API)에 로그인하면, 런처가 API에 선택한 빌드의 일회용 실행 티켓을 요청하고 이를 `session.toml`에 기록합니다. 메신저 stand-in은 티켓을 패스포트로 반환하고, 게임 서버는 로그인 시 이를 계정 이름으로 취급하는 대신 티켓을 교환합니다. 이 경로는 **stand-in** 메신저 모드로 실행되며 계정 인수와 함께 시작되는 빌드에 적용됩니다. 현재 체크포인트에서는 `kr-812`, `id-400`, `id-1809`입니다.
+- **런처 티켓 로그인.** 플레이어가 런처(서버 API)에 로그인하면, 런처가 API에 선택한 빌드의 일회용 실행 티켓을 요청하고 이를 `session.toml`에 기록합니다. 메신저 stand-in은 티켓을 패스포트로 반환하고, 게임 서버는 로그인 시 이를 계정 이름으로 취급하는 대신 티켓을 교환합니다. 티켓은 빌드 정의의 `login` 설정에 따라 두 경로로 전달됩니다. **stand-in** 빌드(`kr-812`, `id-400`, `id-1809`, `tw-454`. nmcogame stand-in이 티켓을 로그인 패스포트로 클라이언트에 전달)와 **로그인 브리지** 빌드(`cn-404`, `cn-406`, `cn-774`. 로그인 모듈이 티켓을 SDO 로그인 진입점으로 전달)입니다.
 - **게임 내 로그인.** 런처 계정이나 티켓이 제공되지 않으면 클라이언트는 자체 로그인 흐름을 사용할 수 있습니다. stand-in 빌드에서는 stand-in이 클라이언트 로그인 화면에 입력된 id(로그인 호출의 클라이언트 대화 상자 변형)를 받아 패스포트로 반환하므로, 서버는 일반 계정 이름을 봅니다. forward 빌드에서는 원본 라이브러리가 클라이언트에 응답하므로 런처의 stand-in이 전혀 관여하지 않습니다. 빌드 정의의 `gamewidget`(`cn-279`, `cn-324`) 또는 `hook`(`kr-1256`) 로그인 모드가 그 경우를 설명하지만, 런처는 현재 체크포인트에서 그 공급자들을 구현하지 않습니다.
 
 빌드 정의의 `login` 값은 데이터입니다. 런처 모듈은 현재 `unverified`만 강제하며(해당 빌드를 거부함), 그 외에는 공급자에 따라 분기하지 않습니다. 위의 대응은 선언된 메신저 모드와 호스트 코드를 따른 것이며, 현재 체크포인트에서 실제 클라이언트로 관찰된 것은 아닙니다.
@@ -148,7 +152,7 @@ UI가 아직 실행을 시작할 수 없지만, 설계와 구현된 코드는 �
 
 `open` 모드에서는 기존 `launcher_tickets` 스위치(`BFF_LAUNCHER_TICKETS`)로 티켓 형태의 로그인을 일반 이름과 함께 교환할 수 있으며, `ticket` 모드에서는 교환이 항상 켜져 있습니다.
 
-현재 체크포인트에서 런처는 **대체(stand-in)** 빌드(`kr-812`, `id-400`, `id-1809`)에만 티켓을 전달합니다. **전달(forward)** 빌드는 아직 런처에서 티켓을 받지 못하므로 `ticket`에서는 해당 플레이어가 로그인할 수 없습니다. 런처가 티켓을 제공할 때까지 이 빌드들은 신뢰할 수 있는 네트워크에서 `open`으로 실행하십시오.
+런처에서 티켓을 받는 빌드는 각 빌드 정의의 `login` 설정이 결정합니다. 현재 정의는 두 경로로 티켓을 전달합니다. **대체(stand-in)** 빌드(`kr-812`, `id-400`, `id-1809`, `tw-454`)와 **로그인 브리지** 빌드(`cn-404`, `cn-406`, `cn-774`)입니다. 나머지 빌드는 아직 티켓을 받지 못합니다. `kr-1256`은 클라이언트를 직접 후킹하고, `cn-279`와 `cn-324`는 일반 위젯을 사용하며, `cn-706`, `cn-717`, `cn-735`의 로그인은 검증되지 않았습니다. 따라서 `ticket`에서는 이 빌드들의 플레이어가 로그인할 수 없습니다. 해당 정의가 티켓을 제공할 때까지 이 빌드들은 신뢰할 수 있는 네트워크에서 `open`으로 실행하십시오.
 
 ### 티켓이 증명하는 것과 증명하지 않는 것
 
@@ -209,7 +213,7 @@ Bubble Fighter 클라이언트 패치는 훅 플러그인으로 제공됩니다.
 
 ### 행 활성화
 
-- 코어 번들은 이 행을 **비활성화** 상태로 제공합니다. 현재 체크포인트에서는 `all` 프로필만 이를 활성화합니다. 이 프로필의 `replace` 패치는 코어 행의 `listen`, `host_policy`, `region` 구성을 제거하므로, 이후 `set` 패치로 다시 추가하지 않는 한 `BFF_LAUNCHER_*` 환경 변수는 해당 프로필에 적용되지 **않습니다**. 이때 리스너는 옵션 기본값을 사용합니다.
+- 코어 번들은 이 행을 **비활성화** 상태로 제공합니다. `all` 프로필은 이 행을 활성화하면서 배포 변수 `BFF_LAUNCHER_LISTEN`, `BFF_LAUNCHER_TICKET_SECONDS`, `BFF_LAUNCHER_HOST_POLICY`, `BFF_LAUNCHER_REGION`을 유지합니다. 기본값은 각각 `127.0.0.1:8090`, `600`, `auto`, 빈 지역입니다. 이후 `set` 패치로 카탈로그 구성을 유지하면서 개별 설정을 재정의할 수 있습니다.
 - 이 플러그인은 런처 계정 저장소와 런처 세션 저장소를 게시하는 활성 지속성 공급자가 필요합니다. 메모리, SQLite, MySQL 세 공급자 모두 이를 제공합니다. `all` 프로필은 프로세스 로컬 메모리 공급자를 사용하므로 재시작하면 계정과 로그인이 초기화됩니다. 지속성이 필요한 배포에서는 SQLite나 MySQL을 사용해야 합니다.
 - 이 행은 `admin.http`와 독립적이며, 하나를 활성화하거나 비활성화해도 다른 하나는 바뀌지 않습니다.
 
@@ -227,14 +231,14 @@ Bubble Fighter 클라이언트 패치는 훅 플러그인으로 제공됩니다.
 | `registration_enabled` | 런처 계정 등록을 허용하는지 여부입니다. | `true` |
 | `create_account_on_login` | 알 수 없는 이름으로 로그인하면 입력한 비밀번호로 그 계정을 만들어, 플레이어가 따로 가입하지 않아도 되게 할지 여부입니다. 이름을 잘못 입력하면 새 계정이 만들어집니다. | `false` |
 | `minimum_launcher_version` | 등록, 로그인, 갱신, 티켓 발급에 필요한 최소 런처 SemVer입니다. 비우면 게이트를 비활성화합니다. | 비어 있음 |
-| `plugin_recommendations` | 최대 64개의 플러그인 id로, 각각 선택적 정확한 빌드와 required 플래그를 가집니다. id만 허용하며 URL이나 경로는 포함하지 않습니다. | 비어 있음 |
+| `plugin_recommendations` | 최대 64개 정책 항목으로 식별자, 선택적 정확한 빌드와 required/disabled 플래그를 포함합니다. URL이나 경로는 허용하지 않습니다. | 비어 있음 |
 | `session_seconds` / `refresh_session_seconds` | 액세스 토큰과 갱신 가능한 세션의 수명(초)입니다. | 1800 / 2592000 |
-| `ticket_seconds` | 실행 티켓 수명(초)입니다. | 60 |
+| `ticket_seconds` | 실행 티켓 수명(초)입니다. | 600 |
 | `requests_per_minute` / `max_concurrent_requests` | 전역 요청 예산과 동시 API 작업 수입니다. | 120 / 8 |
 | `max_body_bytes` / `max_connections` | 요청 본문과 연결 수 제한입니다. | 16384 / 128 |
 | `instances` | 카탈로그에 광고되는 클라이언트 프리셋으로, 최대 64개입니다. | 비어 있음 |
 
-`plugin_recommendations` 항목은 `id`, 선택적 `builds` 목록(비어 있으면 모든 빌드), `required`를 포함합니다. 카탈로그와 모든 로그인 응답에는 최소 런처 버전과 병합된 권장 목록이 포함됩니다.
+`plugin_recommendations` 항목에는 `id`, 선택적 `builds` 목록(비어 있으면 모든 빌드), `required`, `disabled`가 포함됩니다. 추천은 false/false, 필수는 true/false, 사용 금지는 false/true입니다. 같은 식별자의 필수 및 사용 금지 범위는 전체 빌드 규칙을 포함하여 겹치면 안 됩니다. 같은 정책 상태만 병합하며 정확한 빌드 범위는 유지합니다. 카탈로그와 모든 로그인 응답에는 최소 런처 버전과 이 규칙이 포함됩니다. 그래픽 설정은 [WebUI 클라이언트 모드 정책](plugins.ko.md#client-plugin-policy)을 참조하세요.
 
 ### 클라이언트 프리셋(`instances`)
 
@@ -267,6 +271,7 @@ Bubble Fighter 클라이언트 패치는 훅 플러그인으로 제공됩니다.
 | `/v1/auth/logout` | POST | 리프레시 자격 증명 또는 베어러 | 세션을 종료합니다. 버전 게이트가 적용되지 않습니다. |
 | `/v1/account` | GET | 베어러 | 로그인한 계정의 프로필입니다. 표시 이름과 레벨, 경험치, 해당 저장소를 사용할 수 있을 때 Lucci와 캐시를 반환합니다. |
 | `/v1/launch` | POST | 베어러 | 서버가 광고하는 빌드의 일회용 실행 티켓을 발급합니다. |
+| `/v1/companion/tickets` | POST | 베어러 | 계정이 이미 가진 실행에 대해 일회용 Nirinsou Link 티켓을 새로 발급합니다(`{"launchId":"..."}`). |
 
 런처는 `X-FantasyTale-Launcher-Version` 헤더 또는 `launcherVersion` JSON 필드로 버전을 선언합니다. 둘 다 있으면 일치해야 합니다.
 
@@ -302,6 +307,8 @@ Bubble Fighter 클라이언트 패치는 훅 플러그인으로 제공됩니다.
 | `426 launcher_update_required` | 위에서 설명한 런처 버전 게이트입니다. |
 | `429` | 분당 요청 예산 또는 동시성 게이트를 초과했습니다. |
 | `503` | 인증 용량이 가득 찼습니다(보관 중인 세션/티켓이 너무 많음). |
+| `503 server_not_ready` | 모든 행이 활성화되고 호스트가 `Server is ready`를 기록하기 전에는 로그인, 가입, 실행이 거부됩니다. |
+| `404 companion_unavailable` / `404 launch_not_found` | `companion` 행 없이 티켓을 갱신했거나, 끝난 실행 또는 다른 계정의 실행을 갱신했습니다. |
 
 응답에는 `Cache-Control: no-store`가 포함됩니다. 리스너는 설계상 일반 HTTP이므로, 런처가 네트워크를 통해 연결할 때는 자체 TLS 종료 뒤에 두고, 그렇지 않을 때는 루프백에 유지하십시오. API는 게임 클라이언트, 그 파일, 업데이트를 절대 제공하지 않습니다. 다운로드 소스는 런처의 향후 클라이언트 설치를 위한 데이터로 광고될 뿐 서버가 프록시하지 않습니다.
 
@@ -347,6 +354,50 @@ Bubble Fighter 클라이언트 패치는 훅 플러그인으로 제공됩니다.
       region: "${BFF_LAUNCHER_REGION:-}"
 ```
 
+## Nirinsou Link {#nirinsou-link}
+
+Fantasy Tale Nirinsou Link(줄여서 Nirinsou)는 실행 중인 런처와, 그 런처가 게임을 실행한 서버 사이의 선택형
+WebSocket 채널입니다. 게임 위에 뜨는 런처 팝업처럼 원래 게임 클라이언트에 패킷이 없는 기능을 전달합니다. 게임
+연결 자체는 바뀌지 않으며, Nirinsou 없이 실행해도 이전과 똑같이 플레이됩니다.
+
+### 플러그인 행
+
+| 행 | 역할 |
+| --- | --- |
+| `companion` | 리스너와 실행 표. 켜면 모든 `/v1/launch` 응답에 `companion` 객체(`url`, 일회용 `ticket`, `launchId`, `expiresAt`)가 들어갑니다. |
+| `companion.notices` | 런처 팝업(`ui.notification.show`)과 `popup <텍스트>` 관리 명령, 권한 `game.management.popup`. |
+
+두 행은 core 번들에서 꺼져 있고 `all` 프로필이 켭니다. `companion` 옵션:
+
+| 옵션 | 기본값 | 의미 |
+| --- | --- | --- |
+| `listen` | `127.0.0.1:8092`(`BFF_COMPANION_LISTEN`) | WebSocket 리스너 주소. |
+| `public_url` | 빈 값(`BFF_COMPANION_PUBLIC_URL`) | 런처에 건네는 URL, 경로는 `/companion/v1`; `{host}`는 런처가 접속한 호스트로 바뀝니다. 비우면 `ws://{host}:<리스너 포트>/companion/v1`입니다. |
+| `ticket_seconds` | `120` | 연결 티켓을 받아들이는 시간. |
+| `pending_seconds` | `900` | 실행이 게임 로그인을 기다리는 최대 시간. 지나면 버립니다. |
+| `max_launches`, `max_connections` | `4096`, `2048` | 실행 표와 동시 연결 수의 상한. |
+| `message_bytes`, `queue_messages`, `queue_bytes`, `messages_per_second` | `65536`, `128`, `1048576`, `128` | 연결당 메시지, 큐, 속도 상한. 런처와 같습니다. |
+| `idle_seconds` | `60` | 이 시간 동안 조용하면 연결을 닫습니다. 런처는 20초마다 하트비트를 보냅니다. |
+
+### 실행이 묶이는 방식
+
+1. `/v1/launch`가 실행을 열고 게임 티켓과 Nirinsou 권한을 돌려줍니다. 게임 티켓에는 그 실행이 기록됩니다.
+2. 런처는 서브프로토콜 `fantasytale.companion.v1`과 `Authorization: Bearer` 티켓으로 `GET /companion/v1`을
+   업그레이드합니다. 티켓은 한 번만 쓸 수 있으며, 재연결할 때는 `/v1/companion/tickets`로 새 티켓을 받고 새 연결이
+   이전 연결을 대신합니다.
+3. 런처는 빌드, 실행 ID, 언어, 지원하는 메시지 형식을 담은 `companion.hello`를 보내고, 서버는 양쪽이 모두
+   지원하는 형식과 상태 `pending_game`을 담은 `companion.welcome`으로 답합니다.
+4. 게임 로그인이 게임 티켓을 사용하면 실행이 그 게임 연결에 묶이고 런처는 상태 `connected`를 받습니다. 서버
+   메시지는 그 뒤에만 보냅니다.
+5. 게임 연결이 닫히면 실행이 끝나고 Nirinsou 연결도 닫힙니다.
+
+게임이 끝내 로그인하지 않은 실행은 `pending_seconds` 뒤에 버립니다. 모든 메시지는 kind, id, type, 스키마 버전,
+payload를 가진 JSON이며, 형식이 틀리거나 중복되거나 협상되지 않았거나 너무 빠른 메시지는 이유 코드와 함께 연결을
+닫고, 런처는 새 티켓으로 다시 연결합니다.
+
+리스너는 평문 `ws`입니다. 네트워크로 접속할 때는 런처 API와 마찬가지로 TLS 종료 뒤에 두고 `public_url`을 `wss`로
+설정하세요.
+
 ## 문제 해결
 
 다음은 현재 코드에 존재하는 실패 경로입니다. 현재 체크포인트의 런처에는 앱 내 복구 동작이 없으며, 복구란 메시지나 로그를 읽고 입력을 바로잡는 것을 뜻합니다.
@@ -381,3 +432,64 @@ Bubble Fighter 클라이언트 패치는 훅 플러그인으로 제공됩니다.
 - 런처 API 뒤의 프로필 행과 환경 변수는 [서버 설정](configuration.md)을 참고하십시오.
 - 서버 실행, 지속성, 백업, 네트워크 보안은 [배포](deployment.md)를 참고하십시오.
 - 런처에 국한되지 않는 서버 측 실패는 [문제 해결](troubleshooting.md)을 참고하십시오.
+
+## 서버 공개 정보와 접속 허용 정책 {#server-presentation-and-admission}
+
+`GET /v1/catalog`는 `motd`, `iconUrl`, `images`, `onlinePlayers`, `playerLimit`, `state`,
+`whitelist`, `rosterEnabled`를 담은 `presentation`도 반환합니다. `launcher.http` 행의
+`motd`, `icon_url`, `images`, `show_online_players`, `player_limit`, `maintenance`,
+`whitelist_enabled`, `roster_enabled`로 설정합니다. 기본값은 접속 제한 없음, 인원 제한 없음,
+공개 명단 활성화입니다. 세션 서비스를 사용할 수 없으면 인원은 null이고,
+`show_online_players: false`이면 -1입니다. 인증된 게임 플레이어만 계정별로 집계하고,
+종료된 연결과 확인된 경기 연결은 제외합니다. 영구 최고 인원 저장소가 연결되지 않아 과거 최고 인원은 제공하지 않습니다.
+
+인증 없이 호출하는 `GET /v1/players`는 `schema: 1`, `enabled`, `players`, `truncated`를
+반환합니다. 플레이어별 필드는 `name`과 `level`뿐입니다. `roster_enabled: false`이면 세션
+레지스트리를 읽지 않고 빈 명단을 반환합니다. 활성화 상태에서 레지스트리가 없으면 HTTP 503
+`player_state_unavailable`입니다. `max_roster_players`는 응답 크기를 제한하며 기본 1000,
+범위 1–10000입니다. `truncated: true`는 실제 접속자가 더 많다는 뜻입니다. 인원수와 명단
+공개는 별도 설정입니다. HTTP 플러그인은 `ISessionRegistry`와
+`IPlayerSession.LoginConnectionId`를 통해 실제 로그인 연결을 식별합니다. 플레이어 상태를
+공유하는 경기 연결과 이 식별자를 제공하지 않는 플러그인 세션은 공개 명단에서 제외됩니다.
+따라서 티켓 발급이 티켓을 사용하는 로비 및 경기 서비스의 시작을 기다리지 않습니다.
+
+클라이언트 프리셋은 선택적 `protocol_version`(1–65535)과 `patch_version`(최대 64자)을
+지원하며 기존 `build`, `releaseVersion`, `clientLanguages`, `downloadSource`와 함께
+`protocolVersion`, `patchVersion`으로 출력합니다. 생략한 값은 알 수 없는 상태로 유지됩니다.
+이 표시 필드는 아직 실행 요청의 클라이언트 버전을 검증하지 않습니다.
+
+`maintenance: true`는 로그인과 새 티켓 발급을 HTTP 503 `server_maintenance`로 거부합니다.
+선택적 `maintenance_start`, `maintenance_end`, `maintenance_description`은 각각
+`maintenanceStart`, `maintenanceEnd`, `maintenanceDescription`으로 반환됩니다. 날짜는
+안내용이며 자동 예약 기능이 아닙니다. `whitelist_enabled: true`는 `whitelist`의 계정명을
+대소문자 구분 없이 검사합니다. 중복 없는 계정 최대 4096개를 지원하며 미등록 계정은 HTTP 403
+`not_whitelisted`입니다. 양수 `player_limit`는 시작 시 세션 서비스가 필요합니다. 정원에
+도달하면 새 플레이어는 HTTP 503 `server_full`을 받지만 이미 접속한 계정은 대체 티켓을
+받을 수 있습니다. 이 기능은 런처 접속 검사이며 원자적 자리 예약이 아닙니다. 직접 게임 연결과
+티켓 교환에서는 아직 이 설정을 다시 검사하지 않습니다.
+
+인증 거부는 JSON `error`에 HTTP 401 `account_not_found`, `wrong_password`,
+`account_banned`를 반환합니다. 올바른 비밀번호를 확인한 뒤에만 이용 제한 상태를 알리며
+확인되지 않은 제한 사유는 만들지 않습니다. 베어러 실패는 기존 `unauthorized`입니다.
+가입 비활성화는 HTTP 403 `registration_disabled`, 요청 제한은 HTTP 429 `rate_limited`,
+세션 용량 부족은 HTTP 503 `authentication_capacity`입니다. 점검 중에도 세션 갱신과
+로그아웃이 가능합니다. 네트워크 오류는 호출자가 처리하며 서버 인증 오류로 반환하지 않습니다.
+
+같은 `POST /v1/launch` 요청에 선택적으로 `release_version`, `patch_version`,
+`launcher_language`, `native_language`, `client_language`를 보낼 수 있습니다.
+버전 레이블을 보내는 경우 공백만 있는 문자열이나 제어 문자를 포함해서는 안 되며 최대 64자입니다.
+이 레이블은 배포 버전 설명이며 프로토콜 버전으로 해석하거나 공지된 레이블과 비교하지 않습니다.
+언어를 보내는 경우 정확히 `zh-CN`, `zh-TW`, `ko`, `en`, `id`, `vi` 중 하나여야 합니다.
+잘못된 알려진 필드는 티켓 슬롯을 사용하기 전에 HTTP 400 `invalid_request`를 반환합니다.
+기존 요청은 다섯 필드를 모두 생략할 수 있습니다. 알 수 없는 최상위 필드는 계속 무시하고 중복 키는 거부합니다.
+티켓 발급에 성공하면 플러그인 로거에 build와 이 설명 정보를 기록하며 계정 이름, 베어러, 티켓은 기록하지 않습니다.
+이 정보로 설치된 클라이언트의 버전, 언어 또는 무결성을 증명할 수는 없습니다.
+
+게임 연결에서 실행 티켓을 사용하면 `launcher_language`가 방 명령과 자동 시작 알림을 포함한
+서버 알림의 언어를 선택합니다. 클라이언트 지역, `native_language`, `client_language`는
+이 알림 언어를 선택하지 않습니다. 언어 정보나 번역이 없으면 현지화 플러그인의
+`default_language`를 사용합니다. `launcher_languages`는 UI 태그를 리소스 이름에 연결하며,
+기본 설정은 `zh-CN`을 `zh-Hans`에, `zh-TW`를 `zh-Hant`에 연결합니다. 나머지 태그는
+리소스 이름과 직접 일치합니다. 현재 베트남어 사전은 없으므로 `vi`는 배포 기본 언어를 사용합니다.
+실행 티켓 언어 정보가 없는 연결도 기본 언어를 사용합니다. 언어 설정은 연결이 닫힐 때까지
+유지되며 최초 캐릭터 생성 중에도 유지됩니다.

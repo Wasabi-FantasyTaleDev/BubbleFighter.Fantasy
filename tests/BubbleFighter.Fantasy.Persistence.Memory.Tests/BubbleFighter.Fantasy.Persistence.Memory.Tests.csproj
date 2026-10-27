@@ -19,6 +19,7 @@
     <Compile Include="..\Shared\ShopSessionStoreContractGuardTests.cs" Link="ShopSessionStoreContractGuardTests.cs" />
     <Compile Include="..\Shared\ClanStoreContractGuardTests.cs" Link="ClanStoreContractGuardTests.cs" />
     <Compile Include="..\Shared\PresentStoreContractTests.cs" Link="PresentStoreContractTests.cs" />
+    <Compile Include="..\Shared\MessengerStoreContractTests.cs" Link="MessengerStoreContractTests.cs" />
     <Compile Include="..\Shared\LauncherSessionLimitTests.cs" Link="LauncherSessionLimitTests.cs" />
   </ItemGroup>
 </Project>

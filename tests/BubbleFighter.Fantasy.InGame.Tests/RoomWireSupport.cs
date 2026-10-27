@@ -1,4 +1,5 @@
-using BubbleFighter.Fantasy.InGame.Wire;
+using BubbleFighter.Fantasy.InGame.Sessions;
+using BubbleFighter.Fantasy.RoomCore;
 
 namespace BubbleFighter.Fantasy.InGame.Tests;
 

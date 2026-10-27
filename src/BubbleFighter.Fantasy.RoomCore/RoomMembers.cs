@@ -25,6 +25,7 @@ public sealed class RoomMembers<TMember> where TMember : IRoomMember
 {
     private readonly List<TMember> _members;
     private readonly HashSet<int> _closedSlots = [];
+    private readonly HashSet<int> _reservedSlots = [];
     private readonly int _capacity;
     private int? _delegatedMaster;
 
@@ -44,7 +45,23 @@ public sealed class RoomMembers<TMember> where TMember : IRoomMember
     public IReadOnlyCollection<int> ClosedSlots => _closedSlots;
 
     /// <summary>Gets whether no open seat remains.</summary>
-    public bool IsFull => _members.Count + _closedSlots.Count >= _capacity;
+    public bool IsFull => _members.Count + _closedSlots.Count + _reservedSlots.Count >= _capacity;
+
+    /// <summary>Reserves an open seat for a non-connection occupant without making it a closed seat.</summary>
+    /// <param name="slot">The seat to reserve.</param>
+    /// <returns>Whether the seat was open and is now reserved.</returns>
+    public bool Reserve(int slot)
+    {
+        if (slot < 0 || slot >= _capacity || _closedSlots.Contains(slot)
+            || _members.Any(member => member.Slot == slot))
+            return false;
+        return _reservedSlots.Add(slot);
+    }
+
+    /// <summary>Releases a non-connection occupant's seat so a human may join it.</summary>
+    /// <param name="slot">The reserved seat.</param>
+    /// <returns>Whether a reservation was released.</returns>
+    public bool Release(int slot) => _reservedSlots.Remove(slot);
 
     /// <summary>Gets the delegated master's seat, or the first remaining seat when no delegation is held.</summary>
     public int MasterSlot => _delegatedMaster ?? (_members.Count == 0 ? -1 : _members[0].Slot);
@@ -73,7 +90,8 @@ public sealed class RoomMembers<TMember> where TMember : IRoomMember
         if (IsFull)
             throw new InvalidOperationException($"Room is full ({_capacity} seats, {_closedSlots.Count} closed).");
         var slot = Enumerable.Range(0, _capacity).First(candidate =>
-            !_closedSlots.Contains(candidate) && _members.All(member => member.Slot != candidate));
+            !_closedSlots.Contains(candidate) && !_reservedSlots.Contains(candidate)
+            && _members.All(member => member.Slot != candidate));
         var member = create(slot);
         if (member.Slot != slot)
             throw new InvalidOperationException($"Member occupies seat {member.Slot}, expected {slot}.");
@@ -101,7 +119,7 @@ public sealed class RoomMembers<TMember> where TMember : IRoomMember
     {
         if (slot < 0 || slot >= _capacity)
             throw new InvalidOperationException($"Room has no seat {slot}.");
-        if (_members.Any(member => member.Slot == slot))
+        if (_reservedSlots.Contains(slot) || _members.Any(member => member.Slot == slot))
             throw new InvalidOperationException($"Room seat {slot} holds a player and cannot be closed.");
         return closed ? _closedSlots.Add(slot) : _closedSlots.Remove(slot);
     }

@@ -5,6 +5,14 @@ namespace BubbleFighter.Fantasy.Contracts.Lobby;
 /// <summary>Resolves game-facing messages for a client region with a configured fallback language.</summary>
 public interface IGameText
 {
+    /// <summary>Formats a notice in the receiving user's Launcher language, falling back to the deployment default when unspecified.</summary>
+    string Format(ISession session, string key, IReadOnlyDictionary<string, string>? arguments = null) =>
+        Format("", key, arguments);
+
+    /// <summary>Resolves a key in the receiving user's Launcher language or the deployment fallback without inferring language from the build.</summary>
+    bool TryFormat(ISession session, string key, out string text, IReadOnlyDictionary<string, string>? arguments = null) =>
+        TryFormat("", key, out text, arguments);
+
     /// <summary>Formats a resource key for the client's region, replacing named placeholders with caller values.</summary>
     string Format(string region, string key, IReadOnlyDictionary<string, string>? arguments = null);
 

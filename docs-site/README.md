@@ -1,6 +1,6 @@
 # Documentation site
 
-The site uses Vue 3 and VitePress. Public content is maintained in `../docs/`; `pages.json` explicitly selects ten guide routes in four languages. English uses `.md`, Simplified Chinese `.zh.md`, Traditional Chinese `.zh-tw.md` and Korean `.ko.md`. Traditional Chinese wording follows the site's existing terminology; the visible language label is 中文（繁体）.
+The site uses Vue 3 and VitePress. Public content is maintained in `../docs/`; `pages.json` explicitly selects eleven guide routes in four languages. English uses `.md`, Simplified Chinese `.zh.md`, Traditional Chinese `.zh-tw.md` and Korean `.ko.md`. Traditional Chinese wording follows the site's existing terminology; the visible language label is 中文（繁体）.
 
 ## Develop and build
 

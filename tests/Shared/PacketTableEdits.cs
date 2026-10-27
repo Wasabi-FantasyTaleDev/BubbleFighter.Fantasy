@@ -28,7 +28,9 @@ internal static class PacketTableEdits
         foreach (var file in Directory.GetFiles(source, "*.yaml"))
             File.Copy(file, Path.Combine(target.FullName, Path.GetFileName(file)));
         var header = new Regex($@"^  {Regex.Escape(structure)}:\s*(#.*)?$", RegexOptions.CultureInvariant);
-        var nextStructure = new Regex("^  [^ -]", RegexOptions.CultureInvariant);
+        // A structure header is two spaces and a name; a comment line at the same indent (restated
+        // structures open with their evidence notes) is still inside the block, so '#' does not end it.
+        var nextStructure = new Regex("^  [^ #-]", RegexOptions.CultureInvariant);
         var fieldLine = new Regex($@"^(?<prefix>\s*- ){Regex.Escape(field)}: {Regex.Escape(fromType)}(?<tail>\s+#.*)?\s*$",
             RegexOptions.CultureInvariant);
         var foundBlock = false;

@@ -6,6 +6,7 @@ import Icon from './Icon.vue'
 import LiquidGlassLink from './LiquidGlassLink.vue'
 import HeaderDropdown from './HeaderDropdown.vue'
 import DownloadSection from './DownloadSection.vue'
+import ReleaseNotes from './ReleaseNotes.vue'
 import NoahButton from './noah/components/ui/NoahButton.vue'
 import NoahReveal from './noah/components/ui/NoahReveal.vue'
 import NoahTerminal from './noah/components/ui/NoahTerminal.vue'
@@ -52,8 +53,8 @@ const currentPath = computed(() => page.value.relativePath.replace(/^(zh-tw|ko|e
 const currentIndex = computed(() => routes.indexOf(currentPath.value))
 const groups = computed(() => [
   { title: text.value.start, items: [0, 1] },
-  { title: text.value.guides, items: [2, 3, 4, 5, 6, 7] },
-  { title: text.value.project, items: [8, 9] },
+  { title: text.value.guides, items: [2, 3, 4, 5, 6, 7, 8] },
+  { title: text.value.project, items: [9, 10] },
 ])
 const link = (path = '', prefix = language.value.prefix) => withBase(`/${prefix}${path === 'index' ? '' : path}`)
 const closeMenus = () => { mobileOpen.value = false; openHeaderMenu.value = null }
@@ -166,6 +167,7 @@ onUnmounted(() => { media?.removeEventListener('change', updateViewport); motion
     <main id="main-content" class="document">
       <div class="mobile-breadcrumb"><button @click="mobileOpen = true"><Icon name="menu" />{{ text.menu }}</button><span>{{ page.title }}</span></div>
       <div id="overview" class="document-heading"><h1>{{ page.title }}</h1></div>
+      <ReleaseNotes v-if="currentPath === 'project/changelog'" :content="text.releases" />
       <Content class="article-body vp-doc" />
       <footer class="document-footer">
         <p>{{ text.updated }} · {{ frontmatter.updated || '2026-10-15' }}</p>

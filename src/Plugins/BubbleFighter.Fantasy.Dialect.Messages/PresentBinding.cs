@@ -63,6 +63,27 @@ internal sealed class PresentBinding(string protocol, IOpcodeTable opcodes, Pack
             if (tables.Resolve(build, structure).Count == 0)
                 throw new ConfigException($"The present box requires a packet layout '{structure}' for {build}.");
 
+        // The requests the binding parses and the replies it writes, with the fields stated in every build
+        // that mounts the present box; per-build trailing fields (the task-bar count) are not required here.
+        PacketLayoutContract.RequireFields(tables, build, "PresentListRequest", "Present box",
+            ("start", "u32"), ("count", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "PresentSendRequest", "Present box",
+            ("receiver_nickname", "wstr"), ("unknown_32", "wstr"), ("item_key", "u32"), ("message", "wstr"));
+        PacketLayoutContract.RequireFields(tables, build, "PresentIdRequest", "Present box", ("id", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "PresentReceiveReply", "Present box",
+            ("result", "u32"), ("id", "u32"), ("item_key", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "PresentThrowReply", "Present box",
+            ("status", "u32"), ("id", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "PresentDeleteReceivedReply", "Present box",
+            ("status", "u32"), ("id", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "PresentDeleteSentReply", "Present box",
+            ("status", "u32"), ("id", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "PresentNotice", "Present box", ("has_new", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "PresentSendReply", "Present box", ("result", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "PresentReceiveSubList", "Present box",
+            ("status", "u32"), ("total", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "PresentSendSubList", "Present box",
+            ("status", "u32"), ("total", "u32"));
         var noticeRequest = opcodes.C2S("gcpReqPresentNewReceive");
         var sendRequest = opcodes.C2S("gcpReqPresentSend");
         var receivedListRequest = opcodes.C2S("gcpReqPresentReceiveSubList");

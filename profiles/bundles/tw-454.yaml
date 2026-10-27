@@ -11,6 +11,9 @@
   plugin: protocol
   config:
     opcode_table_path: profiles/tw-454/opcodes.yaml
+    # The mandatory first packet, the patch-request slot: every legacy build names it
+    # gcpFirstConnect; kr-1256 names the same slot gcpReqGamePatch.
+    patch_request_name: gcpFirstConnect
     # The greeting handler treats status 2 as a normal connect, as in the other legacy builds.
     bootstrap_status: 2
     # A crash report (19) after a crashed session, and a 30-byte opcode 1500 on every
@@ -32,11 +35,6 @@
     protocol: "tw-454/game"
     max_connections: 512
     idle_timeout_seconds: 0
-- id: dialect.modern.messages
-  plugin: dialect.modern.messages
-  config:
-    protocol: "tw-454/game"
-    relay_protocol: "tw-454/relay"
 # The message adapters every build shares: the login burst, the main-menu install and the bag publication.
 # The build's sequence is its login values in packets/builds.yaml (it omits the gate list and the option sync,
 # which this profile's protocol row and client do not read).
@@ -47,11 +45,17 @@
     login: true
     main_menu_init: true
     inventory: true
+    equipment_view: true
+    equipment: true
+    # The customized-key update and login restoration (packets/customized-keys.yaml; builder tw-454
+    # sub_6F5B50, consumer tw-454 sub_AA49B0) for the player.settings row of the player-settings bundle.
+    customized_keys: true
 - id: lobby
   plugin: lobby
+  parent_id: inventoryview
   config:
     protocol: "tw-454/game"
-    # tw-454 inherits the kr-1256 login codec (dialect.modern.messages) through its lineage.
+    # tw-454 inherits the kr-1256 login codec (dialect.messages login values) through its lineage.
     # Known limitation: the password of gcpReqLogin is not checked, so any password logs in
     # as the named account, and auto_create_players creates an unknown account on first login.
     # authentication: ticket (the default) admits only redeemed launcher tickets; open admits any account name.
@@ -62,3 +66,10 @@
     # ticket: every login must redeem a launcher ticket (needs the launcher.http row). open: any account name
     # logs in, for a trusted LAN only. BFF_LOGIN_AUTHENTICATION sets it for every build at once.
     authentication: ${BFF_LOGIN_AUTHENTICATION:-ticket}
+    online_players: true
+- id: commands.players
+  plugin: commands.players
+  parent_id: lobby
+  disabled: true
+  config:
+    protocol: "tw-454/game"

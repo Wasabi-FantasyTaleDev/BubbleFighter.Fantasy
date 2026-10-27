@@ -235,22 +235,12 @@ public sealed class OpcodeTableTests
     }
 
     [Fact]
-    public void OpcodeConstantsExistInYamlWithSameDirection()
+    public void HandshakeAndPreHandshakeOpcodesResolveFromTheTable()
     {
         var table = OpcodeTableLoader.Load(TablePath, TestWireDialects.Get("kr-1256").Profile);
-        foreach (var field in typeof(WireOpcodes.C2S).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static))
-        {
-            var value = (ushort)field.GetRawConstantValue()!;
-            Assert.True(table.TryGet(PacketDirection.ClientToServer, value, out var entry),
-                $"WireOpcodes.C2S.{field.Name} ({value}) is missing from opcodes.yaml");
-            Assert.NotNull(entry);
-        }
-        foreach (var field in typeof(WireOpcodes.S2C).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static))
-        {
-            var value = (ushort)field.GetRawConstantValue()!;
-            Assert.True(table.TryGet(PacketDirection.ServerToClient, value, out var entry),
-                $"WireOpcodes.S2C.{field.Name} ({value}) is missing from opcodes.yaml");
-            Assert.NotNull(entry);
-        }
+        Assert.Equal(WirePins.PatchRequestOpcode, table.C2S("gcpReqGamePatch"));
+        Assert.Equal(WirePins.PatchReplyOpcode, table.S2C("gspRepGamePatch"));
+        Assert.Equal(WirePins.PreHandshakeOpcode, table.C2S("Unknown521"));
+        Assert.Equal(WirePins.MoveChannelOpcode, table.S2C("gspNotifyFirstMoveChannel"));
     }
 }

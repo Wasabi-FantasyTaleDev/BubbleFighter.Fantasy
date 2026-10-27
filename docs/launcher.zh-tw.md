@@ -1,7 +1,7 @@
 ---
 title: "啟動器"
 description: "Bubble Fighter Fantasy 的配套啟動器：用戶端版本、工作階段、登入票據與伺服器啟動器 API。"
-updated: 2026-10-18
+updated: 2026-10-23
 ---
 
 Bubble Fighter Fantasy 的配套桌面應用程式 **Fantasy Tale Launcher** 正在開發中，目標是安裝並啟動遊戲用戶端，並將它們連線到玩家選擇的伺服器。它是獨立專案：[FantasyTale.Launcher](https://github.com/Wasabi-FantasyTaleDev/FantasyTale.Launcher)，以 MIT 授權條款發布。本伺服器儲存庫不包含它，兩個專案都不散布遊戲用戶端或其資料。
@@ -65,9 +65,13 @@ Bubble Fighter Fantasy 的配套桌面應用程式 **Fantasy Tale Launcher** 正
 | `kr-812` | stand-in | nmco | 7110 |
 | `cn-279` | forward | gamewidget | 7210 |
 | `cn-324` | forward | gamewidget | 7140 |
+| `cn-404` | forward | gamewidget-ticket | 7240 |
+| `cn-406` | forward | gamewidget-ticket | 7230 |
+| `tw-454` | stand-in | nmco | 7200 |
 | `cn-706` | forward | unverified | — |
 | `cn-717` | forward | unverified | — |
 | `cn-735` | forward | unverified | — |
+| `cn-774` | forward | gamewidget-ticket | 7190 |
 | `id-400` | stand-in | nmco | 7120 |
 | `id-1809` | stand-in | nmco | 7130 |
 
@@ -132,7 +136,7 @@ messenger 宿主依下列順序解析通行證（第一個非空值優先）：
 
 本指南區分兩種情形：
 
-- **啟動器票據登入。** 玩家登入啟動器（伺服器 API），啟動器向該 API 為所選版本申請一次性啟動票據，並把它寫入 `session.toml`。messenger 替身把票據作為通行證傳回，遊戲伺服器在登入時兌換它，而不是把它當作帳號名稱。此路徑適用於以**替身** messenger 模式執行、並帶帳號參數啟動的版本：在目前檢查點為 `kr-812`、`id-400` 和 `id-1809`。
+- **啟動器票據登入。** 玩家登入啟動器（伺服器 API），啟動器向該 API 為所選版本申請一次性啟動票據，並把它寫入 `session.toml`。messenger 替身把票據作為通行證傳回，遊戲伺服器在登入時兌換它，而不是把它當作帳號名稱。票據按版本定義的 `login` 設定分發到兩條路徑：**替身**版本（`kr-812`、`id-400`、`id-1809`、`tw-454`，其 nmcogame 替身把票據作為登入通行證交給用戶端）與**登入橋**版本（`cn-404`、`cn-406`、`cn-774`，其登入模組把票據帶進 SDO 登入入口）。
 - **遊戲內登入。** 當沒有提供啟動器帳號或票據時，用戶端可以使用自己的登入流程。在替身版本上，替身接受在用戶端登入介面中輸入的 id（即登入呼叫的用戶端對話方塊變體），並將其作為通行證傳回，因此伺服器看到的是一般帳號名稱。在轉送版本上完全不涉及啟動器的替身，因為由原始函式庫回應用戶端；版本定義中的 `gamewidget`（`cn-279`、`cn-324`）或 `hook`（`kr-1256`）登入模式描述的就是這種情形，但啟動器在目前檢查點並未實作這些提供者。
 
 版本定義中的 `login` 值是資料：啟動器模組目前只對 `unverified` 強制生效（拒絕這些版本），不會針對提供者做其他分支處理。上述對應依據宣告的 messenger 模式與宿主程式碼；在目前檢查點尚未用真實用戶端觀察過。
@@ -148,7 +152,7 @@ messenger 宿主依下列順序解析通行證（第一個非空值優先）：
 
 在 `open` 模式下，舊的 `launcher_tickets` 開關（`BFF_LAUNCHER_TICKETS`）仍可讓票據形式的登入與一般名稱並存兌換；在 `ticket` 模式下兌換一律開啟。
 
-在目前的檢查點，啟動器只向**替身**版本（`kr-812`、`id-400`、`id-1809`）提供票據。**轉送**版本目前還拿不到啟動器票據，因此在 `ticket` 下其玩家無法登入；在啟動器能為它們提供票據之前，請在可信任的網路中以 `open` 執行這些版本。
+哪些版本能從啟動器拿到票據，取決於各版本定義的 `login` 設定。目前定義經兩條路徑提供票據：**替身**版本（`kr-812`、`id-400`、`id-1809`、`tw-454`）與**登入橋**版本（`cn-404`、`cn-406`、`cn-774`）。其餘版本目前拿不到票據——`kr-1256` 直接鉤住用戶端，`cn-279` 與 `cn-324` 使用普通元件，`cn-706`、`cn-717` 與 `cn-735` 的登入未經驗證——因此在 `ticket` 下這些版本的玩家無法登入；在它們的定義提供票據之前，請在可信任的網路中以 `open` 執行這些版本。
 
 ### 票據能證明什麼、不能證明什麼
 
@@ -209,7 +213,7 @@ hook 的預期工作方式：
 
 ### 啟用該列
 
-- 核心 bundle 隨附時該列處於**停用**狀態。在目前檢查點，只有 `all` profile 啟用它。它的 `replace` 修補檔會捨棄核心列的 `listen`、`host_policy` 和 `region` 設定，因此除非後續 `set` 修補檔把它們加回來，`BFF_LAUNCHER_*` 環境變數不會套用於該 profile；此時監聽器使用選項預設值。
+- 核心 bundle 隨附時該列處於**停用**狀態。`all` profile 啟用該列，並保留部署變數 `BFF_LAUNCHER_LISTEN`、`BFF_LAUNCHER_TICKET_SECONDS`、`BFF_LAUNCHER_HOST_POLICY` 和 `BFF_LAUNCHER_REGION`，預設值分別為 `127.0.0.1:8090`、`600`、`auto` 和空白地區。後續 `set` 修補檔可單獨覆寫設定項目，同時保留目錄設定。
 - 該模組需要一個處於啟用狀態的持續性提供者，由它公布啟動器帳號存放庫與啟動器工作階段儲存。三種提供者都滿足：memory、SQLite 和 MySQL。`all` profile 使用處理程序本機記憶體提供者，因此重新啟動時帳號與登入會被重設；持續性部署應使用 SQLite 或 MySQL。
 - 該列與 `admin.http` 相互獨立；啟用或停用其一不會改變另一個。
 
@@ -227,14 +231,14 @@ hook 的預期工作方式：
 | `registration_enabled` | 啟動器帳號是否可以註冊。 | `true` |
 | `create_account_on_login` | 以未知名稱登入時是否以所填密碼建立該帳號，讓玩家不必註冊。名稱輸錯會建立新帳號。 | `false` |
 | `minimum_launcher_version` | 註冊、登入、更新與票據簽發所需的最低啟動器 SemVer。留空則停用閘門。 | 空 |
-| `plugin_recommendations` | 最多 64 個模組識別，每個可選指定精確版本和一個表示是否必要的旗標；只包含識別，絕不包含 URL 或路徑。 | 空 |
+| `plugin_recommendations` | 最多 64 條策略，每條包含識別碼、可選的精確版本及必選／停用旗標；不包含 URL 或路徑。 | 空 |
 | `session_seconds` / `refresh_session_seconds` | 存取權杖與可續期工作階段的有效期限（秒）。 | 1800 / 2592000 |
-| `ticket_seconds` | 啟動票據有效期限（秒）。 | 60 |
+| `ticket_seconds` | 啟動票據有效期限（秒）。 | 600 |
 | `requests_per_minute` / `max_concurrent_requests` | 全域請求額度與並行 API 工作數。 | 120 / 8 |
 | `max_body_bytes` / `max_connections` | 請求主體與連線上限。 | 16384 / 128 |
 | `instances` | 目錄中公布的用戶端預設，最多 64 個。 | 空 |
 
-`plugin_recommendations` 項目包含 `id`、可選的 `builds` 清單（為空表示所有版本）和 `required`。目錄以及每個登入回應都包含最低啟動器版本和合併後的建議。
+`plugin_recommendations` 項目包含 `id`、可選的 `builds` 清單（為空表示所有版本）、`required` 和 `disabled`。推薦為 false/false，必選為 true/false，停用為 false/true。同一識別碼的必選與停用範圍不得重疊，包括所有版本的規則。僅相同策略狀態可以合併，同時保留正確的版本範圍。目錄與每個登入回應皆包含最低啟動器版本及這些規則。圖形化設定請參閱 [WebUI 用戶端模組策略](plugins.zh-tw.md#client-plugin-policy)。
 
 ### 用戶端預設（`instances`）
 
@@ -267,6 +271,7 @@ hook 的預期工作方式：
 | `/v1/auth/logout` | POST | 更新憑證或 Bearer 權杖 | 結束工作階段。不受版本閘門限制。 |
 | `/v1/account` | GET | Bearer 權杖 | 已登入帳號的資料：顯示名稱與等級、經驗、Lucci 與現金（當對應的儲存可用時）。 |
 | `/v1/launch` | POST | Bearer 權杖 | 為伺服器公布的版本簽發一次性啟動票據。 |
+| `/v1/companion/tickets` | POST | Bearer 權杖 | 為帳號已持有的啟動重新簽發一次性 Nirinsou Link 票據（`{"launchId":"..."}`）。 |
 
 啟動器透過 `X-FantasyTale-Launcher-Version` 標頭或 `launcherVersion` JSON 欄位宣告其版本。兩者都提供時必須一致。
 
@@ -302,6 +307,8 @@ hook 的預期工作方式：
 | `426 launcher_update_required` | 上文所述的啟動器版本閘門。 |
 | `429` | 超出每分鐘請求額度或並行閘門。 |
 | `503` | 達到驗證容量上限（保留的工作階段/票據過多）。 |
+| `503 server_not_ready` | 所有列啟用、主機日誌輸出 `Server is ready` 之前，登入、註冊和啟動都會被拒絕。 |
+| `404 companion_unavailable` / `404 launch_not_found` | 未啟用 `companion` 列時續簽票據，或續簽的啟動已結束、屬於其他帳號。 |
 
 回應攜帶 `Cache-Control: no-store`。該監聽器依設計為明文 HTTP；啟動器透過網路連線時，請將其置於自己的 TLS 終止之後；不透過網路連線時，請保持在回送位址上。該 API 從不提供遊戲用戶端、其檔案或更新：下載來源作為資料公布，供啟動器未來安裝用戶端使用，伺服器不代理這些內容。
 
@@ -347,6 +354,46 @@ hook 的預期工作方式：
       region: "${BFF_LAUNCHER_REGION:-}"
 ```
 
+## Nirinsou Link {#nirinsou-link}
+
+Fantasy Tale Nirinsou Link（簡稱 Nirinsou）是執行中的啟動器與其啟動遊戲所在伺服器之間的選用 WebSocket 通道，
+用來承載原版遊戲用戶端沒有對應封包的功能，例如顯示在遊戲上方的啟動器彈窗。遊戲連線本身不變；沒有 Nirinsou
+的啟動與以前完全相同。
+
+### 模組列
+
+| 列 | 作用 |
+| --- | --- |
+| `companion` | 監聽器與啟動表。啟用後，每個 `/v1/launch` 回覆都帶有 `companion` 物件：`url`、一次性 `ticket`、`launchId` 和 `expiresAt`。 |
+| `companion.notices` | 啟動器彈窗（`ui.notification.show`）與 `popup <文字>` 管理指令，權限為 `game.management.popup`。 |
+
+兩列在 core 套件中預設停用，由 `all` 設定啟用。`companion` 的選項：
+
+| 選項 | 預設值 | 含義 |
+| --- | --- | --- |
+| `listen` | `127.0.0.1:8092`（`BFF_COMPANION_LISTEN`） | WebSocket 監聽位址。 |
+| `public_url` | 空（`BFF_COMPANION_PUBLIC_URL`） | 交給啟動器的 URL，路徑為 `/companion/v1`；`{host}` 會替換為啟動器存取時使用的主機。為空時為 `ws://{host}:<監聽埠>/companion/v1`。 |
+| `ticket_seconds` | `120` | 連線票據的有效時間。 |
+| `pending_seconds` | `900` | 啟動等待遊戲登入的最長時間，逾時即捨棄。 |
+| `max_launches`、`max_connections` | `4096`、`2048` | 啟動表與同時連線數的上限。 |
+| `message_bytes`、`queue_messages`、`queue_bytes`、`messages_per_second` | `65536`、`128`、`1048576`、`128` | 每個連線的訊息、佇列與速率上限，與啟動器一致。 |
+| `idle_seconds` | `60` | 連線靜默多久後關閉；啟動器每 20 秒傳送一次心跳。 |
+
+### 啟動如何繫結
+
+1. `/v1/launch` 開啟一個啟動，回傳遊戲票據和 Nirinsou 授權；遊戲票據記錄該啟動。
+2. 啟動器以子協定 `fantasytale.companion.v1` 升級 `GET /companion/v1`，並以 `Authorization: Bearer` 攜帶票據。
+   票據只能使用一次；重新連線時透過 `/v1/companion/tickets` 取得新票據，新連線會取代舊連線。
+3. 啟動器傳送 `companion.hello`，包含版本、啟動 ID、語言及其支援的訊息類型；伺服器回覆 `companion.welcome`，
+   給出雙方都支援的類型和狀態 `pending_game`。
+4. 遊戲登入兌換遊戲票據後，啟動繫結到該遊戲連線，啟動器收到狀態 `connected`。伺服器訊息只在此之後傳送。
+5. 遊戲連線關閉時，啟動結束，Nirinsou 連線隨之關閉。
+
+遊戲始終沒有登入的啟動會在 `pending_seconds` 後捨棄。每則訊息都是 JSON，包含 kind、id、type、結構描述版本和
+payload；格式錯誤、重複、未協商或過快的訊息會以原因代碼關閉連線，啟動器再用新票據重新連線。
+
+監聽器使用明文 `ws`。透過網路存取時，請像啟動器 API 一樣放在 TLS 終止之後，並把 `public_url` 設為 `wss`。
+
 ## 疑難排解
 
 以下是目前程式碼中存在的失敗路徑。目前檢查點的啟動器沒有應用程式內修復操作；復原意味著閱讀訊息或記錄並修正輸入。
@@ -381,3 +428,53 @@ hook 的預期工作方式：
 - [伺服器設定](configuration.md)介紹啟動器 API 背後的 profile 列與環境變數。
 - [部署](deployment.md)介紹如何執行伺服器、持續性、備份與網路安全。
 - [疑難排解](troubleshooting.md)介紹與啟動器無關的伺服器端故障。
+
+## 伺服器公開展示與准入 {#server-presentation-and-admission}
+
+`GET /v1/catalog` 新增 `presentation`，包含 `motd`、`iconUrl`、`images`、`onlinePlayers`、
+`playerLimit`、`state`、`whitelist` 和 `rosterEnabled`。在 `launcher.http` 列中透過
+`motd`、`icon_url`、`images`、`show_online_players`、`player_limit`、`maintenance`、
+`whitelist_enabled` 和 `roster_enabled` 設定。預設不限制准入及人數，公開名單預設開啟。
+工作階段服務不可用時人數為 null，`show_online_players: false` 時為 -1。只計算已驗證的
+遊戲玩家，按帳號去重，排除已關閉連線及已識別的對局連線。尚未接入持久化峰值儲存，因此不提供歷史最高人數。
+
+`GET /v1/players` 不需要 Bearer，回傳 `schema: 1`、`enabled`、`players` 和 `truncated`。
+每位玩家只有 `name` 和 `level`。`roster_enabled: false` 回傳空名單且不讀取工作階段登錄表；
+名單開啟但登錄表不可用時回傳 HTTP 503 `player_state_unavailable`。
+`max_roster_players` 限制單次筆數，預設 1000，範圍 1–10000；`truncated: true` 表示
+實際線上玩家更多。人數與名單公開開關互相獨立。HTTP 模組讀取 `ISessionRegistry`，透過
+`IPlayerSession.LoginConnectionId` 識別實際登入連線。共用玩家狀態的對局連線，以及未提供
+該身分的外掛工作階段，不計入公開線上名單。票據簽發因此無需等待使用票據的大廳與對局服務啟動。
+
+用戶端預設支援選用的 `protocol_version`（1–65535）和 `patch_version`（最多 64 字元），
+分別輸出為 `protocolVersion` 和 `patchVersion`，與現有的 `build`、`releaseVersion`、
+`clientLanguages`、`downloadSource` 並列。未設定的值保持未知；這些展示欄位尚未用於驗證啟動要求中的用戶端版本。
+
+`maintenance: true` 阻止登入及簽發新票據，回傳 HTTP 503 `server_maintenance`。
+選用的 `maintenance_start`、`maintenance_end`、`maintenance_description` 分別輸出為
+`maintenanceStart`、`maintenanceEnd`、`maintenanceDescription`；時間僅作說明，不會自動排程。
+`whitelist_enabled: true` 依 `whitelist` 驗證帳號名稱，不區分大小寫，最多 4096 個不重複帳號；
+未列入時回傳 HTTP 403 `not_whitelisted`。正數 `player_limit` 要求啟動時有工作階段服務；
+達到上限時新玩家收到 HTTP 503 `server_full`，已在線上帳號仍可取得替換票據。
+這些是啟動器准入檢查，不是原子席位預留；直接遊戲連線和票據兌換尚未重新檢查這些選項。
+
+驗證失敗透過 JSON `error` 回傳 HTTP 401 `account_not_found`、`wrong_password` 或
+`account_banned`，只有密碼正確後才披露停權狀態，不編造停權原因。Bearer 失敗仍為 `unauthorized`。
+關閉註冊回傳 HTTP 403 `registration_disabled`，要求限制回傳 HTTP 429 `rate_limited`，
+工作階段容量不足回傳 HTTP 503 `authentication_capacity`。維護期間仍可更新工作階段及登出；
+網路連線失敗由呼叫端處理，不偽裝為伺服器驗證錯誤。
+
+同一個 `POST /v1/launch` 要求也可攜帶 `release_version`、`patch_version`、
+`launcher_language`、`native_language` 與 `client_language`。版本標籤若有提供，必須是非空白、
+不含控制字元且不超過 64 個字元的字串；它們描述發行版本，不會解析為通訊協定版本，也不與公告的標籤比較。
+語言若有提供，必須精確為 `zh-CN`、`zh-TW`、`ko`、`en`、`id` 或 `vi`。
+已知欄位不合法時，在占用票據名額之前回傳 HTTP 400 `invalid_request`。舊要求可以省略全部五個欄位；
+未知頂層欄位仍會忽略，重複鍵仍會拒絕。成功簽發票據時，模組日誌記錄 build 與這些描述資訊，
+不記錄帳號名稱、Bearer 或票據。這些資訊不能證明已安裝用戶端的版本、語言或完整性。
+
+遊戲連線兌換啟動票據後，`launcher_language` 決定該連線收到的伺服器提示語言，包括房間指令與自動開局提示。
+用戶端所屬地區、`native_language` 和 `client_language` 均不決定這些提示的語言。
+未提供語言或缺少譯文時，使用本地化模組的 `default_language`。
+`launcher_languages` 將介面語言標籤對應到資源名稱；預設設定將 `zh-CN` 對應到 `zh-Hans`，
+將 `zh-TW` 對應到 `zh-Hant`，其他標籤直接比對資源名稱。目前沒有越南語字典，`vi` 使用部署預設語言。
+沒有啟動票據語言資訊的連線同樣使用部署預設語言。語言設定持續到連線關閉，並保留至首次建立角色完成。

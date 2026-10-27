@@ -4,6 +4,7 @@ using BubbleFighter.Fantasy.Contracts.Shop;
 using BubbleFighter.Fantasy.Kernel;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using Microsoft.Extensions.Logging;
 
 namespace BubbleFighter.Fantasy.Architecture.Tests;
 
@@ -53,13 +54,15 @@ public sealed class FeatureProfileTests
     [InlineData("fighters", null)]
     [InlineData("inventoryview", "IEquipmentSelection")]
     [InlineData("dialect.messages", "LocalEquipmentViewUpdated")]
-    [InlineData("ingame", "IMatchRoomDirectory")]
+    [InlineData("ingame", "Match capability directory")]
+    [InlineData("rooms", "room create binding")]
     [InlineData("match", null)]
+    [InlineData("match-messages", "Match inbound bindings")]
+    [InlineData("match-replies", "Match reply sender")]
     [InlineData("shop", null)]
     [InlineData("equipment", null)]
     [InlineData("lobby", "IInventoryPushService")]
     [InlineData("persistence", "IInventoryRepository")]
-    [InlineData("messages", "session signature sender")]
     [InlineData("core.message-router", "IMessageRouter")]
     [Trait("Category", "LocalClientData")]
     public async Task RemovingFeatureRowsStartsOrReportsTheConfiguredMissingService(string removed, string? missing)
@@ -107,8 +110,20 @@ public sealed class FeatureProfileTests
         }),
         PluginBoundaryTests.Row("equipment", "equipment"),
         PluginBoundaryTests.Row("lobby", "lobby", new() { ["inventory_source"] = "mysql", ["money_source"] = "mysql" }),
+        PluginBoundaryTests.Row("rooms", "dialect.rooms", TestWireDialects.ModernRoomsConfig()),
         PluginBoundaryTests.Row("ingame", "ingame"),
-        PluginBoundaryTests.Row("match", "match-connection"),
+        // The match transport uses capability admission. This fixture does not start rounds, so the
+        // separate game-side offer binding is absent.
+        PluginBoundaryTests.Row("match-messages", "dialect.match", new()
+        {
+            ["protocol"] = "kr-1256/relay", ["native_handshake"] = "capability",
+            ["packets_directory"] = SharedDialectRows.PacketsDirectory(),
+        }),
+        PluginBoundaryTests.Row("match-replies", "dialect.match-replies", new()
+        {
+            ["protocol"] = "kr-1256/relay", ["packets_directory"] = SharedDialectRows.PacketsDirectory(),
+        }),
+        PluginBoundaryTests.Row("match", "match-connection", new() { ["capability_authentication"] = true }),
         PluginBoundaryTests.Row("inventoryview", "inventoryview", new() { ["enabled"] = true, ["publish_equipped_view_push"] = true }),
         SharedDialectRows.Kr1256(new() { ["inventory"] = true, ["clan"] = clan }),
         PluginBoundaryTests.Row("fighters", "fighters", new()
@@ -118,7 +133,6 @@ public sealed class FeatureProfileTests
         PluginBoundaryTests.Row("persistence", "persistence.memory"),
         PluginBoundaryTests.Row("core.packet-router", "core.packet-router"),
         PluginBoundaryTests.Row("core.message-router", "core.message-router"),
-        PluginBoundaryTests.Row("messages", "dialect.modern.messages", TestWireDialects.ModernMessagesConfig()),
         PluginBoundaryTests.Row("core.opcode-tables", "core.opcode-tables"),
         // The feature rows name their packets; the protocol row supplies the kr-1256 numbers.
         PluginBoundaryTests.Row("core.protocol-registry", "core.protocol-registry"),
@@ -183,7 +197,9 @@ public sealed class FeatureProfileTests
             await host.StartAsync(CancellationToken.None);
             Assert.All(host.Instances, row => Assert.Equal(PluginState.Active, row.State));
             var reloaded = (await host.ReloadAsync("persistence", CancellationToken.None)).ReloadedRowIds;
-            Assert.Equal(new[] { "persistence", "clan" }, reloaded);
+            // The message row reads the settings repository optionally (customized_keys), so the persistence
+            // reload cascades through it to the clan row that consumes its bindings.
+            Assert.Equal(new[] { "persistence", "dialect.messages", "clan" }, reloaded);
         }
         finally { await host.ShutdownAsync(CancellationToken.None); }
 
@@ -212,13 +228,16 @@ public sealed class FeatureProfileTests
             }),
             PluginBoundaryTests.Row("persistence", "persistence.memory"),
             PluginBoundaryTests.Row("router", "core.packet-router"),
-            // The catalog shop resolves its packet numbers by name from the kr-1256 game table.
+            // The shop consumes typed messages only; the shared dialect row binds them to the kr-1256 packets.
             PluginBoundaryTests.Row("core.protocol-registry", "core.protocol-registry"),
+            PluginBoundaryTests.Row("core.session-registry", "core.session-registry"),
+            PluginBoundaryTests.Row("core.message-router", "core.message-router"),
             PluginBoundaryTests.Row("core.client-profiles", "core.client-profiles"),
             PluginBoundaryTests.Row("core.opcode-tables", "core.opcode-tables"),
             PluginBoundaryTests.Row("core.wire-dialects", "core.wire-dialects"),
             PluginBoundaryTests.Row("dialect", "dialect", TestWireDialects.RowConfig("kr-1256")),
             PluginBoundaryTests.Row("protocol", "protocol", new() { ["opcode_table_path"] = Path.Combine(AppContext.BaseDirectory, "opcodes.yaml") }),
+            PluginBoundaryTests.Row("dialect.messages", "dialect.messages", TestWireDialects.MessagesConfig(new() { ["protocol"] = "kr-1256/game", ["login"] = false })),
             PluginBoundaryTests.Row(consumerId, "test.shop-open-consumer"),
         };
         if (reverse)
@@ -269,3 +288,4 @@ public sealed class FeatureProfileTests
         }
     }
 }
+

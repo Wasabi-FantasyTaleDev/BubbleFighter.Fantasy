@@ -46,6 +46,12 @@ public interface IPlayerSession
     /// <summary>Gets the authenticated player.</summary>
     PlayerIdentity Identity { get; }
 
+    /// <summary>
+    /// Gets the connection that owns this authenticated login, or null when the provider does not identify it.
+    /// Match connections may share this state but retain the original owner's id; public presence must count only that owner.
+    /// </summary>
+    long? LoginConnectionId => null;
+
     /// <summary>Updates the committed display nickname while preserving scene phase and generation.</summary>
     void ChangeNickname(string nickname) => throw new NotSupportedException("This player session cannot change its nickname.");
 
@@ -83,6 +89,15 @@ public sealed class PlayerSession : IPlayerSession
         ArgumentNullException.ThrowIfNull(identity);
         _identity = identity;
     }
+
+    /// <summary>Creates player state owned by the connection that completed authentication.</summary>
+    /// <param name="identity">The authenticated identity.</param>
+    /// <param name="loginConnectionId">The owning connection id, preserved when a match connection shares this state.</param>
+    public PlayerSession(PlayerIdentity identity, long loginConnectionId) : this(identity) =>
+        LoginConnectionId = loginConnectionId;
+
+    /// <inheritdoc />
+    public long? LoginConnectionId { get; }
 
     /// <inheritdoc />
     public PlayerIdentity Identity { get { lock (_gate) return _identity; } }

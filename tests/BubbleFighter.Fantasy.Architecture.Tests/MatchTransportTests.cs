@@ -25,7 +25,17 @@ public sealed class MatchTransportTests
         rows.AddRange([
             PluginBoundaryTests.Row("relay", "net.tcp", new() { ["listen"] = $"127.0.0.1:{port}", ["protocol"] = "kr-1256/relay" }),
             PluginBoundaryTests.Row("core.message-router", "core.message-router"),
-            PluginBoundaryTests.Row("messages", "dialect.modern.messages", TestWireDialects.ModernMessagesConfig()),
+            // The match transport rows the profile mounts: the account admission of the raw path (the test's
+            // directory checks the seat key with the account the join carries) and the success-signal sender.
+            PluginBoundaryTests.Row("match-messages", "dialect.match", new()
+            {
+                ["protocol"] = "kr-1256/relay", ["native_handshake"] = "account",
+                ["packets_directory"] = SharedDialectRows.PacketsDirectory(),
+            }),
+            PluginBoundaryTests.Row("match-replies", "dialect.match-replies", new()
+            {
+                ["protocol"] = "kr-1256/relay", ["packets_directory"] = SharedDialectRows.PacketsDirectory(),
+            }),
             PluginBoundaryTests.Row("rooms", "test.match-directory"),
             PluginBoundaryTests.Row("match", "match-connection"),
         ]);
@@ -45,7 +55,7 @@ public sealed class MatchTransportTests
             // A different entity may not claim the authenticated seat's scene.
             await replacement.SendAsync(12, Scene(8), ct);
             Assert.Equal(0, await replacement.Stream.ReadAsync(new byte[1], ct));
-            var reload = await host.ReloadAsync("messages", ct);
+            var reload = await host.ReloadAsync("match-messages", ct);
             Assert.Contains("match", reload.ReloadedRowIds);
             Assert.Equal(0, await second.Stream.ReadAsync(new byte[1], ct));
             using var fresh = await Client.ConnectAsync(port, ct);
@@ -119,10 +129,10 @@ public sealed class MatchTransportTests
         private async Task<byte[]> ReceiveAsync(ushort expected, CancellationToken ct)
         {
             var bytes = new byte[8]; await Stream.ReadExactlyAsync(bytes, ct); _receive.DecryptInPlace(bytes);
-            Assert.True(WireFrame.TryReadHeader(bytes, out var header)); Assert.Equal(expected, header.Opcode);
+            Assert.True(PacketFrame_8Bytes.TryReadHeader(bytes, out var header)); Assert.Equal(expected, header.Opcode);
             Assert.InRange(header.PayloadLength, 0, 4096);
             var body = new byte[header.PayloadLength]; await Stream.ReadExactlyAsync(body, ct); _receive.DecryptInPlace(body);
-            Assert.True(WireFrame.ValidatePayload(header, body)); return body;
+            Assert.True(PacketFrame_8Bytes.ValidatePayload(header, body)); return body;
         }
         public void Dispose() => socket.Dispose();
     }

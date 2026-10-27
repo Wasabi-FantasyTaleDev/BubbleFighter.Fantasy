@@ -16,7 +16,6 @@ bundles:
   - kr-1256
   - ingame
   - shop
-  - inventory-actions
   - player-settings
 patches:
   - patch.yaml

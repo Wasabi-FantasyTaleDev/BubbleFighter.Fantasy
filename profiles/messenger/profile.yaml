@@ -1,0 +1,8 @@
+id: messenger
+description: Standalone messenger shared by one or more game servers; no game or relay ports.
+bundles:
+  - core
+patches:
+  - patch.yaml
+  # Optional developer override; git-ignored and skipped when absent.
+  - local.patch.yaml

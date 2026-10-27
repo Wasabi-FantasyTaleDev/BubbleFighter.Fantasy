@@ -11,11 +11,14 @@
 # these are absolute replacements, not additive score events.
 # cn-279, cn-324 and id-400 retain their whole-scoreboard update path; this table
 # does not enable a packet that their reviewed opcode tables do not expose.
+# The kr-1256 restatement below carries the same frame in the modern number space
+# (S2C 985, three counted lists instead of two).
 version: 1
 structs:
   RoundLiveScore:
     - team: u8
       offset: 4
+      # Zero leaves team totals untouched while still applying seat vectors (kr-812 sub_8046C0).
     - total: u16
       offset: 6
     - scorer_slot: u8
@@ -35,3 +38,38 @@ structs:
       offset: 4
     - value: u16
       offset: 6
+  # The kr-1256 restatement (S2C 985, gspUpdateScoreData in profiles/kr-1256/opcodes.yaml, name matched
+  # to the kr-812 class). Reader kr-1256 sub_9E3420 (985 branch) reads u8 team, u16 total, u8 slot, u8
+  # slot, then THREE u32-counted lists of u8 kind + u16 value: the first two through kr-1256
+  # sub_10D96F0 (4-byte packed elements), the third through kr-1256 sub_10D9890 (8-byte elements,
+  # kind +0 and value +4; the wire element is the same u8 + u16, so the shared element structure
+  # serves all three lists). The offsets are the stack record sub_9E3420 fills and the applier
+  # kr-1256 sub_9E8B20 consumes: team +0, total +4, slots +6/+7, lists +8/+20/+32.
+  # One structure states every body the reader accepts, so there are no separate phase tables:
+  # kr-1256 sub_9E8B20 stores the total at its team index (+8 + 4*team), applies the first list to
+  # the +6 seat's record and the second to the +7 seat's record when those slots are >= 0, and
+  # applies the third list's kind/value pairs (at +156 + 4*kind) only in game modes 5 and 6 - the
+  # 17-byte empty body (slots -1, three zero counts) is the same structure with absent seats.
+  # cn-774 sub_8E33A0 (985) and tw-454 sub_A63910 (984) independently read the same envelope.
+  # Their first two lists use cn-774 sub_1056B60 / tw-454 sub_EC4310, and their third lists use
+  # cn-774 sub_10576A0 / tw-454 sub_EC49D0: u8 kind and u16 value despite the different native strides.
+  RoundLiveScore@kr-1256:
+    - team: u8
+      offset: 0
+      # cn-774 sub_8E33A0 skips the total write for zero, without skipping the seat vectors.
+    - total: u16
+      offset: 4
+    - scorer_slot: u8
+      offset: 6
+      default: 255 # -1: kr-1256 sub_9E8B20 leaves the seat's record untouched when the slot is negative
+    - victim_slot: u8
+      offset: 7
+      default: 255 # -1: same negative-slot gate as the first slot
+    - scorer_stats: "list<RoundLiveScoreStat>"
+      offset: 8
+    - victim_stats: "list<RoundLiveScoreStat>"
+      offset: 20
+    # The third list has no kr-812 counterpart; kr-1256 sub_9E8B20 reads it only in modes 5 and 6,
+    # so its purpose beyond those modes is not traced.
+    - unknown_32: "list<RoundLiveScoreStat>"
+      offset: 32

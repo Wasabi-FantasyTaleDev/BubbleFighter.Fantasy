@@ -20,6 +20,8 @@
     config:
       # cn-706 sub_8FFFF0 sends the named use request; dispatcher sub_7C8720 case 810 owns the reply.
       inventory_item_use: true
+      # This build's customized-key builder and login consumer are not audited; only kr-812's are.
+      customized_keys: false
 - set:
     id: dialect.rooms
     config:

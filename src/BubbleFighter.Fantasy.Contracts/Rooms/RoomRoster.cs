@@ -55,17 +55,3 @@ public interface IRoomRoster
     /// <param name="roomId">The room id.</param>
     RoomRosterView? Find(int roomId);
 }
-
-/// <summary>Team points of the running round, owned by the room so the result screen and rewards read one total.</summary>
-public interface IRoundScoreboard
-{
-    /// <summary>
-    /// Adds one point to a team of the given round and publishes the new totals to the room.
-    /// A point for a round that has already ended or been replaced is ignored.
-    /// </summary>
-    /// <param name="roomId">The room id.</param>
-    /// <param name="generation">The round generation the point was scored in.</param>
-    /// <param name="team">The scoring team, 1 or 2.</param>
-    /// <param name="ct">Cancellation token.</param>
-    ValueTask AddTeamPointAsync(int roomId, int generation, byte team, CancellationToken ct);
-}

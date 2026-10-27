@@ -15,6 +15,38 @@ public sealed class PluginConfigurationReconciliationTests
     private static readonly IReadOnlyDictionary<string, string> Versions = new Dictionary<string, string>
     { ["BubbleFighter.Fantasy.Abstractions"] = typeof(IPlugin).Assembly.GetName().Version!.ToString() };
 
+    /// <summary>Deferred profile values bind during real activation and are refreshed by configuration reconciliation.</summary>
+    [Fact]
+    public async Task EnablingAComposedRowAndReloadingBindsDeferredIntegerConfiguration()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "bff-compose-reconcile-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(directory, "bundles"));
+        Directory.CreateDirectory(Path.Combine(directory, "demo"));
+        try
+        {
+            File.WriteAllText(Path.Combine(directory, "bundles", "a.yaml"),
+                "- id: a\n  plugin: a\n  disabled: true\n  config:\n    value: '${TEST_LIFETIME:-600}'\n");
+            File.WriteAllText(Path.Combine(directory, "demo", "profile.yaml"), "id: demo\nbundles: [a]\n");
+            var patch = Path.Combine(directory, "enable.yaml");
+            File.WriteAllText(patch, "- replace:\n    id: a\n    disabled: false\n");
+            string? lifetime = null;
+            var composer = new ProfileComposer(directory, key => key == "TEST_LIFETIME" ? lifetime : null);
+            var probe = new Probe("a", 0);
+            await using var harness = new Harness(composer.Compose("demo", []).ToArray(), probe);
+            await harness.Host.StartAsync(default).AsTask().WaitAsync(Limit);
+            Assert.Equal(0, probe.Starts);
+            var enabled = await harness.Host.ReconcileConfigurationAsync(composer.Compose("demo", [patch])).AsTask().WaitAsync(Limit);
+            Assert.Equal(PluginTransitionOutcome.Converged, enabled.Outcome);
+            Assert.Equal(600, Assert.Single(probe.Observations).Value);
+            lifetime = "480";
+            var reloaded = await harness.Host.ReconcileConfigurationAsync(composer.Compose("demo", [patch])).AsTask().WaitAsync(Limit);
+            Assert.Equal(PluginTransitionOutcome.Converged, reloaded.Outcome);
+            Assert.Equal(new[] { 600, 480 }, probe.Observations.Select(observation => observation.Value));
+            Assert.Equal(1, probe.Stops);
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
     /// <summary>Provides the first independently configurable dependency consumed by the shared fixture.</summary>
     public interface ILeft
     {

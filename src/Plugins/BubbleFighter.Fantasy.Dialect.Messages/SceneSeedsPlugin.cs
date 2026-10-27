@@ -35,6 +35,17 @@ public sealed class SceneSeedsPlugin : IPlugin
         _ = tables.Resolve(build, "RelayCriticalSeedTable");
         _ = tables.Resolve(build, "RelayDefenceSeedTable");
         _ = tables.Resolve(build, "RelayCriticalSeedCancelTable");
+        // A build that states a seed table uses the actor id and the vector shapes the encoder writes; cn-279
+        // states the tables empty and writes none.
+        if (tables.Resolve(build, "RelayCriticalSeedTable").Count > 0)
+            PacketLayoutContract.RequireFields(tables, build, "RelayCriticalSeedTable", "Native scene seeds",
+                ("entity_id", "u32"), ("unknown_8", "list<u32>"), ("unknown_24", "list<u32>"));
+        if (tables.Resolve(build, "RelayDefenceSeedTable").Count > 0)
+            PacketLayoutContract.RequireFields(tables, build, "RelayDefenceSeedTable", "Native scene seeds",
+                ("entity_id", "u32"), ("unknown_8", "list<u8>"));
+        if (tables.Resolve(build, "RelayCriticalSeedCancelTable").Count > 0)
+            PacketLayoutContract.RequireFields(tables, build, "RelayCriticalSeedCancelTable", "Native scene seeds",
+                ("entity_id", "u32"), ("unknown_8", "list<u32>"));
         var opcodes = context.Services.Get<IOpcodeTableRegistry>().ForProtocol(options.Protocol);
         if (opcodes.Connection != OpcodeConnection.Relay || opcodes.Profile.Id != build)
             throw new ConfigException("Native scene seeds require an opcode table for the owning relay connection.");

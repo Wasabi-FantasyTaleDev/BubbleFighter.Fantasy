@@ -11,6 +11,27 @@
     version_major: 1256
     enabled: true
     publish_equipped_view_push: true
+# The kr-1256 family's match transport, as the shared native rows already serve the legacy builds. The relay
+# handshake (join reader kr-1256 sub_95FD30, scene report reader kr-1256 sub_10F32C0, reconnect map reader
+# kr-1256 sub_9F02F0) is dialect.match; the relay success frames (S2C 22 settings then S2C 1 accepted, and the
+# scene accept's seed tables S2C 4/5/6 before S2C 13; dispatcher kr-1256 sub_9601E0) are dialect.match-replies;
+# the game-side relay offer and connection report (S2C/C2S 571; offer reader kr-1256 sub_9A7250, report builder
+# kr-1256 sub_961C00) are dialect.match-offers. The three rows publish before match-connection consumes them.
+- id: dialect.match
+  plugin: dialect.match
+  config:
+    protocol: "kr-1256/relay"
+    # The typed round admits the relay by its room-issued key (capability admission); the raw opt-out
+    # (profiles/kr-1256/raw.patch.yaml) selects the account admission its raw start flow checks instead.
+    native_handshake: capability
+- id: dialect.match-offers
+  plugin: dialect.match-offers
+  config:
+    protocol: "kr-1256/game"
+- id: dialect.match-replies
+  plugin: dialect.match-replies
+  config:
+    protocol: "kr-1256/relay"
 - id: match-connection
   plugin: match-connection
   config:
@@ -21,14 +42,13 @@
     capability_authentication: true
     require_capability_scene_report: true
 # In-session play row (plaza enter, room create/join/ready, battle).
-# Protocol names and version_major select the dialect. Profile already
-# lists `- ingame`. Do not send these packets on the login 3 to 163 chain.
+# Protocol names select the dialect's listeners; the room and round logic is the typed messages the build's
+# dialect row binds. Profile already lists `- ingame`. Do not send these packets on the login 3 to 163 chain.
 - id: ingame
   plugin: ingame
   config:
     game_protocol: "kr-1256/game"
     relay_protocol: "kr-1256/relay"
-    version_major: 1256
     relay_advertise_ipv4: "${BFF_PUBLIC_HOST:-127.0.0.1}"
     relay_advertise_port: ${KR_1256_RELAY_PUBLIC_PORT:-7101}
     max_matches: 64
@@ -89,9 +109,8 @@
     result_scoreboard_delay_ms: 1000
     result_reward_delay_ms: 5000
     result_close_grace_ms: 10000
-    # The typed room and round path (room_binding: typed on dialect.modern.messages): the ingame row registers no
-    # packet handlers of its own and plays rounds over the native match transport.
-    typed_only: true
+    # The room and round logic is typed only: the ingame row registers no packet handlers of its own and plays
+    # rounds over the native match transport.
     native_match_relay: true
     # A seat whose relay reports failure (kr-1256 sub_960050) plays over its game connection.
     match_transport_fallback: true
@@ -109,14 +128,3 @@
     # and the member list republished.
     reinstall_room_on_first_probe: false
 # In-round traffic between the players: movement, actions, damager spawns, lives
-# and weapon-preset swaps. It reads the rooms through the ingame row's roster
-# and adds team points through its scoreboard, so it is listed after that row.
-- id: match-relay
-  plugin: match-relay
-  # The older packet relay, used only by profiles/kr-1256/raw.patch.yaml.
-  disabled: true
-  config:
-    game_protocol: "kr-1256/game"
-    relay_protocol: "kr-1256/relay"
-    # Merge per-seat motion and send it to the other authenticated match transports.
-    broadcast_movement_samples: true

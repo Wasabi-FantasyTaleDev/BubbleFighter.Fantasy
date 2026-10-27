@@ -5,6 +5,15 @@ using BubbleFighter.Fantasy.Packets;
 
 namespace BubbleFighter.Fantasy.Dialect.Rooms;
 
+/// <summary>
+/// Serves the <c>pve_points</c> and <c>pve_rank_updates</c> capabilities: the reported unit, the point
+/// delta and the rank rows are the structures audited in packets/pve-points.yaml. The delta is three
+/// words (kr-812 <c>sub_9D95D0</c>, cn-717 <c>sub_7F4370</c>, id-400 <c>sub_72E4D0</c>, id-1809
+/// <c>sub_4D8130</c>, cn-406 <c>sub_715B70</c>, cn-324 <c>sub_6EB8B0</c>) whose consumers are the live
+/// row updates and local HUD sorts (kr-812 <c>sub_7FED80</c>, <c>sub_806790</c>), and the rank vector
+/// is read by kr-812 <c>sub_80BE00</c>/<c>sub_80BDC0</c> with cn-717, id-400, id-1809 and cn-324
+/// matching.
+/// </summary>
 internal sealed class PvePointsBinding(string protocol, IOpcodeTable table, PacketTables tables, string build)
     : IInboundMessageBinding<RoundPvePangReported>, IMessageSender<RoundPvePointsChanged>
 {
@@ -14,6 +23,15 @@ internal sealed class PvePointsBinding(string protocol, IOpcodeTable table, Pack
     {
         if (!tables.CapabilityOf(build, "pve_points"))
             throw new ConfigException("pve_points requires an audited native score-unit and point-delta capability.");
+        // Every field the binding casts or sizes is checked against the build's own table at load: the reported
+        // unit index, the point delta it writes, the nested row vector and the row fields it fills.
+        PacketLayoutContract.RequireFields(tables, build, "PvePangUnit", "Cooperative points", ("unit_index", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "PveGamePoint", "Cooperative points",
+            ("seat", "u32"), ("subtract", "u32"), ("amount", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "PveRankInfo", "Cooperative ranking",
+            ("rows", "list<PveRankRow>"));
+        PacketLayoutContract.RequireFields(tables, build, "PveRankRow", "Cooperative ranking",
+            ("seat", "u32"), ("unknown_8", "u32"), ("rank", "u32"));
         foreach (var name in new[] { "PvePangUnit", "PveGamePoint", "PveRankRow", "PveRankInfo" }) _ = tables.Resolve(build, name);
         context.Effect(context.Services.RegisterMany<IInboundMessageBinding<RoundPvePangReported>>(this));
         context.Effect(context.Services.RegisterMany<IMessageSender<RoundPvePointsChanged>>(this));

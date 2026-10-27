@@ -50,3 +50,13 @@ structs:
     - unknown_8: list<u32>
       offset: 8
   RelayCriticalSeedCancelTable@cn-279: []
+
+  # Native relay 7 (kr-1256 sub_9601E0 case 7, block 0x960D92): one word that is read and discarded,
+  # then one float stored at game+0xF20 only while game+0xF54 is set. No consumer of game+0xF20 was
+  # found, so both fields stay unknown; the emulator's writer sends 110.0. The baseline table is empty
+  # because the format requires one.
+  RelaySceneFloat:
+    - unknown_n0: u32
+      only: [kr-1256]
+    - unknown_n1: f32
+      only: [kr-1256]

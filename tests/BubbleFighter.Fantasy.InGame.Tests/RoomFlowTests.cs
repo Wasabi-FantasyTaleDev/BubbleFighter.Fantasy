@@ -61,22 +61,24 @@ public sealed class RoomFlowTests
             new(Registry, Flow, options, MatchNotifications, NullLogger.Instance, lifetime);
 
         public Rig(int seats = 16, InGameOptions? options = null, bool stageProbes = false,
-            Func<long>? autoStartNow = null, Func<TimeSpan, CancellationToken, ValueTask>? autoStartDelay = null)
+            Func<long>? autoStartNow = null, Func<TimeSpan, CancellationToken, ValueTask>? autoStartDelay = null,
+            Func<TimeSpan, CancellationToken, ValueTask>? zombieKingDelay = null, IGameText? texts = null)
         {
-            Registry = new RoomRegistry(options ?? new InGameOptions { TypedOnly = true, MaxPlayersPerMatch = seats });
+            Registry = new RoomRegistry(options ?? new InGameOptions { MaxPlayersPerMatch = seats });
             Flow = new RoomFlow(Registry, new RoomSenders(Entered, SeatUpdated, SeatVacated, MasterChanged, Refused, Left, Starting,
                 Chat: Chat, SeatLock: SeatLock, Kicked: Kicked, AutoStart: AutoStart, Notices: Notices,
                 RescuePrepared: RescuePrepared, SettingsChanged: SettingsChanged,
                 UiChanged: stageProbes ? UiChanged : null, ProbeAcknowledged: stageProbes ? ProbeAcknowledged : null,
                 MasterChangeReply: MasterReplies),
-                NullLogger.Instance, null, null, 36, options, default, new TestTexts(), null, null,
+                NullLogger.Instance, null, null, 36, options, default, texts ?? new TestTexts(), null, null,
                 autoStartNow ?? (() => Environment.TickCount64),
-                autoStartDelay ?? ((delay, ct) => new(Task.Delay(delay, ct))));
+                autoStartDelay ?? ((delay, ct) => new(Task.Delay(delay, ct))),
+                zombieKingDelay ?? ((delay, ct) => new(Task.Delay(delay, ct))));
         }
 
-        public static RoomPushTests.RecordingSession Player(long id, string nickname)
+        public static RecordingSession Player(long id, string nickname)
         {
-            var session = new RoomPushTests.RecordingSession(id);
+            var session = new RecordingSession(id);
             session.SetLobbyPlayer(id, nickname, level: 3);
             return session;
         }
@@ -316,7 +318,7 @@ public sealed class RoomFlowTests
     [Fact]
     public async Task BossStartCommandCancelsWaitingAndArmsEveryMembersNativeCountdownOnce()
     {
-        var rig = new Rig(options: new InGameOptions { TypedOnly = true, AutoStartModeIds = [16], AutoStartTimer = true, AutoStartDelayMs = 65000 });
+        var rig = new Rig(options: new InGameOptions { AutoStartModeIds = [16], AutoStartTimer = true, AutoStartDelayMs = 65000 });
         var host = Rig.Player(11, "host");
         var guest = Rig.Player(22, "guest");
         await rig.Flow.HandleCreateAsync(host, new("boss", "", 16, "rel_ZombiePVE_01"), default);
@@ -343,7 +345,7 @@ public sealed class RoomFlowTests
     [Fact]
     public async Task BossCountdownWaitsForTheClientsResolvedRandomMapAndRejectsALateDuplicate()
     {
-        var rig = new Rig(options: new InGameOptions { TypedOnly = true, AutoStartModeIds = [16], AutoStartTimer = true, AutoStartDelayMs = 65000 });
+        var rig = new Rig(options: new InGameOptions { AutoStartModeIds = [16], AutoStartTimer = true, AutoStartDelayMs = 65000 });
         var host = Rig.Player(11, "host");
         var guest = Rig.Player(22, "guest");
         await rig.Flow.HandleCreateAsync(host, new("boss", "", 16, "Random"), default);
@@ -370,7 +372,7 @@ public sealed class RoomFlowTests
     [Fact]
     public async Task BossCanStartTwoRoundsWithoutChangingItsMap()
     {
-        var rig = new Rig(options: new InGameOptions { TypedOnly = true, AutoStartModeIds = [16] });
+        var rig = new Rig(options: new InGameOptions { AutoStartModeIds = [16] });
         var host = Rig.Player(11, "host");
         await rig.Flow.HandleCreateAsync(host, new("boss", "", 16, "Random"), default);
         var room = rig.Registry.TryGet(host.Id)!;
@@ -464,7 +466,7 @@ public sealed class RoomFlowTests
     {
         var rig = new Rig(options: new InGameOptions
         {
-            TypedOnly = true, RescueModeId = 16,
+            RescueModeId = 16,
             RescueStartTimesMs = [20000], RescueMissionIds = [1], RescueCitizenNames = ["ms_citizen"],
             RescueMapEnemyCounts = [new() { MapKey = "rel_zombie05_Tear", EnemyCounts = [4] }],
         });
@@ -486,7 +488,7 @@ public sealed class RoomFlowTests
     [Fact]
     public async Task DeletingArmedBossRoomNeverEmitsAServerSelectedStart()
     {
-        var rig = new Rig(options: new InGameOptions { TypedOnly = true, AutoStartModeIds = [16] });
+        var rig = new Rig(options: new InGameOptions { AutoStartModeIds = [16] });
         var host = Rig.Player(11, "host");
         await rig.Flow.HandleCreateAsync(host, new("boss", "", 16, "rel_ZombiePVE_01"), default);
         var room = rig.Registry.TryGet(host.Id)!;
@@ -499,7 +501,7 @@ public sealed class RoomFlowTests
     [Fact]
     public async Task LeavingBossRoomCancelsPendingAnnouncements()
     {
-        var rig = new Rig(options: new InGameOptions { TypedOnly = true, AutoStartModeIds = [16], AutoStartTimer = true });
+        var rig = new Rig(options: new InGameOptions { AutoStartModeIds = [16], AutoStartTimer = true });
         var host = Rig.Player(11, "host");
         await rig.Flow.HandleCreateAsync(host, new("boss", "", 16, "rel_ZombiePVE_01"), default);
         var room = rig.Registry.TryGet(host.Id)!;
@@ -833,7 +835,7 @@ public sealed class RoomFlowTests
     [Fact]
     public async Task FirstProbeNeedNotInstallTheRoomAgain()
     {
-        var rig = new Rig(options: new InGameOptions { TypedOnly = true, MaxPlayersPerMatch = 16, ReinstallRoomOnFirstProbe = false },
+        var rig = new Rig(options: new InGameOptions { MaxPlayersPerMatch = 16, ReinstallRoomOnFirstProbe = false },
             stageProbes: true);
         var host = Rig.Player(11, "host");
         try
@@ -1064,7 +1066,7 @@ public sealed class RoomFlowTests
     [Fact]
     public async Task AutomaticStartRoomArmsOnceNoSeatIsLeftOpen()
     {
-        var rig = new Rig(options: new InGameOptions { TypedOnly = true, MaxPlayersPerMatch = 3, AutoStartModeIds = [101] });
+        var rig = new Rig(options: new InGameOptions { MaxPlayersPerMatch = 3, AutoStartModeIds = [101] });
         var host = Rig.Player(11, "host");
         var guest = Rig.Player(22, "guest");
         await rig.Flow.HandleCreateAsync(host, new("pirates", "", 101, "npc_Village07_Easy01"), default);
@@ -1096,7 +1098,7 @@ public sealed class RoomFlowTests
     {
         var rig = new Rig(options: new InGameOptions
         {
-            TypedOnly = true, MaxPlayersPerMatch = 2, AutoStartModeIds = [101], AutoStartRematchHoldMs = 300,
+            MaxPlayersPerMatch = 2, AutoStartModeIds = [101], AutoStartRematchHoldMs = 300,
         });
         var host = Rig.Player(11, "host");
         var guest = Rig.Player(22, "guest");
@@ -1133,7 +1135,7 @@ public sealed class RoomFlowTests
     {
         var rig = new Rig(options: new InGameOptions
         {
-            TypedOnly = true, MaxPlayersPerMatch = 2, AutoStartModeIds = [101], AutoStartRematchHoldMs = 200,
+            MaxPlayersPerMatch = 2, AutoStartModeIds = [101], AutoStartRematchHoldMs = 200,
         });
         var host = Rig.Player(11, "host");
         var guest = Rig.Player(22, "guest");
@@ -1183,7 +1185,7 @@ public sealed class RoomFlowTests
 
         var rig = new Rig(options: new InGameOptions
         {
-            TypedOnly = true, MaxPlayersPerMatch = 2, AutoStartModeIds = [101], AutoStartRematchHoldMs = 200,
+            MaxPlayersPerMatch = 2, AutoStartModeIds = [101], AutoStartRematchHoldMs = 200,
         }, autoStartNow: () => Interlocked.Read(ref now), autoStartDelay: Delay);
         var host = Rig.Player(111, "host");
         var guest = Rig.Player(222, "guest");
@@ -1224,7 +1226,7 @@ public sealed class RoomFlowTests
     [InlineData(1, false)]
     public async Task ClosingEveryOtherSeatArmsOnlyAnAutomaticStartMode(int mode, bool arms)
     {
-        var rig = new Rig(options: new InGameOptions { TypedOnly = true, MaxPlayersPerMatch = 3, AutoStartModeIds = [101] });
+        var rig = new Rig(options: new InGameOptions { MaxPlayersPerMatch = 3, AutoStartModeIds = [101] });
         var host = Rig.Player(11, "host");
         await rig.Flow.HandleCreateAsync(host, new("room", "", mode, "rel_Village07_Easy02"), default);
         var room = rig.Registry.TryGet(host.Id)!;

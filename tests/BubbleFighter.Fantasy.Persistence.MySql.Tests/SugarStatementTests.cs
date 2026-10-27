@@ -49,6 +49,24 @@ public sealed class SugarStatementTests
     }
 
     [Fact]
+    public void PresetPageReplaceScopesTheDeleteToThePlayerAndInsertsTheFivePositionalRows()
+    {
+        // Pages are keyed by list position beside the player (kr-1256 sub_81B820 keys the client's page
+        // map by record position), so the replace is a player-scoped delete plus five fresh rows.
+        using var db = Client();
+        var delete = Normalize(db.Deleteable<WeaponPresetPageRow>().Where(row => row.UserNum == 7L).ToSql().Key);
+        Assert.StartsWith("DELETE FROM `weapon_preset_pages`", delete, StringComparison.Ordinal);
+        Assert.Contains("`user_num` =", delete, StringComparison.Ordinal);
+        var insert = Normalize(db.Insertable(Enumerable.Range(0, WeaponPresetSlots.Count)
+            .Select(index => new WeaponPresetPageRow { UserNum = 7, Page = (byte)index, Word0 = 202001 + index })
+            .ToArray()).ToSql().Key);
+        Assert.StartsWith("INSERT INTO `weapon_preset_pages` (`user_num`,`page`,`word_0`,`word_1`,`word_2`) VALUES", insert, StringComparison.Ordinal);
+        // Five positional rows in one statement, pages 0..4 in order with their weapon words.
+        for (var page = 0; page < WeaponPresetSlots.Count; page++)
+            Assert.Contains($"(N'7',N'{page}',N'{202001 + page}',N'0',N'0')", insert, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PurchaseSeedInsertLeavesUpdatedAtToTheColumnDefaultAndChangesNothingOnConflict()
     {
         var (sql, _) = SugarSql.BuildUpsert(Client(), new WalletRow { UserNum = 7, Lucci = 100, Cash = 0 },
@@ -279,7 +297,7 @@ public sealed class SugarStatementTests
             }));
         var db = Client();
         var entities = assembly.GetTypes().Where(t => t.GetCustomAttribute<SugarTable>() is not null).ToArray();
-        Assert.Equal(19, entities.Length);
+        Assert.Equal(24, entities.Length);
         foreach (var entity in entities)
         {
             var info = db.EntityMaintenance.GetEntityInfo(entity);

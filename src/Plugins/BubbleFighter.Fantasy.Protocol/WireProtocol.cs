@@ -13,7 +13,8 @@ namespace BubbleFighter.Fantasy.Protocol;
 /// <see cref="IPacketRouter"/> under this protocol's name. Frame integrity failures close
 /// the connection, and a packet handler that throws closes only this connection. When
 /// <see cref="ProtocolOptions.EnforceClientVersion"/> is on and the protocol requires the
-/// patch handshake, the first inbound frame must be <c>gcpReqGamePatch</c>.
+/// patch handshake, the first inbound frame must be the row's patch request
+/// (<c>gcpReqGamePatch</c> on kr-1256, <c>gcpFirstConnect</c> on the legacy builds).
 /// </summary>
 internal sealed class WireProtocol : IConnectionProtocol
 {
@@ -29,6 +30,7 @@ internal sealed class WireProtocol : IConnectionProtocol
     private readonly VersionVerifiedScope _versionVerified;
     private readonly ILogger _logger;
     private readonly bool _requiresPatchHandshake;
+    private readonly ushort _patchRequestOpcode;
 
     public WireProtocol(
         string name,
@@ -57,6 +59,7 @@ internal sealed class WireProtocol : IConnectionProtocol
         _versionVerified = versionVerified;
         _logger = logger;
         _requiresPatchHandshake = requiresPatchHandshake;
+        _patchRequestOpcode = requiresPatchHandshake ? opcodes.C2S(options.PatchRequestName) : default(ushort);
     }
 
     /// <inheritdoc />
@@ -195,7 +198,7 @@ internal sealed class WireProtocol : IConnectionProtocol
                 }
 
                 var preHandshake = handshakePending && _options.PreHandshakeOpcodes.Contains(packet.Opcode);
-                if (handshakePending && packet.Opcode != WireOpcodes.C2S.GamePatch && !preHandshake)
+                if (handshakePending && packet.Opcode != _patchRequestOpcode && !preHandshake)
                 {
                     if (!_options.RequirePatchHandshakeFirst)
                     {
@@ -210,7 +213,7 @@ internal sealed class WireProtocol : IConnectionProtocol
                         _logger.LogWarning(
                             "Session {SessionId} from {Remote} sent opcode {Opcode} before the patch handshake.",
                             session.Id, connection.RemoteEndPoint, packet.Opcode);
-                        await connection.CloseAsync("first packet must be gcpReqGamePatch").ConfigureAwait(false);
+                        await connection.CloseAsync($"first packet must be {_options.PatchRequestName}").ConfigureAwait(false);
                         return;
                     }
                 }

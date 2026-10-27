@@ -19,6 +19,9 @@
   plugin: protocol
   config:
     opcode_table_path: profiles/${BFF_PROFILE_ID}/opcodes.yaml
+    # The mandatory first packet, the patch-request slot: every legacy build names it
+    # gcpFirstConnect; kr-1256 names the same slot gcpReqGamePatch.
+    patch_request_name: gcpFirstConnect
     # The dispatcher treats greeting status 2 as a normal connect.
     bootstrap_status: ${LEGACY_BOOTSTRAP_STATUS:-2}
     # The address and port the client reaches this listener on.
@@ -60,6 +63,14 @@
     # handler sub_82C960. A build without the fighter_info capability turns this and the lobby's switch off in its
     # own patch.yaml.
     fighter_info: true
+    # The expired-item discard (gcpReqInventoryThrowItem in, gspRepInventoryThrowItem out;
+    # packets/inventory.yaml) for the inventory.throw row below. Every legacy build of this bundle has audited
+    # consumers and the stored equipment services the handler needs.
+    inventory_actions: true
+    # The customized-key update and login restoration (packets/customized-keys.yaml; builders kr-812 sub_4EB250,
+    # consumers kr-812 sub_8357D0) for the player.settings row of the player-settings bundle. A legacy build whose
+    # own builder and login consumer are not audited turns this off in its patch.yaml.
+    customized_keys: true
 - id: dialect.rooms
   plugin: dialect.rooms
   config:
@@ -127,6 +138,14 @@
     shop_item_client_path: "Config/ShopItem2.xml"
     max_shop_item_bytes: 134217728
     max_paint_items: 256
+# The typed handler of the expired-item discard the dialect.messages row binds above; it sits inside the
+# inventoryview subtree so it consumes this build's isolated equipment and push services.
+- id: inventory.throw
+  plugin: inventory.throw
+  parent_id: inventoryview
+  config:
+    protocol: "${BFF_PROFILE_ID}/game"
+    packets_directory: packets
 - id: lobby
   plugin: lobby
   parent_id: inventoryview
@@ -169,6 +188,12 @@
     online_players: true
     # Answers the player menu's "view info" from the build's logged-in players (needs online_players).
     fighter_info: true
+- id: commands.players
+  plugin: commands.players
+  parent_id: lobby
+  disabled: true
+  config:
+    protocol: "${BFF_PROFILE_ID}/game"
 - id: party
   plugin: party
   parent_id: inventoryview
@@ -194,7 +219,6 @@
     game_protocol: "${BFF_PROFILE_ID}/game"
     # No relay listener on the legacy builds yet; the start chain is not bound.
     relay_protocol: "${BFF_PROFILE_ID}/relay"
-    typed_only: true
     # A kr-812 room carries twelve slots (gspGotoRoom).
     max_players_per_match: ${LEGACY_SEATS:-12}
     # kr-812 sub_7EAB00 displays only remaining-seconds 3/2/1/0; longer waits start blank.

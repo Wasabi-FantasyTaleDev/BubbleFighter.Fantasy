@@ -17,6 +17,7 @@ internal sealed partial class RoomFlow
             RoomSeat[] members = [];
             var result = 0;
             var nextMaster = -1;
+            int? previousAiController = null;
             lock (room.Gate)
             {
                 var requester = room.FindByGame(session.Id);
@@ -30,10 +31,12 @@ internal sealed partial class RoomFlow
                     result = 3;
                 else
                 {
+                    previousAiController = room.Bots.Count > 0 ? requester.UserNum : null;
                     if (!room.TransferMaster(target.Slot))
                         throw new InvalidOperationException("The selected room master disappeared under the room gate.");
                     // kr-812 sub_7FD460 and kr-1256 sub_9DA3C0 clear the new master's ready flag.
                     target.Ready = false;
+                    room.TransferBots(target);
                     nextMaster = target.Slot;
                     members = [.. room.Seats];
                 }
@@ -46,7 +49,7 @@ internal sealed partial class RoomFlow
             }
             // A disconnected requester cannot prevent the committed owner reaching the surviving members.
             await NotifyScenePeerAsync(session, replies, new(request.Nickname, 0), token).ConfigureAwait(false);
-            var changed = new RoomMasterChanged(room.Id, nextMaster);
+            var changed = new RoomMasterChanged(room.Id, nextMaster) { PreviousAiControllerUserNum = previousAiController };
             foreach (var member in members)
                 await NotifyScenePeerAsync(member.Game, _masterChanged, changed, token).ConfigureAwait(false);
         }, ct).ConfigureAwait(false);

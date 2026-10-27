@@ -1,0 +1,49 @@
+version: 1
+# The room recruit ("ask members to join") and amplifier ("announce") messages of the waiting room.
+# The invitation half of recruiting lives with the party tables; these are the in-room broadcasts.
+structs:
+
+  # C2S gcpRoomSendAmpMsg (520): the baseline writer kr-812 sub_845040 and
+  # the modern writers kr-1256 sub_9D7350, cn-774 sub_BD61A0 and tw-454
+  # sub_AB1F70 emit one u32, one counted UTF-16 string, and two u32 words.
+  # The native objects place those values at +0, +4, +28 and +32. The first
+  # word is accepted as kinds 101/102/103 by kr-812 sub_8146C0; the two
+  # trailing words have different contextual uses in the audited producers,
+  # so they remain unknown rather than being called a cost or a colour.
+  RoomAmplifierRequest:
+    - kind: u32
+      offset: 0
+    - message: wstr
+      offset: 4
+    - unknown_28: u32
+      offset: 28
+    - unknown_32: u32
+      offset: 32
+
+  # Legacy C2S gcpRoomSendRecMsgTo (kr-812 2027): the writer kr-812 sub_845640 writes one counted UTF-16
+  # message and then one byte; the sender kr-812 sub_839BB0 stamps 2027 and the reader kr-812 sub_845670 reads
+  # the same two fields. The byte's purpose is not proven.
+  # No modern form is stated: the kr-1256 dispatcher kr-1256 sub_9D2FF0 has no recruit label, and kr-1256 C2S
+  # 2027 carries a different body (a horde-wave drop, recorded as Unknown2027), so a recruit request must not be
+  # read from kr-1256 2027. kr-1256, cn-774 and tw-454 therefore resolve this structure empty; the other legacy
+  # builds inherit the kr-812 shape until their own reader is read.
+  RoomRecruitRequest@kr-812:
+    - message: wstr
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_32: u8
+      offset: 32
+      except: [kr-1256, cn-774, tw-454]
+
+  # Legacy S2C gspRoomReceiveRecruitMsg (kr-812 516): the reader kr-812 sub_80AC10 and the writer kr-812
+  # sub_80ABE0 consume a u16 member identifier and then one counted UTF-16 message; the handler kr-812
+  # sub_8028C0 resolves the identifier against the room members. No kr-1256 dispatcher label exists for this
+  # notification, so the reply is sent to the legacy family only: kr-1256, cn-774 and tw-454 resolve this
+  # structure empty, and the other legacy builds inherit the kr-812 shape until their own reader is read.
+  RoomRecruitReply@kr-812:
+    - member_id: u16
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+    - message: wstr
+      offset: 8
+      except: [kr-1256, cn-774, tw-454]

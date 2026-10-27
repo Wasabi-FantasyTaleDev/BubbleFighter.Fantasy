@@ -19,6 +19,9 @@ internal sealed class PluginRuntimeBudget
 
     internal int EntryCapacity { get; }
     internal int ServiceMetadataCapacity { get; }
+
+    // The host registers IServiceRegistry, IEventBus, IPluginHost and IHostReadiness before any row activates.
+    internal const int HostServiceCount = 4;
     internal int DefinitionSourceCapacity { get; }
     internal int DefinitionCapacity { get; }
 
@@ -27,7 +30,7 @@ internal sealed class PluginRuntimeBudget
         if (initial is null) throw new ConfigException("Initial runtime rows must not be null.");
         var expected = CollectionCount(initial.Count, "initial");
         long entries = expected;
-        long metadata = 3;
+        long metadata = HostServiceCount;
         long sources = 0;
         long definitions = CollectionCount(initialDefinitionCount, "initial definition");
         var grants = new Dictionary<string, StartupGrant>(StringComparer.Ordinal);
@@ -61,7 +64,7 @@ internal sealed class PluginRuntimeBudget
         if ((long)candidateCount + retiringCount > EntryCapacity)
             throw new ConfigException($"Runtime entry capacity of {EntryCapacity} is exceeded by candidate and retiring rows.");
         var capacities = new Dictionary<string, int>(StringComparer.Ordinal);
-        long metadata = 3;
+        long metadata = HostServiceCount;
         Include(candidate, candidateCount, isCandidate: true);
         Include(retiring, retiringCount, isCandidate: false);
         var expected = CollectionCount(owned.Count, "owned");

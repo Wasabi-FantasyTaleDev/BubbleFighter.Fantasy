@@ -10,12 +10,14 @@ public interface IFighterRoster
     /// <param name="userNum">Login player id; 0 when the session has no proven identity.</param>
     /// <param name="itemId">A 300000-range character-item id from the catalog.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <exception cref="InvalidOperationException">Thrown when the id is not a cataloged playable character.</exception>
     ValueTask UnlockAsync(long userNum, int itemId, CancellationToken ct);
 
-    /// <summary>Marks <paramref name="itemId"/> as equipped. The id must already be unlocked.</summary>
+    /// <summary>Marks <paramref name="itemId"/> as equipped; the stored selection is replaced only after the unlock check passes.</summary>
     /// <param name="userNum">Login player id.</param>
     /// <param name="itemId">Unlocked bag item.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <exception cref="InvalidOperationException">Thrown when the id is not a cataloged playable character or the account has not unlocked it.</exception>
     ValueTask EquipAsync(long userNum, int itemId, CancellationToken ct);
 
     /// <summary>Returns unlocked item ids in unlock order, or empty when none were granted.</summary>

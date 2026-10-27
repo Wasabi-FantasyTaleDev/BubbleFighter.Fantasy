@@ -1,0 +1,47 @@
+version: 1
+structs:
+  # C2S gcpReqRefund, the cash-shop refund request. Its kr-812 deserialize slot kr-812 sub_4EC0B0
+  # (Packet_gcpReqRefund, kr-812 vtable 0xD8A9A0) reads a wstring at object +4 through kr-812 sub_A56D70
+  # (a 4-byte character count, then that many UTF-16 units) and one 4-byte word at object +32 through
+  # kr-812 sub_A56C10. The kr-812 sender kr-812 sub_9856D0 stamps C2S 815.
+  # The kr-1256 writer kr-1256 sub_D3E0B0, reached through the thin wrapper kr-1256 sub_D3EDC0, stamps C2S 817
+  # and writes the same two fields in the same order: a 4-byte character count, that many UTF-16 units, then one
+  # 4-byte word. Both values come from the request object the wrapper passes. The offsets above are the
+  # baseline reader's object offsets; the kr-1256 request is proven from the writer only, and the request
+  # object's own offsets were not read.
+  RefundRequest:
+    - unknown_4: wstr # the text the client writes first; its purpose is not proven
+      offset: 4
+    - unknown_32: u32 # one word after the text; its purpose is not proven
+      offset: 32
+
+  # S2C gspRepRefund. Its kr-812 deserialize slot kr-812 sub_6DB1B0 (Packet_gspRepRefund, kr-812 vtable
+  # 0xD6F594) reads two 4-byte words at object +4 and +8. That body is shared by code folding with
+  # other two-word classes: kr-812 vtable 0xD6F534 (Packet_gspRepShopBuy) and kr-812 vtable 0xD490C8
+  # (Packet_gcpReqFighterInfo) resolve to the same function, so the body proves the widths and the order, and
+  # the meaning of each word comes from this packet's own handler.
+  # The kr-812 handler kr-812 sub_829010 (case 820 of kr-812 sub_837170) switches on the SECOND word with cases
+  # 1..6; only case 1 passes the FIRST word to kr-812 sub_977DE0, which walks the 56-byte cash records at the
+  # cash store's +32 and removes the record whose key at +4 equals it. The other cases show one localized notice
+  # each.
+  # The kr-1256 handler kr-1256 sub_9B8700 (case 824 of kr-1256 sub_9D2FF0) reads the first two words into its
+  # message object's +0 and +4 and switches on the second with cases 1..7; only case 1 uses the first, through
+  # kr-1256 sub_8055F0, which removes the matching cash record the same way. The message object then holds a
+  # std::wstring at +8. The decompiler renders that string as a temporary that is constructed and moved into
+  # place without the call that would read it; the same client's cash-pickup parser kr-1256 sub_99B0E0 renders
+  # its own string field exactly the same way and the tables treat that field as read, so this third field is
+  # inferred from the parse idiom and the message layout, not from a rendered read.
+  RefundReply:
+    - cash_slot_id: u32 # the cash record kr-812 sub_977DE0 removes; offset 0 in kr-1256 sub_9B8700
+      offset: 4
+      kr-1256:
+        - cash_slot_id: u32
+          offset: 0
+    - result: u32 # selects the handler branch: kr-812 sub_829010 cases 1..6, kr-1256 sub_9B8700 cases 1..7
+      offset: 8
+      kr-1256:
+        - result: u32
+          offset: 4
+    - unknown_8: wstr # kr-1256 only; the message object's string member at +8, purpose unproven
+      offset: 8
+      only: [kr-1256] # cn-774 and tw-454 follow kr-1256's tables; their readers were not read

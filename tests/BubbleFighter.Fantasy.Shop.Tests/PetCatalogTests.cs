@@ -1,3 +1,4 @@
+using BubbleFighter.Fantasy.Contracts.ClientData;
 using BubbleFighter.Fantasy.Tests;
 using BubbleFighter.Fantasy.Shop.Data;
 using Xunit;

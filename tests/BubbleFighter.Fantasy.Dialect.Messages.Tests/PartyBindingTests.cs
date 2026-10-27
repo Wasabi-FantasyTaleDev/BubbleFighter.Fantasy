@@ -224,6 +224,56 @@ public sealed class PartyBindingTests
         Assert.Equal(300017, Convert.ToInt32(profile["character_id"]));
     }
 
+    /// <summary>
+    /// The modern solo list with the recipient's appearance is pinned to the exact bytes the modern row's own
+    /// party writer produced for the same values (state 2, one member with four zero words at +32..+44, then
+    /// the profile record with the character and the non-character equipped ids): the same bytes the raw
+    /// in-game path's S2C 201 blob carries. Readers: kr-1256 sub_9064B0 (handler) -> kr-1256 sub_905D20
+    /// (body parser) -> kr-1256 sub_1141670 (member element), profile entry element kr-1256 sub_10C4290.
+    /// </summary>
+    [Fact]
+    public void ModernSoloAppearancePinsTheBytesTheModernRowWriterSent()
+    {
+        int[] items = [300017, 200100, 207000];
+        var body = PartyBinding.WriteParty(TestBuilds.Packets, "kr-1256",
+            new PartyUpdated(new([new(11, "member")]), new(11, 300017, items)));
+        Assert.Equal(84, body.Length);
+        Assert.Equal(
+            "02000000010000000B000000060000006D0065006D0062006500720000000000000000000000000000000000010000000B000000F193040002000000A40D03009828030000000000000000000000000000000000",
+            Convert.ToHexString(body));
+    }
+
+    /// <summary>
+    /// The modern group list without an appearance ends in the empty profile map: state 2, two members with
+    /// their four trailing words, then the map count 0. Pinning the count word keeps the keyed map the only
+    /// trailing element (kr-1256 sub_905D20 reads it after the member vector).
+    /// </summary>
+    [Fact]
+    public void ModernGroupWithoutAppearanceEndsInTheEmptyProfileMap()
+    {
+        var body = PartyBinding.WriteParty(TestBuilds.Packets, "kr-1256",
+            new PartyUpdated(new([new(22, "leader"), new(11, "member")]), null));
+        Assert.Equal(84, body.Length);
+        Assert.Equal(
+            "020000000200000016000000060000006C0065006100640065007200000000000000000000000000000000000B000000060000006D0065006D006200650072000000000000000000000000000000000000000000",
+            Convert.ToHexString(body));
+    }
+
+    /// <summary>
+    /// The legacy group list keeps its own shape for the same values: three trailing member words (no word at
+    /// +32, reader kr-812 sub_415C00) and the empty equipped vector, with no profile map at all.
+    /// </summary>
+    [Fact]
+    public void LegacyGroupPinsTheKr812Shape()
+    {
+        var body = PartyBinding.WriteParty(TestBuilds.Packets, "kr-812",
+            new PartyUpdated(new([new(22, "leader"), new(11, "member")]), null));
+        Assert.Equal(76, body.Length);
+        Assert.Equal(
+            "020000000200000016000000060000006C00650061006400650072000000000000000000000000000B000000060000006D0065006D0062006500720000000000000000000000000000000000",
+            Convert.ToHexString(body));
+    }
+
     /// <summary>The modern row mounts the invitation routes only; kick, leader and leave stay off until audited.</summary>
     [Theory]
     [InlineData("kr-1256", true)]

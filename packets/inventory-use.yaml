@@ -4,6 +4,10 @@ structs:
   # kr-812 sub_8B9490 / kr-812 sub_8B9660: two words followed by a wide string.
   # cn-717 sub_8C9E10, cn-324 sub_7FD750, cn-279 sub_450430,
   # id-400 sub_799620, id-1809 sub_912F50, cn-406 sub_85DD10 and cn-706 sub_7A1B40 match.
+  # kr-1256 sub_80DA80 stamps opcode 806 and appends the two words from its source object before
+  # the list; kr-1256 sub_429D10 derives the u32 count as the vector's byte span divided by the
+  # 24-byte MSVC wstring stride, and kr-1256 sub_1126430 caps one string at 0x4000 characters,
+  # so the client cannot emit a longer one.
   InventoryUseRequest:
     - item_id: u32 # cn-324 sub_7FE160 and id-400 sub_8EAC70 supply item ID and quantity.
       offset: 4

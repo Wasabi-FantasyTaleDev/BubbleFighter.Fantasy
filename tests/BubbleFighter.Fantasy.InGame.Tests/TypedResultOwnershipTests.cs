@@ -30,7 +30,6 @@ public sealed class TypedResultOwnershipTests
         var root = Context("root", new());
         var row = Context(build, new()
         {
-            ["typed_only"] = true, ["version_major"] = int.Parse(build[3..]),
             ["game_protocol"] = protocol, ["relay_protocol"] = build + "/relay",
             ["result_reward_delay_ms"] = 10, ["result_close_grace_ms"] = 10,
         });
@@ -57,7 +56,7 @@ public sealed class TypedResultOwnershipTests
             Assert.Single(messages.Handlers, handler => handler.Protocol == protocol
                 && handler.MessageType == typeof(RoundEndRequested));
             var registry = Assert.IsType<RoomRegistry>(Assert.Single(services.GetAll<IMatchCapabilityDirectory>()));
-            var player = new RoomPushTests.RecordingSession(1);
+            var player = new RecordingSession(1);
             var (room, _) = registry.CreateForMode(player, 4, "map", "room", 1, "player", listed: true);
             room.MarkStarting();
             room.MarkPlaying();
@@ -114,7 +113,7 @@ public sealed class TypedResultOwnershipTests
             if (missing >= 0 && missing != 1) Register<RoundScoreboard>();
             if (missing != 2 && missing != -2) Register<RoundEnded>();
             if (missing >= 0 && missing != 3) Register<ResultStageAdvanced>();
-            var options = new InGameOptions { TypedOnly = true, GameProtocol = protocol };
+            var options = new InGameOptions { GameProtocol = protocol };
             var registry = new RoomRegistry(options);
             var senders = new Handlers.RoundSenders(new Sender<RoundPlayerLoaded>(protocol),
                 new Sender<RoundCountdownStarted>(protocol), new Sender<RoundStarted>(protocol));

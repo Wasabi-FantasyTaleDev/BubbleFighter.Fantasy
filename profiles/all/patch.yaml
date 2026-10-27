@@ -10,6 +10,11 @@
     id: launcher.http
     disabled: false
     config:
+      # This replacement also retains the deployment controls from the disabled core row.
+      listen: "${BFF_LAUNCHER_LISTEN:-127.0.0.1:8090}"
+      ticket_seconds: ${BFF_LAUNCHER_TICKET_SECONDS:-600}
+      host_policy: "${BFF_LAUNCHER_HOST_POLICY:-auto}"
+      region: "${BFF_LAUNCHER_REGION:-}"
       # The all-builds deployment exposes the catalog through its configured reverse proxy.
       # Game endpoints are data; the launcher still decides whether to use native login.
       supports_instances: true
@@ -46,3 +51,20 @@
       preview_bytes: 96
       console_packets: false
       preview_handled_opcodes: [502, 503, 702, 704, 705, 707, 713, 803, 804, 805, 901, 903, 904, 908, 923, 924, 32862, 32892, 32920]
+# Messenger for native messenger clients: this server signs its own tickets and runs the core in-process.
+- replace:
+    id: messenger.tickets
+    disabled: false
+- replace:
+    id: messenger
+    disabled: false
+- replace:
+    id: messenger.http
+    disabled: false
+# Nirinsou Link for launchers that support it; launches still work without it.
+- replace:
+    id: companion
+    disabled: false
+- replace:
+    id: companion.notices
+    disabled: false

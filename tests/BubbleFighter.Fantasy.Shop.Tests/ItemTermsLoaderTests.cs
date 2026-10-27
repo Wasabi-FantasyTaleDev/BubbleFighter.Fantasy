@@ -1,3 +1,4 @@
+using BubbleFighter.Fantasy.Contracts.Shop;
 using BubbleFighter.Fantasy.Shop.Data;
 using BubbleFighter.Fantasy.Shop.Purchasing;
 using Xunit;
@@ -42,6 +43,16 @@ public sealed class ItemTermsLoaderTests
     public void InvalidItemTermsFailAtLoad(string id, string duration, string maximum, string buyAgain, string function)
     {
         Assert.Throws<InvalidOperationException>(() => ItemTermsLoader.Parse([Header, [id, duration, maximum, buyAgain, function]]));
+    }
+
+    [Fact]
+    public void CatalogTermsExcludeUnrelatedEventRowsButRejectInvalidOfferedTerms()
+    {
+        IReadOnlyList<IReadOnlyList<string>> rows = [Header,
+            ["1", "day", "360", "0", "0"], ["2", "count", "0", "0", "9"]];
+        Assert.Single(ItemTermsLoader.Parse(rows, new HashSet<int> { 1 }));
+        Assert.Throws<InvalidOperationException>(() => ItemTermsLoader.Parse(rows, new HashSet<int> { 1, 2 }));
+        Assert.Throws<InvalidOperationException>(() => ItemTermsLoader.Parse(rows));
     }
 
     [Fact]

@@ -1,0 +1,78 @@
+# Profile patch for cn-705: applied after the bundle rows (see profiles/kr-1256/patch.yaml
+# for the supported operations). The admin API moves off 8080 so this profile can run
+# beside the other builds on one machine.
+- replace:
+    id: admin.http
+    config:
+      listen: "${CN_705_ADMIN_HOST:-127.0.0.1}:${CN_705_ADMIN_PORT:-8097}"
+- replace:
+    id: diagnostics.packet-log
+    config:
+      file: logs/{date}/packets-cn-705_{timestamp}.log
+      preview_bytes: 96
+- set:
+    id: lobby
+    config:
+      # Resource identity and rename consumer activation remain a separate research audit.
+      rename_item_id: 0
+- set:
+    id: dialect.messages
+    config:
+      # cn-705 sub_8FE7F0 sends Packet_gcpReqInventoryUseItem (C2S 805), the counterpart of
+      # cn-706 sub_8FFFF0; dispatcher cn-705 sub_7C6C40 case 810 owns the reply, as cn-706 sub_7C8720 does.
+      inventory_item_use: true
+      # This build's customized-key builder and login consumer are not audited (the base cn-706
+      # turns the same flag off); cn-705's own export has no gcpUserUpdateCustomizedKeyList row.
+      customized_keys: false
+- set:
+    id: dialect.rooms
+    config:
+      # Ordinary matching activation is deferred while this build remains a research target.
+      quick_matching: false
+      supply_items: false
+      horde_lottery: false
+      counted_pve_items: false
+      # The zombie battle's team change (S2C 504) reaches cn-705 sub_7026A0, the counterpart of
+      # cn-706 sub_7033C0, and cn-705 sub_6F7CB0 sends gcpRoomChangeTeam on death as cn-706
+      # sub_6F89C0 does; the cooperative zombie mode stays off through zombie_conversion_mode_id: 0.
+      zombie_conversion: true
+      pve_points: false
+      rescue_missions: false
+- set:
+    id: ingame
+    config:
+      native_item_slot_count: 1
+      lottery_modes: []
+      counted_item_mode_id: 0
+      counted_item_kinds: []
+      counted_immediate_item_kinds: []
+      zombie_conversion_mode_id: 0
+      # Its direct item-effect surface is off (packets/builds.yaml direct_supply_effects), so the king's ultra
+      # has no reply here yet.
+      zombie_king_ultra_item_kind: 0
+      pve_point_mode_id: 0
+      rescue_mode_id: 0
+      immediate_supply_item_kinds: []
+      random_supply_item_kinds: []
+      # No boxes are scheduled here (supply_items is off), so no mode offers any.
+      item_mode_ids: []
+      item_mode_kinds: []
+# The shop opens with id-400's request (cn-705 sub_656280 sends only the cache token) and reads the
+# cn-706 catalog: reader cn-705 sub_7A01F0, card sub_481290 and stock sub_481060 match cn-706
+# sub_7A17F0, sub_481A40 and sub_481810, whose segments follow id-1809's.
+- set:
+    id: shop
+    config:
+      max_purchase_attempts: ~
+
+# Life-counted items: this build's executable has no "endurance" ShopItem duration type (no item kind 3) and no Life
+# notice text, as cn-706 and the rest of the id-400 lineage, so the daily life rule and life stock are off
+# (packets/builds.yaml life_items: false).
+- set:
+    id: lobby
+    config:
+      life_items: false
+- set:
+    id: shop
+    config:
+      life_items: false

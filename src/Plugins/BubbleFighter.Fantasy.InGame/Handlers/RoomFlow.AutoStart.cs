@@ -22,7 +22,7 @@ internal sealed partial class RoomFlow
         lock (room.Gate)
         {
             if (!IsAutoStartMode(room.ModeId) || room.Phase != RoomPhase.Waiting || room.AutoStartArmed
-                || room.Seats.Count + room.ClosedSlots.Count < room.MaxSeats)
+                || room.OccupantCount + room.ClosedSlots.Count < room.MaxSeats)
                 return;
             if (room.AutoStartRematchAfter is { } after
                 && (_autoStartNow() < after || room.Seats.Any(seat => seat.Slot != room.MasterSlot && !seat.Ready)))
@@ -159,7 +159,7 @@ internal sealed partial class RoomFlow
             ["minutes"] = (seconds / 60.0).ToString("0.##", CultureInfo.InvariantCulture),
         };
         foreach (var member in members)
-            await _notices!.SendAsync(member.Game, new ServerNotice(_texts!.Format(member.Game.Profile, key, arguments)), ct)
+            await _notices!.SendAsync(member.Game, new ServerNotice(_texts!.Format(member.Game, key, arguments)), ct)
                 .ConfigureAwait(false);
     }
 
@@ -190,7 +190,9 @@ internal sealed partial class RoomFlow
             {
                 lock (room.Gate)
                 {
-                    if (room.FindByGame(session.Id)?.Slot != room.MasterSlot)
+                    var seat = room.FindByGame(session.Id);
+                    if (seat is null || (!_commands.SharedDispatch && seat.Slot != room.MasterSlot)
+                        || room.Phase != RoomPhase.Waiting)
                         return;
                     room.AutoStartCancellation?.Cancel();
                 }
@@ -198,6 +200,12 @@ internal sealed partial class RoomFlow
             }, ct).ConfigureAwait(false);
         }
         else
-            await HandleStartAsync(session, new RoomStartRequested { Force = true }, ct).ConfigureAwait(false);
+            await room.Executor.ExecuteAsync(operationCt =>
+            {
+                RoomStartRequested request;
+                lock (room.Gate)
+                    request = new(room.MapKey) { Force = true, MapSelection = room.MapKey };
+                return StartRoomCoreAsync(room, session, request, operationCt, allowMemberStart: _commands.SharedDispatch);
+            }, ct).ConfigureAwait(false);
     }
 }

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using BubbleFighter.Fantasy.RoomCore;
 using System.IO.Pipelines;
 using System.Net;
 using System.Reflection;
@@ -8,7 +9,6 @@ using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Match;
 using BubbleFighter.Fantasy.InGame;
 using BubbleFighter.Fantasy.InGame.Sessions;
-using BubbleFighter.Fantasy.InGame.Wire;
 using BubbleFighter.Fantasy.Kernel;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;

@@ -49,13 +49,30 @@ public sealed record MatchSeatBinding(int RoomId, int Slot, int UserNumber, int 
 /// <summary>Room-owned boundary for granting and revoking authenticated match connections.</summary>
 public interface IMatchRoomDirectory
 {
-    /// <summary>Validates a seat capability and identity, replacing and closing any previous transport for that seat.</summary>
+    /// <summary>
+    /// Validates a seat capability and identity and binds the transport to that seat, replacing and
+    /// closing any previous transport for it. The seat rewrite runs as an operation on the owning
+    /// room's serialized executor, so it cannot interleave with a round start, a departure or the
+    /// countdown expiry; the replaced transport is closed only after the rewrite commits, and its
+    /// close raises its own departure event.
+    /// </summary>
+    /// <param name="session">The match transport's session; it must not already be bound to a room.</param>
+    /// <param name="authentication">The presented ticket and claimed account identity, which must match the seated player.</param>
+    /// <param name="ct">Checked before the bind begins; cancellation after that point does not undo a committed bind.</param>
+    /// <returns>The lease for the seat, valid for the round generation that issued it.</returns>
+    /// <exception cref="InvalidOperationException">The session is already bound, the capability is unknown or
+    /// no longer valid for the room phase or the presented identity, or the room was removed before the bind ran.</exception>
     ValueTask<MatchSeatBinding> BindAsync(ISession session, MatchAuthenticate authentication, CancellationToken ct);
-    /// <summary>Verifies that this transport still owns its lease before processing a subsequent message.</summary>
+    /// <summary>
+    /// Verifies that this transport still owns its lease before a subsequent message is processed: the
+    /// room exists, the round generation matches, the phase is still active, the seat still references
+    /// this session, and neither connection has closed.
+    /// </summary>
     bool IsCurrent(ISession session, MatchSeatBinding binding);
     /// <summary>Marks scene initialization complete for the current lease.</summary>
+    /// <exception cref="InvalidOperationException">The room was removed or the lease is no longer current.</exception>
     void MarkInitialized(ISession session, MatchSeatBinding binding);
-    /// <summary>Revokes this transport without removing its player from the room.</summary>
+    /// <summary>Revokes this transport's lease without removing its player from the room; an unknown or already detached session is ignored.</summary>
     void Release(ISession session);
 }
 
@@ -64,8 +81,29 @@ public interface IMatchCapabilityDirectory : IMatchRoomDirectory
 {
     /// <summary>Identifies the relay protocol owned by this room instance, allowing multiple builds in one host.</summary>
     string Protocol { get; }
-    /// <summary>Issues one owned, bounded key for a live game seat in the current round; its length comes from the dialect.</summary>
+    /// <summary>
+    /// Issues one cryptographically random capability for a live game seat in the current round. The
+    /// key is stored on the seat and stays valid until the round generation advances, the offer is
+    /// withdrawn, or the capability binds. Issuing runs on the room's serialized executor, including
+    /// the native map-load path.
+    /// </summary>
+    /// <param name="game">The seat's live game session.</param>
+    /// <param name="ticketLength">The requested key length in bytes, bounded by the profile's configuration.</param>
+    /// <param name="ct">Cancels the issuance before the capability is stored.</param>
+    /// <exception cref="ArgumentOutOfRangeException">The length is outside the configured bounds.</exception>
+    /// <exception cref="InvalidOperationException">The game session is not a live seat in an active round, or the
+    /// current round already issued or attached a capability for that seat.</exception>
     ValueTask<ReadOnlyMemory<byte>> IssueCapabilityAsync(ISession game, int ticketLength, CancellationToken ct);
-    /// <summary>Matches the exact issued key within the client profile and current round, without accepting guessed account values.</summary>
+    /// <summary>
+    /// Matches the exact issued key by constant-time comparison within the client profile and current
+    /// round, without accepting guessed account values: the seat is found by its stored capability, not
+    /// by presented identity. Binding runs on the room's serialized executor and, as in
+    /// <see cref="IMatchRoomDirectory.BindAsync"/>, closes the replaced transport after the rewrite commits.
+    /// </summary>
+    /// <param name="session">The native match transport's session; it must not already be bound to a room.</param>
+    /// <param name="authentication">The presented capability bytes.</param>
+    /// <param name="ct">Checked before the bind begins.</param>
+    /// <exception cref="InvalidOperationException">The session is already bound, the key is unknown, ambiguous,
+    /// revoked before binding, or no longer valid in the room phase.</exception>
     ValueTask<MatchSeatBinding> BindCapabilityAsync(ISession session, MatchCapabilityAuthenticate authentication, CancellationToken ct);
 }

@@ -1,0 +1,42 @@
+version: 1
+# Portal move: the game connection's scene transition request and its reply, plus the relay connection's
+# companion frame the same client action sends. The structures are stated as kr-812 sends and reads them;
+# the kr-1256 client writes and reads the same bodies.
+#
+# Numbers per build: the request is C2S 948 on kr-812 (Packet_gcpPortalMove) and C2S 939 on kr-1256; the
+# reply is S2C 958 on kr-812, id-400, id-1809, cn-717, cn-404, cn-408 and cn-706, and S2C 953 on kr-1256.
+# cn-774 and tw-454 carry gspRepRecheckMap at 958 and their own gspPortalMove number, so the reply must be
+# resolved by name from each build's table, never by the number alone.
+structs:
+  # kr-812 C2S gcpPortalMove (948), sender kr-812 sub_529E80 (Packet_gcpPortalMove),
+  # deserializer kr-812 sub_52FC40: three four-byte words then a two-byte word (14 bytes).
+  # The kr-1256 C2S 939 builder kr-1256 sub_7037D0 writes the same four pieces in this order.
+  PortalMoveRequest:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - unknown_16: u16
+      offset: 16
+
+  # kr-812 S2C gspPortalMove (958), deserializer kr-812 sub_83B7C0: a four-byte word, a two-byte word and
+  # another four-byte word (10 bytes). The kr-1256 S2C 953 handler kr-1256 sub_9C3DF0 reads four, two and
+  # four bytes in this order and applies the scene transition through kr-1256 sub_6D3390/sub_9E1530.
+  PortalMoveReply:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u16
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+
+  # Relay C2S 26 rcpPortalMove, sent by the same client action next to the game request: kr-812 sender
+  # kr-812 sub_529E80 builds Packet_rcpPortalMove with a four-byte word then a two-byte word; the kr-1256
+  # builder kr-1256 sub_7037D0 writes the same two pieces and stamps 26 (6 bytes).
+  PortalMoveRelay:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u16
+      offset: 8

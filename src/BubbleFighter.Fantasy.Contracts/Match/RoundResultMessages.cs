@@ -106,6 +106,9 @@ public sealed record RoundRewardRow(int Level, long LevelFloorExp, long TotalExp
 /// <param name="Reward">What the seat earned, or <see langword="null"/> on the pass sent before the rewards are computed.</param>
 public sealed record RoundScoreboardRow(int Slot, string Nickname, int Team, int Level, RoundSeatStats Stats, RoundRewardRow? Reward)
 {
+    /// <summary>Gets the computer-player name resource resolved for the recipient; empty preserves a literal player nickname.</summary>
+    public string NicknameKey { get; init; } = "";
+
     /// <summary>Gets the committed primary reward-card sale identity; zero means no selected reward.</summary>
     public int AwardDisplayId { get; init; }
 

@@ -211,7 +211,7 @@ public sealed class NativeMatchRoundTests
     [Fact]
     public async Task NativePolicyRejectsMissingWrongScopedOrOversizedOfferEncoders()
     {
-        var options = new InGameOptions { TypedOnly = true, NativeMatchRelay = true, GameProtocol = "kr-812/game" };
+        var options = new InGameOptions { NativeMatchRelay = true, GameProtocol = "kr-812/game" };
         var registry = new RoomRegistry(options);
         var senders = new RoundSenders(new Sink<RoundPlayerLoaded>(), new Sink<RoundCountdownStarted>(), new Sink<RoundStarted>());
         Assert.Throws<ConfigException>(() => new RoundFlow(registry, options, senders, NullLogger.Instance, default, (_, _) => ValueTask.CompletedTask));
@@ -239,7 +239,7 @@ public sealed class NativeMatchRoundTests
             Host = new(11, build); Host.SetLobbyPlayer(11, "host");
             Guest = new(22, build); Guest.SetLobbyPlayer(22, "guest");
             Offers = new(build + "/game", length);
-            var options = new InGameOptions { TypedOnly = true, NativeMatchRelay = enabled, GameProtocol = build + "/game",
+            var options = new InGameOptions { NativeMatchRelay = enabled, GameProtocol = build + "/game",
                 RelayProtocol = build + "/relay", RelayAdvertiseIpv4 = "10.20.30.40", RelayAdvertisePort = 7111, StartTimerMs = countdownMs,
                 MatchTransportFallback = fallback };
             Registry = new(options);

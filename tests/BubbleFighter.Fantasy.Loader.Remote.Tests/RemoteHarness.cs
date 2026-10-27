@@ -152,7 +152,9 @@ public sealed class TestDialect : IPlugin
     public ValueTask ActivateAsync(IPluginContext context, CancellationToken cancellationToken)
     {
         var state = new DialectState(context.Services.Get<IMessageRouter>());
-        States[(string)context.Row.Config!["key"]!] = state;
+        var key = (string)context.Row.Config!["key"]!;
+        States[key] = state;
+        context.Effect(() => States.TryRemove(key, out _));
         context.Effect(context.Services.RegisterMany<IInboundMessageBinding<LoginRequested>>(new Binding()));
         context.Effect(context.Services.RegisterMany<IMessageSender<LoginAccepted>>(new Sender(state)));
         return ValueTask.CompletedTask;

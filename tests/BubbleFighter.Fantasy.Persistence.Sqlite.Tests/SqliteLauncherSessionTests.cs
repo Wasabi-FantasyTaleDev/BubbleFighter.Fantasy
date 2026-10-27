@@ -37,7 +37,7 @@ public sealed class SqliteLauncherSessionTests : IDisposable
         {
             connection.Open();
             using var command = connection.CreateCommand();
-            command.CommandText = "DROP TABLE round_settlements; DROP TABLE present_claims; DROP TABLE presents; DROP TABLE launcher_sessions; DROP TABLE tutorial_stage_clears; PRAGMA user_version=1;";
+            command.CommandText = "DROP TABLE messenger_requests; DROP TABLE messenger_categories; DROP TABLE messenger_relations; DROP TABLE messenger_users; DROP TABLE round_settlements; DROP TABLE present_claims; DROP TABLE presents; DROP TABLE launcher_sessions; DROP TABLE tutorial_stage_clears; PRAGMA user_version=1;";
             command.ExecuteNonQuery();
         }
         using var upgraded = new SqliteDatabase(Options());

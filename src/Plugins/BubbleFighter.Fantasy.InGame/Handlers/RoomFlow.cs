@@ -27,10 +27,18 @@ internal sealed partial class RoomFlow
     private readonly ILogger _logger;
     private readonly IEquipmentSelection? _selection;
     private readonly ISeatCharacterResolver? _characters;
-    private readonly IMessageSender<RoomEntered> _entered;
-    private readonly IMessageSender<RoomSeatUpdated> _seatUpdated;
-    private readonly IMessageSender<RoomSeatVacated> _seatVacated;
-    private readonly IMessageSender<RoomMasterChanged> _masterChanged;
+    private readonly IMessageSender<RoomEntered>? _enteredSender;
+    private readonly IMessageSender<RoomSeatUpdated>? _seatUpdatedSender;
+    private readonly IMessageSender<RoomSeatVacated>? _seatVacatedSender;
+    private readonly IMessageSender<RoomMasterChanged>? _masterChangedSender;
+    private IMessageSender<RoomEntered> _entered => _enteredSender
+        ?? throw new InvalidOperationException("Room operations require the RoomEntered encoder.");
+    private IMessageSender<RoomSeatUpdated> _seatUpdated => _seatUpdatedSender
+        ?? throw new InvalidOperationException("Room operations require the RoomSeatUpdated encoder.");
+    private IMessageSender<RoomSeatVacated> _seatVacated => _seatVacatedSender
+        ?? throw new InvalidOperationException("Room operations require the RoomSeatVacated encoder.");
+    private IMessageSender<RoomMasterChanged> _masterChanged => _masterChangedSender
+        ?? throw new InvalidOperationException("Room operations require the RoomMasterChanged encoder.");
     private readonly IMessageSender<RoomMasterChangeReplied>? _masterChangeReply;
     private readonly IMessageSender<RoomJoinRefused>? _joinRefused;
     private readonly IMessageSender<RoomLeft>? _left;
@@ -55,10 +63,15 @@ internal sealed partial class RoomFlow
     private readonly CancellationToken _lifetime;
     private readonly Func<long> _autoStartNow;
     private readonly Func<TimeSpan, CancellationToken, ValueTask> _autoStartDelay;
+    private readonly Func<TimeSpan, CancellationToken, ValueTask> _zombieKingDelay;
     private readonly IMessageSender<ServerNotice>? _notices;
     private readonly IGameText? _texts;
     private readonly RoomNotices _roomNotices;
     private readonly GameCommandHandler _commands;
+
+    internal void BindCommands(IPluginContext context, string scope, bool enabled) => _commands.BindShared(context, scope, enabled);
+
+    internal ModeCatalog Modes { get; set; } = new();
 
     /// <summary>
     /// Gets or sets what runs on the room's executor after a player left a room that is not waiting,
@@ -84,6 +97,7 @@ internal sealed partial class RoomFlow
         IPartyDirectory? parties = null, IOnlinePlayers? online = null)
         : this(registry, senders, logger, selection, characters, plazaCapacity, options, lifetime, texts, parties, online,
             static () => Environment.TickCount64,
+            static (delay, ct) => new(Task.Delay(delay, ct)),
             static (delay, ct) => new(Task.Delay(delay, ct)))
     {
     }
@@ -92,7 +106,8 @@ internal sealed partial class RoomFlow
         IEquipmentSelection? selection, ISeatCharacterResolver? characters, int plazaCapacity,
         InGameOptions? options, CancellationToken lifetime, IGameText? texts,
         IPartyDirectory? parties, IOnlinePlayers? online,
-        Func<long> autoStartNow, Func<TimeSpan, CancellationToken, ValueTask> autoStartDelay)
+        Func<long> autoStartNow, Func<TimeSpan, CancellationToken, ValueTask> autoStartDelay,
+        Func<TimeSpan, CancellationToken, ValueTask> zombieKingDelay)
     {
         _registry = registry;
         _logger = logger;
@@ -103,10 +118,10 @@ internal sealed partial class RoomFlow
         if (parties is not null && online is null)
             throw new ConfigException("Party scene following requires the online player directory.");
         _sceneTransitions = new SceneTransitions(options?.MaxPendingSceneTransitions ?? new InGameOptions().MaxPendingSceneTransitions);
-        _entered = senders.Entered;
-        _seatUpdated = senders.SeatUpdated;
-        _seatVacated = senders.SeatVacated;
-        _masterChanged = senders.MasterChanged;
+        _enteredSender = senders.Entered;
+        _seatUpdatedSender = senders.SeatUpdated;
+        _seatVacatedSender = senders.SeatVacated;
+        _masterChangedSender = senders.MasterChanged;
         _masterChangeReply = senders.MasterChangeReply;
         _joinRefused = senders.JoinRefused;
         _left = senders.Left;
@@ -137,11 +152,12 @@ internal sealed partial class RoomFlow
         _lifetime = lifetime;
         _autoStartNow = autoStartNow;
         _autoStartDelay = autoStartDelay;
+        _zombieKingDelay = zombieKingDelay;
         _notices = senders.Notices;
         _texts = texts;
         _roomNotices = new RoomNotices(_notices, _texts);
         _commands = new GameCommandHandler(registry, StartFromCommandAsync, _roomNotices,
-            (room, mode, ct) => ApplyModeAsync(room, mode, null, ct));
+            (room, mode, ct) => ApplyModeAsync(room, mode, null, ct), canStart: _matchStarting is not null);
         if (options is { AutoStartModeIds.Length: > 0 } && (_autoStart is null || _notices is null || _texts is null))
             throw new InvalidOperationException("Automatic room start requires native countdown, notice and localization services.");
         _plaza = new PlazaPresence(plazaCapacity);
@@ -223,7 +239,7 @@ internal sealed partial class RoomFlow
             {
                 var master = room.Seats.FirstOrDefault(seat => seat.Slot == room.MasterSlot)?.Nickname ?? string.Empty;
                 // Closed seats cannot be joined, so the row counts only the open ones.
-                rows.Add(new RoomListEntry(room.Id, room.RoomName, master, room.ModeId, room.Seats.Count,
+                rows.Add(new RoomListEntry(room.Id, room.RoomName, master, room.ModeId, room.OccupantCount,
                     room.MaxSeats - room.ClosedSlots.Count, room.Password.Length > 0, room.BuildSettings)
                     { MatchInProgress = room.Phase != RoomPhase.Waiting });
             }
@@ -494,6 +510,7 @@ internal sealed partial class RoomFlow
         {
             RoomSeat[] members;
             RoomSettingsChanged changed;
+            RoomMemberView[] removedBots;
             lock (room.Gate)
             {
                 var seat = room.FindByGame(session.Id);
@@ -503,6 +520,7 @@ internal sealed partial class RoomFlow
                         session.Id, room.Id);
                     return;
                 }
+                removedBots = _options?.AiModeIds.Contains(request.ModeId) == true ? [] : room.RemoveBots();
                 room.ModeId = checked((ushort)request.ModeId);
                 if (request.MapKey.Length > 0)
                     room.MapKey = request.MapKey;
@@ -520,6 +538,7 @@ internal sealed partial class RoomFlow
                 members = [.. room.Seats];
                 changed = new RoomSettingsChanged(View(room));
             }
+            await NotifyRemovedBotsAsync(room.Id, removedBots, members, operationCt).ConfigureAwait(false);
             foreach (var member in members)
                 await sender.SendAsync(member.Game, changed, operationCt).ConfigureAwait(false);
             await ArmWhenFullAsync(room, operationCt).ConfigureAwait(false);
@@ -541,18 +560,26 @@ internal sealed partial class RoomFlow
     // The caller announces the change with a notice.
     private async ValueTask<bool> ApplyModeAsync(PlayRoom room, ushort mode, ISession? except, CancellationToken ct)
     {
+        if (Modes.HasRows && !Modes.Ids.Contains(mode))
+            return false;
         RoomSeat[] members;
         RoomSettingsChanged changed;
+        RoomMemberView[] removedBots;
         lock (room.Gate)
         {
             if (room.Phase != RoomPhase.Waiting)
                 return false;
+            removedBots = _options?.AiModeIds.Contains(mode) == true ? [] : room.RemoveBots();
             room.ModeId = mode;
             if (room.BuildSettings is { } held)
                 room.BuildSettings = held with { Mode = mode };
             members = [.. room.Seats.Where(seat => seat.Game.Id != except?.Id)];
             changed = new RoomSettingsChanged(View(room));
         }
+        // The caller may answer the requester separately, but every human must see removed AI seats.
+        RoomSeat[] allMembers;
+        lock (room.Gate) allMembers = [.. room.Seats];
+        await NotifyRemovedBotsAsync(room.Id, removedBots, allMembers, ct).ConfigureAwait(false);
         foreach (var member in members)
         {
             if (_settingsChanged is { } sender)
@@ -592,7 +619,7 @@ internal sealed partial class RoomFlow
         }, ct));
     }
 
-    private async ValueTask StartRoomCoreAsync(PlayRoom room, ISession session, RoomStartRequested request, CancellationToken ct)
+    private async ValueTask StartRoomCoreAsync(PlayRoom room, ISession session, RoomStartRequested request, CancellationToken ct, bool allowMemberStart = false)
     {
         var sender = _matchStarting
             ?? throw new InvalidOperationException("Room start requested on a build without a match start encoder.");
@@ -603,7 +630,7 @@ internal sealed partial class RoomFlow
         {
             var seat = room.FindByGame(session.Id);
             var nativeAutoStart = room.AutoStartArmed && IsAutoStartMode(room.ModeId);
-            if (seat is null || seat.Slot != room.MasterSlot || (!room.CanStart && !nativeAutoStart && !request.Force) || room.Phase != RoomPhase.Waiting)
+            if (seat is null || (!allowMemberStart && seat.Slot != room.MasterSlot) || (!room.CanStart && !nativeAutoStart && !request.Force) || room.Phase != RoomPhase.Waiting)
             {
                 _logger.LogInformation("Session {Id} start of room {Room} refused: master={Master} canStart={CanStart} phase={Phase}.",
                     session.Id, room.Id, seat?.Slot == room.MasterSlot, room.CanStart, room.Phase);
@@ -873,12 +900,16 @@ internal sealed partial class RoomFlow
                 // The promoted master never counts as ready.
                 var master = room.Seats.First(seat => seat.Slot == newMaster);
                 master.Ready = false;
+                room.TransferBots(master);
                 masterRecord = new RoomSeatUpdated(room.Id, View(master)) { Room = View(room) };
             }
         }
 
         var vacated = new RoomSeatVacated(room.Id, left);
-        var changed = new RoomMasterChanged(room.Id, newMaster);
+        var changed = new RoomMasterChanged(room.Id, newMaster)
+        {
+            PreviousAiControllerUserNum = wasMaster && room.Bots.Count > 0 ? left.UserNum : null,
+        };
         foreach (var seat in remaining)
         {
             // A member whose own connection is closing has its departure queued behind this one;
@@ -1019,8 +1050,8 @@ internal sealed partial class RoomFlow
 
     // Callers hold the room gate.
     private static RoomView View(PlayRoom room) => new(room.Id, room.RoomName, room.ModeId, room.MapKey, room.MaxSeats,
-        room.MasterSlot, room.Password.Length > 0, [.. room.ClosedSlots.Order()], [.. room.Seats.OrderBy(seat => seat.Slot).Select(View)],
-        room.BuildSettings) { MemberOrder = [.. room.Seats.Select(seat => seat.Slot)] };
+        room.MasterSlot, room.Password.Length > 0, [.. room.ClosedSlots.Order()], [.. room.Seats.Select(View).Concat(room.Bots.Select(bot => bot.Appearance)).OrderBy(seat => seat.Slot)],
+        room.BuildSettings) { MemberOrder = [.. room.Seats.Select(seat => seat.Slot), .. room.Bots.Select(bot => bot.Appearance.Slot)] };
 
     private static RoomMemberView View(RoomSeat seat) => new(seat.Slot, seat.UserNum, seat.Nickname, Math.Max(1, seat.Level),
         seat.Team, seat.Ready, seat.CharacterId != 0 ? seat.CharacterId : seat.LocalCharacterId,
@@ -1054,10 +1085,10 @@ internal sealed partial class RoomFlow
 /// <param name="ProbeAcknowledged">Answers a seated member's native room-stage probe.</param>
 /// <param name="MasterChangeReply">Acknowledges an explicit ownership delegation request.</param>
 internal sealed record RoomSenders(
-    IMessageSender<RoomEntered> Entered,
-    IMessageSender<RoomSeatUpdated> SeatUpdated,
-    IMessageSender<RoomSeatVacated> SeatVacated,
-    IMessageSender<RoomMasterChanged> MasterChanged,
+    IMessageSender<RoomEntered>? Entered,
+    IMessageSender<RoomSeatUpdated>? SeatUpdated,
+    IMessageSender<RoomSeatVacated>? SeatVacated,
+    IMessageSender<RoomMasterChanged>? MasterChanged,
     IMessageSender<RoomJoinRefused>? JoinRefused = null,
     IMessageSender<RoomLeft>? Left = null,
     IMessageSender<RoomMatchStarting>? MatchStarting = null,
@@ -1082,10 +1113,10 @@ internal sealed record RoomSenders(
 {
     /// <summary>Resolves the encoders published for <paramref name="protocol"/>; a missing required one is a configuration error.</summary>
     public static RoomSenders Resolve(IPluginContext context, string protocol) => new(
-        PlaySenders.Required<RoomEntered>(context, protocol),
-        PlaySenders.Required<RoomSeatUpdated>(context, protocol),
-        PlaySenders.Required<RoomSeatVacated>(context, protocol),
-        PlaySenders.Required<RoomMasterChanged>(context, protocol),
+        PlaySenders.Optional<RoomEntered>(context, protocol),
+        PlaySenders.Optional<RoomSeatUpdated>(context, protocol),
+        PlaySenders.Optional<RoomSeatVacated>(context, protocol),
+        PlaySenders.Optional<RoomMasterChanged>(context, protocol),
         PlaySenders.Optional<RoomJoinRefused>(context, protocol),
         PlaySenders.Optional<RoomLeft>(context, protocol),
         PlaySenders.Optional<RoomMatchStarting>(context, protocol),

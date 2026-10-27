@@ -2,9 +2,10 @@ namespace BubbleFighter.Fantasy.Wire;
 
 /// <summary>
 /// The additive stream cipher applied to the whole byte stream after the bootstrap
-/// greeting (client function pair <c>sub_7B4DE0</c>/<c>sub_7B4E50</c>). Two byte tables
-/// drive it: per byte <c>delta = A[ia] + B[ib]</c>, encryption adds and decryption
-/// subtracts <c>delta</c> modulo 256, then both indices advance modulo their table
+/// greeting (encryption <c>kr-1256 sub_7B4DE0</c>, decryption <c>kr-1256 sub_7B4E50</c>:
+/// <c>*out++ = *in++ ± A[ia] + B[ib]</c> with the table indices advancing modulo their
+/// lengths). Two byte tables drive it: per byte <c>delta = A[ia] + B[ib]</c>, encryption adds and
+/// decryption subtracts <c>delta</c> modulo 256, then both indices advance modulo their table
 /// lengths. State is continuous across frames. The table bytes are build data: the
 /// kr-1256 pair below is not present in every binary, so a dialect whose client ships
 /// other tables passes them to the table constructor.
@@ -49,14 +50,18 @@ public sealed class SimpleCipher
     }
 
     /// <summary>
-    /// Creates a cipher for the client-to-server direction. Seeds are set in the client's
-    /// connection constructor (<c>sub_10B9720</c>) as (0, 1).
+    /// Creates a cipher for the client-to-server direction. The client's connection constructor
+    /// (<c>kr-1256 sub_10B9720</c>) seeds it (0, 1) and stores the cipher object at connection
+    /// offset 2460; the send path applies that object's vtable slot +8, the add variant
+    /// <c>kr-1256 sub_7B4DE0</c>.
     /// </summary>
     public static SimpleCipher ClientToServer() => new(0, 1);
 
     /// <summary>
-    /// Creates a cipher for the server-to-client direction. Seeds are set in the client's
-    /// connection constructor (<c>sub_10B9720</c>) as (5, 3).
+    /// Creates a cipher for the server-to-client direction. The same constructor
+    /// (<c>kr-1256 sub_10B9720</c>) seeds it (5, 3) and stores the second cipher at offset 2472;
+    /// the receive path applies its vtable slot +12, the subtract variant
+    /// <c>kr-1256 sub_7B4E50</c>.
     /// </summary>
     public static SimpleCipher ServerToClient() => new(5, 3);
 

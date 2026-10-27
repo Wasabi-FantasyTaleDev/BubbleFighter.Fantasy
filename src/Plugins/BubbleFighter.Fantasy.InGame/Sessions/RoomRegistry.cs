@@ -1,10 +1,10 @@
 using BubbleFighter.Fantasy.Contracts.Match;
+using BubbleFighter.Fantasy.RoomCore;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Sessions;
-using BubbleFighter.Fantasy.InGame.Wire;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using BubbleFighter.Fantasy.Contracts.Rooms;

@@ -11,7 +11,6 @@ description: Chinese 2014 client build 0.2.46.001, ClientVersion_Major 404.
 bundles:
   - core
   - legacy
-  - inventory-actions
 # What this build differs in; everything else is the legacy bundle's (kr-812).
 vars:
   LEGACY_PORT: ${CN_404_GAME_PORT:-7240}

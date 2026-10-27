@@ -183,6 +183,7 @@ public static partial class Program
             ready?.Invoke();
             managed?.PublishReady();
             logger.LogInformation("Server started with {Count} active row(s).", instances.Values.Count(instance => instance.State == PluginState.Active));
+            host.MarkReady();
             await Task.Delay(Timeout.InfiniteTimeSpan, shutdownToken).ConfigureAwait(false);
             return 0;
         }

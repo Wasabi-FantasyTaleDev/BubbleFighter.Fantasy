@@ -1,0 +1,61 @@
+version: 1
+structs:
+  # Full movement record, C2S gppWanderLean (and the relayed S2C copy). kr-812 Packet_gppWanderLean (vtable
+  # 0xD1E32C) is read by kr-812 sub_502910: a 4-byte word at +4, three 2-byte words at +8/+10/+12, three bytes at
+  # +14/+15/+16 and a 2-byte word at +18 (kr-812 sub_A56C10 reads 4 bytes, sub_A56BF0 2 and sub_A56BB0 1). kr-812
+  # sub_80DBB0 is its sender. The kr-812 fields' meanings are not read here, so they keep their offsets; the
+  # kr-1256 record below names them from its own writer.
+  MovementReport:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u16
+      offset: 8
+    - unknown_10: u16
+      offset: 10
+    - unknown_12: u16
+      offset: 12
+    - unknown_14: u8
+      offset: 14
+    - unknown_15: u8
+      offset: 15
+    - unknown_16: u8
+      offset: 16
+    - unknown_18: u16
+      offset: 18
+  # The modern full record, 21 bytes: kr-1256 sub_95E920 writes it and kr-1256 sub_709700 reads the relayed copy.
+  # The same order as kr-812 with four-byte float coordinates. The entity is the scene object computed from the
+  # room slot (kr-1256 sub_6D2040). The tick is the sender's sample clock, forwarded verbatim (it wraps).
+  MovementReport@kr-1256:
+    - object_id: u32
+    - x: f32
+    - y: f32
+    - z: f32
+    - yaw: u8
+    - pitch: u8
+    - state: u8
+    - tick: u16
+
+  # Partial movement, C2S gppWanderLeanOptimize. kr-812 Packet_gppWanderLeanOptimize (vtable 0xD1E8CC) is read by
+  # kr-812 sub_5040D0: a 4-byte word at +4, a 2-byte word at +8, then a member object at +12 that reads itself
+  # through its own vtable. That member's layout is not read, so kr-812's table stops before it and the
+  # structure is not used for kr-812.
+  MovementSample:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u16
+      offset: 8
+  # The modern delta: kr-1256 sub_10F4A10 reads it and kr-1256 sub_10F4930 writes it; kr-1256 sub_95F490 builds
+  # the mask from what changed since the last full record. Each field after the mask is present only when its bit
+  # is set: three four-byte floats for bits 0x01/0x02/0x04, then three bytes for 0x08/0x10/0x20. The full
+  # body is 22 bytes (7 + 15); do not confuse it with the 21-byte record above. The actor is the sender's own
+  # (character+448).
+  MovementSample@kr-1256:
+    - actor: u32
+    - tick: u16
+    - mask: u8
+    - x: 'when<mask&0x01,f32>'
+    - y: 'when<mask&0x02,f32>'
+    - z: 'when<mask&0x04,f32>'
+    - yaw: 'when<mask&0x08,u8>'
+    - pitch: 'when<mask&0x10,u8>'
+    - state: 'when<mask&0x20,u8>'

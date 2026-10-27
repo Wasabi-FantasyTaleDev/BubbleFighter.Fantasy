@@ -132,7 +132,7 @@ public sealed class LegacyNativeCreationScenarioTests
             Row("core.protocol-registry"), Row("core.session-registry"), Row("core.packet-router"),
             Row("core.message-router"), Row("core.client-profiles"), Row("core.opcode-tables"), Row("core.wire-dialects"),
             Row("persistence.memory"), Row("dialect", TestWireDialects.RowConfig("kr-812")),
-            Row("protocol", new() { ["opcode_table_path"] = tablePath, ["bootstrap_status"] = 1 }),
+            Row("protocol", new() { ["opcode_table_path"] = tablePath, ["bootstrap_status"] = 1, ["patch_request_name"] = "gcpFirstConnect" }),
             Row("dialect.messages", new()
             {
                 ["protocol"] = "kr-812/game", ["character_creation"] = true, ["enable_purchases"] = true,
@@ -150,7 +150,7 @@ public sealed class LegacyNativeCreationScenarioTests
                 ["starter_item_ids"] = new object[] { 300001, 201001, 202001, 207001 },
                 ["starter_worn_ids"] = new object[] { 300001, 201001, 202001, 207001 },
             }),
-            Row("ingame", new() { ["typed_only"] = true, ["game_protocol"] = "kr-812/game" }),
+            Row("ingame", new() { ["game_protocol"] = "kr-812/game" }),
             Row("net.tcp", new() { ["listen"] = $"127.0.0.1:{port}", ["protocol"] = "kr-812/game" }),
         ], PluginCatalog.Discover([Path.Combine(AppContext.BaseDirectory, "plugins")]), NullLoggerFactory.Instance);
     }

@@ -13,7 +13,8 @@ namespace BubbleFighter.Fantasy.Dialect.Messages;
 /// (<c>gspReqInventoryChangeWeaponPresetIdx</c> with status zero); a part whose packet the build's table does not
 /// name is skipped. kr-812 sends the view, then the preset bar; kr-1256's view handler overwrites the profile record
 /// the preset packets fill (kr-1256 sub_9AF2F0 -> sub_81CCE0, sub_9C3880 -> sub_81B820), so its presets go first.
-/// Remote observations carry the view alone.
+/// The preset bar is worn-derived unless the message carries persisted pages (the default-off
+/// <c>persist_preset_pages</c> switch). Remote observations carry the view alone.
 /// </summary>
 /// <param name="protocol">The connection protocol whose opcode table names the view.</param>
 /// <param name="view">The S2C opcode of <c>gspInventoryViewUpdateView</c>.</param>
@@ -44,9 +45,13 @@ internal sealed class EquipmentViewBinding(string protocol, ushort view, ushort?
                     parts.Add((view, WriteView(tables, build, _values, message.UserNum, message.CharacterId, message.EquippedItemIds)));
                     break;
                 case "preset_update" when presetUpdate is { } update:
-                    parts.Add((update, PresetWire.WriteUpdate(tables, build, message.ActiveWeaponPresetSlot, message.UserNum,
-                        WeaponPresetSlots.FromWorn(message.EquippedItemIds), message.PrimaryWeaponId, message.SpecialWeaponId,
-                        _values.PresetPages)));
+                    // Persisted pages (persist_preset_pages, default off) replace the derived records: the
+                    // bar then carries all five pages in the build's own form.
+                    parts.Add((update, message.WeaponPresetPages is { Count: > 0 } pages
+                        ? PresetWire.WriteUpdate(tables, build, message.ActiveWeaponPresetSlot, message.UserNum, pages)
+                        : PresetWire.WriteUpdate(tables, build, message.ActiveWeaponPresetSlot, message.UserNum,
+                            WeaponPresetSlots.FromWorn(message.EquippedItemIds), message.PrimaryWeaponId, message.SpecialWeaponId,
+                            _values.PresetPages)));
                     break;
                 case "preset_reply" when presetReply is { } reply:
                     parts.Add((reply, PresetWire.WriteChangeReply(tables, build, message.ActiveWeaponPresetSlot, 0)));
@@ -109,7 +114,10 @@ internal sealed record EquipmentViewValues(string ViewStructure, IReadOnlyList<s
         if (values.TryGetValue("preset_pages", out var count)
             && !(count is string number && int.TryParse(number, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out pages) && pages is > 0 and <= InventoryLimits.MaxWeaponPresetSlot + 1))
             throw new ConfigException($"Build '{build}' equipment.preset_pages must be 1 to {InventoryLimits.MaxWeaponPresetSlot + 1}.");
-        _ = tables.Resolve(build, structure);
+        // Both view records carry the owner number and the worn item ids; the character field is named differently
+        // in each family and is written by name, so only the common fields are required here.
+        PacketLayoutContract.RequireFields(tables, build, structure, "Equipment view",
+            ("user_number", "u32"), ("equipped_items", "list<u32>"));
         return new(structure, order, pages);
     }
 }

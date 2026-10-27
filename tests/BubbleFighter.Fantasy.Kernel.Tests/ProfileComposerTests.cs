@@ -840,6 +840,86 @@ public sealed class ProfileComposerTests : IDisposable
         Assert.True(rows[0].Disabled);
     }
 
+    [Theory]
+    [InlineData(null, 600, false)]
+    [InlineData(null, 600, true)]
+    [InlineData("480", 480, false)]
+    [InlineData("480", 480, true)]
+    public void EnablingPreservedConfigurationResolvesDefaultsAndOverrides(string? value, int expected, bool setFirst)
+    {
+        Write("bundles/a.yaml", "- id: row-a\n  plugin: p.a\n  disabled: true\n  config:\n    value: '${TEST_LIFETIME:-600}'\n");
+        const string enable = "- replace:\n    id: row-a\n    disabled: false\n";
+        const string set = "- set:\n    id: row-a\n    config:\n      label: '${TEST_LABEL:-catalog}'\n";
+        Write("demo/patch.yaml", setFirst ? set + enable : enable + set);
+        WriteProfile("id: demo\nbundles: [a]\npatches: [patch.yaml]\n");
+        var row = Assert.Single(new ProfileComposer(_root, key => key == "TEST_LIFETIME" ? value : null).Compose("demo", []));
+        Assert.False(row.Disabled);
+        var options = new PluginConfig(row).Bind<DeferredOptions>();
+        Assert.Equal(expected, options.Value);
+        Assert.Equal("catalog", options.Label);
+    }
+
+    [Fact]
+    public void EnabledDeferredConfigurationResolvesNestedMappingsAndLists()
+    {
+        Write("bundles/a.yaml", "- id: row-a\n  plugin: p.a\n  disabled: true\n  config:\n    nested:\n      port: '${TEST_PORT:-8090}'\n    values: ['${TEST_FIRST:-one}', '${TEST_SECOND:-two}']\n");
+        Write("demo/patch.yaml", "- replace:\n    id: row-a\n    disabled: false\n");
+        WriteProfile("id: demo\nbundles: [a]\npatches: [patch.yaml]\n");
+        var row = Assert.Single(new ProfileComposer(_root, _ => null).Compose("demo", []));
+        Assert.Equal("8090", Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(row.Config!["nested"])["port"]);
+        Assert.Equal(new object?[] { "one", "two" }, Assert.IsAssignableFrom<IReadOnlyList<object?>>(row.Config["values"]));
+    }
+
+    [Fact]
+    public void DeferredMissingVariableFailsOnlyWhenTheFinalEnabledRowStillNeedsIt()
+    {
+        Write("bundles/a.yaml", "- id: row-a\n  plugin: p.a\n  disabled: true\n  config:\n    value: '${TEST_REQUIRED}'\n");
+        const string enable = "- replace:\n    id: row-a\n    disabled: false\n";
+        Write("demo/patch.yaml", enable);
+        WriteProfile("id: demo\nbundles: [a]\npatches: [patch.yaml]\n");
+        var composer = new ProfileComposer(_root, _ => null);
+        var error = Assert.Throws<ConfigException>(() => composer.Compose("demo", []));
+        Assert.Contains("TEST_REQUIRED", error.Message);
+        Assert.Contains("row-a", error.Message);
+        Write("demo/patch.yaml", enable + "- set:\n    id: row-a\n    config:\n      value: 480\n");
+        Assert.Equal(480, new PluginConfig(Assert.Single(composer.Compose("demo", []))).Bind<DeferredOptions>().Value);
+        Write("demo/patch.yaml", enable + "- set:\n    id: row-a\n    config:\n      value: null\n");
+        Assert.False(Assert.Single(composer.Compose("demo", [])).Config!.ContainsKey("value"));
+        Write("demo/patch.yaml", enable + "- replace:\n    id: row-a\n    disabled: true\n");
+        Assert.True(Assert.Single(composer.Compose("demo", [])).Disabled);
+    }
+
+    [Fact]
+    public void DisableSetAndEnableDoNotExpandResolvedEnvironmentTextTwice()
+    {
+        Write("bundles/a.yaml", "- id: row-a\n  plugin: p.a\n  config:\n    label: '${TEST_LITERAL}'\n");
+        Write("demo/patch.yaml", "- replace:\n    id: row-a\n    disabled: true\n- set:\n    id: row-a\n    config:\n      value: '${TEST_LIFETIME:-600}'\n- replace:\n    id: row-a\n    disabled: false\n");
+        WriteProfile("id: demo\nbundles: [a]\npatches: [patch.yaml]\n");
+        var row = Assert.Single(new ProfileComposer(_root, key => key == "TEST_LITERAL" ? "${KEEP_LITERAL}" : null).Compose("demo", []));
+        var options = new PluginConfig(row).Bind<DeferredOptions>();
+        Assert.Equal("${KEEP_LITERAL}", options.Label);
+        Assert.Equal(600, options.Value);
+    }
+
+    [Fact]
+    public void ReplacingDisabledConfigurationDiscardsEarlierDeferredKeys()
+    {
+        Write("bundles/a.yaml", "- id: row-a\n  plugin: p.a\n  disabled: true\n  config:\n    discarded: '${TEST_MISSING}'\n");
+        Write("demo/patch.yaml", "- replace:\n    id: row-a\n    config:\n      value: '${TEST_LIFETIME:-600}'\n- replace:\n    id: row-a\n    disabled: false\n");
+        WriteProfile("id: demo\nbundles: [a]\npatches: [patch.yaml]\n");
+        var row = Assert.Single(new ProfileComposer(_root, _ => null).Compose("demo", []));
+        Assert.False(row.Config!.ContainsKey("discarded"));
+        Assert.Equal(600, new PluginConfig(row).Bind<DeferredOptions>().Value);
+    }
+
+    private sealed class DeferredOptions
+    {
+        /// <summary>Gets or sets the integer used to detect unresolved placeholder text at binding.</summary>
+        public int Value { get; set; }
+        /// <summary>Gets or sets the text used to check preservation of resolved literal placeholders.</summary>
+        public string Label { get; set; } = "";
+    }
+
     [Fact]
     public void OptionalLocalPatchIsSkippedWhenAbsent()
     {

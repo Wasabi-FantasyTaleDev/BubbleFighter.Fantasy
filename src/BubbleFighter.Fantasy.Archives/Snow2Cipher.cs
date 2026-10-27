@@ -5,10 +5,13 @@ namespace BubbleFighter.Fantasy.Archives;
 /// <summary>
 /// The SNOW 2.0 stream cipher (128-bit key, all-zero IV) as the client's PKN reader uses it.
 /// The six lookup tables are built from the cipher's definition (the AES S-box and the
-/// alpha multiplications over GF(2^8) with x^8+x^7+x^5+x^3+1) and equal the client's tables
-/// at <c>0x154E2B8</c>..<c>0x154F6B8</c>. The keystream is applied word by word: each
-/// little-endian <c>u32</c> of plaintext is added to a keystream word (<c>sub_115D9A0</c>) and
-/// decryption subtracts it (<c>sub_115DA10</c>); a tail shorter than a word is not processed.
+/// alpha multiplications over GF(2^8) with x^8+x^7+x^5+x^3+1) and match the client's tables,
+/// whose six dword bases sit at <c>kr-1256 0x154E2B8</c>, <c>kr-1256 0x154E6B8</c>, <c>kr-1256 0x154EAB8</c>,
+/// <c>kr-1256 0x154EEB8</c>, <c>kr-1256 0x154F2B8</c> and <c>kr-1256 0x154F6B8</c> (0x400 stride; the last table's
+/// bytes extend past its base). The keystream is applied word by word: each
+/// little-endian <c>u32</c> of plaintext is added to a keystream word (<c>kr-1256 sub_115D9A0</c>)
+/// and decryption subtracts it (<c>kr-1256 sub_115DA10</c>); a tail shorter than a word is not
+/// processed.
 /// </summary>
 public sealed class Snow2Cipher
 {
@@ -50,7 +53,7 @@ public sealed class Snow2Cipher
 
     /// <summary>
     /// Keys the cipher from the first 16 bytes of <paramref name="key"/>. The client's key
-    /// schedule (<c>sub_115CA70</c>) reads the key through a signed <c>char*</c>, so every byte
+    /// schedule (<c>kr-1256 sub_115CA70</c>) reads the key through a signed <c>char*</c>, so every byte
     /// is sign-extended before the four big-endian words are assembled; for key bytes of
     /// <c>0x80</c> and above this differs from textbook SNOW 2.0, and the client's packs depend
     /// on it.

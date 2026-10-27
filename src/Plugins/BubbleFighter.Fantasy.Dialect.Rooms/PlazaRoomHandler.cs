@@ -15,8 +15,10 @@ namespace BubbleFighter.Fantasy.Dialect.Rooms;
 /// RoomReqEnterGame / ReadyStatus. This handler answers create with GotoRoom kind 2, ready
 /// with SetSlot, map pick by storing <c>gcpRoomReqEnterGame</c>'s first wstr, and host-start
 /// with RoomEnterGame (not the tutorial PlayTutorial path). <c>gspUserHostStart</c> is not
-/// sent: the client handler returns early unless capability
-/// 23 and room+532 are set.
+/// sent: cn-717 <c>sub_8BEDF0</c> returns early unless capability 23 is enabled and room+532
+/// (the host-ready UI, cn-717 <c>sub_8FB7B0</c>) is set (profiles/cn-717/opcodes.yaml
+/// gspUserHostStart), while <c>gspRoomEnterGame</c> case 0 enters play without room+532
+/// on the same build.
 /// </summary>
 internal sealed class PlazaRoomHandler
 {

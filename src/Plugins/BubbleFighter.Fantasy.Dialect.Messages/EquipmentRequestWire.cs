@@ -1,3 +1,4 @@
+using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Contracts.Inventory;
 using BubbleFighter.Fantasy.Packets;
 
@@ -27,4 +28,20 @@ internal static class EquipmentRequestWire
     /// </summary>
     internal static byte[] WriteResult(PacketTables tables, string build, int result, long key) =>
         PacketCodec.Write(tables, build, "InventoryEquipmentResult", new Dictionary<string, object?> { ["result"] = result, ["item_id"] = key });
+
+    /// <summary>
+    /// Requires the two layouts this wire consumes. The request is one key, a word in the legacy family and
+    /// eight bytes in the modern one, and only the modern result names the item id after the result word, so
+    /// the accepted shapes are listed rather than the single fields.
+    /// </summary>
+    /// <param name="tables">The row's packet tables.</param>
+    /// <param name="build">The client build whose table is checked.</param>
+    /// <exception cref="ConfigException">The build states another request or result shape.</exception>
+    internal static void RequireLayout(PacketTables tables, string build)
+    {
+        PacketLayoutContract.RequireSignature(tables, build, "InventoryEquipmentRequest", "Equipment request",
+            "item_id:u32", "item_id:u64");
+        PacketLayoutContract.RequireSignature(tables, build, "InventoryEquipmentResult", "Equipment request",
+            "result:u32", "result:u32,item_id:u64");
+    }
 }

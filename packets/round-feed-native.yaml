@@ -1,0 +1,88 @@
+version: 1
+structs:
+  # tw-454 sub_718700 writes seven words; tw-454 sub_72F6F0 resolves both leading identities
+  # before applying character/mob animation and impulse. This is not the successful-finish verdict.
+  Unknown32796: []
+  Unknown32796@tw-454:
+    - unknown_0: u32
+      offset: 0
+    - unknown_4: u32
+      offset: 4
+    - position_x: f32
+      offset: 8
+    - position_y: f32
+      offset: 12
+    - position_z: f32
+      offset: 16
+    - unknown_20: u32
+      offset: 20
+    - unknown_24: bool
+      offset: 24
+
+  # These native feed bodies are prerequisites, not an opcode route or full-round capability.
+  # tw-454 sub_70B3F0 case 0x8027 reads two words and a bool32 through tw-454 sub_44ABD0,
+  # then tw-454 sub_72BB40 applies tw-454 sub_77B910's help feedback to the first character.
+  # cn-774 sub_897E80 case 32807 reads the same body before cn-774 sub_8B76E0.
+  # The Korean counterpart has an extra float and byte instead of this final bool32.
+  RoundRescueNative: []
+  RoundRescueNative@cn-774:
+    - rescuer: u32
+      offset: 0
+    - victim: u32
+      offset: 4
+    - unknown_8: bool
+      offset: 8
+
+  # tw-454 sub_7FE6C0 emits 33282 before 33281. The latter carries the rescuer, the rescued character
+  # and a byte; tw-454 sub_70E250 case 0x8201 calls tw-454 sub_72BB40's help-feedback path.
+  # cn-774 sub_89B780 case 38280 reads the same body before cn-774 sub_8B76E0.
+  # This is a separate native action from the twelve-byte 32807 branch above.
+  RoundRescuePairNative: []
+  RoundRescuePairNative@cn-774:
+    - rescuer: u32
+      offset: 0
+    - victim: u32
+      offset: 4
+    - unknown_8: u8
+      offset: 8
+
+  # tw-454 sub_7FE6C0 writes its own character, the rescuer, a timing word and a byte.
+  # tw-454 sub_70E250 case 0x8202 reads all thirteen bytes before calling tw-454 sub_72BA30.
+  # tw-454 sub_776EA0 applies state 109 and the bubble-escape effects to the first character.
+  # cn-774 sub_9F6340 writes the same body for 38273; cn-774 sub_89B780 reads it before
+  # cn-774 sub_8B75D0 applies cn-774 sub_513540 to its first character.
+  # The release application does not consume the third word directly; keep both suffix fields unknown.
+  RoundRescueReleaseNative: []
+  RoundRescueReleaseNative@cn-774:
+    - victim: u32
+      offset: 0
+    - rescuer: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u8
+      offset: 12
+
+  # cn-774 sub_8B43B0 reads a damager key, three position words, one unused word and the target.
+  # It resolves the first through the damager directory and the last through the object directory;
+  # the fifth word is read but has no later use in this consuming path. No reporting actor is proven.
+  # tw-454 sub_711690 / tw-454 sub_8408F0 omit that unused word; tw-454 sub_728CC0 consumes
+  # the remaining five words in the same order. These are distinct from the compact contact body.
+  RoundDamagerContactNative: []
+  RoundDamagerContactNative@cn-774:
+    - unknown_0: u32
+      offset: 0
+    - position_x: f32
+      offset: 4
+    - position_y: f32
+      offset: 8
+    - position_z: f32
+      offset: 12
+    - unknown_16: u32
+      offset: 16
+      except: [tw-454]
+    - target: u32
+      offset: 20
+      tw-454:
+        - target: u32
+          offset: 16

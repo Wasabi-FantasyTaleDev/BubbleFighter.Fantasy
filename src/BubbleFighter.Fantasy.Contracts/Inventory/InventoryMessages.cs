@@ -16,6 +16,14 @@ public sealed record InventoryPurchaseApplied(IReadOnlyList<InventorySlotRecord>
 public sealed record InventorySlotsUpdated(IReadOnlyList<InventorySlotRecord> Slots) : IMessage;
 
 /// <summary>
+/// Flushes held equipped-article records as one slots update whose container 2 carries them: the shop queues
+/// one record per purchase and releases the set when the client's own inventory-dialog open proves the
+/// my-fighter object exists (kr-1256 <c>sub_9AEB10</c> skips container 2 until then).
+/// </summary>
+/// <param name="Articles">The held container-2 records, in purchase order.</param>
+public sealed record EquippedArticlesFlushed(IReadOnlyList<EquippedSlotRecord> Articles) : IMessage;
+
+/// <summary>
 /// Time-limited items of the player ended and were removed from the bag; the build's codec tells the
 /// client with its native expiry notice.
 /// </summary>

@@ -5,10 +5,13 @@ namespace BubbleFighter.Fantasy.Wire;
 
 /// <summary>
 /// The fixed-size message the server sends immediately after a connection is accepted,
-/// consumed by the client's <c>ServerConnection::OnFirstConnected</c> (<c>sub_10BB110 -&gt;
-/// sub_99EAD0</c>): a little-endian <c>u16 status</c> followed by a 128-character UTF-16LE
-/// field holding up to 127 command-line characters, zero padded. It travels in plaintext
-/// before the stream cipher starts.
+/// consumed by the client's server-connection class (kr-1256 RTTI names it <c>ServerConnection</c>;
+/// the receiver is <c>kr-1256 sub_10BB110</c>, which reads 258 bytes in a loop, and the virtual
+/// slot that consumes the buffer is <c>kr-1256 sub_99EAD0</c>, called through vtable +32 from
+/// <c>kr-1256 sub_10BA380</c>; the consuming method's own name is not in the binary, so it is
+/// coined here from the class): a little-endian <c>u16 status</c> followed by a 128-character
+/// UTF-16LE field holding up to 127 command-line characters, zero padded. It travels in
+/// plaintext before the stream cipher starts.
 /// </summary>
 public static class BootstrapGreeting
 {

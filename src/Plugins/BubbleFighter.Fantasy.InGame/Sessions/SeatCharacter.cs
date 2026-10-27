@@ -17,7 +17,7 @@ internal static class SeatCharacter
     internal static async ValueTask<SeatEquipment> ResolveEquipmentAsync(ISession session, int userNum,
         IEquipmentSelection? selection, ISeatCharacterResolver? characters, CancellationToken ct)
     {
-        // 0x81D060 / 0x81CCE0 overwrite the same character field for 117/201/503/806.
+        // kr-1256 sub_81D060 / sub_81CCE0 overwrite the same character field for 117/201/503/806.
         // A login snapshot or optional fighter roster must not override the current worn bag.
         if (selection is not null)
         {
@@ -37,8 +37,11 @@ internal static class SeatCharacter
             if (equipped is >= 300000 and <= 301999)
                 return new SeatEquipment(equipped, null);
         }
-        // Without an equipment service the scene shows the Dao reference character, item 300001
-        // (character type 1; a type-0 item 300000 is replaced by type 1 in the client anyway).
+        // Without an equipment service the scene shows the reference character, item 300001: the
+        // item id is 300000 + character type and Dao is type 1 (packets/builds.yaml
+        // creation_character_types; packets/room.yaml UserSlot.character_type — kr-812 sub_6CBFF0
+        // hands the id to the actor builder kr-812 sub_92B160). What the client does with a type-0
+        // item 300000 is not traced; 300001 is the safe reference.
         return new SeatEquipment(DaoCharacterItemId, null);
     }
 }

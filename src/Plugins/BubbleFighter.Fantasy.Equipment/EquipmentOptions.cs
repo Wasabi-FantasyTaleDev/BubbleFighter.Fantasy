@@ -60,10 +60,40 @@ public sealed class EquipmentOptions : IValidatableOptions
     /// </summary>
     public bool PersistWornState { get; set; } = true;
 
+    /// <summary>
+    /// Gets or sets whether the build's pet items share one worn slot: a pet is a
+    /// <c>ShopItem2</c> row whose <c>function</c> column is 10001 (kr-812 catalog record
+    /// +292, kr-1256 +252), and wearing a pet while another pet is worn is refused through
+    /// the selection's denial path, because both clients render only the first worn
+    /// function-10001 item (kr-812 sub_9782C0, kr-1256 sub_806530). Default off until a
+    /// live test pins the reference behaviour; requires <see cref="PersistWornState"/> and
+    /// a clientdata row. YAML key <c>pet_shared_slot</c>.
+    /// </summary>
+    public bool PetSharedSlot { get; set; }
+
+    /// <summary>
+    /// Gets or sets the client path of the workbook the pet rule reads, through
+    /// <c>IClientDataStore</c>. Every mounted build carries the catalog at the same client
+    /// path. YAML key <c>pet_catalog_client_path</c>.
+    /// </summary>
+    public string PetCatalogClientPath { get; set; } = "Config/ShopItem2.xml";
+
+    /// <summary>Gets or sets the inclusive pet workbook size cap in bytes. YAML key <c>max_pet_catalog_bytes</c>.</summary>
+    [Range(1, 200_000_000)]
+    public long MaxPetCatalogBytes { get; set; } = 134_217_728;
+
     /// <inheritdoc />
     public IEnumerable<ValidationResult> Validate()
     {
         if (string.IsNullOrWhiteSpace(Protocol))
             yield return new ValidationResult("protocol must not be empty.", [nameof(Protocol)]);
+        if (PetSharedSlot && !PersistWornState)
+            yield return new ValidationResult(
+                "pet_shared_slot requires persist_worn_state: an ack-only row never consults the selection the rule guards.",
+                [nameof(PetSharedSlot), nameof(PersistWornState)]);
+        if (PetSharedSlot && string.IsNullOrWhiteSpace(PetCatalogClientPath))
+            yield return new ValidationResult(
+                "pet_shared_slot requires pet_catalog_client_path, the workbook naming the function-10001 items.",
+                [nameof(PetCatalogClientPath)]);
     }
 }

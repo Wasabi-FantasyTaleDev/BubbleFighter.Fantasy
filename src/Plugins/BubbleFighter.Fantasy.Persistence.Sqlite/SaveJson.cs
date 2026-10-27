@@ -5,6 +5,12 @@ using BubbleFighter.Fantasy.Contracts.Settings;
 
 namespace BubbleFighter.Fantasy.Persistence.Sqlite;
 
+/// <summary>
+/// Encodes and decodes the player's <see cref="SaveState"/> snapshot. Unknown members are rejected on
+/// decode rather than ignored: a stored snapshot whose shape the current schema does not know fails
+/// loudly instead of silently dropping fields, which keeps older saves readable while turning schema
+/// drift into a visible migration problem rather than a silent data-loss path.
+/// </summary>
 internal static class SaveJson
 {
     private static readonly JsonSerializerOptions Options = new()
@@ -13,8 +19,11 @@ internal static class SaveJson
         Converters = { new LifetimeConverter(), new CustomizedKeyConverter() },
     };
 
+    /// <summary>Serializes the snapshot with the strict schema options.</summary>
     internal static string Encode(SaveState state) => JsonSerializer.Serialize(state, Options);
 
+    /// <summary>Decodes the snapshot; an empty document is a corrupt save, not an empty state.</summary>
+    /// <exception cref="InvalidDataException">Thrown when the document is null or the JSON does not match the schema.</exception>
     internal static SaveState Decode(string json) => JsonSerializer.Deserialize<SaveState>(json, Options)
         ?? throw new InvalidDataException("SQLite player state is null.");
 

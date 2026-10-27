@@ -8,6 +8,14 @@ public sealed partial class MemoryPlayerRepository
     public bool SupportsAtomicPaintApplication => true;
 
     /// <inheritdoc />
+    /// <remarks>
+    /// The whole application is atomic under the identity gate and then the entry gate. A spray is
+    /// usable when its row is in the character bag with a positive, non-life quantity that has not
+    /// expired; applying it decrements the stack (removing the row at zero), mirrors the decrement on
+    /// the equipped-bag row when one exists, and then sets the color index. The call reports false —
+    /// changing nothing — when the color is already applied or no usable spray is owned; a player
+    /// without an identity entry throws.
+    /// </remarks>
     public ValueTask<bool> ApplyPaintWithItemAsync(long userNum, int itemId, ushort colorIndex, CancellationToken ct)
     {
         RequireUserNum(userNum);

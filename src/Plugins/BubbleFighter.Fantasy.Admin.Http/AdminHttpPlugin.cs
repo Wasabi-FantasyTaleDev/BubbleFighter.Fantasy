@@ -6,6 +6,8 @@ using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Net;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Admin;
+using BubbleFighter.Fantasy.Contracts.Administration;
+using BubbleFighter.Fantasy.Contracts.Distribution;
 using BubbleFighter.Fantasy.Contracts.Installation;
 using BubbleFighter.Fantasy.Contracts.Listeners;
 using BubbleFighter.Fantasy.Contracts.Match;
@@ -30,7 +32,7 @@ namespace BubbleFighter.Fantasy.Admin.Http;
     Requires = [typeof(IPluginHost)],
     Optional = [typeof(IClientProfileRegistry), typeof(IOpcodeTableRegistry), typeof(ISessionRegistry), typeof(IRoomStartService),
         typeof(IAdminWebContent), typeof(IBuildReleaseLabels), typeof(IMatchConnectionTracker),
-        typeof(IInstallationService), typeof(IAdminAccessControl)],
+        typeof(IInstallationService), typeof(IAdminAccessControl), typeof(IPermissionService), typeof(IPermissionRegistry), typeof(IDistributionSources), typeof(IDistributionPlans), typeof(IDistributionPackages), typeof(IDistributionJobs)],
     OptionalMany = [typeof(IListenerEndpoint)])]
 public sealed partial class AdminHttpPlugin : IPlugin
 {
@@ -85,6 +87,9 @@ public sealed partial class AdminHttpPlugin : IPlugin
             app.MapGet("/api/auth/status", () => Results.Ok(new { mode = "none", authenticated = true, installation = false }));
 
         app.MapGet("/health", () => Results.Ok(new { status = "ok", utc = DateTime.UtcNow }));
+
+        ConfigureDistribution(app, context);
+        ConfigureClientPluginPolicy(app, context);
 
         app.MapGet("/api/plugins", () => Results.Ok(host.Instances));
 

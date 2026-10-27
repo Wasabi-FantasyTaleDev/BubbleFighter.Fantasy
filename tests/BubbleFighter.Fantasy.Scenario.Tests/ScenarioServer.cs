@@ -5,12 +5,13 @@ using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Kernel;
 using BubbleFighter.Fantasy.Scenario.Tests.Harness;
 using BubbleFighter.Fantasy.Wire;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BubbleFighter.Fantasy.Scenario.Tests;
 
 /// <summary>
-/// A kr-1256 regression row set started in process on free
+/// A selected client's regression row set started in process on free
 /// loopback ports, with in-memory persistence and fixture game data in place of MySQL and the
 /// unpacked client files. Scenarios drive it with simulated clients over real TCP.
 /// </summary>
@@ -20,11 +21,12 @@ internal sealed class ScenarioServer : IAsyncDisposable
     private readonly List<SimClient> _clients = [];
     private readonly CancellationTokenSource _cts = new(TimeSpan.FromMinutes(2));
 
-    private ScenarioServer(PluginHost host, int gamePort, int relayPort)
+    private ScenarioServer(PluginHost host, int gamePort, int relayPort, string build)
     {
         _host = host;
         GamePort = gamePort;
         RelayPort = relayPort;
+        _build = build;
     }
 
     public int GamePort { get; }
@@ -33,6 +35,7 @@ internal sealed class ScenarioServer : IAsyncDisposable
     public int RelayPort { get; }
 
     public CancellationToken Ct => _cts.Token;
+    private readonly string _build;
 
     public static readonly SimFixtures Fixtures =
         SimFixtures.Load(Path.Combine(AppContext.BaseDirectory, "Fixtures", "client-requests.jsonl"));
@@ -43,24 +46,25 @@ internal sealed class ScenarioServer : IAsyncDisposable
     /// Starts a server whose rows come from <paramref name="rows"/>, called with the free game and relay ports;
     /// scenarios that need other option values than <see cref="Rows"/> build their own list from it.
     /// </summary>
-    public static async Task<ScenarioServer> StartAsync(Func<int, int, List<PluginRow>> rows)
+    public static async Task<ScenarioServer> StartAsync(Func<int, int, List<PluginRow>> rows, string build = "kr-1256", int? minimumPort = null)
     {
-        var (game, relay) = FreePorts();
+        var (game, relay) = FreePorts(minimumPort);
         var host = new PluginHost(rows(game, relay),
             PluginCatalog.Discover([Path.Combine(AppContext.BaseDirectory, "plugins")]), NullLoggerFactory.Instance);
         try { await host.StartAsync(CancellationToken.None); }
         catch (Exception error)
         {
+            await host.ShutdownAsync(CancellationToken.None);
             throw new InvalidOperationException($"Scenario listener startup failed (game port {game}, relay port {relay}).", error);
         }
-        return new ScenarioServer(host, game, relay);
+        return new ScenarioServer(host, game, relay, build);
     }
 
     /// <summary>Connects a client whose launcher-login session is <paramref name="name"/>.</summary>
     public async Task<SimActor> ConnectAsync(string name)
     {
         var client = await SimClient.ConnectAsync(name, new DnsEndPoint("127.0.0.1", GamePort),
-            TestWireDialects.Get("kr-1256"), 4 * 1024 * 1024, Ct);
+            TestWireDialects.Get(_build), 4 * 1024 * 1024, Ct);
         _clients.Add(client);
         return new SimActor(client, Fixtures, TimeSpan.FromSeconds(10), Ct);
     }
@@ -69,7 +73,7 @@ internal sealed class ScenarioServer : IAsyncDisposable
     public async Task<SimActor> ConnectRelayAsync(string name)
     {
         var client = await SimClient.ConnectAsync(name + "-relay", new DnsEndPoint("127.0.0.1", RelayPort),
-            TestWireDialects.Get("kr-1256"), 4 * 1024 * 1024, Ct);
+            TestWireDialects.Get(_build), 4 * 1024 * 1024, Ct);
         _clients.Add(client);
         return new SimActor(client, Fixtures, TimeSpan.FromSeconds(10), Ct);
     }
@@ -93,7 +97,7 @@ internal sealed class ScenarioServer : IAsyncDisposable
         Row("core.wire-dialects", "core.wire-dialects"),
         Row("persistence.memory", "persistence.memory"),
         Row("dialect", "dialect", TestWireDialects.RowConfig("kr-1256")),
-        Row("dialect.modern.messages", "dialect.modern.messages", TestWireDialects.ModernMessagesConfig()),
+        Row("dialect.rooms", "dialect.rooms", TestWireDialects.ModernRoomsConfig()),
         SharedDialectRows.Kr1256(new() { ["inventory"] = true }),
         Row("protocol", "protocol", new() { ["opcode_table_path"] = Path.Combine(AppContext.BaseDirectory, "opcodes.yaml") }),
         // The build's client data: a loose-file tree holding only the synthetic shop workbook. The store is
@@ -116,11 +120,27 @@ internal sealed class ScenarioServer : IAsyncDisposable
             ["protocol"] = "kr-1256/game", ["client_profile"] = "kr-1256", ["version_major"] = 1256,
             ["enabled"] = true, ["publish_equipped_view_push"] = true,
         }),
-        Row("match-connection", "match-connection", new() { ["protocol"] = "kr-1256/relay" }),
+        // The match transport rows of the raw run: the account admission its match-connection row selects and
+        // the success-signal sender. The typed rounds run (ParityRun) switches both to the capability
+        // admission and adds the game-side offer row.
+        Row("dialect.match", "dialect.match", new()
+        {
+            ["protocol"] = "kr-1256/relay", ["native_handshake"] = "capability",
+            ["packets_directory"] = SharedDialectRows.PacketsDirectory(),
+        }),
+        Row("dialect.match-offers", "dialect.match-offers", new()
+        {
+            ["protocol"] = "kr-1256/game", ["packets_directory"] = SharedDialectRows.PacketsDirectory(),
+        }),
+        Row("dialect.match-replies", "dialect.match-replies", new()
+        {
+            ["protocol"] = "kr-1256/relay", ["packets_directory"] = SharedDialectRows.PacketsDirectory(),
+        }),
+        Row("match-connection", "match-connection", new() { ["protocol"] = "kr-1256/relay", ["capability_authentication"] = true }),
         // Explicit test settings keep scenarios independent of deployment-local overrides.
         Row("ingame", "ingame", new()
         {
-            ["game_protocol"] = "kr-1256/game", ["relay_protocol"] = "kr-1256/relay", ["version_major"] = 1256,
+            ["game_protocol"] = "kr-1256/game", ["relay_protocol"] = "kr-1256/relay",
             ["relay_advertise_ipv4"] = "127.0.0.1", ["relay_advertise_port"] = relayPort,
             ["republish_full_room_on_team_change"] = false,
             ["relay_character_positions"] = true, ["start_matches"] = true,
@@ -129,10 +149,6 @@ internal sealed class ScenarioServer : IAsyncDisposable
             ["send_room_list"] = true, ["republish_room_ui_on_position"] = true, ["republish_room_ui_on_join"] = true,
             ["broadcast_room_chat"] = true, ["send_plaza_snapshot"] = true, ["enter_game_stage_on_create"] = false,
             ["room_state"] = 2, ["mode_override"] = 0, ["prime_session_state_before_install"] = true,
-        }),
-        Row("match-relay", "match-relay", new()
-        {
-            ["game_protocol"] = "kr-1256/game", ["relay_protocol"] = "kr-1256/relay", ["broadcast_movement_samples"] = true,
         }),
         Row("shop", "shop", new()
         {
@@ -149,8 +165,24 @@ internal sealed class ScenarioServer : IAsyncDisposable
             Config = config, ParentId = parentId, IsolatedServices = isolatedServices ?? [],
         };
 
-    private static (int Game, int Relay) FreePorts()
+    private static (int Game, int Relay) FreePorts(int? minimumPort = null)
     {
+        if (minimumPort is { } first)
+        {
+            for (var port = first; port < first + 200; port += 2)
+            {
+                using var gameProbe = new TcpListener(IPAddress.Loopback, port);
+                using var relayProbe = new TcpListener(IPAddress.Loopback, port + 1);
+                try
+                {
+                    gameProbe.Start();
+                    relayProbe.Start();
+                    return (port, port + 1);
+                }
+                catch (SocketException) { }
+            }
+            throw new InvalidOperationException("No pair of scenario listener ports is available in the requested range.");
+        }
         using var game = new TcpListener(IPAddress.Loopback, 0);
         using var relay = new TcpListener(IPAddress.Loopback, 0);
         game.Start();
@@ -159,3 +191,6 @@ internal sealed class ScenarioServer : IAsyncDisposable
         return (((IPEndPoint)game.LocalEndpoint).Port, ((IPEndPoint)relay.LocalEndpoint).Port);
     }
 }
+
+
+

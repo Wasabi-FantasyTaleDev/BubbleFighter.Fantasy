@@ -24,8 +24,17 @@ internal sealed class StarBinding(string protocol, IOpcodeTable table, PacketTab
     {
         if (!tables.CapabilityOf(build, "star_items"))
             throw new ConfigException("star_items requires audited star create, claim and count consumers.");
-        foreach (var name in new[] { "LucciDropRequest", "LucciCreate", "LucciPickup", "LucciPicked" })
-            _ = tables.Resolve(build, name);
+        // The drop request is read by LucciBinding, so only its presence is checked here. The three structures this
+        // binding reads and writes are checked field by field with the exact types it casts and sizes them as: the two
+        // claims cast both words to int and the creation sizes nine fields, two words and seven scalars.
+        _ = tables.Resolve(build, "LucciDropRequest");
+        PacketLayoutContract.RequireFields(tables, build, "LucciPickup", "Star items",
+            ("character_id", "u32"), ("object_id", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "LucciPicked", "Star items",
+            ("character_id", "u32"), ("object_id", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "LucciCreate", "Star items",
+            ("object_id", "u32"), ("kind", "u32"), ("x", "f32"), ("y", "f32"), ("z", "f32"),
+            ("velocity_x", "f32"), ("velocity_y", "f32"), ("velocity_z", "f32"), ("unknown_36", "u32"));
         // Resolve every opcode first so a missing row fails the mount instead of the first drop.
         _ = table.C2S("gcpReqCreateStar");
         _ = table.C2S("gcpEatStar");

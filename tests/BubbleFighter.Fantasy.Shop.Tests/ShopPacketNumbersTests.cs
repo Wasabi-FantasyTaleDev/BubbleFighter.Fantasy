@@ -1,20 +1,25 @@
 using BubbleFighter.Fantasy.Abstractions.Protocol;
-using BubbleFighter.Fantasy.Shop.Dialects;
 using Xunit;
 
 namespace BubbleFighter.Fantasy.Shop.Tests;
 
 /// <summary>
-/// Pins the numbers the catalog-schema shop row resolves by name from the kr-1256 opcode table, so a table edit that
-/// moves one is a visible change rather than a silent wire change.
+/// Pins the packet numbers the shop's dialect binding resolves by name from the kr-1256 opcode table, so a table
+/// edit that moves one is a visible change rather than a silent wire change.
 /// </summary>
 public sealed class ShopPacketNumbersTests
 {
-    [Fact]
-    public void RepliesResolveToTheKr1256Labels()
-    {
-        Assert.Equal(new ShopPacketNumbers(800, 801, 816, 817, 803, 833, 834, 106), ShopTablePackets.Numbers);
-    }
+    [Theory]
+    [InlineData("gspRepEnterShop", 800)]
+    [InlineData("gspRepEnterTCShop", 801)]
+    [InlineData("gspInventoryUpdateInventorySlots", 803)]
+    [InlineData("gspRepShopBuy", 816)]
+    [InlineData("gspRepShopItemCardInfo", 817)]
+    [InlineData("gspUserMoneyStat", 106)]
+    [InlineData("gspRepRealCouponUse", 833)]
+    [InlineData("gspRepCheckCash", 834)]
+    public void RepliesResolveByName(string name, ushort expected) =>
+        Assert.Equal(expected, ShopTablePackets.Table.S2C(name));
 
     [Theory]
     [InlineData("gcpEnterShop", 801)]

@@ -312,7 +312,7 @@ public sealed class PartySceneFlowTests
         internal Sink<PlazaMenuReturnRequested> Menu { get; } = new();
         internal Rig(int seats = 4, int plazaCapacity = 36)
         {
-            var options = new InGameOptions { TypedOnly = true, MaxPlayersPerMatch = seats, PlazaCapacity = plazaCapacity };
+            var options = new InGameOptions { MaxPlayersPerMatch = seats, PlazaCapacity = plazaCapacity };
             Registry = new RoomRegistry(options);
             Flow = new RoomFlow(Registry, new RoomSenders(Entered, Seats, new Sink<RoomSeatVacated>(),
                 new Sink<RoomMasterChanged>(), Refused, Left, PlazaEntered: Plaza,
@@ -320,14 +320,14 @@ public sealed class PartySceneFlowTests
                 PlazaPositionReceived: Positions, MenuReturn: Menu), NullLogger.Instance,
                 plazaCapacity: plazaCapacity, options: options, parties: this, online: this);
         }
-        internal RoomPushTests.RecordingSession Player(int user, long? sessionId = null)
+        internal RecordingSession Player(int user, long? sessionId = null)
         {
-            var session = new RoomPushTests.RecordingSession(sessionId ?? user);
+            var session = new RecordingSession(sessionId ?? user);
             session.SetLobbyPlayer(user, "player" + user);
             _online[user] = session;
             return session;
         }
-        internal (RoomPushTests.RecordingSession Leader, RoomPushTests.RecordingSession Member) Pair()
+        internal (RecordingSession Leader, RecordingSession Member) Pair()
         {
             var first = Player(11);
             var second = Player(22);

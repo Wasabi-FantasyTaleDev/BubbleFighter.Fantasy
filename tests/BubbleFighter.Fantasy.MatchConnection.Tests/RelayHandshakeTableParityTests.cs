@@ -1,11 +1,7 @@
 using System.Buffers;
-using System.Collections.Concurrent;
 using System.Globalization;
-using System.IO.Pipelines;
-using System.Net;
-using BubbleFighter.Fantasy.Abstractions.Net;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
-using BubbleFighter.Fantasy.Dialect.Modern.Messages;
+using BubbleFighter.Fantasy.Dialect.Messages;
 using BubbleFighter.Fantasy.Packets;
 using BubbleFighter.Fantasy.Protocol;
 using Xunit;
@@ -13,11 +9,11 @@ using Xunit;
 namespace BubbleFighter.Fantasy.MatchConnection.Tests;
 
 /// <summary>
-/// Proves that the relay handshake frames stated in packets/relay-*.yaml reproduce what ModernMatchCodec
-/// reads and writes: the same account, entity, map and nickname values, the same reply bytes, the same byte
-/// lengths, and the same truncation and trailing-byte rejections. Client evidence: kr-1256 sub_95FD30
-/// (C2S relay 1), kr-1256 sub_9F02F0 (C2S relay 3), kr-1256 sub_9601E0 cases 1, 4, 5, 6, 13 and 22
-/// (S2C relay) and kr-1256 sub_1155B00 (game S2C 521).
+/// Pins the kr-1256 relay handshake frames stated in packets/relay-*.yaml as literal hex: the same account,
+/// entity, map and nickname values through the table readers and the moved wire readers, the same reply bytes,
+/// the same byte lengths, and the same truncation and trailing-byte rejections. Client evidence: kr-1256
+/// sub_95FD30 (C2S relay 1), kr-1256 sub_9F02F0 (C2S relay 3), kr-1256 sub_10F32C0 (C2S relay 12),
+/// kr-1256 sub_9601E0 cases 1, 4, 5, 6, 13 and 22 (S2C relay) and kr-1256 sub_1155B00 (game S2C 521).
 /// </summary>
 public sealed class RelayHandshakeTableParityTests
 {
@@ -45,7 +41,7 @@ public sealed class RelayHandshakeTableParityTests
         });
         Assert.Equal(41, body.Length);
 
-        var codec = ModernMatchCodec.ReadAuthentication(body);
+        var codec = RelayHandshakeWire.ReadAccountJoin(Tables, Build, body);
         Assert.Equal(20, codec.Ticket.Length);
         Assert.Equal(7, codec.UserNumber);
         Assert.Equal("host", codec.Nickname);
@@ -61,10 +57,10 @@ public sealed class RelayHandshakeTableParityTests
 
         for (var length = 0; length < body.Length; length++)
         {
-            Assert.Throws<PacketFormatException>(() => ModernMatchCodec.ReadAuthentication(body.AsSpan(0, length)));
+            Assert.Throws<PacketFormatException>(() => RelayHandshakeWire.ReadAccountJoin(Tables, Build, body.AsSpan(0, length)));
             Assert.Throws<PacketFormatException>(() => PacketCodec.Read(Tables, Build, "RelayJoinRequest", body.AsSpan(0, length)));
         }
-        Assert.Throws<PacketFormatException>(() => ModernMatchCodec.ReadAuthentication([.. body, 0]));
+        Assert.Throws<PacketFormatException>(() => RelayHandshakeWire.ReadAccountJoin(Tables, Build, [.. body, 0]));
         Assert.Throws<PacketFormatException>(() => PacketCodec.Read(Tables, Build, "RelayJoinRequest", [.. body, 0]));
     }
 
@@ -85,7 +81,7 @@ public sealed class RelayHandshakeTableParityTests
         });
         Assert.Equal(42, body.Length);
 
-        var codec = ModernMatchCodec.ReadMap(body);
+        var codec = RelayHandshakeWire.ReadMap(Tables, Build, 1256, body);
         Assert.Equal(1000000, codec.EntityId);
         Assert.Equal("host", codec.Nickname);
         Assert.Equal("map", codec.Map);
@@ -96,81 +92,83 @@ public sealed class RelayHandshakeTableParityTests
         Assert.Equal(codec.EntityId, Convert.ToInt32(table["unknown_n3"], CultureInfo.InvariantCulture));
         Assert.Equal(codec.Nickname, table["unknown_n4"] as string);
 
+        // The version word must be the client's own; another word is not the frame the reader knows.
+        var wrongVersion = (byte[])body.Clone();
+        BitConverter.GetBytes(812).CopyTo(wrongVersion, 0);
+        Assert.Throws<PacketFormatException>(() => RelayHandshakeWire.ReadMap(Tables, Build, 1256, wrongVersion));
+
         for (var length = 0; length < body.Length; length++)
         {
-            Assert.Throws<PacketFormatException>(() => ModernMatchCodec.ReadMap(body.AsSpan(0, length)));
+            Assert.Throws<PacketFormatException>(() => RelayHandshakeWire.ReadMap(Tables, Build, 1256, body.AsSpan(0, length)));
             Assert.Throws<PacketFormatException>(() =>
                 PacketCodec.ReadScalars(Tables, Build, "RelayReconnectMapRequest", body.AsSpan(0, length)));
         }
-        Assert.Throws<PacketFormatException>(() => ModernMatchCodec.ReadMap([.. body, 0]));
+        Assert.Throws<PacketFormatException>(() => RelayHandshakeWire.ReadMap(Tables, Build, 1256, [.. body, 0]));
         Assert.Throws<PacketFormatException>(() =>
             PacketCodec.ReadScalars(Tables, Build, "RelayReconnectMapRequest", [.. body, 0]));
     }
 
-    [Fact]
-    public async Task TheAuthenticationRepliesMatchTheTableAndPinTenAndFourBytes()
-    {
-        var session = new RecordingSession(1);
-        await ModernMatchCodec.SendAuthenticationAsync(session, CancellationToken.None);
+    // The three pins below state the accept path's contract as literal hex written ONLY through the tables,
+    // the frames the deleted modern codec used to send; the mounted dialect.match-replies sender reproduces
+    // them in the same order (MatchRepliesMountTests).
 
-        Assert.Equal(new ushort[] { 22, 1 }, session.Sent.Select(frame => frame.Opcode));
+    [Fact]
+    public void TheAuthenticationAcceptPairPinsItsExactBytesThroughTheTables()
+    {
         var settings = PacketCodec.Write(Tables, Build, "RelayHandshakeSettings", new Dictionary<string, object?>());
         var accepted = PacketCodec.Write(Tables, Build, "RelayJoinAcceptedSignal", new Dictionary<string, object?>());
         Assert.Equal(10, settings.Length);
         Assert.Equal(4, accepted.Length);
-        Assert.Equal(settings, session.Sent[0].Body);
-        Assert.Equal(accepted, session.Sent[1].Body);
+        // kr-1256 sub_9601E0 case 22 (block 0x96113C) reads one zero bool32 word and six zero bytes;
+        // case 1 (block 0x960278) reads no field, so the accepted word is four zero bytes.
+        Assert.Equal("00000000000000000000", Convert.ToHexString(settings));
+        Assert.Equal("00000000", Convert.ToHexString(accepted));
     }
 
     [Fact]
-    public async Task TheSceneRepliesMatchTheSeedTablesAndPinTheirLengths()
+    public void TheSceneAcceptFramesPinTheirExactBytesThroughTheTables()
     {
-        var session = new RecordingSession(1);
-        await ModernMatchCodec.SendSceneAsync(session, 1000000, CancellationToken.None);
-
-        Assert.Equal(new ushort[] { 4, 5, 6, 13 }, session.Sent.Select(frame => frame.Opcode));
+        const int entity = 1000000;
         var critical = PacketCodec.Write(Tables, Build, "RelayCriticalSeedTable", new Dictionary<string, object?>
         {
-            ["entity_id"] = 1000000u,
+            ["entity_id"] = (uint)entity,
             ["unknown_8"] = Zeros(32),
             ["unknown_24"] = Zeros(32),
         });
         var defence = PacketCodec.Write(Tables, Build, "RelayDefenceSeedTable", new Dictionary<string, object?>
         {
-            ["entity_id"] = 1000000u,
+            ["entity_id"] = (uint)entity,
             ["unknown_8"] = Zeros(1000),
         });
         var cancelled = PacketCodec.Write(Tables, Build, "RelayCriticalSeedCancelTable", new Dictionary<string, object?>
         {
-            ["entity_id"] = 1000000u,
+            ["entity_id"] = (uint)entity,
             ["unknown_8"] = Zeros(32),
         });
-        var accepted = PacketCodec.Write(Tables, Build, "RelaySceneAcceptedSignal", new Dictionary<string, object?>());
+        // Consumers kr-1256 sub_4832D0/sub_483420 reset two 32-word bitsets, kr-1256 sub_483540 a
+        // 1000-byte per-entity state: entity word, then the counted zero vectors of exactly those sizes.
         Assert.Equal(268, critical.Length);
         Assert.Equal(1008, defence.Length);
         Assert.Equal(136, cancelled.Length);
-        Assert.Empty(accepted);
-        Assert.Equal(critical, session.Sent[0].Body);
-        Assert.Equal(defence, session.Sent[1].Body);
-        Assert.Equal(cancelled, session.Sent[2].Body);
-        Assert.Equal(accepted, session.Sent[3].Body);
+        Assert.Equal("40420F00" + "20000000" + new string('0', 256) + "20000000" + new string('0', 256),
+            Convert.ToHexString(critical));
+        Assert.Equal("40420F00" + "E8030000" + new string('0', 2000), Convert.ToHexString(defence));
+        Assert.Equal("40420F00" + "20000000" + new string('0', 256), Convert.ToHexString(cancelled));
     }
 
     [Fact]
-    public void TheSessionSignatureMatchesTheTableAndPinsSevenBytes()
+    public void TheSessionSignaturePinsItsExactBytesThroughTheTables()
     {
-        var bytes = ModernMatchCodec.WriteSessionSignature(7);
-        var table = PacketCodec.Write(Tables, Build, "SessionSignatureData", new Dictionary<string, object?>
-        {
-            ["unknown_4"] = (ushort)7,
-        });
-        Assert.Equal(7, bytes.Length);
-        Assert.Equal(table, bytes);
+        var table = LoginBurstWire.WriteSessionSignature(Tables, Build, 7);
+        Assert.Equal(7, table.Length);
+        // kr-1256 sub_1155B00 stores the mode word, then one byte and the empty byte vector.
+        Assert.Equal("0700" + "00" + "00000000", Convert.ToHexString(table));
     }
 
     [Theory]
     [InlineData(PacketDirection.ClientToServer, "rcpReqJoinRelaySession", 1)]
     [InlineData(PacketDirection.ClientToServer, "rcpReqRelayReconnectMap_", 3)]
+    [InlineData(PacketDirection.ClientToServer, "rcpReqReportSceneData_", 12)]
     [InlineData(PacketDirection.ServerToClient, "rspRelayJoinAccepted_", 1)]
     [InlineData(PacketDirection.ServerToClient, "rspSendCrtSeedTable", 4)]
     [InlineData(PacketDirection.ServerToClient, "rspSendDefSeedTable", 5)]
@@ -193,7 +191,7 @@ public sealed class RelayHandshakeTableParityTests
     }
 
     // The repository root is above the test output folder; the packet tables and profiles live there.
-    private static string RepositoryDirectory()
+    internal static string RepositoryDirectory()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
         {
@@ -202,31 +200,5 @@ public sealed class RelayHandshakeTableParityTests
                 return directory.FullName;
         }
         throw new InvalidOperationException("The repository root was not found above the test output folder.");
-    }
-
-    private sealed class RecordingSession(long id) : ISession
-    {
-        public long Id => id;
-        public IConnection Connection { get; } = new RecordingConnection(id);
-        public ClientProfile Profile { get; } = new(Build, "kr", 1256, 0, 0, Build);
-        public ConcurrentDictionary<string, object> Items { get; } = new();
-        public List<(ushort Opcode, byte[] Body)> Sent { get; } = [];
-        public ValueTask SendAsync(ushort opcode, ReadOnlyMemory<byte> payload, CancellationToken ct)
-        {
-            ct.ThrowIfCancellationRequested();
-            Sent.Add((opcode, payload.ToArray()));
-            return ValueTask.CompletedTask;
-        }
-    }
-
-    private sealed class RecordingConnection(long id) : IConnection
-    {
-        public long Id => id;
-        public EndPoint RemoteEndPoint { get; } = new IPEndPoint(IPAddress.Loopback, 1);
-        public PipeReader Input => throw new NotSupportedException();
-        public PipeWriter Output => throw new NotSupportedException();
-        public ConcurrentDictionary<string, object> Items { get; } = new();
-        public bool IsClosed => false;
-        public ValueTask CloseAsync(string reason) => ValueTask.CompletedTask;
     }
 }

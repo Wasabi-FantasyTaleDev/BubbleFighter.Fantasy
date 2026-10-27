@@ -109,6 +109,22 @@ public sealed class EquipmentOpcodeTests
     }
 
     [Fact]
+    public async Task PersistPresetPagesWithoutAPlayerStateFailsLoudAtActivation()
+    {
+        // The pages cannot survive a restart without a store, so the switch is refused before the row
+        // registers anything rather than silently reverting to the derived bar after a restart.
+        using var h = await Harness.CreateAsync(LoadTable());
+        var row = h.Context("inventoryview",
+            new() { ["enabled"] = true, ["publish_equipped_view_push"] = true, ["persist_preset_pages"] = true });
+        var sender = new SnapshotSender("kr-1256/game");
+        row.Effect(h.Services.RegisterMany<IMessageSender<LocalEquipmentViewUpdated>>(sender));
+        row.Effect(h.Services.RegisterMany<IMessageSender<RemoteEquipmentViewUpdated>>(sender));
+        var error = await Assert.ThrowsAsync<ConfigException>(() => new InventoryViewPlugin().ActivateAsync(row, default).AsTask());
+        Assert.Contains("persist_preset_pages", error.Message);
+        Assert.False(h.Services.TryGet<IEquippedViewPush>(out _));
+    }
+
+    [Fact]
     public async Task ViewPublisherUsesResolvedSendersForLocalAndRemoteSnapshotsAndUnloads()
     {
         var original = LoadTable();
@@ -222,9 +238,10 @@ public sealed class EquipmentOpcodeTests
     {
         using var h = await Harness.CreateAsync(new OpcodeTable(LoadTable().Profile, []));
         // The shared row now mounts the login path in a real profile; this scenario asks only that disabled
-        // feature rows need no packet names, so it turns login, the main-menu probe and the bag row off.
+        // feature rows need no packet names, so it turns login, the main-menu probe, the round signature
+        // and the bag row off.
         await new BubbleFighter.Fantasy.Dialect.Messages.MessagesPlugin().ActivateAsync(h.Context("dialect.messages",
-            new() { ["login"] = false, ["main_menu_init"] = false, ["inventory"] = false, ["equipment"] = false, ["equipment_view"] = false }), default);
+            new() { ["login"] = false, ["main_menu_init"] = false, ["session_signature"] = false, ["inventory"] = false, ["equipment"] = false, ["equipment_view"] = false }), default);
         await new EquipmentPlugin().ActivateAsync(h.Context("equipment", new() { ["enabled"] = false }), default);
         Assert.Empty(h.Services.GetAll<IInboundMessageBinding<EquipmentChangeRequested>>());
         Assert.Empty(h.Services.GetAll<IMessageSender<EquipmentChangeReplied>>());
@@ -264,6 +281,15 @@ public sealed class EquipmentOpcodeTests
         }
         public ValueTask SetActiveWeaponPresetSlotAsync(long userNum, byte slot, CancellationToken ct) =>
             throw new InvalidOperationException("A view publication must never write preset state.");
+
+        // A default-off publication never reads pages; reaching this member would mean the switch leaked.
+        public ValueTask<WeaponPresetPage[]?> GetWeaponPresetPagesAsync(long userNum, CancellationToken ct) =>
+            throw new InvalidOperationException("A derived view publication must never read preset pages.");
+
+        public ValueTask<WeaponPresetPage[]> GetOrCreateWeaponPresetPagesAsync(long userNum, WeaponPresetPage[] initialPages, CancellationToken ct) =>
+            throw new InvalidOperationException("This fixture does not initialize preset pages.");
+        public ValueTask SetWeaponPresetPagesAsync(long userNum, WeaponPresetPage[] pages, CancellationToken ct) =>
+            throw new InvalidOperationException("A view publication must never write preset pages.");
     }
 
     private sealed class WaitingSession(RecordingSession inner) : ISession
@@ -293,8 +319,31 @@ public sealed class EquipmentOpcodeTests
 
         internal PluginContext Context(string plugin, Dictionary<string, object?>? config = null)
         {
-            var context = new PluginContext(plugin == "dialect.messages" ? SharedDialectRows.Kr1256(config) : new PluginRow { Id = plugin, Plugin = plugin, Source = "test", Config = config },
-                Services, _events, NullLogger.Instance);
+            PluginRow row;
+            if (plugin == "dialect.messages")
+            {
+                row = SharedDialectRows.Kr1256(config);
+            }
+            else if (plugin == "inventoryview")
+            {
+                // A view-request row resolves its build and tables from the row lineage, as the
+                // profile bundles mount it; rows that log no request never read these values.
+                var merged = new Dictionary<string, object?>(config ?? [], StringComparer.Ordinal)
+                {
+                    ["packets_directory"] = SharedDialectRows.PacketsDirectory(),
+                };
+                row = new PluginRow
+                {
+                    Id = plugin, Plugin = plugin, Source = "test",
+                    ClientBuild = ClientBuild.Parse("kr:1256:1304"), Lineage = ["kr-1256", "kr-812"],
+                    Config = merged,
+                };
+            }
+            else
+            {
+                row = new PluginRow { Id = plugin, Plugin = plugin, Source = "test", Config = config };
+            }
+            var context = new PluginContext(row, Services, _events, NullLogger.Instance);
             _contexts.Add(context);
             return context;
         }

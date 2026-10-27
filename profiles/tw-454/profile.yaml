@@ -11,10 +11,15 @@ experimental: true
 # Nearest build whose layouts this one reuses when it has no variant of its own.
 parent: cn-774
 description: Taiwanese 2019 client build, ClientVersion_Major 454.
+vars:
+  BFF_MODERN_RELAY_PORT: "${TW_454_RELAY_PORT:-7201}"
+  BFF_MODERN_RELAY_PUBLIC_PORT: "${TW_454_RELAY_PUBLIC_PORT:-7201}"
 bundles:
   - core
   - tw-454
   - player-settings
+  - modern-plaza
+  - modern-commerce
 patches:
   - patch.yaml
   # Optional developer override; git-ignored and skipped when absent.

@@ -20,7 +20,7 @@ public sealed record PknEntry(string Path, uint Flags, uint Block, uint Size, ui
 /// </summary>
 public sealed class PknArchive : IArchiveReader
 {
-    // sub_1126430 caps a prefixed wide string at 0x4000 code units.
+    // kr-1256 sub_1126430 caps a prefixed wide string at 0x4000 code units.
     private const int MaxPathLength = 0x4000;
 
     private readonly Stream _stream;

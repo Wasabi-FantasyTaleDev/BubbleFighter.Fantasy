@@ -10,6 +10,25 @@ namespace BubbleFighter.Fantasy.Launcher.Http.Tests;
 
 public sealed class LauncherApiTests
 {
+    /// <summary>Slow startup remains valid until the ten-minute boundary, without permitting ticket replay.</summary>
+    [Theory]
+    [InlineData(62, true)]
+    [InlineData(599, true)]
+    [InlineData(600, false)]
+    public async Task DefaultTicketLifetimeAllowsSlowStartupAndExpiresAtTenMinutes(int elapsedSeconds, bool accepted)
+    {
+        var clock = new TestClock();
+        var sessions = new LauncherSessions(new LauncherOptions(), new MemoryLauncherSessions(10), clock);
+        var session = await sessions.SignInAsync("startup-test", default);
+        var issuedAt = clock.GetUtcNow();
+        var ticket = sessions.Issue(session.AccessToken, "kr-1256");
+        Assert.Equal(issuedAt.AddMinutes(10), ticket.ExpiresAt);
+        clock.Advance(elapsedSeconds);
+        Assert.Null(sessions.Redeem(ticket.Token, "kr-812"));
+        Assert.Equal(accepted ? "startup-test" : null, sessions.Redeem(ticket.Token, "kr-1256"));
+        Assert.Null(sessions.Redeem(ticket.Token, "kr-1256"));
+    }
+
     [Fact]
     public async Task CatalogRegistrationLoginProfileAndLogoutUseRealHttp()
     {

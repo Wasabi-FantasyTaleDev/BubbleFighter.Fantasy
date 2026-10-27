@@ -12,7 +12,6 @@ description: Chinese 2012 client build, ClientVersion_Major 324.
 bundles:
   - core
   - legacy
-  - inventory-actions
 # What this build differs in; everything else is the legacy bundle's (kr-812).
 vars:
   LEGACY_PORT: ${CN_324_GAME_PORT:-7140}

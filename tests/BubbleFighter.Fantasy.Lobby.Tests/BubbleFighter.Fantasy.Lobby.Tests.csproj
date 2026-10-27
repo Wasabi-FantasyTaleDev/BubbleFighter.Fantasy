@@ -11,7 +11,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Lobby\BubbleFighter.Fantasy.Lobby.csproj" />
     <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Dialect.Messages\BubbleFighter.Fantasy.Dialect.Messages.csproj" />
-    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Dialect.Modern.Messages\BubbleFighter.Fantasy.Dialect.Modern.Messages.csproj" />
     <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Persistence.Memory\BubbleFighter.Fantasy.Persistence.Memory.csproj" />
     <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Protocol\BubbleFighter.Fantasy.Protocol.csproj" />
     <ProjectReference Include="..\..\src\BubbleFighter.Fantasy.Kernel\BubbleFighter.Fantasy.Kernel.csproj" />
@@ -21,5 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\Shared\TestPlayerSessions.cs" Link="TestPlayerSessions.cs" />
+    <Compile Include="..\..\src\Plugins\BubbleFighter.Fantasy.InventoryView\EquipmentSelection.cs" Link="Production\EquipmentSelection.cs" />
+    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Persistence.Sqlite\BubbleFighter.Fantasy.Persistence.Sqlite.csproj" />
   </ItemGroup>
 </Project>

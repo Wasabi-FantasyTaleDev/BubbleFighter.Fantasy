@@ -70,11 +70,18 @@ public interface IInventoryRepository
     ValueTask<IReadOnlyList<InventorySlotRecord>> ListSlotsAsync(
         long userNum, InventoryBag bag, int maxCount, CancellationToken ct);
 
-    /// <summary>Replaces every bag slot for one player and bag. An empty list stores an empty bag.</summary>
+    /// <summary>
+    /// Stores exactly the given rows for one player and bag in a single transaction: the bag's stored
+    /// rows are deleted and the supplied rows inserted in order. This is the bulk-replace primitive,
+    /// not an incremental update; a caller that reads and then replaces can lose a purchase committed
+    /// in between, so additive callers use <see cref="AppendMissingItemsAsync"/> instead.
+    /// </summary>
     /// <param name="userNum">Login <c>players.user_num</c>.</param>
     /// <param name="bag">802 character bag or 803 container 1.</param>
-    /// <param name="slots">Rows to store; count must not exceed the bag cap.</param>
+    /// <param name="slots">Rows to store; count must not exceed the bag cap, and every row must target this player and bag.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <exception cref="ArgumentException">Thrown when a row targets another player or bag.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the row count exceeds the bag cap.</exception>
     ValueTask ReplaceSlotsAsync(
         long userNum, InventoryBag bag, IReadOnlyList<InventorySlotRecord> slots, CancellationToken ct);
 

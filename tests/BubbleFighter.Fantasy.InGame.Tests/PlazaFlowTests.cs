@@ -82,15 +82,15 @@ public sealed class PlazaFlowTests
 
         public Rig(InGameOptions? options = null)
         {
-            Registry = new RoomRegistry(new InGameOptions { TypedOnly = true, MaxPlayersPerMatch = 16 });
+            Registry = new RoomRegistry(new InGameOptions { MaxPlayersPerMatch = 16 });
             Flow = new RoomFlow(Registry, new RoomSenders(Entered, SeatUpdated, SeatVacated, MasterChanged,
                 Left: Left, Chat: Chat, PlazaEntered: PlazaEntered, PlazaMemberEntered: MemberEntered,
                 PlazaMemberLeft: MemberLeft, PlazaPositionReceived: Position, MenuReturn: MenuReturn, MainMenu: MainMenu), NullLogger.Instance, options: options);
         }
 
-        public static RoomPushTests.RecordingSession Player(long id, string nickname)
+        public static RecordingSession Player(long id, string nickname)
         {
-            var session = new RoomPushTests.RecordingSession(id);
+            var session = new RecordingSession(id);
             session.SetLobbyPlayer(id, nickname, level: 3);
             return session;
         }

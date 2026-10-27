@@ -4,6 +4,12 @@ using BubbleFighter.Fantasy.Contracts.Shop;
 
 namespace BubbleFighter.Fantasy.Persistence.Sqlite;
 
+/// <summary>
+/// The save's gift fragment. Gifts live in the presents table (schema version 4; once-only system
+/// claims in present_claims from version 5), every operation runs in one transaction of the owned
+/// connection — charge, list-size check and gift row are one change — and a delivery marks the gift
+/// inside the purchase transaction (<see cref="PurchaseAsync"/>).
+/// </summary>
 // Gifts live in the save's presents table (schema version 4; present_claims from version 5). Every operation runs in one transaction of the owned
 // connection, so a charge, a list-size check and the gift row are one change; a delivery marks the gift inside the
 // purchase transaction (SqliteRepositories.PurchaseAsync).

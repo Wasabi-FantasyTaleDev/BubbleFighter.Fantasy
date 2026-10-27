@@ -70,21 +70,56 @@ public sealed class RoomUnchosenMapTests
             (string)setting["unknown_92"]!, (string)setting["unknown_116"]!));
     }
 
-    /// <summary>The builds whose layouts differ state none of the room values.</summary>
+    /// <summary>The native CN and TW map panels use their own strings without inheriting KR AI-seat flags.</summary>
     [Theory]
-    [InlineData("cn-774")]
-    [InlineData("tw-454")]
-    public void TheRestatedBuildsCancelTheRoomValues(string build)
+    [InlineData("cn-774", "unknown_52", "unknown_76", "unknown_100", "unknown_124", "unknown_148")]
+    [InlineData("tw-454", "unknown_36", "unknown_60", "unknown_84", "unknown_108", "unknown_132")]
+    public void NativeMapPanelsRetainAllFourStrings(string build, string selection, string key, string name, string first, string third)
     {
-        Assert.Null(RoomSettingChangeMap.Load(TestBuilds.Packets, build));
+        var map = Assert.IsType<RoomSettingChangeMap>(RoomSettingChangeMap.Load(TestBuilds.Packets, build));
+        var body = PacketCodec.Write(TestBuilds.Packets, build, "RoomGameSettingChangeRequest", new Dictionary<string, object?>
+        {
+            ["unknown_0"] = "native-first", ["unknown_24"] = "map name", ["unknown_48"] = "native-third",
+            ["unknown_72"] = "rel_Village01", ["unknown_128"] = 1,
+        });
+        var change = map.Read(body);
+        Assert.Equal(1, change.Mode);
+        Assert.Equal("rel_Village01", map.RoomKey(change));
+        var setting = new Dictionary<string, object?> { ["unknown_16"] = 42 };
+        map.Apply(setting, change);
+        Assert.Equal("rel_Village01", setting[selection]);
+        Assert.Equal("rel_Village01", setting[key]);
+        Assert.Equal("map name", setting[name]);
+        Assert.Equal("native-first", setting[first]);
+        Assert.Equal("native-third", setting[third]);
+        Assert.Equal(42, setting["unknown_16"]);
+        Assert.Throws<BubbleFighter.Fantasy.Abstractions.Protocol.PacketFormatException>(() => map.Read(body[..^1]));
         Assert.Null(RoomAiSeatFlag.Load(TestBuilds.Packets, build));
     }
 
     /// <summary>The legacy builds present unchosen maps through their own room writer and state no value.</summary>
     [Theory]
     [InlineData("kr-812")]
-    [InlineData("cn-774")]
-    [InlineData("tw-454")]
     public void BuildsWithoutTheValueLeaveTheSettingAlone(string build) =>
         Assert.Null(RoomUnchosenMap.Load(TestBuilds.Packets, build));
+
+    /// <summary>Native room previews discard the startup map and keep all unselected round keys random.</summary>
+    [Theory]
+    [InlineData("cn-774", "unknown_52", "unknown_76", "unknown_176", "unknown_224", "unknown_272")]
+    [InlineData("tw-454", "unknown_36", "unknown_60", "unknown_160", "unknown_208", "unknown_256")]
+    public void NativeUnchosenMapClearsStartupResolution(string build, string selection, string resolved,
+        string first, string second, string third)
+    {
+        var tables = TestBuilds.Packets;
+        var setting = PacketCodec.Read(tables, build, "GameSetting", PacketCodec.Write(tables, build, "GameSetting",
+            new Dictionary<string, object?> { [selection] = "rel_Village01_Byway", [resolved] = "rel_Village01_Byway" }));
+        var originalLength = PacketCodec.Write(tables, build, "GameSetting", setting).Length;
+        Assert.IsType<RoomUnchosenMap>(RoomUnchosenMap.Load(tables, build)).Apply(setting);
+        var body = PacketCodec.Write(tables, build, "GameSetting", setting);
+        Assert.Equal(originalLength - 2 * 2 * "rel_Village01_Byway".Length + 4 * 2 * "Random".Length, body.Length);
+        var decoded = PacketCodec.Read(tables, build, "GameSetting", body);
+        Assert.Equal("Random", decoded[selection]);
+        Assert.Equal("", decoded[resolved]);
+        Assert.All(new[] { first, second, third }, key => Assert.Equal("Random", decoded[key]));
+    }
 }

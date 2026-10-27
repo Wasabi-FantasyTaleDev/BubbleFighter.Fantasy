@@ -64,7 +64,7 @@ public sealed class SqliteRoundSettlementTests : IDisposable
             user = (await stores.CreateAsync("account", "player", default)).UserNum;
             await stores.UpsertAsync(new PlayerWallet(user, 0, 0), default);
         }
-        Execute("DROP TABLE round_settlements; PRAGMA user_version=5;");
+        Execute("DROP TABLE messenger_requests; DROP TABLE messenger_categories; DROP TABLE messenger_relations; DROP TABLE messenger_users; DROP TABLE round_settlements; PRAGMA user_version=5;");
         using (var database = new SqliteDatabase(Options()))
         {
             var stores = new SqliteRepositories(database);
@@ -74,7 +74,7 @@ public sealed class SqliteRoundSettlementTests : IDisposable
         connection.Open();
         using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA user_version";
-        Assert.Equal(6L, command.ExecuteScalar());
+        Assert.Equal(7L, command.ExecuteScalar());
     }
 
     private void Execute(string sql)

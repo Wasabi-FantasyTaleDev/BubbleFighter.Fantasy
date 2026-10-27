@@ -6,10 +6,34 @@ using YamlDotNet.Serialization.NamingConventions;
 
 namespace BubbleFighter.Fantasy.Protocol;
 
+/// <summary>
+/// Binds opcode-catalog research candidates that the runtime table leaves nameless. The catalog
+/// (opcode-catalog.yaml beside the runtime table) is a generated review input, never authority: a row
+/// is only bound when its name is not <c>Unknown*</c>, the runtime table has no reviewed name at that
+/// value, and the best-graded peers agree on one name. A binding is logged as unreviewed, the runtime
+/// table is never edited by it, and a later review can still promote or reject the row.
+/// </summary>
 internal sealed class CatalogOpcodeFallback(IOpcodeTable runtime, ILogger logger, string path)
 {
     private readonly Dictionary<(OpcodeConnection, PacketDirection), List<Row>> _rows = [];
 
+    /// <summary>
+    /// Loads the profile's catalog and indexes its admissible rows. The profile must match the runtime
+    /// table, and the file must exist (when explicitly configured), stay inside its byte and row
+    /// bounds and parse as YAML. Rows keep an explicit <c>connection</c> column when the catalog
+    /// carries one; rows without one are guarded before they default to the game scope:
+    /// <c>rcp*</c>/<c>rsp*</c> names are refused for every build, and for kr-1256 additionally every
+    /// row at value 2000 or above and every <c>gpp*</c> row. These prefixes and that region belong to
+    /// the relay packet family — the catalog generator maps <c>gpp/rcp/rsp</c> to the relay space and
+    /// <c>gcp/gsp</c> to the game space (tools/corpus/catalog.py SPACE_BY_PREFIX), kr-812 names the
+    /// family with real RTTI (<c>Packet_gppKickFail</c>), and the kr-1256 catalog carries no
+    /// connection column at all, so every row would otherwise default to game. The kr-1256 rows the
+    /// guards skip are all shape-matched research names taken from legacy serializers (for example
+    /// C2S 2076 <c>gppReqCreateAISubordinate</c>, shape@kr-812/id-1809), which the runtime table binds
+    /// explicitly where a real reader exists.
+    /// </summary>
+    /// <exception cref="ConfigException">Thrown for a configured-but-missing, oversized, unparsable or
+    /// mismatched catalog, an invalid direction, value or connection column, or a row budget overrun.</exception>
     internal static CatalogOpcodeFallback? Load(ProtocolOptions options, IOpcodeTable runtime, ILogger logger)
     {
         var path = options.OpcodeCatalogPath.Length > 0 ? options.OpcodeCatalogPath
@@ -55,6 +79,16 @@ internal sealed class CatalogOpcodeFallback(IOpcodeTable runtime, ILogger logger
         return result;
     }
 
+    /// <summary>
+    /// Resolves one nameless runtime slot to a candidate value. All rows of the same name must agree
+    /// on one value (otherwise the candidate is ambiguous), the value must not carry a better-graded
+    /// name under a peer row (otherwise the catalog conflicts with itself), and the runtime slot must
+    /// be empty or <c>Unknown*</c> (otherwise the catalog would override reviewed data). The winning
+    /// row is the highest-graded match, and the binding is logged as an unreviewed candidate.
+    /// </summary>
+    /// <returns>The candidate value, or <see langword="null"/> when the catalog has no admissible row for the name.</returns>
+    /// <exception cref="ConfigException">Thrown when the candidate value is ambiguous, conflicts with
+    /// another catalog name, or disagrees with a reviewed runtime binding.</exception>
     internal ushort? Resolve(OpcodeConnection connection, PacketDirection direction, string name)
     {
         if (!_rows.TryGetValue((connection, direction), out var rows)) return null;
@@ -77,6 +111,12 @@ internal sealed class CatalogOpcodeFallback(IOpcodeTable runtime, ILogger logger
         return value;
     }
 
+    /// <summary>
+    /// Ranks the catalog's research grades, best first: reviewed/runtime (a row the review accepted or
+    /// the runtime already carries), label (a client RTTI name), strong, cross (cross-build agreement),
+    /// shape and shape-single (write-shape matches), candidate, ordered, weak and pair (paired
+    /// request/reply guesses). Unrecognized grades score zero and are never bound.
+    /// </summary>
     private static int Grade(string grade) => grade switch
     {
         "reviewed" or "runtime" => 10, "label" => 9, "strong" => 8, "cross" => 7,

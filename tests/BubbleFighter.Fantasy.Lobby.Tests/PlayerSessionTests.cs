@@ -13,6 +13,27 @@ public sealed class PlayerSessionTests
     private static readonly PlayerIdentity Player = new(7, "user", "nick", 3);
 
     [Fact]
+    public void LauncherLanguageIsConnectionLocalAndReleasedEvenBeforeAuthentication()
+    {
+        var scope = new PlayerSessionScope();
+        var pending = new FeatureSession(91);
+        var other = new FeatureSession(92);
+        scope.SetLauncherLanguage(pending, "zh-CN");
+        scope.SetLauncherLanguage(other, "en");
+        scope.SetLauncherLanguage(pending, null);
+        scope.SetLauncherLanguage(pending, "zh-CN");
+        Assert.Equal("zh-CN", pending.Feature<ISessionLanguage>().LauncherLanguage);
+        Assert.Equal("en", other.Feature<ISessionLanguage>().LauncherLanguage);
+        Assert.Throws<InvalidOperationException>(() => scope.SetLauncherLanguage(pending, "ko"));
+        scope.Attach(pending, Player);
+        Assert.Equal("zh-CN", pending.Feature<ISessionLanguage>().LauncherLanguage);
+        scope.Remove(pending.Connection.Id);
+        Assert.False(pending.TryFeature<ISessionLanguage>(out _));
+        scope.Dispose();
+        Assert.False(other.TryFeature<ISessionLanguage>(out _));
+    }
+
+    [Fact]
     public void NicknameChangePreservesAccountSceneAndGeneration()
     {
         var session = new PlayerSession(Player);
@@ -69,6 +90,25 @@ public sealed class PlayerSessionTests
         Assert.Same(first, scope.Attach(session, Player with { Nickname = "again" }));
         Assert.Throws<InvalidOperationException>(() => scope.Attach(session, Player with { UserNum = 8 }));
         Assert.Same(first, session.Feature<IPlayerSession>());
+    }
+
+    [Fact]
+    public void LoginOwnershipSurvivesSharedStateAndMovesOnlyWithAReplacementLogin()
+    {
+        using var scope = new PlayerSessionScope();
+        var first = new FeatureSession(41);
+        var relay = new FeatureSession(42);
+        var replacement = new FeatureSession(43);
+        var state = scope.Attach(first, Player);
+        using var shared = relay.RegisterFeature<IPlayerSession>(state);
+        Assert.Equal(first.Connection.Id, relay.Feature<IPlayerSession>().LoginConnectionId);
+        var claim = scope.Claim(replacement, Player, takeOver: true);
+        Assert.Equal(LoginClaimStatus.Attached, claim.Status);
+        Assert.Equal(replacement.Connection.Id, claim.Session!.LoginConnectionId);
+        Assert.False(first.TryFeature<IPlayerSession>(out _));
+        Assert.Equal(first.Connection.Id, relay.Feature<IPlayerSession>().LoginConnectionId);
+        scope.Remove(replacement.Connection.Id);
+        Assert.False(replacement.TryFeature<IPlayerSession>(out _));
     }
 
     [Fact]

@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Contracts.Inventory;
+using BubbleFighter.Fantasy.Contracts.Distribution;
 using BubbleFighter.Fantasy.Contracts.Lobby;
 using BubbleFighter.Fantasy.Contracts.Match;
 using BubbleFighter.Fantasy.Contracts.Players;
@@ -95,11 +96,32 @@ public sealed class ContractSchemaTests
             .Order(StringComparer.Ordinal).ToArray();
         // These gaps need adapters or callback ownership; adding an unsupported method must be an explicit decision.
         // Installation lifecycle operations remain host-local until the SDK surface defines an explicit setup owner.
-        string[] reviewed = ["IAdminWebContent.TryGetFile", "IBuildReleaseLabels.TryGetRelease", "IGameText.TryFormat", "IGameText.TryFormat",
+        // All three text lookup overloads retain an out parameter, which the RPC adapter cannot transport.
+        // Command registration needs a native owner context and callback lifetime; no remote adapter exists yet.
+        // Permission registration returns an owned IDisposable, which the domain RPC adapter cannot transport.
+        // Game and online-scope registrations require a native owner and endpoint callbacks.
+        // Payload copies need caller-owned native streams; metadata and job operations use serializable records.
+        // Messenger events are an abstract record hierarchy, which needs a tagged-union shape; the long poll stays host-local.
+        // Companion routes and offers return owned registrations with handler callbacks, and Send takes an untyped payload.
+        string[] reviewed = ["IAdminWebContent.TryGetFile", "IBuildReleaseLabels.TryGetRelease", "ICommandRegistry.Register",
+            "ICompanionHub.Offer", "ICompanionHub.Route", "ICompanionHub.Send", "IGameCommandEndpoints.Register", "IGameText.TryFormat", "IGameText.TryFormat", "IGameText.TryFormat",
+            "IDistributionTransport.CopyFileAsync", "IDistributionTransport.CopyRepositoryAssetAsync",
             "IInstallationDatabase.PrepareAsync", "IInstallationRuntime.ApplyAsync", "IInstallationService.ImportClientDataAsync",
-            "IListenerEndpoint.get_LocalEndPoint", "IMatchCapabilityOfferSender.SendAsync", "INativeSceneSeedStore.TryGet",
-            "IPaintItemCatalog.TryGetColorIndex", "IPlayerProgressRepository.SettleRoundAsync", "IRoomStartService.ListAsync"];
+            "IListenerEndpoint.get_LocalEndPoint", "IMatchCapabilityOfferSender.SendAsync", "IMessengerService.WaitEventsAsync", "INativeSceneSeedStore.TryGet",
+            "IOnlineCommandScopes.Register", "IPaintItemCatalog.TryGetColorIndex", "IPermissionRegistry.Register", "IPlayerProgressRepository.SettleRoundAsync", "IRoomStartService.ListAsync"];
         Assert.Equal(reviewed.Order(StringComparer.Ordinal), gaps);
+    }
+
+    [Fact]
+    public void DistributionStreamingRemainsNativeWhileDocumentMetadataIsSerializable()
+    {
+        Assert.Equal("supported", Operation<IDistributionTransport>(nameof(IDistributionTransport.ReadDocumentAsync))["rpc_shape"]!.GetValue<string>());
+        foreach (var name in new[] { nameof(IDistributionTransport.CopyFileAsync), nameof(IDistributionTransport.CopyRepositoryAssetAsync) })
+        {
+            var method = Operation<IDistributionTransport>(name);
+            Assert.Equal("unsupported", method["rpc_shape"]!.GetValue<string>());
+            Assert.Contains("Stream", method["unsupported_reason"]!.GetValue<string>(), StringComparison.Ordinal);
+        }
     }
 
     [Fact]

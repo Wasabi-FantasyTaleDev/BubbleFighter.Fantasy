@@ -1,3 +1,5 @@
+using BubbleFighter.Fantasy.Contracts.ClientData;
+
 namespace BubbleFighter.Fantasy.Fighters.Data;
 
 /// <summary>
@@ -11,13 +13,17 @@ public static class FighterCatalogLoader
     /// <summary>Worksheet that holds the HorzTable used by login type resolution.</summary>
     public const string SheetName = "FighterConfig";
 
+    /// <summary>The row option that owns the size cap, named in the workbook reader's size error.</summary>
+    private const string LimitKey = "max_fighter_config_bytes";
+
     /// <summary>Loads and validates the HorzTable from the bytes the client data store returns.</summary>
     /// <param name="content">The whole <c>FighterConfig.xml</c> file.</param>
     /// <param name="source">The client path the bytes came from, for diagnostics.</param>
     /// <param name="maxBytes">Inclusive size cap.</param>
     public static FighterCatalog Load(ReadOnlyMemory<byte> content, string source, long maxBytes)
     {
-        var sheets = SpreadsheetWorkbook.Load(content, source, maxBytes, [SheetName]);
+        var sheets = SpreadsheetWorkbook.Load(
+            WorkbookFile.FromBytes(source, content.ToArray()), maxBytes, LimitKey, [SheetName]);
         var table = sheets[SheetName];
         if (table.Count == 0)
             throw new InvalidOperationException($"Fighter config {source} sheet {SheetName} has no rows.");

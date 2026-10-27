@@ -1,0 +1,27 @@
+version: 1
+# The nickname-change notification: one four-byte word, then one wide string.
+#
+# Numbers and readers were read per build: the kr-812 and kr-1256 bodies were decoded here. For cn-324 only
+# the class, its deserializer and its writer are named; their bodies were not decoded.
+#   kr-812   S2C 129: receive case in kr-812 sub_837170 (`case 0x81:`) sets the descriptor
+#            kr-812 off_D6E180 and calls handler kr-812 sub_82DE50, which reads one four-byte word
+#            (kr-812 sub_A56C10) and one wide string (kr-812 sub_A56D70) into locals. The dispatcher
+#            descriptor and handler establish this row without relying on a packet class layout.
+#   kr-1256  S2C 138: dispatcher kr-1256 sub_9D2FF0 stores the "gspChangedUserName" literal for case 138
+#            and calls handler kr-1256 sub_9BE480, which reads one four-byte word through the packet buffer
+#            and one wide string through kr-1256 sub_1119C10 and kr-1256 sub_1126430, which reads the
+#            character count and twice that many bytes; the same two fields, no build annotation needed.
+#   cn-324   S2C 126: class Packet_gspChangedUserName; its deserializer cn-324 sub_6FD230 and its writer
+#            cn-324 sub_6FD200 are named but their bodies were not decoded here. cn-279 126 and cn-717 126
+#            carry the same class name.
+#   id-400   S2C 129 (label only), cn-774 138, tw-454 136 (labels only; their readers were not read here).
+# The reply is a notification: kr-812 sub_82DE50 and kr-1256 sub_9BE480 read the two values and store
+# neither, so the receiving client does not update its own copy from this frame. The name the using
+# player sees is installed from the item-use reply's parameters (packets/inventory-use.yaml).
+# Byte lengths: 4 (word) + 4 (count) + 2 per character; 8 bytes with an empty name, 16 with four, 32 with
+# twelve. PacketCodec applies its configured string limits; this table adds no nickname policy.
+# Field keys retain the kr-812 handler's local offsets; native packet-object offsets are not established.
+structs:
+  ChangedUserName:
+    - unknown_4: u32 # the only other word; read and discarded by both handlers, purpose unknown
+    - unknown_8: wstr # the changed name: read (kr-812 sub_A56D70) and discarded by the handler

@@ -6,6 +6,13 @@ namespace BubbleFighter.Fantasy.Lobby.Tests;
 public sealed class LauncherLoginAccountTests
 {
     [Fact]
+    public void OlderTicketProvidersPreserveUsernameWithUnspecifiedUserLanguage()
+    {
+        var identity = LauncherLoginAccount.ResolveIdentity(new string('a', 64), "cn-406", true, new Tickets());
+        Assert.Equal(new LauncherTicketIdentity("native-user"), identity);
+    }
+
+    [Fact]
     public void OrdinaryAccountsRemainUnchangedWhenTicketModeIsEnabledOrDisabled()
     {
         var service = new Tickets();

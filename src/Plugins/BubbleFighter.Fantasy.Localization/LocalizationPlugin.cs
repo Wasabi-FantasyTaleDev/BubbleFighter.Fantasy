@@ -3,6 +3,7 @@ using System.Text.Json;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Lobby;
+using BubbleFighter.Fantasy.Contracts.Sessions;
 
 namespace BubbleFighter.Fantasy.Localization;
 
@@ -26,15 +27,29 @@ public sealed class LocalizationPlugin : IPlugin
             throw new ConfigException("Every configured region language must exist in the resource file.");
         if (options.ProfileLanguages.Any(mapping => !resources.ContainsKey(mapping.Language)))
             throw new ConfigException("Every configured profile language must exist in the resource file.");
+        if (options.LauncherLanguages.Any(mapping => !resources.ContainsKey(mapping.Language)))
+            throw new ConfigException("Every configured Launcher language must resolve to an existing resource language.");
         var languages = options.RegionLanguages.ToDictionary(mapping => mapping.Region, mapping => mapping.Language, StringComparer.OrdinalIgnoreCase);
         var profileLanguages = options.ProfileLanguages.ToDictionary(mapping => mapping.Profile, mapping => mapping.Language, StringComparer.OrdinalIgnoreCase);
-        context.Effect(context.Services.Register<IGameText>(new GameText(options.DefaultLanguage, languages, profileLanguages, resources)));
+        var launcherLanguages = options.LauncherLanguages.ToDictionary(mapping => mapping.LauncherLanguage, mapping => mapping.Language, StringComparer.Ordinal);
+        context.Effect(context.Services.Register<IGameText>(new GameText(options.DefaultLanguage, languages, profileLanguages, launcherLanguages, resources)));
         return ValueTask.CompletedTask;
     }
 
-    private sealed class GameText(string defaultLanguage, Dictionary<string, string> languages, Dictionary<string, string> profileLanguages,
+    private sealed class GameText(string defaultLanguage, Dictionary<string, string> languages, Dictionary<string, string> profileLanguages, Dictionary<string, string> launcherLanguages,
         Dictionary<string, Dictionary<string, string>> resources) : IGameText
     {
+        public string Format(ISession session, string key, IReadOnlyDictionary<string, string>? arguments = null) =>
+            TryFormat(session, key, out var text, arguments) ? text : throw new InvalidOperationException($"Missing game message '{key}'.");
+
+        public bool TryFormat(ISession session, string key, out string text, IReadOnlyDictionary<string, string>? arguments = null)
+        {
+            var preferred = session.TryFeature<ISessionLanguage>(out var selected)
+                ? launcherLanguages.GetValueOrDefault(selected.LauncherLanguage, selected.LauncherLanguage) : defaultLanguage;
+            // A missing translation falls back to deployment wording, never the client's region.
+            return TryFormat(resources.ContainsKey(preferred) ? preferred : defaultLanguage, "", key, out text, arguments);
+        }
+
         public string Format(string region, string key, IReadOnlyDictionary<string, string>? arguments = null) =>
             TryFormat(region, key, out var text, arguments) ? text : throw new InvalidOperationException($"Missing game message '{key}'.");
 
@@ -91,11 +106,17 @@ public sealed class LocalizationOptions : IValidatableOptions
     /// </summary>
     public LocalizationProfileLanguage[] ProfileLanguages { get; set; } = [];
 
+    /// <summary>Gets or sets Launcher UI tags mapped to resource languages independently of client builds.</summary>
+    [Required]
+    public LocalizationLauncherLanguage[] LauncherLanguages { get; set; } = [];
+
     /// <summary>Rejects oversized or ambiguous region-language and profile-language selections.</summary>
     public IEnumerable<ValidationResult> Validate()
     {
-        if (RegionLanguages is null || ProfileLanguages is null)
+        if (RegionLanguages is null || ProfileLanguages is null || LauncherLanguages is null)
             yield break;
+        if (LauncherLanguages.Length > 64 || LauncherLanguages.Select(mapping => mapping.LauncherLanguage).Distinct(StringComparer.Ordinal).Count() != LauncherLanguages.Length)
+            yield return new ValidationResult("At most 64 distinct Launcher language mappings may be configured.");
         if (RegionLanguages.Length > 64)
             yield return new ValidationResult("At most 64 region languages may be configured.");
         if (RegionLanguages.Select(mapping => mapping.Region).Distinct(StringComparer.OrdinalIgnoreCase).Count() != RegionLanguages.Length)
@@ -105,6 +126,15 @@ public sealed class LocalizationOptions : IValidatableOptions
         if (ProfileLanguages.Select(mapping => mapping.Profile).Distinct(StringComparer.OrdinalIgnoreCase).Count() != ProfileLanguages.Length)
             yield return new ValidationResult("Each profile must have exactly one configured language.");
     }
+}
+
+/// <summary>Maps a user-selected Launcher UI tag to a server message resource language.</summary>
+public sealed class LocalizationLauncherLanguage
+{
+    /// <summary>Gets or sets the exact UI language tag supplied by the Launcher.</summary>
+    [Required] public string LauncherLanguage { get; set; } = "";
+    /// <summary>Gets or sets the target language dictionary in the resource file.</summary>
+    [Required] public string Language { get; set; } = "";
 }
 
 /// <summary>Selects a resource language for one client region in a YAML sequence entry.</summary>

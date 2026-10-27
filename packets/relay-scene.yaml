@@ -1,0 +1,67 @@
+version: 1
+structs:
+  # Legacy clients use RelayValidationReport instead of this modern scene upload.
+  RelaySceneReport: []
+
+  # kr-1256 sub_10F32C0 writes account/entity, nickname, appearance, presets, string,
+  # byte, three halfwords, SessionSignatureData and a final byte widened to a word; its caller
+  # kr-1256 sub_9601E0 fills +0 from a global account object and +4 from the character's +0x1C0.
+  # cn-774 sub_488AD0 / tw-454 sub_475C20 write entity, nickname and a session word instead, and
+  # embed their own EquippedItemList objects (cn-774 sub_496E60 / tw-454 sub_4A0480). Their callers
+  # cn-774 sub_B593D0 and the tw-454 caller of sub_475C20 fill +0 from the local character's +440
+  # (the 1000000 + 100000 * slot actor that cn-774 sub_894B80 creates) and +28 from session +236.
+  RelaySceneReport@kr-1256:
+    - account: u32
+      offset: 0
+      cn-774:
+        - entity_id: u32
+          offset: 0
+      tw-454:
+        - entity_id: u32
+          offset: 0
+    - entity_id: u32
+      offset: 4
+      cn-774:
+        - nickname: wstr
+          offset: 4
+        - unknown_28: u32
+          offset: 28
+      tw-454:
+        - nickname: wstr
+          offset: 4
+        - unknown_28: u32
+          offset: 28
+    - nickname: wstr
+      offset: 8
+      except: [cn-774, tw-454]
+    # kr-1256 sub_10F32C0 writes +32 before sub_10C4510 writes the character
+    # and five vectors; together they match RoomProfileEntry (kr-1256 sub_10C4290).
+    - equipment: RoomProfileEntry
+      offset: 32
+      cn-774:
+        - equipment: EquippedObjectEntry
+          offset: 32
+      tw-454:
+        - equipment: EquippedObjectEntry
+          offset: 32
+    # Offsets below name the KR object. The same wire tail is stored at different
+    # native destinations: CN +112/+144/+168/+172/+174/+176/+180/+204,
+    # TW +100/+132/+156/+160/+162/+164/+168/+192 (in field order).
+    - presets: WeaponPresetList
+      offset: 100
+    - unknown_128: wstr
+      offset: 128
+    - unknown_152: u8
+      offset: 152
+    - unknown_156: u16
+      offset: 156
+    - unknown_158: u16
+      offset: 158
+    - unknown_160: u16
+      offset: 160
+    # kr-1256 sub_1155AB0, cn-774 sub_48AFE0 and tw-454 sub_4787C0
+    # write one halfword, one byte and a counted byte vector.
+    - signature: SessionSignatureData
+      offset: 164
+    - unknown_188: u32
+      offset: 188

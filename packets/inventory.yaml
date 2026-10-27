@@ -58,9 +58,15 @@ structs:
 
   # kr-812 C2S gcpReqInventoryDeleteItem (806) and gcpReqInventoryThrowItem (807)
   # each carry the selected item identity as one u32. Writers: kr-812 sub_9BCB10
-  # and sub_9857B0; the throw UI selects that identity in kr-812 sub_984930.
+  # and kr-812 sub_9857B0; the throw UI selects that identity in kr-812 sub_984930.
+  # kr-812 sub_9BCB10 stamps 806 through kr-812 sub_B25E90 and kr-812 sub_9857B0
+  # stamps 807. Both request classes read the word at +4 through kr-812 sub_80A910,
+  # so the delete and throw requests share this structure.
   # The expired-item confirmation sends the same word on C2S 808 in
   # kr-1256 sub_8136F0, cn-774 sub_9B4BC0 and tw-454 sub_C12C40.
+  # The inspected kr-1256 removal UI uses throw request C2S 808: kr-1256 sub_8136F0
+  # writes the word after the identity check. C2S 806 belongs to the use-item builder
+  # kr-1256 sub_80DA80; these paths do not establish whether another delete sender exists.
   # Legacy throw writers: cn-279 sub_404F00, cn-324 sub_45D490,
   # id-400 sub_8F2850 and id-1809 sub_4D7E40 each write one four-byte value.
   # Stamping helpers: cn-279 sub_487630, cn-324 sub_804440,
@@ -74,9 +80,17 @@ structs:
       offset: 4
       only: [kr-812]
 
-  # kr-812 S2C gspRepInventoryDeleteItem (811), vtable D6F51C reader
-  # kr-812 sub_6DB1B0: item identity followed by result. kr-812 sub_826F70
-  # removes the identity through kr-812 sub_97BFD0 when result is zero.
+  # kr-812 S2C gspRepInventoryDeleteItem (811), vtable kr-812 0xD6F51C, reader
+  # kr-812 sub_6DB1B0: item identity at +4 then result at +8, one u32 each
+  # (kr-812 sub_A56C10 reads one word at each offset). Consumer kr-812 sub_826F70:
+  # result zero removes the identity through kr-812 sub_97BFD0 and refreshes the
+  # dialog at +736/+740 through kr-812 sub_953050 and kr-812 sub_94FD20; result 1
+  # and result 2 show fixed failure texts and any other nonzero shows an unknown
+  # failure text.
+  # The kr-1256 client reads S2C 814 inline in dispatcher kr-1256 sub_9D2FF0 at
+  # kr-1256 0x9D4AC2: one u32 identity then one u32 result; result zero removes
+  # that identity through kr-1256 sub_933190, and any nonzero shows an
+  # unknown-failure text. This reply reader does not establish a corresponding request sender.
   InventoryDeleteReply:
     - item_id: u32
       offset: 4
@@ -85,12 +99,15 @@ structs:
       offset: 8
       only: [kr-812]
 
-  # kr-812 S2C gspRepInventoryThrowItem (812), vtable D6F528 reader
+  # kr-812 S2C gspRepInventoryThrowItem (812), vtable kr-812 0xD6F528, reader
   # kr-812 sub_6DB1B0. kr-812 sub_827180 consumes the same identity/result
   # pair and calls kr-812 sub_97BFD0 for result zero before refreshing the UI.
   # Modern S2C 815 readers kr-1256 sub_9B6250, cn-774 sub_BB4930 and
   # tw-454 sub_A92020 also read identity:u32 then result:u32; zero removes
   # that identity via kr-1256 sub_933190, cn-774 sub_B29100 or tw-454 sub_8DAC80.
+  # The kr-1256 handler reads four bytes for the identity and four for the
+  # result; result zero also shows a fixed text, result 1 shows a fixed failure
+  # text, and any other nonzero includes the result word in the failure text.
   # S2C 812 readers cn-279 sub_47E650, cn-324 sub_408DF0, id-400 sub_782DD0
   # and id-1809 sub_4D7F70 also read two u32 values. Their zero-result consumers
   # erase the first value through cn-279 sub_6642B0 (call site 006FEA38),

@@ -2,9 +2,22 @@ using BubbleFighter.Fantasy.Contracts.Installation;
 
 namespace BubbleFighter.Fantasy.Installation;
 
-// This lists local folders only. Authorization is enforced by the same boundary as installation mutations.
+/// <summary>
+/// Lists local directories for the setup assistant's folder pickers. Only fixed, removable and RAM
+/// drives are offered; a requested path must be fully qualified, free of control characters, within
+/// the length bound and rooted on one of those drives; every ancestor is checked for reparse points;
+/// and enumeration stops at the response bound without scanning whole trees. Authorization is the
+/// installation boundary's, not this class's — it refuses nothing that installation mutations could
+/// not already reach, and everything else comes back as <c>directory_unavailable</c>.
+/// </summary>
 internal static class InstallationDirectoryBrowser
 {
+    /// <summary>
+    /// Returns the requested directory's visible subdirectories, its full path and its parent, or the
+    /// drive roots when no path is given. Hidden and system entries and reparse points are filtered;
+    /// the truncation flag reports that the bound stopped the walk even though matching entries remain.
+    /// </summary>
+    /// <exception cref="ArgumentException">Thrown for an unusable path (<c>directory_unavailable</c>).</exception>
     public static InstallationDirectoryPage Browse(string? path, int limit, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

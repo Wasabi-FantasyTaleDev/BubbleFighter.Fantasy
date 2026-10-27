@@ -2,6 +2,41 @@ profile: kr-1256
 # Opcode assignments for the Korean 1256 client. C2S and S2C are separate numeric spaces.
 # Only rows with evidence are listed; see profiles/opcode-policy.md.
 opcodes:
+  - value: 1549
+    direction: s2c
+    connection: game
+    name: gspRoomNpcBotControllerChanged_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_9D9930 dispatches 1549 to kr-1256 sub_DBDFB0, which reads old owner user number and new controller slot and updates matching bot seats"
+  - value: 2076
+    direction: c2s
+    connection: game
+    name: gcpRoomAddNpcBot_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_DBD9A0 writes optional team tag and byte, slot, difficulty and preset from the native bot popup"
+  - value: 2077
+    direction: c2s
+    connection: game
+    name: gcpRoomRemoveNpcBot_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_DBDC80 writes the selected bot slot as one word"
+  - value: 624
+    direction: c2s
+    connection: game
+    name: gcpReqEndStage
+    name_source: mirrored
+    evidence: inferred
+    source: "kr-1256 sub_708B60 stamps 624 and writes a word and bool32; kr-1256 sub_D24400 confirms training exit via kr-1256 sub_6E5840 with {1, false}; matched by behavior to kr-812 Packet_gcpReqEndStage / kr-812 sub_512F80"
+  - value: 107
+    direction: c2s
+    connection: game
+    name: gcpReqPlayTutorial
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_891940 accepts the initial tutorial prompt through kr-1256 sub_99F580; kr-1256 sub_9D7440 stamps 107 and writes thirteen rule words, one packed byte, three counted UTF-16 strings and difficulty; matched by behavior to kr-812 Packet_gcpReqPlayTutorial / kr-812 sub_8455F0"
   - value: 808
     direction: c2s
     name: gcpReqInventoryThrowItem
@@ -20,8 +55,8 @@ opcodes:
     connection: game
     name: gcpRoomSendAmpMsg
     name_source: mirrored
-    evidence: inferred
-    source: "kr-1256 sub_9D7350 stamps 520 and writes the same four-field body as kr-812 Packet_gcpRoomSendAmpMsg via kr-812 sub_845040; the trailing words remain context-dependent"
+    evidence: verified
+    source: "kr-1256 sub_9D7350 stamps 520 and writes the four values of its arguments object (+0, +4, +28, +32) as one u32, one counted UTF-16 string and two u32 words, the same wire as the baseline writer kr-812 sub_845040; the trailing words remain context-dependent"
   - value: 514
     direction: c2s
     connection: game
@@ -58,6 +93,7 @@ opcodes:
     source: "kr-1256 sub_9E1EB0 case 0x248 reads one seat word and marks room+1664+seat; matched to kr-812 Packet_gspGameMapLoadingComplete, sub_80A910 -> sub_802AB0 at S2C 701"
   - value: 32788
     direction: c2s
+    connection: both
     name: Unknown32788
     name_source: none
     evidence: captured
@@ -65,6 +101,7 @@ opcodes:
     notes: "i32 affected actor, i32 source, three f32, i32 unknown0; 24 bytes"
   - value: 32788
     direction: s2c
+    connection: both
     name: Unknown32788
     name_source: none
     evidence: captured
@@ -72,6 +109,7 @@ opcodes:
     notes: "same 24-byte layout; affected actor virtual +524 applies stun"
   - value: 32790
     direction: c2s
+    connection: both
     name: Unknown32790
     name_source: none
     evidence: captured
@@ -79,6 +117,7 @@ opcodes:
     notes: "i32 affected actor; 4 bytes"
   - value: 32790
     direction: s2c
+    connection: both
     name: Unknown32790
     name_source: none
     evidence: captured
@@ -100,13 +139,14 @@ opcodes:
     notes: "602 fields followed by i32 unknown2 at seat+304; 14/18/22 bytes; no captured native reply"
   - value: 985
     direction: s2c
-    name: Unknown985
-    name_source: none
-    evidence: captured
-    source: "client 0x9E3420/0x9E8B20"
-    notes: "i8 team, u16 total, two i8 slots, three counted stat vectors; empty-vector body 17 bytes"
+    name: gspUpdateScoreData
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-1256 sub_9E3420 (S2C 985 branch) reads u8 team, u16 total, two u8 slot words and three counted lists of u8 kind + u16 value; kr-812 Packet_gspUpdateScoreData has the same four scalar fields (five bytes) and the same element, with two of those lists (readers kr-812 sub_80A4F0 and kr-812 sub_80A8B0, element reader kr-812 sub_80A840)"
+    notes: "i8 team, u16 total, two i8 slots, three counted stat vectors; empty-vector body 17 bytes; the kr-1256 form carries one counted list more than the kr-812 class, so the name is matched, not restated"
   - value: 32779
     direction: c2s
+    connection: both
     name: Unknown32779
     name_source: none
     evidence: captured
@@ -114,6 +154,7 @@ opcodes:
     notes: "i32 actor, bool32 unknown0"
   - value: 32779
     direction: s2c
+    connection: both
     name: Unknown32779
     name_source: none
     evidence: captured
@@ -121,6 +162,7 @@ opcodes:
     notes: "i32 actor, bool32 unknown0"
   - value: 32780
     direction: c2s
+    connection: both
     name: Unknown32780
     name_source: none
     evidence: captured
@@ -128,6 +170,7 @@ opcodes:
     notes: "i32 actor, i32 unknown0, u8 unknown1, u8 unknown2"
   - value: 32780
     direction: s2c
+    connection: both
     name: Unknown32780
     name_source: none
     evidence: captured
@@ -135,6 +178,7 @@ opcodes:
     notes: "i32 actor, i32 unknown0, u8 unknown1, u8 unknown2"
   - value: 32781
     direction: c2s
+    connection: both
     name: Unknown32781
     name_source: none
     evidence: captured
@@ -142,6 +186,7 @@ opcodes:
     notes: "i32 actor, i32 unknown0, bool32 unknown1"
   - value: 32781
     direction: s2c
+    connection: both
     name: Unknown32781
     name_source: none
     evidence: captured
@@ -149,6 +194,7 @@ opcodes:
     notes: "i32 actor, i32 unknown0, bool32 unknown1"
   - value: 32784
     direction: c2s
+    connection: both
     name: Unknown32784
     name_source: none
     evidence: captured
@@ -156,6 +202,7 @@ opcodes:
     notes: "i32 actor, i32 unknown0, bool32 unknown1, i32 unknown2"
   - value: 32784
     direction: s2c
+    connection: both
     name: Unknown32784
     name_source: none
     evidence: captured
@@ -163,6 +210,7 @@ opcodes:
     notes: "i32 actor, i32 unknown0, bool32 unknown1, i32 unknown2"
   - value: 32791
     direction: c2s
+    connection: both
     name: Unknown32791
     name_source: none
     evidence: captured
@@ -170,6 +218,7 @@ opcodes:
     notes: "i32 actor, i32 target, i32 unknown0"
   - value: 32791
     direction: s2c
+    connection: both
     name: Unknown32791
     name_source: none
     evidence: captured
@@ -177,6 +226,7 @@ opcodes:
     notes: "i32 actor, i32 target, i32 unknown0"
   - value: 32792
     direction: c2s
+    connection: both
     name: gppKickFail
     name_source: label@kr-812
     evidence: verified
@@ -184,6 +234,7 @@ opcodes:
     notes: "i32 actor"
   - value: 32792
     direction: s2c
+    connection: both
     name: gppKickFail
     name_source: label@kr-812
     evidence: verified
@@ -191,6 +242,7 @@ opcodes:
     notes: "i32 actor"
   - value: 32810
     direction: c2s
+    connection: both
     name: Unknown32810
     name_source: none
     evidence: captured
@@ -198,6 +250,7 @@ opcodes:
     notes: "i32 unknown0, i32 unknown1, i32 actor, u32 unknown2, bool32 unknown3, bool32 unknown4"
   - value: 32810
     direction: s2c
+    connection: both
     name: Unknown32810
     name_source: none
     evidence: captured
@@ -205,6 +258,7 @@ opcodes:
     notes: "i32 unknown0, i32 unknown1, i32 actor, u32 unknown2, bool32 unknown3, bool32 unknown4"
   - value: 32813
     direction: c2s
+    connection: both
     name: Unknown32813
     name_source: none
     evidence: captured
@@ -212,6 +266,7 @@ opcodes:
     notes: "i32 actor"
   - value: 32813
     direction: s2c
+    connection: both
     name: Unknown32813
     name_source: none
     evidence: captured
@@ -219,6 +274,7 @@ opcodes:
     notes: "i32 actor"
   - value: 32815
     direction: c2s
+    connection: both
     name: Unknown32815
     name_source: none
     evidence: captured
@@ -226,6 +282,7 @@ opcodes:
     notes: "i32 actor, i32 unknown0"
   - value: 32815
     direction: s2c
+    connection: both
     name: Unknown32815
     name_source: none
     evidence: captured
@@ -233,6 +290,7 @@ opcodes:
     notes: "i32 actor, i32 unknown0"
   - value: 32816
     direction: c2s
+    connection: both
     name: Unknown32816
     name_source: none
     evidence: captured
@@ -240,6 +298,7 @@ opcodes:
     notes: "i32 actor, i32 target"
   - value: 32816
     direction: s2c
+    connection: both
     name: Unknown32816
     name_source: none
     evidence: captured
@@ -247,6 +306,7 @@ opcodes:
     notes: "i32 actor, i32 target"
   - value: 32835
     direction: c2s
+    connection: both
     name: Unknown32835
     name_source: none
     evidence: captured
@@ -254,6 +314,7 @@ opcodes:
     notes: "i32 actor"
   - value: 32835
     direction: s2c
+    connection: both
     name: Unknown32835
     name_source: none
     evidence: captured
@@ -261,6 +322,7 @@ opcodes:
     notes: "i32 actor"
   - value: 32836
     direction: c2s
+    connection: both
     name: Unknown32836
     name_source: none
     evidence: captured
@@ -268,6 +330,7 @@ opcodes:
     notes: "i32 actor"
   - value: 32836
     direction: s2c
+    connection: both
     name: Unknown32836
     name_source: none
     evidence: captured
@@ -275,6 +338,7 @@ opcodes:
     notes: "i32 actor"
   - value: 32837
     direction: c2s
+    connection: both
     name: gppKickEnd
     name_source: label@kr-812
     evidence: verified
@@ -282,6 +346,7 @@ opcodes:
     notes: "i32 actor"
   - value: 32837
     direction: s2c
+    connection: both
     name: gppKickEnd
     name_source: label@kr-812
     evidence: verified
@@ -289,6 +354,7 @@ opcodes:
     notes: "i32 actor"
   - value: 32882
     direction: c2s
+    connection: both
     name: Unknown32882
     name_source: none
     evidence: captured
@@ -296,6 +362,7 @@ opcodes:
     notes: "i32 actor, bool32 unknown0, bool32 unknown1"
   - value: 32882
     direction: s2c
+    connection: both
     name: Unknown32882
     name_source: none
     evidence: captured
@@ -303,6 +370,7 @@ opcodes:
     notes: "i32 actor, bool32 unknown0, bool32 unknown1"
   - value: 32900
     direction: c2s
+    connection: both
     name: gppSplashDamagerByDamager
     name_source: label@kr-812
     evidence: verified
@@ -310,6 +378,7 @@ opcodes:
     notes: "packets/damagers.yaml SplashDamagerByDamager; relayed unchanged with the damager spawns"
   - value: 32900
     direction: s2c
+    connection: both
     name: gppSplashDamagerByDamager
     name_source: label@kr-812
     evidence: verified
@@ -317,6 +386,7 @@ opcodes:
     notes: "packets/damagers.yaml SplashDamagerByDamager; relayed unchanged with the damager spawns"
   - value: 32772
     direction: c2s
+    connection: both
     name: gppSplashDamager
     name_source: label@kr-812
     evidence: verified
@@ -324,6 +394,7 @@ opcodes:
     notes: "packets/damagers.yaml SplashDamager; relayed unchanged with the damager spawns"
   - value: 32772
     direction: s2c
+    connection: both
     name: gppSplashDamager
     name_source: label@kr-812
     evidence: verified
@@ -331,6 +402,7 @@ opcodes:
     notes: "packets/damagers.yaml SplashDamager; relayed unchanged with the damager spawns"
   - value: 32877
     direction: c2s
+    connection: both
     name: gppMobDropBombOnDead
     name_source: label@kr-812
     evidence: verified
@@ -338,6 +410,7 @@ opcodes:
     notes: "packets/damagers.yaml MobDropBombOnDead; relayed unchanged with the damager spawns"
   - value: 32877
     direction: s2c
+    connection: both
     name: gppMobDropBombOnDead
     name_source: label@kr-812
     evidence: verified
@@ -345,6 +418,7 @@ opcodes:
     notes: "packets/damagers.yaml MobDropBombOnDead; relayed unchanged with the damager spawns"
   - value: 32881
     direction: c2s
+    connection: both
     name: gppDropHumilPrevItem
     name_source: label@kr-812
     evidence: verified
@@ -352,6 +426,7 @@ opcodes:
     notes: "packets/damagers.yaml DropHumilPrevItem; relayed unchanged with the damager spawns"
   - value: 32881
     direction: s2c
+    connection: both
     name: gppDropHumilPrevItem
     name_source: label@kr-812
     evidence: verified
@@ -359,6 +434,7 @@ opcodes:
     notes: "packets/damagers.yaml DropHumilPrevItem; relayed unchanged with the damager spawns"
   - value: 32898
     direction: c2s
+    connection: both
     name: gppFireBullet3
     name_source: label@kr-812
     evidence: verified
@@ -366,6 +442,7 @@ opcodes:
     notes: "packets/damagers.yaml FireBullet3; relayed unchanged with the damager spawns"
   - value: 32898
     direction: s2c
+    connection: both
     name: gppFireBullet3
     name_source: label@kr-812
     evidence: verified
@@ -373,6 +450,7 @@ opcodes:
     notes: "packets/damagers.yaml FireBullet3; relayed unchanged with the damager spawns"
   - value: 32899
     direction: c2s
+    connection: both
     name: gppStormDamager
     name_source: label@kr-812
     evidence: verified
@@ -380,6 +458,7 @@ opcodes:
     notes: "packets/damagers.yaml StormDamager; relayed unchanged with the damager spawns"
   - value: 32899
     direction: s2c
+    connection: both
     name: gppStormDamager
     name_source: label@kr-812
     evidence: verified
@@ -387,6 +466,7 @@ opcodes:
     notes: "packets/damagers.yaml StormDamager; relayed unchanged with the damager spawns"
   - value: 32910
     direction: c2s
+    connection: both
     name: gppStormDamagerItemId
     name_source: label@kr-812
     evidence: verified
@@ -394,6 +474,7 @@ opcodes:
     notes: "packets/damagers.yaml StormDamagerItemId; relayed unchanged with the damager spawns"
   - value: 32910
     direction: s2c
+    connection: both
     name: gppStormDamagerItemId
     name_source: label@kr-812
     evidence: verified
@@ -401,6 +482,7 @@ opcodes:
     notes: "packets/damagers.yaml StormDamagerItemId; relayed unchanged with the damager spawns"
   - value: 33278
     direction: c2s
+    connection: both
     name: gppNearDamager
     name_source: label@kr-812
     evidence: verified
@@ -408,6 +490,7 @@ opcodes:
     notes: "packets/damagers.yaml NearDamager; relayed unchanged with the damager spawns"
   - value: 33278
     direction: s2c
+    connection: both
     name: gppNearDamager
     name_source: label@kr-812
     evidence: verified
@@ -415,6 +498,7 @@ opcodes:
     notes: "packets/damagers.yaml NearDamager; relayed unchanged with the damager spawns"
   - value: 32921
     direction: c2s
+    connection: both
     name: Unknown32921
     name_source: none
     evidence: captured
@@ -422,6 +506,7 @@ opcodes:
     notes: "i32 actor, i32 unknown0, i32 unknown1"
   - value: 32921
     direction: s2c
+    connection: both
     name: Unknown32921
     name_source: none
     evidence: captured
@@ -429,6 +514,7 @@ opcodes:
     notes: "i32 actor, i32 unknown0, i32 unknown1"
   - value: 32926
     direction: c2s
+    connection: both
     name: Unknown32926
     name_source: none
     evidence: captured
@@ -436,6 +522,7 @@ opcodes:
     notes: "i32 actor, tagged optional i32 unknown0, tagged optional i32 unknown1, u8 unknown2, bool32 unknown3"
   - value: 32926
     direction: s2c
+    connection: both
     name: Unknown32926
     name_source: none
     evidence: captured
@@ -443,6 +530,7 @@ opcodes:
     notes: "i32 actor, tagged optional i32 unknown0, tagged optional i32 unknown1, u8 unknown2, bool32 unknown3"
   - value: 38271
     direction: c2s
+    connection: both
     name: Unknown38271
     name_source: none
     evidence: captured
@@ -450,6 +538,7 @@ opcodes:
     notes: "i32 victim, i32 initiator"
   - value: 38271
     direction: s2c
+    connection: both
     name: Unknown38271
     name_source: none
     evidence: captured
@@ -457,6 +546,7 @@ opcodes:
     notes: "i32 victim, i32 initiator"
   - value: 38272
     direction: c2s
+    connection: both
     name: Unknown38272
     name_source: none
     evidence: captured
@@ -464,6 +554,7 @@ opcodes:
     notes: "i32 actor, i32 other (including -1/-2)"
   - value: 38272
     direction: s2c
+    connection: both
     name: Unknown38272
     name_source: none
     evidence: captured
@@ -471,6 +562,7 @@ opcodes:
     notes: "i32 actor, i32 other (including -1/-2)"
   - value: 38273
     direction: c2s
+    connection: both
     name: Unknown38273
     name_source: none
     evidence: captured
@@ -478,6 +570,7 @@ opcodes:
     notes: "i32 victim, i32 rescuer, f32 distance, u8 unknown0"
   - value: 38273
     direction: s2c
+    connection: both
     name: Unknown38273
     name_source: none
     evidence: captured
@@ -485,6 +578,7 @@ opcodes:
     notes: "i32 victim, i32 rescuer, f32 distance, u8 unknown0"
   - value: 38274
     direction: c2s
+    connection: both
     name: Unknown38274
     name_source: none
     evidence: verified
@@ -492,6 +586,7 @@ opcodes:
     notes: "i32 actor"
   - value: 38274
     direction: s2c
+    connection: both
     name: Unknown38274
     name_source: none
     evidence: verified
@@ -499,6 +594,7 @@ opcodes:
     notes: "i32 actor"
   - value: 38277
     direction: c2s
+    connection: both
     name: Unknown38277
     name_source: none
     evidence: captured
@@ -506,6 +602,7 @@ opcodes:
     notes: "bool32 unknown0, i32 victim, i32 initiator, f32 unknown1, f32 unknown2, f32 unknown3, bool32 unknown4, i32 unknown5"
   - value: 38277
     direction: s2c
+    connection: both
     name: Unknown38277
     name_source: none
     evidence: captured
@@ -513,6 +610,7 @@ opcodes:
     notes: "bool32 unknown0, i32 victim, i32 initiator, f32 unknown1, f32 unknown2, f32 unknown3, bool32 unknown4, i32 unknown5"
   - value: 38280
     direction: c2s
+    connection: both
     name: Unknown38280
     name_source: none
     evidence: captured
@@ -520,6 +618,7 @@ opcodes:
     notes: "i32 rescuer, i32 released actor, u8 unknown0"
   - value: 38280
     direction: s2c
+    connection: both
     name: Unknown38280
     name_source: none
     evidence: captured
@@ -527,6 +626,7 @@ opcodes:
     notes: "i32 rescuer, i32 released actor, u8 unknown0"
   - value: 38281
     direction: c2s
+    connection: both
     name: Unknown38281
     name_source: none
     evidence: captured
@@ -534,6 +634,7 @@ opcodes:
     notes: "i32 actor"
   - value: 38281
     direction: s2c
+    connection: both
     name: Unknown38281
     name_source: none
     evidence: captured
@@ -541,6 +642,7 @@ opcodes:
     notes: "i32 actor"
   - value: 38282
     direction: c2s
+    connection: both
     name: Unknown38282
     name_source: none
     evidence: captured
@@ -548,6 +650,7 @@ opcodes:
     notes: "i32 victim, i32 source, f32 unknown0, f32 unknown1, f32 unknown2, i32 unknown3, bool32 unknown4, bool32 unknown5, u32 unknown6, bool32 unknown7"
   - value: 38282
     direction: s2c
+    connection: both
     name: Unknown38282
     name_source: none
     evidence: captured
@@ -555,6 +658,7 @@ opcodes:
     notes: "i32 victim, i32 source, f32 unknown0, f32 unknown1, f32 unknown2, i32 unknown3, bool32 unknown4, bool32 unknown5, u32 unknown6, bool32 unknown7"
   - value: 38283
     direction: c2s
+    connection: both
     name: Unknown38283
     name_source: none
     evidence: captured
@@ -562,6 +666,7 @@ opcodes:
     notes: "i32 damager key, i32 target, three binary16 coordinates, u8 unknown0, bool32 unknown1"
   - value: 38283
     direction: s2c
+    connection: both
     name: Unknown38283
     name_source: none
     evidence: captured
@@ -569,6 +674,7 @@ opcodes:
     notes: "i32 damager key, i32 target, three binary16 coordinates, u8 unknown0, bool32 unknown1"
   - value: 32782
     direction: c2s
+    connection: both
     name: Unknown32782
     name_source: none
     evidence: captured
@@ -576,6 +682,7 @@ opcodes:
     notes: "4 bytes: i32 actor"
   - value: 32782
     direction: s2c
+    connection: both
     name: Unknown32782
     name_source: none
     evidence: captured
@@ -583,6 +690,7 @@ opcodes:
     notes: "4 bytes: i32 actor"
   - value: 32783
     direction: c2s
+    connection: both
     name: Unknown32783
     name_source: none
     evidence: captured
@@ -590,6 +698,7 @@ opcodes:
     notes: "8 bytes: i32 unknown0, i32 actor"
   - value: 32783
     direction: s2c
+    connection: both
     name: Unknown32783
     name_source: none
     evidence: captured
@@ -597,6 +706,7 @@ opcodes:
     notes: "8 bytes: i32 unknown0, i32 actor"
   - value: 32786
     direction: c2s
+    connection: both
     name: Unknown32786
     name_source: none
     evidence: captured
@@ -604,6 +714,7 @@ opcodes:
     notes: "9 bytes: i32 actor, i32 unknown0, u8 unknown1"
   - value: 32786
     direction: s2c
+    connection: both
     name: Unknown32786
     name_source: none
     evidence: captured
@@ -611,6 +722,7 @@ opcodes:
     notes: "9 bytes: i32 actor, i32 unknown0, u8 unknown1"
   - value: 32811
     direction: c2s
+    connection: both
     name: Unknown32811
     name_source: none
     evidence: captured
@@ -618,6 +730,7 @@ opcodes:
     notes: "8 bytes: i32 actor, u32 unknown0"
   - value: 32811
     direction: s2c
+    connection: both
     name: Unknown32811
     name_source: none
     evidence: captured
@@ -625,6 +738,7 @@ opcodes:
     notes: "8 bytes: i32 actor, u32 unknown0"
   - value: 32821
     direction: c2s
+    connection: both
     name: Unknown32821
     name_source: none
     evidence: captured
@@ -632,6 +746,7 @@ opcodes:
     notes: "6 bytes: i32 actor, u8 unknown0, u8 unknown1"
   - value: 32821
     direction: s2c
+    connection: both
     name: Unknown32821
     name_source: none
     evidence: captured
@@ -639,6 +754,7 @@ opcodes:
     notes: "6 bytes: i32 actor, u8 unknown0, u8 unknown1"
   - value: 32834
     direction: c2s
+    connection: both
     name: Unknown32834
     name_source: none
     evidence: captured
@@ -646,6 +762,7 @@ opcodes:
     notes: "8 bytes: i32 actor, i32 unknown0"
   - value: 32834
     direction: s2c
+    connection: both
     name: Unknown32834
     name_source: none
     evidence: captured
@@ -653,6 +770,7 @@ opcodes:
     notes: "8 bytes: i32 actor, i32 unknown0"
   - value: 32884
     direction: c2s
+    connection: both
     name: Unknown32884
     name_source: none
     evidence: captured
@@ -660,6 +778,7 @@ opcodes:
     notes: "16 bytes: i32 actor, i32 target, bool32 unknown0, i32 unknown1"
   - value: 32884
     direction: s2c
+    connection: both
     name: Unknown32884
     name_source: none
     evidence: captured
@@ -667,6 +786,7 @@ opcodes:
     notes: "16 bytes: i32 actor, i32 target, bool32 unknown0, i32 unknown1"
   - value: 32907
     direction: c2s
+    connection: both
     name: Unknown32907
     name_source: none
     evidence: captured
@@ -674,6 +794,7 @@ opcodes:
     notes: "4 bytes: i32 damager key; sender echo also observed"
   - value: 32907
     direction: s2c
+    connection: both
     name: Unknown32907
     name_source: none
     evidence: captured
@@ -681,6 +802,7 @@ opcodes:
     notes: "4 bytes: i32 damager key; sender echo also observed"
   - value: 32925
     direction: c2s
+    connection: both
     name: Unknown32925
     name_source: none
     evidence: captured
@@ -688,6 +810,7 @@ opcodes:
     notes: "32 bytes: i32 actor, u8 weapon slot, 6*u16 unknown0..5 (binary16), i32 unknown6, u8 unknown7, i32 unknown8, u32 unknown9, u16 unknown10"
   - value: 32925
     direction: s2c
+    connection: both
     name: Unknown32925
     name_source: none
     evidence: captured
@@ -695,6 +818,7 @@ opcodes:
     notes: "32 bytes: i32 actor, u8 weapon slot, 6*u16 unknown0..5 (binary16), i32 unknown6, u8 unknown7, i32 unknown8, u32 unknown9, u16 unknown10"
   - value: 33286
     direction: c2s
+    connection: both
     name: Unknown33286
     name_source: none
     evidence: captured
@@ -702,6 +826,7 @@ opcodes:
     notes: "12 bytes: i32 actor, i32 unknown0, i32 unknown1"
   - value: 33286
     direction: s2c
+    connection: both
     name: Unknown33286
     name_source: none
     evidence: captured
@@ -709,6 +834,7 @@ opcodes:
     notes: "12 bytes: i32 actor, i32 unknown0, i32 unknown1"
   - value: 33301
     direction: c2s
+    connection: both
     name: Unknown33301
     name_source: none
     evidence: captured
@@ -716,6 +842,7 @@ opcodes:
     notes: "24 bytes: i32 damager key, 3*f32 hit position, i32 owner actor, i32 target actor"
   - value: 33301
     direction: s2c
+    connection: both
     name: Unknown33301
     name_source: none
     evidence: captured
@@ -723,6 +850,7 @@ opcodes:
     notes: "24 bytes: i32 damager key, 3*f32 hit position, i32 owner actor, i32 target actor"
   - value: 38284
     direction: c2s
+    connection: both
     name: Unknown38284
     name_source: none
     evidence: captured
@@ -730,6 +858,7 @@ opcodes:
     notes: "8 bytes: i32 actor, bool32 unknown0 (render flag)"
   - value: 38284
     direction: s2c
+    connection: both
     name: Unknown38284
     name_source: none
     evidence: captured
@@ -1080,9 +1209,9 @@ opcodes:
     direction: c2s
     name: gcpReqDynamicConfig
     name_source: label@kr-1256
-    evidence: inferred
-    source: "sub_99E860"
-    notes: "Client-labeled C2S request paired with S2C gspRepDynamicConfig."
+    evidence: verified
+    source: "kr-1256 sub_99E860"
+    notes: "Category mask followed by one checksum per set bit, ascending; packets/dynamic-config.yaml."
   - value: 2085
     direction: c2s
     name: Unknown2085
@@ -1326,21 +1455,21 @@ opcodes:
     name_source: label@kr-1256
     evidence: verified
     source: "S2C dispatch label 0x15b81f8; handler sub_429DD0; case_ea 0x9d5035"
-    notes: "S2C 836 dispatcher entry; body semantics remain unverified."
+    notes: "u8 active slot then u32 status, read at case kr-1256 0x9D5035: the latch clears before the test and only status zero applies the slot, so any nonzero status is a silent refusal that leaves the slot unchanged."
   - value: 837
     direction: s2c
     name: gspReqWeaponPreSetUpdate
     name_source: label@kr-1256
     evidence: verified
     source: "S2C dispatch label 0x15b8244; handler sub_9C3880; case_ea 0x9d5117"
-    notes: "S2C 837 dispatcher entry; body semantics remain unverified."
+    notes: "u8 active slot, u32 user number, a counted list of 12-byte preset records (kr-1256 sub_115C000) and a counted byte list; kr-1256 sub_81B820 keys each record by its position, and kr-1256 sub_5FB4F0 enables a displayed index above 2 only when that record exists."
   - value: 932
     direction: s2c
     name: gspTitleSyncInfo
     name_source: label@kr-1256
     evidence: verified
-    source: "S2C dispatch label 0x15b7b34; handler sub_9B1B40; case_ea 0x9d52f3"
-    notes: "S2C 932 dispatcher entry; body semantics remain unverified."
+    source: "kr-1256 dispatcher sub_9D2FF0 jumptable case 932 stores the label at kr-1256 0x15B7B34; handler kr-1256 sub_9B1B40 reads the body through kr-1256 sub_998FB0 and kr-1256 sub_999C00 (a counted list of 4-byte words) (packets/titles-medals.yaml)"
+    notes: "S2C 932 dispatcher entry; the body is a counted word list, the field meanings remain unverified."
   - value: 940
     direction: s2c
     name: gspResCoupleNotifyPartner
@@ -1381,8 +1510,8 @@ opcodes:
     name: gspRepDynamicConfig
     name_source: label@kr-1256
     evidence: verified
-    source: "S2C dispatch label 0x15b8158; handler sub_65F370; case_ea 0x9d58d1"
-    notes: "S2C 1500 dispatcher entry; body semantics remain unverified."
+    source: "kr-1256 sub_9D2FF0 case 1500; kr-1256 sub_65F370; kr-1256 sub_53CDF0"
+    notes: "Category mask, counted zlib blobs per set bit; category 14 carries the native creation form in packets/dynamic-config.yaml. Other category bodies are not established."
   - value: 1550
     direction: s2c
     name: gspGalleryState
@@ -1406,85 +1535,94 @@ opcodes:
     notes: "TcpPacket writer sets *(_WORD *)(pkt+4)=688; separate numeric space from S2C Unknown688"
   - value: 903
     direction: c2s
-    name: Unknown903
-    name_source: none
-    evidence: captured
-    source: "sender 0x7B9820 (latches +151 until S2C 904)"
-    notes: "i32 wave, the next wave the room host starts; 4 bytes; horde-wave family, HordeWave1256"
+    connection: game
+    name: gcpReqStartNewWave
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_7B9820; kr-812 sub_A09070"
+    notes: "One u32 next-wave index; the local latch waits for the matching start reply."
   - value: 904
     direction: s2c
-    name: Unknown904
-    name_source: none
-    evidence: captured
-    source: "consumer not yet located (not in sub_9D2FF0 or sub_6D55D0 switches)"
-    notes: "i32 wave echoed from C2S 903, sent to every seat; 4 bytes; horde-wave family, HordeWave1256"
+    connection: game
+    name: gspRepStartNewWave
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_7ED5C0 -> kr-1256 sub_7BAD80; kr-812 sub_A301C0 case 0x388"
+    notes: "One u32 wave index, including the host, releases the native start latch."
   - value: 908
     direction: c2s
-    name: Unknown908
-    name_source: none
-    evidence: captured
-    notes: "the host wave table, 2584 bytes recorded; relayed without parsing; horde-wave family, HordeWave1256"
+    connection: game
+    name: gcpReqWaveAllSpawnMobs
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_7BAD80 -> kr-1256 sub_10C0560; kr-812 sub_A092B0"
+    notes: "u32 wave, u16, u32, counted spawn records; HordeWaveTable."
   - value: 909
     direction: s2c
-    name: Unknown909
-    name_source: none
-    evidence: captured
-    source: "consumer not yet located"
-    notes: "the host wave table byte-identical to C2S 908, sent to every seat; horde-wave family, HordeWave1256"
+    connection: game
+    name: gspRepWaveAllSpawnMobs
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_7ED5C0 -> kr-1256 sub_7B90D0; kr-812 sub_A07E90"
+    notes: "Complete variable-length wave table; the host also needs this reply to release its table latch."
   - value: 904
     direction: c2s
-    name: Unknown904
-    name_source: none
-    evidence: captured
-    source: "sender 0x7BAB70 (called by 0x7B9820)"
-    notes: "i32 wave the host cleared; 4 bytes; horde-wave family, HordeWave1256"
+    connection: game
+    name: gcpReqEndWave
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_7BAB70; kr-812 sub_A09100"
+    notes: "One u32 cleared-wave index."
   - value: 905
     direction: s2c
-    name: Unknown905
-    name_source: none
-    evidence: captured
-    source: "consumer not yet located"
-    notes: "i32 wave echoed from C2S 904, sent to every seat; 4 bytes; horde-wave family, HordeWave1256"
+    connection: game
+    name: gspRepEndWave
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_7ED5C0 -> kr-1256 sub_7BB460; kr-812 sub_A301C0 case 0x389"
+    notes: "One u32 cleared-wave index, including the host."
   - value: 905
     direction: c2s
-    name: Unknown905
-    name_source: none
-    evidence: captured
-    source: "sender 0x7BAC80"
-    notes: "empty; the host cleared every wave; horde-wave family, HordeWave1256"
+    connection: game
+    name: gcpReqEndAllWave
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_7BAC80; kr-812 sub_A09190"
+    notes: "Empty request after the final wave."
   - value: 906
     direction: s2c
-    name: Unknown906
-    name_source: none
-    evidence: captured
-    source: "consumer not yet located"
-    notes: "empty, sent to every seat after C2S 905; horde-wave family, HordeWave1256"
+    connection: game
+    name: gspRepEndAllWave
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_7ED5C0 case 0x38A; kr-812 sub_A301C0 case 0x38A"
+    notes: "Empty reply sets the NPC completion state to 1."
   - value: 2027
     direction: c2s
     name: Unknown2027
     name_source: none
     evidence: captured
-    notes: "six f32, i32 kind, i32 unknown0 (0 in every recording); 32 bytes; a drop the host round spawned; horde-wave family, HordeWave1256"
+    notes: "six f32, i32 kind, i32 unknown0 (0 in every recording); 32 bytes; a drop the host round spawned; horde-wave family, HordeWaveWire"
   - value: 645
     direction: s2c
     name: Unknown645
     name_source: none
     evidence: captured
     source: "reader 0x6EFD00 via sub_6D55D0 case 645"
-    notes: "i32 server serial, i32 kind, six f32, i32 kind; 36 bytes; sent to every seat; horde-wave family, HordeWave1256"
+    notes: "i32 server serial, i32 kind, six f32, i32 kind; 36 bytes; sent to every seat; horde-wave family, HordeWaveWire"
   - value: 635
     direction: c2s
     name: gcpEatLucci
     name_source: label@cn-717
     evidence: captured
-    notes: "i32 entity, i32 drop serial; 8 bytes; a pickup; horde-wave family, HordeWave1256; builder sub_6DC600; name aligned from cn-717 C2S 735 Packet_gcpEatLucci (label alignment; via cn-774 C2S 635, run cn-717 C2S 724..742 -> 624..642, shape [4 4], similarity 1.0)"
+    notes: "i32 entity, i32 drop serial; 8 bytes; a pickup; horde-wave family, HordeWaveWire; builder sub_6DC600; name aligned from cn-717 C2S 735 Packet_gcpEatLucci (label alignment; via cn-774 C2S 635, run cn-717 C2S 724..742 -> 624..642, shape [4 4], similarity 1.0)"
   - value: 646
     direction: s2c
     name: Unknown646
     name_source: none
     evidence: captured
     source: "reader 0x6EAD50 via sub_6D55D0 case 646"
-    notes: "i32 entity, i32 drop serial repeated from C2S 635 to every seat; 8 bytes; horde-wave family, HordeWave1256"
+    notes: "i32 entity, i32 drop serial repeated from C2S 635 to every seat; 8 bytes; horde-wave family, HordeWaveWire"
   # S2C labels recovered from the dispatcher (dispatcher sub_9D2FF0); layouts are not claimed by these rows.
   - value: 8
     direction: s2c
@@ -1571,7 +1709,7 @@ opcodes:
     name: gspLaboratoryItems
     name_source: label@kr-1256
     evidence: verified
-    source: "dispatcher sub_9D2FF0 jumptable case 110 stores \"gspLaboratoryItems\""
+    source: "dispatcher kr-1256 sub_9D2FF0 jumptable case 110 stores \"gspLaboratoryItems\"; handler kr-1256 sub_9D2890"
   - value: 112
     direction: s2c
     name: gspOveruseAlarmMsg
@@ -1715,25 +1853,25 @@ opcodes:
     name: gspRepCompound
     name_source: label@kr-1256
     evidence: verified
-    source: "dispatcher sub_9D2FF0 jumptable case 151 stores \"gspRepCompound\""
+    source: "dispatcher kr-1256 sub_9D2FF0 jumptable case 151 stores \"gspRepCompound\"; handler kr-1256 sub_9C5460"
   - value: 152
     direction: s2c
     name: gspRepCompoundUnlimited
     name_source: label@kr-1256
     evidence: verified
-    source: "dispatcher sub_9D2FF0 jumptable case 152 stores \"gspRepCompoundUnlimited\""
+    source: "dispatcher kr-1256 sub_9D2FF0 jumptable case 152 stores \"gspRepCompoundUnlimited\"; handler kr-1256 sub_9C5640"
   - value: 153
     direction: s2c
     name: gspRepDecompound
     name_source: label@kr-1256
     evidence: verified
-    source: "dispatcher sub_9D2FF0 jumptable case 153 stores \"gspRepDecompound\""
+    source: "dispatcher kr-1256 sub_9D2FF0 jumptable case 153 stores \"gspRepDecompound\"; handler kr-1256 sub_9C5D70"
   - value: 154
     direction: s2c
     name: gspRepEnchant
     name_source: label@kr-1256
     evidence: verified
-    source: "dispatcher sub_9D2FF0 jumptable case 154 stores \"gspRepEnchant\""
+    source: "dispatcher kr-1256 sub_9D2FF0 jumptable case 154 stores \"gspRepEnchant\"; handler kr-1256 sub_9C5F10"
   - value: 155
     direction: s2c
     name: gspRepPetCompound
@@ -1916,8 +2054,8 @@ opcodes:
     source: "kr-1256 sub_9E1EB0 case 0x260 -> kr-1256 sub_9E7570 starts the round: it reads two words and passes the first to the round-duration setter kr-1256 sub_6FEFC0, the role of the first word of kr-812 Packet_gspGameStartGame (case 704, reader kr-812 sub_9D95D0)"
   - value: 609
     direction: s2c
-    name: Unknown609
-    name_source: none
+    name: gspGameClockUnbounded_
+    name_source: coined
     evidence: inferred
     source: "kr-1256 sub_9E1EB0 case 0x261 reads no body and calls kr-1256 sub_6FEFC0(0x3FFFFFFF), the no-time-limit round duration"
   - value: 750
@@ -2185,6 +2323,13 @@ opcodes:
     evidence: verified
     source: "dispatcher sub_9D2FF0 jumptable case 938 stores \"gspResCoupleInviteAnswer\""
   - value: 939
+    direction: c2s
+    connection: game
+    name: gcpPortalMove
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_7037D0 stamps 939 and writes three four-byte words and a two-byte word before the relay 26 packet; matches kr-812 Packet_gcpPortalMove (writer kr-812 sub_529E80, deserializer kr-812 sub_52FC40); packets/portal.yaml"
+  - value: 939
     direction: s2c
     name: gspResCoupleBreakUp
     name_source: label@kr-1256
@@ -2351,13 +2496,15 @@ opcodes:
     name: gspUserHostSetting
     name_source: label@kr-1256
     evidence: verified
-    source: "dispatcher sub_9D2FF0 jumptable case 991 stores \"gspUserHostSetting\""
+    source: "kr-1256 sub_9D2FF0 jumptable case 991 stores \"gspUserHostSetting\"; case kr-1256 0x9D5411 calls handler kr-1256 sub_9CBF50, which reads four words through stream slot +44"
+    notes: "four u32; their roles are unproven, so the table keeps unknown_0 to unknown_12."
   - value: 992
     direction: s2c
     name: gspUserHostDefaultSetting
     name_source: label@kr-1256
     evidence: verified
-    source: "dispatcher sub_9D2FF0 jumptable case 992 stores \"gspUserHostDefaultSetting\""
+    source: "kr-1256 sub_9D2FF0 jumptable case 992 stores \"gspUserHostDefaultSetting\"; the inline case kr-1256 0x9D542B reads two words and stores them at manager +0x380 and +0x384"
+    notes: "two u32; their roles are unproven, so the table keeps unknown_0 and unknown_4."
   - value: 996
     direction: s2c
     name: gspBingoData
@@ -2797,7 +2944,15 @@ opcodes:
     name: gcpUserHostSetting
     name_source: label@cn-717
     evidence: inferred
-    source: "builder sub_9DFC50; name aligned from cn-717 C2S 2026 Packet_gcpUserHostSetting (label alignment; via cn-774 C2S 2030, run cn-717 C2S 2019..2026 -> 2023..2030, shape [4 4], similarity 1.0)"
+    source: "builder kr-1256 sub_9DFC50 stamps 2032 and appends two words; name aligned from cn-717 C2S 2026 Packet_gcpUserHostSetting (label alignment; via cn-774 C2S 2030, run cn-717 C2S 2019..2026 -> 2023..2030, shape [4 4], similarity 1.0)"
+    notes: "two u32; kr-1256 sub_9731A0 and kr-1256 sub_973220 pass one and a stored member, kr-1256 sub_974530 passes two zeros and kr-1256 sub_968A50 passes two stored members, so the first word is a small selector but the roles are unproven; the table keeps unknown_0 and unknown_4."
+  - value: 2007
+    direction: c2s
+    connection: game
+    name: Unknown2007
+    name_source: none
+    evidence: verified
+    source: "builder kr-1256 sub_999040 stamps 2007 and writes one u16; callers kr-1256 sub_9997D0 and kr-1256 sub_9999F0 pass 1 and 0. Purpose and correspondence to a legacy sender are not established"
   - value: 502
     direction: c2s
     name: gcpRoomSendChatModuleMsg
@@ -2917,18 +3072,20 @@ opcodes:
     source: "kr-1256 room dispatcher sub_9D9930 keeps kr-812 sub_7FBBB0's case order (0x1F5-0x214 = 501-532); case 0x206 reads four words for the joining seat (kr-1256 sub_978F20)"
   - value: 32885
     direction: c2s
+    connection: both
     name: gppWanderLean
     name_source: label@kr-812
     evidence: inferred
     source: "kr-1256 sub_95FAE0 writes it from the full movement record (kr-1256 sub_6CAA90, serializer sub_95E920), the branch kr-812 sub_80DBB0 stamps 32885 on Packet_gppWanderLean"
-    notes: "i32 actor, three f32 coordinates, u8 yaw, u8 pitch, u8 state, u16 tick; 21 bytes (kr-812 has u16 coordinates)"
+    notes: "i32 actor, three f32 coordinates, u8 yaw, u8 pitch, u8 state, u16 tick; 21 bytes. kr-1256 sub_95B910 selects game or match TCP (kr-1256 sub_9A74B0 creates the match connection)."
   - value: 32923
     direction: c2s
+    connection: both
     name: gppWanderLeanOptimize
     name_source: label@kr-812
     evidence: inferred
     source: "kr-1256 sub_95FAE0 writes OptimizeWanderInfo for it (reader kr-1256 sub_6CAFD0), the class kr-812 sub_80DBB0 sends as Packet_gppWanderLeanOptimize under kr-812's 32922"
-    notes: "i32 actor, u16 tick, u8 mask, then the mask-selected f32 x/y/z and u8 yaw/pitch/state"
+    notes: "i32 actor, u16 tick, u8 mask, then the mask-selected f32 x/y/z and u8 yaw/pitch/state. kr-1256 sub_95C250 -> kr-1256 sub_95B910 selects either TCP connection."
   - value: 32885
     direction: s2c
     connection: both
@@ -3026,15 +3183,15 @@ opcodes:
     name: gcpReqCloseGiftBox
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-1256 sub_9369E0 stamps 830; body empty matches kr-812 C2S 828 gcpReqCloseGiftBox"
+    source: "kr-1256 sub_9369E0 builds a bare TcpPacket, stamps 830 and sends with no field writes; the empty body matches kr-812 C2S 828 gcpReqCloseGiftBox (packets/cash-inbox.yaml)"
     connection: game
   - value: 110
     direction: c2s
     name: gcpReqInvite
     name_source: label@kr-812
-    evidence: inferred
-    source: "kr-1256 sub_90A330 stamps 110 from the party invitation UI (sub_938E00); kr-812 Packet_gcpReqInvite sender sub_929F40 is the same role"
-    notes: "wstr target plus a trailing bool; the bool is not the legacy is_party flag (packets/party.yaml PartyInviteRequest@kr-1256)"
+    evidence: verified
+    source: "kr-1256 sub_90A330 stamps 110 (the word at packet+4) from the party invitation UI (kr-1256 sub_938E00) and writes the prefixed wide string before the trailing word; kr-812 Packet_gcpReqInvite (kr-812 vtable 0xd84d60, deserializer kr-812 sub_8456D0) carries the same two fields in the other order"
+    notes: "wstr target plus a trailing bool; the bool is not the legacy is_party flag (packets/party.yaml PartyInviteRequest@kr-1256). kr-812 reads the bool first (kr-812 sub_A56BD0) and then the string (kr-812 sub_A56D70); kr-1256 writes the string first, so the two bodies are not byte-compatible"
     connection: game
   - value: 111
     direction: c2s
@@ -3093,7 +3250,8 @@ opcodes:
     notes: "Empty body. The dialog proves the trigger, not the reply."
   # Relay handshake frames. The relay connection is its own numeric space (resolve names with
   # ForProtocol("kr-1256/relay"), never the game table). Every body is stated in packets/relay-*.yaml;
-  # the two C2S frames kr-1256 adds have no legacy class, so their names are coined and end in _.
+  # the C2S frames kr-1256 adds beyond the legacy relay set have no legacy class, so their names are coined
+  # and end in _.
   - value: 1
     direction: c2s
     connection: relay
@@ -3110,6 +3268,14 @@ opcodes:
     evidence: verified
     source: "kr-1256 sub_9F02F0 stamps 3 and writes the client version word (1256), a byte widened to four bytes, the map string, a word, the nickname string and two more words; no legacy relay build has a C2S 3 frame, so the name is coined"
     notes: "Layout RelayReconnectMapRequest in packets/relay-connection.yaml; fields 2, 4 and 7 are unproven."
+  - value: 12
+    direction: c2s
+    connection: relay
+    name: rcpReqReportSceneData_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_10F32C0 writes the account and entity words, nickname, equipped profile (kr-1256 sub_10C4510), weapon presets (kr-1256 sub_10D7D70), wide string, byte, three halfwords, embedded session signature (kr-1256 sub_1155AB0) and final byte widened to a word; the S2C 1 dispatch at kr-1256 sub_96026F starts this report after the join is accepted"
+    notes: "The complete nested body is read through RelaySceneReport in packets/relay-scene.yaml, including the audited equipment modifiers and weapon presets. The purpose (the seated scene reports itself) is proved by the reader; the name is coined because no class label survives in this build."
   - value: 1
     direction: s2c
     connection: relay
@@ -3158,3 +3324,130 @@ opcodes:
     evidence: verified
     source: "kr-1256 sub_9601E0 case 22 (block 0x96113C) reads a four-byte word compared to zero and six single bytes; no legacy relay build has a 22 frame, so the name is coined"
     notes: "Layout RelayHandshakeSettings in packets/relay-connection.yaml; the six bytes are copied to the client's handshake record without a proven meaning."
+  - value: 26
+    direction: c2s
+    connection: relay
+    name: rcpPortalMove
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_7037D0 writes a four-byte word and a two-byte word and stamps relay 26 right after the game C2S 939 request; matched to kr-812 Packet_rcpPortalMove; packets/portal.yaml"
+  - value: 906
+    direction: c2s
+    connection: game
+    name: gcpFailTutorialWaves_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_7B9820"
+    notes: "Empty request when the local tutorial actor has failed."
+  - value: 907
+    direction: s2c
+    connection: game
+    name: gspFailTutorialWaves_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_7ED5C0 case 0x38B"
+    notes: "Empty reply sets the NPC failure state to 2."
+  - value: 908
+    direction: s2c
+    connection: game
+    name: gspResetTutorialMobs_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_7ED5C0 case 0x38C -> kr-1256 sub_7C61B0"
+    notes: "Empty reply removes previous NPCs before the next spawn table."
+  - value: 32857
+    direction: c2s
+    connection: game
+    name: gppCreateMobsFromSpawnGroup
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_8FC380; kr-1256 sub_8F9240 case 0x8059; kr-812 sub_6E1350"
+    notes: "Solo tutorial NPC operation; validated from the native writer and consuming path."
+  - value: 32857
+    direction: s2c
+    connection: game
+    name: gppCreateMobsFromSpawnGroup
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_8FC380; kr-1256 sub_8F9240 case 0x8059; kr-812 sub_6E1350"
+    notes: "Solo tutorial NPC operation; validated from the native writer and consuming path."
+  - value: 32862
+    direction: c2s
+    connection: game
+    name: gppCreateSpawnGroupMemberMob
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_8FCE10; kr-1256 sub_8FD0A0 -> kr-1256 sub_8F5720; kr-812 sub_6E1930"
+    notes: "Solo tutorial NPC operation; validated from the native writer and consuming path."
+  - value: 32862
+    direction: s2c
+    connection: game
+    name: gppCreateSpawnGroupMemberMob
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_8FCE10; kr-1256 sub_8FD0A0 -> kr-1256 sub_8F5720; kr-812 sub_6E1930"
+    notes: "Solo tutorial NPC operation; validated from the native writer and consuming path."
+  - value: 32892
+    direction: c2s
+    connection: game
+    name: gppCreateAIObject
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_9027F0; kr-1256 sub_6D55D0 -> kr-1256 sub_6EE170; kr-812 sub_647CD0"
+    notes: "Solo tutorial NPC operation; validated from the native writer and consuming path."
+  - value: 32892
+    direction: s2c
+    connection: game
+    name: gppCreateAIObject
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_9027F0; kr-1256 sub_6D55D0 -> kr-1256 sub_6EE170; kr-812 sub_647CD0"
+    notes: "Solo tutorial NPC operation; validated from the native writer and consuming path."
+  - value: 32866
+    direction: c2s
+    connection: game
+    name: gppHordeMobReplay
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_7F3ED0; kr-1256 sub_7ED5C0 -> kr-1256 sub_7DCF20; kr-812 sub_A225A0"
+    notes: "Solo tutorial NPC replay state; the complete native body is validated before acknowledgement."
+  - value: 32866
+    direction: s2c
+    connection: game
+    name: gppHordeMobReplay
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_7F3ED0; kr-1256 sub_7ED5C0 -> kr-1256 sub_7DCF20; kr-812 sub_A225A0"
+    notes: "Solo tutorial NPC replay state; the complete native body is validated before acknowledgement."
+  - value: 32873
+    direction: c2s
+    connection: game
+    name: gppWaveSetMobSpawnGroup
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_7E06D0; kr-1256 sub_7ED5C0; kr-812 sub_A25B40"
+    notes: "Solo tutorial NPC replay state; the complete native body is validated before acknowledgement."
+  - value: 32873
+    direction: s2c
+    connection: game
+    name: gppWaveSetMobSpawnGroup
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_7E06D0; kr-1256 sub_7ED5C0; kr-812 sub_A25B40"
+    notes: "Solo tutorial NPC replay state; the complete native body is validated before acknowledgement."
+  - value: 32876
+    direction: c2s
+    connection: game
+    name: gppSetTutorialSpawnPointReplay_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_8653E0; kr-1256 sub_7ED5C0"
+    notes: "Solo tutorial NPC replay state; the complete native body is validated before acknowledgement."
+  - value: 32876
+    direction: s2c
+    connection: game
+    name: gppSetTutorialSpawnPointReplay_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_8653E0; kr-1256 sub_7ED5C0"
+    notes: "Solo tutorial NPC replay state; the complete native body is validated before acknowledgement."

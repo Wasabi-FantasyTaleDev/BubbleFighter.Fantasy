@@ -84,6 +84,18 @@ internal static class WirePins
     /// <summary>Default greeting: status 4 and an empty command line (258 zero-padded bytes).</summary>
     public const string EmptyGreetingPrefixHex = "0400";
 
+    /// <summary>kr-1256 <c>gcpReqGamePatch</c> opcode: the mandatory first game-protocol packet.</summary>
+    public const ushort PatchRequestOpcode = 1;
+
+    /// <summary>kr-1256 <c>gspRepGamePatch</c> opcode.</summary>
+    public const ushort PatchReplyOpcode = 2;
+
+    /// <summary>kr-1256 <c>Unknown521</c> opcode: a frame the main-menu stage sends first on a later launch.</summary>
+    public const ushort PreHandshakeOpcode = 521;
+
+    /// <summary>kr-1256 <c>gspNotifyFirstMoveChannel</c> opcode.</summary>
+    public const ushort MoveChannelOpcode = 163;
+
     /// <summary>Greeting prefix for status 4 and command line <c>run</c>.</summary>
     public const string RunGreetingPrefixHex = "0400720075006E00";
 

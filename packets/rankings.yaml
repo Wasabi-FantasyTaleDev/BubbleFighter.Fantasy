@@ -1,0 +1,84 @@
+version: 1
+structs:
+  # The kr-812 rank and ladder frames whose whole body was read. Each structure is the read order of the
+  # class's deserializer, with native object offsets. Legacy descendants inherit the baseline; modern
+  # bodies are excluded until their readers are established.
+  #
+  # Width helpers of the kr-812 classes: kr-812 sub_A56C10 reads 4 bytes, kr-812 sub_A56BB0 reads 1 byte,
+  # kr-812 sub_A56BD0 reads 4 bytes into a byte field (the bool32 cases) and kr-812 sub_A56B30 reads a 4-byte
+  # count from the stream (it reads through the stream's own 4-byte slot).
+  #
+  # Not tabled, because their bodies contain a nested record whose reader was not decoded:
+  # gspNotifyRankInfo (kr-812 929, deserializer kr-812 sub_80BE00: a word, a counted word vector, then a record
+  # at +24) and gspCharRankInfo (kr-812 937, deserializer kr-812 sub_83D1E0: a counted vector, tail not read).
+  # gspNotifyRankInfo2 (kr-812 949, deserializer kr-812 sub_80B910) has no direct reads at all.
+  #
+  # kr-1256 dispatches its own rank frames (935, 963-966, 1542-1547); its handlers are located but their bodies
+  # were not read, so no kr-1256 layout is claimed here.
+
+  # C2S gcpReqSeasonLadder: Packet_gcpReqSeasonLadder vtable kr-812 0xd2f6f8, deserializer kr-812 sub_503B90 reads
+  # one byte into object +4.
+  SeasonLadderRequest:
+    - unknown_4: u8
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+
+  # C2S gcpReqSeasonLadderGetRankListNo: vtable kr-812 0xd1c4b4, deserializer kr-812 sub_80A910 reads one 4-byte word.
+  SeasonRankListRequest:
+    - unknown_4: u32
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+
+  # S2C gspSeasonLadderLevelUpNotice: vtable kr-812 0xd6f3a8, deserializer kr-812 sub_80A910 reads one 4-byte word.
+  SeasonLadderLevelUpNotice:
+    - unknown_4: u32
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+
+  # S2C gspRepSeasonLadderGetRankList: vtable kr-812 0xd6f3b4, deserializer kr-812 sub_83AF00 reads a word at +4, a
+  # counted word vector at +8, bool32 at +24, counted eight-byte values at +28, two counted
+  # SeasonLadderRecord vectors at +44/+60 through kr-812 sub_83AEC0, then a word at +76.
+  SeasonRankList:
+    - unknown_4: u32
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_8: "list<u32>"
+      offset: 8
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_24: bool
+      offset: 24
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_28: "list<u64>"
+      offset: 28
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_44: "list<SeasonLadderRecord>"
+      offset: 44
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_60: "list<SeasonLadderRecord>"
+      offset: 60
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_76: u32
+      offset: 76
+      except: [kr-1256, cn-774, tw-454]
+
+  # kr-812 sub_416820 reads the 76-byte native SeasonLadderRecord in this order;
+  # kr-812 sub_83ACE0 constructs the elements used by kr-812 sub_83AEC0.
+  SeasonLadderRecord:
+    - unknown_4: wstr
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_32: u32
+      offset: 32
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_36: wstr
+      offset: 36
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_64: u32
+      offset: 64
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_68: u32
+      offset: 68
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_72: u32
+      offset: 72
+      except: [kr-1256, cn-774, tw-454]

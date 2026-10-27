@@ -69,3 +69,6 @@ __pycache__/
 # the WebUi project builds it before compiling.
 /src/Plugins/BubbleFighter.Fantasy.WebUi/wwwroot/
 /src/Plugins/BubbleFighter.Fantasy.WebUi/client/node_modules/
+
+# Runtime download staging ownership is local to each server.
+/data/distribution-staging/

@@ -10,8 +10,10 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.InventoryView\BubbleFighter.Fantasy.InventoryView.csproj" />
+    <ProjectReference Include="..\..\src\BubbleFighter.Fantasy.Packets\BubbleFighter.Fantasy.Packets.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\Shared\TestPlayerSessions.cs" Link="TestPlayerSessions.cs" />
+    <Compile Include="..\Shared\SharedDialectRows.cs" Link="SharedDialectRows.cs" />
   </ItemGroup>
 </Project>

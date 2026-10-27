@@ -92,6 +92,7 @@ internal sealed class SetupProfileSession : IInstallationRuntime, IPluginExecuti
         var providers = runtime.Where(r => !r.Disabled && (r.Id is "persistence.mysql" or "persistence.sqlite" or "persistence.memory")).ToArray();
         if (providers.Length != 1 || providers[0].Id != "persistence." + settings.DatabaseKind)
             throw new ConfigException("Runtime patches conflict with the installation's durable database selection.");
+        runtime = SetupClientPluginConfiguration.Apply(runtime, settings.ClientPlugins);
         var shellIds = _shell.Select(r => r.Id).ToHashSet(StringComparer.Ordinal);
         var candidate = _shell.Concat(runtime.Where(r => !shellIds.Contains(r.Id))).ToArray();
         var result = await host.ReconcileConfigurationAsync(candidate, cancellationToken).ConfigureAwait(false);

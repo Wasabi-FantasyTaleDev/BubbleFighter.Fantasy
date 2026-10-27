@@ -3,11 +3,9 @@ using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Lobby;
 using BubbleFighter.Fantasy.Contracts.Rooms;
 using BubbleFighter.Fantasy.InGame.Data;
-using BubbleFighter.Fantasy.InGame.Dialects;
 using BubbleFighter.Fantasy.Tests.Shared;
 using BubbleFighter.Fantasy.InGame.Handlers;
 using BubbleFighter.Fantasy.InGame.Sessions;
-using BubbleFighter.Fantasy.InGame.Wire;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -205,115 +203,4 @@ public sealed class RoomModeCommandTests
         Assert.Equal(new RoomModeTag.Result("x #0#", null, "#0#"), RoomModeTag.Extract("x #0#"));
     }
 
-    // The packet room path: the mode rides in the room's MapMeta, which S2C 505 carries.
-    private static (RoomLoop Loop, RoomRegistry Registry, RoomFlowTests.Sink<ServerNotice> Notices) RawRig()
-    {
-        var options = new InGameOptions();
-        var registry = new RoomRegistry(options);
-        var loop = new RoomLoop(registry, new ModeCatalog(), options, "127.0.0.1", NullLogger.Instance);
-        var notices = new RoomFlowTests.Sink<ServerNotice>();
-        var roomNotices = new RoomNotices(notices, new RoomFlowTests.TestTexts());
-        loop.ModeNotices = roomNotices;
-        loop.Commands = new GameCommandHandler(registry, (_, _) => ValueTask.CompletedTask, roomNotices,
-            (room, mode, ct) => loop.ApplyModeAsync(room, mode, null, ct));
-        return (loop, registry, notices);
-    }
-
-    private static RoomPushTests.RecordingSession RawPlayer(long id, int userNum, string name)
-    {
-        var session = new RoomPushTests.RecordingSession(id);
-        session.SetLobbyPlayer(userNum, name);
-        return session;
-    }
-
-    private static InboundPacket RawCreate(string title, int mode)
-    {
-        var setting = RoomWireSupport.OrdinarySettingWithMap();
-        setting = setting with { Unknown8 = title, Map = setting.Map with { Unknown4 = (ushort)mode } };
-        return new InboundPacket(InGameOpcodes.C2SUnknown402,
-            WireLengthSupport.Written(w => { setting.Write(w); w.WriteInt32(0); }));
-    }
-
-    private static InboundPacket RawChat(string text) =>
-        new(InGameOpcodes.C2SRoomChat, WireLengthSupport.Written(w =>
-        {
-            w.WriteInt32(0);
-            w.WriteWideStringPrefixed(text);
-            w.WriteWideStringPrefixed(string.Empty);
-        }));
-
-    private static int ModeOf505(byte[] body) => BinaryPrimitives.ReadUInt16LittleEndian(body.AsSpan(4));
-
-    [Fact]
-    public async Task OnThePacketPathSetChangesTheMapMetaModeAndSendsItToEverySeat()
-    {
-        var (loop, registry, notices) = RawRig();
-        var host = RawPlayer(101, 11, "host");
-        var guest = RawPlayer(102, 22, "guest");
-        await loop.HandleUnknown402Async(host, RawCreate("", 1), default);
-        var room = registry.TryGet(host.Id)!;
-        registry.Join(guest, room.Id, 22, "guest");
-
-        await loop.HandleRoomChatAsync(host, RawChat("!set 8"), default);
-
-        Assert.Equal(8, room.ModeId);
-        Assert.Equal(8, room.Setting.Map.Unknown4);
-        Assert.Equal(8, ModeOf505(host.Body(InGameOpcodes.S2CRoomMapInfo)));
-        Assert.Equal(8, ModeOf505(guest.Body(InGameOpcodes.S2CRoomMapInfo)));
-        Assert.Equal("room.mode.changed:Zombie Battle", Assert.Single(notices.To(host)).Text);
-        Assert.Equal("room.mode.changed:Zombie Battle", Assert.Single(notices.To(guest)).Text);
-    }
-
-    [Fact]
-    public async Task OnThePacketPathAGuestOrAStartedRoomOrABadIdChangesNothing()
-    {
-        var (loop, registry, notices) = RawRig();
-        var host = RawPlayer(101, 11, "host");
-        var guest = RawPlayer(102, 22, "guest");
-        await loop.HandleUnknown402Async(host, RawCreate("", 1), default);
-        var room = registry.TryGet(host.Id)!;
-        registry.Join(guest, room.Id, 22, "guest");
-
-        await loop.HandleRoomChatAsync(guest, RawChat("!set 8"), default);
-        Assert.Equal("command.set.host_only:", Assert.Single(notices.To(guest)).Text);
-        await loop.HandleRoomChatAsync(host, RawChat("!set nope"), default);
-        Assert.Equal("command.set.invalid:", Assert.Single(notices.To(host)).Text);
-        Assert.Equal(1, room.ModeId);
-        Assert.DoesNotContain(InGameOpcodes.S2CRoomMapInfo, host.Opcodes);
-        Assert.DoesNotContain(InGameOpcodes.S2CRoomMapInfo, guest.Opcodes);
-    }
-
-    [Fact]
-    public async Task OnThePacketPathATaggedTitleForcesTheModeAndIsShownWithoutTheTag()
-    {
-        var (loop, registry, notices) = RawRig();
-        var host = RawPlayer(101, 11, "host");
-
-        await loop.HandleUnknown402Async(host, RawCreate("Fun room #8#", 1), default);
-
-        var room = registry.TryGet(host.Id)!;
-        Assert.Equal(8, room.ModeId);
-        Assert.Equal(8, room.Setting.Map.Unknown4);
-        Assert.Equal("Fun room", room.RoomName);
-        Assert.Equal("room.mode.changed:Zombie Battle", Assert.Single(notices.To(host)).Text);
-    }
-
-    [Fact]
-    public async Task OnThePacketPathATagTypedInTheRepeatedCreateIsHandledAndAnInvalidOneIgnored()
-    {
-        var (loop, registry, notices) = RawRig();
-        var host = RawPlayer(101, 11, "host");
-        await loop.HandleUnknown402Async(host, RawCreate("", 1), default);
-
-        await loop.HandleUnknown402Async(host, RawCreate("Bad #0#", 1), default);
-        var room = registry.TryGet(host.Id)!;
-        Assert.Equal("Bad #0#", room.RoomName);
-        Assert.Equal(1, room.ModeId);
-        Assert.Empty(notices.Sent);
-
-        await loop.HandleUnknown402Async(host, RawCreate("Typed #8#", 1), default);
-        Assert.Equal("Typed", room.RoomName);
-        Assert.Equal(8, room.ModeId);
-        Assert.Equal("room.mode.changed:Zombie Battle", Assert.Single(notices.To(host)).Text);
-    }
 }

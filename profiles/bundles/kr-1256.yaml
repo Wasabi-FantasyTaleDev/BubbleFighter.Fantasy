@@ -7,15 +7,20 @@
   config:
     profile_id: "${BFF_PROFILE_ID}"
     frame: modern_8
-- id: dialect.modern.messages
-  plugin: dialect.modern.messages
+- id: dialect.rooms
+  plugin: dialect.rooms
   config:
-    # Rooms, plaza and rounds run on the shared typed messages (the room and round logic of the ingame row), with
-    # the kr-1256 bodies in packets/*.yaml. profiles/kr-1256/raw.patch.yaml restores the older packet path.
-    room_binding: typed
-    typed_rounds: true
-    # The S2C 585 loading words the round start has always sent (kr-1256 start words 1, 0, 1).
-    round_loading_flags: [1, 0, 1]
+    # The typed room families of the modern family: room commands, plaza scene, round start, result screens,
+    # the action feed and the movement relay, each through the kr-1256 bodies in packets/*.yaml. The S2C 585
+    # loading words stay the binding's 1, 0, 1 default, the same words the ingame row's start flags carry.
+    protocol: kr-1256/game
+    relay_protocol: kr-1256/relay
+    modern_rooms: true
+    packets_directory: packets
+    # The first-run tutorial entry stays opt-in until native scene acceptance is complete.
+    initial_tutorial: false
+    initial_tutorial_kind: pirate_prologue
+
 # The message adapters every build shares: the login burst, the main-menu install and the features moved
 # here so far. The build's sequence is its login values in packets/builds.yaml.
 - id: dialect.messages
@@ -27,6 +32,9 @@
     login: true
     # The empty C2S 521 main-menu probe is answered with the empty gspSessionSignatureData body.
     main_menu_init: true
+    # The round's session signature (S2C 521 gspSessionSignatureData with the room's game mode; reader
+    # kr-1256 sub_1155B00, mode check kr-1256 sub_9616A9): the match start flow sends it before the relay join.
+    session_signature: true
     # Party invitation, accept, refusal and membership packets (packets/party.yaml): the invitation prompt is
     # S2C 121 gspAskedInvitation (reader kr-1256 sub_99ABC0), the result is S2C 120/119 (handler
     # kr-1256 sub_9A7A30) and the list is S2C 201 (handler kr-1256 sub_9064B0); needs the party capability
@@ -74,10 +82,18 @@
     # Native character creation (packets/character-creation.yaml): kr-1256 sub_9D2FF0 case 12 opens the stage,
     # kr-1256 sub_5CCC60 builds C2S 31, sub_9A4E90 S2C 13 / C2S 32 and sub_9A46A0 S2C 14 / C2S 33.
     character_creation: true
+    # The expired-item discard (gcpReqInventoryThrowItem in, gspRepInventoryThrowItem out;
+    # packets/inventory.yaml; readers kr-1256 sub_8136F0 / kr-1256 sub_9B6250) for the inventory.throw row below.
+    inventory_actions: true
+    # The customized-key update and login restoration (packets/customized-keys.yaml; builder kr-1256
+    # sub_60B150, consumer kr-1256 sub_9C9BF0) for the player.settings row of the player-settings bundle.
+    customized_keys: true
 - id: protocol
   plugin: protocol
   config:
     opcode_table_path: profiles/kr-1256/opcodes.yaml
+    # The mandatory first packet, the patch-request slot; the legacy builds name it gcpFirstConnect.
+    patch_request_name: gcpReqGamePatch
 - id: game-listener
   plugin: net.tcp
   config:
@@ -129,6 +145,8 @@
     # The first login of a fresh account creates its character through the native creation stage; needs the
     # dialect.messages character_creation option and inventory_source mysql (profiles/kr-1256/patch.yaml).
     character_creation: true
+    # The native form and the lobby share the choices in packets/builds.yaml.
+    build_values: true
 - id: party
   plugin: party
   config:
@@ -139,9 +157,24 @@
     invite_timeout_ms: 30000
     max_pending_invites: 1024
     max_pending_requests: 1024
+- id: commands.players
+  plugin: commands.players
+  parent_id: lobby
+  disabled: true
+  config:
+    protocol: "kr-1256/game"
 - id: equipment
   plugin: equipment
   config:
     protocol: "kr-1256/game"
     client_profile: "kr-1256"
     version_major: 1256
+# The typed handler of the expired-item discard the dialect.messages row binds above; the inventoryview row
+# of the ingame bundle publishes the equipment and push services it needs, and the kernel orders the row
+# after them through its declared requirements.
+- id: inventory.throw
+  plugin: inventory.throw
+  parent_id: inventoryview
+  config:
+    protocol: "kr-1256/game"
+    packets_directory: packets

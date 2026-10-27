@@ -216,12 +216,16 @@ internal sealed partial class RoundFlow
         DeathWait? wait;
         lock (room.Gate)
         {
+            // cn-324 sub_46B190 emits the in-round humiliation-end report. A bound relay
+            // or a room that has left play cannot act as the reporting game seat.
+            if (room.Phase != RoomPhase.Playing || room.FindByGame(session.Id) is null)
+                return;
             wait = room.Seats.Select(seat => _reviving.GetValueOrDefault(seat.Game.Id))
                 .FirstOrDefault(candidate => candidate is not null && candidate.Actor == report.VictimActor);
+            if (wait is null)
+                return;
+            wait.Shorten(reduction);
         }
-        if (wait is null)
-            return;
-        wait.Shorten(reduction);
         _logger.LogInformation("Session {Id} was taunted; its wait is {Ms} ms shorter.", wait.Session.Id, reduction);
         if (_waitChanged is not null)
             await _waitChanged.SendAsync(wait.Session, new RoundRespawnWaitChanged(wait.Actor, -reduction), ct).ConfigureAwait(false);
@@ -371,7 +375,7 @@ internal sealed partial class RoundFlow
             if (_playerLoaded is not null)
                 foreach (var member in members)
                     await _playerLoaded.SendAsync(member.Game, loaded, operationCt).ConfigureAwait(false);
-            if (_capabilityOffers is not null)
+            if (_capabilityOffers is not null && !UsesGameLink(room, loadedSeat))
                 await OfferNativeMatchAsync(room, loadedSeat, operationCt).ConfigureAwait(false);
             await StartCountdownWhenAllLoadedAsync(room, operationCt).ConfigureAwait(false);
         }, ct).ConfigureAwait(false);
@@ -589,13 +593,14 @@ internal sealed partial class RoundFlow
             var sender = room.Seats.FirstOrDefault(seat => seat.Game.Id == session.Id || seat.Relay?.Id == session.Id);
             if (sender is null)
                 return;
-            if (packet.ReportedActors is { Count: > 0 } actors && !actors.Contains(RoomRegistry.SceneEntity(sender.Slot)))
+            if (packet.ReportedActors is { Count: > 0 } actors && !actors.Any(actor => room.ControlsActor(sender, actor)))
             {
                 if (room.Seats.Any(seat => actors.Contains(RoomRegistry.SceneEntity(seat.Slot))))
                     throw new InvalidOperationException($"Feed packet {packet.Code} from slot {sender.Slot} acts for another seat's character.");
                 // In the horde modes the host's client runs the NPCs and reports their actions as its own; anywhere
                 // else a character that belongs to no seat proves nothing.
-                if (GameMode.Resolve(room.ModeId).Family != GameModeFamily.Horde)
+                if (GameMode.Resolve(room.ModeId).Family != GameModeFamily.Horde
+                    && room.Tutorial is not { GameConnectionOnly: true })
                 {
                     _logger.LogWarning("Room {Room} slot {Slot} feed packet {Code} names no character of this room; dropped.",
                         room.Id, sender.Slot, packet.Code);

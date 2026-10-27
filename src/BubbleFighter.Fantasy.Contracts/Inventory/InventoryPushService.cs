@@ -11,7 +11,14 @@ namespace BubbleFighter.Fantasy.Contracts.Inventory;
 /// </summary>
 public interface IInventoryPushService
 {
-    /// <summary>Publishes all changed worn flags, including items displaced by an exclusive equipment selection.</summary>
+    /// <summary>
+    /// Publishes all changed worn flags, including items displaced by an exclusive equipment
+    /// selection. Slots are pushed strictly in order, one restated S2C 803 each; the returned
+    /// task completes only after the last push does.
+    /// </summary>
+    /// <param name="session">The session to push to.</param>
+    /// <param name="slots">The changed bag slots, in push order.</param>
+    /// <param name="ct">Cancellation token.</param>
     async ValueTask PushSlotUpdatesAsync(ISession session, IReadOnlyList<InventorySlotRecord> slots, CancellationToken ct)
     {
         foreach (var slot in slots) await PushSlotUpdateAsync(session, slot, ct).ConfigureAwait(false);

@@ -11,6 +11,8 @@ public interface IAdminAccessControl
     bool AllowsRemoteBootstrap { get; }
     /// <summary>Checks whether a session is live, unexpired and owned by the current activation.</summary>
     bool Authorize(string? session);
+    /// <summary>Resolves a live session to its stable administration account key; providers without identity support return null.</summary>
+    string? GetAccountId(string? session) => null;
     /// <summary>Checks a password under bounded rate/concurrency limits and returns a new session on success.</summary>
     ValueTask<AdminSession?> SignInAsync(string username, string password, CancellationToken cancellationToken);
     /// <summary>Checks administrator credentials with failed attempts isolated to the transport peer address.</summary>

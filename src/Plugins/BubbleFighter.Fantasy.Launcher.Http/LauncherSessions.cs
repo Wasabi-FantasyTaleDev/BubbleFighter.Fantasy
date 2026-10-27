@@ -26,7 +26,7 @@ public sealed class LauncherSessions(LauncherOptions options, ILauncherSessionSt
     private readonly SemaphoreSlim _mutations = new(1, 1);
     private DateTimeOffset? _lastRefreshPrune;
     private readonly Dictionary<string, Entry> _access = new(StringComparer.Ordinal), _tickets = new(StringComparer.Ordinal);
-    private sealed record Entry(string Username, string SessionId, string? Build, DateTimeOffset ExpiresAt);
+    private sealed record Entry(string Username, string SessionId, string? Build, DateTimeOffset ExpiresAt, string? LauncherLanguage = null, string? LaunchId = null);
 
     /// <summary>Starts a new durable session for <paramref name="username"/> and returns its first credentials.</summary>
     public ValueTask<LauncherGrant> SignInAsync(string username, CancellationToken ct) =>
@@ -126,25 +126,33 @@ public sealed class LauncherSessions(LauncherOptions options, ILauncherSessionSt
     }
 
     /// <summary>Issues a ticket whose expiry cannot outlive the authorizing bearer.</summary>
-    public (string Token, DateTimeOffset ExpiresAt) Issue(string accessToken, string build)
+    public (string Token, DateTimeOffset ExpiresAt) Issue(string accessToken, string build) => Issue(accessToken, build, null);
+
+    /// <summary>Issues a one-use ticket carrying the user's optional Launcher UI language and the launch it belongs to.</summary>
+    public (string Token, DateTimeOffset ExpiresAt) Issue(string accessToken, string build, string? launcherLanguage, string? launchId = null)
     {
+        if (launcherLanguage is not (null or "zh-CN" or "zh-TW" or "ko" or "en" or "id" or "vi"))
+            throw new ArgumentException("Unsupported Launcher UI language.", nameof(launcherLanguage));
         lock (_gate)
         {
             Prune();
             var bearer = _access.GetValueOrDefault(Key(accessToken)) ?? throw new UnauthorizedAccessException();
             var expiry = _clock.GetUtcNow().AddSeconds(options.TicketSeconds);
-            return Add(_tickets, bearer with { Build = build, ExpiresAt = expiry < bearer.ExpiresAt ? expiry : bearer.ExpiresAt });
+            return Add(_tickets, bearer with { Build = build, ExpiresAt = expiry < bearer.ExpiresAt ? expiry : bearer.ExpiresAt, LauncherLanguage = launcherLanguage, LaunchId = launchId });
         }
     }
 
     /// <inheritdoc />
-    public string? Redeem(string ticket, string build)
+    public string? Redeem(string ticket, string build) => RedeemIdentity(ticket, build)?.Username;
+
+    /// <inheritdoc />
+    public LauncherTicketIdentity? RedeemIdentity(string ticket, string build)
     {
         lock (_gate)
         {
             Prune(); var key = Key(ticket); var entry = _tickets.GetValueOrDefault(key);
             if (entry is null || entry.Build != build) return null;
-            _tickets.Remove(key); return entry.Username;
+            _tickets.Remove(key); return new(entry.Username, entry.LauncherLanguage, entry.LaunchId);
         }
     }
 

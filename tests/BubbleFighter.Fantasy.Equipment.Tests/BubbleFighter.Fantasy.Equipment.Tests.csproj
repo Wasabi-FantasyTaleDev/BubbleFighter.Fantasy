@@ -14,12 +14,10 @@
     <ProjectReference Include="..\..\src\BubbleFighter.Fantasy.Kernel\BubbleFighter.Fantasy.Kernel.csproj" />
     <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Equipment\BubbleFighter.Fantasy.Equipment.csproj" />
     <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Lobby\BubbleFighter.Fantasy.Lobby.csproj" />
-    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Dialect.Modern.Messages\BubbleFighter.Fantasy.Dialect.Modern.Messages.csproj" />
     <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Persistence.Memory\BubbleFighter.Fantasy.Persistence.Memory.csproj" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\BubbleFighter.Fantasy.Contracts\BubbleFighter.Fantasy.Contracts.csproj" />
-    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Dialect.InventoryActions\BubbleFighter.Fantasy.Dialect.InventoryActions.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\Shared\TestTempDirectories.cs" Link="TestTempDirectories.cs" />

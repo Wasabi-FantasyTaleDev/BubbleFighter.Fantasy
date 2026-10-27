@@ -4,6 +4,11 @@ using BubbleFighter.Fantasy.Contracts.Wallet;
 
 namespace BubbleFighter.Fantasy.Persistence.Sqlite;
 
+/// <summary>
+/// The save's fighter, wallet and round-progress fragment: reads serve the snapshot's stored rows and
+/// writes mutate the whole snapshot under one transaction, keeping wallet changes serialized with
+/// purchases by construction.
+/// </summary>
 internal sealed partial class SqliteRepositories : IFighterRepository, IPlayerWalletRepository, IPlayerProgressRepository
 {
     public ValueTask<IReadOnlyList<FighterRecord>> ListByUserNumAsync(long userNum, CancellationToken ct) =>

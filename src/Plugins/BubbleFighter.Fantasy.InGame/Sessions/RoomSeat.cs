@@ -1,6 +1,6 @@
 using BubbleFighter.Fantasy.Abstractions.Protocol;
+using BubbleFighter.Fantasy.Contracts.Match;
 using BubbleFighter.Fantasy.Contracts.Movement;
-using BubbleFighter.Fantasy.InGame.Wire;
 using BubbleFighter.Fantasy.RoomCore;
 
 namespace BubbleFighter.Fantasy.InGame.Sessions;
@@ -162,9 +162,6 @@ public sealed class RoomSeat : IRoomMember
     /// <summary>Builds the S2C 117 / 118 identity row for this seat.</summary>
     public RoomPlayerIdentity ToIdentity() => new(UserNum, Nickname, checked((byte)Slot), Math.Max(1, Level),
         Team, Ready, InShop, InInventory);
-
-    /// <summary>Builds the current seat record without losing ready or dialog status on a refresh.</summary>
-    public RoomPlayerInfo ToPlayerInfo() => ToIdentity().ToPlayerInfo();
 }
 
 /// <summary>Owns one opaque native capability for a seat's current round.</summary>

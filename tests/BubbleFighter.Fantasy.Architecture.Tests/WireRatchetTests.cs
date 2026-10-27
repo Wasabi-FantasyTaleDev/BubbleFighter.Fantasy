@@ -15,7 +15,7 @@ public sealed class WireRatchetTests
 {
     private static readonly string[] LogicPlugins =
     [
-        "Lobby", "Shop", "Equipment", "InventoryView", "Fighters", "Clan", "InGame", "MatchRelay", "MatchConnection", "PlayerSettings",
+        "Lobby", "Shop", "Equipment", "InventoryView", "Fighters", "Clan", "InGame", "MatchConnection", "PlayerSettings",
     ];
 
     private static readonly (string Metric, Regex Pattern)[] Metrics =

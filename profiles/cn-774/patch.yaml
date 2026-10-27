@@ -9,3 +9,14 @@
     config:
       file: logs/{date}/packets-cn-774_{timestamp}.log
       preview_bytes: 96
+
+# Login and purchases share the same repository-backed bag and wallet.
+- set:
+    id: lobby
+    config:
+      inventory_source: mysql
+      money_source: mysql
+      seed_starter_inventory: true
+      build_values: true
+      starting_lucci: 10000000
+      starting_cash: 10000000

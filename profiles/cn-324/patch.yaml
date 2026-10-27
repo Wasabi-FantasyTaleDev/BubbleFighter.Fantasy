@@ -250,6 +250,8 @@
     id: dialect.messages
     config:
       inventory_item_use: true
+      # This build's customized-key builder and login consumer are not audited; only kr-812's are.
+      customized_keys: false
 - set:
     id: dialect.rooms
     config:

@@ -325,6 +325,7 @@ public sealed class Cn279LoginScenarioTests
             Row("protocol", "protocol", new()
             {
                 ["opcode_table_path"] = tablePath, ["bootstrap_status"] = 1,
+                ["patch_request_name"] = "gcpFirstConnect",
                 ["center_gates"] = new List<object?>
                 {
                     new Dictionary<string, object?>
@@ -353,7 +354,7 @@ public sealed class Cn279LoginScenarioTests
             }),
             Row("ingame", "ingame", new()
             {
-                ["typed_only"] = true, ["game_protocol"] = "cn-279/game", ["version_major"] = 279,
+                ["game_protocol"] = "cn-279/game",
             }),
         ], PluginCatalog.Discover([Path.Combine(AppContext.BaseDirectory, "plugins")]), NullLoggerFactory.Instance);
     }

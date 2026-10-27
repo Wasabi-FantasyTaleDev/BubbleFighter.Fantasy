@@ -14,6 +14,38 @@ namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
 /// <summary>Checks native room entry with sparse occupied rosters, repeat entry and unchanged scalar-only builds.</summary>
 public sealed class EntryRosterTests
 {
+    /// <summary>CN2013 must select a controlled actor before its scene binds the local actor pointer.</summary>
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(2, 5)]
+    [InlineData(5, 7)]
+    public async Task Cn406StartAssignsEachHumanItsOwnControlledActorBeforeSceneEntry(int firstSeat, int secondSeat)
+    {
+        const string build = "cn-406";
+        var (schema, play) = TestBuilds.Of(build);
+        var codec = new PlayRoomCodec(build + "/game", build, schema, play,
+            new Tables(), NullLogger.Instance, TestBuilds.Packets);
+        var room = Room([Member(firstSeat, "AB", 1, 17), Member(secondSeat, "玩家", 2, 23)]);
+        foreach (var localSeat in new[] { firstSeat, secondSeat })
+        {
+            var session = new RecordingSession(build);
+            await codec.SendAsync(session, new RoomSeatUpdated(room.RoomId, room.Seats[0]), default);
+            Assert.Equal(255, session.Sent[0].Payload[16]);
+            session.Sent.Clear();
+            await codec.SendAsync(session, new RoomMatchStarting(room, "rel_Village01_Byway"), default);
+            Assert.Equal(new ushort[] { 503, 503, 510 }, session.Sent.Select(packet => packet.Opcode));
+
+            // cn-406 sub_57E8A0: slot u32, three bool32, then UserSlot +128 as a signed byte.
+            var seats = session.Sent.Take(2).Select(packet => (
+                Seat: BitConverter.ToInt32(packet.Payload), Controller: (sbyte)packet.Payload[16])).ToArray();
+            Assert.Equal(new[] { (firstSeat, (sbyte)firstSeat), (secondSeat, (sbyte)secondSeat) }, seats);
+            // cn-406 sub_4259D0 populates scene +1140 only for controller == local seat;
+            // cn-406 sub_425830 binds the local actor pointer from that list after creating all actors.
+            var controlled = Assert.Single(seats, seat => seat.Controller == localSeat);
+            Assert.Equal(localSeat, controlled.Seat);
+        }
+    }
+
     [Theory]
     [InlineData("cn-279", 184, 149, 1408, 0, 4)]
     [InlineData("cn-324", 196, 221, 1996, 0, 8)]

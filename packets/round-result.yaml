@@ -16,3 +16,53 @@ structs:
       offset: 4
     - blue_total: u8
       offset: 5
+
+  # -------------------------------------------------------------------------------------------------
+  # The kr-1256 result sequence (dispatcher kr-1256 sub_9E2FE0, cases 0x264-0x267 and 0x26C): the frames
+  # the server sends when a round ends, in the order 612, 613, 614, 615, 576, 620. The S2C 614 scoreboard
+  # record between the 613 and the 615 is stated in score.yaml; the S2C 576 clear and the S2C 620 reset
+  # follow the 615. cn-774 sub_8D9000 and tw-454 sub_A58BB0 dispatch the same bodies at 603, 630,
+  # 631 and 634; these shapes do not assign a build's numeric opcodes.
+  # -------------------------------------------------------------------------------------------------
+
+  # S2C 612: kr-1256 sub_9E2FE0 case 0x264 reads two words and passes them to kr-1256 sub_9E88C0, which
+  # opens the result scene and sends the C2S 103 statistics request. No read site names either word; every
+  # emit recipe carries zeros. cn-774 sub_8D9000 / tw-454 sub_A58BB0 also read two words for 603.
+  RoundResultOpen:
+    - unknown_n0: u32
+      only: [kr-1256]
+    - unknown_n1: u32
+      only: [kr-1256]
+
+  # S2C 613: kr-1256 sub_9E2FE0 case 0x265 reads two words and two bytes and passes them to
+  # kr-1256 sub_9E9710. The words are unread by the handler; the bytes are stored at GameInfo+308/+312
+  # and the handler then writes the session phase 5 -> 6 and builds the result banner image path from the
+  # winner fields (kr-1256 sub_9E9710).
+  # cn-774 sub_8E3E30 / tw-454 sub_A64460 consume the same two words and two bytes for 630.
+  RoundResultBanner:
+    - unknown_n0: u32
+      only: [kr-1256]
+    - unknown_n1: u32
+      only: [kr-1256]
+    - unknown_n2: u8
+      only: [kr-1256]           # -> GameInfo+308
+    - unknown_n3: u8
+      only: [kr-1256]           # -> GameInfo+312
+
+  # S2C 615: kr-1256 sub_9E2FE0 case 0x267 reads one byte and calls kr-1256 sub_9E9EF0 with its low bit,
+  # the step into the reward stage. Only the low bit is consumed.
+  # cn-774 sub_8E45A0 / tw-454 sub_A64A80 consume the same low-bit flag for 631.
+  RoundResultClose:
+    - unknown_n0: u8
+      only: [kr-1256]
+
+  # S2C 620: kr-1256 sub_9E2FE0 case 0x26C calls kr-1256 sub_9EA690 without reading the stream; the
+  # handler drops the session phase to 2, tears the round session down and moves the stage manager, so
+  # the body is empty and the frame is parity only.
+  # cn-774 sub_8E5070 / tw-454 sub_A65310 likewise reset the stage without stream fields (634).
+  RoundStageReset: []
+
+  # S2C 576 gspUdpStop (label kept by the dispatcher): kr-1256 sub_9D2FF0's jumptable case at 0x9D4790
+  # reads no stream field; it zeroes the pending-send container at dword_18E5680+436/+484, sets +448 to
+  # -1 and clears the per-player relay state. Sent after the S2C 615 result close.
+  gspUdpStop: []

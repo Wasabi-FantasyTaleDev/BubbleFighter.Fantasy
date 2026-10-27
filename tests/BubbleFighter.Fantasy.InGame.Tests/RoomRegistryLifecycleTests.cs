@@ -1,6 +1,6 @@
 using BubbleFighter.Fantasy.InGame;
+using BubbleFighter.Fantasy.RoomCore;
 using BubbleFighter.Fantasy.InGame.Sessions;
-using BubbleFighter.Fantasy.InGame.Wire;
 using Xunit;
 
 namespace BubbleFighter.Fantasy.InGame.Tests;

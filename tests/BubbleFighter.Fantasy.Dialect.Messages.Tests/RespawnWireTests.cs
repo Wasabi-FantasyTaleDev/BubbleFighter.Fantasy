@@ -275,7 +275,7 @@ public sealed class RespawnWireTests
                 Present(schema, play, MapBlock(101, "Byway", "rel_Village01_Byway", "", ""), createRequest: true));
     }
 
-    private static byte[] Present(RoomSchema schema, PlayBuild play, byte[] block, bool createRequest) =>
+    private static byte[] Present(RoomSchema schema, PlayValues play, byte[] block, bool createRequest) =>
         PlazaRoomWire.PresentUnchosenMap(schema, block, play.Wire.UnchosenMapKey, play.Wire.UnchosenMapTheme,
             createRequest, play.Wire.UnchosenDifficultyMode, play.Wire.UnchosenDifficultyMapKey).ToArray();
 }

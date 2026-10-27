@@ -1,7 +1,7 @@
 ---
 title: "Plugins"
 description: "Understand the plugin model and build, mount, configure and reload a native .NET plugin."
-updated: 2026-10-18
+updated: 2026-10-23
 ---
 
 Everything the server does is implemented by a plugin. A profile composes plugin rows, each row binds one plugin implementation and one configuration to a stable instance id, and the host activates those rows in the order their declared service requirements allow. This page explains that model, shows how to see what the host discovered and loaded, then walks through a first native .NET plugin from project file to a row that runs. It ends with configuration, lifecycle and reload, the boundary between native plugins and the optional language SDKs, the rules plugin authors must follow, and the failures you are most likely to hit.
@@ -255,3 +255,79 @@ If the whole server exits during startup, the message `Server startup did not co
 ## Next
 
 Continue with [SDK protocol](sdk-protocol.md) to mount a plugin written in Python, TypeScript, Go or Rust, then read [Contributing](contributing.md) for the validation gate and review rules. [Server configuration](configuration.md) explains profiles, bundles, patches and environment variables in full.
+
+## Register commands and permissions {#register-commands}
+
+For an explicit notice-before-disconnect operation, `ISession.SendAsync` only queues the message. If the session implements `ISessionOutputDrain`, await `DrainOutputAsync` with the operation's configured cancellation deadline before closing. The fence waits for preceding transport writes; it does not confirm client receipt or rendering. Cancellation stops waiting without retracting queued frames. A full queue, stopped session or failed write fails the drain. Do not use fixed delays or concrete protocol classes as a replacement.
+
+The `permissions` and `commands` rows in the core bundle provide the native command foundation. A plugin declares `IPermissionRegistry` and `ICommandRegistry` from `BubbleFighter.Fantasy.Contracts.Administration` in its `Requires` list, then registers a permission before its command:
+
+```csharp
+context.Effect(context.Services.Get<IPermissionRegistry>().Register(
+    new PermissionDefinition("example.ping", "Check whether the example plugin is ready.")));
+context.Effect(context.Services.Get<ICommandRegistry>().Register(context,
+    new CommandDefinition("ping", ["ready"], "example.ping", "Check plugin readiness.", []),
+    (invocation, token) => ValueTask.FromResult(
+        new CommandResult(CommandStatus.Success, "Ready."))));
+```
+
+Names and aliases are globally unique. Registration snapshots metadata. Disposal removes every alias and signals active invocations; handlers run through the registering context's supervised task API, so plugin unload cancels and drains them. Handlers must observe the supplied token. Expected application-state errors return `InvalidState`; unexpected exceptions propagate and are reported to the owning plugin. `ICommandRegistry.List(principal)` supplies permission-filtered metadata for help and panels.
+
+`ICommandExecutor.ExecuteAsync` accepts a command name and structured positional arguments. `ExecuteTextAsync` recognizes `/`, `!` and `！`, double-quoted tokens, invariant signed integers and a final `RemainingText` argument. Structured callers supply remaining text as one value. There is no separate word-count limit on that text. Console adapters can explicitly allow input without a prefix. No input is evaluated as shell code.
+
+Only trusted adapters construct `CommandCaller`: resolve stable account IDs through authentication and preserve the original `Actor` when acting for a different `Subject`. Never deserialize this identity from request arguments. `Language` carries the user's UI language; an empty value requests the deployment fallback. Audit events contain identity and outcome, without raw argument values. Native registration is available; remote SDK registration still needs a callback/ownership adapter. Console input and WebUI are not connected to this dispatcher yet.
+
+Set `shared_chat_commands: true` in an `ingame` row's config to connect that gameplay scope to shared chat dispatch. This option defaults to `false` pending native-client acceptance; disabled scopes retain their original host-only `!start` and `!set` handlers. Enabling it requires both shared command services, otherwise activation fails.
+
+The core bundle's `commands.game` row connects enabled scopes to the same dispatcher, including native plugin commands. It registers `/start` and `/mode <id>` (alias `/set`) once across gameplay scopes; `!` and `！` also work. Their `game.room.start` and `game.room.mode` permission nodes allow ordinary players by default, acting only on their own waiting room. A configured mode table still rejects unsupported IDs. Command start bypasses ready marks; the native start button retains its room-master check. Prefix input that fails permissions is consumed, with no fallback to the local command path.
+
+Gameplay owners register `IGameCommandEndpoint` through `IGameCommandEndpoints` and own the returned handle. Routing verifies the authenticated game account against the current seat, rejects ambiguous session ownership, and runs under the gameplay owner's lifetime. `commands.game.max_endpoints` defaults to 512 and bounds live scope registrations. This row does not implement map, management or room-transfer commands.
+
+Removing or replacing a gameplay scope invalidates earlier routing snapshots. An invocation that has not begun execution cannot call the withdrawn endpoint or silently follow its replacement.
+
+Permission configuration is on the `permissions` row:
+
+```yaml
+config:
+  groups:
+    - name: players
+      allow: [example.ping]
+    - name: helpers
+      inherits: [players]
+      deny: [example.restricted]
+  subjects:
+    - kind: game
+      id: "42"
+      groups: [helpers]
+    - kind: game
+      id: "7"
+      operator: true
+    - kind: webui
+      id: "admin-account-id"
+      allow: [webui.access, webui.admin]
+```
+
+The IDs refer to accounts already authenticated in their respective namespace. These settings do not create accounts or grant login credentials. Ordinary denials override all ordinary grants, including inherited and wildcard grants. Rules accept exact nodes, `prefix.*` or `*`. Unknown groups and inheritance cycles fail activation. Unregistered nodes fail closed. A game OP and the local console have all registered permissions; game OP does not grant WebUI login. `webui.access` grants entry only; `webui.admin` is the WebUI superuser permission. Permissions never bypass argument or application-state checks. These WebUI nodes are provided for adapter integration; they do not yet replace existing HTTP authorization.
+
+Resource settings protect registry storage and active work, rather than setting gameplay limits. `commands` accepts `max_commands` (512), `max_input_characters` (4096, also the registration-name/schema text budget), `max_result_characters` (16384) and `max_concurrent` (64). Calls receive `Busy` when execution capacity is occupied; no waiting queue is created. `permissions` accepts `max_nodes` (2048) and `max_policy_entries` (65536, the combined storage budget for identities, groups, inheritance links and expanded rules). These validated settings can be changed per deployment.
+
+### Online management commands {#online-management-commands}
+
+Contracts 2.61.0 adds native online-scope registrations. `commands.management` registers `/list`, `/notice <text>` and `/disconnect <nickname> [reason]` once; `commands.players` registers each build's authenticated player directory and configured notice encoder. Both rows are disabled by default pending native-client acceptance. Enable the management row and the selected build's player row together. The player row sits below `lobby`, requires `lobby.online_players: true`, and selects the actual protocol through its required `protocol` option. The corresponding `dialect.messages` row must enable `server_notices: true`; a missing or duplicate encoder fails activation. In a composed profile, use the expanded row IDs shown by `--dump-config`.
+
+`/list` returns the number of distinct online accounts, including main-menu players; it does not disclose names or network addresses. `game.management.list` is allowed to ordinary players by default. `/notice` sends supplied text to every authenticated game connection, including different builds, and reports queued and failed deliveries. It requires `game.management.notice`. `/disconnect` requires `game.management.disconnect`, resolves the current nickname exactly, and rejects ambiguous matches across connections. Game OP has both administrative permissions. Game invocation also verifies that the caller's stable account still owns its connection. Chat entry requires `ingame.shared_chat_commands: true`; console and WebUI adapters remain unavailable.
+
+The disconnect notice uses the target's `launcher_language` and includes the optional reason. It queues the notice, awaits `ISessionOutputDrain`, then closes that selected connection. Notification failure is logged and does not prevent disconnecting a still-current target; a replacement login is never followed. The result reports when notification could not complete. This guarantees neither client receipt nor rendering. Announcements report partial failures without treating a queued message as a confirmed read.
+
+`commands.management` options are `max_scopes` (512 live registrations), `disconnect_notice_timeout_ms` (5000) and `max_notice_characters` (511). The text budget may be lowered; its upper bound follows the native notice buffer. An overlong formatted reason is rejected before any notification or close. Scope registrations are owned effects and calls run under their registering plugin's supervised lifetime. Remote SDK registration remains unsupported because it needs native owner/callback transport. These rows do not implement kick, sudo, persistent OP editing, transfers, WebUI configuration or the distribution store.
+
+
+### Client plugin launch policy {#client-plugin-policy}
+
+The Store page can select client plugin identities from the merged catalog, or add an identity manually, and edit their recommended, required or forbidden status. These rules configure compatible Launchers; client binaries are not installed on the server. Each rule can target selected exact client builds. Leaving every build unchecked applies it to all builds. Profile mode retains the original configuration, while an empty custom list explicitly clears its recommendations.
+
+`GET` and `PUT /api/setup/client-plugins` require an authenticated WebUI account with both `webui.access` and `webui.settings.client_plugins`; `webui.admin` grants both. Game OP does not grant WebUI access. PUT uses the existing same-origin request guard and accepts `{"policies":[{"id":"example.plugin","builds":[],"required":false,"disabled":true}]}`. Send `{"policies":null}` to restore the profile policy or `{"policies":[]}` to clear it. Only store identities are accepted; rules do not contain download URLs or executable paths.
+
+The Launcher catalog, login and refresh responses advertise `pluginRecommendations` with `id`, `builds`, `required` and `disabled`. Recommended is false/false, required is true/false and forbidden is false/true. Required and disabled rules for the same identity cannot overlap, including all-build rules. Different policies on disjoint builds remain distinct; a requirement on one build is never expanded to another build by a global recommendation. Compatible Launchers enforce launch policy; this metadata does not prove client integrity or make game login validate loaded modules.
+
+Changes persist independently of database, account, reward and client-data settings, then use the existing supervised configuration application. HTTP 202 acknowledges admission only. Application may reconnect game services; progress and failures remain visible in the setup status. Restore or retry failed configuration through the existing setup workflow.

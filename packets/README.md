@@ -9,7 +9,9 @@ Chinese: [README.zh.md](README.zh.md).
 |---|---|
 | `builds.yaml` | The client builds, what each is based on, and each build's own values. |
 | `room.yaml` | The room structures: `SessionSetting`, `GameSetting`, `UserSlot`, `EquippedItemList`, `gspGotoRoom`. |
-| `room-details.yaml` | Audited master-change requests/replies, round-setting requests, room inventory notifications and the shared amplifier request; round-map bindings also require the named game opcode and audited target mapping in `builds.yaml`. |
+| `room-details.yaml` | Audited master-change requests/replies, round-setting requests, room inventory notifications; round-map bindings also require the named game opcode and audited target mapping in `builds.yaml`. |
+| `recruit.yaml` | Shared amplifier request and legacy recruitment messages; modern recruitment bodies are excluded. |
+| `round-feed-native.yaml` | Native combat bodies with audited field-order differences; table coverage does not register a feed route or enable rounds. |
 | `score.yaml` | The scoreboard: `ScoreRow`, one seat of `gspGameBroadcastPlayerScoreData`. |
 | `score-reports.yaml` | Native inbound score envelopes; table coverage does not enable unreviewed event kinds or opcode routes. |
 | `inventory.yaml` | `InventoryUpdate` and `InventorySlot`: the bag on S2C 801/802. |
@@ -17,7 +19,7 @@ Chinese: [README.zh.md](README.zh.md).
 | `cash-inventory.yaml` | Counted cash-inventory slots and pickup bodies, with the modern presentation tail. Tables do not enable item claims. |
 | `login.yaml` | `LoginReply`: the legacy S2C login response, including early-client differences. |
 | `weapon-presets.yaml` | Legacy preset requests, status and parallel-vector bars; modern update envelopes with distinct KR, CN and TW entry widths. Table coverage does not enable runtime preset behavior. |
-| `customized-keys.yaml` | Audited customized-key updates and replies for kr-812 and three modern builds; the explicit `player-settings` bundle binds them to scoped storage and login restoration. |
+| `customized-keys.yaml` | Audited customized-key updates and replies for kr-812 and three modern builds; the `customized_keys` option of the `dialect.messages` row binds them to scoped storage and login restoration. |
 | `user-stat.yaml` | `UserStat` (S2C `gspUserStat`, the wallet and FighterInfo) and its `FighterInfo` and `EloRating`. |
 | `fighter-info.yaml` | `FighterInfoRequest` and `FighterInfoReply`: the player menu's "view info" (C2S `gcpReqFighterInfo`, S2C `gspRepFighterInfo`) of the legacy builds and of the kr-1256 family (`FighterInfoReply@kr-1256`). |
 | `clan.yaml` | The clan game-connection bodies (`ClanPassport`, `ClanMarkInfo`, `ClanGuildInfo`, `ClanAttendanceState`) and the empty clan request frames, with the kr-1256 shapes stated beside the kr-812 baseline. |
@@ -249,6 +251,29 @@ means on the wire is up to the plugin that writes it. A structure name may appea
 `room_unchosen_map` in `builds.yaml` lists the `GameSetting` fields, and their values, that a room shows until its master picks a map: the create request carries the client's startup map, not a choice. Each name must be a `wstr` or `u32` field of the build's `GameSetting`; a build that restates `GameSetting` differently cancels the inherited value with `~`.
 `room_unchosen_difficulty` (`mode`, `key`) shows that mode's own marker wherever the all-random entry would show `Random`. `room_setting_change_map` names the map change request's `name`, `key`, `scene` and `mode` fields and the four `GameSetting` strings the room shows them in; a scene with `mission_prefix` stays in every map string. `room_ai_seat` (`field`, `modes`) sets the lowest bit of a `SessionSetting` word for rooms of the listed modes.
 
+`play` in `builds.yaml` states how a build's tutorial and play rooms differ in the packets whose shapes are still written in code. Its sub-blocks are `tutorial` (`old_map_key`, `select_kind`, `skip_enter`, `old_mode`, `wave_map_key`, `master_slot_packet`), `wire` (`server_revives`, `pre_count_down_first`, `unchosen_map_key`, `unchosen_map_theme`, `spawn_group_applies_locally`, `unchosen_difficulty_mode`, `unchosen_difficulty_map_key`, `restate_left_room`, `plaza_entry_settle_ms`) and `score` (`wide_report`, `live_score_packet`, `outcome_first`, `time_over_end`, `npc_team_outcome`, `rescue_credit`, `horde_stage_outcome`, `star_report`, and the four star report kinds `star_small_gained`, `star_big_gained`, `star_small_lost` and `star_big_lost`), beside the flat keys `match_start`, `host_start`, `one_seat_waves`, `npc_waves`, `score_reports` and `tutorial_skip_start`. The legacy room dialect reads them with `PlayValues.Of`, which rejects an unknown key, a value that is not one of its key's names, or a missing `match_start` or `host_start` at startup.
+
 `room_projection_fields` describes the modern typed waiting room's mode field, ordered map fallbacks and ordinary-room gate overlay. `clear_mask` removes only the audited blocking bits from `flags`; unrelated bits, including the round-map selector bit, survive. `clear_words` and `clear_booleans` name the remaining audited gates. The binding validates all aliases and their types before mounting. An inherited map whose aliases do not exist in a later build is an error, not permission to use the baseline offsets.
 
+`round_score_row_marker` names the native `ScoreRow` leading word that the modern result adapter fills for a seated row. It must identify that row's first `u32` field; it does not assign a recovered meaning to the unknown field. Level and reward values use the shared named fields, while each row's table determines their wire positions. A result tail's conditional strings remain absent through explicit default gate values from its own table.
+
 `inventory` in `builds.yaml` says how a build publishes its bag through the shared inventory binding. `envelope` is `plain` or `zlib` (the modern family wraps the 802/803/808 bodies in a `u32` compressed length and a zlib stream; the cash inventory is never wrapped). `rows` is `ranked` (the legacy baseline: ascending item id, empty rows dropped on a restatement, connection-relative day counts) or `mirror` (the stored slots in stored order with their own identity fields). `replaced`, `purchase` and `changed` are the ordered publication lists, built from these entry names: `bag` (the whole-bag packet over the character bag), `slots` (the slots packet over the character bag), `equipped` (the slots packet over the equipped bag), `changed` (the slots packet over the changed slots), `articles` (the empty article table) and `cash` (the empty cash inventory). The binding resolves every packet by name and refuses a list entry whose packet the build's table lacks.
+
+A null entry inside `room_unchosen_map` cancels that inherited field when a descendant restates `GameSetting`; remaining entries are still validated against the descendant layout.
+
+
+`round_feed` in `builds.yaml` maps an action identity to its native opcode name, packet `structure`,
+reporting identity fields (`actors`) and optional sender echo (`echo_sender`). Nested maps inherit, so
+another build changes only differing route properties or explicitly disables an unavailable action
+with `enabled: false`. This is protocol data, not an assertion that the build supports full rounds.
+Game C2S, relay C2S and relay S2C resolve independently through their connection tables. A missing
+name, duplicate numeric assignment, collision with an existing feed family or non-word identity fails
+before the binding publishes services. No numeric equality between those spaces is assumed.
+
+Optional `life_event` and `life_actor` adapt a validated native report to the shared life handler.
+A `finished` event also requires `life_initiator`; `life_success` gates a successful report and
+`life_death_flag` distinguishes immediate death from bubbling. These selectors must name fields in
+the selected structure with the expected widths. `nested: true` selects the complete table reader,
+including absent-tag validation for native reset confirmations. The baseline action bodies and
+reporting roles are evidenced beside their structures in `round-feed.yaml`; damager-spawn and
+writer-only relay-motion routes retain their separately documented handling.

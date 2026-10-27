@@ -4,6 +4,7 @@
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../../src/Plugins/BubbleFighter.Fantasy.Commands/BubbleFighter.Fantasy.Commands.csproj" />
     <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Localization\BubbleFighter.Fantasy.Localization.csproj" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit" />
@@ -12,11 +13,10 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.InGame\BubbleFighter.Fantasy.InGame.csproj" />
-    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.MatchRelay\BubbleFighter.Fantasy.MatchRelay.csproj" />
     <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.InventoryView\BubbleFighter.Fantasy.InventoryView.csproj" />
     <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Equipment\BubbleFighter.Fantasy.Equipment.csproj" />
     <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Lobby\BubbleFighter.Fantasy.Lobby.csproj" />
-    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Dialect.Modern.Messages\BubbleFighter.Fantasy.Dialect.Modern.Messages.csproj" />
+    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Dialect.Rooms\BubbleFighter.Fantasy.Dialect.Rooms.csproj" />
     <!-- The movement broadcast tests run against the real bounded
          MemoryPlayerMovementState the persistence.memory row publishes. -->
     <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Persistence.Memory\BubbleFighter.Fantasy.Persistence.Memory.csproj" />

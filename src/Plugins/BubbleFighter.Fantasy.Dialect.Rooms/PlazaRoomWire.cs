@@ -42,6 +42,8 @@ internal static class PlazaRoomWire
     /// <returns>The two native unknown words.</returns>
     public static (ushort Unknown0, ushort Unknown1) ReadListSession(PacketTables tables, string build, ReadOnlySpan<byte> payload)
     {
+        PacketLayoutContract.RequireFields(tables, build, "RoomListRequest", "Plaza room wire",
+            ("unknown_4", "u16"), ("unknown_6", "u16"));
         var fields = PacketCodec.ReadScalars(tables, build, "RoomListRequest", payload);
         return (Convert.ToUInt16(fields["unknown_4"]), Convert.ToUInt16(fields["unknown_6"]));
     }
@@ -58,8 +60,12 @@ internal static class PlazaRoomWire
     /// <param name="tables">The native list envelope tables.</param>
     /// <param name="build">The selected client build.</param>
     /// <returns>A twelve-byte empty list body.</returns>
-    public static byte[] WriteRepListSessionEmpty(PacketTables tables, string build) =>
-        PacketCodec.Write(tables, build, "RoomListReply", new Dictionary<string, object?>());
+    public static byte[] WriteRepListSessionEmpty(PacketTables tables, string build)
+    {
+        PacketLayoutContract.RequireFields(tables, build, "RoomListReply", "Plaza room wire",
+            ("page", "u32"), ("more", "bool"), ("rooms", "list<SessionSetting>"));
+        return PacketCodec.Write(tables, build, "RoomListReply", new Dictionary<string, object?>());
+    }
 
     /// <summary>
     /// C2S <c>gcpReqCreateSession</c> (kr-812 serialize <c>sub_480D40</c> / reader
@@ -172,6 +178,8 @@ internal static class PlazaRoomWire
     /// <returns>The room number, password and three fields whose meanings remain unproven.</returns>
     public static JoinSessionRequest ReadJoinSession(PacketTables tables, string build, ReadOnlySpan<byte> payload)
     {
+        PacketLayoutContract.RequireFields(tables, build, "RoomJoinRequest", "Plaza room wire",
+            ("room_id", "u32"), ("unknown_8", "u32"), ("unknown_12", "u32"), ("password", "wstr"));
         var fields = PacketCodec.ReadScalars(tables, build, "RoomJoinRequest", payload);
         var tail = fields.TryGetValue("unknown_44", out var value) ? Convert.ToInt32(value) : 0;
         return new JoinSessionRequest((int)fields["room_id"], (int)fields["unknown_8"],
@@ -190,6 +198,9 @@ internal static class PlazaRoomWire
     /// <returns>The decoded change.</returns>
     public static GameSettingChange ReadChangeGameSetting(PacketTables tables, string build, ReadOnlySpan<byte> payload)
     {
+        PacketLayoutContract.RequireFields(tables, build, "RoomGameSettingChangeRequest", "Plaza room wire",
+            ("map_directory", "wstr"), ("current_map", "wstr"), ("map_key", "wstr"),
+            ("mode", "u32"), ("sub_mode", "u32"));
         var values = PacketCodec.ReadScalars(tables, build, "RoomGameSettingChangeRequest", payload);
         var aliases = SettingChangeFields.Require(tables, build);
         return new GameSettingChange((string)values["map_directory"], (string)values["current_map"],
@@ -334,6 +345,8 @@ internal static class PlazaRoomWire
     public static (bool Unknown0, bool Unknown1, bool Unknown2) ReadReadyStatus(PacketTables tables, string build,
         ReadOnlySpan<byte> payload)
     {
+        PacketLayoutContract.RequireFields(tables, build, "RoomReadyRequest", "Plaza room wire",
+            ("ready", "bool"), ("unknown_5", "bool"), ("unknown_6", "bool"));
         var values = PacketCodec.ReadScalars(tables, build, "RoomReadyRequest", payload);
         return ((bool)values["ready"], (bool)values["unknown_5"], (bool)values["unknown_6"]);
     }
@@ -364,6 +377,8 @@ internal static class PlazaRoomWire
     public static (string MapKey, int Unknown1) ReadRoomReqEnterGame(PacketTables tables, string build,
         ReadOnlySpan<byte> payload)
     {
+        PacketLayoutContract.RequireFields(tables, build, "RoomEnterGameRequest", "Plaza room wire",
+            ("map_key", "wstr"));
         var values = PacketCodec.ReadScalars(tables, build, "RoomEnterGameRequest", payload);
         var firstWord = tables.Resolve(build, "RoomEnterGameRequest").First(field => field.Type == "u32");
         return ((string)values["map_key"], (int)values[firstWord.Name]);

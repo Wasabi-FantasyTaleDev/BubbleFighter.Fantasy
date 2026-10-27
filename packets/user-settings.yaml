@@ -1,0 +1,52 @@
+version: 1
+structs:
+  # kr-812 host settings. The client writes the request in kr-812 sub_809110, which builds
+  # Packet_gcpUserHostSetting, stamps 2026 through kr-812 sub_B25E90 and calls the class writer;
+  # the class codec kr-812 sub_6DB1B0 reads two words at +4 and +8.
+  # The roles are not proven, so both words stay unknown_<offset>.
+  UserHostSettingRequest:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+
+  # kr-812 S2C 992 gspUserHostSetting: reader kr-812 sub_80A400 reads four words at
+  # +4/+8/+12/+16.
+  UserHostSettingUpdate:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - unknown_16: u32
+      offset: 16
+
+  # kr-812 S2C 993 gspUserHostDefaultSetting shares the class codec kr-812 sub_6DB1B0 with the
+  # request class and therefore carries two words at +4 and +8.
+  UserHostDefaultSetting:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+
+  # The modern builds read the same bodies into locals, so the fields are stated at their wire
+  # positions in the field names, not native object offsets. kr-1256 writes the request in kr-1256 sub_9DFC50 (stamps 2032, appends four bytes
+  # from each argument; kr-1256 sub_9731A0 and kr-1256 sub_973220 pass one and a stored member,
+  # kr-1256 sub_974530 passes two zeros). Its S2C 991 goes through the case kr-1256 0x9D5411 to
+  # the handler kr-1256 sub_9CBF50, which reads four words through stream slot +44, and its
+  # S2C 992 is the inline case kr-1256 0x9D542B, which reads two words and stores them at
+  # manager +0x380 and +0x384.
+  UserHostSettingRequest@kr-1256:
+    - unknown_0: u32
+    - unknown_4: u32
+
+  UserHostSettingUpdate@kr-1256:
+    - unknown_0: u32
+    - unknown_4: u32
+    - unknown_8: u32
+    - unknown_12: u32
+
+  UserHostDefaultSetting@kr-1256:
+    - unknown_0: u32
+    - unknown_4: u32

@@ -39,7 +39,7 @@ public sealed class ChatRateLimitTests
             {
                 Id = "chat", Plugin = "ingame", Source = "test", Config = new Dictionary<string, object?>
                 {
-                    ["typed_only"] = true, ["game_protocol"] = protocol,
+                    ["game_protocol"] = protocol,
                     ["chat_rate_limit_messages"] = 2, ["chat_rate_limit_window_ms"] = 3600000,
                     ["chat_rate_limit_max_sessions"] = 1,
                 },
@@ -48,14 +48,14 @@ public sealed class ChatRateLimitTests
             {
                 await new InGamePlugin().ActivateAsync(ingame, default);
                 var router = services.Get<IMessageRouter>();
-                var first = new RoomPushTests.RecordingSession(1);
+                var first = new RecordingSession(1);
                 first.SetLobbyPlayer(11, "first");
                 for (var i = 0; i < 3; i++)
                     Assert.True(await router.DispatchAsync(protocol, first, new RoomChatSent(0, "hello"), default));
                 Assert.Equal(2, sent.Count);
                 await first.Connection.CloseAsync("test");
                 events.Emit(new ConnectionClosedEvent(first.Connection, "test"));
-                var second = new RoomPushTests.RecordingSession(2);
+                var second = new RecordingSession(2);
                 second.SetLobbyPlayer(22, "second");
                 Assert.True(await router.DispatchAsync(protocol, second, new RoomChatSent(0, "hello"), default));
                 Assert.Equal(3, sent.Count);
@@ -98,7 +98,7 @@ public sealed class ChatRateLimitTests
     {
         var clock = new ManualClock();
         using var limit = new ChatRateLimit(Options(), NullLogger.Instance, clock);
-        var session = new RoomPushTests.RecordingSession(1);
+        var session = new RecordingSession(1);
         var calls = 0;
         var raw = limit.Wrap((_, _, _) => { calls++; return ValueTask.CompletedTask; });
         var typed = limit.Wrap<RoomChatSent>((_, _, _) => { calls++; return ValueTask.CompletedTask; });
@@ -120,7 +120,7 @@ public sealed class ChatRateLimitTests
     {
         var logger = new WarningCounter();
         using var limit = new ChatRateLimit(Options(), logger, new ManualClock());
-        var session = new RoomPushTests.RecordingSession(1);
+        var session = new RecordingSession(1);
         var calls = 0;
         var handler = limit.Wrap<RoomChatSent>((_, _, _) => { Interlocked.Increment(ref calls); return ValueTask.CompletedTask; });
         await Task.WhenAll(Enumerable.Range(0, 64).Select(_ => Task.Run(() =>
@@ -136,8 +136,8 @@ public sealed class ChatRateLimitTests
         var options = Options();
         options.ChatRateLimitMaxSessions = 1;
         using var limit = new ChatRateLimit(options, NullLogger.Instance);
-        var first = new RoomPushTests.RecordingSession(1);
-        var second = new RoomPushTests.RecordingSession(2);
+        var first = new RecordingSession(1);
+        var second = new RecordingSession(2);
         var calls = 0;
         var handler = limit.Wrap<RoomChatSent>((_, _, _) => { calls++; return ValueTask.CompletedTask; });
         await handler(first, new RoomChatSent(0, "line"), default);
@@ -156,8 +156,8 @@ public sealed class ChatRateLimitTests
         using var limit = new ChatRateLimit(Options(), NullLogger.Instance);
         var calls = 0;
         var handler = limit.Wrap<RoomChatSent>((_, _, _) => { calls++; return ValueTask.CompletedTask; });
-        var first = new RoomPushTests.RecordingSession(1);
-        var second = new RoomPushTests.RecordingSession(2);
+        var first = new RecordingSession(1);
+        var second = new RecordingSession(2);
         for (var i = 0; i < 3; i++) await handler(first, new RoomChatSent(0, "line"), default);
         await handler(second, new RoomChatSent(0, "line"), default);
         Assert.Equal(3, calls);
@@ -168,7 +168,7 @@ public sealed class ChatRateLimitTests
     public async Task MiddlewareLimitsReplacementHandlersBeforeTheyExecute()
     {
         using var limit = new ChatRateLimit(Options(), NullLogger.Instance);
-        var session = new RoomPushTests.RecordingSession(1);
+        var session = new RecordingSession(1);
         var calls = 0;
         MessageHandler<RoomChatSent> original = (_, _, _) => { calls++; return ValueTask.CompletedTask; };
         MessageHandler<RoomChatSent> replacement = (_, _, _) => { calls += 10; return ValueTask.CompletedTask; };
@@ -183,7 +183,7 @@ public sealed class ChatRateLimitTests
     public async Task CancellationAndUnloadDoNotLeaveAdmissionActive()
     {
         var limit = new ChatRateLimit(Options(), NullLogger.Instance);
-        var session = new RoomPushTests.RecordingSession(1);
+        var session = new RecordingSession(1);
         var calls = 0;
         var handler = limit.Wrap<RoomChatSent>((_, _, _) => { calls++; return ValueTask.CompletedTask; });
         Assert.Throws<OperationCanceledException>(() => { _ = handler(session, new RoomChatSent(0, "line"), new CancellationToken(true)); });
@@ -205,7 +205,7 @@ public sealed class ChatRateLimitTests
         var calls = 0;
         var handler = limit.Wrap<RoomChatSent>((_, _, _) => { calls++; return ValueTask.CompletedTask; });
         for (var i = 0; i < 10; i++)
-            await handler(new RoomPushTests.RecordingSession(i), new RoomChatSent(0, "line"), default);
+            await handler(new RecordingSession(i), new RoomChatSent(0, "line"), default);
         Assert.Equal(10, calls);
     }
 

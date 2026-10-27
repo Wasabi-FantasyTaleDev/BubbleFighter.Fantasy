@@ -19,6 +19,18 @@ public sealed class WeaponPresetChangeHandlerTests
         { Lifetime = InventoryLifetime.Permanent };
 
     [Fact]
+    public async Task StoredPagesDoNotEnableThePolicyForAnotherBuild()
+    {
+        var state = new FakeState { Pages = WeaponPresetPages.SeedFromWorn(204001, 0) };
+        var replies = new FakeReplies();
+        var handler = new WeaponPresetChangeHandler(state,
+            new FakeSelection([Worn(300001), Worn(202001)]), new FakeView(), replies, NullLogger.Instance);
+        await handler.HandleAsync(new RecordingSession(1, 42), new WeaponPresetChangeRequested(-1, 4), default);
+        Assert.Null(state.Granted);
+        Assert.Equal(1, Assert.Single(replies.Sent).Status);
+    }
+
+    [Fact]
     public async Task GrantPersistsTheSlotThenRepublishesTheViewThenReplies()
     {
         var order = new List<string>();
@@ -94,11 +106,69 @@ public sealed class WeaponPresetChangeHandlerTests
         Assert.Equal(1, Assert.Single(replies.Sent).Status);
     }
 
-    private sealed class FakeState(List<string>? order = null) : IPlayerInventoryState
+    [Fact]
+    public async Task MaterializedPagesMakeTheExpansionSlotsGrantable()
+    {
+        // Pages win over the worn set: slot 4 is dead in the derived bar (FromWorn pins it unbound) but
+        // grantable here because its page carries a weapon; the worn set still feeds the republished view.
+        var state = new FakeState
+        {
+            Pages = [new(202001, 205001, 0), new(203001, 205001, 0), new(204001, 0, 0), new(202003, 205001, 0), new(204003, 0, 0)],
+        };
+        var view = new FakeView();
+        var replies = new FakeReplies();
+        var handler = new WeaponPresetChangeHandler(state,
+            new FakeSelection([Worn(300001), Worn(202001), Worn(201001)]), view, replies, NullLogger.Instance, state);
+
+        await handler.HandleAsync(new RecordingSession(1, 42), new WeaponPresetChangeRequested(-1, 4), default);
+
+        Assert.Equal((42, (byte)4), state.Granted);
+        Assert.Equal(0, Assert.Single(replies.Sent).Status);
+        Assert.Equal((byte)4, Assert.Single(replies.Sent).Slot);
+    }
+
+    [Fact]
+    public async Task APageWithoutAWeaponIsRefusedLikeAnUnboundSlot()
+    {
+        var state = new FakeState
+        {
+            Pages = [new(202001, 205001, 0), new(0, 0, 0), new(0, 0, 0), new(0, 0, 0), new(0, 0, 0)],
+        };
+        var replies = new FakeReplies();
+        var handler = new WeaponPresetChangeHandler(state,
+            new FakeSelection([Worn(300001), Worn(202001)]), new FakeView(), replies, NullLogger.Instance, state);
+
+        await handler.HandleAsync(new RecordingSession(1, 42), new WeaponPresetChangeRequested(-1, 1), default);
+
+        Assert.Null(state.Granted);
+        Assert.Equal(1, Assert.Single(replies.Sent).Status);
+    }
+
+    [Fact]
+    public async Task APersistedPageGrantsWhatTheWornSetAloneWouldRefuse()
+    {
+        // Nothing primary is worn, so the derived bar would refuse every slot; the materialized page 0
+        // still binds a weapon, and its grant is what a login on the persisted bar replays.
+        var state = new FakeState { Pages = [new(202001, 205001, 0), new(0, 0, 0), new(0, 0, 0), new(0, 0, 0), new(0, 0, 0)] };
+        var replies = new FakeReplies();
+        var handler = new WeaponPresetChangeHandler(state,
+            new FakeSelection([Worn(300001), Worn(201001)]), new FakeView(), replies, NullLogger.Instance, state);
+
+        await handler.HandleAsync(new RecordingSession(1, 42), new WeaponPresetChangeRequested(-1, 0), default);
+
+        Assert.Equal((42, (byte)0), state.Granted);
+        Assert.Equal(0, Assert.Single(replies.Sent).Status);
+    }
+
+    private sealed class FakeState(List<string>? order = null) : IPlayerInventoryState, IWeaponPresetPageSource
     {
         private readonly List<string> _order = order ?? [];
         internal byte Current { get; set; }
         internal (long User, byte Slot)? Granted { get; private set; }
+        /// <summary>Gets or sets materialized pages; null keeps the derived bar (the default-off look).</summary>
+        internal WeaponPresetPage[]? Pages { get; set; }
+        public ValueTask<WeaponPresetPage[]?> ReadAsync(long userNum, CancellationToken ct) =>
+            ValueTask.FromResult(Pages?.ToArray());
         public ValueTask<byte> GetActiveWeaponPresetSlotAsync(long userNum, CancellationToken ct) =>
             ValueTask.FromResult(Current);
         public ValueTask SetActiveWeaponPresetSlotAsync(long userNum, byte slot, CancellationToken ct)
@@ -108,6 +178,12 @@ public sealed class WeaponPresetChangeHandlerTests
             Current = slot;
             return ValueTask.CompletedTask;
         }
+        public ValueTask<WeaponPresetPage[]?> GetWeaponPresetPagesAsync(long userNum, CancellationToken ct) =>
+            ValueTask.FromResult(Pages?.ToArray());
+        public ValueTask<WeaponPresetPage[]> GetOrCreateWeaponPresetPagesAsync(long userNum, WeaponPresetPage[] initialPages, CancellationToken ct) =>
+            throw new InvalidOperationException("This fixture does not initialize preset pages.");
+        public ValueTask SetWeaponPresetPagesAsync(long userNum, WeaponPresetPage[] pages, CancellationToken ct) =>
+            throw new InvalidOperationException("Preset switches never materialize pages.");
     }
 
     private sealed class FakeSelection(IReadOnlyList<InventorySlotRecord> bag) : IEquipmentSelection

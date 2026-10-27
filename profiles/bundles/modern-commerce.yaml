@@ -1,0 +1,35 @@
+# Shared catalog and purchase logic, with each build's own workbook and packet tables.
+- id: clientdata
+  plugin: clientdata
+  isolated_services:
+    - BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore
+  config:
+    data_directory: "${BFF_CLIENT_DATA:-client-data}/${BFF_PROFILE_ID}/data"
+    raw_directory: "${BFF_CLIENT_DATA:-client-data}/${BFF_PROFILE_ID}/dataraw"
+- id: shop
+  plugin: shop
+  parent_id: inventoryview
+  config:
+    protocol: "${BFF_PROFILE_ID}/game"
+    client_profile: "${BFF_PROFILE_ID}"
+    version_major: ${BFF_BUILD_MAJOR}
+    shop_item_client_path: "Config/ShopItem2.xml"
+    # Keep the workbook currency and sellPrice terms independent of the native dialog format.
+    catalog_schema: legacy
+    catalog_display_column: displayName
+    send_shop_catalog: true
+    catalog_tree: id_ranges
+    # cn-774 sub_1047420 / tw-454's legacy_5 framing carries a u16 payload length.
+    # This is a wire ceiling, with no additional card-count restriction.
+    catalog_payload_bytes: 65535
+    grant_purchased_items: true
+    starting_lucci: 100000
+    starting_cash: 0
+- id: equipment
+  plugin: equipment
+  parent_id: inventoryview
+  config:
+    protocol: "${BFF_PROFILE_ID}/game"
+    client_profile: "${BFF_PROFILE_ID}"
+    version_major: ${BFF_BUILD_MAJOR}
+    persist_worn_state: true

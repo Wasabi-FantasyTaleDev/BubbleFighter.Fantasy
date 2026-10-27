@@ -4,6 +4,11 @@ using BubbleFighter.Fantasy.Contracts.Shop;
 
 namespace BubbleFighter.Fantasy.Persistence.Sqlite;
 
+/// <summary>
+/// The save's shop fragment: purchases, shop sessions and clan membership, all as whole-snapshot
+/// mutations under one write transaction, so a purchase's wallet debit, inventory grants and history
+/// append cannot partially apply.
+/// </summary>
 internal sealed partial class SqliteRepositories : IShopPurchaseStore, IShopSessionStore, IClanStore
 {
     public ValueTask<ShopPurchaseResult?> PurchaseAsync(ShopPurchaseCommand command, CancellationToken ct)

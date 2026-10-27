@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
@@ -10,6 +11,10 @@
     <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="../../src/BubbleFighter.Fantasy.Host/SetupClientPluginConfiguration.cs" Link="SetupClientPluginConfiguration.cs" />
+    <Compile Include="../../src/BubbleFighter.Fantasy.Host/SetupProfileSession.cs" Link="SetupProfileSession.cs" />
+    <ProjectReference Include="../../src/Plugins/BubbleFighter.Fantasy.Commands/BubbleFighter.Fantasy.Commands.csproj" />
+    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Distribution\BubbleFighter.Fantasy.Distribution.csproj" />
     <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Installation\BubbleFighter.Fantasy.Installation.csproj" />
     <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Persistence.Sqlite\BubbleFighter.Fantasy.Persistence.Sqlite.csproj" />
     <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Persistence.MySql\BubbleFighter.Fantasy.Persistence.MySql.csproj" />

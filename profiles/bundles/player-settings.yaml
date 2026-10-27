@@ -1,11 +1,7 @@
-# Enable only in profiles whose update builder and login consumer have been audited.
-# Separate scopes preserve native control names until cross-build compatibility is established.
-- id: dialect.customized-keys
-  plugin: dialect.customized-keys
-  config:
-    protocol: "${BFF_PROFILE_ID}/game"
-    packets_directory: packets
-
+# Enable only in profiles whose update builder and login consumer have been audited (the
+# customized_keys option of the dialect.messages row binds the packets; the build's own bundle
+# states it). Separate scopes preserve native control names until cross-build compatibility is
+# established.
 - id: player.settings
   plugin: player.settings
   config:

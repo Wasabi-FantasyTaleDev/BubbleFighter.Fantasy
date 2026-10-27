@@ -121,7 +121,7 @@ structs:
   # cn-774 sub_7368B0 -> cn-774 sub_1059BB0 and tw-454 sub_7E3120 ->
   # tw-454 sub_EBBB40 stamp C2S 513 but write FOUR strings and TWELVE words.
   # Object bytes +96/+97/+136 are widened to four bytes on the wire.
-  # TW inherits this audited shape through cn-774; no handler is enabled here.
+  # TW inherits this audited shape through cn-774; projection aliases live in builds.yaml.
   RoomGameSettingChangeRequest@cn-774:
     - unknown_0: wstr
       offset: 0
@@ -175,6 +175,9 @@ structs:
   # id-400 sub_567300, id-1809 sub_416C60, cn-406 sub_57E4D0, cn-706 sub_567120.
   # The nested block starts at request+96. All readers consume thirteen u32 values,
   # then bool32 in object-offset order 56,57,59,60,58,61; id-400 and cn-406 omit the last bool.
+  # cn-774 sub_BD63E0 -> cn-774 sub_105F2C0 and tw-454 sub_AB2680 -> tw-454 sub_EBE7E0
+  # keep the kr-1256 wire order: bool32, three strings, one word, thirteen rule words, u8, one word.
+  # The helper writes the entire rule record; the call is not an omitted or empty stream wrapper.
   RoomEnterGameRequest:
     - unknown_4: bool
       offset: 4

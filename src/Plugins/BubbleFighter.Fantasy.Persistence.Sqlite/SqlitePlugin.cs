@@ -19,7 +19,7 @@ namespace BubbleFighter.Fantasy.Persistence.Sqlite;
     Provides = [typeof(IPlayerRepository), typeof(ILauncherAccountRepository), typeof(ILauncherSessionStore), typeof(BubbleFighter.Fantasy.Contracts.Progress.ITutorialStageStore), typeof(IFighterRepository),
         typeof(IInventoryRepository), typeof(IPlayerWalletRepository), typeof(IPlayerProgressRepository),
         typeof(IPlayerInventoryState), typeof(IShopPurchaseStore), typeof(IPresentStore), typeof(IShopSessionStore), typeof(IClanStore),
-        typeof(IPlayerMovementState), typeof(IPlayerSettingsRepository)])]
+        typeof(IPlayerMovementState), typeof(IPlayerSettingsRepository), typeof(BubbleFighter.Fantasy.Contracts.Messenger.IMessengerStore)])]
 public sealed class SqlitePlugin : IPlugin
 {
     /// <inheritdoc />
@@ -33,6 +33,7 @@ public sealed class SqlitePlugin : IPlugin
         context.Effect(context.Services.Register<IPlayerSettingsRepository>(new SqlitePlayerSettings(database)));
         context.Effect(context.Services.Register<ILauncherAccountRepository>(repositories));
         context.Effect(context.Services.Register<ILauncherSessionStore>(new SqliteLauncherSessions(database)));
+        context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Messenger.IMessengerStore>(new SqliteMessengerStore(database)));
         context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Progress.ITutorialStageStore>(new SqliteTutorialStages(database)));
         context.Effect(context.Services.Register<IFighterRepository>(repositories));
         context.Effect(context.Services.Register<IInventoryRepository>(repositories));

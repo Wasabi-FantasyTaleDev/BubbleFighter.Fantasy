@@ -1,11 +1,12 @@
 using System.Collections.Concurrent;
+using BubbleFighter.Fantasy.RoomCore;
 using System.IO.Pipelines;
 using System.Net;
 using BubbleFighter.Fantasy.Abstractions.Net;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
+using BubbleFighter.Fantasy.Contracts.Sessions;
 using BubbleFighter.Fantasy.InGame;
 using BubbleFighter.Fantasy.InGame.Sessions;
-using BubbleFighter.Fantasy.InGame.Wire;
 using BubbleFighter.Fantasy.Tests.Shared;
 using Xunit;
 
@@ -32,8 +33,8 @@ public sealed class RoomRegistryTests
     public void UnlistedRoomIsHiddenFromTheListAndJoinsUntilPublished()
     {
         var registry = new RoomRegistry(new InGameOptions());
-        var host = new RoomPushTests.RecordingSession(21);
-        var guest = new RoomPushTests.RecordingSession(22);
+        var host = new RecordingSession(21);
+        var guest = new RecordingSession(22);
         var (room, _) = registry.CreateFromSetting(
             host, RoomWireSupport.WaitingSetting() with { Kind = 0 }, 7, "host", listed: false);
 
@@ -52,7 +53,7 @@ public sealed class RoomRegistryTests
     public void TrainingRoomIsNeverListedOrJoinable()
     {
         var registry = new RoomRegistry(new InGameOptions());
-        var host = new RoomPushTests.RecordingSession(23);
+        var host = new RecordingSession(23);
         var (room, _) = registry.CreateTrainingRoom(host, RoomWireSupport.SampleRules(), 7, "host");
 
         Assert.Null(registry.FindJoinable(room.Id));
@@ -64,8 +65,8 @@ public sealed class RoomRegistryTests
     public void ClosingTheHostConnectionDetachesItsSeatAndOtherClosesDoNot()
     {
         var registry = new RoomRegistry(new InGameOptions());
-        var host = new RoomPushTests.RecordingSession(31);
-        var stranger = new RoomPushTests.RecordingSession(32);
+        var host = new RecordingSession(31);
+        var stranger = new RecordingSession(32);
         var (room, _) = registry.CreateFromSetting(host, RoomWireSupport.WaitingSetting() with { Kind = 0 }, 7, "host");
 
         registry.DetachConnection(stranger.Connection.Id);
@@ -80,14 +81,18 @@ public sealed class RoomRegistryTests
     public void BoundRelaySharesTheGamePlayerUntilItIsReleased()
     {
         var registry = new RoomRegistry(new InGameOptions());
-        var host = new RoomPushTests.RecordingSession(41);
-        var player = host.SetLobbyPlayer(7, "host");
-        var relay = new RoomPushTests.RecordingSession(42);
+        var host = new RecordingSession(41);
+        var player = new PlayerSession(new PlayerIdentity(7, "host", "host", 1), host.Connection.Id);
+        player.MoveTo(SessionPhase.MainMenu);
+        using var login = host.RegisterFeature<IPlayerSession>(player);
+        var relay = new RecordingSession(42);
         var (_, seat) = registry.CreateFromSetting(host, RoomWireSupport.WaitingSetting() with { Kind = 0 }, 7, "host");
 
         registry.BindRelay(relay, seat.Key);
         Assert.True(relay.TryFeature<BubbleFighter.Fantasy.Contracts.Sessions.IPlayerSession>(out var shared));
         Assert.Same(player, shared);
+        Assert.Equal(host.Connection.Id, shared.LoginConnectionId);
+        Assert.NotEqual(relay.Connection.Id, shared.LoginConnectionId);
         Assert.Equal(7, SessionPlayer.ResolveUserNum(relay));
 
         registry.Release(relay);
@@ -99,13 +104,13 @@ public sealed class RoomRegistryTests
     public async Task RepeatedDeparturesForgetConnectionIndexesWithoutWaitingForSocketClose()
     {
         var registry = new RoomRegistry(new InGameOptions { MaxMatches = 1 });
-        var departed = new List<RoomPushTests.RecordingSession>();
+        var departed = new List<RecordingSession>();
         try
         {
             for (var cycle = 0; cycle < 32; cycle++)
             {
-                var game = new RoomPushTests.RecordingSession(100 + cycle * 2);
-                var relay = new RoomPushTests.RecordingSession(101 + cycle * 2);
+                var game = new RecordingSession(100 + cycle * 2);
+                var relay = new RecordingSession(101 + cycle * 2);
                 var (room, seat) = registry.Create(game, RoomWireSupport.WaitingSetting(), 7, "host");
                 registry.BindRelay(relay, seat.Key);
                 Assert.True(registry.TryGetSessionOfConnection(game.Connection.Id, out _));
@@ -134,9 +139,9 @@ public sealed class RoomRegistryTests
     public async Task GameDepartureForgetsBothIndexesAndLateRelayCloseKeepsTheRemainingSeat()
     {
         var registry = new RoomRegistry(new InGameOptions());
-        var host = new RoomPushTests.RecordingSession(41);
-        var guest = new RoomPushTests.RecordingSession(42);
-        var relay = new RoomPushTests.RecordingSession(43);
+        var host = new RecordingSession(41);
+        var guest = new RecordingSession(42);
+        var relay = new RecordingSession(43);
         host.SetLobbyPlayer(7, "host");
         var (room, seat) = registry.Create(host, RoomWireSupport.WaitingSetting(), 7, "host");
         registry.Join(guest, room.Id, 8, "guest");
@@ -368,14 +373,6 @@ public sealed class RoomRegistryTests
         // The client's mode selection survives.
         Assert.Equal(clientSetting.Map.Unknown4, room.Setting.Map.Unknown4);
         Assert.Equal(SessionSettingBlob.MainMenuKind, room.Setting.Kind);
-    }
-
-    [Fact]
-    public void OptionsRejectUnknownDialect()
-    {
-        var options = new InGameOptions { VersionMajor = 9999 };
-        var failures = options.Validate().ToList();
-        Assert.Contains(failures, f => f.MemberNames.Contains(nameof(InGameOptions.VersionMajor)));
     }
 
     /// <summary>In-memory game-protocol session stub. Shared by the registry tests.</summary>

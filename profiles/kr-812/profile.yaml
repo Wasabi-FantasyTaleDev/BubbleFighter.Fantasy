@@ -9,7 +9,6 @@ description: Korean 2015 client build, ClientVersion_Major 812, resource patch 4
 bundles:
   - core
   - legacy
-  - inventory-actions
   - player-settings
 # What this build differs in; everything else is the legacy bundle's (kr-812).
 vars:

@@ -16,6 +16,5 @@
   <ItemGroup>
     <ProjectReference Include="..\..\BubbleFighter.Fantasy.Contracts\BubbleFighter.Fantasy.Contracts.csproj" />
     <ProjectReference Include="..\..\BubbleFighter.Fantasy.RoomCore\BubbleFighter.Fantasy.RoomCore.csproj" />
-    <ProjectReference Include="..\..\BubbleFighter.Fantasy.InGame.Wire\BubbleFighter.Fantasy.InGame.Wire.csproj" />
   </ItemGroup>
 </Project>

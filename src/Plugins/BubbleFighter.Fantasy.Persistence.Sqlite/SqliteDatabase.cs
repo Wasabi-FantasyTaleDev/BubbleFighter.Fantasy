@@ -17,9 +17,23 @@ using SqlSugar;
 namespace BubbleFighter.Fantasy.Persistence.Sqlite;
 
 // One owned connection serializes all mutations, including identity, purchases and inventory.
+/// <summary>
+/// One owned SQLite connection serializing every mutation the save store makes — identities, wallets,
+/// purchases, inventory, fighters, progress — behind a single gate. The connection is private and
+/// unpooled, claimed through a lease file whose inode outlives disposal (deleting it would let a new
+/// owner appear while the old file handle still exists), opened only after a quick integrity check,
+/// an application-id and schema-version check and a page-quota fit against
+/// <see cref="SqliteOptions.MaxDatabaseBytes"/>, and configured with WAL, <c>synchronous=FULL</c> and
+/// foreign keys. Writes run in one transaction that the ORM joins and that ends with a truncating WAL
+/// checkpoint; if that checkpoint fails after a commit, the store refuses all further operations
+/// rather than reporting a committed transaction as rolled back. Schema versions 1 through 6 are
+/// migrated in order, each in its own transaction; fresh files are created at version 1 and stamped
+/// with the application id.
+/// </summary>
 internal sealed class SqliteDatabase : IDisposable
 {
-    private const int SchemaVersion = 6;
+    // Schema v6 fixes the identity, wallet, inventory and settlement row shapes; raising it means writing a migration step below.
+    private const int SchemaVersion = 7;
     private const int ApplicationId = 0x42464653;
     private readonly object _gate = new();
     private readonly FileStream _lease;
@@ -42,6 +56,16 @@ internal sealed class SqliteDatabase : IDisposable
     // on both the commit and exception paths. The transaction is the one installed by Write above.
     private SqliteTransaction? CurrentTransaction => _orm.Ado.Transaction as SqliteTransaction;
 
+    /// <summary>
+    /// Validates the options and customized-key rules, claims the lease, opens and checks the save
+    /// file, applies pending schema migrations, validates every stored row, and runs a first
+    /// checkpoint. Failure at any point releases the lease and propagates: the store never half-opens.
+    /// </summary>
+    /// <exception cref="ConfigException">Thrown when the options or customized keys are invalid.</exception>
+    /// <exception cref="InvalidDataException">Thrown when the file fails its integrity or identity checks, carries
+    /// another application's id, an unsupported schema version, an oversized page count, or stored rows that
+    /// violate their domain rules or capacity.</exception>
+    /// <exception cref="IOException">Thrown when the page quota or WAL mode cannot be applied, or the first checkpoint fails.</exception>
     internal SqliteDatabase(SqliteOptions options, ILogger? logger = null)
     {
         _logger = logger ?? NullLogger.Instance;
@@ -79,7 +103,7 @@ internal sealed class SqliteDatabase : IDisposable
             var version = Convert.ToInt32(RawScalar("PRAGMA user_version"), CultureInfo.InvariantCulture);
             var application = Convert.ToInt32(RawScalar("PRAGMA application_id"), CultureInfo.InvariantCulture);
             var tables = UserTableCount();
-            if (version != SchemaVersion && version is not (1 or 2 or 3 or 4 or 5) && !(version == 0 && application == 0 && tables == 0))
+            if (version != SchemaVersion && version is not (1 or 2 or 3 or 4 or 5 or 6) && !(version == 0 && application == 0 && tables == 0))
                 throw new InvalidDataException($"Unsupported SQLite save schema {version}.");
             if (version != 0 && application != ApplicationId)
                 throw new InvalidDataException("SQLite save belongs to another application.");
@@ -183,6 +207,31 @@ internal sealed class SqliteDatabase : IDisposable
                     """, transaction);
                 RawExecute("PRAGMA user_version=6", transaction);
                 transaction.Commit();
+                version = 6;
+            }
+            if (version == 6)
+            {
+                // Version 7 adds the messenger: accounts keyed by tenant and subject, friendships stored once per
+                // direction, per-owner categories and pending requests. nickname_key is the invariant upper-case
+                // nickname, so a lookup ignores case for every script the way the other stores do.
+                using var transaction = _connection.BeginTransaction();
+                RawExecute("""
+                    CREATE TABLE messenger_users(id INTEGER PRIMARY KEY AUTOINCREMENT, tenant TEXT NOT NULL COLLATE BINARY,
+                        subject TEXT NOT NULL COLLATE BINARY, nickname TEXT NOT NULL, nickname_key TEXT NOT NULL COLLATE BINARY,
+                        game_code INTEGER NOT NULL, UNIQUE(tenant, subject));
+                    CREATE INDEX ix_messenger_users_nickname ON messenger_users(tenant, nickname_key);
+                    CREATE TABLE messenger_relations(owner INTEGER NOT NULL, friend INTEGER NOT NULL,
+                        category INTEGER NOT NULL DEFAULT 0, blocked INTEGER NOT NULL DEFAULT 0 CHECK(blocked IN (0, 1)),
+                        PRIMARY KEY(owner, friend));
+                    CREATE TABLE messenger_categories(owner INTEGER NOT NULL, id INTEGER NOT NULL CHECK(id > 0),
+                        name TEXT NOT NULL, game_code INTEGER NOT NULL, PRIMARY KEY(owner, id));
+                    CREATE TABLE messenger_requests(handle INTEGER PRIMARY KEY AUTOINCREMENT, sender INTEGER NOT NULL,
+                        recipient INTEGER NOT NULL, message TEXT NOT NULL, created_at INTEGER NOT NULL);
+                    CREATE INDEX ix_messenger_requests_recipient ON messenger_requests(recipient, handle);
+                    CREATE INDEX ix_messenger_requests_sender ON messenger_requests(sender);
+                    """, transaction);
+                RawExecute("PRAGMA user_version=7", transaction);
+                transaction.Commit();
             }
             ValidateExistingState();
             Checkpoint();
@@ -194,6 +243,7 @@ internal sealed class SqliteDatabase : IDisposable
         }
     }
 
+    /// <summary>Runs a read under the store gate. Reads see committed state only; a poisoned checkpoint or disposal throws before the delegate runs.</summary>
     internal T Read<T>(Func<SqliteDatabase, T> read, CancellationToken ct)
     {
         lock (_gate)
@@ -205,6 +255,14 @@ internal sealed class SqliteDatabase : IDisposable
         }
     }
 
+    /// <summary>
+    /// Runs one unit of work in a single transaction under the store gate: the ORM joins the
+    /// transaction for the delegate's duration, the transaction commits only after the delegate
+    /// returns without cancellation, and the commit is followed by a truncating WAL checkpoint. A
+    /// checkpoint failure after a successful commit poisons the store — later operations throw until
+    /// the host reopens the save — because the committed data is durable and pretending otherwise
+    /// would invite a destructive reopen.
+    /// </summary>
     internal T Write<T>(Func<SqliteDatabase, SqliteTransaction, T> write, CancellationToken ct)
     {
         lock (_gate)
@@ -256,6 +314,8 @@ internal sealed class SqliteDatabase : IDisposable
         return command.ExecuteNonQuery();
     }
 
+    /// <summary>Decodes and validates the player's whole-domain snapshot, or <see langword="null"/> when the player has no row.</summary>
+    /// <exception cref="InvalidDataException">Thrown when the stored snapshot violates its domain rules.</exception>
     internal SaveState? State(long user)
     {
         if (user <= 0) throw new ArgumentOutOfRangeException(nameof(user));
@@ -266,9 +326,16 @@ internal sealed class SqliteDatabase : IDisposable
         return state;
     }
 
+    /// <summary>Resolves the player's snapshot or throws; the missing-player case is a caller bug, not an empty state.</summary>
     internal SaveState RequireState(long user) =>
         State(user) ?? throw new InvalidOperationException($"SQLite player {user} does not exist.");
 
+    /// <summary>
+    /// Replaces the player's whole-domain snapshot in one statement. Must run inside a write
+    /// transaction; the affected-row check turns a concurrent identity deletion into an error instead
+    /// of a silent lost write.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown when the player row vanished mid-transaction.</exception>
     internal void Save(long user, SaveState state)
     {
         ValidateState(user, state);
@@ -279,6 +346,9 @@ internal sealed class SqliteDatabase : IDisposable
             throw new InvalidOperationException($"SQLite player {user} disappeared during its transaction.");
     }
 
+    /// <summary>Refuses further identity creation once the table holds its configured maximum of rows.</summary>
+    /// <exception cref="InvalidOperationException">Thrown when the table is at capacity.</exception>
+    /// <exception cref="ArgumentException">Thrown for an unknown capacity table.</exception>
     internal void RequireCapacity(string table, int maximum)
     {
         var count = table switch
@@ -414,8 +484,13 @@ internal sealed class SqliteDatabase : IDisposable
                 || row.EquippedItemId != 0 && row.EquippedItemId - 300000 is not (>= 1 and <= 31))
             || state.Purchases.Any(row => row.UserNum != user || row.Price < 0 || row.MoneyType is not ("cash" or "lucci")))
             throw new InvalidDataException("SQLite player snapshot contains invalid domain rows.");
+        // Pages are positional: anything but a full table would shift later pages onto the wrong hotkey.
+        if (state.WeaponPresetPages is { } pages
+            && (pages.Length != InventoryLimits.MaxWeaponPresetSlot + 1 || pages.Any(page => page is null)))
+            throw new InvalidDataException("SQLite weapon-preset pages are not a full five-page table.");
     }
 
+    /// <summary>Checkpoints and closes the save once, releasing the lease while keeping the lease file on disk.</summary>
     public void Dispose()
     {
         lock (_gate)
@@ -444,6 +519,9 @@ internal sealed class SaveState
     public PlayerProgress? Progress { get; set; }
     [JsonRequired]
     public byte ActivePreset { get; set; }
+    // Older snapshots omit this additive field and read as never materialized; null means the derived
+    // preset bar, not an empty page table.
+    public WeaponPresetPage[]? WeaponPresetPages { get; set; }
     [JsonRequired]
     public List<InventorySlotRecord> Slots { get; set; } = [];
     [JsonRequired]

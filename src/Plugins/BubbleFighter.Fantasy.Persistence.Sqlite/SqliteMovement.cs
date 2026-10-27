@@ -2,6 +2,11 @@ using BubbleFighter.Fantasy.Contracts.Movement;
 
 namespace BubbleFighter.Fantasy.Persistence.Sqlite;
 
+/// <summary>
+/// In-process movement state, deliberately outside the durable player snapshot and its disk
+/// transaction path: per-actor runtime positions are lost on restart by design, gate-serialized and
+/// capacity-bounded.
+/// </summary>
 // Movement never enters the durable player snapshot or its disk transaction path.
 internal sealed class SqliteMovement(int maximum) : IPlayerMovementState
 {

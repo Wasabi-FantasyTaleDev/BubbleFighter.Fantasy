@@ -1,0 +1,79 @@
+version: 1
+# Title and medal packet bodies. These tables do not register routes, grant medals or change a title.
+# The title workbook is Config/BF_title.xml (sheets title, title_dec, medal, bonus, program, P2); its
+# `title` sheet maps a title id to a medal id plus the required count, so those ids are the catalogue's
+# identifiers. What the packet bodies below carry is not proven: the first word of both requests is
+# built from a session-derived XOR value (kr-812 sub_886040, kr-812 sub_885F80), the reply words'
+# meanings are unproven, and the reply string's provenance is unknown. Only the widths, order and
+# counted shapes are proven; every field name stays unknown_<offset> until the client's consuming path
+# assigns a meaning.
+structs:
+  # C2S gcpMakeUserTitle: kr-812 sub_886040 builds Packet_gcpMakeUserTitle (kr-812 vtable 0xD753C4,
+  # codec kr-812 sub_6DB1B0 reading two words) and stamps C2S 929 through kr-812 sub_B25E90 after
+  # writing two words. The modern family has no row that proves a make-title request.
+  MakeTitleRequest:
+    - unknown_4: u32
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_8: u32
+      offset: 8
+      except: [kr-1256, cn-774, tw-454]
+
+  # C2S gcpSetUserTitle: kr-812 sub_885F80 builds Packet_gcpSetUserTitle (kr-812 vtable 0xD753D0,
+  # codec kr-812 sub_9D95D0 reading three words) and stamps C2S 930 through kr-812 sub_B25E90 after
+  # writing three words.
+  SetTitleRequest:
+    - unknown_4: u32
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_8: u32
+      offset: 8
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_12: u32
+      offset: 12
+      except: [kr-1256, cn-774, tw-454]
+
+  # S2C gspResMakeUserTitle (kr-812 S2C 933): reader kr-812 sub_8B9660 reads two 4-byte words and then
+  # a counted UTF-16 string through kr-812 sub_A56D70.
+  MakeTitleReply:
+    - unknown_4: u32
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_8: u32
+      offset: 8
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_12: wstr
+      offset: 12
+      except: [kr-1256, cn-774, tw-454]
+
+  # S2C gspResSetUserTitle (kr-812 S2C 934): reader kr-812 sub_9D95D0 reads three 4-byte words.
+  SetTitleReply:
+    - unknown_4: u32
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_8: u32
+      offset: 8
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_12: u32
+      offset: 12
+      except: [kr-1256, cn-774, tw-454]
+
+  # S2C gspTitleSyncInfo (kr-812 S2C 935, kr-1256 S2C 932): reader kr-812 sub_840820 reads a 4-byte
+  # count through kr-812 sub_A56B30 and then that many 4-byte words. The modern family reads the same
+  # counted word list: kr-1256 sub_9B1B40 hands the body to kr-1256 sub_998FB0, whose kr-1256 sub_999C00
+  # reads a 4-byte count and then the words; the modern parser's destination offsets were not read, so
+  # this structure keeps the legacy offsets.
+  TitleSyncInfo:
+    - unknown_4: "list<u32>"
+      offset: 4
+
+  # S2C gspProvideMedal (kr-812 S2C 936, kr-1256 S2C 934): the kr-812 class Packet_gspProvideMedal
+  # (kr-812 vtable 0xD6F6B4) uses the shared two-word codec kr-812 sub_6DB1B0. The kr-1256 body was not
+  # decoded here; its handler kr-1256 sub_9B1C70 is tabled only by the dispatcher label.
+  ProvideMedal:
+    - unknown_4: u32
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_8: u32
+      offset: 8
+      except: [kr-1256, cn-774, tw-454]

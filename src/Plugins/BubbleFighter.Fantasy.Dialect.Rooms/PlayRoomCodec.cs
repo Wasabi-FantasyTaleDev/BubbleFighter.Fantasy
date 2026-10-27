@@ -17,7 +17,7 @@ namespace BubbleFighter.Fantasy.Dialect.Rooms;
 ///
 /// </summary>
 internal sealed partial class PlayRoomCodec(
-    string protocol, string lineage, RoomSchema schema, PlayBuild play,
+    string protocol, string lineage, RoomSchema schema, PlayValues play,
     IOpcodeTableRegistry tables, ILogger logger, PacketTables packetTables)
     : IInboundMessageBinding<RoomListRequested>, IInboundMessageBinding<RoomCreateRequested>,
       IInboundMessageBinding<RoomJoinRequested>, IInboundMessageBinding<RoomLeaveRequested>,
@@ -54,7 +54,7 @@ internal sealed partial class PlayRoomCodec(
     public string Protocol => protocol;
 
     /// <inheritdoc />
-    public bool EndBeforeScoreboard => Score.TimeOverEnd == TimeOverEndBody.Scoreboard;
+    public bool EndBeforeScoreboard => Score.TimeOverEnd == PlayValues.TimeOverEndBody.Scoreboard;
 
     /// <summary>
     /// Gets what sees a load report before the round does, or null: a build whose one-seat tutorial
@@ -436,14 +436,14 @@ internal sealed partial class PlayRoomCodec(
     public async ValueTask SendAsync(ISession session, RoundEnded message, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var shape = play.Score ?? new ScoreShape();
+        var shape = play.Score;
         if (HordeOutcomeNotification(shape, message) is { } notification)
             await session.SendAsync(S2C(session, notification), ReadOnlyMemory<byte>.Empty, ct).ConfigureAwait(false);
         await session.SendAsync(S2C(session, "gspGameEndGame"),
             WriteGameEndForRecipient(packetTables, lineage, shape, message), ct).ConfigureAwait(false);
     }
 
-    internal static string? HordeOutcomeNotification(ScoreShape shape, RoundEnded message)
+    internal static string? HordeOutcomeNotification(PlayValues.ScoreValues shape, RoundEnded message)
     {
         // cn-324 sub_438500 sets HordeModeMgr+5328 from these empty notifications.
         // cn-324 sub_43A4C0 / sub_43B560 / sub_43C810 consume it instead of team totals.
@@ -467,7 +467,7 @@ internal sealed partial class PlayRoomCodec(
         return WriteEndWord(tables, build, OutcomeWord(outcome), outcomeFirst);
     }
 
-    internal static byte[] WriteGameEndForRecipient(PacketTables tables, string build, ScoreShape shape, RoundEnded message)
+    internal static byte[] WriteGameEndForRecipient(PacketTables tables, string build, PlayValues.ScoreValues shape, RoundEnded message)
     {
         var word = OutcomeWord(message.Outcome);
         // cn-324 sub_63B230 / kr-812 sub_5ACB20 compare result 2 with local team in native horde stage kind 10.

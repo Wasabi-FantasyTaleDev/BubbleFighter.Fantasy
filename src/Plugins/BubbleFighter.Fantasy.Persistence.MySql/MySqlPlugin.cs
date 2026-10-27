@@ -44,6 +44,7 @@ namespace BubbleFighter.Fantasy.Persistence.MySql;
         typeof(BubbleFighter.Fantasy.Contracts.Progress.IPlayerProgressRepository),
         typeof(IShopPurchaseStore),
         typeof(IPresentStore),
+        typeof(BubbleFighter.Fantasy.Contracts.Messenger.IMessengerStore),
         typeof(IPlayerInventoryState), typeof(IPlayerSettingsRepository)])]
 public sealed class MySqlPlugin : IPlugin
 {
@@ -85,6 +86,7 @@ public sealed class MySqlPlugin : IPlugin
         context.Effect(context.Services.Register<IPlayerInventoryState>(new MySqlPlayerInventoryState(factory)));
         context.Effect(context.Services.Register<IShopPurchaseStore>(new MySqlShopPurchaseStore(factory)));
         context.Effect(context.Services.Register<IPresentStore>(new MySqlPresentStore(factory)));
+        context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Messenger.IMessengerStore>(new MySqlMessengerStore(factory)));
 
         if (options.AutoMigrate)
             await runner.ApplyAsync(cancellationToken).ConfigureAwait(false);

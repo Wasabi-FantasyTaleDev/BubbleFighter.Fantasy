@@ -5,6 +5,9 @@ structs:
   # Each writer agrees: two words, counted word vector, word and prefixed UTF-16 string.
   # CN2011/CN2012 EquippedItemList has no ItemAttr vector; this structure is not used there.
   # The class label establishes the object type; individual field purposes remain unproven.
+  # kr-1256 sub_10D9410 consumes this same wire sequence inside room appearance profiles;
+  # cn-774 sub_449C80 and tw-454 sub_44A090 consume the same five fields in modern equipped-object vectors.
+  # All three modern objects omit the leading vtable; their member offsets are four bytes lower.
   ItemAttr:
     - unknown_4: u32
       offset: 4

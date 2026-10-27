@@ -5,6 +5,14 @@ using BubbleFighter.Fantasy.Packets;
 
 namespace BubbleFighter.Fantasy.Dialect.Rooms;
 
+/// <summary>
+/// Serves the <c>horde_lottery</c> capability: the card-and-seat request (kr-812 <c>sub_840530</c>
+/// writes, kr-812 <c>sub_6DB1B0</c> reads; cn-717, id-400, id-1809, cn-706 and cn-324 match), the
+/// three-word selection (kr-812 <c>sub_7AA780</c>/<c>sub_9D95D0</c>; cn-324 <c>sub_420900</c> consumes
+/// card, seat and the optional second card), and the counted reveal vector (kr-812 <c>sub_840820</c>,
+/// with cn-717, cn-324, cn-279, id-400, id-1809 and cn-706 matching) — layouts and per-build readers
+/// in packets/horde-lottery.yaml.
+/// </summary>
 internal sealed class LotteryBinding(string protocol, IOpcodeTable table, PacketTables tables, string build)
     : IInboundMessageBinding<RoundLotteryRequested>, IMessageSender<RoundLotteryOpened>, IMessageSender<RoundLotteryClosed>,
       IMessageSender<RoundLotterySelected>, IMessageSender<RoundLotteryRevealed>
@@ -15,8 +23,10 @@ internal sealed class LotteryBinding(string protocol, IOpcodeTable table, Packet
     {
         if (!tables.CapabilityOf(build, "horde_lottery"))
             throw new ConfigException("horde_lottery requires an audited native award dialog, selection and close path.");
-        foreach (var name in new[] { "HordeLotteryRequest", "HordeLotterySelected", "HordeLotteryRevealed" })
-            _ = tables.Resolve(build, name);
+        // The request card and seat this handler casts, the selection it writes, and the reveal vector it sizes.
+        PacketLayoutContract.RequireFields(tables, build, "HordeLotteryRequest", "Horde lottery", ("card", "u32"), ("seat", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "HordeLotterySelected", "Horde lottery", ("card", "u32"), ("seat", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "HordeLotteryRevealed", "Horde lottery", ("items", "list<u32>"));
         context.Effect(context.Services.RegisterMany<IInboundMessageBinding<RoundLotteryRequested>>(this));
         context.Effect(context.Services.RegisterMany<IMessageSender<RoundLotteryOpened>>(this));
         context.Effect(context.Services.RegisterMany<IMessageSender<RoundLotteryClosed>>(this));

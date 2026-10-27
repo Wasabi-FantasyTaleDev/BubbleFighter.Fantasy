@@ -1,11 +1,11 @@
 using BubbleFighter.Fantasy.Abstractions.Protocol;
-using BubbleFighter.Fantasy.InGame.Wire;
+using BubbleFighter.Fantasy.Contracts.Match;
 using BubbleFighter.Fantasy.RoomCore;
 
 namespace BubbleFighter.Fantasy.InGame.Sessions;
 
 /// <summary>Bounded in-memory room. All mutations take <see cref="Gate"/>.</summary>
-public sealed class PlayRoom
+public sealed partial class PlayRoom
 {
     internal BubbleFighter.Fantasy.Contracts.Match.TutorialRoundOpened? Tutorial { get; set; }
     internal CancellationTokenSource? TutorialCancellation { get; set; }
@@ -159,11 +159,11 @@ public sealed class PlayRoom
         _ => 36,   // the constructor default
     };
 
-    /// <summary>Seat count <c>sub_9D9250</c> derives for kind 2 (a room).</summary>
-    public const int RoomSeatCount = RoomSessionBlob.RoomSeatCount;
+    /// <summary>Seat count kr-1256 sub_9D9250 derives for kind 2 (a room).</summary>
+    public const int RoomSeatCount = 16;
 
-    /// <summary>Seat count <c>sub_9D9250</c> derives for kind 3 (the plaza).</summary>
-    public const int PlazaSeatCount = RoomSessionBlob.PlazaSeatCount;
+    /// <summary>Seat count kr-1256 sub_9D9250 derives for kind 3 (the plaza).</summary>
+    public const int PlazaSeatCount = 36;
 
     /// <summary>Whether every seat is taken. Read under <see cref="Gate"/>.</summary>
     internal bool IsFull => _members.IsFull;
@@ -328,6 +328,7 @@ public sealed class PlayRoom
         ZombieKingSlot = null;
         DecidedWinnerTeam = null;
         DecidedWinnerSlots = null;
+        ResetBotRoundState();
         foreach (var seat in Seats)
         {
             seat.Key = RoomRegistry.NewKey();
@@ -352,6 +353,9 @@ public sealed class PlayRoom
 
     /// <summary>Gets or sets the seat the zombie battle made its zombie king this round; null before the first conversion.</summary>
     internal int? ZombieKingSlot { get; set; }
+
+    /// <summary>Gets or sets the single king-picker task retained for this room, so a test can observe it end.</summary>
+    internal Task ZombieKingTask { get; set; } = Task.CompletedTask;
 
     /// <summary>Gets or sets the team a rule of the round declared the winner; null leaves it to the team totals.</summary>
     internal int? DecidedWinnerTeam { get; set; }
@@ -382,21 +386,24 @@ public sealed class PlayRoom
     /// <summary>Gets or sets the single countdown task retained for this bounded room.</summary>
     public Task CountdownTask { get; set; } = Task.CompletedTask;
 
+    /// <summary>Gets whether the current mode requires a red or blue team for seat and spawn placement.</summary>
+    internal bool RequiresSpawnTeams => Setting.Map.Unknown4 is 1 or 3 or 6 or 9 or 11 or 12 or 14 or 16 or 18 or 19
+        or 20 or 21 or 24 or 27 or 29 or 31 or 33 or 34 or 35 or 36 or 37 or 38 or 39;
+
     /// <summary>
     /// Assigns unassigned players to the smaller team before publishing waiting or start rosters.
-    /// The waiting-position selector 0x923790 and initial spawn selector 0xC80220 require team 1 or 2 for these modes;
-    /// team zero leaves its validity flag clear and 0x6D2040 skips placement.
+    /// kr-1256 sub_923790 and kr-1256 sub_C80220 require team 1 or 2 for these modes;
+    /// team zero leaves its validity flag clear and kr-1256 sub_6D2040 skips placement.
     /// Existing team choices and observers are preserved. Call under <see cref="Gate"/>.
     ///
     /// </summary>
     public void AssignSpawnTeams()
     {
-        // 0x1150F80, excluding the earlier 0x1150E70/0x70FBE0 and special-mode branches in 0xC80220.
-        if (Setting.Map.Unknown4 is not (1 or 3 or 6 or 9 or 11 or 12 or 14 or 16 or 18 or 19
-            or 20 or 21 or 24 or 27 or 29 or 31 or 33 or 34 or 35 or 36 or 37 or 38 or 39))
+        // kr-1256 sub_1150F80, excluding the earlier special-mode branches in kr-1256 sub_C80220.
+        if (!RequiresSpawnTeams)
             return;
-        var first = Seats.Count(seat => seat.Team == 1);
-        var second = Seats.Count(seat => seat.Team == 2);
+        var first = Seats.Count(seat => seat.Team == 1) + Bots.Count(bot => bot.Appearance.Team == 1);
+        var second = Seats.Count(seat => seat.Team == 2) + Bots.Count(bot => bot.Appearance.Team == 2);
         foreach (var seat in Seats.OrderBy(seat => seat.Slot))
         {
             if (seat.Team != 0)
@@ -556,6 +563,7 @@ public sealed class PlayRoom
         _members.RemoveAll(s => s.Game.Id == sessionId || s.Relay?.Id == sessionId);
         if (Seats.Count == 0)
         {
+            RemoveBots();
             CancelResultSequence();
             TutorialCancellation?.Cancel();
             Phase = RoomPhase.Closed;

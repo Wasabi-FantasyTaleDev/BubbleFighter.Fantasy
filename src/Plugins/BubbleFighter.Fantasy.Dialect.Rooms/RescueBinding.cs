@@ -5,6 +5,16 @@ using BubbleFighter.Fantasy.Packets;
 
 namespace BubbleFighter.Fantasy.Dialect.Rooms;
 
+/// <summary>
+/// Serves the <c>rescue_missions</c> capability for the builds whose audited readers match: the
+/// mission progress request comes in as C2S <c>gcpMissionProcess</c>, and the dialect publishes
+/// S2C <c>gspMapMissionInfo</c>, <c>gspResMissionStarted</c>, <c>gspResMissionTimeOut</c> and
+/// <c>gspResMissionOK</c>. Layouts and per-build readers live in packets/pve-rescue-missions.yaml —
+/// the baseline readers are kr-812 <c>sub_7A38E0</c> (mission), <c>sub_80C080</c> (entries),
+/// <c>sub_80A910</c> (started/timeout), <c>sub_6DB1B0</c> (succeeded) and <c>sub_9D95D0</c>
+/// (progress), with cn-717, id-400, id-1809, cn-706 and cn-324 matching on the same wire fields;
+/// cn-279 has no such class.
+/// </summary>
 internal sealed class RescueBinding(string protocol, IOpcodeTable table, PacketTables tables, string build)
     : IInboundMessageBinding<RoundRescueProgressReported>, IMessageSender<RoundRescueMissionsPrepared>,
       IMessageSender<RoundRescueMissionStarted>, IMessageSender<RoundRescueMissionFailed>, IMessageSender<RoundRescueMissionSucceeded>
@@ -15,6 +25,20 @@ internal sealed class RescueBinding(string protocol, IOpcodeTable table, PacketT
     {
         if (!tables.CapabilityOf(build, "rescue_missions"))
             throw new ConfigException("rescue_missions requires audited native mission consumers and map groups.");
+        // Every field the binding reads or writes is checked against the build's own table at load: the progress
+        // triple, the three single-index replies, the prepared list and the mission entry it fills.
+        PacketLayoutContract.RequireFields(tables, build, "PveRescueMissionProgress", "Cooperative rescue",
+            ("mission_index", "u32"), ("character_type", "u32"), ("unknown_12", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "PveRescueMissionStarted", "Cooperative rescue",
+            ("mission_index", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "PveRescueMissionTimedOut", "Cooperative rescue",
+            ("next_mission_index", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "PveRescueMissionSucceeded", "Cooperative rescue",
+            ("mission_index", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "PveRescueMissionsPrepared", "Cooperative rescue",
+            ("missions", "list<PveRescueMission>"));
+        PacketLayoutContract.RequireFields(tables, build, "PveRescueMission", "Cooperative rescue",
+            ("mission_id", "u32"), ("start_time_ms", "u32"), ("duration_ms", "u32"), ("arguments", "list<wstr>"));
         foreach (var name in new[] { "PveRescueMission", "PveRescueMissionsPrepared", "PveRescueMissionStarted",
             "PveRescueMissionTimedOut", "PveRescueMissionSucceeded", "PveRescueMissionProgress" })
             _ = tables.Resolve(build, name);

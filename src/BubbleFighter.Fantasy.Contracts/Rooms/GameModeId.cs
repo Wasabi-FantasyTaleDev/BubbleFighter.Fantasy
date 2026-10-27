@@ -6,9 +6,14 @@ namespace BubbleFighter.Fantasy.Contracts.Rooms;
 /// kr-1256 sub_1134540 and back in kr-1256 sub_1134B50, and its <c>StringTable/mode.yaml</c>
 /// (<c>mode/showname</c>) holds the display names summarised on each member. Older builds use the same ids
 /// for the modes they have (kr-812 sub_8E8900 reads <c>DefaultGameType</c> with the same codenames and ids)
-/// and simply lack the later ones. Ids 2, 4, 22 and 104 have no codename in kr-1256 and are not listed: cn-279
-/// still handles 2 (cn-279 sub_718B90 draws a questobject.png marker in it, its name unknown), a mode the
-/// later builds dropped.
+/// and simply lack the later ones. Ids 2, 4 and 22 are named in the kr-1256 client's codename map
+/// (<c>Config/LuaScripts/luaSupportClient/whichGameType.lua</c>): <c>wgtQuest</c> is 2 and
+/// <c>wgtTutorial</c> is 4, both marked deprecated there, and <c>wgtAOS</c> is 22. The client's own
+/// resolvers do not carry them (kr-1256 sub_1134540 returns 0 for a codename it does not compare, and
+/// kr-1256 sub_1134B50 has no case for 2, 4 or 22), so this enum lists only the ids those resolvers
+/// name. 104 has no codename of its own: the map defines <c>wgtHordeOrigin</c> as an alias of
+/// <c>wgtHorde</c> (101), the <see cref="Horde"/> member. cn-279 still handles 2 (cn-279 sub_718B90
+/// draws a questobject.png marker in it), the deprecated quest mode.
 /// </summary>
 public enum GameModeId
 {

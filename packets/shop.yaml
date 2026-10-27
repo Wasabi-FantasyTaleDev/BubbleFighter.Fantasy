@@ -53,10 +53,13 @@ structs:
       offset: 32
     - unknown_36: u32
       offset: 36
+    # cn-774 sub_BB4C80 and tw-454 sub_A92370 stop after the word at +36.
     - unknown_40: u32
       offset: 40
+      except: [cn-774]
     - unknown_44: u32
       offset: 44
+      except: [cn-774]
 
   # One Stock of kr-1256's ShopItemCardInfo, read by kr-1256 sub_113EF70 (serializer
   # kr-1256 sub_113EEC0) and by the counted vector reader kr-1256 sub_11404D0: two 4-byte words, a

@@ -1,6 +1,5 @@
 using BubbleFighter.Fantasy.Abstractions.Net;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
-using BubbleFighter.Fantasy.InGame.Wire;
 
 namespace BubbleFighter.Fantasy.InGame.Sessions;
 

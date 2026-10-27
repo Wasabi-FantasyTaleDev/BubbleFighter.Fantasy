@@ -3,7 +3,12 @@ namespace BubbleFighter.Fantasy.InGame.Data;
 /// <summary>
 /// What one seat earned in a round and the experience figures the S2C 614 row shows: row +56
 /// level, +368 the level's starting experience, +372 the total after the round, +376 the next
-/// level's start, +380 the experience earned and +384 the Lucci earned (layout from the client's result row reader; the client ships no reward formula, so the amounts are deployment options).
+/// level's start, +380 the experience earned and +384 the Lucci earned. The destinations are the
+/// client's own — kr-1256 <c>sub_429620</c> stores the row's 27 stat words there in wire order
+/// (packets/score.yaml <c>ScoreRow@kr-1256</c> notes the wire order is not the destination order) —
+/// but no client consumer names these fields: the meanings are pinned from recorded result rows
+/// (captured evidence), matching the kr-812 baseline row's named experience figures. The client ships
+/// no reward formula, so the amounts are deployment options.
 /// </summary>
 /// <param name="Level">The level after the round.</param>
 /// <param name="LevelStart">Experience at which <paramref name="Level"/> starts.</param>

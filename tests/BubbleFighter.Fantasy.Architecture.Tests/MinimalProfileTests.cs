@@ -73,7 +73,7 @@ public sealed class MinimalProfileTests
 
     private static async Task AssertSignatureReplyAsync(NetworkStream stream, SimpleCipher cipher, CancellationToken ct)
     {
-        var expected = WireFrame.Encode(521, new byte[7]);
+        var expected = PacketFrame_8Bytes.Encode(521, new byte[7]);
         var frame = new byte[expected.Length];
         await stream.ReadExactlyAsync(frame, ct);
         cipher.DecryptInPlace(frame);
@@ -199,7 +199,7 @@ public sealed class MinimalProfileTests
 
     internal static async Task SendAsync(NetworkStream stream, SimpleCipher cipher, ushort opcode, byte[] payload, CancellationToken ct)
     {
-        var frame = WireFrame.Encode(opcode, payload);
+        var frame = PacketFrame_8Bytes.Encode(opcode, payload);
         cipher.EncryptInPlace(frame);
         await stream.WriteAsync(frame, ct);
     }

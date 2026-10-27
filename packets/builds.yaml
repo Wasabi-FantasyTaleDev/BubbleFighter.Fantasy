@@ -272,6 +272,81 @@ builds:
   # round layouts are restated as `Name@kr-1256` where they differ. Nothing below kr-812's capabilities is
   # audited for it yet, so each is off until its consumer is read in this build.
   kr-1256:
+    # Native feed identities and life-field selectors; body evidence is in round-feed.yaml.
+    # kr-1256 sub_6D55D0 dispatches the per-action readers; numbering is resolved through opcodes.yaml.
+    round_feed:
+      Dash: { opcode: Unknown32779, structure: Dash, actors: [actor] }
+      Roll: { opcode: Unknown32780, structure: Roll, actors: [actor] }
+      Jump: { opcode: Unknown32781, structure: Jump, actors: [actor] }
+      Aim: { opcode: Unknown32782, structure: Aim, actors: [actor] }
+      SetTargettingObj: { opcode: Unknown32783, structure: SetTargettingObj, actors: [actor] }
+      BubbleJump: { opcode: Unknown32784, structure: BubbleJump, actors: [actor] }
+      WallAction: { opcode: Unknown32786, structure: WallAction, actors: [actor] }
+      Stunned: { opcode: Unknown32788, structure: Stunned, actors: [actor] }
+      EndStunned: { opcode: Unknown32790, structure: EndStunned, actors: [actor] }
+      KickStart: { opcode: Unknown32791, structure: KickStart, actors: [actor] }
+      KickFail: { opcode: gppKickFail, structure: KickFail, actors: [actor], echo_sender: true }
+      Unknown32810: { opcode: Unknown32810, structure: Unknown32810, actors: [actor] }
+      Reload: { opcode: Unknown32811, structure: Reload, actors: [actor] }
+      ReturnToNormal: { opcode: Unknown32813, structure: ReturnToNormal, actors: [actor] }
+      HumiliationStart: { opcode: Unknown32815, structure: HumiliationStart, actors: [actor] }
+      HumiliationEnd: { opcode: Unknown32816, structure: HumiliationEnd, actors: [actor] }
+      Unknown32821: { opcode: Unknown32821, structure: Unknown32821, actors: [actor] }
+      WallState: { opcode: Unknown32834, structure: WallState, actors: [actor] }
+      GotKicked: { opcode: Unknown32835, structure: GotKicked, actors: [actor] }
+      Dead: { opcode: Unknown32836, structure: Dead, actors: [actor], echo_sender: true, life_event: death_cleaned, life_actor: actor }
+      KickEnd: { opcode: gppKickEnd, structure: KickEnd, actors: [actor], echo_sender: true }
+      Unknown32882: { opcode: Unknown32882, structure: Unknown32882, actors: [actor] }
+      WatchingOnMe: { opcode: Unknown32884, structure: WatchingOnMe, actors: [actor] }
+      Unknown32907: { opcode: Unknown32907, structure: Unknown32907, actors: [], echo_sender: true }
+      Unknown32921: { opcode: Unknown32921, structure: Unknown32921, actors: [actor] }
+      Unknown32925: { opcode: Unknown32925, structure: Unknown32925, actors: [actor] }
+      RoundResetConfirmation: { opcode: Unknown32926, structure: RoundResetConfirmation, actors: [actor], nested: true, life_event: reset_confirmed, life_actor: actor }
+      Unknown33286: { opcode: Unknown33286, structure: Unknown33286, actors: [actor] }
+      Unknown33301: { opcode: Unknown33301, structure: Unknown33301, actors: [actor] }
+      Unknown38271: { opcode: Unknown38271, structure: Unknown38271, actors: [actor, victim], echo_sender: true }
+      Unknown38272: { opcode: Unknown38272, structure: Unknown38272, actors: [actor], echo_sender: true, life_event: released, life_actor: actor }
+      Unknown38273: { opcode: Unknown38273, structure: Unknown38273, actors: [victim, rescuer], echo_sender: true, life_event: released, life_actor: victim }
+      Unknown38274: { opcode: Unknown38274, structure: Unknown38274, actors: [actor], echo_sender: true, life_event: bubble_expired, life_actor: actor }
+      Unknown38277: { opcode: Unknown38277, structure: Unknown38277, actors: [actor, victim], echo_sender: true, life_event: finished, life_actor: victim, life_initiator: actor, life_success: unknown_0 }
+      Unknown38280: { opcode: Unknown38280, structure: Unknown38280, actors: [actor, unknown_0], echo_sender: true }
+      Unknown38281: { opcode: Unknown38281, structure: Unknown38281, actors: [actor], echo_sender: true, life_event: bubbled, life_actor: actor }
+      Unknown38282: { opcode: Unknown38282, structure: Unknown38282, actors: [victim], echo_sender: true, life_event: bubbled, life_actor: victim, life_death_flag: unknown_24 }
+      Unknown38283: { opcode: Unknown38283, structure: Unknown38283, actors: [], echo_sender: true }
+      Unknown38284: { opcode: Unknown38284, structure: Unknown38284, actors: [actor] }
+    # kr-1256 sub_9E5E70 initializes this row word for a seated player.
+    round_score_row_marker: unknown_500
+    # kr-1256 sub_113D030 reads mode +4 and map strings +44/+68/+92/+116.
+    # Keep the established complete flag reset; sub_97C610/sub_9201D0/sub_96F3A0 gate the ordinary room.
+    room_projection_fields:
+      mode: mode
+      maps: [unknown_68, unknown_44, unknown_92, unknown_116]
+      flags: unknown_0
+      clear_mask: 4294967295
+      clear_words: [unknown_20]
+      clear_booleans: [unknown_8]
+    # kr-1256 sub_10E59B0 retains this prologue; kr-1256 sub_1134540 maps wgtHordeTutor to 103.
+    # MapMeta.xml supplies Difficulty=1 and TimeAttackTimeLimit=99999 seconds.
+    # The automatic prompt requests kr-1256 sub_10E5A80's startup map; route selection is server policy.
+    # Explicit build membership prevents unaudited descendants from enabling the route by inheritance.
+    initial_tutorial_routes:
+      pirate_prologue:
+        builds: [kr-1256]
+        mode: 103
+        # kr-1256 sub_7C4660 creates pirates on team 1 and copies the local seat's team to friendly NPCs.
+        # kr-1256 sub_484E80 selects team colors in mode 103; team 2 is the opposing blue team (kr-1256 sub_4BE680).
+        player_team: 2
+        request_map: rel_Village07_Easy02
+        map: rel_prologue_01
+        difficulty: 1
+        time_limit_ms: 99999000
+    lobby:
+      # kr-1256 sub_53D410 / kr-1256 sub_5CC650 load this form and bind edtFighterName and btnConfirm.
+      # FighterConfig.xml maps the four stage_Main3 characters to these chrTypeIdx values.
+      creation_ui: Ui/DlgCreateUser3.ui
+      creation_character_types: [10, 19, 25, 27]
+      # Preserve the modern starter bag when the lobby reads its build values.
+      starter_item_ids: [300001, 201001, 201003, 201004, 201005, 202001, 202003, 202004, 202006, 203001, 203003, 203004, 203005, 204001, 204003, 204004, 204005, 205001, 207001]
     # kr-1256 sub_6141A0 copies the selected pair; sub_89BA30/sub_113C770
     # locate the retained GameSetting. sub_96BA90 displays selections +144/+192/+240.
     room_round_setting_fields:
@@ -344,7 +419,10 @@ builds:
       # The view handler rewrites the profile record the preset packets fill (kr-1256 sub_9C3880 -> sub_81B820), so
       # the preset reply and list come first.
       local_view: [preset_reply, preset_update, view]
-      # Preset records written into the list, one per page; the shipped bar carries three.
+      # Preset records the worn-derived list writes, one per page; the shipped bar carries three, which leaves
+      # pages 3-4 without records and kr-1256 sub_5FB4F0 disables them. The persisted bar the inventoryview row's
+      # persist_preset_pages switch (default off) publishes is not bound to this count: it carries all five
+      # materialized pages, the client-proven page table (kr-1256 sub_808F10 slot<=4, sub_5FB4F0's five-entry walk).
       preset_pages: 3
     family: modern
     # The modern bag family. kr-1256 sub_FA5520 unwraps a u32 compressed length and one zlib stream
@@ -419,14 +497,62 @@ builds:
   # CN 2019 (ClientVersion_Major 774), kr-1256's lineage. Named so a capability can be stated for it; its layouts are
   # kr-1256's unless a table says otherwise.
   cn-774:
-    # cn-774 sub_492EB0 has a distinct GameSetting; selector destinations and consumer gates are still pending.
+    # cn-774 sub_89B780 dispatches the native release/feedback pair; cn-774 sub_8B43B0 reads contact.
+    # Unchanged action routes inherit their field selectors, not Korean opcode rows.
+    round_feed:
+      Unknown38273:
+        structure: RoundRescueReleaseNative
+      Unknown38280:
+        structure: RoundRescuePairNative
+        actors: [rescuer, victim]
+      Unknown33301:
+        structure: RoundDamagerContactNative
+        actors: []
+    # cn-774 sub_492100 binds mode +4 and flags +0. sub_BA0A50 resolves the map at room+212 (+76).
+    # cn-774 sub_BAB9F0 gates stage 4 on 0x18/0x40/0x8000/0x1000; sub_B7A450 also gates ready on 2/0x400.
+    room_projection_fields:
+      mode: unknown_4
+      maps: [unknown_76]
+      flags: unknown_0
+      clear_mask: 37978
+      clear_words: []
+      clear_booleans: []
+    # cn-774 sub_A409A0 copies GameSetting into sub_768FA0; its second/third round controls
+    # select +224/+248 and +272/+296. sub_B6E180 displays +176/+224/+272 as the three map keys.
     room_round_setting_fields:
-      target_strings: []
-    # Its GameSetting is restated with other fields; which ones the room screen tests for Random is not read yet.
-    room_unchosen_map: ~
+      target_strings: [unknown_176, unknown_200, unknown_224, unknown_248, unknown_272, unknown_296]
+    # cn-774 sub_76B1C0 displays selection +52; sub_B6E180 tests the three keys at +176/+224/+272.
+    # cn-774 sub_447590 initializes their Random sentinel; sub_BA0A50 resolves +76 only when starting.
+    room_unchosen_map:
+      unknown_44: ~
+      unknown_68: ~
+      unknown_92: ~
+      unknown_116: ~
+      unknown_144: ~
+      unknown_168: ~
+      unknown_192: ~
+      unknown_216: ~
+      unknown_240: ~
+      unknown_264: ~
+      unknown_52: Random
+      unknown_76: ""
+      unknown_100: ""
+      unknown_124: ""
+      unknown_148: ""
+      unknown_176: Random
+      unknown_200: ""
+      unknown_224: Random
+      unknown_248: ""
+      unknown_272: Random
+      unknown_296: ""
     room_unchosen_difficulty: ~
-    # Its map change request and session words are laid out differently and not yet read.
-    room_setting_change_map: ~
+    # cn-774 sub_768FA0 copies GameSetting +124/+100/+148/+52 to the four request strings.
+    # cn-774 sub_BA0A50 resolves the selected map at +76 before serializing the start request.
+    room_setting_change_map:
+      request: { name: unknown_24, key: unknown_72, scene: unknown_72, mode: unknown_128 }
+      targets: { selection: unknown_52, key: unknown_76, current: unknown_124, name: unknown_100 }
+      string_copies: { targets: [unknown_124, unknown_148], sources: [unknown_0, unknown_48] }
+      mission_prefix: npc_
     room_ai_seat: ~
     base: kr-1256
     # The protocol row already sends the gate list after the patch reply and the bundle reads no option
@@ -436,6 +562,10 @@ builds:
     # cn-774 sub_1063790 (802) and sub_1063970 (803/808) read the count straight off the stream; no
     # zlib unwrap exists on that path, and the 803 reader stops after the slots container (restated
     # as InventorySlots@cn-774). tw-454 writes the same plain bodies.
+    # cn-774 sub_BADE30 / tw-454 sub_A8B4F0 parse EquippedItemList through their own record reader.
+    equipment:
+      view: SoloPartyEquippedItem
+      local_view: [view]
     inventory:
       envelope: plain
     capabilities:
@@ -461,9 +591,70 @@ builds:
 
   # TW 2019 (ClientVersion_Major 454), cn-774's lineage.
   tw-454:
-    # tw-454 sub_48ADF0 has a distinct GameSetting; selector destinations and consumer gates are still pending.
+    # tw-454 sub_70B3F0 dispatches the native life actions; sub_70E250 consumes the rescue pair.
+    # The shared finish body keeps victim before attacker (tw-454 sub_72EAA0 -> sub_77A000 / sub_77B210).
+    round_feed:
+      Unknown38271: { opcode: Unknown32794 }
+      Unknown38272: { opcode: Unknown32806 }
+      Unknown38273: { opcode: Unknown33282 }
+      Unknown38274: { opcode: Unknown32805 }
+      Unknown38277: { opcode: Unknown32795 }
+      Unknown38280: { opcode: Unknown33281 }
+      Unknown38281: { opcode: Unknown32789 }
+      Unknown38282: { opcode: Unknown32787 }
+      # tw-454 sub_70B3F0's 32776 consumer uses full floats, not the inherited compact record;
+      # no native C2S producer for that branch is established, so it must not mount as Korean 38283.
+      Unknown38283: { enabled: false }
+      Unknown38284: { opcode: Unknown33274 }
+      # tw-454 sub_718700 / sub_72F6F0 use a separate seven-word impact record without a life verdict.
+      Unknown32796: { opcode: Unknown32796, structure: Unknown32796, actors: [unknown_0, unknown_4], echo_sender: true }
+    # tw-454 sub_4F6A40 tests the row's +492 word; cn-774 sub_6FA5D0 uses +500 instead.
+    round_score_row_marker: unknown_492
+    # tw-454 sub_A7E150 resolves the map at room+196 (+60); sub_7E0420 reads mode +136 and flags +144.
+    # tw-454 sub_A89100 gates stage 4 on 0x18/0x40/0x1000; sub_7E0420 also gates ready on 2/0x400.
+    room_projection_fields:
+      mode: unknown_0
+      maps: [unknown_60]
+      flags: unknown_8
+      clear_mask: 5210
+      clear_words: []
+      clear_booleans: []
+    # tw-454 sub_627680 copies GameSetting into sub_8B82F0; sub_7D4B20 reads the three keys
+    # at +160/+208/+256, each followed by the accompanying text copied by the map panel.
     room_round_setting_fields:
-      target_strings: []
+      target_strings: [unknown_160, unknown_184, unknown_208, unknown_232, unknown_256, unknown_280]
+    # tw-454 sub_8BA430 displays selection +36; sub_7D4B20 tests +160/+208/+256.
+    # tw-454 sub_445D10 initializes Random; sub_A7E150 resolves +60 only when starting.
+    room_unchosen_map:
+      unknown_52: ~
+      unknown_76: ~
+      unknown_100: ~
+      unknown_124: ~
+      unknown_148: ~
+      unknown_176: ~
+      unknown_200: ~
+      unknown_224: ~
+      unknown_248: ~
+      unknown_272: ~
+      unknown_296: ~
+      unknown_36: Random
+      unknown_60: ""
+      unknown_84: ""
+      unknown_108: ""
+      unknown_132: ""
+      unknown_160: Random
+      unknown_184: ""
+      unknown_208: Random
+      unknown_232: ""
+      unknown_256: Random
+      unknown_280: ""
+    # tw-454 sub_8B82F0 copies GameSetting +108/+84/+132/+36 to the four request strings.
+    # tw-454 sub_A7E150 resolves the selected map at +60 before serializing the start request.
+    room_setting_change_map:
+      request: { name: unknown_24, key: unknown_72, scene: unknown_72, mode: unknown_128 }
+      targets: { selection: unknown_36, key: unknown_60, current: unknown_108, name: unknown_84 }
+      string_copies: { targets: [unknown_108, unknown_132], sources: [unknown_0, unknown_48] }
+      mission_prefix: npc_
     base: cn-774
     capabilities:
       present_box: false # As cn-774.
@@ -920,3 +1111,20 @@ builds:
         # cn-706 sub_6ED650 / sub_6ECE70 report stars in gcpGameUpdateScoreOptimze (stamp helper sub_4E7590).
         star_report: Optimized
         time_over_end: TeamTotals
+
+  # China 2014 0.2.50.004 (cn-705 sub_7A3850 writes 705 into the login envelope's version word, the word
+  # cn-408 sub_7CDA60 fills with 408). Its packets are cn-706's: every switch of this client holds cn-706's
+  # case set whole (144-case main dispatcher cn-705 sub_7C6C40 against cn-706 sub_7C8720, 131-case play
+  # dispatcher cn-705 sub_4C2CD0 against cn-706 sub_4C32D0, and every smaller switch), with one difference:
+  # cn-706's play-only relay case 32925 (Packet_gppRelayedRespawn, cn-706 sub_4D70B0) has no case here.
+  # Body-identical readers and writers opened in this export: UserSlot reader cn-705 sub_61AD00 reads the
+  # restated UserSlot@cn-706 tail (+208 bool, +209 bool, +212 u32, +220 bool, +216 u32, +132, +152, +228,
+  # +232); login request writer cn-705 sub_610D30 writes cn-706 sub_611A60's three strings, adapter list
+  # and trailing u32; shop enter sender cn-705 sub_656280 and catalog reader cn-705 sub_7A01F0 match cn-706
+  # sub_656D60 / sub_7A17F0; cn-705 sub_8FE7F0 sends Packet_gcpReqInventoryUseItem as cn-706 sub_8FFFF0
+  # does. The executable carries the GoHordeAward*LucciItem classes and no "endurance" duration type or
+  # Life notice text, as cn-706. The opcode table follows cn-706's reviewed rows; the research catalog's
+  # labels on 728/733/924 are score-update call sites feeding the shared sender cn-705 sub_4E6BC0, which
+  # stamps 710 with Packet_gcpGameUpdateScore, and this client's own Packet_gcpReqPingUser stamps 517.
+  cn-705:
+    base: cn-706

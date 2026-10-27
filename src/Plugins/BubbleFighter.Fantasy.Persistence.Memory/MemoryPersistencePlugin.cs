@@ -53,7 +53,8 @@ namespace BubbleFighter.Fantasy.Persistence.Memory;
         typeof(IPlayerInventoryState),
         typeof(IShopPurchaseStore),
         typeof(IPresentStore),
-        typeof(IPlayerMovementState)])]
+        typeof(IPlayerMovementState),
+        typeof(BubbleFighter.Fantasy.Contracts.Messenger.IMessengerStore)])]
 public sealed class MemoryPersistencePlugin : IPlugin
 {
     /// <inheritdoc />
@@ -82,6 +83,7 @@ public sealed class MemoryPersistencePlugin : IPlugin
         context.Effect(context.Services.Register<IShopPurchaseStore>(new MemoryShopPurchaseStore(table, presents)));
         context.Effect(context.Services.Register<IPresentStore>(presents));
         context.Effect(context.Services.Register<IPlayerMovementState>(movement));
+        context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Messenger.IMessengerStore>(new MemoryMessengerStore(options.MaxPlayers)));
 
         context.Logger.LogInformation(
             "In-memory persistence active for up to {MaxPlayers} players and {MaxMovementActors} movement actor(s); state is process-local and resets on restart.",

@@ -25,8 +25,12 @@ public sealed class MatchOffersPlugin : IPlugin
         if (options.Protocol != build + "/game")
             throw new ConfigException("Native match offers require the owning client build's game protocol.");
         var tables = PacketTables.Load(options.PacketsDirectory);
-        _ = tables.Resolve(build, "RelayConnectionOffer");
-        _ = tables.Resolve(build, "RelayConnectionReport");
+        // The offer's endpoint and key, the report the client sends back, and the whole opaque session key whose
+        // encoded length is the ticket length this row advertises. A field retyped under the same name fails
+        // here, at activation, instead of on the first packet.
+        RelayConnectionWire.RequireLayouts(tables, build);
+        PacketLayoutContract.RequireSignature(tables, build, "RelayConnectionReport", "Native match offers",
+            "unknown_4:bool", "unknown_4:bool,unknown_5:bool");
         var ticketLength = PacketCodec.Write(tables, build, "RelaySessionKey", new Dictionary<string, object?>()).Length;
         var opcodes = context.Services.Get<IOpcodeTableRegistry>().ForProtocol(options.Protocol);
         if (opcodes.Connection != OpcodeConnection.Game || opcodes.Profile.Id != build)

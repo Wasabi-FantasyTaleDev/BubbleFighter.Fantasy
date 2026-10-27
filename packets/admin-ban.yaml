@@ -1,0 +1,72 @@
+version: 1
+structs:
+  # kr-812 S2C 20 gspDisconnectFromRestriction: reader kr-812 sub_844780 reads a word at +4, two
+  # eight-byte values at +8 and +16, a word at +24 and a wide string at +28. The eight-byte values
+  # are not interpreted here and none of the words' meanings is proven, so every field stays
+  # unknown_<offset>. The modern body is not established here and is excluded.
+  DisconnectFromRestriction:
+    - unknown_4: u32
+      except: [kr-1256, cn-774, tw-454]
+      offset: 4
+    - unknown_8: u64
+      except: [kr-1256, cn-774, tw-454]
+      offset: 8
+    - unknown_16: u64
+      except: [kr-1256, cn-774, tw-454]
+      offset: 16
+    - unknown_24: u32
+      except: [kr-1256, cn-774, tw-454]
+      offset: 24
+    - unknown_28: wstr
+      except: [kr-1256, cn-774, tw-454]
+      offset: 28
+
+  # kr-812 sub_92ACF0 reads two strings. kr-1256 sub_9A69D0 calls kr-1256 sub_905EF0,
+  # whose two kr-1256 sub_1119C10 calls read both strings before the notice handling.
+  DisconnectBlockIP:
+    - unknown_4: wstr
+      offset: 4
+    - unknown_32: wstr
+      offset: 32
+
+  DisconnectBlockIP@kr-1256:
+    - unknown_0: wstr
+      offset: 0
+    - unknown_24: wstr
+      offset: 24
+
+  # Legacy S2C 106 and kr-1256 S2C 112 gspOveruseAlarmMsg: one wide string. The legacy class codec
+  # kr-812 sub_5C8FD0 delegates to the wide-string codec kr-812 sub_A56D70; the kr-1256 handler
+  # kr-1256 sub_9BE7C0 reads one wide string through kr-1256 sub_1119C10. The same shape on both
+  # families; the modern restatement omits the legacy native-object offset.
+  OveruseAlarmMsg:
+    - unknown_4: wstr
+      offset: 4
+
+  # kr-1256 S2C 111 gspOveruseSync: the inline case kr-1256 0x9D4007 reads one four-byte word and
+  # stores it in the session manager; the meaning is unproven. Modern descendants inherit this
+  # baseline; their individual readers are not established here.
+  OveruseSync: []
+
+  OveruseSync@kr-1256:
+    - unknown_0: u32
+
+  # kr-1256 S2C 19: case kr-1256 0x9D3589 calls kr-1256 sub_905EF0 for two counted
+  # strings, used by the notice and open-web paths. Modern descendants inherit this baseline.
+  DisconnectOpenWeb: []
+
+  DisconnectOpenWeb@kr-1256:
+    - unknown_0: wstr
+      offset: 0
+    - unknown_24: wstr
+      offset: 24
+
+  # kr-1256 S2C 10 gspDisconnectMovedUser: the case kr-1256 0x9D34FF reads no field; it only sets
+  # session flags and calls the client's disconnect path. Modern descendants inherit this baseline.
+  DisconnectMovedUser: []
+
+  DisconnectMovedUser@kr-1256: []
+
+  # kr-1256 sub_9BE7C0 stores the counted string in a local aggregate.
+  OveruseAlarmMsg@kr-1256:
+    - unknown_4: wstr

@@ -1,0 +1,44 @@
+version: 1
+# The level-icon change request and the seat record the server sends back as gspRepNotifyChangeLevelIcon.
+# C2S: kr-812 2007 (Packet_gcpReqNotifyChangeLevelIcon). The modern 2007 sender is tabled separately;
+# its association with the level-icon UI has not been established.
+# S2C: kr-812 970 and kr-1256 967 (label gspRepNotifyChangeLevelIcon). The S2C body is one seat record:
+# UserSlot for kr-812 and UserSlot@kr-1256 for kr-1256, both in packets/room.yaml; the chosen icon is
+# the field level_icon those structures state (record +272 and +200).
+structs:
+
+  # kr-812 C2S 2007: sender kr-812 sub_6D0280 stamps 2007 through kr-812 sub_B25E90 and fills the
+  # Packet_gcpReqNotifyChangeLevelIcon object; reader kr-812 sub_9D95D0 reads the three words at
+  # object +4, +8 and +12. The sender copies the picked icon into +4 (call sites kr-812 sub_6D04B0
+  # pass 0, 1, 2 and 3), the local user number from dword_E82674+28 into +8 (the same source
+  # Packet_gcpReqGotoClan's sender kr-812 sub_4428F0 reads), and the local icon word from
+  # dword_E82674+212 into +12.
+  LevelIconChangeRequest:
+    - level_icon: u32
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+    - user_number: u32
+      offset: 8
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_12: u32                  # the sender copies its current local icon word here; why it is sent is not proven
+      offset: 12
+      except: [kr-1256, cn-774, tw-454]
+
+  # kr-1256 C2S 2007: builder kr-1256 sub_999040 stamps 2007 and writes one u16. Its callers
+  # kr-1256 sub_9997D0 and kr-1256 sub_9999F0 pass 1 and 0. cn-774 and tw-454 are based on kr-1256 but
+  # their request bodies are not established here. The value purpose and legacy sender match remain unknown.
+  Unknown2007Request:
+    - unknown_0: u16
+      only: [kr-1256]
+      except: [cn-774, tw-454]
+
+  # S2C gspRepNotifyChangeLevelIcon: one seat record, the same record the room and plaza seat updates
+  # carry. kr-812 reader kr-812 sub_83C040 reads a UserSlot; the kr-812 970 handler kr-812 sub_834FE0
+  # parses it, copies it over the member through kr-812 sub_691CD0 and takes the local player's icon
+  # from the record's +272. kr-1256 dispatcher case 967 (kr-1256 0x9D56DF) builds and parses
+  # UserSlot@kr-1256 through kr-1256 sub_1143710, finds the member by the record's user number
+  # (kr-1256 sub_9DA240) and applies it (kr-1256 sub_9DA290); when the record's user number matches the
+  # local player's, the dispatch passes its +200 word to kr-1256 sub_5210E0, which stores it as the
+  # local icon.
+  LevelIconUpdate:
+    - record: UserSlot

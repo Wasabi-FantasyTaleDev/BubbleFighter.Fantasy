@@ -1,6 +1,7 @@
 using System.Globalization;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Lobby;
+using BubbleFighter.Fantasy.Contracts.Administration;
 using BubbleFighter.Fantasy.InGame.Sessions;
 
 namespace BubbleFighter.Fantasy.InGame.Handlers;
@@ -13,7 +14,15 @@ namespace BubbleFighter.Fantasy.InGame.Handlers;
 /// <param name="texts">The localization service, or null.</param>
 internal sealed class RoomNotices(IMessageSender<ServerNotice>? notices, IGameText? texts)
 {
-    /// <summary>Sends one message key, formatted in the player's region language, to that player.</summary>
+    internal ValueTask SendCommandResultAsync(ISession session, CommandResult result, CancellationToken ct)
+    {
+        if (result.Message.Length == 0 || notices is null) return ValueTask.CompletedTask;
+        return result.Status == CommandStatus.Success
+            ? notices.SendAsync(session, new ServerNotice(result.Message), ct)
+            : SendAsync(session, "command.result." + result.Status.ToString().ToLowerInvariant(), null, ct);
+    }
+
+    /// <summary>Sends one message key in the player's Launcher UI language.</summary>
     /// <param name="session">The receiving player.</param>
     /// <param name="key">The game message key.</param>
     /// <param name="arguments">Named placeholder values, or null.</param>
@@ -22,7 +31,7 @@ internal sealed class RoomNotices(IMessageSender<ServerNotice>? notices, IGameTe
     {
         if (notices is null || texts is null)
             return;
-        await notices.SendAsync(session, new ServerNotice(texts.Format(session.Profile, key, arguments)), ct).ConfigureAwait(false);
+        await notices.SendAsync(session, new ServerNotice(texts.Format(session, key, arguments)), ct).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -42,11 +51,10 @@ internal sealed class RoomNotices(IMessageSender<ServerNotice>? notices, IGameTe
         var id = modeId.ToString(CultureInfo.InvariantCulture);
         foreach (var member in members)
         {
-            var profile = member.Game.Profile;
-            if (!texts.TryFormat(profile, "mode." + id, out var name))
-                name = texts.Format(profile, "mode.unnamed", new Dictionary<string, string> { ["id"] = id });
+            if (!texts.TryFormat(member.Game, "mode." + id, out var name))
+                name = texts.Format(member.Game, "mode.unnamed", new Dictionary<string, string> { ["id"] = id });
             await notices.SendAsync(member.Game,
-                new ServerNotice(texts.Format(profile, "room.mode.changed", new Dictionary<string, string> { ["mode"] = name })), ct)
+                new ServerNotice(texts.Format(member.Game, "room.mode.changed", new Dictionary<string, string> { ["mode"] = name })), ct)
                 .ConfigureAwait(false);
         }
     }

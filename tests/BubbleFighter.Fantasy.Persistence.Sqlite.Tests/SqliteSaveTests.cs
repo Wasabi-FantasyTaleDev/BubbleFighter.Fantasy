@@ -16,10 +16,34 @@ public sealed class SqliteSaveTests : IDisposable
         { DatabasePath = DatabasePath, MaxPlayers = players, MaxAccounts = accounts, MaxDatabaseBytes = bytes };
 
     [Fact]
+    public async Task InitialPagesDoNotReplaceAnExistingTable()
+    {
+        using var database = new SqliteDatabase(Options());
+        var stores = new SqliteRepositories(database);
+        Assert.True(await stores.RegisterAsync("preset-initializer", "hash", default));
+        var player = await stores.CreateCharacterAsync("preset-initializer", "preset-player",
+            new([300001, 202001], [300001, 202001]), default);
+        var first = WeaponPresetPages.SeedFromWorn(202001, 0);
+        var second = WeaponPresetPages.SeedFromWorn(204001, 205001);
+        var pages = await stores.GetOrCreateWeaponPresetPagesAsync(player!.UserNum, first, default);
+        Assert.Equal(first, pages);
+        pages[0] = new(999, 0, 0);
+        Assert.Equal(first, await stores.GetOrCreateWeaponPresetPagesAsync(player.UserNum, second, default));
+        Assert.Equal(first, await stores.GetWeaponPresetPagesAsync(player.UserNum, default));
+    }
+
+    [Fact]
     public async Task RestartRestoresIdentityOnboardingWalletProgressInventoryLifetimesAndOpens()
     {
         long user;
         var deadline = InventoryLifetime.Until(DateTimeOffset.UtcNow.AddDays(3));
+        // The materialized preset pages ride the same snapshot; the second and third words are stored
+        // verbatim because their meaning is not traced.
+        WeaponPresetPage[] pages =
+        [
+            new(202001, 205001, 0), new(203001, 205001, 0), new(204001, 0, 0),
+            new(202003, 205001, 7), new(204003, 0, 0),
+        ];
         using (var database = new SqliteDatabase(Options()))
         {
             var stores = new SqliteRepositories(database);
@@ -30,6 +54,7 @@ public sealed class SqliteSaveTests : IDisposable
             await stores.CompleteTutorialAsync(user, default);
             await stores.UpsertAsync(new BubbleFighter.Fantasy.Contracts.Wallet.PlayerWallet(user, 100, 50), default);
             await stores.SetActiveWeaponPresetSlotAsync(user, 3, default);
+            await stores.SetWeaponPresetPagesAsync(user, pages, default);
             var purchase = await stores.PurchaseAsync(new(new(user, 999, 999), 42, 0, "lucci", 10, 1000,
                 [new(100001, 2) { Lifetime = deadline }, new(100002, 1) { Lifetime = InventoryLifetime.Permanent }]), default);
             Assert.Equal(90, purchase!.Wallet.Lucci);
@@ -52,6 +77,7 @@ public sealed class SqliteSaveTests : IDisposable
             Assert.Equal(95, (await stores.FindByUserNumAsync(user, default))!.Lucci);
             Assert.Equal(123, (await stores.FindAsync(user, default))!.Exp);
             Assert.Equal(3, await stores.GetActiveWeaponPresetSlotAsync(user, default));
+            Assert.Equal(pages, await stores.GetWeaponPresetPagesAsync(user, default));
             var slots = await stores.ListSlotsAsync(user, InventoryBag.CharacterBag, 512, default);
             Assert.Equal(deadline, slots.Single(slot => slot.ItemId == 100001).Lifetime);
             Assert.Equal(InventoryLifetime.Permanent, slots.Single(slot => slot.ItemId == 100002).Lifetime);

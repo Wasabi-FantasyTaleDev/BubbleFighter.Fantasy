@@ -2,8 +2,14 @@ using BubbleFighter.Fantasy.Contracts.Inventory;
 
 namespace BubbleFighter.Fantasy.Persistence.Sqlite;
 
+/// <summary>
+/// The save's paint fragment: one spray's consumption, the equipped-bag mirror and the player's color
+/// index commit as a single snapshot mutation, which is why <see cref="SupportsAtomicPaintApplication"/>
+/// reports true here.
+/// </summary>
 internal sealed partial class SqliteRepositories
 {
+    /// <summary>Paint consumption and the color index commit in one operation.</summary>
     public bool SupportsAtomicPaintApplication => true;
 
     public ValueTask<bool> ApplyPaintWithItemAsync(long userNum, int itemId, ushort colorIndex, CancellationToken ct)

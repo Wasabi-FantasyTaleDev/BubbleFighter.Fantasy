@@ -106,13 +106,12 @@ public sealed class LoginBurstWireTests
     }
 
     /// <summary>
-    /// The empty <c>gspRepDynamicConfig</c> body stays one u32 count of zero: no compressed configuration
-    /// blobs follow (handler kr-1256 sub_65F370 reads the count and then that many bytes).
+    /// A zero category mask in kr-1256 sub_9D2FF0 case 1500 carries no compressed configuration blobs.
     /// </summary>
     [Fact]
-    public void DynamicConfigEmptyPinsTheZeroCountBody()
+    public void DynamicConfigEmptyPinsTheZeroMaskBody()
     {
-        var body = LoginBurstWire.WriteDynamicConfigEmpty();
+        var body = LoginBurstWire.WriteDynamicConfigEmpty(TestBuilds.Packets, "kr-1256");
         Assert.Equal(4, body.Length);
         Assert.Equal("00000000", Convert.ToHexString(body));
     }

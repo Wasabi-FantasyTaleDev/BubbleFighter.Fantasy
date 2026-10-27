@@ -4,6 +4,8 @@ using BubbleFighter.Fantasy.Shop.Data;
 
 namespace BubbleFighter.Fantasy.Shop.Purchasing;
 
+/// <summary>Binds one catalog entry to its grant rule before the store commit; bounds the stock list to the inventory cap.</summary>
+/// <exception cref="ArgumentException">Thrown when the stock list is empty or exceeds the bag bound.</exception>
 internal sealed class ItemPurchasePolicy(ConditionalShopPurchaser purchaser, Func<ShopStockRow, PurchaseGrantTerm> resolve)
 {
     internal ValueTask<ShopPurchaseResult?> CommitAsync(ShopPurchaseCommand command,
@@ -38,6 +40,14 @@ internal sealed class ConditionalShopPurchaser
         _maxAttempts = maxAttempts;
     }
 
+    /// <summary>
+    /// Commits a purchase under concurrent-item replanning: read the bag, plan the expected grants,
+    /// and let the store verify them atomically under its player lock. A store-level pre-commit
+    /// conflict replans and retries within the attempt budget; every other failure — cancellation,
+    /// transport or database — propagates, and a budget-exhausted conflict surfaces as the store's
+    /// own exception. A currency-only reward skips the plan and commits the wallet credit directly.
+    /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the attempt budget is not positive (constructor) or the command is invalid.</exception>
     internal async ValueTask<ShopPurchaseResult?> CommitAsync(ShopPurchaseCommand purchase,
         IReadOnlyList<PurchaseGrantTerm> terms, CancellationToken ct)
     {

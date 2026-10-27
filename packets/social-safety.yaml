@@ -1,0 +1,85 @@
+version: 1
+structs:
+  # Social safety: the recommend/commend requests and their replies on the legacy builds, plus the kr-1256
+  # block result and commend notice whose read order was observed. The legacy half is kr-812's, read from the
+  # class deserializers; the modern half has no class object at all (the handlers read inline), so its rows
+  # use positional field names without native-object offset metadata.
+  #
+  # Width helpers of the kr-812 classes: kr-812 sub_A56C10 reads 4 bytes, kr-812 sub_A56BD0 reads 4 bytes as a
+  # boolean word (the bool32 cases) and kr-812 sub_A56D70 reads a prefixed wide string (u32 character count,
+  # then that many UTF-16LE code units).
+  #
+  # Not tabled: kr-1256 170 gspRepBlockedUserList (handler kr-1256 sub_9D0860 reads nothing directly; its body
+  # is built by helpers), kr-1256 172 gspRepRemoveBlockUser (handler kr-1256 sub_9D0C80 has a decompiler stack
+  # warning, so its read order is not trusted yet), and kr-812 21 gspDisconnectBlockIP (outside this feature).
+
+  # C2S gcpReqRecommendSend (kr-812 119): Packet_gcpReqRecommendSend vtable kr-812 0xd6f588, deserializer
+  # kr-812 sub_5C8FD0 reads one prefixed wide string into object +4.
+  SocialRecommendRequest:
+    - unknown_4: wstr
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+
+  # C2S gcpReqSocialSystemCommend (kr-812 123): vtable kr-812 0xd1e95c, deserializer kr-812 sub_52F4A0 reads
+  # four words at +4, +8, +12 and +16 and then a four-byte boolean word at +20.
+  SocialCommendRequest:
+    - unknown_4: u32
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_8: u32
+      offset: 8
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_12: u32
+      offset: 12
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_16: u32
+      offset: 16
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_20: bool
+      offset: 20
+      except: [kr-1256, cn-774, tw-454]
+
+  # S2C gspRepRecommendResult (kr-812 130): vtable kr-812 0xd6f33c, deserializer kr-812 sub_80C160 reads one
+  # 4-byte flag into +4.
+  SocialRecommendResult:
+    - unknown_4: bool
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+
+  # S2C gspNotifySocialSystem (kr-812 134): vtable kr-812 0xd6f198, deserializer kr-812 sub_6DB1B0 reads two
+  # words at +4 and +8.
+  SocialSystemNotice:
+    - unknown_4: u32
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_8: u32
+      offset: 8
+      except: [kr-1256, cn-774, tw-454]
+
+  # S2C gspRepAddBlockUser (kr-1256 171): handler kr-1256 sub_9D0AC0 reads through kr-1256 sub_10C0640:
+  # one tag byte and an optional word, followed unconditionally by a counted UTF-16 string
+  # through kr-1256 sub_1119C10. unknown_8 names the string in the local aggregate after the optional value.
+  SocialBlockAddResult:
+    - unknown_0: "optional<0x3A,SocialBlockAddWord>"
+      only: [kr-1256]
+
+    - unknown_8: wstr
+      only: [kr-1256]
+
+  # The word kr-1256 sub_10C0640 reads after a 0x3A tag: wire offset 1 follows the tag byte.
+  SocialBlockAddWord:
+    - unknown_1: u32
+      only: [kr-1256]
+
+  # S2C gspNotifySocialCommend (kr-1256 143): handler kr-1256 sub_9C44D0 reads four 4-byte values in this
+  # order. Inline read; names record the positions of its local words. gspNotifySocialReport (144) has the same four reads
+  # (kr-1256 sub_9C4C70); it is not tabled separately until its values' meaning is known.
+  SocialCommendNotice:
+    - unknown_0: u32
+      only: [kr-1256]
+    - unknown_4: u32
+      only: [kr-1256]
+    - unknown_8: u32
+      only: [kr-1256]
+    - unknown_12: u32
+      only: [kr-1256]

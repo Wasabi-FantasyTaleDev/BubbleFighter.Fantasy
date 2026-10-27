@@ -30,7 +30,7 @@ public sealed class WireSessionConcurrencyTests
     /// <remarks>
     /// <para>
     /// Deterministic failure shape of the defect this pins: the send gate used to be
-    /// acquired only around the connection write, so <see cref="WireFrame.Encode"/> and the
+    /// acquired only around the connection write, so <see cref="PacketFrame_8Bytes.Encode"/> and the
     /// continuous cipher's <see cref="SimpleCipher.EncryptInPlace"/> ran before it. Two
     /// concurrent sends could then encrypt in a different order than they wrote to the
     /// connection, and because the server-to-client cipher state is continuous, the
@@ -68,12 +68,12 @@ public sealed class WireSessionConcurrencyTests
             .ToArray();
 
         await Task.WhenAll(sent
-            .Select(payload => Task.Run(() => session.SendAsync(WireOpcodes.S2C.RepGamePatch, payload, CancellationToken.None).AsTask()))
+            .Select(payload => Task.Run(() => session.SendAsync(WirePins.PatchReplyOpcode, payload, CancellationToken.None).AsTask()))
             .ToArray());
         await FlushAsync(session);
 
         var wire = await connection.ReadAllOutputAsync();
-        Assert.Equal(frameCount * (WireFrame.HeaderSize + payloadSize), wire.Length);
+        Assert.Equal(frameCount * (PacketFrame_8Bytes.HeaderSize + payloadSize), wire.Length);
 
         // Replay the continuous cipher the way the client does: over the captured byte
         // stream, in wire order, from the server-to-client seed. A fresh instance is
@@ -87,22 +87,22 @@ public sealed class WireSessionConcurrencyTests
         while (offset < wire.Length)
         {
             Assert.True(
-                wire.Length - offset >= WireFrame.HeaderSize,
+                wire.Length - offset >= PacketFrame_8Bytes.HeaderSize,
                 $"frame {decoded.Count}: stream ends mid-header after {offset} bytes; the frames on the wire no longer tile the stream");
             Assert.True(
-                WireFrame.TryReadHeader(wire.AsSpan(offset, WireFrame.HeaderSize), out var header),
+                PacketFrame_8Bytes.TryReadHeader(wire.AsSpan(offset, PacketFrame_8Bytes.HeaderSize), out var header),
                 $"frame {decoded.Count}: header integrity failure after cipher replay; the wire order diverged from the encryption order");
-            Assert.Equal(WireOpcodes.S2C.RepGamePatch, header.Opcode);
+            Assert.Equal(WirePins.PatchReplyOpcode, header.Opcode);
             Assert.Equal(payloadSize, header.PayloadLength);
             Assert.True(
-                wire.Length - offset >= WireFrame.HeaderSize + header.PayloadLength,
+                wire.Length - offset >= PacketFrame_8Bytes.HeaderSize + header.PayloadLength,
                 $"frame {decoded.Count}: declared payload of {header.PayloadLength} bytes runs past the end of the stream");
-            var payload = wire.AsSpan(offset + WireFrame.HeaderSize, header.PayloadLength).ToArray();
+            var payload = wire.AsSpan(offset + PacketFrame_8Bytes.HeaderSize, header.PayloadLength).ToArray();
             Assert.True(
-                WireFrame.ValidatePayload(header, payload),
+                PacketFrame_8Bytes.ValidatePayload(header, payload),
                 $"frame {decoded.Count}: payload integrity failure; frame bytes were interleaved with another send");
             decoded.Add(Convert.ToHexString(payload));
-            offset += WireFrame.HeaderSize + header.PayloadLength;
+            offset += PacketFrame_8Bytes.HeaderSize + header.PayloadLength;
         }
 
         Assert.Equal(frameCount, decoded.Count);
@@ -148,15 +148,15 @@ public sealed class WireSessionConcurrencyTests
         for (var value = 1; value <= 20; value++)
         {
             BinaryPrimitives.WriteInt32LittleEndian(buffer, value);
-            await session.SendAsync(WireOpcodes.S2C.RepGamePatch, buffer, CancellationToken.None);
+            await session.SendAsync(WirePins.PatchReplyOpcode, buffer, CancellationToken.None);
         }
         await FlushAsync(session);
 
         var wire = await connection.ReadAllOutputAsync();
         SimpleCipher.ServerToClient().DecryptInPlace(wire);
         var values = new List<int>();
-        for (var offset = 0; offset < wire.Length; offset += WireFrame.HeaderSize + 4)
-            values.Add(BinaryPrimitives.ReadInt32LittleEndian(wire.AsSpan(offset + WireFrame.HeaderSize, 4)));
+        for (var offset = 0; offset < wire.Length; offset += PacketFrame_8Bytes.HeaderSize + 4)
+            values.Add(BinaryPrimitives.ReadInt32LittleEndian(wire.AsSpan(offset + PacketFrame_8Bytes.HeaderSize, 4)));
         Assert.Equal(Enumerable.Range(1, 20), values);
     }
 
@@ -298,6 +298,94 @@ public sealed class WireSessionConcurrencyTests
         await Assert.ThrowsAsync<IOException>(() => session.SendAsync(1, new byte[4], CancellationToken.None).AsTask());
     }
 
+    /// <summary>A public fence completes after the session has written its preceding frames.</summary>
+    [Fact]
+    public async Task PublicOutputDrainCompletesAfterPreviouslyQueuedFrames()
+    {
+        var connection = new OutboundCaptureConnection();
+        var session = NewWireSession(connection, TestWireDialects.Get("kr-1256").CreateEncryptor(PacketDirection.ServerToClient),
+            new EventBus(NullLogger.Instance));
+        try
+        {
+            await session.SendAsync(1, new byte[] { 1, 2, 3 }, default);
+            await Assert.IsAssignableFrom<ISessionOutputDrain>(session).DrainOutputAsync(default).AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        finally { await StopAsync(session).WaitAsync(TimeSpan.FromSeconds(5)); }
+        Assert.NotEmpty(await connection.ReadAllOutputAsync());
+    }
+
+    [Fact]
+    public async Task CancellingOutputDrainDoesNotCloseOrRemoveAlreadyQueuedFrames()
+    {
+        var connection = new StalledConnection();
+        var session = NewWireSession(connection, TestWireDialects.Get("kr-1256").CreateEncryptor(PacketDirection.ServerToClient),
+            new EventBus(NullLogger.Instance));
+        try
+        {
+            await session.SendAsync(1, new byte[] { 1 }, default);
+            await connection.WriteStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            using var cancellation = new CancellationTokenSource();
+            var waiting = Assert.IsAssignableFrom<ISessionOutputDrain>(session).DrainOutputAsync(cancellation.Token).AsTask();
+            Assert.False(waiting.IsCompleted);
+            cancellation.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => waiting);
+            Assert.False(connection.IsClosed);
+            Assert.Equal(1, RetainedBytes(session));
+        }
+        finally { await StopAsync(session).WaitAsync(TimeSpan.FromSeconds(5)); }
+    }
+
+    [Fact]
+    public async Task OutputDrainFailsWhenSessionStopsBeforeItsFence()
+    {
+        var connection = new StalledConnection();
+        var session = NewWireSession(connection, TestWireDialects.Get("kr-1256").CreateEncryptor(PacketDirection.ServerToClient),
+            new EventBus(NullLogger.Instance));
+        await session.SendAsync(1, new byte[] { 1 }, default);
+        await connection.WriteStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var waiting = Assert.IsAssignableFrom<ISessionOutputDrain>(session).DrainOutputAsync(default).AsTask();
+        await StopAsync(session).WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.ThrowsAsync<IOException>(() => waiting);
+        await Assert.ThrowsAsync<IOException>(() => ((ISessionOutputDrain)session).DrainOutputAsync(default).AsTask());
+    }
+
+    [Fact]
+    public async Task OutputDrainCannotExceedTheExistingOutboundQueueBudget()
+    {
+        var connection = new StalledConnection();
+        var session = NewWireSession(connection, TestWireDialects.Get("kr-1256").CreateEncryptor(PacketDirection.ServerToClient),
+            new EventBus(NullLogger.Instance), sendQueueCapacity: 1);
+        Task? first = null;
+        try
+        {
+            await session.SendAsync(1, new byte[] { 1 }, default);
+            await connection.WriteStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            var drain = Assert.IsAssignableFrom<ISessionOutputDrain>(session);
+            first = drain.DrainOutputAsync(default).AsTask();
+            await Assert.ThrowsAsync<IOException>(() => drain.DrainOutputAsync(default).AsTask());
+            Assert.False(first.IsCompleted);
+        }
+        finally { await StopAsync(session).WaitAsync(TimeSpan.FromSeconds(5)); }
+        await Assert.ThrowsAsync<IOException>(() => first!);
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task RejectedTransportFlushCannotReportSuccessfulDrain(bool cancelled, bool completed)
+    {
+        var connection = new StalledConnection { RejectedFlush = new(cancelled, completed) };
+        var session = NewWireSession(connection, TestWireDialects.Get("kr-1256").CreateEncryptor(PacketDirection.ServerToClient),
+            new EventBus(NullLogger.Instance));
+        try
+        {
+            await session.SendAsync(1, new byte[] { 1 }, default);
+            await connection.Closed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await Assert.ThrowsAsync<IOException>(() => Assert.IsAssignableFrom<ISessionOutputDrain>(session).DrainOutputAsync(default).AsTask());
+        }
+        finally { await StopAsync(session).WaitAsync(TimeSpan.FromSeconds(5)); }
+    }
+
     /// <summary>A connection whose output never completes a write until it is closed.</summary>
     private sealed class StalledConnection : IConnection
     {
@@ -307,6 +395,7 @@ public sealed class WireSessionConcurrencyTests
 
         public TaskCompletionSource WriteStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource<string> Closed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public FlushResult? RejectedFlush { get; init; }
         public long Id { get; } = 2;
         public EndPoint RemoteEndPoint { get; } = new IPEndPoint(IPAddress.Loopback, 1);
         public PipeReader Input => throw new NotSupportedException();
@@ -332,6 +421,7 @@ public sealed class WireSessionConcurrencyTests
             public override async ValueTask<FlushResult> FlushAsync(CancellationToken cancellationToken = default)
             {
                 owner.WriteStarted.TrySetResult();
+                if (owner.RejectedFlush is { } result) return result;
                 await Task.Delay(Timeout.Infinite, cancellationToken);
                 return new FlushResult(false, true);
             }

@@ -1,3 +1,5 @@
+using BubbleFighter.Fantasy.Contracts.ClientData;
+
 namespace BubbleFighter.Fantasy.Shop.Data;
 
 /// <summary>
@@ -30,7 +32,7 @@ public static class PetCatalogLoader
     {
         ArgumentNullException.ThrowIfNull(file);
         var source = file.Name;
-        var sheets = SpreadsheetWorkbook.Load(file, maxBytes, RequiredSheets);
+        var sheets = SpreadsheetWorkbook.Load(file, maxBytes, ShopCatalogLoader.LimitKey, RequiredSheets);
         var stocks = ParseStocks(RequireSheet(sheets, "Stock"));
         if (stocks.Count == 0)
             throw new InvalidOperationException($"Pet catalog {source} Stock sheet has no data rows.");

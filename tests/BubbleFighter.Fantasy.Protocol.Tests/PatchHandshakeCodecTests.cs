@@ -22,20 +22,20 @@ public sealed class PatchHandshakeCodecTests
         Assert.Equal(WirePins.GamePatchPayloadSize, payload.Length);
         Assert.Equal(1256, BinaryPrimitives.ReadInt32LittleEndian(payload));
 
-        var frame = WireFrame.Encode(WireOpcodes.C2S.GamePatch, payload);
+        var frame = PacketFrame_8Bytes.Encode(WirePins.PatchRequestOpcode, payload);
         Assert.Equal(WirePins.GamePatchFrameSize, frame.Length);
-        Assert.Equal(WirePins.GamePatchPlainHeaderHex, Convert.ToHexString(frame[..WireFrame.HeaderSize]));
-        Assert.Equal(payload, frame[WireFrame.HeaderSize..]);
+        Assert.Equal(WirePins.GamePatchPlainHeaderHex, Convert.ToHexString(frame[..PacketFrame_8Bytes.HeaderSize]));
+        Assert.Equal(payload, frame[PacketFrame_8Bytes.HeaderSize..]);
     }
 
     [Fact]
     public void GamePatchFrameEncryptsToPinnedC2SCiphertext()
     {
-        var frame = WireFrame.Encode(WireOpcodes.C2S.GamePatch, WirePins.GamePatchPayload());
+        var frame = PacketFrame_8Bytes.Encode(WirePins.PatchRequestOpcode, WirePins.GamePatchPayload());
         Assert.Equal(WirePins.GamePatchFrameSize, frame.Length);
         SimpleCipher.ClientToServer().EncryptInPlace(frame);
         Assert.Equal(WirePins.GamePatchC2SFrameCipherHex, Convert.ToHexString(frame));
-        Assert.Equal(WirePins.GamePatchC2SHeaderCipherHex, Convert.ToHexString(frame[..WireFrame.HeaderSize]));
+        Assert.Equal(WirePins.GamePatchC2SHeaderCipherHex, Convert.ToHexString(frame[..PacketFrame_8Bytes.HeaderSize]));
     }
 
     [Fact]
@@ -45,11 +45,11 @@ public sealed class PatchHandshakeCodecTests
         Assert.Equal(WirePins.GamePatchFrameSize, wire.Length);
         SimpleCipher.ClientToServer().DecryptInPlace(wire);
 
-        Assert.True(WireFrame.TryReadHeader(wire, out var header));
+        Assert.True(PacketFrame_8Bytes.TryReadHeader(wire, out var header));
         Assert.Equal(WirePins.GamePatchPayloadSize, header.PayloadLength);
-        Assert.Equal(WireOpcodes.C2S.GamePatch, header.Opcode);
-        Assert.True(WireFrame.ValidatePayload(header, wire.AsSpan(WireFrame.HeaderSize)));
-        Assert.Equal(1256, BinaryPrimitives.ReadInt32LittleEndian(wire.AsSpan(WireFrame.HeaderSize)));
+        Assert.Equal(WirePins.PatchRequestOpcode, header.Opcode);
+        Assert.True(PacketFrame_8Bytes.ValidatePayload(header, wire.AsSpan(PacketFrame_8Bytes.HeaderSize)));
+        Assert.Equal(1256, BinaryPrimitives.ReadInt32LittleEndian(wire.AsSpan(PacketFrame_8Bytes.HeaderSize)));
     }
 
     [Fact]
@@ -61,7 +61,7 @@ public sealed class PatchHandshakeCodecTests
         writer.WriteWideStringPrefixed("");
         Assert.Equal(WirePins.RepGamePatchPayloadSize, buffer.WrittenCount);
 
-        var frame = WireFrame.Encode(WireOpcodes.S2C.RepGamePatch, buffer.WrittenSpan);
+        var frame = PacketFrame_8Bytes.Encode(WirePins.PatchReplyOpcode, buffer.WrittenSpan);
         Assert.Equal(WirePins.RepGamePatchFrameSize, frame.Length);
         Assert.Equal(WirePins.RepGamePatchPlainFrameHex, Convert.ToHexString(frame));
     }
@@ -82,7 +82,7 @@ public sealed class PatchHandshakeCodecTests
             Path.Combine(AppContext.BaseDirectory, "opcodes.yaml"),
             TestWireDialects.Get("kr-1256").Profile);
 
-        Assert.True(table.TryGet(PacketDirection.ClientToServer, WireOpcodes.C2S.GamePatch, out var request));
+        Assert.True(table.TryGet(PacketDirection.ClientToServer, WirePins.PatchRequestOpcode, out var request));
         Assert.Equal("gcpReqGamePatch", request!.Name);
         Assert.Equal(Evidence.Verified, request.Evidence);
         Assert.Equal("sub_99DD00", request.Source);
@@ -90,7 +90,7 @@ public sealed class PatchHandshakeCodecTests
         Assert.NotNull(request.Notes);
         Assert.Contains("96-byte", request.Notes, StringComparison.Ordinal);
 
-        Assert.True(table.TryGet(PacketDirection.ServerToClient, WireOpcodes.S2C.RepGamePatch, out var reply));
+        Assert.True(table.TryGet(PacketDirection.ServerToClient, WirePins.PatchReplyOpcode, out var reply));
         Assert.Equal("gspRepGamePatch", reply!.Name);
         Assert.Equal(Evidence.Verified, reply.Evidence);
         Assert.NotNull(reply.Source);

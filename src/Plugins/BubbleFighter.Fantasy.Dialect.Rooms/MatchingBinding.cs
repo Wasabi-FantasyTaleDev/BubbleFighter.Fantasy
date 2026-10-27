@@ -6,6 +6,14 @@ using BubbleFighter.Fantasy.Packets;
 
 namespace BubbleFighter.Fantasy.Dialect.Rooms;
 
+/// <summary>
+/// Serves the <c>quick_matching</c> capability, whose audited selectors and result are kr-812
+/// <c>sub_5B3640</c> and <c>sub_687640</c>: the request carries the menu mode to +4 (kr-812
+/// <c>sub_420EE0</c> writes, <c>sub_420F60</c> reads; the dedicated-queue flags belong to
+/// <c>sub_68E450</c>/<c>sub_68E640</c>/<c>sub_68E9A0</c> and the retry queue to <c>sub_5B3750</c>),
+/// and the notification result opens the waiting state for 0 and refuses for 1 (kr-812
+/// <c>sub_8B9660</c> reads; cn-717, id-400, id-1809 and cn-406 agree) — packets/room-matching.yaml.
+/// </summary>
 internal sealed class MatchingBinding(string protocol, IOpcodeTable table, PacketTables tables, string build)
     : IInboundMessageBinding<RoomMatchRequested>, IMessageSender<RoomMatchNotified>
 {
@@ -18,6 +26,11 @@ internal sealed class MatchingBinding(string protocol, IOpcodeTable table, Packe
         var requestFields = tables.Resolve(build, "RoomMatchRequest");
         var replyFields = tables.Resolve(build, "RoomMatchNotification");
         Validate(requestFields, replyFields);
+        // The binding casts the mode selector and writes the notification result; the contract fails the row at
+        // load when a build's table keeps those names but changes their types. The two optional queue flags stay
+        // checked by Validate, which accepts them only when the table states them as bool.
+        PacketLayoutContract.RequireFields(tables, build, "RoomMatchRequest", "Quick matching", ("mode_id", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "RoomMatchNotification", "Quick matching", ("result", "u32"));
         _ = table.S2C("gspNotifyMatch");
         context.Effect(context.Services.RegisterMany<IInboundMessageBinding<RoomMatchRequested>>(this));
         context.Effect(context.Services.RegisterMany<IMessageSender<RoomMatchNotified>>(this));

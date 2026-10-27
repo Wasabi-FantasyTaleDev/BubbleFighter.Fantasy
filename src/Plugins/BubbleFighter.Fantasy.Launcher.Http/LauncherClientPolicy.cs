@@ -13,12 +13,13 @@ internal sealed class LauncherClientPolicy
     {
         MinimumLauncherVersion = options.MinimumLauncherVersion.Length == 0 ? null : options.MinimumLauncherVersion;
         LauncherVersion.TryParse(MinimumLauncherVersion, out _minimum);
-        PluginRecommendations = options.PluginRecommendations.GroupBy(p => p.Id, StringComparer.Ordinal).Select(group =>
+        PluginRecommendations = options.PluginRecommendations.GroupBy(p => new { p.Id, p.Required, p.Disabled }).Select(group =>
             (object)new
             {
-                id = group.Key,
+                id = group.Key.Id,
                 builds = group.Any(p => p.Builds.Length == 0) ? Array.Empty<string>() : group.SelectMany(p => p.Builds).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray(),
-                required = group.Any(p => p.Required),
+                required = group.Key.Required,
+                disabled = group.Key.Disabled,
             }).ToArray();
     }
 

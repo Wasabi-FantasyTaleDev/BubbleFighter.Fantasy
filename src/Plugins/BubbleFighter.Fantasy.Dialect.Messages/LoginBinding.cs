@@ -69,6 +69,7 @@ internal sealed class LoginBinding : IInboundMessageBinding<LoginRequested>, IMe
         _inventory = inventory;
         _expired = expired;
         _logger = logger;
+        LoginMessageCodec.RequireLayouts(tables, build, values);
         foreach (var step in values.Burst)
         {
             switch (step)
@@ -94,7 +95,7 @@ internal sealed class LoginBinding : IInboundMessageBinding<LoginRequested>, IMe
                     _centerListOpcode = opcodes.S2C("gspCenterList");
                     break;
                 case LoginBurstStep.UpdateParty:
-                    _ = tables.Resolve(build, "SoloPartySnapshot");
+                    LoginPartySnapshot.RequireLayouts(tables, build);
                     _updatePartyOpcode = opcodes.S2C("gspUpdateParty");
                     break;
                 case LoginBurstStep.OptionSync:
@@ -106,7 +107,7 @@ internal sealed class LoginBinding : IInboundMessageBinding<LoginRequested>, IMe
                 case LoginBurstStep.MainMenu:
                     if (values.MainMenu == LoginValues.TableMainMenu)
                     {
-                        _ = tables.Resolve(build, "gspGotoRoom");
+                        MainMenuInstall.RequireLayouts(tables, build);
                         _gotoRoomOpcode = opcodes.S2C("gspGotoRoom");
                     }
                     break;

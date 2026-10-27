@@ -1,0 +1,64 @@
+version: 1
+structs:
+  # kr-1256 sub_9D18E0 reads a word then invokes kr-1256 sub_11522D0/sub_1152CA0.
+  # Each outer entry has a key and its own counted slot records; it is not a flat word vector.
+  SkillSlotChanged:
+    - unknown_0: u32
+      only: [kr-1256]
+    - slots: "list<SkillSlotGroup>"
+      only: [kr-1256]
+
+  # kr-1256 sub_1152CA0 reads each group key before kr-1256 sub_1153580 reads its list.
+  SkillSlotGroup:
+    - unknown_0: u32
+      only: [kr-1256]
+    - entries: "list<SkillSlotEntry>"
+      only: [kr-1256]
+
+  # kr-1256 sub_1153580 reads an entry key then kr-1256 sub_1152150 reads five words.
+  SkillSlotEntry:
+    - unknown_0: u32
+      only: [kr-1256]
+    - value: SkillSlotValue
+      only: [kr-1256]
+
+  # Native UserSkillSlotInfo fields read by kr-1256 sub_1152150; meanings remain unproven.
+  SkillSlotValue:
+    - unknown_4: u32
+      offset: 4
+      only: [kr-1256]
+    - unknown_8: u32
+      offset: 8
+      only: [kr-1256]
+    - unknown_12: u32
+      offset: 12
+      only: [kr-1256]
+    - unknown_16: u32
+      offset: 16
+      only: [kr-1256]
+    - unknown_20: u32
+      offset: 20
+      only: [kr-1256]
+
+  # S2C gspNotifyFavoriteWeaponGrade at kr-1256 1548. Dispatcher kr-1256 sub_9D2FF0 stores the class
+  # vtable kr-1256 off_15B9288 for its case 1548 and calls kr-1256 sub_9D0E60, which reads a four-byte word
+  # (any nonzero value takes the notice branch), an eight-byte value, then three four-byte words, 24
+  # bytes in all. Names identify wire positions, not native object offsets. The values' meanings are unknown: the first is only proven
+  # to be a branch condition, so it keeps its offset name and the four-byte width is written as bool.
+  FavoriteWeaponGrade:
+    - unknown_0: bool
+      only: [kr-1256]
+    - unknown_4: u64
+      only: [kr-1256]
+    - unknown_12: u32
+      only: [kr-1256]
+    - unknown_16: u32
+      only: [kr-1256]
+    - unknown_20: u32
+      only: [kr-1256]
+
+  # S2C gspHonorUserState at kr-1256 754 is not tabled. Handler kr-1256 sub_9D2660 reads three
+  # four-byte words and then a counted list through kr-1256 sub_113B180; each element starts with a
+  # two-byte value and continues in kr-1256 sub_113AF90 with a nested counted block and a
+  # u16/u16/u32 group. That element record is not read yet, so the structure gets no fields here
+  # until that pass; a partial body would pin bytes the client does not actually read.

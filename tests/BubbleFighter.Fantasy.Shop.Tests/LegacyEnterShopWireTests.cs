@@ -1,5 +1,5 @@
+using BubbleFighter.Fantasy.Contracts.Shop;
 using BubbleFighter.Fantasy.Shop.Data;
-using BubbleFighter.Fantasy.Shop.Wire;
 using Xunit;
 
 namespace BubbleFighter.Fantasy.Shop.Tests;

@@ -35,7 +35,8 @@ public sealed class PaintItemCatalogPlugin : IPlugin
         var options = context.Config.Bind<PaintItemCatalogOptions>();
         var data = context.Services.Get<IClientDataStore>();
         var workbook = WorkbookFile.FromBytes(options.ShopItemClientPath, data.Read(options.ShopItemClientPath));
-        var rows = SpreadsheetWorkbook.Load(workbook, options.MaxShopItemBytes, ["ShopItem"])["ShopItem"];
+        var rows = SpreadsheetWorkbook.Load(
+            workbook, options.MaxShopItemBytes, ShopCatalogLoader.LimitKey, ["ShopItem"])["ShopItem"];
         var catalog = PaintItemCatalog.Parse(rows, options.MaxPaintItems);
         context.Effect(context.Services.Register<IPaintItemCatalog>(catalog));
         return ValueTask.CompletedTask;

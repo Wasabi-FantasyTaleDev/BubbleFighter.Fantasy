@@ -79,3 +79,39 @@ structs:
   RoomTeamChangeFirstTail:
     - unknown_n0: u32
       only: [kr-1256]
+  # Packet_gspRoomSetMasterSlotIdx, S2C 502 (kr-1256 sub_9DA3C0, dispatcher kr-1256 sub_9D9930 case
+  # 0x1F6): one seat index. The handler bounds it by the room's seat count, shows that seat as the new
+  # master and refreshes every slot board; the session's master field itself is written by the room
+  # install, not by this frame.
+  gspRoomSetMasterSlotIdx:
+    - slot: u32
+      only: [kr-1256]
+  # Packet_gspRoomChangeTeam, S2C 504 (kr-1256 sub_9DAE50, dispatcher kr-1256 sub_9D9930 case 0x1F8):
+  # a seat index, the label byte the handler writes to seat+4 through kr-1256 sub_9E4C80 before
+  # refreshing every slot board, and the tagged team tail. Label 36 short-circuits the write and the
+  # refresh; the boards switch on 1, 2 and 36. The hand-written codec's S2C 508 seat-attribute builder
+  # writes this same body: kr-1256's own S2C 508 is the chat record above, so no second 508 structure
+  # exists.
+  gspRoomChangeTeam:
+    - slot: u32
+      only: [kr-1256]
+    - label: u8
+      only: [kr-1256]
+    - unknown_n2: "optional<0x3A,TeamChangeTail>"
+      only: [kr-1256]
+
+  # cn-774 sub_105A540 reads a nickname, level and byte per wait-list row.
+  # tw-454 sub_A899A0 uses the same vector element through its own reader.
+  RoomWaitUser@cn-774:
+    - nickname: wstr
+    - level: u32
+      default: 1
+    - unknown_n2: u8
+
+  # tw-454 sub_EBC660 appends two bytes, rather than cn-774 sub_105A540's single byte.
+  RoomWaitUser@tw-454:
+    - nickname: wstr
+    - level: u32
+      default: 1
+    - unknown_n2: u8
+    - unknown_n3: u8

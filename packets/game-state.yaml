@@ -1,0 +1,56 @@
+# The legacy game-state broadcasts: the score-data list and the item-drop list kr-812 parses.
+#
+# The format of this file is described in packets/README.md and at the top of room.yaml.
+#
+# gspGameScoreData (S2C 989) in kr-812: dispatcher kr-812 sub_7FBBB0 case 989 -> handler
+# kr-812 sub_7FF280; packet reader kr-812 sub_80B1A0 -> body reader kr-812 sub_80B160; the count is
+# one u32 (kr-812 sub_A56B30 reads four bytes); each row is read by kr-812 sub_4168C0 as u8, u16, u16,
+# u16, u16 at object +4, +6, +8, +10, +12 (nine wire bytes; constructor kr-812 sub_80B0A0, element vtable
+# kr-812 0xCBBD4C; the element class is PlayerGameScoreData). The handler only reads the frame; no state
+# update behind it was found, and the scoreboard the server sends uses the 729 broadcast and the
+# live-score updates, so 989 is not needed for it unless a client consumer is found.
+#
+# gspGameItemSpec (S2C 748) in kr-812: dispatcher kr-812 sub_7FBBB0 case 748 -> handler
+# kr-812 sub_8029A0; packet reader kr-812 sub_80ABA0; the count is one u32 (kr-812 sub_A56B30); each
+# entry is a twelve-byte Lambda::ItemDropInfo object (vtable kr-812 0xD69144) read by kr-812 sub_6DB1B0
+# as two u32 at object +4 and +8 (eight wire bytes; constructor kr-812 sub_80AAE0). The handler looks
+# the +4 word up in the item manager (kr-812 sub_72C530) and sets item +372 from whether the +8 word is
+# positive.
+#
+# cn-406 reads the same item-spec body: reader cn-406 sub_700940 and entry reader cn-406 sub_420FC0
+# (count u32, two u32 per entry). The kr-812 and cn-406 shapes agree; the other legacy rows state the
+# same class, but their bodies were not read for this pass. The cn-717 and id-1809 score-data rows
+# likewise state only the class name; cn-324's catalog lists gspGameItemSpec under both 747 and 748,
+# and its opcode row states 748 only, so that number conflict stays open. Modern bodies are not
+# established here and are explicitly excluded.
+version: 1
+structs:
+  GameScoreData:
+    - players: "list<PlayerGameScoreData>"
+      except: [kr-1256, cn-774, tw-454]
+  PlayerGameScoreData:
+    - unknown_4: u8
+      except: [kr-1256, cn-774, tw-454]
+      offset: 4
+    - unknown_6: u16
+      except: [kr-1256, cn-774, tw-454]
+      offset: 6
+    - unknown_8: u16
+      except: [kr-1256, cn-774, tw-454]
+      offset: 8
+    - unknown_10: u16
+      except: [kr-1256, cn-774, tw-454]
+      offset: 10
+    - unknown_12: u16
+      except: [kr-1256, cn-774, tw-454]
+      offset: 12
+  GameItemSpec:
+    - entries: "list<ItemDropInfo>"
+      except: [kr-1256, cn-774, tw-454]
+  ItemDropInfo:
+    - unknown_4: u32
+      except: [kr-1256, cn-774, tw-454]
+      offset: 4
+    - unknown_8: u32
+      except: [kr-1256, cn-774, tw-454]
+      offset: 8

@@ -33,10 +33,8 @@ public sealed class NativeCapabilityPublicationTests
                 RegisterSender<RoomMasterChanged>(protocol);
                 var context = Context(build, new()
                 {
-                    ["typed_only"] = true,
                     ["game_protocol"] = protocol,
                     ["relay_protocol"] = build + "/relay",
-                    ["version_major"] = int.Parse(build[3..]),
                 });
                 contexts.Add(context);
                 await new InGamePlugin().ActivateAsync(context, default);

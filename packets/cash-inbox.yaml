@@ -1,0 +1,8 @@
+version: 1
+# Cash-inventory rows and pickup bodies are in packets/cash-inventory.yaml.
+# Closing the gift box reuses PresentCloseRequest in packets/present.yaml.
+structs:
+  # kr-812 Packet_gcpReqCashInven, vtable kr-812 0xD87FBC, uses empty codec kr-812 sub_5C8FC0.
+  # kr-812 sub_950870 and kr-812 sub_952F40 stamp C2S 826 with no field writes.
+  # A binding requires the named opcode; the modern table has no established open request.
+  CashInboxRequest@kr-812: []

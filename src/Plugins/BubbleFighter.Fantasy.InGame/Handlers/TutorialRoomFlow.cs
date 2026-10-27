@@ -28,6 +28,8 @@ internal sealed class TutorialRoomFlow(RoomRegistry registry, IReadOnlyDictionar
             seat.EquippedItemIds = request.EquippedItemIds.ToArray();
             seat.Team = request.Team;
             room.MarkStarting();
+            if (request.GameConnectionOnly)
+                seat.GameLinkGeneration = room.StartGeneration;
         }
     }
 

@@ -71,7 +71,7 @@ internal sealed class TutorialHandler : IDisposable
     private readonly PlayTutorialShape _play;
     private readonly TutorialMatchStart _matchStart;
     private readonly IReadOnlyList<PacketField> _scoreRowFields;
-    private readonly ScoreShape? _score;
+    private readonly PlayValues.ScoreValues? _score;
     private readonly IOpcodeTableRegistry _tables;
     private readonly PacketTables _packetTables;
     private readonly string _build;
@@ -128,7 +128,7 @@ internal sealed class TutorialHandler : IDisposable
         bool oneSeatWaves = false,
         bool outcomeFirst = false,
         IReadOnlyList<PacketField>? scoreRowFields = null,
-        ScoreShape? score = null,
+        PlayValues.ScoreValues? score = null,
         bool tutorialSkipStart = false,
         bool tutorialUseOldMap = false,
         int maxTutorialSessions = 64,
@@ -451,7 +451,7 @@ internal sealed class TutorialHandler : IDisposable
         switch (_matchStart)
         {
             case TutorialMatchStart.RoomEnterGame:
-                // gspUserHostStart (991) returns before sub_60A490 unless room+532 is set; that
+                // gspUserHostStart (991) returns before cn-717 sub_60A490 unless room+532 is set; that
                 // byte is the host-ready UI checkbox (cn-717 sub_8FB7B0), never armed here.
                 // gspRoomEnterGame case 0 does not check +532 (cn-717 sub_882D40).
                 startName = "gspRoomEnterGame";

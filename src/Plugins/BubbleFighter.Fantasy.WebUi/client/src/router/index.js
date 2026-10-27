@@ -6,7 +6,8 @@ export const PAGES = [
   { path: 'players', title: 'nav.players', icon: 'players', group: 'server', component: () => import('../views/PlayersView.vue') },
   { path: 'rooms', title: 'nav.rooms', icon: 'rooms', group: 'server', component: () => import('../views/RoomsView.vue') },
   { path: 'plugins', title: 'nav.plugins', icon: 'plugins', group: 'system', component: () => import('../views/PluginsView.vue') },
-  { path: 'opcodes', title: 'nav.opcodes', icon: 'opcodes', group: 'system', component: () => import('../views/OpcodesView.vue') },
+  { path: 'store', title: 'nav.store', icon: 'plugins', group: 'system', component: () => import('../views/StoreView.vue') },
+  // { path: 'opcodes', title: 'nav.opcodes', icon: 'opcodes', group: 'system', component: () => import('../views/OpcodesView.vue') },
   { path: 'logs', title: 'nav.logs', icon: 'logs', group: 'system', component: () => import('../views/LogsView.vue') },
   { path: 'settings', title: 'nav.settings', icon: 'gear', group: 'system', component: () => import('../views/SettingsView.vue') }
 ]

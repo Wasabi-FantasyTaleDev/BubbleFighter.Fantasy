@@ -1,7 +1,7 @@
 ---
 title: "插件"
 description: "理解插件模型，并构建、挂载、配置和重新加载原生 .NET 插件。"
-updated: 2026-10-18
+updated: 2026-10-23
 ---
 
 服务器的一切行为都由插件实现。profile 组合插件行，每个行把一个插件实现和一份配置绑定到一个稳定的实例 id 上，Host 按照各行声明的服务依赖能够满足的顺序激活这些行。本页解释这一模型，说明如何查看 Host 发现并加载了什么，然后从项目文件到可运行的行完整演示第一个原生 .NET 插件。最后介绍配置、生命周期与重新加载、原生插件与可选语言 SDK 的边界、插件作者必须遵守的规则，以及最可能遇到的故障。
@@ -255,3 +255,78 @@ Heartbeat every 15 s.
 ## 后续
 
 继续阅读 [SDK 协议](sdk-protocol.md)，挂载用 Python、TypeScript、Go 或 Rust 编写的插件；然后阅读[参与贡献](contributing.md)了解验证门禁与审查规则。[服务器配置](configuration.md)完整说明 profile、bundle、补丁与环境变量。
+## 注册指令与权限 {#register-commands}
+
+需要先通知再断开连接时，`ISession.SendAsync` 只保证消息入队。若会话实现 `ISessionOutputDrain`，应在关闭前使用该操作配置的取消期限等待 `DrainOutputAsync`。此屏障只等待之前的传输写入完成，不确认客户端收到或显示消息。取消只停止等待，不撤回已入队的消息。队列满、会话停止或写入失败都会使等待失败；不要用固定延时或具体协议类代替共享接口。
+
+核心组合中的 `permissions`、`commands` 插件行提供原生插件指令基础。插件在 `Requires` 中声明 `BubbleFighter.Fantasy.Contracts.Administration` 下的 `IPermissionRegistry`、`ICommandRegistry`，先注册权限节点，再注册指令；两份返回句柄都交给 `context.Effect(...)`：
+
+```csharp
+context.Effect(context.Services.Get<IPermissionRegistry>().Register(
+    new PermissionDefinition("example.ping", "Check whether the example plugin is ready.")));
+context.Effect(context.Services.Get<ICommandRegistry>().Register(context,
+    new CommandDefinition("ping", ["ready"], "example.ping", "Check plugin readiness.", []),
+    (invocation, token) => ValueTask.FromResult(
+        new CommandResult(CommandStatus.Success, "Ready."))));
+```
+
+指令名称和别名全局唯一，注册时保存元数据快照。注销会移除全部别名并通知正在执行的任务取消；处理器通过注册者上下文的受监管任务执行，插件卸载会取消并等待任务退出。处理器必须响应传入的取消令牌。正常的状态限制返回 `InvalidState`，意外异常则向调用方传播并报告给所属插件。`ICommandRegistry.List(principal)` 返回经过权限过滤的帮助和面板元数据。
+
+`ICommandExecutor.ExecuteAsync` 接收名称和结构化位置参数。`ExecuteTextAsync` 识别 `/`、`!`、`！`，支持双引号参数、有符号整数和末尾的 `RemainingText`；结构化调用将末尾正文作为一个参数传入。正文没有单独的单词数量限制。控制台适配器可明确允许无前缀输入。不会执行 shell 文本。
+
+只有可信适配器可以构造 `CommandCaller`：从认证结果取得稳定账户 ID，代他人操作时保留原始 `Actor` 与实际 `Subject`，不能从请求参数反序列化这些身份。`Language` 使用用户界面语言，空值表示使用部署默认语言。审计事件包含身份和结果，不记录原始参数。原生插件可以注册指令；远程 SDK 注册仍需要回调和生命周期适配。控制台输入和 WebUI 尚未接入此分派器。
+
+在 `ingame` 行的 config 中设置 `shared_chat_commands: true`，将该游戏作用域接入共享聊天指令。等待原生客户端验收期间，此项默认 `false`；关闭时保留原有仅房主可用的 `!start`、`!set`。启用时必须同时提供两项共享指令服务，否则激活失败。
+
+核心组合的 `commands.game` 行将启用的作用域接入同一分派器，也能调用原生插件注册的指令。它在所有游戏作用域中统一注册 `/start`、`/mode <编号>`（别名 `/set`），也支持 `!`、`！` 前缀。`game.room.start`、`game.room.mode` 权限节点默认允许普通玩家使用，只操作自己所在的等待中房间；已配置的模式表仍会拒绝不支持的编号。指令开始会跳过准备标记，原生开始按钮仍要求房主操作。前缀输入在权限拒绝后不会回退到本地处理器。
+
+游戏插件通过 `IGameCommandEndpoints` 注册 `IGameCommandEndpoint`，并持有返回的注销句柄。路由会核对已认证游戏账户与当前座位，拒绝重复的会话归属，并在游戏插件的生命周期内执行。`commands.game.max_endpoints` 默认 512，用于约束同时注册的作用域存储。本行尚未提供地图、管理或房间传送指令。
+
+注销或替换游戏作用域会使先前的路由快照失效。尚未开始执行的调用不能继续使用已注销的端点，也不能自动改投替换后的端点。
+
+权限配置写在 `permissions` 行：
+
+```yaml
+config:
+  groups:
+    - name: players
+      allow: [example.ping]
+    - name: helpers
+      inherits: [players]
+      deny: [example.restricted]
+  subjects:
+    - kind: game
+      id: "42"
+      groups: [helpers]
+    - kind: game
+      id: "7"
+      operator: true
+    - kind: webui
+      id: "admin-account-id"
+      allow: [webui.access, webui.admin]
+```
+
+ID 属于各自认证空间内已经存在的账户；配置不会创建账户或登录凭据。普通身份的拒绝规则优先于个人、继承及通配符授权。规则支持完整节点、`prefix.*` 和 `*`。不存在的组及继承循环会导致激活失败；未注册节点拒绝访问。游戏 OP 和本地控制台拥有全部已注册权限；OP 不授予 WebUI 登录资格。`webui.access` 只代表入口，`webui.admin` 代表 WebUI 超级管理员。权限不能跳过参数或业务状态校验。这些 WebUI 节点供后续适配使用，尚未替换当前 HTTP 授权。
+
+资源配置保护注册表存储和正在执行的任务，不限制游戏功能。`commands` 支持 `max_commands`（512）、`max_input_characters`（4096，同时作为注册名称及参数定义文本预算）、`max_result_characters`（16384）、`max_concurrent`（64）。执行容量占满时立即返回 `Busy`，不建立等待队列。`permissions` 支持 `max_nodes`（2048）与 `max_policy_entries`（65536，账户、组、继承关系和展开规则的合计存储预算）。这些配置经过校验，可按部署调整。
+
+### 在线管理命令 {#online-management-commands}
+
+Contracts 2.61.0 新增原生在线玩家作用域注册。`commands.management` 统一注册 `/list`、`/notice <文本>`、`/disconnect <昵称> [原因]`；`commands.players` 为各版本接入已认证玩家目录和指定协议的通知编码器。等待原生客户端验收期间，两种插件行默认禁用，启用时须同时启用管理行和所选版本的玩家行。玩家行位于 `lobby` 下，要求 `lobby.online_players: true`，必填 `protocol` 指定真实协议。对应的 `dialect.messages` 还须启用 `server_notices: true`；缺少或重复编码器会使激活失败。组合配置中的完整行 ID 以 `--dump-config` 为准。
+
+`/list` 返回在线账号去重后的数量，包含大厅玩家，不公开昵称或网络地址。`game.management.list` 默认允许普通玩家使用。`/notice` 将输入文本发送给各版本的全部已认证游戏连接，报告入队和失败数量，要求 `game.management.notice`。`/disconnect` 要求 `game.management.disconnect`，精确匹配当前昵称，存在多个匹配连接时拒绝执行。游戏 OP 拥有这两项管理权限；游戏调用还会核对调用者的稳定账号是否仍持有当前连接。聊天入口需要 `ingame.shared_chat_commands: true`；控制台和 WebUI 入口尚未接入。
+
+断开通知按目标的 `launcher_language` 显示，并包含可选原因。先入队通知、等待 `ISessionOutputDrain`，再关闭所选连接。通知失败会记录；目标仍有效时继续断开，不会追踪并关闭重新登录的新连接。返回结果会说明通知未完成。这不保证客户端收到或显示消息；公告也只报告入队及部分失败，不代表玩家已阅读。
+
+`commands.management` 支持 `max_scopes`（512 个注册）、`disconnect_notice_timeout_ms`（5000）、`max_notice_characters`（511）。文本预算可调低，上限来自原生通知缓冲区。格式化后的原因过长时，在发送或关闭前拒绝执行。作用域注册由插件效果管理，操作在注册者的受监督生命周期内执行。远程 SDK 尚无原生所有者与回调传输适配，不能宣称指令注册已与原生等效。本批不包含 kick、sudo、OP 持久化编辑、房间传送、WebUI 配置或分发商店。
+
+
+### 客户端模组启动策略 {#client-plugin-policy}
+
+商店页面可以从合并后的目录选择客户端模组标识，也可以手动添加标识，并设置推荐、必选或禁用。这些规则提供给兼容的启动器，客户端模组文件不会安装到服务器。每条规则可以勾选适用的客户端版本；不勾选任何版本则适用于所有版本。沿用配置文件时保留原始策略，自定义列表为空时则明确清空推荐项。
+
+`GET` 和 `PUT /api/setup/client-plugins` 要求已登录的 WebUI 账号同时拥有 `webui.access` 与 `webui.settings.client_plugins`；`webui.admin` 可授予这两项权限。游戏 OP 不会获得 WebUI 访问权。PUT 使用现有的同源请求保护，接受 `{"policies":[{"id":"example.plugin","builds":[],"required":false,"disabled":true}]}`。提交 `{"policies":null}` 恢复配置文件策略，提交 `{"policies":[]}` 清空策略。规则只接受商店标识，不包含下载网址或可执行文件路径。
+
+启动器目录、登录及刷新响应通过 `pluginRecommendations` 返回 `id`、`builds`、`required` 和 `disabled`。推荐对应 false/false，必选对应 true/false，禁用对应 false/true。同一标识的必选和禁用规则不能覆盖相同版本，包括适用于所有版本的规则。互不重叠的版本范围会分别保留；针对某一版本的必选规则不会因全局推荐而扩展至其他版本。兼容的启动器负责执行启动策略；这些元数据不证明客户端完整性，也不表示游戏登录会校验已加载模组。
+
+修改独立于数据库、账号、奖励与客户端数据设置持久保存，再通过现有的受监督配置流程应用。HTTP 202 只表示请求已受理。应用可能使游戏服务重新连接；安装状态会显示进度和失败，可通过现有配置流程修正或重试。

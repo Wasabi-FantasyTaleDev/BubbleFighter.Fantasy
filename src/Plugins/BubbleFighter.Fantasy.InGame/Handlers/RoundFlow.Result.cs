@@ -72,13 +72,15 @@ internal sealed partial class RoundFlow
             int knockdowns;
             lock (room.Gate)
             {
-                if (room.Phase != RoomPhase.Playing || room.FindByGame(session.Id) is not { } reporter)
+                if (room.Phase != RoomPhase.Playing || room.FindByGame(session.Id) is not { } controller)
                     return;
+                var reporter = ScoreReporter(room, controller, report.ReporterSlot, report.RequiresReporterOwnership);
+                if (reporter is null) return;
                 if (report.RequiresReporterOwnership && (report.ReporterSlot != reporter.Slot || report.Victim == reporter.Slot))
                     return;
                 if (report.IsRescue && (report.ReporterSlot != reporter.Slot
                     || report.Victim is not { } rescuedSlot || rescuedSlot == reporter.Slot
-                    || room.Seats.FirstOrDefault(seat => seat.Slot == rescuedSlot) is not { } rescued
+                    || ScoreMember(room, rescuedSlot) is not { } rescued
                     || rescued.Team != reporter.Team))
                     return;
                 if (!report.IsRescue && report.Victim is { } victim)
@@ -117,8 +119,11 @@ internal sealed partial class RoundFlow
             int? victim;
             lock (room.Gate)
             {
-                if (room.Phase != RoomPhase.Playing || room.FindByGame(session.Id) is not { } reporter)
+                if (room.Phase != RoomPhase.Playing || room.FindByGame(session.Id) is not { } controller)
                     return;
+                var reporter = ScoreReporter(room, controller, report.ReporterSlot,
+                    report.RequiresReporterOwnership || report.RequiresDirectKillMode);
+                if (reporter is null) return;
                 if (report.RequiresReporterOwnership && (report.ReporterSlot != reporter.Slot
                     || !report.HasVictimReference || report.Victim == reporter.Slot))
                     return;
@@ -128,7 +133,7 @@ internal sealed partial class RoundFlow
                     return;
                 var pairedVictim = room.Scoring.TakeVictim(reporter.Slot);
                 victim = report.HasVictimReference ? report.Victim : pairedVictim;
-                var seatedVictim = victim is { } slot && slot != reporter.Slot && room.Seats.Any(seat => seat.Slot == slot) ? victim : null;
+                var seatedVictim = victim is { } slot && slot != reporter.Slot && ScoreMember(room, slot) is not null ? victim : null;
                 if (room.Scoring.AddKill(reporter.Slot, reporter.Team, seatedVictim) is not { } stats)
                     return;
                 kills = stats.Kills;
@@ -319,7 +324,7 @@ internal sealed partial class RoundFlow
         foreach (var seat in room.Seats)
         {
             var reward = rewards.GetValueOrDefault(seat.Slot);
-            rows.Add(new RoundScoreboardRow(seat.Slot, seat.Nickname, objectiveScores && seat.Team == 0 ? 2 : Math.Max(1, (int)seat.Team),
+            rows.Add(new RoundScoreboardRow(seat.Slot, seat.Nickname, objectiveScores && seat.Team == 0 ? 2 : seat.Team,
                 withRewards && reward is not null ? reward.Level : Math.Max(1, seat.Level), room.Scoring.Stats(seat.Slot),
                 RewardRow(Math.Max(1, seat.Level), reward, withRewards))
             {
@@ -328,6 +333,14 @@ internal sealed partial class RoundFlow
                 Outcome = reason is { } ended ? OutcomeOf(room, room.StartGeneration, ended)(seat) : null,
             });
         }
+        foreach (var bot in room.Bots.Select(bot => bot.Appearance).OrderBy(bot => bot.Slot))
+            rows.Add(new RoundScoreboardRow(bot.Slot, bot.Nickname, bot.Team, bot.Level, room.Scoring.Stats(bot.Slot), null)
+            {
+                NicknameKey = bot.Ai?.NicknameKey ?? "",
+                UserNumber = bot.UserNum,
+                Outcome = reason is null ? null : WinnerTeam(room) == 0 ? RoundOutcome.Draw
+                    : WinnerTeam(room) == bot.Team ? RoundOutcome.Won : RoundOutcome.Lost,
+            });
         var totals = room.Scoring.TeamTotals.ToArray();
         var winner = WinnerTeam(room);
         if (objectiveScores)

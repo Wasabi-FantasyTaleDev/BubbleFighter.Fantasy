@@ -50,6 +50,10 @@ public sealed class LoginInventoryResolver(IInventoryRepository inventory, bool 
         return snapshot with { CharacterBag = canonical, EquippedBag = canonical };
     }
 
+    // Login removes expired rows before filling missing starter items, and normalizes only after both bags exist.
+    internal async ValueTask PrepareAsync(long userNum, CancellationToken ct) =>
+        _ = await ResolveStoredAsync(userNum, ct).ConfigureAwait(false);
+
     private async ValueTask<InventorySnapshot> ResolveStoredAsync(long userNum, CancellationToken ct)
     {
         var characterBag = await inventory.ListSlotsAsync(

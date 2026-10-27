@@ -10,13 +10,13 @@ public interface IRoomStartService
     /// <summary>
     /// Starts the room with the given id, sending the documented start chain to
     /// every seat. A missing room or a room that is not waiting is an error.
-    ///
     /// </summary>
     /// <param name="roomId">The room id handed out at create time.</param>
     /// <param name="ct">Cancellation token.</param>
     ValueTask StartAsync(int roomId, CancellationToken ct);
 
-    /// <summary>Lists the live room ids and their seat counts.</summary>
+    /// <summary>Lists the live rooms without changing them.</summary>
     /// <param name="ct">Cancellation token.</param>
+    /// <returns>One entry per live room with its seat count and the row's own phase label.</returns>
     ValueTask<IReadOnlyList<(int RoomId, int Seats, string Phase)>> ListAsync(CancellationToken ct);
 }

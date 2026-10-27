@@ -352,6 +352,326 @@ public sealed class EquipmentSelectionTests
 
     private static int[] Worn(IReadOnlyList<InventorySlotRecord> rows) => rows.Where(s => (s.Flags & 1) != 0).Select(s => s.ItemId).ToArray();
 
+    /// <summary>Writes the catalog-masks fixture pair: a ShopItem workbook with the four location columns and a FighterConfig name row.</summary>
+    private static async Task<(string ShopItem, string FighterConfig)> WriteMaskFixturesAsync(string shopItemRows)
+    {
+        var shopItem = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".xml");
+        var fighterConfig = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".xml");
+        await File.WriteAllTextAsync(shopItem, """
+            <Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+            <Worksheet ss:Name="ShopItem"><Table>
+            <Row><Cell><Data>itemId</Data></Cell><Cell><Data>mainCategory</Data></Cell><Cell><Data>baseLocation</Data></Cell><Cell><Data>slotLocation</Data></Cell><Cell><Data>partLocation</Data></Cell><Cell><Data>secPartLocation</Data></Cell><Cell><Data>allowChr</Data></Cell><Cell><Data>denyChr</Data></Cell></Row>
+            """ + shopItemRows + """
+            </Table></Worksheet>
+            <Worksheet ss:Name="SlotLocation"><Table>
+            <Row><Cell><Data>name</Data></Cell><Cell><Data>id</Data></Cell></Row>
+            <Row><Cell><Data>sWeapon1</Data></Cell><Cell><Data>1</Data></Cell></Row>
+            <Row><Cell><Data>sWeapon2</Data></Cell><Cell><Data>2</Data></Cell></Row>
+            <Row><Cell><Data>sWeapon4</Data></Cell><Cell><Data>3</Data></Cell></Row>
+            <Row><Cell><Data>sEye</Data></Cell><Cell><Data>4</Data></Cell></Row>
+            <Row><Cell><Data>sMask</Data></Cell><Cell><Data>5</Data></Cell></Row>
+            <Row><Cell><Data>sNeck</Data></Cell><Cell><Data>6</Data></Cell></Row>
+            <Row><Cell><Data>sTail</Data></Cell><Cell><Data>7</Data></Cell></Row>
+            <Row><Cell><Data>sTitle</Data></Cell><Cell><Data>8</Data></Cell></Row>
+            <Row><Cell><Data>sTail2</Data></Cell><Cell><Data>9</Data></Cell></Row>
+            <Row><Cell><Data>sHeadBC</Data></Cell><Cell><Data>10</Data></Cell></Row>
+            <Row><Cell><Data>sWristL</Data></Cell><Cell><Data>11</Data></Cell></Row>
+            </Table></Worksheet>
+            <Worksheet ss:Name="PartLocation"><Table>
+            <Row><Cell><Data>name</Data></Cell><Cell><Data>id</Data></Cell></Row>
+            <Row><Cell><Data>Feet</Data></Cell><Cell><Data>1</Data></Cell></Row>
+            <Row><Cell><Data>BodyU</Data></Cell><Cell><Data>2</Data></Cell></Row>
+            <Row><Cell><Data>ArmL</Data></Cell><Cell><Data>3</Data></Cell></Row>
+            <Row><Cell><Data>ArmR</Data></Cell><Cell><Data>4</Data></Cell></Row>
+            <Row><Cell><Data>BodyD</Data></Cell><Cell><Data>5</Data></Cell></Row>
+            <Row><Cell><Data>Legs</Data></Cell><Cell><Data>6</Data></Cell></Row>
+            <Row><Cell><Data>HandL</Data></Cell><Cell><Data>7</Data></Cell></Row>
+            <Row><Cell><Data>HandR</Data></Cell><Cell><Data>8</Data></Cell></Row>
+            <Row><Cell><Data>Head</Data></Cell><Cell><Data>9</Data></Cell></Row>
+            </Table></Worksheet>
+            </Workbook>
+            """);
+        await File.WriteAllTextAsync(fighterConfig, """
+            <Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+            <Worksheet ss:Name="FighterConfig"><Table>
+            <Row><Cell><Data>[Field]</Data></Cell><Cell><Data>[Desc]</Data></Cell><Cell><Data>1</Data></Cell><Cell><Data>3</Data></Cell><Cell><Data>5</Data></Cell><Cell><Data>9</Data></Cell></Row>
+            <Row><Cell><Data>name</Data></Cell><Cell><Data></Data></Cell><Cell><Data>Dao</Data></Cell><Cell><Data>Bazzi</Data></Cell><Cell><Data>Uni</Data></Cell><Cell><Data>PinkBean</Data></Cell></Row>
+            </Table></Worksheet>
+            </Workbook>
+            """);
+        return (shopItem, fighterConfig);
+    }
+
+    private const string MaskRows = """
+        <Row><Cell><Data>201001</Data></Cell><Cell><Data>Weapons</Data></Cell><Cell><Data>sWeapon2</Data></Cell><Cell><Data>sWeapon2</Data></Cell><Cell><Data></Data></Cell><Cell><Data></Data></Cell><Cell><Data>all</Data></Cell><Cell><Data>none</Data></Cell></Row>
+        <Row><Cell><Data>202001</Data></Cell><Cell><Data>Weapons</Data></Cell><Cell><Data>sWeapon1</Data></Cell><Cell><Data>sWeapon1</Data></Cell><Cell><Data></Data></Cell><Cell><Data></Data></Cell><Cell><Data>all</Data></Cell><Cell><Data>none</Data></Cell></Row>
+        <Row><Cell><Data>203001</Data></Cell><Cell><Data>Weapons</Data></Cell><Cell><Data>sWeapon1</Data></Cell><Cell><Data>sWeapon1</Data></Cell><Cell><Data></Data></Cell><Cell><Data></Data></Cell><Cell><Data>all</Data></Cell><Cell><Data>none</Data></Cell></Row>
+        <Row><Cell><Data>205001</Data></Cell><Cell><Data>Weapons</Data></Cell><Cell><Data>sWeapon4</Data></Cell><Cell><Data>sWeapon4</Data></Cell><Cell><Data></Data></Cell><Cell><Data></Data></Cell><Cell><Data>all</Data></Cell><Cell><Data>none</Data></Cell></Row>
+        <Row><Cell><Data>300001</Data></Cell><Cell><Data>Characters</Data></Cell><Cell><Data></Data></Cell><Cell><Data></Data></Cell><Cell><Data></Data></Cell><Cell><Data></Data></Cell><Cell><Data>all</Data></Cell><Cell><Data>none</Data></Cell></Row>
+        <Row><Cell><Data>300009</Data></Cell><Cell><Data>Characters</Data></Cell><Cell><Data></Data></Cell><Cell><Data>all -sHeadBC -sTail2</Data></Cell><Cell><Data>all</Data></Cell><Cell><Data></Data></Cell><Cell><Data>all</Data></Cell><Cell><Data>none</Data></Cell></Row>
+        <Row><Cell><Data>100001</Data></Cell><Cell><Data>Clothes</Data></Cell><Cell><Data>Feet</Data></Cell><Cell><Data></Data></Cell><Cell><Data>Feet</Data></Cell><Cell><Data></Data></Cell><Cell><Data>all</Data></Cell><Cell><Data>none</Data></Cell></Row>
+        <Row><Cell><Data>100004</Data></Cell><Cell><Data>Clothes</Data></Cell><Cell><Data>BodyU</Data></Cell><Cell><Data></Data></Cell><Cell><Data>BodyU ArmL ArmR BodyD Legs Feet HandL HandR</Data></Cell><Cell><Data>BodyD Legs Feet HandL HandR</Data></Cell><Cell><Data>all</Data></Cell><Cell><Data>none</Data></Cell></Row>
+        <Row><Cell><Data>100005</Data></Cell><Cell><Data>Clothes</Data></Cell><Cell><Data>BodyU</Data></Cell><Cell><Data></Data></Cell><Cell><Data>BodyU ArmL ArmR</Data></Cell><Cell><Data></Data></Cell><Cell><Data>all</Data></Cell><Cell><Data>none</Data></Cell></Row>
+        <Row><Cell><Data>100050</Data></Cell><Cell><Data>Clothes</Data></Cell><Cell><Data>Head</Data></Cell><Cell><Data></Data></Cell><Cell><Data></Data></Cell><Cell><Data></Data></Cell><Cell><Data>all</Data></Cell><Cell><Data>none</Data></Cell></Row>
+        <Row><Cell><Data>100689</Data></Cell><Cell><Data>Clothes</Data></Cell><Cell><Data>Feet</Data></Cell><Cell><Data></Data></Cell><Cell><Data>Feet</Data></Cell><Cell><Data></Data></Cell><Cell><Data>Uni</Data></Cell><Cell><Data>none</Data></Cell></Row>
+        <Row><Cell><Data>210001</Data></Cell><Cell><Data>Accessories</Data></Cell><Cell><Data>sEye</Data></Cell><Cell><Data>sEye sMask</Data></Cell><Cell><Data></Data></Cell><Cell><Data></Data></Cell><Cell><Data>all</Data></Cell><Cell><Data>none</Data></Cell></Row>
+        <Row><Cell><Data>210002</Data></Cell><Cell><Data>Accessories</Data></Cell><Cell><Data>sMask</Data></Cell><Cell><Data>sMask sNeck</Data></Cell><Cell><Data></Data></Cell><Cell><Data></Data></Cell><Cell><Data>all</Data></Cell><Cell><Data>none</Data></Cell></Row>
+        <Row><Cell><Data>210003</Data></Cell><Cell><Data>Accessories</Data></Cell><Cell><Data>sTail</Data></Cell><Cell><Data>sTail</Data></Cell><Cell><Data></Data></Cell><Cell><Data></Data></Cell><Cell><Data>all</Data></Cell><Cell><Data>none</Data></Cell></Row>
+        <Row><Cell><Data>210004</Data></Cell><Cell><Data>Accessories</Data></Cell><Cell><Data>sTitle</Data></Cell><Cell><Data>sTitle</Data></Cell><Cell><Data></Data></Cell><Cell><Data></Data></Cell><Cell><Data>all</Data></Cell><Cell><Data>Dao</Data></Cell></Row>
+        <Row><Cell><Data>100051</Data></Cell><Cell><Data>Accessories</Data></Cell><Cell><Data>sWristL</Data></Cell><Cell><Data></Data></Cell><Cell><Data></Data></Cell><Cell><Data></Data></Cell><Cell><Data>all</Data></Cell><Cell><Data>none</Data></Cell></Row>
+        <Row><Cell><Data>220000</Data></Cell><Cell><Data>Accessories</Data></Cell><Cell><Data></Data></Cell><Cell><Data>all -sHeadBC -sTail2</Data></Cell><Cell><Data></Data></Cell><Cell><Data></Data></Cell><Cell><Data>all</Data></Cell><Cell><Data>none</Data></Cell></Row>
+        <Row><Cell><Data>220001</Data></Cell><Cell><Data>Accessories</Data></Cell><Cell><Data>sHeadBC</Data></Cell><Cell><Data>sHeadBC</Data></Cell><Cell><Data></Data></Cell><Cell><Data></Data></Cell><Cell><Data>all</Data></Cell><Cell><Data>none</Data></Cell></Row>
+        <Row><Cell><Data>220002</Data></Cell><Cell><Data>Accessories</Data></Cell><Cell><Data>sTail2</Data></Cell><Cell><Data>sTail2</Data></Cell><Cell><Data></Data></Cell><Cell><Data></Data></Cell><Cell><Data>all</Data></Cell><Cell><Data>none</Data></Cell></Row>
+        """;
+
+    [Fact]
+    public async Task CatalogMasksSlotSetsIntersectingDisplaceAndDisjointSlotsStay()
+    {
+        var (shopItem, fighterConfig) = await WriteMaskFixturesAsync(MaskRows);
+        try
+        {
+            using var h = await Harness.CreateAsync(shopItem, selection: "catalog_masks", fighterConfigPath: fighterConfig);
+            await h.Store.AppendMissingItemsAsync(42, InventoryBag.CharacterBag,
+                new[] { 210001, 210002, 210003, 210004, 100051 }
+                    .Select(id => new InventorySlotRecord(42, InventoryBag.CharacterBag, id, id, 1, 0)).ToArray(), default);
+            // Two primaries share sWeapon1 (kr-1256 sub_A17CF0 reads slotLocation); the second displaces the first.
+            await h.Selection.ApplyAsync(42, 203001, true, default);
+            var primary = Worn(await h.Selection.ReadAsync(42, default));
+            Assert.Contains(203001, primary);
+            Assert.DoesNotContain(202001, primary);
+            Assert.Contains(201001, primary);
+            // Disjoint weapon slots stay side by side.
+            Assert.Contains(205001, primary);
+            // Accessories: sMask joins both lists, so the later one displaces the earlier; sTail and sWristL stay.
+            await h.Selection.ApplyAsync(42, 210001, true, default);
+            await h.Selection.ApplyAsync(42, 210002, true, default);
+            await h.Selection.ApplyAsync(42, 210003, true, default);
+            await h.Selection.ApplyAsync(42, 100051, true, default);
+            var worn = Worn(await h.Selection.ReadAsync(42, default));
+            Assert.Contains(210002, worn);
+            Assert.DoesNotContain(210001, worn);
+            Assert.All(new[] { 210003, 100051 }, id => Assert.Contains(id, worn));
+            Assert.Equal(worn, Worn(await h.Selection.ReadAsync(42, default)));
+        }
+        finally { File.Delete(shopItem); File.Delete(fighterConfig); }
+    }
+
+    [Fact]
+    public async Task CatalogMasksPartSetsIntersectingDisplaceAcrossPrimaryAndSecondaryParts()
+    {
+        var (shopItem, fighterConfig) = await WriteMaskFixturesAsync(MaskRows);
+        try
+        {
+            using var h = await Harness.CreateAsync(shopItem, selection: "catalog_masks", fighterConfigPath: fighterConfig);
+            await h.Store.AppendMissingItemsAsync(42, InventoryBag.CharacterBag,
+                new[] { 100001, 100004, 100005, 100050 }
+                    .Select(id => new InventorySlotRecord(42, InventoryBag.CharacterBag, id, id, 1, 0)).ToArray(), default);
+            // Shoes and a shirt cloth disjoint parts and are worn together; the head part comes from baseLocation alone.
+            await h.Selection.ApplyAsync(42, 100001, true, default);
+            await h.Selection.ApplyAsync(42, 100005, true, default);
+            await h.Selection.ApplyAsync(42, 100050, true, default);
+            var separate = Worn(await h.Selection.ReadAsync(42, default));
+            Assert.All(new[] { 100001, 100005, 100050 }, id => Assert.Contains(id, separate));
+            // The penguin costume shares Feet with the shoes and BodyU with the shirt; both give way.
+            await h.Selection.ApplyAsync(42, 100004, true, default);
+            var costume = Worn(await h.Selection.ReadAsync(42, default));
+            Assert.Contains(100004, costume);
+            Assert.DoesNotContain(100001, costume);
+            Assert.DoesNotContain(100005, costume);
+            Assert.Contains(100050, costume);
+        }
+        finally { File.Delete(shopItem); File.Delete(fighterConfig); }
+    }
+
+    [Fact]
+    public async Task CatalogMasksRefuseCharacterExclusiveWearAndAcceptItForTheAllowedCharacter()
+    {
+        var (shopItem, fighterConfig) = await WriteMaskFixturesAsync(MaskRows);
+        try
+        {
+            using var h = await Harness.CreateAsync(shopItem, selection: "catalog_masks", fighterConfigPath: fighterConfig);
+            await h.Store.AppendMissingItemsAsync(42, InventoryBag.CharacterBag,
+                new[] { 100689, 210004, 300003, 300005 }
+                    .Select(id => new InventorySlotRecord(42, InventoryBag.CharacterBag, id, id, 1, 0)).ToArray(), default);
+            var before = await h.Selection.ReadAsync(42, default);
+            // allowChr "Uni LXUni" excludes the worn Dao; denyChr "Dao" refuses a title for the same character.
+            Assert.Null(await h.Selection.ApplyAsync(42, 100689, true, default));
+            Assert.Null(await h.Selection.ApplyAsync(42, 210004, true, default));
+            Assert.Equal(before, await h.Selection.ReadAsync(42, default));
+            // After the seat moves to Uni the same article is accepted; the title stays refused for Dao and is
+            // accepted once the seat is Bazzi.
+            await h.Selection.ApplyAsync(42, 300005, true, default);
+            Assert.NotNull(await h.Selection.ApplyAsync(42, 100689, true, default));
+            await h.Selection.ApplyAsync(42, 300003, true, default);
+            Assert.NotNull(await h.Selection.ApplyAsync(42, 210004, true, default));
+            var worn = Worn(await h.Selection.ReadAsync(42, default));
+            Assert.All(new[] { 300003, 100689, 210004 }, id => Assert.Contains(id, worn));
+            Assert.DoesNotContain(300005, worn);
+        }
+        finally { File.Delete(shopItem); File.Delete(fighterConfig); }
+    }
+
+    [Fact]
+    public async Task CatalogMasksAllExpressionCoversTheVocabularyMinusExclusionsAndIgnoresSeatColumns()
+    {
+        var (shopItem, fighterConfig) = await WriteMaskFixturesAsync(MaskRows);
+        try
+        {
+            using var h = await Harness.CreateAsync(shopItem, selection: "catalog_masks", fighterConfigPath: fighterConfig);
+            await h.Store.AppendMissingItemsAsync(42, InventoryBag.CharacterBag,
+                new[] { 220000, 220001, 220002, 300009 }
+                    .Select(id => new InventorySlotRecord(42, InventoryBag.CharacterBag, id, id, 1, 0)).ToArray(), default);
+            await h.Selection.ApplyAsync(42, 220000, true, default);
+            var all = Worn(await h.Selection.ReadAsync(42, default));
+            // "all -sHeadBC -sTail2" holds every vocabulary slot except the two named ones: the worn primary and
+            // special weapons give way, and the excluded positions still accept their own articles afterwards.
+            Assert.Contains(220000, all);
+            Assert.DoesNotContain(202001, all);
+            Assert.DoesNotContain(205001, all);
+            await h.Selection.ApplyAsync(42, 220001, true, default);
+            await h.Selection.ApplyAsync(42, 220002, true, default);
+            var exceptions = Worn(await h.Selection.ReadAsync(42, default));
+            Assert.All(new[] { 220000, 220001, 220002 }, id => Assert.Contains(id, exceptions));
+            // The seat row's own all-expression (300009, a Characters row) describes the model it replaces, not
+            // bag conflicts: wearing that character leaves every other worn position untouched.
+            await h.Selection.ApplyAsync(42, 300009, true, default);
+            var seat = Worn(await h.Selection.ReadAsync(42, default));
+            Assert.Contains(300009, seat);
+            Assert.DoesNotContain(300001, seat);
+            Assert.All(new[] { 220000, 220001, 220002, 207001 }, id => Assert.Contains(id, seat));
+        }
+        finally { File.Delete(shopItem); File.Delete(fighterConfig); }
+    }
+
+    [Theory]
+    [InlineData(201001)]
+    [InlineData(300001)]
+    public async Task CatalogMasksRejectDuplicateUnrestrictedAndCharacterRows(int itemId)
+    {
+        var duplicate = $"<Row><Cell><Data>{itemId}</Data></Cell><Cell><Data>Weapons</Data></Cell><Cell><Data>sWeapon2</Data></Cell><Cell><Data>sWeapon2</Data></Cell><Cell><Data></Data></Cell><Cell><Data></Data></Cell><Cell><Data>all</Data></Cell><Cell><Data>none</Data></Cell></Row>";
+        var files = await WriteMaskFixturesAsync(MaskRows + duplicate);
+        try
+        {
+            var error = await Assert.ThrowsAsync<ConfigException>(() => Harness.CreateAsync(files.ShopItem,
+                selection: "catalog_masks", fighterConfigPath: files.FighterConfig));
+            Assert.Contains($"repeats itemId {itemId}", error.Message);
+        }
+        finally
+        {
+            File.Delete(files.ShopItem);
+            File.Delete(files.FighterConfig);
+        }
+    }
+
+    [Fact]
+    public async Task CatalogMasksConfigurationFailuresAreLoud()
+    {
+        // selection catalog_masks without its workbooks fails validation at bind time.
+        var missing = await Assert.ThrowsAsync<ConfigException>(() => Harness.CreateAsync(selection: "catalog_masks"));
+        Assert.Contains("catalog_masks requires exactly one of item_locations_client_path or item_locations_path", missing.Message);
+        Assert.Contains("fighter_config_client_path or fighter_config_path", missing.Message);
+        // A shop workbook without the fighter names fails the same way, whatever file the item path names.
+        var dummy = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".xml");
+        await File.WriteAllTextAsync(dummy, "not a workbook");
+        try
+        {
+            var noNames = await Assert.ThrowsAsync<ConfigException>(() => Harness.CreateAsync(dummy, selection: "catalog_masks"));
+            Assert.Contains("fighter_config_client_path or fighter_config_path", noNames.Message);
+        }
+        finally { File.Delete(dummy); }
+        // A workbook without the vocabulary sheets, a subtraction without all, and an unknown allowChr name all
+        // name their value instead of degrading to the id-range behaviour.
+        var (shopItem, fighterConfig) = await WriteMaskFixturesAsync(MaskRows);
+        try
+        {
+            var stripped = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".xml");
+            await File.WriteAllTextAsync(stripped, """
+                <Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+                <Worksheet ss:Name="ShopItem"><Table>
+                <Row><Cell><Data>itemId</Data></Cell><Cell><Data>baseLocation</Data></Cell><Cell><Data>slotLocation</Data></Cell><Cell><Data>partLocation</Data></Cell><Cell><Data>secPartLocation</Data></Cell><Cell><Data>allowChr</Data></Cell><Cell><Data>denyChr</Data></Cell></Row>
+                <Row><Cell><Data>202001</Data></Cell><Cell><Data>sWeapon1</Data></Cell><Cell><Data>sWeapon1</Data></Cell><Cell><Data></Data></Cell><Cell><Data></Data></Cell><Cell><Data>all</Data></Cell><Cell><Data>none</Data></Cell></Row>
+                </Table></Worksheet>
+                </Workbook>
+                """);
+            var missingSheet = await Assert.ThrowsAsync<ConfigException>(
+                () => Harness.CreateAsync(stripped, selection: "catalog_masks", fighterConfigPath: fighterConfig));
+            Assert.Contains("SlotLocation", missingSheet.Message);
+            File.Delete(stripped);
+            var subtraction = await WriteMaskFixturesAsync(
+                MaskRows + "<Row><Cell><Data>230000</Data></Cell><Cell><Data>Accessories</Data></Cell><Cell><Data></Data></Cell><Cell><Data>-sEye</Data></Cell><Cell><Data></Data></Cell><Cell><Data></Data></Cell><Cell><Data>all</Data></Cell><Cell><Data>none</Data></Cell></Row>\n");
+            var withoutAll = await Assert.ThrowsAsync<ConfigException>(
+                () => Harness.CreateAsync(subtraction.ShopItem, selection: "catalog_masks", fighterConfigPath: subtraction.FighterConfig));
+            Assert.Contains("subtracts names without stating all", withoutAll.Message);
+            File.Delete(subtraction.ShopItem);
+            File.Delete(subtraction.FighterConfig);
+            var unknown = await WriteMaskFixturesAsync(
+                MaskRows + "<Row><Cell><Data>230001</Data></Cell><Cell><Data>Clothes</Data></Cell><Cell><Data>Feet</Data></Cell><Cell><Data></Data></Cell><Cell><Data>Feet</Data></Cell><Cell><Data></Data></Cell><Cell><Data>Dao UnknownHero</Data></Cell><Cell><Data>none</Data></Cell></Row>\n");
+            var unresolved = await Assert.ThrowsAsync<ConfigException>(
+                () => Harness.CreateAsync(unknown.ShopItem, selection: "catalog_masks", fighterConfigPath: unknown.FighterConfig));
+            Assert.Contains("UnknownHero", unresolved.Message);
+            Assert.Contains("FighterConfig", unresolved.Message);
+            File.Delete(unknown.ShopItem);
+            File.Delete(unknown.FighterConfig);
+        }
+        finally { File.Delete(shopItem); File.Delete(fighterConfig); }
+    }
+
+    [Fact]
+    [Trait("Category", "LocalClientData")]
+    public async Task Kr1256CatalogMasksReproduceTheNativeConflicts()
+    {
+        using var h = await Harness.CreateAsync(LocalClientData.Extract("kr-1256", "Config/ShopItem2.xml"),
+            selection: "catalog_masks", fighterConfigPath: LocalClientData.Extract("kr-1256", "Config/FighterConfig.xml"));
+        await h.Store.AppendMissingItemsAsync(42, InventoryBag.CharacterBag,
+            new[] { 100001, 100004, 100689, 103451, 300005, 300009 }
+                .Select(id => new InventorySlotRecord(42, InventoryBag.CharacterBag, id, id, 1, 0)).ToArray(), default);
+        // 203073 and 202001 share slotLocation sWeapon1; the worn practice rifle gives way.
+        await h.Selection.ApplyAsync(42, 203073, true, default);
+        var armed = Worn(await h.Selection.ReadAsync(42, default));
+        Assert.Contains(203073, armed);
+        Assert.DoesNotContain(202001, armed);
+        // The penguin costume's parts cover the shoes' Feet; shoes give way, and the shop workbook's own
+        // secondary part list is what displaces them.
+        await h.Selection.ApplyAsync(42, 100001, true, default);
+        await h.Selection.ApplyAsync(42, 100004, true, default);
+        var dressed = Worn(await h.Selection.ReadAsync(42, default));
+        Assert.DoesNotContain(100001, dressed);
+        // 100689 allowChr "Uni LXUni" refuses Dao (300001) and accepts Uni (300005); 103451 denyChr "PinkBean"
+        // refuses 300009 and accepts Dao.
+        Assert.Null(await h.Selection.ApplyAsync(42, 100689, true, default));
+        await h.Selection.ApplyAsync(42, 300005, true, default);
+        Assert.NotNull(await h.Selection.ApplyAsync(42, 100689, true, default));
+        await h.Selection.ApplyAsync(42, 300009, true, default);
+        Assert.Null(await h.Selection.ApplyAsync(42, 103451, true, default));
+        await h.Selection.ApplyAsync(42, 300001, true, default);
+        Assert.NotNull(await h.Selection.ApplyAsync(42, 103451, true, default));
+        // The Uni shoes took the costume's Feet part when they were accepted, so the costume gave way.
+        var final = Worn(await h.Selection.ReadAsync(42, default));
+        Assert.All(new[] { 300001, 103451, 203073, 100689 }, id => Assert.Contains(id, final));
+        Assert.DoesNotContain(100004, final);
+    }
+
+    [Fact]
+    [Trait("Category", "LocalClientData")]
+    public async Task Legacy812CatalogMasksShareTheLocationColumnSet()
+    {
+        using var h = await Harness.CreateAsync(LocalClientData.Extract("kr-812", "Config/ShopItem2.xml"),
+            selection: "catalog_masks", fighterConfigPath: LocalClientData.Extract("kr-812", "Config/FighterConfig.xml"));
+        await h.Store.AppendMissingItemsAsync(42, InventoryBag.CharacterBag,
+            new[] { 100001, 100004, 202002 }
+                .Select(id => new InventorySlotRecord(42, InventoryBag.CharacterBag, id, id, 1, 0)).ToArray(), default);
+        // The legacy workbook carries the same columns: two sWeapon1 rifles and the same Feet-covering costume.
+        await h.Selection.ApplyAsync(42, 202002, true, default);
+        var armed = Worn(await h.Selection.ReadAsync(42, default));
+        Assert.Contains(202002, armed);
+        Assert.DoesNotContain(202001, armed);
+        await h.Selection.ApplyAsync(42, 100001, true, default);
+        await h.Selection.ApplyAsync(42, 100004, true, default);
+        var dressed = Worn(await h.Selection.ReadAsync(42, default));
+        Assert.DoesNotContain(100001, dressed);
+        Assert.Contains(100004, dressed);
+    }
+
     private static int[] ReadFlags(byte[] body)
     {
         using var source = new MemoryStream(body, 4, body.Length - 4);
@@ -393,7 +713,8 @@ public sealed class EquipmentSelectionTests
             _contexts.Add(context); return context;
         }
         internal static async Task<Harness> CreateAsync(string itemLocationsPath = "",
-            string clothingCategory = "Clothes", string accessoryCategory = "Accessories")
+            string clothingCategory = "Clothes", string accessoryCategory = "Accessories",
+            string selection = "id_ranges", string fighterConfigPath = "")
         {
             var h = new Harness();
             var root = h.Context("root");
@@ -408,6 +729,7 @@ public sealed class EquipmentSelectionTests
             {
                 ["enabled"] = true, ["publish_equipped_view_push"] = true, ["item_locations_path"] = itemLocationsPath,
                 ["clothing_category"] = clothingCategory, ["accessory_category"] = accessoryCategory,
+                ["selection"] = selection, ["fighter_config_path"] = fighterConfigPath,
             }), default);
             root.Effect(h._services.Register<IInventoryPushService>(h.Push()));
             await new EquipmentPlugin().ActivateAsync(h.Context("equipment"), default);

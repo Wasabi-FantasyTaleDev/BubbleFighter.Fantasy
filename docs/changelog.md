@@ -1,11 +1,19 @@
 ---
 title: "Changelog"
 description: "Dated changes for the public release series."
-updated: 2026-10-20
+updated: 2026-10-25
 ---
+
+## Unreleased — 2026-10-25 (UTC+08:00)
+
+- 2026-10-25: Restored all 22 configured kr-1256 AI room presets with their roster levels, characters, colors, clothing, weapons and native item modifiers. AI nicknames follow each recipient's Launcher language across room and round views; Korean names keep their preset spelling and other languages use localized difficulty titles and character names. Invalid modifier targets, missing localization and oversized appearance data fail during activation. Actual in-game appearance acceptance remains pending.
+- 2026-10-25: Added opt-in kr-1256 AI room seats through native add/remove requests, separate slot appearance records, controller migration and actor-specific movement, scoring and life/reset state. Bots reserve seats without acquiring network sessions or blocking the human loading barrier. The optional `profiles/kr-1256/ai-rooms.patch.yaml` supplies configurable server loadouts for the native preset choices; complete official outfits and real-client gameplay acceptance remain unverified. The initial tutorial route is unchanged.
+- 2026-10-25: Removed the unused `match-relay` plugin and the `InGame.Wire` assembly. Shared room bindings read and write round results through the packet tables; room session models live in the room library and relay session keys in the contracts assembly. Existing typed gameplay paths and profile configuration are preserved.
+- 2026-10-24: Folded the last compatibility plugins into the shared rows. Deleted plugin ids: `dialect.modern.messages`, `dialect.inventory-actions` and `dialect.customized-keys`; their packets are now options of `dialect.messages` (`inventory_actions`, `customized_keys`). No wire bytes changed; operator patches listing any deleted row must drop it or the profile fails at composition naming the unknown plugin.
 
 ## Unreleased — 2026-10-20 (UTC+08:00)
 
+- 2026-10-22: Added the self-hosted Launcher store guide covering catalogs, client profiles, plugin metadata, tool prerequisites and limits, and catalog-last publication.
 - Prebuilt packages for Windows x64, Windows ARM64, Linux x64 and Linux arm64 are published with each release. On Windows, extract the ZIP and double-click `BubbleFighter.Fantasy.Host.exe`: the setup assistant starts and opens in the browser, and a startup error stays on screen until a key is pressed. On Linux, `curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash` installs the server, and `--docker` runs it in a container, with a bundled MySQL only when `--with-mysql` is added.
 - KR2026 shop purchases follow the item terms in the client's own shop sheet: timed items expire, permanent items stay permanent, and a purchase the terms refuse gets a failed reply and charges nothing. Six item sets with endurance-counted items cannot be bought until that rule is established for this build.
 - The KR2026 shop now looks up every packet by name from the build's opcode table. Opening the gift box's sent list no longer triggers a purchase, and a refund request is no longer answered with an item card.

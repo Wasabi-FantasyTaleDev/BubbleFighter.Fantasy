@@ -86,17 +86,17 @@ public sealed class WireStreamDecoderTests
     public void UnknownFrameNameFails()
     {
         Assert.Throws<ArgumentException>(() => WireStream.Parse("frame9", null, null));
-        Assert.Throws<ArgumentException>(() => new WireStream(WireFrameKind.Legacy5, [1], null));
+        Assert.Throws<ArgumentException>(() => new WireStream(PacketFrameKind.Legacy5, [1], null));
     }
 
     [Fact]
     public void CreatedDialectCarriesTheProfileIdentity()
     {
         var profile = new ClientProfile("cn-404", "cn", 404, 0, 0, "test build");
-        var dialect = WireDialect.Create(profile, new WireStream(WireFrameKind.Legacy5));
+        var dialect = WireDialect.Create(profile, new WireStream(PacketFrameKind.Legacy5));
         Assert.Equal("cn-404", dialect.Id);
         Assert.Same(profile, dialect.Profile);
-        Assert.Equal(LegacyFrame.HeaderSize, dialect.MaxFrameOverheadBytes);
+        Assert.Equal(PacketFrame_5Bytes.HeaderSize, dialect.MaxFrameOverheadBytes);
     }
 
     [Fact]

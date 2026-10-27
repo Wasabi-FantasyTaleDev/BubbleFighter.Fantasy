@@ -76,6 +76,14 @@ internal static class TestTempDirectories
         {
             return false;
         }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            // Windows reuses process ids: a stale directory can name a live service or another
+            // user's process, whose exit state this account may not query (Win32Exception 5).
+            // Treating it as still running keeps the directory and the test run alive; the
+            // directory is never deleted on a guess.
+            return true;
+        }
     }
 
     // A recursive delete removes a link inside the tree without entering it, and a root that is itself a link is

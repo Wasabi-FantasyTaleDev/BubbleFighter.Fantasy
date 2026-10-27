@@ -8,9 +8,14 @@ namespace BubbleFighter.Fantasy.Shop.Handlers;
 
 /// <summary>
 /// Answers the legacy inventory-dialog entry. The server replies with the bag
-/// restatement (the empty S2C 801 plus the whole bag on S2C 802) followed by the equipped
-/// view and preset bar — never the shop state. The answer
-/// is written through the build's typed senders, so this handler holds no wire layout.
+/// restatement — an empty <c>gspRepEnterTCShop</c> (kr-1256 S2C 801, dispatcher
+/// <c>kr-1256 sub_9D2FF0</c> case 801) followed by the whole bag on
+/// <c>gspInventoryUpdateAllInventorySlot</c> (kr-1256 S2C 802, handler
+/// <c>kr-1256 sub_9AE4A0</c>) — then the equipped view and preset bar, never
+/// the shop state. The answer is written through the build's typed senders, so
+/// this handler holds no wire layout. Items that ended while the player was
+/// online leave the bag before it is restated, and their expiry notice follows
+/// the restatement when the build has one.
 /// </summary>
 /// <param name="inventory">The store the bag is read from.</param>
 /// <param name="replaced">The build's whole-inventory writer.</param>

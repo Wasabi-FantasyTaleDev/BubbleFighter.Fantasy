@@ -32,4 +32,11 @@ public sealed record ShopStateUpdated(PlayerIdentity Player, PlayerWallet Wallet
 /// <summary>Completes a purchase dialog after a committed state publication or a refusal.</summary>
 /// <param name="Key">The exact purchase identity to echo.</param>
 /// <param name="Succeeded">True only after the transaction and state publication succeeded.</param>
-public sealed record ShopPurchaseReplied(int Key, bool Succeeded) : IMessage;
+public sealed record ShopPurchaseReplied(int Key, bool Succeeded) : IMessage
+{
+    /// <summary>
+    /// Gets the reply text of the refusal the modern dialog builds its failure box from; the success path and
+    /// the legacy two-word reply carry it empty. Its display purpose is unproven.
+    /// </summary>
+    public string ReplyText { get; init; } = string.Empty;
+}

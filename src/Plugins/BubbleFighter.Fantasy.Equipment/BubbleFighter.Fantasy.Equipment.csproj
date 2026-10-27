@@ -9,4 +9,7 @@
     <ProjectReference Include="..\..\BubbleFighter.Fantasy.Contracts\BubbleFighter.Fantasy.Contracts.csproj" />
     <ProjectReference Include="..\..\BubbleFighter.Fantasy.Packets\BubbleFighter.Fantasy.Packets.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="BubbleFighter.Fantasy.Equipment.Tests" />
+  </ItemGroup>
 </Project>

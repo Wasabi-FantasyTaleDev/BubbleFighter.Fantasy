@@ -1,4 +1,5 @@
 using BubbleFighter.Fantasy.Abstractions;
+using BubbleFighter.Fantasy.Contracts.Launcher;
 
 namespace BubbleFighter.Fantasy.Contracts.Installation;
 
@@ -25,7 +26,14 @@ public interface IInstallationService
     InstallationConfiguration GetConfiguration();
     /// <summary>Corrects a failed installation, or activates deferred client data without changing durable storage or the administrator.</summary>
     ValueTask UpdateAsync(InstallationUpdate update, CancellationToken cancellationToken);
+    /// <summary>Persists client-plugin launch rules without changing server modules, storage, accounts or reward settings.</summary>
+    ValueTask UpdateClientPluginsAsync(InstallationClientPluginSettings settings, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This installation provider cannot edit client-plugin policy.");
 }
+
+/// <summary>A complete client-plugin override; null restores the profile policy and an empty list explicitly clears it.</summary>
+/// <param name="Policies">The store identities and their exact build scopes, or null to inherit the profile.</param>
+public sealed record InstallationClientPluginSettings(IReadOnlyList<ClientPluginPolicy>? Policies);
 
 /// <summary>An authenticated configuration response; the password field is always empty.</summary>
 /// <param name="Settings">The retained settings with secrets removed.</param>
@@ -40,6 +48,8 @@ public sealed record InstallationUpdate(InstallationSettings Settings, bool Reta
 /// <summary>Configuration edited by the installation assistant; this record must never be exposed as public status.</summary>
 public sealed record InstallationSettings
 {
+    /// <summary>Gets the client-plugin launch rules; null preserves the selected profile's original policy.</summary>
+    public IReadOnlyList<ClientPluginPolicy>? ClientPlugins { get; init; }
     /// <summary>Gets the selected client builds and their independent data roots; null reads the older single-profile fields.</summary>
     public IReadOnlyList<InstallationClient>? Clients { get; init; }
     /// <summary>Gets the administration UI language, independently of the selected game's locale.</summary>

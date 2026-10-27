@@ -1,6 +1,5 @@
 using System.Text;
 using BubbleFighter.Fantasy.Shop.Data;
-using BubbleFighter.Fantasy.Shop.Wire;
 using Xunit;
 using Xunit.Abstractions;
 

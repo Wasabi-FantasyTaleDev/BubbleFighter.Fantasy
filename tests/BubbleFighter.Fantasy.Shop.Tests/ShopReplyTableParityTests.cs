@@ -1,7 +1,7 @@
+using BubbleFighter.Fantasy.Contracts.Shop;
 using System.Globalization;
 using BubbleFighter.Fantasy.Packets;
 using BubbleFighter.Fantasy.Shop.Data;
-using BubbleFighter.Fantasy.Shop.Wire;
 using Xunit;
 
 namespace BubbleFighter.Fantasy.Shop.Tests;

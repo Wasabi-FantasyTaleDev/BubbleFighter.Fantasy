@@ -31,6 +31,19 @@ structs:
       except: [kr-1256]
     - rooms: "list<SessionSetting>"
       offset: 12
+  # S2C gspRoomSetSession (501), the room-info snapshot: exactly one SessionSetting, no seat list, no
+  # team panel and no trailing words, so the room-stage gate kind travels inside the setting.
+  # kr-812 room dispatcher sub_7FBBB0 case 501 -> kr-812 sub_7FD310 builds Packet_gspRoomSetSession
+  # (initializer kr-812 sub_418E10) and reads the setting through the packet vtable D691E4
+  # (kr-812 sub_83C040; the setting reader is kr-812 sub_4191A0). kr-1256 dispatcher kr-1256 sub_9D9930
+  # case 0x1F5 does the same with the initializer kr-1256 sub_113B7B0 and the setting reader
+  # kr-1256 sub_113BD20 - the reader gspGotoRoom's parser kr-1256 sub_10D4520 uses - and applies the
+  # snapshot to the room stage only while the session kind is 2. The room install builds its session
+  # object through the same kr-1256 sub_113B7B0 (kr-1256 sub_9D9250), so this snapshot restates the
+  # leading SessionSetting of gspGotoRoom and nothing else.
+  gspRoomSetSession:
+    - session_setting: SessionSetting
+      offset: 0
   # Slot readers: kr-812 sub_80C1B0, cn-717 sub_890F70, cn-324 sub_6EB1B0,
   # cn-279 sub_4499B0, id-400 sub_782540, id-1809 sub_7A5A30, cn-706 sub_788190.
   RoomSeatUpdate:
@@ -44,7 +57,12 @@ structs:
       # before its kind switch, as the room install does, then a second keyed map and the team panel
       kr-1256:
         - profile_entries: "list<RoomProfileEntry>"
-        - unknown_n3: empty_list        # kr-1256 sub_10C3D80; sent empty
+        # kr-1256 sub_10C3D80/sub_10C4010 read the same element shape; sub_81D010 keys it by user number.
+        - unknown_n3: "list<RoomProfileEntry>"
+        - team_info: ServerTeamInfo
+      # cn-774 sub_8DB6B0 / tw-454 sub_A5B220 read one native equipped object, then the team panel.
+      cn-774:
+        - equipment: EquippedObjectEntry
         - team_info: ServerTeamInfo
       cn-324:
         - equipment: EquippedItemList
@@ -64,6 +82,16 @@ structs:
       cn-706:
         - equipment: EquippedItemList
           offset: 248
+  # S2C gspRoomChangeGameSetting (505), the in-place map update: exactly one GameSetting. kr-812 room
+  # dispatcher sub_7FBBB0 case 505 -> kr-812 sub_7FE410 builds Packet_gspRoomChangeGameSetting around one
+  # GameSetting (initializer kr-812 sub_417BD0, packet vtable D6922C) and applies it on the arms where
+  # the stage word it reads is 2 or 4. kr-1256 dispatcher kr-1256 sub_9D9930 case 0x1F9 ->
+  # kr-1256 sub_9DB8A0 reads the MapMeta with the GameSetting reader kr-1256 sub_113D030, installs it
+  # through the copy helper kr-1256 sub_113C9A0 and redraws the mode/map board. A map change travels on
+  # this frame, never on an S2C 117, whose kind-2 install deletes and rebuilds the room.
+  gspRoomChangeGameSetting:
+    - game_setting: GameSetting
+      offset: 0
   # Leave readers: kr-812 sub_8104E0, cn-717 sub_8C9DB0, cn-324 sub_6FE130,
   # cn-279 sub_44A060, id-400 sub_7828E0, id-1809 sub_7A5E00, cn-706 sub_4BA810.
   RoomSeatLeave:
@@ -73,6 +101,7 @@ structs:
       offset: 8
     # kr-1256 sub_9DB1E0 (case 0x1FF) reads a team panel after the record; a vacated record removes the seat's
     # character, and kr-1256 sends this packet for an occupied seat as well
+    # cn-774 sub_8DC300 / tw-454 sub_A5BED0 read the same suffix after their own UserSlot record.
     - team_info: ServerTeamInfo
       only: [kr-1256]
   # Scene move: kr-812 sub_8446F0/sub_8446C0 and corresponding own readers in
@@ -120,6 +149,8 @@ structs:
       # after the password, which the room binding reads as the absent tag
       kr-1256:
         - unknown_n2: "optional<0x3A,RoomCreateTail>"
+      # tw-454 sub_668EB0 writes SessionSetting through sub_48B420, then the password and no tag.
+      tw-454: []
   RoomJoinRequest:
     # kr-1256 sub_854C90 writes the clicked row's room id and the typed password only
     - room_id: u32
@@ -194,6 +225,8 @@ structs:
       only: [kr-1256]
     - unknown_n10: bool
       only: [kr-1256]
+      # tw-454 sub_A604B0 stops after the preceding string; cn-774 sub_8F1B80 reads this bool32.
+      except: [tw-454]
   # C2S readers: kr-812 sub_844570, cn-717 sub_8CEE00, cn-324 sub_6FD230,
   # cn-279 sub_480550, id-400 sub_798DF0, id-1809 sub_7BE230, cn-706 sub_7A1330.
   RoomChatRequest:
@@ -225,6 +258,15 @@ structs:
       default: 186
     - unknown_n1: "optional<0x3A,TeamChangeTail>"
       default: 186
+  # cn-774 sub_535610 / tw-454 sub_796FB0 write three plain words. The ordinary local-seat
+  # controls cn-774 sub_B739A0 / tw-454 sub_7DA940 send -1, 0, 0; qualified forms remain unknown.
+  RoomTeamChangeRequest@cn-774:
+    - unknown_0: u32
+      offset: 0
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
   # C2S nickname readers: kr-812 sub_5C8FD0, cn-717 sub_740F00,
   # cn-324 sub_6FDDF0, cn-279 sub_481C90, id-400 sub_89DD10,
   # id-1809 sub_68D480, cn-706 sub_567230.

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Version>8.13.0</Version>
-    <AssemblyVersion>8.13.0.0</AssemblyVersion>
+    <Version>8.15.0</Version>
+    <AssemblyVersion>8.15.0.0</AssemblyVersion>
     <Description>Contracts and seam interfaces for the Bubble Fighter Fantasy server plugin tree.</Description>
   </PropertyGroup>
   <ItemGroup>

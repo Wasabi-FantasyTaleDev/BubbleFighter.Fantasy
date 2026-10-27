@@ -3,7 +3,12 @@ using System.Globalization;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text.Json;
+using BubbleFighter.Fantasy.Abstractions;
+using BubbleFighter.Fantasy.Abstractions.Protocol;
+using BubbleFighter.Fantasy.Contracts.Companion;
 using BubbleFighter.Fantasy.Contracts.Launcher;
+using BubbleFighter.Fantasy.Contracts.Match;
+using BubbleFighter.Fantasy.Contracts.Messenger;
 using BubbleFighter.Fantasy.Contracts.Progress;
 using BubbleFighter.Fantasy.Contracts.Wallet;
 using Microsoft.AspNetCore.Builder;
@@ -25,12 +30,25 @@ public sealed class LauncherServer : IAsyncDisposable
     public IReadOnlyCollection<string> Addresses => _app.Urls.ToArray();
 
     /// <summary>Validates settings, binds the listener, and serves accounts and client presets from interfaces.</summary>
+    public static Task<LauncherServer> StartAsync(LauncherOptions options, ILauncherAccountRepository accounts,
+        LauncherSessions sessions, IPlayerWalletRepository? wallets = null, IPlayerProgressRepository? progress = null, CancellationToken ct = default) =>
+        StartAsync(options, accounts, sessions, players: null, matchConnections: null, wallets: wallets, progress: progress, ct: ct);
+
+    /// <summary>Binds the launcher API with presence limited to each authenticated player's owning login connection.</summary>
+    /// <remarks>Direct callers may supply a match classifier for older session providers without login ownership.
+    /// The plugin row does not acquire this service: its provider can depend on the tickets published here.</remarks>
     public static async Task<LauncherServer> StartAsync(LauncherOptions options, ILauncherAccountRepository accounts,
-        LauncherSessions sessions, IPlayerWalletRepository? wallets = null, IPlayerProgressRepository? progress = null, CancellationToken ct = default)
+        LauncherSessions sessions, ISessionRegistry? players, IMatchConnectionTracker? matchConnections = null,
+        IPlayerWalletRepository? wallets = null, IPlayerProgressRepository? progress = null, CancellationToken ct = default,
+        ILogger? logger = null, IMessengerTicketIssuer? messenger = null, IHostReadiness? readiness = null,
+        ICompanionTicketIssuer? companion = null)
     {
         Validator.ValidateObject(options, new ValidationContext(options), true);
         var errors = options.Validate().ToArray(); if (errors.Length > 0) throw new ValidationException(string.Join("; ", errors.Select(e => e.ErrorMessage)));
         var policy = new LauncherClientPolicy(options);
+        var presence = new LauncherPresence(options, players, matchConnections);
+        if (options.PlayerLimit is not null && players is null)
+            throw new ValidationException("player_limit requires ISessionRegistry to enforce launcher admission.");
         await sessions.InitializeAsync(ct).ConfigureAwait(false);
         var builder = WebApplication.CreateSlimBuilder(); builder.Logging.ClearProviders();
         builder.WebHost.ConfigureKestrel(k =>
@@ -46,13 +64,22 @@ public sealed class LauncherServer : IAsyncDisposable
         app.Use(async (context, next) =>
         {
             context.Response.Headers.CacheControl = "no-store";
-            if (!budget.TryTake(context.Connection.RemoteIpAddress) || !await workers.WaitAsync(0, context.RequestAborted).ConfigureAwait(false)) { context.Response.StatusCode = 429; return; }
+            if (!budget.TryTake(context.Connection.RemoteIpAddress) || !await workers.WaitAsync(0, context.RequestAborted).ConfigureAwait(false))
+            { await Error(429, "rate_limited").ExecuteAsync(context).ConfigureAwait(false); return; }
             try { await next(context).ConfigureAwait(false); }
             catch (LauncherUpdateRequiredException)
             { context.Response.StatusCode = 426; await context.Response.WriteAsJsonAsync(new { error = "launcher_update_required", policy.MinimumLauncherVersion }, context.RequestAborted).ConfigureAwait(false); }
+            catch (LauncherApiFailure e) when (!context.Response.HasStarted)
+            {
+                var result = e.Code == "server_maintenance"
+                    ? Results.Json(new { error = e.Code, options.MaintenanceStart, options.MaintenanceEnd, options.MaintenanceDescription }, statusCode: e.Status)
+                    : Error(e.Status, e.Code);
+                await result.ExecuteAsync(context).ConfigureAwait(false);
+            }
             catch (Exception e) when (e is JsonException or BadHttpRequestException or ArgumentException or InvalidDataException)
             { context.Response.StatusCode = 400; await context.Response.WriteAsJsonAsync(new { error = "invalid_request" }, context.RequestAborted).ConfigureAwait(false); }
-            catch (InvalidOperationException e) when (e.Message == "Authentication capacity reached.") { context.Response.StatusCode = 503; }
+            catch (InvalidOperationException e) when (e.Message == "Authentication capacity reached.")
+            { await Error(503, "authentication_capacity").ExecuteAsync(context).ConfigureAwait(false); }
             catch (UnauthorizedAccessException) when (!context.Response.HasStarted)
             { context.Response.StatusCode = 401; await context.Response.WriteAsJsonAsync(new { error = "unauthorized" }, context.RequestAborted).ConfigureAwait(false); }
             finally { workers.Release(); }
@@ -64,9 +91,19 @@ public sealed class LauncherServer : IAsyncDisposable
             registrationFields = Array.Empty<object>(),
             options.HostPolicy, region = options.Region.Length == 0 ? null : options.Region, options.SupportsInstances, options.SupportsPlugins, options.LevelIcon,
             profileFields = new[] { "level", "lucci", "cash" },
+            presentation = presence.Presentation(),
             policy.MinimumLauncherVersion, policy.PluginRecommendations,
             instances = options.Instances.Select(instance => CatalogInstance(instance, context.Request.Host.Host)),
         }));
+        app.MapGet("/v1/players", () =>
+        {
+            // Disabling disclosure must not even consult the session registry.
+            if (!options.RosterEnabled) return Results.Json(new { schema = 1, enabled = false, players = Array.Empty<object>(), truncated = false });
+            var online = presence.Snapshot();
+            return Results.Json(new { schema = 1, enabled = true,
+                players = online.Take(options.MaxRosterPlayers).Select(p => new { name = p.Nickname, level = p.Level }),
+                truncated = online.Length > options.MaxRosterPlayers });
+        });
         app.MapGet("/v1/instances/{id}/instance.toml", (string id) =>
         {
             var preset = options.Instances.SingleOrDefault(i => i.Id == id); if (preset is null) return Results.NotFound();
@@ -77,7 +114,8 @@ public sealed class LauncherServer : IAsyncDisposable
         });
         app.MapPost("/v1/auth/register", async (HttpContext context) =>
         {
-            if (!options.RegistrationEnabled) return Results.StatusCode(403);
+            if (!options.RegistrationEnabled) return Error(403, "registration_disabled");
+            RequireReady(readiness);
             var body = await Body(context).ConfigureAwait(false);
             policy.Check(context, body);
             var username = Username(body); var password = Password(body);
@@ -90,8 +128,11 @@ public sealed class LauncherServer : IAsyncDisposable
         {
             var body = await Body(context).ConfigureAwait(false);
             policy.Check(context, body);
-            var account = await accounts.FindAsync(Username(body), context.RequestAborted).ConfigureAwait(false);
+            var username = Username(body);
             var password = Password(body);
+            RequireReady(readiness);
+            presence.CheckAdmission(username);
+            var account = await accounts.FindAsync(username, context.RequestAborted).ConfigureAwait(false);
             if (account is null && options.CreateAccountOnLogin)
             {
                 if (password.Length < options.MinimumPasswordLength) return Results.BadRequest(new { error = "password_too_short" });
@@ -107,7 +148,9 @@ public sealed class LauncherServer : IAsyncDisposable
                 account = await accounts.FindAsync(account.Username, context.RequestAborted).ConfigureAwait(false);
             }
             var valid = VerifyPassword(password, account?.PasswordHash is { Length: > 0 } hash ? hash : dummyHash);
-            if (!valid || account is null || account.BannedUntil > DateTime.UtcNow) return Results.Unauthorized();
+            if (account is null) return Error(401, "account_not_found");
+            if (!valid) return Error(401, "wrong_password");
+            if (account.BannedUntil > DateTime.UtcNow) return Error(401, "account_banned");
             var profile = await Profile(account, options, wallets, progress, context.RequestAborted).ConfigureAwait(false);
             return Grant(await sessions.SignInAsync(account.Username, context.RequestAborted).ConfigureAwait(false), profile, policy);
         });
@@ -121,7 +164,7 @@ public sealed class LauncherServer : IAsyncDisposable
             if (account is null || account.BannedUntil > DateTime.UtcNow)
             {
                 await sessions.SignOutAsync(grant.RefreshToken, grant.AccessToken, context.RequestAborted).ConfigureAwait(false);
-                throw new UnauthorizedAccessException();
+                throw new LauncherApiFailure(401, account is null ? "unauthorized" : "account_banned");
             }
             return Grant(grant, await Profile(account, options, wallets, progress, context.RequestAborted).ConfigureAwait(false), policy);
         });
@@ -148,8 +191,36 @@ public sealed class LauncherServer : IAsyncDisposable
             policy.Check(context, body);
             var build = body.TryGetProperty("build", out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : throw new InvalidDataException();
             if (!options.Instances.Any(i => i.Build == build)) return Results.BadRequest(new { error = "unsupported_build" });
-            var ticket = sessions.Issue(Bearer(context), build!);
-            return Results.Json(new { account = account.Username, ticket = ticket.Token, expiresAt = ticket.ExpiresAt });
+            var metadata = LauncherLaunchMetadata.Read(body);
+            RequireReady(readiness);
+            presence.CheckAdmission(account.Username);
+            // The companion is optional: a full launch table leaves this launch without it rather than refusing the game.
+            CompanionGrant? companionGrant = null;
+            if (companion is not null)
+            {
+                try { companionGrant = companion.Open(account.Username, build!); }
+                catch (InvalidOperationException e) { logger?.LogWarning("Companion launch not opened: {Reason}", e.Message); }
+            }
+            var ticket = sessions.Issue(Bearer(context), build!, metadata.LauncherLanguage, companionGrant?.LaunchId);
+            logger?.LogInformation("Launcher ticket issued for build {Build}, release {ReleaseVersion}, patch {PatchVersion}, languages {LauncherLanguage}/{NativeLanguage}/{ClientLanguage}.",
+                build, metadata.ReleaseVersion, metadata.PatchVersion, metadata.LauncherLanguage, metadata.NativeLanguage, metadata.ClientLanguage);
+            // The messenger ticket is separate from the single-use game ticket, so the game login cannot consume it.
+            var messengerTicket = messenger?.Issue(account.Username, account.Nickname ?? account.Username, build!);
+            var reply = new Dictionary<string, object?> { ["account"] = account.Username, ["ticket"] = ticket.Token, ["expiresAt"] = ticket.ExpiresAt };
+            if (messengerTicket is not null)
+                reply["messenger"] = new { url = messenger!.PublicUrl.Replace("{host}", context.Request.Host.Host, StringComparison.Ordinal), ticket = messengerTicket.Value, expiresAt = messengerTicket.ExpiresAt };
+            if (companionGrant is not null) reply["companion"] = CompanionReply(companionGrant, context.Request.Host.Host);
+            return Results.Json(reply);
+        });
+        // A reconnecting launcher needs a fresh one-time companion ticket for the launch it already holds.
+        app.MapPost("/v1/companion/tickets", async (HttpContext context) =>
+        {
+            var account = await Authorized(context, accounts, sessions).ConfigureAwait(false);
+            var body = await Body(context).ConfigureAwait(false);
+            var launchId = body.TryGetProperty("launchId", out var value) && value.ValueKind == JsonValueKind.String ? value.GetString()! : throw new InvalidDataException();
+            if (companion is null) return Error(404, "companion_unavailable");
+            var grant = companion.Renew(account.Username, launchId);
+            return grant is null ? Error(404, "launch_not_found") : Results.Json(CompanionReply(grant, context.Request.Host.Host));
         });
         try { await app.StartAsync(ct).ConfigureAwait(false); return new LauncherServer(app, workers, options); }
         catch { await app.DisposeAsync().ConfigureAwait(false); workers.Dispose(); throw; }
@@ -163,11 +234,26 @@ public sealed class LauncherServer : IAsyncDisposable
             ["id"] = instance.Id, ["build"] = instance.Build,
             ["name"] = instance.Name.ToDictionary(n => n.Language, n => n.Text, StringComparer.Ordinal),
             ["releaseVersion"] = instance.ReleaseVersion, ["clientLanguages"] = instance.ClientLanguages,
+            ["protocolVersion"] = instance.ProtocolVersion, ["patchVersion"] = instance.PatchVersion.Length == 0 ? null : instance.PatchVersion,
             ["endpoint"] = new { Host = instance.Host.Length == 0 ? requestHost : instance.Host, instance.Port }, ["launcherLogin"] = instance.LauncherLogin,
         };
         if (instance.DownloadSource is { } source)
             result["downloadSource"] = new { source.Kind, source.BaseUrl, source.CatalogPath, source.PackageId };
         return result;
+    }
+
+    private static IResult Error(int status, string code) => Results.Json(new { error = code }, statusCode: status);
+
+    private static object CompanionReply(CompanionGrant grant, string requestHost) => new
+    {
+        url = grant.Url.Replace("{host}", requestHost, StringComparison.Ordinal), ticket = grant.Ticket, launchId = grant.LaunchId, expiresAt = grant.ExpiresAt,
+    };
+
+    // Game listeners accept connections while later rows are still activating; new sign-ins and launches wait until
+    // every row is active so a player never reaches a half-composed server.
+    private static void RequireReady(IHostReadiness? readiness)
+    {
+        if (readiness is { IsReady: false }) throw new LauncherApiFailure(503, "server_not_ready");
     }
 
     private static async Task<object> Profile(LauncherAccount account, LauncherOptions options, IPlayerWalletRepository? wallets, IPlayerProgressRepository? progress, CancellationToken ct)
@@ -182,7 +268,11 @@ public sealed class LauncherServer : IAsyncDisposable
     {
         var token = Bearer(context); var name = sessions.Account(token) ?? throw new UnauthorizedAccessException();
         var account = await accounts.FindAsync(name, context.RequestAborted).ConfigureAwait(false);
-        if (account is null || account.BannedUntil > DateTime.UtcNow) { await sessions.SignOutAsync(null, token, context.RequestAborted).ConfigureAwait(false); throw new UnauthorizedAccessException(); }
+        if (account is null || account.BannedUntil > DateTime.UtcNow)
+        {
+            await sessions.SignOutAsync(null, token, context.RequestAborted).ConfigureAwait(false);
+            throw new LauncherApiFailure(401, account is null ? "unauthorized" : "account_banned");
+        }
         return account;
     }
     private static string Bearer(HttpContext context) => OptionalBearer(context) ?? throw new UnauthorizedAccessException();

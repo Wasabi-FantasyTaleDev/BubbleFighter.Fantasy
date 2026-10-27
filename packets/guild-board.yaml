@@ -1,0 +1,69 @@
+version: 1
+structs:
+  # The guild (clan) message wall of the legacy builds: a per-guild board the client reads, posts to and
+  # deletes from. All shapes below are the kr-812 client's; the other legacy builds state their own opcode
+  # numbers and their bodies were not read here.
+  # C2S gcpReqGuildLineBoard (the list/refresh request) and C2S gcpReqGuildLineBoardDelete share one class
+  # reader: kr-812 sub_6DAF50 reads 8 bytes at object +8 (kr-812 sub_A56C30) and one 4-byte word at +16
+  # (kr-812 sub_A56C10). The same 8-byte-then-word reader is the kr-812 deserialize slot of other request
+  # classes, so the body is proven and the two fields' meanings are not.
+  GuildLineBoardRequest:
+    - unknown_8: u64 # first 8 bytes of both requests; purpose not proven
+      except: [kr-1256, cn-774, tw-454]
+      offset: 8
+    - unknown_16: u32 # the word after them; purpose not proven
+      except: [kr-1256, cn-774, tw-454]
+      offset: 16
+
+  # C2S gcpReqGuildLineBoardWrite: kr-812 sub_6DAF20 reads 8 bytes at object +8 (kr-812 sub_A56C30) and a
+  # wstring at +16 (kr-812 sub_A56D70, a 4-byte character count then UTF-16). The same reader is the
+  # kr-812 deserialize slot of Packet_gcpReqGotoGuild, so that request carries the same two fields.
+  GuildLineBoardWriteRequest:
+    - unknown_8: u64 # the same leading 8 bytes; purpose not proven
+      except: [kr-1256, cn-774, tw-454]
+      offset: 8
+    - unknown_16: wstr # counted text; its purpose is not proven
+      except: [kr-1256, cn-774, tw-454]
+      offset: 16
+
+  # S2C gspRepGuildLineBoard: kr-812 sub_83D960 reads one 4-byte word at object +4 and then a counted vector
+  # of GuildLineBoardRecord elements at +8 (kr-812 sub_83D850 sizes the vector at 72-byte elements and
+  # kr-812 sub_83D700 constructs each one with the GuildLineBoardRecord vtable).
+  GuildLineBoardReply:
+    - unknown_4: u32 # the word before the records; purpose not proven
+      except: [kr-1256, cn-774, tw-454]
+      offset: 4
+    - records: "list<GuildLineBoardRecord>" # the client's own element class name
+      except: [kr-1256, cn-774, tw-454]
+      offset: 8
+
+  # One line of the board, the element class GuildLineBoardRecord (kr-812 vtable 0xD6EF70). Its deserializer
+  # kr-812 sub_83D920 reads a 4-byte word at +4, a wstring at +8, a second wstring at +36 and 8 bytes at +64.
+  # The object is 72 bytes, which is the vector stride kr-812 sub_83D850 uses, so the four fields fill it
+  # after its four-byte vtable pointer. Their meanings are not proven; the two strings are read in this order.
+  GuildLineBoardRecord:
+    - unknown_4: u32
+      except: [kr-1256, cn-774, tw-454]
+      offset: 4
+    - unknown_8: wstr
+      except: [kr-1256, cn-774, tw-454]
+      offset: 8
+    - unknown_36: wstr
+      except: [kr-1256, cn-774, tw-454]
+      offset: 36
+    - unknown_64: u64
+      except: [kr-1256, cn-774, tw-454]
+      offset: 64
+
+  # S2C gspRepGuildLineBoardWrite and S2C gspRepGuildLineBoardDelete share one class reader: kr-812 sub_80A910
+  # reads one 4-byte word at object +4. The same reader body is the deserialize slot of other one-word reply
+  # classes, so only the width and the position are proven.
+  GuildLineBoardResultReply:
+    - unknown_4: u32
+      except: [kr-1256, cn-774, tw-454]
+      offset: 4
+
+  # C2S gcpReqGuildInfo: the kr-812 deserialize slot of Packet_gcpReqGuildInfo (kr-812 sub_5C8FC0) is an empty
+  # function, so the request carries no field. Its reply, S2C gspResGuildInfo, is already stated as
+  # ClanGuildInfo in packets/clan.yaml (16 bytes when empty) and is not repeated here.
+  GuildInfoRequest: []

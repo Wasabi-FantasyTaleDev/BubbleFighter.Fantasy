@@ -33,10 +33,17 @@ public interface IPlayerRepository
     /// <param name="ct">Cancellation token.</param>
     ValueTask<bool> HasCreatedCharacterAsync(long userNum, CancellationToken ct);
 
-    /// <summary>Creates a player with the given login name and nickname.</summary>
+    /// <summary>
+    /// Creates a player with the given login name and nickname. Rejection of a taken name is
+    /// store-defined: persistent stores rely on the unique username and nickname indexes and let
+    /// the provider's duplicate error surface. Callers that need a definite answer use
+    /// <see cref="FindByUsernameAsync"/> or <see cref="NicknameExistsAsync"/> first, or
+    /// <see cref="CreateCharacterAsync"/>, which returns null for a taken account or name.
+    /// </summary>
     /// <param name="username">The login name.</param>
     /// <param name="nickname">The display name.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <returns>The created record with its new user number and starting level.</returns>
     ValueTask<PlayerRecord> CreateAsync(string username, string nickname, CancellationToken ct);
 
     /// <summary>Checks whether an existing player owns the requested nickname.</summary>

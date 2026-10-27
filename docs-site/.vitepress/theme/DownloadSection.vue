@@ -2,6 +2,7 @@
 import { computed, nextTick, ref, useId } from 'vue'
 import NoahTerminal from './noah/components/ui/NoahTerminal.vue'
 import Icon from './Icon.vue'
+import { launcherRepository, usePublicReleases, windowsX64Asset } from './release'
 import linuxIcon from './icons/linux.svg'
 import dockerIcon from './icons/docker.svg'
 
@@ -9,6 +10,14 @@ defineProps<{ content: Record<string, string>; labels: Record<string, string>; g
 const selectedMode = ref<'script' | 'docker'>('script')
 const modeIsDocker = computed(() => selectedMode.value === 'docker')
 const tabs = ref<HTMLElement>()
+// The version comes from GitHub at view time, so a new release needs no site rebuild.
+const releases = usePublicReleases()
+const latest = computed(() => releases.value?.[0])
+// The launcher card turns into a download as soon as the launcher repository publishes a Windows x64 file.
+const launcherReleases = usePublicReleases(launcherRepository)
+const launcherRelease = computed(() => launcherReleases.value?.[0])
+const launcherAsset = computed(() => windowsX64Asset(launcherRelease.value))
+const launcherUrl = `https://github.com/${launcherRepository}`
 const tabId = `install-${useId()}`
 // Versionless asset names make the latest release's files stable addresses.
 const releaseBase = 'https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest/download'
@@ -30,6 +39,7 @@ async function changeTab(event: KeyboardEvent) {
     <div class="download-heading">
       <h2 id="download-title">{{ content.title }}</h2>
       <p>{{ content.subtitle }}</p>
+      <p v-if="latest" class="download-version">{{ content.latest }} <a :href="latest.url">{{ latest.tag }}</a> · <time :datetime="latest.date">{{ latest.date }}</time></p>
     </div>
     <div class="download-grid">
       <article v-for="architecture in ['x64', 'ARM64']" :key="architecture" class="download-card">
@@ -40,6 +50,16 @@ async function changeTab(event: KeyboardEvent) {
         <a class="download-button" :href="`${releaseBase}/bubblefighter-fantasy-win-${architecture.toLowerCase()}.zip`" :aria-label="`Windows ${architecture}: ${content.download}`"><Icon name="download" /><span>{{ content.download }}</span></a>
       </article>
     </div>
+    <article class="download-card launcher-card" aria-labelledby="launcher-title">
+      <svg class="download-card-mark" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path :d="windowsPath" /></svg>
+      <div class="launcher-text">
+        <h3 id="launcher-title">{{ content.launcherTitle }} <span class="download-architecture">Windows x64</span></h3>
+        <p class="download-meta">{{ content.launcherMeta }}<template v-if="launcherAsset && launcherRelease"> · <a :href="launcherRelease.url">{{ launcherRelease.tag }}</a></template></p>
+        <p class="download-note">{{ content.launcherNote }} <a :href="launcherUrl">{{ content.launcherRepo }}</a></p>
+      </div>
+      <a v-if="launcherAsset" class="download-button" :href="launcherAsset.url" :aria-label="`${content.launcherTitle} Windows x64: ${content.download}`"><Icon name="download" /><span>{{ content.launcherDownload }}</span></a>
+      <span v-else class="download-button download-button-disabled" role="button" aria-disabled="true"><span>{{ content.launcherUnavailable }}</span></span>
+    </article>
     <a class="download-guide" :href="guideHref">{{ content.guide }}<Icon name="arrow" /></a>
   </section>
 

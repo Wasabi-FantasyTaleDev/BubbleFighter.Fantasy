@@ -81,6 +81,17 @@ public sealed class PluginBoundaryTests
         {
             ["Inventory.EquippedSlotRecord"] = [10, 11, 12, 13],
             ["Inventory.WeaponPresetChangeRequested"] = [0],
+            // The persisted page keeps the yaml's unknown_<offset> names: only word 0 is consumed by the
+            // clients (kr-1256 sub_808F10's family check, kr-812 sub_97A8D0's /1000 gate); words 4 and 8
+            // stay unknown until their consuming paths establish their purpose.
+            ["Inventory.WeaponPresetPage"] = [0, 4, 8],
+            // The 20-byte relay session key kr-1256 sub_1159210 writes and sub_11592A0 reads (verified
+            // layout, formerly the InGame.Wire record). Its six words have no traced purpose; the room
+            // registry mints them randomly and the match connection compares them byte for byte.
+            ["Match.RelaySessionKey"] = [0, 1, 2, 3, 4, 5],
+            // kr-1256 sub_10D9410 retains the final ItemAttr word and text; their kind-specific
+            // meanings remain unproven, so room presets preserve the packet table's offset names.
+            ["Rooms.RoomItemAttribute"] = [28, 32],
         }.SelectMany(pair => pair.Value.Select(n => $"BubbleFighter.Fantasy.Contracts.{pair.Key}.Unknown{n}"));
         Assert.Equal(expected.Order(StringComparer.Ordinal), actual.Order(StringComparer.Ordinal));
         Assert.DoesNotContain(typeof(IInventoryRepository).Assembly.GetExportedTypes(), t => t.Name.Contains("Unknown", StringComparison.Ordinal));
@@ -142,9 +153,9 @@ public sealed class PluginBoundaryTests
         Assert.All(plugins, plugin =>
         {
             Assert.StartsWith(plugin.Id == "fighters" ? "2.0.0" : "1.0.0", plugin.Version);
-            Assert.Equal("8.13.0.0", plugin.ContractVersions["BubbleFighter.Fantasy.Abstractions"]);
+            Assert.Equal("8.15.0.0", plugin.ContractVersions["BubbleFighter.Fantasy.Abstractions"]);
             Assert.All(plugin.ContractVersions, pair => Assert.Equal(
-                pair.Key == "BubbleFighter.Fantasy.Contracts" ? contractsVersion : "8.13.0.0", pair.Value));
+                pair.Key == "BubbleFighter.Fantasy.Contracts" ? contractsVersion : "8.15.0.0", pair.Value));
         });
         // Shared plugins name no client builds: a build is added with profile and packet-table data alone.
         Assert.All(new[] { "protocol", "dialect", "lobby", "ingame", "shop", "equipment", "inventoryview", "centers",
@@ -181,7 +192,7 @@ public sealed class PluginBoundaryTests
             var encrypted = dialect.EncodeFrame(2, [1, 2, 3]);
             dialect.CreateEncryptor(Abstractions.Protocol.PacketDirection.ServerToClient).Apply(encrypted);
             Wire.SimpleCipher.ServerToClient().DecryptInPlace(encrypted);
-            Assert.Equal(major == 1256 ? Wire.WireFrame.Encode(2, [1, 2, 3]) : Wire.LegacyFrame.Encode(2, [1, 2, 3]), encrypted);
+            Assert.Equal(major == 1256 ? Wire.PacketFrame_8Bytes.Encode(2, [1, 2, 3]) : Wire.PacketFrame_5Bytes.Encode(2, [1, 2, 3]), encrypted);
         }
         finally
         {

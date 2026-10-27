@@ -5,9 +5,9 @@ using BubbleFighter.Fantasy.Contracts.Presents;
 namespace BubbleFighter.Fantasy.Shop;
 
 /// <summary>
-/// Configuration for the <see cref="ShopPlugin"/> row. Protocol name and
-/// <see cref="VersionMajor"/> are supplied by the profile; this plugin does not
-/// hard-code a client region in its id. Catalog paths are interpolated
+/// Configuration for the <see cref="ShopPlugin"/> row. The protocol name is supplied
+/// by the profile; the dialect comes from the build's lineage, and this plugin does
+/// not hard-code a client region in its id. Catalog paths are interpolated
 /// (<c>${VAR}</c> / <c>${VAR:-default}</c>) by the host.
 ///
 /// </summary>
@@ -165,7 +165,7 @@ public sealed class ShopOptions : IValidatableOptions
     /// framing uses a 16-bit payload length (maximum 65535 bytes); 65000 leaves room
     /// below that wire limit but is a server policy, not a client-requested size.
     /// Cards beyond the budget (or beyond
-    /// <see cref="Wire.ShopWire.LegacyEnterShopCardCap"/>) are omitted in
+    /// <see cref="LegacyEnterShopCardCap"/>) are omitted in
     /// deterministic emit order — mains 1000 and 500 first — and logged.
     /// The kr-1256 dialect ignores this setting.
     ///
@@ -175,7 +175,13 @@ public sealed class ShopOptions : IValidatableOptions
 
     /// <summary>Gets or sets the legacy catalog card limit; zero uses only the encoded frame budget.</summary>
     [Range(0, 10000)]
-    public int MaxEnterShopCards { get; set; } = Wire.ShopWire.LegacyEnterShopCardCap;
+    public int MaxEnterShopCards { get; set; } = LegacyEnterShopCardCap;
+
+    /// <summary>
+    /// The default deployment card-count limit of the legacy catalog selection: a 221-card catalog fits a
+    /// 35256-byte frame. Independent of the 16-bit frame limit; the count does not establish a client limit.
+    /// </summary>
+    public const int LegacyEnterShopCardCap = 221;
 
     /// <summary>Gets or sets whether identical legacy grant contents retain only their longest sale duration.</summary>
     public bool PreferLongestDuration { get; set; } = true;
@@ -274,6 +280,14 @@ public sealed class ShopOptions : IValidatableOptions
     public int CatalogCardLimit { get; set; }
 
     /// <summary>
+    /// Gets or sets the encoded item-catalog payload budget. Zero retains the full catalog; a short-frame
+    /// deployment must set its native payload ceiling. Cards beyond the byte budget are logged and omitted.
+    /// YAML key <c>catalog_payload_bytes</c>.
+    /// </summary>
+    [Range(0, int.MaxValue)]
+    public int CatalogPayloadBytes { get; set; }
+
+    /// <summary>
     /// Gets or sets the main category the S2C 800 reply tells the dialog to open
     /// on: the trailing <c>i32</c> the parser reads at object +68
     /// (<c>sub_99B9A0</c>), which the reply handler hands to the fill as the
@@ -289,7 +303,7 @@ public sealed class ShopOptions : IValidatableOptions
     /// Gets or sets how the S2C 800 tab tree is built. <c>card_names</c> (default) links pages to mains through the
     /// cards' sub-category names and sends <see cref="EnterShopMainCategory"/>. <c>id_ranges</c> groups every page under
     /// the main its id falls in, echoes the requested category when published and sends a content revision (see
-    /// <c>ShopWire.BuildRangeTree</c>); for workbooks whose page names repeat. YAML key <c>catalog_tree</c>.
+    /// <c>ShopRangeTree.BuildRangeTree</c>); for workbooks whose page names repeat. YAML key <c>catalog_tree</c>.
     /// </summary>
     public string CatalogTree { get; set; } = "card_names";
 

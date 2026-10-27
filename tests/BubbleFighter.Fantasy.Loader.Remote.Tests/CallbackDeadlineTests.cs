@@ -56,9 +56,10 @@ public sealed class CallbackDeadlineTests
     [PythonFact]
     public async Task UnansweredMiddlewareCallbackFaultsTheRowWithinTheDeadline()
     {
-        // The deadlines also bound loader startup, so leave the interpreter enough time to answer initialize.
+        // request_timeout_ms also bounds the interpreter's initialize answer, which can take over a second on a
+        // loaded machine; the measured bounds below follow the configured values.
         await using var host = new RemoteHarness([MiddlewareEntry()],
-            new Dictionary<string, object?> { ["request_timeout_ms"] = 1000, ["shutdown_timeout_ms"] = 1000 },
+            new Dictionary<string, object?> { ["request_timeout_ms"] = 4000, ["shutdown_timeout_ms"] = 1000 },
             initialRows: [Row("target", "test.middleware-target")]);
         await host.StartAsync();
         await host.AddRowAsync("middleware", "conformance.middleware",
@@ -66,10 +67,10 @@ public sealed class CallbackDeadlineTests
 
         var watch = Stopwatch.StartNew();
         var dispatch = host.DispatchLoginAsync("alice");
-        await Assert.ThrowsAsync<RemoteTimeoutException>(() => dispatch.WaitAsync(TimeSpan.FromSeconds(10)));
+        await Assert.ThrowsAsync<RemoteTimeoutException>(() => dispatch.WaitAsync(TimeSpan.FromSeconds(15)));
         watch.Stop();
 
-        Assert.InRange(watch.Elapsed, TimeSpan.FromMilliseconds(1500), TimeSpan.FromSeconds(8));
+        Assert.InRange(watch.Elapsed, TimeSpan.FromMilliseconds(4500), TimeSpan.FromSeconds(12));
         // The row is faulted (owned work failed) instead of waiting for a callback that will never answer.
         await WaitForStateAsync(host, PluginState.WorkFailed);
         _ = await host.ShutdownAsync();

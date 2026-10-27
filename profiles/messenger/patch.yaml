@@ -1,0 +1,20 @@
+# The messenger core and its HTTP listener without a game server. Every game server that uses it mounts
+# messenger.tickets with its own tenant and signing key, and its public key is listed here.
+- replace:
+    id: messenger
+    disabled: false
+    config:
+      trust_local_issuer: false
+      tenants:
+        - key: "${BFF_MESSENGER_TENANT:-local}"
+          public_key: "${BFF_MESSENGER_TENANT_PUBLIC_KEY}"
+      games:
+        - code: bubblefighter
+          aliases: [bubblefighter_cn2, bubblefighter_0102220F, bubblefighter_0106220F, bubblefighter_0108220F]
+          full_name: "Bubble Fighter"
+          short_name: "Bubble Fighter"
+- replace:
+    id: messenger.http
+    disabled: false
+    config:
+      listen: "${BFF_MESSENGER_LISTEN:-0.0.0.0:8091}"

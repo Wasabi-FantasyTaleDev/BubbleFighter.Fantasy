@@ -1,7 +1,7 @@
 ---
 title: "模組"
 description: "了解模組模型，並建置、掛載、設定及重新載入原生 .NET 模組。"
-updated: 2026-10-18
+updated: 2026-10-23
 ---
 
 伺服器的一切行為都由模組實作。profile 組合模組資料列，每個資料列把一個模組實作與一份設定綁定到穩定的執行個體 id，Host 則依各列宣告的服務相依性可被滿足的順序啟用這些資料列。本頁說明這個模型，示範如何查看 Host 發現並載入了什麼，然後從專案檔到可執行的資料列，完整走過第一個原生 .NET 模組。最後說明設定、生命週期與重新載入、原生模組與選用語言 SDK 的界線、模組作者必須遵守的規則，以及最可能遇到的故障。
@@ -255,3 +255,78 @@ Heartbeat every 15 s.
 ## 後續
 
 繼續閱讀 [SDK 通訊協定](sdk-protocol.md)，掛載以 Python、TypeScript、Go 或 Rust 撰寫的模組；然後閱讀[參與貢獻](contributing.md)了解驗證關卡與審查規則。[伺服器設定](configuration.md)完整說明 profile、bundle、修補檔與環境變數。
+## 註冊指令與權限 {#register-commands}
+
+需要先通知再中斷連線時，`ISession.SendAsync` 只保證訊息入列。若工作階段實作 `ISessionOutputDrain`，應在關閉前使用該操作設定的取消期限等候 `DrainOutputAsync`。此屏障只等候先前的傳輸寫入完成，不確認用戶端收到或顯示訊息。取消只停止等候，不撤回已入列的訊息。佇列滿、工作階段停止或寫入失敗都會使等候失敗；不要用固定延遲或具體協定類別代替共用介面。
+
+核心組合中的 `permissions`、`commands` 模組列提供原生指令基礎。模組在 `Requires` 宣告 `BubbleFighter.Fantasy.Contracts.Administration` 的 `IPermissionRegistry`、`ICommandRegistry`，先註冊權限節點，再註冊指令，並將兩份回傳控制代碼交給 `context.Effect(...)`：
+
+```csharp
+context.Effect(context.Services.Get<IPermissionRegistry>().Register(
+    new PermissionDefinition("example.ping", "Check whether the example plugin is ready.")));
+context.Effect(context.Services.Get<ICommandRegistry>().Register(context,
+    new CommandDefinition("ping", ["ready"], "example.ping", "Check plugin readiness.", []),
+    (invocation, token) => ValueTask.FromResult(
+        new CommandResult(CommandStatus.Success, "Ready."))));
+```
+
+指令名稱和別名全域唯一，註冊時保存中繼資料快照。取消註冊會移除所有別名並通知執行中的工作取消；處理常式透過註冊者內容的受監管工作執行，卸載會取消並等待工作結束。處理常式必須回應取消權杖。一般狀態限制回傳 `InvalidState`；非預期例外向呼叫端傳遞並回報所屬模組。`ICommandRegistry.List(principal)` 回傳經權限篩選的說明與面板資料。
+
+`ICommandExecutor.ExecuteAsync` 接收名稱及結構化位置參數。`ExecuteTextAsync` 識別 `/`、`!`、`！`，支援雙引號參數、帶正負號的整數與結尾的 `RemainingText`；結構化呼叫將正文作為一個參數傳入。正文沒有獨立字數限制。主控台配接器可明確允許無前綴輸入，不會執行 shell 文字。
+
+只有可信配接器可以建立 `CommandCaller`：從驗證結果取得穩定帳戶 ID，代理操作保留原始 `Actor` 及實際 `Subject`，不可從請求參數還原這些身分。`Language` 使用使用者介面語言，空值表示使用部署預設語言。稽核事件包含身分與結果，不保存原始參數。原生模組可註冊指令；遠端 SDK 註冊仍需要回呼及生命週期配接。主控台輸入及 WebUI 尚未接入此分派器。
+
+在 `ingame` 列的 config 設定 `shared_chat_commands: true`，將該遊戲範圍接入共用聊天指令。等待原生用戶端驗收期間，此項預設 `false`；關閉時保留原有僅房主可用的 `!start`、`!set`。啟用時必須同時提供兩項共用指令服務，否則啟用失敗。
+
+核心組合的 `commands.game` 列將啟用的範圍接入同一分派器，也能呼叫原生模組註冊的指令。它在所有遊戲範圍中統一註冊 `/start`、`/mode <編號>`（別名 `/set`），也支援 `!`、`！` 前綴。`game.room.start`、`game.room.mode` 權限節點預設允許一般玩家使用，只操作自己所在的等候中房間；已設定的模式表仍會拒絕不支援的編號。指令開始會略過準備標記，原生開始按鈕仍要求房主操作。前綴輸入在權限拒絕後不會回退至本機處理常式。
+
+遊戲模組透過 `IGameCommandEndpoints` 註冊 `IGameCommandEndpoint`，並持有回傳的取消註冊控制代碼。路由會核對已驗證遊戲帳戶與目前座位，拒絕重複的工作階段歸屬，並在遊戲模組的生命週期內執行。`commands.game.max_endpoints` 預設 512，用於約束同時註冊的範圍儲存。本列尚未提供地圖、管理或房間傳送指令。
+
+取消註冊或替換遊戲範圍後，先前的路由快照即失效。尚未開始執行的呼叫不能繼續使用已撤銷的端點，也不能自動改用替換後的端點。
+
+權限設定寫在 `permissions` 列：
+
+```yaml
+config:
+  groups:
+    - name: players
+      allow: [example.ping]
+    - name: helpers
+      inherits: [players]
+      deny: [example.restricted]
+  subjects:
+    - kind: game
+      id: "42"
+      groups: [helpers]
+    - kind: game
+      id: "7"
+      operator: true
+    - kind: webui
+      id: "admin-account-id"
+      allow: [webui.access, webui.admin]
+```
+
+ID 指向各自驗證空間內已有的帳戶；設定不會建立帳戶或登入憑證。一般身分的拒絕規則優先於個人、繼承及萬用字元授權。規則支援完整節點、`prefix.*` 及 `*`。不存在的群組及繼承循環會使啟用失敗；未註冊節點拒絕存取。遊戲 OP 及本機主控台擁有所有已註冊權限；OP 不授予 WebUI 登入資格。`webui.access` 只代表入口，`webui.admin` 代表 WebUI 超級管理員。權限不能跳過參數或業務狀態驗證。這些 WebUI 節點供後續整合使用，尚未取代現有 HTTP 授權。
+
+資源設定保護登錄表儲存及執行中的工作，不限制遊戲功能。`commands` 支援 `max_commands`（512）、`max_input_characters`（4096，同時作為註冊名稱與參數定義文字預算）、`max_result_characters`（16384）、`max_concurrent`（64）。執行容量滿時立即回傳 `Busy`，不建立等候佇列。`permissions` 支援 `max_nodes`（2048）與 `max_policy_entries`（65536，帳戶、群組、繼承關係及展開規則的合計儲存預算）。設定經過驗證，可依部署調整。
+
+### 線上管理指令 {#online-management-commands}
+
+Contracts 2.61.0 新增原生線上玩家範圍註冊。`commands.management` 統一註冊 `/list`、`/notice <文字>`、`/disconnect <暱稱> [原因]`；`commands.players` 為各版本接入已驗證玩家目錄與指定通訊協定的通知編碼器。等待原生用戶端驗收期間，兩種模組列預設停用，啟用時須同時啟用管理列及所選版本的玩家列。玩家列位於 `lobby` 下，要求 `lobby.online_players: true`，必填 `protocol` 指定實際通訊協定。對應的 `dialect.messages` 還須啟用 `server_notices: true`；編碼器缺少或重複會使啟用失敗。組合設定的完整列 ID 以 `--dump-config` 為準。
+
+`/list` 傳回去重後的線上帳號數，包含大廳玩家，不公開暱稱或網路位址。`game.management.list` 預設允許一般玩家使用。`/notice` 將輸入文字送給各版本的全部已驗證遊戲連線，報告排入佇列及失敗數量，要求 `game.management.notice`。`/disconnect` 要求 `game.management.disconnect`，精確比對目前暱稱，有多個符合的連線時拒絕執行。遊戲 OP 擁有這兩項管理權限；遊戲呼叫還會核對呼叫者的固定帳號是否仍持有目前連線。聊天入口需要 `ingame.shared_chat_commands: true`；主控台與 WebUI 入口尚未接入。
+
+中斷通知依目標的 `launcher_language` 顯示，並包含選填原因。先將通知排入佇列、等候 `ISessionOutputDrain`，再關閉所選連線。通知失敗會記錄；目標仍有效時繼續中斷，不會追蹤並關閉重新登入的新連線。傳回結果會說明通知未完成。這不保證用戶端收到或顯示訊息；公告只報告排入佇列及部分失敗，不代表玩家已閱讀。
+
+`commands.management` 支援 `max_scopes`（512 個註冊）、`disconnect_notice_timeout_ms`（5000）、`max_notice_characters`（511）。文字預算可調低，上限來自原生通知緩衝區。格式化後的原因過長時，在傳送或關閉前拒絕執行。範圍註冊由模組效果管理，操作在註冊者受監督的生命週期內執行。遠端 SDK 尚無原生擁有者與回呼傳輸介接，不能宣稱指令註冊已與原生等效。本批不包含 kick、sudo、OP 持久化編輯、房間傳送、WebUI 設定或分發商店。
+
+
+### 用戶端模組啟動策略 {#client-plugin-policy}
+
+商店頁面可從合併後的目錄選擇用戶端模組識別碼，也可以手動新增，並設定推薦、必選或停用。規則提供給相容的啟動器，用戶端模組檔案不會安裝至伺服器。每條規則可勾選適用的版本；未勾選任何版本時適用於所有版本。沿用設定檔會保留原始策略，自訂清單為空時則明確清空推薦項目。
+
+`GET` 和 `PUT /api/setup/client-plugins` 要求已登入的 WebUI 帳號同時擁有 `webui.access` 與 `webui.settings.client_plugins`；`webui.admin` 可授予這兩項權限。遊戲 OP 不會取得 WebUI 存取權。PUT 使用現有同源請求保護，接受 `{"policies":[{"id":"example.plugin","builds":[],"required":false,"disabled":true}]}`。提交 `{"policies":null}` 還原設定檔策略，提交 `{"policies":[]}` 清空策略。規則僅包含商店識別碼，不包含下載網址或執行檔路徑。
+
+啟動器目錄、登入及更新回應透過 `pluginRecommendations` 提供 `id`、`builds`、`required` 與 `disabled`。推薦為 false/false，必選為 true/false，停用為 false/true。同一識別碼的必選與停用規則不得涵蓋相同版本，包括所有版本的規則。互不重疊的版本範圍分別保留；單一版本的必選規則不會因全域推薦擴大至其他版本。相容啟動器負責執行策略；這些中繼資料不證明用戶端完整性，也不表示遊戲登入會驗證已載入模組。
+
+變更獨立於資料庫、帳號、獎勵及用戶端資料設定持久儲存，再使用現有受監督的設定套用流程。HTTP 202 僅表示受理。套用可能使遊戲服務重新連線，安裝狀態會顯示進度與失敗，可透過現有設定流程修正或重試。

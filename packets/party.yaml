@@ -8,7 +8,8 @@ structs:
       offset: 4
     - nickname: wstr
       offset: 8
-    # kr-1256's member (kr-1256 sub_9064B0) has four words after the nickname, from +32
+    # kr-1256's element reader kr-1256 sub_1141670 (reached from body parser kr-1256 sub_905D20, which the
+    # handler kr-1256 sub_9064B0 drives) takes four more words after the nickname, at +32..+44
     - unknown_32: u32
       offset: 32
       only: [kr-1256]
@@ -39,8 +40,9 @@ structs:
       offset: 8
     - equipped: empty_list
       offset: 24
-      # kr-1256 sub_9064B0, the only writer of the member vector at dword_18E5660 +8, then writes a profile
-      # record per entry and reaches the spawner kr-1256 sub_920940 for every room seat
+      # The handler kr-1256 sub_9064B0 (body parser kr-1256 sub_905D20) is the only writer of the member
+      # vector at dword_18E5660 +8; it installs one profile record per entry (element reader kr-1256
+      # sub_10C4290) and reaches the spawner kr-1256 sub_920940 for every room seat
       kr-1256:
         - profile_entries: "list<RoomProfileEntry>"
       cn-324:
@@ -76,6 +78,8 @@ structs:
       only: [cn-774]
     - unknown_16: u32                   # +16; cn-774 sub_496F40
       offset: 16
+      # cn-774 sub_496D10 keeps human appearances in the account lookup rather than bot slot zero.
+      default: -1
       only: [cn-774]
     - equipped_items: "list<u32>"       # +20; cn-774 sub_456D30 reads four-byte elements, cn-774 sub_9B5EA0 installs them
       offset: 20
@@ -105,7 +109,9 @@ structs:
       offset: 12
     - unknown_16: u32                   # +16; tw-454 sub_4A0550
       offset: 16
-    - unknown_20: "list<u32>"           # +20; tw-454 sub_45AA50 reads four-byte elements
+      # tw-454 sub_4A0360 initializes the same account-lookup sentinel.
+      default: -1
+    - equipped_items: "list<u32>"       # +20; tw-454 sub_C13960 installs the ids read by tw-454 sub_45AA50
       offset: 20
     - unknown_32: "list<u8>"            # +32; tw-454 sub_478B30 reads one-byte elements
       offset: 32
@@ -257,3 +263,60 @@ structs:
     - code: u32
       offset: 24
       only: [kr-1256]
+
+  # ---- Recruiting and chat ------------------------------------------------------------------------------
+  # C2S gcpReqPartyRecruiting: the party dialog's recruiting switch. The kr-812 class deserialize
+  # kr-812 sub_80C160 reads one 4-byte word as a boolean at object +4 (kr-812 sub_A56BD0). The modern client
+  # has its own recruiting document instead (C2S 305 there writes a word, a word, a byte and a string,
+  # kr-1256 sub_6353D0), but that packet has no name in the kr-1256 opcode table, so only the legacy body is
+  # stated here.
+  PartyRecruitingRequest:
+    - unknown_4: bool # one word read as a boolean; the recruiting switch's value is not proven from this body
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+
+  # C2S gcpReqPartyQuickStart: kr-812 sub_80A910 reads one 4-byte word at object +4. The same reader body is
+  # the deserialize slot of other one-word classes, so only the width and the position are proven. The
+  # kr-1256 sender kr-1256 sub_917360 stamps C2S 306 and writes nothing, so that build's request is empty and
+  # is not stated as this structure.
+  PartyQuickStartRequest:
+    - unknown_4: u32
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+
+  # C2S gcpSendPartyChatMsg: kr-812 class deserialize kr-812 sub_5C8FD0 reads one wstring at object +4
+  # (kr-812 sub_A56D70: a 4-byte character count then UTF-16). The sender kr-812 sub_92A740 stamps C2S 304.
+  # The request carries no channel or recipient; which string of the reply it becomes is not proven.
+  PartyChatRequest:
+    - unknown_4: wstr
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+
+  # S2C gspReceivePartyChatMsg: kr-812 class deserialize kr-812 sub_92AB70 reads a 4-byte word at +4, a
+  # wstring at +8, a wstring at +36, a 4-byte word at +64 and a 4-byte boolean at +68. The dispatcher case is
+  # kr-812 sub_9295C0 (case 0x131 of kr-812 sub_837170). The handler's use of the two strings and of the
+  # boolean (a system-versus-party selector is a lead, not a proof) is not established, so every field keeps
+  # its offset name.
+  PartyChatMessage:
+    - unknown_4: u32
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_8: wstr
+      offset: 8
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_36: wstr
+      offset: 36
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_64: u32
+      offset: 64
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_68: bool
+      offset: 68
+      except: [kr-1256, cn-774, tw-454]
+
+  # S2C gspRepJoinParty: kr-812 sub_80A910 reads one 4-byte word at object +4 (the same shared one-word
+  # reader as PartyQuickStartRequest). kr-1256 has no label for S2C 202 and no row for this packet.
+  PartyJoinReply:
+    - unknown_4: u32
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]

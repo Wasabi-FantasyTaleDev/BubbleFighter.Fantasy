@@ -681,3 +681,10 @@
           enemy_counts: [2, 2, 3, 3, 4, 4]
         - map_key: rel_zombie_01
           enemy_counts: [2, 3, 3, 3, 4, 4]
+
+# The baseline states the customized-key binding (kr-812 sub_4EB250 / kr-812 sub_8357D0); this build's own
+# builder and login consumer are not audited, so the option stays off until they are.
+- set:
+    id: dialect.messages
+    config:
+      customized_keys: false

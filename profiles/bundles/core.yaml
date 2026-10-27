@@ -14,11 +14,57 @@
   plugin: core.opcode-tables
 - id: core.wire-dialects
   plugin: core.wire-dialects
+- id: permissions
+  plugin: permissions
+  config:
+    groups: []
+    subjects: []
+- id: commands
+  plugin: commands
+- id: distribution.sources
+  plugin: distribution.sources
+  config:
+    sources: []
+    state_path: data/distribution-sources.json
+    maximum_sources: 512
+    maximum_document_bytes: 4194304
+    transfer_timeout_ms: 1800000
+    request_timeout_ms: 30000
+    maximum_redirects: 5
+    use_github_mirror: false
+- id: distribution.plans
+  plugin: distribution.plans
+  config:
+    maximum_plans: 256
+    plan_lifetime_seconds: 1800
+- id: distribution.packages
+  plugin: distribution.packages
+  config:
+    experimental_release_format: false
+- id: distribution.jobs
+  plugin: distribution.jobs
+  config:
+    staging_path: data/distribution-staging
+    free_space_reserve_bytes: 0
+    history_page_size: 20
+- id: commands.game
+  plugin: commands.game
+- id: commands.management
+  plugin: commands.management
+  disabled: true
+  config:
+    disconnect_notice_timeout_ms: 5000
+    max_notice_characters: 511
 - id: localization
   plugin: localization
   config:
     resources_path: data/locales/game-messages.json
     default_language: en
+    launcher_languages:
+      - launcher_language: zh-CN
+        language: zh-Hans
+      - launcher_language: zh-TW
+        language: zh-Hant
     region_languages:
       - region: cn
         language: zh-Hans
@@ -112,5 +158,99 @@
   disabled: true
   config:
     listen: "${BFF_LAUNCHER_LISTEN:-127.0.0.1:8090}"
+    ticket_seconds: ${BFF_LAUNCHER_TICKET_SECONDS:-600}
     host_policy: "${BFF_LAUNCHER_HOST_POLICY:-auto}"
     region: "${BFF_LAUNCHER_REGION:-}"
+
+# Messenger (friends) for native messenger clients, opt-in. messenger.tickets signs this server's messenger
+# tickets and launcher.http hands one out with every launch; messenger is the game-neutral core and
+# messenger.http its own HTTP listener. The core and its listener may instead run as a separate deployment
+# (profiles/messenger) that lists this server's public key under tenants.
+- id: messenger.tickets
+  plugin: messenger.tickets
+  disabled: true
+  config:
+    tenant: "${BFF_MESSENGER_TENANT:-local}"
+    # "ephemeral" generates a key at start that only an in-process messenger trusts.
+    signing_key: "${BFF_MESSENGER_SIGNING_KEY:-ephemeral}"
+    public_url: "${BFF_MESSENGER_PUBLIC_URL:-}"
+    ticket_seconds: 300
+    # The code each build's client compares friends against when it does not announce its own at messenger
+    # sign-in (names are NexonGameCode members). A client that announces one sees it instead, so these only matter
+    # as a fallback; builds without a row get no messenger ticket.
+    game_codes:
+      # Locale 2 selects bubblefighter_cn2 in kr-812 sub_8FE660; Korean installs keep the default locale.
+      - build: kr-812
+        code: bubblefighter
+      # kr-1256 sub_D723E0 compares categories against this code only.
+      - build: kr-1256
+        code: bubblefighter
+      # id-400 sub_875BE0 and id-1809 sub_89A550 choose by locale: 0 bubblefighter, 3 bubblefighter_0102220F (id-400
+      # only), 4 bubblefighter_0108220F.
+      - build: id-400
+        code: bubblefighter
+      - build: id-1809
+        code: bubblefighter
+      # tw-454 sub_B0D010 fixes its own code; sub_B0C890 marks friends of any other code as another game.
+      - build: tw-454
+        code: bubblefighter_0102220F
+      # Locale 2, which the Chinese installs run (cn-324 announced it live), selects 0x0106220F in cn-279 sub_6CFE60.
+      - build: cn-279
+        code: bubblefighter_0106220F
+      # The same locale selects bubblefighter_cn2 in cn-324 sub_761F60, cn-406 sub_794F50, cn-404 sub_84CD10,
+      # cn-408 sub_7DEE00, cn-705 sub_7B5470, cn-706 sub_7B6C00 and cn-717 sub_928C90.
+      - build: cn-324
+        code: bubblefighter_cn2
+      - build: cn-404
+        code: bubblefighter_cn2
+      - build: cn-406
+        code: bubblefighter_cn2
+      - build: cn-408
+        code: bubblefighter_cn2
+      - build: cn-705
+        code: bubblefighter_cn2
+      - build: cn-706
+        code: bubblefighter_cn2
+      - build: cn-717
+        code: bubblefighter_cn2
+      # Later builds compare against bubblefighter_cn2 without a locale branch (cn-735 sub_AC07F0, cn-738 sub_ADE010,
+      # cn-742 sub_995B60, cn-774 sub_781600).
+      - build: cn-735
+        code: bubblefighter_cn2
+      - build: cn-738
+        code: bubblefighter_cn2
+      - build: cn-742
+        code: bubblefighter_cn2
+      - build: cn-774
+        code: bubblefighter_cn2
+- id: messenger
+  plugin: messenger
+  disabled: true
+  config:
+    trust_local_issuer: true
+    # Friendships are stored under a game's code and shown under whichever alias the viewing client uses.
+    games:
+      - code: bubblefighter
+        aliases: [bubblefighter_cn2, bubblefighter_0102220F, bubblefighter_0106220F, bubblefighter_0108220F]
+        full_name: "Bubble Fighter"
+        short_name: "Bubble Fighter"
+- id: messenger.http
+  plugin: messenger.http
+  disabled: true
+  config:
+    listen: "${BFF_MESSENGER_LISTEN:-127.0.0.1:8091}"
+
+# Fantasy Tale Nirinsou Link (companion), opt-in: the launch-bound WebSocket channel between launchers and server
+# plugins. launcher.http opens a launch with every game launch and hands the launcher its one-time connection ticket;
+# the launch is bound to the game session that redeems the launch's game ticket. companion.notices adds launcher
+# popups and the popup management command.
+- id: companion
+  plugin: companion
+  disabled: true
+  config:
+    listen: "${BFF_COMPANION_LISTEN:-127.0.0.1:8092}"
+    # Empty hands out ws on the listen port of the host the launcher used; set a wss URL behind TLS termination.
+    public_url: "${BFF_COMPANION_PUBLIC_URL:-}"
+- id: companion.notices
+  plugin: companion.notices
+  disabled: true

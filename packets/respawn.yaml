@@ -67,3 +67,16 @@ structs:
       offset: 4
     - unknown_8: u32
       offset: 8
+  # The kr-1256 in-session spawn event, S2C 38278 (dispatcher kr-1256 sub_6D55D0 case at 0x6D8952,
+  # handler kr-1256 sub_48D3E0): one entity word resolved to the target Character through
+  # kr-1256 sub_6CF510, then one code the handler routes through kr-1256 sub_49F8D0 / kr-1256 sub_B002D0
+  # to an event type - code 29 reaches the respawn kr-1256 sub_49C870 that writes full HP and leaves the
+  # csDead state, code 21 the unguarded stand-up kr-1256 sub_49D020, code 0 an animation or effect
+  # event.
+  RoundInSessionSpawn:
+    - entity_id: u32
+      offset: 4
+      only: [kr-1256]
+    - event_code: u32
+      offset: 8
+      only: [kr-1256]

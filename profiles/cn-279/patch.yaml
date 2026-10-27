@@ -36,6 +36,8 @@
       # cn-279 sub_664890 stamps 805 and sub_450430 reads item/quantity/parameters; paint is independent of rename.
       inventory_item_use: true
       packets_directory: packets
+      # This build's customized-key builder and login consumer are not audited; only kr-812's are.
+      customized_keys: false
 - set:
     id: dialect.rooms
     config:

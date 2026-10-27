@@ -15,6 +15,7 @@ internal static class UserStatWire
     internal static byte[] Write(PacketTables tables, string build, string nickname, int level, int lucci, int cash,
         ushort colorIndex = 0, long userNum = 0)
     {
+        ValidateLayouts(tables, build);
         var values = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
             ["color_index"] = colorIndex, ["lucci"] = lucci, ["cash"] = cash,
@@ -39,6 +40,33 @@ internal static class UserStatWire
             values["level"] = level;
         }
         return PacketCodec.Write(tables, build, "UserStat", values);
+    }
+
+    /// <summary>
+    /// Checks the rows the writer fills: the three counters every UserStat states, and the fighter rows the build's
+    /// own variant carries. The modern family's UserStat nests the whole FighterInfo (kr-1256 sub_9D8030 reads the
+    /// block kr-1256 sub_115A6D0 parses, so +4, +32 and +504 must exist as the writer sizes them), while a legacy
+    /// build's table states the name and level at the FighterInfo the nested field resolves to. This helper has no
+    /// bind step of its own, so it checks before every use rather than on the first send.
+    /// </summary>
+    /// <param name="tables">The shared native packet layouts.</param>
+    /// <param name="build">The audited client build.</param>
+    internal static void ValidateLayouts(PacketTables tables, string build)
+    {
+        PacketLayoutContract.RequireFields(tables, build, "UserStat", "User stat",
+            ("color_index", "u32"), ("lucci", "u32"), ("cash", "u32"));
+        if (HasModernFighterRows(tables, build))
+        {
+            PacketLayoutContract.RequireFields(tables, build, "UserStat", "User stat", ("fighter", "FighterInfo"));
+            PacketLayoutContract.RequireFields(tables, build, "FighterInfo", "User stat",
+                ("unknown_4", "u32"), ("nickname", "wstr"), ("unknown_32", "u32"),
+                ("level", "u32"), ("unknown_504", "wstr"), ("social", "SocialSystemInfo"));
+        }
+        else
+        {
+            PacketLayoutContract.RequireFields(tables, build, "FighterInfo", "User stat",
+                ("nickname", "wstr"), ("level", "u32"));
+        }
     }
 
     // The modern rows of FighterInfo (+4 identity, +32 character type, +504 display name) are the build's own

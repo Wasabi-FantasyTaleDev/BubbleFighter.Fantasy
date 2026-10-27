@@ -20,8 +20,11 @@ public sealed class MatchOffersMountTests
     [InlineData("cn-406", 20, false)]
     [InlineData("id-400", 20, false)]
     [InlineData("id-1809", 20, false)]
+    [InlineData("kr-1256", 20, false, 571)]
+    [InlineData("cn-774", 20, false, 571)]
+    [InlineData("tw-454", 20, false, 571)]
     [InlineData("kr-812", 20, true)]
-    public async Task OwnTablesDriveOfferBytesReportLengthsAndRemovableGameServices(string build, int keyLength, bool remap)
+    public async Task OwnTablesDriveOfferBytesReportLengthsAndRemovableGameServices(string build, int keyLength, bool remap, int nativeOpcode = 601)
     {
         var profile = Profile(build);
         var root = Directory.GetParent(TestBuilds.PacketsDirectory())!.FullName;
@@ -30,7 +33,7 @@ public sealed class MatchOffersMountTests
         using var fixture = new MatchMessagesMountTests.Fixture(table);
         var context = fixture.Context(build, build + "/game", "dialect.match-offers");
         var session = new MatchMessagesMountTests.Session(profile);
-        var opcode = checked((ushort)(remap ? 1601 : 601));
+        var opcode = checked((ushort)(nativeOpcode + (remap ? 1000 : 0)));
         try
         {
             await new MatchOffersPlugin().ActivateAsync(context, default);

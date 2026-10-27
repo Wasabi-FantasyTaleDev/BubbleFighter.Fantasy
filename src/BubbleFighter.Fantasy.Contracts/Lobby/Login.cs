@@ -82,11 +82,13 @@ public enum LoginRejection
 /// <param name="Nickname">The player's nickname.</param>
 /// <param name="CharacterItemId">The equipped character item.</param>
 /// <param name="EquippedItemIds">Every equipped item, the character included.</param>
+/// <param name="Level">The seat's level word; 1 when the caller has no level (kr-1256 sub_EE9550 stores level - 1).</param>
 public sealed record MainMenuRoomOpened(
     int UserNumber,
     string Nickname,
     int CharacterItemId,
-    IReadOnlyList<int> EquippedItemIds) : IMessage
+    IReadOnlyList<int> EquippedItemIds,
+    int Level = 1) : IMessage
 {
     /// <summary>Gets whether to offer the initial tutorial, or null to use the dialect profile's policy.</summary>
     public bool? OfferTutorial { get; init; }

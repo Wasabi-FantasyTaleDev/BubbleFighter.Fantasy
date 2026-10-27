@@ -10,11 +10,11 @@
 - id: installation
   plugin: installation
   # The kernel fixes its budget from these startup rows, and every installation is admitted inside it later.
-  # Each row costs 1 + its effect capacity (4096 by default); all selectable builds compose about 200 rows,
+  # Each row costs 1 + its effect capacity (4096 by default); all selectable builds compose about 250 rows,
   # and a reconfiguration holds the old and new rows at once. SetupRuntimeBudgetTests checks the sum.
   lifecycle:
     entry_reserve: 512
-    service_metadata_reserve: 2000000
+    service_metadata_reserve: 2600000
   config:
     state_directory: "${BFF_STATE_DIR}"
     bootstrap_token: "${BFF_SETUP_TOKEN:-}"

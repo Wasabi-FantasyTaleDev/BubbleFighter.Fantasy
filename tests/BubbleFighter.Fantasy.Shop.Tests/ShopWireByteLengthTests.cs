@@ -1,5 +1,4 @@
 using BubbleFighter.Fantasy.Abstractions.Protocol;
-using BubbleFighter.Fantasy.Shop.Wire;
 using Xunit;
 
 namespace BubbleFighter.Fantasy.Shop.Tests;

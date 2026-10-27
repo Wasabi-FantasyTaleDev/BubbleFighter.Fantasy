@@ -1,5 +1,6 @@
 version: 1
 # Cash-inventory pickup bodies. These tables do not register routes or grant items.
+# The cash box's open and close requests are stated in packets/cash-inbox.yaml.
 structs:
   # kr-812 CashInvenSlot reader sub_842BC0 and modern readers kr-1256 sub_1142F20,
   # cn-774 sub_497700 and tw-454 sub_4A0D00 all read 4,4,2,2,4,4,wstr,1 bytes.

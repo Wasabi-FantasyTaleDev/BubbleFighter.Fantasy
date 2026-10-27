@@ -19,8 +19,8 @@ public sealed class StageEndTests
     public void HordeResultsSelectTheirNativeManagerNotification(int mode, RoundOutcome outcome, string? name)
     {
         var message = new RoundEnded(1, outcome, RoundEndReason.WavesCleared) { ModeId = mode };
-        Assert.Equal(name, PlayRoomCodec.HordeOutcomeNotification(new ScoreShape(HordeStageOutcome: true), message));
-        Assert.Null(PlayRoomCodec.HordeOutcomeNotification(new ScoreShape(), message));
+        Assert.Equal(name, PlayRoomCodec.HordeOutcomeNotification(new PlayValues.ScoreValues(HordeStageOutcome: true), message));
+        Assert.Null(PlayRoomCodec.HordeOutcomeNotification(new PlayValues.ScoreValues(), message));
     }
 
     /// <summary>Preserves recognized result flags and rejects bodies that cannot hold the native word.</summary>

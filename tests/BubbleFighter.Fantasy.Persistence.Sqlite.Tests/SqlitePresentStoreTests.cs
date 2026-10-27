@@ -58,13 +58,13 @@ public sealed class SqlitePresentStoreTests : PresentStoreContractTests
     {
         using (var database = new SqliteDatabase(Options()))
             Assert.True(await new SqliteRepositories(database).RegisterAsync("player", "hash", default));
-        Assert.Equal(6, UserVersion());
-        Execute("DROP TABLE round_settlements; DROP TABLE present_claims; DROP TABLE presents; PRAGMA user_version=3;");
+        Assert.Equal(7, UserVersion());
+        Execute("DROP TABLE messenger_requests; DROP TABLE messenger_categories; DROP TABLE messenger_relations; DROP TABLE messenger_users; DROP TABLE round_settlements; DROP TABLE present_claims; DROP TABLE presents; PRAGMA user_version=3;");
 
         using var upgraded = new SqliteDatabase(Options());
         var stores = new SqliteRepositories(upgraded);
         Assert.Equal("hash", (await stores.FindAsync("player", default))!.PasswordHash);
-        Assert.Equal(6, UserVersion());
+        Assert.Equal(7, UserVersion());
         var sender = new PresentPlayer((await stores.CreateAsync("a-sender", "sender", default)).UserNum, "sender");
         var receiver = new PresentPlayer((await stores.CreateAsync("a-receiver", "receiver", default)).UserNum, "receiver");
         Assert.Equal(PresentSendOutcome.Sent, (await stores.SendAsync(Send(sender, receiver, 5), default)).Outcome);
@@ -81,11 +81,11 @@ public sealed class SqlitePresentStoreTests : PresentStoreContractTests
             receiver = new((await stores.CreateAsync("a-receiver", "receiver", default)).UserNum, "receiver");
             Assert.Equal(PresentSendOutcome.Sent, (await stores.SendAsync(Send(sender, receiver, 5), default)).Outcome);
         }
-        Execute("DROP TABLE round_settlements; DROP TABLE present_claims; PRAGMA user_version=4;");
+        Execute("DROP TABLE messenger_requests; DROP TABLE messenger_categories; DROP TABLE messenger_relations; DROP TABLE messenger_users; DROP TABLE round_settlements; DROP TABLE present_claims; PRAGMA user_version=4;");
 
         using var upgraded = new SqliteDatabase(Options());
         var upgradedStores = new SqliteRepositories(upgraded);
-        Assert.Equal(6, UserVersion());
+        Assert.Equal(7, UserVersion());
         Assert.Equal(1, await upgradedStores.CountPendingAsync("kr-812", receiver.UserNum, default));
         var reward = new PresentRewardCommand("kr-812", receiver.UserNum, "level:2", "System", [1000123], "hi", 1);
         Assert.Equal(PresentRewardOutcome.Granted, (await upgradedStores.GrantRewardAsync(reward, default)).Outcome);
@@ -131,8 +131,8 @@ public sealed class SqlitePresentStoreTests : PresentStoreContractTests
     public void ASaveOfANewerSchemaThanThisBuildKnowsIsRefused()
     {
         using (var database = new SqliteDatabase(Options()))
-            Assert.Equal(6, UserVersion());
-        Execute("PRAGMA user_version=7;");
+            Assert.Equal(7, UserVersion());
+        Execute("PRAGMA user_version=8;");
         Assert.Throws<InvalidDataException>(() => new SqliteDatabase(Options()));
     }
 
@@ -140,7 +140,7 @@ public sealed class SqlitePresentStoreTests : PresentStoreContractTests
     public void TheGiftTableRefusesAStateOrHiddenFlagOutsideItsDomain()
     {
         using (var database = new SqliteDatabase(Options()))
-            Assert.Equal(6, UserVersion());
+            Assert.Equal(7, UserVersion());
         const string row = "INSERT INTO presents(profile,sender_user_num,sender_nickname,receiver_user_num,receiver_nickname,stock_key,message,sent_at";
         Assert.Throws<SqliteException>(() => Execute(row + ",state) VALUES('x',1,'a',2,'b',3,'',0,3);"));
         Assert.Throws<SqliteException>(() => Execute(row + ",sender_hidden) VALUES('x',1,'a',2,'b',3,'',0,2);"));

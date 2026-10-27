@@ -1,0 +1,39 @@
+version: 1
+structs:
+  # The "go to friend" request of the play together dialog. The visit is the second half of the feature; the
+  # invitation half is already tabled in packets/party.yaml (PartyInviteRequest, PartyInviteRequest@kr-1256,
+  # PartyInviteNotice, PartyInviterMoveRequest, PartyInviteAnswer, PartyInviteFailure).
+  #
+  # kr-812 Packet_gcpReqMoveToFriend, vtable kr-812 0xd84d78, deserializer
+  # kr-812 sub_5C8FD0 reads one prefixed wide string (kr-812 sub_A56D70: u32 character count, then that many
+  # UTF-16LE code units) into object +4. The class is the baseline for every build whose packets keep their
+  # class names, so the row is stated as kr-812 has it.
+  # kr-1256: no kr-1256 sender for this packet was found and profiles/kr-1256/opcodes.yaml has no row for
+  # it. Legacy descendants inherit the kr-812 shape; modern builds are excluded. The two visitation failures the kr-1256 client consumes
+  # (S2C 122 and 123) are tabled below.
+  MoveToFriendRequest:
+    - unknown_4: wstr
+      offset: 4
+      only: [kr-812]
+      except: [kr-1256, cn-774, tw-454]
+
+  # kr-1256 S2C 123 gspVisitationFailed. Dispatched by kr-1256 sub_9D2FF0 (jumptable case 123) to handler
+  # kr-1256 sub_9AA690, whose body reads one prefixed wide string (kr-1256 sub_1119C10) and then one 4-byte
+  # word. The meaning of the word is not proven, so the field keeps the unknown name; the wire order and the
+  # widths are what the handler proves.
+  # Names use offsets relative to the stack-local string; the following word is 24 bytes later.
+  # kr-1256 descendants inherit these unbound shapes; their own readers are not established here.
+  VisitationFailed:
+    - unknown_0: wstr
+      only: [kr-1256]
+    - unknown_24: u32
+      only: [kr-1256]
+
+  # kr-1256 S2C 122 gspFailedOnMoveToInviter. Dispatched by kr-1256 sub_9D2FF0 (jumptable case 122) to handler
+  # kr-1256 sub_9A99F0, whose body reads one prefixed wide string (kr-1256 sub_1119C10) and then one 4-byte
+  # word, the same order as the visitation failure above.
+  MoveToInviterFailed:
+    - unknown_0: wstr
+      only: [kr-1256]
+    - unknown_24: u32
+      only: [kr-1256]

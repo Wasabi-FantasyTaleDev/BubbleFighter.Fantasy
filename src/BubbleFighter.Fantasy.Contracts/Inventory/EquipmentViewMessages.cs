@@ -9,13 +9,17 @@ namespace BubbleFighter.Fantasy.Contracts.Inventory;
 /// <param name="ActiveWeaponPresetSlot">The stored active preset slot.</param>
 /// <param name="PrimaryWeaponId">The selected primary weapon, or zero when none is worn.</param>
 /// <param name="SpecialWeaponId">The selected special weapon, or zero when none is worn.</param>
+/// <param name="WeaponPresetPages">The persisted server-owned preset pages, or <see langword="null"/> when this
+/// publication keeps the derived bar (the default); the preset codec sends these pages per page instead of the
+/// worn-derived records when present.</param>
 public sealed record LocalEquipmentViewUpdated(
     int UserNum,
     int CharacterId,
     IReadOnlyList<int> EquippedItemIds,
     byte ActiveWeaponPresetSlot,
     int PrimaryWeaponId,
-    int SpecialWeaponId) : IMessage;
+    int SpecialWeaponId,
+    IReadOnlyList<WeaponPresetPage>? WeaponPresetPages = null) : IMessage;
 
 /// <summary>Publishes another player's committed appearance without changing the recipient's local weapon presets.</summary>
 /// <param name="UserNum">The observed player's identity.</param>

@@ -4,21 +4,38 @@ using BubbleFighter.Fantasy.Abstractions;
 
 namespace BubbleFighter.Fantasy.Kernel;
 
+/// <summary>The mutation surface of a registered service that supports decorators.</summary>
 internal interface IDecoratableService
 {
+    /// <summary>Gets the live proxy: it dispatches to the base instance and every committed decorator layer, ordered by priority.</summary>
     object Reference { get; }
+    /// <summary>Gets the ids of the committed decorator layers, highest priority first.</summary>
     IReadOnlyList<long> DecorationIds { get; }
+    /// <summary>Returns a proxy frozen to the layers the given publication state shows, for a committing or retiring owner to capture.</summary>
     object CaptureReference(ActivationPublication? committing = null, ActivationPublication? excluding = null);
+    /// <summary>Stages one layer's removal without publishing it; <see cref="IDecoratableChange.Commit"/> swaps it in.</summary>
     IDecoratableChange PrepareRemove(long id);
+    /// <summary>Closes the service: further resolutions throw <see cref="ServiceUnavailableException"/>.</summary>
     void Close();
 }
 
+/// <summary>A staged layer mutation that publishes on <see cref="Commit"/> or vanishes on <see cref="IDisposable.Dispose"/>.</summary>
 internal interface IDecoratableChange : IDisposable
 {
+    /// <summary>Gets a proxy fixed to the staged layers, callable before the change is committed.</summary>
     object Reference { get; }
+    /// <summary>Publishes the staged snapshot atomically under the registry gate.</summary>
     void Commit();
 }
 
+/// <summary>
+/// An ordered decorator chain over one registered service. The base instance plus every committed
+/// layer is reachable through <see cref="Reference"/>, a DispatchProxy that walks the layers in
+/// priority order per call. Layers added by an activation stay invisible to other consumers until
+/// that activation's publication commits; layers of a retiring owner are excluded from fresh
+/// captures before the retirement lands.
+/// </summary>
+/// <typeparam name="TService">The closed service interface being decorated.</typeparam>
 internal sealed class DecoratableService<TService> : IDecoratableService where TService : class
 {
     private sealed record Layer(long Id, int Priority, TService Instance, ActivationPublication? Publication);
@@ -59,6 +76,8 @@ internal sealed class DecoratableService<TService> : IDecoratableService where T
         lock (_gate)
         {
             current = _current ?? throw new ServiceUnavailableException(typeof(TService));
+            // The factory runs outside the lock because it may resolve services or register effects;
+            // this flag re-enters only to keep the chain from mutating itself, not to hold the lock.
             if (_creating)
                 throw new InvalidOperationException("Decorator factories cannot mutate their own chain.");
             _creating = true;
@@ -80,6 +99,9 @@ internal sealed class DecoratableService<TService> : IDecoratableService where T
         lock (_gate) return MakeProxy(null, Visible(_current ?? throw new ServiceUnavailableException(typeof(TService)), committing, excluding));
     }
 
+    // A fresh resolve sees committed layers only; the committing owner also sees the layer it is
+    // publishing (its proxy is captured inside the same commit), and a retiring owner's layer drops
+    // out of new captures before Retire() rewrites the bindings.
     private static Snapshot Visible(Snapshot snapshot, ActivationPublication? committing = null, ActivationPublication? excluding = null) =>
         new(snapshot.Base, snapshot.Layers.Where(layer => (excluding is null || !ReferenceEquals(layer.Publication, excluding)) &&
             (layer.Publication is null || layer.Publication.IsReady || ReferenceEquals(layer.Publication, committing))).ToArray());
@@ -125,6 +147,9 @@ internal sealed class DecoratableService<TService> : IDecoratableService where T
 
     private object? Invoke(long? after, MethodInfo method, object?[]? args, Snapshot? fixedSnapshot)
     {
+        // The chain a decorator calls through is fixed at invocation entry: the AsyncLocal snapshot
+        // keeps a nested inner call on the same layers even if another thread commits a change
+        // mid-call, and an inner reference used outside any invocation has no chain to walk.
         var previous = _invocation.Value;
         if (after is not null && previous is null)
             throw new InvalidOperationException("A decorator's inner reference is only valid inside a service invocation.");

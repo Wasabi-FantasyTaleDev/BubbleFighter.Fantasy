@@ -110,7 +110,7 @@ internal sealed partial class RoundFlow
                 if (room.Scoring.AddStars(seat.Slot, change, _options.MaxRoundStars) is not { } stats)
                     return;
                 if (room.Phase == RoomPhase.Playing)
-                    update = new RoundScoreUpdated(room.Id, Math.Max(1, (int)seat.Team), [.. room.Scoring.TeamTotals], [stats], LiveScoreboard(room));
+                    update = new RoundScoreUpdated(room.Id, seat.Team, [.. room.Scoring.TeamTotals], [stats], LiveScoreboard(room));
             }
             if (update is not null)
                 await SendScoreAsync(room, update, operationCt).ConfigureAwait(false);
@@ -125,7 +125,7 @@ internal sealed partial class RoundFlow
         {
             if (room.Phase != RoomPhase.Playing || !IsStarMode(room) || !room.Scoring.CountsStars)
                 return;
-            updates = [.. room.Seats.Select(seat => new RoundScoreUpdated(room.Id, Math.Max(1, (int)seat.Team),
+            updates = [.. room.Seats.Select(seat => new RoundScoreUpdated(room.Id, seat.Team,
                 [.. room.Scoring.TeamTotals], [room.Scoring.Stats(seat.Slot)], LiveScoreboard(room)))];
         }
         foreach (var update in updates)

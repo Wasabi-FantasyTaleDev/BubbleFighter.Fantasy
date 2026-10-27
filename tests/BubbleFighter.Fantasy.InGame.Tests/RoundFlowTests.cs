@@ -318,6 +318,7 @@ public sealed partial class RoundFlowTests
         public Sink<RoundEnded> Ended { get; } = new();
         public Sink<RoundSpawnOffered> SpawnOffered { get; } = new();
         public Sink<RoundPlayerRespawned> Respawned { get; } = new();
+        public Sink<RoundRespawnWaitChanged> WaitChanged { get; } = new();
         public Sink<RoundSupplyCreated> SupplyCreated { get; } = new();
         public Sink<RoundSupplyPicked> SupplyPicked { get; } = new();
         public Sink<RoundLucciCreated> LucciCreated { get; } = new();
@@ -336,15 +337,15 @@ public sealed partial class RoundFlowTests
         public Sink<RoomTeamConverted> TeamConverted { get; } = new();
         public Sink<RoomChatReceived> Chat { get; } = new();
         public Sink<RoundObjectAddAcknowledged> ObjectAdded { get; } = new();
-        public RoomPushTests.RecordingSession Host { get; } = Player(11, "host");
-        public RoomPushTests.RecordingSession Guest { get; } = Player(22, "guest");
+        public RecordingSession Host { get; } = Player(11, "host");
+        public RecordingSession Guest { get; } = Player(22, "guest");
         public int RoomId { get; private set; }
 
         public Rig(int timeLimitMs = 180_000, IPluginContext? resultContext = null, int[]? randomSupplyItemKinds = null,
             int[]? cooperativeStageResultModes = null, int zombieConversionModeId = 0, int[]? countedItemKinds = null, bool rescueMissions = false, int rescueDurationMs = 5000, int rescueCount = 1, int rescueCooldownMs = 25000, int[]? immediateSupplyItemKinds = null, bool pvePoints = false, int rescueStopTimeMs = 0, int[]? cooperativeScoreOutcomeModes = null, int nativeItemSlotCount = 1, int resultRewardDelayMs = 6000, int[]? pvePointUnitValues = null, int[]? countedImmediateItemKinds = null, int[]? directKillModes = null,
-            Action<InGameOptions>? configure = null)
+            Action<InGameOptions>? configure = null, Func<TimeSpan, CancellationToken, ValueTask>? zombieKingDelay = null)
         {
-            var options = new InGameOptions { TypedOnly = true, StartTimerMs = 30, RoundUnknown0 = timeLimitMs, ResultCloseGraceMs = 30, SupplyPollMs = 10,
+            var options = new InGameOptions { StartTimerMs = 30, RoundUnknown0 = timeLimitMs, ResultCloseGraceMs = 30, SupplyPollMs = 10,
                 RandomSupplyItemKinds = randomSupplyItemKinds ?? [], CooperativeStageResultModes = cooperativeStageResultModes ?? [],
                 NativeItemSlotCount = nativeItemSlotCount, ResultRewardDelayMs = resultRewardDelayMs,
                 CooperativeScoreOutcomeModes = cooperativeScoreOutcomeModes ?? [],
@@ -375,8 +376,13 @@ public sealed partial class RoundFlowTests
             }
             Registry = new RoomRegistry(options);
             Rooms = new RoomFlow(Registry, new RoomSenders(Entered, SeatUpdated, SeatVacated, MasterChanged, MatchStarting: Starting,
-                TeamConverted: TeamConverted, CountedItemsPrepared: CountedItemsPrepared, RescuePrepared: RescuePrepared, Chat: Chat), NullLogger.Instance, options: options);
+                TeamConverted: TeamConverted, CountedItemsPrepared: CountedItemsPrepared, RescuePrepared: RescuePrepared, Chat: Chat),
+                NullLogger.Instance, null, null, 36, options, default, null, null, null,
+                static () => Environment.TickCount64,
+                static (delay, ct) => new(Task.Delay(delay, ct)),
+                zombieKingDelay ?? (static (delay, ct) => new(Task.Delay(delay, ct))));
             Round = new RoundFlow(Registry, options, new RoundSenders(Loaded, Countdown, Started, Feed, Ended, SpawnOffered, Respawned,
+                WaitChanged: WaitChanged,
                 SupplyCreated: SupplyCreated, SupplyPicked: SupplyPicked, ItemUsed: ItemUsed,
                 CountedItemUsed: CountedItemUsed, RescueStarted: RescueStarted, RescueFailed: RescueFailed, RescueSucceeded: RescueSucceeded, RescuePrepared: RescuePrepared, PvePoints: PvePoints, ItemSlotChanged: ItemSlotChanged, LucciCreated: LucciCreated, LucciPicked: LucciPicked,
                 StarCreated: StarCreated, StarPicked: StarPicked, ObjectAdded: ObjectAdded), NullLogger.Instance, CancellationToken.None,
@@ -386,9 +392,9 @@ public sealed partial class RoundFlowTests
             Round.RoundPlaying = Rooms.ScheduleZombieKing;
         }
 
-        private static RoomPushTests.RecordingSession Player(long id, string nickname)
+        private static RecordingSession Player(long id, string nickname)
         {
-            var session = new RoomPushTests.RecordingSession(id);
+            var session = new RecordingSession(id);
             session.SetLobbyPlayer(id, nickname);
             return session;
         }
@@ -624,9 +630,13 @@ public sealed partial class RoundFlowTests
                 await rig.Round.HandleRescueProgressAsync(rig.Host, new(0, 101), default);
                 await rig.Round.HandleRescueProgressAsync(rig.Guest, new(0, 102), default);
             }
-            await Task.Delay(150);
-            Assert.Single(rig.RescueStarted.To(rig.Host));
-            for (var i = 0; i < 200 && rig.RescueStarted.To(rig.Host).Length < 2; i++) await Task.Delay(10);
+            // Measure the gap instead of sampling it after a fixed sleep: late scheduling can only lengthen it.
+            var gap = System.Diagnostics.Stopwatch.StartNew();
+            for (var i = 0; i < 1000 && rig.RescueStarted.To(rig.Host).Length < 2; i++) await Task.Delay(10);
+            gap.Stop();
+            Assert.Equal(2, rig.RescueStarted.To(rig.Host).Length);
+            // The cooldown is measured on Environment.TickCount64, whose resolution can be about 16 ms.
+            Assert.True(gap.ElapsedMilliseconds >= 280, $"next mission started {gap.ElapsedMilliseconds} ms after the previous one ended");
             Assert.Equal(1, rig.RescueStarted.To(rig.Guest)[1].MissionIndex);
             var prepared = rig.RescuePrepared.To(rig.Guest)[^1];
             Assert.True(prepared.Missions[1].StartTimeMs >= 330);
@@ -1033,14 +1043,15 @@ public sealed partial class RoundFlowTests
     private const byte ZombieHuman = 1;
     private const byte ZombieTeam = 14;
 
-    private static Rig ZombiePvpRig(int kingDelayMs = 60_000, int timeLimitMs = 180_000, int ultraKind = 0) =>
+    private static Rig ZombiePvpRig(int kingDelayMs = 60_000, int timeLimitMs = 180_000, int ultraKind = 0,
+        Func<TimeSpan, CancellationToken, ValueTask>? zombieKingDelay = null) =>
         new(configure: options =>
         {
             options.ZombiePvpModeIds = [4];
             options.ZombieKingDelayMs = kingDelayMs;
             options.ZombiePvpRoundTimeLimitMs = timeLimitMs;
             options.ZombieKingUltraItemKind = ultraKind;
-        });
+        }, zombieKingDelay: zombieKingDelay);
 
     /// <summary>
     /// The king's ultra request (no object, the ultra's item kind) is answered with the item effect to the king
@@ -1070,12 +1081,12 @@ public sealed partial class RoundFlowTests
     }
 
     /// <summary>Seats an optional third player, starts the zombie battle and waits until it plays.</summary>
-    private static async Task<RoomPushTests.RecordingSession?> StartZombiePvpAsync(Rig rig, bool third = false)
+    private static async Task<RecordingSession?> StartZombiePvpAsync(Rig rig, bool third = false)
     {
-        RoomPushTests.RecordingSession? extra = null;
+        RecordingSession? extra = null;
         if (third)
         {
-            extra = new RoomPushTests.RecordingSession(33);
+            extra = new RecordingSession(33);
             extra.SetLobbyPlayer(33, "third");
             await rig.StartAsync(extra);
         }
@@ -1147,11 +1158,16 @@ public sealed partial class RoundFlowTests
         finally { await rig.Registry.StopAllAsync(); }
     }
 
-    /// <summary>A human who dies before the opening ends becomes the king, and the timer picks no second one.</summary>
+    /// <summary>
+    /// A human who dies before the opening ends becomes the king, and the picker that was still waiting for the
+    /// opening makes no second one. The picker's wait is the room flow's delay delegate, so the death report
+    /// lands while the picker is parked and the retained task reports when the picker has finished.
+    /// </summary>
     [Fact]
     public async Task ZombieBattleDeathBeforeTheOpeningMakesTheKing()
     {
-        var rig = ZombiePvpRig(kingDelayMs: 200);
+        var gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var rig = ZombiePvpRig(kingDelayMs: 200, zombieKingDelay: (_, ct) => new(gate.Task.WaitAsync(ct)));
         try
         {
             await StartZombiePvpAsync(rig);
@@ -1163,12 +1179,82 @@ public sealed partial class RoundFlowTests
             foreach (var member in new[] { rig.Host, rig.Guest })
                 Assert.Equal(new RoomTeamConverted(guest.Slot, ZombieTeam), rig.TeamConverted.To(member)[^1]);
             var sent = rig.TeamConverted.To(rig.Host).Length;
-            await Task.Delay(400);
+            gate.SetResult(true);
+            await room.ZombieKingTask.WaitAsync(TimeSpan.FromSeconds(3));
             Assert.Equal(sent, rig.TeamConverted.To(rig.Host).Length);
             Assert.Equal(ZombieHuman, room.FindByGame(rig.Host.Id)!.Team);
             Assert.Empty(rig.Ended.To(rig.Host));
         }
         finally { await rig.Registry.StopAllAsync(); }
+    }
+
+    /// <summary>
+    /// The picker does nothing while its configured delay is still pending - no seat changes team and the
+    /// retained task is still running - and announces exactly one king once the delay completes.
+    /// </summary>
+    [Fact]
+    public async Task ZombieKingPickerActsOnlyWhenTheDelayCompletes()
+    {
+        var entered = new TaskCompletionSource<TimeSpan>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var rig = ZombiePvpRig(kingDelayMs: 200, zombieKingDelay: (delay, ct) =>
+        {
+            entered.TrySetResult(delay);
+            return new(gate.Task.WaitAsync(ct));
+        });
+        try
+        {
+            await StartZombiePvpAsync(rig);
+            var room = rig.Registry.Find(rig.RoomId)!;
+            Assert.Equal(TimeSpan.FromMilliseconds(200), await entered.Task.WaitAsync(TimeSpan.FromSeconds(3)));
+            Assert.False(room.ZombieKingTask.IsCompleted);
+            Assert.Null(room.ZombieKingSlot);
+            var sent = rig.TeamConverted.To(rig.Host).Length;
+            Assert.All(room.Seats, seat => Assert.Equal(ZombieHuman, seat.Team));
+            gate.SetResult(true);
+            await room.ZombieKingTask.WaitAsync(TimeSpan.FromSeconds(3));
+            var king = Assert.IsType<int>(room.ZombieKingSlot);
+            Assert.Equal(sent + 1, rig.TeamConverted.To(rig.Host).Length);
+            Assert.Equal(new RoomTeamConverted(king, ZombieTeam), rig.TeamConverted.To(rig.Host)[^1]);
+        }
+        finally { await rig.Registry.StopAllAsync(); }
+    }
+
+    /// <summary>
+    /// A picker still waiting for its delay when the room is torn down ends instead of hanging: the retained task
+    /// completes, no king is chosen and nothing is announced after the teardown.
+    /// </summary>
+    [Fact]
+    public async Task ZombieKingPickerCompletesWhenTheRoomIsTornDown()
+    {
+        var entered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var rig = ZombiePvpRig(kingDelayMs: 200, zombieKingDelay: (_, ct) =>
+        {
+            entered.TrySetResult(true);
+            return new(gate.Task.WaitAsync(ct));
+        });
+        var stopped = false;
+        try
+        {
+            await StartZombiePvpAsync(rig);
+            var room = rig.Registry.Find(rig.RoomId)!;
+            var picker = room.ZombieKingTask;
+            Assert.True(await entered.Task.WaitAsync(TimeSpan.FromSeconds(3)));
+            Assert.False(picker.IsCompleted);
+            var sent = rig.TeamConverted.To(rig.Host).Length;
+            await rig.Registry.StopAllAsync();
+            stopped = true;
+            gate.SetResult(true);
+            await picker.WaitAsync(TimeSpan.FromSeconds(3));
+            Assert.Null(room.ZombieKingSlot);
+            Assert.Equal(sent, rig.TeamConverted.To(rig.Host).Length);
+        }
+        finally
+        {
+            if (!stopped)
+                await rig.Registry.StopAllAsync();
+        }
     }
 
     /// <summary>
@@ -2006,7 +2092,7 @@ public sealed partial class RoundFlowTests
     {
         var rig = new Rig();
         await rig.StartAsync();
-        var late = new RoomPushTests.RecordingSession(33);
+        var late = new RecordingSession(33);
         late.SetLobbyPlayer(33, "late");
         var refused = new Sink<RoomJoinRefused>();
         var rooms = new RoomFlow(rig.Registry, new RoomSenders(rig.Entered, rig.SeatUpdated, rig.SeatVacated, rig.MasterChanged, refused),
@@ -2070,8 +2156,8 @@ public sealed partial class RoundFlowTests
         {
             await rig.StartAsync();
             var room = rig.Registry.Find(rig.RoomId)!;
-            var hostRelay = new RoomPushTests.RecordingSession(91);
-            var guestRelay = new RoomPushTests.RecordingSession(92);
+            var hostRelay = new RecordingSession(91);
+            var guestRelay = new RecordingSession(92);
             lock (room.Gate)
                 foreach (var seat in room.Seats)
                 {
@@ -2104,7 +2190,7 @@ public sealed partial class RoundFlowTests
         {
             await rig.StartAsync();
             var room = rig.Registry.Find(rig.RoomId)!;
-            var guestRelay = new RoomPushTests.RecordingSession(92);
+            var guestRelay = new RecordingSession(92);
             int hostActor, guestActor;
             lock (room.Gate)
             {
@@ -2141,8 +2227,8 @@ public sealed partial class RoundFlowTests
         {
             await rig.StartAsync();
             var room = rig.Registry.Find(rig.RoomId)!;
-            var hostRelay = new RoomPushTests.RecordingSession(91);
-            var guestRelay = new RoomPushTests.RecordingSession(92);
+            var hostRelay = new RecordingSession(91);
+            var guestRelay = new RecordingSession(92);
             int hostActor, guestActor;
             RoomSeat guest;
             lock (room.Gate)
@@ -2219,8 +2305,8 @@ public sealed partial class RoundFlowTests
         {
             await rig.StartAsync();
             var room = rig.Registry.Find(rig.RoomId)!;
-            var hostRelay = new RoomPushTests.RecordingSession(91);
-            var guestRelay = new RoomPushTests.RecordingSession(92);
+            var hostRelay = new RecordingSession(91);
+            var guestRelay = new RecordingSession(92);
             int hostActor;
             lock (room.Gate)
             {

@@ -1,4 +1,6 @@
+using BubbleFighter.Fantasy.Contracts.Shop;
 using System.Globalization;
+using BubbleFighter.Fantasy.Contracts.ClientData;
 using BubbleFighter.Fantasy.Shop.Purchasing;
 
 namespace BubbleFighter.Fantasy.Shop.Data;
@@ -32,10 +34,12 @@ internal sealed record ItemTerms(int ItemId, string DurationType, int MaxDuratio
 /// CN717 0xA4DBB0, ID400 0x91A540, CN324 0x821DE0, CN279 0x659E00.</summary>
 internal static class ItemTermsLoader
 {
-    internal static IReadOnlyDictionary<int, ItemTerms> Load(WorkbookFile file, long maxBytes) =>
-        Parse(SpreadsheetWorkbook.Load(file, maxBytes, ["ShopItem"])["ShopItem"]);
+    internal static IReadOnlyDictionary<int, ItemTerms> Load(WorkbookFile file, long maxBytes,
+        IReadOnlySet<int>? purchasableItems = null) =>
+        Parse(SpreadsheetWorkbook.Load(file, maxBytes, ShopCatalogLoader.LimitKey, ["ShopItem"])["ShopItem"], purchasableItems);
 
-    internal static IReadOnlyDictionary<int, ItemTerms> Parse(IReadOnlyList<IReadOnlyList<string>> rows)
+    internal static IReadOnlyDictionary<int, ItemTerms> Parse(IReadOnlyList<IReadOnlyList<string>> rows,
+        IReadOnlySet<int>? purchasableItems = null)
     {
         if (rows.Count == 0)
             throw new InvalidOperationException("ShopItem terms have no header.");
@@ -67,6 +71,10 @@ internal static class ItemTermsLoader
             var id = Number(row, "itemId");
             if (id <= 0)
                 throw new InvalidOperationException("ShopItem identities must be positive.");
+            // A catalog's grant policy validates its purchasable items, not unrelated event-only workbook rows.
+            // Unsupported terms of an item actually offered for sale still fail before any transaction.
+            if (purchasableItems is not null && !purchasableItems.Contains(id))
+                continue;
             var durationType = Cell(row, "durationType");
             if (durationType is not ("count" or "day" or "endurance"))
                 throw new InvalidOperationException($"ShopItem {id} has unknown durationType '{durationType}'.");

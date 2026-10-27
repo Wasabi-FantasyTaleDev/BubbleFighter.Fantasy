@@ -3,6 +3,7 @@ using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Match;
 using BubbleFighter.Fantasy.Dialect.Messages;
 using BubbleFighter.Fantasy.Protocol;
+using BubbleFighter.Fantasy.Tests;
 using Xunit;
 
 namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
@@ -68,6 +69,46 @@ public sealed class MatchRepliesMountTests
     }
 
     [Theory]
+    [InlineData("kr-1256")]
+    [InlineData("cn-774")]
+    [InlineData("tw-454")]
+    public async Task ModernRepliesSendTheSettingsAndSeedFramesAroundTheSignals(string build)
+    {
+        // The kr-1256 accept pair is S2C 22 then S2C 1 (kr-1256 sub_9601E0 case 22 arms the handshake record
+        // before case 1 starts the C2S 12 exchange), and a scene accept initializes the entity's seed tables
+        // before the empty S2C 13. The exact bodies are pinned by RelayHandshakeTableParityTests.
+        var profile = Profile(build);
+        var root = Directory.GetParent(TestBuilds.PacketsDirectory())!.FullName;
+        var relay = OpcodeTableLoader.Load(Path.Combine(root, "profiles", build, "opcodes.yaml"), profile)
+            .ForConnection(OpcodeConnection.Relay);
+        using var fixture = new MatchMessagesMountTests.Fixture(relay);
+        var context = fixture.Context(build, build + "/relay", "dialect.match-replies");
+        var session = new MatchMessagesMountTests.Session(profile);
+        try
+        {
+            await new MatchRepliesPlugin().ActivateAsync(context, default);
+            var join = Assert.Single(fixture.Services.GetAll<IMessageSender<MatchAuthenticationAccepted>>());
+            await join.SendAsync(session, new(), default);
+            Assert.Equal(new ushort[] { 22, 1 }, session.Sent);
+            Assert.Equal(10, session.Bodies[0].Length);
+            Assert.Equal(4, session.Bodies[1].Length);
+
+            var scene = Assert.Single(fixture.Services.GetAll<IMessageSender<MatchSceneAccepted>>());
+            await scene.SendAsync(session, new(1000000), default);
+            Assert.Equal(new ushort[] { 22, 1, 4, 5, 6, 13 }, session.Sent);
+            Assert.Equal(new[] { 268, 1008, 136, 0 },
+                session.Bodies.Skip(2).Select(body => body.Length).ToArray());
+            foreach (var frame in session.Bodies.Skip(2).Take(3))
+                Assert.Equal(1000000, BitConverter.ToInt32(frame));
+            Assert.Equal("00000000000000000000", Convert.ToHexString(session.Bodies[0]));
+            Assert.Equal("00000000", Convert.ToHexString(session.Bodies[1]));
+        }
+        finally { await context.UnwindAsync(); }
+        Assert.Empty(fixture.Services.GetAll<IMessageSender<MatchAuthenticationAccepted>>());
+        Assert.Empty(fixture.Services.GetAll<IMessageSender<MatchSceneAccepted>>());
+    }
+
+    [Theory]
     [InlineData("missing-build")]
     [InlineData("game-protocol")]
     [InlineData("other-protocol")]
@@ -87,6 +128,33 @@ public sealed class MatchRepliesMountTests
         finally { await context.UnwindAsync(); }
         Assert.Empty(fixture.Services.GetAll<IMessageSender<MatchAuthenticationAccepted>>());
         Assert.Empty(fixture.Services.GetAll<IMessageSender<MatchSceneAccepted>>());
+    }
+
+    /// <summary>The reply row validates its own seed layouts even without an inbound match row.</summary>
+    [Theory]
+    [InlineData("RelayCriticalSeedTable", "unknown_8", "list<u32>", "list<u16>")]
+    [InlineData("RelayCriticalSeedTable", "unknown_24", "list<u32>", "list<u16>")]
+    [InlineData("RelayDefenceSeedTable", "unknown_8", "list<u8>", "list<u16>")]
+    [InlineData("RelayCriticalSeedCancelTable", "unknown_8", "list<u32>", "list<u16>")]
+    [InlineData("RelayCriticalSeedTable", "entity_id", "u32", "u16")]
+    public async Task InvalidSeedLayoutFailsBeforePublishingSenders(string structure, string field, string original, string replacement)
+    {
+        var directory = PacketTableEdits.WithFieldType(structure, field, original, replacement);
+        const string build = "kr-1256";
+        var root = Directory.GetParent(TestBuilds.PacketsDirectory())!.FullName;
+        var table = OpcodeTableLoader.Load(Path.Combine(root, "profiles", build, "opcodes.yaml"), Profile(build))
+            .ForConnection(OpcodeConnection.Relay);
+        using var fixture = new MatchMessagesMountTests.Fixture(table);
+        var context = fixture.Context(build, build + "/relay", "dialect.match-replies", directory.FullName);
+        try
+        {
+            var error = await Assert.ThrowsAsync<ConfigException>(() =>
+                new MatchRepliesPlugin().ActivateAsync(context, default).AsTask());
+            Assert.Contains(structure, error.Message, StringComparison.Ordinal);
+            Assert.Empty(fixture.Services.GetAll<IMessageSender<MatchAuthenticationAccepted>>());
+            Assert.Empty(fixture.Services.GetAll<IMessageSender<MatchSceneAccepted>>());
+        }
+        finally { await context.UnwindAsync(); }
     }
 
     private static OpcodeEntry Entry(ushort value, string name) => new(value, PacketDirection.ServerToClient, name, Evidence.Verified, null, null)

@@ -2,8 +2,11 @@ using BubbleFighter.Fantasy.Contracts.Inventory;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Net;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
+using BubbleFighter.Fantasy.Contracts.ClientData;
 using BubbleFighter.Fantasy.Contracts.Sessions;
+using BubbleFighter.Fantasy.Equipment.Data;
 using BubbleFighter.Fantasy.Equipment.Handlers;
+using BubbleFighter.Fantasy.Equipment.Selection;
 using BubbleFighter.Fantasy.Equipment.Sessions;
 using Microsoft.Extensions.Logging;
 
@@ -11,9 +14,9 @@ namespace BubbleFighter.Fantasy.Equipment;
 
 /// <summary>Applies typed equipment changes and publishes each committed inventory and appearance snapshot.</summary>
 [Plugin("equipment",
-    Description = "Atomic worn selection with typed results, inventory and equipped-view updates.", 
+    Description = "Atomic worn selection with typed results, inventory and equipped-view updates.",
     Requires = [typeof(IMessageRouter)],
-    Optional = [typeof(IInventoryRepository), typeof(IInventoryPushService), typeof(IEquipmentSelection), typeof(IEquippedViewPush), typeof(IPlayerInventoryState)], OptionalMany = [typeof(IInboundMessageBinding<EquipmentChangeRequested>), typeof(IMessageSender<EquipmentChangeReplied>), typeof(IInboundMessageBinding<WeaponPresetChangeRequested>), typeof(IMessageSender<WeaponPresetChangeReplied>)])]
+    Optional = [typeof(IInventoryRepository), typeof(IInventoryPushService), typeof(IEquipmentSelection), typeof(IEquippedViewPush), typeof(IPlayerInventoryState), typeof(IWeaponPresetPageSource), typeof(IClientDataStore)], OptionalMany = [typeof(IInboundMessageBinding<EquipmentChangeRequested>), typeof(IMessageSender<EquipmentChangeReplied>), typeof(IInboundMessageBinding<WeaponPresetChangeRequested>), typeof(IMessageSender<WeaponPresetChangeReplied>)])]
 public sealed class EquipmentPlugin : IPlugin
 {
     /// <inheritdoc />
@@ -59,6 +62,27 @@ public sealed class EquipmentPlugin : IPlugin
         context.Services.TryGet<IEquippedViewPush>(out var equippedView);
         if (options.PersistWornState && (selection is null || equippedView is null))
             throw new InvalidOperationException("persist_worn_state requires IEquipmentSelection and IEquippedViewPush; enable the inventory-view provider so equipment changes cannot remain flag-only.");
+        if (options.PetSharedSlot)
+        {
+            // The rule is a default-off capability of this row: the pet identities come from
+            // the build's own workbook, and a missing store or unreadable workbook fails the
+            // row instead of arming a rule with no pets in it.
+            if (inventory is null)
+                throw new ConfigException("pet_shared_slot requires persist_worn_state: an ack-only row never consults the selection the rule guards.");
+            if (!context.Services.TryGet<IClientDataStore>(out var clientData) || clientData is null)
+                throw new ConfigException($"pet_shared_slot is on but no clientdata row is active; '{options.PetCatalogClientPath}' could not be read.");
+            var pets = PetItemCatalogLoader.Load(
+                WorkbookFile.FromBytes(options.PetCatalogClientPath, clientData.Read(options.PetCatalogClientPath)),
+                options.MaxPetCatalogBytes, "equipment.max_pet_catalog_bytes");
+            var petPolicy = new PetSharedSlotPolicy(pets, inventory, options.Protocol, context.Logger);
+            // One middleware of the shared EquipmentSelectionApplying waterfall: the denial
+            // rides the selection's existing refusal path, and any other selection policy
+            // (a character mask, for instance) stays in the chain untouched.
+            context.Effect(context.Events.Intercept<EquipmentSelectionApplying, EquipmentSelectionDecision>(petPolicy.ApplyAsync));
+            context.Logger.LogInformation(
+                "Pet shared slot rule is live on {Protocol}: {Pets} function-10001 items share one worn slot.",
+                options.Protocol, pets.Count);
+        }
         var equippedItems = new EquippedItemScope(options.MaxTrackedConnections, options.MaxEquippedPerSession);
         context.Effect(equippedItems);
         context.Effect(context.Events.On<ConnectionClosedEvent>(e => equippedItems.Remove(e.Connection.Id)));
@@ -86,7 +110,8 @@ public sealed class EquipmentPlugin : IPlugin
                     "The weapon preset codec is mounted but no persistence row publishes IPlayerInventoryState; "
                     + "the granted slot could not persist, so a switch would revert on the next view push.");
             }
-            var presets = new WeaponPresetChangeHandler(playerState, selection, equippedView, presetSenders[0], context.Logger);
+            context.Services.TryGet<IWeaponPresetPageSource>(out var presetPages);
+            var presets = new WeaponPresetChangeHandler(playerState, selection, equippedView, presetSenders[0], context.Logger, presetPages);
             context.Effect(router.For(context).On<WeaponPresetChangeRequested>(protocol, presets.HandleAsync));
             context.Logger.LogInformation(
                 "Weapon preset switching is live on {Protocol}: requests persist the granted slot and republish the view.",

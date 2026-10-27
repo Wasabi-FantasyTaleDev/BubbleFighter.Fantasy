@@ -30,6 +30,7 @@ internal sealed partial class RoomFlow
     public ValueTask HandlePlazaEnterAsync(ISession session, PlazaEnterRequested request, CancellationToken ct) =>
         RunSceneAsync(session, async (group, token) =>
         {
+            await CloseTutorialForSceneAsync(session, token).ConfigureAwait(false);
             await EnterPlazaSceneAsync(session, group is not null, token).ConfigureAwait(false);
             if (_plaza.Find(session.Id) is not null && _registry.TryGet(session.Id) is null)
                 await FollowPlazaAsync(group, token).ConfigureAwait(false);
@@ -84,8 +85,8 @@ internal sealed partial class RoomFlow
         await _plazaEntered.SendAsync(session, new PlazaEntered(you, present)
             { MemberOrder = memberOrder, PartyTransition = partyTransition }, ct).ConfigureAwait(false);
         // The entrant also receives where everyone stands, so its client can place the avatars the
-        // seat records created; a member who has not reported yet goes out with an empty position,
-        // which the build's codec places at its plaza spawn.
+        // seat records created; a member who has not reported yet has no position to replay and the
+        // codec keeps that member at its plaza spawn (kr-1256 sub_91FB80).
         foreach (var member in _options?.PlazaReplayPositionsOnEnter != false ? present : [])
         {
             var (userNumber, sequence, position) = _plaza.LastPosition(member.UserNumber);
@@ -143,6 +144,7 @@ internal sealed partial class RoomFlow
     public ValueTask HandlePlazaMenuReturnAsync(ISession session, PlazaMenuReturnRequested request, CancellationToken ct) =>
         RunSceneAsync(session, async (group, token) =>
         {
+            await CloseTutorialForSceneAsync(session, token).ConfigureAwait(false);
             var fromPlaza = _plaza.Find(session.Id) is not null;
             await ReturnMenuSceneAsync(session, request with { PartyTransition = fromPlaza && group is not null }, token).ConfigureAwait(false);
             if (fromPlaza)

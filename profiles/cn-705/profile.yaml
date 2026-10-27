@@ -1,0 +1,22 @@
+id: cn-705
+display_names:
+  en: "China 2014-08"
+  zh-Hans: "中国 2014-08"
+  zh-Hant: "中國 2014-08"
+  ko: "중국 2014-08"
+client_build: cn:705:0
+# Nearest build whose layouts this one reuses when it has no variant of its own.
+parent: cn-706
+description: Chinese 2014 client build 0.2.50.004, ClientVersion_Major 705.
+bundles:
+  - core
+  - legacy
+# What this build differs in; everything else is the legacy bundle's (kr-812).
+vars:
+  LEGACY_PORT: ${CN_705_GAME_PORT:-7260}
+  LEGACY_PUBLIC_PORT: ${CN_705_PUBLIC_PORT:-7260}
+  LEGACY_SEATS: 8
+patches:
+  - patch.yaml
+  # Optional developer override; git-ignored and skipped when absent.
+  - local.patch.yaml

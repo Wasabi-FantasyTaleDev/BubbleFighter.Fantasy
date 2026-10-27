@@ -27,8 +27,21 @@ internal sealed class LucciBinding(string protocol, IOpcodeTable table, PacketTa
     {
         if (!tables.CapabilityOf(build, "lucci_drops"))
             throw new ConfigException("lucci_drops requires audited Lucci create and pickup consumers.");
-        foreach (var name in new[] { "LucciDropRequest", "LucciCreate", "LucciPickup", "LucciPicked" })
-            _ = tables.Resolve(build, name);
+        // The floats and words the handlers cast and the senders write: the drop request's point, kind and
+        // killer tag, the created item, and the pickup pair in both directions.
+        PacketLayoutContract.RequireFields(tables, build, "LucciDropRequest", "Lucci drops",
+            ("x", "f32"), ("y", "f32"), ("z", "f32"),
+            ("velocity_x", "f32"), ("velocity_y", "f32"), ("velocity_z", "f32"),
+            ("kind", "u32"), ("unknown_36", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "LucciCreate", "Lucci drops",
+            ("object_id", "u32"), ("kind", "u32"),
+            ("x", "f32"), ("y", "f32"), ("z", "f32"),
+            ("velocity_x", "f32"), ("velocity_y", "f32"), ("velocity_z", "f32"),
+            ("unknown_36", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "LucciPickup", "Lucci drops",
+            ("character_id", "u32"), ("object_id", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "LucciPicked", "Lucci drops",
+            ("character_id", "u32"), ("object_id", "u32"));
         // A build with the award request must also read award kinds 3..5 (horde_award_items), or the
         // award item would be created through a handler that ignores or mishandles it.
         var awardOpcode = table.Find(PacketDirection.ClientToServer, "gcpReqCreateHordeAward");
@@ -58,7 +71,11 @@ internal sealed class LucciBinding(string protocol, IOpcodeTable table, PacketTa
         }));
         if (awardOpcode is not { } award)
             return;
-        _ = tables.Resolve(build, "HordeAwardRequest");
+        // The same point and killer tag without a kind; ReadAward casts them back when the request arrives.
+        PacketLayoutContract.RequireFields(tables, build, "HordeAwardRequest", "Lucci drops",
+            ("x", "f32"), ("y", "f32"), ("z", "f32"),
+            ("velocity_x", "f32"), ("velocity_y", "f32"), ("velocity_z", "f32"),
+            ("unknown_32", "u32"));
         HasHordeAward = true;
         context.Effect(context.Services.RegisterMany<IInboundMessageBinding<RoundHordeAwardRequested>>(this));
         context.Effect(router.Register(protocol, award, async (session, packet, ct) =>

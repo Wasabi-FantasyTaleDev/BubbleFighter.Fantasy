@@ -1,0 +1,7 @@
+version: 1
+structs:
+  # kr-812 Packet_gcpRoomChangeTeamObserver uses the empty codec kr-812 sub_5C8FC0;
+  # sender kr-812 sub_5C87A0 stamps C2S 2009 and delegates to that serializer.
+  # The empty request does not establish the server's observer-team assignment policy.
+  # A binding must require the named game opcode: modern tables do not carry this name.
+  RoomObserverTeamChangeRequest@kr-812: []

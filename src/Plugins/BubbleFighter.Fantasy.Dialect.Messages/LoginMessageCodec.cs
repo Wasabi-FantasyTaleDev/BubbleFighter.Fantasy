@@ -63,6 +63,39 @@ internal static class LoginMessageCodec
     private const int MaxAddresses = 10;
 
     /// <summary>
+    /// Checks the reply structures this build's login family writes: the legacy table reply for the builds that
+    /// send <c>gspRepLogin</c> from the packet tables, and the modern table reply and refusal. A field that keeps
+    /// its name but changes its type fails at activation instead of on the first login.
+    /// </summary>
+    /// <param name="tables">The row's packet tables.</param>
+    /// <param name="build">The build whose layout is checked.</param>
+    /// <param name="values">The build's login values, which select the reply family.</param>
+    internal static void RequireLayouts(PacketTables tables, string build, LoginValues values)
+    {
+        if (values.Reply == LoginValues.ModernReply)
+        {
+            // WriteTableModernAccepted writes these fields of the modern LoginReply table.
+            PacketLayoutContract.RequireFields(tables, build, "LoginReply", "Login message",
+                ("result", "u32"), ("account", "wstr"), ("user_number", "u32"), ("nickname", "wstr"),
+                ("character_type", "u32"), ("channel_id", "u32"), ("server_time", "f64"));
+            PacketLayoutContract.RequireFields(tables, build, "LoginRefusal", "Login message", ("result", "u32"));
+            return;
+        }
+        if (values.Shape.LoginResponse)
+            return; // the response-pair reply is written without the packet tables.
+        // Write writes these fields of the legacy LoginReply table; the trailing unknown string is the baseline's
+        // unknown_96 or the cn-324/cn-279 variant's unknown_48, and the build's table states exactly one of them.
+        PacketLayoutContract.RequireFields(tables, build, "LoginReply", "Login message",
+            ("result", "u32"), ("account", "wstr"), ("user_number", "u32"), ("nickname", "wstr"),
+            ("character_type", "u32"), ("server_time", "f64"));
+        var reply = tables.Resolve(build, "LoginReply");
+        if (reply.Any(field => field.Name == "unknown_96"))
+            PacketLayoutContract.RequireFields(tables, build, "LoginReply", "Login message", ("unknown_96", "wstr"));
+        if (reply.Any(field => field.Name == "unknown_48"))
+            PacketLayoutContract.RequireFields(tables, build, "LoginReply", "Login message", ("unknown_48", "wstr"));
+    }
+
+    /// <summary>
     /// Reads <c>gcpReqLogin</c>: <c>wstr account, wstr unknown1, wstr unknown2, u32 count,
     /// count x u32 adapter IPv4</c>, then <c>u32 unknown3, u32 unknown4</c> when the shape has
     /// the request trailer, or one <c>u32</c> token when it has the request token. Each wstr is a <c>u32</c> character count plus UTF-16LE; the
@@ -167,7 +200,7 @@ internal static class LoginMessageCodec
     /// <summary>
     /// Writes an accepted <c>gspRepLogin</c> in the kr-1256 family's table form: the fields come from the
     /// build's <c>LoginReply</c> row (kr-1256 resolves <c>LoginReply@kr-1256</c>), and the values are the ones
-    /// the former modern login codec wrote: a server-issued session identity string, the Dao
+    /// the client's handler consumes: a server-issued session identity string, the equipped
     /// character type, the initial channel that arms the client's room-list polling (<c>kr-1256 sub_8530C0</c>
     /// never arms it for zero) and a zero server time.
     /// </summary>
@@ -188,15 +221,12 @@ internal static class LoginMessageCodec
             ["account"] = sessionId,
             ["user_number"] = accepted.UserNumber,
             ["nickname"] = accepted.Nickname,
-            // The kr-1256 login reply carries the Dao character type, not the equipped character's item id.
-            ["character_type"] = DaoCharacterType,
+            // kr-1256 sub_9A2770 stores the type; kr-1256 sub_4BD3E0 uses it as the avatar fallback.
+            ["character_type"] = accepted.CharacterItemId - CharacterItemBase,
             ["channel_id"] = initialChannelId,
             ["server_time"] = 0.0,
         });
     }
-
-    /// <summary>The Dao character type the modern login reply carries (<c>kr-1256 sub_4BD3E0</c> maps 0 to 1).</summary>
-    internal const int DaoCharacterType = 1;
 
     /// <summary>
     /// Writes a refused <c>gspRepLogin</c> in the kr-1256 family's table form: the build's <c>LoginRefusal</c>

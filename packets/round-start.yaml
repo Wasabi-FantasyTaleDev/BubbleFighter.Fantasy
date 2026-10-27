@@ -43,5 +43,138 @@ structs:
       offset: 12
       # cn-324 sub_408DF0, cn-279 sub_47E650, id-400 sub_782DD0 and cn-406 sub_420FC0 consume two words, and so
       # does kr-1256 sub_9E7570 (the first word goes to the round-duration setter kr-1256 sub_6FEFC0).
+      # cn-774 sub_8E1F90 also reads two words; tw-454 sub_A62210 reads three and stores the third at session+4372.
       except: [cn-324, id-400, kr-1256]
-      also: [cn-706]
+      also: [cn-706, tw-454]
+
+  # The kr-1256 round clock's no-limit step, S2C 609: kr-1256 sub_9E1EB0 case 0x261 reads no stream field
+  # and calls the round-duration setter kr-1256 sub_6FEFC0 with the client's own no-limit sentinel
+  # 0x3FFFFFFF, which sub_6FEFC0 also writes as the second timer's ceiling. The body is empty. The
+  # baseline table is empty because the format requires one. cn-774 sub_8D7D20 and tw-454 sub_A578B0
+  # case 0x27E consume the same empty notification at S2C 638 instead of 609.
+  RoundClockUnbounded: []
+
+  # The kr-1256 seat-info records, S2C 602/603/604/605 (kr-1256 sub_9E1EB0 cases 0x25A-0x25D): one
+  # reader, kr-1256 sub_10D22D0, whose record is copied verbatim into four session slots (+16, +168,
+  # +320 and +472). Two words, then a u64 seat mask; one byte per set bit, read in ascending bit order
+  # into the record's per-seat words (+8+4i). The reader walks bits 0..35 only, so a mask bit above 35 is
+  # never consumed. Identity, team and spawn are not proven for any field; the per-seat byte keeps its
+  # destination offset as its name.
+  RoundSeatInfo:
+    - unknown_0: u32
+      offset: 0
+      only: [kr-1256]
+    - unknown_4: u32
+      offset: 4
+      only: [kr-1256]
+    - seat_mask: u64
+      offset: 8
+      only: [kr-1256]           # one byte follows per set bit 0..35, ascending
+    - unknown_8: "when<seat_mask&0x1,u8>"
+      offset: 8
+      only: [kr-1256]
+    - unknown_12: "when<seat_mask&0x2,u8>"
+      offset: 12
+      only: [kr-1256]
+    - unknown_16: "when<seat_mask&0x4,u8>"
+      offset: 16
+      only: [kr-1256]
+    - unknown_20: "when<seat_mask&0x8,u8>"
+      offset: 20
+      only: [kr-1256]
+    - unknown_24: "when<seat_mask&0x10,u8>"
+      offset: 24
+      only: [kr-1256]
+    - unknown_28: "when<seat_mask&0x20,u8>"
+      offset: 28
+      only: [kr-1256]
+    - unknown_32: "when<seat_mask&0x40,u8>"
+      offset: 32
+      only: [kr-1256]
+    - unknown_36: "when<seat_mask&0x80,u8>"
+      offset: 36
+      only: [kr-1256]
+    - unknown_40: "when<seat_mask&0x100,u8>"
+      offset: 40
+      only: [kr-1256]
+    - unknown_44: "when<seat_mask&0x200,u8>"
+      offset: 44
+      only: [kr-1256]
+    - unknown_48: "when<seat_mask&0x400,u8>"
+      offset: 48
+      only: [kr-1256]
+    - unknown_52: "when<seat_mask&0x800,u8>"
+      offset: 52
+      only: [kr-1256]
+    - unknown_56: "when<seat_mask&0x1000,u8>"
+      offset: 56
+      only: [kr-1256]
+    - unknown_60: "when<seat_mask&0x2000,u8>"
+      offset: 60
+      only: [kr-1256]
+    - unknown_64: "when<seat_mask&0x4000,u8>"
+      offset: 64
+      only: [kr-1256]
+    - unknown_68: "when<seat_mask&0x8000,u8>"
+      offset: 68
+      only: [kr-1256]
+    - unknown_72: "when<seat_mask&0x10000,u8>"
+      offset: 72
+      only: [kr-1256]
+    - unknown_76: "when<seat_mask&0x20000,u8>"
+      offset: 76
+      only: [kr-1256]
+    - unknown_80: "when<seat_mask&0x40000,u8>"
+      offset: 80
+      only: [kr-1256]
+    - unknown_84: "when<seat_mask&0x80000,u8>"
+      offset: 84
+      only: [kr-1256]
+    - unknown_88: "when<seat_mask&0x100000,u8>"
+      offset: 88
+      only: [kr-1256]
+    - unknown_92: "when<seat_mask&0x200000,u8>"
+      offset: 92
+      only: [kr-1256]
+    - unknown_96: "when<seat_mask&0x400000,u8>"
+      offset: 96
+      only: [kr-1256]
+    - unknown_100: "when<seat_mask&0x800000,u8>"
+      offset: 100
+      only: [kr-1256]
+    - unknown_104: "when<seat_mask&0x1000000,u8>"
+      offset: 104
+      only: [kr-1256]
+    - unknown_108: "when<seat_mask&0x2000000,u8>"
+      offset: 108
+      only: [kr-1256]
+    - unknown_112: "when<seat_mask&0x4000000,u8>"
+      offset: 112
+      only: [kr-1256]
+    - unknown_116: "when<seat_mask&0x8000000,u8>"
+      offset: 116
+      only: [kr-1256]
+    - unknown_120: "when<seat_mask&0x10000000,u8>"
+      offset: 120
+      only: [kr-1256]
+    - unknown_124: "when<seat_mask&0x20000000,u8>"
+      offset: 124
+      only: [kr-1256]
+    - unknown_128: "when<seat_mask&0x40000000,u8>"
+      offset: 128
+      only: [kr-1256]
+    - unknown_132: "when<seat_mask&0x80000000,u8>"
+      offset: 132
+      only: [kr-1256]
+    - unknown_136: "when<seat_mask&0x100000000,u8>"
+      offset: 136
+      only: [kr-1256]
+    - unknown_140: "when<seat_mask&0x200000000,u8>"
+      offset: 140
+      only: [kr-1256]
+    - unknown_144: "when<seat_mask&0x400000000,u8>"
+      offset: 144
+      only: [kr-1256]
+    - unknown_148: "when<seat_mask&0x800000000,u8>"
+      offset: 148
+      only: [kr-1256]

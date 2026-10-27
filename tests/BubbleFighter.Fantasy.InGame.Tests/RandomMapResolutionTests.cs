@@ -1,8 +1,9 @@
 using System.Text;
+using BubbleFighter.Fantasy.RoomCore;
 using BubbleFighter.Fantasy.Contracts.ClientData;
 using BubbleFighter.Fantasy.InGame.Data;
 using BubbleFighter.Fantasy.InGame.Handlers;
-using BubbleFighter.Fantasy.InGame.Wire;
+using BubbleFighter.Fantasy.InGame.Sessions;
 using Xunit;
 
 namespace BubbleFighter.Fantasy.InGame.Tests;
@@ -107,7 +108,7 @@ public class RandomMapResolutionTests
     [Fact]
     public void UnresolvedMarkersNeverReachFirstMapKey()
     {
-        Assert.Equal(string.Empty, RoomPush.FirstMapKey(Blob("Random", "Random", "Random")));
+        Assert.Null(MapCatalog.ConcreteSelection(Blob("Random", "Random", "Random")));
         Assert.True(MapCatalog.HasSelection(Blob("", "Random", "")));
     }
 

@@ -5,10 +5,25 @@ using System.Text;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Contracts.Admin;
 using BubbleFighter.Fantasy.Contracts.Installation;
+using BubbleFighter.Fantasy.Contracts.Launcher;
 using Microsoft.Extensions.Logging;
 
 namespace BubbleFighter.Fantasy.Installation;
 
+/// <summary>
+/// The first-run setup assistant's service and, once the administrator is claimed, the deployment's
+/// <see cref="IAdminAccessControl"/> provider. The state machine moves language → claim → applying →
+/// ready or failed: a claim persists its PBKDF2-hashed credential (600000 iterations, schema version 1
+/// fixes the algorithm and work factor) to the setup store before any database or runtime activation
+/// begins, so the claim survives disconnects, crashes and restarts; a restart re-enters applying
+/// through <see cref="ResumeAsync"/>. Exactly one mutation runs at a time (<c>_mutation</c>), one
+/// database preparation at a time (<c>_database</c>), and one sign-in at a time (<c>_login</c>); the
+/// document itself is guarded by <c>_sync</c>. Client-data import is single-flight with its own
+/// deadline. Sign-ins are in-memory sessions (a restart signs everyone out), authenticated by
+/// constant-time PBKDF2 comparison with a per-peer failure window that rate-limits guessing, and
+/// database or configuration failures cross this boundary only as stable error codes, never with
+/// their exception text, which can carry secrets.
+/// </summary>
 internal sealed class InstallationService : IInstallationService, IAdminAccessControl, IDisposable
 {
     // Schema v1 fixes the hash algorithm and work factor; changing them requires a state migration.
@@ -47,6 +62,8 @@ internal sealed class InstallationService : IInstallationService, IAdminAccessCo
     public bool HasAdministrator { get { lock (_sync) return _document is not null; } }
     public bool AllowsRemoteBootstrap => _options.BootstrapToken.Length >= 32;
 
+    /// <summary>Gets whether a claim exists, whether it finished installing, the current phase, the settings as
+    /// stored, and whether any client import is still deferred. Read-only; safe from any thread.</summary>
     public InstallationStatus Status
     {
         get
@@ -70,6 +87,14 @@ internal sealed class InstallationService : IInstallationService, IAdminAccessCo
 
     public long ClientDataUploadLimit => _options.ClientDataUploadBytes;
 
+    /// <summary>
+    /// Imports one client's data archive or file stream into the selected profile's client-data root.
+    /// One import runs at a time process-wide; a second concurrent call is refused rather than queued,
+    /// and each import is bounded by the configured deadline and the plugin lifetime. The profile must
+    /// exist and must not be the management profile.
+    /// </summary>
+    /// <exception cref="ArgumentException">Thrown for an unknown or management profile (<c>client_profile_invalid</c>).</exception>
+    /// <exception cref="InvalidOperationException">Thrown when another import is still running (<c>client_data_busy</c>).</exception>
     public async ValueTask<string> ImportClientDataAsync(string profile, bool archive,
         IAsyncEnumerable<InstallationUpload> files, CancellationToken cancellationToken)
     {
@@ -89,10 +114,18 @@ internal sealed class InstallationService : IInstallationService, IAdminAccessCo
         finally { Interlocked.Exchange(ref _importActive, 0); }
     }
 
+    /// <summary>Checks a bootstrap secret by constant-time hash comparison. Only accepted when remote
+    /// bootstrap is enabled; the compared values are never logged or stored.</summary>
     public bool AcceptsBootstrapToken(string? token) => AllowsRemoteBootstrap && token is { Length: <= 256 } &&
         CryptographicOperations.FixedTimeEquals(SHA256.HashData(Encoding.UTF8.GetBytes(token)),
             SHA256.HashData(Encoding.UTF8.GetBytes(_options.BootstrapToken)));
 
+    /// <summary>
+    /// Validates settings and prepares (without initializing) the selected database. Refused while
+    /// another database operation runs; the wait is tried once, so a busy assistant returns
+    /// <c>operation_busy</c> instead of queueing.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown while another database probe runs or the database fails (<c>database_failed</c>).</exception>
     public async ValueTask ProbeAsync(InstallationSettings settings, CancellationToken cancellationToken)
     {
         settings = Normalize(settings);
@@ -102,6 +135,14 @@ internal sealed class InstallationService : IInstallationService, IAdminAccessCo
         finally { _database.Release(); }
     }
 
+    /// <summary>
+    /// Claims the administrator identity with its credentials and settings and starts the apply
+    /// operation. Repeating the claim's own operation id is idempotent; a different id after a claim
+    /// exists is refused. The claim is persisted before activation starts, so a crash after Begin
+    /// leaves a resumable claim, not a lost one.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown while another mutation runs or an administrator is already claimed.</exception>
+    /// <exception cref="ArgumentException">Thrown for invalid settings or credentials (<c>administrator_invalid</c>, <c>configuration_invalid</c>).</exception>
     public async ValueTask BeginAsync(InstallationRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -135,6 +176,7 @@ internal sealed class InstallationService : IInstallationService, IAdminAccessCo
         finally { _mutation.Release(); }
     }
 
+    /// <summary>Reruns the apply operation after a failure; refused while an operation runs or nothing needs applying.</summary>
     public async ValueTask RetryAsync(CancellationToken cancellationToken)
     {
         if (!await _mutation.WaitAsync(0, cancellationToken).ConfigureAwait(false)) throw new InvalidOperationException("operation_busy");
@@ -147,8 +189,10 @@ internal sealed class InstallationService : IInstallationService, IAdminAccessCo
         finally { _mutation.Release(); }
     }
 
+    /// <summary>Resumes a persisted claim after a restart; a no-op before any claim exists. Called by the host during activation.</summary>
     public ValueTask ResumeAsync() => _document is null ? ValueTask.CompletedTask : StartApplyAsync();
 
+    /// <summary>Returns the stored settings with the database password blanked, plus whether one is stored. Requires a claim.</summary>
     public InstallationConfiguration GetConfiguration()
     {
         lock (_sync)
@@ -158,6 +202,14 @@ internal sealed class InstallationService : IInstallationService, IAdminAccessCo
         }
     }
 
+    /// <summary>
+    /// Applies a settings update and reruns apply. Allowed after a failure or, for the deferred-client
+    /// completion path, while ready. An installed deployment cannot change storage, launch policy or
+    /// credentials this way — only client selection and client-plugin policies — and a retained
+    /// database password can only return to the exact original host, port and account.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown while another mutation runs or the phase forbids updating (<c>retry_unavailable</c>).</exception>
+    /// <exception cref="ArgumentException">Thrown for invalid settings or a forbidden change (<c>configuration_invalid</c>).</exception>
     public async ValueTask UpdateAsync(InstallationUpdate update, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(update);
@@ -173,10 +225,11 @@ internal sealed class InstallationService : IInstallationService, IAdminAccessCo
             }
             var settings = ResolveUpdate(update, document.Settings);
             Validate(settings);
-            // Finishing deferred import cannot silently move an installed database or replace its credentials.
-            if (document.Installed && settings != (document.Settings with
+            // Finishing deferred import cannot change installed storage, launch policy or credentials.
+            if (document.Installed && (settings != (document.Settings with
                 { Clients = settings.Clients, Profile = settings.Profile, ClientDataPath = settings.ClientDataPath,
-                    DeferClientDataImport = settings.DeferClientDataImport }))
+                    DeferClientDataImport = settings.DeferClientDataImport, ClientPlugins = settings.ClientPlugins }) ||
+                !SameClientPluginPolicies(settings.ClientPlugins, document.Settings.ClientPlugins)))
                 throw new ArgumentException("configuration_invalid");
             var corrected = document with { Settings = settings };
             _store.Save(corrected);
@@ -193,6 +246,43 @@ internal sealed class InstallationService : IInstallationService, IAdminAccessCo
         lock (_sync) saved = (_document ?? throw new InvalidOperationException("installation_missing")).Settings;
         return ProbeAsync(ResolveUpdate(update, saved), cancellationToken);
     }
+
+    /// <summary>
+    /// Replaces only the client-plugin policies of an installed, ready deployment and reruns apply.
+    /// No-op when the candidate policies equal the stored ones.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown when no claim is installed, an operation runs, or the phase is not ready.</exception>
+    public async ValueTask UpdateClientPluginsAsync(InstallationClientPluginSettings settings, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        var policies = settings.Policies?.Select(policy => policy is null ? null! : policy with
+        { Builds = policy.Builds?.ToArray()! }).ToArray();
+        if (!await _mutation.WaitAsync(0, cancellationToken).ConfigureAwait(false)) throw new InvalidOperationException("operation_busy");
+        try
+        {
+            InstallationDocument document;
+            lock (_sync)
+            {
+                if (_document is not { Installed: true } || _running || _phase != "ready")
+                    throw new InvalidOperationException("retry_unavailable");
+                document = _document;
+            }
+            var candidate = document.Settings with { ClientPlugins = policies };
+            Validate(candidate);
+            var saved = document.Settings.ClientPlugins;
+            if (SameClientPluginPolicies(policies, saved)) return;
+            var updated = document with { Settings = candidate };
+            _store.Save(updated);
+            lock (_sync) _document = updated;
+            await StartApplyAsync().ConfigureAwait(false);
+        }
+        finally { _mutation.Release(); }
+    }
+
+    private static bool SameClientPluginPolicies(IReadOnlyList<ClientPluginPolicy>? left, IReadOnlyList<ClientPluginPolicy>? right) =>
+        left is null ? right is null : right is not null && left.Count == right.Count &&
+        left.Zip(right).All(pair => pair.First.Id == pair.Second.Id && pair.First.Required == pair.Second.Required &&
+            pair.First.Disabled == pair.Second.Disabled && pair.First.Builds.SequenceEqual(pair.Second.Builds, StringComparer.Ordinal));
 
     private InstallationSettings ResolveUpdate(InstallationUpdate update, InstallationSettings saved)
     {
@@ -283,6 +373,12 @@ internal sealed class InstallationService : IInstallationService, IAdminAccessCo
 
     private void Validate(InstallationSettings settings)
     {
+        if (settings.ClientPlugins is { } policies)
+        {
+            ClientPluginPolicyRules.Validate(policies);
+            if (policies.SelectMany(policy => policy.Builds).Any(build => build == "management" || !_runtime.Profiles.Any(profile => profile.Id == build)))
+                throw new ArgumentException("plugin_policy_invalid");
+        }
         if (settings.Language is not ("en" or "zh-Hans" or "zh-Hant" or "ko") ||
             settings.ServerName is not { Length: >= 1 and <= 80 } || settings.ServerName.Any(char.IsControl) ||
             (settings.Clients is null && !IsSelectable(settings.Profile)) ||
@@ -311,21 +407,39 @@ internal sealed class InstallationService : IInstallationService, IAdminAccessCo
         }
     }
 
-    public bool Authorize(string? session)
+    public bool Authorize(string? session) => GetAccountId(session) is not null;
+
+    /// <summary>Resolves a live, unexpired session to the claimed administrator's username; expired sessions are dropped on sight. No claim resolves nothing.</summary>
+    public string? GetAccountId(string? session)
     {
-        if (session is not { Length: 64 }) return false;
+        if (session is not { Length: 64 }) return null;
         lock (_sync)
         {
-            if (!_sessions.TryGetValue(session, out var expires)) return false;
-            if (expires > DateTimeOffset.UtcNow) return true;
+            if (!_sessions.TryGetValue(session, out var expires)) return null;
+            if (expires > DateTimeOffset.UtcNow) return _document?.Username;
             _sessions.Remove(session);
-            return false;
+            return null;
         }
     }
 
     public ValueTask<AdminSession?> SignInAsync(string username, string password, CancellationToken cancellationToken) =>
         SignInAsync(username, password, IPAddress.None.ToString(), cancellationToken);
 
+    /// <summary>
+    /// Signs the administrator in and returns a fresh session, or <see langword="null"/> when the
+    /// credentials do not match. Password hashing runs under a single-flight gate and a per-peer
+    /// failure window: each source address owns a bounded count of failures inside the configured
+    /// window, exhausted addresses are refused with <c>login_rate_limited</c>, the window table is
+    /// capacity-bounded with oldest-start eviction, and live sessions are capacity-bounded with
+    /// <c>session_capacity</c> refusal. Only the peer's IP text is used; forwarding headers are never
+    /// trusted here.
+    /// </summary>
+    /// <param name="username">The claimed administrator's name; trimmed and normalization-normalized before comparison.</param>
+    /// <param name="password">The supplied password; hashed under the single-flight gate, never logged or retained.</param>
+    /// <param name="sourceAddress">The connection peer's IP address text.</param>
+    /// <param name="cancellationToken">Cancels the pending hash comparison.</param>
+    /// <exception cref="ArgumentException">Thrown when the source address is not an IP address.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when a sign-in already runs (<c>login_busy</c>), the peer is rate-limited, or the session capacity is exhausted.</exception>
     public async ValueTask<AdminSession?> SignInAsync(string username, string password, string sourceAddress, CancellationToken cancellationToken)
     {
         if (!IPAddress.TryParse(sourceAddress, out var peer))

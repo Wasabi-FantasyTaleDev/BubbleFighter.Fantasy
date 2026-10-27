@@ -13,6 +13,41 @@ public sealed class EquipmentViewTableTests
 {
     private const string Kr1256 = "kr-1256";
 
+    /// <summary>CN and TW retain their own native container counts when publishing a worn weapon.</summary>
+    [Theory]
+    [InlineData("cn-774", 4)]
+    [InlineData("tw-454", 3)]
+    public void UnkeyedModernViewsMatchTheirNativeEquipmentReader(string build, int remainingContainers)
+    {
+        // cn-774 sub_496F40 / tw-454 sub_4A0550: four words, the item vector, then the native trailing vectors.
+        var body = EquipmentViewBinding.WriteView(TestBuilds.Packets, build, 42, 300001, [203073]);
+        Assert.Equal("2A000000E193040000000000FFFFFFFF0100000041190300" + new string('0', remainingContainers * 8),
+            Convert.ToHexString(body));
+        Assert.Equal(body, BubbleFighter.Fantasy.Packets.PacketCodec.Write(TestBuilds.Packets, build,
+            "EquippedObjectEntry", new Dictionary<string, object?>
+            {
+                ["user_number"] = 42, ["character_id"] = 300001, ["equipped_items"] = new[] { 203073 },
+            }));
+    }
+
+    /// <summary>The TW byte vector is immediately after the worn ids; CN carries an extra word vector.</summary>
+    [Theory]
+    [InlineData("cn-774", "0100000004030201030000000708090000000000000000")]
+    [InlineData("tw-454", "030000000708090000000000000000")]
+    public void NativeAppearanceContainerWidthsStayDistinct(string build, string expectedTail)
+    {
+        var values = new Dictionary<string, object?>
+        {
+            ["user_number"] = 42, ["character_id"] = 300001,
+            ["unknown_32"] = build == "cn-774" ? new object[] { 0x01020304 } : new object[] { 7, 8, 9 },
+            ["unknown_44"] = build == "cn-774" ? new byte[] { 7, 8, 9 } : Array.Empty<byte>(),
+        };
+        var expected = "2A000000E193040000000000FFFFFFFF00000000" + expectedTail;
+        foreach (var structure in new[] { "SoloPartyEquippedItem", "EquippedObjectEntry" })
+            Assert.Equal(expected, Convert.ToHexString(BubbleFighter.Fantasy.Packets.PacketCodec.Write(
+                TestBuilds.Packets, build, structure, values)));
+    }
+
     [Fact]
     public void Kr1256ViewIsTheProfileRecordWithTheWornIds()
     {
@@ -52,6 +87,8 @@ public sealed class EquipmentViewTableTests
     [Theory]
     [InlineData("kr-812", "EquippedItemList", new[] { "view", "preset_update" })]
     [InlineData("kr-1256", "RoomProfileEntry", new[] { "preset_reply", "preset_update", "view" })]
+    [InlineData("cn-774", "SoloPartyEquippedItem", new[] { "view" })]
+    [InlineData("tw-454", "SoloPartyEquippedItem", new[] { "view" })]
     public void EachBuildStatesItsViewStructureAndOrder(string build, string structure, string[] order)
     {
         var values = EquipmentViewValues.Of(TestBuilds.Packets, build);

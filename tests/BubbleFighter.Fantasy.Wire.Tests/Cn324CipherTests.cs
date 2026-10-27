@@ -13,7 +13,7 @@ public sealed class Cn324CipherTests
     [Fact]
     public void Cn324FramesRoundTripAndDifferFromTheKoreanTables()
     {
-        var frame = LegacyFrame.Encode(1, [0x44, 0x01, 0x00, 0x00]);
+        var frame = PacketFrame_5Bytes.Encode(1, [0x44, 0x01, 0x00, 0x00]);
         var cn = (byte[])frame.Clone();
         TestWireDialects.Get("cn-324").CreateEncryptor(PacketDirection.ClientToServer).Apply(cn);
         var kr = (byte[])frame.Clone();

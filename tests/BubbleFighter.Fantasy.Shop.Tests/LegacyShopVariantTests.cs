@@ -1,6 +1,7 @@
+using BubbleFighter.Fantasy.Contracts.Shop;
+using BubbleFighter.Fantasy.Packets;
 using BubbleFighter.Fantasy.Shop.Data;
-using BubbleFighter.Fantasy.Shop.Dialects;
-using BubbleFighter.Fantasy.Shop.Wire;
+using BubbleFighter.Fantasy.Shop.Handlers;
 using Xunit;
 
 namespace BubbleFighter.Fantasy.Shop.Tests;
@@ -28,7 +29,7 @@ public sealed class LegacyShopVariantTests
             Bundle(13, 100002, 7), Bundle(14, 100002, 30), Bundle(15, 100001, 7, "cash"),
             ShopWireTestSupport.Cards[0],
         };
-        var selected = LegacyShopCatalogHandler.LongestDurationCards(cards);
+        var selected = ShopCatalogHandler.LongestDurationCards(cards);
         Assert.Equal(new[] { 12, 14, 15, 100001 }, selected.Select(card => card.CardId));
         Assert.Equal(cards[^1].PrimaryItemId, selected[^1].PrimaryItemId);
         Assert.Single(selected[^1].Stocks);
@@ -40,7 +41,7 @@ public sealed class LegacyShopVariantTests
         var card = ShopWireTestSupport.Cards[0];
         var first = card.Stocks[0];
         card = card with { Stocks = [first with { Duration = 30 }, first with { StockId = 1999999, Type = 9, Duration = -1, SellPrice = 5000 }] };
-        var result = Assert.Single(LegacyShopCatalogHandler.LongestDurationCards([card]));
+        var result = Assert.Single(ShopCatalogHandler.LongestDurationCards([card]));
         Assert.Equal(-1, Assert.Single(result.Stocks).Duration);
         Assert.Equal(5000, result.SellPrice);
         Assert.True(ShopWire.RepEnterShopLegacy(LegacyLayouts.Of("cn-324"), 0, [result], []).Length < ShopWire.RepEnterShopLegacy(LegacyLayouts.Of("cn-324"), 0, [card], []).Length);
@@ -58,17 +59,17 @@ public sealed class LegacyShopVariantTests
         };
         var cards = new[] { Item(1, "guns"), Item(2, "clothes"), Item(3, "grenades"), Item(4, "hammers") };
         var policy = new BubbleFighter.Fantasy.Shop.ShopOptions { PreferLongestClothes = false };
-        var selected = LegacyShopCatalogHandler.LongestDurationCards(cards, policy);
+        var selected = ShopCatalogHandler.LongestDurationCards(cards, policy);
         Assert.Equal(new[] { 1, 2, 1, 1 }, selected.Select(card => card.Stocks.Count));
         policy.PreferLongestDuration = false;
         policy.LongestTermItemIds = [2];
-        selected = LegacyShopCatalogHandler.LongestDurationCards(cards, policy);
+        selected = ShopCatalogHandler.LongestDurationCards(cards, policy);
         Assert.Equal(new[] { 2, 1, 2, 2 }, selected.Select(card => card.Stocks.Count));
         Assert.Equal(30, Assert.Single(selected[1].Stocks).Duration);
         var packages = new[] { cards[1] with { StockSetId = 2100001, Stocks = [cards[1].Stocks[0]] },
             cards[1] with { StockSetId = 2100002, Stocks = [cards[1].Stocks[1]] } };
-        Assert.Single(LegacyShopCatalogHandler.LongestDurationCards(packages, new()));
-        Assert.Equal(2, LegacyShopCatalogHandler.LongestDurationCards(packages, new() { PreferLongestPackages = false }).Count);
+        Assert.Single(ShopCatalogHandler.LongestDurationCards(packages, new()));
+        Assert.Equal(2, ShopCatalogHandler.LongestDurationCards(packages, new() { PreferLongestPackages = false }).Count);
     }
 
     [Fact]
@@ -212,9 +213,11 @@ public sealed class LegacyShopVariantTests
         Assert.Equal(8, payload.Length);
         Assert.Equal(0x0F45EE, BitConverter.ToInt32(payload.AsSpan(0, 4)));
         Assert.Equal(1, BitConverter.ToInt32(payload.AsSpan(4, 4)));
-        var request = LegacyShopBuyRequest.Parse(new byte[] { 0xEE, 0x45, 0x0F, 0x00, 0x00, 0x00, 0x00, 0x00 });
-        Assert.Equal(0x0F45EE, request.Key);
-        Assert.Equal(0, request.Unknown4);
+        // The legacy two-word request is read through the tables, as the purchases block does.
+        var values = PacketCodec.ReadScalars(ShopWire.Tables, "kr-812", "ShopPurchaseRequest",
+            new byte[] { 0xEE, 0x45, 0x0F, 0x00, 0x00, 0x00, 0x00, 0x00 });
+        Assert.Equal(0x0F45EE, values["key"]);
+        Assert.Equal(false, values["unknown_8"]);
     }
 
     [Fact]

@@ -52,8 +52,7 @@ internal static class LoginBurstWire
     /// <exception cref="ConfigException">The build's tables do not describe the structure.</exception>
     internal static byte[] WriteCenterListEmpty(PacketTables tables, string build)
     {
-        if (tables.Resolve(build, "gspCenterList").Count == 0)
-            throw new ConfigException($"Build '{build}' has no gspCenterList layout; only the modern count-first form is audited.");
+        RequireCenterList(tables, build);
         return PacketCodec.Write(tables, build, "gspCenterList", new Dictionary<string, object?>(StringComparer.Ordinal));
     }
 
@@ -92,16 +91,12 @@ internal static class LoginBurstWire
         });
 
     /// <summary>
-    /// Writes the empty <c>gspRepDynamicConfig</c> body (S2C 1500): a u32 byte count of zero, so no compressed
-    /// configuration blobs follow (handler kr-1256 sub_65F370 reads the count and then that many bytes).
+    /// Writes an empty <c>gspRepDynamicConfig</c> category mask; kr-1256 sub_9D2FF0 case 1500 reads no blobs
+    /// when no category bit is set.
     /// </summary>
     /// <returns>The four-byte body.</returns>
-    internal static byte[] WriteDynamicConfigEmpty()
-    {
-        var w = PacketWriter.Create();
-        w.WriteUInt32(0);
-        return ((System.Buffers.ArrayBufferWriter<byte>)w.Buffer).WrittenSpan.ToArray();
-    }
+    internal static byte[] WriteDynamicConfigEmpty(PacketTables tables, string build) =>
+        PacketCodec.Write(tables, build, "DynamicConfigReply", new Dictionary<string, object?> { ["mask"] = 0 });
 
     /// <summary>
     /// Writes the empty <c>gspSessionSignatureData</c> body the main-menu probe is answered with: a zero u16, a
@@ -113,8 +108,71 @@ internal static class LoginBurstWire
     /// <exception cref="ConfigException">The build's tables do not describe the structure.</exception>
     internal static byte[] WriteSessionSignatureEmpty(PacketTables tables, string build)
     {
-        if (tables.Resolve(build, "SessionSignatureData").Count == 0)
-            throw new ConfigException($"Build '{build}' has no gspSessionSignatureData layout; the main-menu probe has no audited reply.");
+        RequireSessionSignature(tables, build);
         return PacketCodec.Write(tables, build, "SessionSignatureData", new Dictionary<string, object?>(StringComparer.Ordinal));
     }
+
+    /// <summary>
+    /// Writes the round's <c>gspSessionSignatureData</c> body: the room's game mode, a zero byte and an empty
+    /// counted byte vector. kr-1256 sub_1155B00 stores the mode word; kr-1256 sub_9616A9 requires it to equal
+    /// the room mode before the relay join.
+    /// </summary>
+    /// <param name="tables">The row's packet tables.</param>
+    /// <param name="build">The client build whose table is written.</param>
+    /// <param name="gameMode">The round's game mode.</param>
+    /// <returns>The seven-byte body.</returns>
+    /// <exception cref="ConfigException">The build's tables do not describe the structure.</exception>
+    internal static byte[] WriteSessionSignature(PacketTables tables, string build, ushort gameMode)
+    {
+        RequireSessionSignature(tables, build);
+        return PacketCodec.Write(tables, build, "SessionSignatureData", new Dictionary<string, object?>
+        {
+            ["unknown_4"] = gameMode,
+        });
+    }
+
+    /// <summary>
+    /// Requires the two user-state structures the login burst writes: the money snapshot's two balance words
+    /// and the pc-room snapshot's whole default body (two words, a counted string and a u16). Both are single
+    /// tables, so every build states them.
+    /// </summary>
+    /// <param name="tables">The row's packet tables.</param>
+    /// <param name="build">The client build whose table is checked.</param>
+    /// <exception cref="ConfigException">A consumed field is missing or has another type.</exception>
+    internal static void RequireUserState(PacketTables tables, string build)
+    {
+        PacketLayoutContract.RequireFields(tables, build, "UserMoneyStat", "Login burst",
+            ("unknown_16", "u32"), ("unknown_20", "u32"));
+        PacketLayoutContract.RequireSignature(tables, build, "UserPcroomStat", "Login burst",
+            "unknown_0:u32,unknown_4:u32,unknown_8:wstr,unknown_32:u16");
+    }
+
+    /// <summary>
+    /// Requires the count-first center list the empty body presumes: the modern builds state the counted
+    /// <c>gates</c> list, and a build whose table leaves the structure empty is refused.
+    /// </summary>
+    /// <param name="tables">The row's packet tables.</param>
+    /// <param name="build">The client build whose table is checked.</param>
+    /// <exception cref="ConfigException">The build does not state the counted gate list.</exception>
+    internal static void RequireCenterList(PacketTables tables, string build) =>
+        PacketLayoutContract.RequireFields(tables, build, "gspCenterList", "Login burst", ("gates", "list<GateInfo>"));
+
+    /// <summary>Requires the one-word move request and the three-word move reply the handshake reads and writes.</summary>
+    /// <param name="tables">The row's packet tables.</param>
+    /// <param name="build">The client build whose table is checked.</param>
+    /// <exception cref="ConfigException">A consumed field is missing or has another type.</exception>
+    internal static void RequireMoveStage(PacketTables tables, string build)
+    {
+        PacketLayoutContract.RequireFields(tables, build, "MoveStageRequest", "Login burst", ("unknown_0", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "gspRepMoveInto", "Login burst",
+            ("result", "u32"), ("channel_id", "u32"));
+    }
+
+    /// <summary>Requires the session-signature body the main-menu probe is answered with.</summary>
+    /// <param name="tables">The row's packet tables.</param>
+    /// <param name="build">The client build whose table is checked.</param>
+    /// <exception cref="ConfigException">A consumed field is missing or has another type.</exception>
+    internal static void RequireSessionSignature(PacketTables tables, string build) =>
+        PacketLayoutContract.RequireFields(tables, build, "SessionSignatureData", "Login burst",
+            ("unknown_4", "u16"), ("unknown_6", "u8"), ("unknown_8", "list<u8>"));
 }

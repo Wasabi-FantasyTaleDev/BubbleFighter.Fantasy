@@ -175,8 +175,14 @@ public sealed record RoomJoinRefused(int RoomId, RoomJoinRefusal Reason) : IMess
 public sealed record RoomMemberView(int Slot, int UserNum, string Nickname, int Level, int Team, bool Ready,
     int CharacterItemId, IReadOnlyList<int> EquippedItemIds)
 {
+    /// <summary>Gets native computer-player ownership, or null for an ordinary human member.</summary>
+    public RoomAiIdentity? Ai { get; init; }
+
     /// <summary>Gets the player's avatar material color independently of team assignment.</summary>
     public ushort ColorIndex { get; init; }
+
+    /// <summary>Gets per-item appearance and equipment modifiers retained beside the worn item identifiers.</summary>
+    public IReadOnlyList<RoomItemAttribute> ItemAttributes { get; init; } = [];
 
     /// <summary>Gets whether the seated player has the shop open.</summary>
     public bool InShop { get; init; }
@@ -285,7 +291,11 @@ public sealed record RoomSeatVacated(int RoomId, RoomMemberView Seat) : IMessage
 /// <summary>Sent to the members when the room master changes, after the old master's seat was vacated.</summary>
 /// <param name="RoomId">The room.</param>
 /// <param name="MasterSlot">The new master's seat index.</param>
-public sealed record RoomMasterChanged(int RoomId, int MasterSlot) : IMessage;
+public sealed record RoomMasterChanged(int RoomId, int MasterSlot) : IMessage
+{
+    /// <summary>Gets the old AI controller's account number when native computer-player ownership must migrate.</summary>
+    public int? PreviousAiControllerUserNum { get; init; }
+}
 
 /// <summary>Sent to a player whose <see cref="RoomLeaveRequested"/> was carried out: they are back in the lobby.</summary>
 /// <param name="RoomId">The room they left.</param>

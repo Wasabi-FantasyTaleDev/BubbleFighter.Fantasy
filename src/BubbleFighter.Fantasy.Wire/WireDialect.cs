@@ -89,9 +89,9 @@ public abstract partial class WireDialect : IWireDialect
 
         public override int MaxFrameOverheadBytes => stream.Frame switch
         {
-            WireFrameKind.Modern8 => WireFrame.HeaderSize,
-            WireFrameKind.Legacy5 => LegacyFrame.HeaderSize,
-            _ => Legacy10Frame.HeaderSize,
+            PacketFrameKind.Modern8 => PacketFrame_8Bytes.HeaderSize,
+            PacketFrameKind.Legacy5 => PacketFrame_5Bytes.HeaderSize,
+            _ => PacketFrame_10Bytes.HeaderSize,
         };
 
         public override byte[] BuildServerPreamble(ushort status, string commandLine) => BootstrapGreeting.Build(status, commandLine);
@@ -112,17 +112,17 @@ public abstract partial class WireDialect : IWireDialect
             byte[] payload;
             switch (stream.Frame)
             {
-                case WireFrameKind.Modern8:
-                    if (!WireFrame.TryReadFrame(ref plaintext, maxPayloadBytes, out var header, out payload))
+                case PacketFrameKind.Modern8:
+                    if (!PacketFrame_8Bytes.TryReadFrame(ref plaintext, maxPayloadBytes, out var header, out payload))
                         return false;
                     opcode = header.Opcode;
                     break;
-                case WireFrameKind.Legacy5:
-                    if (!LegacyFrame.TryReadFrame(ref plaintext, maxPayloadBytes, out opcode, out payload))
+                case PacketFrameKind.Legacy5:
+                    if (!PacketFrame_5Bytes.TryReadFrame(ref plaintext, maxPayloadBytes, out opcode, out payload))
                         return false;
                     break;
                 default:
-                    if (!Legacy10Frame.TryReadFrame(ref plaintext, maxPayloadBytes, out opcode, out payload))
+                    if (!PacketFrame_10Bytes.TryReadFrame(ref plaintext, maxPayloadBytes, out opcode, out payload))
                         return false;
                     break;
             }
@@ -132,9 +132,9 @@ public abstract partial class WireDialect : IWireDialect
 
         public override byte[] EncodeFrame(ushort opcode, ReadOnlySpan<byte> payload) => stream.Frame switch
         {
-            WireFrameKind.Modern8 => WireFrame.Encode(opcode, payload),
-            WireFrameKind.Legacy5 => LegacyFrame.Encode(opcode, payload),
-            _ => Legacy10Frame.Encode(opcode, payload),
+            PacketFrameKind.Modern8 => PacketFrame_8Bytes.Encode(opcode, payload),
+            PacketFrameKind.Legacy5 => PacketFrame_5Bytes.Encode(opcode, payload),
+            _ => PacketFrame_10Bytes.Encode(opcode, payload),
         };
 
         private SimpleCipher CreateCipher(PacketDirection direction)
@@ -159,15 +159,15 @@ public abstract partial class WireDialect : IWireDialect
 }
 
 /// <summary>How a build lays out one frame on the wire.</summary>
-public enum WireFrameKind
+public enum PacketFrameKind
 {
-    /// <summary>The eight-byte <see cref="WireFrame"/> of the final Korean build (<c>modern_8</c>).</summary>
+    /// <summary>The eight-byte <see cref="PacketFrame_8Bytes"/> of the final Korean build (<c>modern_8</c>).</summary>
     Modern8,
 
-    /// <summary>The five-byte <see cref="LegacyFrame"/> of the builds before it (<c>legacy_5</c>).</summary>
+    /// <summary>The five-byte <see cref="PacketFrame_5Bytes"/> of the builds before it (<c>legacy_5</c>).</summary>
     Legacy5,
 
-    /// <summary>The ten-byte <see cref="Legacy10Frame"/> of the oldest clients, such as the Chinese 2011 one (<c>legacy_10</c>).</summary>
+    /// <summary>The ten-byte <see cref="PacketFrame_10Bytes"/> of the oldest clients, such as the Chinese 2011 one (<c>legacy_10</c>).</summary>
     Legacy10,
 }
 
@@ -179,7 +179,7 @@ public sealed record WireStream
     /// <param name="cipherTableA">The build's first cipher table, or <see langword="null"/> for the shared pair.</param>
     /// <param name="cipherTableB">The build's second cipher table, or <see langword="null"/> for the shared pair.</param>
     /// <exception cref="ArgumentException">Thrown when only one table is given or a table is empty.</exception>
-    public WireStream(WireFrameKind frame, byte[]? cipherTableA = null, byte[]? cipherTableB = null)
+    public WireStream(PacketFrameKind frame, byte[]? cipherTableA = null, byte[]? cipherTableB = null)
     {
         if ((cipherTableA is null) != (cipherTableB is null) || cipherTableA is { Length: 0 } || cipherTableB is { Length: 0 })
             throw new ArgumentException("Cipher tables are given as a non-empty pair or not at all.");
@@ -190,7 +190,7 @@ public sealed record WireStream
 
     /// <summary>Gets the frame layout: Modern8, Legacy5 or Legacy10, represented in
     /// profile text as modern_8, legacy_5 or legacy_10 respectively.</summary>
-    public WireFrameKind Frame { get; }
+    public PacketFrameKind Frame { get; }
 
     /// <summary>Gets the nonempty first cipher table, paired with CipherTableB, or
     /// <see langword="null"/> for the shared pair. The supplied array is borrowed;
@@ -212,9 +212,9 @@ public sealed record WireStream
     {
         var kind = frame switch
         {
-            "modern_8" => WireFrameKind.Modern8,
-            "legacy_5" => WireFrameKind.Legacy5,
-            "legacy_10" => WireFrameKind.Legacy10,
+            "modern_8" => PacketFrameKind.Modern8,
+            "legacy_5" => PacketFrameKind.Legacy5,
+            "legacy_10" => PacketFrameKind.Legacy10,
             _ => throw new ArgumentException($"Unknown wire frame '{frame}'; use modern_8, legacy_5 or legacy_10.", nameof(frame)),
         };
         return new WireStream(kind, Hex(cipherTableA), Hex(cipherTableB));

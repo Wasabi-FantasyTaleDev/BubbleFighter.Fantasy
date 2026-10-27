@@ -1,4 +1,5 @@
-# Item shop / cash shop row. Protocol name and version_major select the dialect.
+# Item shop / cash shop row. The protocol name selects the connection; the build's
+# lineage selects the dialect, as every other row of the bundle does.
 # The workbook is Config/ShopItem2.xml from Packs/ConfigSh_00000.pkn (loader
 # sub_9FE8F0), read through the build's clientdata row.
 # Add `shop` to the profile `bundles` list and enable a provider of IShopSessionStore.
@@ -7,8 +8,6 @@
   plugin: shop
   config:
     protocol: "kr-1256/game"
-    client_profile: "kr-1256"
-    version_major: 1256
     shop_item_client_path: "Config/ShopItem2.xml"
     max_shop_item_bytes: 134217728
     # S2C 800 is the only packet that carries shop content and nothing

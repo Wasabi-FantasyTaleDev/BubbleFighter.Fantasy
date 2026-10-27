@@ -55,6 +55,14 @@ structs:
   TutorialEndStage:
     - completed: u32
       offset: 4
+  # kr-1256 sub_708B60 writes the argument word and the byte at +4 as bool32.
+  # kr-1256 sub_D24400 confirms training exit through kr-1256 sub_6E5840 with {1, false}.
+  # kr-1256 sub_7BAC80 uses {1, false} after all waves; kr-1256 sub_7B9820 uses {0, false} after failure.
+  TutorialEndStage@kr-1256:
+    - unknown_0: u32
+      offset: 0
+    - unknown_4: bool
+      offset: 4
   # Readers: kr-812 sub_80A910, cn-717 sub_8C4210 and id-1809 sub_4D60C0.
   # Other legacy builds have no audited native host-start packet class.
   TutorialHostStart:
@@ -118,6 +126,45 @@ structs:
       offset: 124
     - difficulty: u32
       offset: 152
+  # kr-1256 sub_9D7440 writes kr-1256 sub_10D26C0's thirteen words and packed flags,
+  # then the directory, display name, selected map and difficulty from kr-1256 sub_99F580.
+  TutorialPlayRequest@kr-1256:
+    - end_game_time_over_tick: u32
+      offset: 0
+    - end_game_notify_win_or_lose_tick_team: u32
+      offset: 4
+    - end_game_notify_win_or_lose_tick_star: u32
+      offset: 8
+    - end_game_notify_result_tick: u32
+      offset: 12
+    - fever_time_duration: u32
+      offset: 16
+    - star_drop_time_duration: u32
+      offset: 20
+    - death_match_kill_limit: u32
+      offset: 24
+    - death_match_time_limit_ms: u32
+      offset: 28
+    - time_attack_time_limit_ms: u32
+      offset: 32
+    - conquer_time_limit_ms: u32
+      offset: 36
+    - star_mode_time_limit_ms: u32
+      offset: 40
+    - unknown_44: u32
+      offset: 44
+    - unknown_48: u32
+      offset: 48
+    - unknown_52: u8
+      offset: 52
+    - map_directory: wstr
+      offset: 56
+    - map_name: wstr
+      offset: 80
+    - map_key: wstr
+      offset: 104
+    - difficulty: u32
+      offset: 128
   # cn-324 sub_6FCB70 -> cn-324 sub_40FBF0; cn-279 sub_44EDF0 -> cn-279 sub_425780.
   # Early strings occupy one object word and the four nested bools are sequential.
   TutorialPlayRequest@cn-324:

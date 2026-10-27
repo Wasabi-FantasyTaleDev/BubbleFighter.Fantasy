@@ -1,0 +1,162 @@
+version: 1
+# The horde (pirate) round's main-connection family: the room host's client runs the waves, and the
+# server answers each wave request and repeats the wave table, the drops and the pickups to every
+# seat. Opcode numbers are in each profile's opcodes.yaml.
+#
+# Coverage: the kr-1256 senders and readers are cited per structure. The kr-812 client sends the
+# same wave requests under its own class names (kr-812 sub_A09070, sub_A09100 and sub_A09190 build
+# Packet_gcpReqStartNewWave, Packet_gcpReqEndWave and Packet_gcpReqEndAllWave), and its dispatcher
+# kr-812 sub_A301C0 handles the replies in cases 0x388..0x38D, but those handlers read nothing from
+# the packet object, so no kr-812 reply field is established: every reply field below is the
+# kr-1256 family's (the `only: [kr-1256]` rows, which the builds based on kr-1256 inherit
+# unverified). The drops and the pickup are kr-1256's own numbering (kr-812 numbers its award-drop
+# family differently and its C2S 2027 is another packet), so their fields are kr-1256's too.
+structs:
+  # C2S 903: the next wave the host asks to start. kr-1256 sub_7B9820 (the wave manager update)
+  # writes its stored wave count plus one as four bytes, sends opcode 903 and latches (manager +151)
+  # until the S2C 904 echo releases it. kr-812 sub_A09070 fills Packet_gcpReqStartNewWave's single
+  # word with the wave number the same way.
+  HordeWaveStartRequest:
+    - wave: u32 # one-based: the manager asks for its stored count plus one (kr-1256 sub_7B9820).
+      offset: 4
+  # S2C 904: kr-1256 sub_7ED5C0 dispatches to kr-1256 sub_7BAD80, which reads the wave word
+  # and releases the start latch, including on the host.
+  # kr-812 sub_A301C0 case 0x388 starts its wave logic without reading the packet, so no kr-812
+  # field is stated.
+  HordeWaveStart:
+    - wave: u32
+      offset: 0
+      only: [kr-1256]
+  # C2S 904: the wave the host cleared. kr-1256 sub_7BAB70 writes the wave word its caller
+  # kr-1256 sub_7B9820 read from the wave manager; kr-812 sub_A09100 fills Packet_gcpReqEndWave's
+  # single word.
+  HordeWaveEndRequest:
+    - wave: u32
+      offset: 4
+  # S2C 905: kr-1256 sub_7ED5C0 dispatches to kr-1256 sub_7BB460, which reads the cleared wave
+  # and releases the end latch. kr-812 sub_A301C0 case 0x389 calls kr-812
+  # sub_A09790, which likewise reads nothing from the packet, so no kr-812 field is stated.
+  HordeWaveEnd:
+    - wave: u32
+      offset: 0
+      only: [kr-1256]
+  # C2S 905: the host cleared every wave. kr-1256 sub_7BAC80 stamps opcode 905 with no field
+  # writes; kr-812 sub_A09190 builds Packet_gcpReqEndAllWave with no field, and its dispatcher
+  # case kr-812 sub_A301C0 0x38A reads none either.
+  HordeAllWavesEndRequest: []
+  # S2C 906: kr-1256 sub_7ED5C0 case 0x38A reads no fields and marks completion.
+  # kr-812 sub_A301C0 case 0x38A reads no field either, so the empty body is every
+  # build's here.
+  HordeAllWavesEnd: []
+  # kr-1256 sub_7BAD80 writes u32/u16/u32 and kr-1256 sub_10C0560's counted list;
+  # kr-1256 sub_7B90D0 reads that head and kr-1256 sub_10C11B0 reads the elements.
+  HordeWaveTable:
+    - wave: u32
+      only: [kr-1256]
+    - unknown_4: u16
+      only: [kr-1256]
+    - unknown_6: u32
+      only: [kr-1256]
+    - mobs: list<HordeWaveSpawnMob>
+      only: [kr-1256]
+  # kr-1256 sub_1158DD0 reads each 60-byte in-memory record through its virtual stream reader.
+  HordeWaveSpawnMob:
+    - unknown_4: u32
+      offset: 4
+      only: [kr-1256]
+    - unknown_8: wstr
+      offset: 8
+      only: [kr-1256]
+    - unknown_32: wstr
+      offset: 32
+      only: [kr-1256]
+    - unknown_56: bool
+      offset: 56
+      only: [kr-1256]
+    - unknown_57: u8
+      offset: 57
+      only: [kr-1256]
+    - unknown_58: u8
+      offset: 58
+      only: [kr-1256]
+  # C2S 2027: a drop the host's round spawned. kr-1256 sub_6E8D30 writes three position floats,
+  # three velocity floats, the constant 5 and one caller word. The 5 word is the drop kind: the
+  # S2C 645 reader switches on it (see HordeDropSpawn), and this writer always stamps 5.
+  HordeDropReport:
+    - x: f32
+      offset: 0
+      only: [kr-1256]
+    - y: f32
+      offset: 4
+      only: [kr-1256]
+    - z: f32
+      offset: 8
+      only: [kr-1256]
+    - velocity_x: f32
+      offset: 12
+      only: [kr-1256]
+    - velocity_y: f32
+      offset: 16
+      only: [kr-1256]
+    - velocity_z: f32
+      offset: 20
+      only: [kr-1256]
+    - kind: u32 # kr-1256 sub_6E8D30 stamps the constant 5 here; HordeDropSpawn repeats the word.
+      offset: 24
+      only: [kr-1256]
+    - unknown_28: u32 # the writer's last caller word; 0 in every recording.
+      offset: 28
+      only: [kr-1256]
+  # S2C 645: the drop with the round's serial, sent to every seat. kr-1256 sub_6EFD00 (game
+  # dispatcher kr-1256 sub_6D55D0, jumptable case 645) reads nine words: the serial becomes the
+  # created item's object id, the kind word selects the item (1 and 3 the award-1 Lucci item,
+  # 4 the award-5, 5 the award-10, case 2 through kr-1256 sub_C092B0), the first three floats go to
+  # the item constructor and the next three to its vtable slot 188.
+  HordeDropSpawn:
+    - serial: u32 # the server's drop serial; the reader looks the created item up by it.
+      offset: 0
+      only: [kr-1256]
+    - kind: u32 # the drop's item kind; see the reader's switch above.
+      offset: 4
+      only: [kr-1256]
+    - x: f32
+      offset: 8
+      only: [kr-1256]
+    - y: f32
+      offset: 12
+      only: [kr-1256]
+    - z: f32
+      offset: 16
+      only: [kr-1256]
+    - velocity_x: f32
+      offset: 20
+      only: [kr-1256]
+    - velocity_y: f32
+      offset: 24
+      only: [kr-1256]
+    - velocity_z: f32
+      offset: 28
+      only: [kr-1256]
+    - kind2: u32 # the report's kind word again; the reader hands it to the created item's vtable
+      offset: 32 # slot 252 (kr-1256 sub_6EFD00), whose purpose is not read.
+      only: [kr-1256]
+  # C2S 635 gcpEatLucci: the picking player's client reports its own character and the item.
+  # kr-1256 sub_6DC600 writes the two object ids its caller passes (kr-1256 sub_C09E60 calls it
+  # with the character's and the item's object references).
+  HordeDropPickupRequest:
+    - character_id: u32 # the picking character's object id.
+      offset: 0
+      only: [kr-1256]
+    - serial: u32 # the drop's serial, the created item's object id.
+      offset: 4
+      only: [kr-1256]
+  # S2C 646: the pickup repeated to every seat. kr-1256 sub_6EAD50 (game dispatcher kr-1256
+  # sub_6D55D0, jumptable case 646) resolves the first word to the Character that plays the pickup
+  # effect and the second to the item it destroys.
+  HordeDropPicked:
+    - character_id: u32
+      offset: 0
+      only: [kr-1256]
+    - serial: u32
+      offset: 4
+      only: [kr-1256]

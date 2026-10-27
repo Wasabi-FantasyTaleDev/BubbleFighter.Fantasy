@@ -16,6 +16,7 @@ public sealed class SeatEnvelopeTableTests
     [InlineData("id-400")]
     [InlineData("id-1809")]
     [InlineData("cn-706")]
+    [InlineData("cn-406")]
     public void OccupiedVacantAndDepartedSeatsRetainTheirNativeRecords(string build)
     {
         var schema = TestBuilds.Of(build).Schema;

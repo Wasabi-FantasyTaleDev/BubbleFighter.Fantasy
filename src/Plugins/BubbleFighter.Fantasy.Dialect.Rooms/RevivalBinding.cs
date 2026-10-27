@@ -5,6 +5,13 @@ using BubbleFighter.Fantasy.Packets;
 
 namespace BubbleFighter.Fantasy.Dialect.Rooms;
 
+/// <summary>
+/// Serves the <c>instant_revival</c> capability: the consumable request carries the actor reference
+/// (kr-812 <c>sub_50E8A0</c> writes it, kr-812 <c>sub_80A910</c> reads the one word, with cn-717,
+/// id-400, id-1809, cn-706 and cn-324 matching the same +4 field) and the PvE request has no body at
+/// all — cn-324 <c>sub_53CEC0</c> sends it empty in PvE modes and the identity comes from the
+/// connection (packets/instant-revival.yaml).
+/// </summary>
 internal sealed class RevivalBinding(string protocol, IOpcodeTable table, PacketTables tables, string build)
     : IInboundMessageBinding<RoundInstantRevivalRequested>, IInboundMessageBinding<RoundPveRevivalRequested>
 {
@@ -14,6 +21,10 @@ internal sealed class RevivalBinding(string protocol, IOpcodeTable table, Packet
     {
         if (!tables.CapabilityOf(build, "instant_revival"))
             throw new ConfigException("instant_revival requires an audited consumable revival capability.");
+        // The consumable request carries the actor reference; the PvE request has no body at all. Both are checked
+        // against the build's own table at load so a re-typed field fails the row, not the first revival.
+        PacketLayoutContract.RequireFields(tables, build, "InstantRevivalRequest", "Consumable revival", ("actor", "u32"));
+        PacketLayoutContract.RequireEmpty(tables, build, "PveRevivalRequest", "PvE revival");
         _ = tables.Resolve(build, "InstantRevivalRequest");
         _ = tables.Resolve(build, "PveRevivalRequest");
         context.Effect(context.Services.RegisterMany<IInboundMessageBinding<RoundInstantRevivalRequested>>(this));

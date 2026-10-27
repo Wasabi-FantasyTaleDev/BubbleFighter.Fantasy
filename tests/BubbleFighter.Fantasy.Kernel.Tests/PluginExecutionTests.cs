@@ -231,7 +231,7 @@ public sealed class PluginExecutionTests
             await Assert.ThrowsAsync<InvalidOperationException>(() => host.LoadAsync(declaration.Id, default).AsTask().WaitAsync(Limit));
             Assert.Equal(PluginState.Failed, Assert.Single(host.Instances).State);
             await host.LoadAsync(declaration.Id, default).AsTask().WaitAsync(Limit);
-            Assert.Equal(2, attempts); Assert.Equal(3, saved!.NativeServices!.Registry.RetainedMetadataCount);
+            Assert.Equal(2, attempts); Assert.Equal(4, saved!.NativeServices!.Registry.RetainedMetadataCount);
             Assert.Equal(1, saved.RetainedExecutionCount);
         }
         finally { await host.ShutdownAsync(default).AsTask().WaitAsync(Limit); }

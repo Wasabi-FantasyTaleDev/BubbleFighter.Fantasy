@@ -141,6 +141,13 @@ internal sealed class PlayerEntry
     public byte ActiveWeaponPresetSlot { get; set; }
 
     /// <summary>
+    /// Gets or sets the materialized weapon-preset pages, or <see langword="null"/> before the first
+    /// materialization - the same null-means-fresh contract the sibling stores keep. A set stores a defensive
+    /// copy, so a later mutation of the caller's array cannot rewrite published pages. Guards: <see cref="Gate"/>.
+    /// </summary>
+    public WeaponPresetPage[]? WeaponPresetPages { get; set; }
+
+    /// <summary>
     /// Gets or sets the UTC day of the player's last login as the life rule saw it, or null before the first
     /// login (<see cref="InventoryLife"/>). Guards: <see cref="Gate"/>.
     ///

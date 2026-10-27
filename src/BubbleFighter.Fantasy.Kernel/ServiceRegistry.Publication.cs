@@ -1,7 +1,17 @@
 namespace BubbleFighter.Fantasy.Kernel;
 
+/// <summary>
+/// <see cref="ServiceRegistry"/> half that runs the two-phase publication handshake: a row stages its
+/// publication before registering contributions, then commits them in one gate-held swap, with waiter
+/// callbacks deferred to after the swap.
+/// </summary>
 public sealed partial class ServiceRegistry
 {
+    /// <summary>
+    /// Opens the owner's publication for registration. Must be called before the owner contributes any
+    /// registration; an owner that registered first has already been observed by readers and cannot
+    /// publish atomically, so this throws instead of reordering.
+    /// </summary>
     internal void StageOwner(ServiceActivation owner)
     {
         Runtime.RequireOwner(owner.Runtime);
@@ -14,6 +24,13 @@ public sealed partial class ServiceRegistry
         }
     }
 
+    /// <summary>
+    /// Commits the owner's staged publication and returns the announcement function. The swap and the
+    /// capture of waiting resolvers happen under the registry gate; the announcement itself runs after
+    /// the swap and outside it, so a waiter callback cannot reenter a half-published registry. The
+    /// announcement raises <see cref="BindingChanged"/> first, then runs every waiter and aggregates
+    /// their errors instead of throwing, so one failing callback cannot skip the others.
+    /// </summary>
     internal Func<IReadOnlyList<Exception>> CommitOwner(ServiceActivation owner)
     {
         Runtime.RequireOwner(owner.Runtime);

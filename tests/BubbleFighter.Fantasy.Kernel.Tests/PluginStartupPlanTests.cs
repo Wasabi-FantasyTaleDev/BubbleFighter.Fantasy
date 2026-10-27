@@ -66,7 +66,7 @@ public sealed class PluginStartupPlanTests
         {
             var budget = Budget(scene.Host);
             Assert.Equal(3, budget.EntryCapacity);
-            Assert.Equal(12, budget.ServiceMetadataCapacity);
+            Assert.Equal(13, budget.ServiceMetadataCapacity);
             Assert.Equal(1, budget.DefinitionSourceCapacity);
             Assert.Equal(2, budget.DefinitionCapacity);
             await scene.Host.StartAsync(default).AsTask().WaitAsync(Limit);
@@ -74,7 +74,7 @@ public sealed class PluginStartupPlanTests
             await scene.AdmitDeferredAsync();
             Assert.Same(budget, Budget(scene.Host));
             Assert.Equal(3, budget.EntryCapacity);
-            Assert.Equal(12, budget.ServiceMetadataCapacity);
+            Assert.Equal(13, budget.ServiceMetadataCapacity);
             Assert.Equal(1, budget.DefinitionSourceCapacity);
             Assert.Equal(2, budget.DefinitionCapacity);
             var extra = GameRow() with { Id = "extra", Disabled = true };
@@ -127,7 +127,7 @@ public sealed class PluginStartupPlanTests
         {
             var budget = Budget(scene.Host);
             Assert.Equal(2, budget.EntryCapacity);
-            Assert.Equal(9, budget.ServiceMetadataCapacity);
+            Assert.Equal(10, budget.ServiceMetadataCapacity);
             await scene.Host.StartAsync(default).AsTask().WaitAsync(Limit);
             await scene.AdmitDeferredAsync();
             Assert.Equal(2, scene.Host.Instances.Count);

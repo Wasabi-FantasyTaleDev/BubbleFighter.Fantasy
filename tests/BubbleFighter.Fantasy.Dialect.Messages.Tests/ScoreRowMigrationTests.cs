@@ -106,7 +106,7 @@ public sealed class ScoreRowMigrationTests
             new RoundScoreboard(0, 0, [0, 0], []));
         Assert.Equal(PacketCodec.Write(TestBuilds.Packets, "id-400", "ScoreData",
             PlayRoomCodec.ScoreboardValues(TestBuilds.Packets, "id-400", new RoundScoreboard(0, 0, [0, 0], []))), body);
-        Assert.Equal(TimeOverEndBody.Scoreboard, TestBuilds.Of("id-400").Play.Score!.TimeOverEnd);
-        Assert.Equal(TimeOverEndBody.TeamTotals, TestBuilds.Of("cn-706").Play.Score!.TimeOverEnd);
+        Assert.Equal(PlayValues.TimeOverEndBody.Scoreboard, TestBuilds.Of("id-400").Play.Score.TimeOverEnd);
+        Assert.Equal(PlayValues.TimeOverEndBody.TeamTotals, TestBuilds.Of("cn-706").Play.Score.TimeOverEnd);
     }
 }

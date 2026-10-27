@@ -7,7 +7,7 @@ display_names:
 client_build: cn:406:0
 parent: id-400
 description: Chinese 2013 client, shared login, waiting rooms and ordinary rounds.
-bundles: [core, legacy, inventory-actions]
+bundles: [core, legacy]
 vars:
   LEGACY_PORT: ${CN_406_GAME_PORT:-7230}
   LEGACY_PUBLIC_PORT: ${CN_406_PUBLIC_PORT:-7230}

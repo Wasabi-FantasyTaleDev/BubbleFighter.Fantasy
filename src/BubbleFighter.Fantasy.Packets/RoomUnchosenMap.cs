@@ -6,8 +6,15 @@ namespace BubbleFighter.Fantasy.Packets;
 /// A build's <c>room_unchosen_map</c> value: the <c>GameSetting</c> fields a room shows until its master picks a
 /// map, because the create request carries the client's startup map rather than a choice. Each entry names a
 /// field of the build's <c>GameSetting</c> and the value it is shown with; a field not named keeps the creator's
-/// bytes. A build may state <c>room_unchosen_difficulty</c> as well: in that mode every field shown as the
-/// all-random entry shows the mode's own marker instead (the pirate battle's first difficulty).
+/// bytes. A null entry cancels an inherited field when a build restates the layout. The all-random test is the client's own comparison: kr-1256 <c>sub_96BA90</c> compares the three
+/// round-map keys (the <c>GameSetting</c> strings at +144/+192/+240, held at room session +284/+332/+380) with
+/// the client's Random literal kr-1256 <c>sub_1135A50</c> and shows the all-random picture on a match, and
+/// kr-1256 <c>sub_9EB6C0</c> makes the same test on the start block's first string
+/// (packets/builds.yaml <c>room_unchosen_map</c>). A build may state <c>room_unchosen_difficulty</c> as well:
+/// in that mode every field shown as the all-random entry shows the mode's own marker instead — the pirate
+/// battle's first difficulty, whose mode-101 create carries the marker in its round keys and whose host start
+/// resolves it back to one of that difficulty's missions (kr-812 <c>sub_415D30</c>/<c>sub_415F30</c> from
+/// kr-812 <c>sub_5C3F80</c>; packets/builds.yaml <c>room_unchosen_difficulty</c>).
 /// </summary>
 public sealed class RoomUnchosenMap
 {
@@ -43,6 +50,8 @@ public sealed class RoomUnchosenMap
         var fields = new Dictionary<string, object>(StringComparer.Ordinal);
         foreach (var (name, value) in map)
         {
+            if (value is null)
+                continue;
             var field = layout.FirstOrDefault(candidate => candidate.Name == name)
                 ?? throw new ConfigException($"{where} names '{name}', which the build's GameSetting does not have.");
             fields[name] = field.Type switch

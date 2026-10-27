@@ -1,7 +1,7 @@
 ---
 title: "Launcher"
 description: "The companion launcher for Bubble Fighter Fantasy: client builds, sessions, login tickets and the server launcher API."
-updated: 2026-10-18
+updated: 2026-10-23
 ---
 
 Bubble Fighter Fantasy has a companion desktop application, **Fantasy Tale Launcher**, being developed
@@ -81,9 +81,13 @@ Each build also declares how the client's messenger calls are answered and how i
 | `kr-812` | stand-in | nmco | 7110 |
 | `cn-279` | forward | gamewidget | 7210 |
 | `cn-324` | forward | gamewidget | 7140 |
+| `cn-404` | forward | gamewidget-ticket | 7240 |
+| `cn-406` | forward | gamewidget-ticket | 7230 |
+| `tw-454` | stand-in | nmco | 7200 |
 | `cn-706` | forward | unverified | — |
 | `cn-717` | forward | unverified | — |
 | `cn-735` | forward | unverified | — |
+| `cn-774` | forward | gamewidget-ticket | 7190 |
 | `id-400` | stand-in | nmco | 7120 |
 | `id-1809` | stand-in | nmco | 7130 |
 
@@ -177,9 +181,11 @@ The two cases the guide distinguishes:
 - **Launcher-ticket login.** The player signs in to the launcher (server API), the launcher asks the
   API for a one-use launch ticket for the selected build, and writes it to `session.toml`. The
   messenger stand-in returns the ticket as the passport, and the game server redeems it at login
-  instead of treating it as an account name. This path applies to the builds that run the
-  **stand-in** messenger mode and are started with an account argument: `kr-812`, `id-400` and
-  `id-1809` at this checkpoint.
+  instead of treating it as an account name. Tickets are delivered along the paths each build
+  definition's `login` setting selects: the **stand-in** builds (`kr-812`, `id-400`, `id-1809`,
+  `tw-454`), whose `nmcogame` stand-in hands the ticket to the client as its login passport, and the
+  **login-bridge** builds (`cn-404`, `cn-406`, `cn-774`), whose login module carries the ticket into
+  the SDO login entry.
 - **In-game login.** When no launcher account or ticket is supplied, the client can use its own login
   flow. On a stand-in build the stand-in accepts the id typed into the client's login screen (the
   client's dialog variant of the login call) and returns it as the passport, so the server sees an
@@ -207,10 +213,14 @@ variable sets every build.
 In `open` mode the older `launcher_tickets` switch (`BFF_LAUNCHER_TICKETS`) still lets ticket-shaped
 logins be redeemed next to plain names; in `ticket` mode redemption is always on.
 
-At this checkpoint the launcher delivers tickets only to the **stand-in** builds (`kr-812`, `id-400`,
-`id-1809`). The **forward** builds receive no ticket from the launcher yet, so their players cannot
-log in under `ticket`; run those builds with `open` on a trusted network until the launcher supplies
-their tickets.
+Which builds receive a ticket from the launcher is each build definition's `login` setting. The
+current definitions deliver tickets through two paths: the **stand-in** builds (`kr-812`, `id-400`,
+`id-1809`, `tw-454`), whose `nmcogame` stand-in hands the ticket to the client as its login
+passport, and the **login-bridge** builds (`cn-404`, `cn-406`, `cn-774`), whose login module carries
+the ticket into the SDO login entry. The remaining builds receive no ticket yet — `kr-1256` hooks
+the client directly, `cn-279` and `cn-324` use the plain widget, and the `cn-706`, `cn-717` and
+`cn-735` logins are unverified — so their players cannot log in under `ticket`; run those builds
+with `open` on a trusted network until their definitions deliver tickets.
 
 ### What a ticket does and does not prove
 
@@ -321,10 +331,7 @@ launcher is expected to enforce.
 
 ### Enabling the row
 
-- The core bundle ships the row **disabled**. At this checkpoint only the `all` profile enables it.
-  Its `replace` patch drops the core row's `listen`, `host_policy` and `region` configuration, so the
-  `BFF_LAUNCHER_*` environment variables do **not** apply to that profile unless a later `set` patch
-  adds them back; the listener then uses the option defaults.
+- The core bundle ships the row **disabled**. The `all` profile enables it and preserves the deployment variables `BFF_LAUNCHER_LISTEN`, `BFF_LAUNCHER_TICKET_SECONDS`, `BFF_LAUNCHER_HOST_POLICY` and `BFF_LAUNCHER_REGION`. Their defaults are `127.0.0.1:8090`, `600`, `auto` and an empty region. A later `set` patch can override individual keys without removing the catalog configuration.
 - The plugin requires an active persistence provider that publishes the launcher account repository
   and the launcher session store. All three providers do: memory, SQLite and MySQL. The `all` profile
   uses the process-local memory provider, so accounts and sign-ins reset when it restarts; a durable
@@ -345,16 +352,19 @@ The row's configuration is validated as one unit; unknown keys fail binding. The
 | `registration_enabled` | Whether launcher accounts may register. | `true` |
 | `create_account_on_login` | Whether signing in with an unknown name creates that account with the given password, so players need not register. A mistyped name creates a new account. | `false` |
 | `minimum_launcher_version` | Minimum launcher SemVer for registration, login, refresh and ticket issuance. Empty disables the gate. | empty |
-| `plugin_recommendations` | Up to 64 plugin identities, each with optional exact builds and a required flag; identities only, never URLs or paths. | empty |
+| `plugin_recommendations` | Up to 64 policy entries, each with an identity, optional exact builds and required/disabled flags; never URLs or paths. | empty |
 | `session_seconds` / `refresh_session_seconds` | Access-token and renewable-session lifetimes in seconds. | 1800 / 2592000 |
-| `ticket_seconds` | Launch-ticket lifetime in seconds. | 60 |
+| `ticket_seconds` | Launch-ticket lifetime in seconds. | 600 |
 | `requests_per_minute` / `max_concurrent_requests` | Global request budget and concurrent API work. | 120 / 8 |
 | `max_body_bytes` / `max_connections` | Request body and connection bounds. | 16384 / 128 |
 | `instances` | Client presets advertised in the catalog, at most 64. | empty |
 
 `plugin_recommendations` entries contain an `id`, an optional `builds` list (empty means every
-build) and `required`. The catalog and every sign-in response include the minimum launcher version
-and the merged recommendations.
+build), `required` and `disabled`. Recommended is false/false, required is true/false and forbidden
+is false/true. Required and disabled scopes for the same identity must not overlap, including
+all-build rules. Equivalent policy states may merge while their exact build scopes remain intact.
+The catalog and every sign-in response include the minimum launcher version and these rules.
+See [WebUI client plugin policy](plugins.md#client-plugin-policy) for graphical configuration.
 
 ### Client presets (`instances`)
 
@@ -390,6 +400,7 @@ All routes are under `/v1` and are served by the launcher listener only.
 | `/v1/auth/logout` | POST | refresh credential or bearer | End the session. Not version-gated. |
 | `/v1/account` | GET | bearer | The signed-in account's profile: display name and level, experience, Lucci and cash when the corresponding stores are available. |
 | `/v1/launch` | POST | bearer | Issue a one-use launch ticket for a build the server advertises. |
+| `/v1/companion/tickets` | POST | bearer | Grant a fresh one-time Nirinsou Link ticket for a launch the account already holds (`{"launchId":"..."}`). |
 
 The launcher declares its version in the `X-FantasyTale-Launcher-Version` header or a
 `launcherVersion` JSON field. If both are present they must agree.
@@ -437,6 +448,8 @@ The launcher API is deliberately tolerant of new clients and strict about what i
 | `426 launcher_update_required` | The launcher version gate described above. |
 | `429` | The per-minute request budget or the concurrency gate was exceeded. |
 | `503` | Authentication capacity is reached (too many retained sessions/tickets). |
+| `503 server_not_ready` | Sign-in, registration and launches wait until every row is active and the host has logged `Server is ready`. |
+| `404 companion_unavailable` / `404 launch_not_found` | Ticket renewal without the `companion` row, or for a launch that ended or belongs to another account. |
 
 Responses carry `Cache-Control: no-store`. The listener is plain HTTP by design; run it behind your
 own TLS termination when launchers connect over a network, and keep it on loopback when they do not.
@@ -487,6 +500,53 @@ them back explicitly with a `set` patch:
       region: "${BFF_LAUNCHER_REGION:-}"
 ```
 
+## Nirinsou Link {#nirinsou-link}
+
+Fantasy Tale Nirinsou Link ("Nirinsou") is an optional WebSocket channel between a running launcher and
+the server it launched a game on. It carries features the original game client has no packet for, such as
+launcher popups above the game. The game connection is unchanged; a launch without Nirinsou plays exactly as
+before.
+
+### Rows
+
+| Row | Purpose |
+| --- | --- |
+| `companion` | The listener and the launch table. With it, every `/v1/launch` reply carries a `companion` object: `url`, a one-time `ticket`, the `launchId` and `expiresAt`. |
+| `companion.notices` | Launcher popups (`ui.notification.show`) and the `popup <text>` management command, permission `game.management.popup`. |
+
+Both rows are disabled in the core bundle and enabled by the `all` profile. Options of `companion`:
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `listen` | `127.0.0.1:8092` (`BFF_COMPANION_LISTEN`) | WebSocket listener address. |
+| `public_url` | empty (`BFF_COMPANION_PUBLIC_URL`) | URL handed to launchers, path `/companion/v1`; `{host}` becomes the host the launcher used. Empty means `ws://{host}:<listen port>/companion/v1`. |
+| `ticket_seconds` | `120` | How long a connection ticket is accepted. |
+| `pending_seconds` | `900` | How long a launch waits for its game login before it is dropped. |
+| `max_launches`, `max_connections` | `4096`, `2048` | Bounds of the launch table and of open connections. |
+| `message_bytes`, `queue_messages`, `queue_bytes`, `messages_per_second` | `65536`, `128`, `1048576`, `128` | Per-connection message, queue and rate bounds, matching the launcher's. |
+| `idle_seconds` | `60` | Silence after which a connection is closed; the launcher sends a heartbeat every 20 seconds. |
+
+### How a launch is bound
+
+1. `/v1/launch` opens a launch and returns the game ticket and the Nirinsou grant. The game ticket names
+   the launch.
+2. The launcher upgrades `GET /companion/v1` with the subprotocol `fantasytale.companion.v1` and the ticket
+   as `Authorization: Bearer`. A ticket is accepted once; `/v1/companion/tickets` grants a new one for a
+   reconnect, and a new connection replaces the previous one.
+3. The launcher sends `companion.hello` with its build, launch id, language and the message types it
+   supports; the server answers `companion.welcome` with the types both sides support and the state
+   `pending_game`.
+4. When the game login redeems the game ticket, the launch is bound to that game connection and the
+   launcher receives the state `connected`. Server messages flow only after this.
+5. When the game connection closes, the launch ends and the Nirinsou connection is closed.
+
+A launch whose game never logs in is dropped after `pending_seconds`. Every message is JSON with a kind,
+an id, a type, a schema version and a payload; a malformed, repeated, unnegotiated or too fast message
+closes the connection with a reason code, and the launcher reconnects with a fresh ticket.
+
+The listener is plain `ws`. Over a network, put it behind TLS termination and set a `wss` `public_url`,
+as for the launcher API itself.
+
 ## Troubleshooting
 
 These are the failure paths that exist in the current code. There is no in-app repair action in the
@@ -532,3 +592,67 @@ For server-side failures outside the launcher API, see [Troubleshooting](trouble
 - [Deployment](deployment.md) for running the server, persistence, backups and network security.
 - [Troubleshooting](troubleshooting.md) for server-side failures that are not specific to the
   launcher.
+
+## Public server presentation and admission {#server-presentation-and-admission}
+
+`GET /v1/catalog` also returns `presentation`: `motd`, `iconUrl`, `images`, `onlinePlayers`,
+`playerLimit`, `state`, `whitelist` and `rosterEnabled`. Configure these on the `launcher.http`
+row with `motd`, `icon_url`, `images`, `show_online_players`, `player_limit`,
+`maintenance`, `whitelist_enabled` and `roster_enabled`. Defaults preserve open admission,
+unlimited capacity and an enabled public roster. `onlinePlayers` is null when the session service
+is unavailable, or -1 when `show_online_players: false`. Counts include authenticated game
+players, deduplicate accounts and exclude closed and identified match connections. A historical
+peak is not supplied because no durable peak store is connected.
+
+`GET /v1/players` needs no bearer. Its response contains `schema: 1`, `enabled`, `players`
+(each has only `name` and `level`) and `truncated`. `roster_enabled: false` returns an empty list
+without reading the session registry. Otherwise an unavailable registry returns HTTP 503
+`player_state_unavailable`. `max_roster_players` bounds the list (default 1000, range 1–10000);
+`truncated: true` means more players are online than are listed. Counters and roster disclosure
+are independent switches. The HTTP plugin reads `ISessionRegistry` and the owning login
+connection recorded by `IPlayerSession.LoginConnectionId`. Match connections that share the
+player state and providers that omit this identity are excluded from public presence. This
+keeps ticket issuance independent of the lobby and match services that consume its tickets.
+
+Client presets accept optional `protocol_version` (1–65535) and `patch_version` (up to 64
+characters), exposed as `protocolVersion` and `patchVersion` alongside the existing `build`,
+`releaseVersion`, `clientLanguages` and `downloadSource`. Unset values remain unknown. These
+advertised values do not yet validate client version information sent in a launch request.
+
+`maintenance: true` refuses sign-in and new launch tickets with HTTP 503 `server_maintenance`.
+Optional `maintenance_start`, `maintenance_end` and `maintenance_description` are returned as
+`maintenanceStart`, `maintenanceEnd` and `maintenanceDescription`; dates describe the maintenance
+window and do not schedule it. `whitelist_enabled: true` checks account names against `whitelist`
+(case insensitive, up to 4096 unique names); an unlisted account receives HTTP 403
+`not_whitelisted`. A configured positive `player_limit` requires the session service at startup;
+a new player at capacity receives HTTP 503 `server_full`, while an already-online account can
+obtain a replacement ticket. These are launcher admission checks, not atomic seat reservations:
+direct game connections and ticket redemption do not yet recheck these options.
+
+Authentication refusals now include a JSON `error`: HTTP 401 `account_not_found`, `wrong_password`
+or `account_banned`. A ban is disclosed only after a correct password; no private ban reason is
+invented. Existing bearer failures remain `unauthorized`. Disabled registration returns HTTP 403
+`registration_disabled`, request limits HTTP 429 `rate_limited`, and session capacity HTTP 503
+`authentication_capacity`. Refresh and logout remain available during maintenance. Network
+failures are handled by the caller rather than represented as server authentication errors.
+
+The same `POST /v1/launch` request accepts optional `release_version`, `patch_version`,
+`launcher_language`, `native_language` and `client_language`. Provided version labels must be
+nonblank strings of at most 64 characters without control characters. They describe a distribution;
+they are not parsed as a wire version or compared with the advertised labels. Provided languages
+must be exactly `zh-CN`, `zh-TW`, `ko`, `en`, `id` or `vi`. Invalid known fields return HTTP 400
+`invalid_request` before consuming a ticket slot. Older requests may omit all five fields;
+unknown top-level fields are still ignored, and duplicate keys are still rejected. Successful
+ticket issuance logs the build and this descriptive context through the plugin logger, without
+logging account names, bearers or tickets. This context does not prove the installed client's
+version, language or integrity.
+
+When a game connection redeems a launch ticket, `launcher_language` selects server-generated
+notices for that connection, including room commands and automatic-start messages. Neither
+the build's region nor `native_language` or `client_language` selects these notices. Missing
+language context or an unavailable translation uses the localization plugin's `default_language`.
+Its `launcher_languages` mappings translate UI tags to resource names; the shipped mappings
+are `zh-CN` to `zh-Hans` and `zh-TW` to `zh-Hant`. Other tags use their resource name directly;
+there is currently no Vietnamese dictionary, so `vi` uses the deployment default. Connections
+without launch-ticket language context also use that default. The language registration lasts
+until the connection closes and remains available through first-time character creation.

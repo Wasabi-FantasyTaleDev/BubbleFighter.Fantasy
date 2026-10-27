@@ -354,8 +354,11 @@ internal static class RoomCodec
     /// <param name="build">The selected client build.</param>
     /// <param name="partyTransition">Whether to display the party transition notice.</param>
     /// <returns>The four-byte scene transition body.</returns>
-    public static byte[] WriteSceneTransition(PacketTables tables, string build, bool partyTransition = false) =>
-        PacketCodec.Write(tables, build, "RoomSceneTransition", new Dictionary<string, object?> { ["notice"] = partyTransition });
+    public static byte[] WriteSceneTransition(PacketTables tables, string build, bool partyTransition = false)
+    {
+        ValidateLayouts(tables, build);
+        return PacketCodec.Write(tables, build, "RoomSceneTransition", new Dictionary<string, object?> { ["notice"] = partyTransition });
+    }
 
     /// <summary>
     /// Writes <c>gspGotoRoom</c> for the main menu with the local player alone. Mode and map
@@ -648,6 +651,7 @@ internal static class RoomCodec
     internal static byte[] WriteMenuSeatEnvelope(PacketTables tables, string build, RoomSchema schema,
         MainMenuRoomOpened player, int index, bool ready)
     {
+        ValidateLayouts(tables, build);
         var slot = Seated(player, ready);
         var room = new RoomValues(MainMenuKind, [slot]);
         return PacketCodec.Write(tables, build, "RoomSeatUpdate", new Dictionary<string, object?>
@@ -660,13 +664,34 @@ internal static class RoomCodec
 
     /// <summary>Writes the native seat envelope with separately scoped user and equipment values.</summary>
     internal static byte[] WriteSeatEnvelope(PacketTables tables, string build, RoomSchema schema,
-        int index, RoomSlotValues slot, bool leaving = false) =>
-        PacketCodec.Write(tables, build, leaving ? "RoomSeatLeave" : "RoomSeatUpdate", new Dictionary<string, object?>
+        int index, RoomSlotValues slot, bool leaving = false)
+    {
+        ValidateLayouts(tables, build);
+        return PacketCodec.Write(tables, build, leaving ? "RoomSeatLeave" : "RoomSeatUpdate", new Dictionary<string, object?>
         {
             ["slot"] = index,
             ["user"] = PlaySeatValues(schema, slot, equipment: false),
             ["equipment"] = PlaySeatValues(schema, slot, equipment: true),
         });
+    }
+
+    /// <summary>
+    /// Checks the envelopes whose wrapper keys this codec fixes itself: the scene transition's one bool and the
+    /// seat envelopes' slot word, user record and equipment vector. The session, game and install bodies are
+    /// written from the build's <see cref="RoomSchema"/> field tables, whose names and types are themselves read
+    /// from the same packet tables at load, so the schema is the statement of those layouts. This helper has no
+    /// bind step of its own, so it checks before every use rather than on the first send.
+    /// </summary>
+    /// <param name="tables">The native packet composition tables.</param>
+    /// <param name="build">The client build whose nested records are encoded.</param>
+    internal static void ValidateLayouts(PacketTables tables, string build)
+    {
+        PacketLayoutContract.RequireFields(tables, build, "RoomSceneTransition", "Room codec", ("notice", "bool"));
+        PacketLayoutContract.RequireFields(tables, build, "RoomSeatUpdate", "Room codec",
+            ("slot", "u32"), ("user", "UserSlot"), ("equipment", "EquippedItemList"));
+        PacketLayoutContract.RequireFields(tables, build, "RoomSeatLeave", "Room codec",
+            ("slot", "u32"), ("user", "UserSlot"));
+    }
 
     private static long NumericValue(RoomField field, RoomValues room, RoomSlotValues? slot, bool forceReady) =>
         field.Value switch

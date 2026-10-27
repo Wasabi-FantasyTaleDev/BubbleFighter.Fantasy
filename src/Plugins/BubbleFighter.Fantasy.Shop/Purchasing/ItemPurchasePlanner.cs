@@ -3,14 +3,43 @@ using BubbleFighter.Fantasy.Contracts.Shop;
 
 namespace BubbleFighter.Fantasy.Shop.Purchasing;
 
-internal enum PurchaseGrantKind { Count, Days, Permanent, Life }
+/// <summary>How a catalog entry's grant behaves once owned.</summary>
+internal enum PurchaseGrantKind
+{
+    /// <summary>Stacks quantity on an unowned or unexpired permanent-lifetime row, bounded by the catalog count limit.</summary>
+    Count,
+    /// <summary>Extends or starts a finite deadline from the later of now and the stored expiry, whole remaining days rounded at half a second.</summary>
+    Days,
+    /// <summary>One unbounded, unstackable grant: only acquirable while the item is not owned.</summary>
+    Permanent,
+    /// <summary>Uses charges: re-acquirable only while the owned item's life is exhausted.</summary>
+    Life,
+}
 
+/// <summary>One catalog entry's grant rule, planned against the player's current bag before any store commit.</summary>
+/// <param name="ItemId">The granted item id.</param>
+/// <param name="Kind">The grant behavior once owned.</param>
+/// <param name="Amount">The quantity or duration the entry grants.</param>
+/// <param name="Maximum">The catalog's bound on the resulting quantity or duration.</param>
+/// <param name="RejectOwned">Whether owning the item already rejects the entry.</param>
 internal sealed record PurchaseGrantTerm(int ItemId, PurchaseGrantKind Kind, int Amount,
     int Maximum, bool RejectOwned);
 
 /// <summary>Plans one item entry per catalog identity; persistence checks the expected state under its player lock.</summary>
 internal static class ItemPurchasePlanner
 {
+    /// <summary>
+    /// Turns grant terms into expected-state grants the purchase store verifies atomically. Every term
+    /// group for one item id must agree on kind, bound and ownership rule; duplicate stored instances
+    /// of an item require reconciliation before planning; and each kind has its own renewal rule —
+    /// count items stack only unexpired permanent rows, timed items renew from the stored deadline
+    /// (whole remaining days, half-second rounding, per <c>kr-812 sub_978350</c> and
+    /// <c>kr-812 sub_4C75D0</c>), life items only while the stored charges are used up (same
+    /// <c>kr-812 sub_978350</c> rule), and permanent items only while unowned. Rejections are
+    /// purchase-level user outcomes, not store faults.
+    /// </summary>
+    /// <exception cref="ArgumentException">Thrown for unbounded inputs or a foreign bag.</exception>
+    /// <exception cref="PurchaseRejectedException">Thrown for incompatible terms, invalid amounts, cap overruns, owned-item rules or unreconciled duplicates.</exception>
     internal static IReadOnlyList<ShopPurchaseGrant> Plan(long userNum, IReadOnlyList<PurchaseGrantTerm> terms,
         IReadOnlyList<InventorySlotRecord> bag, DateTimeOffset now)
     {
@@ -58,7 +87,7 @@ internal static class ItemPurchasePlanner
                         : DateTimeOffset.FromUnixTimeMilliseconds(existing.Lifetime.ExpiresAtUnixMilliseconds!.Value);
                     if (start < now)
                         start = now;
-                    // KR812 0x978350 / 0x4C75D0 limit whole remaining days, rounded at half a second.
+                    // kr-812 sub_978350 / sub_4C75D0 limit whole remaining days, rounded at half a second.
                     var wholeDays = (long)Math.Truncate((start - now).TotalDays + 0.5 / 86400);
                     if (wholeDays + amount > term.Maximum)
                         throw new PurchaseRejectedException($"Item {term.ItemId} would exceed its catalog day limit.");
@@ -94,4 +123,5 @@ internal static class ItemPurchasePlanner
     }
 }
 
+/// <summary>A purchase-level rejection: the user's request is refused, not a store or transport fault.</summary>
 internal sealed class PurchaseRejectedException(string message) : InvalidOperationException(message);

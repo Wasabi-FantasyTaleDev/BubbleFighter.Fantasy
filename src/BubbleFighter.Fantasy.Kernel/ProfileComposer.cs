@@ -280,7 +280,7 @@ public sealed partial class ProfileComposer
         {
             if (!ids.Add(row.Id))
                 throw new ConfigException($"Duplicate row id '{row.Id}' in profile '{profileId}'.");
-            result.Add(row.ToPluginRow() with { ClientBuild = clientBuild, Lineage = lineage, Family = family });
+            result.Add(row.ToPluginRow(profileFile) with { ClientBuild = clientBuild, Lineage = lineage, Family = family });
         }
         foreach (var buildId in AsStringList(doc, "builds", profileFile))
             AddBuildRows(profileId, buildId, ids, result);
@@ -567,7 +567,18 @@ public sealed partial class ProfileComposer
 
     private sealed record Row(string Id, string Plugin, IReadOnlyDictionary<string, object?>? Config, bool Disabled, string Source, string? Version, PluginLifecycleOptions Lifecycle, string? ParentId, IReadOnlyList<string> IsolatedServices)
     {
-        public PluginRow ToPluginRow() => new() { Id = Id, Plugin = Plugin, Config = Config, Disabled = Disabled, Source = Source, Version = Version, Lifecycle = Lifecycle, ParentId = ParentId, IsolatedServices = IsolatedServices };
+        // Disabled rows retain raw configuration until a patch enables them. Track keys rather than re-expanding
+        // the whole row: an already resolved environment value may itself contain literal placeholder text.
+        public IReadOnlySet<string> DeferredConfigKeys { get; init; } = new HashSet<string>(StringComparer.Ordinal);
+
+        public PluginRow ToPluginRow(string file)
+        {
+            var config = Config;
+            if (!Disabled && config is not null && DeferredConfigKeys.Count > 0)
+                config = config.ToDictionary(pair => pair.Key, pair => pair.Value is not null && DeferredConfigKeys.Contains(pair.Key)
+                    ? Interpolate(pair.Value, file, Id) : pair.Value, StringComparer.Ordinal);
+            return new() { Id = Id, Plugin = Plugin, Config = config, Disabled = Disabled, Source = Source, Version = Version, Lifecycle = Lifecycle, ParentId = ParentId, IsolatedServices = IsolatedServices };
+        }
     }
 
     private void ApplyPatch(string patchFile, List<Row> rows, string source)
@@ -596,12 +607,15 @@ public sealed partial class ProfileComposer
                     var plugin = argMap.ContainsKey("plugin") ? RequiredString(argMap, "plugin", patchFile) : old.Plugin;
                     var disabled = argMap.ContainsKey("disabled") ? ParseBool(argMap["disabled"], patchFile, id, "disabled") : old.Disabled;
                     var config = old.Config;
+                    var deferred = old.DeferredConfigKeys;
                     if (argMap.ContainsKey("config"))
                     {
                         if (argMap["config"] is not null and not IReadOnlyDictionary<string, object?>)
                             throw new ConfigException($"Patch '{patchFile}': row '{id}' config must be a mapping.");
                         var replaced = argMap["config"] as IReadOnlyDictionary<string, object?>;
                         config = replaced is null || disabled ? replaced : (IReadOnlyDictionary<string, object?>)Interpolate(replaced, patchFile, id);
+                        deferred = disabled && replaced is not null
+                            ? replaced.Keys.ToHashSet(StringComparer.Ordinal) : new HashSet<string>(StringComparer.Ordinal);
                     }
                     var lifecycle = argMap.ContainsKey("lifecycle") ? ReadLifecycle(argMap, patchFile, id) : old.Lifecycle;
                     rows[index] = new Row(
@@ -613,7 +627,8 @@ public sealed partial class ProfileComposer
                         argMap.ContainsKey("version") ? ReadVersion(argMap, patchFile, id) : old.Version,
                         lifecycle,
                         argMap.ContainsKey("parent_id") ? ReadParentId(argMap, patchFile, id) : old.ParentId,
-                        argMap.ContainsKey("isolated_services") ? ReadIsolatedServices(argMap, patchFile, id, lifecycle) : old.IsolatedServices);
+                        argMap.ContainsKey("isolated_services") ? ReadIsolatedServices(argMap, patchFile, id, lifecycle) : old.IsolatedServices)
+                        { DeferredConfigKeys = deferred };
                     break;
                 }
                 case "set":
@@ -634,14 +649,19 @@ public sealed partial class ProfileComposer
                     var merged = old.Config is null
                         ? new Dictionary<string, object?>(StringComparer.Ordinal)
                         : new Dictionary<string, object?>(old.Config, StringComparer.Ordinal);
+                    var deferred = new HashSet<string>(old.DeferredConfigKeys, StringComparer.Ordinal);
                     foreach (var (key, value) in keys)
                     {
+                        deferred.Remove(key);
                         if (value is null)
                             merged.Remove(key);
                         else
+                        {
                             merged[key] = old.Disabled ? value : Interpolate(value, patchFile, id);
+                            if (old.Disabled) deferred.Add(key);
+                        }
                     }
-                    rows[index] = old with { Config = merged, Source = source };
+                    rows[index] = old with { Config = merged, Source = source, DeferredConfigKeys = deferred };
                     break;
                 }
                 case "insert":
@@ -685,7 +705,9 @@ public sealed partial class ProfileComposer
         var interpolated = config is null || disabled ? config : (IReadOnlyDictionary<string, object?>)Interpolate(config, file, id);
         var lifecycle = ReadLifecycle(map, file, id);
         return new Row((string)InterpolateScalar(id, file, id)!, (string)InterpolateScalar(plugin, file, id)!, interpolated, disabled, source, ReadVersion(map, file, id), lifecycle,
-            ReadParentId(map, file, id), ReadIsolatedServices(map, file, id, lifecycle));
+            ReadParentId(map, file, id), ReadIsolatedServices(map, file, id, lifecycle))
+            { DeferredConfigKeys = disabled && config is not null
+                ? config.Keys.ToHashSet(StringComparer.Ordinal) : new HashSet<string>(StringComparer.Ordinal) };
     }
 
     private string? ReadParentId(IReadOnlyDictionary<string, object?> map, string file, string rowId)

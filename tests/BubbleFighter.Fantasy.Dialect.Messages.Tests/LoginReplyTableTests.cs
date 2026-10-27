@@ -1,4 +1,5 @@
 using BubbleFighter.Fantasy.Contracts.Lobby;
+using BubbleFighter.Fantasy.Packets;
 using Xunit;
 
 namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
@@ -11,6 +12,19 @@ namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
 /// </summary>
 public sealed class LoginReplyTableTests
 {
+    /// <summary>Character selection survives login without being replaced by a fixed default type.</summary>
+    [Theory]
+    [InlineData("kr-1256")]
+    [InlineData("cn-774")]
+    [InlineData("tw-454")]
+    public void ModernAcceptedReplyCarriesTheSelectedCharacter(string build)
+    {
+        var body = LoginMessageCodec.WriteTableModernAccepted(Accepted with { CharacterItemId = 300027 },
+            "bff-7", TestBuilds.Packets, build, 99);
+        var values = PacketCodec.Read(TestBuilds.Packets, build, "LoginReply", body);
+        Assert.Equal(27, values["character_type"]);
+    }
+
     private static readonly LoginAccepted Accepted = new(1001, "user", "nick", new DateTime(2026, 10, 16), 300001);
 
     /// <summary>The three builds that share the reply layout write the pinned accepted body.</summary>

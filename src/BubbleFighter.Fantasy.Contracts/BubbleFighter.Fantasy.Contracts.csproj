@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Version>2.57.0</Version>
-    <AssemblyVersion>2.57.0.0</AssemblyVersion>
+    <Version>2.73.0</Version>
+    <AssemblyVersion>2.73.0.0</AssemblyVersion>
     <Description>Shared domain services and records for the server plugin tree.</Description>
   </PropertyGroup>
   <ItemGroup>

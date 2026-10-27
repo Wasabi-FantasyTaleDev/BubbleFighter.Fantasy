@@ -11,9 +11,7 @@ using BubbleFighter.Fantasy.Abstractions.Net;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Shop;
 using BubbleFighter.Fantasy.Shop.Data;
-using BubbleFighter.Fantasy.Shop.Dialects;
 using BubbleFighter.Fantasy.Shop.Purchasing;
-using BubbleFighter.Fantasy.Shop.Wire;
 using Microsoft.Extensions.Logging.Abstractions;
 using BubbleFighter.Fantasy.Tests.Shared;
 using Xunit;
@@ -47,7 +45,7 @@ public sealed class ShopPurchaseTests
         FakeInventoryPushService push,
         FakeShopPurchaseStore purchases,
         ShopOptions? options = null) =>
-        new(options ?? Options(), Catalog(), purchases.Configure(money, inventory), push, NullLogger.Instance) { Packets = ShopTablePackets.Numbers };
+        new(options ?? Options(), Catalog(), purchases.Configure(money, inventory), push, NullLogger.Instance) { ReplySender = new RecordingBuyReplySender(ShopTablePackets.BuyReply), BalanceSender = new RecordingBalanceSender(ShopTablePackets.UserMoneyStat) };
 
     private static ISession Session(long id) => new RecordingSession(id, SampleUserNum);
 
@@ -64,7 +62,7 @@ public sealed class ShopPurchaseTests
         var purchaser = new ShopPurchaser(new ShopOptions { ShopItemClientPath = "test.xml", StartingLucci = 1000 },
             catalog, store, null, NullLogger.Instance)
         {
-            Packets = ShopTablePackets.Numbers,
+            ReplySender = new RecordingBuyReplySender(ShopTablePackets.BuyReply),
             ItemPurchasePolicy = new(new ConditionalShopPurchaser(store, inventory, TimeProvider.System, 2), terms.ForStock),
         };
         var session = new RecordingSession(23, SampleUserNum);
@@ -105,7 +103,7 @@ public sealed class ShopPurchaseTests
         """;
 
     // The reply number by its kr-1256 label, from the build's opcode table rather than a constant.
-    private static readonly ushort RepShopBuy = ShopTablePackets.Numbers.ShopBuyReply;
+    private static readonly ushort RepShopBuy = ShopTablePackets.BuyReply;
 
     private static (ShopPurchaser Purchaser, Persistence.Memory.MemoryInventoryRepository Inventory, ShopCatalog Catalog) Kr1256Purchaser()
     {
@@ -121,7 +119,7 @@ public sealed class ShopPurchaseTests
             Card(4000003, 3000003, 200003, 1, 5)], []);
         var options = new ShopOptions { ShopItemClientPath = "test.xml", StartingLucci = 1000 };
         var policy = ShopPlugin.Kr1256PurchasePolicy(options, ShopWorkbooks.FromXml("kr1256-terms", Kr1256TermsXml), store, inventory);
-        return (new ShopPurchaser(options, catalog, store, new FakeInventoryPushService(), NullLogger.Instance) { ItemPurchasePolicy = policy, Packets = ShopTablePackets.Numbers },
+        return (new ShopPurchaser(options, catalog, store, new FakeInventoryPushService(), NullLogger.Instance) { ItemPurchasePolicy = policy, ReplySender = new RecordingBuyReplySender(ShopTablePackets.BuyReply), BalanceSender = new RecordingBalanceSender(ShopTablePackets.UserMoneyStat) },
             inventory, catalog);
     }
 
@@ -183,7 +181,7 @@ public sealed class ShopPurchaseTests
         var audit = new FakeShopPurchaseStore();
         var session = new RecordingSession(12, SampleUserNum);
         var purchaser = new ShopPurchaser(Options(), catalog, audit.Configure(money, inventory),
-            new FakeInventoryPushService(), NullLogger.Instance) { Packets = ShopTablePackets.Numbers };
+            new FakeInventoryPushService(), NullLogger.Instance) { ReplySender = new RecordingBuyReplySender(ShopTablePackets.BuyReply), BalanceSender = new RecordingBalanceSender(ShopTablePackets.UserMoneyStat) };
 
         await purchaser.PurchaseAsync(session, 1000726, CancellationToken.None);
 
@@ -202,7 +200,7 @@ public sealed class ShopPurchaseTests
         var money = new FakeMoneyRepository(new PlayerWallet(SampleUserNum, 10000, 100));
         var inventory = new FakeInventoryRepository();
         var audit = new FakeShopPurchaseStore();
-        var purchaser = new ShopPurchaser(Options(), new ShopCatalog("test.xml", [set], []), audit.Configure(money, inventory), new FakeInventoryPushService(), NullLogger.Instance) { Packets = ShopTablePackets.Numbers };
+        var purchaser = new ShopPurchaser(Options(), new ShopCatalog("test.xml", [set], []), audit.Configure(money, inventory), new FakeInventoryPushService(), NullLogger.Instance) { ReplySender = new RecordingBuyReplySender(ShopTablePackets.BuyReply), BalanceSender = new RecordingBalanceSender(ShopTablePackets.UserMoneyStat) };
 
         await purchaser.PurchaseAsync(Session(13), set.StockSetId, CancellationToken.None);
 
@@ -269,7 +267,7 @@ public sealed class ShopPurchaseTests
         Assert.Equal(2, frames.Count);
 
         var (opcode, payload) = frames[^1];
-        Assert.Equal(ShopTablePackets.Numbers.ShopBuyReply, opcode);
+        Assert.Equal(ShopTablePackets.BuyReply, opcode);
         Assert.Equal(816, opcode);
         var r = new PacketReader(payload);
         Assert.Equal(4000001, r.ReadInt32());
@@ -283,7 +281,7 @@ public sealed class ShopPurchaseTests
         Assert.Equal(25, payload.Length);
 
         (opcode, payload) = frames[0];
-        Assert.Equal(ShopTablePackets.Numbers.UserMoneyStat, opcode);
+        Assert.Equal(ShopTablePackets.UserMoneyStat, opcode);
         Assert.Equal(106, opcode);
         var m = new PacketReader(payload);
         Assert.Equal(0, m.ReadInt32());
@@ -322,7 +320,7 @@ public sealed class ShopPurchaseTests
         var inventory = new FakeInventoryRepository();
         var purchases = new FakeShopPurchaseStore();
         var purchaser = new ShopPurchaser(Options(), catalog, purchases.Configure(money, inventory),
-            new FakeInventoryPushService(), NullLogger.Instance) { Packets = ShopTablePackets.Numbers };
+            new FakeInventoryPushService(), NullLogger.Instance) { ReplySender = new RecordingBuyReplySender(ShopTablePackets.BuyReply), BalanceSender = new RecordingBalanceSender(ShopTablePackets.UserMoneyStat) };
 
         await purchaser.PurchaseAsync(Session(4), sevenDays.StockId, CancellationToken.None);
 
@@ -375,7 +373,7 @@ public sealed class ShopPurchaseTests
         Assert.Empty(await inventory.ListSlotsAsync(SampleUserNum, InventoryBag.CharacterBag, 512, CancellationToken.None));
 
         var (opcode, payload) = Assert.Single(((RecordingSession)session).Sent);
-        Assert.Equal(ShopTablePackets.Numbers.ShopBuyReply, opcode);
+        Assert.Equal(ShopTablePackets.BuyReply, opcode);
         var r = new PacketReader(payload);
         Assert.Equal(4000001, r.ReadInt32());
         Assert.Equal(0, r.ReadInt32());
@@ -397,7 +395,7 @@ public sealed class ShopPurchaseTests
 
         var frames = ((RecordingSession)session).Sent;
         var (opcode, payload) = frames[^1];
-        Assert.Equal(ShopTablePackets.Numbers.ShopBuyReply, opcode);
+        Assert.Equal(ShopTablePackets.BuyReply, opcode);
         var r = new PacketReader(payload);
         r.ReadInt32();
         Assert.Equal(1, r.ReadInt32());
@@ -430,7 +428,7 @@ public sealed class ShopPurchaseTests
             .PurchaseAsync(session, 12345, CancellationToken.None);
 
         var (opcode, payload) = Assert.Single(((RecordingSession)session).Sent);
-        Assert.Equal(ShopTablePackets.Numbers.ShopBuyReply, opcode);
+        Assert.Equal(ShopTablePackets.BuyReply, opcode);
         Assert.Equal(
             ShopWire.RepShopBuyRefused(12345),
             payload);
@@ -448,7 +446,7 @@ public sealed class ShopPurchaseTests
 
         Assert.Empty(purchases.Rows);
         var (opcode, payload) = Assert.Single(session.Sent);
-        Assert.Equal(ShopTablePackets.Numbers.ShopBuyReply, opcode);
+        Assert.Equal(ShopTablePackets.BuyReply, opcode);
         var r = new PacketReader(payload);
         r.ReadInt32();
         Assert.Equal(0, r.ReadInt32());

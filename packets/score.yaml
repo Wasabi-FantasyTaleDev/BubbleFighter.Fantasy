@@ -230,7 +230,7 @@ structs:
       offset: 4
     - nickname: wstr
       offset: 8
-    - team: u32                         # 1 or 2
+    - team: u32                         # native team identifier, retained by kr-812 sub_417720
       offset: 36
     - level: u32
       offset: 40
@@ -863,3 +863,563 @@ structs:
       offset: 352
     - unknown_356: "u32"
       offset: 356
+
+  # -------------------------------------------------------------------------------------------------
+  # The kr-1256 result scoreboard, S2C 614 (dispatcher kr-1256 sub_9E2FE0 case 0x266): the record is
+  # built by kr-1256 sub_10D16A0 through the record's own virtual reader kr-1256 sub_429620 (RTTI
+  # .?AVScoreData@@) and applied by kr-1256 sub_9E9A60, which splices it into session+1720. Everything
+  # arrives in one body, but two of its repeats are gated by values this format cannot state as a single
+  # structure: the three head vectors are sized by the leading u8 count (kr-1256 sub_429620 reads them
+  # index-interleaved, one word of each per loop pass), and the row blocks and the two trailing word
+  # arrays are gated by the bits of the u64 presence mask (kr-1256 sub_429620 walks bits 0..35 in three
+  # separate loops). The record is therefore stated as the reader's own phases, and a writer composes
+  # them in this order:
+  #
+  #   ScoreDataLead, head_count x ScoreHeadEntry, ScoreDataMask, one ScoreRow@kr-1256 then one
+  #   ScoreGatedWord of the +18892 array and one of the +19036 array per set mask bit (ascending),
+  #   ScoreDataTail.
+  #
+  # An empty record is 31 bytes; every present row adds 242 bytes plus twice its nickname characters,
+  # every head index 12 bytes and every container entry 12 bytes. The kr-812 ScoreData above is a
+  # different layout with the same class name; nothing but the name is shared.
+
+  # cn-774 sub_490F80 and tw-454 sub_47E640 independently read this lead, the interleaved head entries,
+  # the u64 mask, and two whole mask-gated word arrays. Each reader stops its three mask loops at 36.
+  # Their row differences and enclosing packet tails are restated below.
+  # The three leading words, read before any head entry (kr-1256 sub_429620).
+  ScoreDataLead:
+    - head_count: u8
+      offset: 4
+      only: [kr-1256]          # sizes only the three head vectors; the rows are gated by the mask below
+    - winner_slot: u8
+      offset: 452
+      # Kept only when <=36, else -1 (kr-1256 sub_429620). In team results this is a team,
+      # not a seat: cn-774 sub_4917E0 -> cn-774 sub_A91FB0 compares 1/2 with local seat+116;
+      # zero selects ResultDraw. A live unspecified winner remains 255 on the wire.
+      only: [kr-1256]
+    - banner_gate: bool
+      offset: 456
+      only: [kr-1256]          # the same +456 gate the S2C 613 banner block tests (kr-1256 sub_9E9710)
+
+  # One index of the three head vectors (kr-1256 sub_429620's interleaved loop). The +12 vector carries
+  # the team totals: kr-1256 sub_9E9A60 copies +12/+16 to session+644/+648.
+  ScoreHeadEntry:
+    - team_total: u32
+      offset: 12
+      only: [kr-1256]
+    - unknown_160: u32
+      offset: 160
+      only: [kr-1256]
+    - unknown_308: u32
+      offset: 308
+      only: [kr-1256]
+
+  # The u64 presence mask between the head vectors and the rows (kr-1256 sub_429620). Bit i set means the
+  # body carries row i's block, one +18892 word and one +19036 word; all three loops stop at bit 35.
+  ScoreDataMask:
+    - presence_mask: u64
+      only: [kr-1256]
+
+  # One word of the +18892 array or the +19036 array, per set mask bit (kr-1256 sub_429620 reads the
+  # whole +18892 array before the +19036 array). No word has a recovered meaning.
+  ScoreGatedWord:
+    - unknown_0: u32
+      only: [kr-1256]
+
+  # The kr-1256 restatement of one scoreboard row: the block one set mask bit announces (the per-bit
+  # block of kr-1256 sub_429620; row constructor kr-1256 sub_428620). The named fields are the three
+  # kr-1256 sub_9E5E70 seeds from a seat: +0 from seat+8 (the user number), +4 from the seat's nickname
+  # string and +52 from seat+4, the team label byte the S2C 504 handler writes through kr-1256
+  # sub_9E4C80. Offsets are the row object's own (row i sits at record+460+512i). Reward fields retain
+  # the progress meanings consumed by kr-1256 sub_9E9A60; the other counters remain unknown.
+  ScoreRow@kr-1256:
+    - unknown_500: u32
+      offset: 500              # kr-1256 sub_9E5E70 writes 1 for a seated player
+    - user_number: u32
+      offset: 0
+    - nickname: wstr
+      offset: 4
+    - team: u8
+      offset: 52
+    # The twenty-seven stat words in wire order; kr-1256 sub_429620 stores them at +56, +60, +64, +68,
+    # +80, +72, +84, +88, +92, +96, +104, +100, +108, +112, +120, +124, +128, +176, +132, +136, +140,
+    # +364, +368, +372, +376, +380, +384 - the wire order is not the destination order.
+    - level: u32
+      offset: 56
+    - unknown_60: u32
+      offset: 60
+    - unknown_64: u32
+      offset: 64
+    - unknown_68: u32
+      offset: 68
+    - unknown_80: u32
+      offset: 80
+    - unknown_72: u32
+      offset: 72
+    - unknown_84: u32
+      offset: 84
+    - unknown_88: u32
+      offset: 88
+    - unknown_92: u32
+      offset: 92
+    - unknown_96: u32
+      offset: 96
+    - unknown_104: u32
+      offset: 104
+    - unknown_100: u32
+      offset: 100
+    - unknown_108: u32
+      offset: 108
+    - unknown_112: u32
+      offset: 112
+    - unknown_120: u32
+      offset: 120
+    - unknown_124: u32
+      offset: 124
+    - unknown_128: u32
+      offset: 128
+    - unknown_176: u32
+      offset: 176
+    - unknown_132: u32
+      offset: 132
+    - unknown_136: u32
+      offset: 136
+    - unknown_140: u32
+      offset: 140
+    - unknown_364: u32
+      offset: 364
+    - exp_level_start: u32
+      offset: 368
+    - exp_total: u32
+      offset: 372
+    - exp_next_level: u32
+      offset: 376
+    - exp_gained: u32
+      offset: 380
+    - lucci_gained: u32
+      offset: 384
+    - unknown_388: bool
+      offset: 388
+    - unknown_436: u32
+      offset: 436
+    - unknown_464: "list<wstr>"
+      offset: 464              # element reader kr-1256 sub_429E00
+    - unknown_440: wstr
+      offset: 440
+    - unknown_236: u32
+      offset: 236
+    - unknown_476: u32
+      offset: 476
+    - unknown_480: u32
+      offset: 480
+    - unknown_392: u32
+      offset: 392
+      default: -1              # the row constructor seeds -1 (kr-1256 sub_428620); 0 is a visible value
+    - unknown_144: u32
+      offset: 144
+    - unknown_148: u32
+      offset: 148
+    - unknown_408: u32
+      offset: 408
+    - unknown_412: u16
+      offset: 412
+    - unknown_416: u32
+      offset: 416
+    - unknown_420: u32
+      offset: 420
+    - unknown_160: u32
+      offset: 160
+    - unknown_164: u32
+      offset: 164
+    - unknown_168: u32
+      offset: 168
+    - unknown_172: u8
+      offset: 172
+    - unknown_173: u8
+      offset: 173
+    - unknown_184: u16
+      offset: 184
+    - unknown_76: u16
+      offset: 76
+    - unknown_186: u16
+      offset: 186
+    - unknown_508: u32
+      offset: 508
+    - unknown_188: u16
+      offset: 188
+    - unknown_432: u8
+      offset: 432
+    - unknown_192: "u32[8]"
+      offset: 192
+    - unknown_424: u32
+      offset: 424
+    - unknown_428: u32
+      offset: 428
+
+  # The tail after the second mask-gated array (kr-1256 sub_10D16A0). The consumer kr-1256 sub_9E9A60
+  # copies +19196/+19197 to GameInfo+308/+312, splices the container into session+1720 and repeats the
+  # S2C 613 phase/banner work.
+  ScoreDataTail:
+    - unknown_19180: u32
+      offset: 19180
+      only: [kr-1256]
+    - unknown_19184: u32
+      offset: 19184
+      only: [kr-1256]
+    - container_19188: "list<ScoreContainerEntry>"
+      offset: 19188
+      only: [kr-1256]
+    - unknown_19196: u8
+      offset: 19196
+      only: [kr-1256]           # -> GameInfo+308 (kr-1256 sub_9E9A60)
+    - unknown_19197: u8
+      offset: 19197
+      only: [kr-1256]           # -> GameInfo+312 (kr-1256 sub_9E9A60)
+    - flags_19272: u16
+      offset: 19272
+      only: [kr-1256]           # bit 2 gates the three strings below (kr-1256 sub_10D16A0)
+    # The three gated strings, in wire order; their destinations are +19200, +19248 and +19224, so the
+    # wire order is first, third, second against the destination order (kr-1256 sub_10D16A0).
+    - unknown_19200: "when<flags_19272&0x04,wstr>"
+      offset: 19200
+      only: [kr-1256]
+    - unknown_19248: "when<flags_19272&0x04,wstr>"
+      offset: 19248
+      only: [kr-1256]
+    - unknown_19224: "when<flags_19272&0x04,wstr>"
+      offset: 19224
+      only: [kr-1256]
+    - unknown_19276: "optional<0x3A,ScoreOptionalWords>"
+      offset: 19276
+      only: [kr-1256]
+
+  # cn-774 sub_105F4C0 and tw-454 sub_EBEBD0 independently read the same counted three-word entries.
+  # One entry of the counted container after the +19184 word: kr-1256 sub_10D2220 -> kr-1256 sub_10D30B0
+  # reads a u32 count and three words per entry; no entry field has a recovered meaning.
+  ScoreContainerEntry:
+    - unknown_n0: u32
+      only: [kr-1256]
+    - unknown_n1: u32
+      only: [kr-1256]
+    - unknown_n2: u32
+      only: [kr-1256]
+
+  # The three words behind the 0x3A tag that ends the record (kr-1256 sub_10D16A0 stores them at
+  # +19276/+19280/+19284 with a present byte at +19288); no word has a recovered meaning.
+  ScoreOptionalWords:
+    - unknown_19276: u32
+      offset: 19276
+      only: [kr-1256]
+    - unknown_19280: u32
+      offset: 19280
+      only: [kr-1256]
+    - unknown_19284: u32
+      offset: 19284
+      only: [kr-1256]
+
+  # cn-774 sub_490F80 reads this masked row; cn-774 sub_48FEC0 seeds its defaults.
+  # The 28 stat words occupy +56,+60,+64,+68,+72,+76,+80,+84,+88,+92,+96,+100,+104,+108,
+  # +116,+120,+124,+128,+312,+132,+136,+140,+364,+368,+372,+376,+380,+384 in wire order.
+  # cn-774 sub_6F9680 displays +56 as level and (+372 - +368) / (+376 - +368) as experience progress.
+  # cn-774 sub_6FA5D0 formats +380/+384 into form+0x620/+0x624; cn-774 sub_6F48C0 binds those widgets
+  # to lbGainExp/lbGainLucci. The remaining counters keep their native destination names.
+  ScoreRow@cn-774:
+    - unknown_500: "u32"
+      offset: 500
+    - user_number: "u32"
+      offset: 0
+    - nickname: "wstr"
+      offset: 4
+    - team: "u8"
+      offset: 52
+    - level: u32
+      offset: 56
+    - unknown_60: u32
+      offset: 60
+    - unknown_64: u32
+      offset: 64
+    - unknown_68: u32
+      offset: 68
+    - unknown_72: u32
+      offset: 72
+    - unknown_76: u32
+      offset: 76
+    - unknown_80: u32
+      offset: 80
+    - unknown_84: u32
+      offset: 84
+    - unknown_88: u32
+      offset: 88
+    - unknown_92: u32
+      offset: 92
+    - unknown_96: u32
+      offset: 96
+    - unknown_100: u32
+      offset: 100
+    - unknown_104: u32
+      offset: 104
+    - unknown_108: u32
+      offset: 108
+    - unknown_116: u32
+      offset: 116
+    - unknown_120: u32
+      offset: 120
+    - unknown_124: u32
+      offset: 124
+    - unknown_128: u32
+      offset: 128
+    - unknown_312: u32
+      offset: 312
+    - unknown_132: u32
+      offset: 132
+    - unknown_136: u32
+      offset: 136
+    - unknown_140: u32
+      offset: 140
+    - unknown_364: u32
+      offset: 364
+    - exp_level_start: u32
+      offset: 368
+    - exp_total: u32
+      offset: 372
+    - exp_next_level: u32
+      offset: 376
+    - exp_gained: u32
+      offset: 380
+    - lucci_gained: u32
+      offset: 384
+    - unknown_388: "bool"
+      offset: 388
+    - unknown_436: "u32"
+      offset: 436
+    - unknown_464: "list<wstr>"
+      offset: 464
+    - unknown_440: "wstr"
+      offset: 440
+    - unknown_156: "u32"
+      offset: 156
+    - unknown_476: "u32"
+      offset: 476
+    - unknown_480: "u32"
+      offset: 480
+    - unknown_392: "u32"
+      offset: 392
+      default: -1
+    - unknown_280: "u32"
+      offset: 280
+    - unknown_284: "u32"
+      offset: 284
+    - unknown_328: "u32"
+      offset: 328
+    - unknown_408: "u32"
+      offset: 408
+    - unknown_412: "u16"
+      offset: 412
+    - unknown_416: "u32"
+      offset: 416
+    - unknown_420: "u32"
+      offset: 420
+    - unknown_296: "u32"
+      offset: 296
+    - unknown_300: "u32"
+      offset: 300
+    - unknown_304: "u32"
+      offset: 304
+    - unknown_308: "u8"
+      offset: 308
+    - unknown_309: "u8"
+      offset: 309
+    - unknown_320: "u16"
+      offset: 320
+    - unknown_322: "u16"
+      offset: 322
+    - unknown_324: "u16"
+      offset: 324
+    - unknown_508: "u32"
+      offset: 508
+    - unknown_432: "u8"
+      offset: 432
+    - unknown_332: "u32[8]"
+      offset: 332
+    - unknown_424: "u32"
+      offset: 424
+    - unknown_428: "u32"
+      offset: 428
+
+  # tw-454 sub_47E640 reads this masked row; tw-454 sub_47D5D0 seeds its defaults.
+  # The 28 stat words occupy +56,+60,+64,+68,+72,+76,+80,+84,+88,+92,+96,+100,+104,+108,
+  # +116,+120,+124,+128,+312,+132,+136,+140,+364,+368,+372,+376,+380,+384 in wire order.
+  # tw-454 sub_4F5C80 displays the same level and experience ratio; tw-454 sub_4F6A40 formats +380/+384
+  # into its corresponding form+0x4F0/+0x4F4 reward labels. The wire positions are independently read.
+  ScoreRow@tw-454:
+    - unknown_492: "u32"
+      offset: 492
+    - user_number: "u32"
+      offset: 0
+    - nickname: "wstr"
+      offset: 4
+    - team: "u8"
+      offset: 52
+    - level: u32
+      offset: 56
+    - unknown_60: u32
+      offset: 60
+    - unknown_64: u32
+      offset: 64
+    - unknown_68: u32
+      offset: 68
+    - unknown_72: u32
+      offset: 72
+    - unknown_76: u32
+      offset: 76
+    - unknown_80: u32
+      offset: 80
+    - unknown_84: u32
+      offset: 84
+    - unknown_88: u32
+      offset: 88
+    - unknown_92: u32
+      offset: 92
+    - unknown_96: u32
+      offset: 96
+    - unknown_100: u32
+      offset: 100
+    - unknown_104: u32
+      offset: 104
+    - unknown_108: u32
+      offset: 108
+    - unknown_116: u32
+      offset: 116
+    - unknown_120: u32
+      offset: 120
+    - unknown_124: u32
+      offset: 124
+    - unknown_128: u32
+      offset: 128
+    - unknown_312: u32
+      offset: 312
+    - unknown_132: u32
+      offset: 132
+    - unknown_136: u32
+      offset: 136
+    - unknown_140: u32
+      offset: 140
+    - unknown_364: u32
+      offset: 364
+    - exp_level_start: u32
+      offset: 368
+    - exp_total: u32
+      offset: 372
+    - exp_next_level: u32
+      offset: 376
+    - exp_gained: u32
+      offset: 380
+    - lucci_gained: u32
+      offset: 384
+    - unknown_388: "bool"
+      offset: 388
+    - unknown_428: "u32"
+      offset: 428
+    - unknown_456: "list<wstr>"
+      offset: 456
+    - unknown_432: "wstr"
+      offset: 432
+    - unknown_156: "u32"
+      offset: 156
+    - unknown_468: "u32"
+      offset: 468
+    - unknown_472: "u32"
+      offset: 472
+    - unknown_392: "u32"
+      offset: 392
+      default: -1
+    - unknown_280: "u32"
+      offset: 280
+    - unknown_284: "u32"
+      offset: 284
+    - unknown_328: "u32"
+      offset: 328
+    - unknown_408: "u32"
+      offset: 408
+    - unknown_412: "u16"
+      offset: 412
+    - unknown_296: "u32"
+      offset: 296
+    - unknown_300: "u32"
+      offset: 300
+    - unknown_304: "u32"
+      offset: 304
+    - unknown_308: "u8"
+      offset: 308
+    - unknown_309: "u8"
+      offset: 309
+    - unknown_320: "u16"
+      offset: 320
+    - unknown_322: "u16"
+      offset: 322
+    - unknown_324: "u16"
+      offset: 324
+    - unknown_500: "u32"
+      offset: 500
+    - unknown_424: "u8"
+      offset: 424
+    - unknown_425: "u8"
+      offset: 425
+    - unknown_332: "u32[8]"
+      offset: 332
+    - unknown_416: "u32"
+      offset: 416
+    - unknown_420: "u32"
+      offset: 420
+
+
+  # cn-774 sub_8F2280 follows the shared mask-gated score core with two bool32 values and two words.
+  # Unlike kr-1256 sub_10D16A0, it has no optional tag on these final fields.
+  ScoreDataTail@cn-774:
+    - unknown_19180: u32
+      offset: 19180
+    - unknown_19184: u32
+      offset: 19184
+    - container_19188: "list<ScoreContainerEntry>"
+      offset: 19188
+    - unknown_19196: u8
+      offset: 19196
+    - unknown_19197: u8
+      offset: 19197
+    - flags_19272: u16
+      offset: 19272
+    - unknown_19200: "when<flags_19272&0x04,wstr>"
+      offset: 19200
+    - unknown_19248: "when<flags_19272&0x04,wstr>"
+      offset: 19248
+    - unknown_19224: "when<flags_19272&0x04,wstr>"
+      offset: 19224
+    - unknown_19276: bool
+      offset: 19276
+    - unknown_19277: bool
+      offset: 19277
+    - unknown_19280: u32
+      offset: 19280
+    - unknown_19284: u32
+      offset: 19284
+
+  # tw-454 sub_A72D50 ends after the three gated strings, without the CN flags or the KR optional tag.
+  ScoreDataTail@tw-454:
+    - unknown_18892: u32
+      offset: 18892
+    - unknown_18896: u32
+      offset: 18896
+    - container_18900: "list<ScoreContainerEntry>"
+      offset: 18900
+    - unknown_18908: u8
+      offset: 18908
+    - unknown_18909: u8
+      offset: 18909
+    - flags_18984: u16
+      offset: 18984
+    - unknown_18912: "when<flags_18984&0x04,wstr>"
+      offset: 18912
+    - unknown_18960: "when<flags_18984&0x04,wstr>"
+      offset: 18960
+    - unknown_18936: "when<flags_18984&0x04,wstr>"
+      offset: 18936

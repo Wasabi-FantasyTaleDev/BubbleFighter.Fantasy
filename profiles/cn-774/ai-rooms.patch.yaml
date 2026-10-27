@@ -1,0 +1,195 @@
+# Optional operator patch; not enabled by the default profile.
+# cn-774 sub_E4C8C0 defines difficulties 0..3; cn-774 sub_B7DFA0 selects the matching native popup preset.
+# Configured loadouts use items present in this build's catalog, not equipment introduced by later builds.
+# Nickname keys follow the shared translated tier/character names and are resolved per recipient's launcher_language.
+- set:
+    id: ingame
+    config:
+      ai_mode_ids: [38, 39]
+      ai_presets:
+      - difficulty: 0
+        preset: 0
+        nickname: "\uC655\uCD08\uBCF4\u2605\uD22C\uD0D1"
+        nickname_key: room.ai.preset.1.0
+        level: 5
+        character_item_id: 300014
+        color_index: 1
+        equipped_item_ids: [100111, 100143, 100241, 100242, 102640, 102704, 102705, 102933, 201980, 202059, 205003, 207948]
+      - difficulty: 0
+        preset: 1
+        nickname: "\uC655\uCD08\uBCF4\u2605\uB450\uCC0C"
+        nickname_key: room.ai.preset.1.1
+        level: 5
+        character_item_id: 300027
+        color_index: 11
+        equipped_item_ids: [100111, 100143, 100241, 100242, 102204, 102640, 201981, 202059, 205003, 207949, 102963, 102964]
+      - difficulty: 0
+        preset: 2
+        nickname: "\uC655\uCD08\uBCF4\u2605\uB7ED\uB77C"
+        nickname_key: room.ai.preset.1.2
+        level: 5
+        character_item_id: 300025
+        color_index: 13
+        equipped_item_ids: [100111, 100143, 100241, 100242, 102441, 102640, 201982, 203981, 205003, 207945, 102972, 102973]
+      - difficulty: 0
+        preset: 3
+        nickname: "\uC655\uCD08\uBCF4\u2605\uB808\uC624"
+        nickname_key: room.ai.preset.1.3
+        level: 5
+        character_item_id: 300011
+        color_index: 2
+        equipped_item_ids: [100111, 100143, 100241, 100242, 102640, 201981, 203981, 205003, 102580, 102581, 102582, 102583, 102584]
+      - difficulty: 0
+        preset: 4
+        nickname: "\uC655\uCD08\uBCF4\u2605\uB808\uC544"
+        nickname_key: room.ai.preset.1.4
+        level: 5
+        character_item_id: 300029
+        color_index: 8
+        equipped_item_ids: [100111, 100143, 100241, 100242, 102011, 102640, 201982, 202059, 205003, 207984, 102924, 102925]
+      - difficulty: 0
+        preset: 5
+        nickname: "\uC655\uCD08\uBCF4\u2605\uB7ED\uC6B0"
+        nickname_key: room.ai.preset.1.5
+        level: 5
+        character_item_id: 300019
+        color_index: 10
+        equipped_item_ids: [100111, 100143, 100241, 100242, 102150, 102640, 201983, 202059, 205003, 207013, 102966, 102967, 102968, 102969, 102970]
+      - difficulty: 1
+        preset: 0
+        nickname: "\uCD08\uBCF4\u2605\uB7ED\uB77C"
+        nickname_key: room.ai.preset.2.0
+        level: 5
+        character_item_id: 300025
+        color_index: 2
+        equipped_item_ids: [100143, 100224, 100678, 205003, 100431, 207918, 102585, 102586, 201965, 101774, 102438, 102441, 203074]
+      - difficulty: 1
+        preset: 1
+        nickname: "\uCD08\uBCF4\u2605\uB450\uCC0C"
+        nickname_key: room.ai.preset.2.1
+        level: 5
+        character_item_id: 300027
+        color_index: 2
+        equipped_item_ids: [100143, 100224, 100678, 202036, 205003, 100431, 207918, 201965, 101774, 102438, 102441, 102621, 102622, 102623, 102624, 102625]
+      - difficulty: 1
+        preset: 2
+        nickname: "\uCD08\uBCF4\u2605\uB808\uC544"
+        nickname_key: room.ai.preset.2.2
+        level: 5
+        character_item_id: 300029
+        color_index: 2
+        equipped_item_ids: [100143, 100224, 100678, 202036, 205003, 100431, 207918, 201965, 101774, 102438, 102441, 102924, 102925]
+      - difficulty: 1
+        preset: 3
+        nickname: "\uCD08\uBCF4\u2605\uB8E8\uC2DC\uB4DC"
+        nickname_key: room.ai.preset.2.3
+        level: 5
+        character_item_id: 300030
+        color_index: 2
+        equipped_item_ids: [100143, 100224, 100678, 103039, 205003, 100431, 207918, 201965, 101774, 102438, 203074, 103042]
+      - difficulty: 2
+        preset: 0
+        nickname: "\uC911\uC218\u2605\uB7ED\uB77C"
+        nickname_key: room.ai.preset.3.0
+        level: 5
+        character_item_id: 300025
+        color_index: 2
+        equipped_item_ids: [100143, 100224, 100678, 102494, 102608, 205080, 101046, 102603, 102604, 102605, 102606, 102607, 201965, 207993, 101774, 102438,
+          203074]
+      - difficulty: 2
+        preset: 1
+        nickname: "\uC911\uC218\u2605\uB450\uCC0C"
+        nickname_key: room.ai.preset.3.1
+        level: 5
+        character_item_id: 300027
+        color_index: 2
+        equipped_item_ids: [100143, 100224, 100678, 102608, 202036, 205080, 101046, 201965, 207993, 101774, 102438, 102648, 102649, 102650, 102651, 102652,
+          103009]
+      - difficulty: 2
+        preset: 2
+        nickname: "\uC911\uC218\u2605\uB808\uC544"
+        nickname_key: room.ai.preset.3.2
+        level: 5
+        character_item_id: 300029
+        color_index: 2
+        equipped_item_ids: [100143, 100224, 100678, 102608, 202036, 205080, 101046, 201965, 207993, 102653, 102654, 102655, 102656, 102657, 101774, 102438,
+          103009]
+      - difficulty: 2
+        preset: 3
+        nickname: "\uC911\uC218\u2605\uB7ED\uC6B0"
+        nickname_key: room.ai.preset.3.3
+        level: 5
+        character_item_id: 300019
+        color_index: 2
+        equipped_item_ids: [100143, 100224, 100678, 102608, 203073, 205080, 101046, 201965, 207993, 101774, 102438, 103009, 102793, 102794, 102795, 102796,
+          102797]
+      - difficulty: 2
+        preset: 4
+        nickname: "\uC911\uC218\u2605\uB7ED\uB77C"
+        nickname_key: room.ai.preset.3.4
+        level: 5
+        character_item_id: 300025
+        color_index: 2
+        equipped_item_ids: [100224, 100678, 102494, 102608, 190025, 204056, 205080, 101046, 201965, 207993, 102438, 190027, 102826, 102827]
+      - difficulty: 2
+        preset: 5
+        nickname: "\uC911\uC218\u2605\uB450\uCC0C"
+        nickname_key: room.ai.preset.3.5
+        level: 5
+        character_item_id: 300027
+        color_index: 1
+        equipped_item_ids: [100224, 100486, 100678, 102494, 102608, 204057, 205080, 101046, 201965, 207993, 102438, 190027, 102822, 102823]
+      - difficulty: 3
+        preset: 0
+        nickname: "\uACE0\uC218\u2605\uB7ED\uB77C"
+        nickname_key: room.ai.preset.4.0
+        level: 5
+        character_item_id: 300025
+        color_index: 2
+        equipped_item_ids: [100143, 100224, 100241, 100486, 102494, 102608, 102674, 102934, 205080, 301005, 101046, 102603, 102604, 102605, 102606, 102607,
+          201965, 207993, 102438, 102431, 203074]
+      - difficulty: 3
+        preset: 1
+        nickname: "\uACE0\uC218\u2605\uB450\uCC0C"
+        nickname_key: room.ai.preset.4.1
+        level: 5
+        character_item_id: 300027
+        color_index: 2
+        equipped_item_ids: [100143, 100224, 100241, 100486, 100699, 102023, 102608, 102787, 205080, 301005, 101046, 201965, 207993, 102438, 102648, 102649,
+          102650, 102651, 102652, 103009, 202036]
+      - difficulty: 3
+        preset: 2
+        nickname: "\uACE0\uC218\u2605\uB808\uC544"
+        nickname_key: room.ai.preset.4.2
+        level: 5
+        character_item_id: 300029
+        color_index: 2
+        equipped_item_ids: [100143, 100224, 100241, 100486, 100699, 102023, 102608, 102787, 205080, 301005, 101046, 201965, 207993, 102653, 102654, 102655,
+          102656, 102657, 102438, 103009, 202036]
+      - difficulty: 3
+        preset: 3
+        nickname: "\uACE0\uC218\u2605\uB7ED\uC6B0"
+        nickname_key: room.ai.preset.4.3
+        level: 5
+        character_item_id: 300019
+        color_index: 2
+        equipped_item_ids: [100143, 100224, 100241, 100486, 102608, 190173, 205080, 301005, 101046, 201965, 101564, 207993, 102438, 102431, 103009, 102793,
+          102794, 102795, 102796, 102797, 203073]
+      - difficulty: 3
+        preset: 4
+        nickname: "\uACE0\uC218\u2605\uB7ED\uB77C"
+        nickname_key: room.ai.preset.4.4
+        level: 5
+        character_item_id: 300025
+        color_index: 2
+        equipped_item_ids: [100143, 100224, 100241, 100486, 102494, 102608, 102674, 102934, 205080, 301005, 101046, 204056, 201965, 207993, 102438, 102826,
+          102827, 102431]
+      - difficulty: 3
+        preset: 5
+        nickname: "\uACE0\uC218\u2605\uB450\uCC0C"
+        nickname_key: room.ai.preset.4.5
+        level: 5
+        character_item_id: 300027
+        color_index: 1
+        equipped_item_ids: [100143, 100224, 100241, 100486, 102494, 102608, 102674, 102934, 205080, 301005, 101046, 204057, 201965, 207993, 102438, 102431,
+          102822, 102823]

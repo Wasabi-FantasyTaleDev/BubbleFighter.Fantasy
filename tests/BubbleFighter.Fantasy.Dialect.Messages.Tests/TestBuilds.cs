@@ -23,7 +23,7 @@ internal static class TestBuilds
     public static RoomTables All => Loaded.Value;
 
     /// <summary>Gets one build's struct tables and play row.</summary>
-    public static (RoomSchema Schema, PlayBuild Play) Of(string build) => All.Of(build);
+    public static (RoomSchema Schema, PlayValues Play) Of(string build) => All.Of(build);
 
     /// <summary>Loads one build's game-connection opcode table from its profile folder.</summary>
     /// <param name="build">The profile and build name, for example <c>kr-812</c>.</param>

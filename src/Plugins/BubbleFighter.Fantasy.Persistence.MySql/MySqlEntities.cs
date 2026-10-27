@@ -383,6 +383,30 @@ internal sealed class TutorialStageRow
     public int BestSeconds { get; set; }
 }
 
+/// <summary>
+/// A <c>weapon_preset_pages</c> row (migration 0033): one persisted preset page keyed by its list position,
+/// because <c>kr-1256 sub_81B820</c> keys the client's per-slot map by record position.
+/// </summary>
+[SugarTable("weapon_preset_pages")]
+internal sealed class WeaponPresetPageRow
+{
+    [SugarColumn(ColumnName = "user_num", IsPrimaryKey = true)]
+    public long UserNum { get; set; }
+
+    /// <summary>The page's position in the S2C 837/833 list, 0..4.</summary>
+    [SugarColumn(ColumnName = "page", IsPrimaryKey = true)]
+    public byte Page { get; set; }
+
+    [SugarColumn(ColumnName = "word_0")]
+    public int Word0 { get; set; }
+
+    [SugarColumn(ColumnName = "word_1")]
+    public int Word1 { get; set; }
+
+    [SugarColumn(ColumnName = "word_2")]
+    public int Word2 { get; set; }
+}
+
 /// <summary>A <c>schema_migrations</c> row (migration 0001); <c>applied_at</c> comes from the database.</summary>
 [SugarTable("schema_migrations")]
 internal sealed class SchemaMigrationRow

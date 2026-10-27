@@ -5,9 +5,11 @@
   <ItemGroup>
     <ProjectReference Include="..\..\BubbleFighter.Fantasy.Contracts\BubbleFighter.Fantasy.Contracts.csproj" />
     <ProjectReference Include="..\..\BubbleFighter.Fantasy.RoomCore\BubbleFighter.Fantasy.RoomCore.csproj" />
+    <ProjectReference Include="..\BubbleFighter.Fantasy.Dialect.Messages\BubbleFighter.Fantasy.Dialect.Messages.csproj" />
     <ProjectReference Include="..\..\BubbleFighter.Fantasy.Packets\BubbleFighter.Fantasy.Packets.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="BubbleFighter.Fantasy.Dialect.Messages.Tests" />
+    <InternalsVisibleTo Include="BubbleFighter.Fantasy.InGame.Tests" />
   </ItemGroup>
 </Project>

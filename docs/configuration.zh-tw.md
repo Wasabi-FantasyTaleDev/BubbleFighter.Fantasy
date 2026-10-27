@@ -344,9 +344,9 @@ BFF_PUBLIC_HOST=<public-address-clients-use>
 
 少數 bundle 需要明確啟用，且只被用戶端稽核支援的 profile 列出。
 
-**`player-settings`** 掛載 `dialect.customized-keys` 與 `player.settings`，讓玩家儲存自訂按鍵。它被 `kr-812`、`kr-1256`、`cn-774` 與 `tw-454` 列出；其他 profile 需先稽核其原生控制名稱與封包路徑。每個 `player.settings` 資料列都需要 `protocol`，並使用依 profile 的 `scope`，避免混淆不同組建的名稱。持久性提供者依帳號儲存對應；MySQL 透過移轉 `0032_customized_keys.sql` 儲存。每個提供者用 `customized_keys` 設定每帳號預算（`max_scopes` 1–64、`max_mappings` 1–512、`max_name_characters` 1–1024，三者組合必須能放入封包主體）。超出預算會直接失敗，而不會驅逐其他已儲存對應。
+**`player-settings`** 掛載 `player.settings`，即玩家自訂按鍵的類型化儲存。封包本身由 `dialect.messages` 資料列的 `customized_keys` 選項綁定，由 `kr-812`、`kr-1256`、`cn-774` 與 `tw-454` 宣告；其他 profile 需先稽核其原生控制名稱與封包路徑。每個 `player.settings` 資料列都需要 `protocol`，並使用依 profile 的 `scope`，避免混淆不同組建的名稱。持久性提供者依帳號儲存對應；MySQL 透過移轉 `0032_customized_keys.sql` 儲存。每個提供者用 `customized_keys` 設定每帳號預算（`max_scopes` 1–64、`max_mappings` 1–512、`max_name_characters` 1–1024，三者組合必須能放入封包主體）。超出預算會直接失敗，而不會驅逐其他已儲存對應。
 
-**`inventory-actions`** 掛載 `dialect.inventory-actions` 與 `inventory.throw`，讓玩家捨棄過期物品。它由已稽核操作消費者並具備儲存裝備服務的 profile 列出（`kr-812`、`cn-279`、`cn-324`、`cn-406`、`cn-404`、`cn-408`、`cn-706`、`cn-717`、`id-400`、`id-1809`、`kr-1256`）。行為被刻意限制得很窄：只移除一個已驗證玩家兩個背包中的該過期物品；若有符合的權益仍有效，整個移除會被拒絕；組建的類別 6 排除規則會被遵守。比賽中的請求會被拒絕。真實用戶端驗收仍待進行；僅憑封包表涵蓋不足以在另一個組建上掛載該 bundle。
+過期物品捨棄也以同樣方式宣告：`dialect.messages` 資料列的 `inventory_actions` 選項綁定 `gcpReqInventoryThrowItem`/`gspRepInventoryThrowItem`（每個 legacy 組建和 `kr-1256` 均開啟），組建自己的 bundle 內的 `inventory.throw` 資料列透過儲存裝備服務移除該物品。行為被刻意限制得很窄：只移除一個已驗證玩家兩個背包中的該過期物品；若有符合的權益仍有效，整個移除會被拒絕；組建的類別 6 排除規則會被遵守。比賽中的請求會被拒絕。真實用戶端驗收仍待進行；僅憑封包表涵蓋不足以在另一個組建上宣告該選項。
 
 **`launcher.http`** 是選用的公用啟動器 API。它預設停用，與管理工作分離。它接受 `minimum_launcher_version`（留空則關閉檢查）與 `plugin_recommendations`，後者包含商店識別與選用的精確 `builds`，絕不包含可執行檔路徑或下載位址。設定最低版本後，較舊的啟動器會收到 HTTP 426。每個大廳列的 `authentication` 選項（`BFF_LOGIN_AUTHENTICATION`，預設 `ticket`）只接受能兌換啟動器票據的登入，此時需要本列處於啟用狀態；`open` 接受任何帳號名稱，只適用於可信任的區域網路。[啟動器](launcher.md)頁面說明此 API、用戶端預設、帳號與票據流程以及面向營運者的設定。
 

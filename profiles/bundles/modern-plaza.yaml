@@ -1,0 +1,108 @@
+# Shared plaza ownership and persisted appearance for builds with audited native plaza records.
+# The dialect chooses containers through packet data; the gameplay row is the same one rooms use.
+- id: dialect.rooms
+  plugin: dialect.rooms
+  config:
+    protocol: "${BFF_PROFILE_ID}/game"
+    relay_protocol: "${BFF_PROFILE_ID}/relay"
+    modern_rooms: true
+    # Both native dialects pass two-client loading, relay, combat, results and
+    # return through a second round; keep their shared gameplay admission open.
+    waiting_rooms_only: false
+    packets_directory: packets
+- id: inventoryview
+  plugin: inventoryview
+  parent_id: clientdata
+  # Every build keeps its appearance, publication and online-player services in its own subtree.
+  isolated_services:
+    - BubbleFighter.Fantasy.Contracts.Inventory.IInventoryPushService
+    - BubbleFighter.Fantasy.Contracts.Inventory.IEquipmentSelection
+    - BubbleFighter.Fantasy.Contracts.Inventory.IInventoryExpiry
+    - BubbleFighter.Fantasy.Contracts.Inventory.IInventoryItemRemoval
+    - BubbleFighter.Fantasy.Contracts.Inventory.IEquippedViewPush
+    - BubbleFighter.Fantasy.Contracts.Inventory.IWeaponPresetPageSource
+    - BubbleFighter.Fantasy.Contracts.Shop.IShopGiftService
+    - BubbleFighter.Fantasy.Contracts.Players.IOnlinePlayers
+  config:
+    protocol: "${BFF_PROFILE_ID}/game"
+    client_profile: "${BFF_PROFILE_ID}"
+    version_major: ${BFF_BUILD_MAJOR}
+    enabled: true
+    publish_equipped_view_push: true
+- id: ingame
+  plugin: ingame
+  parent_id: inventoryview
+  config:
+    game_protocol: "${BFF_PROFILE_ID}/game"
+    relay_protocol: "${BFF_PROFILE_ID}/relay"
+    relay_advertise_ipv4: "${BFF_PUBLIC_HOST:-127.0.0.1}"
+    relay_advertise_port: ${BFF_MODERN_RELAY_PUBLIC_PORT:-7101}
+    max_matches: 64
+    max_players_per_match: 16
+    start_timer_ms: 7000
+    level_exp_table_path: "${BFF_LEVEL_EXP_TABLE:-data/level-experience.csv}"
+    reward_base_exp: 150
+    reward_exp_per_kill: 0
+    reward_win_multiplier: 2
+    reward_lucci_percent: 35
+    score_based_rewards: true
+    reward_exp_multiplier: ${BFF_REWARD_EXP_MULTIPLIER:-100}
+    reward_lucci_multiplier: ${BFF_REWARD_LUCCI_MULTIPLIER:-100}
+    start_matches: true
+    send_plaza_snapshot: true
+    send_room_list: true
+    republish_room_ui_on_join: true
+    republish_room_ui_on_position: true
+    broadcast_room_chat: true
+    relay_character_positions: true
+    republish_full_room_on_team_change: false
+    room_install_state: 2
+    prime_session_state_before_install: false
+    start_flag0: 1
+    start_flag1: 0
+    start_flag2: 1
+    result_close: 0
+    result_scoreboard_delay_ms: 1000
+    result_reward_delay_ms: 5000
+    result_close_grace_ms: 10000
+    native_match_relay: true
+    match_transport_fallback: true
+    server_map_draw: true
+    assign_spawn_teams_on_start: true
+    native_life_mode_ids: [1]
+    plaza_enter_requires_finished_login: true
+    plaza_replay_positions_on_enter: false
+    plaza_echo_positions: false
+    plaza_vacate_peers_on_menu_return: false
+
+# The native modern relay is a separate listener and protocol scope. These rows
+# are shared by CN2019 and TW2019; the profile's packet table supplies each
+# build's numbers and handshake bodies.
+- id: relay-listener
+  plugin: net.tcp
+  config:
+    listen: "${BFF_BIND_HOST:-0.0.0.0}:${BFF_MODERN_RELAY_PORT:-7101}"
+    protocol: "${BFF_PROFILE_ID}/relay"
+    max_connections: 512
+    idle_timeout_seconds: 0
+- id: dialect.match
+  plugin: dialect.match
+  config:
+    protocol: "${BFF_PROFILE_ID}/relay"
+    native_handshake: capability
+- id: dialect.match-offers
+  plugin: dialect.match-offers
+  config:
+    protocol: "${BFF_PROFILE_ID}/game"
+- id: dialect.match-replies
+  plugin: dialect.match-replies
+  config:
+    protocol: "${BFF_PROFILE_ID}/relay"
+- id: match-connection
+  plugin: match-connection
+  config:
+    protocol: "${BFF_PROFILE_ID}/relay"
+    max_connections: 1024
+    handshake_timeout_ms: 15000
+    capability_authentication: true
+    require_capability_scene_report: true

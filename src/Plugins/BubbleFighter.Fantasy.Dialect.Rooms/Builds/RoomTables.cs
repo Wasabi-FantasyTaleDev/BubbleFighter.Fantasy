@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Reflection;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Packets;
@@ -46,7 +45,7 @@ internal sealed class RoomTables
         ["list<UserSlot>"] = RoomFieldType.UserSlots, ["list<EquippedItemList>"] = RoomFieldType.EquippedItemLists,
     };
 
-    private readonly Dictionary<string, (RoomSchema Schema, PlayBuild Play)> _builds = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (RoomSchema Schema, PlayValues Play)> _builds = new(StringComparer.Ordinal);
 
     private RoomTables(PacketTables tables) => Tables = tables;
 
@@ -57,7 +56,7 @@ internal sealed class RoomTables
     public BuildVariants<RoomSchema> Schemas { get; } = new("legacy main-menu room");
 
     /// <summary>Gets each build's tutorial and play-room row, under the build's name.</summary>
-    public BuildVariants<PlayBuild> Play { get; } = new("legacy tutorial and plaza rooms");
+    public BuildVariants<PlayValues> Play { get; } = new("legacy tutorial and plaza rooms");
 
     /// <summary>Gets, per build, a line saying how much the tables state for it and whose values the rest are.</summary>
     public IReadOnlyList<string> Summary { get; private set; } = [];
@@ -66,7 +65,7 @@ internal sealed class RoomTables
     /// <param name="build">The build's name.</param>
     /// <returns>The struct tables and the play row.</returns>
     /// <exception cref="ConfigException">Thrown when the tables do not name the build.</exception>
-    public (RoomSchema Schema, PlayBuild Play) Of(string build) =>
+    public (RoomSchema Schema, PlayValues Play) Of(string build) =>
         _builds.TryGetValue(build, out var resolved)
             ? resolved
             : throw new ConfigException($"The packets directory '{Tables.Directory}' does not name the build '{build}'.");
@@ -87,8 +86,8 @@ internal sealed class RoomTables
         {
             var where = $"'{packetsDirectory}' build '{build}'";
             var values = tables.ValuesOf(build);
-            // `shop`, `lobby`, `login`, `inventory` and `equipment` belong to the shop, lobby and messages rows, which validate them when they load the same tables.
-            if (values.Keys.FirstOrDefault(key => key is not ("needs_idle_party" or "play" or "capabilities" or "room_setting_change_fields" or "room_round_setting_fields" or "room_unchosen_map" or "room_unchosen_difficulty" or "room_setting_change_map" or "room_ai_seat" or "shop" or "lobby" or "login" or "inventory" or "equipment" or "family")) is { } unknown)
+            // Feature values, including initial_tutorial_routes, are validated by their owning rows.
+            if (values.Keys.FirstOrDefault(key => key is not ("needs_idle_party" or "play" or "capabilities" or "room_setting_change_fields" or "room_round_setting_fields" or "room_projection_fields" or "room_unchosen_map" or "room_unchosen_difficulty" or "room_setting_change_map" or "room_ai_seat" or "round_score_row_marker" or "round_feed" or "shop" or "lobby" or "login" or "inventory" or "equipment" or "family" or "initial_tutorial_routes")) is { } unknown)
                 throw new ConfigException($"{where} has the unknown value '{unknown}'.");
             // A build of another family (its own value or its base's) is served by that family's room binding.
             if (values.TryGetValue("family", out var family))
@@ -104,16 +103,7 @@ internal sealed class RoomTables
                 "false" => false,
                 _ => throw new ConfigException($"{where}: 'needs_idle_party' must be true or false."),
             };
-            PlayBuild play;
-            try
-            {
-                play = (PlayBuild)FromMap(typeof(PlayBuild),
-                    values.GetValueOrDefault("play") as Dictionary<string, object?> ?? new(StringComparer.Ordinal), "play");
-            }
-            catch (Exception ex) when (ex is FormatException or InvalidCastException or ArgumentException or OverflowException)
-            {
-                throw new ConfigException($"{where} play: {ex.Message}");
-            }
+            var play = PlayValues.Of(tables, build);
 
             var schema = new RoomSchema(
                 Fields(tables, build, GotoRoom, menu: true), Fields(tables, build, SessionSetting, menu: true),
@@ -190,48 +180,6 @@ internal sealed class RoomTables
         // UserSlot +6 is set for a seated player together with +4; both take the occupied value.
         roles["seated"] = RoomFieldValue.Occupied;
         return roles;
-    }
-
-    // Builds a record from the map through its primary constructor; an unknown key is an error.
-    private static object FromMap(Type type, Dictionary<string, object?> map, string path)
-    {
-        var constructor = type.GetConstructors(BindingFlags.Public | BindingFlags.Instance)
-            .OrderByDescending(candidate => candidate.GetParameters().Length).First();
-        var parameters = constructor.GetParameters();
-        var known = parameters.Select(parameter => Snake(parameter.Name!)).ToHashSet(StringComparer.Ordinal);
-        if (map.Keys.FirstOrDefault(key => !known.Contains(key)) is { } unknown)
-            throw new ArgumentException($"'{path}.{unknown}' is not a known value.");
-        var arguments = parameters.Select(parameter =>
-        {
-            var key = Snake(parameter.Name!);
-            var target = parameter.ParameterType;
-            if (!map.TryGetValue(key, out var value))
-            {
-                return parameter.HasDefaultValue
-                    ? parameter.DefaultValue
-                    : throw new ArgumentException($"'{path}.{key}' is missing.");
-            }
-            if (value is Dictionary<string, object?> nested)
-                return FromMap(target, nested, $"{path}.{key}");
-            var text = value as string ?? throw new ArgumentException($"'{path}.{key}' must be a value.");
-            if (target.IsEnum)
-            {
-                return Enum.TryParse(target, text, ignoreCase: false, out var parsed) && Enum.IsDefined(target, parsed!)
-                    ? parsed
-                    : throw new ArgumentException($"'{path}.{key}' is not one of {string.Join(", ", Enum.GetNames(target))}.");
-            }
-            if (target == typeof(bool))
-            {
-                return text switch
-                {
-                    "true" => true,
-                    "false" => false,
-                    _ => throw new ArgumentException($"'{path}.{key}' must be true or false."),
-                };
-            }
-            return Convert.ChangeType(text, target, CultureInfo.InvariantCulture);
-        }).ToArray();
-        return constructor.Invoke(arguments);
     }
 
     private static string Snake(string name) =>

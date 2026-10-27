@@ -1,0 +1,52 @@
+version: 1
+structs:
+  # kr-1256 sub_8FCE10 writes two words, a wide string and four words;
+  # kr-1256 sub_8FD0A0 consumes kr-1256 sub_8F5720's matching record.
+  TutorialSpawnMember:
+    - unknown_0: u32
+      offset: 0
+      only: [kr-1256]
+    - unknown_4: u32
+      offset: 4
+      only: [kr-1256]
+    - unknown_8: wstr
+      offset: 8
+      only: [kr-1256]
+    - unknown_32: 'u32[4]'
+      offset: 32
+      only: [kr-1256]
+  # kr-1256 sub_9027F0 writes two words, eight bytes and five words;
+  # kr-1256 sub_6EE170 reads those same 36 bytes before creating the preset actor.
+  TutorialSpawnActor:
+    - unknown_0: 'u32[9]'
+      offset: 0
+      only: [kr-1256]
+  # kr-1256 sub_7F3ED0 writes two words, one wide string and a word;
+  # kr-1256 sub_7DCF20 consumes them to apply the NPC's recorded movement.
+  TutorialActorReplay:
+    - unknown_0: u32
+      offset: 0
+      only: [kr-1256]
+    - unknown_4: u32
+      offset: 4
+      only: [kr-1256]
+    - unknown_8: wstr
+      offset: 8
+      only: [kr-1256]
+    - unknown_32: u32
+      offset: 32
+      only: [kr-1256]
+  # kr-1256 sub_7E06D0 writes two bytes and a word; kr-1256 sub_7ED5C0 reads that order.
+  TutorialWaveMobGroup:
+    - unknown_0: u8
+      only: [kr-1256]
+    - unknown_1: u8
+      only: [kr-1256]
+    - unknown_2: u32
+      only: [kr-1256]
+  # kr-1256 sub_8653E0 writes a word and bool32; kr-1256 sub_7ED5C0 applies the flag to NPC +1681.
+  TutorialSpawnPointReplay:
+    - unknown_0: u32
+      only: [kr-1256]
+    - unknown_4: bool
+      only: [kr-1256]

@@ -1,0 +1,3302 @@
+# Opcode assignments for the CN2014 0.2.50.004 client (ClientVersion_Major 705, cn-705 sub_7A3850).
+# C2S and S2C are separate numeric spaces, and so is the relay connection. The rows are cn-706's
+# reviewed table: every switch of this client (main dispatcher cn-705 sub_7C6C40, play dispatcher
+# cn-705 sub_4C2CD0, and every smaller switch) holds cn-706's case set whole, and the senders and
+# readers opened in this export are body-identical to cn-706's (packets/builds.yaml cn-705); the
+# one difference is cn-706's play-only relay case 32925, which has no case here. Rows whose research
+# catalog label agrees carry name_source label@cn-705 with this client's own sender addresses; the
+# rest carry cn-706's reviewed name and say so in their source. The catalog's labels on 728/733/924
+# are score-update call sites feeding the shared sender cn-705 sub_4E6BC0, which stamps 710 with
+# Packet_gcpGameUpdateScore, and this client's own Packet_gcpReqPingUser stamps 517, so the
+# catalog rows at those numbers are not promoted. The research catalog for this build is
+# profiles/cn-705/opcode-catalog.yaml.
+opcodes:
+  - value: 508
+    direction: c2s
+    connection: game
+    name: gcpRoomReqChangeMaster
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpRoomReqChangeMaster; cn-705 sub_795190 stamps 508 without a binned label
+  - value: 1
+    direction: c2s
+    name: gcpFirstConnect
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpFirstConnect; cn-705 sub_79AFC0/sub_79BE00/sub_7A3850 stamps 1 without a binned label
+  - value: 1
+    direction: s2c
+    name: gspDisconnect
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 1 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 2
+    direction: s2c
+    name: gspRepGamePatch
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gspRepGamePatch; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 3
+    direction: c2s
+    name: gcpReqLogin
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqLogin; cn-705 sub_795200/sub_795270 stamps 3 without a binned label
+  - value: 3
+    direction: s2c
+    name: gspRepLogin
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 3 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 17
+    direction: s2c
+    name: gspCenterList
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 17 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 105
+    direction: s2c
+    name: gspUserStat
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 105 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 105
+    direction: c2s
+    name: gcpReqGotoMenu
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqGotoMenu; cn-705 sub_594F00/sub_596DF0/sub_620250 stamps 105 without a binned label
+  - value: 106
+    direction: c2s
+    name: gcpReqGotoLobby
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqGotoLobby; cn-705 sub_576A90/sub_7926F0/sub_9461E0 stamps 106 without a binned label
+  - value: 108
+    direction: s2c
+    name: gspGotoMenu
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 108 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 109
+    direction: s2c
+    name: gspGotoLobby
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 109 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 110
+    direction: s2c
+    name: gspGotoRoom
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 110 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 201
+    direction: s2c
+    name: gspUpdateParty
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 201 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 9
+    direction: c2s
+    name: gcpReqIDPCRoomAuth
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_612C30/sub_798390 stamps 9 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 22
+    direction: c2s
+    name: gcpHsReportLog
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4C8300/sub_4E6D90/sub_4E6E00/sub_86C3D0 stamps 22 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 107
+    direction: c2s
+    name: gcpReqPlayTutorial
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqPlayTutorial; cn-705 sub_7CA6A0 stamps 107 without a binned label
+  - value: 401
+    direction: c2s
+    name: gcpReqListSession
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_60E460 stamps 401 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 402
+    direction: c2s
+    name: gcpReqCreateSession
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_43A190 stamps 402 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 406
+    direction: c2s
+    name: gcpReqCreateTutorialSession
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_61A650/sub_945E30 stamps 406 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 503
+    direction: c2s
+    name: gcpRoomReqEnterGame
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_622AB0/sub_6FB640 stamps 503 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 505
+    direction: c2s
+    name: gcpRoomReqReadyStatus
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpRoomReqReadyStatus; cn-705 sub_575ED0 stamps 505 without a binned label
+  - value: 521
+    direction: c2s
+    name: gcpSendSessionInit
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_65AF20 stamps 521 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 801
+    direction: c2s
+    name: gcpEnterShop
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_656280 stamps 801 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 800
+    direction: s2c
+    name: gspRepEnterShop
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 800 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 802
+    direction: c2s
+    name: gcpEnterInventory
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_656570/sub_6566A0 stamps 802 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 801
+    direction: s2c
+    name: gspInventoryUpdateAllInventorySlot
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gspInventoryUpdateAllInventorySlot; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 802
+    direction: s2c
+    name: gspInventoryUpdateInventorySlots
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gspInventoryUpdateInventorySlots; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 808
+    direction: c2s
+    name: gcpReqShopBuy
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_8C0930/sub_8C2410/sub_944590 stamps 808 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 813
+    direction: s2c
+    name: gspRepShopBuy
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 813 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 825
+    direction: c2s
+    name: gcpReqCheckCash
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_7CA8D0 stamps 825 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 826
+    direction: c2s
+    name: gcpReqCashInven
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_8D5DC0/sub_8D8C50 stamps 826 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 920
+    direction: c2s
+    name: gcpReqSingleStageInfo
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_661B00/sub_669F00 stamps 920 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 922
+    direction: s2c
+    name: gspResSingleStageInfo
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 922 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 2004
+    direction: c2s
+    name: gcpReqSeasonLadder
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_594DE0/sub_596D80 stamps 2004 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 1
+    direction: c2s
+    connection: relay
+    name: rcpReqJoinRelaySession
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for rcpReqJoinRelaySession; cn-705 sub_79AFC0/sub_79BE00/sub_7A3850 stamps 1 without a binned label
+  - value: 8
+    direction: c2s
+    connection: relay
+    name: rcpReqRegisterPeer
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for rcpReqRegisterPeer; cn-705 sub_797DD0 stamps 8 without a binned label
+  - value: 11
+    direction: c2s
+    connection: relay
+    name: rcpSetDamageAffectingAttribute
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for rcpSetDamageAffectingAttribute; cn-705 sub_4C81B0/sub_4E6CA0/sub_4E6D10 stamps 11 without a binned label
+  - value: 23
+    direction: c2s
+    connection: relay
+    name: rcpRepHackCheckPing
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for rcpRepHackCheckPing; cn-705 sub_4BE480/sub_4E67A0/sub_7CA470/sub_86DF80 stamps 23 without a binned label
+  - value: 20005
+    direction: c2s
+    connection: relay
+    name: rcpReqUdpBypassDisable
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for rcpReqUdpBypassDisable; cn-705 sub_79AD50 stamps 20005 without a binned label
+  - value: 6
+    direction: c2s
+    name: gcpRepPing
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_79C190/sub_7B0AE0 stamps 6 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 7
+    direction: c2s
+    name: gcpRepHackShieldCheck
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_7B0960 stamps 7 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 12
+    direction: c2s
+    name: gcpReqMoveChannel
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_79C120/sub_943E50 stamps 12 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 13
+    direction: c2s
+    name: gcpReqMoveChannelByType
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4E6F00/sub_4E6F70/sub_609E20 stamps 13 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 15
+    direction: c2s
+    name: gcpReqCheckCreateUserName
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4E71D0/sub_4E7240/sub_800200 stamps 15 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 16
+    direction: c2s
+    name: gcpReqCreateUserInfo
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4E6FF0/sub_4E7060/sub_8002F0 stamps 16 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 17
+    direction: c2s
+    name: gcpLoginAfterCreateUserInfo
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_7952F0/sub_795360/sub_8004E0 stamps 17 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 18
+    direction: c2s
+    name: gcpNotifyCloseProgram
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4BE110/sub_4E64C0/sub_867630 stamps 18 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 19
+    direction: c2s
+    name: gcpReportLastCrash
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4E6540/sub_7CA710 stamps 19 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 21
+    direction: c2s
+    name: gcpReportBadProgram
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4E66B0/sub_4E6720/sub_7B0B60 stamps 21 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 23
+    direction: c2s
+    name: gcpReqCenterUserCnt
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4BE480/sub_4E67A0/sub_7CA470/sub_86DF80 stamps 23 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 26
+    direction: c2s
+    name: gcpPortalMove
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_452260/sub_4E2210/sub_4E7440 stamps 26 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 101
+    direction: c2s
+    name: gcpRepUserPoll
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_83FFE0 stamps 101 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 108
+    direction: c2s
+    name: gcpReqInvite
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_8B09B0 stamps 108 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 109
+    direction: c2s
+    name: gcpReqMoveToInviter
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqMoveToInviter; cn-705 sub_669E90 stamps 109 without a binned label
+  - value: 110
+    direction: c2s
+    name: gcpReqMoveToFriend
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_8B0AC0 stamps 110 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 111
+    direction: c2s
+    name: gcpReqMoveToFriendAccept
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_7CA860 stamps 111 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 112
+    direction: c2s
+    name: gcpReqMatch
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_5638C0/sub_5639B0/sub_563AA0/sub_5952B0 stamps 112 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 114
+    direction: c2s
+    name: gcpReqOnlineMatchRankInfo
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_7EAF40 stamps 114 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 115
+    direction: c2s
+    name: gcpReqFighterInfo
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_654F90 stamps 115 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 116
+    direction: c2s
+    name: gcpReqAwardInfo
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_655030 stamps 116 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 118
+    direction: c2s
+    name: gcpReqGotoGuild
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_66CF50/sub_945B50/sub_945C90 stamps 118 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 119
+    direction: c2s
+    name: gcpReqRecommendSend
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_7CA780 stamps 119 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 302
+    direction: c2s
+    name: gcpReqKickFromParty
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_8B0BE0 stamps 302 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 303
+    direction: c2s
+    name: gcpReqChangePartyLeader
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_8B0CE0 stamps 303 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 305
+    direction: c2s
+    name: gcpReqPartyRecruiting
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_8807E0/sub_881690/sub_945DA0 stamps 305 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 306
+    direction: c2s
+    name: gcpReqPartyQuickStart
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_61A6C0/sub_61F930/sub_6201C0 stamps 306 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 504
+    direction: c2s
+    name: gcpRoomReqEnterRoundGame
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-705 sub_576DA0 has the body of cn-706 sub_577550 and stamps 504; name and value carried from cn-706's reviewed row
+  - value: 509
+    direction: c2s
+    name: gcpRoomReqOpenCloseSlot
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpRoomReqOpenCloseSlot; cn-705 sub_579030 stamps 509 without a binned label
+  - value: 513
+    direction: c2s
+    name: gcpRoomChangeGameSetting
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpRoomChangeGameSetting; cn-705 sub_576CC0/sub_632710 stamps 513 without a binned label
+  - value: 515
+    direction: c2s
+    name: gcpRoomChangeTeam
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-705 sub_576B00 has the body of cn-706 sub_5772B0 and stamps 515; name and value carried from cn-706's reviewed row
+  - value: 517
+    direction: c2s
+    name: gcpReqPingUser
+    name_source: label@cn-705
+    evidence: verified
+    source: cn-705 sub_622320 stamps 517 with Packet_gcpReqPingUser; the value and name agree with cn-706's reviewed row
+  - value: 518
+    direction: c2s
+    name: gcpRepPingUser
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_795540 stamps 518 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 519
+    direction: c2s
+    name: gcpReqSelectAward
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_985A80 stamps 519 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 607
+    direction: c2s
+    name: gcpReportTableSetHolePunchingEnd
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_7988E0 stamps 607 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 701
+    direction: c2s
+    name: gcpGameReportMapLoadingComplete
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpGameReportMapLoadingComplete; cn-705 sub_4C5B30 stamps 701 without a binned label
+  - value: 705
+    direction: c2s
+    name: gcpRequestRespawnIdx
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpRequestRespawnIdx; cn-705 sub_4C95B0 stamps 705 without a binned label
+  - value: 707
+    direction: c2s
+    name: gcpEatItem
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpEatItem; cn-705 sub_4C5230 stamps 707 without a binned label
+  - value: 708
+    direction: c2s
+    name: gcpUseItem
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpUseItem; cn-705 sub_4C58F0 stamps 708 without a binned label
+  - value: 709
+    direction: c2s
+    name: gcpReqAddObject
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqAddObject; cn-705 sub_4C6500 stamps 709 without a binned label
+  - value: 711
+    direction: c2s
+    name: gcpGameUpdateDamagePoint
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_7066F0 stamps 711 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 714
+    direction: c2s
+    name: gcpGameReqUseRespawnItem
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4C5D50 stamps 714 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 715
+    direction: c2s
+    name: gcpGameReqExtendRespawn
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpGameReqExtendRespawn; cn-705 sub_4C5DE0 stamps 715 without a binned label
+  - value: 723
+    direction: c2s
+    name: gcpPangZKInZHE
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_99F7C0 stamps 723 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 724
+    direction: c2s
+    name: gcpReqEndStage
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqEndStage; cn-705 sub_4CB490 stamps 724 without a binned label
+  - value: 725
+    direction: c2s
+    name: gcpReqEndStageRoundOverReady
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqEndStageRoundOverReady; cn-705 sub_4CB410 stamps 725 without a binned label
+  - value: 727
+    direction: c2s
+    name: gcpReportHackDetectLucciCount
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReportHackDetectLucciCount; cn-705 sub_4DD2E0 stamps 727 without a binned label
+  - value: 728
+    direction: c2s
+    name: gcpReqCreateItem
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqCreateItem; cn-705 sub_4CCB80/sub_4CCC60/sub_52EFD0/sub_5BDE00 stamps 728 without a binned label
+  - value: 729
+    direction: c2s
+    name: gcpReqCreateWeaponObject
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4CCD30 stamps 729 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 730
+    direction: c2s
+    name: gcpPickUpWeapon
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpPickUpWeapon; cn-705 sub_4CCE10 stamps 730 without a binned label
+  - value: 731
+    direction: c2s
+    name: gcpEatStar
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4C5590 stamps 731 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 732
+    direction: c2s
+    name: gcpReqCreateStar
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqCreateStar; cn-705 sub_4CCEA0 stamps 732 without a binned label
+  - value: 733
+    direction: c2s
+    name: gcpEatEventBox
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpEatEventBox; cn-705 sub_4C5620 stamps 733 without a binned label
+  - value: 734
+    direction: c2s
+    name: gcpReqCreateEventBox
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqCreateEventBox; cn-705 sub_4CCF70 stamps 734 without a binned label
+  - value: 735
+    direction: c2s
+    name: gcpEatLucci
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpEatLucci; cn-705 sub_4C56B0 stamps 735 without a binned label
+  - value: 736
+    direction: c2s
+    name: gcpReqCreateLucci
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4CD100 stamps 736 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 737
+    direction: c2s
+    name: gcpEatChocolate
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpEatChocolate; cn-705 sub_4C57D0 stamps 737 without a binned label
+  - value: 738
+    direction: c2s
+    name: gcpReqCreateChocolate
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqCreateChocolate; cn-705 sub_4CD360 stamps 738 without a binned label
+  - value: 739
+    direction: c2s
+    name: gcpEatSpawner
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4C5860 stamps 739 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 740
+    direction: c2s
+    name: gcpReqCreateSpawner
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqCreateSpawner; cn-705 sub_4CD040 stamps 740 without a binned label
+  - value: 741
+    direction: c2s
+    name: gcpEatHeart
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4C5740 stamps 741 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 742
+    direction: c2s
+    name: gcpReqCreateHeart
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4CD290 stamps 742 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 744
+    direction: c2s
+    name: gcpSwitchItemSlot
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpSwitchItemSlot; cn-705 sub_4DDC60 stamps 744 without a binned label
+  - value: 745
+    direction: c2s
+    name: gcpBFRunnerOver
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpBFRunnerOver; cn-705 sub_4C5360 stamps 745 without a binned label
+  - value: 746
+    direction: c2s
+    name: gcpBFRunnerCheckPoint
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpBFRunnerCheckPoint; cn-705 sub_4C53F0 stamps 746 without a binned label
+  - value: 747
+    direction: c2s
+    name: gcpBFRunnerCheckPointValue
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpBFRunnerCheckPointValue; cn-705 sub_4C5480 stamps 747 without a binned label
+  - value: 748
+    direction: c2s
+    name: gcpBFRunnerEatItem
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpBFRunnerEatItem; cn-705 sub_4C52C0 stamps 748 without a binned label
+  - value: 803
+    direction: c2s
+    name: gcpReqInventoryEquip
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_575B30/sub_646700/sub_8FE630 stamps 803 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 805
+    direction: c2s
+    name: gcpReqInventoryUseItem
+    name_source: label@cn-705
+    evidence: verified
+    source: cn-705 sub_8FE7F0 stamps 805 with Packet_gcpReqInventoryUseItem; the value and name agree with cn-706's reviewed row
+  - value: 806
+    direction: c2s
+    name: gcpReqInventoryDeleteItem
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_9441F0 stamps 806 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 810
+    direction: c2s
+    name: gcpReqPresentNewReceive
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_8E8B00/sub_8E9080 stamps 810 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 813
+    direction: c2s
+    name: gcpReqPresentReceiveSubList
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_8E62A0/sub_8E7A40/sub_8E90F0 stamps 813 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 816
+    direction: c2s
+    name: gcpReqPresentSend
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_8E2CC0 stamps 816 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 819
+    direction: c2s
+    name: gcpReqPresentSendThankMsg
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_8EA990 stamps 819 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 824
+    direction: c2s
+    name: gcpReqRealCouponUse
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_8D0980 stamps 824 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 828
+    direction: c2s
+    name: gcpReqCloseGiftBox
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_669BA0 stamps 828 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 829
+    direction: c2s
+    name: gcpStopShowTerms
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_8F4AA0 stamps 829 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 830
+    direction: c2s
+    name: gcpReqInventoryChangeWeaponPresetIdx
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_900D70 stamps 830 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 900
+    direction: c2s
+    name: gcpReqGuildLineBoard
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_87C960/sub_87CA90/sub_945EC0 stamps 900 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 901
+    direction: c2s
+    name: gcpReqGuildLineBoardWrite
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_66C790/sub_945F70 stamps 901 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 902
+    direction: c2s
+    name: gcpReqGuildLineBoardDelete
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_66C870/sub_946080 stamps 902 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 903
+    direction: c2s
+    name: gcpReqStartNewWave
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_98C1C0 stamps 903 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 904
+    direction: c2s
+    name: gcpReqEndWave
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_98C250 stamps 904 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 905
+    direction: c2s
+    name: gcpReqEndAllWave
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_98C2E0 stamps 905 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 906
+    direction: c2s
+    name: gcpReqGameOver
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_98C370 stamps 906 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 907
+    direction: c2s
+    name: gcpReqDeleteDeadMobs
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_98C140 stamps 907 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 908
+    direction: c2s
+    name: gcpReqWaveAllSpawnMobs
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_98C400 stamps 908 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 909
+    direction: c2s
+    name: gcpCreateUnit
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpCreateUnit; cn-705 sub_4E73D0 stamps 909 without a binned label
+  - value: 911
+    direction: c2s
+    name: gcpReqManufactureRecipeInfo
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_661A00 stamps 911 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 912
+    direction: c2s
+    name: gcpReqManufactureList
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_7B1CB0/sub_959860 stamps 912 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 913
+    direction: c2s
+    name: gcpReqManufactureStart
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_95CCB0 stamps 913 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 914
+    direction: c2s
+    name: gcpReqManufactureGetItem
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_95C4A0 stamps 914 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 915
+    direction: c2s
+    name: gcpReqManufactureTimeOut
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_958D60 stamps 915 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 916
+    direction: c2s
+    name: gcpReqManufactureImmediate
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_95C540 stamps 916 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 917
+    direction: c2s
+    name: gcpReqTreasureChestInfo
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_669B30 stamps 917 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 918
+    direction: c2s
+    name: gcpReqOpenTreasureChest
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_720D80/sub_727900/sub_7297E0 stamps 918 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 919
+    direction: c2s
+    name: gcpReqGuildInfo
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_888700 stamps 919 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 921
+    direction: c2s
+    name: gcpPveUseCountItem
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpPveUseCountItem; cn-705 sub_4C5970 stamps 921 without a binned label
+  - value: 923
+    direction: c2s
+    name: gcpPvePangUnit
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpPvePangUnit; cn-705 sub_4C5A00 stamps 923 without a binned label
+  - value: 924
+    direction: c2s
+    name: gcpPveCombo
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpPveCombo; cn-705 sub_4E10D0 stamps 924 without a binned label
+  - value: 925
+    direction: c2s
+    name: gcpPveUseRevival
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_5BBDE0 stamps 925 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 926
+    direction: c2s
+    name: gcpCompensationItemNoti
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_7169E0 stamps 926 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 927
+    direction: c2s
+    name: gcpMissionProcess
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpMissionProcess; cn-705 sub_4C5A90 stamps 927 without a binned label
+  - value: 929
+    direction: c2s
+    name: gcpMakeUserTitle
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_80FE80 stamps 929 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 930
+    direction: c2s
+    name: gcpSetUserTitle
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_80FDE0 stamps 930 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 935
+    direction: c2s
+    name: gcpReqCoupleInviteExpire
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_97EF10 stamps 935 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 936
+    direction: c2s
+    name: gcpReqCoupleInviteAnswer
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_980F50 stamps 936 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 937
+    direction: c2s
+    name: gcpReqCoupleBreakUp
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_980FC0 stamps 937 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 939
+    direction: c2s
+    name: gcpResClientDamageData
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4E72C0/sub_7C0350 stamps 939 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 941
+    direction: c2s
+    name: gcpSynthesisProcess
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_96DE20 stamps 941 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 943
+    direction: c2s
+    name: gcpReqLotteryRadomMissionCompensation
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_6551A0 stamps 943 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 944
+    direction: c2s
+    name: gcpReqRandomMissionReward
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_655110 stamps 944 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 950
+    direction: c2s
+    name: gcpReqRecheckMap
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_77C1A0 stamps 950 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 952
+    direction: c2s
+    name: gcpReqOXQuizAnswer
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4A3CA0 stamps 952 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 953
+    direction: c2s
+    name: gcpReqBlueMarbleDice
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqBlueMarbleDice; cn-705 sub_45D4A0 stamps 953 without a binned label
+  - value: 954
+    direction: c2s
+    name: gcpReqChangeCouplering
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_485900 stamps 954 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 956
+    direction: c2s
+    name: gcpReqChangeClanMarkNoty
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqChangeClanMarkNoty; cn-705 sub_458CC0 stamps 956 without a binned label
+  - value: 2001
+    direction: c2s
+    name: gcpReqCompareSecondPassword
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_66A030 stamps 2001 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 2007
+    direction: c2s
+    name: gcpReqNotifyChangeLevelIcon
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_66A0A0 stamps 2007 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 2010
+    direction: c2s
+    name: gcpBombMissionOver
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4E2E40 stamps 2010 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 2011
+    direction: c2s
+    name: gcpBombState
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpBombState; cn-705 sub_4E2900 stamps 2011 without a binned label
+  - value: 2013
+    direction: c2s
+    name: gcpRoomReqIntrudeGame
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-705 sub_575E40 has the body of cn-706 sub_5765F0 and stamps 2013; name and value carried from cn-706's reviewed row
+  - value: 2014
+    direction: c2s
+    name: gcpUserState
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpUserState; cn-705 sub_4E3180 stamps 2014 without a binned label
+  - value: 2016
+    direction: c2s
+    name: gcpGoMapItemSync
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_78E560 stamps 2016 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 2017
+    direction: c2s
+    name: gcpDropCaptain
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpDropCaptain; cn-705 sub_4311C0 stamps 2017 without a binned label
+  - value: 2018
+    direction: c2s
+    name: gcpReqClanInfo
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqClanInfo; cn-705 sub_4493D0 stamps 2018 without a binned label
+  - value: 2019
+    direction: c2s
+    name: gcpReportData
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReportData; cn-705 sub_4C50D0 stamps 2019 without a binned label
+  - value: 2020
+    direction: c2s
+    name: gcpReqCreateHordeAward
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4CD1D0 stamps 2020 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 2021
+    direction: c2s
+    name: gcpReqGotoClan
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_431E00 stamps 2021 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 5
+    direction: s2c
+    name: gspReqHackShieldCheck
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 5 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 9
+    direction: s2c
+    name: gspRepMoveChannel
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 9 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 11
+    direction: s2c
+    name: gspRepMoveInto
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 11 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 13
+    direction: s2c
+    name: gspRepCheckCreateUserName
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 13 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 14
+    direction: s2c
+    name: gspRepCreateUserInfo
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 14 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 15
+    direction: s2c
+    name: gspQueryBadProgram
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 15 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 18
+    direction: s2c
+    name: gspRepUniquenessCheck
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 18 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 20
+    direction: s2c
+    name: gspDisconnectFromRestriction
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 20 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 21
+    direction: s2c
+    name: gspDisconnectBlockIP
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 21 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 22
+    direction: s2c
+    name: gspClanPassport
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 22 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 24
+    direction: s2c
+    name: gspClanPointAdd
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 24 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 104
+    direction: s2c
+    name: gspReqUserPoll
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 104 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 106
+    direction: s2c
+    name: gspOveruseAlarmMsg
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 106 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 107
+    direction: s2c
+    name: gspReceiveServerNoticeMsg
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 107 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 111
+    direction: s2c
+    name: gspRepInvite
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 111 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 112
+    direction: s2c
+    name: gspNotifyInvite
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 112 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 113
+    direction: s2c
+    name: gspRepMoveToInviter
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 113 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 114
+    direction: s2c
+    name: gspRepMoveToFriend
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 114 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 118
+    direction: s2c
+    name: gspEventNotice
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gspEventNotice; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 120
+    direction: s2c
+    name: gspEvent2GuildRanking
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 120 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 124
+    direction: s2c
+    name: gspRepFighterInfo
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 124 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 125
+    direction: s2c
+    name: gspRepAwardInfo
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 125 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 126
+    direction: s2c
+    name: gspRepEvent
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 126 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 128
+    direction: s2c
+    name: gspNotifyPromotion
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 128 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 130
+    direction: s2c
+    name: gspRepRecommendResult
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 130 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 131
+    direction: s2c
+    name: gspReqClanMarkInfo
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 131 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 202
+    direction: s2c
+    name: gspRepJoinParty
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 202 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 203
+    direction: s2c
+    name: gspUpdatePartyLeader
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 203 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 204
+    direction: s2c
+    name: gspNotifyPartyLeaveSuccess
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 204 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 205
+    direction: s2c
+    name: gspNotifyMemberLeave
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 205 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 206
+    direction: s2c
+    name: gspNotifyNewMemberJoin
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 206 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 302
+    direction: s2c
+    name: gspRepKickFromParty
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 302 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 303
+    direction: s2c
+    name: gspRepChangePartyLeader
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 303 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 304
+    direction: s2c
+    name: gspNotifyKickFromParty
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 304 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 305
+    direction: s2c
+    name: gspReceivePartyChatMsg
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 305 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 307
+    direction: s2c
+    name: gspNotifyKickMember
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 307 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 603
+    direction: s2c
+    name: gspConnectToSuperPeer
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 603 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 803
+    direction: s2c
+    name: gspInventoryUpdateInventorySlot
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 803 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 805
+    direction: s2c
+    name: gspInventoryViewUpdateView
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 805 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 806
+    direction: s2c
+    name: gspCheckExpiredTimeResult
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 806 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 807
+    direction: s2c
+    name: gspCashInvenUpdateAllInventorySlot
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 807 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 808
+    direction: s2c
+    name: gspRepInventoryEquip
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 808 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 809
+    direction: s2c
+    name: gspRepInventoryUnequip
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 809 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 810
+    direction: s2c
+    name: gspRepInventoryUseItem
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 810 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 811
+    direction: s2c
+    name: gspRepInventoryDeleteItem
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 811 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 812
+    direction: s2c
+    name: gspRepInventoryThrowItem
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 812 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 814
+    direction: s2c
+    name: gspRepShopItemCardInfo
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 814 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 815
+    direction: s2c
+    name: gspRepPresentNewReceive
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 815 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 816
+    direction: s2c
+    name: gspRepPresentReceiveList
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 816 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 817
+    direction: s2c
+    name: gspRepPresentSendList
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 817 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 818
+    direction: s2c
+    name: gspRepPresentReceiveSubList
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 818 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 819
+    direction: s2c
+    name: gspRepPresentSendSubList
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 819 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 820
+    direction: s2c
+    name: gspRepRefund
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 820 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 821
+    direction: s2c
+    name: gspRepPresentSend
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 821 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 822
+    direction: s2c
+    name: gspRepPresentReceive
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 822 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 823
+    direction: s2c
+    name: gspRepPresentThrow
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 823 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 824
+    direction: s2c
+    name: gspRepPresentSendThankMsg
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 824 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 825
+    direction: s2c
+    name: gspRepPresentViewThankMsg
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 825 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 826
+    direction: s2c
+    name: gspRepPresentConfirm
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 826 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 827
+    direction: s2c
+    name: gspRepPresentDeleteSend
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 827 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 828
+    direction: s2c
+    name: gspRepPresentDeleteReceive
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 828 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 829
+    direction: s2c
+    name: gspRepRealCouponUse
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 829 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 831
+    direction: s2c
+    name: gspRepPickup
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 831 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 832
+    direction: s2c
+    name: gspReqInventoryChangeWeaponPresetIdx
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 832 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 833
+    direction: s2c
+    name: gspReqWeaponPreSetUpdate
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 833 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 901
+    direction: s2c
+    name: gspRepGuildLineBoardWrite
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 901 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 902
+    direction: s2c
+    name: gspRepGuildLineBoardDelete
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 902 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 910
+    direction: s2c
+    name: gspMergeCountOrDayItemList
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 910 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 913
+    direction: s2c
+    name: gspManufactureRecipeInfo
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 913 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 914
+    direction: s2c
+    name: gspManufactureList
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 914 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 915
+    direction: s2c
+    name: gspManufactureStart
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 915 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 916
+    direction: s2c
+    name: gspManufactureGetItem
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 916 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 917
+    direction: s2c
+    name: gspManufactureTimeOut
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 917 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 918
+    direction: s2c
+    name: gspResTreasureChestInfo
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 918 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 919
+    direction: s2c
+    name: gspResOpenTreasureChest
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 919 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 920
+    direction: s2c
+    name: gspCustomizeString
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 920 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 921
+    direction: s2c
+    name: gspResGuildInfo
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 921 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 923
+    direction: s2c
+    name: gspResSingleStageState
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 923 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 933
+    direction: s2c
+    name: gspResMakeUserTitle
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 933 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 934
+    direction: s2c
+    name: gspResSetUserTitle
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 934 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 935
+    direction: s2c
+    name: gspTitleSyncInfo
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 935 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 936
+    direction: s2c
+    name: gspProvideMedal
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 936 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 937
+    direction: s2c
+    name: gspCharRankInfo
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 937 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 938
+    direction: s2c
+    name: gspResCoupleInvite
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 938 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 939
+    direction: s2c
+    name: gspResCoupleInviteResult
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 939 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 940
+    direction: s2c
+    name: gspResCoupleInviteAnswer
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 940 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 941
+    direction: s2c
+    name: gspResCoupleBreakUp
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 941 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 942
+    direction: s2c
+    name: gspResCoupleNotifyPartner
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 942 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 947
+    direction: s2c
+    name: gspUpdateCoupleSlot
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 947 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 951
+    direction: s2c
+    name: gspSynthesisProcess
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 951 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 952
+    direction: s2c
+    name: gspResRandomMissionInfo
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 952 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 955
+    direction: s2c
+    name: gspEvolveResult
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 955 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 958
+    direction: s2c
+    name: gspPortalMove
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 958 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 959
+    direction: s2c
+    name: gspNotifyMsg
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 959 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 960
+    direction: s2c
+    name: gspContentConfig
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 960 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 961
+    direction: s2c
+    name: gspRepUpdateELoRating
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 961 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 962
+    direction: s2c
+    name: gspOXContollerData
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 962 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 963
+    direction: s2c
+    name: gspResBlueMarbleDice
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 963 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 966
+    direction: s2c
+    name: gspNotifySecondPassword
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 966 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 968
+    direction: s2c
+    name: gspSeasonLadderLevelUpNotice
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 968 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 969
+    direction: s2c
+    name: gspRepSeasonLadderGetRankList
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 969 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 970
+    direction: s2c
+    name: gspRepNotifyChangeLevelIcon
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 970 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 977
+    direction: s2c
+    name: gspReqGameReady
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 977 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 978
+    direction: s2c
+    name: gspResBaseballBatInfo
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 978 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 979
+    direction: s2c
+    name: gspResBaseballHitResult
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 979 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 982
+    direction: s2c
+    name: gspResChangeCouplering
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 982 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 983
+    direction: s2c
+    name: gspUpdateClanInfoToClanServer
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 983 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 984
+    direction: s2c
+    name: gspResChangeClanMarkNoty
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 dispatcher sub_7C6C40 case 984 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+  - value: 117
+    direction: c2s
+    name: gcpReqEvent
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqEvent; cn-705 sub_4A0AE0/sub_615D90/sub_651210/sub_71F900/sub_71FBD0/sub_7336F0 stamps 117 without a binned label
+  - value: 2022
+    direction: c2s
+    name: gcpGameUpdateScoreOptimze
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpGameUpdateScoreOptimze; cn-705 sub_4C1D00/sub_4D7B70/sub_4E6C30 stamps 2022 without a binned label
+  - value: 704
+    direction: c2s
+    name: gcpRespawn
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gcpRespawn; cn-705 sub_4C9450 stamps 704 without a binned label
+  - value: 713
+    direction: c2s
+    name: gcpGameReqRespawn
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gcpGameReqRespawn; cn-705 sub_4E6A90 stamps 713 without a binned label
+  - value: 940
+    direction: c2s
+    name: gcpReqEventProcess
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqEventProcess; cn-705 sub_419040/sub_43ECA0/sub_562690/sub_7336F0/sub_7359A0/sub_8158E0 stamps 940 without a binned label
+  - value: 2006
+    direction: c2s
+    name: gcpReqSeasonLadderGetRankListNo
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqSeasonLadderGetRankListNo; cn-705 sub_4AD070 stamps 2006 without a binned label
+  - value: 101
+    direction: s2c
+    name: gspRepListSession
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspRepListSession; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 103
+    direction: s2c
+    name: gspRepJoinSession
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspRepJoinSession; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 117
+    direction: s2c
+    name: gspNotifyMatch
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gspNotifyMatch; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 501
+    direction: s2c
+    name: gspRoomSetSession
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspRoomSetSession; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 502
+    direction: s2c
+    name: gspRoomSetMasterSlotIdx
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspRoomSetMasterSlotIdx; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 503
+    direction: s2c
+    name: gspRoomSetSlot
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspRoomSetSlot; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 505
+    direction: s2c
+    name: gspRoomChangeGameSetting
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspRoomChangeGameSetting; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 510
+    direction: s2c
+    name: gspRoomEnterGame
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspRoomEnterGame; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 511
+    direction: s2c
+    name: gspRoomLeaveSlot
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspRoomLeaveSlot; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 521
+    direction: s2c
+    name: gspRepAutoStart
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspRepAutoStart; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 701
+    direction: s2c
+    name: gspGameMapLoadingComplete
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspGameMapLoadingComplete; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 702
+    direction: s2c
+    name: gspGameEverybodyLoadingComplete
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspGameEverybodyLoadingComplete; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 703
+    direction: s2c
+    name: gspGameCountDown
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspGameCountDown; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 704
+    direction: s2c
+    name: gspGameStartGame
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspGameStartGame; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 705
+    direction: s2c
+    name: gspGameEndGame
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspGameEndGame; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 707
+    direction: s2c
+    name: gspRespawn
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspRespawn; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 708
+    direction: s2c
+    name: gspRequestRespawnIdx
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspRequestRespawnIdx; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 14
+    direction: c2s
+    name: gcpReqMoveInto
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqMoveInto; cn-705 sub_4E70E0/sub_4E7150 stamps 14 without a binned label
+  - value: 113
+    direction: c2s
+    name: gcpReqOnlineMatchTeamInfoLoad
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqOnlineMatchTeamInfoLoad; cn-705 sub_60FD00 stamps 113 without a binned label
+  - value: 202
+    direction: c2s
+    name: gcpReqLeaveParty
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqLeaveParty; cn-705 sub_596E60 stamps 202 without a binned label
+  - value: 404
+    direction: c2s
+    name: gcpReqLeaveSession
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqLeaveSession; cn-705 sub_639A20 stamps 404 without a binned label
+  - value: 502
+    direction: c2s
+    name: gcpRoomSendChatModuleMsg
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpRoomSendChatModuleMsg; cn-705 sub_7CA5C0 stamps 502 without a binned label
+  - value: 510
+    direction: c2s
+    name: gcpReqKickFromSession
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqKickFromSession; cn-705 sub_576BE0 stamps 510 without a binned label
+  - value: 514
+    direction: c2s
+    name: gcpRoomChangeRoundSetting
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-705 sub_576B70 has the body of cn-706 sub_577320 and stamps 514; name and value carried from cn-706's reviewed row
+  - value: 520
+    direction: c2s
+    name: gcpRoomSendAmpMsg
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_7CA550 stamps 520 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 603
+    direction: c2s
+    name: gcpReportHolePunchingEnd
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReportHolePunchingEnd; cn-705 sub_798390 stamps 603 without a binned label
+  - value: 710
+    direction: c2s
+    name: gcpGameUpdateScore
+    name_source: label@cn-705
+    evidence: verified
+    source: cn-705 sub_4E6BC0 stamps 710 with Packet_gcpGameUpdateScore (kind word prepared by its callers, e.g. cn-705 sub_4CCB80); the value and name agree with cn-706's reviewed row
+  - value: 807
+    direction: c2s
+    name: gcpReqInventoryThrowItem
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqInventoryThrowItem; cn-705 sub_90BBA0 stamps 807 without a binned label
+  - value: 809
+    direction: c2s
+    name: gcpReqShopItemCardInfo
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqShopItemCardInfo; cn-705 sub_90BB30 stamps 809 without a binned label
+  - value: 814
+    direction: c2s
+    name: gcpReqPresentSendSubList
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqPresentSendSubList; cn-705 sub_8E9160 stamps 814 without a binned label
+  - value: 815
+    direction: c2s
+    name: gcpReqRefund
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqRefund; cn-705 sub_90BAC0 stamps 815 without a binned label
+  - value: 817
+    direction: c2s
+    name: gcpReqPresentReceive
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqPresentReceive; cn-705 sub_8CDC90 stamps 817 without a binned label
+  - value: 818
+    direction: c2s
+    name: gcpReqPresentThrow
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqPresentThrow; cn-705 sub_8CDD00 stamps 818 without a binned label
+  - value: 820
+    direction: c2s
+    name: gcpReqPresentViewThankMsg
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqPresentViewThankMsg; cn-705 sub_8E9010 stamps 820 without a binned label
+  - value: 822
+    direction: c2s
+    name: gcpReqPresentDeleteSend
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqPresentDeleteSend; cn-705 sub_8E8FA0 stamps 822 without a binned label
+  - value: 827
+    direction: c2s
+    name: gcpReqPickup
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqPickup; cn-705 sub_90BA50 stamps 827 without a binned label
+  - value: 928
+    direction: c2s
+    name: gcpUserPlayerEnv
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpUserPlayerEnv; cn-705 sub_7953E0 stamps 928 without a binned label
+  - value: 931
+    direction: c2s
+    name: gcpCheatAddMedal
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpCheatAddMedal; cn-705 sub_735850 stamps 931 without a binned label
+  - value: 932
+    direction: c2s
+    name: gcpCheatAddTitle
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpCheatAddTitle; cn-705 sub_735930 stamps 932 without a binned label
+  - value: 942
+    direction: c2s
+    name: gcpReqUpGradeOlympicMedal
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqUpGradeOlympicMedal; cn-705 sub_83E250 stamps 942 without a binned label
+  - value: 945
+    direction: c2s
+    name: gcpReqIgnoreMissionSet
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqIgnoreMissionSet; cn-705 sub_7358C0 stamps 945 without a binned label
+  - value: 951
+    direction: c2s
+    name: gcpReqAddGiftTest
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqAddGiftTest; cn-705 sub_735A10 stamps 951 without a binned label
+  - value: 958
+    direction: c2s
+    name: gcpReqTESTAddStockAndStockSet
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqTESTAddStockAndStockSet; cn-705 sub_735A80 stamps 958 without a binned label
+  - value: 2002
+    direction: c2s
+    name: gcpReqSetSecondPassword
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqSetSecondPassword; cn-705 sub_9CBFC0 stamps 2002 without a binned label
+  - value: 2003
+    direction: c2s
+    name: gcpReqDeleteSecondPassword
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqDeleteSecondPassword; cn-705 sub_9CC030 stamps 2003 without a binned label
+  - value: 2008
+    direction: c2s
+    name: gcpRoomChangeTeamObserver
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpRoomChangeTeamObserver; cn-705 sub_576C50 stamps 2008 without a binned label
+  - value: 2015
+    direction: c2s
+    name: gcpReqGameReady
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-705 sub_576D30 has the body of cn-706 sub_5774E0 and stamps 2015; name and value carried from cn-706's reviewed row
+  - value: 403
+    direction: c2s
+    name: gcpReqJoinSession
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqJoinSession; cn-705 sub_60FD70 stamps 403 without a binned label
+  - value: 601
+    direction: c2s
+    name: gcpReportRelayConnected
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReportRelayConnected; cn-705 sub_79C040 stamps 601 without a binned label
+  - value: 602
+    direction: c2s
+    name: gcpReportSuperPeerConnected
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReportSuperPeerConnected; cn-705 sub_79C0B0 stamps 602 without a binned label
+  - value: 32772
+    direction: c2s
+    connection: both
+    name: gppSplashDamager
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4C8840 stamps 32772 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32773
+    direction: c2s
+    connection: both
+    name: gppNearDamager
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4C89D0 stamps 32773 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32774
+    direction: c2s
+    connection: both
+    name: gppDeleteObject
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4C60A0 stamps 32774 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32777
+    direction: c2s
+    connection: both
+    name: gppDamageObject
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4C5FA0 stamps 32777 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32779
+    direction: c2s
+    connection: both
+    name: gppDash
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4C6B00 stamps 32779 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32780
+    direction: c2s
+    connection: both
+    name: gppRoll
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4C6C60 stamps 32780 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32782
+    direction: c2s
+    connection: both
+    name: gppAim
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppAim; cn-705 sub_4C6F20 stamps 32782 without a binned label
+  - value: 32783
+    direction: c2s
+    connection: both
+    name: gppSetTargettingObj
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4C7150 stamps 32783 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32784
+    direction: c2s
+    connection: both
+    name: gppBubbleJump
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4C7320 stamps 32784 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32786
+    direction: c2s
+    connection: both
+    name: gppWallAction
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4C7570 stamps 32786 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32787
+    direction: c2s
+    connection: both
+    name: gppKnocked
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4C9650 stamps 32787 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32794
+    direction: c2s
+    connection: both
+    name: gppTryKicked
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4C9D10 stamps 32794 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32795
+    direction: c2s
+    connection: both
+    name: gppKicked
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4C9B30 stamps 32795 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32798
+    direction: c2s
+    connection: both
+    name: gppMeleeReady
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4CA270 stamps 32798 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32800
+    direction: c2s
+    connection: both
+    name: gppChangeState
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4CA350 stamps 32800 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32801
+    direction: c2s
+    connection: both
+    name: gppLockInto
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4CA4B0 stamps 32801 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32807
+    direction: c2s
+    connection: both
+    name: gppRescue
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4C9060 stamps 32807 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32809
+    direction: c2s
+    connection: both
+    name: gppClimbWall
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4CA700 stamps 32809 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32811
+    direction: c2s
+    connection: both
+    name: gppReload
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4CA590 stamps 32811 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32815
+    direction: c2s
+    connection: both
+    name: gppHumiliationStart
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4CA0B0 stamps 32815 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32816
+    direction: c2s
+    connection: both
+    name: gppHumiliationEnd
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4CA190 stamps 32816 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32818
+    direction: c2s
+    connection: both
+    name: gppStickGrenadeTo
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4CD620 stamps 32818 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32824
+    direction: c2s
+    connection: both
+    name: gppItemUseResult
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4CAAC0 stamps 32824 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32829
+    direction: c2s
+    connection: both
+    name: gppHitByItem
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4CAE90 stamps 32829 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32831
+    direction: c2s
+    connection: both
+    name: gppEndFreezeCannon
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4CB210 stamps 32831 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32832
+    direction: c2s
+    connection: both
+    name: gppCreateMapItem
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4CD430 stamps 32832 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32835
+    direction: c2s
+    connection: both
+    name: gppGotKicked
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppGotKicked; cn-705 sub_4C8BF0 stamps 32835 without a binned label
+  - value: 32841
+    direction: c2s
+    connection: both
+    name: gppIniPacket
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_670C30 stamps 32841 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32842
+    direction: c2s
+    connection: both
+    name: gppCreateMob
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_671700 stamps 32842 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32843
+    direction: c2s
+    connection: both
+    name: gppMobFireBullet
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_671940 stamps 32843 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32844
+    direction: c2s
+    connection: both
+    name: gppMobFireMelee
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_671C40 stamps 32844 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32845
+    direction: c2s
+    connection: both
+    name: gppMobKnocked
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_671DA0 stamps 32845 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32846
+    direction: c2s
+    connection: both
+    name: gppMobDie
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_671F30 stamps 32846 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32847
+    direction: c2s
+    connection: both
+    name: gppMobPush
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_672020 stamps 32847 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32848
+    direction: c2s
+    connection: both
+    name: gppMobTryKicked
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_672420 stamps 32848 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32849
+    direction: c2s
+    connection: both
+    name: gppMobKicked
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_672580 stamps 32849 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32852
+    direction: c2s
+    connection: both
+    name: gppMobTryRescued
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_6728B0 stamps 32852 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32853
+    direction: c2s
+    connection: both
+    name: gppMobRescue
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_672A10 stamps 32853 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32857
+    direction: c2s
+    connection: both
+    name: gppCreateMobsFromSpawnGroup
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_673550 stamps 32857 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32859
+    direction: c2s
+    connection: both
+    name: gppSpawnMobsByTrigger
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_673630 stamps 32859 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32860
+    direction: c2s
+    connection: both
+    name: gppCreateNpcBreakableModel
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_673880 stamps 32860 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32861
+    direction: c2s
+    connection: both
+    name: gppRemoveAddableObject
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_673AD0 stamps 32861 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32862
+    direction: c2s
+    connection: both
+    name: gppCreateSpawnGroupMemberMob
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_673C60 stamps 32862 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32863
+    direction: c2s
+    connection: both
+    name: gppActivateSpawnObjByTrigger
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_673710 stamps 32863 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32864
+    direction: c2s
+    connection: both
+    name: gppTriggerLuaEvent
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_673F10 stamps 32864 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32865
+    direction: c2s
+    connection: both
+    name: gppMobLuaMessage
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_672CF0 stamps 32865 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32866
+    direction: c2s
+    connection: both
+    name: gppHordeMobReplay
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_9A5760/sub_9A5AF0 stamps 32866 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32873
+    direction: c2s
+    connection: both
+    name: gppWaveSetMobSpawnGroup
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_9BEB80 stamps 32873 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32876
+    direction: c2s
+    connection: both
+    name: gppSetNoTargetByMob
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_9493D0 stamps 32876 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32877
+    direction: c2s
+    connection: both
+    name: gppMobDropBombOnDead
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4CD710 stamps 32877 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32884
+    direction: c2s
+    connection: both
+    name: gppWatchingOnMe
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_797B80 stamps 32884 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32887
+    direction: c2s
+    connection: both
+    name: gppEmotion
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppEmotion; cn-705 sub_4C6870 stamps 32887 without a binned label
+  - value: 32888
+    direction: c2s
+    connection: both
+    name: gppSyncUseItemSimply
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppSyncUseItemSimply; cn-705 sub_948FD0 stamps 32888 without a binned label
+  - value: 32891
+    direction: c2s
+    connection: both
+    name: gppDummyUnitMotion
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4DD0B0 stamps 32891 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32893
+    direction: c2s
+    connection: both
+    name: gppAgentMoveTo
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4E06B0 stamps 32893 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32895
+    direction: c2s
+    connection: both
+    name: gppChangeTurretState
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppChangeTurretState; cn-705 sub_4DDAE0 stamps 32895 without a binned label
+  - value: 32896
+    direction: c2s
+    connection: both
+    name: gppCitizenHp
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4E1160 stamps 32896 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32897
+    direction: c2s
+    connection: both
+    name: gppAggro
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppAggro; cn-705 sub_4E13D0 stamps 32897 without a binned label
+  - value: 32903
+    direction: c2s
+    connection: both
+    name: gppPopOut2
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4C8F70 stamps 32903 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32910
+    direction: c2s
+    connection: both
+    name: gppShocked2
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4C9890 stamps 32910 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32913
+    direction: c2s
+    connection: both
+    name: gppZombieBossHp
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4E1290 stamps 32913 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32914
+    direction: c2s
+    connection: both
+    name: gppEndDarkCircle
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4CB050 stamps 32914 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32915
+    direction: c2s
+    connection: both
+    name: gppDeleteStormDamagerAOE
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4C6180 stamps 32915 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32918
+    direction: c2s
+    connection: both
+    name: gppReqCreateAISubordinate
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4E2350 stamps 32918 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32920
+    direction: c2s
+    connection: both
+    name: gppLifePoint
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppLifePoint; cn-705 sub_4C7D50 stamps 32920 without a binned label
+  - value: 32772
+    direction: s2c
+    connection: both
+    name: gppSplashDamager
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppSplashDamager; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32773
+    direction: s2c
+    connection: both
+    name: gppNearDamager
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppNearDamager; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32774
+    direction: s2c
+    connection: both
+    name: gppDeleteObject
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppDeleteObject; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32777
+    direction: s2c
+    connection: both
+    name: gppDamageObject
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppDamageObject; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32779
+    direction: s2c
+    connection: both
+    name: gppDash
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppDash; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32780
+    direction: s2c
+    connection: both
+    name: gppRoll
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppRoll; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32782
+    direction: s2c
+    connection: both
+    name: gppAim
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppAim; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32783
+    direction: s2c
+    connection: both
+    name: gppSetTargettingObj
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppSetTargettingObj; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32784
+    direction: s2c
+    connection: both
+    name: gppBubbleJump
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppBubbleJump; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32786
+    direction: s2c
+    connection: both
+    name: gppWallAction
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppWallAction; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32787
+    direction: s2c
+    connection: both
+    name: gppKnocked
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppKnocked; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32794
+    direction: s2c
+    connection: both
+    name: gppTryKicked
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppTryKicked; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32795
+    direction: s2c
+    connection: both
+    name: gppKicked
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppKicked; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32798
+    direction: s2c
+    connection: both
+    name: gppMeleeReady
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppMeleeReady; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32800
+    direction: s2c
+    connection: both
+    name: gppChangeState
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppChangeState; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32801
+    direction: s2c
+    connection: both
+    name: gppLockInto
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppLockInto; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32807
+    direction: s2c
+    connection: both
+    name: gppRescue
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppRescue; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32809
+    direction: s2c
+    connection: both
+    name: gppClimbWall
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppClimbWall; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32811
+    direction: s2c
+    connection: both
+    name: gppReload
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppReload; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32815
+    direction: s2c
+    connection: both
+    name: gppHumiliationStart
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppHumiliationStart; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32816
+    direction: s2c
+    connection: both
+    name: gppHumiliationEnd
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppHumiliationEnd; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32818
+    direction: s2c
+    connection: both
+    name: gppStickGrenadeTo
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppStickGrenadeTo; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32824
+    direction: s2c
+    connection: both
+    name: gppItemUseResult
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppItemUseResult; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32829
+    direction: s2c
+    connection: both
+    name: gppHitByItem
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppHitByItem; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32831
+    direction: s2c
+    connection: both
+    name: gppEndFreezeCannon
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppEndFreezeCannon; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32832
+    direction: s2c
+    connection: both
+    name: gppCreateMapItem
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppCreateMapItem; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32835
+    direction: s2c
+    connection: both
+    name: gppGotKicked
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppGotKicked; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32841
+    direction: s2c
+    connection: both
+    name: gppIniPacket
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppIniPacket; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32842
+    direction: s2c
+    connection: both
+    name: gppCreateMob
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppCreateMob; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32843
+    direction: s2c
+    connection: both
+    name: gppMobFireBullet
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppMobFireBullet; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32844
+    direction: s2c
+    connection: both
+    name: gppMobFireMelee
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppMobFireMelee; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32845
+    direction: s2c
+    connection: both
+    name: gppMobKnocked
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppMobKnocked; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32846
+    direction: s2c
+    connection: both
+    name: gppMobDie
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppMobDie; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32847
+    direction: s2c
+    connection: both
+    name: gppMobPush
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppMobPush; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32848
+    direction: s2c
+    connection: both
+    name: gppMobTryKicked
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppMobTryKicked; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32849
+    direction: s2c
+    connection: both
+    name: gppMobKicked
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppMobKicked; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32852
+    direction: s2c
+    connection: both
+    name: gppMobTryRescued
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppMobTryRescued; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32853
+    direction: s2c
+    connection: both
+    name: gppMobRescue
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppMobRescue; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32857
+    direction: s2c
+    connection: both
+    name: gppCreateMobsFromSpawnGroup
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppCreateMobsFromSpawnGroup; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32859
+    direction: s2c
+    connection: both
+    name: gppSpawnMobsByTrigger
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppSpawnMobsByTrigger; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32860
+    direction: s2c
+    connection: both
+    name: gppCreateNpcBreakableModel
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppCreateNpcBreakableModel; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32861
+    direction: s2c
+    connection: both
+    name: gppRemoveAddableObject
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppRemoveAddableObject; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32862
+    direction: s2c
+    connection: both
+    name: gppCreateSpawnGroupMemberMob
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppCreateSpawnGroupMemberMob; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32863
+    direction: s2c
+    connection: both
+    name: gppActivateSpawnObjByTrigger
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppActivateSpawnObjByTrigger; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32864
+    direction: s2c
+    connection: both
+    name: gppTriggerLuaEvent
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppTriggerLuaEvent; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32865
+    direction: s2c
+    connection: both
+    name: gppMobLuaMessage
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppMobLuaMessage; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32866
+    direction: s2c
+    connection: both
+    name: gppHordeMobReplay
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppHordeMobReplay; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32873
+    direction: s2c
+    connection: both
+    name: gppWaveSetMobSpawnGroup
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppWaveSetMobSpawnGroup; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32876
+    direction: s2c
+    connection: both
+    name: gppSetNoTargetByMob
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppSetNoTargetByMob; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32877
+    direction: s2c
+    connection: both
+    name: gppMobDropBombOnDead
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppMobDropBombOnDead; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32884
+    direction: s2c
+    connection: both
+    name: gppWatchingOnMe
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppWatchingOnMe; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32887
+    direction: s2c
+    connection: both
+    name: gppEmotion
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppEmotion; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32888
+    direction: s2c
+    connection: both
+    name: gppSyncUseItemSimply
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppSyncUseItemSimply; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32891
+    direction: s2c
+    connection: both
+    name: gppDummyUnitMotion
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppDummyUnitMotion; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32893
+    direction: s2c
+    connection: both
+    name: gppAgentMoveTo
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppAgentMoveTo; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32895
+    direction: s2c
+    connection: both
+    name: gppChangeTurretState
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppChangeTurretState; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32896
+    direction: s2c
+    connection: both
+    name: gppCitizenHp
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppCitizenHp; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32897
+    direction: s2c
+    connection: both
+    name: gppAggro
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppAggro; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32903
+    direction: s2c
+    connection: both
+    name: gppPopOut2
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppPopOut2; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32910
+    direction: s2c
+    connection: both
+    name: gppShocked2
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppShocked2; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32913
+    direction: s2c
+    connection: both
+    name: gppZombieBossHp
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppZombieBossHp; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32914
+    direction: s2c
+    connection: both
+    name: gppEndDarkCircle
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppEndDarkCircle; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32915
+    direction: s2c
+    connection: both
+    name: gppDeleteStormDamagerAOE
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppDeleteStormDamagerAOE; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32918
+    direction: s2c
+    connection: both
+    name: gppReqCreateAISubordinate
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppReqCreateAISubordinate; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32920
+    direction: s2c
+    connection: both
+    name: gppLifePoint
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppLifePoint; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 509
+    direction: s2c
+    name: gspRoomReceiveChatModuleMsg
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspRoomReceiveChatModuleMsg; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 512
+    direction: s2c
+    name: gspRoomOpenCloseSlot
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspRoomOpenCloseSlot; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 513
+    direction: s2c
+    name: gspRepKickFromSession
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspRepKickFromSession; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 511
+    direction: c2s
+    name: gcpSendSessionChrPos
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gcpSendSessionChrPos; cn-705 sub_8BA030 stamps 511 without a binned label
+  - value: 804
+    direction: c2s
+    name: gcpReqInventoryUnequip
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqInventoryUnequip; cn-705 sub_8FE730 stamps 804 without a binned label
+  - value: 32892
+    direction: c2s
+    connection: both
+    name: gppCreateAIObject
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_5D9F00 stamps 32892 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 32894
+    direction: c2s
+    connection: both
+    name: gppUseItemDirect
+    name_source: label@cn-705
+    evidence: inferred
+    source: cn-705 sub_4DD760 stamps 32894 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 504
+    direction: s2c
+    name: gspRoomChangeTeam
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gspRoomChangeTeam; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 506
+    direction: s2c
+    name: gspRoomChangeInventory
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspRoomChangeInventory; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 507
+    direction: s2c
+    name: gspRoomRepChangeMaster
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gspRoomRepChangeMaster; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 508
+    direction: s2c
+    name: gspRoomReceiveChatMsg
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspRoomReceiveChatMsg; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 514
+    direction: s2c
+    name: gspReceiveSessionChrPos
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspReceiveSessionChrPos; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 516
+    direction: s2c
+    name: gspRoomReceiveRecruitMsg
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspRoomReceiveRecruitMsg; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 517
+    direction: s2c
+    name: gspReqPingUser
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspReqPingUser; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 518
+    direction: s2c
+    name: gspRepPingUser
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspRepPingUser; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 519
+    direction: s2c
+    name: gspHordeModeRewardList
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspHordeModeRewardList; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 522
+    direction: s2c
+    name: gspSetSessionSigData
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspSetSessionSigData; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 523
+    direction: s2c
+    name: gspResClientDamageSyncData
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspResClientDamageSyncData; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 524
+    direction: s2c
+    name: gspReceiveSessionInit
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspReceiveSessionInit; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 607
+    direction: s2c
+    name: gspTryHolePunching
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspTryHolePunching; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 609
+    direction: s2c
+    name: gspNotifyUdpToServerReceived
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspNotifyUdpToServerReceived; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 610
+    direction: s2c
+    name: gspTableSetHolePunching
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspTableSetHolePunching; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 711
+    direction: s2c
+    name: gspGameCreateGameItem
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gspGameCreateGameItem; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 712
+    direction: s2c
+    name: gspItemEaten
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gspItemEaten; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 713
+    direction: s2c
+    name: gspAddItemToSlot
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gspAddItemToSlot; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 714
+    direction: s2c
+    name: gspItemUsed
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gspItemUsed; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 715
+    direction: s2c
+    name: gspPveItemUsed
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gspPveItemUsed; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 729
+    direction: s2c
+    name: gspGameBroadcastPlayerScoreData
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspGameBroadcastPlayerScoreData; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 730
+    direction: s2c
+    name: gspGameRespawnCharacter
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gspGameRespawnCharacter; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 731
+    direction: s2c
+    name: gspGameExtendRespawn
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gspGameExtendRespawn; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 732
+    direction: s2c
+    name: gspGameTimeOverEnd
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspGameTimeOverEnd; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 734
+    direction: s2c
+    name: gspGameAwardDialog
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gspGameAwardDialog; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 736
+    direction: s2c
+    name: gspGameReturnAfterAward_
+    name_source: coined
+    evidence: inferred
+    source: cn-706's reviewed row for gspGameReturnAfterAward_; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 737
+    direction: s2c
+    name: gspGamePreCountDown
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gspGamePreCountDown; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 739
+    direction: s2c
+    name: gspGamePrepareLucciEvent
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspGamePrepareLucciEvent; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 740
+    direction: s2c
+    name: gspGamePrepareSoccerEvent
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspGamePrepareSoccerEvent; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 741
+    direction: s2c
+    name: gspGamePrepareHordeZHEvent
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspGamePrepareHordeZHEvent; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 742
+    direction: s2c
+    name: gspGamePrepareMoleEvent
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspGamePrepareMoleEvent; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 743
+    direction: s2c
+    name: gspRepAwardSelectSuccess
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspRepAwardSelectSuccess; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 744
+    direction: s2c
+    name: gspRepAwardSelectFail
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gspRepAwardSelectFail; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 747
+    direction: s2c
+    name: gspSwitchItemSlot
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gspSwitchItemSlot; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 748
+    direction: s2c
+    name: gspGameItemSpec
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspGameItemSpec; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 749
+    direction: s2c
+    name: gspEventAwardDialog
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspEventAwardDialog; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 904
+    direction: s2c
+    name: gspRepStartNewWave
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gspRepStartNewWave; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 905
+    direction: s2c
+    name: gspRepEndWave
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gspRepEndWave; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 908
+    direction: s2c
+    name: Unknown908
+    name_source: none
+    evidence: inferred
+    source: cn-706's reviewed row for Unknown908; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 909
+    direction: s2c
+    name: gspRepWaveAllSpawnMobs
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gspRepWaveAllSpawnMobs; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 924
+    direction: s2c
+    name: gspMapMissionInfo
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspMapMissionInfo; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 925
+    direction: s2c
+    name: gspResMissionStart
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspResMissionStart; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 926
+    direction: s2c
+    name: gspResMissionTimeOut
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspResMissionTimeOut; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 927
+    direction: s2c
+    name: gspResMissionOK
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspResMissionOK; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 928
+    direction: s2c
+    name: gspNotifyGamePoint
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspNotifyGamePoint; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 929
+    direction: s2c
+    name: gspNotifyRankInfo
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspNotifyRankInfo; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 930
+    direction: s2c
+    name: gspPveItemInfo
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspPveItemInfo; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 931
+    direction: s2c
+    name: gspCompensationItemNoti
+    name_source: mirrored
+    evidence: inferred
+    source: cn-706's reviewed row for gspCompensationItemNoti; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 32892
+    direction: s2c
+    connection: both
+    name: gppCreateAIObject
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gppCreateAIObject; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 718
+    direction: s2c
+    name: gspGameCreateEventBox
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gspGameCreateEventBox; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 720
+    direction: s2c
+    name: gspGameCreateLucci
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gspGameCreateLucci; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 721
+    direction: s2c
+    name: gspLucciEaten
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gspLucciEaten; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 716
+    direction: s2c
+    name: gspGameCreateStar
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gspGameCreateStar; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 717
+    direction: s2c
+    name: gspStarEaten
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gspStarEaten; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 823
+    direction: c2s
+    name: gcpReqPresentDeleteReceive
+    name_source: label@cn-706
+    evidence: inferred
+    source: cn-706's reviewed row for gcpReqPresentDeleteReceive; cn-705 sub_8E7A40/sub_8E8F30 stamps 823 without a binned label

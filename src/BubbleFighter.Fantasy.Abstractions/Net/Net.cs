@@ -29,7 +29,12 @@ public interface IConnection
     /// <summary>Gets whether the connection has been closed.</summary>
     bool IsClosed { get; }
 
-    /// <summary>Closes the connection.</summary>
+    /// <summary>
+    /// Closes the connection. Only the first call closes it and later calls return immediately;
+    /// the first reason is the one recorded and logged. Pending reads are cancelled and the
+    /// transport's read loop exits on its own, so this method does not wait for it, and writes
+    /// queued after the close fail downstream.
+    /// </summary>
     /// <param name="reason">A short human-readable reason, logged by the transport.</param>
     ValueTask CloseAsync(string reason);
 }

@@ -46,6 +46,8 @@ internal sealed class ShopBinding(string protocol, IOpcodeTable table,
 
     internal static ShopPurchaseRequested ReadPurchase(PacketTables tables, string build, ReadOnlySpan<byte> body)
     {
+        PacketLayoutContract.RequireFields(tables, build, "ShopPurchaseRequest", "Shop purchase",
+            ("key", "u32"), ("unknown_8", "bool"));
         var values = PacketCodec.ReadScalars(tables, build, "ShopPurchaseRequest", body,
             requireCanonicalBooleans: true);
         return new((int)values["key"], !(bool)values["unknown_8"]);
@@ -71,9 +73,13 @@ internal sealed class ShopBinding(string protocol, IOpcodeTable table,
         session.SendAsync(_reply, WriteReply(tables, build, message), ct);
 
     /// <summary>Writes u32 shop key and u32 result; kr-812 sub_827550 consumes result 1 as success.</summary>
-    internal static byte[] WriteReply(PacketTables tables, string build, ShopPurchaseReplied message) =>
-        PacketCodec.Write(tables, build, "ShopPurchaseReply", new Dictionary<string, object?>
+    internal static byte[] WriteReply(PacketTables tables, string build, ShopPurchaseReplied message)
+    {
+        PacketLayoutContract.RequireFields(tables, build, "ShopPurchaseReply", "Shop purchase",
+            ("key", "u32"), ("result", "u32"));
+        return PacketCodec.Write(tables, build, "ShopPurchaseReply", new Dictionary<string, object?>
         {
             ["key"] = message.Key, ["result"] = message.Succeeded ? 1 : 0,
         });
+    }
 }

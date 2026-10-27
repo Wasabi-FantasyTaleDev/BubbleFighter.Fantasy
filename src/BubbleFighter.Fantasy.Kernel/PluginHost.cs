@@ -34,6 +34,7 @@ public sealed partial class PluginHost : IPluginHost
 
     private readonly ServiceRegistry _registry;
     private readonly EventBus _events;
+    private readonly HostReadiness _readiness = new();
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger _logger;
     private PluginCatalog _catalog => Volatile.Read(ref _configuration).Catalog;
@@ -129,9 +130,24 @@ public sealed partial class PluginHost : IPluginHost
         _registry.Register<IServiceRegistry>(_registry);
         _registry.Register<IEventBus>(_events);
         _registry.Register<IPluginHost>(this);
+        _registry.Register<IHostReadiness>(_readiness);
         foreach (var row in _rows)
             _info[row.Id] = InstanceInfo(row, DefinitionFor(row), PluginState.Unloaded, null);
         InitializeBindingReconciliation();
+    }
+
+    /// <summary>Marks the host ready once its startup configuration converged with every enabled row active.</summary>
+    /// <remarks>Called by the server command after startup; rows that admit new players read <see cref="IHostReadiness"/>.</remarks>
+    public void MarkReady()
+    {
+        if (_readiness.Set()) _logger.LogInformation("Server is ready; launcher sign-in and launches are accepted.");
+    }
+
+    private sealed class HostReadiness : IHostReadiness
+    {
+        private int _ready;
+        public bool IsReady => Volatile.Read(ref _ready) != 0;
+        public bool Set() => Interlocked.Exchange(ref _ready, 1) == 0;
     }
 
     /// <inheritdoc />

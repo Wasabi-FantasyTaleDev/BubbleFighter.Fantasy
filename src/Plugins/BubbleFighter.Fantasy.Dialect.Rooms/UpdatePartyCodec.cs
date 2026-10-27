@@ -34,8 +34,10 @@ internal static class UpdatePartyCodec
     /// <param name="build">The audited client build whose solo snapshot is written.</param>
     /// <param name="room">The main-menu player identity.</param>
     /// <returns>The S2C 201 body.</returns>
-    public static byte[] WriteSolo(PacketTables tables, string build, MainMenuRoomOpened room) =>
-        PacketCodec.Write(tables, build, "SoloPartySnapshot", new Dictionary<string, object?>
+    public static byte[] WriteSolo(PacketTables tables, string build, MainMenuRoomOpened room)
+    {
+        ValidateLayouts(tables, build);
+        return PacketCodec.Write(tables, build, "SoloPartySnapshot", new Dictionary<string, object?>
         {
             ["state"] = IdleState,
             ["members"] = new Dictionary<string, object?>[]
@@ -43,14 +45,17 @@ internal static class UpdatePartyCodec
                 new() { ["user_number"] = room.UserNumber, ["nickname"] = room.Nickname },
             },
         });
+    }
 
     /// <summary>The same snapshot for a whole party, leader first (kr-812 sub_926900 takes member[0] as the leader).</summary>
     /// <param name="tables">The shared native packet layouts.</param>
     /// <param name="build">The audited client build.</param>
     /// <param name="party">The party.</param>
     /// <returns>The S2C 201 body.</returns>
-    public static byte[] WriteParty(PacketTables tables, string build, PartySnapshot party) =>
-        PacketCodec.Write(tables, build, "SoloPartySnapshot", new Dictionary<string, object?>
+    public static byte[] WriteParty(PacketTables tables, string build, PartySnapshot party)
+    {
+        ValidateLayouts(tables, build);
+        return PacketCodec.Write(tables, build, "SoloPartySnapshot", new Dictionary<string, object?>
         {
             ["state"] = IdleState,
             ["members"] = party.Members.Select(member => new Dictionary<string, object?>
@@ -58,6 +63,22 @@ internal static class UpdatePartyCodec
                 ["user_number"] = member.UserNum, ["nickname"] = member.Nickname,
             }).ToArray(),
         });
+    }
+
+    /// <summary>
+    /// Checks the two layouts the writers size. The snapshot has one variant that adds a profile-entries vector, so
+    /// only the state word and the member vector are required; each member row is two fields, the words the writers
+    /// fill. This helper has no bind step of its own, so it checks before every use rather than on the first send.
+    /// </summary>
+    /// <param name="tables">The shared native packet layouts.</param>
+    /// <param name="build">The audited client build.</param>
+    internal static void ValidateLayouts(PacketTables tables, string build)
+    {
+        PacketLayoutContract.RequireFields(tables, build, "SoloPartySnapshot", "Solo party snapshot",
+            ("state", "u32"), ("members", "list<SoloPartyMember>"));
+        PacketLayoutContract.RequireFields(tables, build, "SoloPartyMember", "Solo party snapshot",
+            ("user_number", "u32"), ("nickname", "wstr"));
+    }
 
     /// <summary>
     /// Whether this room schema's MainMenu plaza gate needs the solo idle

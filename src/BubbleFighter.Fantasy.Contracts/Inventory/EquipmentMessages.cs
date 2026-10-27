@@ -8,6 +8,16 @@ namespace BubbleFighter.Fantasy.Contracts.Inventory;
 /// <param name="UserNum">The authenticated player owning the inventory.</param>
 public sealed record EquipmentSelectionReadRequested(string Protocol, long UserNum) : IEvent;
 
+/// <summary>Publishes committed appearance during a scene transition without coupling the scene codec to the view provider's activation.</summary>
+/// <param name="Protocol">The game dialect selecting the equipment provider.</param>
+/// <param name="Session">The recipient of the appearance update.</param>
+/// <param name="UserNum">The player whose appearance is published.</param>
+/// <param name="CharacterItemId">The committed character item.</param>
+/// <param name="EquippedItemIds">The committed worn item identities.</param>
+/// <param name="Remote">Whether the appearance belongs to another player rather than the recipient.</param>
+public sealed record EquipmentViewRequested(string Protocol, ISession Session, int UserNum, int CharacterItemId,
+    IReadOnlyList<int> EquippedItemIds, bool Remote) : IEvent;
+
 /// <summary>Requests a worn-state change with an opaque client reference and a codec-resolved inventory target.</summary>
 /// <param name="Reference">The original client reference retained for correlation; it is not a persistence slot key.</param>
 /// <param name="ItemId">The supported positive bag item id, or null when a valid request names an unsupported target.</param>

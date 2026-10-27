@@ -4,6 +4,83 @@ profile: cn-774
 # case's packet name string (jumptable 00BCF218, the case number is the opcode); S2C names
 # below come from there. See profiles/opcode-policy.md.
 opcodes:
+  - value: 510
+    direction: s2c
+    connection: game
+    name: gspRoomEnterGame
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8D7D20 case 0x1FE -> cn-774 sub_8DD8D0 -> cn-774 sub_105EF50 reads three strings, state and the native stage lists; matched to kr-812 gspRoomEnterGame"
+  - value: 2075
+    direction: c2s
+    connection: game
+    name: gcpRoomAddNpcBot_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_E4E740 writes the team byte, selection operation, slot, difficulty and preset; cn-774 sub_E4E8F0 supplies the popup selection"
+  - value: 2076
+    direction: c2s
+    connection: game
+    name: gcpRoomRemoveNpcBot_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_E4EA50 writes the selected bot slot as one word"
+  - value: 1546
+    direction: s2c
+    connection: game
+    name: gspRoomNpcBotControllerChanged_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_8D7D20 dispatches 1546 to cn-774 sub_8EA170, which reads the old controller account and new human slot and updates matching bot seats"
+  - value: 502
+    direction: c2s
+    connection: game
+    name: gcpRoomSendChatModuleMsg
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_B9F5C0 stamps 502 and writes channel plus two counted UTF-16 strings; matched to kr-812 gcpRoomSendChatModuleMsg"
+  - value: 509
+    direction: s2c
+    connection: game
+    name: gspRoomReceiveChatModuleMsg
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8D7D20 case 509 calls cn-774 sub_8E0BA0, which parses through cn-774 sub_8F1B80 and displays the chat line; matched to kr-812 gspRoomReceiveChatModuleMsg"
+  - value: 105
+    direction: c2s
+    connection: game
+    name: gcpReqGotoMenu
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_7D2860 stamps 105 without a body; matches kr-812 gcpReqGotoMenu's empty menu-return request"
+  - value: 106
+    direction: c2s
+    connection: game
+    name: gcpReqGotoLobby
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8EB450 stamps 106 without a body; matches kr-812 gcpReqGotoLobby's empty plaza-entry request"
+  - value: 301
+    direction: c2s
+    connection: game
+    name: gcpSendPartyChrPos
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_B0D330 sends 301 outside a room: u32 sequence, XYZ, two bytes and f32; matches kr-812 sub_934030 gcpSendPartyChrPos"
+  - value: 301
+    direction: s2c
+    connection: game
+    name: gspReceivePartyChrPos
+    name_source: label@cn-774
+    evidence: verified
+    source: "cn-774 sub_BCF090 branch at BD0683 names gspReceivePartyChrPos; cn-774 sub_B01A60 reads identity, sequence, XYZ, two bytes and f32"
+  - value: 511
+    direction: s2c
+    connection: game
+    name: gspRoomLeaveSlot
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8D7D20 case 511 calls cn-774 sub_8DC300: u32 slot, UserSlot and ServerTeamInfo; applies occupied seats or removes unoccupied ones, matching kr-812 gspRoomLeaveSlot"
   - value: 808
     direction: c2s
     name: gcpReqInventoryThrowItem
@@ -43,15 +120,15 @@ opcodes:
     connection: game
     name: gcpRoomReqChangeMaster
     name_source: label@kr-812
-    evidence: inferred
-    source: "cn-774 sub_8E0220 stamps508 and writes the target nickname; same delegation request as kr-812 Packet_gcpRoomReqChangeMaster via kr-812 sub_801C60/sub_809CB0"
+    evidence: verified
+    source: "cn-774 sub_8E0220 stamps 508 and writes counted UTF-16 target nickname; matched to kr-812 gcpRoomReqChangeMaster"
   - value: 507
     direction: s2c
     connection: game
     name: gspRoomRepChangeMaster
     name_source: label@kr-812
     evidence: verified
-    source: "cn-774 sub_8D7D20 case0x1FB -> cn-774 sub_8E0350 reads nickname and result; matches kr-812 Packet_gspRoomRepChangeMaster in kr-812 sub_801D00"
+    source: "cn-774 sub_8E0350 reads nickname and result; matched to kr-812 gspRoomRepChangeMaster"
   - value: 506
     direction: s2c
     connection: game
@@ -1649,10 +1726,11 @@ opcodes:
     source: "builder sub_EC9250; name aligned from cn-717 C2S 122 Packet_gcpReqSocialSystemReport (label alignment, run cn-717 C2S 113..122 -> 117..126, shape [4 4 4 4 S S], similarity 1.0)"
   - value: 515
     direction: c2s
-    name: gcpRoomReqOpenCloseSlot
-    name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_535610; name aligned from cn-717 C2S 509 Packet_gcpRoomReqOpenCloseSlot (label alignment, run cn-717 C2S 502..509 -> 508..515, shape [4 4], similarity 0.8)"
+    connection: game
+    name: gcpRoomChangeTeam
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_535610 stamps 515 and writes three ordinary team-toggle words (-1,0,0); matched to kr-812 gcpRoomChangeTeam"
   - value: 518
     direction: c2s
     name: gcpRepPingUser
@@ -1959,6 +2037,7 @@ opcodes:
     connection: game
   - value: 32792
     direction: c2s
+    connection: both
     name: gppKickFail
     name_source: label@kr-812
     evidence: verified
@@ -1966,6 +2045,7 @@ opcodes:
     notes: "one i32 actor"
   - value: 32792
     direction: s2c
+    connection: both
     name: gppKickFail
     name_source: label@kr-812
     evidence: verified
@@ -1973,20 +2053,23 @@ opcodes:
     notes: "one i32 actor"
   - value: 32837
     direction: c2s
+    connection: both
     name: gppKickEnd
     name_source: label@kr-812
     evidence: verified
-    source: "cn-774 sub_8A3ED0 writer and sub_897E80 -> sub_516570 consumer; kr-812 Packet_gppKickEnd at sub_51EFA0 -> sub_568B50; same actor and local feedback role"
+    source: "cn-774 sub_8A3ED0 writer and sub_897E80 case 32837 consumer; kr-812 Packet_gppKickEnd at sub_51EFA0 -> sub_568B50; same actor and local feedback role"
     notes: "one i32 actor"
   - value: 32837
     direction: s2c
+    connection: both
     name: gppKickEnd
     name_source: label@kr-812
     evidence: verified
-    source: "cn-774 sub_8A3ED0 writer and sub_897E80 -> sub_516570 consumer; kr-812 Packet_gppKickEnd at sub_51EFA0 -> sub_568B50; same actor and local feedback role"
+    source: "cn-774 sub_8A3ED0 writer and sub_897E80 case 32837 consumer; kr-812 Packet_gppKickEnd at sub_51EFA0 -> sub_568B50; same actor and local feedback role"
     notes: "one i32 actor"
   - value: 32900
     direction: c2s
+    connection: both
     name: gppSplashDamagerByDamager
     name_source: label@kr-812
     evidence: verified
@@ -1994,11 +2077,36 @@ opcodes:
     notes: "packets/damagers.yaml SplashDamagerByDamager; relayed unchanged with the damager spawns"
   - value: 32900
     direction: s2c
+    connection: both
     name: gppSplashDamagerByDamager
     name_source: label@kr-812
     evidence: verified
     source: "cn-774 sub_8A0860 writer and sub_897E80 -> sub_8A0B10 consumer; kr-812 Packet_gppSplashDamagerByDamager at sub_50FE10 / sub_50FF40 -> sub_508460; same source-damager lookup, area damager and source retirement"
     notes: "packets/damagers.yaml SplashDamagerByDamager; relayed unchanged with the damager spawns"
+  - value: 32885
+    direction: c2s
+    connection: both
+    name: gppWanderLean
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_B558C0 writes the full movement frame with opcode 32885; cn-774 sub_897E80 dispatches 32885 to sub_8C37D0, which reads the movement record"
+    notes: "MovementReport: i32 actor, three f32 coordinates, u8 yaw, u8 pitch, u8 state and u16 tick (21 bytes); the same record is sent on game and match TCP"
+  - value: 32923
+    direction: c2s
+    connection: both
+    name: gppWanderLeanOptimize
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_B558C0 writes OptimizeWanderInfo with opcode 32923; cn-774 sub_B57A20 serializes its actor and tick before the mask-gated fields"
+    notes: "MovementSample: i32 actor, u16 tick, u8 mask, then only the fields selected by mask bits; the optimized frame is an input on either TCP connection"
+  - value: 32885
+    direction: s2c
+    connection: both
+    name: gppWanderLean
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_897E80 dispatches 32885 to sub_8C37D0 and applies the complete movement record; the relay dispatcher shares this native opcode"
+    notes: "Relayed movement is the complete 21-byte record; optimized input is normalized before the server sends this S2C form"
   - value: 806
     direction: c2s
     name: gcpReqInventoryUseItem
@@ -2008,6 +2116,7 @@ opcodes:
     notes: "packets/inventory-use.yaml InventoryUseRequest; answered by S2C 813 gspRepInventoryUseItem"
   - value: 32772
     direction: c2s
+    connection: both
     name: gppSplashDamager
     name_source: label@kr-812
     evidence: verified
@@ -2015,6 +2124,7 @@ opcodes:
     notes: "packets/damagers.yaml SplashDamager; relayed unchanged with the damager spawns"
   - value: 32772
     direction: s2c
+    connection: both
     name: gppSplashDamager
     name_source: label@kr-812
     evidence: verified
@@ -2022,6 +2132,7 @@ opcodes:
     notes: "packets/damagers.yaml SplashDamager; relayed unchanged with the damager spawns"
   - value: 32877
     direction: c2s
+    connection: both
     name: gppMobDropBombOnDead
     name_source: label@kr-812
     evidence: verified
@@ -2029,6 +2140,7 @@ opcodes:
     notes: "packets/damagers.yaml MobDropBombOnDead; relayed unchanged with the damager spawns"
   - value: 32877
     direction: s2c
+    connection: both
     name: gppMobDropBombOnDead
     name_source: label@kr-812
     evidence: verified
@@ -2036,6 +2148,7 @@ opcodes:
     notes: "packets/damagers.yaml MobDropBombOnDead; relayed unchanged with the damager spawns"
   - value: 32881
     direction: c2s
+    connection: both
     name: gppDropHumilPrevItem
     name_source: label@kr-812
     evidence: verified
@@ -2043,6 +2156,7 @@ opcodes:
     notes: "packets/damagers.yaml DropHumilPrevItem; relayed unchanged with the damager spawns"
   - value: 32881
     direction: s2c
+    connection: both
     name: gppDropHumilPrevItem
     name_source: label@kr-812
     evidence: verified
@@ -2050,6 +2164,7 @@ opcodes:
     notes: "packets/damagers.yaml DropHumilPrevItem; relayed unchanged with the damager spawns"
   - value: 32898
     direction: c2s
+    connection: both
     name: gppFireBullet3
     name_source: label@kr-812
     evidence: verified
@@ -2057,6 +2172,7 @@ opcodes:
     notes: "packets/damagers.yaml FireBullet3; relayed unchanged with the damager spawns"
   - value: 32898
     direction: s2c
+    connection: both
     name: gppFireBullet3
     name_source: label@kr-812
     evidence: verified
@@ -2064,6 +2180,7 @@ opcodes:
     notes: "packets/damagers.yaml FireBullet3; relayed unchanged with the damager spawns"
   - value: 32899
     direction: c2s
+    connection: both
     name: gppStormDamager
     name_source: label@kr-812
     evidence: verified
@@ -2071,6 +2188,7 @@ opcodes:
     notes: "packets/damagers.yaml StormDamager; relayed unchanged with the damager spawns"
   - value: 32899
     direction: s2c
+    connection: both
     name: gppStormDamager
     name_source: label@kr-812
     evidence: verified
@@ -2078,6 +2196,7 @@ opcodes:
     notes: "packets/damagers.yaml StormDamager; relayed unchanged with the damager spawns"
   - value: 32910
     direction: c2s
+    connection: both
     name: gppStormDamagerItemId
     name_source: label@kr-812
     evidence: verified
@@ -2085,6 +2204,7 @@ opcodes:
     notes: "packets/damagers.yaml StormDamagerItemId; relayed unchanged with the damager spawns"
   - value: 32910
     direction: s2c
+    connection: both
     name: gppStormDamagerItemId
     name_source: label@kr-812
     evidence: verified
@@ -2092,6 +2212,7 @@ opcodes:
     notes: "packets/damagers.yaml StormDamagerItemId; relayed unchanged with the damager spawns"
   - value: 33278
     direction: c2s
+    connection: both
     name: gppNearDamager
     name_source: label@kr-812
     evidence: verified
@@ -2099,6 +2220,7 @@ opcodes:
     notes: "packets/damagers.yaml NearDamager; relayed unchanged with the damager spawns"
   - value: 33278
     direction: s2c
+    connection: both
     name: gppNearDamager
     name_source: label@kr-812
     evidence: verified
@@ -2112,3 +2234,876 @@ opcodes:
     evidence: inferred
     source: "cn-774 sender sub_DE26E0 stamps C2S 829 and writes one u32 from the purchase confirmation; matched to kr-812 Packet_gcpReqPickup reader sub_80A910 and sender sub_985660 by the one-word purchase pickup path"
     notes: "Game request only. The selected value is cash_slot_key in packets/cash-inventory.yaml. cn-774 S2C 835 handler sub_BB13B0 consumes the cash-slot key and result, then removes the cash slot through sub_9A54D0 on result 1. No grant route is enabled by this row."
+
+  - value: 801
+    direction: c2s
+    connection: game
+    name: gcpEnterShop
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_B28950 writes u64 cached catalog token then u32 main category; matched to kr-812 gcpEnterShop"
+  - value: 803
+    direction: c2s
+    connection: game
+    name: gcpEnterInventory
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_B28DF0 writes empty inventory-dialog entry; matched to kr-812 gcpEnterInventory"
+  - value: 809
+    direction: c2s
+    connection: game
+    name: gcpReqShopBuy
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_6470C0 writes u32 stock key then zero-extended byte as u32; matched to kr-812 gcpReqShopBuy"
+  - value: 810
+    direction: c2s
+    connection: game
+    name: gcpReqShopItemCardInfo
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_9B57F0 writes one u32 card key; matched to kr-812 gcpReqShopItemCardInfo"
+  - value: 833
+    direction: c2s
+    connection: game
+    name: gcpReqRealCouponUse
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_748DC0 writes u32 UTF-16 character count followed by the code; matched to kr-812 gcpReqRealCouponUse"
+  - value: 804
+    direction: c2s
+    connection: game
+    name: gcpReqInventoryEquip
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_80B980 writes one i64 inventory/article key; matched to kr-812 gcpReqInventoryEquip by the wear/removal path"
+  - value: 805
+    direction: c2s
+    connection: game
+    name: gcpReqInventoryUnequip
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_9A5A40 writes one i64 inventory/article key; matched to kr-812 gcpReqInventoryUnequip by the wear/removal path"
+
+  - value: 401
+    direction: c2s
+    connection: game
+    name: gcpReqListSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_9F2610 stamps 401 and writes two u16 list cursor words; matched to kr-812 gcpReqListSession"
+  - value: 402
+    direction: c2s
+    connection: game
+    name: gcpReqCreateSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_BD86E0 stamps 402 and writes SessionSetting and password; matched to kr-812 gcpReqCreateSession"
+  - value: 403
+    direction: c2s
+    connection: game
+    name: gcpReqJoinSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_9EDFF0 stamps 403 and writes room id and counted UTF-16 password; matched to kr-812 gcpReqJoinSession"
+  - value: 404
+    direction: c2s
+    connection: game
+    name: gcpReqLeaveSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_77EBB0 stamps 404 and writes empty leave request; matched to kr-812 gcpReqLeaveSession"
+  - value: 505
+    direction: c2s
+    connection: game
+    name: gcpRoomReqReadyStatus
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_B7A450 stamps 505 and writes three four-byte ready/shop/inventory booleans; matched to kr-812 gcpRoomReqReadyStatus"
+  - value: 503
+    direction: c2s
+    connection: game
+    name: gcpRoomReqEnterGame
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_BD63E0 stamps 503 and writes the full map and thirteen-word rule record; matched to kr-812 gcpRoomReqEnterGame"
+  - value: 509
+    direction: c2s
+    connection: game
+    name: gcpRoomReqOpenCloseSlot
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_B7E820 stamps 509 and writes seat word and four-byte closed flag; matched to kr-812 gcpRoomReqOpenCloseSlot"
+  - value: 517
+    direction: c2s
+    connection: game
+    name: gcpReqPingUser
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8C75B0 stamps 517 and writes one local-seat probe word; matched to kr-812 gcpReqPingUser"
+  - value: 101
+    direction: s2c
+    connection: game
+    name: gspRepListSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_9ECF50 handles 101 through the native SessionSetting vector reader; matched to kr-812 gspRepListSession"
+  - value: 103
+    direction: s2c
+    connection: game
+    name: gspRepJoinSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_9ECF50 handles 103 as result and an additional word; matched to kr-812 gspRepJoinSession"
+  - value: 501
+    direction: s2c
+    connection: game
+    name: gspRoomSetSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8DB0F0 installs a complete native SessionSetting; matched to kr-812 gspRoomSetSession"
+  - value: 502
+    direction: s2c
+    connection: game
+    name: gspRoomSetMasterSlotIdx
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8DB300 reads the master slot word; matched to kr-812 gspRoomSetMasterSlotIdx"
+  - value: 503
+    direction: s2c
+    connection: game
+    name: gspRoomSetSlot
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8DB6B0 reads slot, native UserSlot, one equipped object and ServerTeamInfo; matched to kr-812 gspRoomSetSlot"
+  - value: 504
+    direction: s2c
+    connection: game
+    name: gspRoomChangeTeam
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8DBEA0 reads seat, signed team byte, two qualifier words and ServerTeamInfo; matched to kr-812 gspRoomChangeTeam"
+  - value: 505
+    direction: s2c
+    connection: game
+    name: gspRoomChangeGameSetting
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8DCC00 reads one native GameSetting; matched to kr-812 gspRoomChangeGameSetting"
+  - value: 517
+    direction: s2c
+    connection: game
+    name: gspReqPingUser
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8D7D20 reads one token and answers with C2S 518; matched to kr-812 gspReqPingUser"
+  - value: 518
+    direction: s2c
+    connection: game
+    name: gspRepPingUser
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8E6990 reads three words for the seat ping history; matched to kr-812 gspRepPingUser"
+  - value: 128
+    direction: s2c
+    connection: game
+    name: gspRoomWaitingDialog_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_9ECF50 handles 128 as the native waiting-wall control with two words and a counted UTF-16 string"
+
+  # Native relay handshake; game and relay directions use independent numeric spaces.
+  - value: 1
+    direction: c2s
+    connection: relay
+    name: rcpReqJoinRelaySession
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_B5B530 stamps relay 1 and writes the nested key, byte, word, account and nickname; matched to kr-812 Packet_rcpReqJoinRelaySession"
+  - value: 3
+    direction: c2s
+    connection: relay
+    name: rcpReqRelayReconnectMap_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_8EB210 stamps relay 3 and writes the native version, widened byte, map string, entity, nickname and two words"
+  - value: 12
+    direction: c2s
+    connection: relay
+    name: rcpReqReportSceneData_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_B593D0 case 1 starts relay 12; cn-774 sub_488AD0 writes its identity, equipped objects, presets, signature and tail"
+    notes: "Complete nested body: RelaySceneReport in packets/relay-scene.yaml."
+  - value: 1
+    direction: s2c
+    connection: relay
+    name: rspRelayJoinAccepted_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_B593D0 case 1 consumes no body and starts the relay 12 scene upload"
+    notes: "The inherited ignored result word does not affect the native consuming path."
+  - value: 4
+    direction: s2c
+    connection: relay
+    name: rspSendCrtSeedTable
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_890D10 reads the entity and two counted word vectors; matched to kr-812 Packet_rspSendCrtSeedTable"
+  - value: 5
+    direction: s2c
+    connection: relay
+    name: rspSendDefSeedTable
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_B593D0 case 5 reads the entity and a counted byte vector; matched to kr-812 Packet_rspSendDefSeedTable"
+  - value: 6
+    direction: s2c
+    connection: relay
+    name: rspSendCrtCancelSeedTable
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_B593D0 case 6 reads the entity and a counted word vector; matched to kr-812 Packet_rspSendCrtCancelSeedTable"
+  - value: 13
+    direction: s2c
+    connection: relay
+    name: rspRelaySceneAccepted_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_B593D0 case 13 consumes no body and reports game-side connection success"
+  - value: 22
+    direction: s2c
+    connection: relay
+    name: rspRelayHandshakeSettings_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_B593D0 case 22 reads one bool32 and six bytes into the handshake record"
+  - value: 571
+    direction: c2s
+    connection: game
+    name: gcpReportRelayConnected
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_B5B620 writes a bool32 and stamps game 571; matched to kr-812 Packet_gcpReportRelayConnected"
+  - value: 601
+    direction: s2c
+    connection: game
+    name: gspGameCountDown
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8E1980 reads the one-word countdown and starts native reconnect-map reporting; matched to kr-812 Packet_gspGameCountDown"
+  - value: 602
+    direction: s2c
+    connection: game
+    name: gspGameStartGame
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8E1F90 reads the round-start words and enters state 4; matched to kr-812 Packet_gspGameStartGame"
+  - value: 638
+    direction: s2c
+    connection: game
+    name: gspGameClockUnbounded_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_8D7D20 case 0x27E consumes no body and resets the round duration to 0x3FFFFFFF"
+
+  - value: 605
+    direction: s2c
+    connection: game
+    name: gspRespawn
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_897E80 case 605 calls cn-774 sub_8B5670; matched to the kr-812 reset grant by its actor/spawn/state-clear consumer"
+  - value: 603
+    direction: s2c
+    connection: game
+    name: gspRoundResultOpen_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_8D9000 case 603 reads two words before opening the result scene"
+  - value: 627
+    direction: s2c
+    connection: game
+    name: gspRoundScoreboard_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_8D9000 case 627 invokes cn-774 sub_8F2280 to read the complete masked scoreboard"
+  - value: 630
+    direction: s2c
+    connection: game
+    name: gspRoundResultBanner_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_8E3E30 consumes two words and two bytes and advances the result banner phase"
+  - value: 631
+    direction: s2c
+    connection: game
+    name: gspRoundRewardStage_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_8E45A0 consumes the low bit of one byte and enters the reward stage"
+  - value: 634
+    direction: s2c
+    connection: game
+    name: gspRoundStageReset_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_8E5070 consumes no stream field and returns the session to its waiting stage"
+  - value: 985
+    direction: s2c
+    connection: game
+    name: gspUpdateScoreData
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8E33A0 reads the team total, two slots and three stat vectors; matched to kr-812 gspUpdateScoreData"
+  - value: 625
+    direction: c2s
+    connection: game
+    name: gcpReqEndStage_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_8A5E30 stamps 625 with no payload writes; the completion and elimination paths invoke it once their stage is over"
+
+  # Native action feed; layouts and reporting identities are selected by inherited packet data.
+  - value: 32779
+    direction: c2s
+    connection: both
+    name: Unknown32779
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_89FFA0 writes 8-byte actor and Boolean word"
+  - value: 32779
+    direction: s2c
+    connection: both
+    name: Unknown32779
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_897E80 consumes 8-byte actor and Boolean word in case 32779"
+  - value: 32780
+    direction: c2s
+    connection: both
+    name: Unknown32780
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_ADA540 writes 10-byte actor, word and two bytes"
+  - value: 32780
+    direction: s2c
+    connection: both
+    name: Unknown32780
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_897E80 consumes 10-byte actor, word and two bytes in case 32780"
+  - value: 32781
+    direction: c2s
+    connection: both
+    name: Unknown32781
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8A01C0 writes three-word jump record"
+  - value: 32781
+    direction: s2c
+    connection: both
+    name: Unknown32781
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_89AE50 selects signed opcode -32755 and consumes actor, word and Boolean word before the character jump transition"
+  - value: 32782
+    direction: c2s
+    connection: both
+    name: Unknown32782
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_822F10 writes one-word actor record"
+  - value: 32782
+    direction: s2c
+    connection: both
+    name: Unknown32782
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_897E80 consumes one-word actor record in case 32782"
+  - value: 32783
+    direction: c2s
+    connection: both
+    name: Unknown32783
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8228D0 writes target word before the actor word"
+  - value: 32783
+    direction: s2c
+    connection: both
+    name: Unknown32783
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8BC570 consumes target word before the actor word"
+  - value: 32784
+    direction: c2s
+    connection: both
+    name: Unknown32784
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8A0480 writes four words with a Boolean third word"
+  - value: 32784
+    direction: s2c
+    connection: both
+    name: Unknown32784
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_897E80 consumes four words with a Boolean third word in case 32784"
+  - value: 32786
+    direction: c2s
+    connection: both
+    name: Unknown32786
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8A0700 writes two words followed by one byte"
+  - value: 32786
+    direction: s2c
+    connection: both
+    name: Unknown32786
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_897E80 consumes two words followed by one byte in case 32786"
+  - value: 32788
+    direction: c2s
+    connection: both
+    name: Unknown32788
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8A4B90 writes actor, source, position triple and word"
+  - value: 32788
+    direction: s2c
+    connection: both
+    name: Unknown32788
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8BAAD0 consumes actor, source, position triple and word"
+  - value: 32790
+    direction: c2s
+    connection: both
+    name: Unknown32790
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_AE1150 writes one-word actor and state-107 transition"
+  - value: 32790
+    direction: s2c
+    connection: both
+    name: Unknown32790
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_897E80 consumes one-word actor and state-107 transition in case 32790"
+  - value: 32791
+    direction: c2s
+    connection: both
+    name: Unknown32791
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8A5540 writes actor, target and word"
+  - value: 32791
+    direction: s2c
+    connection: both
+    name: Unknown32791
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_897E80 consumes actor, target and word in case 32791"
+  - value: 32810
+    direction: c2s
+    connection: both
+    name: Unknown32810
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8A4250 writes six words with the actor third and two Boolean suffixes"
+  - value: 32810
+    direction: s2c
+    connection: both
+    name: Unknown32810
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8B5F30 consumes six words with the actor third and two Boolean suffixes"
+  - value: 32811
+    direction: c2s
+    connection: both
+    name: Unknown32811
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8A5850 writes actor and packed reload word"
+  - value: 32811
+    direction: s2c
+    connection: both
+    name: Unknown32811
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8BCA80 consumes actor and packed reload word"
+  - value: 32813
+    direction: c2s
+    connection: both
+    name: Unknown32813
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8A59F0 writes one-word actor return"
+  - value: 32813
+    direction: s2c
+    connection: both
+    name: Unknown32813
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_897E80 consumes one-word actor return in case 32813"
+  - value: 32815
+    direction: c2s
+    connection: both
+    name: Unknown32815
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8A5660 writes actor and target words"
+  - value: 32815
+    direction: s2c
+    connection: both
+    name: Unknown32815
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8B71A0 consumes actor and target words"
+  - value: 32816
+    direction: c2s
+    connection: both
+    name: Unknown32816
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_AE2CC0 writes actor and target words"
+  - value: 32816
+    direction: s2c
+    connection: both
+    name: Unknown32816
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8B7330 consumes actor and target words"
+  - value: 32821
+    direction: c2s
+    connection: both
+    name: Unknown32821
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_C8EB10 writes actor and two bytes"
+  - value: 32821
+    direction: s2c
+    connection: both
+    name: Unknown32821
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8BC4E0 consumes actor and two bytes"
+  - value: 32834
+    direction: c2s
+    connection: both
+    name: Unknown32834
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8A0330 writes two-word wall-state record"
+  - value: 32834
+    direction: s2c
+    connection: both
+    name: Unknown32834
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_897E80 consumes two-word wall-state record in case 32834"
+  - value: 32835
+    direction: c2s
+    connection: both
+    name: Unknown32835
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_60AA40 writes one-word actor and state-403 transition"
+  - value: 32835
+    direction: s2c
+    connection: both
+    name: Unknown32835
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_897E80 consumes one-word actor and state-403 transition in case 32835"
+  - value: 32836
+    direction: c2s
+    connection: both
+    name: Unknown32836
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8A3DE0 writes one-word death-cleanup actor"
+  - value: 32836
+    direction: s2c
+    connection: both
+    name: Unknown32836
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8B6250 consumes one-word death-cleanup actor"
+  - value: 32882
+    direction: c2s
+    connection: both
+    name: Unknown32882
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8A9400 writes actor and two Boolean words"
+  - value: 32882
+    direction: s2c
+    connection: both
+    name: Unknown32882
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8BD7F0 consumes actor and two Boolean words"
+  - value: 32884
+    direction: c2s
+    connection: both
+    name: Unknown32884
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_B55490 writes actor, target, Boolean word and word"
+  - value: 32884
+    direction: s2c
+    connection: both
+    name: Unknown32884
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8AFC10 consumes actor, target, Boolean word and word"
+  - value: 32907
+    direction: c2s
+    connection: both
+    name: Unknown32907
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_89ED40 writes one-word damager key"
+  - value: 32907
+    direction: s2c
+    connection: both
+    name: Unknown32907
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_897E80 consumes one-word damager key in case 32907"
+  - value: 32921
+    direction: c2s
+    connection: both
+    name: Unknown32921
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_506270 writes actor followed by two words"
+  - value: 32921
+    direction: s2c
+    connection: both
+    name: Unknown32921
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8A1300 consumes actor followed by two words"
+  - value: 32925
+    direction: c2s
+    connection: both
+    name: Unknown32925
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8A33C0 writes 32-byte packed motion record via cn-774 sub_488F60 / cn-774 sub_489090"
+  - value: 32925
+    direction: s2c
+    connection: both
+    name: Unknown32925
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8B0240 consumes 32-byte packed motion record via cn-774 sub_488F60 / cn-774 sub_489090"
+  - value: 32926
+    direction: c2s
+    connection: both
+    name: Unknown32926
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8B5670 writes 13-byte native reset confirmation"
+  - value: 32926
+    direction: s2c
+    connection: both
+    name: Unknown32926
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8B5960 consumes 13-byte native reset confirmation"
+  - value: 33286
+    direction: c2s
+    connection: both
+    name: Unknown33286
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8A15C0 writes actor followed by two words"
+  - value: 33286
+    direction: s2c
+    connection: both
+    name: Unknown33286
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8A2130 consumes actor followed by two words"
+  - value: 33301
+    direction: c2s
+    connection: both
+    name: Unknown33301
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_89E830 writes 24-byte damager contact with the extra word before its target"
+  - value: 33301
+    direction: s2c
+    connection: both
+    name: Unknown33301
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8B43B0 consumes 24-byte damager contact with the extra word before its target"
+  - value: 38271
+    direction: c2s
+    connection: both
+    name: Unknown38271
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8A5260 writes two participant words"
+  - value: 38271
+    direction: s2c
+    connection: both
+    name: Unknown38271
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_897E80 consumes two participant words in case 38271"
+  - value: 38272
+    direction: c2s
+    connection: both
+    name: Unknown38272
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8A3FC0 writes actor and other participant or sentinel"
+  - value: 38272
+    direction: s2c
+    connection: both
+    name: Unknown38272
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8B75D0 consumes actor and other participant or sentinel"
+  - value: 38273
+    direction: c2s
+    connection: both
+    name: Unknown38273
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_9F6340 writes victim, rescuer, clock word and byte before cn-774 sub_8B75D0"
+  - value: 38273
+    direction: s2c
+    connection: both
+    name: Unknown38273
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_89B780 consumes victim, rescuer, clock word and byte before cn-774 sub_8B75D0"
+  - value: 38274
+    direction: c2s
+    connection: both
+    name: Unknown38274
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8A3CF0 writes one-word actor and state-402 transition"
+  - value: 38274
+    direction: s2c
+    connection: both
+    name: Unknown38274
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_897E80 consumes one-word actor and state-402 transition in case 38274"
+  - value: 38277
+    direction: c2s
+    connection: both
+    name: Unknown38277
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8A4EF0 writes 32-byte finishing-blow record"
+  - value: 38277
+    direction: s2c
+    connection: both
+    name: Unknown38277
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8BAC20 consumes 32-byte finishing-blow record"
+  - value: 38280
+    direction: c2s
+    connection: both
+    name: Unknown38280
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_513540 writes rescuer, victim and byte before cn-774 sub_8B76E0"
+  - value: 38280
+    direction: s2c
+    connection: both
+    name: Unknown38280
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_89B780 consumes rescuer, victim and byte before cn-774 sub_8B76E0"
+  - value: 38281
+    direction: c2s
+    connection: both
+    name: Unknown38281
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8A5760 writes one-word actor transition"
+  - value: 38281
+    direction: s2c
+    connection: both
+    name: Unknown38281
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_897E80 consumes one-word actor transition in case 38281"
+  - value: 38282
+    direction: c2s
+    connection: both
+    name: Unknown38282
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8A4980 writes 40-byte knocked record"
+  - value: 38282
+    direction: s2c
+    connection: both
+    name: Unknown38282
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_8B7CA0 consumes 40-byte knocked record"
+  - value: 38283
+    direction: c2s
+    connection: both
+    name: Unknown38283
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_89E580 writes 19-byte compact damager contact"
+  - value: 38283
+    direction: s2c
+    connection: both
+    name: Unknown38283
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_897E80 consumes 19-byte compact damager contact in case 38283"
+  - value: 38284
+    direction: c2s
+    connection: both
+    name: Unknown38284
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_ADC7C0 writes actor and Boolean render word"
+  - value: 38284
+    direction: s2c
+    connection: both
+    name: Unknown38284
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_897E80 consumes actor and Boolean render word in case 38284"
+
+  - value: 578
+    direction: c2s
+    connection: game
+    name: gcpGameReportMapLoadingComplete
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_89E1F0 stamps 578 and writes four words after stage loading; matched to the corresponding kr-812 packet builder"
+
+  - value: 607
+    direction: c2s
+    connection: game
+    name: gcpReqAddObject
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_89F8C0 stamps 607 and writes the local scene object as one word; matched to the corresponding kr-812 packet builder"
+
+  - value: 579
+    direction: c2s
+    connection: game
+    name: gcpGameReportMapData
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8C77E0 stamps 579 and serializes the native map-data report; recorded without parsing; matched to the corresponding kr-812 packet builder"

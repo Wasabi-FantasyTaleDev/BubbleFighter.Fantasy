@@ -41,6 +41,12 @@ public sealed class RoomRoundProjectionTests
     [InlineData("kr-1256", 0, "unknown_168", "unknown_144")]
     [InlineData("kr-1256", 1, "unknown_216", "unknown_192")]
     [InlineData("kr-1256", 2, "unknown_264", "unknown_240")]
+    [InlineData("cn-774", 0, "unknown_176", "unknown_200")]
+    [InlineData("cn-774", 1, "unknown_224", "unknown_248")]
+    [InlineData("cn-774", 2, "unknown_272", "unknown_296")]
+    [InlineData("tw-454", 0, "unknown_160", "unknown_184")]
+    [InlineData("tw-454", 1, "unknown_208", "unknown_232")]
+    [InlineData("tw-454", 2, "unknown_256", "unknown_280")]
     public void EachSelectorChangesOnlyItsAuditedPair(string build, int index, string first, string second)
     {
         var tables = TestBuilds.Packets;
@@ -63,6 +69,8 @@ public sealed class RoomRoundProjectionTests
     [Theory]
     [InlineData("kr-812")]
     [InlineData("kr-1256")]
+    [InlineData("cn-774")]
+    [InlineData("tw-454")]
     public void RequestAdmissionPinsLengthAndRejectsOutOfRangeIndices(string build)
     {
         var projection = Assert.IsType<RoomRoundSettingFields>(RoomRoundSettingFields.Load(TestBuilds.Packets, build));
@@ -82,10 +90,20 @@ public sealed class RoomRoundProjectionTests
         }
     }
 
-    /// <summary>Unresolved later game-setting targets cannot inherit a working baseline projection silently.</summary>
+    /// <summary>Each native selector replaces only its audited pair in an encoded retained setting.</summary>
     [Theory]
     [InlineData("cn-774")]
     [InlineData("tw-454")]
-    public void UnresolvedTargetDataDoesNotPublishABinding(string build) =>
-        Assert.Null(RoomRoundSettingFields.Load(TestBuilds.Packets, build));
+    public void NativeEncodedProjectionPreservesOtherSelectors(string build)
+    {
+        var tables = TestBuilds.Packets;
+        var projection = Assert.IsType<RoomRoundSettingFields>(RoomRoundSettingFields.Load(tables, build));
+        var original = PacketCodec.Write(tables, build, "GameSetting", new Dictionary<string, object?>());
+        for (var index = 0; index < 3; index++)
+        {
+            var changed = projection.Apply(original, index, "selected-map", "native-text");
+            Assert.NotEqual(original, changed);
+            Assert.Equal(original, projection.Apply(changed, index, "", ""));
+        }
+    }
 }

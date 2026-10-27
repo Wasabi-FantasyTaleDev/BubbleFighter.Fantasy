@@ -107,7 +107,8 @@ dotnet run --project src/BubbleFighter.Fantasy.Host -- run --profile kr-1256 --d
 
 ## Before you start a session
 
-- If your checkout has the git-ignored maintainer notes, read them first: `AGENTS.local.md`, then
+- If your checkout has the git-ignored maintainer notes, read them first:
+  `docs/private/handoff/CONTINUE-PROJECT.md` (the entry point), then `AGENTS.local.md` and
   `docs/private/README.md`. They hold the current work board, the shared log, the review checklist and the
   deploy and release procedures. They are not part of the public tree; never copy their contents into
   tracked files, commit messages, pull requests or code comments.

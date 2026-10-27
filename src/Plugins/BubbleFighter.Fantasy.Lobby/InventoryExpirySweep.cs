@@ -27,12 +27,20 @@ public sealed class InventoryExpirySweep(IInventoryRepository inventory, IEquipm
 
     /// <inheritdoc />
     public async ValueTask<IReadOnlyList<int>> SweepAsync(long userNum, CancellationToken ct)
+        => await SweepCoreAsync(userNum, null, ct).ConfigureAwait(false);
+
+    internal ValueTask<IReadOnlyList<int>> SweepForLoginAsync(long userNum,
+        Data.LoginInventoryResolver resolver, CancellationToken ct) => SweepCoreAsync(userNum, resolver, ct);
+
+    private async ValueTask<IReadOnlyList<int>> SweepCoreAsync(long userNum,
+        Data.LoginInventoryResolver? resolver, CancellationToken ct)
     {
         var removed = await inventory.RemoveExpiredAsync(userNum, clock.GetUtcNow(), ct).ConfigureAwait(false);
-        // Deletion commits before the repair. A repair that failed on an earlier sweep leaves nothing expired to find,
-        // so the repair runs on every sweep; it returns at once while a character is worn. A player who owns nothing
-        // has never been seeded: the login resolver that runs next seeds the starter bag with its worn character, and
-        // a repair of one character alone could not satisfy the selection's other required positions.
+        // Partial or interrupted starter grants must be completed before a character repair validates every required position.
+        if (resolver is not null)
+            await resolver.PrepareAsync(userNum, ct).ConfigureAwait(false);
+        // Deletion commits before repair, so a retry must repair even when no expired rows remain.
+        // Ordinary sweeps leave never-seeded bags empty; login prepares the starter rows above before selecting equipment.
         if (removed.Count > 0 || !await OwnsNothingAsync(userNum, ct).ConfigureAwait(false))
             await WearDefaultCharacterAsync(userNum, ct).ConfigureAwait(false);
         return removed.Count == 0 ? [] : removed.Select(row => row.ItemId).Distinct().ToArray();
@@ -42,9 +50,12 @@ public sealed class InventoryExpirySweep(IInventoryRepository inventory, IEquipm
         // Only a removed worn character leaves the player without one; worn weapons simply become unworn.
         removed.Any(IsWornCharacter) ? WearDefaultCharacterAsync(userNum, ct) : ValueTask.CompletedTask;
 
+    // ListSlotsAsync returns a complete snapshot; maxCount is a capacity bound, not a query limit.
     private async ValueTask<bool> OwnsNothingAsync(long userNum, CancellationToken ct) =>
-        (await inventory.ListSlotsAsync(userNum, InventoryBag.CharacterBag, 1, ct).ConfigureAwait(false)).Count == 0
-        && (await inventory.ListSlotsAsync(userNum, InventoryBag.EquippedBag, 1, ct).ConfigureAwait(false)).Count == 0;
+        (await inventory.ListSlotsAsync(userNum, InventoryBag.CharacterBag,
+            InventoryLimits.MaxInventorySlotsPerBag, ct).ConfigureAwait(false)).Count == 0
+        && (await inventory.ListSlotsAsync(userNum, InventoryBag.EquippedBag,
+            InventoryLimits.MaxInventorySlotsPerBag, ct).ConfigureAwait(false)).Count == 0;
 
     private static bool IsWornCharacter(InventorySlotRecord row) =>
         (row.Flags & InventorySlotRecord.WornFlagBit) != 0 && row.ItemId is >= 300001 and <= 300031;

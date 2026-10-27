@@ -4,7 +4,6 @@ using BubbleFighter.Fantasy.InGame;
 using BubbleFighter.Fantasy.InGame.Data;
 using BubbleFighter.Fantasy.InGame.Handlers;
 using BubbleFighter.Fantasy.InGame.Sessions;
-using BubbleFighter.Fantasy.InGame.Wire;
 using Microsoft.Extensions.Logging;
 using BubbleFighter.Fantasy.Tests.Shared;
 using Xunit;
@@ -81,28 +80,11 @@ public sealed class SeatCharacterResolverTests
         Assert.Equal(300001, resolved);
     }
 
-    [Fact]
-    public void ProfileEntryPinsTheResolvedCharacter()
-    {
-        var entry = new ProfileMapEntry(10, 300017);
-
-        Assert.Equal(10, entry.Identity);
-        Assert.Equal(300017, entry.CharacterId);
-    }
-
     private static async ValueTask<int> ResolveAsync(
         RoomRegistryTests.FakeSession session, int userNum, ISeatCharacterResolver? resolver)
     {
-        var loop = new RoomLoop(
-            new RoomRegistry(new InGameOptions()),
-            new ModeCatalog(),
-            new InGameOptions(),
-            "127.0.0.1",
-            new NullLogger(),
-            resolver);
-        var resolved = loop.ResolveSeatCharacterForTest(session, userNum);
-        await ValueTask.CompletedTask;
-        return await resolved;
+        var resolved = SeatCharacter.ResolveEquipmentAsync(session, userNum, null, resolver, CancellationToken.None);
+        return (await resolved).CharacterId;
     }
 
     private sealed class StubRoster(int equipped) : ISeatCharacterResolver

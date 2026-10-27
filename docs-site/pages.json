@@ -28,6 +28,14 @@
     "route": "guides/launcher"
   },
   {
+    "source": "store",
+    "route": "guides/store"
+  },
+  {
+    "source": "self-hosted-store",
+    "route": "guides/self-hosted-store"
+  },
+  {
     "source": "troubleshooting",
     "route": "guides/troubleshooting"
   },

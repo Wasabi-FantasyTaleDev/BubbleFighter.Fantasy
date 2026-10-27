@@ -52,6 +52,10 @@ structs:
   # S2C gspRoomChangeInventory (506): kr-812 sub_7FE650 uses reader
   # kr-812 sub_80C100: three words, then a counted word vector. Their meanings
   # are unresolved. The modern consumers use their first word as the room seat.
+  # The same read order is in cn-717 sub_890EC0, cn-324 sub_6EB2E0 and
+  # cn-279 sub_449C30 (cn-279 dispatcher sub_70A0F0 case 506), each with its
+  # own three four-byte primitives and its own counted word vector; cn-279's
+  # live table row cites the class and reader, the other two inherit this one.
   # kr-1256 sub_9D9930 case 0x1FA reads only two four-byte words.
   # cn-774 sub_8D7D20 case 0x1FA -> cn-774 sub_8DCEE0 and tw-454
   # sub_A578B0 case 0x1FA -> tw-454 sub_A5CA10 restore the longer form.
@@ -80,42 +84,4 @@ structs:
       except: [kr-1256]
       also: [cn-774]
 
-  # C2S gcpRoomSendAmpMsg (520): the baseline writer kr-812 sub_845040 and
-  # the modern writers kr-1256 sub_9D7350, cn-774 sub_BD61A0 and tw-454
-  # sub_AB1F70 emit one u32, one counted UTF-16 string, and two u32 words.
-  # The native objects place those values at +0, +4, +28 and +32. The first
-  # word is accepted as kinds 101/102/103 by kr-812 sub_8146C0; the two
-  # trailing words have different contextual uses in the audited producers,
-  # so they remain unknown rather than being called a cost or a colour.
-  RoomAmplifierRequest:
-    - kind: u32
-      offset: 0
-    - message: wstr
-      offset: 4
-    - unknown_28: u32
-      offset: 28
-    - unknown_32: u32
-      offset: 32
-
-  # Legacy kr-812 recruitment request: writer sub_845640 and reader
-  # sub_845670 serialize one counted UTF-16 message followed by one byte;
-  # sender sub_839BB0 stamps C2S 2027. The byte's purpose is not proven.
-  RoomRecruitRequest@kr-812:
-    - message: wstr
-      offset: 4
-    - unknown_32: u8
-      offset: 32
-
-  # Legacy kr-812 recruitment notification: reader sub_80AC10 and writer
-  # sub_80ABE0 consume a u16 member identifier followed by a counted UTF-16
-  # message; handler sub_8028C0 resolves the identifier against room members.
-  RoomRecruitReply@kr-812:
-    - member_id: u16
-      offset: 4
-    - message: wstr
-      offset: 8
-
-  # Legacy kr-812 observer-team request: the constructor/sender path
-  # sub_5C87A0 stamps C2S 2009 and its serializer is a no-op. The client-side
-  # menu gate is separate; this empty body does not enable observer behavior.
-  RoomObserverTeamChangeRequest@kr-812: []
+  # The room amplifier and recruit messages are stated in packets/recruit.yaml.

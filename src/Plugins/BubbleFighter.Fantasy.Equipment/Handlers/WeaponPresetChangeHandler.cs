@@ -5,26 +5,30 @@ using Microsoft.Extensions.Logging;
 namespace BubbleFighter.Fantasy.Equipment.Handlers;
 
 /// <summary>
-/// Grants or refuses weapon preset switches. The preset bar is server-derived from the worn
-/// set (<see cref="WeaponPresetSlots"/>), so a slot the client could offer is by construction
-/// bound here: the client's send gate (<c>kr-812 sub_956300</c>) suppresses requests for slots whose
-/// published flag is unset. A granted slot persists through
-/// <see cref="IPlayerInventoryState"/> before the view republishes it, matching the recorded
-/// order view, preset bar, status reply.
+/// Grants or refuses weapon preset switches. The published bar is server-derived from the worn
+/// set (<see cref="WeaponPresetSlots"/>) until the player's preset pages were materialized
+/// (<c>persist_preset_pages</c>), and materialized pages win: their first words become the bar's
+/// binding, so pages 3-4 - dead in the derived bar, which publishes no record for them - are
+/// grantable exactly when their page carries a weapon. The client's send gate
+/// (<c>kr-812 sub_956300</c>) still suppresses requests for slots whose published flag is unset.
+/// A granted slot persists through <see cref="IPlayerInventoryState"/> before the view republishes
+/// it, matching the recorded order view, preset bar, status reply.
 /// </summary>
-/// <param name="playerState">Persists the active slot across logins.</param>
+/// <param name="playerState">Persists the active slot and the materialized preset pages across logins.</param>
 /// <param name="selection">Reads the worn set the published bar derives from; may be null on
 /// an ack-only row, which then refuses every switch.</param>
 /// <param name="equippedView">Republishes the appearance and the bar after a grant.</param>
 /// <param name="replies">Writes the build's status reply; it always runs so the client's
 /// latched sender re-arms.</param>
 /// <param name="logger">Reports refused and granted switches.</param>
+/// <param name="presetPages">The build-scoped persisted-bar policy, absent when the build uses a derived bar.</param>
 public sealed class WeaponPresetChangeHandler(
     IPlayerInventoryState playerState,
     IEquipmentSelection? selection,
     IEquippedViewPush? equippedView,
     IMessageSender<WeaponPresetChangeReplied> replies,
-    ILogger logger)
+    ILogger logger,
+    IWeaponPresetPageSource? presetPages = null)
 {
     /// <summary>Handles one decoded preset request.</summary>
     /// <param name="session">The requesting session and its authenticated player feature.</param>
@@ -49,7 +53,13 @@ public sealed class WeaponPresetChangeHandler(
             worn = bag.Where(row => (row.Flags & InventorySlotRecord.WornFlagBit) != 0)
                 .Select(row => row.ItemId).Distinct().ToArray();
         }
-        var slots = WeaponPresetSlots.FromWorn(worn);
+        // Materialized pages are the published bar, so they are also the binding: a page with no weapon
+        // (first word zero) is the unbound slot the client will not offer and the server refuses.
+        var pages = presetPages is null ? null
+            : await presetPages.ReadAsync(user, ct).ConfigureAwait(false);
+        var slots = pages is null
+            ? WeaponPresetSlots.FromWorn(worn)
+            : pages.Select(page => page.Unknown0).ToArray();
         if (request.Slot > InventoryLimits.MaxWeaponPresetSlot
             || request.Slot >= slots.Length
             || slots[request.Slot] == 0)

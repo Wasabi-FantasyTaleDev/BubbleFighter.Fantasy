@@ -76,6 +76,8 @@ structs:
   # before kr-1256 sub_9E5E70 moves the stage. Three strings, six scalars and three lists, with no field
   # in common with the kr-812 header and tail, so the whole record is restated.
   RoomEnterGame@kr-1256:
+    # cn-774 sub_105EF50 and tw-454 sub_EBE3C0 retain this complete wire order.
+    # Their dispatch consumers cn-774 sub_8DD8D0 / tw-454 sub_A5D750 install state +72.
     # kr-1256 sub_9E5E70 copies it to session+208 (the MapMeta key slot) and tests its map record for the
     # mission flags.
     - map_key: wstr

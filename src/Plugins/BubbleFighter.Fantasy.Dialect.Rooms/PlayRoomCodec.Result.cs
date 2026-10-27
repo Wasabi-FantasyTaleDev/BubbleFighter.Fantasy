@@ -30,7 +30,7 @@ internal sealed partial class PlayRoomCodec
     private const int SeatSerialBase = 1_000_000;
     private const int SeatSerialStride = 100_000;
 
-    private ScoreShape Score => play.Score ?? new ScoreShape();
+    private PlayValues.ScoreValues Score => play.Score;
 
     private void MountResult(IPluginContext context)
     {
@@ -100,7 +100,7 @@ internal sealed partial class PlayRoomCodec
         if (StarReports)
         {
             context.Effect(services.RegisterMany<IInboundMessageBinding<RoundStarReported>>(this));
-            if (Score.StarReport == StarReportPacket.Optimized)
+            if (Score.StarReport == PlayValues.StarReportPacket.Optimized)
             {
                 _ = packetTables.Resolve(lineage, "RoundOptimizedScoreReport");
                 _ = table.C2S("gcpGameUpdateScoreOptimze");
@@ -140,7 +140,7 @@ internal sealed partial class PlayRoomCodec
     {
         var fields = PacketCodec.ReadScalars(packetTables, lineage, "RoundScoreReport", body);
         var kind = Convert.ToInt32(fields["kind"]);
-        if (Score.StarReport == StarReportPacket.Full && StarChangeOf(kind) is { } star)
+        if (Score.StarReport == PlayValues.StarReportPacket.Full && StarChangeOf(kind) is { } star)
             return new RoundStarReported(0, star);
         var direct = kind == 3 && packetTables.CapabilityOf(lineage, "direct_kill_reports");
         var ordinary = kind is 1 or 2 && packetTables.CapabilityOf(lineage, "character_reference_score_reports");
@@ -278,7 +278,7 @@ internal sealed partial class PlayRoomCodec
         var kind = (byte)fields["kind"];
         if (kind == 2 && play.ScoreReports && !Score.WideReport)
             return ReadFinishingBlow(session, body);
-        if (Score.StarReport == StarReportPacket.Optimized && StarChangeOf(kind) is { } star)
+        if (Score.StarReport == PlayValues.StarReportPacket.Optimized && StarChangeOf(kind) is { } star)
             return new RoundStarReported((byte)fields["reporter_slot"], star);
         logger.LogInformation("Session {Id} gcpGameUpdateScoreOptimze kind {Kind} is not a report this row reads.", session.Id, kind);
         return null;
@@ -333,7 +333,8 @@ internal sealed partial class PlayRoomCodec
         RoundSeatStats? victim = message.Seats.Count > 1 ? message.Seats[1] : null;
         return PacketCodec.Write(tables, build, "RoundLiveScore", new Dictionary<string, object?>
         {
-            ["team"] = checked((byte)Math.Clamp(message.ScoringTeam, 1, 2)),
+            // kr-812 sub_8046C0 skips the team-total write for zero but still applies seat stats.
+            ["team"] = checked((byte)message.ScoringTeam),
             ["total"] = checked((ushort)TeamTotal(message.TeamTotals, message.ScoringTeam)),
             ["scorer_slot"] = unchecked((byte)(scorer?.Slot ?? -1)),
             ["victim_slot"] = unchecked((byte)(victim?.Slot ?? -1)),
@@ -397,7 +398,7 @@ internal sealed partial class PlayRoomCodec
     {
         ArgumentNullException.ThrowIfNull(message);
         var body = WriteScoreboard(packetTables, lineage, message);
-        if (Score.TimeOverEnd == TimeOverEndBody.Scoreboard && !message.WithRewards)
+        if (Score.TimeOverEnd == PlayValues.TimeOverEndBody.Scoreboard && !message.WithRewards)
         {
             // This build takes the table of the result scene inside gspGameTimeOverEnd, whatever ended the round.
             return session.SendAsync(S2C(session, "gspGameTimeOverEnd"), body, ct);
@@ -499,7 +500,7 @@ internal sealed partial class PlayRoomCodec
         {
             "award_display_id" => row.AwardDisplayId,
             "slot" => row.Slot,
-            "team" => Math.Max(1, row.Team),
+            "team" => row.Team,
             "level" => Math.Max(1, row.Level),
             "knock_downs" => row.Stats.Knockdowns,
             "kills" => row.Stats.Kills,

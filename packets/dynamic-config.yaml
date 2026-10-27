@@ -1,0 +1,70 @@
+version: 1
+structs:
+  DynamicConfigRequest: []
+  # kr-1256 sub_99E860 writes a category mask, then one checksum per set bit in ascending order.
+  DynamicConfigRequest@kr-1256:
+    - mask: u32
+    - checksum_0: 'when<mask&0x1,u32>'
+    - checksum_1: 'when<mask&0x2,u32>'
+    - checksum_2: 'when<mask&0x4,u32>'
+    - checksum_3: 'when<mask&0x8,u32>'
+    - checksum_4: 'when<mask&0x10,u32>'
+    - checksum_5: 'when<mask&0x20,u32>'
+    - checksum_6: 'when<mask&0x40,u32>'
+    - checksum_7: 'when<mask&0x80,u32>'
+    - checksum_8: 'when<mask&0x100,u32>'
+    - checksum_9: 'when<mask&0x200,u32>'
+    - checksum_10: 'when<mask&0x400,u32>'
+    - checksum_11: 'when<mask&0x800,u32>'
+    - checksum_12: 'when<mask&0x1000,u32>'
+    - checksum_13: 'when<mask&0x2000,u32>'
+    - checksum_14: 'when<mask&0x4000,u32>'
+    - checksum_15: 'when<mask&0x8000,u32>'
+    - checksum_16: 'when<mask&0x10000,u32>'
+    - checksum_17: 'when<mask&0x20000,u32>'
+    - checksum_18: 'when<mask&0x40000,u32>'
+    - checksum_19: 'when<mask&0x80000,u32>'
+    - checksum_20: 'when<mask&0x100000,u32>'
+    - checksum_21: 'when<mask&0x200000,u32>'
+    - checksum_22: 'when<mask&0x400000,u32>'
+    - checksum_23: 'when<mask&0x800000,u32>'
+    - checksum_24: 'when<mask&0x1000000,u32>'
+    - checksum_25: 'when<mask&0x2000000,u32>'
+    - checksum_26: 'when<mask&0x4000000,u32>'
+    - checksum_27: 'when<mask&0x8000000,u32>'
+    - checksum_28: 'when<mask&0x10000000,u32>'
+    - checksum_29: 'when<mask&0x20000000,u32>'
+    - checksum_30: 'when<mask&0x40000000,u32>'
+    - checksum_31: 'when<mask&0x80000000,u32>'
+
+  # kr-1256 sub_9D2FF0 case 1500 reads a mask, not a count. Only the audited category is published.
+  DynamicConfigReply:
+    - mask: u32
+    - creation: 'when<mask&0x4000,DynamicConfigBlob>'
+      only: [kr-1256]
+
+  # kr-1256 sub_65F370 reads one compressed byte count and wraps those bytes in a zlib stream.
+  DynamicConfigBlob:
+    - compressed: list<u8>
+
+  CreationContent: []
+  # kr-1256 sub_53D0E0 registers category 14. kr-1256 sub_53CDF0 -> kr-1256 sub_40DC40 reads this inflated body.
+  CreationContent@kr-1256:
+    - ui_path: wstr
+      offset: 0
+    - character_types: list<u32>
+      offset: 24
+    - preview_overrides: list<CreationPreviewOverride>
+      offset: 44
+    - unknown_52: u32
+      offset: 52
+    - unknown_56: u32
+      offset: 56
+      default: 100 # kr-1256 sub_5E6C30 uses this word as a divisor in a separate counter display.
+
+  # kr-1256 sub_40DC40 reads key/value words into the map consumed by kr-1256 sub_53D410 -> kr-1256 sub_904670.
+  CreationPreviewOverride:
+    - unknown_16: u32
+      offset: 16
+    - unknown_20: u32
+      offset: 20

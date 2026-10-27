@@ -11,6 +11,9 @@
   plugin: protocol
   config:
     opcode_table_path: profiles/cn-742/opcodes.yaml
+    # The mandatory first packet, the patch-request slot: every legacy build names it
+    # gcpFirstConnect; kr-1256 names the same slot gcpReqGamePatch.
+    patch_request_name: gcpFirstConnect
     bootstrap_status: 2
     pre_handshake_opcodes: [19]
     bootstrap_command_line: "http://bf.dn.nexoncdn.co.kr/PatchData"

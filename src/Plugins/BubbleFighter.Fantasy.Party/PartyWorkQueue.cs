@@ -15,6 +15,13 @@ internal sealed class PartyWorkQueue(int capacity) : IDisposable
     });
     private int _stopped;
 
+    /// <summary>
+    /// Queues one serialized mutation. A full or stopped queue is refused instead of blocking the
+    /// caller; the caller's token is checked at admission and again before the work is accepted, so a
+    /// disconnecting requester does not run its mutation. The returned task completes when the queued
+    /// operation (and its peer notices) finish.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown when the queue is full or stopped.</exception>
     internal ValueTask ExecuteAsync(Func<CancellationToken, ValueTask> operation, CancellationToken caller)
     {
         caller.ThrowIfCancellationRequested();
@@ -29,6 +36,13 @@ internal sealed class PartyWorkQueue(int capacity) : IDisposable
     // The tracked connection remains the source of truth; repeated signals can be coalesced safely.
     internal void Wake() => _wake.Writer.TryWrite(0);
 
+    /// <summary>
+    /// The queue's single reader loop: wait for a wake signal, run the sweep, then drain every queued
+    /// operation, sweeping again after each. Once accepted, an operation runs with the loop's lifetime
+    /// token — peer notices finish even when the requester's token cancels mid-flight — and its
+    /// failure or cancellation is reported to the queued task, not to the loop. When the lifetime ends,
+    /// the loop stops itself and cancels every still-queued work with a cancelled token.
+    /// </summary>
     internal async ValueTask RunAsync(Func<CancellationToken, ValueTask> sweep, CancellationToken lifetime)
     {
         try
@@ -64,6 +78,7 @@ internal sealed class PartyWorkQueue(int capacity) : IDisposable
         }
     }
 
+    /// <summary>Stops new admissions and completes both channels; the reader loop drains what it can and cancels the rest. Idempotent.</summary>
     public void Dispose()
     {
         Interlocked.Exchange(ref _stopped, 1);

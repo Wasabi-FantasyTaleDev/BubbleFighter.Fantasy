@@ -9,10 +9,15 @@ experimental: true
 # Nearest build whose layouts this one reuses when it has no variant of its own.
 parent: kr-1256
 description: Chinese 2019 client build, ClientVersion_Major 774.
+vars:
+  BFF_MODERN_RELAY_PORT: "${CN_774_RELAY_PORT:-7191}"
+  BFF_MODERN_RELAY_PUBLIC_PORT: "${CN_774_RELAY_PUBLIC_PORT:-7191}"
 bundles:
   - core
   - cn-774
   - player-settings
+  - modern-plaza
+  - modern-commerce
 patches:
   - patch.yaml
   # Optional developer override; git-ignored and skipped when absent.

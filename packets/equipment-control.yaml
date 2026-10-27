@@ -9,10 +9,14 @@ structs:
       offset: 4
   # kr-1256 sub_659850 (wear) and sub_805A60 (removal) write one i64 key: below 100000000 a bag item id, from it an
   # article key (kr-1256 sub_806CE0).
+  # cn-774 sub_80B980/sub_9A5A40 -> sub_108BCE0 and tw-454 sub_C03F70/sub_C040B0 ->
+  # sub_E8E6C0 write the same i64. cn-774 sub_9A6A70 / tw-454 sub_C05410 use the same 100000000 article boundary.
   InventoryEquipmentRequest@kr-1256:
     - item_id: u64
   # kr-1256 sub_9B34D0 / sub_9B3E00 read an i32 result and the request's i64 key, which case 0 hands to
   # kr-1256 sub_806CE0 to apply the slot.
+  # cn-774 sub_BB1F20/sub_BB2670 and tw-454 sub_A8F730/sub_A8FF40 read the same result/key pair;
+  # case 0 applies that exact key through the inventory helper before showing success.
   InventoryEquipmentResult@kr-1256:
     - result: u32
     - item_id: u64

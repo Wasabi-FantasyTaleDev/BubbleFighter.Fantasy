@@ -1,7 +1,7 @@
 ---
 title: "플러그인"
 description: "플러그인 모델을 이해하고 네이티브 .NET 플러그인을 빌드, 마운트, 설정, 다시 로드합니다."
-updated: 2026-10-18
+updated: 2026-10-23
 ---
 
 서버의 모든 동작은 플러그인으로 구현됩니다. profile이 플러그인 행을 구성하고, 각 행은 하나의 플러그인 구현과 하나의 설정을 안정적인 인스턴스 id에 묶으며, Host는 각 행이 선언한 서비스 요구 사항이 충족되는 순서로 행을 활성화합니다. 이 페이지는 그 모델을 설명하고, Host가 무엇을 발견하고 로드했는지 확인하는 방법을 보여 준 뒤, 프로젝트 파일에서 실행되는 행까지 첫 네이티브 .NET 플러그인을 단계별로 안내합니다. 마지막으로 설정, 수명 주기와 다시 로드, 네이티브 플러그인과 선택형 언어 SDK의 경계, 플러그인 작성자가 지켜야 할 규칙, 가장 자주 만나는 실패를 다룹니다.
@@ -255,3 +255,78 @@ Heartbeat every 15 s.
 ## 다음 단계
 
 [SDK 프로토콜](sdk-protocol.md)을 이어 읽고 Python, TypeScript, Go 또는 Rust로 작성한 플러그인을 마운트하세요. 그다음 [기여](contributing.md)에서 검증 게이트와 검토 규칙을 확인하세요. [서버 설정](configuration.md)은 profile, bundle, 패치, 환경 변수를 자세히 설명합니다.
+## 명령과 권한 등록 {#register-commands}
+
+알림 후 연결을 끊는 작업에서 `ISession.SendAsync`는 메시지를 큐에 넣기만 합니다. 세션이 `ISessionOutputDrain`을 구현하면 닫기 전에 작업에 설정된 취소 기한으로 `DrainOutputAsync`를 기다립니다. 이 펜스는 이전 전송 쓰기의 완료만 보장하며 클라이언트 수신이나 화면 표시를 확인하지 않습니다. 취소는 대기만 중단하고 큐의 메시지를 철회하지 않습니다. 큐가 가득 차거나 세션이 중지되거나 쓰기가 실패하면 대기도 실패합니다. 고정 지연이나 구체적인 프로토콜 클래스로 공유 인터페이스를 대체하지 마세요.
+
+core 번들의 `permissions`, `commands` 행은 네이티브 플러그인용 명령 기반을 제공합니다. 플러그인은 `Requires`에 `BubbleFighter.Fantasy.Contracts.Administration`의 `IPermissionRegistry`, `ICommandRegistry`를 선언하고 권한 노드를 먼저 등록한 뒤 명령을 등록합니다. 두 등록 핸들은 모두 `context.Effect(...)`로 소유합니다.
+
+```csharp
+context.Effect(context.Services.Get<IPermissionRegistry>().Register(
+    new PermissionDefinition("example.ping", "Check whether the example plugin is ready.")));
+context.Effect(context.Services.Get<ICommandRegistry>().Register(context,
+    new CommandDefinition("ping", ["ready"], "example.ping", "Check plugin readiness.", []),
+    (invocation, token) => ValueTask.FromResult(
+        new CommandResult(CommandStatus.Success, "Ready."))));
+```
+
+명령 이름과 별칭은 전역에서 고유하며 등록 시 메타데이터를 복사합니다. 등록 해제는 모든 별칭을 제거하고 실행 중인 작업에 취소를 알립니다. 처리기는 등록 플러그인의 감독되는 작업으로 실행되므로 플러그인 해제 시 취소하고 완료를 기다립니다. 처리기는 전달된 취소 토큰을 따라야 합니다. 정상적인 상태 오류는 `InvalidState`로 반환하고 예기치 않은 예외는 호출자와 소유 플러그인에 보고합니다. `ICommandRegistry.List(principal)`은 권한으로 필터링된 도움말 및 패널 메타데이터를 반환합니다.
+
+`ICommandExecutor.ExecuteAsync`는 명령 이름과 구조화된 위치 인수를 받습니다. `ExecuteTextAsync`는 `/`, `!`, `！`, 큰따옴표 인수, 부호 있는 정수, 마지막 `RemainingText`를 지원합니다. 구조화된 호출은 나머지 본문을 하나의 인수로 전달합니다. 본문에 별도의 단어 수 제한은 없습니다. 콘솔 어댑터는 접두사 없는 입력을 명시적으로 허용할 수 있으며 shell 코드를 실행하지 않습니다.
+
+신뢰할 수 있는 어댑터만 인증 결과로 `CommandCaller`를 구성합니다. 안정적인 계정 ID를 사용하고 대리 실행 시 원래 `Actor`와 유효 `Subject`를 보존하며 요청 인수에서 이 신원을 역직렬화하면 안 됩니다. `Language`는 사용자의 UI 언어이며 빈 값은 배포 기본 언어를 요청합니다. 감사 이벤트는 신원과 결과만 포함하며 원본 인수는 저장하지 않습니다. 네이티브 등록을 지원하며 원격 SDK 등록에는 콜백 및 수명 어댑터가 더 필요합니다. 콘솔 입력과 WebUI는 아직 이 디스패처에 연결되지 않았습니다.
+
+`ingame` 행의 config에 `shared_chat_commands: true`를 설정하면 해당 게임 범위의 채팅을 공유 명령에 연결합니다. 네이티브 클라이언트 검증 전까지 기본값은 `false`이며, 비활성 범위는 기존 방장 전용 `!start`, `!set`을 유지합니다. 활성화하려면 두 공유 명령 서비스가 모두 필요하며 없으면 활성화에 실패합니다.
+
+core 번들의 `commands.game` 행은 활성 범위를 같은 디스패처에 연결하며 네이티브 플러그인이 등록한 명령도 호출합니다. 모든 게임 범위에 `/start`, `/mode <번호>`(별칭 `/set`)를 한 번만 등록하고 `!`, `！` 접두사도 지원합니다. `game.room.start`, `game.room.mode` 권한은 기본적으로 일반 플레이어에게 허용되며 자신의 대기 중인 방에만 적용됩니다. 설정된 모드 표에 없는 번호는 거부됩니다. 명령 시작은 준비 표시를 건너뛰지만 기본 시작 버튼의 방장 검사는 유지됩니다. 권한이 거부된 접두사 입력은 로컬 처리기로 우회하지 않습니다.
+
+게임 플러그인은 `IGameCommandEndpoints`를 통해 `IGameCommandEndpoint`를 등록하고 반환된 해제 핸들을 소유합니다. 라우팅은 인증된 게임 계정을 현재 좌석과 대조하고 중복된 세션 소유권을 거부하며 게임 플러그인의 수명 안에서 실행합니다. `commands.game.max_endpoints`는 기본 512로 동시 범위 등록 저장소를 제한합니다. 이 행은 지도, 관리 또는 방 이동 명령을 아직 제공하지 않습니다.
+
+게임 범위를 등록 해제하거나 교체하면 이전 라우팅 스냅샷은 무효가 됩니다. 실행을 시작하지 않은 호출은 해제된 엔드포인트를 호출하거나 교체된 엔드포인트로 자동 전환할 수 없습니다.
+
+`permissions` 행의 설정 예:
+
+```yaml
+config:
+  groups:
+    - name: players
+      allow: [example.ping]
+    - name: helpers
+      inherits: [players]
+      deny: [example.restricted]
+  subjects:
+    - kind: game
+      id: "42"
+      groups: [helpers]
+    - kind: game
+      id: "7"
+      operator: true
+    - kind: webui
+      id: "admin-account-id"
+      allow: [webui.access, webui.admin]
+```
+
+ID는 각 인증 네임스페이스에 이미 존재하는 계정을 가리키며 이 설정은 계정이나 로그인 자격 증명을 만들지 않습니다. 일반 신원의 거부 규칙은 개인, 상속 및 와일드카드 허용보다 우선합니다. 규칙은 정확한 노드, `prefix.*`, `*`를 지원합니다. 알 수 없는 그룹과 상속 순환은 활성화 오류이고 미등록 노드는 거부합니다. 게임 OP와 로컬 콘솔은 모든 등록 권한을 가지지만 게임 OP가 WebUI 로그인을 허용하지는 않습니다. `webui.access`는 진입만, `webui.admin`은 WebUI 전체 관리 권한을 나타냅니다. 권한은 인수 또는 상태 검증을 우회하지 않습니다. 이 WebUI 노드는 어댑터 통합용이며 기존 HTTP 인증을 아직 대체하지 않습니다.
+
+자원 설정은 게임 기능 수가 아닌 등록 저장소와 실행 작업을 보호합니다. `commands`는 `max_commands`(512), `max_input_characters`(4096, 등록 이름 및 인수 정의 텍스트 예산에도 사용), `max_result_characters`(16384), `max_concurrent`(64)를 받습니다. 실행 용량이 차면 대기열 없이 `Busy`를 반환합니다. `permissions`는 `max_nodes`(2048), `max_policy_entries`(65536, 계정·그룹·상속 링크·확장된 규칙의 총 저장 예산)를 받습니다. 검증되는 값은 배포에 맞게 변경할 수 있습니다.
+
+### 온라인 관리 명령 {#online-management-commands}
+
+Contracts 2.61.0은 네이티브 온라인 범위 등록을 추가합니다. `commands.management`는 `/list`, `/notice <텍스트>`, `/disconnect <닉네임> [사유]`를 한 번 등록합니다. `commands.players`는 빌드별 인증된 플레이어 디렉터리와 지정한 프로토콜의 알림 인코더를 연결합니다. 실제 클라이언트 검증 전까지 두 행은 기본 비활성 상태입니다. 관리 행과 대상 빌드의 플레이어 행을 함께 활성화하세요. 플레이어 행은 `lobby` 아래에 두고 `lobby.online_players: true`와 필수 `protocol` 설정이 필요합니다. 해당 `dialect.messages` 행도 `server_notices: true`여야 합니다. 인코더가 없거나 중복되면 활성화에 실패합니다. 복합 프로필의 전체 행 ID는 `--dump-config`로 확인하세요.
+
+`/list`는 메인 메뉴 플레이어를 포함한 중복 없는 온라인 계정 수를 반환하며 이름이나 네트워크 주소는 공개하지 않습니다. `game.management.list`는 기본적으로 일반 플레이어에게 허용됩니다. `/notice`는 모든 빌드의 인증된 게임 연결에 입력 텍스트를 보내고 대기열 등록 및 실패 수를 보고합니다. `game.management.notice`가 필요합니다. `/disconnect`는 `game.management.disconnect`가 필요하며 현재 닉네임을 정확히 비교하고 여러 연결이 일치하면 거부합니다. 게임 OP는 두 관리 권한을 가집니다. 게임 호출은 호출자의 고정 계정이 현재 연결을 소유하는지도 확인합니다. 채팅 진입에는 `ingame.shared_chat_commands: true`가 필요합니다. 콘솔과 WebUI 어댑터는 아직 없습니다.
+
+연결 종료 알림은 대상의 `launcher_language`를 사용하며 선택 사유를 포함합니다. 알림을 대기열에 넣고 `ISessionOutputDrain`을 기다린 다음 선택한 연결을 닫습니다. 알림 실패를 기록하며 대상이 여전히 유효하면 연결을 종료합니다. 재로그인한 새 연결을 따라가서 종료하지 않습니다. 결과는 알림을 완료하지 못한 경우 이를 표시합니다. 클라이언트 수신이나 화면 표시를 보장하지 않습니다. 공지도 대기열 등록 및 부분 실패만 보고하며 읽음 확인이 아닙니다.
+
+`commands.management` 옵션은 `max_scopes`(등록 512개), `disconnect_notice_timeout_ms`(5000), `max_notice_characters`(511)입니다. 텍스트 예산은 낮출 수 있으며 상한은 클라이언트 알림 버퍼를 따릅니다. 서식 적용 후 사유가 너무 길면 전송이나 종료 전에 거부합니다. 범위 등록은 소유된 효과이며 호출은 등록 플러그인의 감독 수명 안에서 실행됩니다. 원격 SDK 등록은 네이티브 소유자와 콜백 전송 어댑터가 필요하므로 아직 지원하지 않습니다. 이 행은 kick, sudo, OP 영구 편집, 방 이동, WebUI 설정 또는 배포 스토어를 구현하지 않습니다.
+
+
+### 클라이언트 모드 실행 정책 {#client-plugin-policy}
+
+스토어 페이지에서 병합된 카탈로그의 클라이언트 모드 식별자를 선택하거나 직접 추가하고 추천, 필수 또는 사용 금지로 설정할 수 있습니다. 규칙은 호환 런처에 제공되며 클라이언트 파일을 서버에 설치하지 않습니다. 규칙마다 정확한 빌드를 선택할 수 있고 아무 빌드도 선택하지 않으면 모든 빌드에 적용됩니다. 프로필 모드는 원래 설정을 유지하고 빈 사용자 지정 목록은 추천을 명시적으로 제거합니다.
+
+`GET` 및 `PUT /api/setup/client-plugins`는 로그인한 WebUI 계정에 `webui.access`와 `webui.settings.client_plugins`가 모두 있어야 하며 `webui.admin`은 둘 다 부여합니다. 게임 OP는 WebUI 접근 권한을 부여하지 않습니다. PUT은 기존 동일 출처 요청 보호를 사용하고 `{"policies":[{"id":"example.plugin","builds":[],"required":false,"disabled":true}]}`를 받습니다. `{"policies":null}`은 프로필 정책 복원, `{"policies":[]}`는 정책 제거입니다. 규칙에는 스토어 식별자만 있으며 다운로드 URL이나 실행 파일 경로는 없습니다.
+
+런처 카탈로그, 로그인 및 갱신 응답의 `pluginRecommendations`에는 `id`, `builds`, `required`, `disabled`가 포함됩니다. 추천은 false/false, 필수는 true/false, 사용 금지는 false/true입니다. 같은 식별자의 필수 및 사용 금지 규칙은 전체 빌드 규칙을 포함하여 같은 빌드에 겹칠 수 없습니다. 겹치지 않는 범위는 별도로 유지하며 특정 빌드의 필수 규칙이 전체 추천 때문에 다른 빌드로 확대되지 않습니다. 호환 런처가 정책을 적용하며 이 정보는 클라이언트 무결성이나 게임 로그인 시 로드된 모드 검증을 보장하지 않습니다.
+
+변경은 데이터베이스, 계정, 보상 및 클라이언트 데이터 설정과 독립적으로 저장되고 기존 감독 설정 적용 절차로 실행됩니다. HTTP 202는 요청 수락만 뜻합니다. 적용 중 게임 서비스가 다시 연결될 수 있으며 설치 상태에 진행 상황과 실패가 표시됩니다. 기존 설정 절차로 수정하거나 다시 시도할 수 있습니다.

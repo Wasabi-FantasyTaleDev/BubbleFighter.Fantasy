@@ -1,0 +1,112 @@
+version: 1
+structs:
+  # The couple (ring) frames of kr-812, which is the only build whose couple bodies were read. Each structure
+  # is the read order of the class's deserializer plus the object offset it stores the field at; every field is
+  # inherited by the legacy family. That inheritance is not independent reader verification for those builds.
+  #
+  # The kr-812 packet classes use their own width helpers: kr-812 sub_A56BD0 reads 4 bytes into a byte field (the bool32 cases), kr-812 sub_A56C10
+  # reads 4 bytes and kr-812 sub_A56D70 reads a prefixed wide string (u32 character count, then that many
+  # UTF-16LE code units). In kr-812 a wide-string field is 28 bytes wide: the deserializers put successive
+  # strings at +8 and +36, and at +8, +36 and +64 in the three-string notice.
+  #
+  # Not tabled: gspResCoupleInvite (kr-812 938). Its deserializer kr-812 sub_83C260 reads a flag at +4, strings
+  # at +8, +36 and +64, and then two further records with their own readers at +92 and +176, whose classes were
+  # not read; a table of the leading fields only would claim a body shorter than the client reads.
+  #
+  # kr-1256 dispatches the same replies at 936-940 and 982 (one or two less than kr-812) and its handlers are
+  # located, but those bodies were not read, so no kr-1256 layout is claimed here and none of the rows below
+  # applies to kr-1256 or to the builds based on it.
+
+  # C2S gcpReqCoupleInviteExpire: Packet_gcpReqCoupleInviteExpire vtable kr-812 0xd93584, deserializer
+  # kr-812 sub_80C160 stores kr-812 sub_A56BD0 at +4.
+  CoupleInviteExpire:
+    - unknown_4: bool
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+
+  # C2S gcpReqCoupleInviteAnswer: vtable kr-812 0xd93590, deserializer kr-812 sub_9FDE70 stores a byte at +4, a byte
+  # at +5, a wide string at +8 and a wide string at +36.
+  CoupleInviteAnswerRequest:
+    - unknown_4: bool
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_5: bool
+      offset: 5
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_8: wstr
+      offset: 8
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_36: wstr
+      offset: 36
+      except: [kr-1256, cn-774, tw-454]
+
+  # C2S gcpReqCoupleBreakUp: vtable kr-812 0xd9359c, deserializer kr-812 sub_5C8FD0 stores a wide string at +4.
+  CoupleBreakUpRequest:
+    - unknown_4: wstr
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+
+  # C2S gcpReqChangeCouplering: vtable kr-812 0xd19bdc, deserializer kr-812 sub_80A910 stores a word at +4.
+  CoupleChangeRingRequest:
+    - unknown_4: u32
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+
+  # S2C gspResCoupleInviteResult: vtable kr-812 0xd6f270, deserializer kr-812 sub_844570 stores a word at +4 and a
+  # wide string at +8.
+  CoupleInviteResult:
+    - unknown_4: u32
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_8: wstr
+      offset: 8
+      except: [kr-1256, cn-774, tw-454]
+
+  # S2C gspResCoupleInviteAnswer: vtable kr-812 0xd6f27c, deserializer kr-812 sub_83C1D0 stores a byte at +4, a wide
+  # string at +8 and a wide string at +36.
+  CoupleInviteAnswerReply:
+    - unknown_4: bool
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_8: wstr
+      offset: 8
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_36: wstr
+      offset: 36
+      except: [kr-1256, cn-774, tw-454]
+
+  # S2C gspResCoupleBreakUp: vtable kr-812 0xd6f288, deserializer kr-812 sub_83C1D0 (the invitation answer's own
+  # reader) stores a byte at +4, a wide string at +8 and a wide string at +36.
+  CoupleBreakUpReply:
+    - unknown_4: bool
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_8: wstr
+      offset: 8
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_36: wstr
+      offset: 36
+      except: [kr-1256, cn-774, tw-454]
+
+  # S2C gspResCoupleNotifyPartner: vtable kr-812 0xd6f294, deserializer kr-812 sub_83C170 stores a byte at +4, a word
+  # at +8 and a wide string at +12.
+  CoupleNotifyPartner:
+    - unknown_4: bool
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_8: u32
+      offset: 8
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_12: wstr
+      offset: 12
+      except: [kr-1256, cn-774, tw-454]
+
+  # S2C gspResChangeCouplering: vtable kr-812 0xd6f258, deserializer kr-812 sub_6DB1B0 stores a word at +4 and a word
+  # at +8.
+  CoupleChangeRingReply:
+    - unknown_4: u32
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_8: u32
+      offset: 8
+      except: [kr-1256, cn-774, tw-454]

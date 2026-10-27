@@ -124,7 +124,7 @@ public sealed class MatchMessagesMountTests
         {
             var error = await Assert.ThrowsAsync<ConfigException>(() => new MatchMessagesPlugin().ActivateAsync(context, default).AsTask());
             Assert.Contains("key", error.Message, StringComparison.Ordinal);
-            Assert.Contains("Native match requests", error.Message, StringComparison.Ordinal);
+            Assert.Contains("Relay connection", error.Message, StringComparison.Ordinal);
             Assert.Empty(fixture.Packets.Handlers);
             Assert.Empty(fixture.Services.GetAll<IInboundMessageBinding<MatchCapabilityAuthenticate>>());
             Assert.Empty(fixture.Services.GetAll<IInboundMessageBinding<MatchSceneIdentityRegistered>>());
@@ -144,12 +144,19 @@ public sealed class MatchMessagesMountTests
         private readonly IDisposable[] _registrations;
         internal Fixture(IOpcodeTable table) => _registrations =
         [Services.Register<IPacketRouter>(Packets), Services.Register<IMessageRouter>(Messages), Services.Register<IOpcodeTableRegistry>(new Tables(table))];
-        internal PluginContext Context(string? build, string protocol, string plugin = "dialect.match", string? packetsDirectory = null) => new(new PluginRow
+        internal PluginContext Context(string? build, string protocol, string plugin = "dialect.match", string? packetsDirectory = null,
+            Dictionary<string, object?>? extra = null)
         {
-            Id = "native-requests", Plugin = plugin, Source = "test",
-            ClientBuild = build is null ? null : new ClientBuild(build[..2], int.Parse(build[3..]), 0),
-            Config = new Dictionary<string, object?> { ["protocol"] = protocol, ["packets_directory"] = packetsDirectory ?? TestBuilds.PacketsDirectory() },
-        }, Services, new EventBus(NullLogger.Instance), NullLogger.Instance);
+            var config = new Dictionary<string, object?> { ["protocol"] = protocol, ["packets_directory"] = packetsDirectory ?? TestBuilds.PacketsDirectory() };
+            foreach (var (key, value) in extra ?? [])
+                config[key] = value;
+            return new(new PluginRow
+            {
+                Id = "native-requests", Plugin = plugin, Source = "test",
+                ClientBuild = build is null ? null : new ClientBuild(build[..2], int.Parse(build[3..]), 0),
+                Config = config,
+            }, Services, new EventBus(NullLogger.Instance), NullLogger.Instance);
+        }
         public void Dispose() { foreach (var registration in _registrations.Reverse()) registration.Dispose(); }
     }
 

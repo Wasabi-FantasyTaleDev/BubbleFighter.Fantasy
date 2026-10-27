@@ -9,10 +9,12 @@ namespace BubbleFighter.Fantasy.Protocol;
 /// <summary>
 /// Client wire protocol plugin. It publishes the profile from the row, loads the opcode
 /// table, mounts the game and relay connection protocols named by that profile, and
-/// registers the patch-check handler (C2S opcode 1, <c>gcpReqGamePatch</c>, builder
-/// <c>sub_99DD00</c>) that verifies <c>ClientVersion_Major</c> and replies
-/// <c>gspRepGamePatch(0, "")</c>. Connection protocols are named after the profile,
-/// <c>&lt;profile&gt;/game</c> and <c>&lt;profile&gt;/relay</c>.
+/// registers the patch-check handler for the client's mandatory first packet (the table row
+/// named by <see cref="ProtocolOptions.PatchRequestName"/>: <c>gcpReqGamePatch</c> on kr-1256
+/// and <c>gcpFirstConnect</c> on the legacy builds, builder kr-1256 <c>sub_99DD00</c>) that
+/// verifies <c>ClientVersion_Major</c> and replies <c>gspRepGamePatch(0, "")</c>. Connection
+/// protocols are named after the profile, <c>&lt;profile&gt;/game</c> and
+/// <c>&lt;profile&gt;/relay</c>.
 /// </summary>
 [Plugin("protocol", Description = "Client wire protocol. Opcode table and version come from the profile row.",
     Requires = [typeof(IConnectionProtocolRegistry), typeof(IPacketRouter), typeof(IClientProfileRegistry), typeof(IOpcodeTableRegistry), typeof(IWireDialectRegistry)],
@@ -44,7 +46,7 @@ public sealed class ProtocolPlugin : IPlugin
     {
         var options = context.Config.Bind<ProtocolOptions>();
         if (options.SendInGameGreeting)
-            throw new ConfigException("send_in_game_greeting was removed; set it to false and mount match-connection with dialect.modern.messages.");
+            throw new ConfigException("send_in_game_greeting was removed; set it to false and mount match-connection with its match dialect rows.");
         var build = context.Row.ClientBuild ?? throw new ConfigException("Protocol requires an explicit client_build.");
         var dialect = context.Services.Get<IWireDialectRegistry>().Resolve(build);
         var profile = dialect.Profile;
@@ -77,7 +79,9 @@ public sealed class ProtocolPlugin : IPlugin
         context.Effect(protocols.Register(new WireProtocol(relayProtocol, dialect, greeting, options, router, table.ForConnection(OpcodeConnection.Relay), context.Events, sessions, versionVerified, context.Logger, context.Lifetime, requiresPatchHandshake: false)));
 
         var centerList = BuildCenterList(options, table);
-        context.Effect(router.Register(gameProtocol, WireOpcodes.C2S.GamePatch, (session, packet, ct) => HandlePatchRequest(session, packet, options, centerList, context, ct)));
+        var patchRequest = table.C2S(options.PatchRequestName);
+        var patchReply = table.S2C("gspRepGamePatch");
+        context.Effect(router.Register(gameProtocol, patchRequest, (session, packet, ct) => HandlePatchRequest(session, packet, options, patchReply, centerList, context, ct)));
 
         context.Logger.LogInformation(
             "Protocol '{ProfileId}' mounted ({Game}, {Relay}); {Count} opcode(s) loaded; version-verified table caps at {Tracked} connections.",
@@ -145,7 +149,7 @@ public sealed class ProtocolPlugin : IPlugin
         }
     }
 
-    private static async ValueTask HandlePatchRequest(ISession session, InboundPacket packet, ProtocolOptions options, (ushort Opcode, byte[] Body)? centerList, IPluginContext context, CancellationToken ct)
+    private static async ValueTask HandlePatchRequest(ISession session, InboundPacket packet, ProtocolOptions options, ushort patchReplyOpcode, (ushort Opcode, byte[] Body)? centerList, IPluginContext context, CancellationToken ct)
     {
         var reader = new PacketReader(packet.Payload.Span);
         var reported = reader.Remaining >= sizeof(int) ? reader.ReadInt32() : -1;
@@ -188,7 +192,7 @@ public sealed class ProtocolPlugin : IPlugin
         var writer = new PacketWriter(buffer);
         writer.WriteInt32(0);
         writer.WriteWideStringPrefixed("");
-        await session.SendAsync(WireOpcodes.S2C.RepGamePatch, buffer.WrittenMemory, ct).ConfigureAwait(false);
+        await session.SendAsync(patchReplyOpcode, buffer.WrittenMemory, ct).ConfigureAwait(false);
         if (centerList is { } list)
             await session.SendAsync(list.Opcode, list.Body, ct).ConfigureAwait(false);
     }

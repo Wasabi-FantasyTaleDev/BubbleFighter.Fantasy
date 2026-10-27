@@ -6,6 +6,7 @@ structs:
   # id-400 sub_8A29B0/sub_8A2A20, id-1809 sub_8C7280/sub_8C7210,
   # cn-706 sub_8B30E0/sub_8B3150, cn-406 sub_816960/sub_8168F0.
   # kr-1256 sub_913640 writes the same seven-field 22-byte body for plaza 301 and room 511.
+  # cn-774 sub_B0D330 / tw-454 sub_BAB9A0 write the same fields on their own plaza connection.
   PlazaPositionUpload:
     - unknown_4: u32
       offset: 4
@@ -28,6 +29,7 @@ structs:
   # kr-812 sub_806C40/sub_6CBC60 apply XYZ; sub_92F1A0 queues the sequence.
   # kr-1256 sub_9D2FF0 at 0x9D4434..0x9D4495 and sub_9D9930 case 0x202 read the same 26-byte form.
   # Its sequence is the uploaded word, not a server-generated replacement (kr-1256 sub_91FB80).
+  # cn-774 sub_B01A60 / tw-454 sub_B9D330 read the same 26-byte body and suppress their own identity.
   PlazaPositionBroadcast:
     - user_number: u32
       offset: 4

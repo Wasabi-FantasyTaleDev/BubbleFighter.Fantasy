@@ -1,10 +1,12 @@
 namespace BubbleFighter.Fantasy.Archives;
 
 /// <summary>
-/// The PKN pack layout of the current client, read by <c>sub_1026520</c> (pack index) and
-/// <c>sub_1024B70</c>/<c>sub_1024D20</c> (members). Everything is keyed by the pack URI: the
+/// The PKN pack layout of the current client, read by <c>kr-1256 sub_1026520</c> (pack open and
+/// index) and <c>kr-1256 sub_1024B70</c>/<c>kr-1256 sub_1024D20</c> (members). Everything is keyed by the pack URI: the
 /// pack's path relative to the client root, lower-cased, with <c>/</c> separators, for
-/// example <c>packs/config_00000.pkn</c>.
+/// example <c>packs/config_00000.pkn</c>. The cn-279 V1 generation
+/// (<see cref="PknArchiveV1"/>) implements the same formulas at its own addresses; the two
+/// never share one.
 /// </summary>
 /// <remarks>
 /// <para>File layout: nothing marks the format. At <see cref="HeaderOffset"/> sits a 9-byte
@@ -15,7 +17,7 @@ namespace BubbleFighter.Fantasy.Archives;
 /// the unpacked member, with <c>checksum == flags + block + size + storedSize + sum(md5 bytes)</c>.
 /// Member data starts at the index end rounded up to 1024 bytes; a member occupies whole
 /// 1024-byte blocks from <c>dataStart + block * 1024</c>.</para>
-/// <para>Member flags (<c>sub_1024D20</c>): bit 1 zlib, bit 2 whole member encrypted, bit 4
+/// <para>Member flags (<c>kr-1256 sub_1024D20</c>): bit 1 zlib, bit 2 whole member encrypted, bit 4
 /// only its first 1024 bytes encrypted, each with <see cref="MemberKey"/>. Decryption comes
 /// before inflation.</para>
 /// </remarks>
@@ -42,14 +44,14 @@ public static class PknFormat
 
     /// <summary>
     /// Header offset: the sum of the URI's UTF-16 code units modulo 312, plus 30
-    /// (<c>sub_1026520</c>, <c>0x10265FD</c>..<c>0x102661C</c>).
+    /// (<c>kr-1256 sub_1026520</c>, <c>kr-1256 0x10265FD</c>..<c>kr-1256 0x102661C</c>).
     /// </summary>
     /// <param name="uri">The pack URI.</param>
     public static int HeaderOffset(string uri) => (int)(CodeUnitSum(uri) % 312) + 30;
 
     /// <summary>
     /// Index offset: the header offset plus 42 plus three times the code-unit sum modulo 212
-    /// (<c>0x1026680</c>..<c>0x102686B</c>).
+    /// (<c>kr-1256 sub_1026520</c>, <c>kr-1256 0x1026680</c>..<c>kr-1256 0x102686B</c>).
     /// </summary>
     /// <param name="uri">The pack URI.</param>
     public static int IndexOffset(string uri) => HeaderOffset(uri) + 42 + (int)(3 * CodeUnitSum(uri) % 212);

@@ -5,6 +5,16 @@ using BubbleFighter.Fantasy.Packets;
 
 namespace BubbleFighter.Fantasy.Dialect.Rooms;
 
+/// <summary>
+/// Serves the <c>map_supplies</c> capability: supply reports, pickups and drops plus the counted item
+/// family ride the structures audited in packets/map-supplies.yaml — the report is kr-812
+/// <c>sub_5312F0</c>'s one word plus fifteen counted vectors, creation is the ten-word envelope kr-812
+/// <c>sub_530570</c> reads (cn-717, id-400, id-1809 matching), pickup and drop are the cn-324 paths
+/// (<c>sub_4672B0</c>, <c>sub_46D020</c>/<c>sub_45D320</c>, <c>sub_46DBE0</c>/<c>sub_408DF0</c>), and
+/// the item-slot answer is the three-word <c>gspAddItemToSlot</c> family (kr-812 <c>sub_9D95D0</c> and
+/// its matches). The report's interval and team vectors stay optional by design: the reader accepts
+/// their absence, so the binding requires only what every report variant states.
+/// </summary>
 internal sealed class SupplyBinding(string protocol, IOpcodeTable table, PacketTables tables, string build, int limit)
     : IInboundMessageBinding<RoundSuppliesReported>, IInboundMessageBinding<RoundSupplyPickupRequested>, IInboundMessageBinding<RoundSupplyDropRequested>,
       IMessageSender<RoundSupplyCreated>, IMessageSender<RoundSupplyPicked>,
@@ -19,8 +29,21 @@ internal sealed class SupplyBinding(string protocol, IOpcodeTable table, PacketT
     {
         if (!tables.CapabilityOf(build, "map_supplies"))
             throw new ConfigException("supply_items requires audited map, drop and slot consumers.");
-        foreach (var name in new[] { "SupplyMapReport", "SupplyPosition", "SupplyPickup", "SupplyCreate", "SupplyPicked", "SupplyDropRequest" })
-            _ = tables.Resolve(build, name);
+        // Every structure this binding reads or writes is checked with the types the code casts and sizes it by. The
+        // report's interval and team vectors are optional by design (the reader handles their absence), so only the
+        // vectors every report variant states are required, and the creation's team word is likewise optional.
+        PacketLayoutContract.RequireFields(tables, build, "SupplyMapReport", "Map supplies",
+            ("positions", "list<SupplyPosition>"), ("kinds", "list<u32>"));
+        PacketLayoutContract.RequireFields(tables, build, "SupplyPosition", "Map supplies",
+            ("x", "f32"), ("y", "f32"), ("z", "f32"));
+        PacketLayoutContract.RequireFields(tables, build, "SupplyPickup", "Map supplies",
+            ("object_id", "u32"), ("kind", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "SupplyPicked", "Map supplies",
+            ("seat", "u32"), ("object_id", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "SupplyCreate", "Map supplies",
+            ("object_id", "u32"), ("unknown_8", "u32"), ("x", "f32"), ("y", "f32"), ("z", "f32"), ("kind", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "SupplyDropRequest", "Map supplies",
+            ("x", "f32"), ("y", "f32"), ("z", "f32"), ("kind", "u32"));
         context.Effect(context.Services.RegisterMany<IInboundMessageBinding<RoundSuppliesReported>>(this));
         context.Effect(context.Services.RegisterMany<IInboundMessageBinding<RoundSupplyPickupRequested>>(this));
         context.Effect(context.Services.RegisterMany<IInboundMessageBinding<RoundSupplyDropRequested>>(this));
@@ -29,15 +52,29 @@ internal sealed class SupplyBinding(string protocol, IOpcodeTable table, PacketT
         var itemUse = table.Find(PacketDirection.ServerToClient, "gspItemUsed") is not null;
         if (itemUse)
         {
-            _ = tables.Resolve(build, "SupplyItemUsed");
-            _ = tables.Resolve(build, "SupplyItemGranted");
+            // The slot word is stated only where the build's reader consumes it; cn-279 sub_81BB50 reads
+            // the seat and kind words alone, so the word is required only when the table states it.
+            var slotWord = tables.Resolve(build, "SupplyItemUsed").Any(field => field.Name == "item_slot");
+            if (slotWord)
+                PacketLayoutContract.RequireFields(tables, build, "SupplyItemUsed", "Map supplies",
+                    ("seat", "u32"), ("kind", "u32"), ("item_slot", "u32"));
+            else
+                PacketLayoutContract.RequireFields(tables, build, "SupplyItemUsed", "Map supplies",
+                    ("seat", "u32"), ("kind", "u32"));
+            if (tables.Resolve(build, "SupplyItemGranted").Any(field => field.Name == "item_slot"))
+                PacketLayoutContract.RequireFields(tables, build, "SupplyItemGranted", "Map supplies",
+                    ("seat", "u32"), ("kind", "u32"), ("item_slot", "u32"));
+            else
+                PacketLayoutContract.RequireFields(tables, build, "SupplyItemGranted", "Map supplies",
+                    ("seat", "u32"), ("kind", "u32"));
             context.Effect(context.Services.RegisterMany<IInboundMessageBinding<RoundItemUseRequested>>(this));
             context.Effect(context.Services.RegisterMany<IMessageSender<RoundItemUsed>>(this));
         }
         var router = context.Services.Get<IPacketRouter>();
         if (table.Find(PacketDirection.ServerToClient, "gspSwitchItemSlot") is not null)
         {
-            _ = tables.Resolve(build, "SupplyItemSlotChanged");
+            PacketLayoutContract.RequireFields(tables, build, "SupplyItemSlotChanged", "Map supplies",
+                ("seat", "u32"), ("item_slot", "u32"), ("kind", "u32"), ("result", "u32"));
             context.Effect(context.Services.RegisterMany<IInboundMessageBinding<RoundItemSlotSwitchRequested>>(this));
             context.Effect(context.Services.RegisterMany<IMessageSender<RoundItemSlotChanged>>(this));
             context.Effect(router.Register(protocol, table.C2S("gcpSwitchItemSlot"), async (session, packet, ct) =>

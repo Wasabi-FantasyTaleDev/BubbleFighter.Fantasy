@@ -5,6 +5,10 @@ namespace BubbleFighter.Fantasy.Packets;
 /// <summary>
 /// A build's <c>room_ai_seat</c> value: the <c>SessionSetting</c> word whose lowest bit lets the room master add
 /// computer players to empty seats, and the modes whose rooms set it. Every other mode keeps the creator's word.
+/// The flag is the client's own gate: kr-1256 <c>sub_9681C0</c> builds the add panel only while the room's session
+/// byte +72 is set, and kr-1256 <c>sub_9D9250</c> copies that byte from the install's <c>SessionSetting</c>
+/// (kr-1256 <c>sub_63EE00</c>), the word whose bits 0/1/2 become the session bytes +72/+73/+74
+/// (packets/builds.yaml <c>room_ai_seat</c>; packets/room.yaml <c>SessionSetting@kr-1256</c>).
 /// </summary>
 public sealed class RoomAiSeatFlag
 {

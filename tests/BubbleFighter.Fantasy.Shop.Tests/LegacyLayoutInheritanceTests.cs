@@ -1,5 +1,5 @@
+using BubbleFighter.Fantasy.Dialect.Messages;
 using Xunit;
-using BubbleFighter.Fantasy.Shop.Wire;
 
 namespace BubbleFighter.Fantasy.Shop.Tests;
 
@@ -18,9 +18,9 @@ public sealed class LegacyLayoutInheritanceTests
     [Fact]
     public void TheBaselineAndTheCn279DifferencesAreStated()
     {
-        Assert.Equal(new LegacyCatalogLayout(true, false, LegacyCategoryTree.Ordered, false, LegacyCatalogTrailer.IdsMain),
+        Assert.Equal(new EnterShopReplyLayout(true, false, LegacyCategoryTree.Ordered, false, LegacyCatalogTrailer.IdsMain),
             LegacyLayouts.Of("kr-812"));
-        Assert.Equal(new LegacyCatalogLayout(false, true, LegacyCategoryTree.Landing, true, LegacyCatalogTrailer.None),
+        Assert.Equal(new EnterShopReplyLayout(false, true, LegacyCategoryTree.Landing, true, LegacyCatalogTrailer.None),
             LegacyLayouts.Of("cn-279"));
     }
 }

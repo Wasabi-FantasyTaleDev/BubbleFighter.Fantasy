@@ -19,13 +19,16 @@ internal static class LauncherLoginAccount
     /// (authentication: ticket) every login must redeem a ticket; otherwise a plain account name passes unchanged.
     /// </summary>
     internal static string? Resolve(string account, string build, bool enabled, ILauncherTicketService? tickets,
+        bool requireTicket = false) => ResolveIdentity(account, build, enabled, tickets, requireTicket)?.Username;
+
+    internal static LauncherTicketIdentity? ResolveIdentity(string account, string build, bool enabled, ILauncherTicketService? tickets,
         bool requireTicket = false)
     {
         var marked = account.StartsWith(Prefix, StringComparison.Ordinal);
-        if (!marked && !IsTicket(account)) return requireTicket ? null : account;
+        if (!marked && !IsTicket(account)) return requireTicket ? null : new(account);
         var token = marked ? account.AsSpan(Prefix.Length) : account.AsSpan();
         if (!enabled || tickets is null || !IsTicket(token)) return null;
-        return tickets.Redeem(token.ToString(), build);
+        return tickets.RedeemIdentity(token.ToString(), build);
     }
 
     /// <summary>Whether the login account is shaped like a launch ticket, marked or bare; redemption decides the rest.</summary>

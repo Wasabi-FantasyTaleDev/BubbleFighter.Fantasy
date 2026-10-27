@@ -11,18 +11,24 @@ structs:
       except: [cn-324]
   # kr-812 sub_83B880; cn-717 sub_8C4380, id-400 sub_7995F0,
   # id-1809 sub_7BF370 and cn-706 sub_7A1AE0 read the same byte and word.
+  # The kr-1256 reader is the dispatcher case at kr-1256 sub_9D2FF0 (case 836, kr-1256 0x9D5035).
+  # It clears the send latch, then applies the slot only on zero; any nonzero status is a silent
+  # refusal that shows no text and leaves the active slot unchanged.
   WeaponPresetChangeReply:
     - active_slot: u8
       offset: 4
       except: [cn-324]
     # kr-812 sub_832BD0, cn-717 sub_8BB110, id-400 sub_7BC6A0,
     # id-1809 sub_7DFE10 and cn-706 sub_7C5CD0 clear the latch before testing zero.
-    - status: u32 # Zero applies the slot; any nonzero value leaves the active slot unchanged.
+    - status: u32 # Zero applies the slot; nonzero leaves it unchanged (silent in kr-1256 sub_9D2FF0).
       offset: 8
       except: [cn-324]
 
   # kr-812 sub_83B820; cn-717 sub_8C4320, id-400 sub_799590,
   # id-1809 sub_7BF310 and cn-706 sub_7A1A80 read the byte then the nested list.
+  # A preset's slot index is its position in the nested list: kr-1256 sub_81B820 rebuilds the
+  # profile's per-slot map with the record counter as the key, and kr-1256 sub_5FB4F0 enables
+  # indices 0 to 2 without a record; a higher displayed index requires its corresponding record.
   WeaponPresetUpdate:
     - active_slot: u8
       offset: 4

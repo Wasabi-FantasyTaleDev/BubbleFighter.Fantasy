@@ -1,10 +1,9 @@
+using BubbleFighter.Fantasy.Dialect.Messages;
 using BubbleFighter.Fantasy.Packets;
-using BubbleFighter.Fantasy.Shop.Dialects;
-using BubbleFighter.Fantasy.Shop.Wire;
 
 namespace BubbleFighter.Fantasy.Shop.Tests;
 
-/// <summary>Reads a build's catalog layout from the repository's packets/builds.yaml, as the shop row does.</summary>
+/// <summary>Reads a build's catalog layout from the repository's packets/builds.yaml, as the dialect row does.</summary>
 internal static class LegacyLayouts
 {
     private static readonly Lazy<PacketTables> Tables = new(() =>
@@ -16,6 +15,6 @@ internal static class LegacyLayouts
     });
 
     /// <summary>Gets the catalog layout of one build.</summary>
-    public static LegacyCatalogLayout Of(string build) =>
-        LegacyShopShape.From(build, Tables.Value.ValuesOf(build)).Catalog;
+    public static EnterShopReplyLayout Of(string build) =>
+        ShopCatalogWire.LayoutOf(build, Tables.Value.ValuesOf(build));
 }

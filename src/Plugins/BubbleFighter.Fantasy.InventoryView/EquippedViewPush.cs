@@ -5,12 +5,27 @@ using Microsoft.Extensions.Logging;
 namespace BubbleFighter.Fantasy.InventoryView;
 
 /// <summary>Publishes stored equipment on entry and the already committed selection on live changes.</summary>
+/// <param name="logger">Logs each publication.</param>
+/// <param name="localSender">The local view publications of the owning protocol.</param>
+/// <param name="remoteSender">The observed-player view publications of the owning protocol.</param>
+/// <param name="playerState">Persists the active slot and, when <paramref name="persistPresetPages"/> is set,
+/// the materialized preset pages; may be null, which keeps the derived bar.</param>
+/// <param name="selection">Reads the worn set the derived bar and the page seeding come from; may be null.</param>
+/// <param name="persistPresetPages">Whether the preset bar is served from persisted pages (the
+/// <c>persist_preset_pages</c> row switch, default off).</param>
 internal sealed class EquippedViewPush(ILogger logger,
     IMessageSender<LocalEquipmentViewUpdated> localSender,
     IMessageSender<RemoteEquipmentViewUpdated> remoteSender,
     IPlayerInventoryState? playerState = null,
-    IEquipmentSelection? selection = null) : IEquippedViewPush
+    IEquipmentSelection? selection = null,
+    bool persistPresetPages = false) : IEquippedViewPush, IWeaponPresetPageSource
 {
+    /// <inheritdoc />
+    public ValueTask<WeaponPresetPage[]?> ReadAsync(long userNum, CancellationToken ct) =>
+        persistPresetPages && playerState is not null
+            ? playerState.GetWeaponPresetPagesAsync(userNum, ct)
+            : ValueTask.FromResult<WeaponPresetPage[]?>(null);
+
     /// <inheritdoc />
     public ValueTask SendRemoteAsync(ISession recipient, int userNum, int characterId,
         IReadOnlyList<int> equippedIds, CancellationToken ct)
@@ -49,10 +64,32 @@ internal sealed class EquippedViewPush(ILogger logger,
         var special = snapshot.FirstOrDefault(id => id is >= 205000 and < 206000);
         var activeSlot = playerState is null ? (byte)0
             : await playerState.GetActiveWeaponPresetSlotAsync(userNum, ct).ConfigureAwait(false);
-        await localSender.SendAsync(session, new(userNum, characterId, snapshot, activeSlot, primary, special), ct)
-            .ConfigureAwait(false);
+        var pages = persistPresetPages && playerState is not null
+            ? await ReadOrMaterializePagesAsync(playerState, userNum, primary, special, ct).ConfigureAwait(false)
+            : null;
+        await localSender.SendAsync(session,
+            new(userNum, characterId, snapshot, activeSlot, primary, special, pages), ct).ConfigureAwait(false);
         logger.LogInformation(
-            "Session {Id} equipment view published: identity={Identity} character={Character} activeSlot={ActiveSlot} equipped=[{Equipped}].",
-            session.Id, userNum, characterId, activeSlot, string.Join(", ", snapshot));
+            "Session {Id} equipment view published: identity={Identity} character={Character} activeSlot={ActiveSlot} equipped=[{Equipped}] presetPages={PresetPages}.",
+            session.Id, userNum, characterId, activeSlot, string.Join(", ", snapshot),
+            pages is null ? "derived" : "persisted");
+    }
+
+    /// <summary>
+    /// Reads the player's persisted preset pages, materializing them from the worn pair on first sight. The
+    /// swap chain has no client-to-server save packet, so this is the only writer: once pages exist they win
+    /// over every later worn change, which is what makes the bar server-owned rather than re-derived.
+    /// </summary>
+    /// <param name="playerState">The store holding the pages.</param>
+    /// <param name="userNum">The player whose pages are read.</param>
+    /// <param name="primary">The worn primary, the derived page's first word.</param>
+    /// <param name="special">The worn special, the derived page's second word.</param>
+    /// <param name="ct">Cancellation for the store round trips.</param>
+    /// <returns>The five pages the publication carries.</returns>
+    private static async ValueTask<WeaponPresetPage[]> ReadOrMaterializePagesAsync(
+        IPlayerInventoryState playerState, long userNum, int primary, int special, CancellationToken ct)
+    {
+        return await playerState.GetOrCreateWeaponPresetPagesAsync(userNum,
+            WeaponPresetPages.SeedFromWorn(primary, special), ct).ConfigureAwait(false);
     }
 }

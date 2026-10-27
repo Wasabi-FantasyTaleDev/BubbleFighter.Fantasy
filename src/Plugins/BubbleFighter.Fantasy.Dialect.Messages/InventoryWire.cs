@@ -1,4 +1,5 @@
 using System.Linq;
+using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Contracts.Inventory;
 using BubbleFighter.Fantasy.Packets;
 
@@ -17,7 +18,7 @@ namespace BubbleFighter.Fantasy.Dialect.Messages;
 internal sealed class InventoryWire(PacketTables tables, string build)
 {
     // Whether the build's slot carries the string extension (cn-324 and cn-279 do not).
-    private readonly bool _hasExtension = tables.Resolve(build, "InventorySlot").Any(field => field.Name == "unknown_48");
+    private readonly bool _hasExtension = CheckedExtension(tables, build);
 
     internal byte[] RepInventoryAll(IReadOnlyList<InventorySlot> slots)
     {
@@ -82,6 +83,24 @@ internal sealed class InventoryWire(PacketTables tables, string build)
             throw new ArgumentOutOfRangeException(nameof(slots));
         if (!_hasExtension && slots.Any(slot => slot.Unknown9.Length != 0))
             throw new ArgumentException("This inventory layout has no string extension.", nameof(slots));
+    }
+
+    /// <summary>
+    /// Requires the four publication structures this wire writes, then reports whether the build's slot carries
+    /// the string extension. Runs once when the row constructs the wire, so a table that renames or retypes a
+    /// consumed field fails at activation rather than on the first publication.
+    /// </summary>
+    /// <param name="tables">The row's packet tables.</param>
+    /// <param name="build">The client build whose table is checked.</param>
+    /// <returns>Whether the build's <c>InventorySlot</c> states the string extension field.</returns>
+    /// <exception cref="ConfigException">A consumed field is missing or has another type.</exception>
+    private static bool CheckedExtension(PacketTables tables, string build)
+    {
+        PacketLayoutContract.RequireFields(tables, build, "InventoryUpdate", "Inventory wire", ("slots", "list<InventorySlot>"));
+        PacketLayoutContract.RequireFields(tables, build, "InventorySlots", "Inventory wire", ("slots", "list<InventorySlot>"));
+        PacketLayoutContract.RequireFields(tables, build, "ArticleSlots", "Inventory wire", ("articles", "empty_list"));
+        PacketLayoutContract.RequireFields(tables, build, "CashInventoryUpdate", "Inventory wire", ("slots", "list<CashInventorySlot>"));
+        return tables.Resolve(build, "InventorySlot").Any(field => field.Name == "unknown_48");
     }
 }
 

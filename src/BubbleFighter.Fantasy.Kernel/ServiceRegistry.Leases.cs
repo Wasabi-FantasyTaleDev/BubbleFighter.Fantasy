@@ -1,7 +1,18 @@
 namespace BubbleFighter.Fantasy.Kernel;
 
+/// <summary>
+/// <see cref="ServiceRegistry"/> half that keeps consumers safe from provider retirement: a consumer
+/// pins the provider publications it read through a <see cref="DependencyLease"/>, and a retiring
+/// owner stays discoverable through its drain task until the last dependent lease is gone.
+/// </summary>
 public sealed partial class ServiceRegistry
 {
+    /// <summary>
+    /// Pins the ready provider publications the accessor depends on and returns their lease. The lease
+    /// must be disposed when the consumer finishes reading; while it lives, none of the pinned
+    /// publications can retire. Returns false without pinning anything when the accessor's own
+    /// publication is stale or when a dependency is not published yet.
+    /// </summary>
     internal bool TryRetainDependencies(ActivationServiceAccess access, out IDisposable? lease)
     {
         lock (_gate)
@@ -18,6 +29,12 @@ public sealed partial class ServiceRegistry
         }
     }
 
+    /// <summary>
+    /// Retires one owner's contributions and returns the task that completes when no dependent lease
+    /// still holds them. Bindings are rewritten to the surviving decorations before the publication is
+    /// retired, so a reader arriving mid-retirement resolves a pre-retirement projection instead of a
+    /// half-decorated chain. The drain task is created only when dependents exist.
+    /// </summary>
     internal Task RetireOwner(ServiceActivation owner)
     {
         Runtime.RequireOwner(owner.Runtime);
@@ -49,6 +66,11 @@ public sealed partial class ServiceRegistry
         return drained;
     }
 
+    /// <summary>
+    /// One consumer's pin over a fixed set of provider publications. Disposing it is the only way the
+    /// pins are released; a second dispose is a no-op, and the owning registry stops counting
+    /// dependents once every pin of a publication is gone.
+    /// </summary>
     private sealed class DependencyLease(ServiceRegistry owner, ServiceActivation[] providers) : IDisposable
     {
         private ServiceRegistry? _owner = owner;

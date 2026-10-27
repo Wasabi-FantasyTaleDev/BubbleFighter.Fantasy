@@ -1,7 +1,7 @@
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Match;
-using BubbleFighter.Fantasy.Dialect.Modern.Messages.Play;
+using BubbleFighter.Fantasy.Dialect.Rooms;
 using BubbleFighter.Fantasy.Kernel;
 using BubbleFighter.Fantasy.Packets;
 using BubbleFighter.Fantasy.Protocol;
@@ -36,9 +36,9 @@ public sealed class ModernRoundTransportTests
             await new PacketRouterPlugin().ActivateAsync(router, default);
             await new MessageRouterPlugin().ActivateAsync(messages, default);
             var table = OpcodeTableLoader.Load(Path.Combine(root, "profiles", "kr-1256", "opcodes.yaml"), TestWireDialects.Get("kr-1256").Profile);
-            new ModernRoundBinding("kr-1256/game", table, PacketTables.Load(Path.Combine(root, "packets")), "kr-1256",
+            new RoundStartBinding("kr-1256/game", table, PacketTables.Load(Path.Combine(root, "packets")), "kr-1256",
                 [1, 0, 1], NullLogger.Instance).Mount(binding);
-            var session = new RoomPushTests.RecordingSession(7);
+            var session = new RecordingSession(7);
             await services.GetAll<IMessageSender<RoundCountdownStarted>>().Single()
                 .SendAsync(session, new RoundCountdownStarted(1, 7000) { MatchOverGame = overGame }, default);
             Assert.Equal(expected, session.Body(table.S2C("gspGameEverybodyLoadingComplete")));

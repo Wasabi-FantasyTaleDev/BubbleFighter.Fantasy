@@ -2,6 +2,10 @@ using BubbleFighter.Fantasy.Contracts.Inventory;
 
 namespace BubbleFighter.Fantasy.Persistence.Sqlite;
 
+/// <summary>
+/// The save's inventory fragment: bag reads plus the atomic expiry, consumption, append, equipment and
+/// worn-flag operations, each a whole-snapshot mutation inside one database write transaction.
+/// </summary>
 internal sealed partial class SqliteRepositories : IInventoryRepository, IPlayerInventoryState
 {
     public ValueTask<IReadOnlyList<InventorySlotRecord>?> RemoveExpiredItemAsync(long userNum, int itemId,
@@ -155,6 +159,28 @@ internal sealed partial class SqliteRepositories : IInventoryRepository, IPlayer
     {
         if (slot > InventoryLimits.MaxWeaponPresetSlot) throw new ArgumentOutOfRangeException(nameof(slot));
         Mutate(userNum, state => state.ActivePreset = slot, ct);
+        return ValueTask.CompletedTask;
+    }
+
+    public ValueTask<WeaponPresetPage[]?> GetWeaponPresetPagesAsync(long userNum, CancellationToken ct) =>
+        new(database.Read(db => db.State(userNum)?.WeaponPresetPages?.ToArray(), ct));
+
+    public ValueTask<WeaponPresetPage[]> GetOrCreateWeaponPresetPagesAsync(long userNum, WeaponPresetPage[] initialPages, CancellationToken ct)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(userNum);
+        var copy = WeaponPresetPages.CopyTable(initialPages);
+        return new(Mutate(userNum, state =>
+        {
+            state.WeaponPresetPages ??= copy;
+            return state.WeaponPresetPages.ToArray();
+        }, ct));
+    }
+
+    public ValueTask SetWeaponPresetPagesAsync(long userNum, WeaponPresetPage[] pages, CancellationToken ct)
+    {
+        // CopyTable validates too: the snapshot check rejects anything but a full five-page table.
+        var copy = WeaponPresetPages.CopyTable(pages);
+        Mutate(userNum, state => state.WeaponPresetPages = copy, ct);
         return ValueTask.CompletedTask;
     }
 }

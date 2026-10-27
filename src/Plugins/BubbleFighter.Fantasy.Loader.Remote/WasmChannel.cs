@@ -71,8 +71,8 @@ internal sealed class WasmChannel : IPluginChannel
     {
         var engine = new Engine(new Config().WithEpochInterruption(true));
         var channel = new WasmChannel(engine, maxLineBytes);
-        Module module;
-        Store store;
+        Module? module = null;
+        Store? store = null;
         Instance instance;
         try
         {
@@ -82,7 +82,8 @@ internal sealed class WasmChannel : IPluginChannel
             // One epoch tick past the start interrupts the guest; only Kill ticks the engine.
             store.SetEpochDeadline(1);
             store.SetWasiConfiguration(new WasiConfiguration());
-            var linker = new Linker(engine);
+            // The instance keeps its imports in the store; the temporary linker can release its native state now.
+            using var linker = new Linker(engine);
             linker.DefineWasi();
             linker.Define("bff", "recv", Function.FromCallback(store, (Caller caller, int ptr, int cap) => channel.Recv(caller, ptr, cap)));
             linker.Define("bff", "send", Function.FromCallback(store, (Caller caller, int ptr, int len) => channel.Write(caller, ptr, len, channel._guestOut)));
@@ -91,6 +92,8 @@ internal sealed class WasmChannel : IPluginChannel
         }
         catch (Exception ex) when (ex is WasmtimeException or IOException or UnauthorizedAccessException)
         {
+            store?.Dispose();
+            module?.Dispose();
             engine.Dispose();
             throw new InvalidOperationException($"WebAssembly plugin '{launch.Module}' could not be loaded: {ex.Message}", ex);
         }

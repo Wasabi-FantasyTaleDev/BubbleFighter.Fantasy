@@ -3,7 +3,16 @@ using BubbleFighter.Fantasy.Abstractions.Protocol;
 
 namespace BubbleFighter.Fantasy.Packets;
 
-/// <summary>Resolves the native round selector's two strings to named fields in the retained game setting.</summary>
+/// <summary>
+/// Resolves the native round selector's two strings to named fields in the retained game setting. The three
+/// map buttons select rounds 0/1/2 (kr-812 <c>sub_5BD770</c> and kr-1256 <c>sub_969730</c>); the request's
+/// first string is the accompanying string and the second is the selected map's key, the order kr-812
+/// <c>sub_6A0E10</c> sends and kr-1256 <c>sub_6141A0</c> copies, and the room displays the selections in the
+/// retained <c>GameSetting</c> strings at +144/+192/+240 (kr-1256 <c>sub_96BA90</c>;
+/// packets/room-details.yaml <c>RoomRoundSettingChangeRequest</c>; packets/builds.yaml
+/// <c>room_round_setting_fields</c>). What the accompanying string does on the client is otherwise
+/// unproven: the two string roles stay unknown beyond their order and display slots.
+/// </summary>
 public sealed class RoomRoundSettingFields
 {
     private readonly PacketTables _tables;

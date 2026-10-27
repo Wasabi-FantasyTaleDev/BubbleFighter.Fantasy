@@ -23,6 +23,14 @@ public static class InventoryWearSelection
     /// Input order breaks historical duplicate selections; stores may order it by last update time.
     /// Unknown flag bits are preserved. An unknown requested item returns null before any changes.
     /// </summary>
+    /// <param name="rows">The complete both-bag snapshot to rewrite; the character bag is authoritative and is not modified.</param>
+    /// <param name="groups">The position rules. Numeric ranges must be positive, mutually disjoint and contain their legacy default.</param>
+    /// <param name="itemId">The item whose worn state changes, or null to repair the current selections only.</param>
+    /// <param name="worn">The target worn state of <paramref name="itemId"/> when it is given.</param>
+    /// <returns>Every input row with its worn bit rewritten, or null when the requested item is not in the character bag.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the row or bag bounds are exceeded.</exception>
+    /// <exception cref="ArgumentException">Thrown when a position range is invalid or overlaps another numeric position.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when a required position lacks its initial item in the character bag.</exception>
     public static IReadOnlyList<InventorySlotRecord>? Apply(
         IReadOnlyList<InventorySlotRecord> rows, IReadOnlyList<InventoryWearGroup> groups, int? itemId, bool worn)
     {

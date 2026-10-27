@@ -2,6 +2,8 @@ using System.Text.Json;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Lobby;
+using BubbleFighter.Fantasy.Contracts.Sessions;
+using BubbleFighter.Fantasy.InGame.Handlers;
 using BubbleFighter.Fantasy.Kernel;
 using BubbleFighter.Fantasy.Localization;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -44,6 +46,11 @@ public sealed class GameModeNameLocalizationTests
             {
                 ["resources_path"] = ResourcesPath(),
                 ["default_language"] = "en",
+                ["launcher_languages"] = new List<object>
+                {
+                    new Dictionary<string, object?> { ["launcher_language"] = "zh-CN", ["language"] = "zh-Hans" },
+                    new Dictionary<string, object?> { ["launcher_language"] = "zh-TW", ["language"] = "zh-Hant" },
+                },
                 ["region_languages"] = new List<object>
                 {
                     new Dictionary<string, object?> { ["region"] = "cn", ["language"] = "zh-Hans" },
@@ -62,6 +69,77 @@ public sealed class GameModeNameLocalizationTests
     {
         Assert.True(text.TryFormat(Profile(profile), "mode." + mode, out var name), $"{profile} mode {mode}");
         return name;
+    }
+
+    [Theory]
+    [InlineData("zh-CN", "zh-Hans")]
+    [InlineData("zh-TW", "zh-Hant")]
+    [InlineData("en", "en")]
+    [InlineData("ko", "ko")]
+    [InlineData("id", "id")]
+    [InlineData("vi", "en")]
+    [InlineData(null, "en")]
+    public async Task KoreanClientUsesLauncherLanguageOrDeploymentDefault(string? language, string resourceLanguage)
+    {
+        var (text, context) = await ActivateAsync();
+        try
+        {
+            var session = new RecordingSession(701);
+            using var registration = language is null ? null : session.RegisterFeature<ISessionLanguage>(new UserLanguage(language));
+            var resources = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, string>>>(File.ReadAllText(ResourcesPath()))!;
+            const string key = "command.start.host_only";
+            Assert.Equal(resources[resourceLanguage][key], text.Format(session, key));
+            Assert.False(text.TryFormat(session, "missing.key", out _));
+            var sink = new RoomFlowTests.Sink<ServerNotice>();
+            await new RoomNotices(sink, text).SendAsync(session, key, null, default);
+            Assert.Equal(resources[resourceLanguage][key], Assert.Single(sink.To(session)).Text);
+        }
+        finally { await context.UnwindAsync(); }
+    }
+
+    [Fact]
+    public async Task RoomModeBroadcastFormatsSeparatelyForUsersOfTheSameClientBuild()
+    {
+        var (text, context) = await ActivateAsync();
+        var rig = new RoomFlowTests.Rig();
+        try
+        {
+            var host = RoomFlowTests.Rig.Player(711, "host");
+            var guest = RoomFlowTests.Rig.Player(712, "guest");
+            using var hostLanguage = host.RegisterFeature<ISessionLanguage>(new UserLanguage("zh-CN"));
+            using var guestLanguage = guest.RegisterFeature<ISessionLanguage>(new UserLanguage("en"));
+            var id = await rig.CreateAsync(host);
+            await rig.Flow.HandleJoinAsync(guest, new(id, ""), default);
+            var sink = new RoomFlowTests.Sink<ServerNotice>();
+            await new RoomNotices(sink, text).AnnounceModeAsync(rig.Registry.TryGet(host.Id)!, 8, default);
+            foreach (var session in new[] { host, guest })
+                Assert.Equal(text.Format(session, "room.mode.changed", new Dictionary<string, string> { ["mode"] = text.Format(session, "mode.8") }),
+                    Assert.Single(sink.To(session)).Text);
+            Assert.NotEqual(sink.To(host)[0].Text, sink.To(guest)[0].Text);
+        }
+        finally { await rig.Registry.StopAllAsync(); await context.UnwindAsync(); }
+    }
+
+    private sealed record UserLanguage(string LauncherLanguage) : ISessionLanguage;
+
+    [Fact]
+    public async Task AutomaticStartNoticeUsesTheReceivingUsersLauncherLanguage()
+    {
+        var (text, context) = await ActivateAsync();
+        var rig = new RoomFlowTests.Rig(options: new InGameOptions
+        {
+            AutoStartModeIds = [16], AutoStartTimer = true, AutoStartDelayMs = 65000,
+        }, texts: text);
+        try
+        {
+            var host = RoomFlowTests.Rig.Player(721, "host");
+            using var language = host.RegisterFeature<ISessionLanguage>(new UserLanguage("zh-CN"));
+            await rig.Flow.HandleCreateAsync(host, new("boss", "", 16, "rel_ZombiePVE_01"), default);
+            var arguments = new Dictionary<string, string> { ["seconds"] = "60", ["minutes"] = "1" };
+            Assert.Equal(text.Format(host, "room.auto_start.created", arguments), Assert.Single(rig.Notices.To(host)).Text);
+            Assert.NotEqual(text.Format(host.Profile, "room.auto_start.created", arguments), rig.Notices.To(host)[0].Text);
+        }
+        finally { await rig.Registry.StopAllAsync(); await context.UnwindAsync(); }
     }
 
     /// <summary>Every language of the shipped file parses and every mode key is a numeric id.</summary>

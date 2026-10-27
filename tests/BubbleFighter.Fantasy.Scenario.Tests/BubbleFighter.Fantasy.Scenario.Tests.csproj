@@ -13,6 +13,8 @@
     <ProjectReference Include="..\..\src\BubbleFighter.Fantasy.Packets\BubbleFighter.Fantasy.Packets.csproj" />
     <ProjectReference Include="..\..\src\BubbleFighter.Fantasy.Wire\BubbleFighter.Fantasy.Wire.csproj" />
     <ProjectReference Include="..\..\src\Plugins\*\*.csproj" ReferenceOutputAssembly="false" />
+    <!-- Keep opcode loading identical without loading the protocol plugin twice during discovery. -->
+    <Compile Include="..\..\src\Plugins\BubbleFighter.Fantasy.Protocol\OpcodeTable.cs" Link="OpcodeTable.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\profiles\kr-1256\opcodes.yaml" Link="opcodes.yaml" CopyToOutputDirectory="PreserveNewest" />

@@ -5,9 +5,20 @@ using BubbleFighter.Fantasy.Contracts.Players;
 
 namespace BubbleFighter.Fantasy.Persistence.Sqlite;
 
+/// <summary>
+/// The SQLite save's repository fragments, split by domain but sharing one model: a player's whole
+/// coupled state lives in one schema-versioned <see cref="SaveState"/> JSON row, every operation goes
+/// through the owned database gate, and cross-domain changes (a purchase touching wallet, inventory
+/// and history at once) are atomic because they mutate and save that single row inside one
+/// <see cref="SqliteDatabase.Write{T}"/> transaction. This fragment owns identity: durable player and
+/// launcher-account records, and character creation that commits the chosen fighter and starter bags
+/// in the same identity transaction. A launcher account and its player share the username.
+/// </summary>
 internal sealed partial class SqliteRepositories(SqliteDatabase database) : IPlayerRepository, ILauncherAccountRepository
 {
+    /// <summary>This provider writes through to disk; identity and onboarding state survive restarts.</summary>
     public bool PersistsState => true;
+    /// <summary>Character creation commits the chosen fighter and the starter bags with the identity row.</summary>
     public bool CreatesStarterInventoryAtomically => true;
 
     // A launcher account and its player share the username; a player without an account reads as an empty-hash account.

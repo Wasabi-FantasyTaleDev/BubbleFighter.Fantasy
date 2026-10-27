@@ -35,6 +35,22 @@ internal sealed class PlayerSessionScope : IDisposable, IOnlinePlayers
     private readonly Lock _gate = new();
     private readonly Dictionary<long, Registration> _registrations = [];
     private readonly Dictionary<long, ISession> _holders = [];
+    private readonly Dictionary<long, IDisposable> _languages = [];
+
+    internal void SetLauncherLanguage(ISession session, string? language)
+    {
+        if (language is null) return;
+        lock (_gate)
+        {
+            if (session.TryFeature<ISessionLanguage>(out var existing))
+            {
+                if (existing.LauncherLanguage != language)
+                    throw new InvalidOperationException("A connection cannot change its authenticated Launcher language.");
+                return;
+            }
+            _languages.Add(session.Connection.Id, session.RegisterFeature<ISessionLanguage>(new SessionLanguage(language)));
+        }
+    }
 
     /// <summary>
     /// Registers the player state for an authenticated login. A second login on the same
@@ -90,7 +106,7 @@ internal sealed class PlayerSessionScope : IDisposable, IOnlinePlayers
                 return new LoginClaim(LoginClaimStatus.RefusedDuplicate, null, holder);
             }
 
-            var state = new PlayerSession(identity);
+            var state = new PlayerSession(identity, connectionId);
             var handle = session.RegisterFeature<IPlayerSession>(state);
             ISession? replaced = null;
             if (_holders.TryGetValue(identity.UserNum, out var taken) && taken is not null
@@ -142,13 +158,14 @@ internal sealed class PlayerSessionScope : IDisposable, IOnlinePlayers
     {
         lock (_gate)
         {
-            foreach (var connectionId in _registrations.Keys.ToArray())
+            foreach (var connectionId in _registrations.Keys.Concat(_languages.Keys).Distinct().ToArray())
                 Release(connectionId);
         }
     }
 
     private void Release(long connectionId)
     {
+        if (_languages.Remove(connectionId, out var language)) language.Dispose();
         if (!_registrations.Remove(connectionId, out var registration))
             return;
         if (_holders.TryGetValue(registration.UserNum, out var holder) && holder.Connection.Id == connectionId)
@@ -160,4 +177,6 @@ internal sealed class PlayerSessionScope : IDisposable, IOnlinePlayers
     /// <param name="Handle">The feature removal handle.</param>
     /// <param name="UserNum">The account the connection is logged in as.</param>
     private readonly record struct Registration(IDisposable Handle, long UserNum);
+
+    private sealed record SessionLanguage(string LauncherLanguage) : ISessionLanguage;
 }

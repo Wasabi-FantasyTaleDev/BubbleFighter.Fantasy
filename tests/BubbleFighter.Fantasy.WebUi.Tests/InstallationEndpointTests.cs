@@ -9,6 +9,7 @@ using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Archives;
 using BubbleFighter.Fantasy.Admin.Http;
 using BubbleFighter.Fantasy.Contracts.Installation;
+using BubbleFighter.Fantasy.Commands;
 using BubbleFighter.Fantasy.Installation;
 using BubbleFighter.Fantasy.Kernel;
 using BubbleFighter.Fantasy.Persistence.MySql;
@@ -490,6 +491,113 @@ public sealed class InstallationEndpointTests
         Assert.DoesNotContain(settings.MySqlPassword, await retained.Content.ReadAsStringAsync());
     }
 
+    [Fact]
+    public async Task ClientPluginPolicyPersistsWithoutChangingStorageOrAdministratorAndCanRestoreInheritance()
+    {
+        await using var fixture = await Fixture.StartAsync(webUiGrants: ["webui.access", "webui.settings.client_plugins"]);
+        await fixture.ClaimAsync(new() { PlayerLogin = "open" });
+        await fixture.SignInAsync();
+        await fixture.WaitForAsync("ready");
+        var initial = await fixture.Http.GetFromJsonAsync<InstallationConfiguration>("/api/setup/configuration");
+        using var before = JsonDocument.Parse(await File.ReadAllTextAsync(fixture.StatePath));
+        var rules = new BubbleFighter.Fantasy.Contracts.Launcher.ClientPluginPolicy[]
+        {
+            new("sample.plugin", ["fixture-build"], Required: true),
+            new("sample.plugin", ["fixture-other"], Disabled: true),
+            new("recommended.plugin", []),
+        };
+        using var response = await fixture.Http.PutAsJsonAsync("/api/setup/client-plugins", new InstallationClientPluginSettings(rules));
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        await fixture.WaitForAsync("ready");
+        var changed = await fixture.Http.GetFromJsonAsync<InstallationConfiguration>("/api/setup/configuration");
+        Assert.Equal(JsonSerializer.Serialize(initial!.Settings with { ClientPlugins = rules }), JsonSerializer.Serialize(changed!.Settings));
+        using var after = JsonDocument.Parse(await File.ReadAllTextAsync(fixture.StatePath));
+        foreach (var property in new[] { "Username", "Salt", "PasswordHash", "OperationId", "Schema", "Installed" })
+            Assert.Equal(before.RootElement.GetProperty(property).GetRawText(), after.RootElement.GetProperty(property).GetRawText());
+        await fixture.RestartAsync();
+        await fixture.SignInAsync();
+        await fixture.WaitForAsync("ready");
+        var restored = await fixture.Http.GetFromJsonAsync<InstallationClientPluginSettings>("/api/setup/client-plugins");
+        Assert.Equal(JsonSerializer.Serialize(rules), JsonSerializer.Serialize(restored!.Policies));
+        using var clear = await fixture.Http.PutAsJsonAsync("/api/setup/client-plugins", new InstallationClientPluginSettings([]));
+        Assert.Equal(HttpStatusCode.Accepted, clear.StatusCode);
+        await fixture.WaitForAsync("ready");
+        Assert.Empty((await fixture.Http.GetFromJsonAsync<InstallationClientPluginSettings>("/api/setup/client-plugins"))!.Policies!);
+        using var inherit = await fixture.Http.PutAsJsonAsync("/api/setup/client-plugins", new InstallationClientPluginSettings(null));
+        Assert.Equal(HttpStatusCode.Accepted, inherit.StatusCode);
+        await fixture.WaitForAsync("ready");
+        Assert.Null((await fixture.Http.GetFromJsonAsync<InstallationClientPluginSettings>("/api/setup/client-plugins"))!.Policies);
+        Assert.Equal(JsonSerializer.Serialize(initial), JsonSerializer.Serialize(await fixture.Http.GetFromJsonAsync<InstallationConfiguration>("/api/setup/configuration")));
+    }
+
+    [Theory]
+    [InlineData("{\"policies\":[{\"id\":\"sample\",\"builds\":[],\"required\":true,\"disabled\":true}]}")]
+    [InlineData("{\"policies\":[{\"id\":\"sample\",\"builds\":[],\"required\":true},{\"id\":\"sample\",\"builds\":[\"fixture-build\"],\"disabled\":true}]}")]
+    [InlineData("{\"policies\":[{\"id\":\"sample\",\"builds\":[\"fixture-build\"],\"required\":true},{\"id\":\"sample\",\"builds\":[],\"disabled\":true}]}")]
+    [InlineData("{\"policies\":[{\"id\":\"sample\",\"builds\":[\"fixture-build\"],\"required\":true},{\"id\":\"sample\",\"builds\":[\"fixture-build\"],\"disabled\":true}]}")]
+    [InlineData("{\"policies\":[{\"id\":\"../sample\",\"builds\":[]}]}")]
+    [InlineData("{\"policies\":[{\"id\":\"sample\",\"builds\":[\"unknown-build\"]}]}")]
+    [InlineData("{\"policies\":[{\"id\":\"sample\",\"builds\":null}]}")]
+    [InlineData("{\"policies\":[null]}")]
+    public async Task InvalidClientPluginPolicyLeavesDurableStateUntouched(string body)
+    {
+        await using var fixture = await Fixture.StartAsync(webUiGrants: ["webui.admin"]);
+        await fixture.ClaimAsync(new() { PlayerLogin = "open" });
+        await fixture.SignInAsync();
+        await fixture.WaitForAsync("ready");
+        var original = await File.ReadAllTextAsync(fixture.StatePath);
+        using var content = new StringContent(body, System.Text.Encoding.UTF8, "application/json");
+        using var response = await fixture.Http.PutAsync("/api/setup/client-plugins", content);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(original, await File.ReadAllTextAsync(fixture.StatePath));
+    }
+
+    [Fact]
+    public async Task DeferredClientActivationPreservesPoliciesAcrossJsonWithoutAllowingAnUnprivilegedPolicyChange()
+    {
+        await using var fixture = await Fixture.StartAsync(webUiGrants: ["webui.access"]);
+        await fixture.ClaimAsync(new()
+        {
+            PlayerLogin = "open", Clients = [new("fixture-build", "", true)],
+            ClientPlugins = [new("sample.plugin", ["fixture-build"], Required: true)],
+        });
+        await fixture.SignInAsync();
+        await fixture.WaitForAsync("ready");
+        var configuration = (await fixture.Http.GetFromJsonAsync<InstallationConfiguration>("/api/setup/configuration"))!;
+        var activated = configuration.Settings with { Clients = [new("fixture-build", Path.GetTempPath(), false)] };
+        var original = await File.ReadAllTextAsync(fixture.StatePath);
+        using var forged = await fixture.Http.PutAsJsonAsync("/api/setup/configuration", new InstallationUpdate(activated with { ClientPlugins = [] }, false));
+        Assert.Equal(HttpStatusCode.BadRequest, forged.StatusCode);
+        Assert.Equal(original, await File.ReadAllTextAsync(fixture.StatePath));
+        using var accepted = await fixture.Http.PutAsJsonAsync("/api/setup/configuration", new InstallationUpdate(activated, false));
+        Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
+        await fixture.WaitForAsync("ready");
+        var updated = (await fixture.Http.GetFromJsonAsync<InstallationConfiguration>("/api/setup/configuration"))!;
+        Assert.Equal(JsonSerializer.Serialize(activated), JsonSerializer.Serialize(updated.Settings));
+    }
+
+    [Fact]
+    public async Task ClientPluginPolicyRequiresItsOwnPermissionAndTheMutationGuard()
+    {
+        await using (var accessOnly = await Fixture.StartAsync(webUiGrants: ["webui.access"]))
+        {
+            Assert.Equal(HttpStatusCode.Unauthorized, (await accessOnly.Http.GetAsync("/api/setup/client-plugins")).StatusCode);
+            await accessOnly.ClaimAsync(new() { PlayerLogin = "open" });
+            await accessOnly.SignInAsync();
+            await accessOnly.WaitForAsync("ready");
+            Assert.Equal(HttpStatusCode.Forbidden, (await accessOnly.Http.GetAsync("/api/setup/client-plugins")).StatusCode);
+            using var refused = await accessOnly.Http.PutAsJsonAsync("/api/setup/client-plugins", new InstallationClientPluginSettings([]));
+            Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
+        }
+        await using var fixture = await Fixture.StartAsync(webUiGrants: ["webui.admin"]);
+        await fixture.ClaimAsync(new() { PlayerLogin = "open" });
+        await fixture.SignInAsync();
+        await fixture.WaitForAsync("ready");
+        fixture.Http.DefaultRequestHeaders.Remove("X-BFF-Request");
+        using var unguarded = await fixture.Http.PutAsJsonAsync("/api/setup/client-plugins", new InstallationClientPluginSettings([]));
+        Assert.Equal(HttpStatusCode.Forbidden, unguarded.StatusCode);
+    }
+
     [Plugin("test.installation-runtime", Provides = [typeof(IInstallationRuntime)])]
     public sealed class Runtime : IPlugin, IInstallationRuntime
     {
@@ -511,17 +619,19 @@ public sealed class InstallationEndpointTests
         private PluginHost? _host;
         private Dictionary<string, object?> _installationOptions = [];
         private Dictionary<string, object?> _adminOptions = [];
+        private string[]? _webUiGrants;
         public string Directory { get; } = Path.Combine(Path.GetTempPath(), "bff-installation-tests", Guid.NewGuid().ToString("N"));
         public string StatePath => Path.Combine(Directory, "administration", "installation.json");
         public HttpClient Http { get; private set; } = null!;
         public CookieContainer Cookies { get; private set; } = null!;
 
         public static async Task<Fixture> StartAsync(Dictionary<string, object?>? installationOptions = null,
-            Dictionary<string, object?>? adminOptions = null)
+            Dictionary<string, object?>? adminOptions = null, string[]? webUiGrants = null)
         {
             var fixture = new Fixture();
             fixture._installationOptions = installationOptions ?? [];
             fixture._adminOptions = adminOptions ?? [];
+            fixture._webUiGrants = webUiGrants;
             await fixture.RestartAsync();
             return fixture;
         }
@@ -536,15 +646,22 @@ public sealed class InstallationEndpointTests
             PluginRow Row(string plugin, Dictionary<string, object?>? config = null) => new() { Id = plugin, Plugin = plugin, Source = "test", Config = config };
             var catalog = PluginCatalog.ScanAssemblies([typeof(PluginHost).Assembly, typeof(AdminHttpPlugin).Assembly,
                 typeof(WebUiPlugin).Assembly, typeof(InstallationPlugin).Assembly, typeof(SqliteSetupPlugin).Assembly,
-                typeof(MySqlSetupPlugin).Assembly, typeof(InstallationEndpointTests).Assembly]);
+                typeof(MySqlSetupPlugin).Assembly, typeof(PermissionsPlugin).Assembly, typeof(InstallationEndpointTests).Assembly]);
             var installationConfig = new Dictionary<string, object?>(_installationOptions)
             { ["state_directory"] = Directory, ["database_timeout_seconds"] = 3, ["login_attempts"] = 2 };
-            _host = new PluginHost([
+            var rows = new List<PluginRow>
+            {
                 Row("test.installation-runtime"), Row("persistence.sqlite.setup"),
                 Row("persistence.mysql.setup", new() { ["connect_timeout_seconds"] = 1 }),
                 Row("installation", installationConfig),
                 Row("webui"), Row("admin.http", new Dictionary<string, object?>(_adminOptions) { ["listen"] = $"127.0.0.1:{port}", ["log_buffer"] = 32 }),
-            ], catalog, NullLoggerFactory.Instance);
+            };
+            if (_webUiGrants is not null)
+                rows.Insert(0, Row("permissions", new() { ["subjects"] = new[]
+                {
+                    new Dictionary<string, object?> { ["kind"] = "webui", ["id"] = Username, ["allow"] = _webUiGrants },
+                } }));
+            _host = new PluginHost(rows, catalog, NullLoggerFactory.Instance);
             await _host.StartAsync(CancellationToken.None);
             Cookies = new CookieContainer();
             Http = new HttpClient(new HttpClientHandler { CookieContainer = Cookies }) { BaseAddress = new Uri($"http://127.0.0.1:{port}") };

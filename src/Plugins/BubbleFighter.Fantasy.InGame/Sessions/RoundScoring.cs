@@ -4,10 +4,10 @@ namespace BubbleFighter.Fantasy.InGame.Sessions;
 
 /// <summary>
 /// One running round's score, owned by the room and mutated only under <see cref="PlayRoom.Gate"/>.
-/// A build's client reports knock-downs and finishing blows; this turns them into the round's
-/// counters with the rule the recorded two-team round shows: a knock-down counts for the reporter
-/// (and is what its score is built from), a finishing blow counts as a kill for the reporter and
-/// the victim's team total, and a player's score is its knock-downs plus twice its kills.
+/// Counts accepted knock-downs, finishing blows and rescues for each seat. A finishing blow adds
+/// a point to the reporter's team and a death to the victim. The current personal total is one per
+/// knock-down and two per kill or rescue. kr-812 sub_804850 case 0x1D installs the absolute total;
+/// that consuming reader does not establish these scoring weights.
 /// </summary>
 internal sealed class RoundScoring
 {
@@ -101,10 +101,11 @@ internal sealed class RoundScoring
         return Stats(reporterSlot);
     }
 
-    // The personal score: knock-downs plus twice the kills (57 = 21 + 2*18), and the final scoreboard repeats the
-    // same three counters.
+    // Keep the weighting distinct from its wire representation: kr-812 sub_804850 case 0x1D
+    // assigns the supplied total to row+64; it does not derive the rescue coefficient.
     private int Score(int slot) => _knockdowns[slot] + 2 * _kills[slot] + 2 * _rescues[slot];
 
+    /// <summary>Counts one completed rescue for a seat; an out-of-range seat has no counters to update.</summary>
     internal RoundSeatStats? AddRescue(int slot)
     {
         if (!IsSeat(slot)) return null;
@@ -135,7 +136,11 @@ internal sealed class RoundScoring
 
     /// <summary>
     /// Applies one star report: the seat's count moves by <paramref name="change"/> and stays within
-    /// zero and <paramref name="cap"/>, since the client keeps the stars and only its reports reach the server.
+    /// zero and <paramref name="cap"/>. The count lives in the client — the live stat writes the
+    /// seat's field (kr-812 sub_804850 case 0x23) and the HUD reads it locally (kr-812 sub_5521F0) —
+    /// and reaches the server only through the build's star reports (packets/score.yaml
+    /// ScoreRow.stars; packets/builds.yaml star_report: kinds 6/15/7/16 on kr-812), so the server's
+    /// counters follow the reports instead of holding an authority of their own.
     /// </summary>
     /// <param name="slot">The reporting seat; one outside the cap is ignored.</param>
     /// <param name="change">The signed change.</param>

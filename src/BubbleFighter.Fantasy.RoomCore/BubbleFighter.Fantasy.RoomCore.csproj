@@ -1,5 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Description>Bounded serial execution primitives for room plugins.</Description>
+    <Description>Bounded serial execution primitives for room plugins, and the room session's wire shapes.</Description>
   </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\BubbleFighter.Fantasy.Abstractions\BubbleFighter.Fantasy.Abstractions.csproj" />
+  </ItemGroup>
 </Project>

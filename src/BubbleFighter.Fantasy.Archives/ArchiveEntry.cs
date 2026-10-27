@@ -53,7 +53,7 @@ public static class Archive
         InvalidDataException modern;
         try { return PknArchive.Open(filePath, clientRelativePath); }
         catch (InvalidDataException e) { modern = e; }
-        try { return LegacyPknArchive.Open(filePath, clientRelativePath); }
+        try { return PknArchiveV1.Open(filePath, clientRelativePath); }
         catch (InvalidDataException legacy)
         {
             throw new InvalidDataException(

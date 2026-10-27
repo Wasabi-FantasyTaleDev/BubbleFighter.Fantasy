@@ -1,6 +1,8 @@
 using System.ComponentModel.DataAnnotations;
+using System.Globalization;
 using System.Net;
 using BubbleFighter.Fantasy.Abstractions;
+using BubbleFighter.Fantasy.Contracts.Launcher;
 
 namespace BubbleFighter.Fantasy.Launcher.Http;
 
@@ -21,6 +23,32 @@ public sealed class LauncherOptions : IValidatableOptions
     public bool SupportsPlugins { get; set; } = true;
     /// <summary>Gets or sets whether account rank icons may be displayed.</summary>
     public bool LevelIcon { get; set; } = true;
+    /// <summary>Gets or sets the public multiline server description, rendered as plain text.</summary>
+    [MaxLength(4096)] public string Motd { get; set; } = "";
+    /// <summary>Gets or sets a public HTTP(S) icon URL, or empty for the launcher's default icon.</summary>
+    public string IconUrl { get; set; } = "";
+    /// <summary>Gets or sets at most sixteen public HTTP(S) screenshot URLs.</summary>
+    public string[] Images { get; set; } = [];
+    /// <summary>Gets or sets whether the public roster discloses authenticated display names and levels.</summary>
+    public bool RosterEnabled { get; set; } = true;
+    /// <summary>Gets or sets the maximum number of names returned by one public roster request.</summary>
+    [Range(1, 10000)] public int MaxRosterPlayers { get; set; } = 1000;
+    /// <summary>Gets or sets whether the catalog exposes the current authenticated-player count.</summary>
+    public bool ShowOnlinePlayers { get; set; } = true;
+    /// <summary>Gets or sets the launcher admission limit; null allows any number of players.</summary>
+    [Range(1, 100000)] public int? PlayerLimit { get; set; }
+    /// <summary>Gets or sets whether launcher sign-ins and new launch tickets are refused for maintenance.</summary>
+    public bool Maintenance { get; set; }
+    /// <summary>Gets or sets the announced maintenance start; the maintenance switch controls admission.</summary>
+    public string? MaintenanceStart { get; set; }
+    /// <summary>Gets or sets the announced maintenance end; null leaves the end unspecified.</summary>
+    public string? MaintenanceEnd { get; set; }
+    /// <summary>Gets or sets the public plain-text explanation attached to maintenance refusals.</summary>
+    [MaxLength(4096)] public string MaintenanceDescription { get; set; } = "";
+    /// <summary>Gets or sets whether only listed accounts may sign in or obtain new launch tickets.</summary>
+    public bool WhitelistEnabled { get; set; }
+    /// <summary>Gets or sets at most 4096 account login names allowed by launcher admission.</summary>
+    public string[] Whitelist { get; set; } = [];
     /// <summary>Gets or sets the minimum Launcher SemVer for registration, login, refresh and tickets; empty disables the gate.</summary>
     public string MinimumLauncherVersion { get; set; } = "";
     /// <summary>Gets or sets at most 64 plugin identity recommendations, resolved by the launcher's configured stores.</summary>
@@ -46,8 +74,8 @@ public sealed class LauncherOptions : IValidatableOptions
     [Range(60, 86400)] public int SessionSeconds { get; set; } = 1800;
     /// <summary>Gets or sets how long a sign-in stays renewable without a password, in seconds; every renewal restarts it.</summary>
     [Range(120, 31536000)] public int RefreshSessionSeconds { get; set; } = 2592000;
-    /// <summary>Gets or sets single-use launch ticket lifetime in seconds.</summary>
-    [Range(10, 600)] public int TicketSeconds { get; set; } = 60;
+    /// <summary>Gets or sets the single-use launch ticket lifetime in seconds; defaults to ten minutes to allow client startup.</summary>
+    [Range(10, 600)] public int TicketSeconds { get; set; } = 600;
     /// <summary>Gets or sets the request budget per transport peer IP in a one-minute window.</summary>
     [Range(1, 100000)] public int RequestsPerMinute { get; set; } = 120;
     /// <summary>Gets or sets retained IP request windows; the oldest window is evicted at capacity. Defaults to 4096.</summary>
@@ -70,20 +98,37 @@ public sealed class LauncherOptions : IValidatableOptions
     /// <inheritdoc />
     public IEnumerable<ValidationResult> Validate()
     {
+        if (Motd is null || Motd.Any(c => char.IsControl(c) && c is not ('\n' or '\r' or '\t')) ||
+            MaintenanceDescription is null || MaintenanceDescription.Any(c => char.IsControl(c) && c is not ('\n' or '\r' or '\t')))
+            yield return new("Server descriptions must be plain text without control characters.", [nameof(Motd), nameof(MaintenanceDescription)]);
+        if (IconUrl is null || IconUrl.Length > 0 && !PublicImage(IconUrl) || Images is null || Images.Length > 16 || Images.Any(i => !PublicImage(i)))
+            yield return new("icon_url and images must be public HTTP(S) URLs without credentials; at most 16 images are allowed.", [nameof(IconUrl), nameof(Images)]);
+        var validStart = MaintenanceTime(MaintenanceStart, out var start);
+        var validEnd = MaintenanceTime(MaintenanceEnd, out var end);
+        if (!validStart || !validEnd)
+            yield return new("Maintenance times must be ISO 8601 timestamps with seconds and an explicit UTC offset, or null.", [nameof(MaintenanceStart), nameof(MaintenanceEnd)]);
+        if (validStart && validEnd && MaintenanceStart is not null && MaintenanceEnd is not null && end <= start)
+            yield return new("maintenance_end must follow maintenance_start.", [nameof(MaintenanceEnd)]);
+        if (Whitelist is null || Whitelist.Length > 4096 || Whitelist.Any(n => n is null || n.Length is < 3 or > 64 || !n.All(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '-' or '.')) ||
+            Whitelist.Distinct(StringComparer.OrdinalIgnoreCase).Count() != Whitelist.Length)
+            yield return new("whitelist must contain at most 4096 distinct valid account names.", [nameof(Whitelist)]);
         if (MinimumLauncherVersion is null || MinimumLauncherVersion.Length != 0 && !LauncherVersion.TryParse(MinimumLauncherVersion, out _))
             yield return new("minimum_launcher_version must be empty or a strict SemVer of at most 128 characters.", [nameof(MinimumLauncherVersion)]);
         if (PluginRecommendations is null || PluginRecommendations.Length > 64)
             yield return new("plugin_recommendations must contain at most 64 entries.", [nameof(PluginRecommendations)]);
         else
         {
-            foreach (var recommendation in PluginRecommendations)
-                if (recommendation is null || recommendation.Id is null || recommendation.Id.Length is < 1 or > 128 ||
-                    !recommendation.Id.All(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '-' or '_') ||
-                    recommendation.Builds is null || recommendation.Builds.Length > 64 || recommendation.Builds.Any(b => b is null || !ValidId(b)))
-                    yield return new("Each plugin recommendation needs an identity and at most 64 valid build ids.", [nameof(PluginRecommendations)]);
-            foreach (var group in PluginRecommendations.Where(p => p is not null && p.Builds is not null).GroupBy(p => p.Id, StringComparer.Ordinal))
-                if (!group.Any(p => p.Builds.Length == 0) && group.SelectMany(p => p.Builds).Distinct(StringComparer.Ordinal).Take(65).Count() > 64)
-                    yield return new("Merged plugin recommendations must contain at most 64 build ids per identity.", [nameof(PluginRecommendations)]);
+            ValidationResult? policyError = null;
+            try
+            {
+                ClientPluginPolicyRules.Validate(PluginRecommendations.Select(policy => policy is null ? null! :
+                    new ClientPluginPolicy(policy.Id, policy.Builds, policy.Required, policy.Disabled)).ToArray());
+            }
+            catch (ArgumentException)
+            {
+                policyError = new("Client-plugin policy must use valid store identities and build scopes without overlapping required and disabled rules.", [nameof(PluginRecommendations)]);
+            }
+            if (policyError is not null) yield return policyError;
         }
         if (HostPolicy is not ("auto" or "ip" or "domain")) yield return new("host_policy must be auto, ip or domain.", [nameof(HostPolicy)]);
         if (Region is null || Region.Length != 0 && (Region.Length != 2 || !Region.All(char.IsAsciiLetterUpper))) yield return new("region must be an uppercase two-letter region code or empty.", [nameof(Region)]);
@@ -95,7 +140,7 @@ public sealed class LauncherOptions : IValidatableOptions
         foreach (var instance in Instances)
         {
             if (!ValidId(instance.Id) || !ValidId(instance.Build) || instance.Name is null || instance.Name.Length == 0 || !instance.Name.Any(n => n is not null && n.Language == "en") || instance.Name.Length > 16 || instance.Name.Any(n => n is null || string.IsNullOrWhiteSpace(n.Text) || n.Text.Length > 128 || string.IsNullOrWhiteSpace(n.Language) || n.Language.Length > 16) || instance.Name.Select(n => n.Language).Distinct(StringComparer.Ordinal).Count() != instance.Name.Length ||
-                instance.Host is null || instance.Host.Length > 0 && Uri.CheckHostName(instance.Host) == UriHostNameType.Unknown || instance.Port is < 1 or > 65535 || instance.LauncherLogin is not ("required" or "optional" or "none") || instance.ReleaseVersion is null || instance.ReleaseVersion.Length > 64 || instance.ClientLanguages is not null && (instance.ClientLanguages.Length > 6 || instance.ClientLanguages.Any(l => l is not ("zh-CN" or "zh-TW" or "ko" or "id" or "vi" or "en")) || instance.ClientLanguages.Distinct(StringComparer.Ordinal).Count() != instance.ClientLanguages.Length))
+                instance.Host is null || instance.Host.Length > 0 && Uri.CheckHostName(instance.Host) == UriHostNameType.Unknown || instance.Port is < 1 or > 65535 || instance.LauncherLogin is not ("required" or "optional" or "none") || instance.ReleaseVersion is null || instance.ReleaseVersion.Length > 64 || instance.ReleaseVersion.Any(char.IsControl) || instance.PatchVersion is null || instance.PatchVersion.Length > 64 || instance.PatchVersion.Any(char.IsControl) || instance.ProtocolVersion is < 1 or > 65535 || instance.ClientLanguages is not null && (instance.ClientLanguages.Length > 6 || instance.ClientLanguages.Any(l => l is not ("zh-CN" or "zh-TW" or "ko" or "id" or "vi" or "en")) || instance.ClientLanguages.Distinct(StringComparer.Ordinal).Count() != instance.ClientLanguages.Length))
                 yield return new("Each instance needs valid id, build, localized name, endpoint and login policy.", [nameof(Instances)]);
             if (instance.DownloadSource is { } source)
                 foreach (var error in source.Validate()) yield return error;
@@ -105,6 +150,17 @@ public sealed class LauncherOptions : IValidatableOptions
     }
 
     private static bool ValidId(string? value) => value is { Length: > 0 and <= 64 } && value.All(c => char.IsAsciiLetterOrDigit(c) || c == '-');
+
+    private static bool PublicImage(string? value) => value is { Length: > 0 and <= 2048 } && !value.Any(char.IsControl) &&
+        Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" && uri.Host.Length > 0 && uri.UserInfo.Length == 0;
+
+    private static bool MaintenanceTime(string? value, out DateTimeOffset time)
+    {
+        time = default;
+        return value is null || value.Length <= 40 && DateTimeOffset.TryParseExact(value,
+            ["yyyy-MM-dd'T'HH:mm:ss'Z'", "yyyy-MM-dd'T'HH:mm:ss.FFFFFFF'Z'", "yyyy-MM-dd'T'HH:mm:sszzz", "yyyy-MM-dd'T'HH:mm:ss.FFFFFFFzzz"],
+            CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out time);
+    }
 }
 
 /// <summary>A plugin store identity with an optional exact-build scope; no download address or executable path is accepted.</summary>
@@ -116,6 +172,8 @@ public sealed class LauncherPluginRecommendation
     public string[] Builds { get; set; } = [];
     /// <summary>Gets or sets whether the launcher must enable this plugin before launching an applicable build.</summary>
     public bool Required { get; set; }
+    /// <summary>Gets or sets whether applicable launches must disable this plugin; conflicts with an overlapping required rule.</summary>
+    public bool Disabled { get; set; }
 }
 
 /// <summary>A deployer's advertised client preset and its connection destination.</summary>
@@ -129,6 +187,10 @@ public sealed class LauncherInstanceOptions
     public LauncherLocalizedName[] Name { get; set; } = [];
     /// <summary>Gets or sets the optional release subversion displayed below the title.</summary>
     public string ReleaseVersion { get; set; } = "";
+    /// <summary>Gets or sets the optional numeric wire version advertised for this preset.</summary>
+    public int? ProtocolVersion { get; set; }
+    /// <summary>Gets or sets an optional distribution patch label, independent of the wire version.</summary>
+    public string PatchVersion { get; set; } = "";
     /// <summary>Gets or sets an optional authoritative list of client language choices.</summary>
     public string[]? ClientLanguages { get; set; }
     /// <summary>Gets or sets the public game hostname, independently of the API bind address; empty advertises the host the launcher used to reach the API.</summary>

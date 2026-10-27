@@ -13,7 +13,7 @@ namespace BubbleFighter.Fantasy.Protocol;
 /// with the server-to-client cipher and writes each frame in queue order, so a slow client
 /// never holds up the handler or room operation that sent to it.
 /// </summary>
-internal sealed class WireSession : ISessionWithFeatures, IDisposable
+internal sealed class WireSession : ISessionWithFeatures, ISessionOutputDrain, IDisposable
 {
     private static long _nextId;
 
@@ -145,6 +145,13 @@ internal sealed class WireSession : ISessionWithFeatures, IDisposable
         return flushed.Task;
     }
 
+    /// <inheritdoc />
+    public ValueTask DrainOutputAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return new(FlushAsync().WaitAsync(cancellationToken));
+    }
+
     /// <summary>
     /// Stops the writer loop and drops the frames it has not written. Called when the
     /// connection's protocol run ends; the connection is already closed or closing.
@@ -173,7 +180,9 @@ internal sealed class WireSession : ISessionWithFeatures, IDisposable
                     // Encryption is continuous; the single reader preserves frame and cipher order.
                     var frame = _dialect.EncodeFrame(outbound.Opcode, outbound.Payload);
                     _cipher.Apply(frame);
-                    await Connection.Output.WriteAsync(frame, ct).ConfigureAwait(false);
+                    var written = await Connection.Output.WriteAsync(frame, ct).ConfigureAwait(false);
+                    if (written.IsCanceled || written.IsCompleted)
+                        throw new IOException("The outbound transport stopped before the frame write completed.");
                     _events.Emit(new PacketSentEvent(this, _protocolName, outbound.Opcode, outbound.Payload.Length)
                     {
                         Payload = outbound.Payload,

@@ -272,7 +272,7 @@ public sealed class ResultSurfaceMountTests
                 var board = new RoundScoreboard(1, 2, [11, 1], []);
                 var sender = Assert.Single(services.GetAll<IMessageSender<RoundScoreboard>>());
                 await sender.SendAsync(session, board, default);
-                var nested = play.Score!.TimeOverEnd == TimeOverEndBody.Scoreboard;
+                var nested = play.Score.TimeOverEnd == PlayValues.TimeOverEndBody.Scoreboard;
                 Assert.Equal(table.S2C(nested ? "gspGameTimeOverEnd" : "gspGameBroadcastPlayerScoreData"), session.Sent[0].Opcode);
                 Assert.Equal(PlayRoomCodec.WriteScoreboard(TestBuilds.Packets, build, board), session.Sent[0].Body);
                 await sender.SendAsync(session, board with { WithRewards = true }, default);

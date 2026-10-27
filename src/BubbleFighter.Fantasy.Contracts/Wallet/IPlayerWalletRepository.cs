@@ -8,8 +8,15 @@ public interface IPlayerWalletRepository
     /// <param name="ct">Cancellation token.</param>
     ValueTask<PlayerWallet?> FindByUserNumAsync(long userNum, CancellationToken ct);
 
-    /// <summary>Inserts or replaces the wallet.</summary>
-    /// <param name="wallet">The balances to store.</param>
+    /// <summary>
+    /// Stores the given absolute balances, creating the wallet when absent. The store does not merge:
+    /// this write wins over any balance read earlier. Changes that must survive a concurrent purchase
+    /// go through the purchase store's serialized operation, which reads the wallet under the wallet
+    /// row lock inside its own transaction.
+    /// </summary>
+    /// <param name="wallet">The balances to store; both balances must be non-negative.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown for a non-positive user number or a negative balance.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the store writes no row.</exception>
     ValueTask UpsertAsync(PlayerWallet wallet, CancellationToken ct);
 }

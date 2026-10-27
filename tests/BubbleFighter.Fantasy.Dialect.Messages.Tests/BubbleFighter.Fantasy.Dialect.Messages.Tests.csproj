@@ -13,9 +13,14 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Dialect.Messages\BubbleFighter.Fantasy.Dialect.Messages.csproj" />
     <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Dialect.Rooms\BubbleFighter.Fantasy.Dialect.Rooms.csproj" />
+    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Equipment\BubbleFighter.Fantasy.Equipment.csproj" />
+    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Lobby\BubbleFighter.Fantasy.Lobby.csproj" />
+    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Persistence.Memory\BubbleFighter.Fantasy.Persistence.Memory.csproj" />
+    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.PlayerSettings\BubbleFighter.Fantasy.PlayerSettings.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\Shared\TestTempDirectories.cs" Link="TestTempDirectories.cs" />
     <Compile Include="..\Shared\PacketTableEdits.cs" Link="PacketTableEdits.cs" />
+    <Compile Include="..\Shared\TestPlayerSessions.cs" Link="TestPlayerSessions.cs" />
   </ItemGroup>
 </Project>

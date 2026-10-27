@@ -1,6 +1,7 @@
 using System.Text;
+using BubbleFighter.Fantasy.RoomCore;
 using BubbleFighter.Fantasy.Contracts.ClientData;
-using BubbleFighter.Fantasy.InGame.Wire;
+using BubbleFighter.Fantasy.InGame.Sessions;
 
 namespace BubbleFighter.Fantasy.InGame.Data;
 
@@ -189,11 +190,23 @@ internal sealed class MapCatalog
     {
         foreach (var candidate in new[] { map.Unknown68, map.Unknown44, map.Unknown92, map.Unknown116 })
         {
-            if (!string.IsNullOrEmpty(candidate) && !Handlers.RoomPush.RandomMapMarkers.Contains(candidate))
+            if (!string.IsNullOrEmpty(candidate) && !RandomMapMarkers.Contains(candidate))
                 return candidate;
         }
         return null;
     }
+
+    /// <summary>The map-list pool markers the client resolves locally.</summary> <remarks> The client's own map
+    /// list carries <c>Random</c> and <c>Random_Hot</c> entries (dword_18EA2EC / dword_18EA304), and its list
+    /// builder drops both before handing one concrete entry back (sub_89E820). A marker string is not a map
+    /// key: the round scene loader consumes the raw session+232 string at world build
+    /// (sub_6CB270:6cc7f5-6cc7f0) and the in-round spawn picker resolves its restriction tables through the
+    /// same key (sub_98DB80), so a marker at that slot loads no scene, leaves the spawn-point map empty,
+    /// and the round avatar is never placed and never filled with HP - the outside-map/scattered-spawn/
+    /// HP-zero family. The room's map is therefore resolved server-side at create and at every C2S 513 map
+    /// change, and no echo path can carry a marker. </remarks>
+    internal static readonly IReadOnlySet<string> RandomMapMarkers =
+        new HashSet<string>(StringComparer.Ordinal) { "Random", "Random_Hot" };
 
     /// <summary>Whether the selection carries any map at all, concrete or a random marker.</summary>
     internal static bool HasSelection(MapMetaBlob map) =>

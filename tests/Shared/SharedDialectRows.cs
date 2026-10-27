@@ -16,6 +16,8 @@ internal static class SharedDialectRows
             ["protocol"] = "kr-1256/game",
             ["login"] = true,
             ["main_menu_init"] = true,
+            // The round's session signature, sent before the relay join (reader kr-1256 sub_1155B00).
+            ["session_signature"] = true,
             // The real bundle mounts the bag row; a caller that has no bag tables overrides this to false.
             ["inventory"] = true,
             ["equipment"] = true,

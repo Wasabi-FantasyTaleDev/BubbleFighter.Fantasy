@@ -503,7 +503,7 @@ public sealed class LobbyPlugin : IPlugin
         if (!options.RequiresTicket)
             context.Logger.LogWarning("Lobby {Protocol} runs with authentication: open. Any client that reaches this port "
                 + "can log in as any account; use it only on a trusted network.", options.Protocol);
-        var handlers = new Handlers(options, players, inventory, money, playerSessions, starter, context.Logger, creation, creationOpened, tickets, expiry, lifeRule);
+        var handlers = new Handlers(options, players, inventory, money, playerSessions, starter, context.Logger, creation, creationOpened, tickets, expiry, lifeRule, context.Events);
         context.Effect(messages.For(context).On<InitialTutorialCompleted>(p, (session, _, ct) =>
         {
             if (!session.TryFeature<IPlayerSession>(out var player))
@@ -574,7 +574,8 @@ public sealed class LobbyPlugin : IPlugin
         IMessageSender<CharacterCreationOpened>? creationOpened,
         ILauncherTicketService? tickets,
         InventoryExpirySweep? expiry = null,
-        LoginLifeRule? lifeRule = null)
+        LoginLifeRule? lifeRule = null,
+        IEventBus? events = null)
     {
         private readonly DuplicateLoginGuard _duplicateLogins = new(playerSessions, options.DuplicateLoginPolicy, logger);
 
@@ -583,9 +584,11 @@ public sealed class LobbyPlugin : IPlugin
             IMessageSender<LoginSucceeded> succeeded, IMessageSender<LoginRejected> rejected, CancellationToken ct,
             bool afterCreation = false)
         {
-            var nativeAccount = LauncherLoginAccount.Resolve(request.Account, session.Profile.Id,
-                options.LauncherTickets || options.RequiresTicket, tickets, options.RequiresTicket);
-            if (nativeAccount is null)
+            // Character creation resumes only from this connection's completed, server-owned pending state.
+            var launchIdentity = afterCreation ? new LauncherTicketIdentity(request.Account)
+                : LauncherLoginAccount.ResolveIdentity(request.Account, session.Profile.Id,
+                    options.LauncherTickets || options.RequiresTicket, tickets, options.RequiresTicket);
+            if (launchIdentity is null)
             {
                 // Never log the refused value: it may be a password typed into an in-game login box.
                 var reason = LauncherLoginAccount.IsTicketForm(request.Account) ? "invalid launcher ticket" : "launcher ticket required";
@@ -593,7 +596,10 @@ public sealed class LobbyPlugin : IPlugin
                 await session.Connection.CloseAsync(reason).ConfigureAwait(false);
                 return;
             }
-            var username = string.IsNullOrWhiteSpace(nativeAccount) ? options.FallbackUsername : nativeAccount.Trim();
+            playerSessions.SetLauncherLanguage(session, launchIdentity.LauncherLanguage);
+            if (launchIdentity.LaunchId is { } launchId)
+                events?.Emit(new LauncherLaunchRedeemed(launchId, launchIdentity.Username, session.Profile.Id, session));
+            var username = string.IsNullOrWhiteSpace(launchIdentity.Username) ? options.FallbackUsername : launchIdentity.Username.Trim();
             logger.LogInformation("Session {Id} requested login as '{User}'.", session.Id, username);
             var needsCreation = false;
             if (creation is not null && !afterCreation)
@@ -638,7 +644,7 @@ public sealed class LobbyPlugin : IPlugin
                 if (lifeRule is not null)
                     _ = await lifeRule.ApplyAsync(player.UserNum, ct).ConfigureAwait(false);
                 if (expiry is not null)
-                    expiredItemIds = await expiry.SweepAsync(player.UserNum, ct).ConfigureAwait(false);
+                    expiredItemIds = await expiry.SweepForLoginAsync(player.UserNum, inventory, ct).ConfigureAwait(false);
                 var snapshot = await inventory.ResolveAsync(player.UserNum, ct).ConfigureAwait(false);
                 (characterBag, equippedBag) = (snapshot.CharacterBag, snapshot.EquippedBag);
                 equipped = snapshot.CharacterBag.Where(row => (row.Flags & 1) != 0).Select(row => row.ItemId).Distinct().ToArray();

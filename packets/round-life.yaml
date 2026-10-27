@@ -1,0 +1,124 @@
+version: 1
+structs:
+  # Native modern life-reset requests and grants. The shared life state machine owns admission;
+  # the dialect echoes the validated request and lets the reply table append its default-zero word.
+  #
+  # Sources: the kr-1256 writer and reader only. C2S 602 is written by kr-1256 sub_6E3730, which stamps
+  # the opcode and serializes one i32 actor and two tagged optional i32 values through kr-1256
+  # sub_10C0430, then writes one bool32 word more. S2C 632 is read by kr-1256 sub_6F5E50: it fills the
+  # same five fields through the counterpart reader kr-1256 sub_10C04D0 (value pair reader
+  # kr-1256 sub_10C0640), reads the bool32, then reads one more i32. The pair record the readers build
+  # is 20 bytes - actor +0, first value +4 with its present byte at +8, second value +12 with its
+  # present byte at +16 - and that record's offsets are the offsets stated below. A present pair is the
+  # tag byte 0x3A followed by its i32; an absent pair is the single byte 0xBA, so the body is 10, 14 or
+  # 18 bytes, and the reply adds one i32 for 14, 18 or 22.
+  #
+  # CN/TW have independently audited plain-word restatements below; they must not inherit these tags.
+  # The optional values' purpose is not traced: kr-1256 sub_6F5E50 stores them, but their consumer is not named.
+
+  # C2S 602 (profiles/kr-1256/opcodes.yaml Unknown602): actor, two tagged optional i32 values, bool32
+  # item reset. The item-reset bool32 is proven by the reply's reader: when it is set, kr-1256
+  # sub_6F5E50 clears the acting character's item state (kr-1256 sub_4753A0 on Character+2984 and two
+  # -1 words at Character+2056/+2060) before storing the trailing word.
+  RoundResetRequest:
+    - actor: u32
+      offset: 0
+      only: [kr-1256]
+    - unknown_4: "optional<0x3A,RoundResetValueTail>"
+      offset: 4
+      default: 186 # 0xBA, the absent tag byte kr-1256 sub_10C0430 writes for a valueless pair
+      only: [kr-1256]
+    - unknown_12: "optional<0x3A,RoundResetValueTail>"
+      offset: 12
+      default: 186 # 0xBA, the absent tag byte kr-1256 sub_10C0430 writes for a valueless pair
+      only: [kr-1256]
+    # No record offset: kr-1256 sub_6E3730 writes the word straight after the pairs and
+    # kr-1256 sub_6F5E50 reads it straight into the item-reset branch.
+    - item_reset: bool
+      only: [kr-1256]
+
+  # The i32 a present 0x3A tag announces; kr-1256 sub_10C04D0 stores it beside its present byte.
+  RoundResetValueTail:
+    - unknown_0: u32
+      offset: 0
+      only: [kr-1256]
+
+  # S2C 632 (profiles/kr-1256/opcodes.yaml Unknown632): the request's five fields, then one i32.
+  # kr-1256 sub_6F5E50 stores the trailing word at +304 of the actor's seat record (seat array base
+  # +592, stride 320, index (actor - 1000000) / 100000); the seat constructor kr-1256 sub_917460
+  # zeroes it, and its meaning is not traced.
+  RoundResetReply:
+    - actor: u32
+      offset: 0
+      only: [kr-1256]
+    - unknown_4: "optional<0x3A,RoundResetValueTail>"
+      offset: 4
+      default: 186 # 0xBA, the absent tag byte kr-1256 sub_10C04D0 keeps for a valueless pair
+      only: [kr-1256]
+    - unknown_12: "optional<0x3A,RoundResetValueTail>"
+      offset: 12
+      default: 186 # 0xBA, the absent tag byte kr-1256 sub_10C04D0 keeps for a valueless pair
+      only: [kr-1256]
+    - item_reset: bool
+      only: [kr-1256]
+    - unknown_304: u32
+      offset: 304
+      only: [kr-1256]
+
+  # C2S 602: cn-774 sub_8A4650 and tw-454 sub_717A20 write actor, a caller word and
+  # one byte widened to u32. Neither writer emits KR's optional-value markers.
+  RoundResetRequest@cn-774:
+    - actor: u32
+      offset: 0
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+
+  # S2C 605: cn-774 sub_8B5670 and tw-454 sub_729D30 read the three request words,
+  # interpreting the third as nonzero/zero to clear character state, then read one seat word.
+  # Keeping that third field u32 preserves every native byte value widened by the request writer.
+  RoundResetReply@cn-774:
+    - actor: u32
+      offset: 0
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_296: u32
+      offset: 296 # cn-774 sub_8B5670: seat stride 312, stores at seat+296.
+      tw-454:
+        - unknown_264: u32
+          offset: 264 # tw-454 sub_729D30: seat stride 280, stores at seat+264.
+
+  # The reset grant makes the local character emit the relay confirmation. KR's tagged
+  # pair reader is kr-1256 sub_10C0640; CN/TW instead emit two words, one byte and bool32
+  # (cn-774 sub_8B5670 / tw-454 sub_729D30), read by cn-774 sub_8B5960 / tw-454 sub_72A000.
+  RoundResetConfirmation:
+    - actor: u32
+      offset: 0
+      only: [kr-1256]
+    - unknown_4: "optional<0x3A,RoundResetValueTail>"
+      offset: 4
+      default: 186
+      only: [kr-1256]
+    - unknown_12: "optional<0x3A,RoundResetValueTail>"
+      offset: 12
+      default: 186
+      only: [kr-1256]
+    - unknown_20: u8
+      offset: 20
+      only: [kr-1256]
+    - unknown_24: bool
+      offset: 24
+      only: [kr-1256]
+
+  RoundResetConfirmation@cn-774:
+    - actor: u32
+      offset: 0
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u8
+      offset: 8
+    - unknown_12: bool
+      offset: 12

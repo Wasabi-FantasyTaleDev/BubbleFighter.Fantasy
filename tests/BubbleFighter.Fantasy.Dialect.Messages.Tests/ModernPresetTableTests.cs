@@ -112,6 +112,30 @@ public sealed class ModernPresetTableTests
         Assert.Equal(body, PacketCodec.Write(TestBuilds.Packets, build, "WeaponPresetUpdate", decoded));
     }
 
+    /// <summary>Pins the fourth positional record without changing its opaque three-word contents.</summary>
+    [Fact]
+    public void FourPositionalRecordsCarryTheExpansionSlot()
+    {
+        // kr-1256 sub_81B820 keys each preset record by its position in the list and
+        // kr-1256 sub_5FB4F0 enables index 3 only when a record exists for it, so the slot
+        // expansion is one more record: active slot 1, identity 7, four 12-byte records,
+        // empty byte tail. The refusal reply is pinned by the status cases above.
+        var body = Convert.FromHexString(
+            "01" + "07000000" + "04000000"
+            + "010000000200000003000000"
+            + "040000000500000006000000"
+            + "070000000800000009000000"
+            + "0A0000000B0000000C000000"
+            + "00000000");
+        Assert.Equal(61, body.Length);
+        var decoded = PacketCodec.Read(TestBuilds.Packets, "kr-1256", "WeaponPresetUpdate", body);
+        var list = Assert.IsType<Dictionary<string, object?>>(decoded["presets"]);
+        var entries = Assert.IsType<object?[]>(list["entries"]);
+        Assert.Equal(4, entries.Length);
+        Assert.Equal(10, Assert.IsType<Dictionary<string, object?>>(entries[3])["unknown_0"]);
+        Assert.Equal(body, PacketCodec.Write(TestBuilds.Packets, "kr-1256", "WeaponPresetUpdate", decoded));
+    }
+
     [Theory]
     [InlineData("kr-1256", true)] // kr-1256 sub_9C3880 reads the tabled list.
     [InlineData("cn-774", false)] // its entry shape is not proven

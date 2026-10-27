@@ -375,3 +375,10 @@
     id: shop
     config:
       life_items: false
+
+# The baseline states the customized-key binding (kr-812 sub_4EB250 / kr-812 sub_8357D0); this build's own
+# builder and login consumer are not audited, so the option stays off until they are.
+- set:
+    id: dialect.messages
+    config:
+      customized_keys: false

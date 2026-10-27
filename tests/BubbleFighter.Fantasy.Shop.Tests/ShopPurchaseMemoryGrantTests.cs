@@ -1,3 +1,4 @@
+using BubbleFighter.Fantasy.Contracts.Shop;
 using BubbleFighter.Fantasy.Lobby;
 using BubbleFighter.Fantasy.Contracts.Inventory;
 using BubbleFighter.Fantasy.Contracts.Wallet;
@@ -9,7 +10,6 @@ using BubbleFighter.Fantasy.Lobby.Data;
 using BubbleFighter.Fantasy.Persistence.Memory;
 using BubbleFighter.Fantasy.Shop;
 using BubbleFighter.Fantasy.Shop.Data;
-using BubbleFighter.Fantasy.Shop.Dialects;
 using BubbleFighter.Fantasy.Shop.Purchasing;
 using Microsoft.Extensions.Logging.Abstractions;
 using BubbleFighter.Fantasy.Tests.Shared;
@@ -45,7 +45,7 @@ public sealed class ShopPurchaseMemoryGrantTests
         var push = new InventoryPush(new LoginInventoryResolver(inventory, seedStarterInventory: false), binding, binding, binding);
         var purchases = new MemoryShopPurchaseStore(table);
         var purchaser = new ShopPurchaser(
-            options ?? Options(), Catalog(), purchases, push, NullLogger.Instance) { Packets = ShopTablePackets.Numbers };
+            options ?? Options(), Catalog(), purchases, push, NullLogger.Instance) { ReplySender = new RecordingBuyReplySender(ShopTablePackets.BuyReply), BalanceSender = new RecordingBalanceSender(ShopTablePackets.UserMoneyStat) };
         return new MemoryGrantFixture(purchaser, money, inventory, purchases);
     }
 
@@ -90,8 +90,8 @@ public sealed class ShopPurchaseMemoryGrantTests
             {
                 (ushort)802,
                 (ushort)803,
-                ShopTablePackets.Numbers.UserMoneyStat,
-                ShopTablePackets.Numbers.ShopBuyReply,
+                ShopTablePackets.UserMoneyStat,
+                ShopTablePackets.BuyReply,
             },
             frames.Select(f => f.Opcode).ToArray());
 
@@ -146,7 +146,7 @@ public sealed class ShopPurchaseMemoryGrantTests
 
         // One refusal frame, no wallet push, no inventory push.
         var (opcode, payload) = Assert.Single(session.Sent);
-        Assert.Equal(ShopTablePackets.Numbers.ShopBuyReply, opcode);
+        Assert.Equal(ShopTablePackets.BuyReply, opcode);
         var buy = new PacketReader(payload);
         Assert.Equal(4000001, buy.ReadInt32());
         Assert.Equal(0, buy.ReadInt32());
@@ -182,8 +182,8 @@ public sealed class ShopPurchaseMemoryGrantTests
         {
             (ushort)802,
             (ushort)803,
-                ShopTablePackets.Numbers.UserMoneyStat,
-                ShopTablePackets.Numbers.ShopBuyReply,
+                ShopTablePackets.UserMoneyStat,
+                ShopTablePackets.BuyReply,
         };
         Assert.Equal(grantOrder.Concat(grantOrder), session.Sent.Select(f => f.Opcode));
     }

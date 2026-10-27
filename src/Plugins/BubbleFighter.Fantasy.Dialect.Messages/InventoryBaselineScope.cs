@@ -2,8 +2,10 @@ namespace BubbleFighter.Fantasy.Dialect.Messages;
 
 /// <summary>
 /// Each live connection's inventory time origin. Legacy slot records carry an f64
-/// "remaining days" field the client anchors at the moment the full inventory list was
-/// published, so every S2C 801/802 body on one connection must share that origin. The
+/// "remaining days" field the client counts from the connection's inventory time origin
+/// (kr-812 <c>sub_978920</c>, packets/inventory.yaml <c>InventorySlot.remaining_days</c>), which the
+/// full-list reader establishes (kr-812 <c>sub_977960</c>) and the update paths preserve — so every
+/// S2C 801/802 body on one connection must share that origin. The
 /// shop state and the inventory restatements both write this family, which is why the
 /// table is owned by the plugin row rather than a single binding.
 /// </summary>

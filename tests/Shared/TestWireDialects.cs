@@ -13,13 +13,37 @@ internal static partial class TestWireDialects
 {
     private static readonly Dictionary<string, WireDialect> Cache = new(StringComparer.Ordinal);
 
+    /// <summary>The dialect.rooms row of the modern family: the typed room families through the kr-1256 tables.</summary>
+    public static Dictionary<string, object?> ModernRoomsConfig(Dictionary<string, object?>? extra = null)
+    {
+        var config = new Dictionary<string, object?>
+        {
+            ["modern_rooms"] = true,
+            ["protocol"] = "kr-1256/game",
+            ["relay_protocol"] = "kr-1256/relay",
+        };
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
+        {
+            var candidate = Path.Combine(directory.FullName, "packets");
+            if (File.Exists(Path.Combine(candidate, "builds.yaml")))
+            {
+                config["packets_directory"] = candidate;
+                break;
+            }
+        }
+        if (extra is not null)
+            foreach (var (key, value) in extra)
+                config[key] = value;
+        return config;
+    }
+
     /// <summary>
-    /// Gets the configuration of a <c>dialect.modern.messages</c> row: <paramref name="extra"/> plus the repository's
-    /// packet tables, which its room codecs read their layouts from.
+    /// Gets the configuration of a <c>dialect.messages</c> row: <paramref name="extra"/> plus the repository's
+    /// packet tables, which its codecs read their layouts from.
     /// </summary>
     /// <param name="extra">Further settings of the row, or null.</param>
     /// <returns>The row configuration.</returns>
-    public static Dictionary<string, object?> ModernMessagesConfig(Dictionary<string, object?>? extra = null)
+    public static Dictionary<string, object?> MessagesConfig(Dictionary<string, object?>? extra = null)
     {
         var config = extra is null ? new Dictionary<string, object?>() : new Dictionary<string, object?>(extra);
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)

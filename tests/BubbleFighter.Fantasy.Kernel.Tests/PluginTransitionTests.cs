@@ -341,7 +341,7 @@ public sealed class PluginTransitionTests
             Assert.Equal(0, old.RetainedEffectCount);
         }
         var current = Assert.IsType<PluginContext>(h[0].Context);
-        Assert.Equal(4, current.NativeServices!.Registry.RetainedMetadataCount);
+        Assert.Equal(5, current.NativeServices!.Registry.RetainedMetadataCount);
         Assert.Equal(0, h.Host.PendingIntentCount);
         Assert.Equal(51, h[0].Starts);
     }
@@ -916,7 +916,7 @@ public sealed class PluginTransitionTests
             Assert.True(oldWork.Completion.IsCompletedSuccessfully);
             if (!restart)
             {
-                Assert.Equal(3, registry.RetainedMetadataCount);
+                Assert.Equal(4, registry.RetainedMetadataCount);
                 Assert.False(registry.TryGet<IA>(out _));
                 Assert.Equal(PluginState.Pending, h.Status(1));
                 Assert.Equal(PluginState.Pending, h.Status(2));
@@ -939,7 +939,7 @@ public sealed class PluginTransitionTests
         var final = Enumerable.Range(0, 3).Select(index => Assert.IsType<PluginContext>(h[index].Context)).ToArray();
         await h.Request(0, false).WaitAsync().AsTask().WaitAsync(Limit);
         AssertDrained(final);
-        Assert.Equal(3, registry.RetainedMetadataCount);
+        Assert.Equal(4, registry.RetainedMetadataCount);
         Assert.Equal(cycles + 1, workStopped); Assert.Equal(cycles + 1, released);
         Assert.True(currentWork!.Completion.IsCompletedSuccessfully);
 
@@ -1008,7 +1008,7 @@ public sealed class PluginTransitionTests
         Assert.Equal(1, closes); Assert.Equal(0, h.Host.PendingIntentCount);
         for (var index = 0; index < 4; index++)
             Assert.Equal(0, Assert.IsType<PluginContext>(h[index].Context).RetainedEffectCount);
-        Assert.Equal(3, Assert.IsType<PluginContext>(h[0].Context).NativeServices!.Registry.RetainedMetadataCount);
+        Assert.Equal(4, Assert.IsType<PluginContext>(h[0].Context).NativeServices!.Registry.RetainedMetadataCount);
         await h.Request(3, true).WaitAsync().AsTask().WaitAsync(Limit);
         Assert.Equal(PluginState.Active, h.Status(3)); Assert.Equal(2, h[3].Starts);
     }

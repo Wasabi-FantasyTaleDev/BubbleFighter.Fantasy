@@ -344,9 +344,9 @@ BFF_PUBLIC_HOST=<public-address-clients-use>
 
 少数 bundle 需要显式启用，且只被客户端审计支持的 profile 列出。
 
-**`player-settings`** 挂载 `dialect.customized-keys` 与 `player.settings`，让玩家保存自定义按键。它被 `kr-812`、`kr-1256`、`cn-774` 和 `tw-454` 列出；其他 profile 需先审计其原生控制名称和封包路径。每个 `player.settings` 行都需要 `protocol`，并使用按 profile 的 `scope`，避免混淆不同构建的名称。持久化提供程序按账号保存映射；MySQL 通过迁移 `0032_customized_keys.sql` 存储。每个提供程序用 `customized_keys` 配置每账号预算（`max_scopes` 1–64、`max_mappings` 1–512、`max_name_characters` 1–1024，三者组合必须能放入封包体）。超出预算会直接失败，而不会驱逐其他已保存映射。
+**`player-settings`** 挂载 `player.settings`，即玩家自定义按键的类型化存储。封包本身由 `dialect.messages` 行的 `customized_keys` 选项绑定，由 `kr-812`、`kr-1256`、`cn-774` 和 `tw-454` 声明；其他 profile 需先审计其原生控制名称和封包路径。每个 `player.settings` 行都需要 `protocol`，并使用按 profile 的 `scope`，避免混淆不同构建的名称。持久化提供程序按账号保存映射；MySQL 通过迁移 `0032_customized_keys.sql` 存储。每个提供程序用 `customized_keys` 配置每账号预算（`max_scopes` 1–64、`max_mappings` 1–512、`max_name_characters` 1–1024，三者组合必须能放入封包体）。超出预算会直接失败，而不会驱逐其他已保存映射。
 
-**`inventory-actions`** 挂载 `dialect.inventory-actions` 与 `inventory.throw`，让玩家丢弃过期物品。它由已审计操作消费者并具备存储装备服务的 profile 列出（`kr-812`、`cn-279`、`cn-324`、`cn-406`、`cn-404`、`cn-408`、`cn-706`、`cn-717`、`id-400`、`id-1809`、`kr-1256`）。行为被有意限制得很窄：只移除一个已认证玩家两个背包中的该过期物品；若有匹配权益仍有效，整个移除会被拒绝；构建的类别 6 排除规则会被遵守。比赛中的请求会被拒绝。真实客户端验收仍待进行；仅凭封包表覆盖不足以在另一个构建上挂载该 bundle。
+过期物品丢弃也以同样方式声明：`dialect.messages` 行的 `inventory_actions` 选项绑定 `gcpReqInventoryThrowItem`/`gspRepInventoryThrowItem`（每个 legacy 构建和 `kr-1256` 均开启），构建自己的 bundle 内的 `inventory.throw` 行通过存储装备服务移除该物品。行为被有意限制得很窄：只移除一个已认证玩家两个背包中的该过期物品；若有匹配权益仍有效，整个移除会被拒绝；构建的类别 6 排除规则会被遵守。比赛中的请求会被拒绝。真实客户端验收仍待进行；仅凭封包表覆盖不足以在另一个构建上声明该选项。
 
 **`launcher.http`** 是可选的公共启动器 API。它默认禁用，与管理工作分离。它接受 `minimum_launcher_version`（留空则关闭检查）与 `plugin_recommendations`，后者包含商店标识和可选的精确 `builds`，绝不包含可执行文件路径或下载地址。配置最低版本后，较旧的启动器会收到 HTTP 426。每个大厅行的 `authentication` 选项（`BFF_LOGIN_AUTHENTICATION`，默认 `ticket`）只接受能兑换启动器票据的登录，此时需要本行处于激活状态；`open` 接受任何账号名，只适用于可信的局域网。[启动器](launcher.md)页面介绍该 API、客户端预设、账号与票据流程以及面向运营者的配置。
 

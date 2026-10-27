@@ -1,6 +1,6 @@
 using BubbleFighter.Fantasy.Abstractions.Protocol;
+using BubbleFighter.Fantasy.Dialect.Messages;
 using BubbleFighter.Fantasy.Packets;
-using BubbleFighter.Fantasy.Shop.Wire;
 using Xunit;
 
 namespace BubbleFighter.Fantasy.Shop.Tests;
@@ -24,11 +24,11 @@ public sealed class ShopRequestTableParityTests
             writer.WriteInt32(1000);
         });
         Assert.Equal(12, payload.Length);
-        var parsed = EnterShopRequest.Parse(payload);
+        var parsed = ShopCatalogBinding.ReadEnterShop(Tables, "kr-1256", payload);
         var values = PacketCodec.ReadScalars(Tables, "kr-1256", "gcpEnterShop", payload);
         Assert.Equal(parsed.Token, Assert.IsType<long>(values["token"]));
-        Assert.Equal(parsed.Unknown4, Assert.IsType<int>(values["unknown_16"]));
-        AssertBothReject("gcpEnterShop", payload, body => EnterShopRequest.Parse(body));
+        Assert.Equal(parsed.MainCategory, Assert.IsType<int>(values["unknown_16"]));
+        AssertBothReject("gcpEnterShop", payload, body => ShopCatalogBinding.ReadEnterShop(Tables, "kr-1256", body));
     }
 
     [Fact]
@@ -36,10 +36,10 @@ public sealed class ShopRequestTableParityTests
     {
         var payload = Payload(writer => writer.WriteInt64(-9000000001L));
         Assert.Equal(8, payload.Length);
-        var parsed = EnterTCShopRequest.Parse(payload);
+        var parsed = ShopCatalogBinding.ReadCashShopEntry(Tables, "kr-1256", payload);
         var values = PacketCodec.ReadScalars(Tables, "kr-1256", "gcpEnterTCShop_", payload);
         Assert.Equal(parsed.Token, Assert.IsType<long>(values["token"]));
-        AssertBothReject("gcpEnterTCShop_", payload, body => EnterTCShopRequest.Parse(body));
+        AssertBothReject("gcpEnterTCShop_", payload, body => ShopCatalogBinding.ReadCashShopEntry(Tables, "kr-1256", body));
     }
 
     [Fact]
@@ -51,11 +51,11 @@ public sealed class ShopRequestTableParityTests
             writer.WriteInt32(0);
         });
         Assert.Equal(8, payload.Length);
-        var parsed = ShopBuyRequest.Parse(payload);
+        var parsed = ShopCatalogBinding.ReadModernPurchase(Tables, "kr-1256", payload);
         var values = PacketCodec.ReadScalars(Tables, "kr-1256", "ShopPurchaseRequest", payload);
-        Assert.Equal(parsed.ItemId, Assert.IsType<int>(values["key"]));
-        Assert.Equal(parsed.Unknown4, Assert.IsType<int>(values["unknown_4"]));
-        AssertBothReject("ShopPurchaseRequest", payload, body => ShopBuyRequest.Parse(body));
+        Assert.Equal(parsed.Key, Assert.IsType<int>(values["key"]));
+        Assert.Equal(parsed.IsOrdinaryPurchase ? 0 : 1, Assert.IsType<int>(values["unknown_4"]));
+        AssertBothReject("ShopPurchaseRequest", payload, body => ShopCatalogBinding.ReadModernPurchase(Tables, "kr-1256", body));
     }
 
     [Fact]
@@ -63,10 +63,10 @@ public sealed class ShopRequestTableParityTests
     {
         var payload = Payload(writer => writer.WriteInt32(42));
         Assert.Equal(4, payload.Length);
-        var parsed = ShopItemCardInfoRequest.Parse(payload);
+        var parsed = ShopCatalogBinding.ReadCardInfo(Tables, "kr-1256", payload);
         var values = PacketCodec.ReadScalars(Tables, "kr-1256", "gcpReqShopItemCardInfo", payload);
-        Assert.Equal(parsed.ItemId, Assert.IsType<int>(values["unknown_0"]));
-        AssertBothReject("gcpReqShopItemCardInfo", payload, body => ShopItemCardInfoRequest.Parse(body));
+        Assert.Equal(parsed.Key, Assert.IsType<int>(values["unknown_0"]));
+        AssertBothReject("gcpReqShopItemCardInfo", payload, body => ShopCatalogBinding.ReadCardInfo(Tables, "kr-1256", body));
     }
 
     [Fact]
@@ -74,10 +74,10 @@ public sealed class ShopRequestTableParityTests
     {
         var payload = Payload(writer => writer.WriteWideStringPrefixed("AB"));
         Assert.Equal(8, payload.Length);
-        var parsed = RealCouponUseRequest.Parse(payload);
+        var parsed = ShopCatalogBinding.ReadCouponUse(Tables, "kr-1256", payload);
         var values = PacketCodec.ReadScalars(Tables, "kr-1256", "gcpReqRealCouponUse", payload);
-        Assert.Equal(parsed.Unknown0, Assert.IsType<string>(values["unknown_0"]));
-        AssertBothReject("gcpReqRealCouponUse", payload, body => RealCouponUseRequest.Parse(body));
+        Assert.Equal(parsed.Code, Assert.IsType<string>(values["unknown_0"]));
+        AssertBothReject("gcpReqRealCouponUse", payload, body => ShopCatalogBinding.ReadCouponUse(Tables, "kr-1256", body));
     }
 
     [Fact]
@@ -85,10 +85,10 @@ public sealed class ShopRequestTableParityTests
     {
         var payload = Payload(writer => writer.WriteWideStringPrefixed("12345678901234567890"));
         Assert.Equal(44, payload.Length);
-        var parsed = CheckCashRequest.Parse(payload);
+        var parsed = ShopCatalogBinding.ReadCashCheck(Tables, "kr-1256", payload);
         var values = PacketCodec.ReadScalars(Tables, "kr-1256", "Unknown834", payload);
-        Assert.Equal(parsed.Unknown1, Assert.IsType<string>(values["unknown_0"]));
-        AssertBothReject("Unknown834", payload, body => CheckCashRequest.Parse(body));
+        Assert.Equal(parsed.Code, Assert.IsType<string>(values["unknown_0"]));
+        AssertBothReject("Unknown834", payload, body => ShopCatalogBinding.ReadCashCheck(Tables, "kr-1256", body));
     }
 
     [Fact]
@@ -100,11 +100,10 @@ public sealed class ShopRequestTableParityTests
             writer.WriteInt32(0);
         });
         Assert.Equal(5, payload.Length);
-        var parsed = SceneBootstrapRequest.Parse(payload);
         var values = PacketCodec.ReadScalars(Tables, "kr-1256", "Unknown2059", payload);
-        Assert.Equal(parsed.Unknown0, Assert.IsType<byte>(values["unknown_0"]));
-        Assert.Equal(parsed.Unknown4, Assert.IsType<int>(values["unknown_4"]));
-        AssertBothReject("Unknown2059", payload, body => SceneBootstrapRequest.Parse(body));
+        Assert.Equal((byte)0x0D, Assert.IsType<byte>(values["unknown_0"]));
+        Assert.Equal(0, Assert.IsType<int>(values["unknown_4"]));
+        AssertBothReject("Unknown2059", payload, body => PacketCodec.ReadScalars(Tables, "kr-1256", "Unknown2059", body));
     }
 
     private static byte[] Payload(Action<PacketWriter> write) => WireLengthSupport.Written(write);

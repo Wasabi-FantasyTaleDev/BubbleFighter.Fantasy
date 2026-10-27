@@ -167,7 +167,9 @@ structs:
       offset: 64
 
   # C2S gcpReqPresentReceiveSubList (kr-812 813) and gcpReqPresentSendSubList (kr-812 814): the first gift to list and
-  # the page size. Writer kr-812 sub_840530; the dialog kr-812 sub_960BE0 always asks for 4.
+  # the page size. Writer kr-812 sub_840530; the dialog kr-812 sub_960BE0 always asks for 4. The modern client sends the
+  # same two words: kr-1256 sub_E49DC0 writes the start and the constant 4 for C2S 815 (its a4 == 1 branch) and C2S 816
+  # (its a4 == 2 branch).
   PresentListRequest:
     - start: u32
       offset: 4
@@ -179,6 +181,36 @@ structs:
   PresentIdRequest:
     - id: u32
       offset: 4
+
+  # C2S gcpReqPresentSendThankMsg (kr-812 819, kr-1256 821): the thank-you message for a gift. Reader kr-812
+  # sub_503BF0 (vtable kr-812 0xD890F4) reads a word, a string and another word. The modern writer kr-1256 sub_E4BB30 writes
+  # the same order (a word, the string's length and bytes, then a word), so both families share this structure.
+  PresentThankRequest:
+    - id: u32
+      offset: 4
+    - message: wstr
+      offset: 8
+    - unknown_36: u32 # Written after the string; its meaning is not established by these request paths.
+      offset: 36
+
+  # C2S gcpReqCloseGiftBox (kr-812 828, kr-1256 830): the gift box was closed. The body is empty: the legacy reader
+  # is the class's own empty method (vtable kr-812 0xD4914C) and the modern writer kr-1256 sub_9369E0 writes nothing after
+  # the opcode.
+  PresentCloseRequest: []
+
+  # The modern gift-purchase request (kr-1256 818): writer kr-1256 sub_650770 reads an arguments object whose two
+  # string objects are shorter than the legacy packet's, so the offsets move; the wire order is the legacy one.
+  # The strings precede the item key and message. The second string retains an unknown name;
+  # the writer accepts its supplied value and does not itself require an empty string.
+  PresentSendRequest@kr-1256:
+    - receiver_nickname: wstr
+      offset: 0
+    - unknown_24: wstr
+      offset: 24
+    - item_key: u32
+      offset: 48
+    - message: wstr
+      offset: 52
 
   # The modern family (kr-1256 and the builds based on it). Its client classes are the same ones, but the object
   # offsets moved (a shorter string object), so the two records are restated; the wire order is the legacy one, with
@@ -248,3 +280,17 @@ structs:
       offset: 32
     - unknown_56: wstr
       offset: 56
+
+  # S2C gspRepPresentSendThankMsg (kr-812 824, kr-1256 828): the result of storing the receiver's thank-you.
+  # The legacy class reader kr-812 sub_80A910 reads one word at +4; the kr-1256 handler kr-1256 sub_9BB8B0 reads one
+  # four-byte word from the stream and shows it. The result values are not decoded, so the name stays generic.
+  PresentSendThanksReply:
+    - result: u32
+      offset: 4
+
+  # S2C gspRepPresentConfirm (kr-812 826, kr-1256 830): the client's confirmation after the thank-you flow.
+  # The legacy class reader kr-812 sub_80A910 reads one word at +4; the inline kr-1256 case kr-1256 0x9D4DC2 reads
+  # one four-byte word and passes it to kr-1256 sub_6481F0, so the body is one word on both builds.
+  PresentConfirmReply:
+    - result: u32
+      offset: 4

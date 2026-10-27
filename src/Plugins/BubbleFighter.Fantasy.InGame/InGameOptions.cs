@@ -1,4 +1,5 @@
 using BubbleFighter.Fantasy.Contracts.Movement;
+using BubbleFighter.Fantasy.RoomCore;
 using System.ComponentModel.DataAnnotations;
 using System.Net;
 using BubbleFighter.Fantasy.Abstractions;
@@ -6,9 +7,8 @@ using BubbleFighter.Fantasy.Abstractions;
 namespace BubbleFighter.Fantasy.InGame;
 
 /// <summary>
-/// Configuration for the <see cref="InGamePlugin"/> row. Protocol names and
-/// <see cref="VersionMajor"/> are supplied by the profile; this plugin does not
-/// hard-code a client region in its id.
+/// Configuration for the <see cref="InGamePlugin"/> row. Protocol names are supplied by the profile;
+/// this plugin does not hard-code a client region in its id.
 ///
 /// </summary>
 public sealed partial class InGameOptions : IValidatableOptions
@@ -248,24 +248,6 @@ public sealed partial class InGameOptions : IValidatableOptions
     /// <summary>Gets or sets the maximum opaque match capability bytes retained for each room seat.</summary>
     [Range(1, 4096)]
     public int MaxMatchCapabilityBytes { get; set; } = 64;
-
-    /// <summary>
-    /// Gets or sets the client major version this row serves. Dialect 1256 is the
-    /// implemented combat table; any other value fails activation.
-    ///
-    /// </summary>
-    [Range(1, int.MaxValue)]
-    public int VersionMajor { get; set; } = 1256;
-
-    /// <summary>
-    /// Gets or sets whether this row registers no packet handlers of its own and serves only the
-    /// typed room, plaza and round messages the build's dialect row delivers. The row publishes
-    /// a protocol-scoped native capability directory, while the singleton wire-match services
-    /// remain owned by a packet-wire row. A round uses
-    /// <see cref="StartTimerMs"/> as its countdown and <see cref="RoundUnknown0"/> as its time limit.
-    ///
-    /// </summary>
-    public bool TypedOnly { get; set; }
 
     /// <summary>
     /// Gets or sets whether loaded game seats receive native match offers and wait for authenticated
@@ -622,6 +604,9 @@ public sealed partial class InGameOptions : IValidatableOptions
     /// </summary>
     public bool BroadcastRoomChat { get; set; }
 
+    /// <summary>Gets or sets whether authenticated game chat invokes shared plugin commands and room-command permissions; disabled until client acceptance.</summary>
+    public bool SharedChatCommands { get; set; }
+
     /// <summary>
     /// Gets or sets whether a seated client's first C2S 511 character position report re-publishes
     /// the room UI (S2C 118 user list plus one S2C 511 seat record per seat). Defaults to <see
@@ -653,7 +638,7 @@ public sealed partial class InGameOptions : IValidatableOptions
     ///
     /// </summary>
     [Range(2, 6)]
-    public int RoomInstallState { get; set; } = BubbleFighter.Fantasy.InGame.Wire.SessionSettingBlob.RoomStateWaiting;
+    public int RoomInstallState { get; set; } = RoomCore.SessionSettingBlob.RoomStateWaiting;
 
     /// <summary>
     /// Gets or sets whether S2C 501 writes <see cref="RoomInstallState"/>
@@ -825,7 +810,7 @@ public sealed partial class InGameOptions : IValidatableOptions
 
     /// <summary>
     /// Gets or sets the state carried by S2C 503 and the S2C 117 room snapshot.
-    /// Defaults to <see cref="BubbleFighter.Fantasy.InGame.Wire.SessionSettingBlob.RoomStateWaiting"/>
+    /// Defaults to <see cref="RoomCore.SessionSettingBlob.RoomStateWaiting"/>
     /// (2), which the kr-1256 start click requires (sub_970590).
     ///
     /// </summary>
@@ -834,7 +819,7 @@ public sealed partial class InGameOptions : IValidatableOptions
     /// S2C 608 consumer sets that state during initialization (sub_9E7570);
     /// sending it for a waiting room can disable its controls prematurely.
     /// </remarks>
-    public int RoomState { get; set; } = BubbleFighter.Fantasy.InGame.Wire.SessionSettingBlob.RoomStateWaiting;
+    public int RoomState { get; set; } = RoomCore.SessionSettingBlob.RoomStateWaiting;
 
     /// <summary>
     /// Gets or sets a mode id that replaces the one the client sent on create.
@@ -860,6 +845,7 @@ public sealed partial class InGameOptions : IValidatableOptions
     /// <inheritdoc />
     public IEnumerable<ValidationResult> Validate()
     {
+        foreach (var result in ValidateAi()) yield return result;
         if (LotteryModes.Length > 0)
         {
             if (string.IsNullOrWhiteSpace(LotteryWorkbookPath) == string.IsNullOrWhiteSpace(LotteryWorkbookClientPath)
@@ -931,15 +917,6 @@ public sealed partial class InGameOptions : IValidatableOptions
             || SendStageSeatRecords || SendStageRoomSnapshots)
             yield return new ValidationResult("Legacy scene/bootstrap experiments are retired; disable send_scene_object_reply, send_in_session_spawn, send_scene_object_on_map_named, send_match_arena_block, send_stage_seat_records and send_stage_room_snapshots. The match-connection row owns the handshake.");
 
-        if (!TypedOnly && VersionMajor != 1256)
-        {
-            yield return new ValidationResult(
-                $"No combat dialect is implemented for version_major {VersionMajor}. The recovered table is 1256.",
-                [nameof(VersionMajor)]);
-        }
-
-        if (NativeMatchRelay && !TypedOnly)
-            yield return new ValidationResult("native_match_relay requires typed_only room and round handlers.", [nameof(NativeMatchRelay)]);
         if (MatchTransportFallback && !NativeMatchRelay)
             yield return new ValidationResult("match_transport_fallback requires native_match_relay.", [nameof(MatchTransportFallback)]);
         if (NativeMatchRelay && (GameProtocol is null || !GameProtocol.EndsWith("/game", StringComparison.Ordinal)

@@ -21,13 +21,14 @@ internal sealed partial class RoundFlow
             RoundScoreUpdated? update = null;
             lock (room.Gate)
             {
-                if (room.Phase != RoomPhase.Playing || !_options.NativeLifeModeIds.Contains(room.ModeId))
+                if (room.Phase != RoomPhase.Playing || !UsesNativeLife(room))
                     return;
                 var sender = room.Seats.FirstOrDefault(seat => seat.Game.Id == session.Id || seat.Relay?.Id == session.Id);
                 if (sender is null)
                     return;
-                var own = report.Actor == RoomRegistry.SceneEntity(sender.Slot);
-                var target = room.Seats.FirstOrDefault(seat => RoomRegistry.SceneEntity(seat.Slot) == report.Actor);
+                var own = room.ControlsActor(sender, report.Actor);
+                var target = LifeActor(room, report.Actor);
+                var actor = own ? target! : new LifeParticipant(sender, null);
                 LifeCheck? ignored = null;
                 switch (report.Event)
                 {
@@ -35,16 +36,16 @@ internal sealed partial class RoundFlow
                         or RoundLifeEvent.DeathCleaned or RoundLifeEvent.ResetConfirmed when !own:
                         ignored = LifeCheck.OwnEventForeignActor;
                         break;
-                    case RoundLifeEvent.Bubbled when sender.Life == SeatLife.Alive:
-                        sender.Life = SeatLife.Bubble;
+                    case RoundLifeEvent.Bubbled when actor.Life == SeatLife.Alive:
+                        actor.Life = SeatLife.Bubble;
                         break;
                     case RoundLifeEvent.Bubbled:
                         ignored = LifeCheck.BubbledWhileNotAlive;
                         break;
-                    case RoundLifeEvent.Died when sender.Life == SeatLife.Alive:
-                    case RoundLifeEvent.BubbleExpired when sender.Life == SeatLife.Bubble:
-                        sender.Life = SeatLife.Dead;
-                        sender.DeathCleaned = false;
+                    case RoundLifeEvent.Died when actor.Life == SeatLife.Alive:
+                    case RoundLifeEvent.BubbleExpired when actor.Life == SeatLife.Bubble:
+                        actor.Life = SeatLife.Dead;
+                        actor.DeathCleaned = false;
                         break;
                     case RoundLifeEvent.Died:
                         ignored = LifeCheck.DiedWhileNotAlive;
@@ -58,22 +59,22 @@ internal sealed partial class RoundFlow
                     case RoundLifeEvent.Released:
                         ignored = LifeCheck.ReleasedNotBubbled;
                         break;
-                    case RoundLifeEvent.DeathCleaned when sender.Life == SeatLife.Dead:
-                        sender.DeathCleaned = true;
+                    case RoundLifeEvent.DeathCleaned when actor.Life == SeatLife.Dead:
+                        actor.DeathCleaned = true;
                         break;
                     case RoundLifeEvent.DeathCleaned:
                         ignored = LifeCheck.CleanedWhileNotDead;
                         break;
                     // The confirmation must come on the match link the reset was granted on.
-                    case RoundLifeEvent.ResetConfirmed when sender.Life == SeatLife.ResetPending
-                        && ReferenceEquals(sender.ResetRelay, session):
-                        sender.Life = SeatLife.Alive;
-                        sender.DeathCleaned = false;
-                        sender.ResetRelay = null;
-                        sender.Movement = null;
+                    case RoundLifeEvent.ResetConfirmed when actor.Life == SeatLife.ResetPending
+                        && ReferenceEquals(actor.ResetRelay, session):
+                        actor.Life = SeatLife.Alive;
+                        actor.DeathCleaned = false;
+                        actor.ResetRelay = null;
+                        actor.ClearMovement();
                         break;
                     case RoundLifeEvent.ResetConfirmed:
-                        ignored = sender.Life == SeatLife.ResetPending ? LifeCheck.ResetConfirmedOnOtherLink : LifeCheck.ResetConfirmedWithoutGrant;
+                        ignored = actor.Life == SeatLife.ResetPending ? LifeCheck.ResetConfirmedOnOtherLink : LifeCheck.ResetConfirmedWithoutGrant;
                         break;
                     case RoundLifeEvent.Finished:
                         (update, ignored) = Finish(room, target, report.Initiator);
@@ -89,12 +90,12 @@ internal sealed partial class RoundFlow
 
     // A pop kills a bubbled enemy: the victim dies and the popper scores. Called under the room gate. A pop that does
     // not fit returns why, for the observation counts.
-    private (RoundScoreUpdated? Update, LifeCheck? Ignored) Finish(PlayRoom room, RoomSeat? victim, int? initiatorActor)
+    private (RoundScoreUpdated? Update, LifeCheck? Ignored) Finish(PlayRoom room, LifeParticipant? victim, int? initiatorActor)
     {
-        var initiator = room.Seats.FirstOrDefault(seat => RoomRegistry.SceneEntity(seat.Slot) == initiatorActor);
+        var initiator = initiatorActor is { } actor ? LifeActor(room, actor) : null;
         LifeCheck? ignored = victim is null ? LifeCheck.PopWithoutVictim
             : initiator is null ? LifeCheck.PopWithoutInitiator
-            : initiator == victim ? LifeCheck.PopOfSelf
+            : initiator.Slot == victim.Slot ? LifeCheck.PopOfSelf
             : victim.Life != SeatLife.Bubble ? LifeCheck.PopOfUnbubbled
             : initiator.Team is not (1 or 2) || victim.Team is not (1 or 2) || initiator.Team == victim.Team
                 ? LifeCheck.PopWithoutOpposingTeams
@@ -132,20 +133,20 @@ internal sealed partial class RoundFlow
             return;
         await room.Executor.ExecuteAsync(async operationCt =>
         {
-            RoomSeat seat;
+            LifeParticipant seat;
             lock (room.Gate)
             {
                 if (room.Phase != RoomPhase.Playing || room.FindByGame(session.Id) is not { } found)
                     return;
-                seat = found;
-                if (request.Actor != RoomRegistry.SceneEntity(seat.Slot))
+                if (!room.ControlsActor(found, request.Actor))
                 {
-                    if (room.Seats.Any(other => RoomRegistry.SceneEntity(other.Slot) == request.Actor))
-                        throw new InvalidOperationException($"Slot {seat.Slot} asked to reset another seat's character.");
+                    if (LifeActor(room, request.Actor) is not null)
+                        throw new InvalidOperationException($"Slot {found.Slot} asked to reset another seat's character.");
                     _logger.LogWarning("Session {Id} reset of actor {Actor}, which belongs to no seat; dropped.", session.Id, request.Actor);
                     return;
                 }
-                if (!_options.NativeLifeModeIds.Contains(room.ModeId) || MatchLink(room, seat) is not { } relay)
+                seat = LifeActor(room, request.Actor)!;
+                if (!UsesNativeLife(room) || MatchLink(room, found) is not { } relay)
                     return;
                 if (seat.Life == SeatLife.ResetPending && !ReferenceEquals(seat.ResetRelay, relay))
                     seat.Life = SeatLife.Dead;

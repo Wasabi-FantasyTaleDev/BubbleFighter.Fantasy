@@ -95,6 +95,13 @@ opcodes:
     evidence: verified
     source: "kr-812 sub_896B60 builds Packet_rcpReqLeaveGame on the relay connection; sender kr-812 sub_897850 stamps 20008; vtable 0xD76A3C writer/reader kr-812 sub_5C8FC0 are empty"
     notes: "empty relay leave; separate from game gcpReqLeaveSession and game gcpRoomReqLeaveGame"
+  - value: 26
+    direction: c2s
+    connection: relay
+    name: rcpPortalMove
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_529E80 builds Packet_rcpPortalMove and stamps relay 26 right after the game gcpPortalMove request; the writer fills a four-byte word and a two-byte word; packets/portal.yaml"
   - value: 12
     direction: s2c
     name: gspNotifyAutoTutorial_
@@ -343,6 +350,13 @@ opcodes:
     name_source: label@kr-812
     evidence: inferred
     source: "Packet_gcpReqChangePartyLeader class and opcode setter sub_B25E90 in sender sub_92A270 (kr-812)"
+  - value: 304
+    direction: c2s
+    connection: game
+    name: gcpSendPartyChatMsg
+    name_source: label@kr-812
+    evidence: inferred
+    source: "Packet_gcpSendPartyChatMsg vtable kr-812 0xD84E14, deserialize kr-812 sub_5C8FD0 reads one wstring at object +4; kr-812 sub_92A740 constructs the class and stamps 304"
   - value: 305
     direction: c2s
     name: gcpReqPartyRecruiting
@@ -870,7 +884,7 @@ opcodes:
     name: gcpReqCashInven
     name_source: label@kr-812
     evidence: inferred
-    source: "Packet_gcpReqCashInven class and opcode setter sub_B25E90 in sender sub_950870 (kr-812)"
+    source: "Packet_gcpReqCashInven (kr-812 vtable 0xD87FBC, empty codec kr-812 0x5C8FC0) is built inline in kr-812 sub_950870 and kr-812 sub_952F40; each stamps 826 through kr-812 sub_B25E90 and sends with no field writes (empty body, packets/cash-inbox.yaml)"
   - value: 827
     direction: c2s
     name: gcpReqPickup
@@ -882,7 +896,7 @@ opcodes:
     name: gcpReqCloseGiftBox
     name_source: label@kr-812
     evidence: inferred
-    source: "Packet_gcpReqCloseGiftBox class and opcode setter sub_B25E90 in sender sub_6D8620 (kr-812)"
+    source: "Packet_gcpReqCloseGiftBox (kr-812 vtable 0xD4914C, empty codec kr-812 0x5C8FC0): kr-812 sub_6D8620 builds the class, stamps 828 through kr-812 sub_B25E90 and sends with no field writes (empty body, packets/cash-inbox.yaml)"
   - value: 829
     direction: c2s
     name: gcpStopShowTerms
@@ -1057,13 +1071,13 @@ opcodes:
     name: gcpMakeUserTitle
     name_source: label@kr-812
     evidence: inferred
-    source: "Packet_gcpMakeUserTitle class and opcode setter sub_B25E90 in sender sub_886040 (kr-812)"
+    source: "kr-812 sub_886040 builds Packet_gcpMakeUserTitle (kr-812 vtable 0xD753C4, codec kr-812 sub_6DB1B0), writes two 4-byte words and stamps 929 through kr-812 sub_B25E90 (packets/titles-medals.yaml)"
   - value: 930
     direction: c2s
     name: gcpSetUserTitle
     name_source: label@kr-812
     evidence: inferred
-    source: "Packet_gcpSetUserTitle class and opcode setter sub_B25E90 in sender sub_885F80 (kr-812)"
+    source: "kr-812 sub_885F80 builds Packet_gcpSetUserTitle (kr-812 vtable 0xD753D0, codec kr-812 sub_9D95D0), writes three 4-byte words and stamps 930 through kr-812 sub_B25E90 (packets/titles-medals.yaml)"
   - value: 931
     direction: c2s
     name: gcpCheatAddMedal
@@ -1341,7 +1355,8 @@ opcodes:
     name: gcpUserHostSetting
     name_source: label@kr-812
     evidence: inferred
-    source: "Packet_gcpUserHostSetting class and opcode setter sub_B25E90 in sender sub_809110 (kr-812)"
+    source: "sender kr-812 sub_809110 builds Packet_gcpUserHostSetting, stamps 2026 through kr-812 sub_B25E90 and calls the class writer; the class codec kr-812 sub_6DB1B0 reads two words at +4 and +8"
+    notes: "two u32, read at class offsets +4 and +8; their roles are unproven, so the table keeps them unknown_4 and unknown_8."
   - value: 2027
     direction: c2s
     name: gcpRoomSendRecMsgTo
@@ -2333,6 +2348,13 @@ opcodes:
     name_source: label@kr-812
     evidence: inferred
     source: "kr-812 dispatcher sub_837170 case 128: Packet_gspNotifyPromotion constructor path"
+  - value: 129
+    direction: s2c
+    name: gspChangedUserName
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 legacy class table names S2C 129 gspChangedUserName; dispatcher kr-812 sub_837170 `case 0x81:` sets descriptor kr-812 off_D6E180 and calls handler kr-812 sub_82DE50, which reads one four-byte word and one wide string (8 + 2*len bytes, layout packets/name-change.yaml)"
+    notes: "the dispatcher descriptor and direct handler reads establish the row; no packet-object layout is claimed; cn-717, cn-324 and cn-279 use 126, id-400 129, kr-1256 and cn-774 138, tw-454 136"
   - value: 130
     direction: s2c
     name: gspRepRecommendResult
@@ -2947,6 +2969,12 @@ opcodes:
     name_source: label@kr-812
     evidence: inferred
     source: "kr-812 dispatcher sub_837170 case 833: Packet_gspReqWeaponPreSetUpdate constructor path"
+  - value: 900
+    direction: s2c
+    name: gspRepGuildLineBoard
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_837170 handles 900 outside its switch and calls kr-812 sub_82D4A0, which constructs Packet_gspRepGuildLineBoard and invokes kr-812 sub_83D960; record reader kr-812 sub_83D920"
   - value: 901
     direction: s2c
     name: gspRepGuildLineBoardWrite
@@ -3103,19 +3131,25 @@ opcodes:
     name: gspResMakeUserTitle
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 933: Packet_gspResMakeUserTitle constructor path"
+    source: "kr-812 dispatcher sub_837170 case 933 constructs Packet_gspResMakeUserTitle (kr-812 vtable 0xD6F690); reader kr-812 sub_8B9660 reads two 4-byte words and a counted UTF-16 string (packets/titles-medals.yaml)"
   - value: 934
     direction: s2c
     name: gspResSetUserTitle
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 934: Packet_gspResSetUserTitle constructor path"
+    source: "kr-812 dispatcher sub_837170 case 934 constructs Packet_gspResSetUserTitle (kr-812 vtable 0xD6F69C); reader kr-812 sub_9D95D0 reads three 4-byte words (packets/titles-medals.yaml)"
+  - value: 935
+    direction: s2c
+    name: gspTitleSyncInfo
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 dispatcher sub_837170 case 935 constructs Packet_gspTitleSyncInfo (kr-812 vtable 0xD6F6A8); reader kr-812 sub_840820 reads a counted list of 4-byte words (packets/titles-medals.yaml)"
   - value: 936
     direction: s2c
     name: gspProvideMedal
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 936: Packet_gspProvideMedal constructor path"
+    source: "kr-812 dispatcher sub_837170 case 936 constructs Packet_gspProvideMedal (kr-812 vtable 0xD6F6B4); reader kr-812 sub_6DB1B0 reads two 4-byte words (packets/titles-medals.yaml)"
   - value: 937
     direction: s2c
     name: gspCharRankInfo
@@ -3334,13 +3368,15 @@ opcodes:
     name: gspUserHostSetting
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 992: Packet_gspUserHostSetting constructor path"
+    source: "kr-812 dispatcher sub_837170 case 992: Packet_gspUserHostSetting constructor path; reader kr-812 sub_80A400 reads four words at +4/+8/+12/+16"
+    notes: "four u32; their roles are unproven, so the table keeps them unknown_4 to unknown_16."
   - value: 993
     direction: s2c
     name: gspUserHostDefaultSetting
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 993: Packet_gspUserHostDefaultSetting constructor path"
+    source: "kr-812 dispatcher sub_837170 case 993: Packet_gspUserHostDefaultSetting constructor path; the class codec kr-812 sub_6DB1B0 reads two words at +4 and +8"
+    notes: "two u32; their roles are unproven, so the table keeps them unknown_4 and unknown_8."
   - value: 994
     direction: s2c
     name: gspCaptainEvent

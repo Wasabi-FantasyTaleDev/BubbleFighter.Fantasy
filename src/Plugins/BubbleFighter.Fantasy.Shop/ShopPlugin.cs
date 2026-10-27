@@ -1,3 +1,4 @@
+using BubbleFighter.Fantasy.Contracts.ClientData;
 using BubbleFighter.Fantasy.Contracts.Inventory;
 using BubbleFighter.Fantasy.Contracts.Shop;
 using BubbleFighter.Fantasy.Contracts.Wallet;
@@ -11,17 +12,16 @@ using BubbleFighter.Fantasy.Contracts.Sessions;
 using BubbleFighter.Fantasy.Contracts.Lobby;
 using BubbleFighter.Fantasy.Packets;
 using BubbleFighter.Fantasy.Shop.Data;
-using BubbleFighter.Fantasy.Shop.Dialects;
 using BubbleFighter.Fantasy.Shop.Handlers;
-using BubbleFighter.Fantasy.Shop.Wire;
 using Microsoft.Extensions.Logging;
 
 namespace BubbleFighter.Fantasy.Shop;
 
 /// <summary>
 /// Cash shop and item shop open / list / buy path. The profile row supplies the
-/// protocol name, <c>version_major</c>, and the client path of <c>Config/ShopItem2.xml</c>, which is read
-/// from the build's client data through <c>IClientDataStore</c>.
+/// protocol name and the client path of <c>Config/ShopItem2.xml</c>, which is read
+/// from the build's client data through <c>IClientDataStore</c>; the dialect that
+/// encodes the packets is the build's lineage.
 /// Enter-shop replies carry the on-sale catalog from that file. Buy and card-info
 /// look up real rows. With the persistence row active a purchase is charged to the
 /// stored wallet, logged, granted into the stored bag and pushed back as the
@@ -35,10 +35,10 @@ namespace BubbleFighter.Fantasy.Shop;
 /// is not registered at all and no wire behaviour changes.
 /// </summary>
 [Plugin("shop",
-    Description = "Item shop and cash shop catalog from Config/ShopItem2.xml with persisted purchases. Dialect selected by version_major.", 
-    Requires = [typeof(IPacketRouter), typeof(IShopSessionStore)],
+    Description = "Item shop and cash shop catalog from Config/ShopItem2.xml with persisted purchases. Dialect selected by the build's lineage.",
+    Requires = [typeof(IMessageRouter), typeof(IShopSessionStore)],
     // An inventory-only row reads no workbook; a row that does fails at activation without the clientdata service.
-    Optional = [typeof(BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore), typeof(IShopPurchaseStore), typeof(IPlayerWalletRepository), typeof(IInventoryPushService), typeof(IOpcodeTableRegistry), typeof(IInventoryRepository), typeof(IMessageRouter), typeof(IEquippedViewPush), typeof(IInventoryExpiry), typeof(IPresentStore), typeof(ISessionRegistry), typeof(IPlayerProgressRepository)], OptionalMany = [typeof(IInboundMessageBinding<PresentSendRequested>), typeof(IInboundMessageBinding<PresentListRequested>), typeof(IInboundMessageBinding<PresentActionRequested>), typeof(IInboundMessageBinding<PresentNoticeRequested>), typeof(IMessageSender<PresentSendReplied>), typeof(IMessageSender<PresentListReplied>), typeof(IMessageSender<PresentActionReplied>), typeof(IMessageSender<PresentNoticeSent>), typeof(IOpcodeTable), typeof(IMessageSender<ShopStateUpdated>), typeof(IMessageSender<ShopBalanceUpdated>), typeof(IInboundMessageBinding<ShopBalanceRequested>), typeof(IMessageSender<ShopPurchaseReplied>), typeof(IInboundMessageBinding<ShopPurchaseRequested>), typeof(IInboundMessageBinding<ShopInventoryRequested>), typeof(IMessageSender<InventoryReplaced>), typeof(IMessageSender<ItemsExpired>)],
+    Optional = [typeof(BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore), typeof(IShopPurchaseStore), typeof(IPlayerWalletRepository), typeof(IInventoryPushService), typeof(IInventoryRepository), typeof(IEquippedViewPush), typeof(IInventoryExpiry), typeof(IPresentStore), typeof(ISessionRegistry), typeof(IPlayerProgressRepository)], OptionalMany = [typeof(IInboundMessageBinding<PresentSendRequested>), typeof(IInboundMessageBinding<PresentListRequested>), typeof(IInboundMessageBinding<PresentActionRequested>), typeof(IInboundMessageBinding<PresentNoticeRequested>), typeof(IMessageSender<PresentSendReplied>), typeof(IMessageSender<PresentListReplied>), typeof(IMessageSender<PresentActionReplied>), typeof(IMessageSender<PresentNoticeSent>), typeof(IMessageSender<ShopStateUpdated>), typeof(IMessageSender<ShopBalanceUpdated>), typeof(IInboundMessageBinding<ShopBalanceRequested>), typeof(IMessageSender<ShopPurchaseReplied>), typeof(IInboundMessageBinding<ShopPurchaseRequested>), typeof(IInboundMessageBinding<ShopInventoryRequested>), typeof(IInboundMessageBinding<ShopCatalogRequested>), typeof(IInboundMessageBinding<ShopCashCatalogRequested>), typeof(IInboundMessageBinding<ShopCardInfoRequested>), typeof(IInboundMessageBinding<ShopCouponUseRequested>), typeof(IInboundMessageBinding<ShopCashCheckRequested>), typeof(IMessageSender<ShopCatalogPublished>), typeof(IMessageSender<ShopCashCatalogPublished>), typeof(IMessageSender<ShopCardInfoReplied>), typeof(IMessageSender<ShopCouponUseReplied>), typeof(IMessageSender<ShopCashCheckReplied>), typeof(IMessageSender<EquippedArticlesFlushed>), typeof(IMessageSender<InventoryReplaced>), typeof(IMessageSender<ItemsExpired>)],
     ConditionalProvides = [typeof(IShopGiftService)])]
 public sealed class ShopPlugin : IPlugin
 {
@@ -95,19 +95,22 @@ public sealed class ShopPlugin : IPlugin
         // The 1256 dialog sends the TC-shop catalog on open, so an empty cash list
         // leaves it dead; the legacy builds price everything in the workbook's own
         // money types and the ID2014 workbook has no cash column values at all.
+        var tableCatalog = schema == ShopCatalogSchema.Kr1256
+            || PacketTables.Load(options.PacketsDirectory).Resolve(options.ClientProfile, "EnterShopReply").Count > 0;
         if (cashCards.Count == 0 && schema == ShopCatalogSchema.Kr1256)
             throw new InvalidOperationException($"{catalog.SourcePath} has no on-sale cash cards.");
 
         // Legacy opcodes beyond catalog entry have different meanings and layouts.
         // In particular the legacy builds have no cash shop entry; kr-812 gcpEnterInventory (kr-812 sub_6C3D20)
         // opens the inventory dialog.
-        if (schema == ShopCatalogSchema.Legacy)
+        // Workbook columns and native dialog layouts are independent: a short-frame modern client can
+        // retain the older workbook schema while consuming the same typed catalog messages.
+        if (!tableCatalog)
         {
+            // The capability checks below read the build's own statements in packets/builds.yaml.
             var tables = PacketTables.Load(options.PacketsDirectory);
-            var shape = LegacyShopShape.From(options.ClientProfile, tables.ValuesOf(options.ClientProfile));
             if (options.HoldEquipUntilInventoryOpen)
                 throw new ConfigException("The selected shop adapter does not support held equipment records.");
-            var table = context.Services.Get<IOpcodeTableRegistry>().ForProtocol(options.Protocol);
             var legacyOpens = new ShopOpenScope(options.MaxOpenSessions);
             context.Effect(legacyOpens);
             context.Effect(context.Events.On<ConnectionClosedEvent>(e => legacyOpens.Remove(e.Connection.Id)));
@@ -127,7 +130,7 @@ public sealed class ShopPlugin : IPlugin
                     OptionalExpiry(context), OptionalNotice(context, options.Protocol));
             }
             // Typed routes need the message router; a catalog-only row has none.
-            var routes = (options.GrantPurchasedItems || enterInventory is not null)
+            var legacyRoutes = (options.GrantPurchasedItems || enterInventory is not null || options.SendShopCatalog)
                 ? context.Services.Get<IMessageRouter>().For(context)
                 : null;
             Purchasing.CatalogPurchaseHandler? buy = null;
@@ -158,13 +161,13 @@ public sealed class ShopPlugin : IPlugin
                 // Rewards named by a workbook key (the tutorial first-clear gift) are granted under the same terms.
                 context.Effect(context.Services.Register<IShopGiftService>(new Purchasing.ShopGiftService(options, catalog,
                     conditional, purchaseStoreLegacy, resolveTerms, stateSender, context.Logger)));
-                context.Effect(routes!.On<ShopPurchaseRequested>(options.Protocol, buy.BuyAsync));
-                context.Effect(routes.On<ShopInventoryRequested>(options.Protocol, buy.InventoryAsync));
+                context.Effect(legacyRoutes!.On<ShopPurchaseRequested>(options.Protocol, buy.BuyAsync));
+                context.Effect(legacyRoutes.On<ShopInventoryRequested>(options.Protocol, buy.InventoryAsync));
                 if (context.Services.GetAll<IInboundMessageBinding<ShopBalanceRequested>>()
                     .Any(binding => binding.Protocol == options.Protocol))
-                    context.Effect(routes.On<ShopBalanceRequested>(options.Protocol, buy.BalanceAsync));
+                    context.Effect(legacyRoutes.On<ShopBalanceRequested>(options.Protocol, buy.BalanceAsync));
                 if (options.PresentBox)
-                    MountPresentBox(context, options, tables, catalog, conditional, resolveTerms, inventoryLegacy, ready, stateSender, routes);
+                    MountPresentBox(context, options, tables, catalog, conditional, resolveTerms, inventoryLegacy, ready, stateSender, legacyRoutes!);
             }
             else if (options.PresentBox)
             {
@@ -172,29 +175,30 @@ public sealed class ShopPlugin : IPlugin
             }
             else if (enterInventory is not null)
             {
-                context.Effect(routes!.On<ShopInventoryRequested>(options.Protocol, enterInventory.HandleAsync));
+                context.Effect(legacyRoutes!.On<ShopInventoryRequested>(options.Protocol, enterInventory.HandleAsync));
             }
             if (options.SendShopCatalog)
             {
-                var legacy = new LegacyShopCatalogHandler(shape, table.S2C("gspRepEnterShop"),
-                    catalog, options.MaxEnterShopFrameBytes, legacyOpens, context.Services.Get<IShopSessionStore>(), context.Logger,
-                    options.MaxEnterShopCards, options.PreferLongestDuration, options);
-                context.Effect(context.Services.Get<IPacketRouter>().Register(options.Protocol,
-                    table.C2S("gcpEnterShop"), async (session, packet, ct) =>
-                    {
-                        legacy.ValidateRequest(packet.Payload.Span);
-                        if (buy is not null)
-                            await buy.OpenAsync(session, ct).ConfigureAwait(false);
-                        await legacy.HandleAsync(session, packet, ct).ConfigureAwait(false);
-                    }));
+                // The dialect row parses C2S 801 and encodes S2C 800 from the build's shop.catalog values;
+                // this handler only selects the eligible cards and remembers the open. The bag restatement a
+                // purchase-gated row sends before the catalog keeps its place ahead of the reply.
+                var legacyCatalogSender = RequireShopSender<ShopCatalogPublished>(context, options.Protocol);
+                var legacyCatalog = new ShopCatalogHandler(catalog, options.MaxEnterShopFrameBytes,
+                    options.MaxEnterShopCards, legacyOpens, context.Services.Get<IShopSessionStore>(),
+                    legacyCatalogSender, context.Logger, options.PreferLongestDuration, options);
+                context.Effect(legacyRoutes!.On<ShopCatalogRequested>(options.Protocol, async (session, request, ct) =>
+                {
+                    if (buy is not null)
+                        await buy.OpenAsync(session, ct).ConfigureAwait(false);
+                    await legacyCatalog.HandleAsync(session, request, ct).ConfigureAwait(false);
+                }));
             }
             return ValueTask.CompletedTask;
         }
 
-        var router = context.Services.Get<IPacketRouter>();
         var store = context.Services.Get<IShopSessionStore>();
         var purchases = context.Services.TryGet<IShopPurchaseStore>(out var purchaseStore) ? purchaseStore : null;
-        var wallets = new WalletStore(options.StartingLucci, options.StartingCash);
+        var wallets = new Handlers.WalletStore(options.StartingLucci, options.StartingCash);
 
         IPlayerWalletRepository? money = context.Services.TryGet<IPlayerWalletRepository>(out var moneyRepo) && moneyRepo is not null
             ? moneyRepo
@@ -220,22 +224,32 @@ public sealed class ShopPlugin : IPlugin
         context.Effect(opens);
         context.Effect(context.Events.On<ConnectionClosedEvent>(e => opens.Remove(e.Connection.Id)));
 
-        // Request and reply numbers come from the build's opcode table by name; a table without one fails here.
-        var opcodes = context.Services.Get<IOpcodeTableRegistry>().ForProtocol(options.Protocol);
-        var numbers = ShopPacketNumbers.From(opcodes);
+        // Every request and reply of this row leaves through the dialect row's typed bindings; the shop never
+        // resolves an opcode. A binding the dialect row did not mount fails here, naming the message.
+        var routes = context.Services.Get<IMessageRouter>().For(context);
+        var protocol = options.Protocol;
+        var catalogSender = RequireShopSender<ShopCatalogPublished>(context, protocol);
         var hold = new Data.EquipHoldStore();
         var persistPurchases = options.GrantPurchasedItems && purchases is not null && push is not null;
         var purchaser = new Purchasing.ShopPurchaser(
             options, catalog, purchases, push, context.Logger, hold)
         {
             ItemPurchasePolicy = persistPurchases
-                ? Kr1256PurchasePolicy(options, workbook, purchases!, context.Services.Get<IInventoryRepository>())
+                ? Kr1256PurchasePolicy(options, workbook, purchases!, context.Services.Get<IInventoryRepository>(),
+                    catalog.Cards.SelectMany(card => card.Stocks).Select(stock => stock.ItemId).Where(id => id > 0).ToHashSet())
                 : null,
-            Packets = numbers,
+            ReplySender = RequireShopSender<ShopPurchaseReplied>(context, protocol),
+            // The money publication rides the persisted purchase path only; an in-memory row never sends it.
+            BalanceSender = persistPurchases ? RequireShopSender<ShopBalanceUpdated>(context, protocol) : null,
         };
-        var handlers = new Handlers(
-            options, store, catalog, itemCards, cashCards, wallets, purchaser, persistPurchases, money, opens, numbers, context.Logger);
-        var protocol = options.Protocol;
+        var handlers = new Handlers.ShopDialogHandlers(
+            options, store, catalog, itemCards, cashCards, wallets, purchaser, persistPurchases, money, opens,
+            catalogSender,
+            RequireShopSender<ShopCashCatalogPublished>(context, protocol),
+            RequireShopSender<ShopCardInfoReplied>(context, protocol),
+            RequireShopSender<ShopCouponUseReplied>(context, protocol),
+            RequireShopSender<ShopCashCheckReplied>(context, protocol),
+            purchaser.ReplySender!, context.Logger);
         if (context.Services.GetAll<IInboundMessageBinding<ShopBalanceRequested>>()
             .Any(binding => binding.Protocol == protocol))
         {
@@ -245,34 +259,30 @@ public sealed class ShopPlugin : IPlugin
                     var current = wallets.Get(user);
                     return new PlayerWallet(user, current.Lucci, current.Cash);
                 }, RequireShopSender<ShopBalanceUpdated>(context, protocol));
-            context.Effect(context.Services.Get<IMessageRouter>().For(context)
-                .On<ShopBalanceRequested>(protocol, balanceHandler.HandleAsync));
+            context.Effect(routes.On<ShopBalanceRequested>(protocol, balanceHandler.HandleAsync));
         }
         else
             context.Logger.LogInformation("Shop balance requests are unavailable on {Protocol}: no inbound binding.", protocol);
-        context.Effect(router.Register(protocol, opcodes.C2S("gcpEnterShop"), handlers.HandleEnterShopAsync));
-        context.Effect(router.Register(protocol, opcodes.C2S("gcpEnterTCShop_"), handlers.HandleEnterTCShopAsync));
-        context.Effect(router.Register(protocol, opcodes.C2S("gcpReqShopBuy"), handlers.HandleShopBuyAsync));
-        context.Effect(router.Register(protocol, opcodes.C2S("gcpReqShopItemCardInfo"), handlers.HandleShopItemCardInfoAsync));
-        context.Effect(router.Register(protocol, opcodes.C2S("gcpReqRealCouponUse"), handlers.HandleRealCouponUseAsync));
-        context.Effect(router.Register(protocol, opcodes.C2S("Unknown834"), handlers.HandleCheckCashAsync));
-        // The kr-1256 shop entry sub_9328B0 sends Unknown2059 once and nothing answers it, so the row only accepts
-        // the body; without it the shop entry lands in the unhandled log. gcpReqPresentSendSubList and gcpReqRefund
-        // are not this row's: they stay unhandled until the gift box and refunds are served.
-        context.Effect(router.Register(protocol, opcodes.C2S("Unknown2059"), handlers.HandleSceneBootstrapAsync));
+        context.Effect(routes.On<ShopCatalogRequested>(protocol, handlers.CatalogAsync));
+        context.Effect(routes.On<ShopCashCatalogRequested>(protocol, handlers.CashCatalogAsync));
+        context.Effect(routes.On<ShopPurchaseRequested>(protocol, handlers.BuyAsync));
+        context.Effect(routes.On<ShopCardInfoRequested>(protocol, handlers.CardInfoAsync));
+        context.Effect(routes.On<ShopCouponUseRequested>(protocol, handlers.CouponAsync));
+        context.Effect(routes.On<ShopCashCheckRequested>(protocol, handlers.CashCheckAsync));
+        // The inventory-dialog entry flushes held equip records; the dialect row accepts the empty body. The kr-1256
+        // shop entry sub_9328B0 sends Unknown2059 once and nothing answers it, and gcpReqPresentSendSubList and
+        // gcpReqRefund are not this row's: they stay unhandled until the gift box and refunds are served.
+        var flush = new Handlers.EquipHoldFlushHandler(hold,
+            RequireShopSender<EquippedArticlesFlushed>(context, protocol), context.Logger);
+        context.Effect(routes.On<ShopInventoryRequested>(protocol, flush.HandleAsync));
         if (options.HoldEquipUntilInventoryOpen)
-        {
-            var inventoryRequest = new InventoryRequestHandlers(hold, numbers.InventorySlotsUpdate, context.Logger);
-            context.Effect(router.Register(
-                protocol, opcodes.C2S("gcpEnterInventory"), inventoryRequest.HandleRequestInventoryAsync));
             context.Logger.LogInformation(
                 "Equip hold on: a purchase queues one gspInventoryUpdateInventorySlots container-2 record (cap {Cap} per player) and gcpEnterInventory flushes it on {Protocol}.",
                 Data.EquipHoldStore.MaxRecordsPerPlayer, protocol);
-        }
 
         context.Logger.LogInformation(
-            "Shop dialect {Version} on {Protocol} (profile {Profile}).",
-            options.VersionMajor, protocol, options.ClientProfile);
+            "Shop catalog on {Protocol} (profile {Profile}).",
+            protocol, options.ClientProfile);
         return ValueTask.CompletedTask;
     }
 
@@ -286,12 +296,12 @@ public sealed class ShopPlugin : IPlugin
     // kr-1256 sub_8068D0 Inventory::IsMaxDurationOver). Without them a grant was stored as quantity 99999 with no
     // lifetime, which the legacy bag writer could not show to the same shared account.
     internal static Purchasing.ItemPurchasePolicy Kr1256PurchasePolicy(ShopOptions options, WorkbookFile workbook,
-        IShopPurchaseStore purchases, IInventoryRepository inventory)
+        IShopPurchaseStore purchases, IInventoryRepository inventory, IReadOnlySet<int>? purchasableItems = null)
     {
         if (options.LifeItems)
             throw new ConfigException("life_items is not established for the kr1256 catalog schema.");
         var rules = new ItemTermRules(options.PermanentDayStockTypes, options.RejectRepeatFunction10001);
-        var terms = ItemTermsLoader.Load(workbook, options.MaxShopItemBytes);
+        var terms = ItemTermsLoader.Load(workbook, options.MaxShopItemBytes, purchasableItems);
         var conditional = new Purchasing.ConditionalShopPurchaser(purchases, inventory, TimeProvider.System,
             options.MaxPurchaseAttempts);
         return new(conditional, stock => terms.TryGetValue(stock.ItemId, out var term)
@@ -380,218 +390,5 @@ public sealed class ShopPlugin : IPlugin
             : throw new ConfigException($"Shop requires exactly one {typeof(T).Name} sender for {protocol}.");
     }
 
-    private sealed class WalletStore(int startingLucci, int startingCash)
-    {
-        private readonly ConcurrentDictionary<long, (int Lucci, int Cash)> _byUser = new();
 
-        public (int Lucci, int Cash) Get(long userNum) =>
-            _byUser.GetOrAdd(userNum, _ => (startingLucci, startingCash));
-
-        public bool TrySpend(long userNum, ShopPurchaseOffer card)
-        {
-            var cashPriced = string.Equals(card.MoneyType, "cash", StringComparison.OrdinalIgnoreCase);
-            var price = card.Price;
-            while (true)
-            {
-                var current = Get(userNum);
-                if (cashPriced)
-                {
-                    if (current.Cash < price)
-                        return false;
-                    if (_byUser.TryUpdate(userNum, (current.Lucci, current.Cash - price), current))
-                        return true;
-                }
-                else
-                {
-                    if (current.Lucci < price)
-                        return false;
-                    if (_byUser.TryUpdate(userNum, (current.Lucci - price, current.Cash), current))
-                        return true;
-                }
-            }
-        }
-    }
-
-    private sealed class Handlers(
-        ShopOptions options,
-        IShopSessionStore store,
-        ShopCatalog catalog,
-        IReadOnlyList<ShopCardRow> itemCards,
-        IReadOnlyList<ShopCardRow> cashCards,
-        WalletStore wallets,
-        Purchasing.ShopPurchaser purchaser,
-        bool persistPurchases,
-        IPlayerWalletRepository? money,
-        ShopOpenScope opens,
-        ShopPacketNumbers numbers,
-        ILogger logger)
-    {
-    public async ValueTask HandleSceneBootstrapAsync(ISession session, InboundPacket packet, CancellationToken ct)
-        {
-            // Fire-and-forget: kr-1256 sub_92F6C0 latches at dword_18E566C+984 and sends once, and no reply path
-            // exists, so the row only accepts the body. The shop entry sends (0x0D, 0).
-            var request = SceneBootstrapRequest.Parse(packet.Payload.Span);
-            logger.LogInformation(
-                "Session {Id} Unknown2059 unknown0=0x{Unknown0:X2} unknown4={Unknown4}; fire-and-forget, no reply.",
-                session.Id, request.Unknown0, request.Unknown4);
-            await ValueTask.CompletedTask.ConfigureAwait(false);
-        }
-
-        public async ValueTask HandleEnterShopAsync(ISession session, InboundPacket packet, CancellationToken ct)
-        {
-            var request = EnterShopRequest.Parse(packet.Payload.Span);
-            var record = new ShopOpenRecord(TryGetUserNum(session), request.Token, request.Unknown4, ShopKind.ItemShop);
-            opens.Remember(session.Connection.Id, record);
-            await store.RememberOpenAsync(record, ct).ConfigureAwait(false);
-            logger.LogInformation(
-                "Session {Id} gcpEnterShop token={Token} cards={Cards} categories={Cats}.",
-                session.Id, request.Token, itemCards.Count, catalog.Categories.Count);
-
-            // gspRepEnterShop is the only packet that carries shop content: nothing
-            // client-local fills the dialog, so withholding the reply is what made
-            // the shop blank by construction. An earlier run that sent it and still
-            // saw nothing was our own layout bug - the counted i32 vector that sits
-            // before the trailing field was never written, so the trailing value was
-            // consumed as that vector's count, the selected category stayed zero, and
-            // the fill returned without drawing a card.
-            if (options.SendShopCatalog)
-            {
-                var cards = itemCards;
-                if (options.CatalogCardLimit > 0 && options.CatalogCardLimit < cards.Count)
-                    cards = cards.Take(options.CatalogCardLimit).ToList();
-                byte[] body;
-                if (options.CatalogTree == "id_ranges")
-                {
-                    var (tree, placed) = ShopWire.BuildRangeTree(catalog, cards);
-                    var selected = ShopWire.SelectEnterShopCategory(request.Unknown4, tree);
-                    var revision = ShopWire.CatalogRevision(ShopWire.RepEnterShop(0, placed, tree, 0));
-                    logger.LogInformation(
-                        "Session {Id} gspRepEnterShop: {Mains} tab(s), {Placed} card(s), selected {Selected} (requested {Requested}).",
-                        session.Id, tree.Count, placed.Count, selected, request.Unknown4);
-                    body = ShopWire.RepEnterShop(revision, placed, tree, selected);
-                }
-                else
-                {
-                    if (catalog.Categories.All(c => c.Id != options.EnterShopMainCategory))
-                        logger.LogWarning("Session {Id} selected shop category {Category} is absent from the catalog.",
-                            session.Id, options.EnterShopMainCategory);
-                    body = ShopWire.RepEnterShop(request.Token, cards, catalog.Categories, options.EnterShopMainCategory);
-                }
-                await session.SendAsync(numbers.EnterShopReply, body, ct).ConfigureAwait(false);
-            }
-        }
-
-        public async ValueTask HandleEnterTCShopAsync(ISession session, InboundPacket packet, CancellationToken ct)
-        {
-            var request = EnterTCShopRequest.Parse(packet.Payload.Span);
-            var record = new ShopOpenRecord(TryGetUserNum(session), request.Token, 0, ShopKind.CashShop);
-            opens.Remember(session.Connection.Id, record);
-            await store.RememberOpenAsync(record, ct).ConfigureAwait(false);
-            logger.LogInformation(
-                "Session {Id} gcpEnterTCShop_ token={Token} cashCards={Cards}.",
-                session.Id, request.Token, cashCards.Count);
-            await session.SendAsync(numbers.EnterCashShopReply, ShopWire.RepEnterTCShop(request.Token, cashCards), ct)
-                .ConfigureAwait(false);
-        }
-
-        public ValueTask HandleShopBuyAsync(ISession session, InboundPacket packet, CancellationToken ct)
-        {
-            var request = ShopBuyRequest.Parse(packet.Payload.Span);
-            // Persistence active: charge, log, grant, push. Otherwise the row
-            // answers from the in-memory wallet and logs that nothing is stored.
-            return persistPurchases
-                ? purchaser.PurchaseAsync(session, request.ItemId, ct)
-                : ReplyBuyAsync(session, request.ItemId, ct);
-        }
-
-        public ValueTask HandleShopItemCardInfoAsync(ISession session, InboundPacket packet, CancellationToken ct) =>
-            ReplyCardAsync(session, ShopItemCardInfoRequest.Parse(packet.Payload.Span).ItemId, ct);
-
-        public ValueTask HandleRealCouponUseAsync(ISession session, InboundPacket packet, CancellationToken ct)
-        {
-            var request = RealCouponUseRequest.Parse(packet.Payload.Span);
-            logger.LogError(
-                "Session {Id} gcpReqRealCouponUse unknown0Length={Length}: no coupon table in ShopItem2.xml. Replying gspRepRealCouponUse unknown0=-1.",
-                session.Id, request.Unknown0.Length);
-            return session.SendAsync(numbers.RealCouponUseReply, ShopWire.RepRealCouponUse(-1), ct);
-        }
-
-        public async ValueTask HandleCheckCashAsync(ISession session, InboundPacket packet, CancellationToken ct)
-        {
-            var request = CheckCashRequest.Parse(packet.Payload.Span);
-            var user = TryGetUserNum(session);
-            if (money is not null)
-            {
-                // A first-seen player has no row yet: seed the configured starting
-                // balances now so the buy flow has a wallet to charge. The login
-                // burst still sends the all-zero snapshot, so this is
-                // the first place the client learns a real balance.
-                var stored = await money.FindByUserNumAsync(user, ct).ConfigureAwait(false);
-                var wallet = stored ?? Purchasing.ShopPurchaser.SeedWallet(options, user);
-                if (stored is null)
-                    await money.UpsertAsync(wallet, ct).ConfigureAwait(false);
-
-                logger.LogInformation(
-                    "Session {Id} Unknown834 unknown1Length={Length} cash={Cash} lucci={Lucci} (stored wallet).",
-                    session.Id, request.Unknown1.Length, wallet.Cash, wallet.Lucci);
-                await session.SendAsync(numbers.CheckCashReply, ShopWire.RepCheckCash(0, wallet.Cash, 0), ct)
-                    .ConfigureAwait(false);
-                // gspRepCheckCash only writes the cash dword (+0x50); the buy pre-check reads the cached lucci
-                // dword (+0x4C), so re-push the full six-field snapshot the login burst uses.
-                await session.SendAsync(
-                    numbers.UserMoneyStat, ShopWire.RepUserMoneyStat(wallet), ct)
-                    .ConfigureAwait(false);
-                return;
-            }
-
-            var cash = wallets.Get(user).Cash;
-            logger.LogInformation(
-                "Session {Id} Unknown834 unknown1Length={Length} cash={Cash} (in-memory).",
-                session.Id, request.Unknown1.Length, cash);
-            await session.SendAsync(numbers.CheckCashReply, ShopWire.RepCheckCash(0, cash, 0), ct)
-                .ConfigureAwait(false);
-        }
-
-        private ValueTask ReplyBuyAsync(ISession session, int key, CancellationToken ct)
-        {
-            var card = catalog.FindPurchase(key);
-            if (card is null)
-            {
-                logger.LogError("Session {Id} shop buy key={Key} not in catalog. gspRepShopBuy result=0.", session.Id, key);
-                return session.SendAsync(numbers.ShopBuyReply, ShopWire.RepShopBuy(key, 0, string.Empty), ct);
-            }
-
-            var user = TryGetUserNum(session);
-            if (!wallets.TrySpend(user, card))
-            {
-                logger.LogError(
-                    "Session {Id} shop buy key={Key} item={Item} refused: wallet cannot pay {Price} {Money}.",
-                    session.Id, key, card.Stocks[0].ItemId, card.Price, card.MoneyType);
-                return session.SendAsync(numbers.ShopBuyReply, ShopWire.RepShopBuy(key, 0, string.Empty), ct);
-            }
-
-            logger.LogInformation(
-                "Session {Id} shop buy key={Key} stockSet={Set} item={Item} name={Name}. gspRepShopBuy result=1. Inventory grant is not sent.",
-                session.Id, key, card.StockSetId, card.Stocks[0].ItemId, card.Name);
-            return session.SendAsync(
-                numbers.ShopBuyReply,
-                ShopWire.RepShopBuy(key, 1, string.Empty),
-                ct);
-        }
-
-        private ValueTask ReplyCardAsync(ISession session, int key, CancellationToken ct)
-        {
-            var card = catalog.Find(key);
-            if (card is null)
-            {
-                logger.LogError("Session {Id} shop card key={Key} not in catalog. gspRepShopItemCardInfo result=-1.", session.Id, key);
-                return session.SendAsync(numbers.ShopItemCardInfoReply, ShopWire.RepShopItemCardInfo(-1, null), ct);
-            }
-
-            logger.LogInformation(
-                "Session {Id} shop card key={Key} stockSet={Set} item={Item}. gspRepShopItemCardInfo result=1.",
-                session.Id, key, card.StockSetId, card.PrimaryItemId);
-            return session.SendAsync(numbers.ShopItemCardInfoReply, ShopWire.RepShopItemCardInfo(1, card), ct);
-        }
-    }
 }

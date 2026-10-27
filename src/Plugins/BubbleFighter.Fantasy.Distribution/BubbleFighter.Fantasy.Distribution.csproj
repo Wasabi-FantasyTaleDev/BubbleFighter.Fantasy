@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><Description>Public distribution catalogs and repository release discovery.</Description></PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Tomlyn" />
+    <InternalsVisibleTo Include="BubbleFighter.Fantasy.Distribution.Tests" />
+    <ProjectReference Include="../../BubbleFighter.Fantasy.Abstractions/BubbleFighter.Fantasy.Abstractions.csproj" />
+    <ProjectReference Include="../../BubbleFighter.Fantasy.Contracts/BubbleFighter.Fantasy.Contracts.csproj" />
+  </ItemGroup>
+</Project>

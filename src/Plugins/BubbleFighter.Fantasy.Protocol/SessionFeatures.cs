@@ -3,6 +3,12 @@ using BubbleFighter.Fantasy.Abstractions.Protocol;
 
 namespace BubbleFighter.Fantasy.Protocol;
 
+/// <summary>
+/// One session's typed feature slots: a gate-locked, capacity-bounded map from closed interface type
+/// to its single registered instance. Each type holds at most one feature, registration and lookup
+/// are refused once the session closes, and closing drops the stored references — the features
+/// themselves remain owned by their registrants, which release them through their own effects.
+/// </summary>
 internal sealed class SessionFeatures : ISessionFeatures, IDisposable
 {
     private readonly object _gate = new();
@@ -21,6 +27,11 @@ internal sealed class SessionFeatures : ISessionFeatures, IDisposable
 
     public bool IsClosed { get { lock (_gate) return _closed; } }
 
+    /// <summary>
+    /// Claims the session's single slot for <typeparamref name="T"/>.
+    /// </summary>
+    /// <exception cref="ObjectDisposedException">Thrown when the session is closed.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the type already holds a feature or the capacity is exhausted.</exception>
     public IDisposable Register<T>(T feature) where T : class
     {
         ArgumentNullException.ThrowIfNull(feature);
@@ -39,6 +50,9 @@ internal sealed class SessionFeatures : ISessionFeatures, IDisposable
         }
     }
 
+    /// <summary>Reads the feature registered for <typeparamref name="T"/>; a missing feature and a closed session are errors, not nulls.</summary>
+    /// <exception cref="ObjectDisposedException">Thrown when the session is closed.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the type has no feature.</exception>
     public T Get<T>() where T : class
     {
         lock (_gate)
@@ -50,6 +64,7 @@ internal sealed class SessionFeatures : ISessionFeatures, IDisposable
         }
     }
 
+    /// <summary>Attempts to read the feature registered for <typeparamref name="T"/>; reports false when absent, without throwing.</summary>
     public bool TryGet<T>([NotNullWhen(true)] out T? feature) where T : class
     {
         lock (_gate)
@@ -59,6 +74,7 @@ internal sealed class SessionFeatures : ISessionFeatures, IDisposable
         }
     }
 
+    /// <summary>Closes the session: registration and lookup are refused from now on and the stored references are dropped. Repeat disposal is a no-op.</summary>
     public void Dispose()
     {
         lock (_gate)

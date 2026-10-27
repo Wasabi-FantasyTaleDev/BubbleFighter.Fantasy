@@ -1,0 +1,80 @@
+version: 1
+structs:
+  # S2C gspEvolveResult at kr-812 955 (the legacy "follower" evolve reply).
+  # kr-812 Packet_gspEvolveResult, vtable kr-812 D6F6F0; deserializer kr-812 sub_9D95D0 reads three
+  # four-byte words through the four-byte primitive kr-812 sub_A56C10 into object +4, +8 and +12.
+  # cn-717 Packet_gspEvolveResult, vtable cn-717 E97D10; reader cn-717 sub_7F4370 reads the same three
+  # words into the same offsets. The values' meanings are unknown: no consumer was read.
+  # The shape is the read order of kr-812 sub_9D95D0 and cn-717 sub_7F4370. kr-1256, cn-774 and
+  # tw-454 resolve it empty because their evolve reply has a different body at another number; the
+  # other legacy builds (id-400, id-1809, cn-404, cn-408, cn-706 and the rest that name a packet at
+  # 955) inherit this shape until their own reader is read.
+  PetEvolveResult:
+    - unknown_4: u32
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_8: u32
+      offset: 8
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_12: u32
+      offset: 12
+      except: [kr-1256, cn-774, tw-454]
+
+  # kr-1256 sub_9C3BE0 reads a word, an eight-byte value and an optional 0x3A-tagged word,
+  # then calls kr-1256 sub_10C9110, which reads a u32 count followed by that many u32 values.
+  # The count is present even without the optional word. Names below use offsets relative to
+  # the first stack-local word (EBP-0x48); they do not assign meanings to the returned values.
+  # cn-774 and tw-454 inherit this unbound shape; their own readers are not established here.
+  PetEvolveResultModern:
+    - unknown_0: u32
+      only: [kr-1256]
+    - unknown_8: u64
+      only: [kr-1256]
+    - unknown_16: 'optional<0x3A,PetEvolveTail>'
+      only: [kr-1256]
+    - unknown_24: 'list<u32>'
+      only: [kr-1256]
+
+  # The one four-byte word the 0x3A tag announces in the kr-1256 evolve reply (wire offset 13).
+  PetEvolveTail:
+    - unknown_0: u32
+      offset: 0
+      only: [kr-1256]
+
+  # S2C gspRepFollowerLevelup at kr-1256 166, stated for the kr-1256 family (kr-1256 and the builds
+  # based on it): cn-774 and tw-454 inherit this table by the build rules and neither was read here.
+  # Dispatcher case 166 stores the class vtable kr-1256 off_15B85C4, reads eight bytes and four bytes, and
+  # calls the level-up handler kr-1256 sub_EE0080 with the four-byte word. The eight-byte value has
+  # the shape the pet helpers take as an item key, but no getter was resolved, so both stay unknown.
+  # Wire offsets, because the inline reader builds no object.
+  PetFollowerLevelUp:
+    - unknown_0: u64
+      offset: 0
+      only: [kr-1256]
+    - unknown_8: u32
+      offset: 8
+      only: [kr-1256]
+
+  # S2C gspRepFollowerAbilityChange at kr-1256 167, stated for the kr-1256 family (kr-1256 and the
+  # builds based on it): cn-774 and tw-454 inherit this table by the build rules and neither was read
+  # here. Dispatcher case 167 stores the class vtable kr-1256 off_15B85F0 and reads eight bytes and four
+  # four-byte words. It branches on the first four-byte word: 0 calls the success handler kr-1256 sub_EE08A0
+  # with the third four-byte word (wire offset 16), 0x16 is dropped, and any other value calls the failure
+  # handler kr-1256 sub_EE0B70. That branching is why the word is named result; the values are a
+  # status set, and the other words are unknown. Wire offsets.
+  PetFollowerAbilityChange:
+    - unknown_0: u64
+      offset: 0
+      only: [kr-1256]
+    - result: u32
+      offset: 8
+      only: [kr-1256]
+    - unknown_12: u32
+      offset: 12
+      only: [kr-1256]
+    - unknown_16: u32
+      offset: 16
+      only: [kr-1256]
+    - unknown_20: u32
+      offset: 20
+      only: [kr-1256]

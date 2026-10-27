@@ -669,6 +669,13 @@ opcodes:
   name_source: label@cn-406
   evidence: verified
   source: "cn-406 sub_427BE0 dispatches 747 to sub_4407F0; reader sub_7137B0 reads seat, slot, kind and result; packets/map-supplies.yaml"
+- value: 748
+  direction: s2c
+  connection: game
+  name: gspGameItemSpec
+  name_source: label@cn-406
+  evidence: inferred
+  source: "cn-406 sub_700EE0 case 748 calls cn-406 sub_706D00, which constructs Packet_gspGameItemSpec; reader cn-406 sub_700940 reads a counted list of two-word ItemDropInfo entries (cn-406 sub_420FC0); packets/game-state.yaml"
 - value: 32894
   direction: c2s
   connection: game

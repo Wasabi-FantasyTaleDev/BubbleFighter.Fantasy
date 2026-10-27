@@ -12,10 +12,8 @@ using BubbleFighter.Fantasy.Abstractions.Net;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Shop;
 using BubbleFighter.Fantasy.Shop.Data;
-using BubbleFighter.Fantasy.Shop.Dialects;
 using BubbleFighter.Fantasy.Shop.Handlers;
 using BubbleFighter.Fantasy.Shop.Purchasing;
-using BubbleFighter.Fantasy.Shop.Wire;
 using Microsoft.Extensions.Logging.Abstractions;
 using BubbleFighter.Fantasy.Tests.Shared;
 using Xunit;
@@ -52,9 +50,12 @@ public sealed class EquipHoldTests
         FakeShopPurchaseStore purchases,
         EquipHoldStore hold,
         ShopOptions options) =>
-        new(options, Catalog(), purchases.Configure(money, inventory), push, NullLogger.Instance, hold) { Packets = ShopTablePackets.Numbers };
+        new(options, Catalog(), purchases.Configure(money, inventory), push, NullLogger.Instance, hold) { ReplySender = new RecordingBuyReplySender(ShopTablePackets.BuyReply), BalanceSender = new RecordingBalanceSender(ShopTablePackets.UserMoneyStat) };
 
     private static RecordingSession Session(long id) => new(id, SampleUserNum);
+
+    private static Handlers.EquipHoldFlushHandler FlushHandlers(EquipHoldStore hold) =>
+        new(hold, new RecordingFlushSender(ShopTablePackets.InventorySlotsUpdate), NullLogger.Instance);
 
     /// <summary>One held record: the identity a first purchase of the sample card produces.</summary>
     private static EquippedSlotRecord FirstHeldRecord() =>
@@ -145,15 +146,15 @@ public sealed class EquipHoldTests
         // inventory push, and no S2C 803 of any kind.
         var sent = session.Sent;
         Assert.Equal(2, sent.Count);
-        Assert.DoesNotContain(sent, frame => frame.Opcode == ShopTablePackets.Numbers.InventorySlotsUpdate);
+        Assert.DoesNotContain(sent, frame => frame.Opcode == ShopTablePackets.InventorySlotsUpdate);
         Assert.Equal(1, hold.Count(SampleUserNum));
 
-        var handlers = new InventoryRequestHandlers(hold, ShopTablePackets.Numbers.InventorySlotsUpdate, NullLogger.Instance);
-        await handlers.HandleRequestInventoryAsync(session, new InboundPacket(803, ReadOnlyMemory<byte>.Empty), CancellationToken.None);
+        var handlers = FlushHandlers(hold);
+        await handlers.HandleAsync(session, new ShopInventoryRequested(), CancellationToken.None);
 
         Assert.Equal(3, sent.Count);
         var (opcode, payload) = sent[2];
-        Assert.Equal(ShopTablePackets.Numbers.InventorySlotsUpdate, opcode);
+        Assert.Equal(ShopTablePackets.InventorySlotsUpdate, opcode);
         Assert.Equal(803, opcode);
         Assert.Equal(ShopWire.InventoryUpdateSlotsEquipHoldEnvelope([FirstHeldRecord()]), payload);
         Assert.Equal(0, hold.Count(SampleUserNum));
@@ -169,12 +170,12 @@ public sealed class EquipHoldTests
         await NewPurchaser(money, new FakeInventoryRepository(), new FakeInventoryPushService(), new FakeShopPurchaseStore(), hold, HoldOptions())
             .PurchaseAsync(session, 4000001, CancellationToken.None);
 
-        var handlers = new InventoryRequestHandlers(hold, ShopTablePackets.Numbers.InventorySlotsUpdate, NullLogger.Instance);
-        await handlers.HandleRequestInventoryAsync(session, new InboundPacket(803, ReadOnlyMemory<byte>.Empty), CancellationToken.None);
-        await handlers.HandleRequestInventoryAsync(session, new InboundPacket(803, ReadOnlyMemory<byte>.Empty), CancellationToken.None);
+        var handlers = FlushHandlers(hold);
+        await handlers.HandleAsync(session, new ShopInventoryRequested(), CancellationToken.None);
+        await handlers.HandleAsync(session, new ShopInventoryRequested(), CancellationToken.None);
 
         Assert.Equal(3, session.Sent.Count);
-        Assert.Single(session.Sent, frame => frame.Opcode == ShopTablePackets.Numbers.InventorySlotsUpdate);
+        Assert.Single(session.Sent, frame => frame.Opcode == ShopTablePackets.InventorySlotsUpdate);
     }
 
     [Fact]
@@ -183,8 +184,7 @@ public sealed class EquipHoldTests
         var hold = new EquipHoldStore();
         var session = Session(3);
 
-        await new InventoryRequestHandlers(hold, ShopTablePackets.Numbers.InventorySlotsUpdate, NullLogger.Instance)
-            .HandleRequestInventoryAsync(session, new InboundPacket(803, ReadOnlyMemory<byte>.Empty), CancellationToken.None);
+        await FlushHandlers(hold).HandleAsync(session, new ShopInventoryRequested(), CancellationToken.None);
 
         Assert.Empty(session.Sent);
     }
@@ -202,8 +202,7 @@ public sealed class EquipHoldTests
         Assert.Equal(2, session.Sent.Count);
         Assert.Equal(0, hold.Count(SampleUserNum));
 
-        await new InventoryRequestHandlers(hold, ShopTablePackets.Numbers.InventorySlotsUpdate, NullLogger.Instance)
-            .HandleRequestInventoryAsync(session, new InboundPacket(803, ReadOnlyMemory<byte>.Empty), CancellationToken.None);
+        await FlushHandlers(hold).HandleAsync(session, new ShopInventoryRequested(), CancellationToken.None);
 
         Assert.Equal(2, session.Sent.Count);
     }
@@ -219,7 +218,7 @@ public sealed class EquipHoldTests
             .PurchaseAsync(session, 4000001, CancellationToken.None);
 
         var (opcode, _) = Assert.Single(session.Sent);
-        Assert.Equal(ShopTablePackets.Numbers.ShopBuyReply, opcode);
+        Assert.Equal(ShopTablePackets.BuyReply, opcode);
         Assert.Equal(0, hold.Count(SampleUserNum));
     }
 
@@ -262,7 +261,7 @@ public sealed class EquipHoldTests
             .PurchaseAsync(session, 4000001, CancellationToken.None);
 
         var (opcode, payload) = Assert.Single(session.Sent);
-        Assert.Equal(ShopTablePackets.Numbers.ShopBuyReply, opcode);
+        Assert.Equal(ShopTablePackets.BuyReply, opcode);
         Assert.Equal(0, payload[4]);
         Assert.Equal(wallet, await money.FindByUserNumAsync(SampleUserNum, CancellationToken.None));
         Assert.Empty(await inventory.ListSlotsAsync(SampleUserNum, InventoryBag.CharacterBag, 512, CancellationToken.None));

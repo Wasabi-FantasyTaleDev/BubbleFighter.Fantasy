@@ -63,6 +63,14 @@ opcodes:
     name_source: label@cn-279
     evidence: verified
     source: "cn-279 dispatcher sub_70A0F0 case 511 calls sub_708040, which constructs Packet_gspRoomLeaveSlot through sub_44A090; reader sub_44A060 reads a seat word and nested UserSlot through sub_4496E0"
+  - value: 506
+    direction: s2c
+    connection: game
+    name: gspRoomChangeInventory
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 dispatcher cn-279 sub_70A0F0 case 506 calls cn-279 sub_708720, which constructs Packet_gspRoomChangeInventory through cn-279 sub_449C80; vtable cn-279 0x9DD974 reader cn-279 sub_449C30 reads three four-byte words and then a counted four-byte list through cn-279 sub_406FA0"
+    notes: "Same read order as kr-812 Packet_gspRoomChangeInventory (kr-812 sub_80C100)."
   - value: 403
     direction: c2s
     name: gcpReqJoinSession

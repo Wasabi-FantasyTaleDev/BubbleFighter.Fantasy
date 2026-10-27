@@ -8,24 +8,24 @@ using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Net;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.InGame.Data;
-using BubbleFighter.Fantasy.InGame.Dialects;
 using BubbleFighter.Fantasy.InGame.Handlers;
 using BubbleFighter.Fantasy.InGame.Sessions;
 using BubbleFighter.Fantasy.Contracts.Sessions;
 using BubbleFighter.Fantasy.Contracts.Party;
 using BubbleFighter.Fantasy.Contracts.Players;
+using BubbleFighter.Fantasy.Contracts.Administration;
 using Microsoft.Extensions.Logging;
 namespace BubbleFighter.Fantasy.InGame;
 
 /// <summary>
 /// In-session play after login: plaza enter, room create / join / ready, and the round's start
-/// and result on the game and relay connections. In-round traffic between the players belongs
-/// to the match-relay row. Dialect 1256 is selected by <c>version_major</c>.
+/// and result on the game and relay connections, all through the typed messages the build's
+/// dialect row binds. The row registers no packet handlers of its own.
 /// This row does not emit packets on the lobby login 3 to 163 chain.
 ///
 /// </summary>
 [Plugin("ingame",
-    Description = "Plaza enter, room create/join/ready, and combat. Dialect selected by version_major.", 
+    Description = "Plaza enter, room create/join/ready, and combat over the typed room and round messages.",
     Requires = [typeof(IPacketRouter), typeof(IMessageRouter)],
     OptionalMany = [typeof(IMatchCapabilityOfferSender), typeof(IInboundMessageBinding<MatchConnectionReported>), typeof(IMessageSender<RoomTeamConverted>), typeof(IInboundMessageBinding<RoomMatchRequested>), typeof(IMessageSender<RoomMatchNotified>), typeof(IMessageSender<RoomAutoStartNotified>), typeof(IMessageSender<ServerNotice>), typeof(IMessageSender<MatchSessionSignature>),
         typeof(IInboundMessageBinding<RoomListRequested>), typeof(IMessageSender<RoomListSnapshot>), typeof(IMessageSender<PartyUpdated>),
@@ -52,10 +52,13 @@ namespace BubbleFighter.Fantasy.InGame;
         typeof(IMessageSender<RoundSpawnOffered>),
         typeof(IMessageSender<RoundPlayerRespawned>),
         typeof(IInboundMessageBinding<RoundTauntReported>), typeof(IMessageSender<RoundRespawnWaitChanged>),
-        typeof(IInboundMessageBinding<RoomChatSent>), typeof(IMessageSender<RoomChatReceived>), typeof(IInboundMessageBinding<RoomSeatLockRequested>),
+        typeof(IInboundMessageBinding<RoomChatSent>), typeof(IMessageSender<RoomChatReceived>), typeof(IInboundMessageBinding<RoomSeatLockRequested>), typeof(IInboundMessageBinding<RoomAiAddRequested>), typeof(IInboundMessageBinding<RoomAiRemoveRequested>),
         typeof(IMessageSender<RoomSeatLockChanged>), typeof(IInboundMessageBinding<RoomKickRequested>), typeof(IMessageSender<RoomMemberKicked>),
         typeof(IInboundMessageBinding<PlazaEnterRequested>), typeof(IInboundMessageBinding<PlazaPositionReported>),
         typeof(IInboundMessageBinding<PlazaMenuReturnRequested>),
+        typeof(IInboundMessageBinding<InitialTutorialRequested>), typeof(IMessageSender<InitialTutorialEntered>),
+        typeof(IInboundMessageBinding<InitialTutorialExitRequested>),
+        typeof(IInboundMessageBinding<InitialTutorialNpcReported>), typeof(IMessageSender<InitialTutorialNpcAcknowledged>),
         typeof(IMessageSender<PlazaEntered>), typeof(IMessageSender<PlazaMemberEntered>), typeof(IMessageSender<PlazaMemberLeft>),
         typeof(IMessageSender<PlazaPositionReceived>), typeof(IMessageSender<PlazaMenuReturnRequested>),
         typeof(IInboundMessageBinding<RoundKillCreditReported>), typeof(IInboundMessageBinding<RoundFinishingBlowReported>),
@@ -75,9 +78,9 @@ namespace BubbleFighter.Fantasy.InGame;
         typeof(IMessageSender<RoundRescueMissionsPrepared>), typeof(IMessageSender<RoundRescueMissionStarted>),
         typeof(IMessageSender<RoundRescueMissionFailed>), typeof(IMessageSender<RoundRescueMissionSucceeded>),
         typeof(IInboundMessageBinding<RoundPvePangReported>), typeof(IMessageSender<RoundPvePointsChanged>)],
-    Optional = [typeof(IPartyDirectory), typeof(IOnlinePlayers), typeof(BubbleFighter.Fantasy.Contracts.Shop.IShopPurchaseStore), typeof(IInventoryRepository), typeof(IInventoryPushService), typeof(IGameText), typeof(ISeatCharacterResolver), typeof(IEquippedViewPush), typeof(IEquipmentSelection), typeof(BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore), typeof(BubbleFighter.Fantasy.Contracts.Progress.IPlayerProgressRepository), typeof(BubbleFighter.Fantasy.Contracts.Wallet.IPlayerWalletRepository), typeof(BubbleFighter.Fantasy.Contracts.Progress.ITutorialStageStore), typeof(BubbleFighter.Fantasy.Contracts.Shop.IShopGiftService)],
+    Optional = [typeof(ICommandExecutor), typeof(IGameCommandEndpoints), typeof(IPartyDirectory), typeof(IOnlinePlayers), typeof(BubbleFighter.Fantasy.Contracts.Shop.IShopPurchaseStore), typeof(IInventoryRepository), typeof(IInventoryPushService), typeof(IGameText), typeof(ISeatCharacterResolver), typeof(IEquippedViewPush), typeof(IEquipmentSelection), typeof(BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore), typeof(BubbleFighter.Fantasy.Contracts.Progress.IPlayerProgressRepository), typeof(BubbleFighter.Fantasy.Contracts.Wallet.IPlayerWalletRepository), typeof(BubbleFighter.Fantasy.Contracts.Progress.ITutorialStageStore), typeof(BubbleFighter.Fantasy.Contracts.Shop.IShopGiftService), typeof(IOpcodeTableRegistry)],
     ProvidesMany = [typeof(IMatchCapabilityDirectory)],
-    ConditionalProvides = [typeof(IMatchConnectionTracker), typeof(IMatchRoomDirectory), typeof(IRoomStartService), typeof(IRoomRoster), typeof(IRoundScoreboard)])]
+    ConditionalProvides = [])]
 public sealed class InGamePlugin : IPlugin
 {
     /// <inheritdoc />
@@ -86,7 +89,6 @@ public sealed class InGamePlugin : IPlugin
         var options = context.Config.Bind<InGameOptions>();
         LevelTable.LoadConfiguredFile(options);
         var modes = ModeCatalog.Load(options.ModeTablePath);
-        var router = context.Services.Get<IPacketRouter>();
         var registry = new RoomRegistry(options, context.Logger);
         // Registered first so it runs last on unload: by then every handler and event subscription that
         // enqueues room work is gone, and room state is released only after the running operations return.
@@ -100,199 +102,19 @@ public sealed class InGamePlugin : IPlugin
         var chatRateLimit = new ChatRateLimit(options, context.Logger);
         context.Effect(chatRateLimit);
         context.Effect(context.Events.On<ConnectionClosedEvent>(chatRateLimit.OnConnectionClosed));
-        if (options.TypedOnly)
-        {
-            // Protocol-scoped capabilities above can coexist; the singleton services below belong to the wire row.
-            ActivateTypedOnly(context, options, registry, chatRateLimit);
-            return ValueTask.CompletedTask;
-        }
-
-        // Publish the relay-bind classification so the lobby login handler can
-        // leave a match connection's reconnect-shaped C2S 3 to the in-game seam
-        // (the lobby router owns opcode 3; the routing boundary asks its gameplay owner and
-        // avoids a reverse service dependency on a later activation).
-        context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Match.IMatchConnectionTracker>(registry));
-        context.Effect(context.Services.Register<IMatchRoomDirectory>(registry));
-        context.Effect(context.Events.Intercept<LoginConnectionRouting, bool>((request, next, ct) =>
-            request.Protocol == options.GameProtocol && registry.IsMatchBound(request.Session)
-                ? ValueTask.FromResult(true) : next(ct)));
-        // In-round traffic belongs to the match-relay row: it reads the seats through the roster and
-        // adds team points through the scoreboard, which stay on the room for the result and rewards.
-        var roster = new RoomRoster(registry, context.Logger, context.Lifetime);
-        context.Effect(context.Services.Register<IRoomRoster>(roster));
-        context.Effect(context.Services.Register<IRoundScoreboard>(roster));
-        // Scene maps and S2C 806 must resolve the same stored selection (0x81D060 / 0x81CCE0).
-        context.Services.TryGet<IEquipmentSelection>(out var selection);
-        if (selection is not null)
-            context.Logger.LogInformation("InGame scene character ids resolve through the authoritative IEquipmentSelection.");
-        var characters = context.Services.TryGet<ISeatCharacterResolver>(out var resolver) && resolver is not null
-            ? resolver
-            : null;
-        if (characters is not null)
-            context.Logger.LogInformation("InGame seat character ids resolve through a published ISeatCharacterResolver.");
-        // The equipped view (S2C 806) is the write that puts a player's equipped
-        // character and weapons into the profile map the in-room spawner and the
-        // appearance rebuilder read. A working reference session sends it as part
-        // of its room-entry sequence, right after the room install. The service
-        // is optional: without the row the room path simply does not send it.
-        var equippedView = context.Services.TryGet<IEquippedViewPush>(out var push) && push is not null
-            ? push
-            : null;
-        if (equippedView is not null)
-            context.Logger.LogInformation("InGame room entry publishes the equipped set through a published IEquippedViewPush.");
-        var signatureSenders = context.Services.GetAll<IMessageSender<MatchSessionSignature>>()
-            .Where(sender => sender.Protocol == options.GameProtocol).ToArray();
-        if (signatureSenders.Length != 1)
-            throw new ConfigException($"InGame requires exactly one session signature sender for '{options.GameProtocol}'.");
-        // The plaza population lives beside the room registry, not inside it: a
-        // plaza player has no room id, no phase and no relay key, and folding
-        // them into RoomRegistry would list them as rooms and expose them to the
-        // start seam. See PlazaRoster.
-        var plaza = new PlazaRoster(options.RoomQueueCapacity);
-        // Stopped after the handlers and subscriptions that enqueue plaza work are gone.
-        context.Effect(() =>
-        {
-            if (!plaza.Executor.StopAsync().Wait(roomStopTimeout))
-                throw new TimeoutException($"InGame plaza executor did not stop within {options.RoomStopTimeoutMs} ms.");
-        });
-        var partySender = PlaySenders.Optional<PartyUpdated>(context, options.GameProtocol);
-        var rooms = new RoomLoop(
-            registry, modes, options, options.RelayAdvertiseIpv4, context.Logger, characters, plaza, equippedView, selection, partySender)
-        {
-            RoomListSender = PlaySenders.Optional<RoomListSnapshot>(context, options.GameProtocol),
-        };
-        // Random map selections draw from the client's own pools when the client data is loaded.
-        Data.MapCatalog? maps = null;
-        if (context.Services.TryGet<BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore>(out var clientData) && clientData is not null)
-        {
-            maps = Data.MapCatalog.Load(clientData);
-            context.Logger.LogInformation("InGame map pools loaded from client data: {Hot} mode(s) with a random pool, {Difficulty} with a difficulty list.",
-                maps.HotModeCount, maps.DifficultyModeCount);
-        }
-        else
-        {
-            context.Logger.LogWarning("InGame has no client data (clientdata row): random map selections fall back to the shipped keys, whatever the mode.");
-        }
-        context.Services.TryGet<BubbleFighter.Fantasy.Contracts.Progress.IPlayerProgressRepository>(out var progress);
-        if (progress is not null && options.LevelExpThresholds.Count == 0)
-            context.Logger.LogWarning("Round rewards are off: level_exp_thresholds is empty.");
-        var flows = new InGameFlows(options, registry, context.Logger, characters, equippedView, context.Lifetime, signatureSenders[0], selection, maps, progress, partySender, context.Events);
-        var modeNotices = new RoomNotices(PlaySenders.Optional<ServerNotice>(context, options.GameProtocol),
-            context.Services.TryGet<IGameText>(out var commandTexts) ? commandTexts : null);
-        rooms.ModeNotices = modeNotices;
-        rooms.Commands = new GameCommandHandler(registry, async (session, ct) =>
-        {
-            if (registry.TryGet(session.Id) is { } room)
-                await flows.Start.StartMatchAsync(room, ct, session.Id, force: true).ConfigureAwait(false);
-        }, modeNotices, (room, mode, ct) => rooms.ApplyModeAsync(room, mode, null, ct));
-        context.Effect(context.Events.OnAsync<EquipmentSelectionCommitted>(async (change, ct) =>
-        {
-            using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, context.Lifetime);
-            await rooms.OnEquipmentSelectionCommittedAsync(change, linked.Token).ConfigureAwait(false);
-        }));
-        var game = options.GameProtocol;
-        var relay = options.RelayProtocol;
-        // Where each game-connection request is expected, from the recorded plaza, room and match
-        // sessions and a live client (C2S 106, 401, 502 and 511 also arrive outside their first
-        // recorded phase). Observation only until the sets are confirmed; see PhaseGate.
-        var gate = new PhaseGate(context.Logger);
-        const SessionPhase Menu = SessionPhase.MainMenu, Plaza = SessionPhase.Plaza, Room = SessionPhase.Room, Match = SessionPhase.Match;
-        PacketHandler In(ushort opcode, PacketHandler handler, params SessionPhase[] phases) => gate.Expect(opcode, handler, phases);
-
-        context.Effect(router.Register(game, InGameOpcodes.C2SUnknown106, In(InGameOpcodes.C2SUnknown106, rooms.Plaza.HandleEnterPlazaAsync, Menu, Plaza)));
-        context.Effect(router.Register(game, InGameOpcodes.C2SReturnToMenu, In(InGameOpcodes.C2SReturnToMenu, rooms.Plaza.HandleReturnToMenuAsync, Plaza)));
-        // C2S 108 is the single-player training-ground create: the 56-byte rule record only, with mode 40 and
-        // the training map synthesized server-side because neither is on the wire.
-        context.Effect(router.Register(game, InGameOpcodes.C2STrainingRoom, flows.Setup.HandleTrainingRoomAsync));
-        var messages = context.Services.Get<IMessageRouter>().For(context);
-        if (rooms.RoomListSender is not null)
-            context.Effect(messages.On<RoomListRequested>(game, gate.Expect<RoomListRequested>(rooms.HandleRoomListAsync, Plaza, Room)));
-        context.Effect(router.Register(game, InGameOpcodes.C2SUnknown402, In(InGameOpcodes.C2SUnknown402, rooms.HandleUnknown402Async, Plaza)));
-        context.Effect(router.Register(game, InGameOpcodes.C2SUnknown403, In(InGameOpcodes.C2SUnknown403, rooms.HandleUnknown403Async, Plaza)));
-        context.Effect(router.Register(game, InGameOpcodes.C2SUnknown404, In(InGameOpcodes.C2SUnknown404, rooms.HandleUnknown404Async, Room)));
-        context.Effect(router.Register(game, InGameOpcodes.C2SCreateRoom, In(InGameOpcodes.C2SCreateRoom, flows.Setup.HandleCreateRoomAsync, Room)));
-        context.Effect(router.Register(game, InGameOpcodes.C2SQuickCreateRoom, flows.Setup.HandleQuickCreateRoomAsync));
-        context.Effect(router.Register(game, InGameOpcodes.C2SJoinRoom, rooms.HandleJoinRoomAsync));
-        context.Effect(router.Register(game, InGameOpcodes.C2SUnknown505, In(InGameOpcodes.C2SUnknown505, flows.Setup.HandleRoomStatusAsync, Room)));
-        context.Effect(router.Register(game, InGameOpcodes.C2SRoomChat, chatRateLimit.Wrap(In(InGameOpcodes.C2SRoomChat, rooms.HandleRoomChatAsync, Menu, Plaza, Room))));
-        context.Effect(router.Register(game, InGameOpcodes.C2SRoomChatTyped, chatRateLimit.Wrap(In(InGameOpcodes.C2SRoomChatTyped, rooms.HandleRoomChatTypedAsync, Room))));
-        // C2S 515 is the team-change send the room-stage click dispatcher
-        // builds (sub_969730 -> sub_971140 -> sub_4B3AC0). The
-        // opcode is shared with two other builders, so the body is logged
-        // rather than parsed; registering it keeps the click out of the
-        // unhandled log once a client can press the button.
-        context.Effect(router.Register(game, InGameOpcodes.C2SUnknown509, In(InGameOpcodes.C2SUnknown509, rooms.HandleSeatCloseAsync, Room)));
-        context.Effect(router.Register(game, InGameOpcodes.C2SChangeTeam, In(InGameOpcodes.C2SChangeTeam, rooms.HandleChangeTeamAsync, Room)));
-        // C2S 511 is the in-room character position report, not a separate state command, so only the position
-        // handler is registered for it; the plaza twin C2S 301 shares the same body.
-        context.Effect(router.Register(game, InGameOpcodes.C2SCharacterPositionPlaza, In(InGameOpcodes.C2SCharacterPositionPlaza, rooms.HandleCharacterPositionAsync, Plaza)));
-        context.Effect(router.Register(game, InGameOpcodes.C2SCharacterPositionRoom, In(InGameOpcodes.C2SCharacterPositionRoom, rooms.HandleCharacterPositionAsync, Plaza, Room)));
-        context.Effect(router.Register(game, InGameOpcodes.C2SGameStartReady, flows.Start.HandleGameStartReadyAsync));
-        context.Effect(router.Register(game, InGameOpcodes.C2SRelayEndpoint, flows.Start.HandleRelayEndpointAsync));
-        context.Effect(router.Register(game, InGameOpcodes.C2SRelayConnectResult, flows.Start.HandleRelayConnectResultAsync));
-        context.Effect(router.Register(game, InGameOpcodes.C2SRelayAck, flows.Start.HandleRelayAckAsync));
-        context.Effect(router.Register(game, InGameOpcodes.C2SSceneObjectReady, In(InGameOpcodes.C2SSceneObjectReady, flows.Start.HandleSceneObjectReadyAsync, Match)));
-        // C2S 579 is the client's "I consumed the stage move" report, sent in the
-        // same millisecond as C2S 607 under one gate (sub_755330). Neither
-        // was registered, so a chain that waited for a position report or for C2S
-        // 571 could stall and read as "the round never starts".
-        context.Effect(router.Register(game, InGameOpcodes.C2SStageMoveConsumed, In(InGameOpcodes.C2SStageMoveConsumed, flows.Start.HandleStageMoveConsumedAsync, Match)));
-        // C2S 513 is the map-list report. Its body is two prefixed wstrings and
-        // an i32 per sub_9D8C00, so it is parsed and logged rather than left in
-        // the unhandled log.
-        context.Effect(router.Register(game, InGameOpcodes.C2SMapListReport, flows.Setup.HandleMapListReportAsync));
-        context.Effect(router.Register(game, InGameOpcodes.C2SLeaveGame, In(InGameOpcodes.C2SLeaveGame, flows.Setup.HandleLeaveAsync, Match)));
-        context.Effect(router.Register(game, InGameOpcodes.C2SGameOver, In(InGameOpcodes.C2SGameOver, flows.Result.HandleGameOverAsync, Match)));
-        context.Effect(router.Register(game, InGameOpcodes.C2SGameResultStats, In(InGameOpcodes.C2SGameResultStats, flows.Result.HandleResultStatsAsync, Match)));
-        // The horde (pirate) round: the host's client runs the waves and the server answers or
-        // repeats its reports to every seat (HordeWave1256).
-        var horde = new HordeWaveFlow(registry, context.Logger);
-        context.Effect(router.Register(game, HordeWave1256.WaveStartRequest, horde.HandleWaveStartAsync));
-        context.Effect(router.Register(game, HordeWave1256.WaveTableReport, horde.HandleWaveTableAsync));
-        context.Effect(router.Register(game, HordeWave1256.WaveEndRequest, horde.HandleWaveEndAsync));
-        context.Effect(router.Register(game, HordeWave1256.AllWavesEndRequest, horde.HandleAllWavesEndAsync));
-        context.Effect(router.Register(game, HordeWave1256.DropReport, horde.HandleDropAsync));
-        context.Effect(router.Register(game, HordeWave1256.PickupReport, horde.HandlePickupAsync));
-
-        // C2S 17 gspGameStartReady rides the RELAY connection, not the game one,
-        // once per round. The client builds it with sub_755330 alongside C2S 579 and
-        // sends the pair in the same millisecond once the stage move is consumed.
-        // Registering it on the game listener only meant the report never arrived,
-        // so MarkPlaying never ran and the room sat in Starting - which is exactly
-        // the "the round never starts" symptom. The handler resolves the room
-        // through the relay seat rather than the game session id.
-        context.Effect(router.Register(relay, InGameOpcodes.C2SGameStartReady, flows.Start.HandleGameStartReadyAsync));
-        // Publish the room start service so administration requests use the same phase validation and start
-        // sequence as the client-driven path.
-        context.Effect(context.Services.Register<IRoomStartService>(
-            new RoomStartService(registry, flows.Start)));
-
-        context.Effect(context.Events.On<ConnectionClosedEvent>(flows.Setup.OnConnectionClosed));
-        // The match connection opens on the GAME listener - the reference's own
-        // match connections do, and the emulator's does - with opcode 1 and a relay
-        // authentication rather than the 96-byte patch handshake. That opcode is
-        // already taken on the game protocol by the handshake, so the pair cannot
-        // be registered twice; the router's packet-received event is the seam, and
-        // the protocol row deliberately leaves a non-handshake opcode 1 unanswered
-        // for exactly this reason.
-        // The plaza has no leave packet, so the connection close is the only
-        // signal that a player left the plaza; the room detach above and this
-        // subscription are independent.
-        context.Effect(context.Events.On<ConnectionClosedEvent>(rooms.Plaza.OnConnectionClosed));
-        context.Logger.LogInformation(
-            "InGame dialect {Version} on {Game} and {Relay}; mode table {Modes}; advertise {Ip}:{Port}.",
-            options.VersionMajor, game, relay, modes.HasRows ? modes.Ids.Count : 0,
-            options.RelayAdvertiseIpv4, options.RelayAdvertisePort);
+        // The room and round logic is typed only: the row registers no packet handlers of its own. The
+        // protocol-scoped capability directory above is the match transport's admission seam.
+        ActivateTyped(context, options, registry, chatRateLimit, modes);
         return ValueTask.CompletedTask;
     }
 
     /// <summary>
-    /// The typed-only form of the row: the waiting-room requests the build's dialect row delivers
-    /// as typed messages, and nothing else. A request family is served when the dialect publishes
-    /// its binding, so a build without one has no such feature.
+    /// The row's only form: the waiting-room, plaza and round requests the build's dialect row delivers
+    /// as typed messages. A request family is served when the dialect publishes its binding, so a build
+    /// without one has no such feature.
     ///
     /// </summary>
-    private static void ActivateTypedOnly(IPluginContext context, InGameOptions options, RoomRegistry registry, ChatRateLimit chatRateLimit)
+    private static void ActivateTyped(IPluginContext context, InGameOptions options, RoomRegistry registry, ChatRateLimit chatRateLimit, ModeCatalog modes)
     {
         var game = options.GameProtocol;
         // The profile's inventoryview realm supplies this build's stored appearance to every scene.
@@ -303,15 +125,38 @@ public sealed class InGamePlugin : IPlugin
         var messages = context.Services.Get<IMessageRouter>().For(context);
         var gate = new PhaseGate(context.Logger);
         const SessionPhase Menu = SessionPhase.MainMenu, Plaza = SessionPhase.Plaza, Room = SessionPhase.Room;
-        if (!Bound<RoomCreateRequested>())
-            throw new ConfigException($"InGame typed_only needs a room create binding on '{game}'; the build's dialect row publishes none.");
+        var roomsBound = Bound<RoomCreateRequested>();
+        if (!roomsBound && !Bound<PlazaEnterRequested>())
+            throw new ConfigException($"InGame typed_only needs a room create binding or plaza enter binding on '{game}'; the build's dialect row publishes neither.");
+        if (roomsBound)
+        {
+            _ = PlaySenders.Required<RoomEntered>(context, game);
+            _ = PlaySenders.Required<RoomSeatUpdated>(context, game);
+            _ = PlaySenders.Required<RoomSeatVacated>(context, game);
+            _ = PlaySenders.Required<RoomMasterChanged>(context, game);
+        }
+        if (Bound<PlazaEnterRequested>())
+        {
+            _ = PlaySenders.Required<PlazaEntered>(context, game);
+            _ = PlaySenders.Required<PlazaMemberEntered>(context, game);
+            _ = PlaySenders.Required<PlazaMemberLeft>(context, game);
+            _ = PlaySenders.Required<PlazaPositionReceived>(context, game);
+            _ = PlaySenders.Required<PlazaMenuReturnRequested>(context, game);
+        }
         if (options.NativeMatchRelay && !Bound<RoundLoadReported>())
             throw new ConfigException("Native match relay requires a map-load binding and shared round handlers.");
+        if (options.AiModeIds.Length > 0 && !(Bound<RoomAiAddRequested>() && Bound<RoomAiRemoveRequested>()))
+            throw new ConfigException("ai_mode_ids requires the native AI add and remove bindings on the game protocol.");
+        foreach (var key in options.AiPresets.Select(preset => preset.NicknameKey).Where(key => key.Length > 0).Distinct(StringComparer.Ordinal))
+            if (!context.Services.TryGet<IGameText>(out var names) || names is null || !names.TryFormat("", key, out _))
+                throw new ConfigException($"ai_presets nickname_key '{key}' requires localization with a deployment-default translation.");
         var rooms = new RoomFlow(registry, RoomSenders.Resolve(context, game), context.Logger, selection, characters,
             options.PlazaCapacity, options, context.Lifetime,
             context.Services.TryGet<IGameText>(out var texts) ? texts : null,
             context.Services.TryGet<IPartyDirectory>(out var parties) ? parties : null,
             context.Services.TryGet<IOnlinePlayers>(out var online) ? online : null);
+        rooms.Modes = modes;
+        rooms.BindCommands(context, game, options.SharedChatCommands);
         context.Effect(() =>
         {
             if (!rooms.StopScenesAsync().Wait(TimeSpan.FromMilliseconds(options.RoomStopTimeoutMs)))
@@ -340,7 +185,8 @@ public sealed class InGamePlugin : IPlugin
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, context.Lifetime);
             await rooms.OnEquipmentSelectionCommittedAsync(change, linked.Token).ConfigureAwait(false);
         }));
-        context.Effect(messages.On<RoomCreateRequested>(game, gate.Expect<RoomCreateRequested>(rooms.HandleCreateAsync, Menu, Plaza)));
+        if (roomsBound)
+            context.Effect(messages.On<RoomCreateRequested>(game, gate.Expect<RoomCreateRequested>(rooms.HandleCreateAsync, Menu, Plaza)));
         if (Bound<RoomMatchRequested>())
         {
             var matching = new RoomQuickMatcher(registry, rooms, options, PlaySenders.Required<RoomMatchNotified>(context, game),
@@ -358,11 +204,11 @@ public sealed class InGamePlugin : IPlugin
         if (Bound<RoomLeaveRequested>())
             context.Effect(messages.On<RoomLeaveRequested>(game, gate.Expect<RoomLeaveRequested>(rooms.HandleLeaveAsync, Room)));
         if (Bound<PlazaEnterRequested>())
-            context.Effect(messages.On<PlazaEnterRequested>(game, gate.Expect<PlazaEnterRequested>(rooms.HandlePlazaEnterAsync, Menu, Plaza)));
+            context.Effect(messages.On<PlazaEnterRequested>(game, gate.Expect<PlazaEnterRequested>(rooms.HandlePlazaEnterAsync, Menu, Plaza, SessionPhase.Match)));
         if (Bound<PlazaPositionReported>())
             context.Effect(messages.On<PlazaPositionReported>(game, gate.Expect<PlazaPositionReported>(rooms.HandlePlazaPositionAsync, Plaza)));
         if (Bound<PlazaMenuReturnRequested>())
-            context.Effect(messages.On<PlazaMenuReturnRequested>(game, gate.Expect<PlazaMenuReturnRequested>(rooms.HandlePlazaMenuReturnAsync, Plaza, Room)));
+            context.Effect(messages.On<PlazaMenuReturnRequested>(game, gate.Expect<PlazaMenuReturnRequested>(rooms.HandlePlazaMenuReturnAsync, Plaza, Room, SessionPhase.Match)));
         if (Bound<RoomReadyRequested>())
             context.Effect(messages.On<RoomReadyRequested>(game, gate.Expect<RoomReadyRequested>(rooms.HandleReadyAsync, Room)));
         if (Bound<RoomUiRefreshRequested>())
@@ -390,6 +236,10 @@ public sealed class InGamePlugin : IPlugin
             context.Effect(messages.On<RoomChatSent>(game, rooms.HandleChatAsync));
             context.Effect(messages.Use<RoomChatSent>(game, chatRateLimit.Filter<RoomChatSent>));
         }
+        if (Bound<RoomAiAddRequested>())
+            context.Effect(messages.On<RoomAiAddRequested>(game, gate.Expect<RoomAiAddRequested>(rooms.HandleAiAddAsync, Room)));
+        if (Bound<RoomAiRemoveRequested>())
+            context.Effect(messages.On<RoomAiRemoveRequested>(game, gate.Expect<RoomAiRemoveRequested>(rooms.HandleAiRemoveAsync, Room)));
         if (Bound<RoomSeatLockRequested>())
             context.Effect(messages.On<RoomSeatLockRequested>(game, gate.Expect<RoomSeatLockRequested>(rooms.HandleSeatLockAsync, Room)));
         if (Bound<RoomKickRequested>())
@@ -431,6 +281,20 @@ public sealed class InGamePlugin : IPlugin
                 }
             }
             var tutorials = new TutorialRoomFlow(registry, stageTable?.Numbers, tutorialStages, context.Logger, tutorialGifts, giftService);
+            if (Bound<InitialTutorialRequested>())
+            {
+                var entered = PlaySenders.Required<InitialTutorialEntered>(context, game);
+                context.Effect(messages.On<InitialTutorialRequested>(game,
+                    gate.Expect<InitialTutorialRequested>((session, request, ct) => rooms.HandleInitialTutorialAsync(session, request, entered, ct), Menu)));
+                context.Effect(messages.On<InitialTutorialExitRequested>(game,
+                    gate.Expect<InitialTutorialExitRequested>(rooms.HandleInitialTutorialExitAsync, Room, SessionPhase.Match)));
+            }
+            if (Bound<InitialTutorialNpcReported>())
+            {
+                var npc = PlaySenders.Required<InitialTutorialNpcAcknowledged>(context, game);
+                context.Effect(messages.On<InitialTutorialNpcReported>(game,
+                    (session, request, ct) => rooms.HandleInitialTutorialNpcAsync(session, request, npc, ct)));
+            }
             context.Effect(messages.On<TutorialRoundOpened>(game, tutorials.OpenAsync));
             context.Effect(messages.On<TutorialRoundClosed>(game, tutorials.CloseAsync));
             context.Effect(messages.On<TutorialStageCleared>(game, tutorials.ClearedAsync));
@@ -558,33 +422,5 @@ public sealed class InGamePlugin : IPlugin
         context.Effect(context.Events.On<ConnectionClosedEvent>(rooms.OnConnectionClosed));
         context.Effect(context.Events.On<ConnectionClosedEvent>(rooms.OnPlazaConnectionClosed));
         context.Logger.LogInformation("InGame serves typed room and round messages on {Game}.", game);
-    }
-
-    /// <summary>
-    /// Publishes the room registry as the administration start seam. The match
-    /// start is server-driven, so no client packet is invented for it.
-    ///
-    /// </summary>
-    private sealed class RoomStartService(RoomRegistry registry, MatchStartFlow start) : IRoomStartService
-    {
-        public ValueTask StartAsync(int roomId, CancellationToken ct)
-        {
-            var room = registry.Find(roomId)
-                ?? throw new InvalidOperationException($"Room {roomId} is not live.");
-            return start.StartMatchAsync(room, ct);
-        }
-
-        public ValueTask<IReadOnlyList<(int RoomId, int Seats, string Phase)>> ListAsync(CancellationToken ct)
-        {
-            ct.ThrowIfCancellationRequested();
-            List<(int RoomId, int Seats, string Phase)> rows = [];
-            foreach (var room in registry.All())
-            {
-                lock (room.Gate)
-                    rows.Add((room.Id, room.Seats.Count, room.Phase.ToString()));
-            }
-
-            return ValueTask.FromResult<IReadOnlyList<(int RoomId, int Seats, string Phase)>>(rows);
-        }
     }
 }

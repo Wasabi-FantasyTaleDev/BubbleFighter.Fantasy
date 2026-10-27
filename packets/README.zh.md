@@ -8,16 +8,18 @@
 |---|---|
 | `builds.yaml` | 有哪些客戶端版本、各自以誰為基底、各版本自己的設定值。 |
 | `room.yaml` | 房間相關結構：`SessionSetting`、`GameSetting`、`UserSlot`、`EquippedItemList`、`gspGotoRoom`。 |
-| `room-details.yaml` | 已核對的房主變更請求／回覆、回合設定請求、房間背包通知和共享擴音器請求；分輪地圖綁定還要求具名的 game opcode 與 `builds.yaml` 中已核對的目標映射。 |
+| `room-details.yaml` | 已核對的房主變更請求／回覆、回合設定請求、房間背包通知；分輪地圖綁定還要求具名的 game opcode 與 `builds.yaml` 中已核對的目標映射。 |
 | `equipment-attributes.yaml` | 完整裝備清單中的原生 `ItemAttr` 與 `ItemExpiredTime` 元素布局。 |
 | `cash-inventory.yaml` | 帶數量的現金收件箱清單與領取封包，包含 modern 的展示尾段；結構表不會啟用道具領取。 |
 | `damagers.yaml` | 伺服器原樣轉發的回合內傷害體封包，例如 `SplashDamagerByDamager`（32900）以及 `packets/damagers.yaml` 中的七个生成封包。 |
+| `recruit.yaml` | 共享擴音器請求與傳統招募訊息；排除尚未核實的現代招募格式。 |
+| `round-feed-native.yaml` | 已核对字段顺序差异的原生战斗消息；封包表不会自行注册中继路由或启用对局。 |
 | `score.yaml` | 計分板：`ScoreRow`，`gspGameBroadcastPlayerScoreData` 裡的一個座位。 |
 | `score-reports.yaml` | 原生入站積分上報布局；表中有布局不代表啟用尚未審核的事件類型或 opcode 路由。 |
 | `inventory.yaml` | `InventoryUpdate` 和 `InventorySlot`：S2C 801/802 的背包。 |
 | `login.yaml` | `LoginReply`：legacy 的 S2C 登入回覆，包含早期客戶端差異。 |
 | `weapon-presets.yaml` | legacy 武器預設請求、狀態與平行向量列表，以及 KR、CN、TW 元素寬度各異的 modern 更新布局；表中有布局不代表啟用預設功能。 |
-| `customized-keys.yaml` | kr-812 與三個 modern 版本已核對的自訂按鍵更新和回覆；顯式啟用的 `player-settings` bundle 將其接入獨立作用域儲存與登入恢復。 |
+| `customized-keys.yaml` | kr-812 與三個 modern 版本已核對的自訂按鍵更新和回覆；`dialect.messages` 行的 `customized_keys` 選項將其接入獨立作用域儲存與登入恢復。 |
 | `user-stat.yaml` | `UserStat`（S2C `gspUserStat`，錢包和 FighterInfo），以及其中的 `FighterInfo`、`EloRating`。 |
 | `fighter-info.yaml` | `FighterInfoRequest`、`FighterInfoReply`：legacy 版本與 kr-1256 家族（`FighterInfoReply@kr-1256`）玩家菜單的「查看資訊」（C2S `gcpReqFighterInfo`，S2C `gspRepFighterInfo`）。 |
 | `clan.yaml` | 氏族（clan）game 連線的封包體：`ClanPassport`、`ClanMarkInfo`、`ClanGuildInfo`、`ClanAttendanceState`，以及空的氏族請求；以 kr-1256 的結構為主，並列 kr-812 的基底結構。 |
@@ -200,4 +202,24 @@ IReadOnlyList<PacketField> fields = tables.Resolve("id-400", "MyStructure");
 
 `builds.yaml` 中的 `room_setting_change_fields` 将原生地图修改请求的第三个字符串和前两个标志映射到已核对的偏移字段名。各构建继承基线，只覆盖不同字段名。房间方言在挂载类型化请求前校验映射键、目标类型及两个标志目标互不重复。
 
+`builds.yaml` 中的 `play` 描述各构建的教程房与游戏房在仍由代码写出形状的封包上的差异。其子块为 `tutorial`（`old_map_key`、`select_kind`、`skip_enter`、`old_mode`、`wave_map_key`、`master_slot_packet`）、`wire`（`server_revives`、`pre_count_down_first`、`unchosen_map_key`、`unchosen_map_theme`、`spawn_group_applies_locally`、`unchosen_difficulty_mode`、`unchosen_difficulty_map_key`、`restate_left_room`、`plaza_entry_settle_ms`）与 `score`（`wide_report`、`live_score_packet`、`outcome_first`、`time_over_end`、`npc_team_outcome`、`rescue_credit`、`horde_stage_outcome`、`star_report` 及 `star_small_gained`、`star_big_gained`、`star_small_lost`、`star_big_lost` 四个星星上报种类），另有平铺键 `match_start`、`host_start`、`one_seat_waves`、`npc_waves`、`score_reports` 与 `tutorial_skip_start`。旧版房间方言通过 `PlayValues.Of` 读取，启动时拒绝未知键、不属于该键名称的取值，以及缺失的 `match_start` 或 `host_start`。
+
 `room_projection_fields` 描述 modern 类型化等待房间的模式字段、按顺序使用的地图候选及普通房间 UI 门控覆盖规则。`clear_mask` 只从 `flags` 清除已核对的阻断位，保留分轮地图选择位及其他无关位；`clear_words` 和 `clear_booleans` 指定其余已核对的门控字段。绑定挂载前校验全部别名及类型。较晚构建若不存在继承映射中的字段，会报告错误，不会借用基线偏移。
+
+`room_unchosen_map` 内的空值条目用于取消继承的字段，适用于后代版本重新定义 `GameSetting` 的情况；其余条目仍按后代版本的布局校验。
+
+`round_score_row_marker` 指定 modern 结算适配器为已入座记录填写的 `ScoreRow` 首字段，必须是该行开头的 `u32` 字段；这个别名不为未知字段赋予未经恢复的含义。等级和奖励使用共享字段名，线上顺序由各自封包表决定。结算尾部的条件字符串通过该表显式提供的默认门控值保持缺省。
+
+
+`builds.yaml` 的 `round_feed` 按动作标识配置原生 Opcode 名称、封包 `structure`、
+报告者身份字段（`actors`）及可选的发送者回显（`echo_sender`）。嵌套配置可以继承，
+其他版本仅覆盖差异属性；不存在的动作通过 `enabled: false` 显式关闭。这些协议数据不代表
+该版本已支持完整对局。游戏 C2S、中继 C2S、中继 S2C 分别从各自连接的表中查找，不假定编号相等。
+缺失名称、重复编号、与既有动作族冲突或身份字段不是完整整数字时，在发布服务之前报错。
+
+可选的 `life_event` 和 `life_actor` 将已验证的原生消息转换为共享生命处理器的事件。
+`finished` 还必须提供 `life_initiator`；`life_success` 控制报告是否成功，
+`life_death_flag` 区分直接死亡与进入泡泡。这些配置必须指向所选结构中类型正确的字段。
+`nested: true` 使用完整封包表读取器，并校验原生复活确认的缺省标签。
+基线动作的结构和报告者证据记录在 `round-feed.yaml`；伤害体创建消息和仅有写入证据的中继移动消息
+继续使用其各自已记录的处理方式。

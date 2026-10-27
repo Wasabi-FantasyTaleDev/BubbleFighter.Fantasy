@@ -1,10 +1,9 @@
 using BubbleFighter.Fantasy.Contracts.Inventory;
+using BubbleFighter.Fantasy.Contracts.Sessions;
 using BubbleFighter.Fantasy.Contracts.Shop;
 using BubbleFighter.Fantasy.Contracts.Wallet;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Shop.Data;
-using BubbleFighter.Fantasy.Shop.Dialects;
-using BubbleFighter.Fantasy.Shop.Wire;
 using Microsoft.Extensions.Logging;
 
 namespace BubbleFighter.Fantasy.Shop.Purchasing;
@@ -26,8 +25,11 @@ public sealed class ShopPurchaser(
     // A dialect supplies catalog term interpretation; the shared purchase path retains pricing and audit inputs.
     internal ItemPurchasePolicy? ItemPurchasePolicy { get; init; }
 
-    // The reply numbers, resolved by name from the build's opcode table; PurchaseAsync needs them.
-    internal ShopPacketNumbers? Packets { get; init; }
+    // The typed reply paths of the modern family; PurchaseAsync needs both.
+    internal IMessageSender<ShopPurchaseReplied>? ReplySender { get; init; }
+
+    // The typed balance publication; the modern family's sender writes the money snapshot.
+    internal IMessageSender<ShopBalanceUpdated>? BalanceSender { get; init; }
 
     /// <summary>
     /// Second <c>i32</c> of every 802/803 bag slot; kept
@@ -94,14 +96,14 @@ public sealed class ShopPurchaser(
     {
         if (purchases is null || push is null)
             throw new InvalidOperationException("Purchases require IShopPurchaseStore and IInventoryPushService.");
-        var packets = Packets ?? throw new InvalidOperationException("Purchases require the build's shop packet numbers.");
+        var reply = ReplySender ?? throw new InvalidOperationException("Purchases require the shop reply sender.");
+        var balance = BalanceSender ?? throw new InvalidOperationException("Purchases require the shop balance sender.");
 
         var card = catalog.FindPurchase(key);
         if (card is null)
         {
             logger.LogError("Session {Id} shop buy key={Key} not in catalog. gspRepShopBuy result=0.", session.Id, key);
-            await session.SendAsync(packets.ShopBuyReply, ShopWire.RepShopBuy(key, 0, string.Empty), ct)
-                .ConfigureAwait(false);
+            await reply.SendAsync(session, new(key, false), ct).ConfigureAwait(false);
             return;
         }
 
@@ -111,8 +113,7 @@ public sealed class ShopPurchaser(
             logger.LogError(
                 "Session {Id} shop buy key={Key} has no lobby identity (players row missing). gspRepShopBuy result=0; nothing persisted.",
                 session.Id, key);
-            await session.SendAsync(packets.ShopBuyReply, ShopWire.RepShopBuy(key, 0, card.Name), ct)
-                .ConfigureAwait(false);
+            await reply.SendAsync(session, new(key, false) { ReplyText = card.Name }, ct).ConfigureAwait(false);
             return;
         }
 
@@ -130,20 +131,16 @@ public sealed class ShopPurchaser(
         }
         if (result is null)
         {
-            await session.SendAsync(packets.ShopBuyReply, ShopWire.RepShopBuy(key, 0, string.Empty), ct)
-                .ConfigureAwait(false);
+            await reply.SendAsync(session, new(key, false), ct).ConfigureAwait(false);
             return;
         }
 
         // Inventory and money are published before the modal reply.
         // kr-1256 sub_9B6A19 passes the request key to sub_E4D6A0; an equipment id cannot resolve its Stock.
         await push.PushPurchaseAsync(session, user, result.Grants, ct).ConfigureAwait(false);
-        await session.SendAsync(
-            packets.UserMoneyStat, ShopWire.RepUserMoneyStat(result.Wallet), ct)
-            .ConfigureAwait(false);
-        await session.SendAsync(
-            packets.ShopBuyReply, ShopWire.RepShopBuy(key, 1, string.Empty), ct)
-            .ConfigureAwait(false);
+        await balance.SendAsync(session, new(
+            session.Feature<IPlayerSession>().Identity, result.Wallet), ct).ConfigureAwait(false);
+        await reply.SendAsync(session, new(key, true), ct).ConfigureAwait(false);
 
         logger.LogInformation(
             "Session {Id} shop buy key={Key} stockSet={Set} item={Item} price={Price} {Money}: charged, logged (slot {Slot}), gspRepShopBuy result=1, wallet + inventory pushed.",

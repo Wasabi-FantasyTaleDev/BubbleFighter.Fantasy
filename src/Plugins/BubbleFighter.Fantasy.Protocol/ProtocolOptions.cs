@@ -10,6 +10,14 @@ public sealed class ProtocolOptions
     [Required]
     public string OpcodeTablePath { get; set; } = "profiles/kr-1256/opcodes.yaml";
 
+    /// <summary>
+    /// Gets or sets the opcode table name of the client's mandatory first packet, the patch-request
+    /// slot. kr-1256 names that slot <c>gcpReqGamePatch</c>; every legacy build names the same slot
+    /// <c>gcpFirstConnect</c>. The handshake handler and the first-frame gate resolve it by this name.
+    /// </summary>
+    [Required]
+    public string PatchRequestName { get; set; } = "gcpReqGamePatch";
+
     /// <summary>Gets or sets whether an existing codec may use a logged unique catalog candidate when its exact name is absent from the runtime table.</summary>
     public bool UseCatalogCandidates { get; set; } = true;
 

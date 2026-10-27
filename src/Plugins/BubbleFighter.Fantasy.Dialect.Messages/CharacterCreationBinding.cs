@@ -19,6 +19,8 @@ internal sealed class CharacterCreationBinding(string protocol, IOpcodeTable opc
       IInboundMessageBinding<CharacterLoginRequested>, IMessageSender<CharacterCreationOpened>,
       IMessageSender<CharacterNameReplied>, IMessageSender<CharacterCreateReplied>
 {
+    private readonly DynamicConfigWire _configuration = new(tables, build);
+
     /// <summary>The S2C creation-opened names; the client reads no field of this frame on either family.</summary>
     internal static readonly string[] OpenNames = ["gspNotifyAutoTutorial_", "gspNotifyCreateUserInfo"];
 
@@ -37,6 +39,7 @@ internal sealed class CharacterCreationBinding(string protocol, IOpcodeTable opc
         _ = opcodes.S2C("gspRepCheckCreateUserName");
         _ = opcodes.S2C("gspRepCreateUserInfo");
         _ = opcodes.S2C(openName);
+        if (_configuration.HasCreationContent) _ = opcodes.S2C("gspRepDynamicConfig");
         context.Effect(context.Services.RegisterMany<IInboundMessageBinding<CharacterNameRequested>>(this));
         context.Effect(context.Services.RegisterMany<IInboundMessageBinding<CharacterCreateRequested>>(this));
         context.Effect(context.Services.RegisterMany<IInboundMessageBinding<CharacterLoginRequested>>(this));
@@ -98,9 +101,14 @@ internal sealed class CharacterCreationBinding(string protocol, IOpcodeTable opc
 
     // kr-812 sub_837170 sets the creation flag on S2C 12; cn-279 sub_6FFDE0 uses S2C 11. Neither client reads a
     // field, so both families send the zero-length body the table states, not a code-side assumption.
-    public ValueTask SendAsync(ISession session, CharacterCreationOpened message, CancellationToken ct) =>
-        session.SendAsync(opcodes.S2C(ResolveSingleName(OpenNames, PacketDirection.ServerToClient, "creation opened")),
-            Write("CharacterCreationOpened", new Dictionary<string, object?>(StringComparer.Ordinal)), ct);
+    public async ValueTask SendAsync(ISession session, CharacterCreationOpened message, CancellationToken ct)
+    {
+        // kr-1256 sub_53D410 reads the content when constructing the stage; a later reply cannot repair its form.
+        if (_configuration.HasCreationContent)
+            await session.SendAsync(opcodes.S2C("gspRepDynamicConfig"), _configuration.CreationSnapshot(), ct).ConfigureAwait(false);
+        await session.SendAsync(opcodes.S2C(ResolveSingleName(OpenNames, PacketDirection.ServerToClient, "creation opened")),
+            Write("CharacterCreationOpened", new Dictionary<string, object?>(StringComparer.Ordinal)), ct).ConfigureAwait(false);
+    }
 
     public ValueTask SendAsync(ISession session, CharacterNameReplied message, CancellationToken ct) =>
         session.SendAsync(opcodes.S2C("gspRepCheckCreateUserName"),

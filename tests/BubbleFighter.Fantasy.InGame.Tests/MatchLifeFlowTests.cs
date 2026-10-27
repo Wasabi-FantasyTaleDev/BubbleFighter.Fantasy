@@ -1,47 +1,17 @@
-using BubbleFighter.Fantasy.MatchRelay;
 using System.Buffers.Binary;
-using BubbleFighter.Fantasy.Abstractions.Protocol;
-using BubbleFighter.Fantasy.InGame.Dialects;
 using BubbleFighter.Fantasy.InGame.Sessions;
 using Xunit;
 
 namespace BubbleFighter.Fantasy.InGame.Tests;
 
+/// <summary>
+/// The typed round's life rules on the seats' own state: a pop that does not fit the rules scores nothing and
+/// sends nothing on any game connection, and a character reset is granted only to a dead, cleaned-up owner
+/// whose round is still running. Every case dispatches the client's own C2S frame through the round feed, so
+/// the reader's grammar is exercised with the flow's checks.
+/// </summary>
 public sealed partial class MatchActionRelayTests
 {
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task PangUpdatesBothPlayersOnceAndNativeResetAllowsTheNextLife(bool victimReports)
-    {
-        using var h = await LifeHarnessAsync();
-        await h.DispatchAsync(38281, BitConverter.GetBytes(1000000));
-        await h.DispatchAsync(38277, Pang(), victimReports ? h.Host : h.Guest);
-        await h.DispatchAsync(38277, Pang(), h.Guest);
-        Assert.Equal((ushort)1, h.Room.RedScore);
-        Assert.Equal(CharacterLife.Dead, h.HostState.Life);
-        foreach (var game in new[] { h.HostGame, h.GuestGame })
-        {
-            Assert.Equal(new ushort[] { 985, 985 }, game.Sent.Select(p => p.Opcode));
-            Assert.Equal(Convert.FromHexString("020100FFFF000000000000000000000000"), game.Sent[1].Body);
-        }
-        await h.DispatchAsync(32836, BitConverter.GetBytes(1000000));
-        var request = Convert.FromHexString("40420F00BABA00000000");
-        await h.DispatchAsync(602, request, h.HostGame, "kr-1256/game");
-        Assert.Equal((ushort)632, h.HostGame.Sent.Last().Opcode);
-        Assert.Equal(Convert.FromHexString("40420F00BABA0000000000000000"), h.HostGame.Sent.Last().Body);
-        Assert.Equal(CharacterLife.ResetPending, h.HostState.Life);
-        await h.DispatchAsync(602, request, h.HostGame, "kr-1256/game");
-        Assert.Single(h.HostGame.Sent, p => p.Opcode == 632);
-        await h.DispatchAsync(32926, ResetBody(false, false));
-        Assert.Equal(CharacterLife.Alive, h.HostState.Life);
-        Assert.False(h.HostState.DeathCleanupReceived);
-        Assert.Equal((ushort)32926, h.Guest.Sent.Last().Opcode);
-        await h.DispatchAsync(38281, BitConverter.GetBytes(1000000));
-        await h.DispatchAsync(38277, Pang(), h.Guest);
-        Assert.Equal((ushort)2, h.Room.RedScore);
-    }
-
     [Theory]
     [InlineData("alive")]
     [InlineData("same-team")]
@@ -52,11 +22,11 @@ public sealed partial class MatchActionRelayTests
     public async Task InvalidPangDoesNotAwardPoints(string state)
     {
         using var h = await LifeHarnessAsync();
-        h.HostState.Life = CharacterLife.Bubble;
+        h.HostSeat.Life = SeatLife.Bubble;
         var body = Pang();
         switch (state)
         {
-            case "alive": h.HostState.Life = CharacterLife.Alive; break;
+            case "alive": h.HostSeat.Life = SeatLife.Alive; break;
             case "same-team": h.GuestSeat.Team = h.HostSeat.Team; break;
             case "self": BinaryPrimitives.WriteInt32LittleEndian(body.AsSpan(4), 1100000); break;
             case "unknown-victim": BinaryPrimitives.WriteInt32LittleEndian(body.AsSpan(4), 1000004); break;
@@ -64,141 +34,88 @@ public sealed partial class MatchActionRelayTests
             case "unsuccessful": BinaryPrimitives.WriteInt32LittleEndian(body, 0); break;
         }
         await h.DispatchAsync(38277, body, h.Guest);
-        Assert.Equal((ushort)0, h.Room.RedScore);
+        Assert.Equal(0, h.Room.Scoring.TeamTotals[0] + h.Room.Scoring.TeamTotals[1]);
         Assert.Empty(h.GuestGame.Sent);
     }
 
+    /// <summary>
+    /// The typed grant follows the death presentation (kr-1256 sub_6F5E50), not the match link's state: a dead,
+    /// cleaned-up owner is granted even when its relay never finished registration or its main connection already
+    /// closed - the relay-era row refused both - because the grant rides the game connection and the pending
+    /// state only needs the relay link the confirmation will name.
+    /// </summary>
     [Theory]
     [InlineData("alive")]
     [InlineData("bubble")]
     [InlineData("no-cleanup")]
     [InlineData("result")]
-    [InlineData("relay-uninitialized")]
     [InlineData("relay-closed")]
-    [InlineData("main-closed")]
     [InlineData("other-mode")]
     [InlineData("relay-sender")]
-    [InlineData("unknown-entity")]
-    public async Task ResetRequiresAnInitializedDeadOwnerWithCleanup(string state)
+    [InlineData("uninitialized-relay-still-grants")]
+    [InlineData("closed-main-still-grants")]
+    public async Task ResetRequiresADeadOwnerWithCleanup(string state)
     {
         using var h = await LifeHarnessAsync();
-        h.HostState.Life = CharacterLife.Dead;
-        h.HostState.DeathCleanupReceived = true;
+        h.HostSeat.Life = SeatLife.Dead;
+        h.HostSeat.DeathCleaned = true;
         var sender = h.HostGame;
         var body = Convert.FromHexString("40420F00BABA00000000");
+        var granted = false;
         switch (state)
         {
-            case "alive": h.HostState.Life = CharacterLife.Alive; break;
-            case "bubble": h.HostState.Life = CharacterLife.Bubble; break;
-            case "no-cleanup": h.HostState.DeathCleanupReceived = false; break;
+            case "alive": h.HostSeat.Life = SeatLife.Alive; break;
+            case "bubble": h.HostSeat.Life = SeatLife.Bubble; break;
+            case "no-cleanup": h.HostSeat.DeathCleaned = false; break;
             case "result": h.Room.MarkResult(); break;
-            case "relay-uninitialized": h.HostSeat.RelayInitialized = false; break;
             case "relay-closed": await h.Host.Connection.CloseAsync("test"); break;
-            case "main-closed": await h.HostGame.Connection.CloseAsync("test"); break;
             case "other-mode": h.Room.ModeId = 7; break;
             case "relay-sender": sender = h.Host; break;
-            case "unknown-entity": BinaryPrimitives.WriteInt32LittleEndian(body, 1000004); break;
+            case "uninitialized-relay-still-grants": h.HostSeat.RelayInitialized = false; granted = true; break;
+            case "closed-main-still-grants": await h.HostGame.Connection.CloseAsync("test"); granted = true; break;
         }
         await h.DispatchAsync(602, body, sender, "kr-1256/game");
-        Assert.Empty(h.HostGame.Sent);
-        Assert.Empty(h.GuestGame.Sent);
-    }
-
-    [Fact]
-    public async Task ResetCannotImpersonateAnotherRegisteredPlayer()
-    {
-        using var h = await LifeHarnessAsync();
-        await Assert.ThrowsAsync<PacketFormatException>(() => h.DispatchAsync(602,
-            Convert.FromHexString("E0C81000BABA00000000"), h.HostGame, "kr-1256/game"));
-    }
-
-    [Theory]
-    [InlineData(false, false, 14)]
-    [InlineData(true, false, 18)]
-    [InlineData(false, true, 18)]
-    [InlineData(true, true, 22)]
-    public void ResetCodecPinsAllOptionalCombinationsAndRejectsMalformedBodies(bool first, bool second, int replyLength)
-    {
-        var action = ResetBody(first, second);
-        var request = action.Where((_, index) => index != action.Length - 5).ToArray();
-        Assert.Equal(1000000, MatchLife1256.ReadReset(request));
-        var reply = MatchLife1256.ResetReplyForTimedScore(request);
-        Assert.Equal(replyLength, reply.Length);
-        Assert.Equal(request, reply[..^4]);
-        Assert.Equal(new byte[4], reply[^4..]);
-        for (var length = 0; length < request.Length; length++)
-            Assert.Throws<PacketFormatException>(() => MatchLife1256.ReadReset(request[..length]));
-        Assert.Throws<PacketFormatException>(() => MatchLife1256.ReadReset([.. request, 0]));
-        request[4] = 0;
-        Assert.Throws<PacketFormatException>(() => MatchLife1256.ReadReset(request));
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task FailedResetCanRetryWithoutRollingBackANewerRound(bool newRound)
-    {
-        using var h = await LifeHarnessAsync();
-        h.HostState.Life = CharacterLife.Dead;
-        h.HostState.DeathCleanupReceived = true;
-        h.HostGame.BeforeSend = async () =>
+        if (granted)
         {
-            await Task.Yield();
-            if (newRound) { h.Room.ResetToWaiting(); h.Room.MarkStarting(); }
-            throw new IOException("test reset failure");
-        };
-        var request = Convert.FromHexString("40420F00BABA00000000");
-        await Assert.ThrowsAsync<IOException>(() => h.DispatchAsync(602, request, h.HostGame, "kr-1256/game"));
-        Assert.Equal(newRound ? CharacterLife.Alive : CharacterLife.Dead, h.HostState.Life);
-        if (!newRound)
+            Assert.Equal((ushort)632, Assert.Single(h.HostGame.Sent).Opcode);
+            Assert.Empty(h.GuestGame.Sent);
+        }
+        else
         {
-            h.HostGame.BeforeSend = null;
-            await h.DispatchAsync(602, request, h.HostGame, "kr-1256/game");
-            Assert.Single(h.HostGame.Sent);
+            Assert.Empty(h.HostGame.Sent);
+            Assert.Empty(h.GuestGame.Sent);
         }
     }
 
+    /// <summary>An actor no seat owns is dropped with a warning, while naming another seat's character is refused loudly.</summary>
     [Fact]
-    public async Task PendingResetCanBeRetriedAfterMatchTransportReplacement()
+    public async Task AResetNamingAnEntityNoSeatOwnsIsDroppedAndAnotherSeatsCharacterIsRefused()
     {
         using var h = await LifeHarnessAsync();
-        h.HostState.Life = CharacterLife.Dead;
-        h.HostState.DeathCleanupReceived = true;
-        var request = Convert.FromHexString("40420F00BABA00000000");
-        await h.DispatchAsync(602, request, h.HostGame, "kr-1256/game");
-        var replacement = await h.BindAsync(h.HostSeat, 60);
-        // The reset granted on the replaced transport is void, so the same request is granted again.
-        await h.DispatchAsync(602, request, h.HostGame, "kr-1256/game");
-        Assert.Equal(2, h.HostGame.Sent.Count);
-        await h.DispatchAsync(32926, ResetBody(false, false), replacement);
-        Assert.Equal(CharacterLife.Alive, h.HostState.Life);
-    }
-
-    [Fact]
-    public async Task SenderDepartureDuringPangFanoutDoesNotHideTheCommittedScore()
-    {
-        using var h = await LifeHarnessAsync();
-        h.HostState.Life = CharacterLife.Bubble;
-        h.Host.BeforeSend = () => { h.Registry.Release(h.Guest); return Task.CompletedTask; };
-        await h.DispatchAsync(38277, Pang(), h.Guest);
-        Assert.Equal((ushort)1, h.Room.RedScore);
-        Assert.Equal(2, h.HostGame.Sent.Count);
-        Assert.Equal(2, h.GuestGame.Sent.Count);
+        h.HostSeat.Life = SeatLife.Dead;
+        h.HostSeat.DeathCleaned = true;
+        var body = Convert.FromHexString("40420F00BABA00000000");
+        BinaryPrimitives.WriteInt32LittleEndian(body, 1000004);
+        await h.DispatchAsync(602, body, h.HostGame, "kr-1256/game");
+        Assert.Empty(h.HostGame.Sent);
+        BinaryPrimitives.WriteInt32LittleEndian(body, 1100000);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => h.DispatchAsync(602, body, h.HostGame, "kr-1256/game"));
+        Assert.Empty(h.HostGame.Sent);
     }
 
     [Fact]
     public async Task NewRoundClearsScoresAndLifeWithoutPublishingOldUpdates()
     {
         using var h = await LifeHarnessAsync();
-        h.HostState.Life = CharacterLife.Bubble;
+        h.HostSeat.Life = SeatLife.Bubble;
         h.Host.BeforeSend = () =>
         {
             h.Room.ResetToWaiting(); h.Room.MarkStarting();
             return Task.CompletedTask;
         };
         await h.DispatchAsync(38277, Pang(), h.Guest);
-        Assert.Equal((ushort)0, h.Room.RedScore);
-        Assert.Equal(CharacterLife.Alive, h.HostState.Life);
+        Assert.Equal(0, h.Room.Scoring.TeamTotals[0] + h.Room.Scoring.TeamTotals[1]);
+        Assert.Equal(SeatLife.Alive, h.HostSeat.Life);
         Assert.Empty(h.HostGame.Sent);
     }
 
