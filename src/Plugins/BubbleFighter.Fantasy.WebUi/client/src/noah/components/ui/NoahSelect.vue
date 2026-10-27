@@ -24,7 +24,9 @@
     </button>
 
     <!-- Dropdown Panel -->
-    <div v-if="isOpen" class="noah-select-dropdown glass-panel">
+    <Teleport to="body">
+    <Transition name="admin-select">
+    <div v-if="isOpen" ref="dropdownRef" class="noah-select-dropdown glass-panel" :style="dropdownStyle">
       <ul :id="listId" class="noah-select-list" role="listbox" :aria-labelledby="$attrs['aria-labelledby']" :aria-label="$attrs['aria-label'] || placeholder">
         <li
           v-for="(item, index) in options"
@@ -47,6 +49,8 @@
         </li>
       </ul>
     </div>
+    </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -82,6 +86,8 @@ const emit = defineEmits(['update:modelValue', 'change'])
 
 const selectRef = ref(null)
 const triggerRef = ref(null)
+const dropdownRef = ref(null)
+const dropdownStyle = ref({})
 const isOpen = ref(false)
 const activeIndex = ref(-1)
 const listId = `noah-select-${useId()}`
@@ -102,6 +108,7 @@ const toggleDropdown = () => {
 }
 
 function openDropdown() {
+  updatePosition()
   isOpen.value = true
   const selected = props.options.findIndex(o => o.value === props.modelValue && !o.disabled)
   setActive(selected >= 0 ? selected : props.options.findIndex(o => !o.disabled))
@@ -109,7 +116,33 @@ function openDropdown() {
 
 function setActive(index) {
   activeIndex.value = index
-  nextTick(() => selectRef.value?.querySelector(`[id="${listId}-${index}"]`)?.scrollIntoView({ block: 'nearest' }))
+  nextTick(() => {
+    const menu = dropdownRef.value
+    const option = menu?.querySelector(`[id="${listId}-${index}"]`)
+    if (!menu || !option) return
+    // Scroll only the popup; scrolling ancestors moves the entire settings page.
+    const item = option.getBoundingClientRect()
+    const bounds = menu.getBoundingClientRect()
+    if (item.top < bounds.top + 4) menu.scrollTop -= bounds.top + 4 - item.top
+    else if (item.bottom > bounds.bottom - 4) menu.scrollTop += item.bottom - bounds.bottom + 4
+  })
+}
+
+function updatePosition() {
+  const trigger = triggerRef.value
+  if (!trigger) return
+  const rect = trigger.getBoundingClientRect()
+  const above = Math.max(0, rect.top - 12)
+  const below = Math.max(0, window.innerHeight - rect.bottom - 12)
+  const upward = below < 220 && above > below
+  const height = Math.min(220, upward ? above : below)
+  const width = Math.min(rect.width, Math.max(0, window.innerWidth - 16))
+  dropdownStyle.value = {
+    left: `${Math.max(8, Math.min(rect.left, window.innerWidth - width - 8))}px`,
+    width: `${width}px`,
+    maxHeight: `${height}px`,
+    ...(upward ? { bottom: `${window.innerHeight - rect.top + 4}px` } : { top: `${rect.bottom + 4}px` })
+  }
 }
 
 function handleKeydown(event) {
@@ -148,28 +181,34 @@ const selectOption = (item) => {
   emit('update:modelValue', item.value)
   emit('change', item.value)
   isOpen.value = false
-  triggerRef.value?.focus()
+  triggerRef.value?.focus({ preventScroll: true })
 }
 
 function handleFocusOut(event) {
-  if (!selectRef.value?.contains(event.relatedTarget)) isOpen.value = false
+  if (!selectRef.value?.contains(event.relatedTarget) && !dropdownRef.value?.contains(event.relatedTarget)) isOpen.value = false
 }
 watch(() => props.disabled, value => { if (value) isOpen.value = false })
 watch(() => props.options, () => { if (isOpen.value) openDropdown() })
 
 const handleClickOutside = (e) => {
-  if (selectRef.value && !selectRef.value.contains(e.target)) {
+  if (selectRef.value && !selectRef.value.contains(e.target) && !dropdownRef.value?.contains(e.target)) {
     isOpen.value = false
   }
 }
 
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
+  window.addEventListener('resize', reposition)
+  document.addEventListener('scroll', reposition, true)
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
+  window.removeEventListener('resize', reposition)
+  document.removeEventListener('scroll', reposition, true)
 })
+
+function reposition() { if (isOpen.value) updatePosition() }
 </script>
 
 <style scoped>
@@ -237,14 +276,13 @@ onUnmounted(() => {
 
 /* Dropdown */
 .noah-select-dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  width: 100%;
+  position: fixed;
+  box-sizing: border-box;
   max-height: 220px;
   overflow-y: auto;
   border-radius: var(--radius-xs);
-  z-index: 300;
+  z-index: 2000;
+  overscroll-behavior: contain;
   padding: 4px;
   box-shadow: var(--shadow);
 }

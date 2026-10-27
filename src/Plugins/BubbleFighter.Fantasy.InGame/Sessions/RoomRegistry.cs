@@ -20,7 +20,7 @@ namespace BubbleFighter.Fantasy.InGame.Sessions;
 /// consults that classification to leave the reconnect-shaped C2S 3 alone.
 ///
 /// </summary>
-public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabilityDirectory
+public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabilityDirectory, IRoomAdminDirectory
 {
     private readonly ConcurrentDictionary<int, PlayRoom> _rooms = new();
     private readonly ConcurrentDictionary<long, int> _sessionToRoom = new();
@@ -35,6 +35,9 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
     private readonly ConcurrentDictionary<int, Task> _retiring = new();
     private readonly InGameOptions _options;
     private readonly ILogger _logger;
+
+    /// <inheritdoc />
+    public string ClientBuild => _options.GameProtocol.Split('/')[0];
     private int _nextId;
 
     // Room ids travel as the u16 SessionSetting+0 of list rows and room sessions, so they cycle
@@ -619,6 +622,42 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
     /// <param name="connectionId">The connection id.</param>
     public PlayRoom? FindByConnection(long connectionId) =>
         _connectionToSession.TryGetValue(connectionId, out var sessionId) ? TryGet(sessionId) : null;
+
+    /// <inheritdoc />
+    public ValueTask<IReadOnlyList<AdminRoomSnapshot>> ListAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var rooms = _rooms.Values.Select(room => Snapshot(room, includePassword: false))
+            .Where(room => room is not null).Cast<AdminRoomSnapshot>().OrderBy(room => room.RoomId).ToArray();
+        return ValueTask.FromResult<IReadOnlyList<AdminRoomSnapshot>>(rooms);
+    }
+
+    /// <inheritdoc />
+    public ValueTask<AdminRoomSnapshot?> GetAsync(int roomId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(_rooms.TryGetValue(roomId, out var room) ? Snapshot(room, includePassword: true) : null);
+    }
+
+    private AdminRoomSnapshot? Snapshot(PlayRoom room, bool includePassword)
+    {
+        lock (room.Gate)
+        {
+            if (room.Phase == RoomPhase.Closed) return null;
+            var players = room.Seats.Select(seat => new AdminRoomPlayer(seat.UserNum, seat.Nickname, seat.Level,
+                    seat.Team, seat.Ready, seat.Slot == room.MasterSlot, false))
+                .Concat(room.Bots.Select(bot => new AdminRoomPlayer(-1 - bot.Appearance.Slot, bot.Appearance.Nickname,
+                    bot.Appearance.Level, bot.Appearance.Team, bot.Appearance.Ready, false, true)))
+                .ToArray();
+            var owner = players.FirstOrDefault(player => player.Host)?.Nickname;
+            var clientBuild = room.Seats.FirstOrDefault()?.Game.Profile.Id ?? ClientBuild;
+            return new AdminRoomSnapshot(room.Id, room.RoomName, clientBuild,
+                room.ModeId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                string.IsNullOrEmpty(room.RoundMapKey) ? room.MapKey : room.RoundMapKey,
+                room.Phase.ToString(), players.Length, room.SeatCount, room.Password.Length > 0,
+                includePassword && room.Password.Length > 0 ? room.Password : null, owner, players);
+        }
+    }
 
     /// <summary>
     /// Stops the executor of every live room and waits for the shutdowns of already deleted rooms.

@@ -193,7 +193,7 @@ public sealed class PluginVersionTests
                 await action();
                 var info = Assert.Single(host.Instances);
                 Assert.StartsWith("1.0.0", info.Version);
-                Assert.Equal("8.15.0.0", info.ContractVersions["BubbleFighter.Fantasy.Abstractions"]);
+                Assert.Equal("8.16.0.0", info.ContractVersions["BubbleFighter.Fantasy.Abstractions"]);
                 Assert.Equal(["kr:1100-1256"], info.SupportedBuilds);
             }
             Assert.False(Activated.ContainsKey(row.Id));

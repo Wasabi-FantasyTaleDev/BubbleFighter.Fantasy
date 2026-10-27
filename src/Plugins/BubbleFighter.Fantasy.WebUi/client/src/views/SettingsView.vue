@@ -2,9 +2,13 @@
 import { computed, onMounted, ref } from 'vue'
 import NoahSelect from '../noah/components/ui/NoahSelect.vue'
 import NoahSwitch from '../noah/components/ui/NoahSwitch.vue'
+import NoahButton from '../noah/components/ui/NoahButton.vue'
+import { useRouter } from 'vue-router'
+import { useWebUiStore } from '../stores/webui'
 import { useNoahToast } from '../noah/components/ui/useNoahToast'
 import SectionCard from '../components/SectionCard.vue'
-import ClientDataSettings from '../components/ClientDataSettings.vue'
+// Client data is managed on the Builds page; kept here commented in case Settings needs it again.
+// import ClientDataSettings from '../components/ClientDataSettings.vue'
 import { useServerStore } from '../stores/server'
 import { api } from '../api/client'
 import { useI18n } from '../i18n'
@@ -15,6 +19,12 @@ const { t } = useI18n()
 const ui = useUiStore()
 const server = useServerStore()
 const toast = useNoahToast()
+const webui = useWebUiStore()
+const router = useRouter()
+function checkWebUi() {
+  if (webui.hasUpdate) router.push({ path: '/store', query: { plugin: webui.plugin.plugin } })
+  else webui.refresh()
+}
 
 // null means the server does not offer the setting (yet): the switch stays disabled.
 const crossVersion = ref(null)
@@ -66,7 +76,9 @@ const themeOptions = computed(() => [
 </script>
 
 <template>
+  <!-- Client data is managed on the Builds page.
   <ClientDataSettings v-if="server.installation && server.setupStatus?.clientDataDeferred" />
+  -->
   <SectionCard :title="t('settings.gameplay')">
     <div class="setting">
       <div class="setting-text">
@@ -104,4 +116,22 @@ const themeOptions = computed(() => [
       </div>
     </div>
   </SectionCard>
+  <SectionCard :title="t('settings.webui.title')">
+    <div class="setting">
+      <div class="setting-text">
+        <div class="setting-name">WebUI</div>
+        <div class="setting-desc">{{ t('settings.webui.description') }}</div>
+        <p v-if="webui.error" class="setting-desc" role="alert">{{ webui.error.message }}</p>
+        <p v-if="webui.catalogError" class="setting-desc" role="status">{{ t('settings.webui.checkFailed') }}: {{ webui.catalogError }}</p>
+      </div>
+      <div class="webui-version-controls">
+        <span class="mono" :title="webui.plugin?.version">{{ webui.plugin?.version?.split('+')[0] || t(webui.loading ? 'common.loading' : 'common.unavailable') }}</span>
+        <NoahButton :variant="webui.hasUpdate ? 'primary' : 'glass'" :loading="webui.loading" @click="checkWebUi">{{ webui.hasUpdate ? t('settings.webui.updateButton', { from: webui.plugin.version.split('+')[0], to: webui.availableVersion.split('+')[0] }) : t('settings.webui.check') }}</NoahButton>
+      </div>
+    </div>
+  </SectionCard>
 </template>
+
+<style scoped>
+.webui-version-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px; }
+</style>

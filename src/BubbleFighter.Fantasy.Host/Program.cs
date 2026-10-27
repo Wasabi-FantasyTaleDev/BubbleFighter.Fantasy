@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Diagnostics;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Kernel;
 using BubbleFighter.Fantasy.Loader.Native;
@@ -42,8 +43,10 @@ public static partial class Program
             // composition so ${VAR} / ${VAR:-default} can resolve.
             var envFile = args[0] == "start" ? null : RepoRootEnvFile.Apply();
             var logLevel = ParseLogLevel(args);
+            var logFeed = new ServerLogFeed();
             using var loggerFactory = LoggerFactory.Create(builder => builder
                 .SetMinimumLevel(logLevel)
+                .AddProvider(logFeed)
                 .AddConsole(options =>
                 {
                     if (args[0] == "contracts") options.LogToStandardErrorThreshold = LogLevel.Trace;
@@ -60,8 +63,8 @@ public static partial class Program
 
             return args[0] switch
             {
-                "start" => await StartAsync(args[1..], openBrowser, loggerFactory, logger).ConfigureAwait(false),
-                "run" => await RunAsync(args[1..], loggerFactory, logger).ConfigureAwait(false),
+                "start" => await StartAsync(args[1..], openBrowser, loggerFactory, logger, logFeed).ConfigureAwait(false),
+                "run" => await RunAsync(args[1..], loggerFactory, logger, logFeed).ConfigureAwait(false),
                 "profiles" when args.Length > 1 && args[1] == "list" => ListProfiles(args[2..]),
                 "packets" when args.Length > 1 && args[1] is "show" or "diff" or "check" or "json" => Packets(args[1], args[2..]),
                 "plugins" when args.Length > 1 && args[1] == "list" => await ListPluginsAsync(args[2..], loggerFactory).ConfigureAwait(false),
@@ -79,7 +82,7 @@ public static partial class Program
         }
     }
 
-    private static async Task<int> RunAsync(string[] args, ILoggerFactory loggerFactory, ILogger logger)
+    private static async Task<int> RunAsync(string[] args, ILoggerFactory loggerFactory, ILogger logger, IServerLogFeed logFeed)
     {
         var options = ParseRunOptions(args);
         if (options.Profile is null)
@@ -98,8 +101,10 @@ public static partial class Program
         }
 
         var shutdown = new OwnedShutdownSignal();
+        var restartService = options.ManagedStdio ? null : new ServerRestartService(shutdown);
         ManagedStdioSession? managed = null;
         Exception? startupFailure = null;
+        var result = 1;
         ConsoleCancelEventHandler cancelHandler = (_, e) =>
         {
             e.Cancel = true;
@@ -130,9 +135,9 @@ public static partial class Program
             var bootstrapDirectory = Path.GetFullPath(options.BootstrapDir ?? Path.Combine(AppContext.BaseDirectory, "bootstrap"));
             var initial = BootstrapConfiguration.Compose(bootstrapDirectory, "run", inputs);
             var startup = new PluginStartupPlan(initial, rows);
-            var host = new PluginHost(startup, catalog, loggerFactory);
+            var host = new PluginHost(startup, catalog, loggerFactory, restartService, logFeed);
             var candidate = startup.InitialRows.Concat(startup.DeferredRows).ToArray();
-            return await RunServerAsync(host, candidate, logger, shutdown.Token, managed).ConfigureAwait(false);
+            result = await RunServerAsync(host, candidate, logger, shutdown.Token, managed).ConfigureAwait(false);
         }
         catch (Exception error)
         {
@@ -160,6 +165,28 @@ public static partial class Program
                 ReportSecondaryFailure("server cancellation", cancellationError);
             }
             if (startupFailure is null && managedFailure is not null) throw managedFailure;
+        }
+        return shutdown.RestartRequested ? RestartProcess() : result;
+    }
+
+    private static int RestartProcess()
+    {
+        if (Environment.ProcessPath is not { Length: > 0 } executable)
+        {
+            Console.Error.WriteLine("error: the current process path is unavailable; server restart was not completed.");
+            return 1;
+        }
+        try
+        {
+            var start = new ProcessStartInfo(executable) { UseShellExecute = false, WorkingDirectory = Environment.CurrentDirectory };
+            foreach (var argument in Environment.GetCommandLineArgs().Skip(1)) start.ArgumentList.Add(argument);
+            _ = Process.Start(start) ?? throw new InvalidOperationException("The replacement server process did not start.");
+            return 0;
+        }
+        catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception or IOException)
+        {
+            Console.Error.WriteLine($"error: server restart failed: {error.Message}");
+            return 1;
         }
     }
 

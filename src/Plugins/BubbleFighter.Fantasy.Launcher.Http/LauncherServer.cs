@@ -92,7 +92,7 @@ public sealed class LauncherServer : IAsyncDisposable
             options.HostPolicy, region = options.Region.Length == 0 ? null : options.Region, options.SupportsInstances, options.SupportsPlugins, options.LevelIcon,
             profileFields = new[] { "level", "lucci", "cash" },
             presentation = presence.Presentation(),
-            policy.MinimumLauncherVersion, policy.PluginRecommendations,
+            policy.MinimumLauncherVersion, clientPolicy = policy.ClientPolicy,
             instances = options.Instances.Select(instance => CatalogInstance(instance, context.Request.Host.Host)),
         }));
         app.MapGet("/v1/players", () =>
@@ -285,7 +285,7 @@ public sealed class LauncherServer : IAsyncDisposable
     {
         accessToken = grant.AccessToken, accessExpiresAt = grant.AccessExpiresAt.UtcDateTime,
         refreshToken = grant.RefreshToken, refreshExpiresAt = grant.RefreshExpiresAt.UtcDateTime, account = profile,
-        policy.MinimumLauncherVersion, policy.PluginRecommendations,
+        policy.MinimumLauncherVersion, clientPolicy = policy.ClientPolicy,
     });
     private static string RefreshToken(JsonElement body)
     {
@@ -309,7 +309,7 @@ public sealed class LauncherServer : IAsyncDisposable
     }
     private static string Password(JsonElement body)
     {
-        if (!body.TryGetProperty("password", out var value) || value.ValueKind != JsonValueKind.String || value.GetString()!.Length is < 1 or > 256) throw new InvalidDataException();
+        if (!body.TryGetProperty("password", out var value) || value.ValueKind != JsonValueKind.String || value.GetString()!.Length == 0) throw new InvalidDataException();
         return value.GetString()!;
     }
     private static string HashPassword(string password, int iterations)

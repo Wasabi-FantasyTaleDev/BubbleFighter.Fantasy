@@ -26,7 +26,7 @@ public static partial class Program
                 + $"{WindowsPackagePathLimit}. Move the folder to a shorter location such as C:\\BubbleFighterFantasy and start it again.");
     }
 
-    private static async Task<int> StartAsync(string[] args, bool openBrowser, ILoggerFactory loggerFactory, ILogger logger)
+    private static async Task<int> StartAsync(string[] args, bool openBrowser, ILoggerFactory loggerFactory, ILogger logger, IServerLogFeed logFeed)
     {
         string? stateDirectory = Environment.GetEnvironmentVariable("BFF_STATE_DIR");
         var patches = new List<string>();
@@ -66,20 +66,22 @@ public static partial class Program
         var startup = new PluginStartupPlan(initial, deferred);
         var candidate = startup.InitialRows.Concat(startup.DeferredRows).ToArray();
         session.CaptureShell(candidate);
-        var host = new PluginHost(startup, catalog, loggerFactory);
         var shutdown = new OwnedShutdownSignal();
+        var host = new PluginHost(startup, catalog, loggerFactory, new ServerRestartService(shutdown), logFeed);
+        var result = 1;
         ConsoleCancelEventHandler cancel = (_, e) => { e.Cancel = true; shutdown.RequestCancellation(); };
         Console.CancelKeyPress += cancel;
         try
         {
             using var sigterm = PosixSignalRegistration.Create(PosixSignal.SIGTERM, c => { c.Cancel = true; shutdown.RequestCancellation(); });
             using var sigint = PosixSignalRegistration.Create(PosixSignal.SIGINT, c => { c.Cancel = true; shutdown.RequestCancellation(); });
-            return await RunServerAsync(host, candidate, logger, shutdown.Token, null, session.MarkReady).ConfigureAwait(false);
+            result = await RunServerAsync(host, candidate, logger, shutdown.Token, null, session.MarkReady).ConfigureAwait(false);
         }
         finally
         {
             Console.CancelKeyPress -= cancel;
             await shutdown.CompleteAsync().ConfigureAwait(false);
         }
+        return shutdown.RestartRequested ? RestartProcess() : result;
     }
 }

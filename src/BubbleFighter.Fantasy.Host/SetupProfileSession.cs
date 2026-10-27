@@ -39,11 +39,11 @@ internal sealed class SetupProfileSession : IInstallationRuntime, IPluginExecuti
     public void MarkReady() => _ready.TrySetResult();
     public Task WaitForBootstrapAsync(CancellationToken cancellationToken) => _ready.Task.WaitAsync(cancellationToken);
 
-    public ValueTask ApplyAsync(InstallationSettings settings, IReadOnlyDictionary<string, object?> databaseConfig,
+    public ValueTask ApplyAsync(InstallationSettings settings, IReadOnlyDictionary<string, object?> databaseConfig, string administrator,
         CancellationToken cancellationToken) =>
-        (_dispatcher ?? throw new InvalidOperationException("Profile adapter is not active.")).ApplyAsync(settings, databaseConfig, cancellationToken);
+        (_dispatcher ?? throw new InvalidOperationException("Profile adapter is not active.")).ApplyAsync(settings, databaseConfig, administrator, cancellationToken);
 
-    private async ValueTask ApplyCoreAsync(InstallationSettings settings, IReadOnlyDictionary<string, object?> databaseConfig,
+    private async ValueTask ApplyCoreAsync(InstallationSettings settings, IReadOnlyDictionary<string, object?> databaseConfig, string administrator,
         CancellationToken cancellationToken)
     {
         var host = _host ?? throw new InvalidOperationException("Profile adapter is not active.");
@@ -92,7 +92,8 @@ internal sealed class SetupProfileSession : IInstallationRuntime, IPluginExecuti
         var providers = runtime.Where(r => !r.Disabled && (r.Id is "persistence.mysql" or "persistence.sqlite" or "persistence.memory")).ToArray();
         if (providers.Length != 1 || providers[0].Id != "persistence." + settings.DatabaseKind)
             throw new ConfigException("Runtime patches conflict with the installation's durable database selection.");
-        runtime = SetupClientPluginConfiguration.Apply(runtime, settings.ClientPlugins);
+        runtime = SetupClientPolicyConfiguration.Apply(runtime, settings.ClientPolicy);
+        runtime = SetupAdministratorPermissions.Apply(runtime, administrator);
         var shellIds = _shell.Select(r => r.Id).ToHashSet(StringComparer.Ordinal);
         var candidate = _shell.Concat(runtime.Where(r => !shellIds.Contains(r.Id))).ToArray();
         var result = await host.ReconcileConfigurationAsync(candidate, cancellationToken).ConfigureAwait(false);
@@ -105,7 +106,6 @@ internal sealed class SetupProfileSession : IInstallationRuntime, IPluginExecuti
         {
             // JSON is a YAML subset; this derived file contains placeholders, never database credentials.
             var bytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(operations);
-            if (bytes.Length > 65536) throw new ConfigException("Installation overlay exceeds its format bound.");
             var temporary = overlay + ".next";
             foreach (var path in new[] { overlay, temporary })
                 if (File.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
@@ -200,7 +200,7 @@ internal sealed class SetupProfileSession : IInstallationRuntime, IPluginExecuti
     // has independent execution context and always retains the shell rows, so it cannot unload its caller.
     private sealed class Dispatcher : IAsyncDisposable
     {
-        private sealed record Request(InstallationSettings Settings, IReadOnlyDictionary<string, object?> Database,
+        private sealed record Request(InstallationSettings Settings, IReadOnlyDictionary<string, object?> Database, string Administrator,
             CancellationToken Cancellation, TaskCompletionSource Completion);
         private readonly SetupProfileSession _session;
         private readonly CancellationTokenSource _stopping;
@@ -216,12 +216,12 @@ internal sealed class SetupProfileSession : IInstallationRuntime, IPluginExecuti
             else { using (ExecutionContext.SuppressFlow()) _worker = Task.Run(WorkAsync); }
         }
 
-        public async ValueTask ApplyAsync(InstallationSettings settings, IReadOnlyDictionary<string, object?> database,
+        public async ValueTask ApplyAsync(InstallationSettings settings, IReadOnlyDictionary<string, object?> database, string administrator,
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            if (!_requests.Writer.TryWrite(new(settings, database, cancellationToken, completion)))
+            if (!_requests.Writer.TryWrite(new(settings, database, administrator, cancellationToken, completion)))
                 throw new InvalidOperationException("The profile adapter is busy or closing.");
             await completion.Task.ConfigureAwait(false);
         }
@@ -235,7 +235,7 @@ internal sealed class SetupProfileSession : IInstallationRuntime, IPluginExecuti
                     using var linked = CancellationTokenSource.CreateLinkedTokenSource(_stopping.Token, request.Cancellation);
                     try
                     {
-                        await _session.ApplyCoreAsync(request.Settings, request.Database, linked.Token).ConfigureAwait(false);
+                        await _session.ApplyCoreAsync(request.Settings, request.Database, request.Administrator, linked.Token).ConfigureAwait(false);
                         request.Completion.TrySetResult();
                     }
                     catch (OperationCanceledException) when (linked.IsCancellationRequested) { request.Completion.TrySetCanceled(linked.Token); }

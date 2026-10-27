@@ -153,9 +153,9 @@ public sealed class PluginBoundaryTests
         Assert.All(plugins, plugin =>
         {
             Assert.StartsWith(plugin.Id == "fighters" ? "2.0.0" : "1.0.0", plugin.Version);
-            Assert.Equal("8.15.0.0", plugin.ContractVersions["BubbleFighter.Fantasy.Abstractions"]);
+            Assert.Equal("8.16.0.0", plugin.ContractVersions["BubbleFighter.Fantasy.Abstractions"]);
             Assert.All(plugin.ContractVersions, pair => Assert.Equal(
-                pair.Key == "BubbleFighter.Fantasy.Contracts" ? contractsVersion : "8.15.0.0", pair.Value));
+                pair.Key == "BubbleFighter.Fantasy.Contracts" ? contractsVersion : "8.16.0.0", pair.Value));
         });
         // Shared plugins name no client builds: a build is added with profile and packet-table data alone.
         Assert.All(new[] { "protocol", "dialect", "lobby", "ingame", "shop", "equipment", "inventoryview", "centers",

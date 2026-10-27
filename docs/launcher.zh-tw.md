@@ -231,14 +231,34 @@ hook 的預期工作方式：
 | `registration_enabled` | 啟動器帳號是否可以註冊。 | `true` |
 | `create_account_on_login` | 以未知名稱登入時是否以所填密碼建立該帳號，讓玩家不必註冊。名稱輸錯會建立新帳號。 | `false` |
 | `minimum_launcher_version` | 註冊、登入、更新與票據簽發所需的最低啟動器 SemVer。留空則停用閘門。 | 空 |
-| `plugin_recommendations` | 最多 64 條策略，每條包含識別碼、可選的精確版本及必選／停用旗標；不包含 URL 或路徑。 | 空 |
+| `client_policy` | 傳送給啟動器的商店來源與依模組的型別化規則，見[用戶端策略](#client-policy)。 | 空 |
 | `session_seconds` / `refresh_session_seconds` | 存取權杖與可續期工作階段的有效期限（秒）。 | 1800 / 2592000 |
 | `ticket_seconds` | 啟動票據有效期限（秒）。 | 600 |
 | `requests_per_minute` / `max_concurrent_requests` | 全域請求額度與並行 API 工作數。 | 120 / 8 |
 | `max_body_bytes` / `max_connections` | 請求主體與連線上限。 | 16384 / 128 |
 | `instances` | 目錄中公布的用戶端預設，最多 64 個。 | 空 |
 
-`plugin_recommendations` 項目包含 `id`、可選的 `builds` 清單（為空表示所有版本）、`required` 和 `disabled`。推薦為 false/false，必選為 true/false，停用為 false/true。同一識別碼的必選與停用範圍不得重疊，包括所有版本的規則。僅相同策略狀態可以合併，同時保留正確的版本範圍。目錄與每個登入回應皆包含最低啟動器版本及這些規則。圖形化設定請參閱 [WebUI 用戶端模組策略](plugins.zh-tw.md#client-plugin-policy)。
+### 用戶端策略（`client_policy`） {#client-policy}
+
+用戶端策略告訴啟動器：連線至本伺服器啟動時，哪些模組必須使用、可以使用或不得使用。它包含兩份清單，項目數量不設上限：
+
+- `sources`：商店目錄，每個包含小寫的 `name`、`kind`（`http` 或 `alist`）、`base_url`（HTTP(S)，不含憑證、查詢或片段）與 `catalog_path`。
+- `plugins`：每個模組一個項目，包含商店 `id`、選用的 `name` 與 `description`（只在 WebUI 顯示，不會傳送給啟動器）以及它的 `rules`。
+
+每條規則有一個在所屬模組內唯一的 `id`、一個 `type`，以及選用的 `builds` 清單（為空表示所有版本）。規則類型如下：
+
+| 類型 | 欄位 | 啟動器的行為 |
+|---|---|---|
+| `require` | 無 | 模組安裝並啟用之前拒絕啟動，並提供安裝。 |
+| `disable` | 無 | 連線至本伺服器啟動時關閉該模組，不變更已儲存的選擇。版本本身要求的模組不能被關閉，此時拒絕啟動。 |
+| `recommend` | `sources` | 每個用戶端、每條規則推薦一次，從指定來源安裝（清單為空時允許任何已宣告的來源）。 |
+| `min_version` | `version` | 已啟用的模組低於此版本時，啟動前必須更新。 |
+| `max_version` | `version` | 已啟用的模組高於此版本時，改為安裝來源中允許的最高版本；沒有可用版本時拒絕啟動。 |
+| `latest` | 無 | 啟動前將已啟用的模組更新至最新版本。 |
+
+版本採用嚴格的 SemVer。同一模組的兩條規則在版本範圍重疊且符合下列任一條件時衝突：類型相同；其中一條是 `disable`；一條是 `latest`、另一條是 `max_version`；或 `min_version` 高於 `max_version`（兩者相等即鎖定單一版本）。存在衝突、格式錯誤或未知類型的規則時，該列無法啟動。不認得某個規則類型的啟動器會拒絕連線至本伺服器啟動，並提示玩家更新啟動器。
+
+目錄與每個登入回應都攜帶最低啟動器版本，以及名為 `clientPolicy` 的策略（`version`、`sources`、`plugins`）；規則的 `version` 或 `sources` 只在其類型需要時出現。玩家登入時收到的策略用於啟動；目錄中的副本只在登入前顯示。此策略設定的是相容的啟動器，不證明用戶端完整性，也不表示遊戲登入會檢查已載入的模組。管理 API 請參閱 [WebUI 用戶端策略](plugins.zh-tw.md#client-plugin-policy)。
 
 ### 用戶端預設（`instances`）
 
@@ -325,10 +345,20 @@ hook 的預期工作方式：
       name: "Example Community Server"
       region: "KR"
       minimum_launcher_version: "1.4.0"
-      plugin_recommendations:
-        - id: "bubblefighter.fantasy.kr1256-shop-gates"
-          builds: ["kr-1256"]
-          required: true
+      client_policy:
+        sources:
+          - name: "community"
+            kind: "http"
+            base_url: "https://store.example.com"
+            catalog_path: "FantasyTale/source.toml"
+        plugins:
+          - id: "bubblefighter.fantasy.kr1256-shop-gates"
+            rules:
+              - { id: "needed", type: "require", builds: ["kr-1256"] }
+              - { id: "floor", type: "min_version", builds: ["kr-1256"], version: "1.2.0" }
+          - id: "example.optional-overlay"
+            rules:
+              - { id: "offer", type: "recommend", sources: ["community"] }
       instances:
         - id: "kr-1256-main"
           build: "kr-1256"

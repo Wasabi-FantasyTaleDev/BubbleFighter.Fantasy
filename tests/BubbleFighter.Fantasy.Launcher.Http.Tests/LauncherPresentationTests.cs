@@ -212,6 +212,8 @@ public sealed class LauncherPresentationTests
     private sealed class Readiness : IHostReadiness
     {
         public bool IsReady { get; set; }
+        public bool IsMaintenance { get; private set; }
+        public void SetMaintenance(bool enabled) => IsMaintenance = enabled;
     }
 
     [Fact]

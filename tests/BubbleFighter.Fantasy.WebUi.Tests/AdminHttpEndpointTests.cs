@@ -179,6 +179,19 @@ public sealed partial class AdminHttpEndpointTests : IAsyncLifetime
         Assert.Equal("[]", (await sessions.Content.ReadAsStringAsync()).Trim());
     }
 
+    [Fact]
+    public async Task OperationalControlsRequireAnAdministrationIdentity()
+    {
+        using var health = JsonDocument.Parse(await _http.GetStringAsync("/api/health"));
+        Assert.True(health.RootElement.GetProperty("startedUtc").GetDateTime() <= DateTime.UtcNow);
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, (await _http.GetAsync("/api/maintenance")).StatusCode);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, (await _http.GetAsync("/api/rooms/kr-1256/1")).StatusCode);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, (await _http.PostAsync("/api/plugins/test/load", content: null)).StatusCode);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, (await _http.PostAsync("/api/plugins/test/unload", content: null)).StatusCode);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, (await _http.PostAsync("/api/plugins/test/disable", content: null)).StatusCode);
+    }
+
     [GeneratedRegex(@"assets/[^""']+\.js")]
     private static partial Regex AssetReference();
 }

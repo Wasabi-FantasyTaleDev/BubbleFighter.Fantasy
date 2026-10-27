@@ -20,6 +20,7 @@
     <Content Include="$(RepoRoot)profiles\**\*.yaml" Exclude="$(RepoRoot)profiles\**\local.patch.yaml" Link="profiles\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="$(RepoRoot)packets\**\*.yaml" Link="packets\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="$(RepoRoot)data\level-experience.csv" Link="data\level-experience.csv" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="$(RepoRoot)data\github-mirrors.json" Link="data\github-mirrors.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="$(RepoRoot)data\locales\*.json" Link="data\locales\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <!-- Make locally built plugins under artifacts/plugins visible to the default "plugins"

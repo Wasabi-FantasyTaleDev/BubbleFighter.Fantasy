@@ -17,7 +17,7 @@ public sealed class SqliteSetupPlugin : IPlugin
         return ValueTask.CompletedTask;
     }
 
-    private sealed class Database(ILogger logger, SqliteSetupOptions setup) : IInstallationDatabase
+    internal sealed class Database(ILogger logger, SqliteSetupOptions setup) : IInstallationDatabase
     {
         public string Kind => "sqlite";
 
@@ -27,7 +27,9 @@ public sealed class SqliteSetupPlugin : IPlugin
             var options = new SqliteOptions { DatabasePath = settings.SqlitePath, BusyTimeoutMs = setup.BusyTimeoutMs };
             if (options.Validate().Any()) throw new ArgumentException("sqlite_path_invalid");
             cancellationToken.ThrowIfCancellationRequested();
-            if (initialize)
+            // A running provider holds the lease and already owns the schema, so a reconfiguration of a live installation
+            // only proves the file is healthy and writable instead of opening a second owner.
+            if (initialize && !LeaseHeld(options.DatabasePath))
             {
                 using var database = new SqliteDatabase(options, logger);
             }
@@ -54,6 +56,15 @@ public sealed class SqliteSetupPlugin : IPlugin
             }
             cancellationToken.ThrowIfCancellationRequested();
             return new Dictionary<string, object?> { ["database_path"] = settings.SqlitePath, ["busy_timeout_ms"] = setup.BusyTimeoutMs };
+        }
+
+        // The same lease file and sharing mode the provider takes, released at once when nobody holds it.
+        private static bool LeaseHeld(string path)
+        {
+            var lease = Path.GetFullPath(path) + ".lock";
+            if (!File.Exists(lease)) return false;
+            try { using var probe = new FileStream(lease, FileMode.Open, FileAccess.ReadWrite, FileShare.None); return false; }
+            catch (IOException) { return true; }
         }
     }
 }

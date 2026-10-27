@@ -42,7 +42,7 @@ public sealed class LauncherPolicyTests
         var grant = await fixture.LoginAsync(null);
         Assert.Equal("tester", grant.GetProperty("account").GetProperty("username").GetString());
         Assert.Equal(JsonValueKind.Null, grant.GetProperty("minimumLauncherVersion").ValueKind);
-        Assert.Empty(grant.GetProperty("pluginRecommendations").EnumerateArray());
+        Assert.Empty(grant.GetProperty("clientPolicy").GetProperty("plugins").EnumerateArray());
     }
 
     [Theory]
@@ -210,19 +210,28 @@ public sealed class LauncherPolicyTests
     }
 
     [Fact]
-    public async Task PublicCatalogAndSessionEnvelopesPreserveEachIdentityPolicyScope()
+    public async Task CatalogLoginAndRefreshCarryTheSameClientPolicyWithoutManagementLabels()
     {
-        LauncherPluginRecommendation[] recommendations =
-        [
-            new() { Id = "plugin.scoped", Builds = ["build-z"], Required = false },
-            new() { Id = "plugin.scoped", Builds = ["build-a", "build-z"], Required = true },
-            new() { Id = "plugin.global", Builds = ["build-a"], Required = true },
-            new() { Id = "plugin.global", Builds = [], Required = false },
-        ];
-        await using var fixture = await Fixture.StartAsync("1.0.0", recommendations);
-        fixture.Http.DefaultRequestHeaders.Add(VersionHeader, "malformed-old-client");
+        var policy = new LauncherClientPolicyOptions
+        {
+            Sources = [new() { Name = "official", Kind = "alist", BaseUrl = "https://store.example.invalid", CatalogPath = "store/catalog.toml" }],
+            Plugins =
+            [
+                new()
+                {
+                    Id = "plugin.scoped", Name = "Label", Description = "Operator note",
+                    Rules =
+                    [
+                        new() { Id = "need", Type = "require", Builds = ["build-a"] },
+                        new() { Id = "off", Type = "disable", Builds = ["build-b"] },
+                        new() { Id = "offer", Type = "recommend", Builds = ["build-a"], Sources = ["official"] },
+                        new() { Id = "floor", Type = "min_version", Builds = ["build-a"], Version = "1.2.0" },
+                    ],
+                },
+            ],
+        };
+        await using var fixture = await Fixture.StartAsync("1.0.0", policy);
         var catalog = await fixture.Http.GetFromJsonAsync<JsonElement>("v1/catalog");
-        fixture.Http.DefaultRequestHeaders.Remove(VersionHeader);
         var login = await fixture.LoginAsync("1.0.0");
         using var refresh = await fixture.Http.PostAsJsonAsync("v1/auth/refresh", new { refreshToken = login.GetProperty("refreshToken").GetString(), launcherVersion = "1.0.0" });
         Assert.Equal(HttpStatusCode.OK, refresh.StatusCode);
@@ -230,93 +239,51 @@ public sealed class LauncherPolicyTests
         foreach (var envelope in new[] { catalog, login, renewed })
         {
             Assert.Equal("1.0.0", envelope.GetProperty("minimumLauncherVersion").GetString());
-            var plugins = envelope.GetProperty("pluginRecommendations").EnumerateArray().ToArray();
-            Assert.Equal(4, plugins.Length);
-            var scoped = Assert.Single(plugins, p => p.GetProperty("id").GetString() == "plugin.scoped" && p.GetProperty("required").GetBoolean());
-            Assert.Equal(["build-a", "build-z"], scoped.GetProperty("builds").EnumerateArray().Select(b => b.GetString()));
-            Assert.True(scoped.GetProperty("required").GetBoolean());
-            var global = Assert.Single(plugins, p => p.GetProperty("id").GetString() == "plugin.global" && !p.GetProperty("required").GetBoolean());
-            Assert.Empty(global.GetProperty("builds").EnumerateArray());
-            Assert.False(global.GetProperty("required").GetBoolean());
-            var scopedGlobal = Assert.Single(plugins, p => p.GetProperty("id").GetString() == "plugin.global" && p.GetProperty("required").GetBoolean());
-            Assert.Equal(["build-a"], scopedGlobal.GetProperty("builds").EnumerateArray().Select(build => build.GetString()));
-            Assert.All(plugins, p => Assert.Equal(["id", "builds", "required", "disabled"], p.EnumerateObject().Select(v => v.Name)));
-            Assert.All(plugins, p => Assert.False(p.GetProperty("disabled").GetBoolean()));
-        }
-    }
-
-    [Fact]
-    public async Task DisjointRequiredAndDisabledScopesSurviveCatalogLoginAndRefresh()
-    {
-        await using var fixture = await Fixture.StartAsync(recommendations:
-        [
-            new() { Id = "plugin.scoped", Builds = ["build-a"], Required = true },
-            new() { Id = "plugin.scoped", Builds = ["build-b"], Disabled = true },
-            new() { Id = "plugin.scoped", Builds = ["build-c"], Disabled = true },
-        ]);
-        var catalog = await fixture.Http.GetFromJsonAsync<JsonElement>("v1/catalog");
-        var login = await fixture.LoginAsync(null);
-        using var refresh = await fixture.Http.PostAsJsonAsync("v1/auth/refresh", new { refreshToken = login.GetProperty("refreshToken").GetString() });
-        Assert.Equal(HttpStatusCode.OK, refresh.StatusCode);
-        var renewed = await refresh.Content.ReadFromJsonAsync<JsonElement>();
-        foreach (var envelope in new[] { catalog, login, renewed })
-        {
-            var policies = envelope.GetProperty("pluginRecommendations").EnumerateArray().ToArray();
-            Assert.Equal(2, policies.Length);
-            var required = Assert.Single(policies, policy => policy.GetProperty("required").GetBoolean());
-            Assert.False(required.GetProperty("disabled").GetBoolean());
-            Assert.Equal(["build-a"], required.GetProperty("builds").EnumerateArray().Select(build => build.GetString()));
-            var disabled = Assert.Single(policies, policy => policy.GetProperty("disabled").GetBoolean());
-            Assert.False(disabled.GetProperty("required").GetBoolean());
-            Assert.Equal(["build-b", "build-c"], disabled.GetProperty("builds").EnumerateArray().Select(build => build.GetString()));
+            Assert.False(envelope.TryGetProperty("pluginRecommendations", out _));
+            var sent = envelope.GetProperty("clientPolicy");
+            Assert.Equal(["version", "sources", "plugins"], sent.EnumerateObject().Select(p => p.Name));
+            Assert.Equal(1, sent.GetProperty("version").GetInt32());
+            var source = Assert.Single(sent.GetProperty("sources").EnumerateArray());
+            Assert.Equal(["name", "kind", "baseUrl", "catalogPath"], source.EnumerateObject().Select(p => p.Name));
+            var plugin = Assert.Single(sent.GetProperty("plugins").EnumerateArray());
+            Assert.Equal(["id", "rules"], plugin.EnumerateObject().Select(p => p.Name));
+            var rules = plugin.GetProperty("rules").EnumerateArray().ToArray();
+            Assert.Equal(["need", "off", "offer", "floor"], rules.Select(r => r.GetProperty("id").GetString()));
+            Assert.Equal(["id", "type", "builds"], rules[0].EnumerateObject().Select(p => p.Name));
+            Assert.Equal(["id", "type", "builds", "sources"], rules[2].EnumerateObject().Select(p => p.Name));
+            Assert.Equal(["id", "type", "builds", "version"], rules[3].EnumerateObject().Select(p => p.Name));
+            Assert.Equal("1.2.0", rules[3].GetProperty("version").GetString());
         }
     }
 
     [Theory]
     [InlineData("minimum")]
-    [InlineData("long-version")]
     [InlineData("null-version")]
-    [InlineData("null-recommendations")]
+    [InlineData("null-policy")]
+    [InlineData("null-plugins")]
     [InlineData("null-entry")]
+    [InlineData("null-rule")]
     [InlineData("url-identity")]
-    [InlineData("path-identity")]
-    [InlineData("null-identity")]
-    [InlineData("long-identity")]
-    [InlineData("null-builds")]
-    [InlineData("null-build")]
-    [InlineData("path-build")]
-    [InlineData("too-many-entries")]
-    [InlineData("too-many-builds")]
-    [InlineData("merged-builds")]
-    [InlineData("required-disabled")]
-    [InlineData("overlap")]
-    [InlineData("required-wildcard")]
-    [InlineData("disabled-wildcard")]
+    [InlineData("unknown-type")]
+    [InlineData("conflict")]
+    [InlineData("unknown-source")]
     public async Task InvalidPolicyFailsBeforeListenerBinding(string scenario)
     {
         var options = Fixture.Options();
-        options.PluginRecommendations = [new() { Id = "plugin.id" }];
+        options.ClientPolicy = new() { Plugins = [new() { Id = "plugin.id", Rules = [new() { Id = "r1", Type = "require" }] }] };
+        var plugin = options.ClientPolicy.Plugins[0];
         switch (scenario)
         {
             case "minimum": options.MinimumLauncherVersion = "1.0"; break;
-            case "long-version": options.MinimumLauncherVersion = "1.0.0+" + new string('a', 123); break;
             case "null-version": options.MinimumLauncherVersion = null!; break;
-            case "null-recommendations": options.PluginRecommendations = null!; break;
-            case "null-entry": options.PluginRecommendations = [null!]; break;
-            case "url-identity": options.PluginRecommendations[0].Id = "https://example.invalid/plugin"; break;
-            case "path-identity": options.PluginRecommendations[0].Id = "../plugin"; break;
-            case "null-identity": options.PluginRecommendations[0].Id = null!; break;
-            case "long-identity": options.PluginRecommendations[0].Id = new string('a', 129); break;
-            case "null-builds": options.PluginRecommendations[0].Builds = null!; break;
-            case "null-build": options.PluginRecommendations[0].Builds = [null!]; break;
-            case "path-build": options.PluginRecommendations[0].Builds = ["../build"]; break;
-            case "too-many-entries": options.PluginRecommendations = Enumerable.Range(0, 65).Select(i => new LauncherPluginRecommendation { Id = $"plugin.{i}" }).ToArray(); break;
-            case "too-many-builds": options.PluginRecommendations[0].Builds = Enumerable.Range(0, 65).Select(i => $"build-{i}").ToArray(); break;
-            case "merged-builds": options.PluginRecommendations = [new() { Id = "same", Builds = Enumerable.Range(0, 64).Select(i => $"build-{i}").ToArray() }, new() { Id = "same", Builds = ["build-64"] }]; break;
-            case "required-disabled": options.PluginRecommendations[0].Required = true; options.PluginRecommendations[0].Disabled = true; break;
-            case "overlap": options.PluginRecommendations = [new() { Id = "same", Builds = ["build-a", "build-b"], Required = true }, new() { Id = "same", Builds = ["build-b", "build-c"], Disabled = true }]; break;
-            case "required-wildcard": options.PluginRecommendations = [new() { Id = "same", Required = true }, new() { Id = "same", Builds = ["build-a"], Disabled = true }]; break;
-            case "disabled-wildcard": options.PluginRecommendations = [new() { Id = "same", Builds = ["build-a"], Required = true }, new() { Id = "same", Disabled = true }]; break;
+            case "null-policy": options.ClientPolicy = null!; break;
+            case "null-plugins": options.ClientPolicy.Plugins = null!; break;
+            case "null-entry": options.ClientPolicy.Plugins = [null!]; break;
+            case "null-rule": plugin.Rules = [null!]; break;
+            case "url-identity": plugin.Id = "https://example.invalid/plugin"; break;
+            case "unknown-type": plugin.Rules[0].Type = "teleport"; break;
+            case "conflict": plugin.Rules = [.. plugin.Rules, new() { Id = "r2", Type = "disable" }]; break;
+            case "unknown-source": plugin.Rules = [new() { Id = "r1", Type = "recommend", Sources = ["missing"] }]; break;
         }
         await Assert.ThrowsAsync<ValidationException>(() => LauncherServer.StartAsync(options, new MemoryLauncherAccounts(10), new LauncherSessions(options, new MemoryLauncherSessions(10))));
     }
@@ -345,25 +312,46 @@ public sealed class LauncherPolicyTests
     }
 
     [Fact]
-    public void SnakeCaseConfigurationBindsPolicyAndAcceptsExactLimits()
+    public void SnakeCaseConfigurationBindsTheClientPolicy()
     {
         var config = new BubbleFighter.Fantasy.Kernel.PluginConfig(new BubbleFighter.Fantasy.Abstractions.PluginRow
         {
             Id = "launcher.http", Plugin = "launcher.http", Source = "test", Config = new Dictionary<string, object?>
             {
                 ["minimum_launcher_version"] = "1.2.3",
-                ["plugin_recommendations"] = new List<object?> { new Dictionary<string, object?> { ["id"] = "plugin.id", ["builds"] = new List<object?> { "build-a" }, ["required"] = true } },
+                ["client_policy"] = new Dictionary<string, object?>
+                {
+                    ["sources"] = new List<object?> { new Dictionary<string, object?> { ["name"] = "official", ["kind"] = "http", ["base_url"] = "https://store.example.invalid", ["catalog_path"] = "catalog.toml" } },
+                    ["plugins"] = new List<object?>
+                    {
+                        new Dictionary<string, object?>
+                        {
+                            ["id"] = "plugin.id",
+                            ["rules"] = new List<object?> { new Dictionary<string, object?> { ["id"] = "cap", ["type"] = "max_version", ["builds"] = new List<object?> { "build-a" }, ["version"] = "2.0.0" } },
+                        },
+                    },
+                },
             },
         });
         var options = config.Bind<LauncherOptions>();
         Assert.Equal("1.2.3", options.MinimumLauncherVersion);
-        var recommendation = Assert.Single(options.PluginRecommendations);
-        Assert.Equal("plugin.id", recommendation.Id);
-        Assert.Equal(["build-a"], recommendation.Builds);
-        Assert.True(recommendation.Required);
-        options.MinimumLauncherVersion = "1.0.0+" + new string('a', 122);
-        options.PluginRecommendations = Enumerable.Range(0, 64).Select(i => new LauncherPluginRecommendation { Id = i == 0 ? new string('a', 128) : $"plugin.{i}", Builds = Enumerable.Range(0, 64).Select(b => $"build-{b}").ToArray() }).ToArray();
+        Assert.Equal("https://store.example.invalid", Assert.Single(options.ClientPolicy.Sources).BaseUrl);
+        var rule = Assert.Single(Assert.Single(options.ClientPolicy.Plugins).Rules);
+        Assert.Equal(("cap", "max_version", "2.0.0"), (rule.Id, rule.Type, rule.Version));
+        Assert.Equal(["build-a"], rule.Builds);
         Assert.Empty(options.Validate());
+    }
+
+    [Fact]
+    public void TheRemovedRecommendationKeyIsAnUnknownKey()
+    {
+        var config = new BubbleFighter.Fantasy.Kernel.PluginConfig(new BubbleFighter.Fantasy.Abstractions.PluginRow
+        {
+            Id = "launcher.http", Plugin = "launcher.http", Source = "test",
+            Config = new Dictionary<string, object?> { ["plugin_recommendations"] = new List<object?>() },
+        });
+        var error = Assert.ThrowsAny<Exception>(() => config.Bind<LauncherOptions>());
+        Assert.Contains("plugin_recommendations", error.Message, StringComparison.Ordinal);
     }
 
     private static Dictionary<string, object> LoginBody(string? version)
@@ -383,11 +371,11 @@ public sealed class LauncherPolicyTests
             Listen = "127.0.0.1:0", PasswordIterations = 100000, AllowLegacyPasswordEnrollment = true,
             Instances = [new() { Id = "test-build", Build = "test-build", Name = [new() { Language = "en", Text = "Test build" }], Port = 7100, LauncherLogin = "optional" }],
         };
-        internal static async Task<Fixture> StartAsync(string minimum = "", LauncherPluginRecommendation[]? recommendations = null)
+        internal static async Task<Fixture> StartAsync(string minimum = "", LauncherClientPolicyOptions? policy = null)
         {
             var options = Options();
             options.MinimumLauncherVersion = minimum;
-            options.PluginRecommendations = recommendations ?? [];
+            options.ClientPolicy = policy ?? new();
             var accounts = new MemoryLauncherAccounts(10);
             await accounts.RegisterAsync("tester", "", default);
             var sessions = new LauncherSessions(options, new MemoryLauncherSessions(10));

@@ -321,12 +321,21 @@ Contracts 2.61.0은 네이티브 온라인 범위 등록을 추가합니다. `co
 `commands.management` 옵션은 `max_scopes`(등록 512개), `disconnect_notice_timeout_ms`(5000), `max_notice_characters`(511)입니다. 텍스트 예산은 낮출 수 있으며 상한은 클라이언트 알림 버퍼를 따릅니다. 서식 적용 후 사유가 너무 길면 전송이나 종료 전에 거부합니다. 범위 등록은 소유된 효과이며 호출은 등록 플러그인의 감독 수명 안에서 실행됩니다. 원격 SDK 등록은 네이티브 소유자와 콜백 전송 어댑터가 필요하므로 아직 지원하지 않습니다. 이 행은 kick, sudo, OP 영구 편집, 방 이동, WebUI 설정 또는 배포 스토어를 구현하지 않습니다.
 
 
-### 클라이언트 모드 실행 정책 {#client-plugin-policy}
+### 클라이언트 정책 {#client-plugin-policy}
 
-스토어 페이지에서 병합된 카탈로그의 클라이언트 모드 식별자를 선택하거나 직접 추가하고 추천, 필수 또는 사용 금지로 설정할 수 있습니다. 규칙은 호환 런처에 제공되며 클라이언트 파일을 서버에 설치하지 않습니다. 규칙마다 정확한 빌드를 선택할 수 있고 아무 빌드도 선택하지 않으면 모든 빌드에 적용됩니다. 프로필 모드는 원래 설정을 유지하고 빈 사용자 지정 목록은 추천을 명시적으로 제거합니다.
+WebUI는 설치된 서버의 [클라이언트 정책](launcher.ko.md#client-policy), 즉 스토어 소스와 플러그인별 유형 규칙을 편집합니다. 이 규칙은 호환 런처를 구성하며 클라이언트 파일은 서버에 설치되지 않습니다. 프로필 모드에서는 선택한 프로필의 정책을 사용합니다. 처음 변경을 저장하면 사용자 지정 정책으로 바뀌고, 프로필 모드로 복원하면 프로필 자체의 정책으로 돌아갑니다.
 
-`GET` 및 `PUT /api/setup/client-plugins`는 로그인한 WebUI 계정에 `webui.access`와 `webui.settings.client_plugins`가 모두 있어야 하며 `webui.admin`은 둘 다 부여합니다. 게임 OP는 WebUI 접근 권한을 부여하지 않습니다. PUT은 기존 동일 출처 요청 보호를 사용하고 `{"policies":[{"id":"example.plugin","builds":[],"required":false,"disabled":true}]}`를 받습니다. `{"policies":null}`은 프로필 정책 복원, `{"policies":[]}`는 정책 제거입니다. 규칙에는 스토어 식별자만 있으며 다운로드 URL이나 실행 파일 경로는 없습니다.
+모든 경로에는 `webui.access`와 `webui.settings.client_policy`를 모두 가진 로그인한 WebUI 계정이 필요하며 `webui.admin`은 둘 다 부여합니다. 게임 OP는 WebUI 접근 권한을 부여하지 않습니다.
 
-런처 카탈로그, 로그인 및 갱신 응답의 `pluginRecommendations`에는 `id`, `builds`, `required`, `disabled`가 포함됩니다. 추천은 false/false, 필수는 true/false, 사용 금지는 false/true입니다. 같은 식별자의 필수 및 사용 금지 규칙은 전체 빌드 규칙을 포함하여 같은 빌드에 겹칠 수 없습니다. 겹치지 않는 범위는 별도로 유지하며 특정 빌드의 필수 규칙이 전체 추천 때문에 다른 빌드로 확대되지 않습니다. 호환 런처가 정책을 적용하며 이 정보는 클라이언트 무결성이나 게임 로그인 시 로드된 모드 검증을 보장하지 않습니다.
+| 경로 | 용도 |
+|---|---|
+| `GET /api/setup/client-policy` | `mode`(`profile` 또는 `custom`), `revision`, 저장된 `policy`(프로필 모드에서는 null), 그리고 런처가 지금 받는 정책인 `active`를 반환합니다. |
+| `GET /api/setup/client-policy/rule-types` | 각 규칙 유형의 `name`, 양식 `field`(`none`, `version` 또는 `sources`), 충돌할 수 있는 유형 `conflicts`를 반환합니다. |
+| `PUT /api/setup/client-policy` | 정책 전체를 교체합니다: `{"policy":{"sources":[],"plugins":[]}}`. `{"policy":null}`은 프로필 정책으로 돌아갑니다. |
+| `PUT /api/setup/client-policy/sources` | 소스 목록만 교체합니다. |
+| `PUT /api/setup/client-policy/plugins/{id}` | 다른 플러그인은 그대로 두고 한 플러그인의 항목 `{"id":"{id}","name":null,"description":null,"rules":[...]}`을 교체합니다. |
+| `DELETE /api/setup/client-policy/plugins/{id}` | 한 플러그인의 항목을 삭제합니다. |
+
+쓰기 요청은 기존 동일 출처 요청 보호를 사용하며 편집한 `revision`을 `If-Match`로 보내야 합니다. 없으면 428로 거부되고, 이전 revision에 대한 쓰기는 현재 `revision`과 함께 409로 거부되므로 동시에 열린 두 편집기가 서로 덮어쓰지 않습니다. 프로필 모드에서의 부분 쓰기는 현재 적용 중인 정책을 기준으로 합니다. 거부된 정책은 `error`(`client_policy_invalid`, `client_policy_unknown_type`, `client_policy_unknown_source`, `client_policy_unknown_build` 또는 `client_policy_conflict`)와 알 수 있는 경우 `plugin`, `rule`, 충돌하는 `other` 규칙을 담아 400을 반환합니다. 규칙의 빌드는 `management`가 아닌 구성된 클라이언트 프로필이어야 합니다.
 
 변경은 데이터베이스, 계정, 보상 및 클라이언트 데이터 설정과 독립적으로 저장되고 기존 감독 설정 적용 절차로 실행됩니다. HTTP 202는 요청 수락만 뜻합니다. 적용 중 게임 서비스가 다시 연결될 수 있으며 설치 상태에 진행 상황과 실패가 표시됩니다. 기존 설정 절차로 수정하거나 다시 시도할 수 있습니다.

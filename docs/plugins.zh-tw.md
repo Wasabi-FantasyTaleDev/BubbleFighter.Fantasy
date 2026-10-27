@@ -321,12 +321,21 @@ Contracts 2.61.0 新增原生線上玩家範圍註冊。`commands.management` �
 `commands.management` 支援 `max_scopes`（512 個註冊）、`disconnect_notice_timeout_ms`（5000）、`max_notice_characters`（511）。文字預算可調低，上限來自原生通知緩衝區。格式化後的原因過長時，在傳送或關閉前拒絕執行。範圍註冊由模組效果管理，操作在註冊者受監督的生命週期內執行。遠端 SDK 尚無原生擁有者與回呼傳輸介接，不能宣稱指令註冊已與原生等效。本批不包含 kick、sudo、OP 持久化編輯、房間傳送、WebUI 設定或分發商店。
 
 
-### 用戶端模組啟動策略 {#client-plugin-policy}
+### 用戶端策略 {#client-plugin-policy}
 
-商店頁面可從合併後的目錄選擇用戶端模組識別碼，也可以手動新增，並設定推薦、必選或停用。規則提供給相容的啟動器，用戶端模組檔案不會安裝至伺服器。每條規則可勾選適用的版本；未勾選任何版本時適用於所有版本。沿用設定檔會保留原始策略，自訂清單為空時則明確清空推薦項目。
+WebUI 可以編輯已安裝伺服器的[用戶端策略](launcher.zh-tw.md#client-policy)：商店來源與依模組的型別化規則。這些規則設定的是相容的啟動器，用戶端檔案不會安裝至伺服器。沿用設定檔時，伺服器使用所選設定檔中的策略；第一次儲存修改後切換為自訂策略，還原沿用設定檔則回到設定檔本身的策略。
 
-`GET` 和 `PUT /api/setup/client-plugins` 要求已登入的 WebUI 帳號同時擁有 `webui.access` 與 `webui.settings.client_plugins`；`webui.admin` 可授予這兩項權限。遊戲 OP 不會取得 WebUI 存取權。PUT 使用現有同源請求保護，接受 `{"policies":[{"id":"example.plugin","builds":[],"required":false,"disabled":true}]}`。提交 `{"policies":null}` 還原設定檔策略，提交 `{"policies":[]}` 清空策略。規則僅包含商店識別碼，不包含下載網址或執行檔路徑。
+所有路由都要求已登入的 WebUI 帳號同時擁有 `webui.access` 與 `webui.settings.client_policy`；`webui.admin` 可授予這兩項權限。遊戲 OP 不會取得 WebUI 存取權。
 
-啟動器目錄、登入及更新回應透過 `pluginRecommendations` 提供 `id`、`builds`、`required` 與 `disabled`。推薦為 false/false，必選為 true/false，停用為 false/true。同一識別碼的必選與停用規則不得涵蓋相同版本，包括所有版本的規則。互不重疊的版本範圍分別保留；單一版本的必選規則不會因全域推薦擴大至其他版本。相容啟動器負責執行策略；這些中繼資料不證明用戶端完整性，也不表示遊戲登入會驗證已載入模組。
+| 路由 | 作用 |
+|---|---|
+| `GET /api/setup/client-policy` | 回傳 `mode`（`profile` 或 `custom`）、`revision`、已儲存的 `policy`（沿用設定檔時為 null）以及 `active`，即啟動器目前收到的策略。 |
+| `GET /api/setup/client-policy/rule-types` | 每種規則類型的 `name`、表單 `field`（`none`、`version` 或 `sources`）以及可能衝突的類型 `conflicts`。 |
+| `PUT /api/setup/client-policy` | 取代整個策略：`{"policy":{"sources":[],"plugins":[]}}`，或以 `{"policy":null}` 回到設定檔的策略。 |
+| `PUT /api/setup/client-policy/sources` | 只取代來源清單。 |
+| `PUT /api/setup/client-policy/plugins/{id}` | 取代一個模組的項目 `{"id":"{id}","name":null,"description":null,"rules":[...]}`，其他模組不變。 |
+| `DELETE /api/setup/client-policy/plugins/{id}` | 刪除一個模組的項目。 |
+
+寫入使用現有的同源請求保護，且必須在 `If-Match` 中傳送所編輯的 `revision`。缺少時回傳 428；依據舊版本的寫入回傳 409 並附上目前的 `revision`，兩個同時開啟的編輯器不會互相覆寫。沿用設定檔時的部分寫入以目前生效的策略為基礎。被拒絕的策略回傳 400，包含 `error`（`client_policy_invalid`、`client_policy_unknown_type`、`client_policy_unknown_source`、`client_policy_unknown_build` 或 `client_policy_conflict`），並在可得知時提供 `plugin`、`rule` 與衝突的 `other` 規則。規則的版本必須是已設定的、`management` 以外的用戶端設定檔。
 
 變更獨立於資料庫、帳號、獎勵及用戶端資料設定持久儲存，再使用現有受監督的設定套用流程。HTTP 202 僅表示受理。套用可能使遊戲服務重新連線，安裝狀態會顯示進度與失敗，可透過現有設定流程修正或重試。

@@ -26,6 +26,7 @@
       </span>
       <span v-if="subtext" class="noah-metric-subtext">{{ subtext }}</span>
     </div>
+    <slot name="action" />
   </div>
 </template>
 

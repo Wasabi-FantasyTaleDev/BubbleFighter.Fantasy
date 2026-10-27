@@ -19,6 +19,11 @@ public sealed class HostReadinessTests
             Assert.False(readiness.IsReady);
             host.MarkReady();
             Assert.True(readiness.IsReady);
+            readiness.SetMaintenance(true);
+            Assert.True(readiness.IsMaintenance);
+            Assert.False(readiness.IsReady);
+            readiness.SetMaintenance(false);
+            Assert.True(readiness.IsReady);
             host.MarkReady();
             Assert.True(readiness.IsReady);
         }

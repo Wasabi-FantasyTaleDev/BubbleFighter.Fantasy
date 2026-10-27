@@ -10,8 +10,8 @@ namespace BubbleFighter.Fantasy.Distribution;
 /// and GitHub repositories (release metadata through the REST API, catalog documents through raw
 /// content). Every document read is bounded by the configured byte budget and deadline, every URL is
 /// revalidated to stay credential-free, and HTTPS is never downgraded, including across redirects and
-/// AList's returned address. The GitHub mirror switch is not wired: enabling it fails here rather
-/// than pretending to accelerate anything. Source edits persist by optimistic revision: the state
+/// AList's returned address. With the GitHub mirror on, release attachments and archives are tried through the
+/// mirrors before GitHub itself; metadata is always read from GitHub. Source edits persist by optimistic revision: the state
 /// file is replaced through flush-to-disk plus rename under the settings gate, so a crash keeps the
 /// previous revision readable and a stale editor's save is refused instead of silently overwriting.
 /// </summary>
@@ -24,17 +24,18 @@ internal sealed partial class DistributionSources : IDistributionSources, IDistr
     private readonly long _maximumPayloadBytes;
     private readonly int _transferTimeoutMs;
     private readonly CancellationToken _lifetime;
+    private readonly GithubMirrors? _mirrors;
     private IReadOnlyList<DistributionSource> _sources;
     private readonly Lock _settingsGate = new();
     private readonly string? _statePath;
     private readonly int _maximumSources;
     private long _revision;
 
-    internal DistributionSources(HttpClient http, DistributionOptions options, CancellationToken lifetime = default)
+    internal DistributionSources(HttpClient http, DistributionOptions options, CancellationToken lifetime = default, GithubMirrors? mirrors = null)
     {
         ArgumentNullException.ThrowIfNull(options);
-        if (options.UseGithubMirror) throw new NotSupportedException("GitHub mirror support is TODO.");
         _http = http;
+        _mirrors = mirrors;
         _maximumBytes = options.MaximumDocumentBytes;
         _timeoutMs = options.RequestTimeoutMs;
         _redirects = options.MaximumRedirects;

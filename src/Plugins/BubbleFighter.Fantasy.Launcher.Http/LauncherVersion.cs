@@ -6,7 +6,7 @@ internal sealed class LauncherVersion(string[] release, string[]? prerelease) : 
     internal static bool TryParse(string? text, out LauncherVersion? version)
     {
         version = null;
-        if (text is null || text.Length is < 5 or > 128) return false;
+        if (text is null || text.Length < 5) return false;
         var metadata = text.Split('+');
         if (metadata.Length > 2 || metadata.Length == 2 && !Identifiers(metadata[1], false)) return false;
         var separator = metadata[0].IndexOf('-');

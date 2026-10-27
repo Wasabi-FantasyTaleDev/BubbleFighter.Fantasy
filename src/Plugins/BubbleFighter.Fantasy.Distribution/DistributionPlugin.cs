@@ -5,7 +5,7 @@ using BubbleFighter.Fantasy.Contracts.Distribution;
 namespace BubbleFighter.Fantasy.Distribution;
 
 /// <summary>Publishes catalog transports and release discovery as an ordinary owned plugin service.</summary>
-[Plugin("distribution.sources", Provides = [typeof(IDistributionSources), typeof(IDistributionTransport)])]
+[Plugin("distribution.sources", Provides = [typeof(IDistributionSources), typeof(IDistributionTransport), typeof(IDistributionGithubMirror)])]
 public sealed class DistributionPlugin : IPlugin
 {
     /// <inheritdoc />
@@ -14,7 +14,18 @@ public sealed class DistributionPlugin : IPlugin
         var options = context.Config.Bind<DistributionOptions>();
         var http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = Timeout.InfiniteTimeSpan };
         context.Effect(http);
-        var service = new DistributionSources(http, options, context.Lifetime);
+        GithubMirrors? mirrors = null;
+        if (options.GithubMirrorsPath is { Length: > 0 } path)
+        {
+            mirrors = new GithubMirrors(GithubMirrorConfiguration.Load(path), options.GithubMirrorStatePath);
+            context.Effect(mirrors);
+            // The one-time location check runs beside startup and stops with the row.
+            var detection = mirrors.DetectCountryAsync(context.Lifetime);
+            context.Effect(() => { try { detection.Wait(); } catch (AggregateException) { } });
+            context.Effect(context.Services.Register<IDistributionGithubMirror>(mirrors));
+        }
+        else context.Effect(context.Services.Register<IDistributionGithubMirror>(new NoGithubMirrors()));
+        var service = new DistributionSources(http, options, context.Lifetime, mirrors);
         context.Effect(context.Services.Register<IDistributionSources>(service));
         context.Effect(context.Services.Register<IDistributionTransport>(service));
         return ValueTask.CompletedTask;
@@ -48,8 +59,11 @@ public sealed class DistributionOptions
     /// <summary>Gets or sets the total deadline for a payload transfer, including source lookup and redirects.</summary>
     [Range(1, int.MaxValue)] public int TransferTimeoutMs { get; set; } = 1800000;
 
-    /// <summary>Gets or sets the reserved GitHub mirror option; enabling it fails until a provider exists.</summary>
-    public bool UseGithubMirror { get; set; }
+    /// <summary>Gets or sets the GitHub mirror list and measurement settings file; empty, the default, leaves the mirror feature off.</summary>
+    public string GithubMirrorsPath { get; set; } = "";
+
+    /// <summary>Gets or sets the file holding the mirror switch, selection and one-time location check; empty keeps them in memory.</summary>
+    public string GithubMirrorStatePath { get; set; } = "data/distribution-github-mirror.json";
 }
 
 /// <summary>Configures one credential-free HTTP, AList or GitHub catalog.</summary>
@@ -65,4 +79,16 @@ public sealed class DistributionSourceOptions
     [Required] public string BaseUrl { get; set; } = "";
     /// <summary>Gets or sets the catalog path relative to the transport root.</summary>
     [Required] public string CatalogPath { get; set; } = "source.toml";
+}
+
+/// <summary>The mirror service of a row without a mirror list: it lists nothing and refuses to be turned on.</summary>
+internal sealed class NoGithubMirrors : IDistributionGithubMirror
+{
+    public GithubMirrorState State { get; } = new(false, "auto", false, false);
+    public IReadOnlyList<GithubMirrorProvider> Providers { get; } = [];
+    public IReadOnlyList<GithubMirrorResult> Results { get; } = [];
+    public GithubMirrorState Save(bool? enabled, string? selection) => enabled == true || selection is not (null or "auto")
+        ? throw new ArgumentException("This server has no GitHub mirror list.") : State;
+    public GithubMirrorState MarkSuggestionShown() => State;
+    public Task MeasureAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }

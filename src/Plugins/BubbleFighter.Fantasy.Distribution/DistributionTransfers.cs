@@ -66,7 +66,31 @@ internal sealed partial class DistributionSources
         return deadline;
     }
 
+    // A GitHub payload tries the mirrors first, fastest measured first, and GitHub itself last. Every route is held to the
+    // same size and SHA-256 that GitHub published, so a mirror can only fail a download, never change what is staged.
     private async Task CopyVerifiedAsync(Uri address, long expectedSize, string sha256, Stream staging, CancellationToken token)
+    {
+        var routes = _mirrors is not null && GithubMirrors.IsPayload(address) && staging.CanSeek
+            ? await _mirrors.RoutesAsync(address, token).ConfigureAwait(false) : [];
+        var start = routes.Count > 0 ? staging.Position : 0;
+        foreach (var route in routes)
+        {
+            try
+            {
+                await CopyFromAsync(route, expectedSize, sha256, staging, _mirrors!.RequestTimeout, token).ConfigureAwait(false);
+                return;
+            }
+            catch (Exception error) when (!token.IsCancellationRequested &&
+                error is HttpRequestException or IOException or InvalidDataException or OperationCanceledException)
+            {
+                staging.SetLength(start);
+                staging.Position = start;
+            }
+        }
+        await CopyFromAsync(address, expectedSize, sha256, staging, null, token).ConfigureAwait(false);
+    }
+
+    private async Task CopyFromAsync(Uri address, long expectedSize, string sha256, Stream staging, TimeSpan? headerTimeout, CancellationToken token)
     {
         for (var redirects = 0; ; redirects++)
         {
@@ -75,7 +99,10 @@ internal sealed partial class DistributionSources
             using var request = new HttpRequestMessage(HttpMethod.Get, address);
             request.Headers.UserAgent.ParseAdd("BubbleFighter-Fantasy-Distribution/1.0");
             request.Headers.Accept.ParseAdd("application/octet-stream");
-            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token).ConfigureAwait(false);
+            // A mirror that does not answer within its deadline yields to the next route; the body keeps the transfer deadline.
+            using var headers = CancellationTokenSource.CreateLinkedTokenSource(token);
+            if (headerTimeout is { } limit) headers.CancelAfter(limit);
+            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, headers.Token).ConfigureAwait(false);
             if ((int)response.StatusCode is 301 or 302 or 303 or 307 or 308)
             {
                 if (redirects >= _redirects || response.Headers.Location is not { } location)
@@ -86,6 +113,8 @@ internal sealed partial class DistributionSources
                 continue;
             }
             response.EnsureSuccessStatusCode();
+            if (headerTimeout is not null && response.Content.Headers.ContentType?.MediaType == "text/html")
+                throw new InvalidDataException("The mirror answered with a web page.");
             if (response.Content.Headers.ContentLength is { } contentLength && contentLength != expectedSize)
                 throw new InvalidDataException("The payload Content-Length disagrees with the selected release.");
             await using var input = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false);

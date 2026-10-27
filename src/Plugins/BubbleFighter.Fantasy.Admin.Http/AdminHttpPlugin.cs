@@ -9,6 +9,7 @@ using BubbleFighter.Fantasy.Contracts.Admin;
 using BubbleFighter.Fantasy.Contracts.Administration;
 using BubbleFighter.Fantasy.Contracts.Distribution;
 using BubbleFighter.Fantasy.Contracts.Installation;
+using BubbleFighter.Fantasy.Contracts.Launcher;
 using BubbleFighter.Fantasy.Contracts.Listeners;
 using BubbleFighter.Fantasy.Contracts.Match;
 using BubbleFighter.Fantasy.Contracts.Rooms;
@@ -32,8 +33,10 @@ namespace BubbleFighter.Fantasy.Admin.Http;
     Requires = [typeof(IPluginHost)],
     Optional = [typeof(IClientProfileRegistry), typeof(IOpcodeTableRegistry), typeof(ISessionRegistry), typeof(IRoomStartService),
         typeof(IAdminWebContent), typeof(IBuildReleaseLabels), typeof(IMatchConnectionTracker),
-        typeof(IInstallationService), typeof(IAdminAccessControl), typeof(IPermissionService), typeof(IPermissionRegistry), typeof(IDistributionSources), typeof(IDistributionPlans), typeof(IDistributionPackages), typeof(IDistributionJobs)],
-    OptionalMany = [typeof(IListenerEndpoint)])]
+        typeof(IInstallationService), typeof(IClientPolicyView), typeof(IAdminAccessControl), typeof(IPermissionService), typeof(IPermissionRegistry),
+        typeof(IHostReadiness), typeof(IServerRestartService), typeof(IServerLogFeed), typeof(ICommandRegistry), typeof(ICommandExecutor),
+        typeof(IDistributionSources), typeof(IDistributionGithubMirror), typeof(IDistributionPlans), typeof(IDistributionPackages), typeof(IDistributionJobs)],
+    OptionalMany = [typeof(IListenerEndpoint), typeof(IRoomAdminDirectory)])]
 public sealed partial class AdminHttpPlugin : IPlugin
 {
     /// <inheritdoc />
@@ -46,8 +49,16 @@ public sealed partial class AdminHttpPlugin : IPlugin
         var ring = new LogRing(options.LogBuffer);
         var builder = WebApplication.CreateSlimBuilder();
         builder.Logging.ClearProviders();
+        // Per-request routing and result lines would bury the server's own log, and the console's polling makes
+        // one set every second; failures still arrive as warnings and errors.
+        builder.Logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
         builder.Logging.AddProvider(new ForwardingLoggerProvider(context.Logger));
-        builder.Logging.AddProvider(new RingLoggerProvider(ring));
+        // The console shows the whole process when the host offers its feed; this listener's own entries reach the
+        // feed through the forwarding provider, so the ring reads only the feed then.
+        if (context.Services.TryGet<IServerLogFeed>(out var feed) && feed is not null)
+            context.Effect(feed.Subscribe(ring.Append));
+        else
+            builder.Logging.AddProvider(new RingLoggerProvider(ring));
         // Enums travel by name so the web interface never has to know their numeric values.
         builder.Services.ConfigureHttpJsonOptions(json => json.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
         builder.WebHost.ConfigureKestrel(kestrel =>
@@ -86,24 +97,21 @@ public sealed partial class AdminHttpPlugin : IPlugin
         if (access is null)
             app.MapGet("/api/auth/status", () => Results.Ok(new { mode = "none", authenticated = true, installation = false }));
 
-        app.MapGet("/health", () => Results.Ok(new { status = "ok", utc = DateTime.UtcNow }));
+        app.MapGet("/health", () => Results.Ok(new { status = "ok", utc = DateTime.UtcNow, startedUtc = processStartedUtc }));
+        app.MapGet("/api/health", () => Results.Ok(new { status = "ok", utc = DateTime.UtcNow, startedUtc = processStartedUtc }));
 
         ConfigureDistribution(app, context);
-        ConfigureClientPluginPolicy(app, context);
+        ConfigureClientPolicy(app, context);
+        ConfigureOperationalEndpoints(app, context, host);
 
         app.MapGet("/api/plugins", () => Results.Ok(host.Instances));
 
-        app.MapPost("/api/plugins/{rowId}/reload", async (string rowId, CancellationToken ct) =>
+        app.MapPost("/api/plugins/{rowId}/reload", async (string rowId, HttpContext http, CancellationToken ct) =>
         {
-            try
-            {
-                var result = await host.ReloadAsync(rowId, ct).ConfigureAwait(false);
-                return Results.Ok(result);
-            }
-            catch (Exception ex)
-            {
-                return Results.Problem(ex.Message, statusCode: StatusCodes.Status409Conflict);
-            }
+            var denial = RequireAdmin(context, http, out _, PluginsManagePermission);
+            if (denial is not null) return denial;
+            return await RunTransitionAsync(context, async () => Results.Ok(await host.ReloadAsync(rowId, CancellationToken.None).ConfigureAwait(false)))
+                .ConfigureAwait(false);
         });
 
         app.MapGet("/api/profiles", () =>
@@ -142,14 +150,22 @@ public sealed partial class AdminHttpPlugin : IPlugin
             var profiles = context.Services.TryGet<IClientProfileRegistry>(out var registry) && registry is not null ? registry.All : [];
             var players = (context.Services.TryGet<ISessionRegistry>(out var sessions) && sessions is not null ? sessions.All : [])
                 .Where(s => !IsMatchBound(s)).ToArray();
-            int? rooms = context.Services.TryGet<IRoomStartService>(out var roomService) && roomService is not null
-                ? (await roomService.ListAsync(ct).ConfigureAwait(false)).Count
-                : null;
+            // Every InGame row publishes its build's room directory; the count is unknown only when no build runs one.
+            var directories = context.Services.GetAll<IRoomAdminDirectory>();
+            int? rooms = null;
+            if (directories.Count > 0)
+            {
+                rooms = 0;
+                foreach (var directory in directories) rooms += (await directory.ListAsync(ct).ConfigureAwait(false)).Count;
+            }
+            else if (context.Services.TryGet<IRoomStartService>(out var roomService) && roomService is not null)
+                rooms = (await roomService.ListAsync(ct).ConfigureAwait(false)).Count;
             var listeners = context.Services.GetAll<IListenerEndpoint>();
             var instances = host.Instances;
             return Results.Ok(new
             {
                 startedUtc = processStartedUtc,
+                maintenance = context.Services.TryGet<IHostReadiness>(out var maintenance) && maintenance is not null && maintenance.IsMaintenance,
                 players = players.Length,
                 rooms,
                 rows = new
@@ -196,14 +212,25 @@ public sealed partial class AdminHttpPlugin : IPlugin
         // endpoints 409 when no row publishes IRoomStartService.
         app.MapGet("/api/rooms", async (CancellationToken ct) =>
         {
+            var directories = context.Services.GetAll<IRoomAdminDirectory>();
+            if (directories.Count > 0)
+            {
+                var snapshots = new List<AdminRoomSnapshot>();
+                foreach (var directory in directories)
+                    snapshots.AddRange(await directory.ListAsync(ct).ConfigureAwait(false));
+                return Results.Ok(snapshots.OrderBy(room => room.ClientBuild, StringComparer.Ordinal)
+                    .ThenBy(room => room.RoomId).ToArray());
+            }
             if (!context.Services.TryGet<IRoomStartService>(out var rooms) || rooms is null)
                 return Results.Problem("IRoomStartService is not available.", statusCode: StatusCodes.Status503ServiceUnavailable);
             var live = await rooms.ListAsync(ct).ConfigureAwait(false);
             return Results.Ok(live.Select(r => new { roomId = r.RoomId, seats = r.Seats, phase = r.Phase }));
         });
 
-        app.MapPost("/api/rooms/{roomId}/start", async (int roomId, CancellationToken ct) =>
+        app.MapPost("/api/rooms/{roomId}/start", async (int roomId, HttpContext http, CancellationToken ct) =>
         {
+            var denial = RequireAdmin(context, http, out _);
+            if (denial is not null) return denial;
             if (!context.Services.TryGet<IRoomStartService>(out var rooms) || rooms is null)
                 return Results.Problem("IRoomStartService is not available.", statusCode: StatusCodes.Status503ServiceUnavailable);
             try

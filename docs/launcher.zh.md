@@ -231,14 +231,34 @@ hook 的预期工作方式：
 | `registration_enabled` | 启动器账号是否可以注册。 | `true` |
 | `create_account_on_login` | 用未知名称登录时是否以所填密码创建该账号，使玩家无需注册。名称输错会创建新账号。 | `false` |
 | `minimum_launcher_version` | 注册、登录、刷新与票据签发所需的最低启动器 SemVer。留空则禁用门禁。 | 空 |
-| `plugin_recommendations` | 最多 64 条策略，每条包含标识、可选的精确版本及必选／禁用标志；不包含 URL 或路径。 | 空 |
+| `client_policy` | 发送给启动器的商店来源和按插件的类型化规则，见[客户端策略](#client-policy)。 | 空 |
 | `session_seconds` / `refresh_session_seconds` | 访问令牌与可续期会话的有效期（秒）。 | 1800 / 2592000 |
 | `ticket_seconds` | 启动票据有效期（秒）。 | 600 |
 | `requests_per_minute` / `max_concurrent_requests` | 全局请求预算与并发 API 工作数。 | 120 / 8 |
 | `max_body_bytes` / `max_connections` | 请求体与连接上限。 | 16384 / 128 |
 | `instances` | 目录中公布的客户端预设，最多 64 个。 | 空 |
 
-`plugin_recommendations` 条目包含 `id`、可选的 `builds` 列表（为空表示所有版本）、`required` 和 `disabled`。推荐对应 false/false，必选对应 true/false，禁用对应 false/true。同一标识的必选和禁用范围不得重叠，包括所有版本的规则。只有相同策略状态可以合并，同时保留准确的版本范围。目录和每个登录响应都包含最低启动器版本及这些规则。图形化设置参见 [WebUI 客户端模组策略](plugins.zh.md#client-plugin-policy)。
+### 客户端策略（`client_policy`） {#client-policy}
+
+客户端策略告诉启动器：连接本服务器启动时，哪些插件必须使用、可以使用或不得使用。它包含两个列表，条目数量不设上限：
+
+- `sources`：商店目录，每个包含小写的 `name`、`kind`（`http` 或 `alist`）、`base_url`（HTTP(S)，不含凭据、查询或片段）和 `catalog_path`。
+- `plugins`：每个插件一个条目，包含商店 `id`、可选的 `name` 和 `description`（只在 WebUI 中显示，不会发送给启动器）以及它的 `rules`。
+
+每条规则有一个在所属插件内唯一的 `id`、一个 `type`，以及可选的 `builds` 列表（为空表示所有版本）。规则类型如下：
+
+| 类型 | 字段 | 启动器的行为 |
+|---|---|---|
+| `require` | 无 | 插件安装并启用之前拒绝启动，并提供安装。 |
+| `disable` | 无 | 连接本服务器启动时关闭该插件，不改变已保存的选择。版本本身要求的插件不能被关闭，此时拒绝启动。 |
+| `recommend` | `sources` | 每个客户端、每条规则推荐一次，从指定来源安装（列表为空时允许任何已声明的来源）。 |
+| `min_version` | `version` | 已启用的插件低于此版本时，启动前必须更新。 |
+| `max_version` | `version` | 已启用的插件高于此版本时，改为安装来源中允许的最高版本；没有可用版本时拒绝启动。 |
+| `latest` | 无 | 启动前把已启用的插件更新到最新版本。 |
+
+版本使用严格的 SemVer。同一插件的两条规则在版本范围重叠且满足以下任一条件时冲突：类型相同；其中一条是 `disable`；一条是 `latest`、另一条是 `max_version`；或 `min_version` 高于 `max_version`（两者相等即锁定一个版本）。存在冲突、格式错误或未知类型的规则时，该行无法启动。不认识某个规则类型的启动器会拒绝连接本服务器启动，并提示玩家更新启动器。
+
+目录和每个登录响应都携带最低启动器版本，以及名为 `clientPolicy` 的策略（`version`、`sources`、`plugins`）；规则的 `version` 或 `sources` 只在其类型需要时出现。玩家登录时收到的策略用于启动；目录中的副本只在登录前显示。该策略配置的是兼容的启动器，不证明客户端完整性，也不表示游戏登录会检查已加载的模组。管理 API 参见 [WebUI 客户端策略](plugins.zh.md#client-plugin-policy)。
 
 ### 客户端预设（`instances`）
 
@@ -325,10 +345,20 @@ hook 的预期工作方式：
       name: "Example Community Server"
       region: "KR"
       minimum_launcher_version: "1.4.0"
-      plugin_recommendations:
-        - id: "bubblefighter.fantasy.kr1256-shop-gates"
-          builds: ["kr-1256"]
-          required: true
+      client_policy:
+        sources:
+          - name: "community"
+            kind: "http"
+            base_url: "https://store.example.com"
+            catalog_path: "FantasyTale/source.toml"
+        plugins:
+          - id: "bubblefighter.fantasy.kr1256-shop-gates"
+            rules:
+              - { id: "needed", type: "require", builds: ["kr-1256"] }
+              - { id: "floor", type: "min_version", builds: ["kr-1256"], version: "1.2.0" }
+          - id: "example.optional-overlay"
+            rules:
+              - { id: "offer", type: "recommend", sources: ["community"] }
       instances:
         - id: "kr-1256-main"
           build: "kr-1256"

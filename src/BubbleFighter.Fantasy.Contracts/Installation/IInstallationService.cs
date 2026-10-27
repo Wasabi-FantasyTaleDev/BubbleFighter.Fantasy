@@ -26,14 +26,37 @@ public interface IInstallationService
     InstallationConfiguration GetConfiguration();
     /// <summary>Corrects a failed installation, or activates deferred client data without changing durable storage or the administrator.</summary>
     ValueTask UpdateAsync(InstallationUpdate update, CancellationToken cancellationToken);
-    /// <summary>Persists client-plugin launch rules without changing server modules, storage, accounts or reward settings.</summary>
-    ValueTask UpdateClientPluginsAsync(InstallationClientPluginSettings settings, CancellationToken cancellationToken) =>
-        throw new NotSupportedException("This installation provider cannot edit client-plugin policy.");
+    /// <summary>Persists the client policy without changing server modules, storage, accounts or reward settings.</summary>
+    /// <param name="settings">The replacement policy, or null inside it to return to the profile's policy.</param>
+    /// <param name="expectedRevision">The revision the caller edited, or null to replace unconditionally.</param>
+    /// <param name="cancellationToken">Cancels waiting for the installation lock.</param>
+    /// <exception cref="ClientPolicyRevisionException">The saved policy changed after <paramref name="expectedRevision"/>.</exception>
+    ValueTask UpdateClientPolicyAsync(InstallationClientPolicySettings settings, string? expectedRevision, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This installation provider cannot edit the client policy.");
 }
 
-/// <summary>A complete client-plugin override; null restores the profile policy and an empty list explicitly clears it.</summary>
-/// <param name="Policies">The store identities and their exact build scopes, or null to inherit the profile.</param>
-public sealed record InstallationClientPluginSettings(IReadOnlyList<ClientPluginPolicy>? Policies);
+/// <summary>A complete client-policy override; a null policy restores the profile's own policy, an empty one clears it.</summary>
+/// <param name="Policy">The replacement policy, or null to inherit the profile.</param>
+public sealed record InstallationClientPolicySettings(ClientPolicy? Policy)
+{
+    /// <summary>A stable digest of the saved policy, so two editors cannot silently overwrite each other.</summary>
+    /// <param name="policy">The saved policy, or null for the profile's own.</param>
+    public static string Revision(ClientPolicy? policy)
+    {
+        var text = System.Text.Json.JsonSerializer.Serialize(policy, RevisionJson);
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(text)))[..16].ToLowerInvariant();
+    }
+
+    private static readonly System.Text.Json.JsonSerializerOptions RevisionJson = new(System.Text.Json.JsonSerializerDefaults.Web);
+}
+
+/// <summary>The saved client policy changed after the caller read it.</summary>
+/// <param name="current">The revision now saved.</param>
+public sealed class ClientPolicyRevisionException(string current) : InvalidOperationException("client_policy_revision_conflict")
+{
+    /// <summary>Gets the revision now saved, for the caller to reload.</summary>
+    public string Current { get; } = current;
+}
 
 /// <summary>An authenticated configuration response; the password field is always empty.</summary>
 /// <param name="Settings">The retained settings with secrets removed.</param>
@@ -48,8 +71,8 @@ public sealed record InstallationUpdate(InstallationSettings Settings, bool Reta
 /// <summary>Configuration edited by the installation assistant; this record must never be exposed as public status.</summary>
 public sealed record InstallationSettings
 {
-    /// <summary>Gets the client-plugin launch rules; null preserves the selected profile's original policy.</summary>
-    public IReadOnlyList<ClientPluginPolicy>? ClientPlugins { get; init; }
+    /// <summary>Gets the client policy sent to the Launcher; null preserves the selected profile's original policy.</summary>
+    public ClientPolicy? ClientPolicy { get; init; }
     /// <summary>Gets the selected client builds and their independent data roots; null reads the older single-profile fields.</summary>
     public IReadOnlyList<InstallationClient>? Clients { get; init; }
     /// <summary>Gets the administration UI language, independently of the selected game's locale.</summary>
@@ -187,5 +210,10 @@ public interface IInstallationRuntime
     /// <summary>Waits for the bootstrap configuration to converge before requesting another configuration.</summary>
     Task WaitForBootstrapAsync(CancellationToken cancellationToken);
     /// <summary>Composes and admits the desired profile while retaining the installation services, then verifies every enabled row.</summary>
-    ValueTask ApplyAsync(InstallationSettings settings, IReadOnlyDictionary<string, object?> databaseConfig, CancellationToken cancellationToken);
+    /// <param name="settings">The saved installation settings.</param>
+    /// <param name="databaseConfig">The prepared configuration of the selected database provider.</param>
+    /// <param name="administrator">The account that claimed the installation; the composed profile lets it administer the WebUI.</param>
+    /// <param name="cancellationToken">Cancels the composition.</param>
+    ValueTask ApplyAsync(InstallationSettings settings, IReadOnlyDictionary<string, object?> databaseConfig, string administrator,
+        CancellationToken cancellationToken);
 }

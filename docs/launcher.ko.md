@@ -231,14 +231,34 @@ Bubble Fighter 클라이언트 패치는 훅 플러그인으로 제공됩니다.
 | `registration_enabled` | 런처 계정 등록을 허용하는지 여부입니다. | `true` |
 | `create_account_on_login` | 알 수 없는 이름으로 로그인하면 입력한 비밀번호로 그 계정을 만들어, 플레이어가 따로 가입하지 않아도 되게 할지 여부입니다. 이름을 잘못 입력하면 새 계정이 만들어집니다. | `false` |
 | `minimum_launcher_version` | 등록, 로그인, 갱신, 티켓 발급에 필요한 최소 런처 SemVer입니다. 비우면 게이트를 비활성화합니다. | 비어 있음 |
-| `plugin_recommendations` | 최대 64개 정책 항목으로 식별자, 선택적 정확한 빌드와 required/disabled 플래그를 포함합니다. URL이나 경로는 허용하지 않습니다. | 비어 있음 |
+| `client_policy` | 런처에 보내는 스토어 소스와 플러그인별 유형 규칙입니다. [클라이언트 정책](#client-policy)을 참조하세요. | 비어 있음 |
 | `session_seconds` / `refresh_session_seconds` | 액세스 토큰과 갱신 가능한 세션의 수명(초)입니다. | 1800 / 2592000 |
 | `ticket_seconds` | 실행 티켓 수명(초)입니다. | 600 |
 | `requests_per_minute` / `max_concurrent_requests` | 전역 요청 예산과 동시 API 작업 수입니다. | 120 / 8 |
 | `max_body_bytes` / `max_connections` | 요청 본문과 연결 수 제한입니다. | 16384 / 128 |
 | `instances` | 카탈로그에 광고되는 클라이언트 프리셋으로, 최대 64개입니다. | 비어 있음 |
 
-`plugin_recommendations` 항목에는 `id`, 선택적 `builds` 목록(비어 있으면 모든 빌드), `required`, `disabled`가 포함됩니다. 추천은 false/false, 필수는 true/false, 사용 금지는 false/true입니다. 같은 식별자의 필수 및 사용 금지 범위는 전체 빌드 규칙을 포함하여 겹치면 안 됩니다. 같은 정책 상태만 병합하며 정확한 빌드 범위는 유지합니다. 카탈로그와 모든 로그인 응답에는 최소 런처 버전과 이 규칙이 포함됩니다. 그래픽 설정은 [WebUI 클라이언트 모드 정책](plugins.ko.md#client-plugin-policy)을 참조하세요.
+### 클라이언트 정책(`client_policy`) {#client-policy}
+
+클라이언트 정책은 이 서버로 실행할 때 어떤 플러그인을 반드시 사용해야 하는지, 사용할 수 있는지, 사용하면 안 되는지를 런처에 알려 줍니다. 두 목록으로 구성되며 항목 수에는 제한이 없습니다.
+
+- `sources`: 스토어 카탈로그. 각각 소문자 `name`, `kind`(`http` 또는 `alist`), `base_url`(자격 증명, 쿼리, 프래그먼트가 없는 HTTP(S)), `catalog_path`를 가집니다.
+- `plugins`: 플러그인마다 하나의 항목. 스토어 `id`, 선택적 `name`과 `description`(WebUI에만 표시되며 런처로 보내지 않음), 그리고 `rules`를 가집니다.
+
+모든 규칙에는 해당 플러그인 안에서 고유한 `id`, `type`, 선택적 `builds` 목록(비어 있으면 모든 빌드)이 있습니다. 규칙 유형은 다음과 같습니다.
+
+| 유형 | 필드 | 런처 동작 |
+|---|---|---|
+| `require` | 없음 | 플러그인이 설치되고 활성화될 때까지 실행을 거부하고 설치를 제안합니다. |
+| `disable` | 없음 | 이 서버로 실행할 때 저장된 선택은 바꾸지 않고 플러그인을 끕니다. 빌드 자체가 요구하는 플러그인은 끌 수 없으며 이 경우 실행을 거부합니다. |
+| `recommend` | `sources` | 클라이언트와 규칙마다 한 번 플러그인을 추천하고 지정한 소스에서 설치합니다(목록이 비어 있으면 선언된 모든 소스 허용). |
+| `min_version` | `version` | 활성화된 플러그인이 이 버전보다 낮으면 실행 전에 업데이트해야 합니다. |
+| `max_version` | `version` | 활성화된 플러그인이 이 버전보다 높으면 소스에서 허용되는 가장 높은 버전으로 교체합니다. 사용할 수 있는 버전이 없으면 실행을 거부합니다. |
+| `latest` | 없음 | 실행 전에 활성화된 플러그인을 최신 버전으로 업데이트합니다. |
+
+버전은 엄격한 SemVer입니다. 한 플러그인의 두 규칙은 빌드 범위가 겹치고 다음 중 하나에 해당하면 충돌합니다. 유형이 같은 경우, 한쪽이 `disable`인 경우, 한쪽이 `latest`이고 다른 쪽이 `max_version`인 경우, 또는 `min_version`이 `max_version`보다 높은 경우(같으면 한 버전으로 고정)입니다. 충돌하거나 형식이 잘못되었거나 알 수 없는 규칙이 있으면 해당 행이 시작되지 않습니다. 규칙 유형을 모르는 런처는 이 서버로의 실행을 거부하고 플레이어에게 런처 업데이트를 요청합니다.
+
+카탈로그와 모든 로그인 응답에는 최소 런처 버전과 `clientPolicy`(`version`, `sources`, `plugins`) 정책이 포함되며, 규칙의 `version`이나 `sources`는 해당 유형이 사용할 때만 들어갑니다. 실행에는 플레이어가 로그인할 때 받은 정책이 사용되고, 카탈로그의 사본은 로그인 전에 표시하는 용도입니다. 이 정책은 호환 런처를 구성할 뿐이며 클라이언트 무결성을 증명하거나 게임 로그인 시 로드된 모드를 검사하지 않습니다. 관리 API는 [WebUI 클라이언트 정책](plugins.ko.md#client-plugin-policy)을 참조하세요.
 
 ### 클라이언트 프리셋(`instances`)
 
@@ -325,10 +345,20 @@ Bubble Fighter 클라이언트 패치는 훅 플러그인으로 제공됩니다.
       name: "Example Community Server"
       region: "KR"
       minimum_launcher_version: "1.4.0"
-      plugin_recommendations:
-        - id: "bubblefighter.fantasy.kr1256-shop-gates"
-          builds: ["kr-1256"]
-          required: true
+      client_policy:
+        sources:
+          - name: "community"
+            kind: "http"
+            base_url: "https://store.example.com"
+            catalog_path: "FantasyTale/source.toml"
+        plugins:
+          - id: "bubblefighter.fantasy.kr1256-shop-gates"
+            rules:
+              - { id: "needed", type: "require", builds: ["kr-1256"] }
+              - { id: "floor", type: "min_version", builds: ["kr-1256"], version: "1.2.0" }
+          - id: "example.optional-overlay"
+            rules:
+              - { id: "offer", type: "recommend", sources: ["community"] }
       instances:
         - id: "kr-1256-main"
           build: "kr-1256"

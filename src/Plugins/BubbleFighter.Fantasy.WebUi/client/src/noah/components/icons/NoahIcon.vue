@@ -107,6 +107,10 @@
     </g>
     <path v-else-if="name === 'rooms'" d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />
     <path v-else-if="name === 'plugins'" d="M9 3v4M15 3v4M7 7h10v4a5 5 0 0 1-10 0zM12 16v5" />
+    <g v-else-if="name === 'store'">
+      <path d="M5 7h14l1 13H4L5 7z" />
+      <path d="M9 8V6a3 3 0 0 1 6 0v2" />
+    </g>
     <path v-else-if="name === 'opcodes'" d="m8 7-5 5 5 5M16 7l5 5-5 5M13.5 4l-3 16" />
     <path v-else-if="name === 'logs'" d="M5 4h14v16H5zM8.5 9h7M8.5 13h7M8.5 17h4" />
     <g v-else-if="name === 'builds'">

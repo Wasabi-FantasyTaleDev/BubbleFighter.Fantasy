@@ -165,15 +165,6 @@ public sealed class DistributionSourcesTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending.WaitAsync(TimeSpan.FromSeconds(10)));
     }
 
-    [Fact]
-    public void MirrorDoesNotPretendAnUnimplementedProviderIsAvailable()
-    {
-        using var http = new HttpClient();
-        var options = Options();
-        options.UseGithubMirror = true;
-        Assert.Contains("TODO", Assert.Throws<NotSupportedException>(() => new DistributionSources(http, options)).Message);
-    }
-
     private static DistributionOptions Options(string kind = "http", string root = "https://files.example.org/") => new()
     { Sources = [new() { Id = "community", Name = "Community", Kind = kind, BaseUrl = root }] };
 

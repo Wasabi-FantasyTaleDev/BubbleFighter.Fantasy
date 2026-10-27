@@ -8,12 +8,16 @@ internal sealed class OwnedShutdownSignal : IAsyncDisposable
     private Task? _cancellation;
     private Task? _completion;
     private bool _completing;
+    private int _restartRequested;
 
     /// <summary>Captures the token before ownership can close or dispose its cancellation source.</summary>
     internal OwnedShutdownSignal() => Token = _source.Token;
 
     /// <summary>Gets the stable token used by the hosted startup and server wait operations.</summary>
     internal CancellationToken Token { get; }
+
+    /// <summary>Gets whether shutdown was requested by an authenticated restart operation.</summary>
+    internal bool RestartRequested => Volatile.Read(ref _restartRequested) != 0;
 
     /// <summary>Requests cancellation once without running or surfacing plugin callbacks on the signal-handler thread.</summary>
     internal void RequestCancellation()
@@ -31,6 +35,13 @@ internal sealed class OwnedShutdownSignal : IAsyncDisposable
                 _cancellation = Task.FromException(error);
             }
         }
+    }
+
+    /// <summary>Requests normal owned shutdown and marks the process for replacement after cleanup.</summary>
+    internal void RequestRestart()
+    {
+        Interlocked.Exchange(ref _restartRequested, 1);
+        RequestCancellation();
     }
 
     /// <summary>Closes signal admission, waits for actual callbacks and disposes the source with one shared completion result.</summary>

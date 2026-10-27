@@ -79,7 +79,7 @@ namespace BubbleFighter.Fantasy.InGame;
         typeof(IMessageSender<RoundRescueMissionFailed>), typeof(IMessageSender<RoundRescueMissionSucceeded>),
         typeof(IInboundMessageBinding<RoundPvePangReported>), typeof(IMessageSender<RoundPvePointsChanged>)],
     Optional = [typeof(ICommandExecutor), typeof(IGameCommandEndpoints), typeof(IPartyDirectory), typeof(IOnlinePlayers), typeof(BubbleFighter.Fantasy.Contracts.Shop.IShopPurchaseStore), typeof(IInventoryRepository), typeof(IInventoryPushService), typeof(IGameText), typeof(ISeatCharacterResolver), typeof(IEquippedViewPush), typeof(IEquipmentSelection), typeof(BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore), typeof(BubbleFighter.Fantasy.Contracts.Progress.IPlayerProgressRepository), typeof(BubbleFighter.Fantasy.Contracts.Wallet.IPlayerWalletRepository), typeof(BubbleFighter.Fantasy.Contracts.Progress.ITutorialStageStore), typeof(BubbleFighter.Fantasy.Contracts.Shop.IShopGiftService), typeof(IOpcodeTableRegistry)],
-    ProvidesMany = [typeof(IMatchCapabilityDirectory)],
+    ProvidesMany = [typeof(IMatchCapabilityDirectory), typeof(IRoomAdminDirectory)],
     ConditionalProvides = [])]
 public sealed class InGamePlugin : IPlugin
 {
@@ -99,6 +99,7 @@ public sealed class InGamePlugin : IPlugin
                 throw new TimeoutException($"InGame room executors did not stop within {options.RoomStopTimeoutMs} ms.");
         });
         context.Effect(context.Services.RegisterMany<IMatchCapabilityDirectory>(registry));
+        context.Effect(context.Services.RegisterMany<IRoomAdminDirectory>(registry));
         var chatRateLimit = new ChatRateLimit(options, context.Logger);
         context.Effect(chatRateLimit);
         context.Effect(context.Events.On<ConnectionClosedEvent>(chatRateLimit.OnConnectionClosed));

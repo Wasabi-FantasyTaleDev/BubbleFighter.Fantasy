@@ -196,4 +196,4 @@ Set-Location 'D:/Launcher'
 
 來源預設儲存至 `data/distribution-sources.json`，下載存放於 `data/distribution-staging`。可設定的列選項包括 `maximum_document_bytes`（4194304）、`maximum_sources`（512）、中繼資料逾時 `request_timeout_ms`（30000）及下載逾時 `transfer_timeout_ms`（1800000）。`maximum_payload_bytes` 為選用；下載仍受宣告的確切大小及可用磁碟空間限制。`free_space_reserve_bytes` 預設 0，歷史分頁 `history_page_size` 預設 20。這些是部署選項，並非套件格式要求。已完成的下載不會自動刪除。
 
-伺服器應用程式清單使用既有 schema 1 格式。伺服器外掛清單需要明確啟用實驗讀取器 `distribution.packages.experimental_release_format: true`（預設 false）；該提案尚非啟動器的正式共用規格。GitHub 附件的發布者雜湊不證明平台相容性。GitHub 鏡像尚未實作，啟用 `use_github_mirror` 會明確回報錯誤。安裝後的商店 API 使用管理員工作階段與既有要求保護，尚無逐項操作的商店權限節點；命令模式管理仍僅監聽回環位址。[用戶端外掛啟動原則](plugins.md#client-plugin-policy)有獨立的權限要求。
+伺服器應用程式清單使用既有 schema 1 格式。伺服器外掛清單需要明確啟用實驗讀取器 `distribution.packages.experimental_release_format: true`（預設 false）；該提案尚非啟動器的正式共用規格。GitHub 附件的發布者雜湊不證明平台相容性。發布附件可透過 [GitHub 鏡像](store.zh-tw.md#github-mirror)下載，並仍以該雜湊核對。安裝後的商店 API 使用管理員工作階段與既有要求保護，尚無逐項操作的商店權限節點；命令模式管理仍僅監聽回環位址。[用戶端外掛啟動原則](plugins.md#client-plugin-policy)有獨立的權限要求。

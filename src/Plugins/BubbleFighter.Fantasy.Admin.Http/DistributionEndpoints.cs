@@ -15,8 +15,42 @@ public sealed partial class AdminHttpPlugin
             if (!context.Services.TryGet<IDistributionSources>(out var sources) || sources is null)
                 return Results.Json(new { error = "distribution_unavailable" }, statusCode: 503);
             var settings = sources.Settings;
-            return Results.Ok(new { settings.Sources, settings.Revision, githubMirrorAvailable = false });
+            return Results.Ok(new { settings.Sources, settings.Revision,
+                githubMirrorAvailable = context.Services.TryGet<IDistributionGithubMirror>(out var mirror) && mirror is not null && mirror.Providers.Count > 0 });
         });
+
+        // The store's GitHub mirror: its switch and selection, the one-time location suggestion, and a speed test whose
+        // progress the page reads from the same GET while the POST runs.
+        app.MapGet("/api/distribution/v1/github-mirror", () => Mirror(mirror => Results.Ok(MirrorView(mirror))));
+        app.MapPut("/api/distribution/v1/github-mirror", (GithubMirrorRequest request) => Mirror(mirror =>
+        {
+            try { mirror.Save(request.Enabled, request.Selection); return Results.Ok(MirrorView(mirror)); }
+            catch (ArgumentException) { return Results.Json(new { error = "github_mirror_unknown" }, statusCode: 400); }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            { return Results.Json(new { error = "github_mirror_write_failed" }, statusCode: 503); }
+        }));
+        app.MapPost("/api/distribution/v1/github-mirror/suggestion-shown", () => Mirror(mirror =>
+        {
+            mirror.MarkSuggestionShown();
+            return Results.Ok(MirrorView(mirror));
+        }));
+        app.MapPost("/api/distribution/v1/github-mirror/test", async (CancellationToken ct) =>
+        {
+            if (!context.Services.TryGet<IDistributionGithubMirror>(out var mirror) || mirror is null)
+                return Results.Json(new { error = "github_mirror_unavailable" }, statusCode: 503);
+            await mirror.MeasureAsync(ct).ConfigureAwait(false);
+            return Results.Ok(MirrorView(mirror));
+        });
+
+        IResult Mirror(Func<IDistributionGithubMirror, IResult> action) =>
+            context.Services.TryGet<IDistributionGithubMirror>(out var mirror) && mirror is not null
+                ? action(mirror) : Results.Json(new { error = "github_mirror_unavailable" }, statusCode: 503);
+
+        static object MirrorView(IDistributionGithubMirror mirror)
+        {
+            var state = mirror.State;
+            return new { state.Enabled, state.Selection, state.SuggestionPending, state.DetectionPending, providers = mirror.Providers, results = mirror.Results };
+        }
 
         app.MapPut("/api/distribution/v1/sources", async (SourceSettingsRequest request, CancellationToken ct) =>
         {
@@ -170,6 +204,8 @@ public sealed partial class AdminHttpPlugin
     }
 
     private sealed record RepositoryReleaseRequest(string RepositoryUrl, string? Tag);
+    private sealed record GithubMirrorRequest(bool? Enabled, string? Selection);
+
     private sealed record SourceSettingsRequest(long Revision, IReadOnlyList<DistributionSource>? Sources);
     private sealed record DownloadJobRequest(string PlanId);
 }

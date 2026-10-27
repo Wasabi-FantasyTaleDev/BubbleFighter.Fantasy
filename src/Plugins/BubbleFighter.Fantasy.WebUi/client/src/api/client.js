@@ -2,9 +2,10 @@ import { useServerStore } from '../stores/server'
 
 /** A failed API call: `status` is the HTTP status, or 0 when the server could not be reached. */
 export class ApiError extends Error {
-  constructor(message, status) {
+  constructor(message, status, body = null) {
     super(message)
     this.status = status
+    this.body = body
   }
 }
 
@@ -34,11 +35,12 @@ export async function api(path, options = {}) {
   }
   if (!res.ok) {
     let detail = res.statusText
+    let body = null
     try {
-      const body = await res.json()
+      body = await res.json()
       detail = body.detail || body.title || body.error || detail
     } catch { /* not JSON */ }
-    throw new ApiError(detail, res.status)
+    throw new ApiError(detail, res.status, body)
   }
   const text = await res.text()
   return text ? JSON.parse(text) : null

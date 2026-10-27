@@ -321,12 +321,21 @@ Contracts 2.61.0 新增原生在线玩家作用域注册。`commands.management`
 `commands.management` 支持 `max_scopes`（512 个注册）、`disconnect_notice_timeout_ms`（5000）、`max_notice_characters`（511）。文本预算可调低，上限来自原生通知缓冲区。格式化后的原因过长时，在发送或关闭前拒绝执行。作用域注册由插件效果管理，操作在注册者的受监督生命周期内执行。远程 SDK 尚无原生所有者与回调传输适配，不能宣称指令注册已与原生等效。本批不包含 kick、sudo、OP 持久化编辑、房间传送、WebUI 配置或分发商店。
 
 
-### 客户端模组启动策略 {#client-plugin-policy}
+### 客户端策略 {#client-plugin-policy}
 
-商店页面可以从合并后的目录选择客户端模组标识，也可以手动添加标识，并设置推荐、必选或禁用。这些规则提供给兼容的启动器，客户端模组文件不会安装到服务器。每条规则可以勾选适用的客户端版本；不勾选任何版本则适用于所有版本。沿用配置文件时保留原始策略，自定义列表为空时则明确清空推荐项。
+WebUI 可以编辑已安装服务器的[客户端策略](launcher.zh.md#client-policy)：商店来源和按插件的类型化规则。这些规则配置的是兼容的启动器，客户端文件不会安装到服务器。沿用配置文件时，服务器使用所选配置文件中的策略；第一次保存修改后切换为自定义策略，恢复沿用配置文件则回到配置文件自身的策略。
 
-`GET` 和 `PUT /api/setup/client-plugins` 要求已登录的 WebUI 账号同时拥有 `webui.access` 与 `webui.settings.client_plugins`；`webui.admin` 可授予这两项权限。游戏 OP 不会获得 WebUI 访问权。PUT 使用现有的同源请求保护，接受 `{"policies":[{"id":"example.plugin","builds":[],"required":false,"disabled":true}]}`。提交 `{"policies":null}` 恢复配置文件策略，提交 `{"policies":[]}` 清空策略。规则只接受商店标识，不包含下载网址或可执行文件路径。
+所有路由都要求已登录的 WebUI 账号同时拥有 `webui.access` 与 `webui.settings.client_policy`；`webui.admin` 可授予这两项权限。游戏 OP 不会获得 WebUI 访问权。
 
-启动器目录、登录及刷新响应通过 `pluginRecommendations` 返回 `id`、`builds`、`required` 和 `disabled`。推荐对应 false/false，必选对应 true/false，禁用对应 false/true。同一标识的必选和禁用规则不能覆盖相同版本，包括适用于所有版本的规则。互不重叠的版本范围会分别保留；针对某一版本的必选规则不会因全局推荐而扩展至其他版本。兼容的启动器负责执行启动策略；这些元数据不证明客户端完整性，也不表示游戏登录会校验已加载模组。
+| 路由 | 作用 |
+|---|---|
+| `GET /api/setup/client-policy` | 返回 `mode`（`profile` 或 `custom`）、`revision`、已保存的 `policy`（沿用配置文件时为 null）以及 `active`，即启动器当前收到的策略。 |
+| `GET /api/setup/client-policy/rule-types` | 每种规则类型的 `name`、表单 `field`（`none`、`version` 或 `sources`）以及可能冲突的类型 `conflicts`。 |
+| `PUT /api/setup/client-policy` | 替换整个策略：`{"policy":{"sources":[],"plugins":[]}}`，或用 `{"policy":null}` 回到配置文件的策略。 |
+| `PUT /api/setup/client-policy/sources` | 只替换来源列表。 |
+| `PUT /api/setup/client-policy/plugins/{id}` | 替换一个插件的条目 `{"id":"{id}","name":null,"description":null,"rules":[...]}`，其他插件不变。 |
+| `DELETE /api/setup/client-policy/plugins/{id}` | 删除一个插件的条目。 |
+
+写入使用现有的同源请求保护，并且必须在 `If-Match` 中发送所编辑的 `revision`。缺少时返回 428；基于旧版本的写入返回 409 并附带当前 `revision`，两个同时打开的编辑器不会互相覆盖。沿用配置文件时的局部写入以当前生效的策略为基础。被拒绝的策略返回 400，包含 `error`（`client_policy_invalid`、`client_policy_unknown_type`、`client_policy_unknown_source`、`client_policy_unknown_build` 或 `client_policy_conflict`），并在可知时给出 `plugin`、`rule` 和冲突的 `other` 规则。规则的版本必须是已配置的、`management` 以外的客户端配置文件。
 
 修改独立于数据库、账号、奖励与客户端数据设置持久保存，再通过现有的受监督配置流程应用。HTTP 202 只表示请求已受理。应用可能使游戏服务重新连接；安装状态会显示进度和失败，可通过现有配置流程修正或重试。

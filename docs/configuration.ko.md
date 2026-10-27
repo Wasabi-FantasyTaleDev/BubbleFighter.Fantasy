@@ -348,7 +348,7 @@ BFF_PUBLIC_HOST=<public-address-clients-use>
 
 만료된 아이템 버리기도 같은 방식으로 선언합니다. `dialect.messages` 행의 `inventory_actions` 옵션이 `gcpReqInventoryThrowItem`/`gspRepInventoryThrowItem`을 묶고(모든 legacy 빌드와 `kr-1256`에서 켬), 빌드 자신의 bundle 안 `inventory.throw` 행이 저장 장비 서비스를 통해 해당 아이템을 제거합니다. 동작은 의도적으로 좁습니다. 인증된 한 플레이어의 두 가방에서 해당 만료 아이템만 제거하고, 일치하는 이용 권한이 유효하면 제거 전체를 거부하며, 빌드의 범주 6 제외 규칙을 따릅니다. 경기 중 요청은 거부됩니다. 실제 클라이언트 수용은 아직 남아 있으며, 패킷 표 지원만으로 다른 빌드에서 이 옵션을 선언할 수는 없습니다.
 
-**`launcher.http`**는 선택적 공용 런처 API입니다. 기본적으로 비활성화되며 관리와 분리됩니다. `minimum_launcher_version`(비우면 검사 안 함)과 `plugin_recommendations`를 받으며, 권장 항목은 스토어 ID와 선택적 정확한 `builds`를 포함하고 실행 파일 경로나 다운로드 URL은 절대 포함하지 않습니다. 최소 버전이 설정되면 구버전 런처는 HTTP 426을 받습니다. 각 로비 행의 `authentication` 옵션(`BFF_LOGIN_AUTHENTICATION`, 기본값 `ticket`)은 런처 티켓을 교환하는 로그인만 허용하며 이때 이 행이 활성 상태여야 합니다. `open`은 모든 계정 이름을 허용하므로 신뢰할 수 있는 LAN에서만 사용하십시오. [런처](launcher.md) 페이지에서 API, 클라이언트 프리셋, 계정과 티켓 흐름, 운영자 설정을 설명합니다.
+**`launcher.http`**는 선택적 공용 런처 API입니다. 기본적으로 비활성화되며 관리와 분리됩니다. `minimum_launcher_version`(비우면 검사 안 함)과 런처가 적용하는 플러그인별 유형 규칙인 `client_policy`를 받습니다. 규칙은 스토어 ID와 선언된 스토어 소스만 가리키며 실행 파일 경로는 절대 포함하지 않습니다. 최소 버전이 설정되면 구버전 런처는 HTTP 426을 받습니다. 각 로비 행의 `authentication` 옵션(`BFF_LOGIN_AUTHENTICATION`, 기본값 `ticket`)은 런처 티켓을 교환하는 로그인만 허용하며 이때 이 행이 활성 상태여야 합니다. `open`은 모든 계정 이름을 허용하므로 신뢰할 수 있는 LAN에서만 사용하십시오. [런처](launcher.md) 페이지에서 API, 클라이언트 프리셋, 계정과 티켓 흐름, 운영자 설정을 설명합니다.
 
 런처 요청 및 로그인 세션 제한은 `launcher.http` 행에서 설정합니다.
 

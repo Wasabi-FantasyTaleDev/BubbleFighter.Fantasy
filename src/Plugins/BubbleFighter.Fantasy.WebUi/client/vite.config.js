@@ -1,7 +1,8 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
-const backend = 'http://127.0.0.1:8080'
+// The preview server can point at any isolated local Host without changing the production build.
+const backend = process.env.BFF_WEBUI_BACKEND || 'http://127.0.0.1:8080'
 const apiProxy = {
   target: backend,
   changeOrigin: true,

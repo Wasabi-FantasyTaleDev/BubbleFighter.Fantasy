@@ -11,7 +11,8 @@
     <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="../../src/BubbleFighter.Fantasy.Host/SetupClientPluginConfiguration.cs" Link="SetupClientPluginConfiguration.cs" />
+    <Compile Include="../../src/BubbleFighter.Fantasy.Host/SetupClientPolicyConfiguration.cs" Link="SetupClientPolicyConfiguration.cs" />
+    <Compile Include="../../src/BubbleFighter.Fantasy.Host/SetupAdministratorPermissions.cs" Link="SetupAdministratorPermissions.cs" />
     <Compile Include="../../src/BubbleFighter.Fantasy.Host/SetupProfileSession.cs" Link="SetupProfileSession.cs" />
     <ProjectReference Include="../../src/Plugins/BubbleFighter.Fantasy.Commands/BubbleFighter.Fantasy.Commands.csproj" />
     <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Distribution\BubbleFighter.Fantasy.Distribution.csproj" />
@@ -22,5 +23,6 @@
     <ProjectReference Include="..\..\src\BubbleFighter.Fantasy.Contracts\BubbleFighter.Fantasy.Contracts.csproj" />
     <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.WebUi\BubbleFighter.Fantasy.WebUi.csproj" />
     <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Admin.Http\BubbleFighter.Fantasy.Admin.Http.csproj" />
+    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Launcher.Http\BubbleFighter.Fantasy.Launcher.Http.csproj" />
   </ItemGroup>
 </Project>

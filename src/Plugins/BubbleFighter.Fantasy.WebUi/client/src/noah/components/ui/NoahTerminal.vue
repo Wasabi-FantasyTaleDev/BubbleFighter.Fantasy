@@ -31,8 +31,9 @@
           <button
             type="button"
             class="control-dot dot-maximize"
-            title="Maximize"
-            aria-label="Maximize"
+            :title="maximizeLabel || (isExpanded ? 'Restore' : 'Maximize')"
+            :aria-label="maximizeLabel || (isExpanded ? 'Restore' : 'Maximize')"
+            :aria-pressed="isExpanded"
             @click="handleMaximize"
           >
             <svg class="control-icon" viewBox="0 0 10 10"><path d="M2.5 7.5L7.5 2.5M7.5 2.5H4M7.5 2.5V6" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -79,6 +80,8 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  expanded: { type: Boolean, default: undefined },
+  maximizeLabel: { type: String, default: '' },
   copyable: {
     type: Boolean,
     default: true
@@ -89,7 +92,8 @@ const emit = defineEmits(['close', 'minimize', 'maximize'])
 
 const copied = ref(false)
 const isCollapsed = ref(false)
-const isExpanded = ref(false)
+const localExpanded = ref(false)
+const isExpanded = computed(() => props.expanded ?? localExpanded.value)
 const isCleared = ref(false)
 
 const displayContent = computed(() => {
@@ -118,8 +122,10 @@ const handleMinimize = () => {
 }
 
 const handleMaximize = () => {
-  isExpanded.value = !isExpanded.value
-  emit('maximize', isExpanded.value)
+  const next = !isExpanded.value
+  localExpanded.value = next
+  if (next) isCollapsed.value = false
+  emit('maximize', next)
 }
 </script>
 

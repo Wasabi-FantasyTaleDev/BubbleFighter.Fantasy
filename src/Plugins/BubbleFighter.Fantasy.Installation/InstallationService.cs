@@ -203,8 +203,8 @@ internal sealed class InstallationService : IInstallationService, IAdminAccessCo
     }
 
     /// <summary>
-    /// Applies a settings update and reruns apply. Allowed after a failure or, for the deferred-client
-    /// completion path, while ready. An installed deployment cannot change storage, launch policy or
+    /// Applies a settings update and reruns apply. Allowed after a failure or while ready, so clients can be
+    /// added and their data imported at any time. An installed deployment cannot change storage, launch policy or
     /// credentials this way — only client selection and client-plugin policies — and a retained
     /// database password can only return to the exact original host, port and account.
     /// </summary>
@@ -219,7 +219,8 @@ internal sealed class InstallationService : IInstallationService, IAdminAccessCo
             InstallationDocument document;
             lock (_sync)
             {
-                if (_document is null || _running || (_phase != "failed" && !(_phase == "ready" && HasDeferredClients(_document.Settings))))
+                // A ready server may change its clients at any time; the check below keeps everything else as installed.
+                if (_document is null || _running || _phase is not ("failed" or "ready"))
                     throw new InvalidOperationException("retry_unavailable");
                 document = _document;
             }
@@ -228,8 +229,8 @@ internal sealed class InstallationService : IInstallationService, IAdminAccessCo
             // Finishing deferred import cannot change installed storage, launch policy or credentials.
             if (document.Installed && (settings != (document.Settings with
                 { Clients = settings.Clients, Profile = settings.Profile, ClientDataPath = settings.ClientDataPath,
-                    DeferClientDataImport = settings.DeferClientDataImport, ClientPlugins = settings.ClientPlugins }) ||
-                !SameClientPluginPolicies(settings.ClientPlugins, document.Settings.ClientPlugins)))
+                    DeferClientDataImport = settings.DeferClientDataImport, ClientPolicy = settings.ClientPolicy }) ||
+                !SameClientPolicy(settings.ClientPolicy, document.Settings.ClientPolicy)))
                 throw new ArgumentException("configuration_invalid");
             var corrected = document with { Settings = settings };
             _store.Save(corrected);
@@ -248,15 +249,14 @@ internal sealed class InstallationService : IInstallationService, IAdminAccessCo
     }
 
     /// <summary>
-    /// Replaces only the client-plugin policies of an installed, ready deployment and reruns apply.
-    /// No-op when the candidate policies equal the stored ones.
+    /// Replaces only the client policy of an installed, ready deployment and reruns apply.
+    /// No-op when the candidate equals the stored policy.
     /// </summary>
     /// <exception cref="InvalidOperationException">Thrown when no claim is installed, an operation runs, or the phase is not ready.</exception>
-    public async ValueTask UpdateClientPluginsAsync(InstallationClientPluginSettings settings, CancellationToken cancellationToken)
+    /// <exception cref="ClientPolicyRevisionException">Thrown when the saved policy no longer has the expected revision.</exception>
+    public async ValueTask UpdateClientPolicyAsync(InstallationClientPolicySettings settings, string? expectedRevision, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        var policies = settings.Policies?.Select(policy => policy is null ? null! : policy with
-        { Builds = policy.Builds?.ToArray()! }).ToArray();
         if (!await _mutation.WaitAsync(0, cancellationToken).ConfigureAwait(false)) throw new InvalidOperationException("operation_busy");
         try
         {
@@ -267,10 +267,12 @@ internal sealed class InstallationService : IInstallationService, IAdminAccessCo
                     throw new InvalidOperationException("retry_unavailable");
                 document = _document;
             }
-            var candidate = document.Settings with { ClientPlugins = policies };
+            var saved = document.Settings.ClientPolicy;
+            var current = InstallationClientPolicySettings.Revision(saved);
+            if (expectedRevision is not null && expectedRevision != current) throw new ClientPolicyRevisionException(current);
+            var candidate = document.Settings with { ClientPolicy = settings.Policy };
             Validate(candidate);
-            var saved = document.Settings.ClientPlugins;
-            if (SameClientPluginPolicies(policies, saved)) return;
+            if (SameClientPolicy(settings.Policy, saved)) return;
             var updated = document with { Settings = candidate };
             _store.Save(updated);
             lock (_sync) _document = updated;
@@ -279,10 +281,8 @@ internal sealed class InstallationService : IInstallationService, IAdminAccessCo
         finally { _mutation.Release(); }
     }
 
-    private static bool SameClientPluginPolicies(IReadOnlyList<ClientPluginPolicy>? left, IReadOnlyList<ClientPluginPolicy>? right) =>
-        left is null ? right is null : right is not null && left.Count == right.Count &&
-        left.Zip(right).All(pair => pair.First.Id == pair.Second.Id && pair.First.Required == pair.Second.Required &&
-            pair.First.Disabled == pair.Second.Disabled && pair.First.Builds.SequenceEqual(pair.Second.Builds, StringComparer.Ordinal));
+    private static bool SameClientPolicy(ClientPolicy? left, ClientPolicy? right) =>
+        InstallationClientPolicySettings.Revision(left) == InstallationClientPolicySettings.Revision(right);
 
     private InstallationSettings ResolveUpdate(InstallationUpdate update, InstallationSettings saved)
     {
@@ -319,7 +319,7 @@ internal sealed class InstallationService : IInstallationService, IAdminAccessCo
             try { config = await PrepareDatabaseAsync(document.Settings, true, cancellationToken).ConfigureAwait(false); }
             finally { _database.Release(); }
             errorCode = "runtime_failed";
-            await _runtime.ApplyAsync(document.Settings, config, cancellationToken).ConfigureAwait(false);
+            await _runtime.ApplyAsync(document.Settings, config, document.Username, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             errorCode = "storage_failed";
             var installed = document with { Installed = true };
@@ -373,11 +373,12 @@ internal sealed class InstallationService : IInstallationService, IAdminAccessCo
 
     private void Validate(InstallationSettings settings)
     {
-        if (settings.ClientPlugins is { } policies)
+        if (settings.ClientPolicy is { } policy)
         {
-            ClientPluginPolicyRules.Validate(policies);
-            if (policies.SelectMany(policy => policy.Builds).Any(build => build == "management" || !_runtime.Profiles.Any(profile => profile.Id == build)))
-                throw new ArgumentException("plugin_policy_invalid");
+            ClientPolicyRules.Validate(policy);
+            if (policy.Plugins.SelectMany(plugin => plugin.Rules).SelectMany(rule => rule.Builds)
+                .Any(build => build == "management" || !_runtime.Profiles.Any(profile => profile.Id == build)))
+                throw new ClientPolicyException("client_policy_unknown_build");
         }
         if (settings.Language is not ("en" or "zh-Hans" or "zh-Hant" or "ko") ||
             settings.ServerName is not { Length: >= 1 and <= 80 } || settings.ServerName.Any(char.IsControl) ||

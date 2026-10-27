@@ -330,7 +330,7 @@ public sealed class LobbyOptions : IValidatableOptions
 /// </summary>
 [Plugin("lobby", Description = "Login and main-menu logic shared by every client build.",
     Requires = [typeof(IMessageRouter)],
-    Optional = [typeof(IPlayerRepository), typeof(IPaintItemCatalog), typeof(ILauncherTicketService), typeof(IEquipmentSelection), typeof(IDbConnectionFactory), typeof(IInventoryRepository), typeof(IPlayerWalletRepository)], OptionalMany = [typeof(IMessageSender<ServerNotice>), typeof(IInboundMessageBinding<InventoryItemUseRequested>), typeof(IMessageSender<InventoryItemUseReplied>), typeof(IMessageSender<UserStatUpdated>), typeof(IInboundMessageBinding<CharacterNameRequested>), typeof(IInboundMessageBinding<CharacterCreateRequested>), typeof(IInboundMessageBinding<CharacterLoginRequested>), typeof(IMessageSender<CharacterCreationOpened>), typeof(IMessageSender<CharacterNameReplied>), typeof(IMessageSender<CharacterCreateReplied>), typeof(IInboundMessageBinding<BubbleFighter.Fantasy.Contracts.Lobby.MainMenuInitRequest>), typeof(IMessageSender<EmptySessionSignature>), typeof(IInboundMessageBinding<LoginRequested>), typeof(IMessageSender<LoginSucceeded>), typeof(IMessageSender<LoginRejected>), typeof(IMessageSender<InventoryReplaced>), typeof(IMessageSender<InventoryPurchaseApplied>), typeof(IMessageSender<InventorySlotsUpdated>), typeof(IMessageSender<ItemsExpired>), typeof(IInboundMessageBinding<FighterInfoRequested>), typeof(IMessageSender<FighterInfoReplied>)],
+    Optional = [typeof(IPlayerRepository), typeof(IPaintItemCatalog), typeof(ILauncherTicketService), typeof(IEquipmentSelection), typeof(IDbConnectionFactory), typeof(IInventoryRepository), typeof(IPlayerWalletRepository), typeof(IHostReadiness)], OptionalMany = [typeof(IMessageSender<ServerNotice>), typeof(IInboundMessageBinding<InventoryItemUseRequested>), typeof(IMessageSender<InventoryItemUseReplied>), typeof(IMessageSender<UserStatUpdated>), typeof(IInboundMessageBinding<CharacterNameRequested>), typeof(IInboundMessageBinding<CharacterCreateRequested>), typeof(IInboundMessageBinding<CharacterLoginRequested>), typeof(IMessageSender<CharacterCreationOpened>), typeof(IMessageSender<CharacterNameReplied>), typeof(IMessageSender<CharacterCreateReplied>), typeof(IInboundMessageBinding<BubbleFighter.Fantasy.Contracts.Lobby.MainMenuInitRequest>), typeof(IMessageSender<EmptySessionSignature>), typeof(IInboundMessageBinding<LoginRequested>), typeof(IMessageSender<LoginSucceeded>), typeof(IMessageSender<LoginRejected>), typeof(IMessageSender<InventoryReplaced>), typeof(IMessageSender<InventoryPurchaseApplied>), typeof(IMessageSender<InventorySlotsUpdated>), typeof(IMessageSender<ItemsExpired>), typeof(IInboundMessageBinding<FighterInfoRequested>), typeof(IMessageSender<FighterInfoReplied>)],
     ConditionalProvides = [typeof(IInventoryPushService), typeof(IInventoryExpiry), typeof(IInventoryItemRemoval), typeof(IOnlinePlayers)])]
 public sealed class LobbyPlugin : IPlugin
 {
@@ -503,7 +503,8 @@ public sealed class LobbyPlugin : IPlugin
         if (!options.RequiresTicket)
             context.Logger.LogWarning("Lobby {Protocol} runs with authentication: open. Any client that reaches this port "
                 + "can log in as any account; use it only on a trusted network.", options.Protocol);
-        var handlers = new Handlers(options, players, inventory, money, playerSessions, starter, context.Logger, creation, creationOpened, tickets, expiry, lifeRule, context.Events);
+        context.Services.TryGet<IHostReadiness>(out var readiness);
+        var handlers = new Handlers(options, players, inventory, money, playerSessions, starter, context.Logger, creation, creationOpened, tickets, expiry, lifeRule, context.Events, readiness);
         context.Effect(messages.For(context).On<InitialTutorialCompleted>(p, (session, _, ct) =>
         {
             if (!session.TryFeature<IPlayerSession>(out var player))
@@ -575,7 +576,7 @@ public sealed class LobbyPlugin : IPlugin
         ILauncherTicketService? tickets,
         InventoryExpirySweep? expiry = null,
         LoginLifeRule? lifeRule = null,
-        IEventBus? events = null)
+        IEventBus? events = null, IHostReadiness? readiness = null)
     {
         private readonly DuplicateLoginGuard _duplicateLogins = new(playerSessions, options.DuplicateLoginPolicy, logger);
 
@@ -584,6 +585,12 @@ public sealed class LobbyPlugin : IPlugin
             IMessageSender<LoginSucceeded> succeeded, IMessageSender<LoginRejected> rejected, CancellationToken ct,
             bool afterCreation = false)
         {
+            if (readiness is { IsMaintenance: true })
+            {
+                logger.LogInformation("Session {Id} login refused while the server is in maintenance.", session.Id);
+                await session.Connection.CloseAsync("server is not accepting new players").ConfigureAwait(false);
+                return;
+            }
             // Character creation resumes only from this connection's completed, server-owned pending state.
             var launchIdentity = afterCreation ? new LauncherTicketIdentity(request.Account)
                 : LauncherLoginAccount.ResolveIdentity(request.Account, session.Profile.Id,

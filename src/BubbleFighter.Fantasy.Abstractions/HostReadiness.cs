@@ -5,8 +5,8 @@ namespace BubbleFighter.Fantasy.Abstractions;
 /// row is active, so a feature that admits new players (for example a launcher sign-in) can refuse them until the
 /// rest of the server is running.
 /// </summary>
-public interface IHostReadiness
+public interface IHostReadiness : IServerMaintenance
 {
-    /// <summary>True once the host's startup configuration converged with every enabled row active; it stays true.</summary>
+    /// <summary>True after startup convergence and while maintenance mode is off.</summary>
     bool IsReady { get; }
 }

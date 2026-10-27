@@ -9,6 +9,7 @@ using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Archives;
 using BubbleFighter.Fantasy.Admin.Http;
 using BubbleFighter.Fantasy.Contracts.Installation;
+using BubbleFighter.Fantasy.Contracts.Launcher;
 using BubbleFighter.Fantasy.Commands;
 using BubbleFighter.Fantasy.Installation;
 using BubbleFighter.Fantasy.Kernel;
@@ -491,65 +492,142 @@ public sealed class InstallationEndpointTests
         Assert.DoesNotContain(settings.MySqlPassword, await retained.Content.ReadAsStringAsync());
     }
 
-    [Fact]
-    public async Task ClientPluginPolicyPersistsWithoutChangingStorageOrAdministratorAndCanRestoreInheritance()
+    private static readonly ClientPolicy SamplePolicy = new([new("official", "http", "https://store.example.invalid", "catalog.toml")],
+    [
+        new("sample.plugin", "Sample", null, [new("need", "require", ["fixture-build"]), new("off", "disable", ["fixture-other"])]),
+        new("recommended.plugin", null, null, [new("offer", "recommend", [], Sources: ["official"])]),
+    ]);
+
+    private static async Task<JsonElement> ReadPolicyAsync(Fixture fixture) =>
+        await fixture.Http.GetFromJsonAsync<JsonElement>("/api/setup/client-policy");
+
+    private static async Task<HttpResponseMessage> SendPolicyAsync(Fixture fixture, HttpMethod method, string path, object? body, string? revision)
     {
-        await using var fixture = await Fixture.StartAsync(webUiGrants: ["webui.access", "webui.settings.client_plugins"]);
+        using var request = new HttpRequestMessage(method, path);
+        if (body is not null) request.Content = JsonContent.Create(body);
+        if (revision is not null) request.Headers.TryAddWithoutValidation("If-Match", "\"" + revision + "\"");
+        return await fixture.Http.SendAsync(request);
+    }
+
+    [Fact]
+    public async Task ClientPolicyPersistsWithoutChangingStorageOrAdministratorAndCanRestoreInheritance()
+    {
+        await using var fixture = await Fixture.StartAsync(webUiGrants: ["webui.access", "webui.settings.client_policy"]);
         await fixture.ClaimAsync(new() { PlayerLogin = "open" });
         await fixture.SignInAsync();
         await fixture.WaitForAsync("ready");
         var initial = await fixture.Http.GetFromJsonAsync<InstallationConfiguration>("/api/setup/configuration");
         using var before = JsonDocument.Parse(await File.ReadAllTextAsync(fixture.StatePath));
-        var rules = new BubbleFighter.Fantasy.Contracts.Launcher.ClientPluginPolicy[]
-        {
-            new("sample.plugin", ["fixture-build"], Required: true),
-            new("sample.plugin", ["fixture-other"], Disabled: true),
-            new("recommended.plugin", []),
-        };
-        using var response = await fixture.Http.PutAsJsonAsync("/api/setup/client-plugins", new InstallationClientPluginSettings(rules));
+        var inherited = await ReadPolicyAsync(fixture);
+        Assert.Equal("profile", inherited.GetProperty("mode").GetString());
+        using var response = await SendPolicyAsync(fixture, HttpMethod.Put, "/api/setup/client-policy",
+            new InstallationClientPolicySettings(SamplePolicy), inherited.GetProperty("revision").GetString());
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         await fixture.WaitForAsync("ready");
         var changed = await fixture.Http.GetFromJsonAsync<InstallationConfiguration>("/api/setup/configuration");
-        Assert.Equal(JsonSerializer.Serialize(initial!.Settings with { ClientPlugins = rules }), JsonSerializer.Serialize(changed!.Settings));
+        Assert.Equal(JsonSerializer.Serialize(initial!.Settings with { ClientPolicy = SamplePolicy }), JsonSerializer.Serialize(changed!.Settings));
         using var after = JsonDocument.Parse(await File.ReadAllTextAsync(fixture.StatePath));
         foreach (var property in new[] { "Username", "Salt", "PasswordHash", "OperationId", "Schema", "Installed" })
             Assert.Equal(before.RootElement.GetProperty(property).GetRawText(), after.RootElement.GetProperty(property).GetRawText());
         await fixture.RestartAsync();
         await fixture.SignInAsync();
         await fixture.WaitForAsync("ready");
-        var restored = await fixture.Http.GetFromJsonAsync<InstallationClientPluginSettings>("/api/setup/client-plugins");
-        Assert.Equal(JsonSerializer.Serialize(rules), JsonSerializer.Serialize(restored!.Policies));
-        using var clear = await fixture.Http.PutAsJsonAsync("/api/setup/client-plugins", new InstallationClientPluginSettings([]));
+        var restored = await ReadPolicyAsync(fixture);
+        Assert.Equal("custom", restored.GetProperty("mode").GetString());
+        Assert.Equal(InstallationClientPolicySettings.Revision(SamplePolicy), restored.GetProperty("revision").GetString());
+
+        // One plugin's rules are replaced and another removed without resending the rest.
+        var revision = restored.GetProperty("revision").GetString();
+        using var replaced = await SendPolicyAsync(fixture, HttpMethod.Put, "/api/setup/client-policy/plugins/sample.plugin",
+            new ClientPluginRules("sample.plugin", null, null, [new("fresh", "latest", [])]), revision);
+        Assert.Equal(HttpStatusCode.Accepted, replaced.StatusCode);
+        await fixture.WaitForAsync("ready");
+        using var stale = await SendPolicyAsync(fixture, HttpMethod.Delete, "/api/setup/client-policy/plugins/recommended.plugin", null, revision);
+        Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
+        var current = (await stale.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("revision").GetString();
+        using var removed = await SendPolicyAsync(fixture, HttpMethod.Delete, "/api/setup/client-policy/plugins/recommended.plugin", null, current);
+        Assert.Equal(HttpStatusCode.Accepted, removed.StatusCode);
+        await fixture.WaitForAsync("ready");
+        var edited = (await fixture.Http.GetFromJsonAsync<InstallationConfiguration>("/api/setup/configuration"))!.Settings.ClientPolicy!;
+        Assert.Equal(SamplePolicy.Sources, edited.Sources);
+        var plugin = Assert.Single(edited.Plugins);
+        Assert.Equal(("sample.plugin", "fresh"), (plugin.Id, Assert.Single(plugin.Rules).Id));
+
+        using var clear = await SendPolicyAsync(fixture, HttpMethod.Put, "/api/setup/client-policy",
+            new InstallationClientPolicySettings(ClientPolicy.Empty), (await ReadPolicyAsync(fixture)).GetProperty("revision").GetString());
         Assert.Equal(HttpStatusCode.Accepted, clear.StatusCode);
         await fixture.WaitForAsync("ready");
-        Assert.Empty((await fixture.Http.GetFromJsonAsync<InstallationClientPluginSettings>("/api/setup/client-plugins"))!.Policies!);
-        using var inherit = await fixture.Http.PutAsJsonAsync("/api/setup/client-plugins", new InstallationClientPluginSettings(null));
+        Assert.Empty((await ReadPolicyAsync(fixture)).GetProperty("policy").GetProperty("plugins").EnumerateArray());
+        using var inherit = await SendPolicyAsync(fixture, HttpMethod.Put, "/api/setup/client-policy",
+            new InstallationClientPolicySettings(null), (await ReadPolicyAsync(fixture)).GetProperty("revision").GetString());
         Assert.Equal(HttpStatusCode.Accepted, inherit.StatusCode);
         await fixture.WaitForAsync("ready");
-        Assert.Null((await fixture.Http.GetFromJsonAsync<InstallationClientPluginSettings>("/api/setup/client-plugins"))!.Policies);
+        Assert.Equal("profile", (await ReadPolicyAsync(fixture)).GetProperty("mode").GetString());
         Assert.Equal(JsonSerializer.Serialize(initial), JsonSerializer.Serialize(await fixture.Http.GetFromJsonAsync<InstallationConfiguration>("/api/setup/configuration")));
     }
 
     [Theory]
-    [InlineData("{\"policies\":[{\"id\":\"sample\",\"builds\":[],\"required\":true,\"disabled\":true}]}")]
-    [InlineData("{\"policies\":[{\"id\":\"sample\",\"builds\":[],\"required\":true},{\"id\":\"sample\",\"builds\":[\"fixture-build\"],\"disabled\":true}]}")]
-    [InlineData("{\"policies\":[{\"id\":\"sample\",\"builds\":[\"fixture-build\"],\"required\":true},{\"id\":\"sample\",\"builds\":[],\"disabled\":true}]}")]
-    [InlineData("{\"policies\":[{\"id\":\"sample\",\"builds\":[\"fixture-build\"],\"required\":true},{\"id\":\"sample\",\"builds\":[\"fixture-build\"],\"disabled\":true}]}")]
-    [InlineData("{\"policies\":[{\"id\":\"../sample\",\"builds\":[]}]}")]
-    [InlineData("{\"policies\":[{\"id\":\"sample\",\"builds\":[\"unknown-build\"]}]}")]
-    [InlineData("{\"policies\":[{\"id\":\"sample\",\"builds\":null}]}")]
-    [InlineData("{\"policies\":[null]}")]
-    public async Task InvalidClientPluginPolicyLeavesDurableStateUntouched(string body)
+    [InlineData("{\"policy\":{\"sources\":[],\"plugins\":[{\"id\":\"sample\",\"rules\":[{\"id\":\"a\",\"type\":\"require\",\"builds\":[]},{\"id\":\"b\",\"type\":\"disable\",\"builds\":[\"fixture-build\"]}]}]}}", "client_policy_conflict")]
+    [InlineData("{\"policy\":{\"sources\":[],\"plugins\":[{\"id\":\"sample\",\"rules\":[{\"id\":\"a\",\"type\":\"teleport\",\"builds\":[]}]}]}}", "client_policy_unknown_type")]
+    [InlineData("{\"policy\":{\"sources\":[],\"plugins\":[{\"id\":\"sample\",\"rules\":[{\"id\":\"a\",\"type\":\"recommend\",\"builds\":[],\"sources\":[\"x\"]}]}]}}", "client_policy_unknown_source")]
+    [InlineData("{\"policy\":{\"sources\":[],\"plugins\":[{\"id\":\"sample\",\"rules\":[{\"id\":\"a\",\"type\":\"require\",\"builds\":[\"unknown-build\"]}]}]}}", "client_policy_unknown_build")]
+    [InlineData("{\"policy\":{\"sources\":[],\"plugins\":[{\"id\":\"../sample\",\"rules\":[]}]}}", "client_policy_invalid")]
+    [InlineData("{\"policy\":{\"sources\":[],\"plugins\":[null]}}", "client_policy_invalid")]
+    [InlineData("{\"policy\":{\"sources\":null,\"plugins\":[]}}", "client_policy_invalid")]
+    public async Task InvalidClientPolicyLeavesDurableStateUntouched(string body, string code)
     {
         await using var fixture = await Fixture.StartAsync(webUiGrants: ["webui.admin"]);
         await fixture.ClaimAsync(new() { PlayerLogin = "open" });
         await fixture.SignInAsync();
         await fixture.WaitForAsync("ready");
         var original = await File.ReadAllTextAsync(fixture.StatePath);
-        using var content = new StringContent(body, System.Text.Encoding.UTF8, "application/json");
-        using var response = await fixture.Http.PutAsync("/api/setup/client-plugins", content);
+        using var request = new HttpRequestMessage(HttpMethod.Put, "/api/setup/client-policy")
+        { Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json") };
+        request.Headers.TryAddWithoutValidation("If-Match", (await ReadPolicyAsync(fixture)).GetProperty("revision").GetString());
+        using var response = await fixture.Http.SendAsync(request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(code, (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error").GetString());
         Assert.Equal(original, await File.ReadAllTextAsync(fixture.StatePath));
+    }
+
+    [Fact]
+    public async Task RuleTypesDescribeEachFormField()
+    {
+        await using var fixture = await Fixture.StartAsync(webUiGrants: ["webui.admin"]);
+        await fixture.ClaimAsync(new() { PlayerLogin = "open" });
+        await fixture.SignInAsync();
+        await fixture.WaitForAsync("ready");
+        var types = (await fixture.Http.GetFromJsonAsync<JsonElement>("/api/setup/client-policy/rule-types")).EnumerateArray().ToArray();
+        Assert.Equal(["require", "disable", "recommend", "min_version", "max_version", "latest"], types.Select(t => t.GetProperty("name").GetString()));
+        Assert.Equal(["none", "none", "sources", "version", "version", "none"], types.Select(t => t.GetProperty("field").GetString()));
+        Assert.Contains("max_version", types[5].GetProperty("conflicts").EnumerateArray().Select(c => c.GetString()));
+    }
+
+    [Fact]
+    public async Task AReadyServerAddsPackagedClientsAndOnlyPermittedAccountsChangeIt()
+    {
+        await using (var accessOnly = await Fixture.StartAsync(webUiGrants: ["webui.access"]))
+        {
+            await accessOnly.ClaimAsync(new() { PlayerLogin = "open", Clients = [new("fixture-build", accessOnly.Directory, false)] });
+            await accessOnly.SignInAsync();
+            await accessOnly.WaitForAsync("ready");
+            foreach (var (path, body) in new[] { ("/api/clients", (object)new { profile = "fixture-other" }), ("/api/restart", new { }),
+                ("/api/plugins/test.installation-runtime/unload", new { }) })
+                Assert.Equal(HttpStatusCode.Forbidden, (await accessOnly.Http.PostAsJsonAsync(path, body)).StatusCode);
+        }
+        await using var fixture = await Fixture.StartAsync(webUiGrants: ["webui.admin"]);
+        await fixture.ClaimAsync(new() { PlayerLogin = "open", Clients = [new("fixture-build", fixture.Directory, false)] });
+        Assert.Equal(HttpStatusCode.OK, (await fixture.Http.GetAsync("/api/health")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await fixture.Http.GetAsync("/api/overview")).StatusCode);
+        await fixture.SignInAsync();
+        Assert.False((await fixture.WaitForAsync("ready")).ClientDataDeferred);
+        // A build that is not running yet is exactly the one an operator adds; only packaged, selectable builds qualify.
+        Assert.Equal(HttpStatusCode.BadRequest, (await fixture.Http.PostAsJsonAsync("/api/clients", new { profile = "fixture-preparing" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, (await fixture.Http.PostAsJsonAsync("/api/clients", new { profile = "fixture-other" })).StatusCode);
+        Assert.True((await fixture.WaitForAsync("ready")).ClientDataDeferred);
+        var saved = (await fixture.Http.GetFromJsonAsync<InstallationConfiguration>("/api/setup/configuration"))!;
+        Assert.Equal([new("fixture-build", fixture.Directory, false), new InstallationClient("fixture-other", "", true)], saved.Settings.Clients);
+        Assert.Equal(HttpStatusCode.Conflict, (await fixture.Http.PostAsJsonAsync("/api/clients", new { profile = "fixture-other" })).StatusCode);
     }
 
     [Fact]
@@ -559,14 +637,14 @@ public sealed class InstallationEndpointTests
         await fixture.ClaimAsync(new()
         {
             PlayerLogin = "open", Clients = [new("fixture-build", "", true)],
-            ClientPlugins = [new("sample.plugin", ["fixture-build"], Required: true)],
+            ClientPolicy = new([], [new("sample.plugin", null, null, [new("need", "require", ["fixture-build"])])]),
         });
         await fixture.SignInAsync();
         await fixture.WaitForAsync("ready");
         var configuration = (await fixture.Http.GetFromJsonAsync<InstallationConfiguration>("/api/setup/configuration"))!;
         var activated = configuration.Settings with { Clients = [new("fixture-build", Path.GetTempPath(), false)] };
         var original = await File.ReadAllTextAsync(fixture.StatePath);
-        using var forged = await fixture.Http.PutAsJsonAsync("/api/setup/configuration", new InstallationUpdate(activated with { ClientPlugins = [] }, false));
+        using var forged = await fixture.Http.PutAsJsonAsync("/api/setup/configuration", new InstallationUpdate(activated with { ClientPolicy = ClientPolicy.Empty }, false));
         Assert.Equal(HttpStatusCode.BadRequest, forged.StatusCode);
         Assert.Equal(original, await File.ReadAllTextAsync(fixture.StatePath));
         using var accepted = await fixture.Http.PutAsJsonAsync("/api/setup/configuration", new InstallationUpdate(activated, false));
@@ -577,24 +655,30 @@ public sealed class InstallationEndpointTests
     }
 
     [Fact]
-    public async Task ClientPluginPolicyRequiresItsOwnPermissionAndTheMutationGuard()
+    public async Task ClientPolicyRequiresItsOwnPermissionTheMutationGuardAndARevision()
     {
         await using (var accessOnly = await Fixture.StartAsync(webUiGrants: ["webui.access"]))
         {
-            Assert.Equal(HttpStatusCode.Unauthorized, (await accessOnly.Http.GetAsync("/api/setup/client-plugins")).StatusCode);
+            Assert.Equal(HttpStatusCode.Unauthorized, (await accessOnly.Http.GetAsync("/api/setup/client-policy")).StatusCode);
             await accessOnly.ClaimAsync(new() { PlayerLogin = "open" });
             await accessOnly.SignInAsync();
             await accessOnly.WaitForAsync("ready");
-            Assert.Equal(HttpStatusCode.Forbidden, (await accessOnly.Http.GetAsync("/api/setup/client-plugins")).StatusCode);
-            using var refused = await accessOnly.Http.PutAsJsonAsync("/api/setup/client-plugins", new InstallationClientPluginSettings([]));
+            Assert.Equal(HttpStatusCode.Forbidden, (await accessOnly.Http.GetAsync("/api/setup/client-policy")).StatusCode);
+            using var refused = await SendPolicyAsync(accessOnly, HttpMethod.Put, "/api/setup/client-policy", new InstallationClientPolicySettings(null), "x");
             Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
         }
         await using var fixture = await Fixture.StartAsync(webUiGrants: ["webui.admin"]);
         await fixture.ClaimAsync(new() { PlayerLogin = "open" });
         await fixture.SignInAsync();
         await fixture.WaitForAsync("ready");
+        var revision = (await ReadPolicyAsync(fixture)).GetProperty("revision").GetString();
+        using var unversioned = await SendPolicyAsync(fixture, HttpMethod.Put, "/api/setup/client-policy", new InstallationClientPolicySettings(null), null);
+        Assert.Equal((HttpStatusCode)428, unversioned.StatusCode);
+        using var mismatched = await SendPolicyAsync(fixture, HttpMethod.Put, "/api/setup/client-policy/plugins/other",
+            new ClientPluginRules("sample", null, null, []), revision);
+        Assert.Equal(HttpStatusCode.BadRequest, mismatched.StatusCode);
         fixture.Http.DefaultRequestHeaders.Remove("X-BFF-Request");
-        using var unguarded = await fixture.Http.PutAsJsonAsync("/api/setup/client-plugins", new InstallationClientPluginSettings([]));
+        using var unguarded = await SendPolicyAsync(fixture, HttpMethod.Put, "/api/setup/client-policy", new InstallationClientPolicySettings(null), revision);
         Assert.Equal(HttpStatusCode.Forbidden, unguarded.StatusCode);
     }
 
@@ -610,7 +694,7 @@ public sealed class InstallationEndpointTests
             return ValueTask.CompletedTask;
         }
         public Task WaitForBootstrapAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-        public ValueTask ApplyAsync(InstallationSettings settings, IReadOnlyDictionary<string, object?> databaseConfig,
+        public ValueTask ApplyAsync(InstallationSettings settings, IReadOnlyDictionary<string, object?> databaseConfig, string administrator,
             CancellationToken cancellationToken) => ValueTask.CompletedTask;
     }
 

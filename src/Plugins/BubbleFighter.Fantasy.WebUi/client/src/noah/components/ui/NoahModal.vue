@@ -4,9 +4,10 @@
       <div v-if="modelValue" class="noah-modal-overlay glass-backdrop" @click="handleOverlayClick">
         <div
           class="noah-modal-dialog glass-panel"
-          :style="{ maxWidth: width }"
+          :style="{ maxWidth: width, height: dialogHeight }"
           @click.stop
         >
+          <div ref="content" class="noah-modal-content">
           <!-- Header -->
           <div v-if="title || $slots.title || showClose" class="noah-modal-header">
             <slot name="title">
@@ -33,6 +34,7 @@
           <div v-if="$slots.footer" class="noah-modal-footer">
             <slot name="footer" />
           </div>
+          </div>
         </div>
       </div>
     </Transition>
@@ -40,6 +42,7 @@
 </template>
 
 <script setup>
+import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import NoahIcon from '../icons/NoahIcon.vue'
 
 const props = defineProps({
@@ -70,6 +73,25 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:modelValue', 'close'])
+const content = ref(null)
+const dialogHeight = ref(undefined)
+let sizeObserver
+let observation = 0
+
+// Measure the unconstrained inner flow so changing forms can animate the outer height.
+watch(() => props.modelValue, async open => {
+  const mine = ++observation
+  sizeObserver?.disconnect()
+  dialogHeight.value = undefined
+  if (!open) return
+  await nextTick()
+  if (mine !== observation || !content.value) return
+  const measure = () => { if (mine === observation && content.value) dialogHeight.value = `${content.value.offsetHeight}px` }
+  measure()
+  sizeObserver = new ResizeObserver(measure)
+  sizeObserver.observe(content.value)
+}, { immediate: true })
+onBeforeUnmount(() => { observation++; sizeObserver?.disconnect() })
 
 const handleClose = () => {
   emit('update:modelValue', false)
@@ -101,7 +123,10 @@ const handleOverlayClick = () => {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  transition: height 220ms cubic-bezier(.2, .8, .2, 1), max-width 220ms cubic-bezier(.2, .8, .2, 1);
 }
+
+.noah-modal-content { display: flex; flex-direction: column; flex: none; min-width: 0; }
 
 .noah-modal-header {
   display: flex;
@@ -163,9 +188,12 @@ const handleOverlayClick = () => {
 }
 
 .noah-modal-fade-enter-active .noah-modal-dialog {
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), height 220ms cubic-bezier(.2, .8, .2, 1), max-width 220ms cubic-bezier(.2, .8, .2, 1);
 }
 .noah-modal-fade-enter-from .noah-modal-dialog {
   transform: scale(0.96) translateY(8px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .noah-modal-dialog, .noah-modal-fade-enter-active .noah-modal-dialog { transition: none; }
 }
 </style>

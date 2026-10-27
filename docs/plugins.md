@@ -322,12 +322,21 @@ The disconnect notice uses the target's `launcher_language` and includes the opt
 `commands.management` options are `max_scopes` (512 live registrations), `disconnect_notice_timeout_ms` (5000) and `max_notice_characters` (511). The text budget may be lowered; its upper bound follows the native notice buffer. An overlong formatted reason is rejected before any notification or close. Scope registrations are owned effects and calls run under their registering plugin's supervised lifetime. Remote SDK registration remains unsupported because it needs native owner/callback transport. These rows do not implement kick, sudo, persistent OP editing, transfers, WebUI configuration or the distribution store.
 
 
-### Client plugin launch policy {#client-plugin-policy}
+### Client policy {#client-plugin-policy}
 
-The Store page can select client plugin identities from the merged catalog, or add an identity manually, and edit their recommended, required or forbidden status. These rules configure compatible Launchers; client binaries are not installed on the server. Each rule can target selected exact client builds. Leaving every build unchecked applies it to all builds. Profile mode retains the original configuration, while an empty custom list explicitly clears its recommendations.
+The WebUI edits the [client policy](launcher.md#client-policy) of an installed server: store sources and typed rules per plugin. These rules configure compatible Launchers; client binaries are not installed on the server. In profile mode the server uses the policy from the selected profile; the first saved change switches to a custom policy, and restoring profile mode returns to the profile's own.
 
-`GET` and `PUT /api/setup/client-plugins` require an authenticated WebUI account with both `webui.access` and `webui.settings.client_plugins`; `webui.admin` grants both. Game OP does not grant WebUI access. PUT uses the existing same-origin request guard and accepts `{"policies":[{"id":"example.plugin","builds":[],"required":false,"disabled":true}]}`. Send `{"policies":null}` to restore the profile policy or `{"policies":[]}` to clear it. Only store identities are accepted; rules do not contain download URLs or executable paths.
+Every route requires an authenticated WebUI account with both `webui.access` and `webui.settings.client_policy`; `webui.admin` grants both. Game OP does not grant WebUI access.
 
-The Launcher catalog, login and refresh responses advertise `pluginRecommendations` with `id`, `builds`, `required` and `disabled`. Recommended is false/false, required is true/false and forbidden is false/true. Required and disabled rules for the same identity cannot overlap, including all-build rules. Different policies on disjoint builds remain distinct; a requirement on one build is never expanded to another build by a global recommendation. Compatible Launchers enforce launch policy; this metadata does not prove client integrity or make game login validate loaded modules.
+| Route | Purpose |
+|---|---|
+| `GET /api/setup/client-policy` | `mode` (`profile` or `custom`), `revision`, the saved `policy` (null in profile mode) and `active`, the policy launchers receive now. |
+| `GET /api/setup/client-policy/rule-types` | Each rule type's `name`, its form `field` (`none`, `version` or `sources`) and the types it may `conflicts` with. |
+| `PUT /api/setup/client-policy` | Replaces the whole policy: `{"policy":{"sources":[],"plugins":[]}}`, or `{"policy":null}` to return to the profile's policy. |
+| `PUT /api/setup/client-policy/sources` | Replaces only the source list. |
+| `PUT /api/setup/client-policy/plugins/{id}` | Replaces one plugin's entry, `{"id":"{id}","name":null,"description":null,"rules":[...]}`, leaving the others unchanged. |
+| `DELETE /api/setup/client-policy/plugins/{id}` | Removes one plugin's entry. |
+
+Writes use the existing same-origin request guard and must send the `revision` they edited in `If-Match`. A write without it is refused with 428; a write against an older revision is refused with 409 and the current `revision`, so two open editors cannot overwrite each other. A partial write in profile mode starts from the active policy. A rejected policy returns 400 with `error` (`client_policy_invalid`, `client_policy_unknown_type`, `client_policy_unknown_source`, `client_policy_unknown_build` or `client_policy_conflict`) and, where known, the `plugin`, `rule` and conflicting `other` rule. Rule builds must be configured client profiles other than `management`.
 
 Changes persist independently of database, account, reward and client-data settings, then use the existing supervised configuration application. HTTP 202 acknowledges admission only. Application may reconnect game services; progress and failures remain visible in the setup status. Restore or retry failed configuration through the existing setup workflow.

@@ -352,19 +352,47 @@ The row's configuration is validated as one unit; unknown keys fail binding. The
 | `registration_enabled` | Whether launcher accounts may register. | `true` |
 | `create_account_on_login` | Whether signing in with an unknown name creates that account with the given password, so players need not register. A mistyped name creates a new account. | `false` |
 | `minimum_launcher_version` | Minimum launcher SemVer for registration, login, refresh and ticket issuance. Empty disables the gate. | empty |
-| `plugin_recommendations` | Up to 64 policy entries, each with an identity, optional exact builds and required/disabled flags; never URLs or paths. | empty |
+| `client_policy` | Store sources and typed rules per plugin, sent to the Launcher; see [Client policy](#client-policy). | empty |
 | `session_seconds` / `refresh_session_seconds` | Access-token and renewable-session lifetimes in seconds. | 1800 / 2592000 |
 | `ticket_seconds` | Launch-ticket lifetime in seconds. | 600 |
 | `requests_per_minute` / `max_concurrent_requests` | Global request budget and concurrent API work. | 120 / 8 |
 | `max_body_bytes` / `max_connections` | Request body and connection bounds. | 16384 / 128 |
 | `instances` | Client presets advertised in the catalog, at most 64. | empty |
 
-`plugin_recommendations` entries contain an `id`, an optional `builds` list (empty means every
-build), `required` and `disabled`. Recommended is false/false, required is true/false and forbidden
-is false/true. Required and disabled scopes for the same identity must not overlap, including
-all-build rules. Equivalent policy states may merge while their exact build scopes remain intact.
-The catalog and every sign-in response include the minimum launcher version and these rules.
-See [WebUI client plugin policy](plugins.md#client-plugin-policy) for graphical configuration.
+### Client policy (`client_policy`) {#client-policy}
+
+The client policy tells the Launcher which plugins a launch to this server must, may or must not
+use. It has two lists, with no limit on how many entries either holds:
+
+- `sources`: store catalogs, each with a lowercase `name`, `kind` (`http` or `alist`),
+  `base_url` (HTTP(S) without credentials, query or fragment) and `catalog_path`.
+- `plugins`: one entry per plugin, each with a store `id`, an optional `name` and `description`
+  (shown only in the WebUI, never sent to the Launcher) and its `rules`.
+
+Every rule has an `id` that is unique within its plugin, a `type`, and an optional `builds` list
+(empty means every build). The rule types are:
+
+| Type | Field | What the Launcher does |
+|---|---|---|
+| `require` | none | Refuses to launch until the plugin is installed and enabled, and offers to install it. |
+| `disable` | none | Turns the plugin off for launches to this server without changing the saved selection. A plugin the build itself requires cannot be turned off; the launch is refused instead. |
+| `recommend` | `sources` | Offers the plugin once per client and rule, installing from the named sources (an empty list allows any declared source). |
+| `min_version` | `version` | An enabled plugin older than this version must be updated before launch. |
+| `max_version` | `version` | An enabled plugin newer than this version is replaced by the highest allowed version from the sources; the launch is refused if none is available. |
+| `latest` | none | An enabled plugin is updated to its newest version before launch. |
+
+Versions are strict SemVer. Two rules of one plugin conflict when their builds overlap and any of
+these holds: they have the same type; one is `disable`; one is `latest` and the other
+`max_version`; or a `min_version` is above a `max_version` (equal bounds pin one version). A
+conflicting, malformed or unknown rule stops the row from starting. A Launcher that does not know a
+rule type refuses launches to the server and asks the player to update the Launcher.
+
+The catalog and every sign-in response carry the minimum launcher version and the policy as
+`clientPolicy` (`version`, `sources`, `plugins`), with each rule's `version` or `sources` only when
+its type takes it. The policy a player receives at sign-in is the one launches use; the catalog copy
+is only shown before sign-in. The policy configures compatible Launchers; it does not prove client
+integrity or make game login check loaded modules. See
+[WebUI client policy](plugins.md#client-plugin-policy) for the management API.
 
 ### Client presets (`instances`)
 
@@ -470,10 +498,20 @@ only:
       name: "Example Community Server"
       region: "KR"
       minimum_launcher_version: "1.4.0"
-      plugin_recommendations:
-        - id: "bubblefighter.fantasy.kr1256-shop-gates"
-          builds: ["kr-1256"]
-          required: true
+      client_policy:
+        sources:
+          - name: "community"
+            kind: "http"
+            base_url: "https://store.example.com"
+            catalog_path: "FantasyTale/source.toml"
+        plugins:
+          - id: "bubblefighter.fantasy.kr1256-shop-gates"
+            rules:
+              - { id: "needed", type: "require", builds: ["kr-1256"] }
+              - { id: "floor", type: "min_version", builds: ["kr-1256"], version: "1.2.0" }
+          - id: "example.optional-overlay"
+            rules:
+              - { id: "offer", type: "recommend", sources: ["community"] }
       instances:
         - id: "kr-1256-main"
           build: "kr-1256"

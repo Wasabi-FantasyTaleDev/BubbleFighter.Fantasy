@@ -31,7 +31,8 @@
     transfer_timeout_ms: 1800000
     request_timeout_ms: 30000
     maximum_redirects: 5
-    use_github_mirror: false
+    github_mirrors_path: data/github-mirrors.json
+    github_mirror_state_path: data/distribution-github-mirror.json
 - id: distribution.plans
   plugin: distribution.plans
   config:

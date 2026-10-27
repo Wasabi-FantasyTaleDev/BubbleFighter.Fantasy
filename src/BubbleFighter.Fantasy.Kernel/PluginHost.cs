@@ -110,7 +110,10 @@ public sealed partial class PluginHost : IPluginHost
     /// <param name="startup">The immutable initial and deferred rows whose grants establish startup capacity.</param>
     /// <param name="catalog">Definitions required by initial entries; deferred definitions may be supplied by ordinary sources.</param>
     /// <param name="loggerFactory">The logging factory used by runtime contexts and diagnostics.</param>
-    public PluginHost(PluginStartupPlan startup, PluginCatalog catalog, ILoggerFactory loggerFactory)
+    /// <param name="restartService">Optional process restart control published to plugin rows.</param>
+    /// <param name="logFeed">Optional feed of every entry the process logs, published to plugin rows.</param>
+    public PluginHost(PluginStartupPlan startup, PluginCatalog catalog, ILoggerFactory loggerFactory, IServerRestartService? restartService = null,
+        IServerLogFeed? logFeed = null)
     {
         ArgumentNullException.ThrowIfNull(startup);
         ArgumentNullException.ThrowIfNull(catalog);
@@ -131,6 +134,8 @@ public sealed partial class PluginHost : IPluginHost
         _registry.Register<IEventBus>(_events);
         _registry.Register<IPluginHost>(this);
         _registry.Register<IHostReadiness>(_readiness);
+        if (restartService is not null) _registry.Register(restartService);
+        if (logFeed is not null) _registry.Register(logFeed);
         foreach (var row in _rows)
             _info[row.Id] = InstanceInfo(row, DefinitionFor(row), PluginState.Unloaded, null);
         InitializeBindingReconciliation();
@@ -143,10 +148,13 @@ public sealed partial class PluginHost : IPluginHost
         if (_readiness.Set()) _logger.LogInformation("Server is ready; launcher sign-in and launches are accepted.");
     }
 
-    private sealed class HostReadiness : IHostReadiness
+    private sealed class HostReadiness : IHostReadiness, IServerMaintenance
     {
         private int _ready;
-        public bool IsReady => Volatile.Read(ref _ready) != 0;
+        private int _maintenance;
+        public bool IsReady => Volatile.Read(ref _ready) != 0 && !IsMaintenance;
+        public bool IsMaintenance => Volatile.Read(ref _maintenance) != 0;
+        public void SetMaintenance(bool enabled) => Volatile.Write(ref _maintenance, enabled ? 1 : 0);
         public bool Set() => Interlocked.Exchange(ref _ready, 1) == 0;
     }
 
@@ -652,6 +660,7 @@ public sealed partial class PluginHost : IPluginHost
             CodeRefreshPolicy = row.Lifecycle.CodeRefreshPolicy,
             CodeLifetime = descriptor?.ModuleCode?.Lifetime ?? PluginCodeLifetime.Unknown,
             Version = descriptor?.Version,
+            Description = descriptor?.Description,
             ContractVersions = descriptor?.ContractVersions ?? new Dictionary<string, string>(),
             SupportedBuilds = descriptor?.SupportedBuilds ?? [],
             Overrides = descriptor is null ? [] : Metadata(descriptor).Overrides,

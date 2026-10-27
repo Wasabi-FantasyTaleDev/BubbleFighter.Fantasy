@@ -348,7 +348,7 @@ BFF_PUBLIC_HOST=<public-address-clients-use>
 
 过期物品丢弃也以同样方式声明：`dialect.messages` 行的 `inventory_actions` 选项绑定 `gcpReqInventoryThrowItem`/`gspRepInventoryThrowItem`（每个 legacy 构建和 `kr-1256` 均开启），构建自己的 bundle 内的 `inventory.throw` 行通过存储装备服务移除该物品。行为被有意限制得很窄：只移除一个已认证玩家两个背包中的该过期物品；若有匹配权益仍有效，整个移除会被拒绝；构建的类别 6 排除规则会被遵守。比赛中的请求会被拒绝。真实客户端验收仍待进行；仅凭封包表覆盖不足以在另一个构建上声明该选项。
 
-**`launcher.http`** 是可选的公共启动器 API。它默认禁用，与管理工作分离。它接受 `minimum_launcher_version`（留空则关闭检查）与 `plugin_recommendations`，后者包含商店标识和可选的精确 `builds`，绝不包含可执行文件路径或下载地址。配置最低版本后，较旧的启动器会收到 HTTP 426。每个大厅行的 `authentication` 选项（`BFF_LOGIN_AUTHENTICATION`，默认 `ticket`）只接受能兑换启动器票据的登录，此时需要本行处于激活状态；`open` 接受任何账号名，只适用于可信的局域网。[启动器](launcher.md)页面介绍该 API、客户端预设、账号与票据流程以及面向运营者的配置。
+**`launcher.http`** 是可选的公共启动器 API。它默认禁用，与管理工作分离。它接受 `minimum_launcher_version`（留空则关闭检查）与 `client_policy`，即启动器执行的按插件分类的类型化规则；规则只引用商店标识和已声明的商店来源，绝不包含可执行文件路径。配置最低版本后，较旧的启动器会收到 HTTP 426。每个大厅行的 `authentication` 选项（`BFF_LOGIN_AUTHENTICATION`，默认 `ticket`）只接受能兑换启动器票据的登录，此时需要本行处于激活状态；`open` 接受任何账号名，只适用于可信的局域网。[启动器](launcher.md)页面介绍该 API、客户端预设、账号与票据流程以及面向运营者的配置。
 
 启动器请求与登录会话限制在 `launcher.http` 行配置：
 

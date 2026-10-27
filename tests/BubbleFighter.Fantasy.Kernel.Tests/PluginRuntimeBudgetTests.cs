@@ -16,7 +16,7 @@ public sealed class PluginRuntimeBudgetTests
         var budget = PluginRuntimeBudget.Capture(rows);
 
         Assert.Equal(2, budget.EntryCapacity);
-        Assert.Equal(8198, budget.ServiceMetadataCapacity);
+        Assert.Equal(8200, budget.ServiceMetadataCapacity);
         budget.Validate(rows, [], []);
         Assert.Throws<ConfigException>(() => budget.Validate([.. rows, Row("extra")], [], []));
     }
@@ -28,7 +28,7 @@ public sealed class PluginRuntimeBudgetTests
         var budget = PluginRuntimeBudget.Capture([]);
 
         Assert.Equal(0, budget.EntryCapacity);
-        Assert.Equal(4, budget.ServiceMetadataCapacity);
+        Assert.Equal(6, budget.ServiceMetadataCapacity);
         budget.Validate([], [], []);
         Assert.Throws<ConfigException>(() => budget.Validate([Row("new", effects: 1)], [], []));
     }
@@ -41,7 +41,7 @@ public sealed class PluginRuntimeBudgetTests
         var budget = PluginRuntimeBudget.Capture([donor]);
 
         Assert.Equal(3, budget.EntryCapacity);
-        Assert.Equal(13, budget.ServiceMetadataCapacity);
+        Assert.Equal(15, budget.ServiceMetadataCapacity);
         budget.Validate([donor, Row("second", 2), Row("third", 2)], [], []);
         Assert.Contains("service metadata capacity", Assert.Throws<ConfigException>(() =>
             budget.Validate([donor, Row("second", 2), Row("third", 3)], [], [])).Message);
@@ -65,7 +65,7 @@ public sealed class PluginRuntimeBudgetTests
         var donor = Row("donor", effects: 1, entries: 1, metadata: 2);
         var budget = PluginRuntimeBudget.Capture([donor]);
 
-        Assert.Equal(8, budget.ServiceMetadataCapacity);
+        Assert.Equal(10, budget.ServiceMetadataCapacity);
         budget.Validate([Row("new", 1)], [donor], []);
         Assert.Contains("service metadata capacity", Assert.Throws<ConfigException>(() =>
             budget.Validate([Row("new", 2)], [donor], [])).Message);
@@ -99,7 +99,7 @@ public sealed class PluginRuntimeBudgetTests
         budget.Validate([smaller, Row("new", 8)], [], []);
         Assert.Throws<ConfigException>(() => budget.Validate([smaller, Row("new", 9)], [], []));
         Assert.Equal(2, budget.EntryCapacity);
-        Assert.Equal(15, budget.ServiceMetadataCapacity);
+        Assert.Equal(17, budget.ServiceMetadataCapacity);
     }
 
     /// <summary>Repeated ownership snapshots for one identity charge one slot and its maximum effect limit.</summary>
@@ -115,7 +115,7 @@ public sealed class PluginRuntimeBudgetTests
 
         budget.Validate([smaller], [], reverse ? owned.Reverse().ToArray() : owned);
         Assert.Equal(1, budget.EntryCapacity);
-        Assert.Equal(15, budget.ServiceMetadataCapacity);
+        Assert.Equal(17, budget.ServiceMetadataCapacity);
     }
 
     /// <summary>Owned identities require a current or retiring declaration even when they were present at startup.</summary>
@@ -141,7 +141,7 @@ public sealed class PluginRuntimeBudgetTests
 
         budget.Validate([Row("entry", effects: 5, metadata: 3)], [], [old]);
         Assert.Throws<ConfigException>(() => budget.Validate([Row("entry", effects: 6, metadata: 3)], [], [old]));
-        Assert.Equal(10, budget.ServiceMetadataCapacity);
+        Assert.Equal(12, budget.ServiceMetadataCapacity);
     }
 
     /// <summary>A reduced retiring declaration cannot hide the larger capacity of its still-owned activation.</summary>
@@ -223,7 +223,7 @@ public sealed class PluginRuntimeBudgetTests
         budget.Validate([Row("first", 2), Row("second", 2)], [], []);
         budget.Validate([donor, Row("first", 2)], [], []);
         Assert.Equal(2, budget.EntryCapacity);
-        Assert.Equal(10, budget.ServiceMetadataCapacity);
+        Assert.Equal(12, budget.ServiceMetadataCapacity);
         Assert.Throws<ConfigException>(() => budget.Validate([donor, Row("first", 2), Row("second", 2)], [], []));
     }
 
@@ -304,7 +304,7 @@ public sealed class PluginRuntimeBudgetTests
         var second = Row("second", effects: 2, metadata: 2);
         var budget = PluginRuntimeBudget.Capture([donor, first, second]);
 
-        Assert.Equal(19, budget.ServiceMetadataCapacity);
+        Assert.Equal(21, budget.ServiceMetadataCapacity);
         budget.Validate([donor, first, second], [], [Row("first", 6)]);
         budget.Validate([donor, first, second], [], [Row("second", 6)]);
         Assert.Contains("service metadata capacity", Assert.Throws<ConfigException>(() =>
@@ -339,7 +339,7 @@ public sealed class PluginRuntimeBudgetTests
         var added = Row("new", effects: 3);
         var budget = PluginRuntimeBudget.Capture([old]);
 
-        Assert.Equal(15, budget.ServiceMetadataCapacity);
+        Assert.Equal(17, budget.ServiceMetadataCapacity);
         Assert.Contains("declared and owned entry capacities", Assert.Throws<ConfigException>(() =>
             budget.Validate([smaller, added], [], [old])).Message);
         budget.Validate([smaller, added], [], []);

@@ -196,4 +196,4 @@ Set-Location 'D:/Launcher'
 
 来源默认保存到 `data/distribution-sources.json`，下载保存在 `data/distribution-staging`。可配置的行选项包括 `maximum_document_bytes`（4194304）、`maximum_sources`（512）、元数据超时 `request_timeout_ms`（30000）和下载超时 `transfer_timeout_ms`（1800000）。`maximum_payload_bytes` 可选；下载仍受声明的准确大小及可用磁盘空间约束。`free_space_reserve_bytes` 默认 0，历史分页 `history_page_size` 默认 20。这些是部署选项，不是包格式要求。已完成下载不会自动删除。
 
-服务端应用清单使用既有 schema 1 格式。服务端插件清单需要显式启用实验读取器 `distribution.packages.experimental_release_format: true`（默认 false）；该提案尚非启动器的正式共享规范。GitHub 附件的发布者哈希不证明平台兼容性。GitHub 镜像尚未实现，启用 `use_github_mirror` 会明确报错。安装后的商店 API 使用管理员会话及既有请求保护，尚无逐操作的商店权限节点；命令模式管理仍仅监听回环地址。[客户端插件启动策略](plugins.md#client-plugin-policy)有独立的权限要求。
+服务端应用清单使用既有 schema 1 格式。服务端插件清单需要显式启用实验读取器 `distribution.packages.experimental_release_format: true`（默认 false）；该提案尚非启动器的正式共享规范。GitHub 附件的发布者哈希不证明平台兼容性。发布附件可通过 [GitHub 镜像](store.zh.md#github-mirror)下载，并仍以该哈希核对。安装后的商店 API 使用管理员会话及既有请求保护，尚无逐操作的商店权限节点；命令模式管理仍仅监听回环地址。[客户端插件启动策略](plugins.md#client-plugin-policy)有独立的权限要求。

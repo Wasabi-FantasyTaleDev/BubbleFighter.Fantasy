@@ -20,8 +20,8 @@ internal sealed class PluginRuntimeBudget
     internal int EntryCapacity { get; }
     internal int ServiceMetadataCapacity { get; }
 
-    // The host registers IServiceRegistry, IEventBus, IPluginHost and IHostReadiness before any row activates.
-    internal const int HostServiceCount = 4;
+    // The host reserves IServiceRegistry, IEventBus, IPluginHost, IHostReadiness, restart control and the log feed before rows activate.
+    internal const int HostServiceCount = 6;
     internal int DefinitionSourceCapacity { get; }
     internal int DefinitionCapacity { get; }
 

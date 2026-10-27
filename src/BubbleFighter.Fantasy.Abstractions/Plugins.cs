@@ -157,6 +157,9 @@ public sealed record PluginInstanceInfo(string RowId, string Plugin, string Sour
     /// <summary>Gets the plugin assembly's informational release version, including build metadata.</summary>
     public string? Version { get; init; }
 
+    /// <summary>Gets the human-readable description the plugin declares, when it declares one.</summary>
+    public string? Description { get; init; }
+
     /// <summary>Gets referenced shared contract assembly versions keyed by assembly name.</summary>
     public IReadOnlyDictionary<string, string> ContractVersions { get; init; } = new Dictionary<string, string>();
 

@@ -31,9 +31,23 @@ whole list at once.
 
 Saving uses an optimistic revision: the editor captures the settings revision when it opens and
 sends it back with the save. If another administrator saved in between, the save is refused with
-`source_revision_conflict` and the dialog stays open for you to review and reapply. GitHub mirror
-support is not implemented: enabling `use_github_mirror` fails the distribution row at startup
-instead of pretending to accelerate downloads.
+`source_revision_conflict` and the dialog stays open for you to review and reapply.
+
+## GitHub mirror {#github-mirror}
+
+Where GitHub is slow or blocked, the store can download GitHub release attachments and archives
+through public URL-prefix mirrors. Open **Manage sources** and turn on **GitHub mirror
+acceleration**; **Automatic** measures every mirror before each download and tries the fastest
+available ones first, or choose one mirror after a **Speed test**. GitHub itself is always the
+last route. Only payloads travel through a mirror: release information and catalogs are read from
+GitHub directly, and every mirrored byte is checked against the size and SHA-256 that GitHub
+published, so a mirror can make a download fail but cannot change what is installed.
+
+The server checks its own address once. When it is in mainland China, the first administrator to
+open the WebUI is asked whether to turn the mirror on; the dialog is shown once and nothing changes
+until it is confirmed. The mirror list, the probe file and the measurement bounds are in
+`data/github-mirrors.json` (`github_mirrors_path` on the `distribution.sources` row; empty turns the
+feature off), and the switch, selection and location check are kept in `github_mirror_state_path`.
 
 ## Browsing the catalog {#browsing}
 
@@ -81,15 +95,9 @@ A passing verification states what the staging volume held at that instant. It g
 installation authority, and a later change on disk is detected by verifying again, not trusted
 forward.
 
-## Client plugin launch policy {#client-plugin-policy}
+## Client policy {#client-plugin-policy}
 
-The Store page also edits the client plugin launch policy when the server is installed: per
-identity, optional exact client builds, and recommended, required or forbidden states (required and
-disabled must not overlap). Saving requires the `webui.settings.client_plugins` permission on top
-of the administrator session, is refused unless the server is installed and ready, and reruns the
-configuration application afterwards. These rules configure compatible Launchers — client binaries
-are not installed on the server, and the rules prove nothing about client integrity. See
-[Client plugin launch policy](plugins.md#client-plugin-policy) for the wire format.
+The client policy that decides which plugins Launchers must, may or must not use is edited in the WebUI of an installed server. Saving requires the `webui.settings.client_policy` permission on top of the administrator session and reruns the configuration application. These rules configure compatible Launchers; client binaries are not installed on the server, and the rules prove nothing about client integrity. See [Client policy](plugins.md#client-plugin-policy) for the management API and [the rule types](launcher.md#client-policy).
 
 ## Administration API {#administration-api}
 

@@ -48,7 +48,9 @@ public sealed partial class AdminHttpPlugin
                 new[] { "X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Proto", "Forwarded" }
                     .Any(http.Request.Headers.ContainsKey))
             { await RejectAsync(http, 403, "setup_proxy_refused").ConfigureAwait(false); return; }
-            var publicAuth = path is "/api/auth/status" or "/api/auth/login";
+            // Health carries no data beyond liveness and start time; it stays public so a restart can be observed after
+            // the in-memory sessions are gone.
+            var publicAuth = path is "/api/auth/status" or "/api/auth/login" or "/api/health";
             var freshSetup = !access.HasAdministrator && (path is "/api/setup/status" or "/api/setup/probe" or "/api/setup/complete" or "/api/setup/directories" or "/api/setup/client-data");
             if (freshSetup && !(http.Connection.RemoteIpAddress is { } remote && IPAddress.IsLoopback(remote)) &&
                 !access.AcceptsBootstrapToken(http.Request.Headers["X-BFF-Setup-Token"].ToString()))

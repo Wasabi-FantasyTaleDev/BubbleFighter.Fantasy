@@ -1,5 +1,6 @@
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Contracts.Installation;
+using BubbleFighter.Fantasy.Contracts.Launcher;
 using BubbleFighter.Fantasy.Host;
 using BubbleFighter.Fantasy.Kernel;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -7,7 +8,7 @@ using Xunit;
 
 namespace BubbleFighter.Fantasy.WebUi.Tests;
 
-public sealed class ClientPluginPolicyRuntimeTests
+public sealed class ClientPolicyRuntimeTests
 {
     [Fact]
     public async Task ActualProfileApplicationPublishesOverridesClearsAndRestoresInheritedPolicy()
@@ -26,14 +27,20 @@ public sealed class ClientPluginPolicyRuntimeTests
             - id: persistence.sqlite
               plugin: policy-test.storage
               disabled: true
+            - id: permissions
+              plugin: permissions
+              config:
+                subjects:
+                  - { kind: webui, id: deputy, allow: [webui.access] }
             - id: launcher.http
               plugin: launcher.http
               config:
                 ticket_seconds: 600
-                plugin_recommendations:
-                  - id: inherited.plugin
-                    builds: []
-                    required: false
+                client_policy:
+                  plugins:
+                    - id: inherited.plugin
+                      rules:
+                        - { id: offer, type: recommend, builds: [], sources: [] }
             """);
         var session = new SetupProfileSession(root, root, []);
         PluginRow[] shell = [new() { Id = "adapter", Plugin = "host.profiles", Source = "fixture",
@@ -41,21 +48,28 @@ public sealed class ClientPluginPolicyRuntimeTests
         session.CaptureShell(shell);
         var launcher = new Recorder("launcher.http");
         var storage = new Recorder("policy-test.storage");
-        var host = new PluginHost(shell, PluginCatalog.FromDefinitions([session.Definition, launcher.Definition, storage.Definition]), NullLoggerFactory.Instance);
+        var permissions = new Recorder("permissions");
+        var host = new PluginHost(shell, PluginCatalog.FromDefinitions([session.Definition, launcher.Definition, storage.Definition, permissions.Definition]), NullLoggerFactory.Instance);
         try
         {
             await host.StartAsync(default);
             var settings = new InstallationSettings { Clients = [], DatabaseKind = "sqlite", PlayerLogin = "open",
-                ClientPlugins = [new("selected.plugin", ["build-a"], Disabled: true)] };
-            await session.ApplyAsync(settings, new Dictionary<string, object?>(), default);
-            var rule = Assert.Single(Rules());
-            Assert.Equal("selected.plugin", rule["id"]);
-            Assert.Equal(true, rule["disabled"]);
+                ClientPolicy = new([], [new("selected.plugin", null, null, [new("off", "disable", ["build-a"])])]) };
+            await session.ApplyAsync(settings, new Dictionary<string, object?>(), "owner", default);
+            // The claiming account administers the WebUI; subjects the profile already lists are kept.
+            var subjects = Assert.IsAssignableFrom<IEnumerable<object?>>(permissions.Configuration!["subjects"])
+                .Select(value => Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(value)).ToArray();
+            Assert.Equal(["deputy", "owner"], subjects.Select(subject => subject["id"]?.ToString()));
+            Assert.Equal("webui.admin", Assert.Single(Assert.IsAssignableFrom<IEnumerable<object?>>(subjects[1]["allow"]))?.ToString());
+            var plugin = Assert.Single(Plugins());
+            Assert.Equal("selected.plugin", plugin["id"]);
+            var rule = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(Assert.Single(Assert.IsAssignableFrom<IEnumerable<object?>>(plugin["rules"])));
+            Assert.Equal("disable", rule["type"]);
             Assert.Equal("600", launcher.Configuration!["ticket_seconds"]?.ToString());
-            await session.ApplyAsync(settings with { ClientPlugins = [] }, new Dictionary<string, object?>(), default);
-            Assert.Empty(Rules());
-            await session.ApplyAsync(settings with { ClientPlugins = null }, new Dictionary<string, object?>(), default);
-            Assert.Equal("inherited.plugin", Assert.Single(Rules())["id"]);
+            await session.ApplyAsync(settings with { ClientPolicy = ClientPolicy.Empty }, new Dictionary<string, object?>(), "owner", default);
+            Assert.Empty(Plugins());
+            await session.ApplyAsync(settings with { ClientPolicy = null }, new Dictionary<string, object?>(), "owner", default);
+            Assert.Equal("inherited.plugin", Assert.Single(Plugins())["id"]);
         }
         finally
         {
@@ -63,8 +77,8 @@ public sealed class ClientPluginPolicyRuntimeTests
             Directory.Delete(root, recursive: true);
         }
 
-        IReadOnlyDictionary<string, object?>[] Rules() =>
-            Assert.IsAssignableFrom<IEnumerable<object?>>(launcher.Configuration!["plugin_recommendations"])
+        IReadOnlyDictionary<string, object?>[] Plugins() =>
+            Assert.IsAssignableFrom<IEnumerable<object?>>(Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(launcher.Configuration!["client_policy"])["plugins"])
                 .Select(value => Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(value)).ToArray();
     }
 

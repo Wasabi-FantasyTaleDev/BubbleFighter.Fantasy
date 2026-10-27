@@ -2,6 +2,19 @@
 
 日期采用 `YYYY-MM-DD`；注明时间时使用 Asia/Shanghai（UTC+08:00）。新条目追加在旧条目上方，中英文在同一提交更新。本公开日志从预发布准备开始，更早的开发记录内部保留。
 
+## 尚未发布
+
+- 2026-10-27：开启 **GitHub 镜像加速**（管理来源）后，商店会通过公共镜像下载 GitHub 发布附件和压缩包。自动模式每次下载前测量镜像，失败时回退到 GitHub；测速会列出每个镜像的速度和延迟，并可固定使用某个镜像。发布信息从不经过镜像，经镜像收到的每个字节都必须与 GitHub 公布的大小和 SHA-256 一致。位于中国大陆的服务器会询问第一位管理员一次是否开启。镜像列表为 `data/github-mirrors.json`（`github_mirrors_path`）；`use_github_mirror` 已移除。Contracts 3.1.0 新增 `IDistributionGithubMirror`。
+- 2026-10-27：WebUI 可管理运行中的服务器。概览控制台向服务器发送命令、切换维护模式（暂停新的接入，已连接的玩家不受影响），并可重启服务器，只有在服务器以新的启动时间恢复后才报告成功。插件可加载、卸载、禁用和重新加载；房间显示其玩家和密码；可在“客户端版本”页面添加客户端并导入其数据。每项操作都有独立权限（`webui.plugins.manage`、`webui.server.maintenance`、`webui.server.restart`、`webui.clients.manage`、`webui.rooms.inspect`）；仅有 `webui.access` 时只能查看服务器。
+- 2026-10-27：客户端插件策略在“插件 > 客户端插件策略”中编辑。可按插件标识或从商店目录添加插件；每条规则有类型、各自的客户端版本，并按类型填写版本或推荐来源。规则冲突时会询问保留哪一条；期间若在别处有修改，会提示而不是覆盖；也可恢复 profile 中的策略。旧的商店策略页面已移除。
+- 2026-10-27：认领安装的账号现在是其所启动 profile 的 WebUI 管理员。打包的 profile 不列出任何权限主体，因此此前安装时创建的管理员虽能登录，却无法使用任何需要权限的功能。
+- 2026-10-27：修复安装后的客户端版本管理。已就绪的服务器可随时添加客户端；“客户端版本”页面会列出已配置但尚未导入数据的客户端，并保存导入的目录，使该版本启动。运行中的 SQLite 安装不再因第二次打开数据库而使每次配置修改失败。
+- 2026-10-27：WebUI 控制台和日志页面通过主机日志源（`IServerLogFeed`，Abstractions 8.16.0）显示整个服务器的日志，而不只是管理监听器自身的请求；不再记录每个请求的 ASP.NET Core 日志行。插件显示其标识和声明的说明，“内置”和“更新”筛选可用，插件未提供的字段不再显示。概览统计所有版本的房间数，`/api/health` 无需登录即可访问。重新加载或卸载管理行所依赖的插件不再使 WebUI 卡死：请求会在该行重启期间返回。“设置”页面不再提供客户端数据。
+- 2026-10-27：用客户端策略取代启动器的插件推荐。`launcher.http` 改为接受 `client_policy`：具名的商店来源，以及每个插件的类型化规则（`require`、`disable`、带来源的 `recommend`、`min_version`、`max_version`、`latest`），每条规则都可单独指定适用版本。相互冲突的规则（例如 `disable` 与任何其他规则、`latest` 与 `max_version`，或版本范围重叠时最低版本高于最高版本）会使该行无法启动，并指出相关插件和规则。目录和登录响应发送 `clientPolicy`，不再发送 `pluginRecommendations`。WebUI 管理 API 改为 `/api/setup/client-policy`，提供按插件和按来源的路由、供表单使用的规则类型列表，以及 `If-Match` 修订号，两个编辑器不会互相覆盖；权限改为 `webui.settings.client_policy`。
+- 2026-10-27：移除没人要求过的限制。客户端策略对插件、规则、来源和版本的数量不设上限；安装设置文件不再限制大小和嵌套层数；`launcher.http` 不再限制图片、白名单名称和实例的数量、文本和地址的长度，也不再限制可调参数的上限（例如 `ticket_seconds` 超过十分钟）。数值仍须有效，监听器的请求大小和速率设置仍可配置。`minimum_password_length` 默认改为 6，这也是允许的最小值，密码不再有长度上限。
+- 升级须知：`plugin_recommendations` 已移除，请把其中的条目迁移到 `client_policy`，否则启动时会因未知键失败。路由 `/api/setup/client-plugins` 和权限 `webui.settings.client_plugins` 已移除。Contracts 3.0.0：`ClientPluginPolicy`、`ClientPluginPolicyRules` 和 `InstallationClientPluginSettings` 由 `ClientPolicy`、`ClientPolicyRules` 和 `InstallationClientPolicySettings` 取代。
+- 2026-10-27：WebUI 插件默认使用紧凑浏览布局，详情区域独立滚动；支持搜索、状态筛选及切换回详细表格，并在浏览器中记住布局选择。本机前端开发可通过 `BFF_WEBUI_BACKEND` 指定独立后端。
+
 ## 0.2.0 — 2026-10-27
 
 要点（详细内容见下方按日期排列的条目）：
