@@ -172,7 +172,7 @@ internal sealed partial class RoomFlow
             // cn-324 sub_707520 only switches the stage; it retains the selection scene's
             // session. Reuse the login installer before constructing the menu avatar.
             await _mainMenu.SendAsync(session, new MainMenuRoomOpened(userNum, nickname, equipment.CharacterId,
-                equipment.ItemIds ?? [equipment.CharacterId]) { OfferTutorial = false, ColorIndex = SessionPlayer.ResolveColorIndex(session) }, ct).ConfigureAwait(false);
+                equipment.ItemIds ?? [equipment.CharacterId], SessionPlayer.ResolveLevel(session)) { OfferTutorial = false, ColorIndex = SessionPlayer.ResolveColorIndex(session) }, ct).ConfigureAwait(false);
             ScenePhase.Entered(session, SessionPhase.Plaza, _logger);
             ScenePhase.Entered(session, SessionPhase.MainMenu, _logger);
             return;

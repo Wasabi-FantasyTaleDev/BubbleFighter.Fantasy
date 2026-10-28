@@ -30,7 +30,7 @@ public sealed class UpdatePartyWireTests
         Assert.Equal(0, BitConverter.ToInt32(body, 12));
         Assert.Equal(0, BitConverter.ToInt32(body, 16));
         Assert.Equal(0, BitConverter.ToInt32(body, 20));
-        Assert.Equal(0, BitConverter.ToInt32(body, 24));
+        Assert.Equal(1, BitConverter.ToInt32(body, 24));
         Assert.Equal(0, BitConverter.ToInt32(body, 28));
     }
 
@@ -42,9 +42,9 @@ public sealed class UpdatePartyWireTests
     [InlineData("id-400")]
     [InlineData("id-1809")]
     [InlineData("cn-706")]
-    public void SoloNicknamePinsPrefixedWideStringAndTrailingZeros(string build)
+    public void SoloNicknamePinsPrefixedWideStringAndSavedRank(string build)
     {
-        var body = UpdatePartyCodec.WriteSolo(TestBuilds.All.Tables, build, new MainMenuRoomOpened(42, "ab", 300001, []));
+        var body = UpdatePartyCodec.WriteSolo(TestBuilds.All.Tables, build, new MainMenuRoomOpened(42, "ab", 300001, [], 17));
         // 4+4+4 + (4+4) + 12 + 4 = 36.
         Assert.Equal(36, body.Length);
         Assert.Equal(42, BitConverter.ToInt32(body, 8));
@@ -52,7 +52,7 @@ public sealed class UpdatePartyWireTests
         Assert.Equal((byte)'a', body[16]);
         Assert.Equal((byte)'b', body[18]);
         Assert.Equal(0, BitConverter.ToInt32(body, 32));
-        Assert.Equal(Convert.FromHexString("02000000010000002A000000020000006100620000000000000000000000000000000000"), body);
+        Assert.Equal(Convert.FromHexString("02000000010000002A000000020000006100620000000000000000001100000000000000"), body);
     }
 
     [Theory]

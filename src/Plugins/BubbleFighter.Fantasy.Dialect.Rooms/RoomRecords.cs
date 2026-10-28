@@ -175,7 +175,7 @@ internal static class RoomRecords
     internal static byte[] Party(PacketTables tables, string build, RoomMemberView seat, ISession? session = null)
     {
         var party = session is not null && session.TryFeature<IPartyMembership>(out var membership)
-            ? membership.Party : new PartySnapshot([new(seat.UserNum, seat.Nickname)]);
+            ? membership.Party : new PartySnapshot([new(seat.UserNum, seat.Nickname, seat.Level)]);
         return PartyRecords.Write(tables, build,
             new PartyUpdated(party, new(seat.UserNum, seat.CharacterItemId, seat.EquippedItemIds)));
     }

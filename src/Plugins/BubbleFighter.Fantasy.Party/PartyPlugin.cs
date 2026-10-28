@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 namespace BubbleFighter.Fantasy.Party;
 
 /// <summary>
-/// Parties for every build: invitations, joining, leaving, kicks and leader handover, on typed messages from the
+/// Parties for every build: invitations, visits, joining, leaving, kicks and leader handover, on typed messages from the
 /// build's dialect. The party list is the client's own S2C gspUpdateParty, leader first; parties live in memory while
 /// their members are logged in, and a disconnect is a leave.
 /// </summary>
@@ -18,12 +18,15 @@ namespace BubbleFighter.Fantasy.Party;
     Requires = [typeof(IMessageRouter), typeof(IOnlinePlayers)],
     OptionalMany = [typeof(IInboundMessageBinding<PartyInviteRequested>), typeof(IInboundMessageBinding<PartyInviteAccepted>),
         typeof(IInboundMessageBinding<PartyInviteAnswered>), typeof(IInboundMessageBinding<PartyInviteTokenRefused>),
+        typeof(IInboundMessageBinding<PartyVisitRequested>), typeof(IInboundMessageBinding<PartyVisitAnswered>),
+        typeof(IInboundMessageBinding<PartyVisitTokenAnswered>),
         typeof(IInboundMessageBinding<PartyLeaveRequested>),
         typeof(IInboundMessageBinding<PartyKickRequested>), typeof(IInboundMessageBinding<PartyLeaderChangeRequested>),
         typeof(IMessageSender<PartyInviteReplied>), typeof(IMessageSender<PartyInviteNotified>), typeof(IMessageSender<PartyUpdated>),
         typeof(IMessageSender<PartyLeaderReplaced>), typeof(IMessageSender<PartyLeft>), typeof(IMessageSender<PartyMemberLeft>),
         typeof(IMessageSender<PartyMemberJoined>), typeof(IMessageSender<PartyKickReplied>), typeof(IMessageSender<PartyKicked>),
-        typeof(IMessageSender<PartyMemberKicked>), typeof(IMessageSender<PartyLeaderChanged>)],
+        typeof(IMessageSender<PartyMemberKicked>), typeof(IMessageSender<PartyLeaderChanged>),
+        typeof(IMessageSender<PartyVisitAsked>), typeof(IMessageSender<PartyVisitFailed>), typeof(IMessageSender<PartyVisitGranted>)],
     Provides = [typeof(IPartyDirectory)])]
 public sealed class PartyPlugin : IPlugin
 {
@@ -36,6 +39,8 @@ public sealed class PartyPlugin : IPlugin
         var send = new PartySenders(context, protocol);
         var book = new PartyBook(options.MaxMembers, options.MaxPendingInvites,
             TimeSpan.FromMilliseconds(options.InviteTimeoutMs), TimeProvider.System);
+        // A visit shares the invitation bounds: once accepted it becomes an invitation from the visited player.
+        var visits = new PartyVisitBook(options.MaxPendingInvites, TimeSpan.FromMilliseconds(options.InviteTimeoutMs), TimeProvider.System);
         var connections = new Dictionary<int, (ISession Session, PartyMember Member)>();
         var memberships = new PartyMemberships();
         context.Effect(memberships);
@@ -95,6 +100,8 @@ public sealed class PartyPlugin : IPlugin
             if (result != PartyInviteResult.Sent)
                 await SendAsync(inviterSession, new PartyInviteReplied(result, joiner.Nickname), ct).ConfigureAwait(false);
             await DeliverAsync(notices, ct).ConfigureAwait(false);
+            if (result == PartyInviteResult.Sent)
+                await FollowLeaderAsync(session, ct).ConfigureAwait(false);
         });
 
         On<PartyInviteAnswered>(async (session, answer, ct) =>
@@ -121,6 +128,59 @@ public sealed class PartyPlugin : IPlugin
             var inviterSession = online.FindByUserNum(inviterUserNum);
             if (inviterSession is not null)
                 await SendAsync(inviterSession, new PartyInviteReplied(PartyInviteResult.Refused, target.Nickname), ct).ConfigureAwait(false);
+        });
+
+        On<PartyVisitRequested>(async (session, request, ct) =>
+        {
+            var visitor = Track(session);
+            var failure = VisitFailure(session, visitor, request.Target, out var hostSession, out var host);
+            if (failure is null && !request.RequiresApproval)
+            {
+                var notices = new List<PartyNotice>();
+                var result = book.Join(host!, visitor, notices);
+                if (result == PartyInviteResult.Sent)
+                {
+                    await DeliverAsync(notices, ct).ConfigureAwait(false);
+                    await FollowLeaderAsync(session, ct, acknowledgeVisit: true).ConfigureAwait(false);
+                    return;
+                }
+                failure = result == PartyInviteResult.PartyFull ? PartyVisitFailure.PartyFull : PartyVisitFailure.Unavailable;
+            }
+            var token = 0u;
+            if (failure is null && !visits.Ask(visitor.UserNum, host!.UserNum, hostSession!.Connection.Id, out token))
+                failure = PartyVisitFailure.Unavailable;
+            if (failure is null && !await SendAsync(hostSession!, new PartyVisitAsked(visitor.Nickname, token), ct).ConfigureAwait(false))
+            {
+                visits.Take(visitor.UserNum, host!.UserNum, hostSession!.Connection.Id);
+                failure = PartyVisitFailure.Offline;
+            }
+            if (failure is { } reason)
+                await SendAsync(session, new PartyVisitFailed(reason, request.Target), ct).ConfigureAwait(false);
+        });
+
+        On<PartyVisitAnswered>(async (session, answer, ct) =>
+        {
+            var host = Track(session);
+            var visitorSession = online.FindByNickname(answer.Visitor);
+            if (visitorSession is null || !visitorSession.TryFeature<IPlayerSession>(out var visitorPlayer)
+                || !visits.Take(visitorPlayer.Identity.UserNum, host.UserNum, session.Connection.Id))
+            {
+                context.Logger.LogInformation("Visit answer from {User} for {Visitor} has no pending visit.", host.UserNum, answer.Visitor);
+                return;
+            }
+            await AnswerVisitAsync(host, visitorSession, answer.Accepted, ct).ConfigureAwait(false);
+        });
+
+        On<PartyVisitTokenAnswered>(async (session, answer, ct) =>
+        {
+            var host = Track(session);
+            if (!visits.TakeByToken(answer.Token, host.UserNum, session.Connection.Id, out var visitorUserNum)
+                || online.FindByUserNum(visitorUserNum) is not { } visitorSession)
+            {
+                context.Logger.LogInformation("Visit token {Token} from {User} names no pending visit; ignored.", answer.Token, host.UserNum);
+                return;
+            }
+            await AnswerVisitAsync(host, visitorSession, answer.Accepted, ct).ConfigureAwait(false);
         });
 
         On<PartyLeaveRequested>(async (session, _, ct) =>
@@ -159,6 +219,59 @@ public sealed class PartyPlugin : IPlugin
             context.Effect(messages.On<T>(protocol, (session, message, ct) =>
                 work.ExecuteAsync(token => handler(session, message, token), ct)));
 
+        async ValueTask FollowLeaderAsync(ISession session, CancellationToken ct, bool acknowledgeVisit = false)
+        {
+            var party = book.PartyOf(Track(session).UserNum)
+                ?? throw new InvalidOperationException("Committed party membership is missing.");
+            if (!await context.Services.Get<IMessageRouter>().DispatchAsync(protocol, session,
+                new PartySceneFollowRequested(party.Leader.UserNum, acknowledgeVisit), ct).ConfigureAwait(false))
+                throw new InvalidOperationException("Party scene following requires a scene handler for this protocol.");
+        }
+
+        // The checks a visit passes before the visited player is asked; the book repeats the party checks on accept.
+        PartyVisitFailure? VisitFailure(ISession session, PartyMember visitor, string target, out ISession? hostSession, out PartyMember? host)
+        {
+            host = null;
+            hostSession = online.FindByNickname(target);
+            if (hostSession is null || !hostSession.TryFeature<IPlayerSession>(out var hostPlayer)) return PartyVisitFailure.Offline;
+            if (hostPlayer.Identity.UserNum == visitor.UserNum) return PartyVisitFailure.Self;
+            if (session.TryFeature<IPlayerSession>(out var visitorPlayer) && visitorPlayer.Phase is SessionPhase.Match)
+                return PartyVisitFailure.VisitorPlaying;
+            if (hostPlayer.Phase is SessionPhase.Match) return PartyVisitFailure.TargetPlaying;
+            host = Track(hostSession);
+            if (book.PartyOf(host.UserNum) is { } party)
+            {
+                if (party.Members.Any(member => member.UserNum == visitor.UserNum)) return PartyVisitFailure.SameParty;
+                if (party.Members.Count >= options.MaxMembers) return PartyVisitFailure.PartyFull;
+            }
+            // The visitor joins the visited player's party, which the book allows only from outside any party.
+            return book.PartyOf(visitor.UserNum) is null ? null : PartyVisitFailure.Unavailable;
+        }
+
+        // An accepted visit becomes an invitation from the visited player that the visitor's client accepts by itself.
+        async ValueTask AnswerVisitAsync(PartyMember host, ISession visitorSession, bool accepted, CancellationToken ct)
+        {
+            var visitor = Track(visitorSession);
+            if (!accepted)
+            {
+                await SendAsync(visitorSession, new PartyVisitFailed(PartyVisitFailure.Declined, host.Nickname), ct).ConfigureAwait(false);
+                return;
+            }
+            var result = book.Invite(host, visitor, visitorSession.Connection.Id);
+            if (result != PartyInviteResult.Sent)
+            {
+                await SendAsync(visitorSession, new PartyVisitFailed(result switch
+                {
+                    PartyInviteResult.SameParty => PartyVisitFailure.SameParty,
+                    PartyInviteResult.PartyFull => PartyVisitFailure.PartyFull,
+                    _ => PartyVisitFailure.Unavailable,
+                }, host.Nickname), ct).ConfigureAwait(false);
+                return;
+            }
+            if (!await SendAsync(visitorSession, new PartyVisitGranted(host.Nickname), ct).ConfigureAwait(false))
+                book.TakeInvite(host.UserNum, visitor.UserNum, visitorSession.Connection.Id);
+        }
+
         PartyMember Track(ISession session)
         {
             if (!session.TryFeature<IPlayerSession>(out var player))
@@ -183,6 +296,7 @@ public sealed class PartyPlugin : IPlugin
                 connections.Remove(userNum);
                 memberships.Forget(tracked.Session.Connection.Id);
                 book.ForgetInvites(userNum);
+                visits.ForgetPlayer(userNum);
                 var notices = new List<PartyNotice>();
                 book.Leave(tracked.Member, notices);
                 await DeliverAsync(notices, ct).ConfigureAwait(false);
@@ -228,7 +342,7 @@ public sealed class PartyPlugin : IPlugin
         }
     }
 
-    private static PartyMember Member(IPlayerSession player) => new(player.Identity.UserNum, player.Identity.Nickname);
+    private static PartyMember Member(IPlayerSession player) => new(player.Identity.UserNum, player.Identity.Nickname, player.Identity.Level);
 }
 
 /// <summary>
@@ -287,6 +401,10 @@ internal sealed class PartySenders(IPluginContext context, string protocol)
     private readonly IMessageSender<PartyMemberJoined> _joined = Sender<PartyMemberJoined>(context, protocol);
     private readonly IMessageSender<PartyKicked>? _kicked = OptionalSender<PartyKicked>(context, protocol);
     private readonly IMessageSender<PartyMemberKicked>? _memberKicked = OptionalSender<PartyMemberKicked>(context, protocol);
+    // Builds without a visit request (cn-279, cn-324) have no visit senders either.
+    private readonly IMessageSender<PartyVisitAsked>? _visitAsked = OptionalSender<PartyVisitAsked>(context, protocol);
+    private readonly IMessageSender<PartyVisitFailed>? _visitFailed = OptionalSender<PartyVisitFailed>(context, protocol);
+    private readonly IMessageSender<PartyVisitGranted>? _visitGranted = OptionalSender<PartyVisitGranted>(context, protocol);
 
     /// <summary>Sends one of the party notices the book decides.</summary>
     public ValueTask SendAsync(ISession session, object message, CancellationToken ct) => message switch
@@ -302,6 +420,9 @@ internal sealed class PartySenders(IPluginContext context, string protocol)
         PartyKicked m => Required(_kicked).SendAsync(session, m, ct),
         PartyMemberKicked m => Required(_memberKicked).SendAsync(session, m, ct),
         PartyLeaderChanged m => Required(LeaderChanged).SendAsync(session, m, ct),
+        PartyVisitAsked m => Required(_visitAsked).SendAsync(session, m, ct),
+        PartyVisitFailed m => Required(_visitFailed).SendAsync(session, m, ct),
+        PartyVisitGranted m => Required(_visitGranted).SendAsync(session, m, ct),
         _ => throw new InvalidOperationException($"No party sender for {message.GetType().Name}."),
     };
 

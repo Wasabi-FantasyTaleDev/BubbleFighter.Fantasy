@@ -23,10 +23,16 @@ structs:
       cn-324:
         - unknown_16: u32
           offset: 16
-    - unknown_44: u32
+    # kr-812 sub_89B070 passes the local member +44 to rank renderer kr-812 sub_6C60F0.
+    - level: u32
       offset: 44
+      kr-1256:
+        - unknown_44: u32
+          offset: 44
       cn-324:
-        - unknown_20: u32
+        # cn-324 sub_7632C0 finds the local member and passes +20 to badge renderer cn-324 sub_5D32D0.
+        # cn-279 sub_8344D0 copies +20 into each party UI row as its rank value.
+        - level: u32
           offset: 20
   # gspUpdateParty readers: kr-812 sub_92B130, cn-717 sub_9CD590, id-400 sub_89DCE0,
   # id-1809 sub_8C2520, cn-706 sub_8AE390, cn-324 sub_7C6B00 and cn-279 sub_4802A0.
@@ -165,8 +171,9 @@ structs:
     - nickname: wstr
       offset: 8
   # S2C gspNotifyInvite: kr-812 reader sub_844490, writer sub_844450; +36 is a Lambda::NetAddress the accept sends
-  # back. kr-812 sub_81DEA0 skips the prompt when +48 is set (purpose unproven; sent as 0), and answers by itself
-  # with gcpReqMoveToFriendAccept when the player's option at state +256/+257 refuses invitations.
+  # back. When +48 is set kr-812 sub_81DEA0 skips the prompt and sends gcpReqMoveToInviter at once (kr-812
+  # sub_6DA520 / sub_6D88F0): the server sets it only to move a visitor whose visit was accepted. The client answers
+  # by itself with gcpReqMoveToFriendAccept when the player's option at state +256/+257 refuses invitations.
   PartyInviteNotice:
     - is_party: bool
       offset: 4
@@ -174,7 +181,7 @@ structs:
       offset: 8
     - address: RelayEndpoint
       offset: 36
-    - unknown_48: bool
+    - auto_accept: bool
       offset: 48
   # S2C gspRepChangePartyLeader: kr-812 reader sub_80AE00; the handler kr-812 sub_928C50 switches on +60.
   PartyLeaderChangeReply:
@@ -194,8 +201,8 @@ structs:
   # C2S gcpReqInvite (kr-1256 C2S 110): sender kr-1256 sub_90A330, reached from the party invitation UI
   # (kr-1256 sub_938E00). Name length is capped at 12 before sending. The trailing word is not the legacy is_party
   # flag: kr-1256 sub_90A330 stores 1, or kr-1256 sub_90AB30(party) < 3 when its stage test holds (feature 304
-  # forces 1). Its purpose is unproven, so it is read and ignored. cn-774 (C2S 111, name only, cn-774 sub_B32AD0)
-  # and tw-454 have no proven invitation sender and no row for this packet.
+  # forces 1). Its purpose is unproven, so it is read and ignored. cn-774 and tw-454 send the same body as C2S 109
+  # from the friend window's invite item (cn-774 sub_B04050 via sub_B322B0, tw-454 sub_B9FA50 via sub_8E3C40).
   PartyInviteRequest@kr-1256:
     - target: wstr
     - unknown_flag: bool

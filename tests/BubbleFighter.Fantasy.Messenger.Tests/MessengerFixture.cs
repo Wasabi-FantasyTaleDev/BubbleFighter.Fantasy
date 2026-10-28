@@ -25,7 +25,8 @@ internal sealed class MessengerFixture : IDisposable
     internal MessengerService Service { get; }
     internal Dictionary<string, MessengerTicketIssuer> Issuers { get; } = [];
 
-    internal MessengerFixture(Action<MessengerOptions>? configure = null)
+    internal MessengerFixture(Action<MessengerOptions>? configure = null,
+        Func<MessengerUser, CancellationToken, ValueTask<int?>>? levelSource = null)
     {
         Options = new MessengerOptions
         {
@@ -47,7 +48,7 @@ internal sealed class MessengerFixture : IDisposable
             _owned.Add(verify);
             tenants[tenant] = verify;
         }
-        Service = new MessengerService(Options, Store, tenants, Clock);
+        Service = new MessengerService(Options, Store, tenants, Clock, levelSource: levelSource);
     }
 
     internal string Ticket(string subject, string? nickname = null, string tenant = "alpha") =>

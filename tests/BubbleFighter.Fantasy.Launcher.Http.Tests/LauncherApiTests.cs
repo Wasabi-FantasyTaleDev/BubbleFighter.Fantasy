@@ -63,6 +63,50 @@ public sealed class LauncherApiTests
         using var expired = await http.GetAsync("v1/account"); Assert.Equal(HttpStatusCode.Unauthorized, expired.StatusCode);
     }
 
+    /// <summary>
+    /// An in-game sign-in build launches without a bearer; the game then signs in with the launcher's own requests
+    /// and binds that launch once. Other builds still refuse an anonymous launch, and the catalog carries the HTTPS
+    /// override.
+    /// </summary>
+    [Fact]
+    public async Task AnInGameSignInBuildLaunchesFirstAndTheGameBindsTheLaunch()
+    {
+        var options = new LauncherOptions { Listen = "127.0.0.1:0", PasswordIterations = 100000, SecureUrl = "https://bf.example/api",
+            Instances =
+            [
+                new() { Id = "id-400", Build = "id-400", Name = [new() { Language = "en", Text = "ID 2014" }], Port = 7120, LauncherLogin = "game" },
+                new() { Id = "kr-812", Build = "kr-812", Name = [new() { Language = "en", Text = "KR 2015" }], Port = 7110 },
+            ] };
+        var accounts = new MemoryLauncherAccounts(10); var sessions = new LauncherSessions(options, new MemoryLauncherSessions(10));
+        await using var server = await LauncherServer.StartAsync(options, accounts, sessions);
+        using var http = new HttpClient { BaseAddress = new Uri(server.Addresses.Single()) };
+        Assert.Equal("https://bf.example/api", (await http.GetFromJsonAsync<JsonElement>("v1/catalog")).GetProperty("secureUrl").GetString());
+        using var refused = await http.PostAsJsonAsync("v1/launch", new { build = "kr-812" }); Assert.Equal(HttpStatusCode.Unauthorized, refused.StatusCode);
+        using var opened = await http.PostAsJsonAsync("v1/launch", new { build = "id-400" }); opened.EnsureSuccessStatusCode();
+        var launch = await opened.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(launch.GetProperty("gameLogin").GetBoolean());
+        Assert.False(launch.TryGetProperty("ticket", out _));
+        var launchId = launch.GetProperty("launchId").GetString()!; var launchKey = launch.GetProperty("launchKey").GetString()!;
+        using var early = await http.PostAsJsonAsync("v1/launch/companion", new { launchId, launchKey });
+        Assert.Equal("launch_not_bound", (await early.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error").GetString());
+
+        using var created = await http.PostAsJsonAsync("v1/auth/register", new { username = "player", password = "Local-test-123" }); created.EnsureSuccessStatusCode();
+        using var login = await http.PostAsJsonAsync("v1/auth/login", new { username = "player", password = "Local-test-123" }); login.EnsureSuccessStatusCode();
+        using var game = new HttpClient { BaseAddress = http.BaseAddress };
+        game.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
+            (await login.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("accessToken").GetString());
+        using var wrongKey = await game.PostAsJsonAsync("v1/launch", new { build = "id-400", launchId, launchKey = "00" }); Assert.Equal(HttpStatusCode.NotFound, wrongKey.StatusCode);
+        using var bound = await game.PostAsJsonAsync("v1/launch", new { build = "id-400", launchId, launchKey }); bound.EnsureSuccessStatusCode();
+        var ticket = (await bound.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("ticket").GetString()!;
+        Assert.Equal("player", sessions.Redeem(ticket, "id-400"));
+        using var replay = await game.PostAsJsonAsync("v1/launch", new { build = "id-400", launchId, launchKey }); Assert.Equal(HttpStatusCode.NotFound, replay.StatusCode);
+        // Without a companion row the bound launch has no grant to hand out.
+        using var later = await http.PostAsJsonAsync("v1/launch/companion", new { launchId, launchKey });
+        Assert.Equal("companion_unavailable", (await later.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error").GetString());
+        // A game started without the launcher signs in and launches without a launch to bind.
+        using var standalone = await game.PostAsJsonAsync("v1/launch", new { build = "id-400" }); standalone.EnsureSuccessStatusCode();
+    }
+
     [Fact]
     public async Task SessionBoundsExpiryAndRevocationAreEnforced()
     {

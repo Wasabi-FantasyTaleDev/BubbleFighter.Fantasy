@@ -77,7 +77,11 @@ public sealed class MessengerHttpTests : IAsyncLifetime
 
         var (_, category) = await CallAsync("CNMAddCategoryFunc", new { name = "Team" }, ann);
         var id = category.GetProperty("category").GetProperty("id").GetInt32();
-        Assert.Equal("ok", (await CallAsync("CNMAddFriendToCategoryFunc", new { friendId = friend.GetProperty("id").GetInt64(), categoryId = id }, ann)).Body.GetProperty("result").GetString());
+        Assert.Equal(1, category.GetProperty("friendList").GetProperty("categories").GetArrayLength());
+        var (_, moved) = await CallAsync("CNMAddFriendToCategoryFunc", new { friendId = friend.GetProperty("id").GetInt64(), categoryId = id }, ann);
+        Assert.Equal("ok", moved.GetProperty("result").GetString());
+        // A change answers with the list it produced, so the client redraws without a second exchange.
+        Assert.Equal(id, moved.GetProperty("friendList").GetProperty("friends")[0].GetProperty("categoryId").GetInt32());
         Assert.Equal("not_empty", (await CallAsync("CNMDeleteCategoryFunc", new { categoryId = id }, ann)).Body.GetProperty("result").GetString());
 
         var (_, games) = await CallAsync("CNMGetSupportGameListFunc", new { }, ann);

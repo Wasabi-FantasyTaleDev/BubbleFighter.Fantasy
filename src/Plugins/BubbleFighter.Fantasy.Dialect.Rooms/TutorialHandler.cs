@@ -1098,14 +1098,12 @@ internal sealed class TutorialHandler : IDisposable
     {
         if (!session.TryFeature<IPlayerSession>(out var player))
             throw new InvalidOperationException($"Session {session.Id} has no IPlayerSession; login must complete before tutorial.");
-        // Four-arg MainMenuRoomOpened only. Mode / map key are WriteRoom parameters — never
-        // optional ctor args on this message (those made Room.dll require a six-arg ctor the
-        // host Contracts assembly lacked; CreateTutorial then MissingMethodException-closed).
+        // Mode and map key belong to WriteRoom; the menu identity retains the player's saved level.
         var room = new MainMenuRoomOpened(
             player.Identity.UserNum,
             player.Identity.Nickname,
             DefaultCharacterItemId,
-            [DefaultCharacterItemId]) { ColorIndex = player.Identity.ColorIndex };
+            [DefaultCharacterItemId], player.Identity.Level) { ColorIndex = player.Identity.ColorIndex };
         return new PlayerContext(room, player);
     }
 }

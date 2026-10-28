@@ -61,6 +61,7 @@ public sealed class LauncherServer : IAsyncDisposable
         var app = builder.Build(); var workers = new SemaphoreSlim(options.MaxConcurrentRequests);
         var budget = new LauncherRequestBudget(options.RequestsPerMinute, options.MaxRateLimitAddresses);
         var dummyHash = HashPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(16)), options.PasswordIterations);
+        var gameLogins = new LauncherGameLogins(options);
         app.Use(async (context, next) =>
         {
             context.Response.Headers.CacheControl = "no-store";
@@ -88,6 +89,7 @@ public sealed class LauncherServer : IAsyncDisposable
         app.MapGet("/v1/catalog", (HttpContext context) => Results.Json(new
         {
             schema = 1, game = "bubblefighter", name = options.Name, registrationEnabled = options.RegistrationEnabled,
+            secureUrl = options.SecureUrl.Length == 0 ? null : options.SecureUrl,
             registrationFields = Array.Empty<object>(),
             options.HostPolicy, region = options.Region.Length == 0 ? null : options.Region, options.SupportsInstances, options.SupportsPlugins, options.LevelIcon,
             profileFields = new[] { "level", "lucci", "cash" },
@@ -186,13 +188,31 @@ public sealed class LauncherServer : IAsyncDisposable
         });
         app.MapPost("/v1/launch", async (HttpContext context) =>
         {
-            var account = await Authorized(context, accounts, sessions).ConfigureAwait(false);
+            // A build whose players sign in inside the game is launched before anyone signs in; the game binds the
+            // launch with its own sign-in (launchId + launchKey below). Every other launch needs the bearer first.
+            var anonymous = OptionalBearer(context) is null;
+            var account = anonymous ? null : await Authorized(context, accounts, sessions).ConfigureAwait(false);
             var body = await Body(context).ConfigureAwait(false);
             policy.Check(context, body);
             var build = body.TryGetProperty("build", out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : throw new InvalidDataException();
-            if (!options.Instances.Any(i => i.Build == build)) return Results.BadRequest(new { error = "unsupported_build" });
+            var preset = options.Instances.FirstOrDefault(i => i.Build == build);
+            if (preset is null) return Results.BadRequest(new { error = "unsupported_build" });
             var metadata = LauncherLaunchMetadata.Read(body);
             RequireReady(readiness);
+            if (account is null)
+            {
+                if (preset.LauncherLogin != "game") throw new UnauthorizedAccessException();
+                var opened = gameLogins.Open(build!);
+                logger?.LogInformation("Launch opened for an in-game sign-in on build {Build}, release {ReleaseVersion}.", build, metadata.ReleaseVersion);
+                return Results.Json(new { launchId = opened.Id, launchKey = opened.Key, expiresAt = opened.ExpiresAt, gameLogin = true });
+            }
+            string? boundLaunch = null;
+            if (body.TryGetProperty("launchId", out var launchValue))
+            {
+                var launchKey = body.TryGetProperty("launchKey", out var keyValue) && keyValue.ValueKind == JsonValueKind.String ? keyValue.GetString()! : throw new InvalidDataException();
+                boundLaunch = launchValue.ValueKind == JsonValueKind.String ? launchValue.GetString()! : throw new InvalidDataException();
+                if (!gameLogins.Bind(boundLaunch, launchKey, build!, account.Username)) return Error(404, "launch_not_found");
+            }
             presence.CheckAdmission(account.Username);
             // The companion is optional: a full launch table leaves this launch without it rather than refusing the game.
             CompanionGrant? companionGrant = null;
@@ -210,7 +230,23 @@ public sealed class LauncherServer : IAsyncDisposable
             if (messengerTicket is not null)
                 reply["messenger"] = new { url = messenger!.PublicUrl.Replace("{host}", context.Request.Host.Host, StringComparison.Ordinal), ticket = messengerTicket.Value, expiresAt = messengerTicket.ExpiresAt };
             if (companionGrant is not null) reply["companion"] = CompanionReply(companionGrant, context.Request.Host.Host);
+            // The launcher that opened an in-game sign-in launch fetches this grant with the launch key.
+            if (boundLaunch is not null && companionGrant is not null) gameLogins.Attach(boundLaunch, companionGrant);
             return Results.Json(reply);
+        });
+        // The launcher of an in-game sign-in launch holds no bearer: its launch key fetches the companion grant once the
+        // game has signed in (404 launch_not_bound until then), and a fresh one on every later call.
+        app.MapPost("/v1/launch/companion", async (HttpContext context) =>
+        {
+            var body = await Body(context).ConfigureAwait(false);
+            string Text(string name) => body.TryGetProperty(name, out var item) && item.ValueKind == JsonValueKind.String ? item.GetString()! : throw new InvalidDataException();
+            var launchId = Text("launchId");
+            var found = gameLogins.Companion(launchId, Text("launchKey"));
+            if (found is null) return Error(404, gameLogins.Known(launchId) ? "launch_not_bound" : "launch_not_found");
+            var (owner, grant, fresh) = found.Value;
+            if (companion is null || grant is null) return Error(404, "companion_unavailable");
+            var current = fresh ? grant : companion.Renew(owner, grant.LaunchId);
+            return current is null ? Error(404, "launch_not_found") : Results.Json(CompanionReply(current, context.Request.Host.Host));
         });
         // A reconnecting launcher needs a fresh one-time companion ticket for the launch it already holds.
         app.MapPost("/v1/companion/tickets", async (HttpContext context) =>

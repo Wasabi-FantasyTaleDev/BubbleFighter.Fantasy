@@ -28,7 +28,7 @@ namespace BubbleFighter.Fantasy.InGame;
     Description = "Plaza enter, room create/join/ready, and combat over the typed room and round messages.",
     Requires = [typeof(IPacketRouter), typeof(IMessageRouter)],
     OptionalMany = [typeof(IMatchCapabilityOfferSender), typeof(IInboundMessageBinding<MatchConnectionReported>), typeof(IMessageSender<RoomTeamConverted>), typeof(IInboundMessageBinding<RoomMatchRequested>), typeof(IMessageSender<RoomMatchNotified>), typeof(IMessageSender<RoomAutoStartNotified>), typeof(IMessageSender<ServerNotice>), typeof(IMessageSender<MatchSessionSignature>),
-        typeof(IInboundMessageBinding<RoomListRequested>), typeof(IMessageSender<RoomListSnapshot>), typeof(IMessageSender<PartyUpdated>),
+        typeof(IInboundMessageBinding<RoomListRequested>), typeof(IMessageSender<RoomListSnapshot>), typeof(IMessageSender<PartyUpdated>), typeof(IMessageSender<PartyVisitSucceeded>), typeof(IMessageSender<PartyInvitationMoveSucceeded>), typeof(IMessageSender<PartyVisitFailed>),
         typeof(IInboundMessageBinding<RoomCreateRequested>), typeof(IInboundMessageBinding<RoomJoinRequested>),
         typeof(IInboundMessageBinding<RoomLeaveRequested>), typeof(IInboundMessageBinding<RoomReadyRequested>),
         typeof(IInboundMessageBinding<RoomUiRefreshRequested>), typeof(IMessageSender<RoomUiChanged>), typeof(IMessageSender<RoomProbeAcknowledged>),
@@ -186,6 +186,23 @@ public sealed class InGamePlugin : IPlugin
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, context.Lifetime);
             await rooms.OnEquipmentSelectionCommittedAsync(change, linked.Token).ConfigureAwait(false);
         }));
+        if (roomsBound)
+            context.Effect(messages.On<PartySceneFollowRequested>(game, async (session, request, ct) =>
+            {
+                var arrived = await rooms.HandlePartySceneFollowAsync(session, request, ct).ConfigureAwait(false);
+                var target = online?.FindByUserNum(request.LeaderUserNum);
+                var nickname = target?.TryFeature<IPlayerSession>(out var player) == true ? player.Identity.Nickname : "";
+                if (!request.AcknowledgeVisit)
+                {
+                    if (arrived && PlaySenders.Optional<PartyInvitationMoveSucceeded>(context, game) is { } reply)
+                        await reply.SendAsync(session, new(nickname), ct).ConfigureAwait(false);
+                    return;
+                }
+                if (arrived)
+                    await PlaySenders.Required<PartyVisitSucceeded>(context, game).SendAsync(session, new(nickname), ct).ConfigureAwait(false);
+                else
+                    await PlaySenders.Required<PartyVisitFailed>(context, game).SendAsync(session, new(PartyVisitFailure.Unavailable, nickname), ct).ConfigureAwait(false);
+            }));
         if (roomsBound)
             context.Effect(messages.On<RoomCreateRequested>(game, gate.Expect<RoomCreateRequested>(rooms.HandleCreateAsync, Menu, Plaza)));
         if (Bound<RoomMatchRequested>())

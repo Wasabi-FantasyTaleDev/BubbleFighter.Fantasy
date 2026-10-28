@@ -17,6 +17,34 @@ namespace BubbleFighter.Fantasy.Party.Tests;
 /// <summary>Exercises concurrent requests and connection lifetimes through the mounted party row.</summary>
 public sealed class PartyPluginTests
 {
+    /// <summary>Committed membership requests a scene move once, and a replayed accept cannot move again.</summary>
+    [Fact]
+    public async Task AcceptFollowsTheCommittedPartyLeaderOnce()
+    {
+        await using var rig = await Rig.StartAsync();
+        await rig.InviteAsync();
+        await rig.AcceptAsync();
+        var follow = Assert.Single(rig.SceneFollows);
+        Assert.Same(rig.B, follow.Session);
+        Assert.Equal(1, follow.Request.LeaderUserNum);
+        await rig.AcceptAsync();
+        Assert.Single(rig.SceneFollows);
+    }
+
+    /// <summary>A build without a visit-answer packet joins and follows directly instead of sending an unusable prompt.</summary>
+    [Fact]
+    public async Task DirectVisitJoinsAndFollowsWithoutAskingTheHost()
+    {
+        await using var rig = await Rig.StartAsync();
+        await rig.SendAsync(rig.A, new PartyVisitRequested("Bo", RequiresApproval: false));
+        Assert.DoesNotContain(rig.Sent, sent => sent.Message is PartyVisitAsked or PartyVisitGranted);
+        Assert.Equal(new[] { 2, 1 }, rig.Parties.PartyOf(1)!.Members.Select(member => member.UserNum));
+        var follow = Assert.Single(rig.SceneFollows);
+        Assert.Same(rig.A, follow.Session);
+        Assert.Equal(2, follow.Request.LeaderUserNum);
+        Assert.True(follow.Request.AcknowledgeVisit);
+    }
+
     [Fact]
     public async Task RoomAcceptCannotConsumePartyInvitation()
     {
@@ -242,6 +270,74 @@ public sealed class PartyPluginTests
         Assert.Null(rig.Parties.PartyOf(2));
     }
 
+    /// <summary>
+    /// A visit asks the visited player; an accepted visit becomes an invitation from the visited player that the
+    /// visitor's client accepts by itself, joining the visitor to the visited player's party.
+    /// </summary>
+    [Fact]
+    public async Task AnAcceptedVisitJoinsTheVisitorToTheHostsParty()
+    {
+        await using var rig = await Rig.StartAsync();
+        await rig.SendAsync(rig.A, new PartyVisitRequested("Bo"));
+        var asked = Assert.IsType<PartyVisitAsked>(rig.Sent.Last().Message);
+        Assert.Same(rig.B, rig.Sent.Last().Session);
+        Assert.Equal("Al", asked.Visitor);
+        Assert.NotEqual(0u, asked.Token);
+        await rig.SendAsync(rig.B, new PartyVisitTokenAnswered(asked.Token, true));
+        Assert.Equal(new PartyVisitGranted("Bo"), rig.Sent.Last().Message);
+        Assert.Same(rig.A, rig.Sent.Last().Session);
+        await rig.SendAsync(rig.A, new PartyInviteAccepted(true, "Bo"));
+        var party = rig.Parties.PartyOf(1)!;
+        Assert.Equal(new[] { 2, 1 }, party.Members.Select(member => member.UserNum));
+    }
+
+    /// <summary>The legacy answer names the visitor; a declined visit tells the visitor and leaves no invitation.</summary>
+    [Fact]
+    public async Task ADeclinedVisitTellsTheVisitorAndCannotBeAcceptedLater()
+    {
+        await using var rig = await Rig.StartAsync();
+        await rig.SendAsync(rig.A, new PartyVisitRequested("Bo"));
+        await rig.SendAsync(rig.B, new PartyVisitAnswered("Al", false));
+        Assert.Equal(new PartyVisitFailed(PartyVisitFailure.Declined, "Bo"), rig.Sent.Last().Message);
+        await rig.SendAsync(rig.A, new PartyInviteAccepted(true, "Bo"));
+        Assert.Null(rig.Parties.PartyOf(1));
+        var count = rig.Sent.Count;
+        await rig.SendAsync(rig.B, new PartyVisitAnswered("Al", true));
+        Assert.Equal(count, rig.Sent.Count);
+    }
+
+    /// <summary>A visit that cannot be asked fails at once: oneself, an absent player, or the visitor in a round.</summary>
+    [Fact]
+    public async Task AVisitThatCannotBeAskedFailsAtOnce()
+    {
+        await using var rig = await Rig.StartAsync();
+        await rig.SendAsync(rig.A, new PartyVisitRequested("Al"));
+        Assert.Equal(new PartyVisitFailed(PartyVisitFailure.Self, "Al"), rig.Sent.Last().Message);
+        await rig.SendAsync(rig.A, new PartyVisitRequested("Nobody"));
+        Assert.Equal(new PartyVisitFailed(PartyVisitFailure.Offline, "Nobody"), rig.Sent.Last().Message);
+        await rig.InviteAsync();
+        await rig.AcceptAsync();
+        await rig.SendAsync(rig.B, new PartyVisitRequested("Al"));
+        Assert.Equal(new PartyVisitFailed(PartyVisitFailure.SameParty, "Al"), rig.Sent.Last().Message);
+    }
+
+    /// <summary>Only the visited player's own connection can answer its prompt, once.</summary>
+    [Fact]
+    public async Task AVisitTokenBelongsToTheVisitedPlayerOnly()
+    {
+        await using var rig = await Rig.StartAsync();
+        await rig.SendAsync(rig.A, new PartyVisitRequested("Bo"));
+        var token = Assert.IsType<PartyVisitAsked>(rig.Sent.Last().Message).Token;
+        var count = rig.Sent.Count;
+        await rig.SendAsync(rig.A, new PartyVisitTokenAnswered(token, true));
+        await rig.SendAsync(rig.B, new PartyVisitTokenAnswered(token + 1000, true));
+        Assert.Equal(count, rig.Sent.Count);
+        await rig.SendAsync(rig.B, new PartyVisitTokenAnswered(token, false));
+        Assert.Equal(new PartyVisitFailed(PartyVisitFailure.Declined, "Bo"), rig.Sent.Last().Message);
+        await rig.SendAsync(rig.B, new PartyVisitTokenAnswered(token, true));
+        Assert.Equal(count + 1, rig.Sent.Count);
+    }
+
     private sealed class Rig : IAsyncDisposable
     {
         internal ServiceRegistry Services { get; } = new();
@@ -250,6 +346,7 @@ public sealed class PartyPluginTests
         internal Session A { get; } = new(1, "Al", 1);
         internal Session B { get; } = new(2, "Bo", 2);
         internal ConcurrentQueue<(Session Session, IMessage Message)> Sent { get; } = new();
+        internal List<(ISession Session, PartySceneFollowRequested Request)> SceneFollows { get; } = [];
         internal Func<ISession, IMessage, CancellationToken, ValueTask>? BeforeSend { get; set; }
         internal PluginContext Context { get; }
         private readonly PluginContext _routerContext;
@@ -269,11 +366,17 @@ public sealed class PartyPluginTests
             Register<PartyLeaderReplaced>(); Register<PartyLeft>(); Register<PartyMemberLeft>();
             Register<PartyMemberJoined>(); Register<PartyKickReplied>(); Register<PartyKicked>();
             Register<PartyMemberKicked>(); Register<PartyLeaderChanged>();
+            Register<PartyVisitAsked>(); Register<PartyVisitFailed>(); Register<PartyVisitGranted>();
         }
         internal static async Task<Rig> StartAsync(int inviteTimeoutMs = 30000)
         {
             var rig = new Rig(inviteTimeoutMs);
             await new MessageRouterPlugin().ActivateAsync(rig._routerContext, default);
+            rig.Context.Effect(rig.Services.Get<IMessageRouter>().For(rig.Context).On<PartySceneFollowRequested>("test/game", (session, request, _) =>
+            {
+                rig.SceneFollows.Add((session, request));
+                return ValueTask.CompletedTask;
+            }));
             await new PartyPlugin().ActivateAsync(rig.Context, default);
             return rig;
         }

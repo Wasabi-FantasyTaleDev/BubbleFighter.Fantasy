@@ -5,7 +5,8 @@ namespace BubbleFighter.Fantasy.Contracts.Party;
 /// <summary>One party member as the party list shows it.</summary>
 /// <param name="UserNum">Account id.</param>
 /// <param name="Nickname">Display nickname.</param>
-public sealed record PartyMember(int UserNum, string Nickname);
+/// <param name="Level">The player's displayed level, used where the build's party record includes its rank.</param>
+public sealed record PartyMember(int UserNum, string Nickname, int Level = 1);
 
 /// <summary>
 /// A party's members in order. The client takes the first member as the leader (kr-812 sub_926900 reads no leader
@@ -128,6 +129,78 @@ public sealed record PartyInviteTokenRefused(uint Token) : IMessage;
 /// invitation carries none.
 /// </param>
 public sealed record PartyInviteNotified(bool IsParty, string Inviter, uint Token = 0) : IMessage;
+
+/// <summary>
+/// Why a visit cannot go ahead. The values are the server's own; each build's dialect writes its client's code (the
+/// legacy gspRepMoveToFriend texts of kr-812, the modern party/VisitFailed texts of kr-1256 sub_9AA990).
+/// </summary>
+public enum PartyVisitFailure
+{
+    /// <summary>The player asked to visit themselves.</summary>
+    Self,
+
+    /// <summary>No player has that nickname.</summary>
+    Unregistered,
+
+    /// <summary>The player is not logged in.</summary>
+    Offline,
+
+    /// <summary>The visited player is in a round.</summary>
+    TargetPlaying,
+
+    /// <summary>The visitor is in a round.</summary>
+    VisitorPlaying,
+
+    /// <summary>The two players are already in the same party.</summary>
+    SameParty,
+
+    /// <summary>The visited player's party is full.</summary>
+    PartyFull,
+
+    /// <summary>The visited player declined.</summary>
+    Declined,
+
+    /// <summary>The visit cannot be served (the visitor already has a party, or the server is out of capacity).</summary>
+    Unavailable,
+}
+
+/// <summary>A player asks to visit a friend (C2S gcpReqMoveToFriend, kr-812 sender sub_92A050).</summary>
+/// <param name="Target">The visited player's nickname.</param>
+/// <param name="RequiresApproval">Whether this build has a visited-player prompt and its answer packet.</param>
+public sealed record PartyVisitRequested(string Target, bool RequiresApproval = true) : IMessage;
+
+/// <summary>
+/// The visited player answers a visit prompt that names the visitor (kr-812 gcpReqMoveToFriendAccept with answer 1
+/// accept, 0 decline or 2 declined by the player's option: the result 17 branch of kr-812 sub_81ED40).
+/// </summary>
+/// <param name="Visitor">The visitor's nickname.</param>
+/// <param name="Accepted">Whether the visit was accepted.</param>
+public sealed record PartyVisitAnswered(string Visitor, bool Accepted) : IMessage;
+
+/// <summary>
+/// The visited player answers a visit prompt by its token (the modern family: kr-1256 sub_9D7890 accepts,
+/// kr-1256 sub_9D77E0 declines).
+/// </summary>
+/// <param name="Token">The <see cref="PartyVisitAsked.Token"/> of the prompt.</param>
+/// <param name="Accepted">Whether the visit was accepted.</param>
+public sealed record PartyVisitTokenAnswered(uint Token, bool Accepted) : IMessage;
+
+/// <summary>The visited player's prompt (kr-812 gspRepMoveToFriend result 17, kr-1256 gspAskedVisitation).</summary>
+/// <param name="Visitor">The visitor's nickname.</param>
+/// <param name="Token">The word the modern prompt carries and its answer echoes; legacy builds ignore it.</param>
+public sealed record PartyVisitAsked(string Visitor, uint Token) : IMessage;
+
+/// <summary>The visitor learns that the visit cannot go ahead.</summary>
+/// <param name="Reason">Why.</param>
+/// <param name="Target">The visited player's nickname.</param>
+public sealed record PartyVisitFailed(PartyVisitFailure Reason, string Target) : IMessage;
+
+/// <summary>
+/// The visitor's client is told to move to the visited player, which it answers with its own C2S gcpReqMoveToInviter
+/// (kr-812 sub_81DEA0 on a notice that skips the prompt, kr-1256 sub_9A9710 on gspVisitationAccepted).
+/// </summary>
+/// <param name="Host">The visited player's nickname.</param>
+public sealed record PartyVisitGranted(string Host) : IMessage;
 
 /// <summary>The party list of one member (S2C gspUpdateParty).</summary>
 /// <param name="Party">The member's party; a party of one when the member is alone.</param>

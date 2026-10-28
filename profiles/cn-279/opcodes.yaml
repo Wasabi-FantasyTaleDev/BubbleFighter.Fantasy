@@ -401,6 +401,12 @@ opcodes:
     name_source: label@cn-279
     evidence: inferred
     source: "cn-279 sub_454300 stamps 109 through sub_56E6E0 after the Packet_gcpReqMoveToInviter constructor cn-279 sub_44EC40; writer cn-279 sub_44EBE0"
+  - value: 110
+    direction: c2s
+    name: gcpReqMoveToFriend
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_77DC00 constructs Packet_gcpReqMoveToFriend with cn-279 sub_4289E0; cn-279 sub_42A6A0 stamps 110 through cn-279 sub_56E6E0"
   - value: 922
     direction: s2c
     name: gspResSingleStageInfo

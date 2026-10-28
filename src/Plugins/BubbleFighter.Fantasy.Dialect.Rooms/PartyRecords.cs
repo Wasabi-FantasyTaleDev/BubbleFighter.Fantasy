@@ -13,7 +13,7 @@ internal static class PartyRecords
         {
             // kr-1256 sub_9064B0 replaces membership; its keyed profile loop updates only supplied entries.
             ["members"] = message.Party.Members.Select(member => new Dictionary<string, object?>
-                { ["user_number"] = member.UserNum, ["nickname"] = member.Nickname }).ToArray(),
+                { ["user_number"] = member.UserNum, ["nickname"] = member.Nickname, ["level"] = member.Level }).ToArray(),
         };
         if (message.Appearance is { } appearance)
         {

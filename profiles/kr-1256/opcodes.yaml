@@ -2979,10 +2979,11 @@ opcodes:
     source: "kr-812 C2S 509 gcpRoomReqOpenCloseSlot; kr-1256 builder sub_97CFD0 writes the same two words (seat, closed)"
   - value: 511
     direction: c2s
+    connection: game
     name: gcpSendSessionChrPos
     name_source: label@kr-812
-    evidence: inferred
-    source: "kr-812 C2S 511 gcpSendSessionChrPos (serializer kr-812 sub_934030); kr-1256 reports the character's position in the room with it and the server relays it as S2C 514"
+    evidence: verified
+    source: "kr-1256 sub_913640 selects 511 whenever a session exists, including the kind-3 plaza: u32 sequence, XYZ, two bytes and f32 (22 bytes); matches kr-812 gcpSendSessionChrPos"
   - value: 513
     direction: c2s
     name: gcpRoomChangeGameSetting
@@ -3200,6 +3201,30 @@ opcodes:
     evidence: inferred
     source: "kr-1256 sub_9D7750 stamps 111, called when the gspAskedInvitation prompt (sub_9A8DF0) is refused; kr-812 sub_81DEA0 builds Packet_gcpReqMoveToFriendAccept on the same branch"
     notes: "one u32: the token of the S2C 121 prompt"
+    connection: game
+  - value: 112
+    direction: c2s
+    name: gcpReqMoveToFriend
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_939820 stamps 112 with one prefixed wide string, the friend to visit; the role of kr-812 C2S 110 sub_92A050"
+    notes: "wstr target"
+    connection: game
+  - value: 113
+    direction: c2s
+    name: gcpReqRefuseVisitation_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_9D77E0 stamps 113 when the gspAskedVisitation prompt (kr-1256 sub_9AB8F0) is declined"
+    notes: "u32 token, u32 reason"
+    connection: game
+  - value: 114
+    direction: c2s
+    name: gcpReqAcceptVisitation_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_9D7890 stamps 114 when the gspAskedVisitation prompt (kr-1256 sub_9AB8F0) is accepted"
+    notes: "u32 token"
     connection: game
   - value: 115
     direction: c2s

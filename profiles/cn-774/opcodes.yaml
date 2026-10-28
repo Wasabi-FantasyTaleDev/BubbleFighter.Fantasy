@@ -75,6 +75,13 @@ opcodes:
     evidence: verified
     source: "cn-774 sub_BCF090 branch at BD0683 names gspReceivePartyChrPos; cn-774 sub_B01A60 reads identity, sequence, XYZ, two bytes and f32"
   - value: 511
+    direction: c2s
+    connection: game
+    name: gcpSendSessionChrPos
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_B0D330 selects 511 whenever a session exists, including the kind-3 plaza: u32 sequence, XYZ, two bytes and f32 (22 bytes); matches kr-1256 sub_913640 and kr-812 gcpSendSessionChrPos"
+  - value: 511
     direction: s2c
     connection: game
     name: gspRoomLeaveSlot
@@ -2026,6 +2033,38 @@ opcodes:
     evidence: inferred
     source: "cn-774 sub_BD6550 stamps 110, called when the gspAskedInvitation prompt (sub_BA8CD0) is refused; same role as kr-1256 C2S 111 sub_9D7750"
     notes: "one u32: the token of the S2C 121 prompt"
+    connection: game
+  - value: 109
+    direction: c2s
+    name: gcpReqInvite
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_B04050 stamps 109 for the friend window invite item (cn-774 sub_783530 case 2, cn-774 sub_B322B0); same body as kr-1256 C2S 110 sub_90A330"
+    notes: "wstr target, u32 flag"
+    connection: game
+  - value: 111
+    direction: c2s
+    name: gcpReqMoveToFriend
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_B32AD0 stamps 111 for the friend window visit item (cn-774 sub_783530 case 3); one prefixed wide string, the role of kr-812 C2S 110 sub_92A050"
+    notes: "wstr target"
+    connection: game
+  - value: 112
+    direction: c2s
+    name: gcpReqRefuseVisitation_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_BD65E0 stamps 112 when the gspAskedVisitation prompt (cn-774 sub_BAB150) is declined"
+    notes: "u32 token, u32 reason (0 declined by the player, 1 by the client itself)"
+    connection: game
+  - value: 113
+    direction: c2s
+    name: gcpReqAcceptVisitation_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_BD6690 stamps 113 when the gspAskedVisitation prompt (cn-774 sub_BAB150) is accepted"
+    notes: "u32 token"
     connection: game
   - value: 114
     direction: c2s

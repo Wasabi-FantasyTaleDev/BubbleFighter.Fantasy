@@ -44,14 +44,16 @@ internal static class LoginPartySnapshot
     /// <param name="userNumber">The login user number written as the member and profile identity.</param>
     /// <param name="nickname">The player's nickname, written into the member.</param>
     /// <param name="characterItemId">The persisted equipped character item id carried by the profile record.</param>
+    /// <param name="level">The local player's level for party rank records.</param>
     /// <returns>The <c>gspUpdateParty</c> body.</returns>
     internal static byte[] Write(BubbleFighter.Fantasy.Packets.PacketTables tables, string build, int userNumber,
-        string nickname, int characterItemId)
+        string nickname, int characterItemId, int level = 1)
     {
         var member = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
             ["user_number"] = userNumber,
             ["nickname"] = nickname,
+            ["level"] = level,
         };
         // kr-1256 reads user_number as the profile map's key and character_id as its payload head; cn-774
         // and tw-454 read the same two words as the record's own identity and equipped character.

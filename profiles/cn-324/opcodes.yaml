@@ -1202,6 +1202,12 @@ opcodes:
     name_source: label@cn-324
     evidence: inferred
     source: "cn-324 dispatcher sub_714540 case 919: Packet_gspResOpenTreasureChest"
+  - value: 110
+    direction: c2s
+    name: gcpReqMoveToFriend
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_7A1A90 constructs Packet_gcpReqMoveToFriend with cn-324 sub_5C7C50; cn-324 sub_5DB390 stamps 110 through cn-324 sub_91B110; cn-324 sub_706F70 consumes the direct result without an approval prompt"
   - value: 920
     direction: s2c
     name: gspCustomizeString

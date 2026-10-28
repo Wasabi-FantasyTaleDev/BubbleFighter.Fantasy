@@ -7,6 +7,9 @@ using System.Text;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Kernel;
+using BubbleFighter.Fantasy.Contracts.Party;
+using BubbleFighter.Fantasy.Contracts.Players;
+using BubbleFighter.Fantasy.Contracts.Sessions;
 using BubbleFighter.Fantasy.Packets;
 using BubbleFighter.Fantasy.Scenario.Tests.Harness;
 using BubbleFighter.Fantasy.Wire;
@@ -19,7 +22,7 @@ namespace BubbleFighter.Fantasy.Scenario.Tests;
 /// Two clients over real sockets invite, answer and leave parties on both families. kr-1256 runs through the mounted
 /// modern party binding and the shared party row: A invites B (C2S 110), B gets the prompt with its token (S2C 121)
 /// and A the delivery notice (S2C 120); a refusal that echoes the token (C2S 111) answers A; a second invitation is
-/// accepted with kind 1 (C2S 115) and both get the party list and the join notice, while accepts of kinds 0 and 2 and
+/// accepted with kind 1 or granted-visit kind 0 (C2S 115) and both get the party list and the join notice, while kind 2 and
 /// a refusal with a stale token change nothing. kr-812 runs through the native binding: B accepts A's invitation
 /// (C2S 109) and both get the list and the join notice; B leaves (C2S 202) and both are parties of one again; a
 /// refused invitation answers A.
@@ -28,8 +31,43 @@ namespace BubbleFighter.Fantasy.Scenario.Tests;
 /// </summary>
 public sealed class PartyScenarioTests
 {
-    [Fact]
-    public async Task Kr1256InviteRefuseAndAcceptReachBothPlayers()
+    /// <summary>Owns the no-op scene follow in membership scenarios whose players are already in the same menu.</summary>
+    [Plugin("test.party-menu-scene", Requires = [typeof(IMessageRouter), typeof(IPartyDirectory), typeof(IOnlinePlayers)])]
+    public sealed class MenuSceneOwner : IPlugin
+    {
+        /// <summary>Checks the committed membership and both menu states before accepting the scene request.</summary>
+        public ValueTask ActivateAsync(IPluginContext context, CancellationToken cancellationToken)
+        {
+            var protocol = context.Config.Bind<MenuSceneOptions>().Protocol;
+            var parties = context.Services.Get<IPartyDirectory>();
+            var online = context.Services.Get<IOnlinePlayers>();
+            context.Effect(context.Services.Get<IMessageRouter>().For(context).On<PartySceneFollowRequested>(protocol,
+                (session, request, _) =>
+                {
+                    Assert.True(session.TryFeature<IPlayerSession>(out var member));
+                    Assert.Equal(request.LeaderUserNum, parties.PartyOf(member!.Identity.UserNum)!.Leader.UserNum);
+                    Assert.Equal(SessionPhase.MainMenu, member.Phase);
+                    Assert.True(online.FindByUserNum(request.LeaderUserNum)!.TryFeature<IPlayerSession>(out var leader));
+                    Assert.Equal(SessionPhase.MainMenu, leader!.Phase);
+                    return ValueTask.CompletedTask;
+                }));
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    /// <summary>Selects the protocol scope of the menu-only scenario scene owner.</summary>
+    public sealed class MenuSceneOptions
+    {
+        /// <summary>Gets or sets the scenario's game message scope.</summary>
+        public string Protocol { get; set; } = "";
+    }
+
+    /// <summary>Exercises invitation refusal, stale answers and both client-proven party move kinds over TCP.</summary>
+    /// <param name="acceptKind">The invitation prompt kind 1 or granted visit move kind 0.</param>
+    [Theory]
+    [InlineData((byte)0)]
+    [InlineData((byte)1)]
+    public async Task Kr1256InviteRefuseAndAcceptReachBothPlayers(byte acceptKind)
     {
         using var limit = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         var ct = limit.Token;
@@ -61,6 +99,7 @@ public sealed class PartyScenarioTests
                 ["online_players"] = true,
             }),
             Row("party", new() { ["protocol"] = "kr-1256/game", ["max_members"] = 12 }),
+            Row("test.party-menu-scene", new() { ["protocol"] = "kr-1256/game" }),
             Row("net.tcp", new() { ["listen"] = $"127.0.0.1:{port}", ["protocol"] = "kr-1256/game" }),
         ], PluginCatalog.Discover([Path.Combine(AppContext.BaseDirectory, "plugins")]), NullLoggerFactory.Instance);
         try
@@ -84,7 +123,7 @@ public sealed class PartyScenarioTests
             PinBytes("refused", PartyPins.Kr1256Refused, (await a.WaitAsync(ca, 119, TimeSpan.FromSeconds(10), ct)).Payload);
             Assert.Single(a.Since(ca));
 
-            // A invites again: the token is new. A refusal with the old token and accepts of kinds 0 and 2 do nothing.
+            // A invites again: the token is new. A refusal with the old token and kind 2 do nothing.
             ca = a.Cursor; cb = b.Cursor;
             await a.SendAsync(110, [.. Text("partyb"), .. Word(0)], ct, 0);
             var secondPrompt = await b.WaitAsync(cb, 121, TimeSpan.FromSeconds(10), ct);
@@ -94,14 +133,13 @@ public sealed class PartyScenarioTests
             PinBytes("delivered2", PartyPins.Kr1256Delivered, (await a.WaitAsync(ca, 120, TimeSpan.FromSeconds(10), ct)).Payload);
             ca = a.Cursor; cb = b.Cursor;
             await b.SendAsync(111, Word((int)first), ct, 0);
-            await b.SendAsync(115, Accept(0), ct, 0);
             await b.SendAsync(115, Accept(2), ct, 0);
             await Task.Delay(500, ct);
             Assert.Empty(a.Since(ca));
             Assert.Empty(b.Since(cb));
 
-            // The accept of the prompt (kind 1) joins B to A: both get the list with A first, then the join notice.
-            await b.SendAsync(115, Accept(1), ct, 0);
+            // kr-1256 sub_9A8DF0 sends kind 1; kr-1256 sub_9A9710 sends kind 0 for a granted visit.
+            await b.SendAsync(115, Accept(acceptKind), ct, 0);
             foreach (var (client, from, who) in new[] { (a, ca, "a"), (b, cb, "b") })
             {
                 var list = await client.WaitAsync(from, 201, TimeSpan.FromSeconds(10), ct);
@@ -163,6 +201,7 @@ public sealed class PartyScenarioTests
             Row("dialect.messages", new() { ["protocol"] = "kr-812/game", ["inventory"] = true, ["party"] = true, ["packets_directory"] = RepositoryPackets.Directory() }),
             Row("lobby", new() { ["protocol"] = "kr-812/game", ["auto_create_players"] = true, ["online_players"] = true }),
             Row("party", new() { ["protocol"] = "kr-812/game" }),
+            Row("test.party-menu-scene", new() { ["protocol"] = "kr-812/game" }),
             Row("net.tcp", new() { ["listen"] = $"127.0.0.1:{port}", ["protocol"] = "kr-812/game" }),
         ], PluginCatalog.Discover([Path.Combine(AppContext.BaseDirectory, "plugins")]), NullLoggerFactory.Instance);
         try
@@ -338,12 +377,12 @@ internal static class PartyPins
 
     internal const string LegacyPrompt = "010000000600000070006100720074007900610000000000000000000000";
     internal const string LegacySent = "0000000006000000700061007200740079006200";
-    internal const string LegacyList = "02000000020000000100000006000000700061007200740079006100000000000000000000000000020000000600000070006100720074007900620000000000000000000000000000000000";
+    internal const string LegacyList = "02000000020000000100000006000000700061007200740079006100000000000000000001000000020000000600000070006100720074007900620000000000000000000100000000000000";
     internal const string LegacyJoined = "06000000700061007200740079006200";
     internal const string LegacyLeaveConfirm = "";
     internal const string LegacyLeaveNotice = "06000000700061007200740079006200";
-    internal const string LegacySoloA = "0200000001000000010000000600000070006100720074007900610000000000000000000000000000000000";
-    internal const string LegacySoloB = "0200000001000000020000000600000070006100720074007900620000000000000000000000000000000000";
+    internal const string LegacySoloA = "0200000001000000010000000600000070006100720074007900610000000000000000000100000000000000";
+    internal const string LegacySoloB = "0200000001000000020000000600000070006100720074007900620000000000000000000100000000000000";
     internal const string LegacyRefused = "0E00000006000000700061007200740079006200";
 
     internal static bool Capture(List<string> pins, string name, string expected, byte[] payload) =>

@@ -7,30 +7,30 @@ using Xunit;
 namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
 
 /// <summary>
-/// Pins the play together bodies that are not already in <c>packets/party.yaml</c>: the kr-812 "go to friend"
-/// request and the two kr-1256 visit failures, each with its exact byte length.
+/// Pins the visit bodies of <c>packets/play-together.yaml</c>: the "go to friend" request every visiting build shares and
+/// the two kr-1256 failures, each with its exact byte length.
 /// </summary>
 public sealed class PlayTogetherTablePins
 {
     private const string LegacyBuild = "kr-812";
     private const string ModernBuild = "kr-1256";
 
-    /// <summary>The kr-812 request is one prefixed wide string, read by kr-812 sub_5C8FD0 into object +4.</summary>
+    /// <summary>The kr-812 request is one prefixed wide string, the friend's nickname, read by kr-812 sub_5C8FD0.</summary>
     [Fact]
     public void MoveToFriendRequestIsOnePrefixedName()
     {
         var body = Text("Ab");
         Assert.Equal(8, body.Length);
-        Assert.Equal(body, PacketCodec.Write(TestTables(), LegacyBuild, "MoveToFriendRequest", Values(("unknown_4", "Ab"))));
+        Assert.Equal(body, PacketCodec.Write(TestTables(), LegacyBuild, "MoveToFriendRequest", Values(("target", "Ab"))));
         var read = PacketCodec.Read(TestTables(), LegacyBuild, "MoveToFriendRequest", body);
-        Assert.Equal("Ab", read["unknown_4"]);
+        Assert.Equal("Ab", read["target"]);
         Assert.Throws<PacketFormatException>(() => PacketCodec.Read(TestTables(), LegacyBuild, "MoveToFriendRequest", body[..^1]));
         Assert.Throws<PacketFormatException>(() => PacketCodec.Read(TestTables(), LegacyBuild, "MoveToFriendRequest", [.. body, 0]));
     }
 
     /// <summary>
     /// The kr-1256 visitation failure is a nickname and one word; handler kr-1256 sub_9AA690 reads them in that
-    /// order. The word's meaning is unproven, so it keeps its position name.
+    /// order and kr-1256 sub_9AA990 selects the party/VisitFailed text by the word.
     /// </summary>
     [Fact]
     public void VisitationFailedIsANicknameAndAWord()
@@ -38,10 +38,10 @@ public sealed class PlayTogetherTablePins
         var body = Combine(Text("Ab"), Word(7));
         Assert.Equal(12, body.Length);
         Assert.Equal(body, PacketCodec.Write(TestTables(), ModernBuild, "VisitationFailed",
-            Values(("unknown_0", "Ab"), ("unknown_24", 7))));
+            Values(("nickname", "Ab"), ("code", 7))));
         var read = PacketCodec.Read(TestTables(), ModernBuild, "VisitationFailed", body);
-        Assert.Equal("Ab", read["unknown_0"]);
-        Assert.Equal(7, Convert.ToInt32(read["unknown_24"]));
+        Assert.Equal("Ab", read["nickname"]);
+        Assert.Equal(7, Convert.ToInt32(read["code"]));
         Assert.Equal(body, PacketCodec.Write(TestTables(), ModernBuild, "VisitationFailed", read));
         Assert.Throws<PacketFormatException>(() => PacketCodec.Read(TestTables(), ModernBuild, "VisitationFailed", body[..^1]));
         Assert.Throws<PacketFormatException>(() => PacketCodec.Read(TestTables(), ModernBuild, "VisitationFailed", [.. body, 0]));
@@ -58,7 +58,7 @@ public sealed class PlayTogetherTablePins
         Assert.Throws<PacketFormatException>(() => PacketCodec.Read(TestTables(), ModernBuild, "MoveToInviterFailed", body[..^1]));
     }
 
-    /// <summary>The failure shapes follow the modern family; the friend request follows the legacy family.</summary>
+    /// <summary>The failure shapes follow the modern family; the friend request is shared by both families.</summary>
     [Fact]
     public void TheVisitFailuresAreModernOnly()
     {
@@ -70,7 +70,8 @@ public sealed class PlayTogetherTablePins
         Assert.NotEmpty(TestTables().Resolve("cn-717", "MoveToFriendRequest"));
         foreach (var build in new[] { "kr-1256", "cn-774", "tw-454" })
         {
-            Assert.Empty(TestTables().Resolve(build, "MoveToFriendRequest"));
+            Assert.NotEmpty(TestTables().Resolve(build, "MoveToFriendRequest"));
+            Assert.Empty(TestTables().Resolve(build, "MoveToFriendReply"));
             Assert.NotEmpty(TestTables().Resolve(build, "VisitationFailed"));
             Assert.NotEmpty(TestTables().Resolve(build, "MoveToInviterFailed"));
         }

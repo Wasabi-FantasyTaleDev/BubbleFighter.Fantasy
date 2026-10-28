@@ -134,9 +134,14 @@ internal sealed class WireProtocol : IConnectionProtocol
                     result = await connection.Input.ReadAsync(ct).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) { break; }
-                catch (IOException) { break; }
-                catch (ObjectDisposedException) { break; }
-                catch (InvalidOperationException) { break; }
+                catch (IOException error)
+                {
+                    _logger.LogWarning(error, "Connection {Id} input failed before the peer completed its stream.", connection.Id);
+                    await writer.CompleteAsync(error).ConfigureAwait(false);
+                    return;
+                }
+                catch (ObjectDisposedException) when (ct.IsCancellationRequested || connection.IsClosed) { break; }
+                catch (InvalidOperationException) when (ct.IsCancellationRequested || connection.IsClosed) { break; }
 
                 foreach (var segment in result.Buffer)
                 {
@@ -174,9 +179,14 @@ internal sealed class WireProtocol : IConnectionProtocol
                 result = await reader.ReadAsync(ct).ConfigureAwait(false);
             }
             catch (OperationCanceledException) { break; }
-            catch (IOException) { break; }
-            catch (ObjectDisposedException) { break; }
-            catch (InvalidOperationException) { break; }
+            catch (IOException error)
+            {
+                _logger.LogWarning(error, "Connection {Id} inbound frame stream ended with an input error.", connection.Id);
+                await connection.CloseAsync("inbound transport read failed").ConfigureAwait(false);
+                return;
+            }
+            catch (ObjectDisposedException) when (ct.IsCancellationRequested || connection.IsClosed) { break; }
+            catch (InvalidOperationException) when (ct.IsCancellationRequested || connection.IsClosed) { break; }
 
             var buffer = result.Buffer;
             while (true)
@@ -230,7 +240,11 @@ internal sealed class WireProtocol : IConnectionProtocol
             }
             reader.AdvanceTo(buffer.Start, buffer.End);
             if (result.IsCompleted)
+            {
+                await connection.CloseAsync(buffer.IsEmpty ? "peer completed inbound stream"
+                    : $"peer ended with an incomplete frame ({buffer.Length} buffered bytes)").ConfigureAwait(false);
                 break;
+            }
         }
     }
 

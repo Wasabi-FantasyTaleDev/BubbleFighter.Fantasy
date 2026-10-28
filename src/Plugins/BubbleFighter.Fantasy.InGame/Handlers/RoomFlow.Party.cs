@@ -15,6 +15,73 @@ internal sealed partial class RoomFlow
     private readonly IOnlinePlayers? _online;
     private readonly SceneTransitions _sceneTransitions;
 
+    /// <summary>Brings a newly admitted member to the committed leader's current scene through normal admission.</summary>
+    internal async ValueTask<bool> HandlePartySceneFollowAsync(ISession session, PartySceneFollowRequested request, CancellationToken ct)
+    {
+        var memberUser = SessionPlayer.ResolveUserNum(session);
+        if (_online?.FindByUserNum(request.LeaderUserNum) is not { } leader
+            || !ReferenceEquals(_online.FindByUserNum(memberUser), session)
+            || _parties?.PartyOf(memberUser) is not { } party || party.Leader.UserNum != request.LeaderUserNum
+            || ReferenceEquals(leader, session)) return false;
+        var group = new SceneGroup(leader, party, [session]);
+        var source = _registry.TryGet(session.Id);
+        var destination = _registry.TryGet(leader.Id);
+        var leaderPhase = leader.TryFeature<IPlayerSession>(out var leaderPlayer) ? leaderPlayer.Phase : (SessionPhase?)null;
+        var memberPhase = session.TryFeature<IPlayerSession>(out var memberPlayer) ? memberPlayer.Phase : (SessionPhase?)null;
+        var arrived = false;
+        using var queued = CancellationTokenSource.CreateLinkedTokenSource(ct, _lifetime);
+        await _sceneTransitions.RunAsync([leader.Id, session.Id], async token =>
+        {
+            if (!FollowerIsCurrent(group, session) || memberPlayer?.Phase != memberPhase || leaderPlayer?.Phase != leaderPhase
+                || !ReferenceEquals(source, _registry.TryGet(session.Id))
+                || !ReferenceEquals(destination, _registry.TryGet(leader.Id))) return;
+            if (source is not null && !ReferenceEquals(source, destination))
+            {
+                if (source.Phase != RoomPhase.Waiting || !PlazaBound) return;
+                if (destination is not null)
+                {
+                    var admissible = false;
+                    try
+                    {
+                        await destination.Executor.ExecuteAsync(_ =>
+                        {
+                            admissible = FollowerIsCurrent(group, session)
+                                && ReferenceEquals(destination, _registry.TryGet(leader.Id))
+                                && destination.Phase == RoomPhase.Waiting && !destination.IsFull
+                                && destination.Password.Length == 0;
+                            return ValueTask.CompletedTask;
+                        }, token).ConfigureAwait(false);
+                    }
+                    catch (ObjectDisposedException) when (_registry.Find(destination.Id) is null) { return; }
+                    if (!admissible) return;
+                }
+                // Leave through the normal scene owner with a reserved plaza seat. Target admission is
+                // checked again after leaving; a room that fills meanwhile never receives an extra member.
+                await FollowRoomLeaveAsync(group, source, token).ConfigureAwait(false);
+            }
+            if (ReferenceEquals(destination, _registry.TryGet(session.Id)) && destination is not null)
+            {
+                arrived = true;
+                return;
+            }
+            if (!CanFollowFromMenuOrPlaza(session)) return;
+            if (destination is not null)
+            {
+                // An invitation conveys membership, not the password of an existing room.
+                await FollowRoomAsync(group, destination, "", token).ConfigureAwait(false);
+                arrived = ReferenceEquals(destination, _registry.TryGet(session.Id));
+                return;
+            }
+            if (leaderPhase == SessionPhase.Plaza && _plaza.Find(leader.Id) is { Reserved: false })
+                await FollowPlazaAsync(group, token).ConfigureAwait(false);
+            else if (leaderPhase == SessionPhase.MainMenu && memberPlayer?.Phase == SessionPhase.Plaza)
+                await ReturnMenuSceneAsync(session, new() { PartyTransition = true }, token).ConfigureAwait(false);
+            arrived = memberPlayer?.Phase == leaderPhase
+                && (leaderPhase == SessionPhase.MainMenu || _plaza.Find(session.Id) is { Reserved: false });
+        }, queued.Token).ConfigureAwait(false);
+        return arrived;
+    }
+
     private async ValueTask RunSceneAsync(ISession session,
         Func<SceneGroup?, CancellationToken, ValueTask> operation, CancellationToken ct)
     {

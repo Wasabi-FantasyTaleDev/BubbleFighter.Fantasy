@@ -6,6 +6,33 @@ namespace BubbleFighter.Fantasy.Messenger.Tests;
 /// <summary>The messenger core over the in-memory store: tickets, relations, isolation, replay and events.</summary>
 public sealed class MessengerServiceTests
 {
+    /// <summary>The trusted local account level survives logout and cannot be cleared by a stale native report.</summary>
+    [Fact]
+    public async Task StoredLevelsRemainVisibleAcrossOfflineAndReplacementSessions()
+    {
+        var stored = new Dictionary<string, int> { ["ann"] = 8, ["bob"] = 42 };
+        using var fixture = new MessengerFixture(levelSource: (user, _) => ValueTask.FromResult<int?>(
+            user.Tenant == "alpha" ? stored[user.Subject] : null));
+        var (ann, bob) = await fixture.FriendsAsync();
+        Assert.Equal(42, Assert.Single((await fixture.Service.GetFriendListAsync(ann.Token, 0, default)).Friends).Presence.Level);
+        await fixture.Service.ChangeMyLevelAsync(bob.Token, 0, default);
+        Assert.Equal(42, Assert.Single((await fixture.Service.GetFriendListAsync(ann.Token, 0, default)).Friends).Presence.Level);
+        await fixture.Service.LogoutAuthAsync(bob.Token, default);
+        var offline = Assert.Single((await fixture.Service.GetFriendListAsync(ann.Token, 0, default)).Friends).Presence;
+        Assert.Equal((MessengerPresenceStatus.Offline, 42), (offline.Status, offline.Level));
+        stored["bob"] = 43;
+        var again = await fixture.SignInAsync("bob");
+        await fixture.Service.ChangeMyLevelAsync(again.Token, 1, default);
+        Assert.Equal(43, Assert.Single((await fixture.Service.GetFriendListAsync(ann.Token, 0, default)).Friends).Presence.Level);
+        var remote = await fixture.SignInAsync("bob", tenant: "beta");
+        await fixture.Service.ChangeMyLevelAsync(remote.Token, 12, default);
+        var other = await fixture.SignInAsync("ann", tenant: "beta");
+        await fixture.Service.RequestNewFriendAsync(remote.Token, null, "ann", "", default);
+        var handle = Assert.Single((await fixture.DrainAsync(other)).OfType<MessengerFriendRequestEvent>()).Request.Handle;
+        await fixture.Service.ConfirmNewFriendAsync(other.Token, null, handle, MessengerFriendDecision.Accept, default);
+        Assert.Equal(12, Assert.Single((await fixture.Service.GetFriendListAsync(other.Token, 0, default)).Friends).Presence.Level);
+    }
+
     [Fact]
     public async Task TicketSignInIsSingleUseAndRejectsTamperingExpiryAndUnknownTenants()
     {
@@ -73,6 +100,50 @@ public sealed class MessengerServiceTests
         Assert.Equal([MessengerPresenceStatus.Online, MessengerPresenceStatus.Offline],
             events.OfType<MessengerPresenceChangedEvent>().Select(e => e.Presence.Status));
         Assert.Equal(MessengerPresenceStatus.Offline, Assert.Single((await fixture.Service.GetFriendListAsync(ann.Token, 0, default)).Friends).Presence.Status);
+    }
+
+    [Theory]
+    [InlineData(MessengerFriendDecision.Accept)]
+    [InlineData(MessengerFriendDecision.Decline)]
+    public async Task ResolvedRequestsCannotReplayAcrossMessengerOrAuthSignIn(MessengerFriendDecision decision)
+    {
+        using var fixture = new MessengerFixture();
+        var ann = await fixture.SignInAsync("ann");
+        var bob = await fixture.SignInAsync("bob");
+        await fixture.Service.RequestNewFriendAsync(ann.Token, null, "bob", "", default);
+        var request = Assert.IsType<MessengerFriendRequestEvent>(Assert.Single(await fixture.DrainAsync(bob)));
+        Assert.Equal(MessengerResult.Ok, await fixture.Service.ConfirmNewFriendAsync(bob.Token, null, request.Request.Handle, decision, default));
+
+        await fixture.Service.LogoutMessengerAsync(bob.Token, default);
+        await fixture.Service.LoginMessengerAsync(bob.Token, default);
+        Assert.DoesNotContain(await fixture.DrainAsync(bob), e => e is MessengerFriendRequestEvent);
+        var replacement = await fixture.SignInAsync("bob");
+        Assert.DoesNotContain(await fixture.DrainAsync(replacement), e => e is MessengerFriendRequestEvent);
+        var reset = await fixture.Service.WaitEventsAsync(replacement.Token, long.MaxValue, TimeSpan.Zero, default);
+        Assert.True(reset.Reset);
+        Assert.DoesNotContain(reset.Events, e => e is MessengerFriendRequestEvent);
+
+        var cid = await fixture.SignInAsync("cid");
+        await fixture.Service.RequestNewFriendAsync(cid.Token, null, "bob", "new request", default);
+        var next = Assert.Single((await fixture.DrainAsync(replacement, request.Sequence)).OfType<MessengerFriendRequestEvent>());
+        Assert.Equal("cid", next.Request.From.Nickname);
+        Assert.True(next.Sequence > request.Sequence);
+    }
+
+    [Fact]
+    public async Task PendingRequestHasOnlyOneReplayEntryAfterRepeatedMessengerSignIn()
+    {
+        using var fixture = new MessengerFixture();
+        var ann = await fixture.SignInAsync("ann");
+        var bob = await fixture.SignInAsync("bob");
+        await fixture.Service.RequestNewFriendAsync(ann.Token, null, "bob", "", default);
+        var original = Assert.IsType<MessengerFriendRequestEvent>(Assert.Single(await fixture.DrainAsync(bob)));
+        await fixture.Service.ConfirmNewFriendAsync(bob.Token, null, original.Request.Handle, MessengerFriendDecision.Dismiss, default);
+        await fixture.Service.LoginMessengerAsync(bob.Token, default);
+        await fixture.Service.LoginMessengerAsync(bob.Token, default);
+        var replay = Assert.Single((await fixture.DrainAsync(bob)).OfType<MessengerFriendRequestEvent>());
+        Assert.Equal(original.Request.Handle, replay.Request.Handle);
+        Assert.True(replay.Sequence > original.Sequence);
     }
 
     [Fact]

@@ -16,6 +16,113 @@ namespace BubbleFighter.Fantasy.InGame.Tests;
 /// <summary>Party moves reuse the shared room and plaza owners with individual seats and live membership checks.</summary>
 public sealed class PartySceneFlowTests
 {
+    /// <summary>An invitation accepted after the leader has already arrived follows that scene immediately.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task NewlyJoinedMemberFollowsExistingLeaderScene(bool roomScene)
+    {
+        await using var rig = new Rig();
+        var leader = rig.Player(11);
+        var member = rig.Player(22);
+        if (roomScene) await rig.Flow.HandleCreateAsync(leader, new("existing", "", 1, "map"), default);
+        else await rig.Flow.HandlePlazaEnterAsync(leader, new(), default);
+        rig.Party = new([new(11, "player11"), new(22, "player22")]);
+        await rig.Flow.HandlePartySceneFollowAsync(member, new(11), default);
+        Assert.False(member.Connection.IsClosed);
+        if (roomScene)
+        {
+            Assert.Same(rig.Registry.TryGet(leader.Id), rig.Registry.TryGet(member.Id));
+            Assert.True(Assert.Single(rig.Entered.To(member)).PartyTransition);
+        }
+        else
+        {
+            Assert.Equal(SessionPhase.Plaza, member.Features.Get<IPlayerSession>().Phase);
+            Assert.True(Assert.Single(rig.Plaza.To(member)).PartyTransition);
+        }
+    }
+
+    /// <summary>A new party membership does not bypass password, capacity or active-round restrictions.</summary>
+    [Theory]
+    [InlineData("password")]
+    [InlineData("full")]
+    [InlineData("started")]
+    public async Task NewMembershipDoesNotBypassRoomAdmission(string restriction)
+    {
+        await using var rig = new Rig(seats: restriction == "full" ? 1 : 4);
+        var leader = rig.Player(11);
+        var member = rig.Player(22);
+        await rig.Flow.HandlePlazaEnterAsync(member, new(), default);
+        await rig.Flow.HandleCreateAsync(leader, new("existing", restriction == "password" ? "key" : "", 1, "map"), default);
+        if (restriction == "started") rig.Registry.TryGet(leader.Id)!.MarkPlaying();
+        rig.Party = new([new(11, "player11"), new(22, "player22")]);
+        await rig.Flow.HandlePartySceneFollowAsync(member, new(11), default);
+        Assert.Null(rig.Registry.TryGet(member.Id));
+        Assert.Equal(SessionPhase.Plaza, member.Features.Get<IPlayerSession>().Phase);
+        Assert.Empty(rig.Entered.To(member));
+        Assert.Empty(rig.PlazaDepartures.To(leader));
+    }
+
+    /// <summary>The member returns to the leader's menu without pulling other members through another scene.</summary>
+    [Fact]
+    public async Task NewlyJoinedMemberCanFollowLeaderBackToMenu()
+    {
+        await using var rig = new Rig();
+        var leader = rig.Player(11);
+        var member = rig.Player(22);
+        await rig.Flow.HandlePlazaEnterAsync(member, new(), default);
+        rig.Party = new([new(11, "player11"), new(22, "player22")]);
+        await rig.Flow.HandlePartySceneFollowAsync(member, new(11), default);
+        Assert.Equal(SessionPhase.MainMenu, member.Features.Get<IPlayerSession>().Phase);
+        Assert.True(Assert.Single(rig.Menu.To(member)).PartyTransition);
+        Assert.Empty(rig.Menu.To(leader));
+    }
+
+    /// <summary>A new party member can leave a waiting room and follow the leader to any idle scene.</summary>
+    [Theory]
+    [InlineData("room")]
+    [InlineData("plaza")]
+    [InlineData("menu")]
+    public async Task MemberInAnotherRoomFollowsLeader(string scene)
+    {
+        await using var rig = new Rig();
+        var leader = rig.Player(11);
+        var member = rig.Player(22);
+        await rig.Flow.HandleCreateAsync(member, new("source", "", 1, "map"), default);
+        if (scene == "room") await rig.Flow.HandleCreateAsync(leader, new("target", "", 1, "map"), default);
+        else if (scene == "plaza") await rig.Flow.HandlePlazaEnterAsync(leader, new(), default);
+        rig.Party = new([new(11, "player11"), new(22, "player22")]);
+        await rig.Flow.HandlePartySceneFollowAsync(member, new(11), default);
+        Assert.False(member.Connection.IsClosed);
+        if (scene == "room") Assert.Same(rig.Registry.TryGet(leader.Id), rig.Registry.TryGet(member.Id));
+        else
+        {
+            Assert.Null(rig.Registry.TryGet(member.Id));
+            Assert.Equal(scene == "plaza" ? SessionPhase.Plaza : SessionPhase.MainMenu,
+                member.Features.Get<IPlayerSession>().Phase);
+        }
+    }
+
+    /// <summary>A rejected invitation destination does not remove the member's existing room seat.</summary>
+    [Theory]
+    [InlineData("password")]
+    [InlineData("full")]
+    [InlineData("started")]
+    public async Task RefusedDestinationRetainsOriginalRoom(string restriction)
+    {
+        await using var rig = new Rig(seats: restriction == "full" ? 1 : 4);
+        var leader = rig.Player(11);
+        var member = rig.Player(22);
+        await rig.Flow.HandleCreateAsync(member, new("source", "", 1, "map"), default);
+        var source = rig.Registry.TryGet(member.Id);
+        await rig.Flow.HandleCreateAsync(leader, new("target", restriction == "password" ? "key" : "", 1, "map"), default);
+        if (restriction == "started") rig.Registry.TryGet(leader.Id)!.MarkPlaying();
+        rig.Party = new([new(11, "player11"), new(22, "player22")]);
+        await rig.Flow.HandlePartySceneFollowAsync(member, new(11), default);
+        Assert.Same(source, rig.Registry.TryGet(member.Id));
+        Assert.Empty(rig.Left.To(member));
+    }
+
     /// <summary>A departing member's reserved plaza slot receives no roster or movement traffic before installation.</summary>
     [Fact]
     public async Task PlazaReservationStaysInvisibleBetweenRoomDetachAndPlazaEntry()

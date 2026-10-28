@@ -303,6 +303,29 @@ public sealed class ProtocolHandshakeTests
         Assert.Contains("MaxSessionFeatures", error.InnerException!.Message);
     }
 
+    /// <summary>Clean peer completion, a partial frame and a failed read retain distinct close reasons.</summary>
+    [Theory]
+    [InlineData("eof", "peer completed inbound stream")]
+    [InlineData("partial", "incomplete frame")]
+    [InlineData("error", "inbound transport read failed")]
+    public async Task InboundCompletionKeepsItsTransportReason(string termination, string reason)
+    {
+        await using var harness = await ProtocolHarness.StartAsync();
+        await WithProtocolAsync(harness.Game, async (connection, ct) =>
+        {
+            _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
+            if (termination == "partial")
+            {
+                var frame = PacketFrame_8Bytes.Encode(WirePins.PatchRequestOpcode, WirePins.GamePatchPayload());
+                SimpleCipher.ClientToServer().EncryptInPlace(frame);
+                await connection.SendAsync(frame.AsMemory(0, 3), ct);
+            }
+            await connection.ClientOutput.CompleteAsync(termination == "error" ? new IOException("injected read reset") : null);
+            Assert.True(await WaitForAsync(() => connection.IsClosed));
+            Assert.Contains(reason, connection.CloseReason);
+        });
+    }
+
     [Fact]
     public async Task MalformedFrameClosesFeatureAdmission()
     {

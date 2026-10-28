@@ -5,8 +5,8 @@ structs:
   # cn-324 sub_7C9EB0/sub_7C9E40, cn-279 sub_481310/sub_4812A0,
   # id-400 sub_8A29B0/sub_8A2A20, id-1809 sub_8C7280/sub_8C7210,
   # cn-706 sub_8B30E0/sub_8B3150, cn-406 sub_816960/sub_8168F0.
-  # kr-1256 sub_913640 writes the same seven-field 22-byte body for plaza 301 and room 511.
-  # cn-774 sub_B0D330 / tw-454 sub_BAB9A0 write the same fields on their own plaza connection.
+  # kr-1256 sub_913640 / cn-774 sub_B0D330 select 511 with a session (including the plaza), otherwise 301.
+  # tw-454 sub_BA8CE0 selects sub_BAB810 (511) or sub_BAB9A0 (301); both write the same 22-byte body.
   PlazaPositionUpload:
     - unknown_4: u32
       offset: 4

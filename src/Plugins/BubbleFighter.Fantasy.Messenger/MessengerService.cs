@@ -24,7 +24,10 @@ internal sealed class MessengerService : IMessengerService
     private readonly ILogger? _logger;
     private readonly MessengerLimits _limits;
     private readonly MessengerGameCatalog _catalog;
+    private readonly Func<MessengerUser, CancellationToken, ValueTask<int?>>? _levelSource;
     private readonly object _gate = new();
+    // Keep durable request changes and their replay entries in the same order, including concurrent sign-ins.
+    private readonly SemaphoreSlim _friendRequests = new(1, 1);
     private readonly Dictionary<string, Session> _sessions = new(StringComparer.Ordinal);
     private readonly Dictionary<long, Account> _accounts = [];
     private readonly Dictionary<string, long> _usedTickets = new(StringComparer.Ordinal);
@@ -67,7 +70,8 @@ internal sealed class MessengerService : IMessengerService
         public (long, long) Pair => PairOf(Members[0].Id, Members[1].Id);
     }
 
-    internal MessengerService(MessengerOptions options, IMessengerStore store, IReadOnlyDictionary<string, ECDsa> tenants, TimeProvider? clock = null, ILogger? logger = null)
+    internal MessengerService(MessengerOptions options, IMessengerStore store, IReadOnlyDictionary<string, ECDsa> tenants, TimeProvider? clock = null, ILogger? logger = null,
+        Func<MessengerUser, CancellationToken, ValueTask<int?>>? levelSource = null)
     {
         _options = options;
         _store = store;
@@ -76,6 +80,7 @@ internal sealed class MessengerService : IMessengerService
         _logger = logger;
         _limits = new(options.MaxFriends, options.MaxCategories, options.MaxPendingRequests);
         _catalog = new(options.Games);
+        _levelSource = levelSource;
         _lastPrune = _clock.GetUtcNow();
     }
 
@@ -108,6 +113,7 @@ internal sealed class MessengerService : IMessengerService
             _usedTickets.Add(claims.Id, claims.ExpiresAt);
         }
         var user = await _store.UpsertUserAsync(new(claims.Tenant, claims.Subject, claims.Nickname, _catalog.Canonical(claims.GameCode)), cancellationToken).ConfigureAwait(false);
+        var storedLevel = await StoredLevelAsync(user, cancellationToken).ConfigureAwait(false);
         lock (_gate)
         {
             DropExpiredSessions(now);
@@ -125,6 +131,7 @@ internal sealed class MessengerService : IMessengerService
             }
             if (_sessions.Count >= _options.MaxSessions) throw new InvalidOperationException("Messenger session capacity reached.");
             if (account is null) _accounts.Add(user.Id.Value, account = new(user));
+            if (storedLevel is { } knownLevel) account.Level = knownLevel;
             var session = new Session(Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)).TrimEnd('=').Replace('+', '-').Replace('/', '_'), user, shown, now)
             {
                 ExpiresAt = now.AddSeconds(_options.SessionSeconds),
@@ -157,11 +164,18 @@ internal sealed class MessengerService : IMessengerService
     public async ValueTask LoginMessengerAsync(string session, CancellationToken cancellationToken)
     {
         var (current, _) = await AuthorizeAsync(session, s => s.Online = true, cancellationToken).ConfigureAwait(false);
-        foreach (var request in await _store.ListIncomingRequestsAsync(current.User.Id, cancellationToken).ConfigureAwait(false))
+        await _friendRequests.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            var from = await _store.FindUserAsync(request.From, cancellationToken).ConfigureAwait(false);
-            if (from is not null) Enqueue(current.User.Id, sequence => new MessengerFriendRequestEvent(sequence, ToRequest(request, from, current.User)));
+            var pending = await _store.ListIncomingRequestsAsync(current.User.Id, cancellationToken).ConfigureAwait(false);
+            RemoveRequestEvents(current.User.Id, null);
+            foreach (var request in pending)
+            {
+                var from = await _store.FindUserAsync(request.From, cancellationToken).ConfigureAwait(false);
+                if (from is not null) Enqueue(current.User.Id, sequence => new MessengerFriendRequestEvent(sequence, ToRequest(request, from, current.User)));
+            }
         }
+        finally { _friendRequests.Release(); }
     }
 
     /// <inheritdoc />
@@ -174,6 +188,7 @@ internal sealed class MessengerService : IMessengerService
         ArgumentOutOfRangeException.ThrowIfNegative(level);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(level, 1_000_000);
         var (current, _) = await AuthorizeAsync(session, null, cancellationToken).ConfigureAwait(false);
+        level = await StoredLevelAsync(current.User, cancellationToken).ConfigureAwait(false) ?? level;
         bool notify;
         lock (_gate)
         {
@@ -192,12 +207,20 @@ internal sealed class MessengerService : IMessengerService
         var total = relations.Relations.Count;
         var pages = Math.Max(1, (total + _options.PageSize - 1) / _options.PageSize);
         if (page < 0 || page >= pages) throw new ArgumentOutOfRangeException(nameof(page), "The page is outside the friend list.");
+        var pageRelations = relations.Relations.Skip(page * _options.PageSize).Take(_options.PageSize).ToArray();
+        var levels = new Dictionary<long, int>();
+        foreach (var relation in pageRelations)
+            if (await StoredLevelAsync(relation.Friend, cancellationToken).ConfigureAwait(false) is { } knownLevel)
+                levels.Add(relation.Friend.Id.Value, knownLevel);
         MessengerFriend[] friends;
         lock (_gate)
-            friends = relations.Relations.Skip(page * _options.PageSize).Take(_options.PageSize)
+            friends = pageRelations
                 .Select(r => new MessengerFriend(Show(r.Friend, current.GameCode), r.CategoryId, r.Blocked,
-                    r.BlockedByFriend ? Hidden(r.Friend.Id) : PresenceOf(r.Friend.Id))).ToArray();
+                    WithStoredLevel(r.BlockedByFriend ? Hidden(r.Friend.Id) : PresenceOf(r.Friend.Id), r.Friend.Id))).ToArray();
         return new(relations.Categories.Select(c => Show(c, current.GameCode)).ToArray(), friends, page, pages, total);
+
+        MessengerPresence WithStoredLevel(MessengerPresence presence, MessengerUserId friend) =>
+            levels.TryGetValue(friend.Value, out var known) ? presence with { Level = known } : presence;
     }
 
     /// <inheritdoc />
@@ -211,10 +234,15 @@ internal sealed class MessengerService : IMessengerService
             if (target is null) return MessengerResult.NotFound;
             if (target.Id == current.User.Id) return MessengerResult.Invalid;
             if (target.Tenant != current.User.Tenant) return MessengerResult.CrossTenant;
-            var (result, request) = await _store.CreateRequestAsync(current.User.Id, target.Id, message, _clock.GetUtcNow().UtcDateTime, _limits, cancellationToken).ConfigureAwait(false);
-            if (result == MessengerResult.Ok)
-                Enqueue(target.Id, sequence => new MessengerFriendRequestEvent(sequence, ToRequest(request!, current.User, target)));
-            return result;
+            await _friendRequests.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                var (result, request) = await _store.CreateRequestAsync(current.User.Id, target.Id, message, _clock.GetUtcNow().UtcDateTime, _limits, cancellationToken).ConfigureAwait(false);
+                if (result == MessengerResult.Ok)
+                    Enqueue(target.Id, sequence => new MessengerFriendRequestEvent(sequence, ToRequest(request!, current.User, target)));
+                return result;
+            }
+            finally { _friendRequests.Release(); }
         }).ConfigureAwait(false);
     }
 
@@ -225,14 +253,23 @@ internal sealed class MessengerService : IMessengerService
         var (current, _) = await AuthorizeAsync(session, null, cancellationToken).ConfigureAwait(false);
         return await ReplayAsync(current.User, "confirm", requestKey, async () =>
         {
-            if (decision == MessengerFriendDecision.Dismiss)
-                return (await _store.ListIncomingRequestsAsync(current.User.Id, cancellationToken).ConfigureAwait(false)).Any(r => r.Handle == handle)
-                    ? MessengerResult.Ok : MessengerResult.NotFound;
-            var accept = decision == MessengerFriendDecision.Accept;
-            var (result, request) = await _store.ResolveRequestAsync(handle, current.User.Id, accept, _limits, cancellationToken).ConfigureAwait(false);
-            if (result == MessengerResult.Ok && accept)
-                foreach (var id in new[] { request!.From, request.To }) Enqueue(id, sequence => new MessengerFriendListChangedEvent(sequence));
-            return result;
+            await _friendRequests.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                if (decision == MessengerFriendDecision.Dismiss)
+                    return (await _store.ListIncomingRequestsAsync(current.User.Id, cancellationToken).ConfigureAwait(false)).Any(r => r.Handle == handle)
+                        ? MessengerResult.Ok : MessengerResult.NotFound;
+                var accept = decision == MessengerFriendDecision.Accept;
+                var (result, request) = await _store.ResolveRequestAsync(handle, current.User.Id, accept, _limits, cancellationToken).ConfigureAwait(false);
+                if (result == MessengerResult.Ok)
+                {
+                    RemoveRequestEvents(current.User.Id, handle);
+                    if (accept)
+                        foreach (var id in new[] { request!.From, request.To }) Enqueue(id, sequence => new MessengerFriendListChangedEvent(sequence));
+                }
+                return result;
+            }
+            finally { _friendRequests.Release(); }
         }).ConfigureAwait(false);
     }
 
@@ -592,6 +629,15 @@ internal sealed class MessengerService : IMessengerService
     private MessengerPresence Hidden(MessengerUserId id) =>
         new(MessengerPresenceStatus.Offline, _accounts.TryGetValue(id.Value, out var account) ? account.Level : 0);
 
+    private async ValueTask<int?> StoredLevelAsync(MessengerUser user, CancellationToken ct)
+    {
+        if (_levelSource is null) return null;
+        var level = await _levelSource(user, ct).ConfigureAwait(false);
+        if (level is < 1 or > 1_000_000)
+            throw new InvalidOperationException("The messenger level source returned an invalid player level.");
+        return level;
+    }
+
     private async ValueTask NotifyPresenceAsync(MessengerUser user, CancellationToken cancellationToken)
     {
         var relations = await _store.LoadRelationsAsync(user.Id, cancellationToken).ConfigureAwait(false);
@@ -600,6 +646,21 @@ internal sealed class MessengerService : IMessengerService
             MessengerPresence visible;
             lock (_gate) visible = relation.Blocked ? Hidden(user.Id) : PresenceOf(user.Id);
             Enqueue(relation.Friend.Id, sequence => new MessengerPresenceChangedEvent(sequence, user.Id, visible));
+        }
+    }
+
+    private void RemoveRequestEvents(MessengerUserId target, int? handle)
+    {
+        lock (_gate)
+        {
+            if (!_accounts.TryGetValue(target.Value, out var account)) return;
+            for (var node = account.Events.First; node is not null;)
+            {
+                var next = node.Next;
+                if (node.Value is MessengerFriendRequestEvent request && (handle is null || request.Request.Handle == handle))
+                    account.Events.Remove(node);
+                node = next;
+            }
         }
     }
 

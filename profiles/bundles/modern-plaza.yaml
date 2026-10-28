@@ -74,6 +74,8 @@
     plaza_replay_positions_on_enter: false
     plaza_echo_positions: false
     plaza_vacate_peers_on_menu_return: false
+    # cn-774 sub_BAB9F0 / tw-454 sub_A89100 rebuild the stage on every room install.
+    reinstall_room_on_first_probe: false
 
 # The native modern relay is a separate listener and protocol scope. These rows
 # are shared by CN2019 and TW2019; the profile's packet table supplies each

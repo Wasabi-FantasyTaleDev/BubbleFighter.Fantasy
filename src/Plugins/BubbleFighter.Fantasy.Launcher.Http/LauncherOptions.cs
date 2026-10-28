@@ -92,12 +92,20 @@ public sealed class LauncherOptions : IValidatableOptions
     [Range(1, int.MaxValue)] public int ShutdownSeconds { get; set; } = 5;
     /// <summary>Gets or sets a trusted HTTPS rank-icon template containing {level}, or empty for numeric levels.</summary>
     public string LevelIconTemplate { get; set; } = "";
+    /// <summary>
+    /// Gets or sets this API's public HTTPS base URL, or empty. When set it overrides the address launchers and game
+    /// clients were given, so their sign-ins travel encrypted; when empty they use the address as entered (HTTP works).
+    /// </summary>
+    public string SecureUrl { get; set; } = "";
     /// <summary>Gets or sets server-provided client presets, independent of users' installed instances.</summary>
     public LauncherInstanceOptions[] Instances { get; set; } = [];
 
     /// <inheritdoc />
     public IEnumerable<ValidationResult> Validate()
     {
+        if (SecureUrl.Length > 0 && (!Uri.TryCreate(SecureUrl, UriKind.Absolute, out var secure) || secure.Scheme != Uri.UriSchemeHttps
+            || secure.Query.Length > 0 || secure.Fragment.Length > 0))
+            yield return new("secure_url must be an absolute https URL without query or fragment.", [nameof(SecureUrl)]);
         if (Motd is null || Motd.Any(c => char.IsControl(c) && c is not ('\n' or '\r' or '\t')) ||
             MaintenanceDescription is null || MaintenanceDescription.Any(c => char.IsControl(c) && c is not ('\n' or '\r' or '\t')))
             yield return new("Server descriptions must be plain text without control characters.", [nameof(Motd), nameof(MaintenanceDescription)]);
@@ -132,7 +140,7 @@ public sealed class LauncherOptions : IValidatableOptions
         foreach (var instance in Instances)
         {
             if (!ValidId(instance.Id) || !ValidId(instance.Build) || instance.Name is null || instance.Name.Length == 0 || !instance.Name.Any(n => n is not null && n.Language == "en") || instance.Name.Any(n => n is null || string.IsNullOrWhiteSpace(n.Text) || string.IsNullOrWhiteSpace(n.Language)) || instance.Name.Select(n => n.Language).Distinct(StringComparer.Ordinal).Count() != instance.Name.Length ||
-                instance.Host is null || instance.Host.Length > 0 && Uri.CheckHostName(instance.Host) == UriHostNameType.Unknown || instance.Port is < 1 or > 65535 || instance.LauncherLogin is not ("required" or "optional" or "none") || instance.ReleaseVersion is null || instance.ReleaseVersion.Any(char.IsControl) || instance.PatchVersion is null || instance.PatchVersion.Any(char.IsControl) || instance.ProtocolVersion is < 1 or > 65535 || instance.ClientLanguages is not null && (instance.ClientLanguages.Any(l => l is not ("zh-CN" or "zh-TW" or "ko" or "id" or "vi" or "en")) || instance.ClientLanguages.Distinct(StringComparer.Ordinal).Count() != instance.ClientLanguages.Length))
+                instance.Host is null || instance.Host.Length > 0 && Uri.CheckHostName(instance.Host) == UriHostNameType.Unknown || instance.Port is < 1 or > 65535 || instance.LauncherLogin is not ("required" or "optional" or "none" or "game") || instance.ReleaseVersion is null || instance.ReleaseVersion.Any(char.IsControl) || instance.PatchVersion is null || instance.PatchVersion.Any(char.IsControl) || instance.ProtocolVersion is < 1 or > 65535 || instance.ClientLanguages is not null && (instance.ClientLanguages.Any(l => l is not ("zh-CN" or "zh-TW" or "ko" or "id" or "vi" or "en")) || instance.ClientLanguages.Distinct(StringComparer.Ordinal).Count() != instance.ClientLanguages.Length))
                 yield return new("Each instance needs valid id, build, localized name, endpoint and login policy.", [nameof(Instances)]);
             if (instance.DownloadSource is { } source)
                 foreach (var error in source.Validate()) yield return error;
@@ -234,7 +242,10 @@ public sealed class LauncherInstanceOptions
     public string Host { get; set; } = "127.0.0.1";
     /// <summary>Gets or sets the game connection port.</summary>
     public int Port { get; set; }
-    /// <summary>Gets or sets required, optional or none for launcher authentication.</summary>
+    /// <summary>
+    /// Gets or sets required, optional or none for launcher authentication, or game for a client whose own login
+    /// screen signs in: the launcher launches without a sign-in and the game binds the launch with the player's.
+    /// </summary>
     public string LauncherLogin { get; set; } = "required";
     /// <summary>Gets or sets an optional public store recommendation for this build's client package.</summary>
     public LauncherDownloadSourceOptions? DownloadSource { get; set; }

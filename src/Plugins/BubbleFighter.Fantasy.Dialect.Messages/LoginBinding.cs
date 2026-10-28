@@ -165,7 +165,7 @@ internal sealed class LoginBinding : IInboundMessageBinding<LoginRequested>, IMe
                     break;
                 case LoginBurstStep.UpdateParty:
                     await session.SendAsync(_updatePartyOpcode!.Value, LoginPartySnapshot.Write(_tables, _build,
-                        login.UserNumber, login.Nickname, login.CharacterItemId), ct).ConfigureAwait(false);
+                        login.UserNumber, login.Nickname, login.CharacterItemId, login.Level), ct).ConfigureAwait(false);
                     break;
                 case LoginBurstStep.OptionSync:
                     await session.SendAsync(_optionOpcode!.Value, ReadOnlyMemory<byte>.Empty, ct).ConfigureAwait(false);
@@ -259,7 +259,7 @@ internal sealed class LoginBinding : IInboundMessageBinding<LoginRequested>, IMe
             return;
         }
         await senders[0].SendAsync(session, new MainMenuRoomOpened(login.UserNumber, login.Nickname,
-            login.CharacterItemId, login.EquippedItemIds) { OfferTutorial = login.OfferTutorial, ColorIndex = login.ColorIndex }, ct)
+            login.CharacterItemId, login.EquippedItemIds, login.Level) { OfferTutorial = login.OfferTutorial, ColorIndex = login.ColorIndex }, ct)
             .ConfigureAwait(false);
     }
 

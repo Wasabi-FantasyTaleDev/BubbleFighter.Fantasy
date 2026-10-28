@@ -581,6 +581,120 @@ public sealed partial class RoomCommandsBindingTests
         Assert.NotNull(harness.Registry.TryGet(harness.Host.Id));
     }
 
+    /// <summary>Installed plaza sessions report native positions without echoing or crossing scene membership.</summary>
+    [Theory]
+    [InlineData("kr-1256", "mode")]
+    [InlineData("cn-774", "unknown_4")]
+    [InlineData("tw-454", "unknown_0")]
+    public async Task NativeSessionPositionsReachOnlyPresentPlazaPeers(string build, string modeField)
+    {
+        using var harness = await Harness.CreateAsync(build: build);
+        var table = OpcodeTableLoader.Load(Path.Combine(Root, "profiles", build, "opcodes.yaml"), TestWireDialects.Get(build).Profile);
+        var positionOpcode = table.S2C("gspReceivePartyChrPos");
+        var upload = Convert.FromHexString("00000000D8523144585C3343E4FC04440000157A43C0");
+        Assert.Equal(22, upload.Length);
+        await harness.Dispatch(harness.Host, table.C2S("gcpReqGotoLobby"), []);
+        await harness.Dispatch(harness.Guest, table.C2S("gcpReqGotoLobby"), []);
+        Assert.Empty(harness.Host.Bodies(positionOpcode));
+        Assert.Empty(harness.Guest.Bodies(positionOpcode));
+        var outsider = new RecordingSession(103, TestWireDialects.Get(build).Profile);
+        outsider.SetLobbyPlayer(33, "outsider");
+        await harness.Dispatch(outsider, 511, upload);
+        Assert.Empty(harness.Host.Bodies(positionOpcode));
+        Assert.Empty(harness.Guest.Bodies(positionOpcode));
+        foreach (var sequence in new uint[] { 0, 77, uint.MaxValue })
+        {
+            BinaryPrimitives.WriteUInt32LittleEndian(upload, sequence);
+            var hostCount = harness.Host.Opcodes.Count();
+            var guestCount = harness.Guest.Opcodes.Count();
+            await harness.Dispatch(harness.Host, 511, upload);
+            Assert.Equal(hostCount, harness.Host.Opcodes.Count());
+            Assert.Equal(new[] { positionOpcode }, harness.Guest.Opcodes.Skip(guestCount));
+            Assert.Equal(new byte[] { 11, 0, 0, 0 }.Concat(upload), harness.Guest.Body(positionOpcode));
+            Assert.Equal(26, harness.Guest.Body(positionOpcode).Length);
+            guestCount = harness.Guest.Opcodes.Count();
+            await harness.Dispatch(harness.Guest, 511, upload);
+            Assert.Equal(guestCount, harness.Guest.Opcodes.Count());
+            Assert.Equal(new[] { positionOpcode }, harness.Host.Opcodes.Skip(hostCount));
+            Assert.Equal(new byte[] { 22, 0, 0, 0 }.Concat(upload), harness.Host.Body(positionOpcode));
+        }
+        Assert.Empty(outsider.Opcodes);
+        var beforeMalformed = harness.Host.Opcodes.Count();
+        foreach (var malformed in new[] { upload[..^1], upload.Concat(new byte[] { 0 }).ToArray(), Array.Empty<byte>() })
+            await Assert.ThrowsAsync<PacketFormatException>(() => harness.Dispatch(harness.Guest, 511, malformed));
+        Assert.Equal(beforeMalformed, harness.Host.Opcodes.Count());
+        await harness.Dispatch(harness.Host, table.C2S("gcpReqCreateSession"), NativeCreateBody(build, modeField));
+        var hostPositions = harness.Host.Bodies(positionOpcode).Length;
+        var guestPositions = harness.Guest.Bodies(positionOpcode).Length;
+        await harness.Dispatch(harness.Host, 511, upload);
+        await harness.Dispatch(harness.Guest, 511, upload);
+        Assert.Equal(hostPositions, harness.Host.Bodies(positionOpcode).Length);
+        Assert.Equal(guestPositions, harness.Guest.Bodies(positionOpcode).Length);
+        await harness.Dispatch(harness.Host, table.C2S("gcpReqLeaveSession"), []);
+        Assert.Equal(SessionPhase.Plaza, harness.Host.Features.Get<IPlayerSession>().Phase);
+        Assert.Equal(hostPositions, harness.Host.Bodies(positionOpcode).Length);
+        Assert.Equal(guestPositions, harness.Guest.Bodies(positionOpcode).Length);
+        await harness.Dispatch(harness.Host, 511, upload);
+        Assert.Equal(guestPositions + 1, harness.Guest.Bodies(positionOpcode).Length);
+        await harness.Dispatch(harness.Host, table.C2S("gcpReqGotoMenu"), []);
+        await harness.Dispatch(harness.Host, 511, upload);
+        await harness.Dispatch(harness.Guest, 511, upload);
+        Assert.Equal(hostPositions, harness.Host.Bodies(positionOpcode).Length);
+        Assert.Equal(guestPositions + 1, harness.Guest.Bodies(positionOpcode).Length);
+        await harness.Dispatch(harness.Host, table.C2S("gcpReqGotoLobby"), []);
+        await harness.Dispatch(harness.Guest, 511, upload);
+        Assert.Equal(hostPositions + 1, harness.Host.Bodies(positionOpcode).Length);
+        Assert.Equal(new byte[] { 22, 0, 0, 0 }.Concat(upload), harness.Host.Body(positionOpcode));
+    }
+
+    /// <summary>Packaged modern profiles acknowledge creator and joiner probes without reinstalling their room.</summary>
+    [Theory]
+    [InlineData("kr-1256", "mode")]
+    [InlineData("cn-774", "unknown_4")]
+    [InlineData("tw-454", "unknown_0")]
+    public async Task PackagedModernRoomProbesDoNotRepeatTheStageInstall(string build, string modeField)
+    {
+        var rows = new ProfileComposer(Path.Combine(Root, "profiles"), name => name == "BFF_MYSQL_PASSWORD" ? "unused" : null).Compose(build, []);
+        var options = new PluginConfig(rows.Single(row => row.Id == "ingame")).Bind<InGameOptions>();
+        using var harness = await Harness.CreateAsync(build: build, reinstallRoomOnFirstProbe: options.ReinstallRoomOnFirstProbe);
+        var table = OpcodeTableLoader.Load(Path.Combine(Root, "profiles", build, "opcodes.yaml"), TestWireDialects.Get(build).Profile);
+        var install = table.S2C("gspGotoRoom");
+        await harness.Dispatch(harness.Host, table.C2S("gcpReqCreateSession"), NativeCreateBody(build, modeField));
+        var room = harness.Room;
+        async Task ProbeTwice(RecordingSession player)
+        {
+            var slot = room.FindByGame(player.Id)!.Slot;
+            var request = PacketCodec.Write(Tables, build, "RoomPingRequest", new Dictionary<string, object?> { ["unknown_n0"] = slot });
+            for (var index = 0; index < 2; index++)
+            {
+                var count = player.Opcodes.Count();
+                await harness.Dispatch(player, table.C2S("gcpReqPingUser"), request);
+                Assert.Equal(new[] { table.S2C("gspReqPingUser"), table.S2C("gspRepPingUser"), table.S2C("gspRepWaitUserList") }, player.Opcodes.Skip(count));
+                var reply = PacketCodec.Read(Tables, build, "gspRepPingUser", player.Body(table.S2C("gspRepPingUser")));
+                Assert.Equal(slot, reply["slot"]);
+                Assert.True(room.FindByGame(player.Id)!.JoinAcked);
+                Assert.Single(player.Bodies(install));
+                Assert.Same(room, harness.Room);
+            }
+        }
+        await ProbeTwice(harness.Host);
+        await harness.Dispatch(harness.Guest, table.C2S("gcpReqJoinSession"), PacketCodec.Write(Tables, build, "RoomJoinRequest",
+            new Dictionary<string, object?> { ["room_id"] = room.Id, ["password"] = "pw" }));
+        await ProbeTwice(harness.Guest);
+        await ProbeTwice(harness.Host);
+        Assert.Single(harness.Host.Bodies(install));
+        Assert.Single(harness.Guest.Bodies(install));
+    }
+
+    private static byte[] NativeCreateBody(string build, string modeField) => PacketCodec.Write(Tables, build, "RoomCreateRequest", new Dictionary<string, object?>
+    {
+        ["session_setting"] = new Dictionary<string, object?>
+        {
+            ["title"] = "room", ["game_setting"] = new Dictionary<string, object?> { [modeField] = 3 },
+        },
+        ["password"] = "pw", ["unknown_n2"] = (byte)0xBA,
+    });
+
     /// <summary>kr-1256 sub_978F20 indexes the seat ping history with the first S2C 518 word: the prober's own seat.</summary>
     [Fact]
     public async Task ProbeReplyNamesTheProbingSeat()
@@ -682,7 +796,7 @@ public sealed partial class RoomCommandsBindingTests
         internal IMessageSender<T> Sender<T>() where T : IMessage => _services.GetAll<IMessageSender<T>>().Single();
 
         internal static async Task<Harness> CreateAsync(bool ai = false, IGameText? texts = null, string nicknameKey = "", int level = 1,
-            object[]? itemAttributes = null, bool roundsBound = false, string build = "kr-1256")
+            object[]? itemAttributes = null, bool roundsBound = false, string build = "kr-1256", bool reinstallRoomOnFirstProbe = true)
         {
             var h = new Harness();
             h._protocol = build + "/game";
@@ -728,6 +842,7 @@ public sealed partial class RoomCommandsBindingTests
                     } } : Array.Empty<object>(),
                     ["max_players_per_match"] = 4, ["plaza_enter_requires_finished_login"] = true, ["plaza_replay_positions_on_enter"] = false,
                     ["plaza_echo_positions"] = false, ["plaza_vacate_peers_on_menu_return"] = false,
+                    ["reinstall_room_on_first_probe"] = reinstallRoomOnFirstProbe,
                 }), default);
                 return h;
             }

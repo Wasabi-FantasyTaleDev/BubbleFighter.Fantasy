@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Contracts.Messenger;
+using BubbleFighter.Fantasy.Contracts.Players;
 using Microsoft.Extensions.Logging;
 
 namespace BubbleFighter.Fantasy.Messenger;
@@ -11,7 +12,7 @@ namespace BubbleFighter.Fantasy.Messenger;
 /// server and as a standalone deployment shared by several servers.
 /// </summary>
 [Plugin("messenger", Description = "Game-neutral friends, categories, presence and change events for native messenger clients.",
-    Requires = [typeof(IMessengerStore)], Optional = [typeof(IMessengerTicketIssuer)], Provides = [typeof(IMessengerService)])]
+    Requires = [typeof(IMessengerStore)], Optional = [typeof(IMessengerTicketIssuer), typeof(IPlayerRepository)], Provides = [typeof(IMessengerService)])]
 public sealed class MessengerPlugin : IPlugin
 {
     /// <inheritdoc />
@@ -19,6 +20,7 @@ public sealed class MessengerPlugin : IPlugin
     {
         var options = context.Config.Bind<MessengerOptions>();
         var tenants = new Dictionary<string, ECDsa>(StringComparer.Ordinal);
+        string? localTenant = null;
         foreach (var tenant in options.Tenants)
             tenants.Add(tenant.Key, Own(context, MessengerTicketCodec.ImportKey(tenant.PublicKey, requirePrivate: false)));
         if (options.TrustLocalIssuer && context.Services.TryGet<IMessengerTicketIssuer>(out var issuer) && issuer is not null)
@@ -28,11 +30,14 @@ public sealed class MessengerPlugin : IPlugin
             var key = Own(context, ECDsa.Create());
             key.ImportSubjectPublicKeyInfo(issuer.PublicKey.Span, out _);
             tenants.Add(issuer.Tenant, key);
+            localTenant = issuer.Tenant;
         }
         if (tenants.Count == 0)
             throw new ConfigException("The messenger trusts no tenant: list tenants or mount a messenger.tickets row with trust_local_issuer.");
 
-        var service = new MessengerService(options, context.Services.Get<IMessengerStore>(), tenants, TimeProvider.System, context.Logger);
+        context.Services.TryGet<IPlayerRepository>(out var players);
+        var service = new MessengerService(options, context.Services.Get<IMessengerStore>(), tenants, TimeProvider.System, context.Logger,
+            localTenant is not null && players is not null ? LocalLevelAsync : null);
         context.Effect(context.Services.Register<IMessengerService>(service));
         await context.RunTaskAsync("messenger-sweep", async token =>
         {
@@ -44,6 +49,13 @@ public sealed class MessengerPlugin : IPlugin
             }
         }, cancellationToken).ConfigureAwait(false);
         context.Logger.LogInformation("Messenger core active for {TenantCount} tenant(s) and {GameCount} catalog game(s).", tenants.Count, options.Games.Length);
+
+        async ValueTask<int?> LocalLevelAsync(MessengerUser user, CancellationToken ct)
+        {
+            // Only the trusted local issuer's subjects name this deployment's player accounts.
+            if (user.Tenant != localTenant) return null;
+            return (await players!.FindByUsernameAsync(user.Subject, ct).ConfigureAwait(false))?.Level;
+        }
     }
 
     private static ECDsa Own(IPluginContext context, ECDsa key)

@@ -1,32 +1,84 @@
 version: 1
 structs:
-  # The "go to friend" request of the play together dialog. The visit is the second half of the feature; the
-  # invitation half is already tabled in packets/party.yaml (PartyInviteRequest, PartyInviteRequest@kr-1256,
-  # PartyInviteNotice, PartyInviterMoveRequest, PartyInviteAnswer, PartyInviteFailure).
-  #
-  # kr-812 Packet_gcpReqMoveToFriend, vtable kr-812 0xd84d78, deserializer
-  # kr-812 sub_5C8FD0 reads one prefixed wide string (kr-812 sub_A56D70: u32 character count, then that many
-  # UTF-16LE code units) into object +4. The class is the baseline for every build whose packets keep their
-  # class names, so the row is stated as kr-812 has it.
-  # kr-1256: no kr-1256 sender for this packet was found and profiles/kr-1256/opcodes.yaml has no row for
-  # it. Legacy descendants inherit the kr-812 shape; modern builds are excluded. The two visitation failures the kr-1256 client consumes
-  # (S2C 122 and 123) are tabled below.
+  # The visit ("go to friend", kr-812 text 찾아가기) of the play together dialog and the friend window. The invitation
+  # half is tabled in packets/party.yaml (PartyInviteRequest, PartyInviteNotice, PartyInviterMoveRequest,
+  # PartyInviteAnswer, PartyInviteFailure). A granted visit reuses the invitation's accept: the visitor's client
+  # sends C2S gcpReqMoveToInviter by itself (kr-812 sub_81DEA0 on a notice with auto_accept set, kr-1256 sub_9A9710
+  # and cn-774 sub_BA95E0 on gspVisitationAccepted, tw-454 sub_A86A70 on a notice with auto_accept set).
+
+  # C2S gcpReqMoveToFriend, the visit request. kr-812 Packet_gcpReqMoveToFriend (vtable kr-812 0xd84d78) is sent
+  # by kr-812 sub_92A050 with the friend's nickname; its deserializer kr-812 sub_5C8FD0 reads one prefixed wide
+  # string (kr-812 sub_A56D70) into object +4. The modern family sends the same single string from its friend
+  # window: kr-1256 C2S 112 (kr-1256 sub_939820), cn-774 C2S 111 (cn-774 sub_B32AD0, menu item 3 of cn-774
+  # sub_783530), tw-454 C2S 112 (tw-454 sub_8E3F20 with dl = 0, menu item 3 of tw-454 sub_B0E7D0).
   MoveToFriendRequest:
-    - unknown_4: wstr
+    - target: wstr
       offset: 4
-      only: [kr-812]
-      except: [kr-1256, cn-774, tw-454]
+
+  # S2C gspRepMoveToFriend (kr-812 S2C 114), read by kr-812 sub_81ED40: u32 result, wstr nickname, u32. The result
+  # selects the text: 0 success (kr-812 sub_8F69B0), 1 self, 2 unregistered, 3 offline, 4 another game, 5 same
+  # party, 6 same waiting room, 7 party full, 8 waiting room full, 9 other channel, 10 cannot visit, 11 kicked from
+  # that room, 12 GM, 13 tournament, 14 tracking, 15 quick start, 17 the visit prompt shown to the visited player
+  # ("%s is visiting you, accept?"), 18 the visited player declined, 19 visits disabled, 20 matching, 21 invitation
+  # declined, 22 clan channel. The trailing word is read and never used by kr-812 sub_81ED40.
+  # cn-324 sub_706F70 handles only results 0..12; cn-279 sub_6F6460 handles only 0..11. Neither has a visit
+  # approval packet or result-17 prompt: their Find sender requests a direct scene move.
+  MoveToFriendReply:
+    - result: u32
+      except: [kr-1256]
+      offset: 4
+    - nickname: wstr
+      except: [kr-1256]
+      offset: 8
+    - unknown_36: u32
+      except: [kr-1256]
+      offset: 36
+
+  # The modern prompt to the visited player, S2C gspAskedVisitation (kr-1256 S2C 124, reader kr-1256 sub_9AB8F0;
+  # cn-774 S2C 124, cn-774 sub_BAB150; tw-454 S2C 122, tw-454 sub_A88970): u32 token, wstr visitor, u32 flag. The
+  # client echoes the token in its answer. A nonzero flag lets the prompt through while the client is in state 5
+  # (kr-1256 sub_9AB8F0 tests dword_18E5608 +88 == 5 first); its purpose is not proven further, so it is sent as 0.
+  VisitationAsked:
+    - token: u32
+      only: [kr-1256]
+    - visitor: wstr
+      only: [kr-1256]
+    - unknown_flag: bool
+      only: [kr-1256]
+
+  # The visited player accepts: kr-1256 C2S 114 (kr-1256 sub_9D7890), cn-774 C2S 113 (cn-774 sub_BD6690), tw-454
+  # C2S 114 (tw-454 sub_AB2D00); one u32, the prompt's token.
+  VisitationAccept:
+    - token: u32
+      only: [kr-1256]
+
+  # The visited player declines: kr-1256 C2S 113 (kr-1256 sub_9D77E0), cn-774 C2S 112 (cn-774 sub_BD65E0), tw-454
+  # C2S 113 (tw-454 sub_AB2BF0); u32 token, then a byte widened to a u32. cn-774 sub_BAB150 sends 0 when the player
+  # declines and 1 when the client declines by itself (busy, or its option refuses visits).
+  VisitationRefusal:
+    - token: u32
+      only: [kr-1256]
+    - reason: u32
+      only: [kr-1256]
+
+  # S2C gspVisitationAccepted (kr-1256 S2C 125, reader kr-1256 sub_9A9710; cn-774 S2C 125, cn-774 sub_BA95E0): wstr
+  # nickname, u32 address word, u16 port. The client answers at once with C2S gcpReqMoveToInviter kind 0 carrying the
+  # same nickname and endpoint. tw-454 has no such packet: its visitor is moved by a notice with auto_accept set.
+  VisitationAccepted:
+    - nickname: wstr
+      only: [kr-1256]
+    - address: RelayEndpoint
+      only: [kr-1256]
 
   # kr-1256 S2C 123 gspVisitationFailed. Dispatched by kr-1256 sub_9D2FF0 (jumptable case 123) to handler
-  # kr-1256 sub_9AA690, whose body reads one prefixed wide string (kr-1256 sub_1119C10) and then one 4-byte
-  # word. The meaning of the word is not proven, so the field keeps the unknown name; the wire order and the
-  # widths are what the handler proves.
-  # Names use offsets relative to the stack-local string; the following word is 24 bytes later.
-  # kr-1256 descendants inherit these unbound shapes; their own readers are not established here.
+  # kr-1256 sub_9AA690, whose body reads one prefixed wide string (kr-1256 sub_1119C10) and then one 4-byte word.
+  # The word selects the text in kr-1256 sub_9AA990 (party/VisitFailed.*): 1 Myself, 2 TargetAlreadyIn,
+  # 3 YouOnPlaying, 4 YouOnMatching, 7 and 8 TargetIngame, 9 TargetInmatching, 14 FullParty, 15 FullRoom,
+  # 21 TargetNotLogin, 22 TargetNotRegistered, 28 TargetRefused, other codes AnywayTarget.
   VisitationFailed:
-    - unknown_0: wstr
+    - nickname: wstr
       only: [kr-1256]
-    - unknown_24: u32
+    - code: u32
       only: [kr-1256]
 
   # kr-1256 S2C 122 gspFailedOnMoveToInviter. Dispatched by kr-1256 sub_9D2FF0 (jumptable case 122) to handler

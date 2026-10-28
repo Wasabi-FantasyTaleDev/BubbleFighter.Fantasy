@@ -42,7 +42,7 @@ internal static class UpdatePartyCodec
             ["state"] = IdleState,
             ["members"] = new Dictionary<string, object?>[]
             {
-                new() { ["user_number"] = room.UserNumber, ["nickname"] = room.Nickname },
+                new() { ["user_number"] = room.UserNumber, ["nickname"] = room.Nickname, ["level"] = room.Level },
             },
         });
     }
@@ -60,7 +60,7 @@ internal static class UpdatePartyCodec
             ["state"] = IdleState,
             ["members"] = party.Members.Select(member => new Dictionary<string, object?>
             {
-                ["user_number"] = member.UserNum, ["nickname"] = member.Nickname,
+                ["user_number"] = member.UserNum, ["nickname"] = member.Nickname, ["level"] = member.Level,
             }).ToArray(),
         });
     }

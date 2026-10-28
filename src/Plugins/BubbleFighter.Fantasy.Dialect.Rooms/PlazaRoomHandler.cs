@@ -239,7 +239,7 @@ internal sealed class PlazaRoomHandler
             player.Identity.UserNum,
             player.Identity.Nickname,
             DefaultCharacterItemId,
-            [DefaultCharacterItemId]) { ColorIndex = player.Identity.ColorIndex };
+            [DefaultCharacterItemId], player.Identity.Level) { ColorIndex = player.Identity.ColorIndex };
         return new PlayerContext(room, player);
     }
 }

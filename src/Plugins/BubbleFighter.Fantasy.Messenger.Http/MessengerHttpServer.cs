@@ -90,40 +90,32 @@ public sealed class MessengerHttpServer : IAsyncDisposable
         Map<Empty>(app, "CNMLogoutMessengerFunc", true, async (s, _, t) => { await messenger.LogoutMessengerAsync(s, t).ConfigureAwait(false); return Ok(MessengerResult.Ok); });
         Map<LevelRequest>(app, "CNMChangeMyLevelFunc", true, async (s, b, t) => { await messenger.ChangeMyLevelAsync(s, b.Level, t).ConfigureAwait(false); return Ok(MessengerResult.Ok); });
         Map<PageRequest>(app, "CNMGetFriendListFunc", true, async (s, b, t) =>
-        {
-            var page = await messenger.GetFriendListAsync(s, b.Page, t).ConfigureAwait(false);
-            return new
-            {
-                page.Page, page.TotalPages, page.TotalFriends,
-                categories = page.Categories.Select(c => new { c.Id, c.Name, c.GameCode }),
-                friends = page.Friends.Select(f => new
-                {
-                    id = f.User.Id.Value, f.User.Nickname, f.User.GameCode, f.CategoryId, f.Blocked,
-                    status = f.Presence.Status, f.Presence.Level,
-                }),
-            };
-        });
+            FriendPage(await messenger.GetFriendListAsync(s, b.Page, t).ConfigureAwait(false)));
         Map<FriendRequest>(app, "CNMRequestNewFriendFunc", true, async (s, b, t) =>
-            Ok(await messenger.RequestNewFriendAsync(s, b.RequestKey, b.Nickname, b.Message, t).ConfigureAwait(false)));
+            await Changed(messenger, s, await messenger.RequestNewFriendAsync(s, b.RequestKey, b.Nickname, b.Message, t).ConfigureAwait(false), t).ConfigureAwait(false));
         Map<ConfirmRequest>(app, "CNMConfirmNewFriendFunc", true, async (s, b, t) =>
-            Ok(await messenger.ConfirmNewFriendAsync(s, b.RequestKey, b.Handle, b.Decision, t).ConfigureAwait(false)));
+            await Changed(messenger, s, await messenger.ConfirmNewFriendAsync(s, b.RequestKey, b.Handle, b.Decision, t).ConfigureAwait(false), t).ConfigureAwait(false));
         Map<BlockRequest>(app, "CNMBlockFriendFunc", true, async (s, b, t) =>
-            Ok(await messenger.BlockFriendAsync(s, b.RequestKey, new(b.FriendId), b.Blocked, t).ConfigureAwait(false)));
+            await Changed(messenger, s, await messenger.BlockFriendAsync(s, b.RequestKey, new(b.FriendId), b.Blocked, t).ConfigureAwait(false), t).ConfigureAwait(false));
         Map<FriendCategoryRequest>(app, "CNMAddFriendToCategoryFunc", true, async (s, b, t) =>
-            Ok(await messenger.AddFriendToCategoryAsync(s, b.RequestKey, new(b.FriendId), b.CategoryId, t).ConfigureAwait(false)));
+            await Changed(messenger, s, await messenger.AddFriendToCategoryAsync(s, b.RequestKey, new(b.FriendId), b.CategoryId, t).ConfigureAwait(false), t).ConfigureAwait(false));
         Map<FriendCategoryRequest>(app, "CNMDeleteFriendFromCategoryFunc", true, async (s, b, t) =>
-            Ok(await messenger.DeleteFriendFromCategoryAsync(s, b.RequestKey, new(b.FriendId), b.CategoryId, t).ConfigureAwait(false)));
+            await Changed(messenger, s, await messenger.DeleteFriendFromCategoryAsync(s, b.RequestKey, new(b.FriendId), b.CategoryId, t).ConfigureAwait(false), t).ConfigureAwait(false));
         Map<MoveRequest>(app, "CNMMoveFriendCategoryFunc", true, async (s, b, t) =>
-            Ok(await messenger.MoveFriendCategoryAsync(s, b.RequestKey, new(b.FriendId), b.FromCategoryId, b.ToCategoryId, t).ConfigureAwait(false)));
+            await Changed(messenger, s, await messenger.MoveFriendCategoryAsync(s, b.RequestKey, new(b.FriendId), b.FromCategoryId, b.ToCategoryId, t).ConfigureAwait(false), t).ConfigureAwait(false));
         Map<CategoryNameRequest>(app, "CNMAddCategoryFunc", true, async (s, b, t) =>
         {
             var (result, category) = await messenger.AddCategoryAsync(s, b.RequestKey, b.Name, t).ConfigureAwait(false);
-            return new { result, category = category is null ? null : new { category.Id, category.Name, category.GameCode } };
+            return new
+            {
+                result, category = category is null ? null : new { category.Id, category.Name, category.GameCode },
+                friendList = FriendPage(await messenger.GetFriendListAsync(s, 0, t).ConfigureAwait(false)),
+            };
         });
         Map<CategoryRequest>(app, "CNMDeleteCategoryFunc", true, async (s, b, t) =>
-            Ok(await messenger.DeleteCategoryAsync(s, b.RequestKey, b.CategoryId, t).ConfigureAwait(false)));
+            await Changed(messenger, s, await messenger.DeleteCategoryAsync(s, b.RequestKey, b.CategoryId, t).ConfigureAwait(false), t).ConfigureAwait(false));
         Map<RenameRequest>(app, "CNMChangeCategoryNameFunc", true, async (s, b, t) =>
-            Ok(await messenger.ChangeCategoryNameAsync(s, b.RequestKey, b.CategoryId, b.Name, t).ConfigureAwait(false)));
+            await Changed(messenger, s, await messenger.ChangeCategoryNameAsync(s, b.RequestKey, b.CategoryId, b.Name, t).ConfigureAwait(false), t).ConfigureAwait(false));
         Map<Empty>(app, "CNMGetSupportGameListFunc", true, async (s, _, t) =>
             new { games = (await messenger.GetSupportGameListAsync(s, t).ConfigureAwait(false)).Select(g => new { g.Code, g.FullName, g.ShortName }) });
         Map<GameRequest>(app, "CNMGetGameFullNameFunc", true, async (s, b, t) => await GameName(messenger, s, b.Code, full: true, t).ConfigureAwait(false));
@@ -195,6 +187,21 @@ public sealed class MessengerHttpServer : IAsyncDisposable
     }
 
     private static object Ok(MessengerResult result) => new { result };
+
+    // A change answers with the first page of the list it produced, so the client redraws after one exchange.
+    private static async Task<object> Changed(IMessengerService messenger, string session, MessengerResult result, CancellationToken ct) =>
+        new { result, friendList = FriendPage(await messenger.GetFriendListAsync(session, 0, ct).ConfigureAwait(false)) };
+
+    private static object FriendPage(MessengerFriendListPage page) => new
+    {
+        page.Page, page.TotalPages, page.TotalFriends,
+        categories = page.Categories.Select(c => new { c.Id, c.Name, c.GameCode }),
+        friends = page.Friends.Select(f => new
+        {
+            id = f.User.Id.Value, f.User.Nickname, f.User.GameCode, f.CategoryId, f.Blocked,
+            status = f.Presence.Status, f.Presence.Level,
+        }),
+    };
 
     private static object User(MessengerUser user) => new { id = user.Id.Value, user.Nickname, user.GameCode, user.Tenant };
 

@@ -19,7 +19,7 @@ public sealed class PartyBindingTests
 {
     public static readonly TheoryData<string> PartyBuilds = new() { "kr-812", "cn-717", "cn-324", "cn-279", "id-400", "id-1809", "cn-706", "cn-404", "cn-408" };
 
-    /// <summary>The party list is the state word, the counted members (user, nickname, three zero words) and an empty equipped list.</summary>
+    /// <summary>The party list is the state word, the counted members (user, nickname, two unknown words and level) and an empty equipped list.</summary>
     [Fact]
     public void PartyListCarriesEveryMemberLeaderFirst()
     {
@@ -33,11 +33,24 @@ public sealed class PartyBindingTests
             Text(expected, nick);
             Word(expected, 0);
             Word(expected, 0);
-            Word(expected, 0);
+            Word(expected, 1);
         }
         Word(expected, 0);
         Assert.Equal(58, bytes.Length);
         Assert.Equal(expected.ToArray(), bytes);
+    }
+
+    /// <summary>The final member word preserves the actual rank rather than clearing the badge on an update.</summary>
+    [Theory]
+    [MemberData(nameof(PartyBuilds))]
+    public void PartyMemberRankIsWrittenAtTheNativeSlot(string build)
+    {
+        var bytes = PartyBinding.WriteParty(TestBuilds.Packets, build,
+            new PartySnapshot([new(7, "Ab", 17), new(9, "Cd", 42)]));
+        // Each member is user (4), counted UTF-16 nickname (8), then two unknown words and its rank (12).
+        Assert.Equal(17u, BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(28)));
+        Assert.Equal(42u, BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(52)));
+        Assert.Equal(60, bytes.Length);
     }
 
     /// <summary>Every party request decodes from its native body in each build.</summary>
@@ -89,7 +102,12 @@ public sealed class PartyBindingTests
                 Assert.True(routes.Handlers.ContainsKey((build + "/game", table.C2S(name))), name);
             var answer = table.Find(PacketDirection.ClientToServer, "gcpReqMoveToFriendAccept");
             Assert.Equal(build is not ("cn-324" or "cn-279"), answer is not null);
-            Assert.Equal(PartyBinding.Requests.Length + (answer is null ? 0 : 1), routes.Handlers.Count);
+            // cn-324 and cn-279 visit directly; their C2S 111 belongs to matching, not a visit-answer packet.
+            var visit = table.Find(PacketDirection.ClientToServer, "gcpReqMoveToFriend");
+            Assert.NotNull(visit);
+            Assert.Equal(PartyBinding.Requests.Length + 1 + (answer is null ? 0 : 1), routes.Handlers.Count);
+            Assert.Equal(answer is null ? 0 : 1, services.GetAll<IInboundMessageBinding<PartyVisitAnswered>>().Count);
+            Assert.Equal(answer is null ? 0 : 1, services.GetAll<IMessageSender<PartyVisitAsked>>().Count);
             foreach (var name in PartyBinding.Replies)
                 Assert.NotNull(table.Find(PacketDirection.ServerToClient, name));
             Assert.Single(services.GetAll<IMessageSender<PartyUpdated>>());
@@ -97,6 +115,35 @@ public sealed class PartyBindingTests
         finally { await context.UnwindAsync(); }
         Assert.Empty(routes.Handlers);
         Assert.Empty(services.GetAll<IMessageSender<PartyUpdated>>());
+    }
+
+    /// <summary>Direct Find completion has its own native success result and trailing word.</summary>
+    [Theory]
+    [InlineData("cn-279")]
+    [InlineData("cn-324")]
+    public async Task DirectVisitSuccessResetsTheNativePendingMove(string build)
+    {
+        var binding = Binding(build, out var table);
+        var session = new Session();
+        await binding.SendAsync(session, new PartyVisitSucceeded("Bob"), default);
+        var sent = Assert.Single(session.Sent);
+        Assert.Equal(table.S2C("gspRepMoveToFriend"), sent.Opcode);
+        Assert.Equal(Bytes(b => { Word(b, 0); Text(b, "Bob"); Word(b, 0); }), sent.Body);
+        Assert.Equal(18, sent.Body.Length);
+    }
+
+    /// <summary>Invitation arrival completes the legacy native UI through its result and nickname reply.</summary>
+    [Theory]
+    [MemberData(nameof(PartyBuilds))]
+    public async Task InvitationArrivalWritesTheNativeCompletionReply(string build)
+    {
+        var binding = Binding(build, out var table);
+        var session = new Session();
+        await binding.SendAsync(session, new PartyInvitationMoveSucceeded("Bob"), default);
+        var sent = Assert.Single(session.Sent);
+        Assert.Equal(table.S2C("gspRepMoveToInviter"), sent.Opcode);
+        Assert.Equal(Bytes(b => { Word(b, 0); Text(b, "Bob"); }), sent.Body);
+        Assert.Equal(14, sent.Body.Length);
     }
 
     /// <summary>The notices write the native shapes: result + nickname, two nicknames, and the handover reply.</summary>
@@ -146,7 +193,7 @@ public sealed class PartyBindingTests
         }
     }
 
-    /// <summary>The modern accept reads its own shape; only the kind that answers a prompt is a party accept.</summary>
+    /// <summary>The modern accept reads its own shape; the prompt's kind 1 and a granted visit's kind 0 join the party.</summary>
     [Theory]
     [InlineData("kr-1256")]
     [InlineData("cn-774")]
@@ -160,7 +207,7 @@ public sealed class PartyBindingTests
         Assert.Equal(new PartyInviteAccepted(true, "Al"), binding.ReadAccept(Body(hasKind ? (byte)1 : null)));
         if (hasKind)
         {
-            Assert.Throws<NotSupportedException>(() => binding.ReadAccept(Body(0)));
+            Assert.Equal(new PartyInviteAccepted(true, "Al"), binding.ReadAccept(Body(0)));
             Assert.Throws<NotSupportedException>(() => binding.ReadAccept(Body(2)));
             Assert.Throws<PacketFormatException>(() => binding.ReadAccept(Body(null)));
         }
@@ -270,15 +317,18 @@ public sealed class PartyBindingTests
             new PartyUpdated(new([new(22, "leader"), new(11, "member")]), null));
         Assert.Equal(76, body.Length);
         Assert.Equal(
-            "020000000200000016000000060000006C00650061006400650072000000000000000000000000000B000000060000006D0065006D0062006500720000000000000000000000000000000000",
+            "020000000200000016000000060000006C00650061006400650072000000000000000000010000000B000000060000006D0065006D0062006500720000000000000000000100000000000000",
             Convert.ToHexString(body));
     }
 
-    /// <summary>The modern row mounts the invitation routes only; kick, leader and leave stay off until audited.</summary>
+    /// <summary>
+    /// The modern row mounts the invitation and visit routes only; kick, leader and leave stay off until audited.
+    /// cn-774 and tw-454 send the invitation as C2S 109 (cn-774 sub_B04050, tw-454 sub_B9FA50).
+    /// </summary>
     [Theory]
     [InlineData("kr-1256", true)]
-    [InlineData("cn-774", false)]
-    [InlineData("tw-454", false)]
+    [InlineData("cn-774", true)]
+    [InlineData("tw-454", true)]
     public async Task ModernRowMountsTheInvitationRoutesOnly(string build, bool hasInvite)
     {
         var binding = Binding(build, out var table);
@@ -291,7 +341,11 @@ public sealed class PartyBindingTests
         try
         {
             binding.Bind(context, messages);
-            var expected = new List<ushort> { table.C2S("gcpReqMoveToInviter"), table.C2S("gcpReqMoveToFriendAccept") };
+            var expected = new List<ushort>
+            {
+                table.C2S("gcpReqMoveToInviter"), table.C2S("gcpReqMoveToFriendAccept"), table.C2S("gcpReqMoveToFriend"),
+                table.C2S("gcpReqAcceptVisitation_"), table.C2S("gcpReqRefuseVisitation_"),
+            };
             if (hasInvite) expected.Add(table.C2S("gcpReqInvite"));
             Assert.Equal(expected.Order(), routes.Handlers.Keys.Select(key => key.Item2).Order());
             Assert.Single(services.GetAll<IMessageSender<PartyInviteNotified>>());
@@ -306,15 +360,111 @@ public sealed class PartyBindingTests
             var accept = routes.Handlers[(build + "/game", table.C2S("gcpReqMoveToInviter"))];
             await Assert.ThrowsAsync<PacketFormatException>(async () => await accept(new Session(), new InboundPacket(0, new byte[0]), default));
             Assert.Empty(messages.Received);
-            var body = Bytes(b => { Text(b, "Al"); Word(b, 0x7F000001); b.Add(0x39); b.Add(0x30); b.Add(1); });
+            var body = Bytes(b => { Text(b, "Al"); Word(b, 0x7F000001); b.Add(0x39); b.Add(0x30); if (build != "tw-454") b.Add(1); });
             await accept(new Session(), new InboundPacket(0, body), default);
             Assert.Equal(new PartyInviteAccepted(true, "Al"), Assert.Single(messages.Received));
             messages.Received.Clear();
+            if (build == "tw-454") return; // tw-454's accept carries no kind byte.
             var wrongKind = Bytes(b => { Text(b, "Al"); Word(b, 0x7F000001); b.Add(0x39); b.Add(0x30); b.Add(2); });
             await accept(new Session(), new InboundPacket(0, wrongKind), default);
             Assert.Empty(messages.Received);
         }
         finally { await context.UnwindAsync(); }
+    }
+
+    /// <summary>
+    /// The legacy answer packet carries both prompts: 3 refuses an invitation (kr-812 sub_81DEA0), 1 accepts a visit
+    /// and 0 or 2 declines it (kr-812 sub_81ED40 case 17).
+    /// </summary>
+    [Fact]
+    public void LegacyFriendAnswerSplitsInvitationAndVisit()
+    {
+        var binding = Binding("kr-812", out _);
+        byte[] Answer(uint code) => Bytes(b => { Text(b, "Al"); Word(b, (int)code); });
+        Assert.Equal(new PartyInviteAnswered("Al", 3), binding.ReadFriendAnswer(Answer(3)));
+        Assert.Equal(new PartyVisitAnswered("Al", true), binding.ReadFriendAnswer(Answer(1)));
+        Assert.Equal(new PartyVisitAnswered("Al", false), binding.ReadFriendAnswer(Answer(0)));
+        Assert.Equal(new PartyVisitAnswered("Al", false), binding.ReadFriendAnswer(Answer(2)));
+        Assert.Throws<NotSupportedException>(() => binding.ReadFriendAnswer(Answer(4)));
+    }
+
+    /// <summary>
+    /// kr-812 visits through gspRepMoveToFriend (kr-812 sub_81ED40): result 17 prompts the visited player, the
+    /// failures use the same packet, and the visitor is moved by a notice whose +48 skips the prompt (kr-812 sub_81DEA0).
+    /// </summary>
+    [Fact]
+    public async Task LegacyVisitWritesTheMoveToFriendReplyAndASkippedNotice()
+    {
+        var binding = Binding("kr-812", out var table);
+        Assert.Equal("legacy", binding.VisitFamily());
+        Assert.Equal(new PartyVisitRequested("Bob"), binding.ReadVisit(Bytes(b => Text(b, "Bob"))));
+        var session = new Session();
+        await binding.SendAsync(session, new PartyVisitAsked("Al", 9), default);
+        await binding.SendAsync(session, new PartyVisitFailed(PartyVisitFailure.Declined, "Bob"), default);
+        await binding.SendAsync(session, new PartyVisitGranted("Bob"), default);
+        Assert.Equal(table.S2C("gspRepMoveToFriend"), session.Sent[0].Opcode);
+        Assert.Equal(Bytes(b => { Word(b, 17); Text(b, "Al"); Word(b, 0); }), session.Sent[0].Body);
+        Assert.Equal(Bytes(b => { Word(b, 18); Text(b, "Bob"); Word(b, 0); }), session.Sent[1].Body);
+        Assert.Equal(table.S2C("gspNotifyInvite"), session.Sent[2].Opcode);
+        Assert.Equal(Bytes(b => { Word(b, 1); Text(b, "Bob"); Word(b, 0); b.AddRange(new byte[2]); Word(b, 1); }), session.Sent[2].Body);
+    }
+
+    /// <summary>The older direct Find request has no approval sender and preserves its native nickname and error layout.</summary>
+    [Theory]
+    [InlineData("cn-279")]
+    [InlineData("cn-324")]
+    public async Task OlderFindUsesTheDirectFlowAndNativeReply(string build)
+    {
+        var binding = Binding(build, out var table);
+        Assert.Equal("direct", binding.VisitFamily());
+        Assert.Equal(110, table.C2S("gcpReqMoveToFriend"));
+        Assert.Null(table.Find(PacketDirection.ClientToServer, "gcpReqMoveToFriendAccept"));
+        var body = Bytes(bytes => Text(bytes, "Bob"));
+        Assert.Equal(10, body.Length);
+        Assert.Equal(new PartyVisitRequested("Bob", RequiresApproval: false), binding.ReadVisit(body));
+        var session = new Session();
+        await binding.SendAsync(session, new PartyVisitFailed(PartyVisitFailure.Offline, "Bob"), default);
+        var reply = Assert.Single(session.Sent);
+        Assert.Equal(114, reply.Opcode);
+        Assert.Equal(Bytes(bytes => { Word(bytes, 3); Text(bytes, "Bob"); Word(bytes, 0); }), reply.Body);
+        Assert.Equal(18, reply.Body.Length);
+    }
+
+    /// <summary>
+    /// The modern family prompts with gspAskedVisitation (token, visitor, flag; kr-1256 sub_9AB8F0), answers by token
+    /// and fails with gspVisitationFailed (nickname, party/VisitFailed code; kr-1256 sub_9AA990). kr-1256 and cn-774
+    /// grant with gspVisitationAccepted; tw-454, which has none, with a notice that skips the prompt.
+    /// </summary>
+    [Theory]
+    [InlineData("kr-1256", 112, 113, 114)]
+    [InlineData("cn-774", 111, 112, 113)]
+    [InlineData("tw-454", 112, 113, 114)]
+    public async Task ModernVisitUsesTheTokenPromptAndTheFailureCodes(string build, int request, int refuse, int accept)
+    {
+        var binding = Binding(build, out var table);
+        Assert.Equal("modern", binding.VisitFamily());
+        Assert.Equal(request, table.C2S("gcpReqMoveToFriend"));
+        Assert.Equal(refuse, table.C2S("gcpReqRefuseVisitation_"));
+        Assert.Equal(accept, table.C2S("gcpReqAcceptVisitation_"));
+        Assert.Equal(build == "kr-1256" ? 110 : 109, table.C2S("gcpReqInvite"));
+        var session = new Session();
+        await binding.SendAsync(session, new PartyVisitAsked("Al", 0x01020304), default);
+        Assert.Equal(table.S2C("gspAskedVisitation"), session.Sent[0].Opcode);
+        Assert.Equal(Bytes(b => { Word(b, 0x01020304); Text(b, "Al"); Word(b, 0); }), session.Sent[0].Body);
+        await binding.SendAsync(session, new PartyVisitFailed(PartyVisitFailure.Declined, "Bob"), default);
+        Assert.Equal(table.S2C("gspVisitationFailed"), session.Sent[1].Opcode);
+        Assert.Equal(Bytes(b => { Text(b, "Bob"); Word(b, 28); }), session.Sent[1].Body);
+        await binding.SendAsync(session, new PartyVisitGranted("Bob"), default);
+        if (build == "tw-454")
+        {
+            Assert.Equal(table.S2C("gspNotifyInvite"), session.Sent[2].Opcode);
+            Assert.Equal(Bytes(b => { Text(b, "Bob"); Word(b, 0); b.AddRange(new byte[2]); Word(b, 1); }), session.Sent[2].Body);
+        }
+        else
+        {
+            Assert.Equal(table.S2C("gspVisitationAccepted"), session.Sent[2].Opcode);
+            Assert.Equal(Bytes(b => { Text(b, "Bob"); Word(b, 0); b.AddRange(new byte[2]); }), session.Sent[2].Body);
+        }
     }
 
     /// <summary>A table that gives a consumed party field another type is refused when the row binds.</summary>

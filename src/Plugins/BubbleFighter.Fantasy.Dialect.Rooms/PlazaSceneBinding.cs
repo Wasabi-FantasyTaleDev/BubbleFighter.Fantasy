@@ -53,11 +53,13 @@ internal sealed class PlazaSceneBinding(string protocol, IOpcodeTable table, Pac
         context.Effect(context.Services.RegisterMany<IMessageSender<PlazaMenuReturnRequested>>(this));
         Bind(context, "gcpReqGotoLobby", body => { RoomRoutes.RequireEmpty(body, "C2S gcpReqGotoLobby"); return new PlazaEnterRequested(); });
         Bind(context, "gcpReqGotoMenu", body => { RoomRoutes.RequireEmpty(body, "C2S gcpReqGotoMenu"); return new PlazaMenuReturnRequested(); });
-        Bind(context, "gcpSendPartyChrPos", body =>
-        {
-            _ = PacketCodec.ReadScalars(packets, build, "PlazaPositionUpload", body);
-            return new PlazaPositionReported(body.ToArray());
-        });
+        // kr-1256 sub_913640 selects the session upload whenever a session exists, including the plaza.
+        foreach (var name in new[] { "gcpSendPartyChrPos", "gcpSendSessionChrPos" })
+            Bind(context, name, body =>
+            {
+                _ = PacketCodec.ReadScalars(packets, build, "PlazaPositionUpload", body);
+                return new PlazaPositionReported(body.ToArray());
+            });
     }
 
     private void Bind<T>(IPluginContext context, string name, Func<ReadOnlySpan<byte>, T> decode) where T : class, IMessage =>
@@ -92,8 +94,7 @@ internal sealed class PlazaSceneBinding(string protocol, IOpcodeTable table, Pac
 
     public ValueTask SendAsync(ISession session, PlazaPositionReceived message, CancellationToken ct)
     {
-        // The enter replay carries a member with no reported position as an empty body (kr-1256 sub_91FB80
-        // keeps such a member at its plaza spawn); there is no upload to echo, so nothing is sent.
+        // An empty replay has no client-supplied coordinates to forward.
         if (message.Body.IsEmpty)
             return ValueTask.CompletedTask;
         // kr-1256 sub_913640 supplies the sequence; sub_9D2FF0 and sub_91FB80 consume it unchanged after identity.

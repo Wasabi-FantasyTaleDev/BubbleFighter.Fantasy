@@ -54,6 +54,13 @@ opcodes:
     evidence: verified
     source: "tw-454 sub_AACF80 equality branch for 301 calls tw-454 sub_B9D330; identity, sequence, XYZ, two bytes and f32 match cn-774 sub_B01A60 gspReceivePartyChrPos"
   - value: 511
+    direction: c2s
+    connection: game
+    name: gcpSendSessionChrPos
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_BA8CE0 selects sub_BAB810 whenever a session exists, including the kind-3 plaza; tw-454 sub_BAB810 stamps 511 and writes u32 sequence, XYZ, two bytes and f32 (22 bytes), matching kr-1256 sub_913640 and kr-812 gcpSendSessionChrPos"
+  - value: 511
     direction: s2c
     connection: game
     name: gspRoomLeaveSlot
@@ -1777,6 +1784,38 @@ opcodes:
     evidence: inferred
     source: "tw-454 sub_AB2AE0 stamps 111, called when the gspNotifyInvite prompt (sub_A86A70) is refused; kr-812 sub_81DEA0 builds Packet_gcpReqMoveToFriendAccept on the same branch"
     notes: "wstr inviter nickname"
+    connection: game
+  - value: 109
+    direction: c2s
+    name: gcpReqInvite
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_B9FA50 stamps 109 for the friend window invite item (tw-454 sub_B0E7D0 case 2, tw-454 sub_8E3C40); same body as cn-774 C2S 109"
+    notes: "wstr target, u32 flag"
+    connection: game
+  - value: 112
+    direction: c2s
+    name: gcpReqMoveToFriend
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_8E3F20 stamps 112 for the friend window visit item (tw-454 sub_B0E7D0 case 3, dl = 0); one prefixed wide string, the role of kr-812 C2S 110 sub_92A050"
+    notes: "wstr target"
+    connection: game
+  - value: 113
+    direction: c2s
+    name: gcpReqRefuseVisitation_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_AB2BF0 stamps 113 when the gspAskedVisitation prompt (tw-454 sub_A88970) is declined"
+    notes: "u32 token, u32 reason"
+    connection: game
+  - value: 114
+    direction: c2s
+    name: gcpReqAcceptVisitation_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_AB2D00 stamps 114 when the gspAskedVisitation prompt (tw-454 sub_A88970) is accepted"
+    notes: "u32 token"
     connection: game
   - value: 32792
     direction: c2s
