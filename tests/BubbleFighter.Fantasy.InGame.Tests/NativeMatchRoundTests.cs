@@ -189,6 +189,41 @@ public sealed class NativeMatchRoundTests
             rig.Feed.Sent.Select(sent => (sent.Session, sent.Message.Payload.Span[0])).ToArray());
     }
 
+    /// <summary>
+    /// A legacy round with one seat on its relay and one fallen back to its game connection: the relay seat's game
+    /// session is linked from its relay so the dialect can hand relay frames to the game handlers, peer feed that
+    /// arrives as the sender's game session reaches each seat on its match link, and the countdown requests seed
+    /// tables only for the relay seat, keyed by its scene entity.
+    /// </summary>
+    [Fact]
+    public async Task MixedRelayAndFallbackSeatsGetFeedOnTheirMatchLinkAndSeedsOnlyOnTheRelay()
+    {
+        await using var rig = new Rig("cn-324", 18, fallback: true);
+        await rig.StartAsync();
+        await rig.LoadAsync(rig.Host);
+        var hostRelay = new Session(101, "cn-324");
+        rig.Registry.MarkInitialized(hostRelay, await rig.Registry.BindCapabilityAsync(hostRelay, new(rig.Offers.Sent[0].Message.Ticket), default));
+        Assert.True(hostRelay.TryFeature<IMatchGameLink>(out var link));
+        Assert.Same(rig.Host, link.Game);
+        await rig.Round.HandleMatchConnectionReportedAsync(rig.Host, new(true), default);
+        await rig.LoadAsync(rig.Guest);
+        Assert.Empty(rig.Seeds.Sent);
+
+        await rig.Round.HandleMatchConnectionReportedAsync(rig.Guest, new(false), default);
+        Assert.Equal([false, true], rig.Countdowns.Sent.Select(sent => sent.MatchOverGame));
+        var seed = Assert.Single(rig.Seeds.Sent);
+        Assert.Equal(hostRelay.Id, seed.Session);
+        Assert.Equal(RoomRegistry.SceneEntity(rig.Room.Seats[0].Slot), seed.Message.EntityId);
+        Assert.Equal(rig.Room.Id, seed.Message.RoomId);
+        Assert.Equal(MatchPreviousRound.None, seed.Message.PreviousRound);
+
+        // Bridged relay frames carry the game session and no relay flag; the native relay still routes them per seat.
+        await rig.Round.HandleFeedAsync(rig.Host, new RoundFeedSent(32885, new byte[] { 1 }), default);
+        await rig.Round.HandleFeedAsync(rig.Guest, new RoundFeedSent(32885, new byte[] { 2 }), default);
+        Assert.Equal([(rig.Guest.Id, (byte)1), (hostRelay.Id, (byte)2)],
+            rig.Feed.Sent.Select(sent => (sent.Session, sent.Message.Payload.Span[0])).ToArray());
+    }
+
     /// <summary>Without the fallback a failure report keeps the loading barrier closed, as before.</summary>
     [Fact]
     public async Task FailedRelayWithoutFallbackKeepsWaiting()
@@ -231,6 +266,7 @@ public sealed class NativeMatchRoundTests
         internal Sink<RoundCountdownStarted> Countdowns { get; } = new();
         internal Sink<RoundStarted> Started { get; } = new();
         internal Recorder<RoundFeedReceived> Feed { get; } = new();
+        internal Recorder<MatchSeedTablesRequested> Seeds { get; } = new();
         internal Session Host { get; }
         internal Session Guest { get; }
         internal PlayRoom Room => Registry.TryGet(Host.Id)!;
@@ -246,7 +282,7 @@ public sealed class NativeMatchRoundTests
             Rooms = new(Registry, new RoomSenders(new Sink<RoomEntered>(), new Sink<RoomSeatUpdated>(), new Sink<RoomSeatVacated>(),
                 new Sink<RoomMasterChanged>(), MatchStarting: new Sink<RoomMatchStarting>()), NullLogger.Instance, options: options);
             Round = new(Registry, options, new RoundSenders(new Sink<RoundPlayerLoaded>(), Countdowns, Started, Feed),
-                NullLogger.Instance, _lifetime.Token, Rooms.ReturnToRoomAsync, capabilityOffers: Offers);
+                NullLogger.Instance, _lifetime.Token, Rooms.ReturnToRoomAsync, capabilityOffers: Offers, seedTables: Seeds);
         }
         internal async Task StartAsync()
         {

@@ -74,3 +74,20 @@
     id: shop
     config:
       life_items: false
+# This build's relay rows are not audited (no relay S2C 1/13, C2S 12 or game S2C 601 rows in its opcode table), so
+# its rounds stay on the game connection.
+- remove: relay-listener
+- remove: dialect.match
+- remove: dialect.match-offers
+- remove: dialect.match-replies
+- remove: match-connection
+- remove: dialect.scene-seeds
+- set:
+    id: ingame
+    config:
+      native_match_relay: false
+      match_transport_fallback: false
+- set:
+    id: dialect.rooms
+    config:
+      select_match_relay: false

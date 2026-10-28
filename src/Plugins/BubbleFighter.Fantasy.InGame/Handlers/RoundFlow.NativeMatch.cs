@@ -104,6 +104,53 @@ internal sealed partial class RoundFlow
         }, ct).ConfigureAwait(false);
     }
 
+    // Runs on the room's executor once the countdown went out, when every seat's character exists: the seed appliers
+    // look the actor up by its entity and drop a table without one (cn-324 sub_460820, kr-812 sub_506290). A seat
+    // playing over its game connection has no relay to receive them. A failed seat is logged and the round goes on,
+    // because its tables only decide critical hits.
+    private async ValueTask SendSeedTablesAsync(PlayRoom room, RoomSeat[] members, int generation, CancellationToken ct)
+    {
+        foreach (var member in members)
+        {
+            ISession? relay;
+            MatchSeedTablesRequested request;
+            lock (room.Gate)
+            {
+                relay = UsesGameLink(room, member) ? null : MatchLink(room, member);
+                request = new(room.Id, generation, RoomRegistry.SceneEntity(member.Slot), member.PreviousRound);
+            }
+            if (relay is null)
+                continue;
+            try
+            {
+                await _seedTables!.SendAsync(relay, request, ct).ConfigureAwait(false);
+            }
+            catch (Exception failure) when (failure is not OperationCanceledException)
+            {
+                _logger.LogError(failure, "Room {Room} slot {Slot}: the round's seed tables could not be sent.", room.Id, member.Slot);
+            }
+        }
+    }
+
+    // The previous-round history the next round's critical table keys on (CriticalHitTable rows prevWin, prevDraw,
+    // prevLose and prevLoseInRow; cn-279 sub_705DF0 sets the same four states at its round end).
+    private static void RememberOutcomes(PlayRoom room, int generation, Func<RoomSeat, RoundOutcome> outcome)
+    {
+        lock (room.Gate)
+        {
+            if (room.StartGeneration != generation)
+                return;
+            foreach (var seat in room.Seats)
+                seat.PreviousRound = outcome(seat) switch
+                {
+                    RoundOutcome.Won => MatchPreviousRound.Won,
+                    RoundOutcome.Draw => MatchPreviousRound.Drew,
+                    _ => seat.PreviousRound is MatchPreviousRound.Lost or MatchPreviousRound.LostInRow
+                        ? MatchPreviousRound.LostInRow : MatchPreviousRound.Lost,
+                };
+        }
+    }
+
     // Callers hold the room gate. A game-side report alone never grants a relay lease; a seat moved to its game
     // connection in this round is ready once that connection is open.
     private static bool NativeMatchReady(PlayRoom room, RoomSeat seat) =>

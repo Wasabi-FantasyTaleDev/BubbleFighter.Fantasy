@@ -3,20 +3,22 @@ using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Net;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Match;
-using BubbleFighter.Fantasy.Contracts.Rooms;
+using BubbleFighter.Fantasy.Contracts.ClientData;
 using BubbleFighter.Fantasy.Packets;
 using Microsoft.Extensions.Logging;
 
 namespace BubbleFighter.Fantasy.Dialect.Messages;
 
 /// <summary>
-/// Receives audited legacy relay seed tables and retains them per connection. This row is
-/// deliberately opt-in: it supplies scene state to a future initializer but does not broadcast
-/// guessed values or enable a relay listener by itself.
+/// The native seed authority of a legacy relay: issues each seat's critical, defence and cancellation tables when its
+/// round starts, with the critical chance drawn from the build's own CriticalHitTable, and keeps the tables a client
+/// reports back for diagnostics only. The appliers drop a table whose actor does not exist yet, so the round flow
+/// asks for the tables after the countdown, never at the scene handshake.
 /// </summary>
-[Plugin("dialect.scene-seeds", Description = "Native legacy relay scene seed state.",
-    Requires = [typeof(IPacketRouter), typeof(IOpcodeTableRegistry), typeof(IEventBus), typeof(IRoomRoster)],
-    ProvidesMany = [typeof(INativeSceneSeedStore), typeof(IMessageSender<NativeSceneSeedTable>)])]
+[Plugin("dialect.scene-seeds", Description = "Native legacy relay seed authority.",
+    Requires = [typeof(IPacketRouter), typeof(IOpcodeTableRegistry), typeof(IEventBus), typeof(IClientDataStore)],
+    OptionalMany = [typeof(IOpcodeTable)],
+    ProvidesMany = [typeof(INativeSceneSeedStore), typeof(IMessageSender<MatchSeedTablesRequested>)])]
 public sealed class SceneSeedsPlugin : IPlugin
 {
     /// <inheritdoc />
@@ -32,36 +34,39 @@ public sealed class SceneSeedsPlugin : IPlugin
         var tables = PacketTables.Load(options.PacketsDirectory);
         if (!tables.CapabilityOf(build, "native_scene_seed_tables"))
             throw new ConfigException($"Build '{build}' does not support native scene seed tables.");
-        _ = tables.Resolve(build, "RelayCriticalSeedTable");
-        _ = tables.Resolve(build, "RelayDefenceSeedTable");
-        _ = tables.Resolve(build, "RelayCriticalSeedCancelTable");
-        // A build that states a seed table uses the actor id and the vector shapes the encoder writes; cn-279
-        // states the tables empty and writes none.
-        if (tables.Resolve(build, "RelayCriticalSeedTable").Count > 0)
-            PacketLayoutContract.RequireFields(tables, build, "RelayCriticalSeedTable", "Native scene seeds",
-                ("entity_id", "u32"), ("unknown_8", "list<u32>"), ("unknown_24", "list<u32>"));
-        if (tables.Resolve(build, "RelayDefenceSeedTable").Count > 0)
-            PacketLayoutContract.RequireFields(tables, build, "RelayDefenceSeedTable", "Native scene seeds",
-                ("entity_id", "u32"), ("unknown_8", "list<u8>"));
-        if (tables.Resolve(build, "RelayCriticalSeedCancelTable").Count > 0)
-            PacketLayoutContract.RequireFields(tables, build, "RelayCriticalSeedCancelTable", "Native scene seeds",
-                ("entity_id", "u32"), ("unknown_8", "list<u32>"));
+        PacketLayoutContract.RequireFields(tables, build, "RelayCriticalSeedTable", "Native scene seeds",
+            ("entity_id", "u32"));
+        if (tables.Resolve(build, "RelayCriticalSeedTable").Count(field => field.Type == "list<u32>") != 2)
+            throw new ConfigException($"Build '{build}' must state two critical seed word vectors.");
+        PacketLayoutContract.RequireFields(tables, build, "RelayDefenceSeedTable", "Native scene seeds",
+            ("entity_id", "u32"), ("unknown_8", "list<u8>"));
+        PacketLayoutContract.RequireFields(tables, build, "RelayCriticalSeedCancelTable", "Native scene seeds",
+            ("entity_id", "u32"), ("unknown_8", "list<u32>"));
         var opcodes = context.Services.Get<IOpcodeTableRegistry>().ForProtocol(options.Protocol);
         if (opcodes.Connection != OpcodeConnection.Relay || opcodes.Profile.Id != build)
             throw new ConfigException("Native scene seeds require an opcode table for the owning relay connection.");
+        var chances = CriticalHitChances.Load(context.Services.Get<IClientDataStore>(), options.CriticalHitTableClientPath,
+            options.CriticalHitTableSheet, options.CriticalHitTableMaxBytes);
 
         var store = new SceneSeedStore(options.MaxSessions);
-        var roster = context.Services.Get<IRoomRoster>();
+        var authority = new SceneSeedAuthority(options.Protocol, build, tables, opcodes.S2C("rspSendCrtSeedTable"),
+            opcodes.S2C("rspSendDefSeedTable"), opcodes.S2C("rspSendCrtCancelSeedTable"), chances, options.MaxSessions,
+            Random.Shared);
         context.Effect(context.Services.RegisterMany<INativeSceneSeedStore>(store));
-        var sender = new SceneSeedSender(options.Protocol, build, tables, opcodes, roster);
-        context.Effect(context.Services.RegisterMany<IMessageSender<NativeSceneSeedTable>>(sender));
-        context.Effect(context.Events.On<ConnectionClosedEvent>(eventArgs => store.Remove(eventArgs.Connection.Id)));
+        context.Effect(context.Services.RegisterMany<IMessageSender<MatchSeedTablesRequested>>(authority));
+        context.Effect(context.Events.On<ConnectionClosedEvent>(eventArgs =>
+        {
+            store.Remove(eventArgs.Connection.Id);
+            authority.Remove(eventArgs.Connection.Id);
+        }));
         var router = context.Services.Get<IPacketRouter>();
         Register(NativeSceneSeedKind.Critical, "rcpCrtSeedTable");
         Register(NativeSceneSeedKind.Defence, "rcpDefSeedTable");
         Register(NativeSceneSeedKind.CriticalCancellation, "rcpCrtCnclSeedTable");
         return ValueTask.CompletedTask;
 
+        // The client repacks what it was sent only when the relay asks (cn-324 sub_6FA120 cases 10/11/12); a report
+        // must name the entity issued to that relay session and is never fed back into the tables.
         void Register(NativeSceneSeedKind kind, string name)
         {
             var opcode = opcodes.C2S(name);
@@ -70,15 +75,10 @@ public sealed class SceneSeedsPlugin : IPlugin
                 ct.ThrowIfCancellationRequested();
                 if (session.Profile.Id != build)
                     throw new InvalidOperationException("Native scene seed belongs to another client profile.");
-                var view = roster.FindBySession(session.Id)
-                    ?? throw new InvalidOperationException("Native scene seed requires a relay session bound to a room.");
-                var seat = view.Seats.FirstOrDefault(candidate => candidate.Relay?.Id == session.Id)
-                    ?? throw new InvalidOperationException("Native scene seed relay is not bound to a room seat.");
                 var table = SceneSeedWire.Read(tables, build, kind, packet.Payload.Span, options.ReadLimits);
-                var expectedEntity = checked(1_000_000 + 100_000 * seat.Slot);
-                if (table.EntityId != expectedEntity)
-                    throw new PacketFormatException($"Native scene seed entity {table.EntityId} does not belong to relay seat {seat.Slot} (expected {expectedEntity}).", 0);
-                store.Set(session.Id, view.Generation, table);
+                if (!authority.Issued(session.Id, table.EntityId, out var generation))
+                    throw new PacketFormatException($"Native scene seed entity {table.EntityId} was not issued to relay session {session.Id}.", 0);
+                store.Set(session.Id, generation, table);
                 context.Logger.LogDebug("Session {SessionId} reported native {Kind} seed table for entity {EntityId} ({Words} words, {Bytes} bytes).",
                     session.Id, kind, table.EntityId, table.WordValues.Count, table.ByteValues.Count);
                 return ValueTask.CompletedTask;
@@ -87,38 +87,9 @@ public sealed class SceneSeedsPlugin : IPlugin
     }
 }
 
-/// <summary>Encodes a validated native seed table without choosing or changing its values.</summary>
-internal sealed class SceneSeedSender(string protocol, string build, PacketTables tables, IOpcodeTable opcodes,
-    IRoomRoster roster)
-    : IMessageSender<NativeSceneSeedTable>
+/// <summary>Encodes a native seed table without choosing or changing its values.</summary>
+internal static class SceneSeedSender
 {
-    /// <inheritdoc />
-    public string Protocol => protocol;
-
-    /// <inheritdoc />
-    public ValueTask SendAsync(ISession session, NativeSceneSeedTable table, CancellationToken ct)
-    {
-        ct.ThrowIfCancellationRequested();
-        if (session.Profile.Id != build)
-            throw new InvalidOperationException("Native scene seed belongs to another client profile.");
-        var view = roster.FindBySession(session.Id)
-            ?? throw new InvalidOperationException("Native scene seed requires a relay session bound to a room.");
-        var seat = view.Seats.FirstOrDefault(candidate => candidate.Relay?.Id == session.Id)
-            ?? throw new InvalidOperationException("Native scene seed relay is not bound to a room seat.");
-        var expectedEntity = checked(1_000_000 + 100_000 * seat.Slot);
-        if (table.EntityId != expectedEntity)
-            throw new InvalidOperationException($"Native scene seed entity {table.EntityId} does not belong to relay seat {seat.Slot} (expected {expectedEntity}).");
-        var (structure, name) = table.Kind switch
-        {
-            NativeSceneSeedKind.Critical => ("RelayCriticalSeedTable", "rspSendCrtSeedTable"),
-            NativeSceneSeedKind.Defence => ("RelayDefenceSeedTable", "rspSendDefSeedTable"),
-            NativeSceneSeedKind.CriticalCancellation => ("RelayCriticalSeedCancelTable", "rspSendCrtCancelSeedTable"),
-            _ => throw new ArgumentOutOfRangeException(nameof(table)),
-        };
-        var body = Encode(tables, build, table, structure);
-        return session.SendAsync(opcodes.S2C(name), body, ct);
-    }
-
     /// <summary>Encodes one seed table according to the selected build's audited field order.</summary>
     /// <param name="tables">The packet tables.</param>
     /// <param name="build">The client build receiving the table.</param>
@@ -154,7 +125,7 @@ internal sealed class SceneSeedSender(string protocol, string build, PacketTable
     }
 }
 
-/// <summary>Bounds the opt-in native scene seed receiver for one legacy relay protocol.</summary>
+/// <summary>Bounds the native seed authority of one legacy relay protocol and names its client data.</summary>
 public sealed class SceneSeedsOptions
 {
     /// <summary>Gets or sets the owning build's relay protocol.</summary>
@@ -172,6 +143,18 @@ public sealed class SceneSeedsOptions
     /// <summary>Gets or sets the maximum number of values accepted in one native seed vector.</summary>
     [Range(1, 4096)]
     public int MaxElements { get; set; } = 1000;
+
+    /// <summary>Gets or sets the client path of the workbook whose category chances set the critical bits.</summary>
+    [Required, StringLength(260, MinimumLength = 1)]
+    public string CriticalHitTableClientPath { get; set; } = "Config/CriticalHitTable.xml";
+
+    /// <summary>Gets or sets the worksheet of that workbook holding the category rows.</summary>
+    [Required, StringLength(64, MinimumLength = 1)]
+    public string CriticalHitTableSheet { get; set; } = "CriticalHitTable";
+
+    /// <summary>Gets or sets the inclusive size cap of that workbook in bytes.</summary>
+    [Range(1, 16777216)]
+    public int CriticalHitTableMaxBytes { get; set; } = 1048576;
 
     /// <summary>Gets the bounded packet-tree limits used for all three native seed structures.</summary>
     internal PacketReadLimits ReadLimits => new(MaxCollectionElements: MaxElements,

@@ -188,6 +188,7 @@ internal sealed partial class RoundFlow
         var rewards = ComputeRewards(room, generation, reason);
         var rewardStartedAt = Environment.TickCount64;
         var outcome = OutcomeOf(room, generation, reason);
+        RememberOutcomes(room, generation, outcome);
         var scoreDelay = 0;
         if (!await TypedResultStepAsync(room, generation, async token =>
         {

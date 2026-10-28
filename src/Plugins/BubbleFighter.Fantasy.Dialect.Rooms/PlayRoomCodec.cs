@@ -42,6 +42,8 @@ internal sealed partial class PlayRoomCodec(
 {
     private RoomRoundSettingFields? _roundSettingFields;
     internal bool EchoDirectItemEffects { get; init; }
+    /// <summary>Gets whether an ordinary round's loading gate selects the match relay for seats still on it.</summary>
+    internal bool SelectMatchRelay { get; init; }
     /// <summary>Gets whether the row reads the clients' star-count reports (the <c>star_items</c> option and capability).</summary>
     internal bool StarReports { get; init; }
     internal Func<ISession, RoomReadyRequested, CancellationToken, ValueTask<bool>>? ReadyRequestFirst { get; init; }
@@ -238,6 +240,20 @@ internal sealed partial class PlayRoomCodec(
                     new RoundTauntReported(BitConverter.ToInt32(received.Packet.Payload.Span[4..])), ct).ConfigureAwait(false);
             }
         }));
+        // With the match relay selected the client sends its gpp frames on the relay (cn-324 sub_6F7F10, kr-812
+        // sub_80D4C0); the relay's own rows claim only its handshake and seeds, so every other peer frame is handed to
+        // this protocol as if the seat's game connection carried it, keeping one stream for the handlers above.
+        if (SelectMatchRelay)
+        {
+            var relayProtocol = protocol[..protocol.LastIndexOf('/')] + "/relay";
+            context.Effect(context.Events.OnAsync<PacketReceivedEvent>(async (received, ct) =>
+            {
+                if (received.HasHandler || received.ProtocolName != relayProtocol || received.Packet.Opcode < FeedBase
+                    || !received.Session.TryFeature<IMatchGameLink>(out var link) || link.Game.Connection.IsClosed)
+                    return;
+                await router.DispatchAsync(protocol, link.Game, received.Packet, ct).ConfigureAwait(false);
+            }));
+        }
         if (play.HostStart)
         {
             On("gcpUserHostStart", (_, body) =>
@@ -421,7 +437,7 @@ internal sealed partial class PlayRoomCodec(
     /// <summary>Sends the shared loading gates and countdown using this build's native packet sequence.</summary>
     public ValueTask SendAsync(ISession session, RoundCountdownStarted message, CancellationToken ct) =>
         RoundStartSender.SendCountdownAsync(packetTables, lineage, tables.Get(session.Profile.Id),
-            play.Wire.PreCountDownFirst, session, message, ct);
+            play.Wire.PreCountDownFirst, SelectMatchRelay, session, message, ct);
 
     /// <summary>Sends the shared match clock and native start words using this build's packet table.</summary>
     public ValueTask SendAsync(ISession session, RoundStarted message, CancellationToken ct) =>

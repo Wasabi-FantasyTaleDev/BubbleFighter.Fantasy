@@ -53,6 +53,41 @@ public sealed record NativeSceneSeedTable(
         new(kind, entityId, Array.Empty<IReadOnlyList<uint>>(), values.ToArray());
 }
 
+/// <summary>A seat's result in the previous round of the same room, the history the critical table keys on.</summary>
+public enum MatchPreviousRound
+{
+    /// <summary>The seat played no earlier round in this room.</summary>
+    None,
+    /// <summary>The seat's team won the previous round.</summary>
+    Won,
+    /// <summary>The previous round was a draw for the seat.</summary>
+    Drew,
+    /// <summary>The seat's team lost the previous round after not losing the one before it.</summary>
+    Lost,
+    /// <summary>The seat's team lost the previous round and the one before it.</summary>
+    LostInRow,
+}
+
+/// <summary>
+/// Asks the seed authority to issue one seat's critical, defence and cancellation tables over its match connection
+/// for the round that is starting. The authority chooses every value; nothing reported by a client is reused.
+/// </summary>
+/// <param name="RoomId">The room whose round is starting.</param>
+/// <param name="Generation">The room start generation the tables belong to.</param>
+/// <param name="EntityId">The seat's native scene actor identifier.</param>
+/// <param name="PreviousRound">The seat's result in the previous round of the same room.</param>
+public sealed record MatchSeedTablesRequested(int RoomId, int Generation, int EntityId, MatchPreviousRound PreviousRound) : IMessage;
+
+/// <summary>
+/// The game connection of the seat a match connection is bound to, published on the match session while the binding
+/// lasts, so a dialect can hand the relay's peer frames to the build's game-side handlers.
+/// </summary>
+public interface IMatchGameLink
+{
+    /// <summary>Gets the bound seat's game connection.</summary>
+    ISession Game { get; }
+}
+
 /// <summary>Provides the latest bounded native seed tables for live relay sessions.</summary>
 public interface INativeSceneSeedStore
 {

@@ -91,6 +91,9 @@ public sealed class RoomSeat : IRoomMember
     /// </summary>
     internal int GameLinkGeneration { get; set; }
 
+    /// <summary>Gets the seat's result in the previous round of this room, the history its critical table keys on.</summary>
+    internal MatchPreviousRound PreviousRound { get; set; }
+
     /// <summary>Gets or sets whether the round already acknowledged this seat's request to add its own character.</summary>
     public bool ObjectAdded { get; set; }
 

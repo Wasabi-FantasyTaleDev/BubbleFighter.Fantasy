@@ -15,6 +15,8 @@ bundles:
 vars:
   LEGACY_PORT: ${CN_279_GAME_PORT:-7210}
   LEGACY_PUBLIC_PORT: ${CN_279_PUBLIC_PORT:-7210}
+  LEGACY_RELAY_PORT: ${CN_279_RELAY_PORT:-7211}
+  LEGACY_RELAY_PUBLIC_PORT: ${CN_279_PUBLIC_RELAY_PORT:-7211}
   # Ten-byte frames (cn-279 sub_570BD0 removes the plaintext greeting before decrypting the rest) and the
   # binary's own cipher tables, which cn-279 sub_46A040/sub_46A0A0 index at 0x9E9378/0x9E93AC modulo 49/24;
   # the TcpConnection constructor cn-279 sub_570560 seeds send +2200 and receive +2212.

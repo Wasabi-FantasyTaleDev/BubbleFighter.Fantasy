@@ -165,11 +165,11 @@ Listener ports come from the profile, usually through per-build variables and `v
 | Endpoint | kr-1256 (modern) | kr-812 (legacy) |
 | --- | --- | --- |
 | Game TCP | `7100` (`KR_1256_GAME_PORT`) | `7110` (`KR_812_GAME_PORT`) |
-| Relay TCP | `7101` (`KR_1256_RELAY_PORT`) | not opened by the legacy bundle |
+| Relay TCP | `7101` (`KR_1256_RELAY_PORT`) | `7111` (`KR_812_RELAY_PORT`) |
 | Administration HTTP | `8080` (`BFF_ADMIN_PORT`) | `8081`, moved by the profile patch |
 | Optional native selector | not used | `7112` when `center-selector.yaml` is mounted |
 
-The `all` profile composes the brought-up client builds into one process, each on its own game listener. Its default game ports run from `7100` in steps of ten (`kr-1256` 7100, `kr-812` 7110, `id-400` 7120, and so on through `cn-408` 7250). Use `--dump-config` to read the exact `listen` strings for the profile you selected before opening firewall rules.
+The `all` profile composes the brought-up client builds into one process, each on its own game listener. Its default game ports run from `7100` in steps of ten (`kr-1256` 7100, `kr-812` 7110, `id-400` 7120, and so on through `cn-408` 7250), and each build's relay listens one above its game port (`<BUILD>_RELAY_PORT`, advertised as `<BUILD>_PUBLIC_RELAY_PORT`). The legacy builds play a round over their relay when it connects and fall back to the game connection when it fails; `cn-706` and `cn-705` keep their rounds on the game connection because their relay packets are not audited. Use `--dump-config` to read the exact `listen` strings for the profile you selected before opening firewall rules.
 
 Keep the administration port on loopback or a controlled network. Open only the game and relay ports that the selected profiles serve, and never expose MySQL on a public interface.
 

@@ -362,7 +362,11 @@ internal sealed class TutorialHandler : IDisposable
         }
         var admission = new TutorialRoundOpened(modeForRoom, mapForRoom,
                 player.Room.CharacterItemId, player.Room.EquippedItemIds, checked((byte)tutorialTeam),
-                TutorialCountDownMs, request.TimeAttackTimeLimitMs, !waves);
+                TutorialCountDownMs, request.TimeAttackTimeLimitMs, !waves)
+        {
+            // The solo tutorial scene gets no relay offer; it plays over its game connection as it always has.
+            GameConnectionOnly = true,
+        };
         if (!_skipStart && !_play.SkipEnter)
         {
             if (_matchStart == TutorialMatchStart.RepAutoStart)
@@ -624,7 +628,7 @@ internal sealed class TutorialHandler : IDisposable
         await session.SendAsync(table.S2C("gspGameMapLoadingComplete"), seatBody, ct).ConfigureAwait(false);
 
         // cn-717 sub_886D80 requires the first loading gate; the tutorial has no pre-countdown.
-        await RoundStartSender.SendCountdownAsync(_packetTables, _build, table, false, session,
+        await RoundStartSender.SendCountdownAsync(_packetTables, _build, table, false, false, session,
             new RoundCountdownStarted(0, TutorialCountDownMs) { IsTutorial = true }, ct)
             .ConfigureAwait(false);
         _logger.LogInformation(

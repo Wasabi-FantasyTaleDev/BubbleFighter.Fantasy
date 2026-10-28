@@ -2,7 +2,8 @@
 # once. A build's profile gives the port (vars: LEGACY_PORT) and states only what differs, in its
 # vars and with `set` operations in its patch.yaml. Whatever a profile does not state is kr-812's.
 #
-# Profile vars read here: LEGACY_PORT (required), LEGACY_BOOTSTRAP_STATUS (2), LEGACY_GATE_KEY (0),
+# Profile vars read here: LEGACY_PORT (required), LEGACY_RELAY_PORT and LEGACY_RELAY_PUBLIC_PORT (required while the
+# relay rows are on), LEGACY_BOOTSTRAP_STATUS (2), LEGACY_GATE_KEY (0),
 # LEGACY_GATE_SUB_KEY (0), LEGACY_SEATS (12), LEGACY_START_TIMER_MS (4000), LEGACY_SHOP_NAME_COLUMN (name).
 # The build's wire stream. Every legacy build reads the 258-byte greeting and seeds SimpleCipher (0, 1)
 # client-to-server and (5, 3) server-to-client (kr-812 sub_B26AE0); the frame and the cipher table
@@ -38,6 +39,41 @@
     protocol: "${BFF_PROFILE_ID}/game"
     max_connections: 512
     idle_timeout_seconds: 0
+# The native match relay: game S2C 601 names this listener (kr-812 sub_81CAB0, cn-324 sub_705D80 create the relay
+# object from it), the client joins with relay C2S 1 and its validation report (C2S 12), and the round's gpp frames
+# use it once the loading gate selects it. A build without the audited relay rows turns these rows off in its
+# patch.yaml. Profile vars: LEGACY_RELAY_PORT (required), LEGACY_RELAY_PUBLIC_PORT.
+- id: relay-listener
+  plugin: net.tcp
+  config:
+    listen: "${BFF_BIND_HOST:-0.0.0.0}:${LEGACY_RELAY_PORT}"
+    protocol: "${BFF_PROFILE_ID}/relay"
+    max_connections: 512
+    idle_timeout_seconds: 0
+- id: dialect.match
+  plugin: dialect.match
+  config:
+    protocol: "${BFF_PROFILE_ID}/relay"
+    packets_directory: packets
+- id: dialect.match-offers
+  plugin: dialect.match-offers
+  config:
+    protocol: "${BFF_PROFILE_ID}/game"
+    packets_directory: packets
+- id: dialect.match-replies
+  plugin: dialect.match-replies
+  config:
+    protocol: "${BFF_PROFILE_ID}/relay"
+    packets_directory: packets
+- id: match-connection
+  plugin: match-connection
+  config:
+    protocol: "${BFF_PROFILE_ID}/relay"
+    max_connections: 1024
+    handshake_timeout_ms: 15000
+    capability_authentication: true
+    # The validation report (relay C2S 12) completes the join; a build without it states false in its patch.yaml.
+    require_capability_scene_report: true
 - id: dialect.messages
   plugin: dialect.messages
   config:
@@ -96,6 +132,8 @@
     # stays this long before the tutorial room.
     tutorial_score_ms: 3000
     tutorial_result_ms: 5000
+    # The ordinary round's loading gate selects the relay the ingame row offers (cn-324 sub_6F0B30, kr-812 sub_802E60).
+    select_match_relay: true
 # The build's own client data: its archives under data/ at their client paths and loose files under dataraw/,
 # provisioned separately. Isolated so each build in the all-builds profile reads its own files.
 - id: clientdata
@@ -105,6 +143,15 @@
   config:
     data_directory: "${BFF_CLIENT_DATA:-client-data}/${BFF_PROFILE_ID}/data"
     raw_directory: "${BFF_CLIENT_DATA:-client-data}/${BFF_PROFILE_ID}/dataraw"
+# The relay's seed authority: each seat's critical, defence and cancellation tables when its round starts, the critical
+# chance taken from this build's Config/CriticalHitTable.xml. The seeded-critical builds read their critical hits only
+# from these tables (cn-324 sub_4A94C0); a build without the seed capability turns this row off in its patch.yaml.
+- id: dialect.scene-seeds
+  plugin: dialect.scene-seeds
+  parent_id: clientdata
+  config:
+    protocol: "${BFF_PROFILE_ID}/relay"
+    packets_directory: packets
 - id: inventoryview
   plugin: inventoryview
   parent_id: clientdata
@@ -217,8 +264,14 @@
   parent_id: inventoryview
   config:
     game_protocol: "${BFF_PROFILE_ID}/game"
-    # No relay listener on the legacy builds yet; the start chain is not bound.
     relay_protocol: "${BFF_PROFILE_ID}/relay"
+    # Loaded seats get the relay offer and the countdown waits for each relay to join, register and be confirmed
+    # on the game connection (game C2S 601). A seat whose relay fails (kr-812 sub_810BA0 reports it there) plays
+    # over its game connection; the loading gate then leaves its relay word clear.
+    native_match_relay: true
+    match_transport_fallback: true
+    relay_advertise_ipv4: "${BFF_PUBLIC_HOST:-127.0.0.1}"
+    relay_advertise_port: ${LEGACY_RELAY_PUBLIC_PORT}
     # A kr-812 room carries twelve slots (gspGotoRoom).
     max_players_per_match: ${LEGACY_SEATS:-12}
     # kr-812 sub_7EAB00 displays only remaining-seconds 3/2/1/0; longer waits start blank.

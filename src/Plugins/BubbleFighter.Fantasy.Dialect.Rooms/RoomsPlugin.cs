@@ -195,6 +195,7 @@ public sealed class RoomsPlugin : IPlugin
                     LeaveRequestFirst = tutorial.TryHandleLeaveAsync,
                     MultiplayerRoomEntering = tutorial.ClearTutorialStateAsync,
                     ReadyRequestFirst = tutorial.TryHandleReadyAsync,
+                    SelectMatchRelay = options.SelectMatchRelay,
                     EchoDirectItemEffects = options.EchoDirectItemEffects
                         && builds.Tables.CapabilityOf(room.Profile, "direct_item_effect_echo"),
                     StarReports = options.StarItems && builds.Tables.CapabilityOf(room.Profile, "star_items"),
@@ -377,6 +378,13 @@ public sealed class RoomsOptions
 
     /// <summary>Gets or sets the relay connection's protocol scope the feed and movement bindings register on. YAML key <c>relay_protocol</c>.</summary>
     public string RelayProtocol { get; set; } = "kr-1256/relay";
+
+    /// <summary>
+    /// Gets or sets whether a legacy round's loading gate selects the match relay for every seat that did not fall
+    /// back to its game connection (first word of gspGameEverybodyLoadingComplete; cn-324 sub_6F0B30, kr-812
+    /// sub_802E60). Turn it on together with the ingame row's native match relay. YAML key <c>select_match_relay</c>.
+    /// </summary>
+    public bool SelectMatchRelay { get; set; }
 
     /// <summary>Gets or sets the S2C 585 loading words the round start sends (kr-1256 start words 1, 0, 1). YAML key <c>round_loading_flags</c>.</summary>
     public int[] RoundLoadingFlags { get; set; } = [1, 0, 1];

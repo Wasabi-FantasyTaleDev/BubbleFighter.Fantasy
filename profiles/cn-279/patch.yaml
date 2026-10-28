@@ -111,3 +111,11 @@
     id: shop
     config:
       life_items: false
+# CN2011 reports relay success on the game connection straight after relay 1, without a validation report
+# (cn-279 sub_701270), and has no seed tables (packets/builds.yaml native_scene_seed_tables: false; its critical
+# hit is a local roll, cn-279 sub_7EC4D0).
+- set:
+    id: match-connection
+    config:
+      require_capability_scene_report: false
+- remove: dialect.scene-seeds

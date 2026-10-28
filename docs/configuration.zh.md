@@ -165,11 +165,11 @@ dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile 
 | 端点 | kr-1256（现代） | kr-812（旧版） |
 | --- | --- | --- |
 | 游戏 TCP | `7100`（`KR_1256_GAME_PORT`） | `7110`（`KR_812_GAME_PORT`） |
-| 中继 TCP | `7101`（`KR_1256_RELAY_PORT`） | 旧版 bundle 不打开 |
+| 中继 TCP | `7101`（`KR_1256_RELAY_PORT`） | `7111`（`KR_812_RELAY_PORT`） |
 | 管理 HTTP | `8080`（`BFF_ADMIN_PORT`） | `8081`，由 profile 补丁移动 |
 | 可选原生选择器 | 不使用 | 挂载 `center-selector.yaml` 时为 `7112` |
 
-`all` profile 把已接入的客户端构建组合进一个进程，每个构建使用自己的游戏监听器。其默认游戏端口从 `7100` 开始以十递增（`kr-1256` 7100、`kr-812` 7110、`id-400` 7120，直到 `cn-408` 7250）。开放防火墙规则前，请用 `--dump-config` 读取所选 profile 的实际 `listen` 字符串。
+`all` profile 把已接入的客户端构建组合进一个进程，每个构建使用自己的游戏监听器。其默认游戏端口从 `7100` 开始以十递增（`kr-1256` 7100、`kr-812` 7110、`id-400` 7120，直到 `cn-408` 7250），每个构建的中继监听在游戏端口加一（`<BUILD>_RELAY_PORT`，对客户端公布 `<BUILD>_PUBLIC_RELAY_PORT`）。旧版构建在中继连上时通过中继进行回合，中继失败时回退到游戏连接；`cn-706` 和 `cn-705` 的中继封包未经审计，回合仍走游戏连接。开放防火墙规则前，请用 `--dump-config` 读取所选 profile 的实际 `listen` 字符串。
 
 管理端口应保持在回环或受控网络。只开放所选 profile 提供服务的游戏与中继端口，绝不要把 MySQL 暴露在公共接口上。
 

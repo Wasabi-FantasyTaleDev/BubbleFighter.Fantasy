@@ -32,6 +32,7 @@ internal sealed partial class RoundFlow
     private readonly IInventoryRepository? _revivalInventory;
     private readonly IInventoryPushService? _revivalInventoryPush;
     private readonly IMatchCapabilityOfferSender? _capabilityOffers;
+    private readonly IMessageSender<MatchSeedTablesRequested>? _seedTables;
 
     /// <summary>Builds the flow over the build's round encoders.</summary>
     /// <param name="registry">The room registry.</param>
@@ -42,9 +43,10 @@ internal sealed partial class RoundFlow
     /// <param name="returnToRoom">Sends every member back into the waiting room; runs on the room's executor.</param>
     /// <param name="context">The owning row's context, which the result surface is resolved from; null runs the round without one.</param>
     /// <param name="capabilityOffers">Native offer encoder; when omitted an enabled native relay policy resolves it from the row's services.</param>
+    /// <param name="seedTables">Seed-table encoder on the relay protocol; when omitted an enabled native relay policy resolves it from the row's services.</param>
     public RoundFlow(RoomRegistry registry, InGameOptions options, RoundSenders senders, ILogger logger, CancellationToken lifetime,
         Func<PlayRoom, CancellationToken, ValueTask> returnToRoom, IPluginContext? context = null,
-        IMatchCapabilityOfferSender? capabilityOffers = null)
+        IMatchCapabilityOfferSender? capabilityOffers = null, IMessageSender<MatchSeedTablesRequested>? seedTables = null)
     {
         _returnToRoom = returnToRoom;
         _ended = senders.Ended;
@@ -68,6 +70,7 @@ internal sealed partial class RoundFlow
                 || matches[0].TicketLength < 1 || matches[0].TicketLength > options.MaxMatchCapabilityBytes)
                 throw new ConfigException("Native match relay requires exactly one owning game offer sender with a bounded key length.");
             _capabilityOffers = matches[0];
+            _seedTables = seedTables ?? (context is null ? null : PlaySenders.Optional<MatchSeedTablesRequested>(context, options.RelayProtocol));
         }
         if (options.InstantRevivalItemId > 0)
         {
@@ -516,6 +519,7 @@ internal sealed partial class RoundFlow
             return;
         }
         var outcome = OutcomeOf(room, generation, reason);
+        RememberOutcomes(room, generation, outcome);
         foreach (var member in members)
             await _ended.SendAsync(member.Game, new RoundEnded(room.Id, outcome(member), reason) { ModeId = room.ModeId, RecipientTeam = member.Team }, ct).ConfigureAwait(false);
         _logger.LogInformation("Room {Room}: round ended; back to the room in {Ms} ms.", room.Id, _options.ResultCloseGraceMs);
@@ -608,8 +612,9 @@ internal sealed partial class RoundFlow
                 }
             }
             // A relay packet goes to each seat's match link of this round: its relay connection, or its game
-            // connection after its relay failed. A seat with neither gets nothing rather than a stale copy.
-            targets = packet.OnRelay
+            // connection after its relay failed. A seat with neither gets nothing rather than a stale copy. With the
+            // native match relay every peer packet is round traffic, whichever connection the sender used.
+            targets = packet.OnRelay || _options.NativeMatchRelay
                 ? [.. room.Seats.Where(seat => packet.IncludeSender || seat != sender)
                     .Select(seat => MatchLink(room, seat)).OfType<ISession>()]
                 : [.. room.Seats.Where(seat => packet.IncludeSender || seat != sender).Select(seat => seat.Game)];
@@ -642,6 +647,8 @@ internal sealed partial class RoundFlow
             lock (room.Gate) overGame = UsesGameLink(room, member);
             await _countdown.SendAsync(member.Game, countdown with { MatchOverGame = overGame }, ct).ConfigureAwait(false);
         }
+        if (_seedTables is not null)
+            await SendSeedTablesAsync(room, members, generation, ct).ConfigureAwait(false);
         _logger.LogInformation("Room {Room}: all {Count} player(s) loaded; the round starts in {Ms} ms.",
             room.Id, members.Length, countdownMs);
         room.CountdownTask = BackgroundWork.Detached(() => FinishCountdownAsync(room, generation));

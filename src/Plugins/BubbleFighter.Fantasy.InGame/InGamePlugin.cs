@@ -27,7 +27,7 @@ namespace BubbleFighter.Fantasy.InGame;
 [Plugin("ingame",
     Description = "Plaza enter, room create/join/ready, and combat over the typed room and round messages.",
     Requires = [typeof(IPacketRouter), typeof(IMessageRouter)],
-    OptionalMany = [typeof(IMatchCapabilityOfferSender), typeof(IInboundMessageBinding<MatchConnectionReported>), typeof(IMessageSender<RoomTeamConverted>), typeof(IInboundMessageBinding<RoomMatchRequested>), typeof(IMessageSender<RoomMatchNotified>), typeof(IMessageSender<RoomAutoStartNotified>), typeof(IMessageSender<ServerNotice>), typeof(IMessageSender<MatchSessionSignature>),
+    OptionalMany = [typeof(IMatchCapabilityOfferSender), typeof(IMessageSender<MatchSeedTablesRequested>), typeof(IInboundMessageBinding<MatchConnectionReported>), typeof(IMessageSender<RoomTeamConverted>), typeof(IInboundMessageBinding<RoomMatchRequested>), typeof(IMessageSender<RoomMatchNotified>), typeof(IMessageSender<RoomAutoStartNotified>), typeof(IMessageSender<ServerNotice>), typeof(IMessageSender<MatchSessionSignature>),
         typeof(IInboundMessageBinding<RoomListRequested>), typeof(IMessageSender<RoomListSnapshot>), typeof(IMessageSender<PartyUpdated>), typeof(IMessageSender<PartyVisitSucceeded>), typeof(IMessageSender<PartyInvitationMoveSucceeded>), typeof(IMessageSender<PartyVisitFailed>),
         typeof(IInboundMessageBinding<RoomCreateRequested>), typeof(IInboundMessageBinding<RoomJoinRequested>),
         typeof(IInboundMessageBinding<RoomLeaveRequested>), typeof(IInboundMessageBinding<RoomReadyRequested>),

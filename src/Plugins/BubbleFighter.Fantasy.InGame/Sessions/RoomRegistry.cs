@@ -724,10 +724,28 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
     private void SharePlayer(ISession game, ISession relay)
     {
         UnsharePlayer(relay.Id);
-        if (relay is not ISessionWithFeatures || !game.TryFeature<IPlayerSession>(out var player)
-            || relay.TryFeature<IPlayerSession>(out _))
+        if (relay is not ISessionWithFeatures || relay.TryFeature<IMatchGameLink>(out _))
             return;
-        _relayPlayers[relay.Id] = relay.RegisterFeature<IPlayerSession>(player);
+        // The dialect routes the relay's peer frames through the seat's game connection by this link.
+        var link = relay.RegisterFeature<IMatchGameLink>(new MatchGameLink(game));
+        if (!game.TryFeature<IPlayerSession>(out var player) || relay.TryFeature<IPlayerSession>(out _))
+        {
+            _relayPlayers[relay.Id] = link;
+            return;
+        }
+        var shared = relay.RegisterFeature<IPlayerSession>(player);
+        _relayPlayers[relay.Id] = new CompositeHandle(link, shared);
+    }
+
+    private sealed record MatchGameLink(ISession Game) : IMatchGameLink;
+
+    private sealed class CompositeHandle(IDisposable first, IDisposable second) : IDisposable
+    {
+        public void Dispose()
+        {
+            second.Dispose();
+            first.Dispose();
+        }
     }
 
     private void UnsharePlayer(long relaySessionId)

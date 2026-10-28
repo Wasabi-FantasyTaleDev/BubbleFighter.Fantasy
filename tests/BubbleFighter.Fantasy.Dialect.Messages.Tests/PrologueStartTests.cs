@@ -58,7 +58,7 @@ public sealed class PrologueStartTests
     {
         var session = new TutorialSession();
         var table = new TutorialTable();
-        await RoundStartSender.SendCountdownAsync(TestBuilds.Packets, build, table, true, session,
+        await RoundStartSender.SendCountdownAsync(TestBuilds.Packets, build, table, true, false, session,
             new RoundCountdownStarted(1, 4000) { IsTutorial = true }, default);
         await RoundStartSender.SendStartedAsync(TestBuilds.Packets, build, table, session,
             new RoundStarted(1, 99999000) { IsTutorial = true }, default);
@@ -70,7 +70,7 @@ public sealed class PrologueStartTests
             Enumerable.Range(0, fields).Select(i => BitConverter.ToInt32(session.Sent[2].Payload, i * 4)));
 
         session.Sent.Clear();
-        await RoundStartSender.SendCountdownAsync(TestBuilds.Packets, build, table, true, session,
+        await RoundStartSender.SendCountdownAsync(TestBuilds.Packets, build, table, true, false, session,
             new RoundCountdownStarted(1, 3000), default);
         await RoundStartSender.SendStartedAsync(TestBuilds.Packets, build, table, session,
             new RoundStarted(1, 240000), default);
@@ -78,6 +78,17 @@ public sealed class PrologueStartTests
         Assert.All(session.Sent[0].Payload, value => Assert.Equal(0, value));
         Assert.Equal(fields == 3 ? new[] { 240000, 0, 0 } : new[] { 240000, 0 },
             Enumerable.Range(0, fields).Select(i => BitConverter.ToInt32(session.Sent[3].Payload, i * 4)));
+
+        // With the relay offered, the first word selects it unless this seat fell back to its game connection.
+        session.Sent.Clear();
+        await RoundStartSender.SendCountdownAsync(TestBuilds.Packets, build, table, true, true, session,
+            new RoundCountdownStarted(1, 3000), default);
+        Assert.Equal(1, BitConverter.ToInt32(session.Sent[0].Payload));
+        Assert.All(session.Sent[0].Payload.Skip(4), value => Assert.Equal(0, value));
+        session.Sent.Clear();
+        await RoundStartSender.SendCountdownAsync(TestBuilds.Packets, build, table, true, true, session,
+            new RoundCountdownStarted(1, 3000) { MatchOverGame = true }, default);
+        Assert.All(session.Sent[0].Payload, value => Assert.Equal(0, value));
     }
 
     /// <summary>
