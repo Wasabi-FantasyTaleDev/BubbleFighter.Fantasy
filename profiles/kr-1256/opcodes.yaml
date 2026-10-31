@@ -1623,6 +1623,30 @@ opcodes:
     evidence: captured
     source: "reader 0x6EAD50 via sub_6D55D0 case 646"
     notes: "i32 entity, i32 drop serial repeated from C2S 635 to every seat; 8 bytes; horde-wave family, HordeWaveWire"
+  - value: 634
+    direction: s2c
+    connection: game
+    name: gspGameFeverStart_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_6D55D0 jumptable case 634 -> kr-1256 sub_6ECD60; the empty body selects the mode 5/6 branch and plays star-spawn-big and m-star-1m"
+    notes: "Zero-byte star-mode Fever/Hurry notification."
+  - value: 641
+    direction: s2c
+    connection: game
+    name: gspGameCreateStar
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_6D55D0 jumptable case 641 -> kr-1256 sub_6EF890; kind 1 constructs GoStarItem through kr-1256 sub_C1A740, kind 2 GoBigStarItem through kr-1256 sub_C0A050"
+    notes: "Nine words: object id, kind, position, velocity and tag; packets/lucci-drops.yaml LucciCreate order."
+  - value: 642
+    direction: s2c
+    connection: game
+    name: gspStarEaten
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_6D55D0 jumptable case 642 -> kr-1256 sub_6E9F30; two words resolve the eater and the GoStarItem/GoBigStarItem object and play the pickup effect"
+    notes: "Eight bytes: character id then object id; packets/lucci-drops.yaml LucciPicked order."
   # S2C labels recovered from the dispatcher (dispatcher sub_9D2FF0); layouts are not claimed by these rows.
   - value: 8
     direction: s2c
@@ -2855,18 +2879,34 @@ opcodes:
     name_source: label@cn-717
     evidence: inferred
     source: "builder sub_498F50; name aligned from cn-717 C2S 730 Packet_gcpPickUpWeapon (label alignment; via cn-774 C2S 630, run cn-717 C2S 724..742 -> 624..642, shape [4 4], similarity 1.0)"
+  - value: 2029
+    direction: c2s
+    connection: game
+    name: gcpGameUpdateScoreOptimze
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_708480 stamps C2S 2029; the client's star collision callers report kinds 21 and 24"
+    notes: "Six bytes: u8 kind, u32 character id, u8 reporter slot; packets/score-reports.yaml RoundOptimizedScoreReport@kr-1256."
+  - value: 608
+    direction: c2s
+    connection: game
+    name: gcpGameUpdateScore
+    name_source: label@cn-717
+    evidence: verified
+    source: "kr-1256 sub_6DDBA0 stamps C2S 608 and writes the mixed-width RoundScoreReport; star gain/loss callers kr-1256 sub_54DCF0 and kr-1256 sub_6F7C50 pass kinds 6 and 7"
+    notes: "Sixteen bytes: u8 kind, two u32, three u8 and two u16; packets/score-reports.yaml RoundScoreReport order."
   - value: 631
     direction: c2s
     name: gcpEatStar
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_6DC3C0; name aligned from cn-717 C2S 731 Packet_gcpEatStar (label alignment; via cn-774 C2S 631, run cn-717 C2S 724..742 -> 624..642, shape [4 4], similarity 1.0)"
+    evidence: verified
+    source: "kr-1256 sub_6DC3C0 stamps C2S 631 and writes the character/object pair; name aligned from cn-717 C2S 731 Packet_gcpEatStar"
   - value: 632
     direction: c2s
     name: gcpReqCreateStar
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_6E8580; name aligned from cn-717 C2S 732 Packet_gcpReqCreateStar (label alignment; via cn-774 C2S 632, run cn-717 C2S 724..742 -> 624..642, shape [4 4 4 4 4 4 4 4 4], similarity 0.94)"
+    evidence: verified
+    source: "kr-1256 sub_6E8580 stamps C2S 632 and writes the nine-word position, velocity, kind and tag body; name aligned from cn-717 C2S 732 Packet_gcpReqCreateStar"
   - value: 633
     direction: c2s
     name: gcpEatEventBox
@@ -3102,6 +3142,13 @@ opcodes:
     evidence: verified
     source: "kr-1256 sub_9E2FE0 case 0x264 reads two words and calls sub_9E88C0, which opens the result scene and sends C2S 103 (sub_9E80F0)"
     notes: "result open; i32, i32 (8 bytes), sent as zeros"
+  - value: 613
+    direction: s2c
+    name: Unknown613
+    name_source: none
+    evidence: verified
+    source: "kr-1256 sub_9E2FE0 case 0x265 reads two words and two bytes and applies them through sub_9E9710"
+    notes: "result banner; two ignored i32 words followed by the two u8 team scores"
   - value: 614
     direction: s2c
     name: Unknown614

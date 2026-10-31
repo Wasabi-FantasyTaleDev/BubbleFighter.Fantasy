@@ -134,7 +134,38 @@ public sealed record RoundScoreboard(int RoomId, int WinnerTeam, IReadOnlyList<i
 {
     /// <summary>Gets the round's mode, so the dialect can apply the build's per-mode result presentation.</summary>
     public int ModeId { get; init; }
+
+    /// <summary>Gets the semantic result presentation, independent of the deployment's numeric mode id.</summary>
+    public RoundScoreboardPresentation Presentation { get; init; }
+
+    /// <summary>Gets the winning seat for an individual result, when the native winner field carries a seat rather than a team.</summary>
+    public int? WinnerSlot { get; init; }
+
+    /// <summary>Gets the first score carried into the native result banner.</summary>
+    public int BannerFirstScore { get; init; }
+
+    /// <summary>Gets the second score carried into the native result banner.</summary>
+    public int BannerSecondScore { get; init; }
 }
+
+/// <summary>Selects the native scoreboard semantics without coupling the dialect to deployment mode ids.</summary>
+public enum RoundScoreboardPresentation
+{
+    /// <summary>The ordinary team-and-player result table.</summary>
+    Generic,
+
+    /// <summary>Individual star ranks, including a winning seat and each seat's star count.</summary>
+    StarIndividual,
+
+    /// <summary>Team star totals, including each seat's star count.</summary>
+    StarTeam,
+}
+
+/// <summary>Opens the native result banner before the final scoreboard (kr-1256 S2C 613).</summary>
+/// <param name="RoomId">The room.</param>
+/// <param name="FirstScore">The first byte consumed by the banner.</param>
+/// <param name="SecondScore">The second byte consumed by the banner.</param>
+public sealed record RoundResultBanner(int RoomId, int FirstScore, int SecondScore) : IMessage;
 
 /// <summary>The balances and level the round left the player with; the client's user-info block is refreshed from it.</summary>
 /// <param name="UserNum">The player.</param>
@@ -173,6 +204,9 @@ public sealed record RoundEnded(int RoomId, RoundOutcome Outcome, RoundEndReason
 
     /// <summary>Gets this recipient's team; zero retains the dialect's unassigned-seat wire policy.</summary>
     public int RecipientTeam { get; init; }
+
+    /// <summary>Gets each team's score at the end, indexed by team number minus one.</summary>
+    public IReadOnlyList<int> TeamTotals { get; init; } = [];
 }
 
 /// <summary>Declares a client's ordering dependency between its result gate and scoreboard scene.</summary>

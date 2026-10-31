@@ -28,6 +28,12 @@ public sealed record RoundStarPickupRequested(int CharacterObjectId, int ObjectI
 /// <param name="ObjectId">The consumed star's object id.</param>
 public sealed record RoundStarPicked(int CharacterObjectId, int ObjectId) : IMessage;
 
+/// <summary>
+/// Starts the star modes' Fever/Hurry phase for every round member. The native packet has an empty body;
+/// kr-1256 sub_6ECD60 selects the star-mode branch and plays star-spawn-big and m-star-1m.
+/// </summary>
+public sealed record RoundStarFeverStarted : IMessage;
+
 /// <summary>How a client says its own star count changed.</summary>
 public enum RoundStarChange
 {

@@ -301,6 +301,27 @@ public sealed partial class RoundFlowTests
         }
     }
 
+    private sealed class ResultGate : IMessageSender<RoundEnded>, IMessageSender<RoundResultBanner>, IRoundResultSequencePolicy
+    {
+        public string Protocol => "test/game";
+        public bool EndBeforeScoreboard => true;
+        public bool SingleScoreboard => true;
+        public int Ends { get; private set; }
+        public int Banners { get; private set; }
+        public List<RoundResultBanner> BannerMessages { get; } = [];
+        public ValueTask SendAsync(ISession session, RoundEnded message, CancellationToken ct)
+        {
+            Ends++;
+            return ValueTask.CompletedTask;
+        }
+        public ValueTask SendAsync(ISession session, RoundResultBanner message, CancellationToken ct)
+        {
+            Banners++;
+            BannerMessages.Add(message);
+            return ValueTask.CompletedTask;
+        }
+    }
+
     private sealed class Rig
     {
         public RoomRegistry Registry { get; }
@@ -325,6 +346,7 @@ public sealed partial class RoundFlowTests
         public Sink<RoundLucciPicked> LucciPicked { get; } = new();
         public Sink<RoundStarCreated> StarCreated { get; } = new();
         public Sink<RoundStarPicked> StarPicked { get; } = new();
+        public Sink<RoundStarFeverStarted> StarFever { get; } = new();
         public Sink<RoundItemUsed> ItemUsed { get; } = new();
         public Sink<RoundItemSlotChanged> ItemSlotChanged { get; } = new();
         public Sink<RoundCountedItemsPrepared> CountedItemsPrepared { get; } = new();
@@ -385,7 +407,7 @@ public sealed partial class RoundFlowTests
                 WaitChanged: WaitChanged,
                 SupplyCreated: SupplyCreated, SupplyPicked: SupplyPicked, ItemUsed: ItemUsed,
                 CountedItemUsed: CountedItemUsed, RescueStarted: RescueStarted, RescueFailed: RescueFailed, RescueSucceeded: RescueSucceeded, RescuePrepared: RescuePrepared, PvePoints: PvePoints, ItemSlotChanged: ItemSlotChanged, LucciCreated: LucciCreated, LucciPicked: LucciPicked,
-                StarCreated: StarCreated, StarPicked: StarPicked, ObjectAdded: ObjectAdded), NullLogger.Instance, CancellationToken.None,
+                StarCreated: StarCreated, StarPicked: StarPicked, StarFever: StarFever, ObjectAdded: ObjectAdded), NullLogger.Instance, CancellationToken.None,
                 Rooms.ReturnToRoomAsync, resultContext);
             Rooms.SeatLeftDuringRound = Round.OnSeatLeftAsync;
             Rooms.TeamConvertedDuringRound = Round.OnTeamConvertedAsync;
@@ -418,6 +440,104 @@ public sealed partial class RoundFlowTests
             for (var i = 0; i < 200 && Started.To(member).Length == 0; i++)
                 await Task.Delay(10);
             return Assert.Single(Started.To(member));
+        }
+    }
+
+    /// <summary>A native-banner time-over grants rewards and sends one final scoreboard instead of 613 plus 614.</summary>
+    [Fact]
+    public async Task NativeBannerTimeOverUsesOneFinalScoreboard()
+    {
+        var services = new ServiceRegistry();
+        var context = new PluginContext(new PluginRow { Id = "single-result-test", Plugin = "single-result-test", Source = "test" },
+            services, new EventBus(NullLogger.Instance), NullLogger.Instance);
+        var gate = new ResultGate();
+        var boards = new Sink<RoundScoreboard>();
+        context.Effect(services.RegisterMany<IMessageSender<RoundScoreUpdated>>(new Sink<RoundScoreUpdated>()));
+        context.Effect(services.RegisterMany<IMessageSender<RoundScoreboard>>(boards));
+        context.Effect(services.RegisterMany<IMessageSender<RoundEnded>>(gate));
+        context.Effect(services.RegisterMany<IMessageSender<RoundResultBanner>>(gate));
+        context.Effect(services.RegisterMany<IMessageSender<ResultStageAdvanced>>(new Sink<ResultStageAdvanced>()));
+        var rig = new Rig(resultContext: context, resultRewardDelayMs: 150,
+            configure: options => options.StarModeIds = [5]);
+        try
+        {
+            await rig.StartAsync();
+            await rig.Round.HandleLoadReportedAsync(rig.Host, new(), default);
+            await rig.Round.HandleLoadReportedAsync(rig.Guest, new(), default);
+            await rig.WaitStartedAsync(rig.Host);
+            var room = rig.Registry.Find(rig.RoomId)!;
+            lock (room.Gate)
+            {
+                room.ModeId = 5;
+                room.Scoring.AddStars(room.FindByGame(rig.Host.Id)!.Slot, 7, 1000);
+                Assert.Equal(7, room.Scoring.Stars(room.FindByGame(rig.Host.Id)!.Slot));
+            }
+            await rig.Round.HandleEndRequestedAsync(rig.Host, new() { Reason = RoundEndReason.TimeLimit }, default);
+            for (var i = 0; i < 100 && boards.To(rig.Host).Length == 0; i++) await Task.Delay(10);
+            var board = Assert.Single(boards.To(rig.Host));
+            Assert.True(board.WithRewards);
+            Assert.True(board.TimeOver);
+            Assert.Equal(RoundScoreboardPresentation.StarIndividual, board.Presentation);
+            Assert.Equal(7, board.BannerFirstScore);
+            Assert.Equal(7, board.BannerSecondScore);
+            Assert.Equal(0, gate.Banners);
+            await room.ResultTask.WaitAsync(TimeSpan.FromSeconds(3));
+            Assert.Single(boards.To(rig.Host));
+        }
+        finally
+        {
+            await rig.Registry.StopAllAsync();
+            context.Unwind();
+        }
+    }
+
+    /// <summary>The team star transition uses 613 alone; the individual transition uses 614 alone.</summary>
+    [Fact]
+    public async Task NativeBannerTeamTimeOverUsesOnlyResultBanner()
+    {
+        var services = new ServiceRegistry();
+        var context = new PluginContext(new PluginRow { Id = "team-banner-test", Plugin = "team-banner-test", Source = "test" },
+            services, new EventBus(NullLogger.Instance), NullLogger.Instance);
+        var gate = new ResultGate();
+        var boards = new Sink<RoundScoreboard>();
+        context.Effect(services.RegisterMany<IMessageSender<RoundScoreUpdated>>(new Sink<RoundScoreUpdated>()));
+        context.Effect(services.RegisterMany<IMessageSender<RoundScoreboard>>(boards));
+        context.Effect(services.RegisterMany<IMessageSender<RoundEnded>>(gate));
+        context.Effect(services.RegisterMany<IMessageSender<RoundResultBanner>>(gate));
+        context.Effect(services.RegisterMany<IMessageSender<ResultStageAdvanced>>(new Sink<ResultStageAdvanced>()));
+        var rig = new Rig(resultContext: context, resultRewardDelayMs: 150,
+            configure: options => options.StarTeamModeIds = [6]);
+        try
+        {
+            await rig.StartAsync();
+            await rig.Round.HandleLoadReportedAsync(rig.Host, new(), default);
+            await rig.Round.HandleLoadReportedAsync(rig.Guest, new(), default);
+            await rig.WaitStartedAsync(rig.Host);
+            var room = rig.Registry.Find(rig.RoomId)!;
+            lock (room.Gate)
+            {
+                room.ModeId = 6;
+                room.FindByGame(rig.Host.Id)!.Team = 1;
+                room.FindByGame(rig.Guest.Id)!.Team = 2;
+                room.Scoring.AddStars(room.FindByGame(rig.Host.Id)!.Slot, 3, 1000, team: 1, trackTeamTotal: true);
+                room.Scoring.AddStars(room.FindByGame(rig.Guest.Id)!.Slot, 7, 1000, team: 2, trackTeamTotal: true);
+            }
+            await rig.Round.HandleEndRequestedAsync(rig.Host, new() { Reason = RoundEndReason.TimeLimit }, default);
+            for (var i = 0; i < 100 && gate.Banners < 2; i++) await Task.Delay(10);
+            Assert.Empty(boards.To(rig.Host));
+            Assert.Equal(2, gate.Banners);
+            Assert.All(gate.BannerMessages, banner =>
+            {
+                Assert.Equal(3, banner.FirstScore);
+                Assert.Equal(7, banner.SecondScore);
+            });
+            await room.ResultTask.WaitAsync(TimeSpan.FromSeconds(3));
+            Assert.Empty(boards.To(rig.Host));
+        }
+        finally
+        {
+            await rig.Registry.StopAllAsync();
+            context.Unwind();
         }
     }
 
@@ -1373,14 +1493,19 @@ public sealed partial class RoundFlowTests
         Assert.Empty(new InGameOptions { ZombiePvpModeIds = [8], ZombieConversionModeId = 16 }.Validate());
         Assert.Contains(new InGameOptions { ZombiePvpModeIds = modes, ZombieConversionModeId = conversionMode }.Validate(),
             result => result.ErrorMessage!.Contains("zombie_pvp_mode_ids"));
+        Assert.Contains(new InGameOptions { StarModeIds = [5], StarRoundTimeLimitMs = 100, StarFeverLeadMs = 100 }.Validate(),
+            result => result.ErrorMessage!.Contains("star_fever_lead_ms"));
     }
 
-    private static Rig StarRig(bool team = false, int timeLimitMs = 180_000) =>
+    private static Rig StarRig(bool team = false, int timeLimitMs = 180_000, int feverLeadMs = 45_000,
+        string starDropPointsDirectory = "") =>
         new(configure: options =>
         {
             if (team) options.StarTeamModeIds = [4];
             else options.StarModeIds = [4];
             options.StarRoundTimeLimitMs = timeLimitMs;
+            options.StarFeverLeadMs = feverLeadMs;
+            options.StarDropPointsDirectory = starDropPointsDirectory;
         });
 
     private static readonly RoundLucciPoint StarPoint = new(1, 2, 3, 0, 1, 0);
@@ -1404,6 +1529,7 @@ public sealed partial class RoundFlowTests
             Assert.Equal(created, Assert.Single(rig.StarCreated.To(rig.Guest)));
             Assert.Equal(2, created.Kind);
             Assert.Equal(StarPoint, created.Point);
+            Assert.Equal(0, created.Tag);
             await rig.Round.HandleStarPickupAsync(rig.Guest, new RoundStarPickupRequested(1_100_000, created.ObjectId), default);
             await rig.Round.HandleStarPickupAsync(rig.Host, new RoundStarPickupRequested(1_000_000, created.ObjectId), default);
             Assert.Equal(new RoundStarPicked(1_100_000, created.ObjectId), Assert.Single(rig.StarPicked.To(rig.Host)));
@@ -1412,6 +1538,86 @@ public sealed partial class RoundFlowTests
                 rig.Round.HandleStarDropAsync(rig.Host, new RoundStarDropRequested(StarPoint, 3, 0), default).AsTask());
         }
         finally { await rig.Registry.StopAllAsync(); }
+    }
+
+    /// <summary>The T-45 Fever packet precedes one appended second wave with fresh ids and the same seeds.</summary>
+    [Fact]
+    public async Task StarFeverAppendsSecondWaveWithFreshObjectIds()
+    {
+        var rig = StarRig(timeLimitMs: 400, feverLeadMs: 300);
+        try
+        {
+            await rig.StartAsync();
+            await rig.Round.HandleLoadReportedAsync(rig.Host, new(), default);
+            await rig.Round.HandleLoadReportedAsync(rig.Guest, new(), default);
+            await rig.WaitStartedAsync(rig.Host);
+            var secondSeedPoint = new RoundLucciPoint(4, 5, 6, 0, 0, 2);
+            await rig.Round.HandleStarDropAsync(rig.Host, new RoundStarDropRequested(StarPoint, 1, 3), default);
+            await rig.Round.HandleStarDropAsync(rig.Guest, new RoundStarDropRequested(secondSeedPoint, 2, 4), default);
+
+            for (var i = 0; i < 100 && rig.StarCreated.To(rig.Host).Length < 4; i++)
+                await Task.Delay(10);
+            Assert.Single(rig.StarFever.To(rig.Host));
+            Assert.Single(rig.StarFever.To(rig.Guest));
+            var sent = rig.StarCreated.To(rig.Host);
+            Assert.Equal(4, sent.Length);
+            var expectedSeeds = new[] { (1, StarPoint, 3), (2, secondSeedPoint, 4) };
+            Assert.Equal(expectedSeeds, sent.Take(2).Select(created => (created.Kind, created.Point, created.Tag)));
+            Assert.Equal(expectedSeeds, sent.Skip(2).Select(created => (created.Kind, created.Point, created.Tag)));
+            Assert.True(sent[2].ObjectId > sent[1].ObjectId);
+            Assert.True(sent[3].ObjectId > sent[2].ObjectId);
+            var room = rig.Registry.Find(rig.RoomId)!;
+            Assert.Equal(4, room.Stars!.Items.Count);
+            Assert.Contains(sent[2].ObjectId, room.Stars.Items.Keys);
+            Assert.Contains(sent[3].ObjectId, room.Stars.Items.Keys);
+
+            await Task.Delay(150);
+            Assert.Single(rig.StarFever.To(rig.Host));
+            Assert.Equal(4, rig.StarCreated.To(rig.Host).Length);
+        }
+        finally { await rig.Registry.StopAllAsync(); }
+    }
+
+    /// <summary>A captured map first wave is created once and the T-45 second wave copies exactly those seeds.</summary>
+    [Fact]
+    public async Task StarDropPointsCreateFirstWaveAndFeverCopiesIt()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "bff-star-points-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        await File.WriteAllTextAsync(Path.Combine(directory, "map.json"), """
+            {"small":[{"x":10,"y":20,"z":30},{"x":40,"y":50,"z":60}],"big":[{"x":70,"y":80,"z":90}]}
+            """);
+        await File.WriteAllTextAsync(Path.Combine(directory, "stale-selection.json"), """
+            {"small":[{"x":1000,"y":2000,"z":3000}],"big":[]}
+            """);
+        var rig = StarRig(timeLimitMs: 1000, feverLeadMs: 800, starDropPointsDirectory: directory);
+        try
+        {
+            await rig.StartAsync();
+            var room = rig.Registry.Find(rig.RoomId)!;
+            lock (room.Gate) room.MapKey = "stale-selection";
+            await rig.Round.HandleLoadReportedAsync(rig.Host, new(), default);
+            await rig.Round.HandleLoadReportedAsync(rig.Guest, new(), default);
+            await rig.WaitStartedAsync(rig.Host);
+            for (var i = 0; i < 100 && rig.StarCreated.To(rig.Host).Length < 3; i++) await Task.Delay(10);
+            var first = rig.StarCreated.To(rig.Host);
+            Assert.Equal(new[] { 1, 1, 2 }, first.Select(star => star.Kind));
+            Assert.Equal(new[] { 3, 3, 4 }, first.Select(star => star.Tag));
+
+            for (var i = 0; i < 200 && rig.StarCreated.To(rig.Host).Length < 6; i++) await Task.Delay(10);
+            Assert.Single(rig.StarFever.To(rig.Host));
+            var sent = rig.StarCreated.To(rig.Host);
+            Assert.Equal(6, sent.Length);
+            Assert.Equal(first.Select(star => (star.Kind, star.Point, star.Tag)),
+                sent.Skip(3).Select(star => (star.Kind, star.Point, star.Tag)));
+            Assert.True(sent[3].ObjectId > sent[2].ObjectId);
+            Assert.Equal(6, room.Stars!.Items.Count);
+        }
+        finally
+        {
+            await rig.Registry.StopAllAsync();
+            Directory.Delete(directory, recursive: true);
+        }
     }
 
     /// <summary>Outside the star modes the star packets and reports change nothing.</summary>
@@ -1509,6 +1715,7 @@ public sealed partial class RoundFlowTests
             }
             await ReportStarsAsync(rig, rig.Guest, RoundStarChange.SmallGained, 4);
             await ReportStarsAsync(rig, rig.Host, RoundStarChange.SmallGained, 1);
+            Assert.Equal(new[] { 1, 4 }, room.Scoring.StarTeamTotals);
             Assert.Equal(RoundOutcome.Won, (await WaitEndedAsync(rig, rig.Guest)).Outcome);
             Assert.Equal(RoundOutcome.Lost, (await WaitEndedAsync(rig, rig.Host)).Outcome);
         }

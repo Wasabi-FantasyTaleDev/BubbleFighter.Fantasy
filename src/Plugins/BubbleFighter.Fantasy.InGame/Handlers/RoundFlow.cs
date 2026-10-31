@@ -61,6 +61,7 @@ internal sealed partial class RoundFlow
         _spawnOffered = senders.SpawnOffered;
         _waitChanged = senders.WaitChanged;
         _respawned = senders.Respawned;
+        _starFever = senders.StarFever;
         if (options.NativeMatchRelay)
         {
             var matches = capabilityOffers is null
@@ -499,6 +500,7 @@ internal sealed partial class RoundFlow
                 room.DecidedWinnerTeam ??= RoomFlow.ZombiePvpHumanTeam;
             if (IsStarMode(room))
                 DecideStarRound(room);
+            room.CancelStarFever();
             room.MarkResult();
             generation = room.StartGeneration;
             members = [.. room.Seats];
@@ -709,6 +711,11 @@ internal sealed partial class RoundFlow
                     room.CountdownTask = BackgroundWork.Detached(() => EndAtTimeLimitAsync(room, generation, timeLimit));
                 if (room.Tutorial is null) RoundPlaying?.Invoke(room, generation);
                 if (room.Tutorial is null) await PushStarCountsAsync(room, operationCt).ConfigureAwait(false);
+                if (room.Tutorial is null && IsStarMode(room))
+                {
+                    await SpawnInitialStarWaveAsync(room, generation, operationCt).ConfigureAwait(false);
+                    ScheduleStarFever(room, generation, timeLimit);
+                }
             }, token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
@@ -748,6 +755,7 @@ internal sealed partial class RoundFlow
 /// <param name="LucciPicked">Removes a picked-up Lucci item; null when the Lucci packets are not bound.</param>
 /// <param name="StarCreated">Creates a star of the star modes; null when the star packets are not bound.</param>
 /// <param name="StarPicked">Removes a claimed star; null when the star packets are not bound.</param>
+/// <param name="StarFever">Starts the star modes' Fever/Hurry phase; null on a build with no audited empty notification.</param>
 /// <param name="ObjectAdded">Acknowledges a player's own character add request; null on a build whose server does not answer it.</param>
 internal sealed record RoundSenders(
     IMessageSender<RoundPlayerLoaded>? PlayerLoaded,
@@ -772,6 +780,7 @@ internal sealed record RoundSenders(
     IMessageSender<RoundLucciPicked>? LucciPicked = null,
     IMessageSender<RoundStarCreated>? StarCreated = null,
     IMessageSender<RoundStarPicked>? StarPicked = null,
+    IMessageSender<RoundStarFeverStarted>? StarFever = null,
     IMessageSender<RoundObjectAddAcknowledged>? ObjectAdded = null)
 {
     /// <summary>
@@ -809,5 +818,6 @@ internal sealed record RoundSenders(
         PlaySenders.Optional<RoundLucciPicked>(context, protocol),
         PlaySenders.Optional<RoundStarCreated>(context, protocol),
         PlaySenders.Optional<RoundStarPicked>(context, protocol),
+        PlaySenders.Optional<RoundStarFeverStarted>(context, protocol),
         PlaySenders.Optional<RoundObjectAddAcknowledged>(context, protocol));
 }

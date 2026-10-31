@@ -39,6 +39,7 @@ internal sealed partial class RoundFlow
         var scoreboard = PlaySenders.Optional<RoundScoreboard>(context, protocol);
         var ended = PlaySenders.Optional<RoundEnded>(context, protocol);
         var stage = PlaySenders.Optional<ResultStageAdvanced>(context, protocol);
+        var banner = PlaySenders.Optional<RoundResultBanner>(context, protocol);
         if (score is null && scoreboard is null && stage is null)
             return null;
         if (score is null || scoreboard is null || ended is null || stage is null)
@@ -47,7 +48,7 @@ internal sealed partial class RoundFlow
         var levels = options.LevelExpThresholds.Count > 0 ? new LevelTable(options.LevelExpThresholds, options.MaxLevel) : null;
         return new RoundResultSurface(
             new RoundResultSenders(score, scoreboard, ended, stage,
-                PlaySenders.Optional<RoundPlayerWalletChanged>(context, protocol)),
+                PlaySenders.Optional<RoundPlayerWalletChanged>(context, protocol), banner),
             levels,
             wallets is null ? null : (userNum, ct) => wallets.FindByUserNumAsync(userNum, ct),
             context.Services.TryGet<IPlayerProgressRepository>(out var progress) ? progress : null);
@@ -164,6 +165,15 @@ internal sealed partial class RoundFlow
         {
             ct.ThrowIfCancellationRequested();
             await result.Score.SendAsync(member.Game, update, ct).ConfigureAwait(false);
+            if (update.Scoreboard is { } board && IsStarMode(room))
+            {
+                lock (room.Gate)
+                {
+                    if (room.Phase != RoomPhase.Playing || room.FindByGame(member.Game.Id) is not { } seat) continue;
+                    board = WithBannerScores(room, seat, board);
+                }
+                await result.Scoreboard.SendAsync(member.Game, board, ct).ConfigureAwait(false);
+            }
         }
     }
 
@@ -186,33 +196,56 @@ internal sealed partial class RoundFlow
         if (lifeChecks is not null)
             _logger.LogInformation("Room {Room} match {Match}: ignored life reports {Checks}.", room.Id, room.MatchId, lifeChecks);
         var rewards = ComputeRewards(room, generation, reason);
+        var teamTotals = ResultTeamTotals(room);
         var rewardStartedAt = Environment.TickCount64;
         var outcome = OutcomeOf(room, generation, reason);
         RememberOutcomes(room, generation, outcome);
         var scoreDelay = 0;
+        var single = result.Ended is IRoundResultSequencePolicy { EndBeforeScoreboard: true, SingleScoreboard: true };
+        var announcedAtOpen = false;
         if (!await TypedResultStepAsync(room, generation, async token =>
         {
             if (reason == RoundEndReason.TimeLimit)
             {
                 scoreDelay = Math.Min(_options.ResultTimeOverDelayMs, _options.ResultRewardDelayMs);
-                return await SendToMembersAsync(room, generation, (seat, sendCt) =>
+                if (!await SendToMembersAsync(room, generation, (seat, sendCt) =>
                     result.Ended.SendAsync(seat.Game, new RoundEnded(room.Id, outcome(seat), reason)
-                        { ModeId = room.ModeId, RecipientTeam = seat.Team }, sendCt), token).ConfigureAwait(false);
+                        { ModeId = room.ModeId, RecipientTeam = seat.Team, TeamTotals = teamTotals }, sendCt), token).ConfigureAwait(false))
+                    return false;
+                // Both 613 and 614 independently replay the native banner and sound. For a
+                // single-scoreboard client keep only 614, granting its rows before sending it.
+                if (result.Banner is not null && single)
+                {
+                    announcedAtOpen = true;
+                    rewards = await GrantRewardsAsync(room, generation, reason, token).ConfigureAwait(false);
+                    // 613 is the team transition (AllPangStageTimer); 614 is the individual
+                    // rank/result surface. Each independently plays the banner sound, so send only
+                    // the frame owned by this mode.
+                    if (_options.StarTeamModeIds.Contains(room.ModeId))
+                        return await SendResultBannerAsync(room, generation, token).ConfigureAwait(false);
+                    return await SendScoreboardAsync(room, generation, rewards, withRewards: true, token, reason,
+                        timeOver: true).ConfigureAwait(false);
+                }
+                if (result.Banner is not null)
+                    return await SendResultBannerAsync(room, generation, token).ConfigureAwait(false);
+                return !single
+                    || await SendScoreboardAsync(room, generation, rewards, withRewards: false, token, reason,
+                        timeOver: true).ConfigureAwait(false);
             }
             var endFirst = result.Ended is IRoundResultSequencePolicy { EndBeforeScoreboard: true };
             if (!endFirst && !await SendScoreboardAsync(room, generation, rewards, false, token, reason).ConfigureAwait(false))
                 return false;
             if (!await SendToMembersAsync(room, generation, (seat, sendCt) =>
                 result.Ended.SendAsync(seat.Game, new RoundEnded(room.Id, outcome(seat), reason)
-                    { ModeId = room.ModeId, RecipientTeam = seat.Team }, sendCt), token).ConfigureAwait(false))
+                    { ModeId = room.ModeId, RecipientTeam = seat.Team, TeamTotals = teamTotals }, sendCt), token).ConfigureAwait(false))
                 return false;
             if (endFirst) scoreDelay = Math.Min(_options.ResultScoreboardDelayMs, _options.ResultRewardDelayMs);
             return true;
         }, ct).ConfigureAwait(false)) return;
 
         // A single-scoreboard client gets the rewards granted before its one scoreboard, which carries them.
-        var single = result.Ended is IRoundResultSequencePolicy { EndBeforeScoreboard: true, SingleScoreboard: true };
-        if (reason == RoundEndReason.TimeLimit || result.Ended is IRoundResultSequencePolicy { EndBeforeScoreboard: true })
+        if (!announcedAtOpen
+            && (reason == RoundEndReason.TimeLimit || result.Ended is IRoundResultSequencePolicy { EndBeforeScoreboard: true }))
         {
             await Task.Delay(scoreDelay, ct).ConfigureAwait(false);
             if (!await TypedResultStepAsync(room, generation, async token =>
@@ -300,6 +333,47 @@ internal sealed partial class RoundFlow
         return proceed;
     }
 
+    private int[] ResultTeamTotals(PlayRoom room) =>
+        IsStarMode(room) ? room.Scoring.StarTeamTotals.ToArray() : room.Scoring.TeamTotals.ToArray();
+
+    private RoundScoreboard WithBannerScores(PlayRoom room, RoomSeat seat, RoundScoreboard scoreboard)
+    {
+        if (_options.StarModeIds.Contains(room.ModeId))
+        {
+            var stars = room.Scoring.Stars(seat.Slot);
+            return scoreboard with { BannerFirstScore = stars, BannerSecondScore = stars };
+        }
+        var totals = ResultTeamTotals(room);
+        return scoreboard with
+        {
+            BannerFirstScore = totals.ElementAtOrDefault(0),
+            BannerSecondScore = totals.ElementAtOrDefault(1),
+        };
+    }
+
+    private async ValueTask<bool> SendResultBannerAsync(PlayRoom room, int generation, CancellationToken ct)
+    {
+        var banner = _result?.Banner;
+        if (banner is null)
+            return true;
+        return await SendToMembersAsync(room, generation, (seat, token) =>
+        {
+            int first, second;
+            lock (room.Gate)
+            {
+                if (_options.StarModeIds.Contains(room.ModeId))
+                    first = second = room.Scoring.Stars(seat.Slot);
+                else
+                {
+                    var totals = ResultTeamTotals(room);
+                    first = totals.ElementAtOrDefault(0);
+                    second = totals.ElementAtOrDefault(1);
+                }
+            }
+            return banner.SendAsync(seat.Game, new RoundResultBanner(room.Id, first, second), token);
+        }, ct).ConfigureAwait(false);
+    }
+
     // Pass 1 shows the experience the seat came in with and no gain; pass 2 carries the rewards.
     // The client replaces its whole table with
     // each scoreboard, so both passes repeat every row.
@@ -313,8 +387,12 @@ internal sealed partial class RoundFlow
                 return false;
             scoreboard = Scoreboard(room, rewards, withRewards, reason) with { TimeOver = timeOver, ModeId = room.ModeId };
         }
-        return await SendToMembersAsync(room, generation,
-            (seat, token) => _result!.Scoreboard.SendAsync(seat.Game, scoreboard, token), ct).ConfigureAwait(false);
+        return await SendToMembersAsync(room, generation, (seat, token) =>
+        {
+            lock (room.Gate)
+                scoreboard = WithBannerScores(room, seat, scoreboard);
+            return _result!.Scoreboard.SendAsync(seat.Game, scoreboard, token);
+        }, ct).ConfigureAwait(false);
     }
 
     // The table of a round as it stands; call under the room's gate.
@@ -342,7 +420,7 @@ internal sealed partial class RoundFlow
                 Outcome = reason is null ? null : WinnerTeam(room) == 0 ? RoundOutcome.Draw
                     : WinnerTeam(room) == bot.Team ? RoundOutcome.Won : RoundOutcome.Lost,
             });
-        var totals = room.Scoring.TeamTotals.ToArray();
+        var totals = ResultTeamTotals(room);
         var winner = WinnerTeam(room);
         if (objectiveScores)
         {
@@ -361,7 +439,14 @@ internal sealed partial class RoundFlow
                 totals[winner - 1] = Math.Max(totals[winner - 1], checked(totals[2 - winner] + 1));
             }
         }
-        return new RoundScoreboard(room.Id, winner, totals, rows, withRewards);
+        var winnerSlot = room.DecidedWinnerSlots is { Count: > 0 } decidedSlots ? decidedSlots.Min() : (int?)null;
+        return new RoundScoreboard(room.Id, winner, totals, rows, withRewards)
+        {
+            WinnerSlot = winnerSlot,
+            Presentation = _options.StarModeIds.Contains(room.ModeId) ? RoundScoreboardPresentation.StarIndividual
+                : _options.StarTeamModeIds.Contains(room.ModeId) ? RoundScoreboardPresentation.StarTeam
+                : RoundScoreboardPresentation.Generic,
+        };
     }
 
     // The table a live score update carries along, with the experience each seat came in with; call
@@ -574,9 +659,11 @@ internal sealed record RoundResultSurface(
 /// <param name="Ended">The round's end, with the outcome for each recipient.</param>
 /// <param name="Stage">The move to the reward stage.</param>
 /// <param name="Wallet">The balance refresh after the return; null on a build whose wallet packet the dialect does not carry.</param>
+/// <param name="Banner">The native time-over banner; null on a build that has no separate banner frame.</param>
 internal sealed record RoundResultSenders(
     IMessageSender<RoundScoreUpdated> Score,
     IMessageSender<RoundScoreboard> Scoreboard,
     IMessageSender<RoundEnded> Ended,
     IMessageSender<ResultStageAdvanced> Stage,
-    IMessageSender<RoundPlayerWalletChanged>? Wallet = null);
+    IMessageSender<RoundPlayerWalletChanged>? Wallet = null,
+    IMessageSender<RoundResultBanner>? Banner = null);

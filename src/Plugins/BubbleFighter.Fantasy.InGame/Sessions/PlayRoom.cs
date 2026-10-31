@@ -21,8 +21,8 @@ public sealed partial class PlayRoom
     internal ushort RedScore { get; set; }
     internal BubbleFighter.Fantasy.InGame.Handlers.RoundSupplyState? Supplies { get; set; }
     internal BubbleFighter.Fantasy.InGame.Handlers.RoundLucciState? Lucci { get; set; }
-    // The star modes' unconsumed stars; the same id-to-kind bookkeeping as the Lucci items.
-    internal BubbleFighter.Fantasy.InGame.Handlers.RoundLucciState? Stars { get; set; }
+    // The star modes' active stars and the first-wave seeds copied at T-45.
+    internal BubbleFighter.Fantasy.InGame.Handlers.RoundStarState? Stars { get; set; }
 
     /// <summary>
     /// Gets the current round's per-seat counters and team totals. A new object per round, so a
@@ -319,6 +319,7 @@ public sealed partial class PlayRoom
             throw new InvalidOperationException($"Room {Id} cannot start from phase {Phase}.");
         CancelResultSequence();
         Phase = RoomPhase.Starting;
+        CancelStarFever();
         StartGeneration++;
         MatchId = Guid.NewGuid().ToString("N");
         BlueScore = RedScore = 0;
@@ -385,6 +386,12 @@ public sealed partial class PlayRoom
 
     /// <summary>Gets or sets the single countdown task retained for this bounded room.</summary>
     public Task CountdownTask { get; set; } = Task.CompletedTask;
+
+    /// <summary>Gets or sets the single T-45 Fever/second-wave task retained for this bounded room.</summary>
+    internal Task StarFeverTask { get; set; } = Task.CompletedTask;
+
+    /// <summary>Gets or sets the cancellation source that ends this round's T-45 task.</summary>
+    internal CancellationTokenSource? StarFeverCancellation { get; set; }
 
     /// <summary>Gets whether the current mode requires a red or blue team for seat and spawn placement.</summary>
     internal bool RequiresSpawnTeams => Setting.Map.Unknown4 is 1 or 3 or 6 or 9 or 11 or 12 or 14 or 16 or 18 or 19
@@ -499,6 +506,15 @@ public sealed partial class PlayRoom
     /// <summary>Gets or sets whether S2C 615 advanced clients to the reward stage.</summary>
     public bool ResultCloseSent { get; set; }
 
+    /// <summary>Cancels the current round's T-45 task without running its continuation inline while the room gate is held.</summary>
+    internal void CancelStarFever()
+    {
+        var source = StarFeverCancellation;
+        StarFeverCancellation = null;
+        if (source is { IsCancellationRequested: false })
+            _ = source.CancelAsync();
+    }
+
     /// <summary>
     /// Returns the room from the result phase to waiting after S2C 620, clearing the round clock and the result flags under the room
     /// gate, so the next start click finds a reusable room.
@@ -515,6 +531,7 @@ public sealed partial class PlayRoom
             Supplies = null;
             Lucci = null;
             Stars = null;
+            CancelStarFever();
             RoundMapKey = string.Empty;
             RoundStageKey = string.Empty;
             RoundEndsAtUtc = null;
@@ -566,6 +583,7 @@ public sealed partial class PlayRoom
             RemoveBots();
             CancelResultSequence();
             TutorialCancellation?.Cancel();
+            CancelStarFever();
             Phase = RoomPhase.Closed;
         }
     }

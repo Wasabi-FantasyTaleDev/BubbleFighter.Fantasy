@@ -7,15 +7,21 @@ namespace BubbleFighter.Fantasy.Dialect.Rooms;
 
 /// <summary>
 /// Binds the star modes' packets: the drop request (C2S <c>gcpReqCreateStar</c>), the star creation
-/// (<c>gspGameCreateStar</c>), the claim (<c>gcpEatStar</c>) and its confirmation (<c>gspStarEaten</c>). Every
-/// build reads and writes them with the Lucci packets' own serializers (kr-812 sub_530870 writes both create
-/// requests, sub_5302A0 reads both creations), so the layouts are the <c>packets/lucci-drops.yaml</c> structures
-/// and a build differs only in its opcode numbers.
+/// (<c>gspGameCreateStar</c>), the claim (<c>gcpEatStar</c>), its confirmation (<c>gspStarEaten</c>) and,
+/// where the build states it, the empty Fever/Hurry notification. Every build reads and writes the item
+/// bodies with the Lucci packets' own field order (kr-812 sub_530870 writes both create requests,
+/// sub_5302A0 reads both creations), so a build differs only in its opcode numbers. The modern room path
+/// also binds the full score report that carries a client's own star-count changes.
 /// </summary>
-internal sealed class StarBinding(string protocol, IOpcodeTable table, PacketTables tables, string build)
+internal sealed class StarBinding(string protocol, IOpcodeTable table, PacketTables tables, string build,
+    bool bindScoreReports = false)
     : IInboundMessageBinding<RoundStarDropRequested>, IInboundMessageBinding<RoundStarPickupRequested>,
-      IMessageSender<RoundStarCreated>, IMessageSender<RoundStarPicked>
+      IInboundMessageBinding<RoundStarReported>, IMessageSender<RoundStarCreated>, IMessageSender<RoundStarPicked>,
+      IMessageSender<RoundStarFeverStarted>
 {
+    /// <summary>The build's score-report values when this binding owns the modern full report.</summary>
+    private PlayValues.ScoreValues? _score;
+
     /// <inheritdoc />
     public string Protocol => protocol;
 
@@ -40,6 +46,7 @@ internal sealed class StarBinding(string protocol, IOpcodeTable table, PacketTab
         _ = table.C2S("gcpEatStar");
         _ = table.S2C("gspGameCreateStar");
         _ = table.S2C("gspStarEaten");
+        var fever = table.Find(PacketDirection.ServerToClient, "gspGameFeverStart_");
         var router = context.Services.Get<IPacketRouter>();
         context.Effect(context.Services.RegisterMany<IInboundMessageBinding<RoundStarDropRequested>>(this));
         context.Effect(context.Services.RegisterMany<IInboundMessageBinding<RoundStarPickupRequested>>(this));
@@ -58,6 +65,30 @@ internal sealed class StarBinding(string protocol, IOpcodeTable table, PacketTab
             if (!await messages.DispatchAsync(protocol, session, request, ct).ConfigureAwait(false))
                 throw new InvalidOperationException("Star claims have no typed handler.");
         }));
+        if (fever is not null)
+            context.Effect(context.Services.RegisterMany<IMessageSender<RoundStarFeverStarted>>(this));
+        if (!bindScoreReports)
+            return;
+        // kr-1256 reports star gains in the six-byte opcode 2029 body: kind 21 for a small star and
+        // kind 24 for a big star. Select the layout and opcode from the same profile values.
+        var score = PlayValues.Of(tables, build).Score;
+        _score = score;
+        context.Effect(context.Services.RegisterMany<IInboundMessageBinding<RoundStarReported>>(this));
+        var (layout, opcodeName) = score.StarReport switch
+        {
+            PlayValues.StarReportPacket.Optimized => ("RoundOptimizedScoreReport", "gcpGameUpdateScoreOptimze"),
+            PlayValues.StarReportPacket.Full => ("RoundScoreReport", "gcpGameUpdateScore"),
+            _ => throw new ConfigException($"Unsupported star report layout {score.StarReport}."),
+        };
+        _ = tables.Resolve(build, layout);
+        var scoreOpcode = table.C2S(opcodeName);
+        context.Effect(router.Register(protocol, scoreOpcode, async (session, packet, ct) =>
+        {
+            if (ReadStarReport(packet.Payload.Span, layout) is not { } report)
+                return;
+            if (!await messages.DispatchAsync(protocol, session, report, ct).ConfigureAwait(false))
+                throw new InvalidOperationException("Star count reports have no typed handler.");
+        }));
     }
 
     /// <inheritdoc />
@@ -75,4 +106,23 @@ internal sealed class StarBinding(string protocol, IOpcodeTable table, PacketTab
     public ValueTask SendAsync(ISession session, RoundStarPicked message, CancellationToken ct) =>
         session.SendAsync(table.S2C("gspStarEaten"), PacketCodec.Write(tables, build, "LucciPicked",
             new Dictionary<string, object?> { ["character_id"] = message.CharacterObjectId, ["object_id"] = message.ObjectId }), ct);
+
+    /// <inheritdoc />
+    public ValueTask SendAsync(ISession session, RoundStarFeverStarted message, CancellationToken ct) =>
+        session.SendAsync(table.S2C("gspGameFeverStart_"), ReadOnlyMemory<byte>.Empty, ct);
+
+    private RoundStarReported? ReadStarReport(ReadOnlySpan<byte> body, string layout)
+    {
+        var values = PacketCodec.ReadScalars(tables, build, layout, body);
+        var kind = (int)(byte)values["kind"];
+        if (kind == 0)
+            return null;
+        var score = _score ?? throw new InvalidOperationException("Star score reports are not mounted.");
+        RoundStarChange? change = kind == score.StarSmallGained ? RoundStarChange.SmallGained
+            : kind == score.StarBigGained ? RoundStarChange.BigGained
+            : kind == score.StarSmallLost ? RoundStarChange.SmallLost
+            : kind == score.StarBigLost ? RoundStarChange.BigLost
+            : null;
+        return change is { } value ? new RoundStarReported((byte)values["reporter_slot"], value) : null;
+    }
 }

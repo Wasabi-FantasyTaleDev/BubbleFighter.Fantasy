@@ -255,7 +255,7 @@ structs:
     - unknown_80: u32
       offset: 80
     - unknown_84: u32
-      offset: 84
+      offset: 84              # score column in the generic result scoreboard
     - unknown_88: u32
       offset: 88
     - unknown_92: u32
@@ -269,7 +269,7 @@ structs:
     - unknown_116: u32
       offset: 116
     - unknown_120: u32
-      offset: 120
+      offset: 120              # star count shown by the star-mode HUD and result column
     - unknown_124: u32
       offset: 124
     - unknown_128: u32
@@ -423,7 +423,7 @@ structs:
     - unknown_60: u32
       offset: 60
     - unknown_64: u32
-      offset: 64
+      offset: 64              # pang count in the generic result scoreboard
     - unknown_68: u32
       offset: 68
     - unknown_72: u32
