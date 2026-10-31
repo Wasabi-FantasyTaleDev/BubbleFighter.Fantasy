@@ -62,14 +62,14 @@ namespace BubbleFighter.Fantasy.InGame;
         typeof(IMessageSender<PlazaEntered>), typeof(IMessageSender<PlazaMemberEntered>), typeof(IMessageSender<PlazaMemberLeft>),
         typeof(IMessageSender<PlazaPositionReceived>), typeof(IMessageSender<PlazaMenuReturnRequested>),
         typeof(IInboundMessageBinding<RoundKillCreditReported>), typeof(IInboundMessageBinding<RoundFinishingBlowReported>),
-        typeof(IMessageSender<RoundScoreUpdated>), typeof(IMessageSender<RoundScoreboard>), typeof(IMessageSender<ResultStageAdvanced>),
+        typeof(IMessageSender<RoundScoreUpdated>), typeof(IMessageSender<RoundScoreboard>), typeof(IMessageSender<RoundResultBanner>), typeof(IMessageSender<ResultStageAdvanced>),
         typeof(IMessageSender<RoundPlayerWalletChanged>), typeof(IMessageSender<RoundWaveChanged>),
         typeof(IInboundMessageBinding<RoundSuppliesReported>), typeof(IInboundMessageBinding<RoundSupplyPickupRequested>), typeof(IInboundMessageBinding<RoundSupplyDropRequested>),
         typeof(IMessageSender<RoundSupplyCreated>), typeof(IMessageSender<RoundSupplyPicked>),
         typeof(IInboundMessageBinding<RoundLucciDropRequested>), typeof(IInboundMessageBinding<RoundHordeAwardRequested>),
         typeof(IInboundMessageBinding<RoundLucciPickupRequested>), typeof(IMessageSender<RoundLucciCreated>), typeof(IMessageSender<RoundLucciPicked>),
         typeof(IInboundMessageBinding<RoundStarDropRequested>), typeof(IInboundMessageBinding<RoundStarPickupRequested>),
-        typeof(IInboundMessageBinding<RoundStarReported>), typeof(IMessageSender<RoundStarCreated>), typeof(IMessageSender<RoundStarPicked>),
+        typeof(IInboundMessageBinding<RoundStarReported>), typeof(IMessageSender<RoundStarCreated>), typeof(IMessageSender<RoundStarPicked>), typeof(IMessageSender<RoundStarFeverStarted>),
         typeof(IInboundMessageBinding<RoundItemUseRequested>), typeof(IMessageSender<RoundItemUsed>),
         typeof(IInboundMessageBinding<RoundItemSlotSwitchRequested>), typeof(IMessageSender<RoundItemSlotChanged>),
         typeof(IInboundMessageBinding<RoundInstantRevivalRequested>), typeof(IInboundMessageBinding<RoundPveRevivalRequested>),
@@ -369,6 +369,8 @@ public sealed class InGamePlugin : IPlugin
             var starModes = options.StarModeIds.Length + options.StarTeamModeIds.Length > 0;
             if (starModes && !Bound<RoundStarDropRequested>())
                 throw new ConfigException("Star modes require the native star packets (dialect.rooms star_items).");
+            if (starModes && !Bound<RoundStarReported>())
+                throw new ConfigException("Star modes require the client's star-count report binding.");
             if (Bound<RoundStarDropRequested>())
             {
                 _ = PlaySenders.Required<RoundStarCreated>(context, game);

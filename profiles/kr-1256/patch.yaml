@@ -15,6 +15,14 @@
 #     id: persistence.mysql
 #     disabled: true
 - set:
+    id: ingame
+    config:
+      # Star modes 5 and 6 use the client-reported count; S2C 634 is the empty T-45 Fever/Hurry.
+      star_mode_ids: [5]
+      star_team_mode_ids: [6]
+      star_round_time_limit_ms: 240000
+      star_fever_lead_ms: 45000
+- set:
     id: lobby
     config:
       inventory_source: mysql

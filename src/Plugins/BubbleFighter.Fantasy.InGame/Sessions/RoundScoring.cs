@@ -36,8 +36,11 @@ internal sealed class RoundScoring
         _pendingVictims = new int?[seats];
     }
 
-    /// <summary>Gets each team's confirmed total, indexed by the team number minus one.</summary>
+    /// <summary>Gets each team's combat total, indexed by the team number minus one.</summary>
     internal int[] TeamTotals { get; } = new int[2];
+
+    /// <summary>Gets each team's star total in team star mode, indexed by the team number minus one.</summary>
+    internal int[] StarTeamTotals { get; } = new int[2];
 
     /// <summary>Reads one seat's counters; a seat outside the cap reads as all zero.</summary>
     /// <param name="slot">The seat index.</param>
@@ -145,12 +148,18 @@ internal sealed class RoundScoring
     /// <param name="slot">The reporting seat; one outside the cap is ignored.</param>
     /// <param name="change">The signed change.</param>
     /// <param name="cap">The most stars one seat may hold.</param>
+    /// <param name="team">The seat team, used only when team totals are tracked.</param>
+    /// <param name="trackTeamTotal">Whether the applied delta also updates <see cref="StarTeamTotals"/>.</param>
     /// <returns>The updated counters, or <see langword="null"/> when the seat is outside the cap.</returns>
-    internal RoundSeatStats? AddStars(int slot, int change, int cap)
+    internal RoundSeatStats? AddStars(int slot, int change, int cap, int team = 0, bool trackTeamTotal = false)
     {
         if (!IsSeat(slot)) return null;
         _countsStars = true;
-        _stars[slot] = (int)Math.Clamp((long)_stars[slot] + change, 0, cap);
+        var before = _stars[slot];
+        var after = (int)Math.Clamp((long)before + change, 0, cap);
+        _stars[slot] = after;
+        if (trackTeamTotal && team is 1 or 2)
+            StarTeamTotals[team - 1] = Math.Max(0, StarTeamTotals[team - 1] + after - before);
         return Stats(slot);
     }
 

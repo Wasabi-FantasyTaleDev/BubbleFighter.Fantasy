@@ -125,6 +125,20 @@ public sealed partial class InGameOptions : IValidatableOptions
     public int StarRoundTimeLimitMs { get; set; } = 240000;
 
     /// <summary>
+    /// Gets or sets how long before the round's end the star Fever/Hurry notification and second wave begin.
+    /// The star-mode maps carry FeverTimeDuration 45000 for this T-45 trigger.
+    /// </summary>
+    [Range(0, 600000)]
+    public int StarFeverLeadMs { get; set; } = 45000;
+
+    /// <summary>
+    /// Gets or sets a directory of per-map star point JSON files captured from the kr-1256 star-mode client.
+    /// Each file is named after the map key and contains <c>small</c> and <c>big</c> x/y/z arrays. Empty
+    /// keeps the first wave client-driven.
+    /// </summary>
+    public string StarDropPointsDirectory { get; set; } = "";
+
+    /// <summary>
     /// Gets or sets how many stars a big star is worth. The client turns ten held stars into one big star
     /// when it drops them (kr-812 sub_520A20, sub_5632F0), so ten.
     ///
@@ -906,6 +920,10 @@ public sealed partial class InGameOptions : IValidatableOptions
         if (starModes.Any(mode => mode is <= 0 or > ushort.MaxValue || mode == ZombieConversionModeId || ZombiePvpModeIds.Contains(mode))
             || starModes.Distinct().Count() != starModes.Length)
             yield return new ValidationResult("star_mode_ids and star_team_mode_ids must contain distinct positive mode ids that no zombie mode uses.");
+        if (starModes.Length > 0 && StarFeverLeadMs >= StarRoundTimeLimitMs)
+            yield return new ValidationResult("star_fever_lead_ms must be shorter than star_round_time_limit_ms.", [nameof(StarFeverLeadMs)]);
+        if (StarDropPointsDirectory.Length > 0 && !Directory.Exists(StarDropPointsDirectory))
+            yield return new ValidationResult("star_drop_points_directory must name an existing directory.", [nameof(StarDropPointsDirectory)]);
         if (AutoStartModeIds.Any(mode => mode is <= 0 or > ushort.MaxValue) || AutoStartModeIds.Distinct().Count() != AutoStartModeIds.Length)
             yield return new ValidationResult("auto_start_mode_ids must contain distinct positive mode ids.");
         if (LucciKindValues.Length != 5 || LucciKindValues.Any(value => value is < 0 or > 1000000))

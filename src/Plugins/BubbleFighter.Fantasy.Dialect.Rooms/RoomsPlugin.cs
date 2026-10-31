@@ -40,14 +40,14 @@ namespace BubbleFighter.Fantasy.Dialect.Rooms;
         typeof(IMessageSender<RoundEnded>), typeof(IMessageSender<RoundWaveChanged>), typeof(IInboundMessageBinding<RoundRespawnRequested>), typeof(IInboundMessageBinding<RoundSpawnAccepted>),
         typeof(IInboundMessageBinding<RoundDeathReported>), typeof(IMessageSender<RoundSpawnOffered>), typeof(IMessageSender<RoundPlayerRespawned>), typeof(IInboundMessageBinding<RoundTauntReported>),
         typeof(IMessageSender<RoundRespawnWaitChanged>), typeof(IInboundMessageBinding<RoundKillCreditReported>), typeof(IInboundMessageBinding<RoundFinishingBlowReported>), typeof(IMessageSender<RoundScoreUpdated>),
-        typeof(IMessageSender<RoundScoreboard>), typeof(IMessageSender<ResultStageAdvanced>), typeof(IInboundMessageBinding<RoomChatSent>), typeof(IMessageSender<RoomChatReceived>),
+        typeof(IMessageSender<RoundScoreboard>), typeof(IMessageSender<RoundResultBanner>), typeof(IMessageSender<ResultStageAdvanced>), typeof(IInboundMessageBinding<RoomChatSent>), typeof(IMessageSender<RoomChatReceived>),
         typeof(IInboundMessageBinding<RoomSeatLockRequested>), typeof(IMessageSender<RoomSeatLockChanged>), typeof(IInboundMessageBinding<RoomKickRequested>), typeof(IMessageSender<RoomMemberKicked>),
         typeof(IInboundMessageBinding<PlazaEnterRequested>), typeof(IInboundMessageBinding<PlazaPositionReported>), typeof(IInboundMessageBinding<PlazaMenuReturnRequested>), typeof(IMessageSender<PlazaEntered>),
         typeof(IMessageSender<PlazaMemberEntered>), typeof(IMessageSender<PlazaMemberLeft>), typeof(IMessageSender<PlazaPositionReceived>), typeof(IMessageSender<PlazaMenuReturnRequested>),
         typeof(IInboundMessageBinding<RoundSuppliesReported>), typeof(IInboundMessageBinding<RoundSupplyPickupRequested>), typeof(IInboundMessageBinding<RoundSupplyDropRequested>), typeof(IMessageSender<RoundSupplyCreated>),
         typeof(IMessageSender<RoundSupplyPicked>), typeof(IInboundMessageBinding<RoundLucciDropRequested>), typeof(IInboundMessageBinding<RoundHordeAwardRequested>), typeof(IInboundMessageBinding<RoundLucciPickupRequested>),
         typeof(IMessageSender<RoundLucciCreated>), typeof(IMessageSender<RoundLucciPicked>), typeof(IInboundMessageBinding<RoundStarDropRequested>), typeof(IInboundMessageBinding<RoundStarPickupRequested>),
-        typeof(IInboundMessageBinding<RoundStarReported>), typeof(IMessageSender<RoundStarCreated>), typeof(IMessageSender<RoundStarPicked>), typeof(IInboundMessageBinding<RoundItemUseRequested>),
+        typeof(IInboundMessageBinding<RoundStarReported>), typeof(IMessageSender<RoundStarCreated>), typeof(IMessageSender<RoundStarPicked>), typeof(IMessageSender<RoundStarFeverStarted>), typeof(IInboundMessageBinding<RoundItemUseRequested>),
         typeof(IMessageSender<RoundItemUsed>), typeof(IInboundMessageBinding<RoundItemSlotSwitchRequested>), typeof(IMessageSender<RoundItemSlotChanged>), typeof(IInboundMessageBinding<RoundInstantRevivalRequested>),
         typeof(IInboundMessageBinding<RoundPveRevivalRequested>), typeof(IInboundMessageBinding<RoundCountedItemUseRequested>), typeof(IMessageSender<RoundCountedItemsPrepared>), typeof(IMessageSender<RoundCountedItemUsed>),
         typeof(IInboundMessageBinding<RoundRescueProgressReported>), typeof(IMessageSender<RoundRescueMissionsPrepared>), typeof(IMessageSender<RoundRescueMissionStarted>), typeof(IMessageSender<RoundRescueMissionFailed>),
@@ -69,7 +69,8 @@ public sealed class RoomsPlugin : IPlugin
         var lineage = context.Row.LineageOrBuild();
         if (options.ModernRooms)
         {
-            ActivateModern(context, options, lineage);
+            ActivateModern(context, options, lineage,
+                context.Services.TryGet<IMessageRouter>(out var messageRouter) ? messageRouter : null);
             return ValueTask.CompletedTask;
         }
         if (options.PlazaOnly)
@@ -256,7 +257,8 @@ public sealed class RoomsPlugin : IPlugin
     /// list. Each family binds only what the build's opcode table names, exactly as the modern message row
     /// mounted them before the port; the bytes are pinned by the typed scenario parity suite.
     /// </summary>
-    private static void ActivateModern(IPluginContext context, RoomsOptions options, IReadOnlyList<string> lineage)
+    private static void ActivateModern(IPluginContext context, RoomsOptions options, IReadOnlyList<string> lineage,
+        IMessageRouter? messageRouter)
     {
         if (options.WaitingRoomsOnly && (options.PlazaOnly || options.InitialTutorial))
             throw new ConfigException("waiting_rooms_only cannot be combined with plaza_only or initial_tutorial.");
@@ -304,8 +306,13 @@ public sealed class RoomsPlugin : IPlugin
         new RoundFeedBinding(options.Protocol, options.RelayProtocol, table,
             context.Services.Get<IOpcodeTableRegistry>().ForProtocol(options.RelayProtocol), packets, tableBuild).Mount(context);
         new RoundResultBinding(options.Protocol, table, packets, tableBuild, options.ResultScoreboardModes, context.Logger).Mount(context);
-
-}
+        if (options.StarItems)
+        {
+            if (messageRouter is null)
+                throw new ConfigException("Modern star items require the core.message-router row.");
+            new StarBinding(options.Protocol, table, packets, tableBuild, bindScoreReports: true).Mount(context, messageRouter);
+        }
+    }
 }
 
 /// <summary>

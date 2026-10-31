@@ -104,8 +104,8 @@ public sealed class NativeRoundResultTests
             await adapter.SendAsync(session, new RoundScoreUpdated(7, 1, [11, 22], []), default);
             Assert.Equal(new byte[] { 1, 11, 0, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, session.Bodies((ushort)(live + shift))[0]);
             Assert.Equal(new byte[] { 2, 22, 0, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, session.Bodies((ushort)(live + shift))[1]);
-            await adapter.SendAsync(session, new RoundEnded(7, RoundOutcome.Won), default);
-            Assert.Equal(new byte[8], session.Body((ushort)(open + shift)));
+            await adapter.SendAsync(session, new RoundEnded(7, RoundOutcome.Won) { TeamTotals = [11, 22] }, default);
+            Assert.Equal(Convert.FromHexString("0B00000016000000"), session.Body((ushort)(open + shift)));
 
             var rows = new RoundScoreboardRow[]
             {
@@ -167,5 +167,110 @@ public sealed class NativeRoundResultTests
                 Assert.Equal(firstReward == 0 ? 0 : firstReward + word,
                     BinaryPrimitives.ReadInt32LittleEndian(bytes[(15 + (progressWord + word) * 4)..]));
         }
+    }
+
+    /// <summary>Star modes carry each seat's absolute count in the third live-score list and stat 19 on the named seat.</summary>
+    [Fact]
+    public async Task LiveStarSlotsProjectAbsoluteCounts()
+    {
+        var tables = PacketTables.Load(SharedDialectRows.PacketsDirectory());
+        var profile = TestWireDialects.Get("kr-1256").Profile;
+        var root = Directory.GetParent(SharedDialectRows.PacketsDirectory())!.FullName;
+        var table = OpcodeTableLoader.Load(Path.Combine(root, "profiles", "kr-1256", "opcodes.yaml"), profile);
+        var services = new ServiceRegistry();
+        var context = new PluginContext(new PluginRow { Id = "result", Plugin = "result", Source = "test" },
+            services, new EventBus(NullLogger.Instance), NullLogger.Instance);
+        try
+        {
+            await new PacketRouterPlugin().ActivateAsync(context, default);
+            await new MessageRouterPlugin().ActivateAsync(context, default);
+            var adapter = new RoundResultBinding("kr-1256/game", table, tables, "kr-1256", [41], NullLogger.Instance);
+            adapter.Mount(context);
+            var rows = new RoundScoreboardRow[]
+            {
+                new(0, "A", 1, 1, new RoundSeatStats(0, 0, 0, 0, 0) { Stars = 5 }, null),
+                new(1, "B", 2, 1, new RoundSeatStats(1, 0, 0, 0, 0) { Stars = 7 }, null),
+            };
+            var board = new RoundScoreboard(7, 1, [5, 7], rows)
+            {
+                ModeId = 41,
+                Presentation = RoundScoreboardPresentation.StarTeam,
+            };
+            var session = new RecordingSession(7, profile);
+            await adapter.SendAsync(session, new RoundScoreUpdated(7, 1, [5, 7], [rows[0].Stats], board), default);
+            var bodies = session.Bodies(table.S2C("gspUpdateScoreData"));
+            Assert.Equal(4, bodies.Length);
+            Assert.All(bodies.Take(2), body => Assert.Equal(23, body.Length));
+            Assert.Equal(Convert.FromHexString("010500FFFF000000000000000002000000010500020700"), bodies[0]);
+            Assert.Equal(Convert.FromHexString("020700FFFF000000000000000002000000010500020700"), bodies[1]);
+            Assert.Equal(Convert.FromHexString("00000000FF010000001305000000000000000000"), bodies[2]);
+            Assert.Equal(Convert.FromHexString("00000001FF010000001307000000000000000000"), bodies[3]);
+
+            await adapter.SendAsync(session, board with
+            {
+                TimeOver = true,
+                BannerFirstScore = 5,
+                BannerSecondScore = 7,
+            }, default);
+            var timeOverBody = session.Body(table.S2C("Unknown614"));
+            var timeOverValues = PacketCodec.Read(tables, "kr-1256", "ScoreRow", timeOverBody.AsSpan(38, 244));
+            Assert.Equal(5, Convert.ToInt32(timeOverValues["unknown_84"]));
+            Assert.Equal(5, Convert.ToInt32(timeOverValues["unknown_120"]));
+            // Two rows then two gated words per row place the tail at 38 + 2*244 + 4*4.
+            var tailValues = PacketCodec.Read(tables, "kr-1256", "ScoreDataTail", timeOverBody.AsSpan(542));
+            Assert.Equal((byte)5, tailValues["unknown_19196"]);
+            Assert.Equal((byte)7, tailValues["unknown_19197"]);
+
+            await adapter.SendAsync(session, new RoundResultBanner(7, 5, 7), default);
+            Assert.Equal(Convert.FromHexString("00000000000000000507"),
+                session.Body(table.S2C("Unknown613")));
+
+            await adapter.SendAsync(session, board with { WithRewards = true, TimeOver = true }, default);
+            var finalBody = session.Body(table.S2C("Unknown614"));
+            var finalLead = PacketCodec.Read(tables, "kr-1256", "ScoreDataLead", finalBody.AsSpan(0, 6));
+            Assert.Equal(false, finalLead["banner_gate"]);
+            var finalValues = PacketCodec.Read(tables, "kr-1256", "ScoreRow", finalBody.AsSpan(38, 244));
+            Assert.Equal(5, Convert.ToInt32(finalValues["unknown_120"]));
+            Assert.Equal(5, Convert.ToInt32(finalValues["unknown_84"]));
+        }
+        finally { await context.UnwindAsync(); }
+    }
+
+    /// <summary>Individual star results name the winning seat and carry its stars in the row's +0x78 star field.</summary>
+    [Fact]
+    public async Task IndividualStarResultCarriesWinnerSeatAndStarWord()
+    {
+        var tables = PacketTables.Load(SharedDialectRows.PacketsDirectory());
+        var profile = TestWireDialects.Get("kr-1256").Profile;
+        var root = Directory.GetParent(SharedDialectRows.PacketsDirectory())!.FullName;
+        var table = OpcodeTableLoader.Load(Path.Combine(root, "profiles", "kr-1256", "opcodes.yaml"), profile);
+        var services = new ServiceRegistry();
+        var context = new PluginContext(new PluginRow { Id = "result", Plugin = "result", Source = "test" },
+            services, new EventBus(NullLogger.Instance), NullLogger.Instance);
+        try
+        {
+            await new PacketRouterPlugin().ActivateAsync(context, default);
+            await new MessageRouterPlugin().ActivateAsync(context, default);
+            var adapter = new RoundResultBinding("kr-1256/game", table, tables, "kr-1256", [42], NullLogger.Instance);
+            adapter.Mount(context);
+            var row = new RoundScoreboardRow(3, "C", 1, 1,
+                new RoundSeatStats(3, 0, 0, 0, 0) { Stars = 9 }, null) { UserNumber = 3 };
+            var session = new RecordingSession(7, profile);
+            await adapter.SendAsync(session, new RoundScoreboard(7, 0, [0, 0], [row], WithRewards: true)
+            {
+                ModeId = 42,
+                Presentation = RoundScoreboardPresentation.StarIndividual,
+                WinnerSlot = 3,
+            }, default);
+            var body = session.Body(table.S2C("Unknown614"));
+            Assert.Equal(4, body[1]);
+
+            // Lead (6 bytes) + two 12-byte head entries + presence mask (8 bytes).
+            var values = PacketCodec.Read(tables, "kr-1256", "ScoreRow", body.AsSpan(38, 244));
+            Assert.Equal(9, Convert.ToInt32(values["unknown_84"]));
+            Assert.Equal(9, Convert.ToInt32(values["unknown_120"]));
+
+        }
+        finally { await context.UnwindAsync(); }
     }
 }

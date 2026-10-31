@@ -464,7 +464,9 @@ builds:
       pve_rank_updates: false
       direct_supply_effects: false
       lucci_drops: false
-      star_items: false
+      # kr-1256 sub_6D55D0 case 641 creates GoStarItem/GoBigStarItem and case 642 removes them;
+      # C2S 631/632 are the claim and request. See profiles/kr-1256/opcodes.yaml.
+      star_items: true
       horde_award_items: false
       direct_item_effect_echo: false
       relay_validation_report: false
@@ -493,6 +495,15 @@ builds:
       # The gift box stays off until the kr-1256 shop row mounts it (ShopPlugin's kr1256 catalog branch).
       # The client readers are in packets/present.yaml.
       present_box: false
+    play:
+      score:
+        # kr-1256 sub_708480 stamps C2S 2029; the six-byte report carries the kind, character id and reporter slot.
+        # The client's star collision callers report kind 21 for a small gain and kind 24 for a big gain.
+        star_report: Optimized
+        star_small_gained: 21
+        star_small_lost: 0
+        star_big_gained: 24
+        star_big_lost: 0
 
   # CN 2019 (ClientVersion_Major 774), kr-1256's lineage. Named so a capability can be stated for it; its layouts are
   # kr-1256's unless a table says otherwise.

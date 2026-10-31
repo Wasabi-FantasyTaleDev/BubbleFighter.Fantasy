@@ -505,6 +505,7 @@ internal sealed partial class PlayRoomCodec
             "knock_downs" => row.Stats.Knockdowns,
             "kills" => row.Stats.Kills,
             "score" => row.Stats.Score,
+            "unknown_112" => row.Stats.Stars ?? 0,
             "stats_visible" => 1,
             "leveled_up" => row.Reward?.LeveledUp == true ? 1 : 0,
             "exp_level_start" => row.Reward?.LevelFloorExp ?? 0,
@@ -523,7 +524,7 @@ internal sealed partial class PlayRoomCodec
     // The names the round fills; on a seat nobody sits in they are 0 unless the table states a vacant value.
     private static bool IsScoreRowValue(string name) => name is "slot" or "team" or "level" or "knock_downs" or "kills"
         or "score" or "stats_visible" or "leveled_up" or "exp_level_start" or "exp_total" or "exp_next_level" or "exp_gained" or "lucci_gained"
-        or "stars";
+        or "stars" or "unknown_112";
 
     /// <summary>
     /// The seat a client reference names: a client builds its entity references as

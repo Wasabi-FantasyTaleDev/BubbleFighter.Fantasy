@@ -17,6 +17,11 @@
     relay_protocol: kr-1256/relay
     modern_rooms: true
     packets_directory: packets
+    # Modes 5/6 use the full ScoreData row table for live rank and final star results.
+    result_scoreboard_modes: [1, 5, 6]
+    # S2C 641/642 create/remove GoStarItem and GoBigStarItem; C2S 631/632 use the
+    # Lucci field order. See packets/builds.yaml and profiles/kr-1256/opcodes.yaml.
+    star_items: true
     # The first-run tutorial entry stays opt-in until native scene acceptance is complete.
     initial_tutorial: false
     initial_tutorial_kind: pirate_prologue
