@@ -79,6 +79,7 @@ public sealed class MemoryPlayerTable
 /// </summary>
 internal sealed class PlayerEntry
 {
+    internal Dictionary<string, InventoryLoadoutState> Loadouts { get; } = new(StringComparer.Ordinal);
     /// <summary>Gets saved control maps by explicit scope; guarded by <see cref="Gate"/>.</summary>
     public Dictionary<string, BubbleFighter.Fantasy.Contracts.Settings.CustomizedKey[]> CustomizedKeys { get; } = new(StringComparer.Ordinal);
 
@@ -132,6 +133,12 @@ internal sealed class PlayerEntry
 
     /// <summary>Gets the match ids of <see cref="Settlements"/>, in the same order. Guards: <see cref="Gate"/>.</summary>
     public List<string> SettlementMatches { get; } = [];
+
+    /// <summary>Gets non-evicting battle receipts, bounded by the progress store configuration and guarded by Gate.</summary>
+    public Dictionary<string, BubbleFighter.Fantasy.Contracts.Progress.RoundSettlementResult> BattleSettlements { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>Gets immutable cumulative records by game mode, guarded by Gate.</summary>
+    public Dictionary<int, BubbleFighter.Fantasy.Contracts.Progress.PlayerBattleRecord> BattleRecords { get; } = [];
 
     /// <summary>
     /// Gets or sets the active weapon-preset slot the server granted last; 0 until the first grant.

@@ -42,7 +42,7 @@ internal sealed partial class RoundFlow
 
     internal async ValueTask HandleRescueProgressAsync(ISession session, RoundRescueProgressReported report, CancellationToken ct)
     {
-        var (room, _) = _registry.RequireGame(session);
+        if (FindGameReportRoom(session) is not { } room) return;
         await room.Executor.ExecuteAsync(async operationCt =>
         {
             RoomSeat[] members;

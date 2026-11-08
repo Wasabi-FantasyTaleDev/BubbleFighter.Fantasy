@@ -75,6 +75,40 @@ public sealed class ClientDataStoreTests : IDisposable
         Assert.Throws<BubbleFighter.Fantasy.Abstractions.ConfigException>(() => Open());
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void BoundedReadsRejectOversizedArchiveAndLooseResources(bool loose)
+    {
+        Pkn("Packs/Maps_00000.pkn", ("Maps/Nested/track.wb", "world-block"));
+        if (loose)
+        {
+            Directory.CreateDirectory(Path.Combine(Raw, "Maps", "Nested"));
+            File.WriteAllText(Path.Combine(Raw, "Maps", "Nested", "track.wb"), "world-block");
+        }
+        using var store = Open();
+        Assert.Throws<InvalidDataException>(() => store.Read("maps/nested/TRACK.WB", 4));
+        Assert.Equal("world-block", Encoding.UTF8.GetString(store.Read("maps/nested/TRACK.WB", 11)));
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void BoundedArchiveReadsUseTheSameLastDuplicateAsOrdinaryReads(bool bfz, bool lastIsLarge)
+    {
+        var first = lastIsLarge ? "small" : "larger-content";
+        var last = lastIsLarge ? "larger-content" : "small";
+        (string Path, string Text)[] members = [("Maps/Nested/track.wb", first), ("maps/nested/TRACK.WB", last)];
+        if (bfz) Bfz("Maps/Maps.bfz", members);
+        else Pkn("Packs/Maps_00000.pkn", members);
+        using var store = Open();
+        Assert.Equal(last, Text(store, "Maps/Nested/track.wb"));
+        if (lastIsLarge) Assert.Throws<InvalidDataException>(() => store.Read("Maps/Nested/track.wb", 5));
+        else Assert.Equal(last, Encoding.UTF8.GetString(store.Read("Maps/Nested/track.wb", 5)));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_root)) Directory.Delete(_root, recursive: true);

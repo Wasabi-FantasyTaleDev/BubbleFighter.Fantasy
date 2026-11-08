@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Security.Cryptography;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 
 namespace BubbleFighter.Fantasy.Wire;
@@ -20,7 +21,7 @@ public abstract record WireStreamItem
 /// they arrived in: the dialect's plaintext preamble first, then deciphered frames. The
 /// buffered remainder is bounded by the largest frame the dialect accepts.
 /// </summary>
-public sealed class WireStreamDecoder
+public sealed class WireStreamDecoder : IDisposable
 {
     private readonly IWireDialect _dialect;
     private readonly IStreamTransform _decryptor;
@@ -30,6 +31,7 @@ public sealed class WireStreamDecoder
     private int _preambleFilled;
     private byte[] _buffer;
     private int _buffered;
+    private bool _disposed;
 
     /// <summary>Creates a decoder positioned at the start of a connection.</summary>
     /// <param name="dialect">The dialect the connection speaks.</param>
@@ -59,7 +61,27 @@ public sealed class WireStreamDecoder
     /// the decoder is unusable afterwards.</exception>
     public IReadOnlyList<WireStreamItem> Feed(ReadOnlySpan<byte> raw)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         var items = new List<WireStreamItem>();
+        try
+        {
+            FeedCore(raw, items);
+            return items;
+        }
+        catch
+        {
+            foreach (var item in items)
+            {
+                if (item is WireStreamItem.Frame frame) CryptographicOperations.ZeroMemory(frame.Value.Payload);
+                else if (item is WireStreamItem.Preamble preamble) CryptographicOperations.ZeroMemory(preamble.Bytes);
+            }
+            Dispose();
+            throw;
+        }
+    }
+
+    private void FeedCore(ReadOnlySpan<byte> raw, List<WireStreamItem> items)
+    {
         if (_preambleFilled < _preamble.Length)
         {
             var take = Math.Min(raw.Length, _preamble.Length - _preambleFilled);
@@ -70,7 +92,7 @@ public sealed class WireStreamDecoder
                 items.Add(new WireStreamItem.Preamble(_preamble.ToArray()));
         }
         if (raw.IsEmpty)
-            return items;
+            return;
 
         while (!raw.IsEmpty)
         {
@@ -85,7 +107,10 @@ public sealed class WireStreamDecoder
                 var previous = sequence.Length;
                 if (!_dialect.TryReadFrame(ref sequence, _maxPayloadBytes, out var frame)) break;
                 if (sequence.Length >= previous)
+                {
+                    CryptographicOperations.ZeroMemory(frame.Payload);
                     throw new PacketFormatException("Dialect returned a frame without consuming input", _buffered);
+                }
                 items.Add(new WireStreamItem.Frame(frame));
             }
             var consumed = _buffered - (int)sequence.Length;
@@ -93,13 +118,23 @@ public sealed class WireStreamDecoder
             {
                 _buffer.AsSpan(consumed, _buffered - consumed).CopyTo(_buffer);
                 _buffered -= consumed;
+                CryptographicOperations.ZeroMemory(_buffer.AsSpan(_buffered, consumed));
             }
         }
-        return items;
     }
 
     /// <summary>Gets the number of decrypted bytes held that do not yet form a whole frame.</summary>
     public int PendingBytes => _buffered;
+
+    /// <summary>Erases buffered plaintext and prevents further input; previously returned items remain owned by the caller.</summary>
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        CryptographicOperations.ZeroMemory(_buffer);
+        CryptographicOperations.ZeroMemory(_preamble);
+        _buffered = 0;
+    }
 
     private void Append(ReadOnlySpan<byte> raw)
     {
@@ -107,7 +142,12 @@ public sealed class WireStreamDecoder
             throw new PacketFormatException(
                 $"stream holds {_buffered + raw.Length} undecoded bytes, more than one maximum frame", _buffered);
         if (_buffered + raw.Length > _buffer.Length)
-            Array.Resize(ref _buffer, Math.Min(_maxBuffered, Math.Max(_buffer.Length * 2, _buffered + raw.Length)));
+        {
+            var previous = _buffer;
+            _buffer = new byte[Math.Min(_maxBuffered, Math.Max(_buffer.Length * 2, _buffered + raw.Length))];
+            previous.AsSpan(0, _buffered).CopyTo(_buffer);
+            CryptographicOperations.ZeroMemory(previous);
+        }
         var target = _buffer.AsSpan(_buffered, raw.Length);
         raw.CopyTo(target);
         _decryptor.Apply(target);

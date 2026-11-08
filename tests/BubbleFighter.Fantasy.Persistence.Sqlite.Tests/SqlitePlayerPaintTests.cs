@@ -1,4 +1,5 @@
 using BubbleFighter.Fantasy.Contracts.Inventory;
+using BubbleFighter.Fantasy.Contracts.Players;
 using BubbleFighter.Fantasy.Persistence.Sqlite;
 using Microsoft.Data.Sqlite;
 using Xunit;
@@ -32,8 +33,14 @@ public sealed class SqlitePlayerPaintTests : IDisposable
         {
             var stores = new SqliteRepositories(db);
             var player = await stores.FindByUsernameAsync("paint", default);
+            Assert.True(stores.SupportsRetainedAccountLookup);
             Assert.Equal((ushort)14, player!.ColorIndex);
             Assert.Equal("Painter", player.Nickname);
+            IPlayerRepository players = stores;
+            Assert.Equal(player, await players.FindByUserNumAsync(user, default));
+            Assert.Null(await players.FindByUserNumAsync(long.MaxValue, default));
+            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => players.FindByUserNumAsync(0, default).AsTask());
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => players.FindByUserNumAsync(user, new CancellationToken(true)).AsTask());
             Assert.Equal(new[] { 3, 1 }, (await stores.ListSlotsAsync(user, InventoryBag.CharacterBag, 32, default)).Select(row => row.Quantity));
             var mirror = Assert.Single(await stores.ListSlotsAsync(user, InventoryBag.EquippedBag, 32, default));
             Assert.Equal(1, mirror.Quantity);

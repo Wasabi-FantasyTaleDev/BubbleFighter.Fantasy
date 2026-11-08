@@ -38,6 +38,7 @@ internal static class SetupClientPolicyConfiguration
                 var item = new Dictionary<string, object?> { ["id"] = rule.Id, ["type"] = rule.Type, ["builds"] = rule.Builds.ToArray() };
                 if (rule.Version is not null) item["version"] = rule.Version;
                 if (rule.Sources is not null) item["sources"] = rule.Sources.ToArray();
+                if (rule.DefaultSelected is { } selected) item["default_selected"] = selected;
                 return (object?)item;
             }).ToList();
             return (object?)entry;

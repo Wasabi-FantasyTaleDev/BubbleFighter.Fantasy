@@ -120,18 +120,54 @@ public sealed class LegacyEnterShopWireTests
     }
 
     [Fact]
-    public void SelectBoundedCardsHonoursTheCaptureCardCap()
+    public void DefaultSelectionUsesEncodedBytesBeyondTheFormerCountLimit()
     {
-        var cards = new List<ShopCardRow>();
-        for (var i = 0; i < ShopWire.LegacyEnterShopCardCap + 50; i++)
-            cards.Add(Card(10_000 + i, main: ShopWire.LegacyEnterShopMainCategory, sub: ShopWire.LegacyEnterShopDefaultSubCategory));
+        var cards = Enumerable.Range(0, 300).Select(i => Card(10_000 + i, 1000, 1002)).ToArray();
+        var (selected, dropped) = ShopWire.SelectBoundedCards(cards, budget: 65000);
+        Assert.Equal(cards.Length, selected.Count);
+        Assert.Equal(0, dropped);
+        Assert.InRange(ShopWire.RepEnterShopLegacy(LegacyLayouts.Of("kr-812"), 0, selected, Categories).Length, 1, 65000);
+    }
 
-        var (selected, dropped) = ShopWire.SelectBoundedCards(cards, budget: 1_000_000);
-        Assert.Equal(ShopWire.LegacyEnterShopCardCap, selected.Count);
-        Assert.Equal(50, dropped);
-        var (all, omitted) = ShopWire.SelectBoundedCards(cards, budget: 1_000_000, maxCards: 0);
-        Assert.Equal(cards.Count, all.Count);
+    [Theory]
+    [InlineData("cn-279")]
+    [InlineData("cn-324")]
+    [InlineData("cn-406")]
+    [InlineData("cn-404")]
+    [InlineData("cn-408")]
+    [InlineData("cn-705")]
+    [InlineData("cn-706")]
+    [InlineData("cn-717")]
+    [InlineData("id-400")]
+    [InlineData("id-1809")]
+    [InlineData("kr-812")]
+    public void EncodedBudgetIncludesTreeAndPreservesLateCharacterCategory(string build)
+    {
+        const int budget = 65000;
+        var layout = LegacyLayouts.Of(build);
+        var categories = new ShopCategoryRow[]
+        {
+            new(1000, "Main", 0, [new(1002, "New", 0, 0, 0)]),
+            new(500, "Weapons", 1, [new(501, "Guns", 0, 0, 0)]),
+            new(900, "Characters", 2, [new(901, "Characters", 0, 0, 0)]),
+        };
+        var cards = Enumerable.Range(0, 600).Select(i => Card(10_000 + i, 1000, 1002, new string('x', 80)))
+            .Append(Card(20_000, 500, 501))
+            .Append(Card(30_000, 900, 901)).ToArray();
+        var fixedBytes = ShopWire.RepEnterShopLegacy(layout, 0, [], categories).Length;
+        var (selected, dropped) = ShopWire.SelectBoundedCards(cards, budget - fixedBytes, layout.WideStockType);
+        var body = ShopWire.RepEnterShopLegacy(layout, 0, selected, categories);
+        Assert.InRange(body.Length, 1, budget);
+        Assert.True(dropped > 0);
+        Assert.Contains(selected, card => card.PrimaryItemId == 30_000);
+        Assert.Contains(selected, card => card.PrimaryItemId == 20_000);
+        var next = cards.First(card => !selected.Contains(card));
+        Assert.True(ShopWire.RepEnterShopLegacy(layout, 0, selected.Append(next).ToArray(), categories).Length > budget);
+        var (exact, omitted) = ShopWire.SelectBoundedCards(selected, body.Length - fixedBytes, layout.WideStockType);
+        Assert.Equal(selected.Count, exact.Count);
         Assert.Equal(0, omitted);
+        var (shorter, _) = ShopWire.SelectBoundedCards(selected, body.Length - fixedBytes - 1, layout.WideStockType);
+        Assert.True(shorter.Count < selected.Count);
     }
 
     [Fact]

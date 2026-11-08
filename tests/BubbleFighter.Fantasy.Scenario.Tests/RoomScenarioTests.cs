@@ -181,6 +181,8 @@ public sealed class RoomScenarioTests
         await b.EnterPlaza();
         var before = await b.ListRooms();
         var installId = await a.CreateRoom();
+        // The install precedes publication; a same-connection list request fences completion of the create handler.
+        Assert.Contains(await a.ListRooms(), row => row.Id == installId);
         var room = SimRoomList.FindNewRoom(before, await b.ListRooms(), installId);
         return (a, b, room);
     }

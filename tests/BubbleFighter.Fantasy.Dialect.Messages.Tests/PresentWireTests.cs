@@ -65,11 +65,17 @@ public sealed class PresentWireTests
 
     [Theory]
     [InlineData("cn-735")]
+    public void TheTabledModernBuildsDoNotHaveTheCapability(string build) =>
+        Assert.False(TestBuilds.Packets.CapabilityOf(build, "present_box"));
+
+    // The modern gift boxes are tabled end to end (packets/present.yaml modern records, sublists and send
+    // replies) and each profile's shop row serves them.
+    [Theory]
     [InlineData("kr-1256")]
     [InlineData("cn-774")]
     [InlineData("tw-454")]
-    public void TheTabledModernBuildsDoNotHaveTheCapability(string build) =>
-        Assert.False(TestBuilds.Packets.CapabilityOf(build, "present_box"));
+    public void TheTabledModernBuildsHaveTheCapability(string build) =>
+        Assert.True(TestBuilds.Packets.CapabilityOf(build, "present_box"));
 
     [Theory, MemberData(nameof(AllBuilds))]
     public void TheNewGiftWordIsTwoWordsWithTheCountAndOneWithout(string build)
@@ -234,6 +240,90 @@ public sealed class PresentWireTests
             session.Sent.Select(frame => frame.Opcode));
     }
 
+    /// <summary>
+    /// The modern boxes mount the requests their own clients stamp: both list pages (kr-1256 sub_E49DC0,
+    /// cn-774 sub_7CAFA0, tw-454 sub_BDA7E0), the purchase (kr-1256 sub_650770, cn-774 sub_7C48B0,
+    /// tw-454 sub_BD3D00), the take and throw stamps of the receive dialog (kr-1256 0xE2C2EF / kr-1256 0xE2C630,
+    /// cn-774 sub_6AEEE0, tw-454 sub_BBC770) and the two deletes. The legacy new-gift query has no modern
+    /// sender, so the modern boxes mount no notice route while the S2C push stays.
+    /// </summary>
+    [Theory]
+    [InlineData("kr-1256")]
+    [InlineData("cn-774")]
+    [InlineData("tw-454")]
+    public async Task TheModernBoxMountsTheStampedRequestsWithoutTheLegacyNoticeQuery(string build)
+    {
+        var binding = Mounted(build, out var routes, out var session, out var messages);
+        var protocol = build + "/game";
+        Assert.Equal(new ushort[] { 815, 816, 818, 819, 820, 824, 825 },
+            routes.Handlers.Keys.Select(key => key.Item2).Order());
+
+        async Task Send(int number, byte[] body) =>
+            await routes.Handlers[(protocol, (ushort)number)](session, new((ushort)number, body), default);
+
+        await Send(815, Bytes(0, 4));
+        await Send(816, Bytes(4, 4));
+        await Send(818, Bytes("target", "", 1000123, "hello"));
+        await Send(819, Bytes(9));
+        await Send(820, Bytes(9));
+        await Send(824, Bytes(9));
+        await Send(825, Bytes(9));
+        Assert.Equal<IMessage>(
+        [
+            new PresentListRequested(PresentBox.Received, 0, 4),
+            new PresentListRequested(PresentBox.Sent, 4, 4), new PresentSendRequested("target", 1000123, "hello"),
+            new PresentActionRequested(PresentAction.Receive, 9), new PresentActionRequested(PresentAction.Throw, 9),
+            new PresentActionRequested(PresentAction.DeleteSent, 9), new PresentActionRequested(PresentAction.DeleteReceived, 9),
+        ], messages.Received);
+        await Assert.ThrowsAsync<PacketFormatException>(() => Send(819, [0]));
+
+        await binding.SendAsync(session, new PresentSendReplied(PresentSendStatus.Sent), default);
+        await binding.SendAsync(session, new PresentListReplied(PresentBox.Received, 0, 0, []), default);
+        await binding.SendAsync(session, new PresentListReplied(PresentBox.Sent, 0, 0, []), default);
+        await binding.SendAsync(session, new PresentActionReplied(PresentAction.Receive, true, 1, 1, 0), default);
+        await binding.SendAsync(session, new PresentActionReplied(PresentAction.Throw, true, 1, 0, 0), default);
+        await binding.SendAsync(session, new PresentActionReplied(PresentAction.DeleteSent, true, 1, 0, 0), default);
+        await binding.SendAsync(session, new PresentActionReplied(PresentAction.DeleteReceived, true, 1, 0, 0), default);
+        Assert.Equal(new ushort[] { 825, 822, 823, 826, 827, 831, 832 },
+            session.Sent.Select(frame => frame.Opcode));
+    }
+
+    /// <summary>
+    /// The modern purchase reply carries the result in the third wire field for kr-1256: the client's switch
+    /// over the failure codes runs on the second dword after the leading string (kr-1256 sub_9B9A40's switch
+    /// variable sits at struct +28), so a result written to the first dword would answer every gift with the
+    /// generic failure line. CN also reads three counted strings; TW reads two. Their result word follows
+    /// the leading string and context word (cn-774 sub_BB7130, tw-454 sub_A94910).
+    /// </summary>
+    [Theory]
+    [InlineData("kr-1256", "0000000000000000010000000000000000000000", "0000000000000000FDFFFFFF0000000000000000")]
+    [InlineData("cn-774", "0000000000000000010000000000000000000000", "0000000000000000FDFFFFFF0000000000000000")]
+    [InlineData("tw-454", "00000000000000000100000000000000", "0000000000000000FDFFFFFF00000000")]
+    public async Task TheModernSendReplyCarriesTheResultWhereItsClientGatesIt(string build, string successHex, string failureHex)
+    {
+        var binding = Mounted(build, out _, out var session, out _);
+        await binding.SendAsync(session, new PresentSendReplied(PresentSendStatus.Sent), default);
+        await binding.SendAsync(session, new PresentSendReplied(PresentSendStatus.InsufficientFunds), default);
+        var sent = session.Sent;
+        Assert.Equal(Convert.FromHexString(successHex), sent[0].Body);
+        Assert.Equal(Convert.FromHexString(failureHex), sent[1].Body);
+    }
+
+    /// <summary>The native string readers consume every counted string around the two reply words.</summary>
+    [Theory]
+    [InlineData("kr-1256", "0100000041004433221101000000010000004200010000004300")]
+    [InlineData("cn-774", "0100000041004433221101000000010000004200010000004300")]
+    [InlineData("tw-454", "0100000041004433221101000000010000004200")]
+    public void ModernGiftReplyStringsSurroundTheContextAndResult(string build, string expectedHex)
+    {
+        var body = PacketCodec.Write(TestBuilds.Packets, build, "PresentSendReply", new Dictionary<string, object?>
+        {
+            ["unknown_0"] = "A", ["unknown_24"] = 0x11223344u, ["result"] = 1u,
+            ["unknown_32"] = "B", ["unknown_56"] = "C",
+        });
+        Assert.Equal(Convert.FromHexString(expectedHex), body);
+    }
+
     [Fact]
     public async Task ABuildWhoseTableLacksARowFailsBeforeAnyRouteOrServiceIsPublished()
     {
@@ -276,11 +366,27 @@ public sealed class PresentWireTests
         Assert.Empty(services.GetAll<IMessageSender<PresentNoticeSent>>());
     }
 
-    private static PresentBinding Mounted(string build, out Routes routes, out Session session, out Messages messages)
+    /// <summary>Optional gift queries never consult research candidates when the runtime table omits them.</summary>
+    [Theory]
+    [InlineData("kr-1256")]
+    [InlineData("cn-774")]
+    [InlineData("tw-454")]
+    public void ModernBoxesIgnoreCatalogCandidatesForTheAbsentNoticeQuery(string build)
+    {
+        _ = Mounted(build, out var routes, out _, out _,
+            (_, _, name) => throw new ConfigException($"Unexpected catalog lookup: {name}"));
+
+        Assert.Equal(7, routes.Handlers.Count);
+        Assert.Contains((build + "/game", (ushort)819), routes.Handlers.Keys);
+    }
+
+    private static PresentBinding Mounted(string build, out Routes routes, out Session session, out Messages messages,
+        Func<OpcodeConnection, PacketDirection, string, ushort?>? fallback = null)
     {
         var root = RepositoryRoot();
         var profile = new ClientProfile(build, build[..2], int.Parse(build[3..]), 0, 0, build);
-        var table = OpcodeTableLoader.Load(Path.Combine(root, "profiles", build, "opcodes.yaml"), profile);
+        var runtime = OpcodeTableLoader.Load(Path.Combine(root, "profiles", build, "opcodes.yaml"), profile);
+        var table = new OpcodeTable(profile, runtime.All, fallback);
         var services = new ServiceRegistry();
         routes = new Routes();
         messages = new Messages();

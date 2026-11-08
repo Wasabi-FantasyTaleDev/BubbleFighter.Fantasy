@@ -17,7 +17,9 @@ public sealed class Cn279ScoreboardOpcodeTests
         // 711 is the item box creation here (cn-279 dispatcher sub_82AB20 case 0x2C7), not the later builds' score data.
         Assert.True(table.TryGet(PacketDirection.ServerToClient, 711, out var created));
         Assert.Equal("gspGameCreateGameItem", created!.Name);
-        Assert.False(table.TryGet(PacketDirection.ServerToClient, 729, out _));
+        Assert.True(table.TryGet(PacketDirection.ServerToClient, 729, out var afterAward));
+        Assert.Equal("gspGameReturnAfterAward_", afterAward!.Name);
+        Assert.Equal(Evidence.Verified, afterAward.Evidence);
         Assert.Equal((ushort)725, table.S2C("gspGameTimeOverEnd"));
         Assert.Equal((ushort)726, table.S2C("gspGameShowResult_"));
         Assert.True(table.TryGet(PacketDirection.ServerToClient, 725, out var timeOver));

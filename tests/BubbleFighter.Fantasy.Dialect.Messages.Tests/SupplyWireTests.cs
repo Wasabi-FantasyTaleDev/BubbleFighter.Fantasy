@@ -1,5 +1,7 @@
 using System.Buffers;
+using System.Collections.Concurrent;
 using BubbleFighter.Fantasy.Abstractions;
+using BubbleFighter.Fantasy.Abstractions.Net;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Match;
 using BubbleFighter.Fantasy.Dialect.Rooms;
@@ -11,6 +13,35 @@ namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
 /// <summary>Pins map supply layouts and rejects report counts that exceed the configured bound.</summary>
 public sealed class SupplyWireTests
 {
+    /// <summary>Audited box-removal consumers suppress actor effects when the seat word is -1.</summary>
+    [Theory]
+    [InlineData("kr-812")]
+    [InlineData("cn-279")]
+    public async Task RemovalWithoutPickupHasNoGrantFrame(string build)
+    {
+        var table = TestBuilds.Opcodes(build).ForConnection(OpcodeConnection.Game);
+        var sender = new SupplyBinding(build + "/game", table, TestBuilds.All.Tables, build, 128);
+        var session = new SupplySession();
+        await sender.SendAsync(session, new RoundSupplyPicked(-1, 0x62000001), default);
+        var packet = Assert.Single(session.Sent);
+        Assert.Equal(table.S2C("gspItemEaten"), packet.Opcode);
+        Assert.Equal(Convert.FromHexString("FFFFFFFF01000062"), packet.Body);
+    }
+
+    private sealed class SupplySession : ISession
+    {
+        internal List<(ushort Opcode, byte[] Body)> Sent { get; } = [];
+        public long Id => 1;
+        public ClientProfile Profile => new("kr-812", "kr", 812, 0, 0, "kr-812");
+        public IConnection Connection => throw new NotSupportedException();
+        public ConcurrentDictionary<string, object> Items { get; } = new();
+        public ValueTask SendAsync(ushort opcode, ReadOnlyMemory<byte> payload, CancellationToken ct)
+        {
+            Sent.Add((opcode, payload.ToArray()));
+            return ValueTask.CompletedTask;
+        }
+    }
+
     /// <summary>The shared writer preserves the existing scalar replies and native creation defaults.</summary>
     [Theory]
     [InlineData("kr-812")]
@@ -58,21 +89,53 @@ public sealed class SupplyWireTests
         Assert.Throws<PacketFormatException>(() => SupplyBinding.ReadDrop(tables, build, invalid));
     }
 
-    /// <summary>Pins the native four-word switch reply and the slot-one grant/use bodies.</summary>
-    [Fact]
-    public void ItemSwitchReplyPinsItsSelectedSlotAndResult()
+    /// <summary>Victim team survives the audited legacy drop word; neutral throws remain neutral.</summary>
+    [Theory]
+    [InlineData("kr-812")]
+    [InlineData("cn-324")]
+    [InlineData("cn-406")]
+    [InlineData("cn-404")]
+    [InlineData("cn-408")]
+    [InlineData("cn-705")]
+    [InlineData("cn-706")]
+    [InlineData("cn-717")]
+    [InlineData("id-400")]
+    [InlineData("id-1809")]
+    public void HurtDropPreservesItsNativeTeamWord(string build)
     {
         var tables = TestBuilds.All.Tables;
-        var reply = ScalarGolden.Write(tables.Resolve("cn-324", "SupplyItemSlotChanged"),
+        var values = new Dictionary<string, object?> { ["kind"] = 0, ["team"] = 2, ["unknown_36"] = 20000 };
+        var body = PacketCodec.Write(tables, build, "SupplyDropRequest", values);
+        Assert.Equal(36, body.Length);
+        Assert.Equal(2, BitConverter.ToInt32(body, 28));
+        var drop = SupplyBinding.ReadDrop(tables, build, body);
+        Assert.Equal(2, drop.Point.Team);
+        Assert.Equal(20000, drop.CreationClass);
+        values["team"] = 0;
+        Assert.Equal(0, SupplyBinding.ReadDrop(tables, build, PacketCodec.Write(tables, build, "SupplyDropRequest", values)).Point.Team);
+        values["team"] = 3;
+        Assert.Throws<PacketFormatException>(() => SupplyBinding.ReadDrop(tables, build,
+            PacketCodec.Write(tables, build, "SupplyDropRequest", values)));
+    }
+
+    /// <summary>Pins the native four-word switch reply and the slot-one grant/use bodies.</summary>
+    [Theory]
+    [InlineData("cn-324")]
+    [InlineData("cn-705")]
+    [InlineData("cn-706")]
+    public void ItemSwitchReplyPinsItsSelectedSlotAndResult(string build)
+    {
+        var tables = TestBuilds.All.Tables;
+        var reply = ScalarGolden.Write(tables.Resolve(build, "SupplyItemSlotChanged"),
             new() { ["seat"] = 2, ["item_slot"] = 1, ["kind"] = 109, ["result"] = 0 });
         Assert.Equal(16, reply.Length);
         Assert.Equal(Convert.FromHexString("02000000010000006D00000000000000"), reply);
-        var rejected = ScalarGolden.Write(tables.Resolve("cn-324", "SupplyItemSlotChanged"),
+        var rejected = ScalarGolden.Write(tables.Resolve(build, "SupplyItemSlotChanged"),
             new() { ["seat"] = 2, ["item_slot"] = 0, ["kind"] = -1, ["result"] = 1 });
         Assert.Equal(Convert.FromHexString("0200000000000000FFFFFFFF01000000"), rejected);
         foreach (var name in new[] { "SupplyItemGranted", "SupplyItemUsed" })
         {
-            var body = ScalarGolden.Write(tables.Resolve("cn-324", name),
+            var body = ScalarGolden.Write(tables.Resolve(build, name),
                 new() { ["seat"] = 2, ["kind"] = 109, ["item_slot"] = 1 });
             Assert.Equal(12, body.Length);
             Assert.Equal(Convert.FromHexString("020000006D00000001000000"), body);

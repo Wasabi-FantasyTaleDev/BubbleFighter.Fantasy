@@ -95,8 +95,11 @@ public sealed class ShopPlugin : IPlugin
         // The 1256 dialog sends the TC-shop catalog on open, so an empty cash list
         // leaves it dead; the legacy builds price everything in the workbook's own
         // money types and the ID2014 workbook has no cash column values at all.
+        // The kr1256 schema needs no packet tables; the workbook-schema fallback reads them (the short circuit
+        // keeps rows without a packets directory working), and the gift box loads them on demand.
+        PacketTables? tableTables = schema == ShopCatalogSchema.Kr1256 ? null : PacketTables.Load(options.PacketsDirectory);
         var tableCatalog = schema == ShopCatalogSchema.Kr1256
-            || PacketTables.Load(options.PacketsDirectory).Resolve(options.ClientProfile, "EnterShopReply").Count > 0;
+            || tableTables!.Resolve(options.ClientProfile, "EnterShopReply").Count > 0;
         if (cashCards.Count == 0 && schema == ShopCatalogSchema.Kr1256)
             throw new InvalidOperationException($"{catalog.SourcePath} has no on-sale cash cards.");
 
@@ -231,12 +234,19 @@ public sealed class ShopPlugin : IPlugin
         var catalogSender = RequireShopSender<ShopCatalogPublished>(context, protocol);
         var hold = new Data.EquipHoldStore();
         var persistPurchases = options.GrantPurchasedItems && purchases is not null && push is not null;
+        // The workbook terms serve the persisted purchase policy and, when the gift box is mounted, its take
+        // path; one parse serves both.
+        ItemTermRules? workbookRules = null;
+        IReadOnlyDictionary<int, ItemTerms>? workbookTerms = null;
+        if (persistPurchases || options.PresentBox)
+            (workbookRules, workbookTerms) = Kr1256Terms(options, workbook,
+                catalog.Cards.SelectMany(card => card.Stocks).Select(stock => stock.ItemId).Where(id => id > 0).ToHashSet());
         var purchaser = new Purchasing.ShopPurchaser(
             options, catalog, purchases, push, context.Logger, hold)
         {
             ItemPurchasePolicy = persistPurchases
-                ? Kr1256PurchasePolicy(options, workbook, purchases!, context.Services.Get<IInventoryRepository>(),
-                    catalog.Cards.SelectMany(card => card.Stocks).Select(stock => stock.ItemId).Where(id => id > 0).ToHashSet())
+                ? Kr1256PurchasePolicy(workbookRules!, workbookTerms!, options.MaxPurchaseAttempts, purchases!,
+                    context.Services.Get<IInventoryRepository>())
                 : null,
             ReplySender = RequireShopSender<ShopPurchaseReplied>(context, protocol),
             // The money publication rides the persisted purchase path only; an in-memory row never sends it.
@@ -270,11 +280,22 @@ public sealed class ShopPlugin : IPlugin
         context.Effect(routes.On<ShopCouponUseRequested>(protocol, handlers.CouponAsync));
         context.Effect(routes.On<ShopCashCheckRequested>(protocol, handlers.CashCheckAsync));
         // The inventory-dialog entry flushes held equip records; the dialect row accepts the empty body. The kr-1256
-        // shop entry sub_9328B0 sends Unknown2059 once and nothing answers it, and gcpReqPresentSendSubList and
-        // gcpReqRefund are not this row's: they stay unhandled until the gift box and refunds are served.
+        // shop entry kr-1256 sub_9328B0 sends Unknown2059 once and nothing answers it; gcpReqRefund stays unhandled until
+        // refunds are served.
         var flush = new Handlers.EquipHoldFlushHandler(hold,
             RequireShopSender<EquippedArticlesFlushed>(context, protocol), context.Logger);
         context.Effect(routes.On<ShopInventoryRequested>(protocol, flush.HandleAsync));
+        if (options.PresentBox)
+        {
+            // The gift box rides this row's catalog and workbook terms; the capability gate inside decides
+            // whether this build's client states the packets, and the dialect row's bindings must be up.
+            var presentTables = tableTables ?? PacketTables.Load(options.PacketsDirectory);
+            var giftInventory = context.Services.Get<IInventoryRepository>();
+            var giftConditional = new Purchasing.ConditionalShopPurchaser(purchases!, giftInventory,
+                TimeProvider.System, options.MaxPurchaseAttempts);
+            MountPresentBox(context, options, presentTables, catalog, giftConditional,
+                Kr1256Resolve(workbookRules!, workbookTerms!), giftInventory, opens, null, routes);
+        }
         if (options.HoldEquipUntilInventoryOpen)
             context.Logger.LogInformation(
                 "Equip hold on: a purchase queues one gspInventoryUpdateInventorySlots container-2 record (cap {Cap} per player) and gcpEnterInventory flushes it on {Protocol}.",
@@ -298,30 +319,49 @@ public sealed class ShopPlugin : IPlugin
     internal static Purchasing.ItemPurchasePolicy Kr1256PurchasePolicy(ShopOptions options, WorkbookFile workbook,
         IShopPurchaseStore purchases, IInventoryRepository inventory, IReadOnlySet<int>? purchasableItems = null)
     {
+        var (rules, terms) = Kr1256Terms(options, workbook, purchasableItems);
+        return Kr1256PurchasePolicy(rules, terms, options.MaxPurchaseAttempts, purchases, inventory);
+    }
+
+    internal static Purchasing.ItemPurchasePolicy Kr1256PurchasePolicy(ItemTermRules rules,
+        IReadOnlyDictionary<int, ItemTerms> terms, int maxPurchaseAttempts,
+        IShopPurchaseStore purchases, IInventoryRepository inventory) =>
+        new(new Purchasing.ConditionalShopPurchaser(purchases, inventory, TimeProvider.System, maxPurchaseAttempts),
+            Kr1256Resolve(rules, terms));
+
+    // The workbook terms are parsed once per activation and shared by the persisted purchase policy and the gift
+    // box's take path; SpreadsheetWorkbook reads the whole sheet, so a second load would double the activation cost.
+    internal static (ItemTermRules Rules, IReadOnlyDictionary<int, ItemTerms> Terms) Kr1256Terms(
+        ShopOptions options, WorkbookFile workbook, IReadOnlySet<int>? purchasableItems = null)
+    {
         if (options.LifeItems)
             throw new ConfigException("life_items is not established for the kr1256 catalog schema.");
-        var rules = new ItemTermRules(options.PermanentDayStockTypes, options.RejectRepeatFunction10001);
-        var terms = ItemTermsLoader.Load(workbook, options.MaxShopItemBytes, purchasableItems);
-        var conditional = new Purchasing.ConditionalShopPurchaser(purchases, inventory, TimeProvider.System,
-            options.MaxPurchaseAttempts);
-        return new(conditional, stock => terms.TryGetValue(stock.ItemId, out var term)
-            ? term.ForStock(stock, rules)
-            : throw new Purchasing.PurchaseRejectedException($"Item {stock.ItemId} has no purchase terms."));
+        return (new ItemTermRules(options.PermanentDayStockTypes, options.RejectRepeatFunction10001),
+            ItemTermsLoader.Load(workbook, options.MaxShopItemBytes, purchasableItems));
     }
+
+    internal static Func<ShopStockRow, Purchasing.PurchaseGrantTerm> Kr1256Resolve(ItemTermRules rules,
+        IReadOnlyDictionary<int, ItemTerms> terms) =>
+        stock => terms.TryGetValue(stock.ItemId, out var term) ? term.ForStock(stock, rules)
+            : throw new Purchasing.PurchaseRejectedException($"Item {stock.ItemId} has no purchase terms.");
 
     // The gift box rides the shop's catalog, item terms and purchase transaction; the dialect row owns its packets.
     private static void MountPresentBox(IPluginContext context, ShopOptions options, PacketTables tables, ShopCatalog catalog,
         Purchasing.ConditionalShopPurchaser conditional, Func<ShopStockRow, Purchasing.PurchaseGrantTerm> resolve,
-        IInventoryRepository inventory, ShopOpenScope ready, IMessageSender<ShopStateUpdated> state, IMessageRoutes routes)
+        IInventoryRepository inventory, ShopOpenScope ready, IMessageSender<ShopStateUpdated>? state, IMessageRoutes routes)
     {
         if (!tables.CapabilityOf(options.ClientProfile, "present_box"))
             throw new ConfigException($"present_box requires a build with the present_box capability; '{options.ClientProfile}' has none.");
         if (!Bound<PresentSendRequested>(context, options.Protocol) || !Bound<PresentListRequested>(context, options.Protocol)
             || !Bound<PresentActionRequested>(context, options.Protocol) || !Bound<PresentNoticeRequested>(context, options.Protocol))
             throw new ConfigException($"present_box requires the dialect row of '{options.Protocol}' to bind the gift packets (present_box there).");
+        context.Services.TryGet<IInventoryPushService>(out var push);
+        if (state is null && push is null)
+            throw new ConfigException(
+                $"present_box requires the purchase state sender or the lobby inventory push to publish a taken gift's bag on '{options.Protocol}'.");
         context.Services.TryGet<ISessionRegistry>(out var sessions);
         var service = new Presents.PresentService(options, catalog, conditional, resolve, inventory,
-            context.Services.Get<IPresentStore>(), ready, state,
+            context.Services.Get<IPresentStore>(), ready, state, push,
             RequireShopSender<ShopBalanceUpdated>(context, options.Protocol),
             RequireShopSender<PresentSendReplied>(context, options.Protocol),
             RequireShopSender<PresentListReplied>(context, options.Protocol),

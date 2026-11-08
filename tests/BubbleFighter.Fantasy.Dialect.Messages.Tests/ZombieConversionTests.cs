@@ -21,6 +21,7 @@ public sealed class ZombieConversionTests
     [InlineData("cn-324")]
     [InlineData("id-400")]
     [InlineData("id-1809")]
+    [InlineData("cn-406")]
     public void ConversionIsASeatAndAnAllegianceWord(string build)
     {
         var body = ZombieConversionCodec.Encode(TestBuilds.Packets, build, new(1, 15));
@@ -35,6 +36,7 @@ public sealed class ZombieConversionTests
     [InlineData("cn-324", false)]
     [InlineData("id-400", false)]
     [InlineData("id-1809", false)]
+    [InlineData("cn-406", false)]
     [InlineData("kr-812", true)]
     public async Task ConversionAndZombieRevivalUseInstalledBuildRoutesAndUnload(string build, bool remap)
     {

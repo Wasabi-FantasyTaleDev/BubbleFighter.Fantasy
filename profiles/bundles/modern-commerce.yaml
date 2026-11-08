@@ -23,6 +23,14 @@
     # This is a wire ceiling, with no additional card-count restriction.
     catalog_payload_bytes: 65535
     grant_purchased_items: true
+    # The gift box rides this row's catalog and purchase transaction (packets/present.yaml): the sender is
+    # charged at the catalog price when the gift is stored and the receiver takes it through the same terms.
+    # Needs the build's present_box capability, the dialect row's present_box and a persistence row that
+    # provides the gift store; a taken gift is published through the lobby inventory push and the money stat,
+    # the pair the modern purchase path sends.
+    # Enable together with dialect.messages.present_box for native-client acceptance.
+    present_box: false
+    max_presents_per_player: 100
     starting_lucci: 100000
     starting_cash: 0
 - id: equipment

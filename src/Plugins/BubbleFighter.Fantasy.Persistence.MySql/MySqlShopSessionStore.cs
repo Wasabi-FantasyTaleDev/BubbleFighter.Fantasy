@@ -1,10 +1,11 @@
 using BubbleFighter.Fantasy.Abstractions.Persistence;
 using BubbleFighter.Fantasy.Contracts.Shop;
+using BubbleFighter.Fantasy.Contracts.Cluster;
 
 namespace BubbleFighter.Fantasy.Persistence.MySql;
 
 /// <summary>Last-open persistence over the <c>shop_sessions</c> table from migration 0011.</summary>
-public sealed class MySqlShopSessionStore(IDbConnectionFactory connections) : IShopSessionStore
+public sealed class MySqlShopSessionStore(IDbConnectionFactory connections, IAccountMutationFence? authority = null) : IShopSessionStore
 {
     /// <inheritdoc />
     public async ValueTask RememberOpenAsync(ShopOpenRecord record, CancellationToken ct)
@@ -18,6 +19,7 @@ public sealed class MySqlShopSessionStore(IDbConnectionFactory connections) : IS
             return;
 
         await using var session = await SugarSession.OpenAsync(connections, ct).ConfigureAwait(false);
+        await using var transaction = await session.BeginWriteAsync(record.UserNum, authority, ct).ConfigureAwait(false);
         var row = new ShopSessionRow
         {
             UserNum = record.UserNum,
@@ -32,6 +34,7 @@ public sealed class MySqlShopSessionStore(IDbConnectionFactory connections) : IS
         // Reopening with identical values in the same second may report zero affected rows.
         if (rows < 0 || rows > 2)
             throw new InvalidOperationException($"shop_sessions upsert for user_num {record.UserNum} wrote {rows} row(s).");
+        await transaction.CommitAsync().ConfigureAwait(false);
     }
 
     /// <inheritdoc />

@@ -1,0 +1,10 @@
+# Mount only on the node that owns launcher.http's ticket store.
+- insert:
+    - id: cluster-ticket-authority
+      plugin: cluster.ticket-authority
+      config:
+        listen: "${BFF_CLUSTER_TICKET_LISTEN:-127.0.0.1:8094}"
+        peers:
+          - node_id: worker
+            key: "${BFF_CLUSTER_REDEMPTION_KEY}"
+            builds: [kr-1256]

@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using BubbleFighter.Fantasy.Contracts.Inventory;
 using BubbleFighter.Fantasy.Contracts.Settings;
+using BubbleFighter.Fantasy.Contracts.Progress;
 
 namespace BubbleFighter.Fantasy.Persistence.Sqlite;
 
@@ -16,7 +17,7 @@ internal static class SaveJson
     private static readonly JsonSerializerOptions Options = new()
     {
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
-        Converters = { new LifetimeConverter(), new CustomizedKeyConverter() },
+        Converters = { new LifetimeConverter(), new CustomizedKeyConverter(), new BattleRecordConverter() },
     };
 
     /// <summary>Serializes the snapshot with the strict schema options.</summary>
@@ -26,6 +27,37 @@ internal static class SaveJson
     /// <exception cref="InvalidDataException">Thrown when the document is null or the JSON does not match the schema.</exception>
     internal static SaveState Decode(string json) => JsonSerializer.Deserialize<SaveState>(json, Options)
         ?? throw new InvalidDataException("SQLite player state is null.");
+
+    // Every stored counter is required: a truncated history record must not silently turn into zero statistics.
+    private sealed class BattleRecordConverter : JsonConverter<PlayerBattleRecord>
+    {
+        private static readonly string[] Fields = ["ModeId", "Wins", "Draws", "Losses", "Escapes",
+            "Knockdowns", "Kills", "Rescues", "Deaths", "Score"];
+
+        public override PlayerBattleRecord Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            using var document = JsonDocument.ParseValue(ref reader);
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object || root.EnumerateObject().Count() != Fields.Length)
+                throw new JsonException("A battle aggregate must contain its mode and every counter exactly once.");
+            var values = new long[Fields.Length];
+            for (var index = 0; index < Fields.Length; index++)
+                if (!root.TryGetProperty(Fields[index], out var field) || field.ValueKind != JsonValueKind.Number
+                    || !field.TryGetInt64(out values[index]))
+                    throw new JsonException("A battle aggregate is missing a required integer field.");
+            return new(checked((int)values[0]), values[1], values[2], values[3], values[4], values[5],
+                values[6], values[7], values[8], values[9]);
+        }
+
+        public override void Write(Utf8JsonWriter writer, PlayerBattleRecord value, JsonSerializerOptions options)
+        {
+            writer.WriteStartObject();
+            long[] values = [value.ModeId, value.Wins, value.Draws, value.Losses, value.Escapes,
+                value.Knockdowns, value.Kills, value.Rescues, value.Deaths, value.Score];
+            for (var index = 0; index < Fields.Length; index++) writer.WriteNumber(Fields[index], values[index]);
+            writer.WriteEndObject();
+        }
+    }
 
     // Missing key words must not deserialize as zero, which is a valid saved binding.
     private sealed class CustomizedKeyConverter : JsonConverter<CustomizedKey>

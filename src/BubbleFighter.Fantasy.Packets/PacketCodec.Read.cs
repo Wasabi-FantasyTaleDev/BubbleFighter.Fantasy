@@ -19,17 +19,35 @@ public static partial class PacketCodec
     public static Dictionary<string, object?> Read(PacketTables tables, string build, string structure,
         ReadOnlySpan<byte> payload, PacketReadLimits? limits = null, bool requireCanonicalBooleans = false)
     {
-        ArgumentNullException.ThrowIfNull(tables);
-        limits ??= new PacketReadLimits();
-        limits.Validate();
         if (payload.Length > ushort.MaxValue)
             throw new PacketFormatException("Body exceeds the native frame bound.", 0);
         var reader = new PacketReader(payload);
-        var budget = new ReadBudget(limits, requireCanonicalBooleans);
-        var values = ReadStructure(ref reader, tables, build, structure, budget, 1);
+        var values = ReadPrefix(ref reader, tables, build, structure, limits, requireCanonicalBooleans);
         if (reader.Remaining != 0)
             throw new PacketFormatException($"{structure} has trailing bytes.", reader.Offset);
         return values;
+    }
+
+    /// <summary>Consumes one table-defined structure while leaving the enclosing packet's following fields unread.</summary>
+    /// <param name="reader">Cursor positioned at the structure; its offset records the original byte range.</param>
+    /// <param name="tables">Audited layouts used for all nested fields.</param>
+    /// <param name="build">Client build whose resolved structure is consumed.</param>
+    /// <param name="structure">Name of the structure at the cursor.</param>
+    /// <param name="limits">Bounds for this structure's decoded tree, including all nested collections.</param>
+    /// <param name="requireCanonicalBooleans">Reject boolean words other than zero or one when enabled.</param>
+    /// <returns>The consumed structure's field map; callers must separately validate the enclosing packet.</returns>
+    /// <exception cref="PacketFormatException">The structure is truncated or exceeds a decoding bound.</exception>
+    /// <exception cref="ConfigException">A table names an unsupported type or an unresolved structure.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">A decoding limit exceeds its supported range.</exception>
+    public static Dictionary<string, object?> ReadPrefix(ref PacketReader reader, PacketTables tables, string build,
+        string structure, PacketReadLimits? limits = null, bool requireCanonicalBooleans = false)
+    {
+        ArgumentNullException.ThrowIfNull(tables);
+        limits ??= new PacketReadLimits();
+        limits.Validate();
+        if ((long)reader.Offset + reader.Remaining > ushort.MaxValue)
+            throw new PacketFormatException("Body exceeds the native frame bound.", reader.Offset);
+        return ReadStructure(ref reader, tables, build, structure, new ReadBudget(limits, requireCanonicalBooleans), 1);
     }
 
     private static Dictionary<string, object?> ReadStructure(ref PacketReader reader, PacketTables tables,

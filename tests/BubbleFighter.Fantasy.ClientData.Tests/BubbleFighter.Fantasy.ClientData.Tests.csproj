@@ -11,5 +11,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.ClientData\BubbleFighter.Fantasy.ClientData.csproj" />
+    <Compile Include="..\Shared\WorldBlockFixture.cs" Link="WorldBlockFixture.cs" />
   </ItemGroup>
 </Project>

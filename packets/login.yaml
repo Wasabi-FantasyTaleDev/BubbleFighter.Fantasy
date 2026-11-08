@@ -15,12 +15,15 @@ structs:
       offset: 68
     - unknown_72: u32
       offset: 72
-    # The client keeps this word at ServerConnection +2432 (kr-812 sub_818680); kr-812 sub_5831A0 matches it
-    # against 20, 30, 40, 70 and 91 for its callers kr-812 sub_54A7E0 and sub_814A70. Purpose unproven. The
-    # map dialog does not read it: kr-812 sub_69F610 passes the UserStat FighterInfo level (manager +104, set
-    # by kr-812 sub_81A820) to sub_6A2310, which picks ServerShared/Default.ini (HideThemes=1, all-maps tab
-    # only) up to level 5 and themed lists above.
-    - unknown_76: u32
+    # The player's channel. kr-812 sub_818680 stores this word at ServerConnection +2432, the same slot the
+    # move reply gspRepMoveInto fills (kr-812 sub_81C6F0); no other code writes it. At round start kr-812
+    # sub_587690 reads it back as the round's channel (0, 99 and 100 become 10, Junior) and kr-812 sub_584320
+    # looks that channel up in the FighterConfigChannel sheet of Config/FighterConfig.xml, whose columns
+    # carry the channel's movement and bubble values. kr-812 sub_5831A0 also matches it against 20, 30, 40,
+    # 70 and 91 for its callers kr-812 sub_54A7E0 and sub_814A70. The map dialog does not read it: kr-812
+    # sub_69F610 passes the UserStat FighterInfo level (manager +104, set by kr-812 sub_81A820) to
+    # sub_6A2310. The value written is the dialect.messages row's login_channel (zero when unset).
+    - channel_id: u32
       offset: 76
     - unknown_80: u32
       offset: 80
@@ -166,15 +169,9 @@ structs:
     - unknown_32: u16
       offset: 32
 
-  # S2C gspCenterList for the modern family. kr-1256 dispatches it as S2C 17 (case at 0x9D31CE, label
-  # 0x15B6C00) and reads it with kr-1256 sub_10C7500: a u32 count, then count GateInfo records. Each record
-  # is read by kr-1256 sub_10C6CF0 as 4, 4, 4, 4 and 2 bytes into a native 24-byte object (vtable, four
-  # dwords, u16 and padding; the vector advances six dwords per element). Count 0 is legal - both the
-  # allocation guard and the element loop accept it - so the empty body is the four-byte count alone.
-  # cn-774 sub_BCF090 case 19 and tw-454 sub_AACF80 case 19 name the same packet.
-  gspCenterList@kr-1256:
-    - gates: "list<GateInfo>"
   # The gate object's fields, in wire order. Their purposes are not proven.
+  # Experimental Gateway projection uses the legacy grouping keys and endpoint positions;
+  # the modern reader establishes field widths, not these assigned meanings.
   GateInfo@kr-1256:
     - unknown_4: u32
       offset: 4
@@ -186,10 +183,29 @@ structs:
       offset: 16
     - unknown_20: u16
       offset: 20
-  # The legacy readers (kr-812 sub_817960 for the list) describe their own gate record and are not audited
-  # here; these tables serve the modern login burst only.
-  gspCenterList: []
-  GateInfo: []
+  # kr-812 sub_817960 -> sub_845430; cn-324 sub_7035A0 -> sub_6FB400;
+  # cn-279 sub_44DBC0. The native 24-byte object serializes to 18 bytes.
+  # S2C gspCenterList for the modern family. kr-1256 dispatches it as S2C 17 (case at 0x9D31CE, label
+  # 0x15B6C00) and reads it with kr-1256 sub_10C7500: a u32 count, then count GateInfo records. Each record
+  # is read by kr-1256 sub_10C6CF0 as 4, 4, 4, 4 and 2 bytes into a native 24-byte object (vtable, four
+  # dwords, u16 and padding; the vector advances six dwords per element). Count 0 is legal - both the
+  # allocation guard and the element loop accept it - so the empty body is the four-byte count alone.
+  # cn-774 sub_BCF090 case 19 and tw-454 sub_AACF80 case 19 name the same packet.
+  gspCenterList:
+    - gates: "list<GateInfo>"
+  GateInfo:
+    # kr-812 sub_8E6A40 / sub_8E7110 and cn-324 sub_78CE60 / sub_78D580
+    # group endpoints by these two keys and compare address/port with the current socket.
+    - key: u32
+      offset: 4
+    - sub_key: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - address: u32 # Raw IPv4 bytes, preserved without a host/network byte-order conversion.
+      offset: 16
+    - port: u16
+      offset: 20
 
   # C2S gcpReqMoveStage as kr-1256 names it (runtime row Unknown53). Builder kr-1256 sub_56FB50 stamps the
   # opcode and writes one 4-byte word taken from the caller; the value's meaning is not proven from the

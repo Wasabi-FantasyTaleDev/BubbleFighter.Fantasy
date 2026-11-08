@@ -1,4 +1,5 @@
 using BubbleFighter.Fantasy.Contracts.Clans;
+using BubbleFighter.Fantasy.Contracts.Couples;
 using BubbleFighter.Fantasy.Contracts.Fighters;
 using BubbleFighter.Fantasy.Contracts.Inventory;
 using BubbleFighter.Fantasy.Contracts.Movement;
@@ -20,7 +21,27 @@ namespace BubbleFighter.Fantasy.Persistence.Memory.Tests;
 /// </summary>
 public sealed class MemoryPersistencePluginTests
 {
-
+    /// <summary>The relationship provider uses the row's capacity limits and unregisters with its owned effects.</summary>
+    [Fact]
+    public async Task CoupleProviderUsesConfiguredLimitsAndUnloads()
+    {
+        var registry = new FakeRegistry();
+        var context = new FakeContext(registry, new MemoryPersistenceOptions
+        {
+            Couples = new MemoryCoupleOptions { MaxPendingInvitations = 1 },
+        });
+        await new MemoryPersistencePlugin().ActivateAsync(context, default);
+        var store = registry.Get<ICoupleStore>();
+        Assert.False(store.PersistsState);
+        var now = new DateTimeOffset(2026, 11, 7, 0, 0, 0, TimeSpan.Zero);
+        await store.CreateInvitationAsync(new("alpha", 1),
+            new(Guid.NewGuid(), new("alpha", 2), "Hello", now, now.AddMinutes(1)), default);
+        var second = await store.CreateInvitationAsync(new("alpha", 3),
+            new(Guid.NewGuid(), new("alpha", 4), "Hello", now, now.AddMinutes(1)), default);
+        Assert.Equal(CoupleStoreResult.CapacityReached, second.Result);
+        foreach (var effect in registry.Disposables.AsEnumerable().Reverse()) effect.Dispose();
+        Assert.False(registry.TryGet<ICoupleStore>(out _));
+    }
 
     private sealed class FakeContext(FakeRegistry registry, MemoryPersistenceOptions options) : IPluginContext
     {

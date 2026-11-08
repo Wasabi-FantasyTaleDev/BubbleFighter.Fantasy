@@ -123,11 +123,8 @@ public sealed class PlayRoomWireTests
         w.WriteInt32(0);
         Assert.Equal(20, buffer.WrittenCount);
 
-        var request = PlazaRoomWire.ReadJoinSession(TestBuilds.Packets, "kr-812", buffer.WrittenSpan);
-
-        Assert.Equal((404, 1200, 1971401584, "", 0),
-            (request.RoomId, request.Unknown1, request.Unknown2, request.Password, request.Unknown4));
-        Assert.Throws<PacketFormatException>(() => PlazaRoomWire.ReadJoinSession(TestBuilds.Packets, "kr-812", buffer.WrittenSpan[..19]));
+        Assert.Equal(new RoomJoinRequested(404, ""), RoomRequests.ReadJoin(TestBuilds.Packets, "kr-812", buffer.WrittenSpan));
+        Assert.Throws<PacketFormatException>(() => RoomRequests.ReadJoin(TestBuilds.Packets, "kr-812", buffer.WrittenSpan[..19]));
     }
 
     [Fact]

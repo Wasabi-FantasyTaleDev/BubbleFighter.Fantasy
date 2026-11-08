@@ -78,18 +78,13 @@ internal sealed partial class RoundFlow
                 if (reporter is null) return;
                 if (report.RequiresReporterOwnership && (report.ReporterSlot != reporter.Slot || report.Victim == reporter.Slot))
                     return;
-                if (report.IsRescue && (report.ReporterSlot != reporter.Slot
-                    || report.Victim is not { } rescuedSlot || rescuedSlot == reporter.Slot
-                    || ScoreMember(room, rescuedSlot) is not { } rescued
-                    || rescued.Team != reporter.Team))
+                if (report.IsRescue && report.ReporterSlot != reporter.Slot)
                     return;
-                if (!report.IsRescue && report.Victim is { } victim)
-                    room.Scoring.RememberVictim(reporter.Slot, victim);
-                if ((report.IsRescue ? room.Scoring.AddRescue(reporter.Slot) : room.Scoring.AddKnockdown(reporter.Slot)) is not { } stats)
+                if (CreditAction(room, reporter.Slot, report.Victim, report.IsRescue, lifeEvidence: false) is not { } credited)
                     return;
-                knockdowns = stats.Knockdowns;
+                knockdowns = credited.Seats[0].Knockdowns;
                 nickname = reporter.Nickname;
-                update = new RoundScoreUpdated(room.Id, reporter.Team, [.. room.Scoring.TeamTotals], [stats], LiveScoreboard(room));
+                update = credited;
             }
             await SendScoreAsync(room, update, operationCt).ConfigureAwait(false);
             _logger.LogInformation(
@@ -111,6 +106,9 @@ internal sealed partial class RoundFlow
     {
         if (_result is null || _registry.TryGet(session.Id) is not { } room || room.Tutorial is not null)
             return;
+        var captainReport = IsCaptainMode(room) ? CaptureCaptainReport(room, session, report.Victim) : null;
+        int? finalZoneGeneration = IsFinalZoneMode(room) ? room.StartGeneration : null;
+        if (IsCaptainMode(room) && captainReport is null) return;
         await room.Executor.ExecuteAsync(async operationCt =>
         {
             RoundScoreUpdated update;
@@ -121,8 +119,11 @@ internal sealed partial class RoundFlow
             {
                 if (room.Phase != RoomPhase.Playing || room.FindByGame(session.Id) is not { } controller)
                     return;
+                if (captainReport is { } stamp && !CaptainReportIsCurrent(room, stamp)) return;
+                if (finalZoneGeneration is { } generation && !FinalZoneReportIsCurrent(room, session, generation)) return;
                 var reporter = ScoreReporter(room, controller, report.ReporterSlot,
-                    report.RequiresReporterOwnership || report.RequiresDirectKillMode);
+                    report.RequiresReporterOwnership || report.RequiresDirectKillMode || IsCaptainMode(room)
+                        || IsFinalZoneMode(room) || _options.ZombiePvpModeIds.Contains(room.ModeId));
                 if (reporter is null) return;
                 if (report.RequiresReporterOwnership && (report.ReporterSlot != reporter.Slot
                     || !report.HasVictimReference || report.Victim == reporter.Slot))
@@ -131,20 +132,24 @@ internal sealed partial class RoundFlow
                     || report.ReporterSlot != reporter.Slot || !report.HasVictimReference
                     || report.Victim == reporter.Slot))
                     return;
-                var pairedVictim = room.Scoring.TakeVictim(reporter.Slot);
-                victim = report.HasVictimReference ? report.Victim : pairedVictim;
-                var seatedVictim = victim is { } slot && slot != reporter.Slot && ScoreMember(room, slot) is not null ? victim : null;
-                if (room.Scoring.AddKill(reporter.Slot, reporter.Team, seatedVictim) is not { } stats)
+                if (report.CaptainKill && !CreditsCaptainKill(room, reporter.Slot, report.Victim))
                     return;
-                kills = stats.Kills;
+                var credited = CreditKill(room, new(reporter.Slot, report.Victim, KillEvidence.ScoreReport,
+                    HasVictimReference: report.HasVictimReference));
+                if (credited.Update is not { } accepted)
+                    return;
+                update = accepted;
+                victim = credited.Victim;
+                kills = update.Seats[0].Kills;
                 nickname = reporter.Nickname;
-                update = new RoundScoreUpdated(room.Id, reporter.Team, [.. room.Scoring.TeamTotals],
-                    seatedVictim is { } died ? [stats, room.Scoring.Stats(died)] : [stats], LiveScoreboard(room));
             }
             await SendScoreAsync(room, update, operationCt).ConfigureAwait(false);
             _logger.LogInformation(
                 "Room {Room} seat {Slot} ({Nick}) confirmed kill {Kills} over {Victim}; team totals {Totals}.",
                 room.Id, report.ReporterSlot, nickname, kills, victim, string.Join(':', update.TeamTotals));
+            if (_options.ZombiePvpModeIds.Contains(room.ModeId))
+                await ZombiePvpOutcomeAsync(room, operationCt).ConfigureAwait(false);
+            await SynchronizeFinalZoneAsync(room, operationCt).ConfigureAwait(false);
         }, ct).ConfigureAwait(false);
     }
 
@@ -177,20 +182,26 @@ internal sealed partial class RoundFlow
     /// <param name="reason">Why the round ended.</param>
     /// <param name="generation">The round generation, so a stale sequence cannot touch a new round.</param>
     /// <param name="ct">Cancellation token for the retained result sequence.</param>
-    private async ValueTask RunTypedResultAsync(PlayRoom room, RoundEndReason reason, int generation, CancellationToken ct)
+    /// <param name="settlementOnly">Continues the final reward stages after an inter-round forfeit without replaying its end presentation.</param>
+    private async ValueTask<bool> RunTypedResultAsync(PlayRoom room, RoundEndReason reason, int generation, CancellationToken ct,
+        bool settlementOnly = false)
     {
-        if (_result is not { } result) return;
+        if (_result is not { } result) return false;
         string? lifeChecks;
+        bool continues;
         lock (room.Gate)
+        {
             lifeChecks = room.LifeChecks.Any ? room.LifeChecks.Summary() : null;
+            continues = room.BombSeries is { CanContinue: true };
+        }
         if (lifeChecks is not null)
             _logger.LogInformation("Room {Room} match {Match}: ignored life reports {Checks}.", room.Id, room.MatchId, lifeChecks);
-        var rewards = ComputeRewards(room, generation, reason);
-        var rewardStartedAt = Environment.TickCount64;
+        var rewards = continues ? new Dictionary<int, RoundReward>() : ComputeRewards(room, generation, reason);
+        var rewardStartedAt = Environment.TickCount64 - (settlementOnly ? _options.ResultRewardDelayMs : 0);
         var outcome = OutcomeOf(room, generation, reason);
-        RememberOutcomes(room, generation, outcome);
+        if (!continues) RememberOutcomes(room, generation, outcome);
         var scoreDelay = 0;
-        if (!await TypedResultStepAsync(room, generation, async token =>
+        if (!settlementOnly && !await TypedResultStepAsync(room, generation, async token =>
         {
             if (reason == RoundEndReason.TimeLimit)
             {
@@ -208,32 +219,39 @@ internal sealed partial class RoundFlow
                 return false;
             if (endFirst) scoreDelay = Math.Min(_options.ResultScoreboardDelayMs, _options.ResultRewardDelayMs);
             return true;
-        }, ct).ConfigureAwait(false)) return;
+        }, ct).ConfigureAwait(false)) return false;
 
         // A single-scoreboard client gets the rewards granted before its one scoreboard, which carries them.
         var single = result.Ended is IRoundResultSequencePolicy { EndBeforeScoreboard: true, SingleScoreboard: true };
-        if (reason == RoundEndReason.TimeLimit || result.Ended is IRoundResultSequencePolicy { EndBeforeScoreboard: true })
+        if (!settlementOnly && (reason == RoundEndReason.TimeLimit || result.Ended is IRoundResultSequencePolicy { EndBeforeScoreboard: true }))
         {
             await Task.Delay(scoreDelay, ct).ConfigureAwait(false);
             if (!await TypedResultStepAsync(room, generation, async token =>
             {
-                if (single) rewards = await GrantRewardsAsync(room, generation, reason, token).ConfigureAwait(false);
-                return await SendScoreboardAsync(room, generation, rewards, single, token, reason,
+                if (single && !continues) rewards = await GrantRewardsAsync(room, generation, reason, token).ConfigureAwait(false);
+                return await SendScoreboardAsync(room, generation, rewards, single && !continues, token, reason,
                     timeOver: reason == RoundEndReason.TimeLimit).ConfigureAwait(false);
-            }, ct).ConfigureAwait(false)) return;
+            }, ct).ConfigureAwait(false)) return false;
+        }
+
+        if (continues)
+        {
+            var interval = Math.Max(0, _options.ResultRewardDelayMs - (Environment.TickCount64 - rewardStartedAt));
+            await Task.Delay(TimeSpan.FromMilliseconds(interval), ct).ConfigureAwait(false);
+            return await TypedResultStepAsync(room, generation, _ => ValueTask.FromResult(true), ct).ConfigureAwait(false);
         }
 
         // Result intervals are preserved; only each stage owns the executor.
-        if (!single && !await TypedResultStepAsync(room, generation, async token =>
+        if ((!single || settlementOnly) && !await TypedResultStepAsync(room, generation, async token =>
         {
             rewards = await GrantRewardsAsync(room, generation, reason, token).ConfigureAwait(false);
             return true;
-        }, ct).ConfigureAwait(false)) return;
+        }, ct).ConfigureAwait(false)) return false;
         var remainingDelay = Math.Max(0, _options.ResultRewardDelayMs - (Environment.TickCount64 - rewardStartedAt));
         await Task.Delay(TimeSpan.FromMilliseconds(remainingDelay), ct).ConfigureAwait(false);
         if (!await TypedResultStepAsync(room, generation, async token =>
         {
-            if (!single && !await SendScoreboardAsync(room, generation, rewards, true, token, reason).ConfigureAwait(false)) return false;
+            if ((!single || settlementOnly) && !await SendScoreboardAsync(room, generation, rewards, true, token, reason).ConfigureAwait(false)) return false;
             if (!await SendToMembersAsync(room, generation, (seat, sendCt) =>
                 result.Stage.SendAsync(seat.Game, new ResultStageAdvanced(room.Id, ResultStage.Reward), sendCt), token)
                 .ConfigureAwait(false)) return false;
@@ -242,7 +260,7 @@ internal sealed partial class RoundFlow
                 foreach (var seat in room.Seats)
                     if (rewards.TryGetValue(seat.Slot, out var reward)) seat.Level = reward.Level;
             return true;
-        }, ct).ConfigureAwait(false)) return;
+        }, ct).ConfigureAwait(false)) return false;
 
         if (LotteryAllowed(_options, room.ModeId, reason))
         {
@@ -255,7 +273,7 @@ internal sealed partial class RoundFlow
         {
             lotteryOpened = await BeginLotteryAsync(room, generation, reason, rewards, token).ConfigureAwait(false);
             return true;
-        }, ct).ConfigureAwait(false) || lotteryOpened) return;
+        }, ct).ConfigureAwait(false) || lotteryOpened) return false;
         await Task.Delay(_options.ResultCloseGraceMs, ct).ConfigureAwait(false);
         await TypedResultStepAsync(room, generation, async token =>
         {
@@ -263,25 +281,54 @@ internal sealed partial class RoundFlow
             await _returnToRoom(room, token).ConfigureAwait(false);
             return true;
         }, ct).ConfigureAwait(false);
+        return false;
     }
 
     private async Task RunTypedResultDetachedAsync(PlayRoom room, RoundEndReason reason, int generation,
         CancellationTokenSource cancellation)
     {
+        var canceled = false;
+        var settlementOnly = false;
         try
         {
-            await RunTypedResultAsync(room, reason, generation, cancellation.Token).ConfigureAwait(false);
+            while (true)
+            {
+                var continues = false;
+                try
+                {
+                    continues = await RunTypedResultAsync(room, reason, generation, cancellation.Token, settlementOnly).ConfigureAwait(false);
+                }
+                finally
+                {
+                    canceled = cancellation.IsCancellationRequested;
+                    continues &= !canceled;
+                    await room.ReleaseResultSequenceAsync(cancellation).ConfigureAwait(false);
+                }
+                if (!continues) return;
+                var settleForfeit = false;
+                await room.Executor.ExecuteAsync(async token =>
+                {
+                    lock (room.Gate)
+                    {
+                        if (room.Phase != RoomPhase.Result || room.StartGeneration != generation || room.IsStopping) return;
+                        if (room.BombSeries is { Forfeited: true })
+                        {
+                            cancellation = room.BeginResultSequence(_lifetime);
+                            settleForfeit = true;
+                        }
+                    }
+                    if (!settleForfeit) await _continueSeries!(room, generation, token).ConfigureAwait(false);
+                }, _lifetime).ConfigureAwait(false);
+                if (!settleForfeit) return;
+                settlementOnly = true;
+            }
         }
-        catch (OperationCanceledException) when (cancellation.IsCancellationRequested || _lifetime.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (canceled || _lifetime.IsCancellationRequested || room.IsStopping) { }
         catch (ObjectDisposedException) { }
         catch (Exception failure)
         {
             _logger.LogError(failure, "Room {Room}: typed result sequence failed.", room.Id);
             throw;
-        }
-        finally
-        {
-            await room.ReleaseResultSequenceAsync(cancellation).ConfigureAwait(false);
         }
     }
 
@@ -361,7 +408,7 @@ internal sealed partial class RoundFlow
                 totals[winner - 1] = Math.Max(totals[winner - 1], checked(totals[2 - winner] + 1));
             }
         }
-        return new RoundScoreboard(room.Id, winner, totals, rows, withRewards);
+        return new RoundScoreboard(room.Id, winner, totals, rows, withRewards) { RoundWins = room.BombSeries?.SnapshotWins() };
     }
 
     // The table a live score update carries along, with the experience each seat came in with; call
@@ -511,14 +558,43 @@ internal sealed partial class RoundFlow
     {
         var rewards = ComputeRewards(room, generation, reason);
         if (_progress is null || _levels is null) return rewards;
-        var matchId = room.MatchId;
-        var committed = await Task.WhenAll(Snapshot(room, generation).Where(seat => rewards.ContainsKey(seat.Slot)).Select(async seat =>
+        string matchId;
+        IReadOnlyList<BattleSettlementPlan> plans;
+        lock (room.Gate)
         {
-            var estimate = rewards[seat.Slot];
+            if (room.StartGeneration != generation || room.RoundCancelled
+                || room.Phase != RoomPhase.Result
+                    && !(_options.RecordBattleStatistics && room.Phase == RoomPhase.Starting
+                        && room.BombSeries is { Forfeited: true, RoundIndex: > 0 })) return [];
+            matchId = room.MatchId;
+            if (_options.RecordBattleStatistics)
+            {
+                if (room.BombSeries is { CanContinue: true }) return [];
+                var outcome = OutcomeOf(room, generation, reason);
+                room.BattleSettlements ??= room.Seats.Where(seat => rewards.ContainsKey(seat.Slot))
+                    .Select(seat => new BattleSettlementPlan(seat, rewards[seat.Slot],
+                        BattleRecord(room, seat, outcome(seat) switch
+                        {
+                            RoundOutcome.Won => BattleRecordOutcome.Won,
+                            RoundOutcome.Draw => BattleRecordOutcome.Draw,
+                            RoundOutcome.Lost => BattleRecordOutcome.Lost,
+                            _ => throw new InvalidOperationException("Unknown round outcome."),
+                        }))).ToArray();
+                plans = room.BattleSettlements;
+            }
+            else
+                plans = room.Seats.Where(seat => rewards.ContainsKey(seat.Slot))
+                    .Select(seat => new BattleSettlementPlan(seat, rewards[seat.Slot], null)).ToArray();
+        }
+        var committed = await Task.WhenAll(plans.Select(async plan =>
+        {
+            var seat = plan.Seat;
+            var estimate = plan.Reward;
             try
             {
+                using var authority = _mutations?.Enter(seat.Game);
                 var settled = await RoundSettler.SettleAsync(_progress, _levels, matchId, seat.UserNum, estimate.ExpEarned,
-                    estimate.LucciEarned, _options.SettlementAttempts, _logger, ct).ConfigureAwait(false);
+                    estimate.LucciEarned, _options.SettlementAttempts, _logger, ct, plan.Record).ConfigureAwait(false);
                 var after = settled.After;
                 var reward = estimate with
                 {
@@ -527,8 +603,9 @@ internal sealed partial class RoundFlow
                 };
                 _logger.LogInformation("Room {Room} seat {Slot}: {Outcome} {Exp} experience and {Lucci} Lucci for match {Match}; balance {Balance}.",
                     room.Id, seat.Slot, settled.Outcome, reward.ExpEarned, reward.LucciEarned, matchId, settled.LucciBalance);
-                await LevelRaisedPublisher.PublishAsync(_events, _logger, _options.GameProtocol, seat.UserNum,
-                    Math.Max(1, settled.Before.Level), after.Level, ct).ConfigureAwait(false);
+                if (plan.Record is null || plan.TryBeginLevelAnnouncement())
+                    await LevelRaisedPublisher.PublishAsync(_events, _logger, _options.GameProtocol, seat.UserNum,
+                        Math.Max(1, settled.Before.Level), after.Level, ct).ConfigureAwait(false);
                 return new KeyValuePair<int, RoundReward>?(new(seat.Slot, reward));
             }
             catch (Exception exception) when (exception is not OperationCanceledException)

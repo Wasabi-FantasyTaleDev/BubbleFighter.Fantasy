@@ -35,6 +35,8 @@ public sealed class ExpiredItemsTests
     [InlineData("id-1809")]
     [InlineData("cn-706")]
     [InlineData("cn-406")]
+    [InlineData("cn-774")]
+    [InlineData("tw-454")]
     public void TheCountedIdListIsTwelveBytesForTwoItems(string build)
     {
         Assert.True(TestBuilds.Packets.CapabilityOf(build, "expired_item_notice"));
@@ -145,6 +147,8 @@ public sealed class ExpiredItemsTests
 
     [Theory]
     [InlineData("kr-1256")]
+    [InlineData("cn-774")]
+    [InlineData("tw-454")]
     public async Task TheModernBurstAnnouncesExpiredItemsAfterTheMenu(string build)
     {
         var session = new RecordingSession();

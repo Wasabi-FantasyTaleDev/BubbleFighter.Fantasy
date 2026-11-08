@@ -33,10 +33,25 @@ structs:
   RoomEnterGameTail@id-400:
     - unknown_3204: u32
       offset: 3204
+      cn-404:
+        - unknown_4692: u32
+          offset: 4692
+      cn-408:
+        - unknown_4740: u32
+          offset: 4740
     - unknown_3208: u32
       offset: 3208
+      cn-404:
+        - unknown_4696: u32
+          offset: 4696
+      cn-408:
+        - unknown_4744: u32
+          offset: 4744
     - unknown_3212: u32
       offset: 3212
+      cn-404:
+        - unknown_4700: u32
+          offset: 4700
       # cn-408 sub_7B24D0 reads the three words at +4740 and then one more bool (cn-408 sub_7B2460
       # writes it from +4752); the nested ScoreData moved them by its twelve 4-byte longer rows.
       cn-408:
@@ -71,6 +86,46 @@ structs:
       only: [cn-324]
     - tail: RoomEnterGameTail
       except: [cn-324]
+  # cn-735 sub_9F4C00 reads one counted UTF-16 key, two words, two bytes, one word and one byte.
+  # It copies the key to session+220 and the first word to session+12 before loading the stage.
+  # cn-738 sub_A22B50, cn-742 sub_975AB0 and cn-742 sub_962DB0 retain the wire order with smaller string objects.
+  RoomEnterGame@cn-735:
+    - map_key: wstr
+      offset: 8
+      cn-738:
+        - map_key: wstr
+          offset: 4
+    - room_state: u32
+      offset: 36
+      cn-738:
+        - room_state: u32
+          offset: 32
+    - unknown_40: u32
+      offset: 40
+      cn-738:
+        - unknown_36: u32
+          offset: 36
+    - unknown_48: u8
+      offset: 48
+      cn-738:
+        - unknown_44: u8
+          offset: 44
+    - unknown_52: u8
+      offset: 52
+      cn-738:
+        - unknown_48: u8
+          offset: 48
+    - unknown_56: u32
+      offset: 56
+      cn-738:
+        - unknown_52: u32
+          offset: 52
+    - unknown_60: u8
+      offset: 60
+      cn-738:
+        - unknown_56: u8
+          offset: 56
+
   # kr-1256 restates the stage record of gspRoomEnterGame: room dispatcher kr-1256 sub_9D9930 case 0x1FE
   # constructs it (kr-1256 sub_10D1C10), reads it with kr-1256 sub_10D1D70 and copies +72 to session+12
   # before kr-1256 sub_9E5E70 moves the stage. Three strings, six scalars and three lists, with no field

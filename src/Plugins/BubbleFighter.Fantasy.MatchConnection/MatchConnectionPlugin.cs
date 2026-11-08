@@ -10,7 +10,7 @@ namespace BubbleFighter.Fantasy.MatchConnection;
 /// <summary>Owns authenticated match connections and their bounded handshake lifetime.</summary>
 [Plugin("match-connection", Description = "Authenticated match transport lifecycle.",
     Requires = [typeof(IMessageRouter)], Optional = [typeof(IMatchRoomDirectory)],
-    OptionalMany = [typeof(IMatchCapabilityDirectory), typeof(IInboundMessageBinding<MatchAuthenticate>),
+    OptionalMany = [typeof(IMatchUdpRelayDirectory), typeof(IMatchCapabilityDirectory), typeof(IInboundMessageBinding<MatchAuthenticate>),
         typeof(IInboundMessageBinding<MatchSceneRegistered>), typeof(IInboundMessageBinding<MatchCapabilityAuthenticate>),
         typeof(IInboundMessageBinding<MatchSceneIdentityRegistered>), typeof(IInboundMessageBinding<MatchMapNamed>),
         typeof(IMessageSender<MatchAuthenticationAccepted>), typeof(IMessageSender<MatchSceneAccepted>)])]
@@ -49,7 +49,12 @@ public sealed class MatchConnectionPlugin : IPlugin
         }
         var accepted = RequireSender<MatchAuthenticationAccepted>();
         var initialized = sceneReport ? RequireSender<MatchSceneAccepted>() : null;
-        var lifecycle = new MatchConnectionLifecycle(directory, accepted, initialized, options, context.Logger);
+        var udpDirectories = context.Services.GetAll<IMatchUdpRelayDirectory>()
+            .Where(item => item.Protocol == options.Protocol).ToArray();
+        if (udpDirectories.Length > 1)
+            throw new ConfigException($"Ambiguous UDP directory for '{options.Protocol}'.");
+        var lifecycle = new MatchConnectionLifecycle(directory, accepted, initialized, options, context.Logger,
+            udpDirectories.SingleOrDefault());
         context.Effect(lifecycle);
         var routes = context.Services.Get<IMessageRouter>().For(context);
         if (options.CapabilityAuthentication)
@@ -116,6 +121,7 @@ public sealed class MatchConnectionLifecycle : IDisposable
         public bool Revoked { get; set; }
         public SemaphoreSlim Gate { get; } = new(1, 1);
         public MatchSeatBinding? Binding { get; set; }
+        public IDisposable? UdpRegistration { get; set; }
         public bool Ready { get; set; }
         public long Started { get; } = Environment.TickCount64;
     }
@@ -130,14 +136,17 @@ public sealed class MatchConnectionLifecycle : IDisposable
     private readonly Timer _timer;
     private bool _disposed;
 
+    private readonly IMatchUdpRelayDirectory? _udp;
+
     /// <summary>Creates a lifecycle whose timer and retained connections end on disposal.</summary>
     public MatchConnectionLifecycle(IMatchRoomDirectory directory,
         IMessageSender<MatchAuthenticationAccepted> accepted, IMessageSender<MatchSceneAccepted>? initialized,
-        MatchConnectionOptions options, ILogger logger)
+        MatchConnectionOptions options, ILogger logger, IMatchUdpRelayDirectory? udp = null)
     {
         Validator.ValidateObject(options, new ValidationContext(options), true);
         if (initialized is null && (!options.CapabilityAuthentication || options.RequireCapabilitySceneReport))
             throw new ArgumentException("Scene-report authentication requires a scene acknowledgement sender.", nameof(initialized));
+        _udp = udp;
         _directory = directory;
         _accepted = accepted;
         _initialized = initialized;
@@ -198,6 +207,7 @@ public sealed class MatchConnectionLifecycle : IDisposable
                         throw new InvalidOperationException("Match capability was revoked before its direct acknowledgement.");
                     // cn-279 sub_701270 reports game-side success immediately on relay1, without a later validation report.
                     _directory.MarkInitialized(session, binding);
+                    RegisterUdp(entry);
                     entry.Ready = true;
                 }
             }
@@ -241,6 +251,7 @@ public sealed class MatchConnectionLifecycle : IDisposable
             {
                 RequireBinding(entry);
                 _directory.MarkInitialized(session, binding);
+                RegisterUdp(entry);
             }
             await initialized.SendAsync(session, new(binding.EntityId), linked.Token).ConfigureAwait(false);
             lock (entry.Sync)
@@ -289,6 +300,17 @@ public sealed class MatchConnectionLifecycle : IDisposable
         foreach (var entry in entries) Remove(entry.Session.Id, entry);
     }
 
+    private void RegisterUdp(Entry entry)
+    {
+        if (_udp is null) return;
+        entry.UdpRegistration = _udp.Register(entry.Session, () =>
+        {
+            lock (entry.Sync)
+                return !entry.Revoked && entry.Binding is { } binding
+                    && _directory.IsCurrent(entry.Session, binding);
+        });
+    }
+
     private Entry Require(ISession session)
     {
         lock (_gate)
@@ -311,6 +333,8 @@ public sealed class MatchConnectionLifecycle : IDisposable
         lock (expected.Sync)
         {
             expected.Revoked = true;
+            expected.UdpRegistration?.Dispose();
+            expected.UdpRegistration = null;
             _directory.Release(expected.Session);
         }
         expected.Stop.Cancel();

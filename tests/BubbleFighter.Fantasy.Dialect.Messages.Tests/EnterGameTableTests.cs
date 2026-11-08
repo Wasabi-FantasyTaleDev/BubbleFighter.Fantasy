@@ -36,7 +36,7 @@ public sealed class EnterGameTableTests
     [InlineData("cn-279")]
     public void EarlyCnEntriesRetainTheExactScoreBlockWithoutAScalarTail(string build)
     {
-        var scoreValues = PlayRoomCodec.ScoreboardValues(TestBuilds.Packets, build,
+        var scoreValues = RoundResultWire.ScoreboardValues(TestBuilds.Packets, build,
             new RoundScoreboard(0, 0, [0, 0], []));
         var body = TutorialWire.WriteRoomEnterGame(TestBuilds.Packets, build, 0, "ab", unknown4: 3, scoreboardValues: scoreValues);
         Assert.Equal(new byte[] { 0, 0, 0, 0, 2, 0, 0, 0, 97, 0, 98, 0 }, body[..12]);
@@ -105,14 +105,14 @@ public sealed class EnterGameTableTests
         BubbleFighter.Fantasy.Packets.PacketCodec.Write(writer, TestBuilds.Packets, build, "RoomEnterGameHeader", values);
         if (initialScore)
             BubbleFighter.Fantasy.Packets.PacketCodec.Write(writer, TestBuilds.Packets, build, "ScoreData",
-                PlayRoomCodec.ScoreboardValues(TestBuilds.Packets, build, new RoundScoreboard(0, 0, [0, 0], [])));
+                RoundResultWire.ScoreboardValues(TestBuilds.Packets, build, new RoundScoreboard(0, 0, [0, 0], [])));
         if (scoreboard)
-            writer.WriteBytes(PlayRoomCodec.WriteScoreboard(TestBuilds.Packets, build, board));
+            writer.WriteBytes(RoundResultWire.WriteScoreboard(TestBuilds.Packets, build, board));
         else
             BubbleFighter.Fantasy.Packets.PacketCodec.Write(writer, TestBuilds.Packets, build, "RoomEnterGameTail", values);
         Assert.Equal(expected.WrittenSpan.ToArray(), TutorialWire.WriteRoomEnterGame(
             TestBuilds.Packets, build, 7, "m", 11, 13, 4,
-            scoreboard ? PlayRoomCodec.ScoreboardValues(TestBuilds.Packets, build, board) : null));
+            scoreboard ? RoundResultWire.ScoreboardValues(TestBuilds.Packets, build, board) : null));
         Assert.Equal(scoreboard, TutorialWire.EntryNeedsScoreboard(TestBuilds.Packets, build));
     }
 

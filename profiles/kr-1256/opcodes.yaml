@@ -2,6 +2,113 @@ profile: kr-1256
 # Opcode assignments for the Korean 1256 client. C2S and S2C are separate numeric spaces.
 # Only rows with evidence are listed; see profiles/opcode-policy.md.
 opcodes:
+  - value: 932
+    direction: c2s
+    connection: game
+    name: gcpReqCoupleInviteAnswer
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_E881A0 stamps 932 and writes two bool32 values then two counted UTF-16 names from the invitation dialog kr-1256 sub_E83FE0; matched to kr-812 Packet_gcpReqCoupleInviteAnswer reader kr-812 sub_9FDE70 and dialog kr-812 sub_9FB200"
+    notes: "Complete layout in packets/couple.yaml; no native couple handler is registered. Client names are not authenticated account identities."
+  - value: 510
+    direction: c2s
+    connection: game
+    name: gcpReqKickFromSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_96A730 confirms a room-player removal, stamps 510 and writes one counted UTF-16 target nickname; matched to kr-812 Packet_gcpReqKickFromSession builder kr-812 sub_5C8730 and reader kr-812 sub_5C8FD0"
+  - value: 513
+    direction: s2c
+    connection: game
+    name: gspRepKickFromSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_9D9930 case 0x201 dispatches to kr-1256 sub_9DD000; kr-1256 sub_9D8C00 reads two counted UTF-16 nicknames and a u32 result, matched to kr-812 Packet_gspRepKickFromSession handler kr-812 sub_8014B0 and reader kr-812 sub_80AE00"
+    notes: "Requester nickname, removed nickname, result; zero announces removal in RoomStage8vs8, while nonzero results display a failure to the requester."
+  - value: 54
+    direction: c2s
+    connection: game
+    name: gcpReqMoveInto
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_99DD00 migration branch stamps 54 and writes retained user number then a stage flag; matched kr-812 sub_813060 and kr-812 sub_8399F0"
+  - value: 55
+    direction: c2s
+    connection: game
+    name: gcpAcknowledgePendingPromotion_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_9D2FF0 case 9 calls kr-1256 sub_9A6BA0, which promotes pending to current then stamps opcode 55 with no body through the connection receiving promotion (argument a1, virtual send slot +28)"
+  - value: 22
+    direction: c2s
+    connection: game
+    name: gcpReqCenterUserCnt
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_885D00 stamps opcode 22 with an empty body; kr-1256 sub_99DD00 sends it on the native auxiliary first-connect path"
+  - value: 23
+    direction: c2s
+    connection: game
+    name: gcpReqUniquenessCheck
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_9D76C0 stamps opcode 23 and writes one retained user word; kr-1256 sub_9A2770 sends it to unselected auxiliary connections"
+  - value: 20005
+    direction: c2s
+    connection: relay
+    name: rcpReqUdpBypassDisable
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_95AD40 sends an empty relay TCP20005 after the UDP liveness check fails"
+  - value: 19
+    direction: s2c
+    connection: udp
+    name: rspUdpBypassVerify_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_95E410 handles UDP 19 from the configured relay endpoint"
+  - value: 20002
+    direction: c2s
+    connection: udp
+    name: rcpUdpBypassVerifyAck
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_95E2B0 answers UDP 19 with UDP 20002 carrying the offered cookie"
+  - value: 20001
+    direction: c2s
+    connection: udp
+    name: rcpUdpBypassAck
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_9601E0 relay S2C 18 reader stores its u16 as the UDP destination port and copies the following eight bytes into the UDP C2S 20001 payload before kr-1256 sub_10BD3B0 sends it"
+  - value: 20003
+    direction: c2s
+    connection: udp
+    name: rcpUdpBypassWanderLean
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_95FAE0 wraps the full movement record written by kr-1256 sub_95E920 with an eight-byte relay identity prefix"
+  - value: 20004
+    direction: c2s
+    connection: udp
+    name: rcpUdpBypassWanderLeanOptimize
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_95FAE0 wraps the masked movement sample written by kr-1256 sub_10F4930 with an eight-byte relay identity prefix"
+  - value: 18
+    direction: s2c
+    connection: relay
+    name: rspUdpBypassInfo
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_9601E0 relay S2C 18 reader stores the u16 destination port and sends the following eight bytes as UDP C2S 20001 through kr-1256 sub_10BD3B0"
+  - value: 20
+    direction: s2c
+    connection: relay
+    name: rspUdpBypassReady_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_9601E0 relay S2C 20 sets the relay object's UDP-ready byte at +0x9F8"
   - value: 1549
     direction: s2c
     connection: game
@@ -125,18 +232,27 @@ opcodes:
     notes: "i32 actor, virtual +664 enters sub-state 107; 4 bytes"
   - value: 602
     direction: c2s
-    name: Unknown602
-    name_source: none
-    evidence: captured
-    source: "client 0x6E3730"
-    notes: "actor, two tagged optional i32 values, bool32 item reset; 10/14/18 bytes"
+    name: gcpRespawn
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_6E3730 stamps 602 and delegates the optional fields to kr-1256 sub_10C0430: the actor u32 always, then the 0x3A-tagged u32 or the bare 0xBA byte, then the trailing item-reset u32 from the itemResetOnRespawn settings (kr-1256 sub_423AF0); the dispatcher echo path and the per-player loop kr-1256 0x6D7775 both send it"
+    notes: "10/14/18 bytes depending on the two tagged optionals; supersedes the captured note that described the UDP dispatcher's case 32790"
+  - value: 612
+    direction: c2s
+    connection: game
+    name: gcpGameReqUseRespawnItem
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_511450 stamps 612 and writes one u32 actor word from the character object; the pre-send check kr-1256 sub_808040(100443) counts the revival item in the bag, and the key handler kr-1256 sub_B02FB0 reaches it in the dead state"
+    notes: "The one-u32 actor body continues the legacy kr-812 sub_50E8A0 shape; the client checks the item count locally and never decrements it (server-authoritative)."
   - value: 632
     direction: s2c
-    name: Unknown632
-    name_source: none
+    connection: game
+    name: gspRespawn
+    name_source: mirrored
     evidence: verified
-    source: "client 0x6F5E50; main dispatcher 0x9D3058; seat constructor 0x917460"
-    notes: "602 fields followed by i32 unknown2 at seat+304; 14/18/22 bytes; no captured native reply"
+    source: "kr-1256 sub_6F5E50 reads the actor header with the 0x3A/0xBA optional markers (reader kr-1256 sub_10C04D0) plus [u32 flag][u32 value], clears the character's state vectors on the flag and stores the value per seat; the dispatcher site is kr-1256 0x9D3058"
+    notes: "Mirrors the cn-774 and tw-454 gspRespawn (their S2C 605), which the same consumer shape serves; kr-1256 numbers the grant 632 with its own marker framing."
   - value: 985
     direction: s2c
     name: gspUpdateScoreData
@@ -147,50 +263,50 @@ opcodes:
   - value: 32779
     direction: c2s
     connection: both
-    name: Unknown32779
-    name_source: none
+    name: gppDash
+    name_source: label@kr-812
     evidence: captured
-    source: "client 0x6D6765"
+    source: "kr-1256 sub_6DE620 writes actor and bool32 for dash; matches kr-812 sub_50F510 Packet_gppDash builder"
     notes: "i32 actor, bool32 unknown0"
   - value: 32779
     direction: s2c
     connection: both
-    name: Unknown32779
-    name_source: none
+    name: gppDash
+    name_source: label@kr-812
     evidence: captured
-    source: "client 0x6D6765"
+    source: "kr-1256 sub_6D55D0 consumes actor and bool32 for dash; matches kr-812 sub_523A60 Packet_gppDash consumer"
     notes: "i32 actor, bool32 unknown0"
   - value: 32780
     direction: c2s
     connection: both
-    name: Unknown32780
-    name_source: none
+    name: gppRoll
+    name_source: label@kr-812
     evidence: captured
-    source: "client 0x6D67D8"
+    source: "kr-1256 sub_6DE8E0 writes actor, word and two bytes for roll; matches kr-812 sub_50F630 Packet_gppRoll builder"
     notes: "i32 actor, i32 unknown0, u8 unknown1, u8 unknown2"
   - value: 32780
     direction: s2c
     connection: both
-    name: Unknown32780
-    name_source: none
+    name: gppRoll
+    name_source: label@kr-812
     evidence: captured
-    source: "client 0x6D67D8"
+    source: "kr-1256 sub_6D55D0 consumes actor, word and two bytes for roll; matches kr-812 sub_523AF0 Packet_gppRoll consumer"
     notes: "i32 actor, i32 unknown0, u8 unknown1, u8 unknown2"
   - value: 32781
     direction: c2s
     connection: both
-    name: Unknown32781
-    name_source: none
+    name: gppJump
+    name_source: label@kr-812
     evidence: captured
-    source: "client 0x6D8E90"
+    source: "kr-1256 sub_6DEB60 writes actor, word and bool32 for jump; matches kr-812 sub_50F750 Packet_gppJump builder"
     notes: "i32 actor, i32 unknown0, bool32 unknown1"
   - value: 32781
     direction: s2c
     connection: both
-    name: Unknown32781
-    name_source: none
+    name: gppJump
+    name_source: label@kr-812
     evidence: captured
-    source: "client 0x6D8E90"
+    source: "kr-1256 sub_6D8E90 consumes actor, word and bool32 for jump; matches kr-812 sub_523B80 Packet_gppJump consumer"
     notes: "i32 actor, i32 unknown0, bool32 unknown1"
   - value: 32784
     direction: c2s
@@ -875,8 +991,8 @@ opcodes:
     direction: c2s
     name: gcpReqGamePatch
     evidence: verified
-    source: sub_99DD00
-    notes: "96-byte payload; first u32 is ClientVersion_Major"
+    source: "kr-1256 sub_99DD00 stamps opcode 1 and ClientVersion_Major; kr-1256 sub_10C6440 writes the body"
+    notes: "u32 version, seven counted UTF-16 strings, u32 unknown_172, fifteen counted UTF-16 strings; 96 bytes only when all strings are empty"
   - value: 1
     direction: s2c
     name: gspDisconnect
@@ -969,8 +1085,64 @@ opcodes:
     name: gcpReqUserLaboratoryState
     name_source: mirrored
     evidence: inferred
-    source: "builder sub_E7E020 writes no fields"
-    notes: "named after S2C 109 gspUserLaboratoryState; the recorded lobby session sends it with an empty body"
+    source: "kr-1256 sub_E7E020 stamps an empty 109 from the UiRoomStageUserList timer path with a 10000 ms throttle"
+    notes: "Compatibility name inferred from S2C 109 gspUserLaboratoryState. The sender does not establish that S2C 109/110 are its replies; no laboratory state is sent for this request."
+  - value: 131
+    direction: c2s
+    name: gcpReqScienceLabCompound_
+    name_source: coined
+    evidence: verified
+    source: "DlgCompound slot-4 wrapper kr-1256 sub_DCE3C0 -> sender kr-1256 sub_DCD850 stamps 131; the shared RequestScienceLab class (vtable 0x163be5c, writer kr-1256 sub_114B300) carries vector<u64> material keys and one u64"
+    notes: "The u64 is an obfuscated global counter plus one (kr-1256 sub_F9DA80/sub_F9DDC0), not an item key. Materials are the dialog's registered entries resolved through the inventory map, key at content+48. The client pre-validates the 20-day minimum and the duration kind; the server mirrors the refusals. Recipe results and probabilities are server data."
+  - value: 132
+    direction: c2s
+    name: gcpReqScienceLabCompoundUnlimited_
+    name_source: coined
+    evidence: verified
+    source: "DlgCompoundUnlimited slot-4 wrapper kr-1256 sub_DD2B60 -> sender kr-1256 sub_DD30F0 stamps 132; the shared class carries the card-backed keys (ArticleSetItemSlotCardContent key +104 plus the attached list +112) and u64 zero"
+    notes: "Sends even when the resolved map is empty. Reply S2C 152 (kind 7)."
+  - value: 134
+    direction: c2s
+    name: gcpReqScienceLabEnchant_
+    name_source: coined
+    evidence: verified
+    source: "DlgEnchant slot-4 wrapper kr-1256 sub_DD6A80 -> sender kr-1256 sub_DD5E70 stamps 134; the shared class carries the selected content key at content+48 (or the card key +104 plus attachments when the content is card-backed) and a 0/1 flag"
+    notes: "The flag is 1 when the stored content key equals slotHolder+352, else 0. Reply S2C 154 (kind 2)."
+  - value: 135
+    direction: c2s
+    name: gcpReqScienceLabPetCompound_
+    name_source: coined
+    evidence: verified
+    source: "DlgPetCompound slot-4 wrapper kr-1256 sub_DDD890 -> sender kr-1256 sub_DDD260 stamps 135; the shared class carries the registered material keys (the same getter as 131) and u64 zero"
+    notes: "A material whose content+292 is nonzero aborts client-side and deselects. Reply S2C 155 (kind 3)."
+  - value: 136
+    direction: c2s
+    name: gcpReqScienceLabMakeItemAdvanced_
+    name_source: coined
+    evidence: verified
+    source: "DlgMakeItemAdvanced slot-4 wrapper kr-1256 sub_DDA6B0 -> sender kr-1256 sub_DDA160 stamps 136; the shared class carries the card key +104 plus the attached list (the content must be card-backed) and the selected item key at content+56"
+    notes: "Reply S2C 156 (kind 6)."
+  - value: 137
+    direction: c2s
+    name: gcpReqScienceLabChangeUnlimited_
+    name_source: coined
+    evidence: verified
+    source: "DlgChangeUnlimited slot-4 wrapper kr-1256 sub_DCAB80 -> sender kr-1256 sub_DCA620 stamps 137; the shared class carries the single selected key at content+56 and u64 zero"
+    notes: "Every sub-item id must resolve with obj+236 nonzero client-side before sending. Reply S2C 157 (kind 4)."
+  - value: 138
+    direction: c2s
+    name: gcpReqScienceLabModification_
+    name_source: coined
+    evidence: verified
+    source: "DlgScienceLabModification slot-4 wrapper kr-1256 sub_DE79A0 -> sender kr-1256 sub_DE7EF0 stamps 138; the shared class carries one key per selected-parts map node (value u64 at node+48) and u64 zero"
+    notes: "Reply S2C 158 (kind 8)."
+  - value: 139
+    direction: c2s
+    name: gcpReqScienceLabModificationDelete_
+    name_source: coined
+    evidence: verified
+    source: "DlgScienceLabModification slot-66 handler kr-1256 sub_DE7170 (behind the confirmDeleteModification modal, which sends on result 257) -> sender kr-1256 sub_DE81E0 stamps 139; the shared class carries the slot holder's single key and the part-node value at node+16 whose +20 equals the clicked control id"
+    notes: "Reply S2C 159 (kind 8, the same kind as 158)."
   - value: 53
     direction: c2s
     name: Unknown53
@@ -1073,8 +1245,8 @@ opcodes:
     connection: both
     name: gcpReqInventoryChangeWeaponPresetIdx
     name_source: label@kr-812
-    evidence: inferred
-    source: "kr-1256 builder sub_808F10 stamps C2S 832 and writes i32 context then u8 preset slot; matched to kr-812 Packet_gcpReqInventoryChangeWeaponPresetIdx builder sub_97A8D0 and the shared five-byte swap path"
+    evidence: verified
+    source: "kr-1256 sub_808F10 stamps C2S 832 and writes [u32 context][u8 slot]; the cross-build audit verified the same byte layout in cn-774 sub_9A9700 and tw-454 sub_C07A40"
     notes: "The in-round request is registered on both game and relay connections; S2C 836 gspReqInventoryChangeWeaponPresetIdx is the status reply. The kr-1256 binary has no label for this C2S row."
   - value: 827
     direction: c2s
@@ -1127,11 +1299,11 @@ opcodes:
   - value: 817
     direction: c2s
     connection: game
-    name: gcpReqRefund
-    name_source: label@kr-812
-    evidence: inferred
-    source: "kr-1256 sub_D3E0B0 (sent through the thin wrapper sub_D3EDC0) stamps 817 and writes a prefixed wstr then one i32; kr-812 Packet_gcpReqRefund (serializer kr-812 sub_4EC0B0: wstr then u32, sender kr-812 sub_9856D0) has the same fields"
-    notes: "Not a card info request. No server row answers it yet; it is logged as unhandled."
+    name: Unknown817
+    name_source: none
+    evidence: verified
+    source: "kr-1256 sub_D3E0B0 (through kr-1256 sub_D3EDC0) stamps 817 and writes an empty counted wstr then one u32; the first zero word is the string length, followed by zero string bytes and the item word. The wrapper is referenced by vtable kr-1256 0x16078D0, whose RTTI identifies a CashInvenSlotCardContent action lambda."
+    notes: "The wire shape alone matches the kr-812 refund (kr-812 sub_4EC0B0); it does not prove that the cash-inventory action has the same purpose. The exact action remains unproven, so no refund name or route is assigned. The request is logged as unhandled."
   - value: 833
     direction: c2s
     connection: game
@@ -1205,6 +1377,14 @@ opcodes:
     evidence: verified
     source: "kr-812 C2S 404 gcpReqLeaveSession (sender kr-812 sub_6A7A50); kr-1256 sub_62A880 sends it to leave the room for the lobby; earlier: sub_62A880"
     notes: "c2s_builders in dispatch export"
+  - value: 128
+    direction: c2s
+    name: gcpReqMatch
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_E651C0 stamps 128 and the request-object serializer kr-1256 sub_114E2E0 (vftable 0x163BDD8, RTTI RequestUserMysteryStore) writes a u8 type plus a u32 and a per-type tail before kr-1256 sub_961940 sends it; the senders are kr-1256 sub_E5F070 (type 1), kr-1256 sub_E64FC0 (type 2), kr-1256 sub_E33FD0 (type 3) and kr-1256 sub_E6CE80 (type 4). The reply S2C 128 opens DlgWaiting on result 0 exactly as the kr-812 gcpReqMatch to gspNotifyMatch pair does, so the kr-812 label mirrors"
+    notes: "Typed bodies live in packets/room-matching.yaml (kr-1256): type 1 match start, type 2 five-second keepalive, type 3 party join, type 4 listing enter. Distinct from the C2S 401..404 room-list family."
+    connection: game
   - value: 1500
     direction: c2s
     name: gcpReqDynamicConfig
@@ -1281,14 +1461,14 @@ opcodes:
     name_source: label@kr-1256
     evidence: verified
     source: "S2C dispatch label 0x15b7118; handler sub_9ACD00; case_ea 0x9d37b1"
-    notes: "S2C 118 dispatcher entry; body semantics remain unverified."
+    notes: "The body is a u32 count then that many {counted string, u32} records (28-byte elements, reader kr-1256 sub_10D4B50); the consumer copies the list into the RoomStage8vs8 wait-list object at +0xC64."
   - value: 128
     direction: s2c
-    name: Unknown128
-    name_source: none
-    evidence: captured
-    source: "absent from dispatch CSV and census S2C (census has C2S 128 only)"
-    notes: "Both-table miss. Do not confuse with C2S Unknown128 / sub_E651C0."
+    name: gspNotifyMatch
+    name_source: mirrored
+    evidence: verified
+    source: "Two stage handlers consume it outside the sub_9D2FF0 jumptable: MainMenuStage kr-1256 sub_8925A0 case 128, and the LobbyStage handler kr-1256 sub_853CF0 through kr-1256 sub_853E90 case 0x80. Both parse through kr-1256 sub_84F6C0 (u32 result, u32 unknown, wstr) and result 0 opens DlgWaiting (kr-1256 sub_8926C0 into kr-1256 sub_65B5A0, or kr-1256 sub_858250), which is the kr-812 sub_687640 gate's own semantics, so the kr-812 label mirrors"
+    notes: "Both-table miss resolved: the stage OnPacket handlers, not the main dispatcher, consume it. Pairs with C2S 128 gcpReqMatch; the body is RoomMatchNotification, identical to the kr-812 baseline."
   - value: 135
     direction: s2c
     name: gspRepEvent
@@ -1393,13 +1573,6 @@ opcodes:
     evidence: verified
     source: "kr-1256 room dispatcher sub_9D9930 keeps kr-812 sub_7FBBB0's case order (0x1F5-0x214 = 501-532); case 0x205 -> kr-1256 sub_9DF920; earlier: sub_9DF920"
     notes: "sub_9D9930 dispatcher case; not in sub_9D2FF0 jumptable; C2S 517 is Unknown517 (separate space)"
-  - value: 688
-    direction: s2c
-    name: Unknown688
-    name_source: none
-    evidence: captured
-    source: "not in sub_9D2FF0 or sub_9D9930"
-    notes: "Client has no S2C dispatch case for 688. Separate C2S 688 writer at sub_C0D140. Spaces are independent."
   - value: 754
     direction: s2c
     name: gspHonorUserState
@@ -1605,22 +1778,26 @@ opcodes:
     notes: "six f32, i32 kind, i32 unknown0 (0 in every recording); 32 bytes; a drop the host round spawned; horde-wave family, HordeWaveWire"
   - value: 645
     direction: s2c
-    name: Unknown645
-    name_source: none
-    evidence: captured
-    source: "reader 0x6EFD00 via sub_6D55D0 case 645"
-    notes: "i32 server serial, i32 kind, six f32, i32 kind; 36 bytes; sent to every seat; horde-wave family, HordeWaveWire"
+    connection: game
+    name: gspGameCreateLucci
+    name_source: mirrored
+    source: "kr-1256 sub_C16880 constructs GoLucciItem and GoBigLucciItem from the nine u32 words; the legacy label mirrors (kr-812 sub_51AD80's own create)"
+    evidence: verified
+    notes: "Supersedes the captured Unknown645 now that the cross-build economy audit verified the constructor"
   - value: 635
     direction: c2s
+    connection: game
     name: gcpEatLucci
-    name_source: label@cn-717
-    evidence: captured
-    notes: "i32 entity, i32 drop serial; 8 bytes; a pickup; horde-wave family, HordeWaveWire; builder sub_6DC600; name aligned from cn-717 C2S 735 Packet_gcpEatLucci (label alignment; via cn-774 C2S 635, run cn-717 C2S 724..742 -> 624..642, shape [4 4], similarity 1.0)"
+    name_source: label@kr-1256
+    evidence: verified
+    source: "kr-1256 sub_6DC600 stamps 635 and writes [u32 actor][u32 item object]; the GoLucciItem, GoBigLucciItem and GoHordeAward1/5/10LucciItem slot 34 handlers feed it"
+    notes: "8 bytes; supersedes the captured note"
   - value: 646
     direction: s2c
-    name: Unknown646
-    name_source: none
-    evidence: captured
+    connection: game
+    name: gspLucciEaten
+    name_source: mirrored
+    evidence: verified
     source: "reader 0x6EAD50 via sub_6D55D0 case 646"
     notes: "i32 entity, i32 drop serial repeated from C2S 635 to every seat; 8 bytes; horde-wave family, HordeWaveWire"
   # S2C labels recovered from the dispatcher (dispatcher sub_9D2FF0); layouts are not claimed by these rows.
@@ -1950,6 +2127,54 @@ opcodes:
     name_source: label@kr-1256
     evidence: verified
     source: "dispatcher sub_9D2FF0 jumptable case 172 stores \"gspRepRemoveBlockUser\""
+  - value: 173
+    direction: s2c
+    connection: game
+    name: gspMatchBoardDeny_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_8A0E60 pump case 0xAD reads it with kr-1256 sub_10D9F90 and routes the parsed values to the matching-denied popup kr-1256 sub_8A2B10; no document reactor runs"
+    notes: "The pump family consumes one contiguous S2C range before each build's opcode jump table: 173-178 on kr-1256 and cn-774, 170-175 on tw-454."
+  - value: 174
+    direction: s2c
+    connection: game
+    name: gspMatchBoardRoomUpsert_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 pump case 0xAE reads it with kr-1256 sub_8A0390, upserts the entry into the MatchingDocument room map through kr-1256 sub_8A8300 and runs the per-room row reactor kr-1256 sub_622C80"
+    notes: "The optional title is followed by a second optional word-vector record, read by kr-1256 sub_10D5BE0."
+  - value: 175
+    direction: s2c
+    connection: game
+    name: gspMatchBoardCountFlag_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 pump case 0xAF parses it inline, stores the counts on the entry and turns the trailing flag byte into a document state through kr-1256 sub_D91AE0 before the per-room row reactor"
+    notes: "The row records follow the kr-1256 table through builds.yaml for cn-774 and tw-454."
+  - value: 176
+    direction: s2c
+    connection: game
+    name: gspMatchBoardCount_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 pump case 0xB0 parses it inline, stores the counts and runs the per-room row reactor; kr-1256 conditions a full board refresh on it"
+    notes: ""
+  - value: 177
+    direction: s2c
+    connection: game
+    name: gspMatchBoardCountSet_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 pump case 0xB1 parses it inline, stores the counts and sets the entry's state flag to one through kr-1256 sub_D91AE0 before the per-room row reactor"
+    notes: ""
+  - value: 178
+    direction: s2c
+    connection: game
+    name: gspMatchBoardNames_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 pump case 0xB2 reads it with kr-1256 sub_8A05B0: a map of entry keys to display names and a second map of 0x3A-tagged optional word-vector records, then the full board refresh kr-1256 sub_622BF0"
+    notes: "cn-774 and tw-454 carry only the first map; the second map is kr-1256's own extension."
   - value: 203
     direction: s2c
     name: gspUpdatePartyLeader
@@ -2328,7 +2553,7 @@ opcodes:
     name: gcpPortalMove
     name_source: mirrored
     evidence: verified
-    source: "kr-1256 sub_7037D0 stamps 939 and writes three four-byte words and a two-byte word before the relay 26 packet; matches kr-812 Packet_gcpPortalMove (writer kr-812 sub_529E80, deserializer kr-812 sub_52FC40); packets/portal.yaml"
+    source: "kr-1256 sub_7037D0 writes game 939 as position xyz and region u16; matched to kr-812 sub_529E80 Packet_gcpPortalMove; kr-1256 sub_9C3DF0 consumes the native movement authorization; packets/portal.yaml"
   - value: 939
     direction: s2c
     name: gspResCoupleBreakUp
@@ -2361,10 +2586,11 @@ opcodes:
     source: "dispatcher sub_9D2FF0 jumptable case 952 stores \"gspNexonGuard\""
   - value: 953
     direction: s2c
+    connection: game
     name: gspPortalMove
     name_source: label@kr-1256
     evidence: verified
-    source: "dispatcher sub_9D2FF0 jumptable case 953 stores \"gspPortalMove\""
+    source: "kr-1256 sub_9C3DF0 reads word, region u16 and seat word, invokes the native region action and clears local pending contact; packets/portal.yaml"
   - value: 954
     direction: s2c
     name: gspNotifyMsg
@@ -2431,6 +2657,7 @@ opcodes:
     name_source: label@kr-1256
     evidence: verified
     source: "dispatcher sub_9D2FF0 jumptable case 969 stores \"gspRepMatchWaitingInfo\""
+    notes: "The body is two u32 words, a counted string and one more u32; kr-1256 sub_9C9A20 parses and discards it (verified instruction-by-instruction in the disassembly), so the board is not fed by this message on this build."
   - value: 974
     direction: s2c
     name: gspRepCustomizedKeyList
@@ -2817,14 +3044,16 @@ opcodes:
     direction: c2s
     name: gcpRequestRespawnIdx
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_6E3940; name aligned from cn-717 C2S 705 Packet_gcpRequestRespawnIdx (label alignment; via cn-774 C2S 603, run cn-717 C2S 704..715 -> 602..613, shape [4 4], similarity 1.0)"
+    evidence: verified
+    source: "kr-1256 sub_6E3940 writes [u32 actor][u32 spawn index]; the index comes from the client's own spawn-point chooser kr-1256 sub_98DB80 or echoes the server's offer"
+    notes: "verified from the builder; the label alignment from cn-717 stands"
   - value: 605
     direction: c2s
+    connection: game
     name: gcpEatItem
-    name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_6DBED0; name aligned from cn-717 C2S 707 Packet_gcpEatItem (label alignment; via cn-774 C2S 605, run cn-717 C2S 704..715 -> 602..613, shape [4 4], similarity 1.0)"
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_6DBED0 writes the item object id and resolved item kind, two u32 words"
   - value: 609
     direction: c2s
     name: gcpGameUpdateDamagePoint
@@ -2835,92 +3064,237 @@ opcodes:
     direction: c2s
     name: gcpGameReqExtendRespawn
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_7D0BB0; name aligned from cn-717 C2S 715 Packet_gcpGameReqExtendRespawn (label alignment; via cn-774 C2S 613, run cn-717 C2S 704..715 -> 602..613, shape [4 4], similarity 1.0)"
+    evidence: verified
+    source: "kr-1256 sub_7D0BB0 writes [u32 my actor][u32 wait delta], the delta scaled by the same 0.429296875 constant the cn-774 and tw-454 senders use"
+    notes: "verified from the builder"
   - value: 628
     direction: c2s
+    connection: game
     name: gcpReqCreateItem
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_708C10; name aligned from cn-717 C2S 728 Packet_gcpReqCreateItem (label alignment; via cn-774 C2S 628, run cn-717 C2S 724..742 -> 624..642, shape [4 4 4 4 4 4 4 4 4], similarity 0.89)"
+    evidence: verified
+    source: "kr-1256 sub_708C10 stamps 628 and writes the position and direction triplets, the item kind, one byte and the item lifetime; the wrappers kr-1256 sub_6E7380 (life 20000), sub_6E7480 (life 10000) and sub_4988C0 (kind 14) feed it from the kill-drop and mode-script paths"
+    notes: "33 bytes; the position and direction words carry float bit patterns"
   - value: 629
     direction: c2s
+    connection: game
     name: gcpReqCreateWeaponObject
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_708D50; name aligned from cn-717 C2S 729 Packet_gcpReqCreateWeaponObject (label alignment; via cn-774 C2S 629, run cn-717 C2S 724..742 -> 624..642, shape [4 4 4 4 4 4 4 4 4 4], similarity 0.95)"
+    evidence: verified
+    source: "kr-1256 sub_708D50 via sub_6E7580 stamps 629 and writes eleven u32 words (ten fields and the byte at object +40 widened); the drop-weapon path kr-1256 sub_4993B0 drops the weapon of a slot at most five in front of the player"
+    notes: "44 bytes"
   - value: 630
     direction: c2s
+    connection: game
     name: gcpPickUpWeapon
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_498F50; name aligned from cn-717 C2S 730 Packet_gcpPickUpWeapon (label alignment; via cn-774 C2S 630, run cn-717 C2S 724..742 -> 624..642, shape [4 4], similarity 1.0)"
+    evidence: verified
+    source: "kr-1256 sub_498F50 stamps 630 and writes [u32 weapon object][u32 actor]; the walk-over tick picks the nearest WeaponObject within the 30/140 range with the slot list under three"
+    notes: "8 bytes"
   - value: 631
     direction: c2s
+    connection: game
     name: gcpEatStar
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_6DC3C0; name aligned from cn-717 C2S 731 Packet_gcpEatStar (label alignment; via cn-774 C2S 631, run cn-717 C2S 724..742 -> 624..642, shape [4 4], similarity 1.0)"
+    evidence: verified
+    source: "kr-1256 sub_6DC3C0 stamps 631 and writes [u32 actor][u32 item object]; the GoStarItem and GoBigStarItem vtable slot 34 overlap handlers feed it, cooldown-gated"
+    notes: "8 bytes"
   - value: 632
     direction: c2s
+    connection: game
     name: gcpReqCreateStar
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_6E8580; name aligned from cn-717 C2S 732 Packet_gcpReqCreateStar (label alignment; via cn-774 C2S 632, run cn-717 C2S 724..742 -> 624..642, shape [4 4 4 4 4 4 4 4 4], similarity 0.94)"
+    evidence: verified
+    source: "kr-1256 sub_6E8580 stamps 632 and writes nine u32 words (position and direction triplets, the star kind and two trailing words); the star-mode kill drop kr-1256 sub_4A9670 and the scatter loop sub_6F9AA0 feed it"
+    notes: "36 bytes"
   - value: 633
     direction: c2s
+    connection: game
     name: gcpEatEventBox
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_6DC4E0; name aligned from cn-717 C2S 733 Packet_gcpEatEventBox (label alignment; via cn-774 C2S 633, run cn-717 C2S 724..742 -> 624..642, shape [4 4], similarity 1.0)"
+    evidence: verified
+    source: "kr-1256 sub_6DC4E0 stamps 633 and writes [u32 actor][u32 item object]; the GoEventBoxItem and GoHordeAwardBoxItem slot 34 handlers feed it"
+    notes: "8 bytes"
   - value: 634
     direction: c2s
+    connection: game
     name: gcpReqCreateEventBox
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_6E8770; name aligned from cn-717 C2S 734 Packet_gcpReqCreateEventBox (label alignment; via cn-774 C2S 634, run cn-717 C2S 724..742 -> 624..642, shape [4 4 4 4 4 4 4 4 4], similarity 0.94)"
+    evidence: verified
+    source: "kr-1256 sub_6E8770 stamps 634 and writes nine u32 words (position and direction triplets and the constants 1, 1); the event-box spawn helper kr-1256 sub_485BE0 feeds it"
+    notes: "36 bytes"
   - value: 636
     direction: c2s
+    connection: game
     name: gcpReqCreateLucci
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_6E8B40; name aligned from cn-717 C2S 736 Packet_gcpReqCreateLucci (label alignment; via cn-774 C2S 636, run cn-717 C2S 724..742 -> 624..642, shape [4 4 4 4 4 4 4 4 4], similarity 0.94)"
+    evidence: verified
+    source: "kr-1256 sub_6E8B40 stamps 636 and writes nine u32 words (position and direction triplets, the lucci kind 1/2, the constant 5 and one trailing word); the kill-drop scatter kr-1256 sub_6FF200 and the mode-gated sub_4A9D40 feed it"
+    notes: "36 bytes"
   - value: 637
     direction: c2s
+    connection: game
     name: gcpEatChocolate
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_C0C890; name aligned from cn-717 C2S 737 Packet_gcpEatChocolate (label alignment; via cn-774 C2S 637, run cn-717 C2S 724..742 -> 624..642, shape [4 4], similarity 1.0)"
+    evidence: verified
+    source: "kr-1256 sub_C0C890 stamps 637 and writes [u32 actor][u32 item object], but the sender has zero call sites and zero vtable rows in this build"
+    notes: "Dead code: the client never emits it; the chocolate eat is server-driven (the S2C 648 notice)"
   - value: 638
     direction: c2s
+    connection: game
     name: gcpReqCreateChocolate
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_6E9100; name aligned from cn-717 C2S 738 Packet_gcpReqCreateChocolate (label alignment; via cn-774 C2S 638, run cn-717 C2S 724..742 -> 624..642, shape [4 4 4 4 4 4 4 4 4], similarity 0.94)"
+    evidence: verified
+    source: "kr-1256 sub_6E9100 stamps 638 and writes nine u32 words (position and direction triplets and the constants 1, 1); the chocolate kill drop in kr-1256 sub_6FF200 feeds it"
+    notes: "36 bytes"
   - value: 639
     direction: c2s
+    connection: game
     name: gcpEatSpawner
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_C1A550; name aligned from cn-717 C2S 739 Packet_gcpEatSpawner (label alignment; via cn-774 C2S 639, run cn-717 C2S 724..742 -> 624..642, shape [4 4 4], similarity 1.0)"
+    evidence: verified
+    source: "kr-1256 sub_C1A550 stamps 639 and writes [u32 actor][u32 item object][u32 zero], but the sender has zero call sites in this build"
+    notes: "Dead code: the client never emits it; the spawner activation is server-driven (the S2C 650 notice)"
   - value: 640
     direction: c2s
+    connection: game
     name: gcpReqCreateSpawner
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_6E8960; name aligned from cn-717 C2S 740 Packet_gcpReqCreateSpawner (label alignment; via cn-774 C2S 640, run cn-717 C2S 724..742 -> 624..642, shape [4 4 4 4 4 4 4 4], similarity 0.93)"
+    evidence: verified
+    source: "kr-1256 sub_6E8960 stamps 640 and writes eight u32 words (the spawn position, three zero words, the spawner id and the spawner state); the Spawner fire path kr-1256 sub_9027F0 feeds it"
+    notes: "32 bytes; cn-774 and tw-454 order the same eight words differently - packets/object-economy.yaml states each layout"
   - value: 641
     direction: c2s
+    connection: game
     name: gcpEatHeart
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_C131F0; name aligned from cn-717 C2S 741 Packet_gcpEatHeart (label alignment; via cn-774 C2S 641, run cn-717 C2S 724..742 -> 624..642, shape [4 4], similarity 1.0)"
+    evidence: verified
+    source: "kr-1256 sub_C131F0 stamps 641 and writes [u32 actor][u32 item object]; the GoHeartItem slot 34 handler feeds it"
+    notes: "8 bytes"
   - value: 642
     direction: c2s
+    connection: game
     name: gcpReqCreateHeart
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_6E8F10; name aligned from cn-717 C2S 742 Packet_gcpReqCreateHeart (label alignment; via cn-774 C2S 642, run cn-717 C2S 724..742 -> 624..642, shape [4 4 4 4 4 4 4 4 4], similarity 0.94)"
+    evidence: verified
+    source: "kr-1256 sub_6E8F10 stamps 642 and writes nine u32 words (position and direction triplets and the constants 1, 1); the kill-drop dispatcher kr-1256 sub_4AA7D0 feeds it"
+    notes: "36 bytes"
+  - value: 634
+    direction: s2c
+    connection: game
+    name: gspGameBigDropEventTick_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_6D55D0 case 634, zero-byte body; the client logs starSpawnBig and lucci-bigdrop-splash timers"
+    notes: "Big-drop event tick"
+  - value: 641
+    direction: s2c
+    connection: game
+    name: gspGameCreateStar
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_C0A050 constructs GoStarItem and GoBigStarItem from the nine u32 words; the label mirrors the legacy star create"
+    notes: "Star create notice"
+
+  - value: 642
+    direction: s2c
+    connection: game
+    name: gspStarEaten
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 case 642 reads two u32 words; the client logs bigstarChr"
+    notes: "Big-star eaten notice"
+
+  - value: 643
+    direction: s2c
+    connection: game
+    name: gspGameCreateEventBox_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_C117E0 constructs GoEventBoxItem from the nine u32 words"
+    notes: "Event box create notice"
+
+  - value: 644
+    direction: s2c
+    connection: game
+    name: gspEventBoxEaten_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 case 644 reads two u32 words; the client logs pigboxChr"
+    notes: "Event box eaten notice"
+
+  - value: 647
+    direction: s2c
+    connection: game
+    name: gspGameCreateChocolate_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_C0C1F0 constructs the chocolate item from three u32 words"
+    notes: "Chocolate create notice"
+
+  - value: 648
+    direction: s2c
+    connection: game
+    name: gspChocolateEaten_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 case 648 reads two u32 words; the client logs chocolateChr or chocolateEat"
+    notes: "Chocolate eaten notice"
+
+  - value: 649
+    direction: s2c
+    connection: game
+    name: gspGameCreateSpawner_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_C1A230 constructs the spawner item from three u32 words"
+    notes: "Spawner create notice"
+
+  - value: 650
+    direction: s2c
+    connection: game
+    name: gspSpawnerEaten_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 case 650 reads two u32 words; the spawner activation"
+    notes: "Spawner eaten notice"
+
+  - value: 651
+    direction: s2c
+    connection: game
+    name: gspGameCreateHeart_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_C12B50 constructs the heart item from three u32 words"
+    notes: "Heart create notice"
+
+  - value: 652
+    direction: s2c
+    connection: game
+    name: gspHeartEaten_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 case 652 reads two u32 words; the client logs heartChr"
+    notes: "Heart eaten notice"
+
+  - value: 656
+    direction: s2c
+    connection: game
+    name: gspGameCreateWeaponObject_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_C1BBB0 constructs the WeaponObject from twelve u32 words"
+    notes: "Weapon object create notice"
+
+  - value: 657
+    direction: s2c
+    connection: game
+    name: gspPickUpWeapon_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_C1C400 reads two u32 words; the weapon pickup notice"
+    notes: "Weapon pickup notice"
+
   - value: 922
     direction: c2s
     name: gcpCompensationItemNoti
@@ -3023,10 +3397,11 @@ opcodes:
     source: "kr-1256 builder sub_6DC970 writes four words: 3000 when the room flag at +173 is set, else 5000 for modes 7/11/17/21, else 0; then its argument; then 0 and 0. kr-812 sender sub_50E670 of Packet_gcpGameReportMapLoadingComplete (C2S 701) writes the same words with the same 5000 modes. Both run once from the stage loop after its one-second wait (kr-1256 sub_75B3E0 sets +2186, kr-812 sub_6655C0 sets +1037)"
   - value: 579
     direction: c2s
+    connection: game
     name: gcpGameReportMapData
-    name_source: label@kr-812
-    evidence: inferred
-    source: "kr-1256 builder sub_6DA5D0 stamps 579 and serializes through kr-1256 sub_10D14C0; its caller kr-1256 sub_755330 sends it at stage entry and then C2S 607 with the local character's entity, as kr-812 sub_661AF0 sends Packet_gcpGameReportMapData (C2S 702, sender kr-812 sub_50C840) and then gcpReqAddObject. The kr-1256 body layout is not tabled"
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_6DA5D0 / kr-1256 sub_10D14C0 writes a u32 and fourteen counted vectors; positions, kinds, byte teams, maximum and minimum milliseconds precede the remaining native map vectors"
   - value: 607
     direction: c2s
     name: gcpReqAddObject
@@ -3151,6 +3526,20 @@ opcodes:
     evidence: inferred
     source: "kr-1256 sub_650770 stamps 818; body wstr, wstr (empty), u32 item key, wstr message matches kr-812 C2S 816 gcpReqPresentSend"
     connection: game
+  - value: 819
+    direction: c2s
+    name: gcpReqPresentReceive
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 0xE2C2EF (the receive dialog's notify handler) stamps 819 and writes one u32 id with the same writer call the dialog module's stamped 822/824 senders (kr-1256 sub_E45350) use; cn-774 sub_6AEEE0 and tw-454 sub_BBC770 send the same request from the same dialog's OK button; the reply is S2C 826 gspRepPresentReceive"
+    connection: game
+  - value: 820
+    direction: c2s
+    name: gcpReqPresentThrow
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 0xE2C630 (the receive dialog's notify handler, discard path) stamps 820 with the same writer call as the stamped 822/824 senders; cn-774 sub_6AEEE0 and tw-454 sub_BBC770 send it from the dialog's discard button; the reply is S2C 827 gspRepPresentThrow"
+    connection: game
   - value: 821
     direction: c2s
     name: gcpReqPresentSendThankMsg
@@ -3193,6 +3582,30 @@ opcodes:
     evidence: verified
     source: "kr-1256 sub_90A330 stamps 110 (the word at packet+4) from the party invitation UI (kr-1256 sub_938E00) and writes the prefixed wide string before the trailing word; kr-812 Packet_gcpReqInvite (kr-812 vtable 0xd84d60, deserializer kr-812 sub_8456D0) carries the same two fields in the other order"
     notes: "wstr target plus a trailing bool; the bool is not the legacy is_party flag (packets/party.yaml PartyInviteRequest@kr-1256). kr-812 reads the bool first (kr-812 sub_A56BD0) and then the string (kr-812 sub_A56D70); kr-1256 writes the string first, so the two bodies are not byte-compatible"
+    connection: game
+  - value: 202
+    direction: c2s
+    name: gcpReqLeaveParty
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_90B630 builds a bare TcpPacket, stamps 202 and writes nothing; sent from the party dialog's leave item (kr-1256 sub_9446C0 case 4 via kr-1256 sub_907CC0) and the leader-only gate (kr-1256 sub_99D510 mode 2, which asks before leaving); the body is empty, as kr-812 C2S 202"
+    notes: "empty body"
+    connection: game
+  - value: 302
+    direction: c2s
+    name: gcpReqKickFromParty
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_90A770 stamps 302 and writes one prefixed wide string, the member to kick; sent from the party dialog (kr-1256 sub_9446C0 case 6 -> kr-1256 sub_90AB60 behind its confirm) and the player context menu (kr-1256 sub_96A730 case 11)"
+    notes: "wstr target, as kr-812's shared writer kr-812 sub_92ABC0"
+    connection: game
+  - value: 303
+    direction: c2s
+    name: gcpReqChangePartyLeader
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_90A950 stamps 303 and writes one prefixed wide string, the member to promote; sent from the party dialog (kr-1256 sub_9446C0 case 5) and the context menu (kr-1256 sub_96A730 case 9) behind kr-1256 sub_90AF40's guards (clan-channel membership, and a refusal while the leader's recruiting flag is set)"
+    notes: "wstr target, same shape as the kick"
     connection: game
   - value: 111
     direction: c2s
@@ -3375,91 +3788,91 @@ opcodes:
   - value: 908
     direction: s2c
     connection: game
-    name: gspResetTutorialMobs_
+    name: gspResetWaveMobs_
     name_source: coined
     evidence: verified
     source: "kr-1256 sub_7ED5C0 case 0x38C -> kr-1256 sub_7C61B0"
     notes: "Empty reply removes previous NPCs before the next spawn table."
   - value: 32857
     direction: c2s
-    connection: game
+    connection: both
     name: gppCreateMobsFromSpawnGroup
     name_source: mirrored
     evidence: verified
     source: "kr-1256 sub_8FC380; kr-1256 sub_8F9240 case 0x8059; kr-812 sub_6E1350"
-    notes: "Solo tutorial NPC operation; validated from the native writer and consuming path."
+    notes: "NPC peer operation; kr-1256 sub_7AB190 queues local execution and kr-1256 sub_95B0B0 selects relay or game transport."
   - value: 32857
     direction: s2c
-    connection: game
+    connection: both
     name: gppCreateMobsFromSpawnGroup
     name_source: mirrored
     evidence: verified
     source: "kr-1256 sub_8FC380; kr-1256 sub_8F9240 case 0x8059; kr-812 sub_6E1350"
-    notes: "Solo tutorial NPC operation; validated from the native writer and consuming path."
+    notes: "NPC peer operation; kr-1256 sub_7AB190 queues local execution and kr-1256 sub_95B0B0 selects relay or game transport."
   - value: 32862
     direction: c2s
-    connection: game
+    connection: both
     name: gppCreateSpawnGroupMemberMob
     name_source: mirrored
     evidence: verified
     source: "kr-1256 sub_8FCE10; kr-1256 sub_8FD0A0 -> kr-1256 sub_8F5720; kr-812 sub_6E1930"
-    notes: "Solo tutorial NPC operation; validated from the native writer and consuming path."
+    notes: "NPC peer operation; kr-1256 sub_7AB190 queues local execution and kr-1256 sub_95B0B0 selects relay or game transport."
   - value: 32862
     direction: s2c
-    connection: game
+    connection: both
     name: gppCreateSpawnGroupMemberMob
     name_source: mirrored
     evidence: verified
     source: "kr-1256 sub_8FCE10; kr-1256 sub_8FD0A0 -> kr-1256 sub_8F5720; kr-812 sub_6E1930"
-    notes: "Solo tutorial NPC operation; validated from the native writer and consuming path."
+    notes: "NPC peer operation; kr-1256 sub_7AB190 queues local execution and kr-1256 sub_95B0B0 selects relay or game transport."
   - value: 32892
     direction: c2s
-    connection: game
+    connection: both
     name: gppCreateAIObject
     name_source: mirrored
     evidence: verified
     source: "kr-1256 sub_9027F0; kr-1256 sub_6D55D0 -> kr-1256 sub_6EE170; kr-812 sub_647CD0"
-    notes: "Solo tutorial NPC operation; validated from the native writer and consuming path."
+    notes: "NPC peer operation; kr-1256 sub_7AB190 queues local execution and kr-1256 sub_95B0B0 selects relay or game transport."
   - value: 32892
     direction: s2c
-    connection: game
+    connection: both
     name: gppCreateAIObject
     name_source: mirrored
     evidence: verified
     source: "kr-1256 sub_9027F0; kr-1256 sub_6D55D0 -> kr-1256 sub_6EE170; kr-812 sub_647CD0"
-    notes: "Solo tutorial NPC operation; validated from the native writer and consuming path."
+    notes: "NPC peer operation; kr-1256 sub_7AB190 queues local execution and kr-1256 sub_95B0B0 selects relay or game transport."
   - value: 32866
     direction: c2s
-    connection: game
+    connection: both
     name: gppHordeMobReplay
     name_source: mirrored
     evidence: verified
     source: "kr-1256 sub_7F3ED0; kr-1256 sub_7ED5C0 -> kr-1256 sub_7DCF20; kr-812 sub_A225A0"
-    notes: "Solo tutorial NPC replay state; the complete native body is validated before acknowledgement."
+    notes: "NPC peer state; kr-1256 sub_7AB190 queues local execution and kr-1256 sub_95B0B0 selects relay or game transport."
   - value: 32866
     direction: s2c
-    connection: game
+    connection: both
     name: gppHordeMobReplay
     name_source: mirrored
     evidence: verified
     source: "kr-1256 sub_7F3ED0; kr-1256 sub_7ED5C0 -> kr-1256 sub_7DCF20; kr-812 sub_A225A0"
-    notes: "Solo tutorial NPC replay state; the complete native body is validated before acknowledgement."
+    notes: "NPC peer state; kr-1256 sub_7AB190 queues local execution and kr-1256 sub_95B0B0 selects relay or game transport."
   - value: 32873
     direction: c2s
-    connection: game
+    connection: both
     name: gppWaveSetMobSpawnGroup
     name_source: mirrored
     evidence: verified
     source: "kr-1256 sub_7E06D0; kr-1256 sub_7ED5C0; kr-812 sub_A25B40"
-    notes: "Solo tutorial NPC replay state; the complete native body is validated before acknowledgement."
+    notes: "NPC peer state; kr-1256 sub_7AB190 queues local execution and kr-1256 sub_95B0B0 selects relay or game transport."
   - value: 32873
     direction: s2c
-    connection: game
+    connection: both
     name: gppWaveSetMobSpawnGroup
     name_source: mirrored
     evidence: verified
     source: "kr-1256 sub_7E06D0; kr-1256 sub_7ED5C0; kr-812 sub_A25B40"
-    notes: "Solo tutorial NPC replay state; the complete native body is validated before acknowledgement."
+    notes: "NPC peer state; kr-1256 sub_7AB190 queues local execution and kr-1256 sub_95B0B0 selects relay or game transport."
   - value: 32876
     direction: c2s
     connection: game
@@ -3476,3 +3889,742 @@ opcodes:
     evidence: verified
     source: "kr-1256 sub_8653E0; kr-1256 sub_7ED5C0"
     notes: "Solo tutorial NPC replay state; the complete native body is validated before acknowledgement."
+
+  - value: 32885
+    direction: s2c
+    connection: udp
+    name: gppWanderLean
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_95E410 dispatches the native UDP movement body after the datagram header"
+
+  - value: 32923
+    direction: s2c
+    connection: udp
+    name: gppWanderLeanOptimize
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_95E410 dispatches the native UDP movement body after the datagram header"
+
+  - value: 917
+    direction: c2s
+    connection: game
+    name: gcpPveUseCountItem
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_502350 stamps 917 and writes [u32 slot]; the hotkey dispatcher kr-1256 sub_501310 calls it with slots 1..3, gated on four cooldown timers and an FNV-hashed inventory-bucket lookup"
+    notes: "Renumbered from cn-406's 921; the body shape is preserved"
+
+
+  - value: 919
+    direction: c2s
+    connection: game
+    name: gcpPvePangUnit
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_6DC720 stamps 919 and writes [u32 unit id]; the mission-NPC handlers kr-1256 sub_B2BB90 (citizen kind 100), sub_B2C3C0 (poison-sac kind 102) and sub_B2C8B0 (kind 101) feed it after the NpcTurret RTTI cast and kind match"
+    notes: "Renumbered from cn-406's 923; the body shape is preserved"
+
+
+  - value: 915
+    direction: c2s
+    connection: game
+    name: Unknown915
+    name_source: none
+    evidence: verified
+    source: "kr-1256 sub_DAEF80 stamps 915 with no body write; the request purpose is not established"
+
+
+  - value: 923
+    direction: c2s
+    connection: game
+    name: gcpMissionProcess
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_6DC830 stamps 923 and writes [u32 mission index][u32 NPC kind][u32 zero]; the same mission-NPC handlers feed it immediately after 919"
+    notes: "Renumbered from cn-406's 927; the body shape is preserved. Wire order is mission index first, NPC kind second, zero word third"
+
+
+  - value: 921
+    direction: s2c
+    connection: game
+    name: gspMapMissionInfo
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_9E5410 parses the 44-byte sMissionInfo_From_Svr records and rebuilds the mission list at dword_18E5618"
+    notes: "One counted vector; native 44-byte records contain six words, a string vector and bool32 on the wire"
+
+
+  - value: 922
+    direction: s2c
+    connection: game
+    name: gspResMissionStart
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_9E5790 reads one u32 and announces from the ZombieRushMiss string table (24 chars) with balloon effects at +300/+400"
+    notes: "Renumbered from cn-406's 925; the announce and balloon paths are preserved"
+
+
+  - value: 923
+    direction: s2c
+    connection: game
+    name: gspResMissionTimeOut
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_9E1EB0; one u32, the mission index kept at dword_18E5618+28"
+    notes: "Renumbered from cn-406's 926; the mission index is kept for the advance"
+
+
+  - value: 924
+    direction: s2c
+    connection: game
+    name: gspResMissionOK
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_9E1EB0; two u32 words (flag and mission index); flag 0 advances the index"
+    notes: "Renumbered from cn-406's 927; the flag-0 advance path is preserved"
+
+
+  - value: 925
+    direction: s2c
+    connection: game
+    name: gspNotifyGamePoint
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_9E1EB0; three u32 words (seat bounded at 36, subtract flag, amount); the per-seat points land in the round object's table at this[435]+48*seat+8/12"
+    notes: "Renumbered from cn-406's 928; the seat bound widened from 32 to 36"
+
+
+  - value: 926
+    direction: s2c
+    connection: game
+    name: gspNotifyRankInfo
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_9E59D0 reads the state, the counted u32 vector and the counted five-word rank rows (three summed words and a stored word)"
+    notes: "Renumbered from cn-406's 929; rank rows contain five wire words; their native 24-byte size includes a vtable"
+
+
+  - value: 927
+    direction: s2c
+    connection: game
+    name: gspPveItemInfo
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_9E04A0 reads the counted sPVESLOTITEMINFO entries (three u32 each, reader kr-1256 sub_1159070)"
+    notes: "Renumbered from cn-406's 930; each counted entry carries three wire words; its native size includes a vtable"
+
+
+  - value: 928
+    direction: s2c
+    connection: game
+    name: gspPveStatusNotice_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_9E1EB0; one counted string routed to the notice list at dword_18E566C+708"
+    notes: "Modern extra absent from cn-406"
+  - value: 606
+    direction: c2s
+    connection: game
+    name: gcpUseItem
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_492BB0 stamps 606 without payload writes after the held-item and use-timer checks"
+  - value: 644
+    direction: c2s
+    connection: game
+    name: gcpSwitchItemSlot
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_6FEEC0 stamps an empty 644; kr-1256 sub_B037D0 sends it only with a held alternate slot and marks the switch pending"
+  - value: 636
+    direction: s2c
+    connection: game
+    name: gspGameCreateGameItem
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_6D55D0 case 636 invokes kr-1256 sub_6ED050, reading object, classification, position, kind, three vector words and one team byte (37 bytes)"
+  - value: 637
+    direction: s2c
+    connection: game
+    name: gspItemEaten
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_6D55D0 case 637 reads seat and object u32 words and removes the matching world object"
+  - value: 638
+    direction: s2c
+    connection: game
+    name: gspAddItemToSlot
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_6D55D0 case 638 invokes kr-1256 sub_6EBEA0, reading seat, kind and native item slot (12 bytes); mode 16 uses its counted inventory"
+  - value: 639
+    direction: s2c
+    connection: game
+    name: gspItemUsed
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_6D55D0 case 639 reads seat, kind and item slot, clears that slot and applies the local native effect through kr-1256 sub_491940"
+  - value: 640
+    direction: s2c
+    connection: game
+    name: gspPveItemUsed
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_6D55D0 case 640 reads three words and applies the local kind effect without clearing the held slot through kr-1256 sub_491940"
+  - value: 658
+    direction: s2c
+    connection: game
+    name: gspSwitchItemSlot
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_6D55D0 case 658 clears the pending switch and installs the selected slot and kind; three u32 words, no result word"
+  - value: 2018
+    direction: c2s
+    connection: game
+    name: gcpBombState
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_703B00 stamps 2018 and writes two words plus three floats; matched to kr-812 gcpBombState."
+  - value: 2017
+    direction: c2s
+    connection: game
+    name: gcpBombMissionOver
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_7042B0 stamps 2017 and writes one winner byte and two operator words; matched to kr-812 gcpBombMissionOver."
+  - value: 2024
+    direction: c2s
+    connection: game
+    name: gcpDropCaptain
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_46ED80 stamps 2024 on local Captain death and writes one seat word; matched to kr-812 gcpDropCaptain."
+  - value: 972
+    direction: s2c
+    connection: game
+    name: gspBombState
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_6D55D0 case 972 decodes the Bomb broadcast and calls kr-1256 sub_467090; matched to kr-812 gspBombState."
+  - value: 973
+    direction: s2c
+    connection: game
+    name: gspObserver
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_703C80 reads one scene-object word and gates its observer transition on mode 19; matched to kr-812 gspObserver."
+  - value: 981
+    direction: s2c
+    connection: game
+    name: gspCreateCaptain
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_9E1EB0 case 981 dispatches to kr-1256 sub_46FA00, which appoints the Captain from one seat word; matched to kr-812 gspCreateCaptain."
+  - value: 608
+    direction: c2s
+    connection: game
+    name: gcpGameUpdateScore
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_46FB10 sends the Captain kill through kr-1256 sub_6DDBA0, which stamps 608 and writes the 16-byte full score report; matched to kr-812 gcpGameUpdateScore."
+  - value: 711
+    direction: s2c
+    connection: game
+    name: gspExtremeRacingTimer_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_9E1EB0 default hands S2C 600..764 to the mode strategy's slot 28; GameExtremeRacingStrategy slot 28 kr-1256 sub_CE55F0 -> kr-1256 sub_CE5600 case 0x2C7 reads code, duration and a bool word and applies them through kr-1256 sub_67E8B0 (codes 2500, 20000, 210000)"
+    notes: "packets/extreme-racing.yaml ExtremeRacingTimer; the client stores no name for this frame"
+  - value: 712
+    direction: s2c
+    connection: game
+    name: gspExtremeRacingRound_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_CE5600 case 0x2C8 reads two words and passes the second to kr-1256 sub_67E4A0, which stores the race round at stage +3160"
+    notes: "packets/extreme-racing.yaml ExtremeRacingRound; a different number space from C2S 712 gcpExtremeRacingCoin_ (sender kr-1256 sub_BF45D0)"
+  - value: 714
+    direction: s2c
+    connection: game
+    name: gspExtremeRacingUpdatePlayRecord_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_CE5600 case 0x2CA reads a scope word and kr-1256 sub_10C1850's counted ExtremeRacing::UpdatePlayRecord list, applied by kr-1256 sub_CE6BA0"
+    notes: "packets/extreme-racing.yaml ExtremeRacingRecords; named after the client's own record class"
+  - value: 711
+    direction: c2s
+    connection: game
+    name: gcpExtremeRacingGoal_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_B0D760 kind 5 stamps 711 with one word, the goal's round, while the race flag stage +10352 is set and the round equals stage +3160, and sends it on the game connection dword_18E7F48"
+    notes: "packets/extreme-racing.yaml ExtremeRacingGoal; once per round per local player (character +14024)"
+  - value: 712
+    direction: c2s
+    connection: game
+    name: gcpExtremeRacingCoin_
+    name_source: coined
+    evidence: verified
+    source: "the coin pickup's timer-gated sender kr-1256 sub_BF45D0 word-writes 712 into the TcpPacket opcode slot and one dword - the coin object's field at +588 (dword index 147) - then sends it on the game connection, gated by the one-shot byte at +580 (set on send), the elapsed check at +604/+608 and the round check this+592 == ExtremeRacingGameStage+3160; the aLucciEat effect the same sender triggers after the write identifies `this` as the coin object"
+    notes: "One dword: the collected coin's field at +588. Mirrors cn-774 sub_D3ADA0's one-dword report (cn field at +572)."
+  - value: 32934
+    direction: c2s
+    connection: both
+    name: gppExtremeRacingCheckPoint_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_B0D760 kind 10 stamps 32934 (word -32602) with the character word, index / 10 and index % 10, and sends it through the peer sender kr-1256 sub_7AB190"
+    notes: "packets/round-feed.yaml ExtremeRacingCheckPoint; relayed on the round feed"
+  - value: 32934
+    direction: s2c
+    connection: both
+    name: gppExtremeRacingCheckPoint_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_6D55D0 -> kr-1256 sub_6D97D0 reads three words, resolves the character and moves its indicator mark through kr-1256 sub_D13900 under GameExtremeRacingStrategy"
+    notes: "packets/round-feed.yaml ExtremeRacingCheckPoint"
+  - value: 32922
+    direction: c2s
+    connection: both
+    name: gppTeleportPortal
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_8F3380 writes actor and position xyz under 32922; kr-1256 sub_6FCB20 resolves that character and applies native teleport effects; matched to kr-812 sub_50FA90 / kr-812 sub_523F20 Packet_gppTeleportPortal; packets/portal.yaml"
+  - value: 32922
+    direction: s2c
+    connection: both
+    name: gppTeleportPortal
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_8F3380 writes actor and position xyz under 32922; kr-1256 sub_6FCB20 resolves that character and applies native teleport effects; matched to kr-812 sub_50FA90 / kr-812 sub_523F20 Packet_gppTeleportPortal; packets/portal.yaml"
+  - value: 681
+    direction: s2c
+    connection: game
+    name: gspArea32ItemSeed_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_9E1EB0 routes to kr-1256 sub_CD7EE0 case 0x2A9; kr-1256 sub_CDA8A0 applies seed, maximum count, first object handle in that wire order."
+  - value: 682
+    direction: c2s
+    connection: game
+    name: gcpArea32ItemPickup_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_4FFE40 writes object handle and actor handle and sends through the game connection."
+  - value: 682
+    direction: s2c
+    connection: game
+    name: gspArea32ItemPicked_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_CD7EE0 case 0x2AA reads object and actor; kr-1256 sub_CDAC10 applies the item and removes its world object."
+  - value: 683
+    direction: c2s
+    connection: game
+    name: gcpArea32BackpackDrop_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_CDC4A0 calls kr-1256 sub_6DD420 after elimination; kr-1256 sub_7083A0 writes the owner, position, three words, text and item list."
+  - value: 683
+    direction: s2c
+    connection: game
+    name: gspArea32BackpackSpawn_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_CD7EE0 case 0x2AB calls kr-1256 sub_CD3000; kr-1256 sub_CDAEC0 constructs the backpack with a handle and full drop descriptor."
+  - value: 684
+    direction: c2s
+    connection: game
+    name: gcpArea32BackpackPickup_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_4622D0 writes the open backpack handle and selected item specification key."
+  - value: 684
+    direction: s2c
+    connection: game
+    name: gspArea32BackpackPicked_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_CD7EE0 case 0x2AC reads user number, backpack handle and item specification; kr-1256 sub_4627C0 removes the entry and awards it to the local user match."
+  - value: 685
+    direction: c2s
+    connection: game
+    name: gcpArea32ItemsDrop_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_6F6BA0 supplies live dropped item descriptors to kr-1256 sub_7091B0; each omits the server object handle."
+  - value: 685
+    direction: s2c
+    connection: game
+    name: gspArea32WaterTimer_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_CD7EE0 case 0x2AD reads active bool32, integer phase and duration in milliseconds; kr-1256 sub_45BED0 switches on phases 1 through 4."
+  - value: 687
+    direction: s2c
+    connection: game
+    name: gspArea32ItemsSpawn_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_CD7EE0 case 0x2AF reads a counted vector via kr-1256 sub_10C1A80 and kr-1256 sub_10C3030; kr-1256 sub_CDB180 creates each explicit item."
+  - value: 688
+    direction: s2c
+    connection: game
+    name: gspArea32PlayerEliminated_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_CD7EE0 case 0x2B0 reads actor and survivors remaining; kr-1256 sub_CDC4A0 updates the HUD and initiates the eliminated local backpack report. This strategy case is outside the global dispatcher."
+  - value: 689
+    direction: c2s
+    connection: game
+    name: gcpArea32DroneDestroyed_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_D38160 writes the drone handle, position and damaging-object word after entering the destruction state."
+  - value: 690
+    direction: c2s
+    connection: game
+    name: gcpArea32GoldenSupply_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_770380 sends the script's golden-supply index and position on the game connection."
+  - value: 692
+    direction: s2c
+    connection: game
+    name: gspArea32DroneSpawn_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_CD7EE0 case 0x2B4 reads a handle and seed; kr-1256 sub_CDB420 creates the native drone."
+  - value: 693
+    direction: s2c
+    connection: game
+    name: gspArea32DroneBoxSpawn_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_CD7EE0 case 0x2B5 reads seven words, finalizes the drone, seeds rewards through kr-1256 sub_D35740 and creates the box."
+  - value: 694
+    direction: s2c
+    connection: game
+    name: gspArea32GoldenSupplySpawn_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_CD7EE0 case 0x2B6 reads six words; kr-1256 sub_CDB7E0 creates the seeded box and invokes OnGoldenSupplySpawned."
+  - value: 686
+    direction: c2s
+    connection: game
+    name: gcpArea32TrapPlace_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_4FC800 writes the actor, BoobyTrapRod specification 560, stage 1/3 and target coordinates."
+  - value: 689
+    direction: s2c
+    connection: game
+    name: gspArea32TrapSpawn_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_CD7EE0 case 0x2B1 reads seven words, calls kr-1256 sub_501120 for the local owner and creates the rod through kr-1256 sub_D36490."
+  - value: 33275
+    direction: c2s
+    connection: both
+    name: gppArea32TrapLink_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_501120 calls kr-1256 sub_6E4850 after both rod acknowledgements; the peer body carries three handles, a 16-bit weapon and a word vector."
+  - value: 33275
+    direction: s2c
+    connection: game
+    name: gppArea32TrapLink_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_6D97D0 case 0x81FB decodes the peer body; kr-1256 sub_6FBDF0 links both rods and resets the local owner's placement state on receipt."
+  - value: 33292
+    direction: c2s
+    connection: both
+    name: gppArea32MapEffect_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_76F4F0 calls kr-1256 sub_6E0850 to send three strings, bool32, unknown word and script sequence on the peer route."
+  - value: 33292
+    direction: s2c
+    connection: game
+    name: gppArea32MapEffect_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_6E12D0 reads the effect descriptor and installs its sequence at world offset 2808; the producer also needs the echo."
+  - value: 305
+    direction: c2s
+    connection: game
+    name: gcpReqPublishPartyRecruitment_
+    name_source: coined
+    evidence: verified
+    source: kr-1256 sub_6353D0 publishes two u32 settings, one byte and counted UTF-16 recruitment text; the first setting is not the legacy toggle
+  - value: 306
+    direction: c2s
+    connection: game
+    name: gcpReqCancelPartyRecruiting_
+    name_source: coined
+    evidence: verified
+    source: kr-1256 sub_917360 stamps 306 with an empty body to cancel recruitment
+  - value: 308
+    direction: c2s
+    connection: game
+    name: gcpReqPartyRecruitDocuments_
+    name_source: coined
+    evidence: verified
+    source: kr-1256 sub_93F660 stamps 308 with a byte filter and zero-based u32 page
+
+  - value: 122
+    direction: c2s
+    connection: game
+    name: Unknown122
+    name_source: none
+    evidence: verified
+    source: "kr-1256 sub_9A1680 stamps 122 and writes u32 N + 2N UTF-16LE (N = the wide string's character count), a single counted wide string, sent through the game session helper kr-1256 sub_961940"
+    notes: "The writer establishes the frame; its purpose remains unknown."
+  - value: 140
+    direction: c2s
+    connection: game
+    name: Unknown140
+    name_source: none
+    evidence: verified
+    source: "kr-1256 sub_DCCF40 stamps 140 into an empty TcpPacket and sends it through kr-1256 sub_961940"
+    notes: "The writer establishes the frame; its purpose remains unknown."
+  - value: 147
+    direction: c2s
+    connection: game
+    name: Unknown147
+    name_source: none
+    evidence: verified
+    source: "kr-1256 sub_EE7660 stamps 147 and writes one byte (58 when its flag argument is set, else 186), a dword only when the flag is set, then u32 N + 2N UTF-16LE (N = the wide string's character count); sent through kr-1256 sub_961940"
+    notes: "The writer establishes the frame; its purpose remains unknown."
+  - value: 577
+    direction: c2s
+    connection: game
+    name: Unknown577
+    name_source: none
+    evidence: verified
+    source: "kr-1256 sub_9E1EB0 S2C case 0x245 stamps 577 into an empty TcpPacket built by kr-1256 sub_10BB220 and sends it through kr-1256 sub_961940 while the game session connected byte +326 is set"
+  - value: 762
+    direction: c2s
+    connection: game
+    name: gcpZoneTouchReport_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_B0D760 zone kind 4 stamps 762 with one dword, the zone entry value, skipped until it differs from the previously sent value kept at ChrLogic +13712, and sends it on the game connection dword_18E7F48"
+    notes: "same zone sender as C2S 711 (kind 5) and 32934 (kind 10); the kind-4 branch is not gated on the extreme racing stage, so the name keeps to the zone evidence"
+  - value: 831
+    direction: c2s
+    connection: game
+    name: Unknown831
+    name_source: none
+    evidence: verified
+    source: "kr-1256 sub_B84860 stamps 831 into an empty TcpPacket and sends it on the game connection dword_18E7F48"
+    notes: "Empty body; its purpose remains unknown."
+  - value: 938
+    direction: c2s
+    connection: game
+    name: gcpNexonGuardData_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_DAC540 drains the queued guard blobs of dword_18E57A0 (enqueued by kr-1256 sub_DAC230) into one packet stamped 938: u32 byte count then that many raw bytes, on the game connection while the session connected byte +326 is set"
+    notes: "coined from the client own NexonGuard log strings on both queue sides; the same-number S2C label gspResCoupleInviteAnswer is not used, the body and send path prove the guard forwarder"
+  - value: 946
+    direction: c2s
+    connection: game
+    name: Unknown946
+    name_source: none
+    evidence: verified
+    source: "kr-1256 sub_521120 stamps 946 and writes four dwords: the manager dword_18E6D30 third field, then this[57], this[58] and this[59]; sent on the game session dword_18E7F48 vtable slot +28"
+    notes: "The writer establishes the frame; its purpose remains unknown."
+  - value: 2031
+    direction: c2s
+    connection: game
+    name: Unknown2031
+    name_source: none
+    evidence: verified
+    source: "kr-1256 sub_970590 stamps 2031 into an empty TcpPacket and sends it through kr-1256 sub_961940 after kr-1256 sub_9EE1B0 reports matching user counts and its dialog flag is set"
+  - value: 2083
+    direction: c2s
+    connection: game
+    name: Unknown2083
+    name_source: none
+    evidence: verified
+    source: "kr-1256 sub_DC6980 stamps 2083 after dialog result 257 and writes a dword from its owner object, a dword from the object its manager resolves through vtable slot +60, then u32 element count and that many two-dword entries via kr-1256 sub_10E28B0; sent through kr-1256 sub_961940"
+  - value: 2088
+    direction: c2s
+    connection: game
+    name: Unknown2088
+    name_source: none
+    evidence: verified
+    source: "kr-1256 sub_755330 stamps 2088 and appends one dword read through its request object vtable slot +8, then the raw bytes between that object fields +24 and +28; sent through kr-1256 sub_961940"
+
+  - value: 2072
+    direction: c2s
+    name: gcpReqRheaForm_
+    name_source: coined
+    evidence: verified
+    connection: game
+    source: "kr-1256 sub_6E3A60"
+    notes: "Rhea form request: scene actor u32, active bool32; native input owns charge and expiry. packets/character-form.yaml."
+  - value: 1540
+    direction: s2c
+    name: gspRheaForm_
+    name_source: coined
+    evidence: verified
+    connection: game
+    source: "kr-1256 sub_6D55D0 -> kr-1256 sub_7055D0"
+    notes: "Scene actor u32, active bool32; applies Rhea form 29/2000, preserves HP ratio, clears local pending latch. Send accepted changes to owner and peers."
+  - value: 33287
+    direction: c2s
+    connection: both
+    name: gppScriptZombieConversion_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_AD2060 writes team:u8, seat:u32, operation:u32, zombie kind and weapon through the peer route."
+  - value: 33287
+    direction: s2c
+    connection: game
+    name: gppScriptZombieConversion_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_6E0DA0 applies the authorized zombie character and clears the local pending latch on receipt."
+  - value: 33290
+    direction: c2s
+    connection: both
+    name: gppSetAddableObjectVisible_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_76F1E0 calls kr-1256 sub_6E03D0 to send counted narrow name, bool32 visibility and script sequence on the peer route."
+  - value: 33290
+    direction: s2c
+    connection: game
+    name: gppSetAddableObjectVisible_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_6E0FD0 reads counted narrow name, bool32 visibility and script sequence and installs the sequence only on receipt, including for the producer."
+  - value: 33291
+    direction: c2s
+    connection: both
+    name: gppCreateBreakableObject_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_76F3A0 calls kr-1256 sub_6E0630 to send counted narrow name, float32 health and script sequence on the peer route."
+  - value: 33291
+    direction: s2c
+    connection: game
+    name: gppCreateBreakableObject_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_6E1150 reads counted narrow name, float32 health and script sequence and installs the sequence only on receipt, including for the producer."
+
+  - value: 32840
+    direction: c2s
+    connection: both
+    name: gppPing
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_7629A0 writes two u32 words; routing helper kr-1256 sub_95B0B0 selects the relay or game connection. The pair matches Packet_gppPing read by kr-812 sub_6DB1B0."
+  - value: 32840
+    direction: s2c
+    connection: both
+    name: gppPing
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_6D55D0 case 32840 at 0x6D6440 reads two u32 words, compares the first with kr-1256 sub_9E1580 and passes the second to kr-1256 sub_762570 for the saved-clock comparison."
+  - value: 32774
+    direction: c2s
+    connection: both
+    name: gppDeleteObject
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_6DD200; kr-1256 sub_6D55D0 case 32774; kr-812 sub_50EB50"
+    notes: "Object word; the reader resolves the object through kr-1256 sub_6CF510 before deletion. kr-1256 sub_7AB190 and kr-1256 sub_95B0B0 select local execution and relay/game transport."
+  - value: 32774
+    direction: s2c
+    connection: both
+    name: gppDeleteObject
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_6DD200; kr-1256 sub_6D55D0 case 32774; kr-812 sub_50EB50"
+    notes: "Object word; the reader resolves the object through kr-1256 sub_6CF510 before deletion. kr-1256 sub_7AB190 and kr-1256 sub_95B0B0 select local execution and relay/game transport."
+  - value: 32841
+    direction: c2s
+    connection: both
+    name: gppIniPacket
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_8F9E20; kr-1256 sub_8F9240 -> kr-1256 sub_8FA4F0; kr-812 sub_6DEE10"
+    notes: "Counted UTF-16 document; the NPC context consumes its native commands, including newSpawn. kr-1256 sub_7AB190 and kr-1256 sub_95B0B0 select local execution and relay/game transport."
+  - value: 32841
+    direction: s2c
+    connection: both
+    name: gppIniPacket
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_8F9E20; kr-1256 sub_8F9240 -> kr-1256 sub_8FA4F0; kr-812 sub_6DEE10"
+    notes: "Counted UTF-16 document; the NPC context consumes its native commands, including newSpawn. kr-1256 sub_7AB190 and kr-1256 sub_95B0B0 select local execution and relay/game transport."
+  - value: 32865
+    direction: c2s
+    connection: both
+    name: gppMobLuaMessage
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_8FB840; kr-1256 sub_8FC040; kr-812 sub_6E0B70"
+    notes: "Word and counted UTF-16 document; zero selects every mob, otherwise the reader resolves the target MobBase. kr-1256 sub_7AB190 and kr-1256 sub_95B0B0 select local execution and relay/game transport."
+  - value: 32865
+    direction: s2c
+    connection: both
+    name: gppMobLuaMessage
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_8FB840; kr-1256 sub_8FC040; kr-812 sub_6E0B70"
+    notes: "Word and counted UTF-16 document; zero selects every mob, otherwise the reader resolves the target MobBase. kr-1256 sub_7AB190 and kr-1256 sub_95B0B0 select local execution and relay/game transport."
+  - value: 32891
+    direction: c2s
+    connection: both
+    name: gppDummyUnitMotion
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_6FE410; kr-1256 sub_6FE110; kr-812 sub_524F90"
+    notes: "Object word, counted UTF-16 motion name and unknown word; only non-master clients apply this motion. kr-1256 sub_7AB190 and kr-1256 sub_95B0B0 select local execution and relay/game transport."
+  - value: 32891
+    direction: s2c
+    connection: both
+    name: gppDummyUnitMotion
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_6FE410; kr-1256 sub_6FE110; kr-812 sub_524F90"
+    notes: "Object word, counted UTF-16 motion name and unknown word; only non-master clients apply this motion. kr-1256 sub_7AB190 and kr-1256 sub_95B0B0 select local execution and relay/game transport."
+  - value: 32893
+    direction: c2s
+    connection: both
+    name: gppAgentMoveTo
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_702030; kr-1256 sub_6D55D0 case 32893; kr-812 sub_5285E0"
+    notes: "Object word, slot word and three position floats; the consumer checks that the slot resolves to this object. kr-1256 sub_7AB190 and kr-1256 sub_95B0B0 select local execution and relay/game transport."
+  - value: 32893
+    direction: s2c
+    connection: both
+    name: gppAgentMoveTo
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_702030; kr-1256 sub_6D55D0 case 32893; kr-812 sub_5285E0"
+    notes: "Object word, slot word and three position floats; the consumer checks that the slot resolves to this object. kr-1256 sub_7AB190 and kr-1256 sub_95B0B0 select local execution and relay/game transport."
+  - value: 32894
+    direction: c2s
+    connection: both
+    name: gppUseItemDirect
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_6FE730; kr-1256 sub_6FE850; kr-812 sub_525670"
+    notes: "Object word and item word; the consumer resolves a ChrLogic and applies its direct-use item effect. kr-1256 sub_7AB190 and kr-1256 sub_95B0B0 select local execution and relay/game transport."
+  - value: 32894
+    direction: s2c
+    connection: both
+    name: gppUseItemDirect
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_6FE730; kr-1256 sub_6FE850; kr-812 sub_525670"
+    notes: "Object word and item word; the consumer resolves a ChrLogic and applies its direct-use item effect. kr-1256 sub_7AB190 and kr-1256 sub_95B0B0 select local execution and relay/game transport."

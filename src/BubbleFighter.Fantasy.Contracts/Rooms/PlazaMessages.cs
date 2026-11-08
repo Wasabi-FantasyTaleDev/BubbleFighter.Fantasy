@@ -10,14 +10,17 @@ namespace BubbleFighter.Fantasy.Contracts.Rooms;
 /// <param name="CharacterItemId">The equipped character item.</param>
 /// <param name="EquippedItemIds">The worn items shown in the seat record.</param>
 /// <param name="EntrySeed">
-/// A value fixed per plaza entry, so every receiver of the member's spawn derives the same start
-/// position from it; a new entry gets a new value.
+/// Identifies one plaza entry so receivers can distinguish a state refresh from a new scene and
+/// discard the previous entry's movement history.
 /// </param>
 public sealed record PlazaMember(int Slot, int UserNumber, string Nickname, int Level, int CharacterItemId,
     IReadOnlyList<int> EquippedItemIds, int EntrySeed = 0)
 {
     /// <summary>Gets the player's committed avatar material color.</summary>
     public ushort ColorIndex { get; init; }
+
+    /// <summary>Gets the shared scene owner's recruitment state, when recruitment is enabled.</summary>
+    public PlazaRecruitmentState? Recruitment { get; init; }
 }
 
 /// <summary>A client asks to enter the plaza from the main menu, or after leaving a room.</summary>
@@ -74,5 +77,5 @@ public sealed record PlazaPositionReported(ReadOnlyMemory<byte> Body) : IMessage
 /// <param name="UserNumber">The moving player's identity number.</param>
 /// <param name="Sequence">The per-member position sequence, starting at 1 on each plaza entry.</param>
 /// <param name="Body">The position the member reported, verbatim.</param>
-/// <param name="EntrySeed">The member's <see cref="PlazaMember.EntrySeed"/>, used to place a member who has not reported.</param>
+/// <param name="EntrySeed">The member's <see cref="PlazaMember.EntrySeed"/>, identifying the entry that owns this report.</param>
 public sealed record PlazaPositionReceived(int UserNumber, int Sequence, ReadOnlyMemory<byte> Body, int EntrySeed = 0) : IMessage;

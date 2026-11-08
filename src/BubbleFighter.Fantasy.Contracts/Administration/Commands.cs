@@ -33,7 +33,11 @@ public sealed record CommandDefinition(string Name, IReadOnlyList<string> Aliase
 /// <param name="Actor">The original authenticated initiator, preserved during delegated execution.</param>
 /// <param name="Language">The user's UI language, independent of client build; empty requests the deployment fallback.</param>
 /// <param name="SessionId">The transport's verified game session identifier, when applicable.</param>
-public sealed record CommandCaller(CommandPrincipal Subject, CommandPrincipal Actor, string Language = "en", string? SessionId = null);
+public sealed record CommandCaller(CommandPrincipal Subject, CommandPrincipal Actor, string Language = "en", string? SessionId = null)
+{
+    /// <summary>Requires a scene-departure command to recheck an ordinary playing match on its room executor.</summary>
+    public bool RequireMatchDeparture { get; init; }
+}
 
 /// <summary>The normalized, read-only input delivered to a plugin handler.</summary>
 /// <param name="Caller">The verified invocation identity.</param>
@@ -86,6 +90,6 @@ public interface ICommandExecutor
     /// <summary>Executes positional UI arguments; a remaining-text argument is supplied as one value.</summary>
     ValueTask<CommandResult> ExecuteAsync(CommandCaller caller, string command, IReadOnlyList<string> arguments, CancellationToken cancellationToken = default);
 
-    /// <summary>Parses quoted text; when required, only '/', '!' or U+FF01 admits a command.</summary>
+    /// <summary>Parses quoted text after any equivalent '/', '!' or U+FF01 trigger; non-game entry points also accept bare commands.</summary>
     ValueTask<CommandResult> ExecuteTextAsync(CommandCaller caller, string text, bool requirePrefix = true, CancellationToken cancellationToken = default);
 }

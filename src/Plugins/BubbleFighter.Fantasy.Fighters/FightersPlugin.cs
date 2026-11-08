@@ -35,10 +35,7 @@ public sealed class FightersPlugin : IPlugin
         if (catalog.Playable.Count == 0)
             throw new InvalidOperationException($"{catalog.Source} has no 1..31 Field columns.");
 
-        // The unlocked set is the character bag and the equipped id is the
-        // fighters table, so a restart keeps what the player owns and wears.
-        // Without the persistence rows the in-memory roster is used and the
-        // session's unlocks reset on restart, which the log states.
+        // Ownership comes from the bag; the build's equipment selection takes precedence over legacy fighter slots.
         IFighterRoster roster;
         var hasInventory = context.Services.TryGet<IInventoryRepository>(out var inventoryStore)
             && inventoryStore is not null;
@@ -49,7 +46,8 @@ public sealed class FightersPlugin : IPlugin
             context.Services.TryGet<IEquipmentSelection>(out var selection);
             roster = new StoreBackedFighterRoster(inventoryStore!, fighterStore!, catalog, selection);
             context.Logger.LogInformation(
-                "Fighters roster is store-backed: unlocked = character bag, equipped = fighters table.");
+                "Fighters roster is store-backed: ownership = character bag, equipment = {Source}.",
+                selection is null ? "legacy fighter slot" : "current build selection");
         }
         else
         {

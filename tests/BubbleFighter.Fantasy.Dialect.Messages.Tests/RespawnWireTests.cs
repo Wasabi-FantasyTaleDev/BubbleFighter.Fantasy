@@ -28,7 +28,7 @@ public sealed class RespawnWireTests
     [Fact]
     public void RespawnIsSixteenBytesWithTheReviveFlagSet()
     {
-        var body = PlayRoomCodec.WriteRespawn(TestBuilds.Packets, "kr-812", 1100000, 1);
+        var body = RoundRespawnBinding.WriteRespawn(TestBuilds.Packets, "kr-812", 1100000, 1);
 
         Assert.Equal(16, body.Length);
         Assert.Equal(1100000, BitConverter.ToInt32(body, 0));
@@ -45,7 +45,7 @@ public sealed class RespawnWireTests
     {
         foreach (var body in new[]
                  {
-                     PlayRoomCodec.WriteRespawn(TestBuilds.Packets, "cn-324", 1100000, 1),
+                     RoundRespawnBinding.WriteRespawn(TestBuilds.Packets, "cn-324", 1100000, 1),
                      PlayRoomCodec.WriteRespawnIndexRequest(TestBuilds.Packets, "cn-324", 1100000, 1),
                  })
         {
@@ -81,7 +81,7 @@ public sealed class RespawnWireTests
         const int actor = unchecked((int)0x80000001);
         const int index = -1;
         var prefix = new byte[] { 1, 0, 0, 128, 255, 255, 255, 255 };
-        var confirmation = PlayRoomCodec.WriteRespawn(TestBuilds.Packets, build, actor, index);
+        var confirmation = RoundRespawnBinding.WriteRespawn(TestBuilds.Packets, build, actor, index);
         var expected = new byte[confirmationBytes];
         prefix.CopyTo(expected, 0);
         if (confirmationBytes > 8)
@@ -94,16 +94,16 @@ public sealed class RespawnWireTests
         prefix.CopyTo(acceptance, 0);
         if (acceptanceBytes > 8)
             acceptance[8] = 1;
-        var parsed = PlayRoomCodec.ReadSpawnAcceptance(TestBuilds.Packets, build, acceptance);
+        var parsed = RoundRespawnBinding.ReadSpawnAcceptance(TestBuilds.Packets, build, acceptance);
         Assert.Equal(actor, parsed.Actor);
         Assert.Equal(index, parsed.SpawnIndex);
         for (var length = 0; length < acceptance.Length; length++)
         {
             var truncated = acceptance[..length];
             Assert.Throws<PacketFormatException>(() =>
-                PlayRoomCodec.ReadSpawnAcceptance(TestBuilds.Packets, build, truncated));
+                RoundRespawnBinding.ReadSpawnAcceptance(TestBuilds.Packets, build, truncated));
         }
-        Assert.Throws<PacketFormatException>(() => PlayRoomCodec.ReadSpawnAcceptance(
+        Assert.Throws<PacketFormatException>(() => RoundRespawnBinding.ReadSpawnAcceptance(
             TestBuilds.Packets, build, acceptance.Concat(new byte[] { 0 }).ToArray()));
     }
 

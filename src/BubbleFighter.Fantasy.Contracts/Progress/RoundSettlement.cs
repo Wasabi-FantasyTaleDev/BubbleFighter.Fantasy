@@ -18,6 +18,12 @@ namespace BubbleFighter.Fantasy.Contracts.Progress;
 public sealed record RoundSettlementCommand(string MatchId, long UserNum, int LucciEarned,
     Func<PlayerProgress, PlayerProgress> Advance)
 {
+    /// <summary>
+    /// Gets accepted battle counters to commit with this receipt. Supplying them requires an
+    /// <see cref="IPlayerBattleRecordsRepository"/>; a provider without that capability must reject them.
+    /// </summary>
+    public RoundBattleRecord? BattleRecord { get; init; }
+
     /// <summary>The longest match identity a store accepts.</summary>
     public const int MaxMatchIdLength = 64;
 
@@ -25,6 +31,7 @@ public sealed record RoundSettlementCommand(string MatchId, long UserNum, int Lu
     public void Validate()
     {
         ArgumentNullException.ThrowIfNull(Advance);
+        BattleRecord?.Validate();
         if (string.IsNullOrEmpty(MatchId) || MatchId.Length > MaxMatchIdLength
             || !MatchId.All(c => c is >= 'a' and <= 'z' or >= 'A' and <= 'Z' or >= '0' and <= '9' or '-'))
             throw new ArgumentException("A match id is 1 to 64 ASCII letters, digits or hyphens.", nameof(MatchId));

@@ -337,6 +337,8 @@ WebUI: http://127.0.0.1:8080/
 
 默认限制为每次上传 8 GiB、每次导入解压数据 16 GiB、每次导入 32,768 个文件、保留 64 份副本、导入存储总量 64 GiB、每次导入最长 20 分钟。可在 `installation` 行中用 `client_data_upload_bytes`、`client_data_extracted_bytes`、`client_data_file_limit`、`client_data_copy_limit`、`client_data_storage_bytes` 和 `client_data_import_seconds` 调整。再次导入不会删除先前成功的副本。
 
+在 Windows 上，扫描程序或其他进程可能在文件写完后短暂阻止最终目录重命名。只有这一步发布操作会对 Windows 访问、共享或锁冲突重试：`client_data_publish_attempts` 默认 20 次，范围 1–100；间隔 `client_data_publish_retry_ms` 默认 50 毫秒，范围 1–1000。将次数设为 1 可关闭重试。整体导入截止时间和取消仍然生效；不会重放上传、覆盖已有目标，永久错误或其他错误仍会报告。
+
 **检查是否成功：** 向导报告安装完成，WebUI 切换到管理界面。即使还没有管理员，下文所述的 `/health` 检查在向导运行期间也会正常响应。
 
 ## 检查安装

@@ -164,8 +164,7 @@ public sealed class ShopOptions : IValidatableOptions
     /// Gets or sets the inclusive S2C 800 payload budget for legacy dialects. Their
     /// framing uses a 16-bit payload length (maximum 65535 bytes); 65000 leaves room
     /// below that wire limit but is a server policy, not a client-requested size.
-    /// Cards beyond the budget (or beyond
-    /// <see cref="LegacyEnterShopCardCap"/>) are omitted in
+    /// Cards beyond the encoded budget are omitted in
     /// deterministic emit order — mains 1000 and 500 first — and logged.
     /// The kr-1256 dialect ignores this setting.
     ///
@@ -175,13 +174,7 @@ public sealed class ShopOptions : IValidatableOptions
 
     /// <summary>Gets or sets the legacy catalog card limit; zero uses only the encoded frame budget.</summary>
     [Range(0, 10000)]
-    public int MaxEnterShopCards { get; set; } = LegacyEnterShopCardCap;
-
-    /// <summary>
-    /// The default deployment card-count limit of the legacy catalog selection: a 221-card catalog fits a
-    /// 35256-byte frame. Independent of the 16-bit frame limit; the count does not establish a client limit.
-    /// </summary>
-    public const int LegacyEnterShopCardCap = 221;
+    public int MaxEnterShopCards { get; set; }
 
     /// <summary>Gets or sets whether identical legacy grant contents retain only their longest sale duration.</summary>
     public bool PreferLongestDuration { get; set; } = true;

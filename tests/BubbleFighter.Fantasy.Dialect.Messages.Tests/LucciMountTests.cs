@@ -24,6 +24,8 @@ public sealed class LucciMountTests
     [InlineData("cn-324", false, false)]
     [InlineData("cn-406", false, false)]
     [InlineData("cn-279", false, false)]
+    [InlineData("kr-1256", false, false)]
+    [InlineData("tw-454", false, false)]
     public async Task LucciRoutesAndRepliesUseTheBuildTableAndUnload(string build, bool award, bool remap)
     {
         var profile = new ClientProfile(build, build[..2], int.Parse(build[3..]), 0, 0, build);
@@ -93,6 +95,9 @@ public sealed class LucciMountTests
     [InlineData("cn-324", 736, 735, 720, 721, 0)]
     [InlineData("cn-406", 736, 735, 720, 721, 0)]
     [InlineData("cn-279", 733, 732, 717, 718, 0)]
+    [InlineData("kr-1256", 636, 635, 645, 646, 0)]
+    [InlineData("cn-774", 636, 635, 618, 619, 2025)]
+    [InlineData("tw-454", 636, 635, 618, 619, 0)]
     public void OpcodeNumbersMatchTheClientDispatchers(string build, int create, int eat, int created, int eaten, int award)
     {
         var profile = new ClientProfile(build, build[..2], int.Parse(build[3..]), 0, 0, build);
@@ -115,6 +120,9 @@ public sealed class LucciMountTests
     [InlineData("cn-324")]
     [InlineData("cn-406")]
     [InlineData("cn-279")]
+    [InlineData("kr-1256")]
+    [InlineData("cn-774")]
+    [InlineData("tw-454")]
     public void StructuresHaveTheNativeBodySizes(string build)
     {
         var tables = TestBuilds.All.Tables;
@@ -150,5 +158,42 @@ public sealed class LucciMountTests
         var other = second.Context(indonesian, indonesian + "/game");
         Assert.Throws<ConfigException>(() => new LucciBinding(indonesian + "/game", withAward, TestBuilds.All.Tables, indonesian).Mount(other, second.Messages));
         await other.UnwindAsync();
+    }
+}
+
+/// <summary>The cn-774 award row blocks the Lucci binding until its trigger is audited, and the
+/// tw-454 star binding mounts on the same shared structures.</summary>
+public sealed class ModernEconomyMountTests
+{
+    /// <summary>Mounting the Lucci binding on cn-774 fails the horde-award guard: the build sends
+    /// the award request but its create notice constructs no award item kinds.</summary>
+    [Fact]
+    public void Cn774AwardRowBlocksTheLucciMount()
+    {
+        var profile = new ClientProfile("cn-774", "cn", 774, 0, 0, "cn-774");
+        var root = Directory.GetParent(TestBuilds.PacketsDirectory())!.FullName;
+        var table = OpcodeTableLoader.Load(Path.Combine(root, "profiles", "cn-774", "opcodes.yaml"), profile).ForConnection(OpcodeConnection.Game);
+        Assert.NotNull(table.Find(PacketDirection.ClientToServer, "gcpReqCreateHordeAward"));
+        Assert.False(TestBuilds.All.Tables.CapabilityOf("cn-774", "horde_award_items"));
+        var binding = new LucciBinding("cn-774/game", table, TestBuilds.All.Tables, "cn-774");
+        using var fixture = new MatchMessagesMountTests.Fixture(table);
+        Assert.Throws<ConfigException>(() => binding.Mount(fixture.Context("cn-774", "cn-774/game", "dialect.rooms"), fixture.Messages));
+    }
+
+    /// <summary>The tw-454 star binding mounts on the shared structures and answers through its
+    /// own S2C numbers.</summary>
+    [Fact]
+    public void Tw454StarBindingMountsAndAnswers()
+    {
+        var profile = new ClientProfile("tw-454", "tw", 454, 0, 0, "tw-454");
+        var root = Directory.GetParent(TestBuilds.PacketsDirectory())!.FullName;
+        var table = OpcodeTableLoader.Load(Path.Combine(root, "profiles", "tw-454", "opcodes.yaml"), profile).ForConnection(OpcodeConnection.Game);
+        using var fixture = new MatchMessagesMountTests.Fixture(table);
+        var binding = new StarBinding("tw-454/game", table, TestBuilds.All.Tables, "tw-454");
+        binding.Mount(fixture.Context("tw-454", "tw-454/game", "dialect.rooms"), fixture.Messages);
+        Assert.Equal(2, fixture.Packets.Handlers.Count);
+        Assert.Equal((ushort)632, table.C2S("gcpReqCreateStar"));
+        Assert.Equal((ushort)614, table.S2C("gspGameCreateStar"));
+        Assert.Equal((ushort)615, table.S2C("gspStarEaten"));
     }
 }

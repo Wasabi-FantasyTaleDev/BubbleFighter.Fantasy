@@ -41,10 +41,28 @@ public sealed class ProtocolPlugin : IPlugin
     /// <summary>The longest <c>gcpFirstConnect</c> string accepted, in UTF-16 code units.</summary>
     private const int FirstConnectMaxChars = 1024;
 
+    /// <summary>
+    /// Turns the operator switches into the bootstrap lists by packet name, so a server states only which
+    /// auxiliary connections it accepts and each build's opcode table supplies the numbers.
+    /// </summary>
+    private static void DeriveBootstrapLists(ProtocolOptions options)
+    {
+        var auxiliary = options.AnswerCenterStatus || options.AcceptRetainedMoves && options.AuxiliaryPrefix.Count > 0;
+        if (auxiliary && options.AlternateHandshakeSequence.Count == 0)
+            options.AlternateHandshakeSequence = [.. options.AuxiliaryPrefix, "gcpReqCenterUserCnt"];
+        if (options.AcceptRetainedMoves && !options.PreHandshakeOpcodes.Contains("gcpReqMoveInto"))
+            options.PreHandshakeOpcodes = [.. options.PreHandshakeOpcodes, "gcpReqMoveInto"];
+    }
+
     /// <inheritdoc />
     public ValueTask ActivateAsync(IPluginContext context, CancellationToken cancellationToken)
     {
         var options = context.Config.Bind<ProtocolOptions>();
+        DeriveBootstrapLists(options);
+        if (options.AlternateHandshakeSequence.Count > 8 || options.AlternateHandshakeSequence.Distinct().Count() != options.AlternateHandshakeSequence.Count
+            || options.AlternateHandshakeSequence.Count > 0 && (!options.RequirePatchHandshakeFirst
+                || options.AlternateHandshakeSequence.Intersect(options.PreHandshakeOpcodes).Any()))
+            throw new ConfigException("alternate_handshake_sequence must contain zero or 1-8 distinct opcodes, require the patch handshake, and not overlap pre_handshake_opcodes.");
         if (options.SendInGameGreeting)
             throw new ConfigException("send_in_game_greeting was removed; set it to false and mount match-connection with its match dialect rows.");
         var build = context.Row.ClientBuild ?? throw new ConfigException("Protocol requires an explicit client_build.");
@@ -59,7 +77,7 @@ public sealed class ProtocolPlugin : IPlugin
         var catalog = options.UseCatalogCandidates
             ? CatalogOpcodeFallback.Load(options, runtime, context.Logger) : null;
         IOpcodeTable table = catalog is null ? runtime
-            : new OpcodeTable(profile, runtime.All.Concat(runtime.ForConnection(OpcodeConnection.Relay).All).Distinct(), catalog.Resolve);
+            : new OpcodeTable(profile, runtime.All.Concat(runtime.ForConnection(OpcodeConnection.Relay).All).Concat(runtime.ForConnection(OpcodeConnection.Udp).All).Distinct(), catalog.Resolve);
         var sessions = context.Services.TryGet<ISessionRegistry>(out var registry) ? registry : null;
         var versionVerified = new VersionVerifiedScope(options.MaxTrackedConnections);
         context.Effect(versionVerified);

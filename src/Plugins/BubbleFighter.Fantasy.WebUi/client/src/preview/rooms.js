@@ -1,7 +1,7 @@
 import clientBuilds from './clientBuilds'
 
 // Development-only room records for the directory and player drawer.
-const nicknames = ['Wasabi', 'Philosophyz', 'TrustInMe', 'FakeMe', 'FindTheBlue', 'RaisedBed', 'PottedOne', 'CANOE', 'Remembrance']
+const nicknames = ['PlayerOne', 'PlayerTwo', 'PlayerThree', 'PlayerFour', 'PlayerFive', 'PlayerSix', 'PlayerSeven', 'PlayerEight', 'PlayerNine']
 const titles = ['难道无人能赐我一败？', '逃跑达人宝宝', '让你看看俺躲的最高境界', '酣畅淋漓的一局！', '泡泡战士总攻']
 const builds = ['kr-1256', 'cn-774', 'kr-1256', 'tw-454', 'kr-812']
 const levels = [32, 26, 18, 21, 45, 12, 38, 54, 63]

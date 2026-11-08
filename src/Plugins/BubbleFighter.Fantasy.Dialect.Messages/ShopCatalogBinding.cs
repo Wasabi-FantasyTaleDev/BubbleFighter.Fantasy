@@ -480,6 +480,9 @@ internal sealed class ShopCatalogBinding(
             ? ShopCatalogWire.ResolveEnterShopMainCategory(message.MainCategory, cards, message.Categories)
             : ShopCatalogWire.LegacyEnterShopMainCategory;
         var body = ShopCatalogWire.RepEnterShopLegacy(layout, message.Token, cards, categories, main);
+        if (body.Length > message.ByteBudget || body.Length > ushort.MaxValue)
+            throw new InvalidOperationException(
+                $"Legacy shop catalog needs {body.Length} payload bytes, exceeding the {message.ByteBudget}-byte budget or the 16-bit frame limit.");
         logger.LogInformation(
             "Legacy shop catalog: {Sent} sent, {Dropped} omitted; payload {Bytes}/{Budget} bytes.",
             cards.Count, dropped, body.Length, message.ByteBudget);

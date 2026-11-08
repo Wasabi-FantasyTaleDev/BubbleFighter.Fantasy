@@ -1,3 +1,4 @@
+using BubbleFighter.Fantasy.Contracts.Cluster;
 using System.Text.Json;
 using BubbleFighter.Fantasy.Abstractions.Persistence;
 using BubbleFighter.Fantasy.Contracts.Settings;
@@ -9,14 +10,16 @@ namespace BubbleFighter.Fantasy.Persistence.MySql;
 public sealed class MySqlPlayerSettings : IPlayerSettingsRepository
 {
     private readonly IDbConnectionFactory _connections;
+    private readonly IAccountMutationFence? _authority;
 
     /// <summary>Creates the store with deployment-specific scope, row and string budgets.</summary>
-    public MySqlPlayerSettings(IDbConnectionFactory connections, CustomizedKeyLimits limits)
+    public MySqlPlayerSettings(IDbConnectionFactory connections, CustomizedKeyLimits limits, IAccountMutationFence? authority = null)
     {
         ArgumentNullException.ThrowIfNull(connections);
         ArgumentNullException.ThrowIfNull(limits);
         limits.Validate();
         _connections = connections;
+        _authority = authority;
         Limits = limits;
     }
 
@@ -41,7 +44,7 @@ public sealed class MySqlPlayerSettings : IPlayerSettingsRepository
         CustomizedKeyLimits.ValidateIdentity(userNum, scope);
         var copy = Limits.Copy(mappings);
         await using var session = await SugarSession.OpenAsync(_connections, ct).ConfigureAwait(false);
-        await using var transaction = await session.BeginAsync().ConfigureAwait(false);
+        await using var transaction = await session.BeginWriteAsync(userNum, _authority, ct).ConfigureAwait(false);
         var db = session.Db;
         await MySqlPlayerLock.AcquireAsync(db, userNum, ct).ConfigureAwait(false);
         var selected = db.Queryable<CustomizedKeysRow>().Where(row => row.UserNum == userNum && row.Scope == scope);

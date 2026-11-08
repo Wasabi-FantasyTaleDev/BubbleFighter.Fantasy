@@ -1,0 +1,31 @@
+# Optional logged-in room migration between nodes of one data scope; no shipped profile mounts it.
+# Node-wide rows. Mount after cluster-node, cluster-room-directory, cluster-account-store,
+# cluster-account-sessions and cluster-account-write-fencing, and set migrations: true plus each node's
+# native_migration_builds at the directory. Then apply cluster-migration-build.patch.yaml per build.
+# listener_id names the game listener row: game-listener in a single-build profile, <build>.game-listener
+# in a multi-build profile. host is the public name players reach; it is resolved when a move is offered.
+- insert:
+    - id: cluster-migration-broker
+      plugin: cluster.migration-broker
+      config:
+        node_id: "${BFF_CLUSTER_NODE_ID}"
+        directory_url: "${BFF_CLUSTER_DIRECTORY_URL}"
+        access_key: "${BFF_CLUSTER_NODE_KEY}"
+    - id: cluster-migration-arrivals
+      plugin: cluster.migration-arrivals
+    - id: cluster-migration-destination
+      plugin: cluster.migration-destination
+      config:
+        node_id: "${BFF_CLUSTER_NODE_ID}"
+        # A single-build profile advertises its own build and public game port; a multi-build profile
+        # replaces this list with one endpoint per build (listener_id <build>.game-listener).
+        endpoints:
+          - client_build: "${BFF_PROFILE_ID}"
+            listener_id: game-listener
+            host: "${BFF_PUBLIC_DOMAIN}"
+            port: ${GAME_PUBLIC_PORT}
+# Migration hands accounts between nodes, so the ownership store must publish this node's identity.
+- set:
+    id: cluster-account-store
+    config:
+      node_id: "${BFF_CLUSTER_NODE_ID}"

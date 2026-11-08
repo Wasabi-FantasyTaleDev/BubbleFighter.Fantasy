@@ -237,27 +237,12 @@ internal static class TutorialWire
     /// <returns>The complete bounded S2C body.</returns>
     public static byte[] WriteRoomEnterGame(PacketTables tables, string build, int unknown0, string unknown1,
         int unknown2 = 0, int unknown3 = 0, int unknown4 = 0,
-        IReadOnlyDictionary<string, object?>? scoreboardValues = null)
-    {
-        if (scoreboardValues is null && EntryNeedsScoreboard(tables, build))
-            throw new InvalidOperationException("Room entry requires complete ScoreData values.");
-        return PacketCodec.Write(tables, build, "RoomEnterGame", new Dictionary<string, object?>
-        {
-            ["unknown_4"] = unknown0, ["map_key"] = unknown1,
-            ["unknown_36"] = unknown2, ["unknown_40"] = unknown3, ["unknown_44"] = unknown4,
-            ["unknown_3204"] = unknown2, ["unknown_3208"] = unknown3, ["unknown_3212"] = unknown4,
-            ["unknown_3028"] = unknown2,
-            ["scoreboard"] = scoreboardValues,
-            // Without a round the block is the client's own empty scoreboard (id-400 sub_780A20,
-            // cn-406 sub_6FEA10): every row is a vacant seat.
-            ["initial_score"] = scoreboardValues
-                ?? PlayRoomCodec.ScoreboardValues(tables, build, new RoundScoreboard(0, 0, [0, 0], [])),
-        });
-    }
+        IReadOnlyDictionary<string, object?>? scoreboardValues = null) =>
+        RoundEntryWire.Write(tables, build, unknown0, unknown1, unknown2, unknown3, unknown4, scoreboardValues);
 
     /// <summary>Checks whether the native entry table requires caller-projected scoreboard values.</summary>
     internal static bool EntryNeedsScoreboard(PacketTables tables, string build) =>
-        tables.Resolve(build, "RoomEnterGame").Any(field => field.Name == "scoreboard");
+        RoundEntryWire.NeedsScoreboard(tables, build);
 
     /// <summary>
     /// Nested MapMetaData u32 index of <c>TimeAttackTimeLimit</c> (cn-717 fill
@@ -295,65 +280,6 @@ internal static class TutorialWire
     /// accepted for echo. Layout is host-authored; the server does not invent fields.
     /// </summary>
     public const int MaxMobCreateBytes = 4096;
-
-    /// <summary>
-    /// Writes <c>gppCreateMobsFromSpawnGroup</c> (cn-717 builder <c>sub_747250</c> /
-    /// apply <c>sub_744160</c>): one u32 spawn-group index. Host emits C2S 32857 with
-    /// group 1 from <c>sub_741980</c> after StartGame when <c>NpcGameContext</c> is live;
-    /// the S2C apply path is the same opcode (dispatcher case <c>0x8059</c>).
-    /// </summary>
-    /// <param name="tables">Audited packet layouts.</param>
-    /// <param name="build">Client build whose layout is selected.</param>
-    /// <param name="spawnGroup">Spawn-group index (prologue host sends 1).</param>
-    /// <returns>The body (exactly four bytes).</returns>
-    public static byte[] WriteCreateMobsFromSpawnGroup(PacketTables tables, string build, int spawnGroup)
-    {
-        ValidateLayouts(tables, build);
-        return PacketCodec.Write(tables, build, "TutorialSpawnGroup",
-            new Dictionary<string, object?> { ["spawn_group"] = spawnGroup });
-    }
-
-    /// <summary>
-    /// Consumes <c>gppCreateMobsFromSpawnGroup</c>: one u32, no trailing bytes.
-    /// </summary>
-    /// <param name="payload">The C2S body.</param>
-    /// <param name="tables">Audited packet layouts.</param>
-    /// <param name="build">Client build whose layout is selected.</param>
-    /// <returns>The spawn-group index.</returns>
-    public static int ReadCreateMobsFromSpawnGroup(PacketTables tables, string build, ReadOnlySpan<byte> payload)
-    {
-        ValidateLayouts(tables, build);
-        return (int)PacketCodec.ReadScalars(tables, build, "TutorialSpawnGroup", payload)["spawn_group"];
-    }
-
-    /// <summary>
-    /// Writes <c>gspRepStartNewWave</c> (cn-717 case <c>0x388</c> / <c>sub_ABD9A0</c>):
-    /// one u32 wave index. Same layout as C2S <c>gcpReqStartNewWave</c>
-    /// (<c>sub_ABD760</c>).
-    /// </summary>
-    /// <param name="tables">Audited packet layouts.</param>
-    /// <param name="build">Client build whose layout is selected.</param>
-    /// <param name="wave">Wave index the host requested (prologue starts at 1).</param>
-    /// <returns>The body (exactly four bytes).</returns>
-    public static byte[] WriteStartNewWave(PacketTables tables, string build, int wave)
-    {
-        ValidateLayouts(tables, build);
-        return PacketCodec.Write(tables, build, "TutorialWave",
-            new Dictionary<string, object?> { ["wave"] = wave });
-    }
-
-    /// <summary>
-    /// Consumes <c>gcpReqStartNewWave</c>: one u32 wave index, no trailing bytes.
-    /// </summary>
-    /// <param name="payload">The C2S body.</param>
-    /// <param name="tables">Audited packet layouts.</param>
-    /// <param name="build">Client build whose layout is selected.</param>
-    /// <returns>The wave index.</returns>
-    public static int ReadStartNewWave(PacketTables tables, string build, ReadOnlySpan<byte> payload)
-    {
-        ValidateLayouts(tables, build);
-        return (int)PacketCodec.ReadScalars(tables, build, "TutorialWave", payload)["wave"];
-    }
 
     /// <summary>
     /// Checks C2S <c>gcpReqWaveAllSpawnMobs</c>: opaque wave table, size-bounded only.
@@ -444,8 +370,6 @@ internal static class TutorialWire
         // table states it, the same conditional shape the inventory extension uses.
         if (tables.Resolve(build, "TutorialHostStart").Any(field => field.Name == "unknown_4"))
             PacketLayoutContract.RequireFields(tables, build, "TutorialHostStart", "Tutorial", ("unknown_4", "u32"));
-        PacketLayoutContract.RequireFields(tables, build, "TutorialSpawnGroup", "Tutorial", ("spawn_group", "u32"));
-        PacketLayoutContract.RequireFields(tables, build, "TutorialWave", "Tutorial", ("wave", "u32"));
         PacketLayoutContract.RequireFields(tables, build, "TutorialPlayRequest", "Tutorial",
             ("map_key", "wstr"), ("difficulty", "u32"), ("time_attack_time_limit_ms", "u32"));
     }

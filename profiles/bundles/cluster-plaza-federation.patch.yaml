@@ -1,0 +1,11 @@
+# Optional shared plaza. Nodes of one verified account domain (same data_scope and database identity at the
+# directory) show each other's plaza members per client build; friendly servers never share.
+# The directory row also needs plaza_federation: true. List every build whose plaza is shared on this node.
+- insert:
+    - id: cluster-plaza-federation
+      plugin: cluster.plaza-federation
+      config:
+        node_id: "${BFF_CLUSTER_NODE_ID}"
+        directory_url: "${BFF_CLUSTER_DIRECTORY_URL:-http://127.0.0.1:8093}"
+        access_key: "${BFF_CLUSTER_NODE_KEY}"
+        builds: [kr-1256]

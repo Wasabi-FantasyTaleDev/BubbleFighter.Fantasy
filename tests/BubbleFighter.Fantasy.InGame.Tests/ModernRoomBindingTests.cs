@@ -457,7 +457,7 @@ public sealed partial class RoomCommandsBindingTests
         Assert.Equal(Table("RoomJoinResult", new() { ["result"] = 4 }), harness.Guest.Body(103));
         await harness.Dispatch(harness.Guest, 403, Request("RoomJoinRequest", new() { ["room_id"] = harness.Room.Id, ["password"] = "pw" }));
         var installs = harness.Host.Bodies(117).Length;
-        await harness.Dispatch(harness.Guest, 505, Request("RoomReadyRequest", new() { ["unknown_5"] = true }));
+        await harness.Dispatch(harness.Guest, 505, Request("RoomReadyRequest", new() { ["in_shop"] = true }));
         Assert.True(harness.Room.Seats[1].InShop);
         await harness.Dispatch(harness.Guest, 515, new byte[] { 0xBA, 0xBA });
         Assert.Equal(Table("ZombieTeamChange", new() { ["seat"] = 1, ["team"] = checked((byte)harness.Room.Seats[1].Team) }), harness.Host.Body(504));
@@ -796,7 +796,8 @@ public sealed partial class RoomCommandsBindingTests
         internal IMessageSender<T> Sender<T>() where T : IMessage => _services.GetAll<IMessageSender<T>>().Single();
 
         internal static async Task<Harness> CreateAsync(bool ai = false, IGameText? texts = null, string nicknameKey = "", int level = 1,
-            object[]? itemAttributes = null, bool roundsBound = false, string build = "kr-1256", bool reinstallRoomOnFirstProbe = true)
+            object[]? itemAttributes = null, bool roundsBound = false, string build = "kr-1256", bool reinstallRoomOnFirstProbe = true,
+            bool roomKicking = false)
         {
             var h = new Harness();
             h._protocol = build + "/game";
@@ -825,7 +826,7 @@ public sealed partial class RoomCommandsBindingTests
                 }));
                 var table = OpcodeTableLoader.Load(Path.Combine(Root, "profiles", build, "opcodes.yaml"), TestWireDialects.Get(build).Profile);
                 new RoomCommandsBinding(h._protocol, table, Tables, build, NullLogger.Instance,
-                    roundsBound: roundsBound || !string.IsNullOrEmpty(nicknameKey)).Mount(h.Context("binding"));
+                    roundsBound: roundsBound || !string.IsNullOrEmpty(nicknameKey), roomKicking: roomKicking).Mount(h.Context("binding"));
                 if (ai) new RoomAiBinding(h._protocol, table, Tables, build, NullLogger.Instance).Mount(h.Context("ai"));
                 new PlazaSceneBinding(h._protocol, table, Tables, build, NullLogger.Instance).Mount(h.Context("plaza"));
                 new RoomListCodec(h._protocol, table.C2S("gcpReqListSession"), table.S2C("gspRepListSession"), Tables, build, NullLogger.Instance).Mount(h.Context("list"));

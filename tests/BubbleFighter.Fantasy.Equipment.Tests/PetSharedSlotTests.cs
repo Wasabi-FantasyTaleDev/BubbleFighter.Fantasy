@@ -1,5 +1,6 @@
 using BubbleFighter.Fantasy.Tests;
 using System.Buffers.Binary;
+using System.IO.Compression;
 using System.Text;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
@@ -11,6 +12,8 @@ using BubbleFighter.Fantasy.Kernel;
 using BubbleFighter.Fantasy.Lobby;
 using BubbleFighter.Fantasy.Lobby.Data;
 using BubbleFighter.Fantasy.Persistence.Memory;
+using BubbleFighter.Fantasy.Packets;
+using BubbleFighter.Fantasy.Wire;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -84,6 +87,15 @@ public sealed class PetSharedSlotTests
     [Theory]
     [InlineData("kr-812", 14, 301014)]
     [InlineData("kr-1256", 26, null)]
+    [InlineData("cn-406", 3, null)]
+    [InlineData("cn-404", 8, null)]
+    [InlineData("cn-408", 8, null)]
+    [InlineData("cn-706", 10, null)]
+    [InlineData("cn-717", 14, null)]
+    [InlineData("id-400", 5, null)]
+    [InlineData("id-1809", 7, null)]
+    [InlineData("cn-774", 24, null)]
+    [InlineData("tw-454", 23, null)]
     [Trait("Category", "LocalClientData")]
     public void LoaderReadsTheRealWorkbooks(string build, int expectedPets, int? kr812Last)
     {
@@ -92,9 +104,40 @@ public sealed class PetSharedSlotTests
             134_217_728, "equipment.max_pet_catalog_bytes");
         Assert.Equal(expectedPets, pets.Count);
         Assert.Contains(301001, pets);
-        Assert.All(pets, id => Assert.True(id >= 301001));
         if (kr812Last is { } last)
             Assert.Contains(last, pets);
+    }
+
+    [Theory]
+    [InlineData("cn-279")]
+    [InlineData("cn-324")]
+    [Trait("Category", "LocalClientData")]
+    public void EarlyClientWorkbooksDoNotSupplyPetIdentities(string build)
+    {
+        var error = Assert.Throws<InvalidOperationException>(() => PetItemCatalogLoader.Load(
+            WorkbookFile.FromBytes("Config/ShopItem2.xml", LocalClientData.Bytes(build, "Config/ShopItem2.xml")),
+            134_217_728, "equipment.max_pet_catalog_bytes"));
+        Assert.Contains("no function-10001", error.Message);
+    }
+
+    [Theory]
+    [InlineData("kr-812", true)]
+    [InlineData("kr-1256", true)]
+    [InlineData("cn-279", false)]
+    [InlineData("cn-324", false)]
+    [InlineData("cn-406", true)]
+    [InlineData("cn-404", true)]
+    [InlineData("cn-408", true)]
+    [InlineData("cn-706", true)]
+    [InlineData("cn-717", true)]
+    [InlineData("id-400", true)]
+    [InlineData("id-1809", true)]
+    [InlineData("cn-774", true)]
+    [InlineData("tw-454", true)]
+    public void EveryMountedBuildHasAnExplicitPetEquipmentDisposition(string build, bool supported)
+    {
+        var tables = PacketTables.Load((string)TestWireDialects.MessagesConfig()["packets_directory"]!);
+        Assert.Equal(supported, tables.CapabilityOf(build, "pet_equipment"));
     }
 
     [Fact]
@@ -137,6 +180,49 @@ public sealed class PetSharedSlotTests
     }
 
     [Fact]
+    public async Task RetargetedRequestCannotBypassThePetSlot()
+    {
+        using var h = await Harness.CreateAsync();
+        Assert.NotNull(await h.Selection.ApplyAsync(42, 301001, true, default));
+        using var retarget = h.Events.Intercept<EquipmentSelectionApplying, EquipmentSelectionDecision>(
+            (_, _, _) => ValueTask.FromResult(new EquipmentSelectionDecision(true, 301002, true)));
+
+        Assert.Null(await h.Selection.ApplyAsync(42, 203073, true, default));
+        var stored = await h.Store.ListSlotsAsync(42, InventoryBag.CharacterBag, InventoryLimits.MaxInventorySlotsPerBag, default);
+        Assert.Contains(301001, Worn(stored));
+        Assert.DoesNotContain(301002, Worn(stored));
+    }
+
+    [Fact]
+    public async Task IndependentSelectionProvidersCannotCommitTwoPetsFromTheSameSnapshot()
+    {
+        using var first = await Harness.CreateAsync();
+        using var second = await Harness.CreateAsync(sharedStore: first.Store);
+        var entered = 0;
+        var bothEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        async ValueTask<EquipmentSelectionDecision> Pause(EquipmentSelectionApplying request,
+            Func<CancellationToken, ValueTask<EquipmentSelectionDecision>> next, CancellationToken ct)
+        {
+            var decision = await next(ct);
+            if (Interlocked.Increment(ref entered) == 2) bothEntered.TrySetResult();
+            await release.Task.WaitAsync(ct);
+            return decision;
+        }
+        using var firstPause = first.Events.Intercept<EquipmentSelectionApplying, EquipmentSelectionDecision>(Pause);
+        using var secondPause = second.Events.Intercept<EquipmentSelectionApplying, EquipmentSelectionDecision>(Pause);
+        var one = first.Selection.ApplyAsync(42, 301001, true, default).AsTask();
+        var two = second.Selection.ApplyAsync(42, 301002, true, default).AsTask();
+        try { await bothEntered.Task.WaitAsync(TimeSpan.FromSeconds(5)); }
+        finally { release.TrySetResult(); }
+        var results = await Task.WhenAll(one, two);
+
+        Assert.Single(results, result => result is not null);
+        var stored = await first.Store.ListSlotsAsync(42, InventoryBag.CharacterBag, InventoryLimits.MaxInventorySlotsPerBag, default);
+        Assert.Single(Worn(stored), item => item is 301001 or 301002);
+    }
+
+    [Fact]
     public async Task RefusedSecondPetRepliesFailureOnTheWire()
     {
         using var h = await Harness.CreateAsync();
@@ -165,6 +251,56 @@ public sealed class PetSharedSlotTests
         Assert.NotNull(await h.Selection.ApplyAsync(42, 301001, true, default));
         Assert.NotNull(await h.Selection.ApplyAsync(42, 301001, true, default));
         Assert.Single(Worn(await h.Selection.ReadAsync(42, default)), id => id is >= 301000 and < 302000);
+    }
+
+    [Fact]
+    public async Task RemovingTheActivePetPublishesTheChangeAndLoginInventoryRestoresTheNextPet()
+    {
+        using var h = await Harness.CreateAsync();
+        await h.WearAsync(301001);
+        Assert.Contains(301001, ReadWornFlags(Assert.Single(h.Session.Sent, packet => packet.Opcode == 803).Payload));
+        Assert.Contains(301001, ReadViewItems(Assert.Single(h.Session.Sent, packet => packet.Opcode == 806).Payload));
+        h.Session.Sent.Clear();
+        await h.RemoveAsync(301001);
+        Assert.Equal(0, BinaryPrimitives.ReadInt32LittleEndian(Assert.Single(h.Session.Sent, packet => packet.Opcode == 812).Payload));
+        Assert.DoesNotContain(301001, ReadWornFlags(Assert.Single(h.Session.Sent, packet => packet.Opcode == 803).Payload));
+        Assert.DoesNotContain(301001, ReadViewItems(Assert.Single(h.Session.Sent, packet => packet.Opcode == 806).Payload));
+        await h.WearAsync(301002);
+
+        using var nextSession = await Harness.CreateAsync(sharedStore: h.Store);
+        await nextSession.PublishInventoryAsync();
+        var published = ReadWornFlags(nextSession.Session.Sent[1].Payload);
+        Assert.DoesNotContain(301001, published);
+        Assert.Contains(301002, published);
+        var restored = Worn(await nextSession.Selection.ReadAsync(42, default));
+        Assert.DoesNotContain(301001, restored);
+        Assert.Contains(301002, restored);
+        Assert.Null(await nextSession.Selection.ApplyAsync(42, 301001, true, default));
+    }
+
+    [Fact]
+    public async Task NormalizationRepairsHistoricalMultiplePetsWithoutChangingInventoryOrOtherFlags()
+    {
+        using var h = await Harness.CreateAsync();
+        var before = await h.Store.ListSlotsAsync(42, InventoryBag.CharacterBag, InventoryLimits.MaxInventorySlotsPerBag, default);
+        var ambiguous = before.Select(row => row.ItemId is 301001 or 301002 ? row with { Flags = 0x81 } : row).ToArray();
+        await h.Store.ReplaceSlotsAsync(42, InventoryBag.CharacterBag, ambiguous, default);
+
+        var normalized = await h.Selection.ReadAsync(42, default);
+        Assert.Equal(ambiguous.Select(row => (row.ItemId, row.SlotKey, row.Quantity)), normalized.Select(row => (row.ItemId, row.SlotKey, row.Quantity)));
+        Assert.Single(Worn(normalized), item => item is 301001 or 301002);
+        Assert.All(normalized.Where(row => row.ItemId is 301001 or 301002), row => Assert.Equal(0x80, row.Flags & ~1));
+    }
+
+    [Fact]
+    public async Task UnloadingTheEquipmentRowRemovesItsSelectionConstraints()
+    {
+        using var h = await Harness.CreateAsync();
+        Assert.NotNull(await h.Selection.ApplyAsync(42, 301001, true, default));
+        h.UnloadEquipment();
+
+        Assert.NotNull(await h.Selection.ApplyAsync(42, 301002, true, default));
+        Assert.Equal([301001, 301002], Worn(await h.Selection.ReadAsync(42, default)).Where(item => item is 301001 or 301002).Order());
     }
 
     [Fact]
@@ -221,6 +357,16 @@ public sealed class PetSharedSlotTests
         Assert.Contains("pet_shared_slot", error.Message);
     }
 
+    [Theory]
+    [InlineData("cn-279")]
+    [InlineData("cn-324")]
+    public async Task BuildsWithoutNativePetEvidenceRejectTheOptIn(string build)
+    {
+        var error = await Assert.ThrowsAsync<ConfigException>(() => Harness.CreateAsync(build: build));
+        Assert.Contains("pet_shared_slot", error.Message);
+        Assert.Contains(build, error.Message);
+    }
+
     [Fact]
     public void PetSharedSlotDefaultsToOffAndValidatesItsRequirements()
     {
@@ -242,17 +388,44 @@ public sealed class PetSharedSlotTests
     private static int[] Worn(IReadOnlyList<InventorySlotRecord> rows) =>
         rows.Where(row => (row.Flags & InventorySlotRecord.WornFlagBit) != 0).Select(row => row.ItemId).ToArray();
 
+    private static int[] ReadViewItems(byte[] body)
+    {
+        var count = BinaryPrimitives.ReadInt32LittleEndian(body.AsSpan(8));
+        return Enumerable.Range(0, count).Select(index => BinaryPrimitives.ReadInt32LittleEndian(body.AsSpan(12 + 4 * index))).ToArray();
+    }
+
+    private static int[] ReadWornFlags(byte[] body)
+    {
+        using var source = new MemoryStream(body, 4, body.Length - 4);
+        using var zip = new ZLibStream(source, CompressionMode.Decompress);
+        using var plain = new MemoryStream();
+        zip.CopyTo(plain);
+        var reader = new PacketReader(plain.ToArray());
+        var count = reader.ReadUInt32();
+        var worn = new List<int>();
+        for (var index = 0; index < count; index++)
+        {
+            var id = reader.ReadInt32();
+            reader.ReadInt32();
+            reader.ReadInt64();
+            reader.ReadWideStringPrefixed();
+            Assert.Equal(0u, reader.ReadUInt32());
+            if ((reader.ReadByte() & InventorySlotRecord.WornFlagBit) != 0) worn.Add(id);
+        }
+        return worn.ToArray();
+    }
+
     /// <summary>
     /// The real plugin chain of the equipment row over the in-memory store, with the pet
     /// rule's workbook served by a stub client data row.
     /// </summary>
-    private sealed class Harness : IDisposable
+    private sealed class Harness(MemoryInventoryRepository? sharedStore = null, string build = "kr-1256") : IDisposable
     {
         private readonly ServiceRegistry _services = new();
         private readonly EventBus _events = new(NullLogger.Instance);
         internal IEventBus Events => _events;
         private readonly List<PluginContext> _contexts = [];
-        internal MemoryInventoryRepository Store { get; } = new(new MemoryPlayerTable(8));
+        internal MemoryInventoryRepository Store { get; } = sharedStore ?? new(new MemoryPlayerTable(8));
         internal RecordingSession Session { get; } = new(11, 42);
         internal IEquipmentSelection Selection => _services.Get<IEquipmentSelection>();
         internal IPacketRouter Router => _services.Get<IPacketRouter>();
@@ -260,15 +433,17 @@ public sealed class PetSharedSlotTests
         private PluginContext Context(string name, Dictionary<string, object?>? config = null)
         {
             var context = new PluginContext(
-                name == "dialect.messages" ? SharedDialectRows.Kr1256(config) : new PluginRow { Id = name, Plugin = name, Source = "test", Config = config },
+                name == "dialect.messages" ? SharedDialectRows.Kr1256(config)
+                    : new PluginRow { Id = name, Plugin = name, Source = "test", Config = config, Lineage = [build] },
                 _services, _events, NullLogger.Instance);
             _contexts.Add(context);
             return context;
         }
 
-        internal static async Task<Harness> CreateAsync(bool petSharedSlot = true, bool mountClientData = true)
+        internal static async Task<Harness> CreateAsync(bool petSharedSlot = true, bool mountClientData = true,
+            MemoryInventoryRepository? sharedStore = null, string build = "kr-1256")
         {
-            var h = new Harness();
+            var h = new Harness(sharedStore, build);
             var root = h.Context("root");
             root.Effect(h._services.Register<IInventoryRepository>(h.Store));
             if (mountClientData)
@@ -288,8 +463,20 @@ public sealed class PetSharedSlotTests
                 h._services.GetAll<IMessageSender<InventoryReplaced>>().Single(),
                 h._services.GetAll<IMessageSender<InventoryPurchaseApplied>>().Single(),
                 h._services.GetAll<IMessageSender<InventorySlotsUpdated>>().Single())));
-            await new EquipmentPlugin().ActivateAsync(
-                h.Context("equipment", petSharedSlot ? new() { ["pet_shared_slot"] = true } : null), default);
+            // The kr-1256 row now mounts the preset switch on its capability; the harness needs the
+            // persistence face the real mysql row publishes.
+            root.Effect(h._services.Register<IPlayerInventoryState>(new ZeroPresetState()));
+            try
+            {
+                await new EquipmentPlugin().ActivateAsync(h.Context("equipment",
+                    TestWireDialects.MessagesConfig(new() { ["pet_shared_slot"] = petSharedSlot })), default);
+            }
+            catch
+            {
+                h.Dispose();
+                throw;
+            }
+            if (sharedStore is not null) return h;
             await h.Store.ReplaceSlotsAsync(42, InventoryBag.CharacterBag, StarterInventory.Slots(42, InventoryBag.CharacterBag, DateTimeOffset.UtcNow), default);
             await h.Store.ReplaceSlotsAsync(42, InventoryBag.EquippedBag, StarterInventory.Slots(42, InventoryBag.EquippedBag, DateTimeOffset.UtcNow), default);
             await h.Store.AppendMissingItemsAsync(42, InventoryBag.CharacterBag,
@@ -301,6 +488,13 @@ public sealed class PetSharedSlotTests
 
         internal Task WearAsync(int id) =>
             Router.DispatchAsync("kr-1256/game", Session, new(804, BitConverter.GetBytes((long)id)), default).AsTask();
+
+        internal Task RemoveAsync(int id) =>
+            Router.DispatchAsync("kr-1256/game", Session, new(805, BitConverter.GetBytes((long)id)), default).AsTask();
+
+        internal ValueTask PublishInventoryAsync() => _services.Get<IInventoryPushService>().PushInventoryAsync(Session, 42, default);
+
+        internal void UnloadEquipment() => _contexts.Single(context => context.Row.Id == "equipment").Unwind();
 
         public void Dispose()
         {

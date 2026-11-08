@@ -3,14 +3,11 @@ structs:
   # S2C gspInventoryUpdateAllInventorySlot (801) and gspInventoryUpdateInventorySlots (802): the whole bag
   # or the changed slots, as one counted list. Readers: kr-812 sub_843420, cn-717 sub_8CD130,
   # id-400 sub_7993D0, cn-324 sub_6FE0C0, cn-279 sub_450230.
-  InventoryUpdate:
-    - slots: "list<InventorySlot>"
-
-  # The whole-bag packet of the builds whose bag record is the modern one. kr-1256 sub_9AE4A0
+  # The builds whose bag record is the modern one read the same counted list. kr-1256 sub_9AE4A0
   # unwraps the compressed envelope (kr-1256 sub_FA5520) and reads this counted list through
   # kr-1256 sub_10D7C50 -> sub_10D8550; cn-774 sub_BAD820 -> sub_1063790 reads the count straight
   # off the stream, and tw-454 writes the cn-774 plain body.
-  InventoryUpdate@kr-1256:
+  InventoryUpdate:
     - slots: "list<InventorySlot>"
 
   # One modern bag slot, read by kr-1256 sub_10D8550: item id, count, eight bytes stored at record

@@ -8,7 +8,7 @@ using Xunit;
 namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
 
 /// <summary>Pins the legacy seed authority's table bodies and its data-driven critical chance.</summary>
-public sealed class SceneSeedAuthorityTests
+public sealed partial class SceneSeedAuthorityTests
 {
     private static readonly PacketTables Tables = PacketTables.Load(TestBuilds.PacketsDirectory());
 
@@ -54,7 +54,7 @@ public sealed class SceneSeedAuthorityTests
         Assert.Equal(0.046, chances.RoundStartChance(MatchPreviousRound.LostInRow), 6);
     }
 
-    /// <summary>A missing category or a defence chance with no proven byte scale fails at load.</summary>
+    /// <summary>A missing category or a defence chance with no established seed distribution fails at load.</summary>
     [Fact]
     public void IncompleteOrDefenceTablesAreRejected()
     {
@@ -64,9 +64,9 @@ public sealed class SceneSeedAuthorityTests
         Assert.Throws<ConfigException>(() => Chances(Workbook(rows, defence: "5")));
     }
 
-    /// <summary>A realistic chance still yields some critical bits, and every round draws new ones.</summary>
+    /// <summary>Independent encodings at a realistic chance produce fresh tables containing some critical bits.</summary>
     [Fact]
-    public void EachRequestDrawsFreshBits()
+    public void IndependentCriticalEncodingsDrawFreshBits()
     {
         var authority = Authority("cn-324", new Random(3));
         var first = authority.Critical(1_000_000, 0.013);

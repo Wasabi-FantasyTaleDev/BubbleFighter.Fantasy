@@ -10,11 +10,13 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Persistence.MySql\BubbleFighter.Fantasy.Persistence.MySql.csproj" />
+    <ProjectReference Include="../../src/BubbleFighter.Fantasy.Kernel/BubbleFighter.Fantasy.Kernel.csproj" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\BubbleFighter.Fantasy.Contracts\BubbleFighter.Fantasy.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\Shared\TestPlayerSessions.cs" Link="TestPlayerSessions.cs" />
     <Compile Include="..\Shared\ShopSessionStoreContractGuardTests.cs" Link="ShopSessionStoreContractGuardTests.cs" />
     <Compile Include="..\Shared\ClanStoreContractGuardTests.cs" Link="ClanStoreContractGuardTests.cs" />
     <Compile Include="..\Shared\MessengerStoreContractTests.cs" Link="MessengerStoreContractTests.cs" />

@@ -301,6 +301,25 @@ public sealed partial class RoundFlowTests
         }
     }
 
+    private sealed class ObservationSink(int[] modes, string protocol = "test/game") : IRoundObservationSender
+    {
+        private readonly Sink<RoundPlayerObserved> _sent = new();
+        public string Protocol => protocol;
+        public bool SupportsMode(int modeId) => modes.Contains(modeId);
+        public ValueTask SendAsync(ISession session, RoundPlayerObserved message, CancellationToken ct) => _sent.SendAsync(session, message, ct);
+        public RoundPlayerObserved[] To(ISession session) => _sent.To(session);
+    }
+
+    private sealed class SeriesEntrySink : IRoundSeriesEntrySender
+    {
+        private readonly Sink<RoomMatchStarting> _sent = new();
+        public string Protocol => "test/game";
+        public int RoundsToWin { get; set; } = 2;
+        public bool SupportsMode(int modeId) => modeId == 19;
+        public ValueTask SendAsync(ISession session, RoomMatchStarting message, CancellationToken ct) => _sent.SendAsync(session, message, ct);
+        public RoomMatchStarting[] To(ISession session) => _sent.To(session);
+    }
+
     private sealed class Rig
     {
         public RoomRegistry Registry { get; }
@@ -310,17 +329,21 @@ public sealed partial class RoundFlowTests
         public Sink<RoomSeatUpdated> SeatUpdated { get; } = new();
         public Sink<RoomSeatVacated> SeatVacated { get; } = new();
         public Sink<RoomMasterChanged> MasterChanged { get; } = new();
-        public Sink<RoomMatchStarting> Starting { get; } = new();
+        public SeriesEntrySink Starting { get; } = new();
         public Sink<RoundPlayerLoaded> Loaded { get; } = new();
         public Sink<RoundCountdownStarted> Countdown { get; } = new();
         public Sink<RoundStarted> Started { get; } = new();
         public Sink<RoundFeedReceived> Feed { get; } = new();
         public Sink<RoundEnded> Ended { get; } = new();
+        public Sink<RoundBombStateChanged> BombChanged { get; } = new();
         public Sink<RoundSpawnOffered> SpawnOffered { get; } = new();
         public Sink<RoundPlayerRespawned> Respawned { get; } = new();
+        public ObservationSink Observed { get; }
         public Sink<RoundRespawnWaitChanged> WaitChanged { get; } = new();
         public Sink<RoundSupplyCreated> SupplyCreated { get; } = new();
         public Sink<RoundSupplyPicked> SupplyPicked { get; } = new();
+        public Sink<RoundWeaponCreated> WeaponCreated { get; } = new();
+        public Sink<RoundWeaponPicked> WeaponPicked { get; } = new();
         public Sink<RoundLucciCreated> LucciCreated { get; } = new();
         public Sink<RoundLucciPicked> LucciPicked { get; } = new();
         public Sink<RoundStarCreated> StarCreated { get; } = new();
@@ -336,6 +359,7 @@ public sealed partial class RoundFlowTests
         public Sink<RoundRescueMissionSucceeded> RescueSucceeded { get; } = new();
         public Sink<RoomTeamConverted> TeamConverted { get; } = new();
         public Sink<RoomChatReceived> Chat { get; } = new();
+        public Sink<RoomLeft> Left { get; } = new();
         public Sink<RoundObjectAddAcknowledged> ObjectAdded { get; } = new();
         public RecordingSession Host { get; } = Player(11, "host");
         public RecordingSession Guest { get; } = Player(22, "guest");
@@ -343,8 +367,11 @@ public sealed partial class RoundFlowTests
 
         public Rig(int timeLimitMs = 180_000, IPluginContext? resultContext = null, int[]? randomSupplyItemKinds = null,
             int[]? cooperativeStageResultModes = null, int zombieConversionModeId = 0, int[]? countedItemKinds = null, bool rescueMissions = false, int rescueDurationMs = 5000, int rescueCount = 1, int rescueCooldownMs = 25000, int[]? immediateSupplyItemKinds = null, bool pvePoints = false, int rescueStopTimeMs = 0, int[]? cooperativeScoreOutcomeModes = null, int nativeItemSlotCount = 1, int resultRewardDelayMs = 6000, int[]? pvePointUnitValues = null, int[]? countedImmediateItemKinds = null, int[]? directKillModes = null,
-            Action<InGameOptions>? configure = null, Func<TimeSpan, CancellationToken, ValueTask>? zombieKingDelay = null)
+            Action<InGameOptions>? configure = null, Func<TimeSpan, CancellationToken, ValueTask>? zombieKingDelay = null,
+            bool observation = false, int[]? observationModes = null, int roundsToWin = 2)
         {
+            Starting.RoundsToWin = roundsToWin;
+            Observed = new ObservationSink(observationModes ?? [4, 19]);
             var options = new InGameOptions { StartTimerMs = 30, RoundUnknown0 = timeLimitMs, ResultCloseGraceMs = 30, SupplyPollMs = 10,
                 RandomSupplyItemKinds = randomSupplyItemKinds ?? [], CooperativeStageResultModes = cooperativeStageResultModes ?? [],
                 NativeItemSlotCount = nativeItemSlotCount, ResultRewardDelayMs = resultRewardDelayMs,
@@ -376,7 +403,8 @@ public sealed partial class RoundFlowTests
             }
             Registry = new RoomRegistry(options);
             Rooms = new RoomFlow(Registry, new RoomSenders(Entered, SeatUpdated, SeatVacated, MasterChanged, MatchStarting: Starting,
-                TeamConverted: TeamConverted, CountedItemsPrepared: CountedItemsPrepared, RescuePrepared: RescuePrepared, Chat: Chat),
+                TeamConverted: TeamConverted, CountedItemsPrepared: CountedItemsPrepared, RescuePrepared: RescuePrepared, Chat: Chat,
+                Left: Left),
                 NullLogger.Instance, null, null, 36, options, default, null, null, null,
                 static () => Environment.TickCount64,
                 static (delay, ct) => new(Task.Delay(delay, ct)),
@@ -385,9 +413,12 @@ public sealed partial class RoundFlowTests
                 WaitChanged: WaitChanged,
                 SupplyCreated: SupplyCreated, SupplyPicked: SupplyPicked, ItemUsed: ItemUsed,
                 CountedItemUsed: CountedItemUsed, RescueStarted: RescueStarted, RescueFailed: RescueFailed, RescueSucceeded: RescueSucceeded, RescuePrepared: RescuePrepared, PvePoints: PvePoints, ItemSlotChanged: ItemSlotChanged, LucciCreated: LucciCreated, LucciPicked: LucciPicked,
-                StarCreated: StarCreated, StarPicked: StarPicked, ObjectAdded: ObjectAdded), NullLogger.Instance, CancellationToken.None,
-                Rooms.ReturnToRoomAsync, resultContext);
+                StarCreated: StarCreated, StarPicked: StarPicked, ObjectAdded: ObjectAdded,
+                WeaponCreated: WeaponCreated, WeaponPicked: WeaponPicked, Observer: observation ? Observed : null,
+                BombStateChanged: BombChanged), NullLogger.Instance, CancellationToken.None,
+                Rooms.ReturnToRoomAsync, resultContext, continueSeries: Rooms.ContinueSeriesAsync);
             Rooms.SeatLeftDuringRound = Round.OnSeatLeftAsync;
+            Rooms.BeforeSeatLeaves = Round.RecordDepartureAsync;
             Rooms.TeamConvertedDuringRound = Round.OnTeamConvertedAsync;
             Round.RoundPlaying = Rooms.ScheduleZombieKing;
         }
@@ -548,6 +579,37 @@ public sealed partial class RoundFlowTests
             await rig.Round.HandlePvePangAsync(rig.Host, new(64), default);
             Assert.Equal(3, rig.PvePoints.To(rig.Host).Length);
             Assert.Equal(0, rig.Registry.TryGet(rig.Host.Id)!.Scoring.Stats(first.Slot).Kills);
+        }
+        finally { await rig.Registry.StopAllAsync(); }
+    }
+
+    /// <summary>Cooperative points accept either spawn team when conversion belongs to no mode or another mode.</summary>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(9)]
+    public async Task PvePointsWithoutConversionAcceptBothSpawnTeams(int conversionMode)
+    {
+        var rig = new Rig(zombieConversionModeId: conversionMode, pvePoints: true);
+        try
+        {
+            await rig.StartAsync();
+            await rig.Round.HandleLoadReportedAsync(rig.Host, new(), default);
+            await rig.Round.HandleLoadReportedAsync(rig.Guest, new(), default);
+            await rig.WaitStartedAsync(rig.Host);
+            var room = rig.Registry.Find(rig.RoomId)!;
+            lock (room.Gate)
+            {
+                room.FindByGame(rig.Host.Id)!.Team = 1;
+                room.FindByGame(rig.Guest.Id)!.Team = 2;
+            }
+            await rig.Round.HandlePvePangAsync(rig.Host, new(0), default);
+            await rig.Round.HandlePvePangAsync(rig.Guest, new(1), default);
+            foreach (var member in new[] { rig.Host, rig.Guest })
+            {
+                var last = rig.PvePoints.To(member).Last();
+                Assert.Equal(new[] { 2, 5 }, last.Rows.Select(row => row.Points));
+                Assert.Equal(new[] { 2, 1 }, last.Rows.Select(row => row.Rank));
+            }
         }
         finally { await rig.Registry.StopAllAsync(); }
     }
@@ -975,11 +1037,11 @@ public sealed partial class RoundFlowTests
             await rig.Rooms.HandleTeamChangeAsync(rig.Host, new(), default);
             Assert.Equal(2, room.FindByGame(rig.Host.Id)!.Team);
             await rig.Round.HandleDeathReportedAsync(rig.Guest, new(1000001, 3200) { ActorSeat = 1 }, default);
-            Assert.False(room.FindByGame(rig.Guest.Id)!.AwaitingRespawn);
+            Assert.False(room.FindByGame(rig.Guest.Id)!.Life.ServerTimedWait);
             await rig.Rooms.HandleTeamChangeAsync(rig.Guest, new(), default);
             var seat = room.FindByGame(rig.Guest.Id)!;
             Assert.Equal(15, seat.Team);
-            Assert.Null(seat.LastDeathActor);
+            Assert.Null(seat.Life.DeathActor);
             foreach (var member in new[] { rig.Host, rig.Guest })
                 Assert.Equal(new RoomTeamConverted(1, 15), rig.TeamConverted.To(member)[^1]);
         }
@@ -1005,9 +1067,9 @@ public sealed partial class RoundFlowTests
             Assert.True(await rig.Rooms.TryPveZombieRevivalAsync(rig.Guest, default));
             var seat = rig.Registry.Find(rig.RoomId)!.FindByGame(rig.Guest.Id)!;
             Assert.Equal(15, seat.Team);
-            Assert.False(seat.AwaitingRespawn);
-            Assert.Null(seat.LastDeathActor);
-            Assert.False(seat.InstantRevivalPending);
+            Assert.False(seat.Life.ServerTimedWait);
+            Assert.Null(seat.Life.DeathActor);
+            Assert.False(seat.Life.RevivalOffered);
             foreach (var member in new[] { rig.Host, rig.Guest })
             {
                 Assert.Equal(new RoomTeamConverted(1, 15), rig.TeamConverted.To(member)[^1]);
@@ -1060,13 +1122,16 @@ public sealed partial class RoundFlowTests
     [Fact]
     public async Task ZombieKingUltraIsConfirmedToTheKingAlone()
     {
-        var rig = ZombiePvpRig(kingDelayMs: 150, ultraKind: 104);
+        var allowKing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var rig = ZombiePvpRig(kingDelayMs: 150, ultraKind: 104,
+            zombieKingDelay: (_, ct) => new ValueTask(allowKing.Task.WaitAsync(ct)));
         try
         {
             await StartZombiePvpAsync(rig);
             var room = rig.Registry.Find(rig.RoomId)!;
             await rig.Round.HandleSupplyPickupAsync(rig.Host, new(-1, 104), default);
             Assert.Empty(rig.CountedItemUsed.To(rig.Host));
+            allowKing.SetResult();
             for (var i = 0; i < 300 && room.ZombieKingSlot is null; i++)
                 await Task.Delay(10);
             var king = Assert.IsType<int>(room.ZombieKingSlot);
@@ -1284,6 +1349,11 @@ public sealed partial class RoundFlowTests
             var sent = rig.TeamConverted.To(rig.Host).Length;
             await rig.Rooms.HandleTeamChangeAsync(rig.Guest, new(), default);
             Assert.Equal(sent, rig.TeamConverted.To(rig.Host).Length);
+            Assert.Equal(RoomPhase.Playing, room.Phase);
+            Assert.Null(room.DecidedWinnerTeam);
+            Assert.Empty(rig.Ended.To(rig.Host));
+            await rig.Round.HandleLifeReportedAsync(rig.Guest,
+                new(RoundLifeEvent.DeathCleaned, RoomRegistry.SceneEntity(room.ZombieKingSlot!.Value)), default);
             Assert.Equal(RoundOutcome.Won, (await WaitEndedAsync(rig, rig.Host)).Outcome);
             Assert.Equal(RoundOutcome.Lost, (await WaitEndedAsync(rig, rig.Guest)).Outcome);
             Assert.Equal(RoundOutcome.Lost, (await WaitEndedAsync(rig, third)).Outcome);
@@ -1391,6 +1461,14 @@ public sealed partial class RoundFlowTests
             await rig.Round.HandleStarReportedAsync(member, new RoundStarReported(0, change), default);
     }
 
+    // The time limit runs from the round's start, so the outcome tests report their stars while the map loads:
+    // a loaded test host then cannot let the limit expire before the reports arrive.
+    private static async Task FinishLoadingAsync(Rig rig)
+    {
+        await rig.Round.HandleLoadReportedAsync(rig.Host, new(), default);
+        await rig.Round.HandleLoadReportedAsync(rig.Guest, new(), default);
+    }
+
     /// <summary>A dropped star goes to every member, the dropper too, and only the first claim removes it.</summary>
     [Fact]
     public async Task StarDropReachesEveryMemberAndOnlyTheFirstClaimRemovesIt()
@@ -1466,10 +1544,11 @@ public sealed partial class RoundFlowTests
         var rig = StarRig(timeLimitMs: 400);
         try
         {
-            await StartZombiePvpAsync(rig);
-            Assert.Equal(400, (await rig.WaitStartedAsync(rig.Host)).TimeLimitMs);
+            await rig.StartAsync();
             await ReportStarsAsync(rig, rig.Host, RoundStarChange.SmallGained, 3);
             await ReportStarsAsync(rig, rig.Guest, RoundStarChange.BigGained);
+            await FinishLoadingAsync(rig);
+            Assert.Equal(400, (await rig.WaitStartedAsync(rig.Host)).TimeLimitMs);
             Assert.Equal(RoundOutcome.Won, (await WaitEndedAsync(rig, rig.Guest)).Outcome);
             Assert.Equal(RoundOutcome.Lost, (await WaitEndedAsync(rig, rig.Host)).Outcome);
         }
@@ -1483,9 +1562,10 @@ public sealed partial class RoundFlowTests
         var rig = StarRig(timeLimitMs: 300);
         try
         {
-            await StartZombiePvpAsync(rig);
+            await rig.StartAsync();
             await ReportStarsAsync(rig, rig.Host, RoundStarChange.SmallGained, 2);
             await ReportStarsAsync(rig, rig.Guest, RoundStarChange.SmallGained, 2);
+            await FinishLoadingAsync(rig);
             Assert.Equal(RoundOutcome.Draw, (await WaitEndedAsync(rig, rig.Host)).Outcome);
             Assert.Equal(RoundOutcome.Draw, (await WaitEndedAsync(rig, rig.Guest)).Outcome);
         }
@@ -1499,7 +1579,7 @@ public sealed partial class RoundFlowTests
         var rig = StarRig(team: true, timeLimitMs: 400);
         try
         {
-            await StartZombiePvpAsync(rig);
+            await rig.StartAsync();
             var room = rig.Registry.Find(rig.RoomId)!;
             lock (room.Gate)
             {
@@ -1509,6 +1589,7 @@ public sealed partial class RoundFlowTests
             }
             await ReportStarsAsync(rig, rig.Guest, RoundStarChange.SmallGained, 4);
             await ReportStarsAsync(rig, rig.Host, RoundStarChange.SmallGained, 1);
+            await FinishLoadingAsync(rig);
             Assert.Equal(RoundOutcome.Won, (await WaitEndedAsync(rig, rig.Guest)).Outcome);
             Assert.Equal(RoundOutcome.Lost, (await WaitEndedAsync(rig, rig.Host)).Outcome);
         }
@@ -1583,24 +1664,45 @@ public sealed partial class RoundFlowTests
         await rig.Registry.StopAllAsync();
     }
 
-    [Fact]
-    public async Task DroppedItemsFromEitherPlayerReachBothAndCannotBePickedTwice()
+    /// <summary>Either player can drop a random box, but only one positive resolved pickup grants its held item.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DroppedItemsFromEitherPlayerReachBothAndCannotBePickedTwice(bool hostDrops)
     {
-        var rig = new Rig();
-        await rig.StartAsync();
-        await rig.Round.HandleLoadReportedAsync(rig.Host, new(), default);
-        await rig.Round.HandleLoadReportedAsync(rig.Guest, new(), default);
-        await rig.WaitStartedAsync(rig.Host);
-        await rig.Round.HandleSupplyDropAsync(rig.Guest, new(new(10, 20, 30, 0, 0, 0), 10000), default);
-        var box = Assert.Single(rig.SupplyCreated.To(rig.Host));
-        Assert.Equal(box, Assert.Single(rig.SupplyCreated.To(rig.Guest)));
-        Assert.Equal(0, box.Point.Kind);
-        await rig.Round.HandleSupplyPickupAsync(rig.Host, new(box.ObjectId, 1), default);
-        Assert.Empty(rig.SupplyPicked.To(rig.Host));
-        await rig.Round.HandleSupplyPickupAsync(rig.Host, new(box.ObjectId, 0), default);
-        await rig.Round.HandleSupplyPickupAsync(rig.Guest, new(box.ObjectId, 0), default);
-        Assert.Single(rig.SupplyPicked.To(rig.Host));
-        Assert.Single(rig.SupplyPicked.To(rig.Guest));
+        var rig = new Rig(randomSupplyItemKinds: [101]);
+        try
+        {
+            await rig.StartAsync();
+            await rig.Round.HandleLoadReportedAsync(rig.Host, new(), default);
+            await rig.Round.HandleLoadReportedAsync(rig.Guest, new(), default);
+            await rig.WaitStartedAsync(rig.Host);
+            var dropper = hostDrops ? rig.Host : rig.Guest;
+            var picker = hostDrops ? rig.Guest : rig.Host;
+            await rig.Round.HandleSupplyDropAsync(dropper, new(new(10, 20, 30, 0, 0, 0), 10000), default);
+            var box = Assert.Single(rig.SupplyCreated.To(rig.Host));
+            Assert.Equal(box, Assert.Single(rig.SupplyCreated.To(rig.Guest)));
+            Assert.Equal(0, box.Point.Kind);
+            await rig.Round.HandleSupplyPickupAsync(picker, new(box.ObjectId, 1), default);
+            await rig.Round.HandleSupplyPickupAsync(picker, new(box.ObjectId, 0), default);
+            Assert.Empty(rig.SupplyPicked.To(rig.Host));
+            Assert.Empty(rig.SupplyPicked.To(rig.Guest));
+            var room = rig.Registry.Find(rig.RoomId)!;
+            Assert.Equal(box, Assert.Single(room.Supplies!.Dropped).Value);
+            // cn-279 sub_89DD80 resolves kind 0 before cn-279 sub_8190C0 sends the pickup.
+            await rig.Round.HandleSupplyPickupAsync(picker, new(box.ObjectId, 101), default);
+            await rig.Round.HandleSupplyPickupAsync(dropper, new(box.ObjectId, 101), default);
+            await rig.Round.HandleSupplyPickupAsync(picker, new(box.ObjectId, 101), default);
+            var expected = new RoundSupplyPicked(room.FindByGame(picker.Id)!.Slot, box.ObjectId) { ItemKind = 101 };
+            Assert.Equal(expected, Assert.Single(rig.SupplyPicked.To(rig.Host)));
+            Assert.Equal(expected, Assert.Single(rig.SupplyPicked.To(rig.Guest)));
+            Assert.Empty(room.Supplies.Dropped);
+            await rig.Round.HandleItemUseAsync(picker, new(), default);
+            await rig.Round.HandleItemUseAsync(dropper, new(), default);
+            Assert.Equal(new RoundItemUsed(expected.Seat) { Kind = 101 }, Assert.Single(rig.ItemUsed.To(rig.Host)));
+            Assert.Equal(new RoundItemUsed(expected.Seat) { Kind = 101 }, Assert.Single(rig.ItemUsed.To(rig.Guest)));
+        }
+        finally { await rig.Registry.StopAllAsync(); }
     }
 
     private static async Task<PlayRoom> StartedRoundAsync(Rig rig)
@@ -1832,8 +1934,11 @@ public sealed partial class RoundFlowTests
     [Fact]
     public async Task ThreeCooperativeSlotsDoNotHoldImmediateBoostOrGrenadePickups()
     {
-        var rig = new Rig(randomSupplyItemKinds: [229, 146, 136, 101],
-            countedItemKinds: [229, 146, 136], countedImmediateItemKinds: [101, 17]);
+        var composer = new BubbleFighter.Fantasy.Kernel.ProfileComposer(RepositoryProfiles(),
+            key => key is "BFF_MYSQL_PASSWORD" or "BFF_ADMIN_TOKEN" ? "isolated-test-placeholder" : null);
+        var configured = new PluginConfig(Assert.Single(composer.Compose("cn-406", []), row => row.Id == "ingame")).Bind<InGameOptions>();
+        var rig = new Rig(randomSupplyItemKinds: configured.RandomSupplyItemKinds,
+            countedItemKinds: configured.CountedItemKinds, countedImmediateItemKinds: configured.CountedImmediateItemKinds);
         try
         {
             await rig.StartAsync();
@@ -1858,6 +1963,14 @@ public sealed partial class RoundFlowTests
             Assert.Empty(rig.CountedItemUsed.To(rig.Guest));
         }
         finally { await rig.Registry.StopAllAsync(); }
+    }
+
+    private static string RepositoryProfiles()
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
+            if (File.Exists(Path.Combine(directory.FullName, "packets", "builds.yaml")))
+                return Path.Combine(directory.FullName, "profiles");
+        throw new InvalidOperationException("Repository profiles were not found.");
     }
 
     private static Rig ItemModeRig(int[]? modeIds = null) => new(randomSupplyItemKinds: [101, 109, 138], nativeItemSlotCount: 2,
@@ -1928,6 +2041,46 @@ public sealed partial class RoundFlowTests
             await rig.Round.HandleSupplyPickupAsync(rig.Guest, new(box.ObjectId, 138), default);
             foreach (var member in new[] { rig.Host, rig.Guest })
                 Assert.Equal(new RoundSupplyPicked(1, box.ObjectId) { ItemKind = 138 }, Assert.Single(rig.SupplyPicked.To(member)));
+        }
+        finally { await rig.Registry.StopAllAsync(); }
+    }
+
+    /// <summary>Hurt-dropped boxes retain team ownership through creation and cannot be consumed by an opposing seat.</summary>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    public async Task HurtDroppedBoxRetainsItsTeamUntilAnEligiblePickup(int team)
+    {
+        var rig = ItemModeRig();
+        try
+        {
+            await rig.StartAsync();
+            var room = rig.Registry.Find(rig.RoomId)!;
+            lock (room.Gate)
+            {
+                room.FindByGame(rig.Host.Id)!.Team = 1;
+                room.FindByGame(rig.Guest.Id)!.Team = 2;
+            }
+            await rig.Round.HandleLoadReportedAsync(rig.Host, new(), default);
+            await rig.Round.HandleLoadReportedAsync(rig.Guest, new(), default);
+            await rig.WaitStartedAsync(rig.Host);
+            await rig.Round.HandleSupplyDropAsync(rig.Guest, new(new(1, 2, 3, 0, 0, 0, team), 20000), default);
+            var box = Assert.Single(rig.SupplyCreated.To(rig.Host));
+            Assert.Equal(team, box.Point.Team);
+            Assert.Equal(20000, box.CreationClass);
+            Assert.Equal(box, Assert.Single(rig.SupplyCreated.To(rig.Guest)));
+            await rig.Round.HandleSupplyPickupAsync(rig.Host, new(box.ObjectId, 101), default);
+            if (team == 0)
+                Assert.Single(rig.SupplyPicked.To(rig.Host));
+            else
+            {
+                Assert.Empty(rig.SupplyPicked.To(rig.Host));
+                await rig.Round.HandleSupplyPickupAsync(rig.Guest, new(box.ObjectId, 101), default);
+                Assert.Single(rig.SupplyPicked.To(rig.Guest));
+            }
+            await rig.Round.HandleSupplyPickupAsync(rig.Guest, new(box.ObjectId, 101), default);
+            Assert.Single(rig.SupplyPicked.To(rig.Host));
+            Assert.Single(rig.SupplyPicked.To(rig.Guest));
         }
         finally { await rig.Registry.StopAllAsync(); }
     }
@@ -2010,12 +2163,15 @@ public sealed partial class RoundFlowTests
         await room.Supplies.Worker;
     }
 
-    [Fact]
-    public async Task SuppliesReachBothPlayersAndABoxCanBeConsumedOnlyOnce()
+    /// <summary>Both fixed and random boxes admit configured immediate effects exactly once and refresh on their native interval.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SuppliesReachBothPlayersAndABoxCanBeConsumedOnlyOnce(bool randomBox)
     {
         var rig = new Rig(immediateSupplyItemKinds: [10]);
         await rig.StartAsync();
-        var report = new RoundSuppliesReported([new(1, 2, 3, 10, 150, 150)]);
+        var report = new RoundSuppliesReported([new(1, 2, 3, randomBox ? 0 : 10, 150, 150)]);
         await rig.Round.HandleSuppliesReportedAsync(rig.Guest, report, default);
         Assert.Null(rig.Registry.Find(rig.RoomId)!.Supplies);
         await rig.Round.HandleSuppliesReportedAsync(rig.Host, report, default);
@@ -2062,6 +2218,58 @@ public sealed partial class RoundFlowTests
         await rig.Round.HandleWaveReportedAsync(rig.Host, new(1, false), waves, default);
         foreach (var member in new[] { rig.Host, rig.Guest })
             Assert.Equal(new[] { new RoundWaveChanged(1, true), new RoundWaveChanged(1, false) }, waves.To(member));
+    }
+
+    [Theory]
+    [InlineData(101)]
+    [InlineData(106)]
+    public async Task HordeHostNpcWavesAndTableReachEveryPlayerWithoutTutorialState(ushort mode)
+    {
+        var rig = new Rig();
+        await rig.StartAsync();
+        await rig.Round.HandleLoadReportedAsync(rig.Host, new(), default);
+        await rig.Round.HandleLoadReportedAsync(rig.Guest, new(), default);
+        await rig.WaitStartedAsync(rig.Host);
+        var room = rig.Registry.Find(rig.RoomId)!;
+        lock (room.Gate) room.ModeId = mode;
+        Assert.Null(room.Tutorial);
+        var npc = new Sink<RoundNpcAcknowledged>();
+        byte[] wave = [1, 0, 0, 0], table = [7, 7, 7];
+        await rig.Round.HandleNpcAsync(rig.Host, new(RoundNpcOperation.StartWave, wave), npc, default);
+        await rig.Round.HandleNpcAsync(rig.Host, new(RoundNpcOperation.SpawnTable, table), npc, default);
+        await rig.Round.HandleNpcAsync(rig.Host, new(RoundNpcOperation.CompleteWaves, wave), npc, default);
+        foreach (var member in new[] { rig.Host, rig.Guest })
+        {
+            var sent = npc.To(member);
+            Assert.Equal(RoundNpcOperation.StartWave, sent[0].Operation);
+            Assert.Equal(wave, sent[0].Payload.ToArray());
+            Assert.Equal(RoundNpcOperation.SpawnTable, sent[1].Operation);
+            Assert.Equal(table, sent[1].Payload.ToArray());
+        }
+        Assert.Equal(3, npc.To(rig.Host).Length);
+        Assert.Equal(RoundNpcOperation.CompleteWaves, npc.To(rig.Host)[2].Operation);
+        Assert.Equal(2, npc.To(rig.Guest).Length);
+    }
+
+    [Fact]
+    public async Task NpcRequestsFromAGuestOutsideHordeOrForUnprovenSpawnsAreNotAnswered()
+    {
+        var rig = new Rig();
+        await rig.StartAsync();
+        await rig.Round.HandleLoadReportedAsync(rig.Host, new(), default);
+        await rig.Round.HandleLoadReportedAsync(rig.Guest, new(), default);
+        await rig.WaitStartedAsync(rig.Host);
+        var room = rig.Registry.Find(rig.RoomId)!;
+        var npc = new Sink<RoundNpcAcknowledged>();
+        lock (room.Gate) room.ModeId = 9;
+        await rig.Round.HandleNpcAsync(rig.Host, new(RoundNpcOperation.StartWave, new byte[4]), npc, default);
+        lock (room.Gate) room.ModeId = 101;
+        await rig.Round.HandleNpcAsync(rig.Guest, new(RoundNpcOperation.StartWave, new byte[4]), npc, default);
+        await rig.Round.HandleNpcAsync(rig.Host, new(RoundNpcOperation.SpawnGroup, new byte[4]), npc, default);
+        Assert.Empty(npc.To(rig.Host));
+        Assert.Empty(npc.To(rig.Guest));
+        Assert.False(rig.Host.Connection.IsClosed);
+        Assert.False(rig.Guest.Connection.IsClosed);
     }
 
     [Fact]
@@ -2180,7 +2388,8 @@ public sealed partial class RoundFlowTests
 
     /// <summary>
     /// A feed packet whose layout names actors passes only when one of them is the sender's character: another
-    /// seat's character is a protocol violation, and a character of no seat is dropped outside the horde modes.
+    /// seat's character is rejected without interrupting later valid actions, and an actor no seat owns (an NPC the
+    /// host's client runs) passes in any mode.
     /// </summary>
     [Fact]
     public async Task FeedPacketsThatNameActorsMustNameTheSendersOwnCharacter()
@@ -2206,10 +2415,11 @@ public sealed partial class RoundFlowTests
             await rig.Round.HandleFeedAsync(rig.Host, Feed(guestActor + 7, hostActor), CancellationToken.None);
             Assert.Single(rig.Feed.To(guestRelay));
             await rig.Round.HandleFeedAsync(rig.Host, Feed(hostActor + 7), CancellationToken.None);
-            Assert.Single(rig.Feed.To(guestRelay));
-            await Assert.ThrowsAsync<InvalidOperationException>(
-                () => rig.Round.HandleFeedAsync(rig.Host, Feed(guestActor), CancellationToken.None).AsTask());
-            Assert.Single(rig.Feed.To(guestRelay));
+            Assert.Equal(2, rig.Feed.To(guestRelay).Length);
+            await rig.Round.HandleFeedAsync(rig.Host, Feed(guestActor), CancellationToken.None);
+            Assert.Equal(2, rig.Feed.To(guestRelay).Length);
+            await rig.Round.HandleFeedAsync(rig.Host, Feed(hostActor), CancellationToken.None);
+            Assert.Equal(3, rig.Feed.To(guestRelay).Length);
         }
         finally { await rig.Registry.StopAllAsync(); }
     }
@@ -2242,31 +2452,31 @@ public sealed partial class RoundFlowTests
             }
             rig.Registry.BindRelay(hostRelay, room.FindByGame(rig.Host.Id)!.Key);
             rig.Registry.BindRelay(guestRelay, guest.Key);
-            var granted = new Sink<RoundResetGranted>();
+            var granted = rig.Respawned;
             byte[] request = [.. BitConverter.GetBytes(guestActor), 0xBA, 0xBA, 0, 0, 0, 0];
 
             // A bubble the guest reports for someone else is ignored; its own bubble counts.
             await rig.Round.HandleLifeReportedAsync(rig.Guest, new(RoundLifeEvent.Bubbled, hostActor), default);
             await rig.Round.HandleLifeReportedAsync(rig.Guest, new(RoundLifeEvent.Bubbled, guestActor), default);
-            Assert.Equal(SeatLife.Bubble, guest.Life);
+            Assert.Equal(SeatLife.Bubble, guest.Life.State);
             // The pop is reported by both clients and counts once.
             await rig.Round.HandleLifeReportedAsync(hostRelay, new(RoundLifeEvent.Finished, guestActor) { Initiator = hostActor }, default);
             await rig.Round.HandleLifeReportedAsync(guestRelay, new(RoundLifeEvent.Finished, guestActor) { Initiator = hostActor }, default);
-            Assert.Equal(SeatLife.Dead, guest.Life);
+            Assert.Equal(SeatLife.Dead, guest.Life.State);
             Assert.Equal(1, room.Scoring.TeamTotals[0]);
 
             // Too early: the death presentation has not finished.
-            await rig.Round.HandleResetRequestedAsync(rig.Guest, new(guestActor, request), granted, default);
+            await rig.Round.HandleSpawnAcceptedAsync(rig.Guest, new RoundSpawnAccepted(guestActor, 0) { Request = request, Rules = new(RoundRespawnAudience.Requester, RoundRespawnCompletion.MatchConfirmation, RoundRespawnAdmission.CleanedDeath) }, default);
             Assert.Empty(granted.To(rig.Guest));
             await rig.Round.HandleLifeReportedAsync(guestRelay, new(RoundLifeEvent.DeathCleaned, guestActor), default);
-            await rig.Round.HandleResetRequestedAsync(rig.Guest, new(guestActor, request), granted, default);
+            await rig.Round.HandleSpawnAcceptedAsync(rig.Guest, new RoundSpawnAccepted(guestActor, 0) { Request = request, Rules = new(RoundRespawnAudience.Requester, RoundRespawnCompletion.MatchConfirmation, RoundRespawnAdmission.CleanedDeath) }, default);
             Assert.Equal(request, Assert.Single(granted.To(rig.Guest)).Request.ToArray());
-            Assert.Equal(SeatLife.ResetPending, guest.Life);
+            Assert.Equal(SeatLife.ResetPending, guest.Life.State);
             // Only the relay the reset was granted on completes it.
             await rig.Round.HandleLifeReportedAsync(rig.Guest, new(RoundLifeEvent.ResetConfirmed, guestActor), default);
-            Assert.Equal(SeatLife.ResetPending, guest.Life);
+            Assert.Equal(SeatLife.ResetPending, guest.Life.State);
             await rig.Round.HandleLifeReportedAsync(guestRelay, new(RoundLifeEvent.ResetConfirmed, guestActor), default);
-            Assert.Equal(SeatLife.Alive, guest.Life);
+            Assert.Equal(SeatLife.Alive, guest.Life.State);
             // The ignored reports are only counted: the foreign bubble, the second report of the pop and the
             // confirmation on the game connection.
             lock (room.Gate)
@@ -2279,7 +2489,7 @@ public sealed partial class RoundFlowTests
             await rig.Round.HandleLifeReportedAsync(hostRelay, new(RoundLifeEvent.Finished, guestActor) { Initiator = hostActor }, default);
             await rig.Round.HandleLifeReportedAsync(guestRelay, new(RoundLifeEvent.Finished, guestActor) { Initiator = guestActor }, default);
             await rig.Round.HandleLifeReportedAsync(hostRelay, new(RoundLifeEvent.Released, hostActor), default);
-            Assert.Equal(SeatLife.Bubble, guest.Life);
+            Assert.Equal(SeatLife.Bubble, guest.Life.State);
             lock (room.Gate)
             {
                 Assert.Equal(1, room.LifeChecks.Count(LifeCheck.PopWithoutOpposingTeams));
@@ -2287,7 +2497,122 @@ public sealed partial class RoundFlowTests
                 Assert.Equal(1, room.LifeChecks.Count(LifeCheck.ReleasedNotBubbled));
             }
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                rig.Round.HandleResetRequestedAsync(rig.Guest, new(hostActor, request), granted, default).AsTask());
+                rig.Round.HandleSpawnAcceptedAsync(rig.Guest, new RoundSpawnAccepted(hostActor, 0) { Request = request, Rules = new(RoundRespawnAudience.Requester, RoundRespawnCompletion.MatchConfirmation, RoundRespawnAdmission.CleanedDeath) }, default).AsTask());
+        }
+        finally { await rig.Registry.StopAllAsync(); }
+    }
+
+    /// <summary>
+    /// With every mode reviving, a death's stage report never ends the round in any mode; a horde host's cleared
+    /// waves do. Without the switch an unlisted mode still ends on the stage report.
+    /// </summary>
+    [Theory]
+    [InlineData(9, true, false)]
+    [InlineData(101, true, false)]
+    [InlineData(9, false, true)]
+    public async Task ADeathsStageReportEndsNoRoundWhenEveryModeRevives(ushort mode, bool everyMode, bool ends)
+    {
+        var rig = new Rig(configure: options => options.NativeLifeEveryMode = everyMode);
+        try
+        {
+            await rig.StartAsync();
+            var room = rig.Registry.Find(rig.RoomId)!;
+            lock (room.Gate)
+            {
+                room.ModeId = mode;
+                room.MarkPlaying();
+            }
+            await rig.Round.HandleEndRequestedAsync(rig.Guest, new(), default);
+            Assert.Equal(ends, rig.Ended.To(rig.Host).Length > 0);
+            if (mode != 101) return;
+            await rig.Round.HandleNpcAsync(rig.Host, new(RoundNpcOperation.CompleteWaves, new byte[4]), new Sink<RoundNpcAcknowledged>(), default);
+            Assert.Equal(RoundEndReason.WavesCleared, Assert.Single(rig.Ended.To(rig.Host)).Reason);
+        }
+        finally { await rig.Registry.StopAllAsync(); }
+    }
+
+    /// <summary>
+    /// With every mode reviving, a player whose bubble runs out in a mode outside the timed list is granted its reset
+    /// after its death presentation; without the switch the same request is dropped.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task EveryModeRevivesADeadPlayerWhenEnabled(bool everyMode)
+    {
+        var rig = new Rig(configure: options => options.NativeLifeEveryMode = everyMode);
+        try
+        {
+            await rig.StartAsync();
+            var room = rig.Registry.Find(rig.RoomId)!;
+            var guestRelay = new RecordingSession(92);
+            int guestActor;
+            RoomSeat guest;
+            lock (room.Gate)
+            {
+                room.ModeId = 9;
+                room.MarkPlaying();
+                guest = room.FindByGame(rig.Guest.Id)!;
+                guestActor = RoomRegistry.SceneEntity(guest.Slot);
+            }
+            rig.Registry.BindRelay(guestRelay, guest.Key);
+            var granted = rig.Respawned;
+            byte[] request = [.. BitConverter.GetBytes(guestActor), 0xBA, 0xBA, 0, 0, 0, 0];
+            await rig.Round.HandleLifeReportedAsync(rig.Guest, new(RoundLifeEvent.Bubbled, guestActor), default);
+            await rig.Round.HandleLifeReportedAsync(rig.Guest, new(RoundLifeEvent.BubbleExpired, guestActor), default);
+            await rig.Round.HandleLifeReportedAsync(guestRelay, new(RoundLifeEvent.DeathCleaned, guestActor), default);
+            await rig.Round.HandleSpawnAcceptedAsync(rig.Guest, new RoundSpawnAccepted(guestActor, 0) { Request = request, Rules = new(RoundRespawnAudience.Requester, RoundRespawnCompletion.MatchConfirmation, RoundRespawnAdmission.CleanedDeath) }, default);
+            Assert.Equal(everyMode ? 1 : 0, granted.To(rig.Guest).Length);
+            if (!everyMode) return;
+            // The revived player can die and come back again: there is no limit.
+            await rig.Round.HandleLifeReportedAsync(guestRelay, new(RoundLifeEvent.ResetConfirmed, guestActor), default);
+            await rig.Round.HandleLifeReportedAsync(rig.Guest, new(RoundLifeEvent.Bubbled, guestActor), default);
+            await rig.Round.HandleLifeReportedAsync(rig.Guest, new(RoundLifeEvent.BubbleExpired, guestActor), default);
+            await rig.Round.HandleLifeReportedAsync(guestRelay, new(RoundLifeEvent.DeathCleaned, guestActor), default);
+            await rig.Round.HandleSpawnAcceptedAsync(rig.Guest, new RoundSpawnAccepted(guestActor, 0) { Request = request, Rules = new(RoundRespawnAudience.Requester, RoundRespawnCompletion.MatchConfirmation, RoundRespawnAdmission.CleanedDeath) }, default);
+            Assert.Equal(2, granted.To(rig.Guest).Length);
+        }
+        finally { await rig.Registry.StopAllAsync(); }
+    }
+
+    /// <summary>
+    /// In a pirate battle a player popped by one of the host's NPCs dies without anyone scoring, and its reset is
+    /// granted after its death presentation like any other death. Outside the horde modes the same pop changes nothing.
+    /// </summary>
+    [Theory]
+    [InlineData(101, true)]
+    [InlineData(4, false)]
+    public async Task AnNpcPopInAHordeRoundKillsSoTheResetIsGranted(ushort mode, bool horde)
+    {
+        var rig = new Rig(configure: options => options.NativeLifeEveryMode = true);
+        try
+        {
+            await rig.StartAsync();
+            var room = rig.Registry.Find(rig.RoomId)!;
+            var guestRelay = new RecordingSession(92);
+            int guestActor;
+            RoomSeat guest;
+            lock (room.Gate)
+            {
+                room.ModeId = mode;
+                room.MarkPlaying();
+                foreach (var seat in room.Seats)
+                    seat.Team = 1;
+                guest = room.FindByGame(rig.Guest.Id)!;
+                guestActor = RoomRegistry.SceneEntity(guest.Slot);
+            }
+            rig.Registry.BindRelay(guestRelay, guest.Key);
+            const int npcActor = 5000123;
+            var granted = rig.Respawned;
+            byte[] request = [.. BitConverter.GetBytes(guestActor), 0xBA, 0xBA, 0, 0, 0, 0];
+
+            await rig.Round.HandleLifeReportedAsync(rig.Guest, new(RoundLifeEvent.Bubbled, guestActor), default);
+            await rig.Round.HandleLifeReportedAsync(rig.Host, new(RoundLifeEvent.Finished, guestActor) { Initiator = npcActor }, default);
+            Assert.Equal(horde ? SeatLife.Dead : SeatLife.Bubble, guest.Life.State);
+            Assert.All(room.Scoring.TeamTotals, total => Assert.Equal(0, total));
+            await rig.Round.HandleLifeReportedAsync(guestRelay, new(RoundLifeEvent.DeathCleaned, guestActor), default);
+            await rig.Round.HandleSpawnAcceptedAsync(rig.Guest, new RoundSpawnAccepted(guestActor, 0) { Request = request, Rules = new(RoundRespawnAudience.Requester, RoundRespawnCompletion.MatchConfirmation, RoundRespawnAdmission.CleanedDeath) }, default);
+            Assert.Equal(horde ? 1 : 0, granted.To(rig.Guest).Length);
         }
         finally { await rig.Registry.StopAllAsync(); }
     }

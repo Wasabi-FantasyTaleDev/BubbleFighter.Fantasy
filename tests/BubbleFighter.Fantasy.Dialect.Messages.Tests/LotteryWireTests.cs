@@ -1,5 +1,6 @@
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Dialect.Rooms;
+using BubbleFighter.Fantasy.Packets;
 using Xunit;
 
 namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
@@ -7,18 +8,26 @@ namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
 /// <summary>Pins native card selection and reveal bodies to the CN2012 consuming paths.</summary>
 public sealed class LotteryWireTests
 {
-    /// <summary>The reward icon comes from the primary ScoreData field consumed at native row +168.</summary>
-    [Fact]
-    public void SelectedSaleIdentityTravelsInTheScoreboard()
+    /// <summary>The reward icon comes from each build's primary ScoreData field consumed by its award dialog.</summary>
+    [Theory]
+    [InlineData("cn-279", 124)]
+    [InlineData("cn-324", 168)]
+    [InlineData("cn-406", 220)]
+    [InlineData("cn-705", 224)]
+    [InlineData("cn-706", 224)]
+    public void SelectedSaleIdentityTravelsInTheScoreboard(string build, int offset)
     {
-        var (schema, play) = TestBuilds.Of("cn-324");
+        var (schema, play) = TestBuilds.Of(build);
         var field = schema.ScoreRow.Single(value => value.Name == "award_display_id");
-        Assert.Equal(168, field.Offset);
+        Assert.Equal(offset, field.Offset);
         var row = new BubbleFighter.Fantasy.Contracts.Match.RoundScoreboardRow(0, "player", 2, 1,
             new(0, 0, 0, 0, 0), null) { AwardDisplayId = 1013192 };
-        var body = PlayRoomCodec.WriteScoreRowBody(TestBuilds.Packets, "cn-324", [field], row);
+        var body = RoundResultWire.WriteScoreRowBody(TestBuilds.Packets, build, [field], row);
         Assert.Equal(4, body.Length);
         Assert.Equal(1013192, BitConverter.ToInt32(body));
+        var complete = RoundResultWire.WriteScoreRowBody(TestBuilds.Packets, build, schema.ScoreRow, row);
+        var values = PacketCodec.Read(TestBuilds.Packets, build, "ScoreRow", complete);
+        Assert.Equal(1013192, values["award_display_id"]);
     }
 
     /// <summary>Reads the clicked card followed by the claimed seat and rejects extra or missing words.</summary>

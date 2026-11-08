@@ -5,22 +5,6 @@ using BubbleFighter.Fantasy.RoomCore;
 
 namespace BubbleFighter.Fantasy.InGame.Sessions;
 
-/// <summary>A character's life in a round whose clients report it.</summary>
-internal enum SeatLife
-{
-    /// <summary>Playing normally.</summary>
-    Alive,
-
-    /// <summary>Trapped in a bubble; a release or an enemy's pop decides what follows.</summary>
-    Bubble,
-
-    /// <summary>Dead; waits for its death presentation and then asks for a reset.</summary>
-    Dead,
-
-    /// <summary>The reset was granted; the client's confirmation on the relay completes it.</summary>
-    ResetPending,
-}
-
 /// <summary>One player seat inside a <see cref="PlayRoom"/>.</summary>
 public sealed class RoomSeat : IRoomMember
 {
@@ -28,15 +12,16 @@ public sealed class RoomSeat : IRoomMember
     internal int RelayGeneration { get; set; }
     // The player's merged movement this round; a partial report only means something against it.
     internal PlayerMovementState? Movement { get; set; }
-    // The character's life this round where the clients report it; see RoundFlow.Life.
-    internal SeatLife Life { get; set; }
-    internal bool DeathCleaned { get; set; }
-    // The relay a granted reset belongs to; a reset granted on an earlier relay died with it.
-    internal ISession? ResetRelay { get; set; }
-    internal bool AwaitingRespawn { get; set; }
-    internal bool InstantRevivalPending { get; set; }
-    internal int? LastDeathActor { get; set; }
-    internal bool PveRevivalRequested { get; set; }
+    // The character's life this round, whichever protocol family reports it.
+    internal ParticipantLife Life { get; } = new();
+    internal RoundCriticalState? Critical { get; set; }
+
+    internal void ClearCritical()
+    {
+        var previous = Critical;
+        Critical = null;
+        previous?.Dispose();
+    }
     /// <summary>Creates a seat for a game session.</summary>
     /// <param name="slot">Seat index.</param>
     /// <param name="game">The game-protocol session.</param>
@@ -90,6 +75,9 @@ public sealed class RoomSeat : IRoomMember
     ///
     /// </summary>
     internal int GameLinkGeneration { get; set; }
+
+    /// <summary>Gets or sets the round generation in which a forwarded feed packet last skipped this seat for want of a match link.</summary>
+    internal int FeedGapGeneration { get; set; }
 
     /// <summary>Gets the seat's result in the previous round of this room, the history its critical table keys on.</summary>
     internal MatchPreviousRound PreviousRound { get; set; }
@@ -147,6 +135,9 @@ public sealed class RoomSeat : IRoomMember
     ///
     /// </summary>
     public int CharacterId { get; set; }
+
+    /// <summary>Gets or sets the temporary native waiting-room selectors; leaving the room discards them.</summary>
+    public BubbleFighter.Fantasy.Contracts.Rooms.RoomInventorySelection? InventorySelection { get; set; }
 
     /// <summary>Gets or sets the committed worn item snapshot used by every profile update; null means no inventory provider.</summary>
     public IReadOnlyList<int>? EquippedItemIds { get; set; }

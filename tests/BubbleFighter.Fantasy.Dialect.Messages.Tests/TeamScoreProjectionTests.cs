@@ -18,7 +18,7 @@ public sealed class TeamScoreProjectionTests
     [InlineData("cn-706", 0)]
     public void LiveScorePreservesTheTeamAndPlayerCounters(string build, int team)
     {
-        var body = PlayRoomCodec.WriteScoreUpdate(TestBuilds.Packets, build,
+        var body = RoundResultWire.WriteScoreUpdate(TestBuilds.Packets, build,
             new RoundScoreUpdated(7, team, [11, 22], [new(3, 2, 3, 7, 1)]));
 
         Assert.Equal(25, body.Length);
@@ -35,7 +35,7 @@ public sealed class TeamScoreProjectionTests
     [InlineData(-1)]
     [InlineData(256)]
     public void LiveScoreRejectsAnUnrepresentableTeam(int team) =>
-        Assert.Throws<OverflowException>(() => PlayRoomCodec.WriteScoreUpdate(TestBuilds.Packets, "kr-812",
+        Assert.Throws<OverflowException>(() => RoundResultWire.WriteScoreUpdate(TestBuilds.Packets, "kr-812",
             new RoundScoreUpdated(7, team, [11, 22], [])));
 
     /// <summary>Occupied legacy rows retain the same native team as shared gameplay and modern rows.</summary>
@@ -53,7 +53,7 @@ public sealed class TeamScoreProjectionTests
     public void ScoreRowsPreserveNativeTeamIdentifiers(string build, int team)
     {
         var row = new RoundScoreboardRow(0, "P", team, 6, new(0, 2, 3, 7, 1), null);
-        var body = PlayRoomCodec.WriteScoreRowBody(TestBuilds.Packets, build, TestBuilds.Packets.Resolve(build, "ScoreRow"), row);
+        var body = RoundResultWire.WriteScoreRowBody(TestBuilds.Packets, build, TestBuilds.Packets.Resolve(build, "ScoreRow"), row);
         var decoded = PacketCodec.Read(TestBuilds.Packets, build, "ScoreRow", body);
 
         Assert.Equal(team, Convert.ToInt32(decoded["team"]));

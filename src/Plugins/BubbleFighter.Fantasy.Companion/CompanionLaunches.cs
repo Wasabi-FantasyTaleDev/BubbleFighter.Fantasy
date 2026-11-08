@@ -55,7 +55,7 @@ internal sealed class CompanionLaunches(CompanionOptions options, TimeProvider c
             {
                 if (_closed) return null;
                 Sweep(ended);
-                return _launches.TryGetValue(launchId, out var launch) && launch.Account == account ? Grant(launch) : null;
+                return _launches.TryGetValue(launchId, out var launch) && !launch.Remote && launch.Account == account ? Grant(launch) : null;
             }
         }
         finally { Close(ended, "companion.launch-expired"); }
@@ -82,7 +82,7 @@ internal sealed class CompanionLaunches(CompanionOptions options, TimeProvider c
         bool bound;
         lock (_gate)
         {
-            if (_closed || !_launches.TryGetValue(launch.Id, out var live) || !ReferenceEquals(live, launch)) return null;
+            if (_closed || launch.Remote || !_launches.TryGetValue(launch.Id, out var live) || !ReferenceEquals(live, launch)) return null;
             previous = launch.Socket;
             launch.Socket = socket;
             bound = launch.Session is not null;
@@ -106,7 +106,7 @@ internal sealed class CompanionLaunches(CompanionOptions options, TimeProvider c
         lock (_gate)
         {
             if (_closed || !_launches.TryGetValue(redeemed.LaunchId, out var launch)) return;
-            if (launch.Account != redeemed.Account || launch.Session is not null)
+            if (launch.Remote || launch.Account != redeemed.Account || launch.Build != redeemed.Build || launch.Session is not null)
             {
                 logger.LogWarning("Companion launch {LaunchId} was redeemed by a session that does not own it; the binding is refused.", redeemed.LaunchId);
                 return;
@@ -167,7 +167,7 @@ internal sealed class CompanionLaunches(CompanionOptions options, TimeProvider c
     private void Sweep(List<CompanionSocket> ended)
     {
         var now = clock.GetUtcNow();
-        foreach (var launch in _launches.Values.Where(l => l.Session is null && l.PendingUntil <= now).ToArray())
+        foreach (var launch in _launches.Values.Where(l => !l.Remote && l.Session is null && l.PendingUntil <= now).ToArray())
         {
             Remove(launch);
             if (launch.Socket is { } socket) ended.Add(socket);
@@ -215,5 +215,59 @@ internal sealed class CompanionLaunches(CompanionOptions options, TimeProvider c
         internal DateTimeOffset TicketExpiresAt { get; set; }
         internal ISession? Session { get; set; }
         internal CompanionSocket? Socket { get; set; }
+        internal bool Imported { get; set; }
+        internal string? ImportAuthority { get; set; }
+        internal bool Remote { get; set; }
+    }
+
+    internal bool OwnsPending(string account, string build, string launchId)
+    {
+        lock (_gate) return !_closed && _launches.TryGetValue(launchId, out var launch)
+            && launch.Account == account && launch.Build == build && launch.Session is null && !launch.Remote
+            && !launch.Imported && launch.PendingUntil > clock.GetUtcNow();
+    }
+
+    internal bool Import(string account, string build, string launchId, string authority)
+    {
+        Sweep();
+        lock (_gate)
+        {
+            if (_closed) return false;
+            if (_launches.TryGetValue(launchId, out var found))
+                return found.Imported && !found.Remote && found.Account == account && found.Build == build && found.ImportAuthority == authority;
+            if (_launches.Count >= options.MaxLaunches) return false;
+            _launches.Add(launchId, new(launchId, account, build, clock.GetUtcNow().AddSeconds(options.PendingSeconds))
+                { Imported = true, ImportAuthority = authority });
+            return true;
+        }
+    }
+
+    internal bool IsImported(string account, string build, string launchId, string authority)
+    {
+        lock (_gate) return !_closed && _launches.TryGetValue(launchId, out var launch) && launch.Imported && !launch.Remote
+            && launch.Account == account && launch.Build == build && launch.ImportAuthority == authority
+            && (launch.Session is { Connection.IsClosed: false } || launch.Session is null && launch.PendingUntil > clock.GetUtcNow());
+    }
+
+    internal bool Redirect(string account, string build, string launchId)
+    {
+        CompanionSocket? socket;
+        lock (_gate)
+        {
+            if (!OwnsPending(account, build, launchId)) return false;
+            var launch = _launches[launchId];
+            launch.Remote = true;
+            if (launch.TicketHash is not null) _tickets.Remove(launch.TicketHash);
+            launch.TicketHash = null;
+            socket = launch.Socket;
+        }
+        socket?.Close("companion.node-changed");
+        return true;
+    }
+
+    internal void ForgetRemote(string launchId)
+    {
+        lock (_gate)
+            if (_launches.TryGetValue(launchId, out var launch) && launch.Remote) Remove(launch);
     }
 }

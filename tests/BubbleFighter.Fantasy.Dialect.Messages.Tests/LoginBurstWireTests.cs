@@ -2,6 +2,7 @@ using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Dialect.Messages;
 using BubbleFighter.Fantasy.Packets;
+using BubbleFighter.Fantasy.Tests;
 using Xunit;
 
 namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
@@ -54,14 +55,23 @@ public sealed class LoginBurstWireTests
     }
 
     /// <summary>
-    /// A build whose table does not describe the count-first list must fail loud instead of sending an empty
-    /// body; the legacy baseline's own center body is not audited in these tables.
+    /// A table that replaces the counted list with a scalar must fail before writing a different body.
     /// </summary>
     [Fact]
     public void CenterListRefusesABuildWithoutTheCountFirstLayout()
     {
-        Assert.Throws<ConfigException>(() => LoginBurstWire.WriteCenterListEmpty(TestBuilds.Packets, "kr-812"));
+        var directory = PacketTableEdits.WithFieldType("gspCenterList", "gates", "\"list<GateInfo>\"", "u32");
+        var tables = PacketTables.Load(directory.FullName);
+        Assert.Throws<ConfigException>(() => LoginBurstWire.WriteCenterListEmpty(tables, "kr-812"));
     }
+
+    /// <summary>The audited legacy readers also consume a four-byte zero count for an empty directory.</summary>
+    [Theory]
+    [InlineData("kr-812")]
+    [InlineData("cn-324")]
+    [InlineData("cn-279")]
+    public void LegacyCenterListEmptyIsTheZeroCount(string build) =>
+        Assert.Equal(EmptyCenterList, Convert.ToHexString(LoginBurstWire.WriteCenterListEmpty(TestBuilds.Packets, build)));
 
     /// <summary>
     /// The move request is exactly one word: both a short and a long body are rejected, while the word's
@@ -133,6 +143,7 @@ public sealed class LoginBurstWireTests
             Assert.Single(tables.Resolve(build, "MoveStageRequest"));
             Assert.Equal(3, tables.Resolve(build, "gspRepMoveInto").Count);
         }
-        Assert.Empty(tables.Resolve("kr-812", "gspCenterList"));
+        Assert.Single(tables.Resolve("kr-812", "gspCenterList"));
+        Assert.Equal(5, tables.Resolve("kr-812", "GateInfo").Count);
     }
 }

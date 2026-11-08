@@ -26,11 +26,32 @@ internal sealed class RoomChatBinding(string protocol, IOpcodeTable table, Packe
     public ValueTask SendAsync(ISession session, RoomChatReceived message, CancellationToken ct) =>
         session.SendAsync(table.S2C("gspRoomReceiveChatModuleMsg"), Write(packets, build, message), ct);
 
-    internal static byte[] Write(PacketTables packets, string build, RoomChatReceived message) =>
-        // cn-774 sub_8F1B80 / tw-454 sub_A604B0 read the same chat fields, with the table's native tail.
-        PacketCodec.Write(packets, build, "RoomChatReceived", new Dictionary<string, object?>
+    /// <summary>
+    /// Writes one chat line for any build. builds.yaml room_chat_colour selects how a channel-1 line is coloured:
+    /// <c>channel</c> sends the channel and lets the client colour it (kr-812 sub_8023E0), <c>suffix_word</c> sends
+    /// channel 0 with the colour word the client uses for type 1 (kr-1256 sub_9DE360).
+    /// </summary>
+    internal static byte[] Write(PacketTables packets, string build, RoomChatReceived message)
+    {
+        var values = new Dictionary<string, object?>
         {
-            ["slot"] = checked((ushort)message.Slot), ["nickname"] = message.Nickname, ["channel"] = 0,
-            ["text"] = message.Text, ["unknown_96"] = message.Channel == 1 ? unchecked((int)0xFFFFA1A1) : -1,
-        });
+            ["slot"] = checked((ushort)message.Slot), ["nickname"] = message.Nickname, ["text"] = message.Text,
+        };
+        switch (packets.ValuesOf(build).GetValueOrDefault("room_chat_colour") as string)
+        {
+            case "channel":
+                values["channel"] = message.Channel;
+                break;
+            case "suffix_word":
+                values["channel"] = 0;
+                values["unknown_96"] = message.Channel == 1 ? ChannelOneColour : -1;
+                break;
+            default:
+                throw new ConfigException($"Build '{build}' must set room_chat_colour to channel or suffix_word in builds.yaml.");
+        }
+        return PacketCodec.Write(packets, build, "RoomChatReceived", values);
+    }
+
+    /// <summary>The colour word both kr-812 sub_8023E0 and kr-1256 sub_9DE360 give a channel-1 line (-24159).</summary>
+    private const int ChannelOneColour = unchecked((int)0xFFFFA1A1);
 }

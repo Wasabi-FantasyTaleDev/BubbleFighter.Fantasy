@@ -81,11 +81,14 @@ internal sealed record PlayValues(
     /// <param name="StarBigGained">The report kind for one big star more (kr-812 sub_75C680: 15; cn-279 sub_88ED00 reports 14).</param>
     /// <param name="StarSmallLost">The report kind for one small star dropped (kr-812 sub_520A20, sub_5632F0: 7).</param>
     /// <param name="StarBigLost">The report kind for one big star dropped (kr-812 sub_520A20, sub_5632F0: 16; cn-279's drop path reports 15).</param>
+    /// <param name="ZombieResultCause">Whether the zombie banner consumes a shared terminal cause instead of a recipient's win/loss.</param>
+    /// <param name="CaptainKill">The <c>gcpGameUpdateScore</c> kind of a Captain kill (kr-812 sub_430640: 27), or 0 for a build that states none.</param>
     internal sealed record ScoreValues(
         bool WideReport = false, bool LiveScorePacket = true, bool OutcomeFirst = false,
         TimeOverEndBody TimeOverEnd = TimeOverEndBody.TeamTotals, bool NpcTeamOutcome = false,
         bool RescueCredit = false, bool HordeStageOutcome = false, StarReportPacket StarReport = StarReportPacket.Optimized,
-        int StarSmallGained = 6, int StarBigGained = 15, int StarSmallLost = 7, int StarBigLost = 16);
+        int StarSmallGained = 6, int StarBigGained = 15, int StarSmallLost = 7, int StarBigLost = 16,
+        bool ZombieResultCause = false, int CaptainKill = 0);
 
     // The keys the play block and its sub-blocks know; anything else is a configuration error.
     private static readonly HashSet<string> Keys = new(StringComparer.Ordinal)
@@ -105,7 +108,8 @@ internal sealed record PlayValues(
     private static readonly HashSet<string> ScoreKeys = new(StringComparer.Ordinal)
     {
         "wide_report", "live_score_packet", "outcome_first", "time_over_end", "npc_team_outcome", "rescue_credit",
-        "horde_stage_outcome", "star_report", "star_small_gained", "star_big_gained", "star_small_lost", "star_big_lost",
+        "horde_stage_outcome", "star_report", "star_small_gained", "star_big_gained", "star_small_lost", "star_big_lost", "zombie_result_cause",
+        "captain_kill",
     };
 
     /// <summary>
@@ -172,7 +176,9 @@ internal sealed record PlayValues(
                 Number(score, "star_small_gained", 6, $"{where}.score"),
                 Number(score, "star_big_gained", 15, $"{where}.score"),
                 Number(score, "star_small_lost", 7, $"{where}.score"),
-                Number(score, "star_big_lost", 16, $"{where}.score")),
+                Number(score, "star_big_lost", 16, $"{where}.score"),
+                Flag(score, "zombie_result_cause", false, $"{where}.score"),
+                Number(score, "captain_kill", 0, $"{where}.score")),
             Flag(play, "tutorial_skip_start", false, where),
             Flag(play, "npc_waves", false, where));
     }

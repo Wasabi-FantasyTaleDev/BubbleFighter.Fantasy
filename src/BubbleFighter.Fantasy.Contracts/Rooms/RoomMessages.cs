@@ -106,7 +106,11 @@ public sealed record RoomStartUnavailableRequested : IMessage;
 public sealed record RoomAutoStartNotified : IMessage;
 
 /// <summary>A seated player asks to move to the other team.</summary>
-public sealed record RoomTeamChangeRequested : IMessage;
+public sealed record RoomTeamChangeRequested : IMessage
+{
+    /// <summary>Gets the native script conversion, or null for an ordinary waiting-room team toggle.</summary>
+    public BubbleFighter.Fantasy.Contracts.Match.ScriptZombieConversion? ZombieConversion { get; init; }
+}
 
 /// <summary>Changes a seated character's native allegiance, including cooperative zombie conversion.</summary>
 /// <param name="Slot">The player's room seat.</param>
@@ -118,6 +122,9 @@ public sealed record RoomTeamConverted(int Slot, int Team) : IMessage;
 /// <param name="MapKey">The map the round is played on.</param>
 public sealed record RoomMatchStarting(RoomView Room, string MapKey) : IMessage
 {
+    /// <summary>Gets the round index and role for a multi-round match; null retains ordinary single-round entry.</summary>
+    public BubbleFighter.Fantasy.Contracts.Match.RoundSeriesEntry? Series { get; init; }
+
     /// <summary>Gets the stage the map loads when the server drew the map, or empty when the stage is the map itself.</summary>
     public string StageKey { get; init; } = "";
 
@@ -178,6 +185,9 @@ public sealed record RoomMemberView(int Slot, int UserNum, string Nickname, int 
     /// <summary>Gets native computer-player ownership, or null for an ordinary human member.</summary>
     public RoomAiIdentity? Ai { get; init; }
 
+    /// <summary>Gets an early native temporary selection retained independently of owned bag items.</summary>
+    public RoomInventorySelection? InventorySelection { get; init; }
+
     /// <summary>Gets the player's avatar material color independently of team assignment.</summary>
     public ushort ColorIndex { get; init; }
 
@@ -189,6 +199,9 @@ public sealed record RoomMemberView(int Slot, int UserNum, string Nickname, int 
 
     /// <summary>Gets whether the seated player has the inventory open.</summary>
     public bool InInventory { get; init; }
+
+    /// <summary>Gets the recruitment state when this record represents a plaza member.</summary>
+    public PlazaRecruitmentState? Recruitment { get; init; }
 }
 
 /// <summary>A waiting room as a member's client needs it to draw the room.</summary>
@@ -321,6 +334,21 @@ public sealed record RoomChatSent(int Channel, string Text) : IMessage;
 /// <param name="Channel">The channel selector the speaker's client sent.</param>
 /// <param name="Text">The line.</param>
 public sealed record RoomChatReceived(int RoomId, int Slot, string Nickname, int Channel, string Text) : IMessage;
+
+/// <summary>
+/// A seated member types into the waiting-room chat box (the legacy C2S gcpRoomSendChatMsg, which kr-812 sub_8145C0
+/// sends only while a room exists). The client draws nothing until the server answers.
+/// </summary>
+/// <param name="TeamOnly">Whether the speaker addressed only their own team.</param>
+/// <param name="Text">The line.</param>
+public sealed record RoomSessionChatSent(bool TeamOnly, string Text) : IMessage;
+
+/// <summary>Sent to each member who hears a waiting-room chat line, the speaker included.</summary>
+/// <param name="RoomId">The room.</param>
+/// <param name="Slot">The speaker's seat; the client names the speaker from it.</param>
+/// <param name="TeamOnly">Whether the line was addressed to the speaker's team; the client colours it by team.</param>
+/// <param name="Text">The line.</param>
+public sealed record RoomSessionChatReceived(int RoomId, int Slot, bool TeamOnly, string Text) : IMessage;
 
 /// <summary>The master closes an empty seat, or opens a closed one.</summary>
 /// <param name="Slot">The seat index.</param>

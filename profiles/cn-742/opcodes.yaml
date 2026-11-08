@@ -59,7 +59,7 @@ opcodes:
     name: gspGotoRoom
     name_source: label@cn-742
     evidence: verified
-    source: "UTF-16 gspGotoRoom; client uses opcode 112; SessionSetting sub_42CC90, GameSetting sub_42C270, UserSlot sub_42D560 match cn-735 wire"
+    source: "UTF-16 gspGotoRoom; cn-742 sub_9BD720 reads SessionSetting cn-742 sub_42CC90, the two slot words, UserSlot vector cn-742 sub_9BE1B0, equipment vector cn-742 sub_9BD610, bool32 and u32; cn-742 sub_42D560 seats include the two-word ArenaLevel cn-742 sub_4014C0"
     notes: "kind 1 SessionSetting opens the character session before gspGotoMenu"
   - value: 106
     direction: c2s
@@ -67,3 +67,419 @@ opcodes:
     name_source: mirrored
     evidence: inferred
     source: "cn-742 senders sub_6D6620 stamp 106 through its frame header with an empty body, as cn-717 gcpReqGotoLobby does; the build has no class labels"
+
+  - value: 18
+    direction: s2c
+    connection: relay
+    name: rspUdpBypassInfo
+    name_source: mirrored
+    evidence: verified
+    source: "cn-742 sub_97D120 selects18 and cn-742 sub_97DD90 reads u16 port/u32 cookie"
+
+  - value: 20
+    direction: s2c
+    connection: relay
+    name: rspUdpBypassReady_
+    name_source: coined
+    evidence: verified
+    source: "cn-742 sub_97D120 selects20 and sets relay byte2464 without reading a body"
+
+  - value: 19
+    direction: s2c
+    connection: udp
+    name: rspUdpBypassVerify_
+    name_source: coined
+    evidence: verified
+    source: "cn-742 sub_97BE20 selects UDP19; cn-742 sub_97BDE0 verifies the relay address/port"
+
+  - value: 20001
+    direction: c2s
+    connection: udp
+    name: rcpUdpBypassAck
+    name_source: mirrored
+    evidence: verified
+    source: "cn-742 sub_97DD90 writes the four-byte offered cookie as UDP20001"
+
+  - value: 20002
+    direction: c2s
+    connection: udp
+    name: rcpUdpBypassVerifyAck
+    name_source: mirrored
+    evidence: verified
+    source: "cn-742 sub_97CC70 replies to UDP19 with the four-byte relay cookie"
+
+  - value: 20005
+    direction: c2s
+    connection: relay
+    name: rcpReqUdpBypassDisable
+    name_source: mirrored
+    evidence: verified
+    source: "cn-742 sub_97E2C0 writes empty TCP20005 and invokes cn-742 sub_E4EC40(0)"
+
+  - value: 20003
+    direction: c2s
+    connection: udp
+    name: rcpUdpBypassWanderLean
+    name_source: mirrored
+    evidence: verified
+    source: "cn-742 sub_97CD30 converts32885 to20003 with four-byte cookie and the native full body"
+
+  - value: 20004
+    direction: c2s
+    connection: udp
+    name: rcpUdpBypassWanderLeanOptimize
+    name_source: mirrored
+    evidence: verified
+    source: "cn-742 sub_97CD30 converts32923 to20004 with four-byte cookie and the native masked body"
+
+  - value: 32885
+    direction: c2s
+    connection: both
+    name: gppWanderLean
+    name_source: mirrored
+    evidence: verified
+    source: "cn-742 sub_97CD30 reads native TCP32885 before converting to UDP; cn-742 sub_97BE20 consumes its downlink"
+
+  - value: 32885
+    direction: s2c
+    connection: both
+    name: gppWanderLean
+    name_source: mirrored
+    evidence: verified
+    source: "cn-742 sub_97BE20 dispatches native32885; cn-742 sub_97CD30 matches its TCP movement body"
+
+  - value: 32885
+    direction: s2c
+    connection: udp
+    name: gppWanderLean
+    name_source: mirrored
+    evidence: verified
+    source: "cn-742 sub_97BE20 consumes32885 after the six-byte UDP header, without an uplink cookie"
+
+  - value: 32923
+    direction: c2s
+    connection: both
+    name: gppWanderLeanOptimize
+    name_source: mirrored
+    evidence: verified
+    source: "cn-742 sub_97CD30 reads native TCP32923 before converting to UDP; cn-742 sub_97BE20 consumes its downlink"
+
+  - value: 32923
+    direction: s2c
+    connection: both
+    name: gppWanderLeanOptimize
+    name_source: mirrored
+    evidence: verified
+    source: "cn-742 sub_97BE20 dispatches native32923; cn-742 sub_97CD30 matches its TCP movement body"
+
+  - value: 32923
+    direction: s2c
+    connection: udp
+    name: gppWanderLeanOptimize
+    name_source: mirrored
+    evidence: verified
+    source: "cn-742 sub_97BE20 consumes32923 after the six-byte UDP header, without an uplink cookie"
+
+  - value: 1
+    direction: c2s
+    connection: relay
+    name: rcpReqJoinRelaySession
+    name_source: mirrored
+    evidence: verified
+    source: "cn-742 sub_97E360 stamps relay1 and serializes RelayJoinRequest with its key, byte, two words and string"
+
+  - value: 12
+    direction: c2s
+    connection: relay
+    name: rcpReqReportHackCheckData
+    name_source: mirrored
+    evidence: verified
+    source: "cn-742 sub_97E590 stamps relay12; cn-742 sub_97E930 writes the complete legacy scene tree in RelayValidationReport"
+
+  - value: 1
+    direction: s2c
+    connection: relay
+    name: rspRelayJoinAccepted_
+    name_source: coined
+    evidence: verified
+    source: "cn-742 sub_97D120 relay1 reads no body and constructs report12 from the local actor"
+
+  - value: 13
+    direction: s2c
+    connection: relay
+    name: rspRelaySceneAccepted_
+    name_source: coined
+    evidence: verified
+    source: "cn-742 sub_97D120 relay13 reads no body and reports game-side success through cn-742 sub_97E410"
+
+  - value: 22
+    direction: s2c
+    connection: relay
+    name: rspRelayHandshakeSettings_
+    name_source: coined
+    evidence: verified
+    source: "cn-742 sub_97D120 relay22 calls cn-742 sub_97EE10, which reads bool32 and six bytes"
+
+  - value: 4
+    direction: s2c
+    connection: relay
+    name: rspSendCrtSeedTable
+    name_source: mirrored
+    evidence: verified
+    source: "cn-742 sub_97D120 relay4 invokes cn-742 sub_5E3270: actor word followed by two counted word vectors"
+
+  - value: 5
+    direction: s2c
+    connection: relay
+    name: rspSendDefSeedTable
+    name_source: mirrored
+    evidence: verified
+    source: "cn-742 sub_97D120 relay5 invokes cn-742 sub_5E3450: actor word followed by a counted byte vector"
+
+  - value: 6
+    direction: s2c
+    connection: relay
+    name: rspSendCrtCancelSeedTable
+    name_source: mirrored
+    evidence: verified
+    source: "cn-742 sub_97D120 relay6 invokes cn-742 sub_5E3540: actor word followed by a counted word vector"
+
+  - value: 401
+    direction: c2s
+    connection: game
+    name: gcpReqListSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_794550 stamps 401 and writes two u16 list cursor words; matched to kr-812 gcpReqListSession"
+
+  - value: 402
+    direction: c2s
+    connection: game
+    name: gcpReqCreateSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_53E800 stamps 402 and writes SessionSetting and the password without a trailing flag; matched to kr-812 gcpReqCreateSession"
+
+  - value: 403
+    direction: c2s
+    connection: game
+    name: gcpReqJoinSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_7943E0 stamps 403 and writes the room word, UTF-16 password and one trailing word; matched to kr-812 gcpReqJoinSession"
+
+  - value: 404
+    direction: c2s
+    connection: game
+    name: gcpReqLeaveSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_971760 stamps 404 and writes an empty game leave-session request; matched to kr-812 gcpReqLeaveSession"
+
+  - value: 503
+    direction: c2s
+    connection: game
+    name: gcpRoomReqEnterGame
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_9B6030 stamps 503 and writes bool32, three UTF-16 strings, one word, thirteen rule words and one byte; matched to kr-812 gcpRoomReqEnterGame"
+
+  - value: 505
+    direction: c2s
+    connection: game
+    name: gcpRoomReqReadyStatus
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_6D6E50 stamps 505 and writes three bool32 status fields; matched to kr-812 gcpRoomReqReadyStatus"
+
+  - value: 701
+    direction: c2s
+    connection: game
+    name: gcpGameReportMapLoadingComplete
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_5EC4C0 stamps 701 and writes four loading-report words; matched to kr-812 gcpGameReportMapLoadingComplete"
+
+  - value: 601
+    direction: c2s
+    connection: game
+    name: gcpReportRelayConnected
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_97E410 stamps 601 and writes the relay-success bool32; matched to kr-812 gcpReportRelayConnected"
+
+  - value: 501
+    direction: s2c
+    connection: game
+    name: gspRoomSetSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_95E440 dispatches 501 to cn-742 sub_960650, which reads the complete SessionSetting and copies it into the current session; matched to kr-812 gspRoomSetSession"
+
+  - value: 502
+    direction: s2c
+    connection: game
+    name: gspRoomSetMasterSlotIdx
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_95E440 dispatches 502 to cn-742 sub_960710, which reads one seat word and changes the room master; matched to kr-812 gspRoomSetMasterSlotIdx"
+
+  - value: 503
+    direction: s2c
+    connection: game
+    name: gspRoomSetSlot
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_95E440 dispatches 503 to cn-742 sub_960A10, which reads one seat word, UserSlot and EquippedItemList; matched to kr-812 gspRoomSetSlot"
+
+  - value: 505
+    direction: s2c
+    connection: game
+    name: gspRoomChangeGameSetting
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_95E440 dispatches 505 to cn-742 sub_961970, which reads one complete GameSetting and updates the current room; matched to kr-812 gspRoomChangeGameSetting"
+
+  - value: 511
+    direction: s2c
+    connection: game
+    name: gspRoomLeaveSlot
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_95E440 dispatches 511 to cn-742 sub_961310, which reads one seat word and UserSlot without a team-panel suffix; matched to kr-812 gspRoomLeaveSlot"
+
+  - value: 510
+    direction: s2c
+    connection: game
+    name: gspRoomEnterGame
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_95E440 dispatches 510 to cn-742 sub_962DB0, which reads one UTF-16 map key, two words, two bytes, one word and one byte before the stage transition; matched to kr-812 gspRoomEnterGame"
+
+  - value: 701
+    direction: s2c
+    connection: game
+    name: gspGameMapLoadingComplete
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_95E440 dispatches 701 to cn-742 sub_966630, which reads one seat word and marks that member loaded; matched to kr-812 gspGameMapLoadingComplete"
+
+  - value: 702
+    direction: s2c
+    connection: game
+    name: gspGameEverybodyLoadingComplete
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_95E440 dispatches 702 to cn-742 sub_9668F0, which reads three bool32 relay, peer and optimizer flags; matched to kr-812 gspGameEverybodyLoadingComplete"
+
+  - value: 703
+    direction: s2c
+    connection: game
+    name: gspGameCountDown
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_95E440 dispatches 703 to cn-742 sub_9669B0, which reads the countdown word before enabling the loaded scene; matched to kr-812 gspGameCountDown"
+
+  - value: 704
+    direction: s2c
+    connection: game
+    name: gspGameStartGame
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_95E440 dispatches 704 to cn-742 sub_967130, which reads three words and changes the session state to playing; matched to kr-812 gspGameStartGame"
+
+  - value: 607
+    direction: s2c
+    connection: game
+    name: gspTryHolePunching
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_95E440 dispatches 607 to cn-742 sub_96BD90, which reads u16 discovery port, u32 identity and one unknown byte; matched to kr-812 gspTryHolePunching"
+
+  - value: 608
+    direction: s2c
+    connection: game
+    name: gspStopUdpDiscovery_
+    name_source: coined
+    evidence: verified
+    source: "cn-742 sub_95E440 case 608 clears the discovery flag without consuming stream fields"
+
+  - value: 609
+    direction: s2c
+    connection: game
+    name: gspNotifyUdpToServerReceived
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_95E440 dispatches 609 to cn-742 sub_96BE00, which reads seat and outer-port words and narrows the port to u16; matched to kr-812 gspNotifyUdpToServerReceived"
+
+  - value: 610
+    direction: s2c
+    connection: game
+    name: gspTableSetHolePunching
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_95E440 dispatches 610 to cn-742 sub_97AD30, which reads seat, identity, local IPv4 list, local u16 port, outer IPv4 and outer u16 port; matched to kr-812 gspTableSetHolePunching"
+
+  - value: 611
+    direction: s2c
+    connection: game
+    name: gspUdpPeerTableEnd_
+    name_source: coined
+    evidence: verified
+    source: "cn-742 sub_95E440 dispatches 611 to cn-742 sub_97A9D0, which consumes no stream fields and sends the empty table acknowledgement"
+
+  - value: 612
+    direction: s2c
+    connection: game
+    name: gspUdpPeerPunchStart_
+    name_source: coined
+    evidence: verified
+    source: "cn-742 sub_95E440 dispatches 612 to cn-742 sub_97AA80, which consumes no stream fields and starts local and outer UDP peer attempts"
+
+  - value: 613
+    direction: s2c
+    connection: game
+    name: gspUdpPeerPunchFinish_
+    name_source: coined
+    evidence: verified
+    source: "cn-742 sub_95E440 dispatches 613 to cn-742 sub_97A410, which consumes no stream fields and finalizes peer attempts"
+
+  - value: 740
+    direction: s2c
+    connection: game
+    name: gspGameClockUnbounded_
+    name_source: coined
+    evidence: verified
+    source: "cn-742 sub_95E440 case 740 consumes no stream fields and calls cn-742 sub_969CE0 to set the round duration and its ceiling to 0x3FFFFFFF"
+
+  - value: 2
+    direction: c2s
+    connection: udp
+    name: upTrySendUdpToServer
+    name_source: mirrored
+    evidence: verified
+    source: "cn-742 sub_97C2F0 stamps UDP2 and writes u32 probe identity, u32 local IPv4 and u16 local port"
+
+  - value: 607
+    direction: c2s
+    connection: game
+    name: gcpReportTableSetHolePunchingEnd
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_97A9D0 stamps 607 in the packet header and sends an empty body; matched to kr-812 gcpReportTableSetHolePunchingEnd"
+
+  - value: 603
+    direction: c2s
+    connection: game
+    name: gcpReportHolePunchingEnd
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_97A410 stamps 603 in the packet header and writes occupied-seat and connected-peer words; matched to kr-812 gcpReportHolePunchingEnd"
+
+  - value: 101
+    direction: s2c
+    connection: game
+    name: gspRepListSession
+    name_source: mirrored
+    evidence: verified
+    source: "cn-742 sub_78BF80 routes 101 to cn-742 sub_78F7D0: u32 page, bool32 and vector via cn-742 sub_794830; rows read by cn-742 sub_42CC90"

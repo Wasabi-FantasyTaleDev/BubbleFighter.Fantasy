@@ -93,9 +93,18 @@ public sealed partial class MatchActionRelayTests
             Assert.Equal(cleanup, Assert.Single(h.Guest.Sent).Body);
             return;
         }
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            h.DispatchAsync((ushort)opcode, Body(length, actorOffset, 1100000)));
-        Assert.Empty(h.Guest.Sent);
+        foreach (var protocol in new[] { "kr-1256/game", "kr-1256/relay" })
+        {
+            var before = h.Guest.Sent.Count;
+            await h.DispatchAsync((ushort)opcode, Body(length, actorOffset, 1100000), protocol: protocol);
+            Assert.Equal(before, h.Guest.Sent.Count);
+            Assert.Equal(echo ? before : 0, h.Host.Sent.Count);
+            var valid = Body(length, actorOffset);
+            await h.DispatchAsync((ushort)opcode, valid, protocol: protocol);
+            Assert.Equal(before + 1, h.Guest.Sent.Count);
+            Assert.Equal(valid, h.Guest.Sent.Last().Body);
+            Assert.Equal(echo ? before + 1 : 0, h.Host.Sent.Count);
+        }
     }
 
     [Fact]
@@ -110,15 +119,16 @@ public sealed partial class MatchActionRelayTests
     }
 
     [Theory]
-    [InlineData(1000004)]
-    [InlineData(1000028)]
-    [InlineData(-1)]
-    public async Task UnregisteredEntitiesAreRejectedWithoutBreakingSubsequentPlayerActions(int entity)
+    [InlineData(1000004, true)]
+    [InlineData(1000028, true)]
+    [InlineData(-1, false)]
+    public async Task EntitiesNoMemberOwnsPassInOrdinaryRoundsWithoutBreakingSubsequentPlayerActions(int entity, bool passes)
     {
+        // An entity no seat or bot owns is an NPC the host runs; no mode list gates it. -1 names no entity.
         using var h = await Harness.CreateAsync();
         await h.DispatchAsync(38281, Body(4, 0, entity));
-        Assert.Empty(h.Host.Sent);
-        Assert.Empty(h.Guest.Sent);
+        Assert.Equal(passes ? 1 : 0, h.Guest.Sent.Count);
+        h.Guest.Sent.Clear();
         await h.DispatchAsync(32925, Body(32, 0));
         Assert.Equal((ushort)32925, Assert.Single(h.Guest.Sent).Opcode);
         Assert.False(h.Host.Connection.IsClosed);
@@ -171,13 +181,30 @@ public sealed partial class MatchActionRelayTests
         using var h = await Harness.CreateAsync();
         var events = new List<PacketReceivedEvent>();
         using var subscription = h.Events.On<PacketReceivedEvent>(events.Add);
-        await h.DispatchAsync(32840, new byte[8]);
+        await h.DispatchAsync(ushort.MaxValue, new byte[8]);
         Assert.False(Assert.Single(events).HasHandler);
         h.Binding.Unwind();
         h.InGame.Unwind();
         foreach (var protocol in new[] { "kr-1256/game", "kr-1256/relay" })
             await h.DispatchAsync(32925, Body(32, 0), protocol: protocol);
         Assert.All(events, e => Assert.False(e.HasHandler));
+        Assert.Empty(h.Guest.Sent);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task BattlePingRepliesOnlyToItsGameOrRelaySender(bool relay)
+    {
+        using var h = await Harness.CreateAsync();
+        var sender = relay ? h.Host : h.HostGame;
+        var body = Convert.FromHexString("98BADCFEEFCDAB89");
+        await h.DispatchAsync(32840, body, sender, relay ? "kr-1256/relay" : "kr-1256/game");
+        var reply = Assert.Single(sender.Sent);
+        Assert.Equal((ushort)32840, reply.Opcode);
+        Assert.Equal(body, reply.Body);
+        Assert.Empty((relay ? h.HostGame : h.Host).Sent);
+        Assert.Empty(h.GuestGame.Sent);
         Assert.Empty(h.Guest.Sent);
     }
 
@@ -202,13 +229,18 @@ public sealed partial class MatchActionRelayTests
     }
 
     [Fact]
-    public async Task OrdinaryRoundsStillRejectActionsForEntitiesNoSeatOwns()
+    public async Task EveryModeRelaysTheHostsActionsForEntitiesNoSeatOwns()
     {
-        using var h = await Harness.CreateAsync();
-        h.Room.ModeId = 1;
-        await h.DispatchAsync(38281, BitConverter.GetBytes(1000004));
-        Assert.Empty(h.Guest.Sent);
-        Assert.Empty(h.Host.Sent);
+        // NPCs exist in many modes (zombie PvE 16, rescues, tutorials), so no mode list gates them.
+        foreach (var mode in new ushort[] { 1, 16 })
+        {
+            using var h = await Harness.CreateAsync();
+            h.Room.ModeId = mode;
+            var body = BitConverter.GetBytes(1000004);
+            await h.DispatchAsync(38281, body);
+            Assert.Equal(body, Assert.Single(h.Guest.Sent).Body);
+            Assert.Equal(body, Assert.Single(h.Host.Sent).Body);
+        }
     }
 
 
@@ -318,21 +350,27 @@ public sealed partial class MatchActionRelayTests
         internal RecordingSession? Sender { get; set; }
         private readonly Dictionary<(int Room, int Slot), byte[]> _tickets = [];
 
-        private Harness()
+        private Harness(bool extremeRacing)
         {
             _routerContext = new(new PluginRow { Id = "router", Plugin = "core.packet-router", Source = "test" }, _services, Events, NullLogger.Instance);
             InGame = new(new PluginRow
             {
                 Id = "ingame", Plugin = "ingame", Source = "test",
-                Config = new Dictionary<string, object?> { ["native_life_mode_ids"] = new object[] { 1 } },
+                Config = new Dictionary<string, object?>
+                {
+                    ["native_life_mode_ids"] = new object[] { 1 }, ["start_timer_ms"] = 1,
+                    ["extreme_racing_rounds"] = 1, ["extreme_racing_round_ms"] = 60_000,
+                    ["extreme_racing_finish_countdown_ms"] = 60_000, ["extreme_racing_intermission_ms"] = 1100,
+                    ["result_reward_delay_ms"] = extremeRacing ? 60_000 : 10_000,
+                },
             }, _services, Events, NullLogger.Instance);
             Binding = new(new PluginRow { Id = "binding", Plugin = "test", Source = "test", ClientBuild = new("kr", 1256, 1304), Lineage = ["kr-1256", "kr-812"] }, _services, Events, NullLogger.Instance);
             _routerContext.Effect(_services.RegisterMany<IMessageSender<MatchSessionSignature>>(new RecordingSignatureSender()));
         }
 
-        internal static async Task<Harness> CreateAsync()
+        internal static async Task<Harness> CreateAsync(bool extremeRacing = false, bool finalZone = false)
         {
-            var h = new Harness();
+            var h = new Harness(extremeRacing);
             try
             {
                 await new PacketRouterPlugin().ActivateAsync(h._routerContext, CancellationToken.None);
@@ -345,17 +383,45 @@ public sealed partial class MatchActionRelayTests
                 // The dialect row's room and round surface, mounted exactly as the row mounts it.
                 new RoomCommandsBinding("kr-1256/game", table, packets, "kr-1256", NullLogger.Instance, roundsBound: true).Mount(h.Binding);
                 new RoundStartBinding("kr-1256/game", table, packets, "kr-1256", [1, 0, 1], NullLogger.Instance).Mount(h.Binding);
-                new RoundResultBinding("kr-1256/game", table, packets, "kr-1256", [1], NullLogger.Instance).Mount(h.Binding);
+                new RoundResultBinding("kr-1256/game", table, packets, "kr-1256", finalZone ? [1, 30] : extremeRacing ? [1, 24] : [1], NullLogger.Instance).Mount(h.Binding);
                 new RoundFeedBinding("kr-1256/game", "kr-1256/relay", table, table.ForConnection(OpcodeConnection.Relay), packets, "kr-1256").Mount(h.Binding);
+                if (extremeRacing) new ExtremeRacingBinding("kr-1256/game", table, packets, "kr-1256", NullLogger.Instance).Mount(h.Binding);
+                if (finalZone)
+                {
+                    h.Binding.Effect(h._services.Register<BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore>(new FinalZoneStore()));
+                    new FinalZoneBinding("kr-1256/game", table, packets, "kr-1256").Mount(h.Binding);
+                    new FinalZoneTrapBinding("kr-1256/game", "kr-1256/relay", table,
+                        table.ForConnection(OpcodeConnection.Relay), packets, "kr-1256").Mount(h.Binding);
+                    new FinalZoneMapEffectBinding("kr-1256/game", "kr-1256/relay", table,
+                        table.ForConnection(OpcodeConnection.Relay), packets, "kr-1256").Mount(h.Binding);
+                }
                 await new InGamePlugin().ActivateAsync(h.InGame, CancellationToken.None);
                 h.Registry = Assert.IsType<RoomRegistry>(Assert.Single(
                     h._services.GetAll<IMatchCapabilityDirectory>(), directory => directory.Protocol == "kr-1256/relay"));
                 (h.Room, h.HostSeat) = h.Registry.Create(h.HostGame, RoomWireSupport.OrdinarySettingWithMap(), 1, "host");
                 (_, h.GuestSeat) = h.Registry.Join(h.GuestGame, h.Room.Id, 2, "guest");
+                if (extremeRacing)
+                {
+                    h.Room.ModeId = (ushort)GameModeId.ExtremeRacing;
+                    h.HostSeat.Team = 1;
+                    h.GuestSeat.Team = 2;
+                }
                 h.Room.MarkStarting();
+                if (finalZone)
+                {
+                    h.Room.ModeId = (ushort)GameModeId.FinalZone;
+                    h.Room.RoundStageKey = "fixture";
+                }
                 h.Host = await h.BindAsync(h.HostSeat, 20);
                 h.Guest = await h.BindAsync(h.GuestSeat, 21);
-                h.Room.MarkPlaying();
+                if (extremeRacing || finalZone)
+                {
+                    var load = table.C2S("gcpGameReportMapLoadingComplete");
+                    await h.DispatchAsync(load, new byte[16], h.HostGame, "kr-1256/game");
+                    await h.DispatchAsync(load, new byte[16], h.GuestGame, "kr-1256/game");
+                    await h.Room.CountdownTask.WaitAsync(TimeSpan.FromSeconds(5));
+                }
+                else h.Room.MarkPlaying();
                 return h;
             }
             catch { h.Dispose(); throw; }
@@ -388,6 +454,7 @@ public sealed partial class MatchActionRelayTests
         public ISessionFeatures Features { get; } = new TestSessionFeatures();
 
         internal List<(ushort Opcode, byte[] Body)> Sent { get; } = [];
+        internal (ushort Opcode, byte[] Body)[] SentSnapshot { get { lock (Sent) return [.. Sent]; } }
         internal Func<Task>? BeforeSend { get; set; }
         public long Id => id;
         public IConnection Connection { get; } = new FakeConnection();
@@ -396,7 +463,7 @@ public sealed partial class MatchActionRelayTests
         public async ValueTask SendAsync(ushort opcode, ReadOnlyMemory<byte> payload, CancellationToken ct)
         {
             if (BeforeSend is { } before) await before();
-            Sent.Add((opcode, payload.ToArray()));
+            lock (Sent) Sent.Add((opcode, payload.ToArray()));
         }
     }
 

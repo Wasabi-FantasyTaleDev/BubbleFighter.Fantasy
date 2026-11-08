@@ -3,6 +3,8 @@ using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Party;
 using BubbleFighter.Fantasy.Packets;
 using Microsoft.Extensions.Logging;
+using System.Globalization;
+using System.Text.Json;
 
 namespace BubbleFighter.Fantasy.Dialect.Messages;
 
@@ -12,10 +14,13 @@ namespace BubbleFighter.Fantasy.Dialect.Messages;
 /// list and the membership notices out. The invitation result family is selected by the build's table: the legacy
 /// builds write <c>gspRepInvite</c> with the <see cref="PartyInviteResult"/> codes (kr-812 sub_81CDF0), the modern
 /// family writes <c>gspInvitationDelivered</c> / <c>gspInvitationFailed</c> with its own codes (kr-1256 sub_9A7D50).
-/// The leave, kick and leader requests are mounted only for builds whose tables name them; the modern family's rows
-/// are not audited yet, so those three stay off there (S5). Visits (C2S gcpReqMoveToFriend) are mounted where the
+/// The leave, kick and leader requests are mounted only for builds whose tables name them; kr-1256's are
+/// audited from its own client (leave kr-1256 sub_90B630, kick kr-1256 sub_90A770, handover kr-1256 sub_90A950). Visits
+/// (C2S gcpReqMoveToFriend) are mounted where the
 /// build's table names the request; the prompt, the answers and the failure are the legacy gspRepMoveToFriend family
-/// or the modern gspAskedVisitation family, again by the build's own names (packets/play-together.yaml).
+/// or the modern gspAskedVisitation family, again by the build's own names (packets/play-together.yaml). The
+/// quick-start exchange (C2S gcpReqPartyQuickStart, S2C gspRepPartyQuickStart) mounts only where the build's
+/// table names both one-kind-word bodies (packets/party.yaml).
 /// </summary>
 internal sealed class PartyBinding(string protocol, IOpcodeTable opcodes, PacketTables tables, string build)
     : IInboundMessageBinding<PartyInviteRequested>, IInboundMessageBinding<PartyInviteAccepted>,
@@ -27,8 +32,11 @@ internal sealed class PartyBinding(string protocol, IOpcodeTable opcodes, Packet
       IMessageSender<PartyMemberJoined>, IMessageSender<PartyKickReplied>, IMessageSender<PartyKicked>,
       IMessageSender<PartyMemberKicked>, IMessageSender<PartyLeaderChanged>,
       IInboundMessageBinding<PartyVisitRequested>, IInboundMessageBinding<PartyVisitAnswered>,
+      IInboundMessageBinding<PartyRecruitmentJoinRequested>,
       IInboundMessageBinding<PartyVisitTokenAnswered>, IMessageSender<PartyVisitAsked>, IMessageSender<PartyVisitFailed>,
-      IMessageSender<PartyVisitGranted>, IMessageSender<PartyVisitSucceeded>, IMessageSender<PartyInvitationMoveSucceeded>
+      IMessageSender<PartyVisitGranted>, IMessageSender<PartyVisitSucceeded>, IMessageSender<PartyInvitationMoveSucceeded>,
+      IInboundMessageBinding<PartyChatSent>, IMessageSender<PartyChatReceived>,
+      IInboundMessageBinding<PartyQuickStartRequested>, IMessageSender<PartyQuickStartAnswered>
 {
     /// <summary>The C2S names the legacy family mounts; gcpReqMoveToFriendAccept is read where the build has it.</summary>
     internal static readonly string[] Requests =
@@ -71,34 +79,15 @@ internal sealed class PartyBinding(string protocol, IOpcodeTable opcodes, Packet
         [PartyVisitFailure.Declined] = 18,       // %s declined the visit
     };
 
-    /// <summary>The modern gspVisitationFailed codes (kr-1256 sub_9AA990, party/VisitFailed.*).</summary>
-    private static readonly IReadOnlyDictionary<PartyVisitFailure, uint> ModernVisitCodes = new Dictionary<PartyVisitFailure, uint>
-    {
-        [PartyVisitFailure.Self] = 1,            // Myself
-        [PartyVisitFailure.SameParty] = 2,       // TargetAlreadyIn
-        [PartyVisitFailure.VisitorPlaying] = 3,  // YouOnPlaying
-        [PartyVisitFailure.TargetPlaying] = 8,   // TargetIngame
-        [PartyVisitFailure.PartyFull] = 14,      // FullParty
-        [PartyVisitFailure.Unavailable] = 20,    // AnywayTarget
-        [PartyVisitFailure.Offline] = 21,        // TargetNotLogin
-        [PartyVisitFailure.Unregistered] = 22,   // TargetNotRegistered
-        [PartyVisitFailure.Declined] = 28,       // TargetRefused
-    };
+    private readonly Lazy<IReadOnlyDictionary<PartyVisitFailure, uint>> _visitFailures = new(() =>
+        ReadFailureCodes(tables, build, "party_visit_failure_codes", Enum.GetValues<PartyVisitFailure>()));
 
     /// <summary>The prompt name candidates, legacy first: kr-1256 and cn-774 call it gspAskedInvitation.</summary>
     private static readonly string[] NoticeNames = ["gspNotifyInvite", "gspAskedInvitation"];
 
-    /// <summary>The modern invitation-result codes (kr-1256 sub_9A7D50 text switch; cn-774 sub_BA7E60 has the same set).</summary>
-    private static readonly IReadOnlyDictionary<PartyInviteResult, uint> FailureCodes = new Dictionary<PartyInviteResult, uint>
-    {
-        [PartyInviteResult.Self] = 1,          // party/InviteFailed.Myself
-        [PartyInviteResult.SameParty] = 2,     // party/InviteFailed.InviteeAlreadyIn
-        [PartyInviteResult.Playing] = 3,       // party/InviteFailed.InviteeOnPlaying
-        [PartyInviteResult.PartyFull] = 14,    // party/InviteFailed.FullParty
-        [PartyInviteResult.Offline] = 24,      // party/InviteFailed.InviteeNotLogin (kr-1256 sub_9A7A30 clears the pending member)
-        [PartyInviteResult.Unregistered] = 25, // party/InviteFailed.InviteeNotRegistered
-        [PartyInviteResult.Refused] = 26,      // party/InviteFailed.InviteeRefused
-    };
+    private readonly Lazy<IReadOnlyDictionary<PartyInviteResult, uint>> _inviteFailures = new(() =>
+        ReadFailureCodes(tables, build, "party_invitation_failure_codes",
+            Enum.GetValues<PartyInviteResult>().Where(result => result != PartyInviteResult.Sent)));
 
     public string Protocol => protocol;
 
@@ -108,6 +97,11 @@ internal sealed class PartyBinding(string protocol, IOpcodeTable opcodes, Packet
         if (VisitFamily() == "direct")
             context.Effect(context.Services.RegisterMany<IMessageSender<PartyVisitSucceeded>>(this));
         var modern = UsesModernResults();
+        if (modern)
+        {
+            _ = _inviteFailures.Value;
+            if (VisitFamily() == "modern") _ = _visitFailures.Value;
+        }
         if (!modern)
             context.Effect(context.Services.RegisterMany<IMessageSender<PartyInvitationMoveSucceeded>>(this));
         context.Effect(context.Services.RegisterMany<IInboundMessageBinding<PartyInviteRequested>>(this));
@@ -119,24 +113,28 @@ internal sealed class PartyBinding(string protocol, IOpcodeTable opcodes, Packet
         context.Effect(context.Services.RegisterMany<IMessageSender<PartyLeft>>(this));
         context.Effect(context.Services.RegisterMany<IMessageSender<PartyMemberLeft>>(this));
         context.Effect(context.Services.RegisterMany<IMessageSender<PartyMemberJoined>>(this));
-        if (!modern)
-        {
-            // The legacy family's kick and leader results; the modern rows have no audited request bodies (S5).
-            context.Effect(context.Services.RegisterMany<IMessageSender<PartyKickReplied>>(this));
-            context.Effect(context.Services.RegisterMany<IMessageSender<PartyKicked>>(this));
-            context.Effect(context.Services.RegisterMany<IMessageSender<PartyMemberKicked>>(this));
-            context.Effect(context.Services.RegisterMany<IMessageSender<PartyLeaderChanged>>(this));
-            context.Effect(context.Services.RegisterMany<IInboundMessageBinding<PartyLeaveRequested>>(this));
-            context.Effect(context.Services.RegisterMany<IInboundMessageBinding<PartyKickRequested>>(this));
-            context.Effect(context.Services.RegisterMany<IInboundMessageBinding<PartyLeaderChangeRequested>>(this));
-        }
+        // The kick and leader results and the leave, kick and leader requests: kr-1256 sub_90B630 (empty
+        // leave), kr-1256 sub_90A770 and kr-1256 sub_90A950 (one-name kick and handover) are audited from its own client.
+        context.Effect(context.Services.RegisterMany<IMessageSender<PartyKickReplied>>(this));
+        context.Effect(context.Services.RegisterMany<IMessageSender<PartyKicked>>(this));
+        context.Effect(context.Services.RegisterMany<IMessageSender<PartyMemberKicked>>(this));
+        context.Effect(context.Services.RegisterMany<IMessageSender<PartyLeaderChanged>>(this));
+        context.Effect(context.Services.RegisterMany<IInboundMessageBinding<PartyLeaveRequested>>(this));
+        context.Effect(context.Services.RegisterMany<IInboundMessageBinding<PartyKickRequested>>(this));
+        context.Effect(context.Services.RegisterMany<IInboundMessageBinding<PartyLeaderChangeRequested>>(this));
         var router = context.Services.Get<IPacketRouter>();
-        // The inviter's request exists where the build's table names it: kr-1256 has it, cn-774 and tw-454 do not.
+        // Native senders: kr-1256 sub_90A330, cn-774 sub_B04050 and tw-454 sub_B9FA50.
         if (opcodes.Find(PacketDirection.ClientToServer, "gcpReqInvite") is not null)
             Route<PartyInviteRequested>(context, router, messages, "gcpReqInvite", ReadInvite);
         else if (!modern)
             throw new ConfigException($"Build '{build}' mounts the legacy party binding without C2S gcpReqInvite.");
-        Route<PartyInviteAccepted>(context, router, messages, "gcpReqMoveToInviter", ReadAccept);
+        if (HasField("PartyInviterMoveRequest", "kind"))
+        {
+            context.Effect(context.Services.RegisterMany<IInboundMessageBinding<PartyRecruitmentJoinRequested>>(this));
+            RouteMessage(context, router, messages, "gcpReqMoveToInviter", ReadMove);
+        }
+        else
+            Route<PartyInviteAccepted>(context, router, messages, "gcpReqMoveToInviter", ReadAccept);
         // cn-324 and cn-279 have no gcpReqMoveToFriendAccept class (their C2S 111 is gcpReqMatch): no answer packet.
         if (opcodes.Find(PacketDirection.ClientToServer, "gcpReqMoveToFriendAccept") is not null)
         {
@@ -173,22 +171,66 @@ internal sealed class PartyBinding(string protocol, IOpcodeTable opcodes, Packet
                     new(Convert.ToUInt32(PacketCodec.Read(tables, build, "VisitationRefusal", body)["token"]), false));
             }
         }
-        if (modern)
-        {
-            // The modern family's leave, kick and leader request bodies are not audited; the shared party row still
-            // mounts, but those three stay off until the client's reader proves each body (S5 scope).
-            context.Logger.LogInformation(
-                "Party binding on '{Protocol}' for '{Build}': invitation and membership only; leave, kick and leader requests stay off until their bodies are audited.",
-                protocol, build);
-        }
-        else
+        // The leave, kick and leader routes mount where the build's table names them: kr-1256 sub_90B630
+        // (empty leave), kr-1256 sub_90A770 and kr-1256 sub_90A950 (one-name kick and handover) are audited from its own
+        // client. A build that claims the party capability without the rows still fails loud.
+        if (opcodes.Find(PacketDirection.ClientToServer, "gcpReqLeaveParty") is not null)
         {
             Route<PartyLeaveRequested>(context, router, messages, "gcpReqLeaveParty", body =>
                 body.IsEmpty ? new PartyLeaveRequested() : throw new PacketFormatException("gcpReqLeaveParty must be empty.", 0));
             Route<PartyKickRequested>(context, router, messages, "gcpReqKickFromParty", body => new(Nickname(body)));
             Route<PartyLeaderChangeRequested>(context, router, messages, "gcpReqChangePartyLeader", body => new(Nickname(body)));
         }
+        else if (!modern)
+            throw new ConfigException($"Build '{build}' mounts the legacy party binding without C2S gcpReqLeaveParty.");
+        // The chat box outside a room sends C2S gcpSendPartyChatMsg (cn-717 sub_9C9130 -> sub_9CCA60) and draws
+        // nothing until S2C gspReceivePartyChatMsg returns. Mounted where the build's table names both.
+        if (opcodes.Find(PacketDirection.ClientToServer, "gcpSendPartyChatMsg") is not null)
+        {
+            _ = opcodes.S2C("gspReceivePartyChatMsg");
+            PacketLayoutContract.RequireSignature(tables, build, "PartyChatRequest", "Party", "text:wstr");
+            PacketLayoutContract.RequireFields(tables, build, "PartyChatMessage", "Party",
+                ("user_number", "u32"), ("text", "wstr"), ("system", "bool"));
+            context.Effect(context.Services.RegisterMany<IInboundMessageBinding<PartyChatSent>>(this));
+            context.Effect(context.Services.RegisterMany<IMessageSender<PartyChatReceived>>(this));
+            Route<PartyChatSent>(context, router, messages, "gcpSendPartyChatMsg",
+                body => new((string)PacketCodec.ReadScalars(tables, build, "PartyChatRequest", body)["text"]));
+        }
+        // The quick-start request and its answer mount only where the build states both one-kind-word bodies:
+        // the leader's client sends C2S gcpReqPartyQuickStart (kr-812 sub_68E390 / kr-812 sub_68E580 / kr-812 sub_68EF80, one u32
+        // kind) and each member's stage dispatcher consumes the answer (kr-812 sub_68D530 case 0x134 ->
+        // kr-812 sub_68EF10). kr-1256 stamps the request with an empty body and has no audited answer, so the
+        // missing structures keep it unmounted.
+        if (opcodes.Find(PacketDirection.ClientToServer, "gcpReqPartyQuickStart") is not null
+            && opcodes.Find(PacketDirection.ServerToClient, "gspRepPartyQuickStart") is not null
+            && tables.Resolve(build, "PartyQuickStartRequest") is { Count: > 0 })
+        {
+            _ = opcodes.S2C("gspRepPartyQuickStart");
+            PacketLayoutContract.RequireSignature(tables, build, "PartyQuickStartRequest", "Party", "kind:u32");
+            PacketLayoutContract.RequireSignature(tables, build, "PartyQuickStartReply", "Party", "kind:u32");
+            context.Effect(context.Services.RegisterMany<IInboundMessageBinding<PartyQuickStartRequested>>(this));
+            context.Effect(context.Services.RegisterMany<IMessageSender<PartyQuickStartAnswered>>(this));
+            Route<PartyQuickStartRequested>(context, router, messages, "gcpReqPartyQuickStart",
+                body => new(Convert.ToInt32(PacketCodec.ReadScalars(tables, build, "PartyQuickStartRequest", body)["kind"])));
+        }
     }
+
+    /// <summary>
+    /// Writes S2C gspReceivePartyChatMsg as a member's line: cn-717 sub_9CB6E0 names it after the party member whose
+    /// user number is <c>user_number</c> and draws <c>text</c>; <c>system</c> false keeps it off the fixed system line.
+    /// </summary>
+    public ValueTask SendAsync(ISession session, PartyChatReceived message, CancellationToken ct) =>
+        Send(session, "gspReceivePartyChatMsg", "PartyChatMessage", new()
+        {
+            ["user_number"] = message.UserNum, ["text"] = message.Text, ["system"] = false,
+        }, ct);
+
+    /// <summary>
+    /// Writes S2C gspRepPartyQuickStart, the one-u32-kind answer every member's stage dispatcher consumes
+    /// (kr-812 sub_68EF10); 0 is the cancel form the stage-local consumer kr-812 sub_6875C0 exits on.
+    /// </summary>
+    public ValueTask SendAsync(ISession session, PartyQuickStartAnswered message, CancellationToken ct) =>
+        Send(session, "gspRepPartyQuickStart", "PartyQuickStartReply", new() { ["kind"] = message.Kind }, ct);
 
     /// <summary>Gets whether the build writes the modern invitation-result family, by its own S2C names.</summary>
     internal bool UsesModernResults()
@@ -207,7 +249,7 @@ internal sealed class PartyBinding(string protocol, IOpcodeTable opcodes, Packet
                 : Send(session, "gspInvitationFailed", "PartyInviteFailure", new()
                 {
                     ["nickname"] = message.Target,
-                    ["code"] = FailureCodes.TryGetValue(message.Result, out var code) ? code
+                    ["code"] = _inviteFailures.Value.TryGetValue(message.Result, out var code) ? code
                         : throw new InvalidOperationException($"No gspInvitationFailed code for {message.Result}."),
                 }, ct)
             : Send(session, "gspRepInvite", "PartyResult", new() { ["result"] = (uint)message.Result, ["nickname"] = message.Target }, ct);
@@ -260,7 +302,7 @@ internal sealed class PartyBinding(string protocol, IOpcodeTable opcodes, Packet
             }, ct)
             : Send(session, "gspVisitationFailed", "VisitationFailed", new()
             {
-                ["nickname"] = message.Target, ["code"] = ModernVisitCodes[message.Reason],
+                ["nickname"] = message.Target, ["code"] = _visitFailures.Value[message.Reason],
             }, ct);
 
     // kr-1256 and cn-774 have gspVisitationAccepted; kr-812 and tw-454 move the visitor with an invitation notice that
@@ -270,9 +312,9 @@ internal sealed class PartyBinding(string protocol, IOpcodeTable opcodes, Packet
         var address = new Dictionary<string, object?> { ["ipv4_word"] = 0u, ["port"] = (ushort)0 };
         if (opcodes.Find(PacketDirection.ServerToClient, "gspVisitationAccepted") is not null)
             return Send(session, "gspVisitationAccepted", "VisitationAccepted", new() { ["nickname"] = message.Host, ["address"] = address }, ct);
-        if (!HasField("PartyInviteNotice", "auto_accept"))
-            throw new ConfigException($"Build '{build}' can neither accept a visit nor skip its invitation prompt.");
-        var fields = new Dictionary<string, object?> { ["inviter"] = message.Host, ["address"] = address, ["auto_accept"] = true };
+        // cn-406 sub_713F90 has no skip word: the visitor is asked once more and its accept sends the same request.
+        var fields = new Dictionary<string, object?> { ["inviter"] = message.Host, ["address"] = address };
+        if (HasField("PartyInviteNotice", "auto_accept")) fields["auto_accept"] = true;
         if (HasField("PartyInviteNotice", "is_party")) fields["is_party"] = true;
         return session.SendAsync(NoticeName(), PacketCodec.Write(tables, build, "PartyInviteNotice", fields), ct);
     }
@@ -324,7 +366,7 @@ internal sealed class PartyBinding(string protocol, IOpcodeTable opcodes, Packet
             ["state"] = 2,
             ["members"] = message.Party.Members.Select(member => new Dictionary<string, object?>
             {
-                ["user_number"] = member.UserNum, ["nickname"] = member.Nickname, ["level"] = member.Level,
+                ["user_number"] = member.UserNum, ["nickname"] = member.Nickname, ["level"] = NativeDisplayLevel.Project(tables, build, member.Level),
             }).ToArray(),
         };
         if (message.Appearance is { } appearance)
@@ -369,6 +411,15 @@ internal sealed class PartyBinding(string protocol, IOpcodeTable opcodes, Packet
         return fields.TryGetValue("is_party", out var isParty)
             ? new((bool)isParty!, (string)fields["inviter"]!)
             : new(true, (string)fields["inviter"]!);
+    }
+
+    // kr-1256 sub_631590/sub_9396F0 and cn-774 sub_7B0800/sub_B329D0 select kind 2 for a document join.
+    internal IMessage ReadMove(ReadOnlySpan<byte> body)
+    {
+        var fields = PacketCodec.Read(tables, build, "PartyInviterMoveRequest", body);
+        return fields.TryGetValue("kind", out var kind) && Convert.ToByte(kind) == 2
+            ? new PartyRecruitmentJoinRequested((string)fields["inviter"]!)
+            : ReadAccept(body);
     }
 
     internal PartyInviteTokenRefused ReadTokenRefusal(ReadOnlySpan<byte> body) =>
@@ -434,6 +485,25 @@ internal sealed class PartyBinding(string protocol, IOpcodeTable opcodes, Packet
 
     private string Nickname(ReadOnlySpan<byte> body) => (string)PacketCodec.Read(tables, build, "PartyNickname", body)["nickname"]!;
 
+    // tw-454 sub_A854A0/sub_A87B50 select different texts from kr-1256 sub_9A7D50/sub_9AA990.
+    private static IReadOnlyDictionary<T, uint> ReadFailureCodes<T>(PacketTables tables, string build,
+        string setting, IEnumerable<T> required) where T : struct, Enum
+    {
+        if (tables.ValuesOf(build).GetValueOrDefault(setting) is not IReadOnlyDictionary<string, object?> values)
+            throw new ConfigException($"Build '{build}' needs {setting} for its party result family.");
+        var result = new Dictionary<T, uint>();
+        foreach (var reason in required)
+        {
+            var key = JsonNamingPolicy.SnakeCaseLower.ConvertName(reason.ToString());
+            if (!values.TryGetValue(key, out var raw)
+                || !uint.TryParse(Convert.ToString(raw, CultureInfo.InvariantCulture),
+                    NumberStyles.None, CultureInfo.InvariantCulture, out var code))
+                throw new ConfigException($"Build '{build}' {setting}.{key} must be an unsigned result code.");
+            result.Add(reason, code);
+        }
+        return result;
+    }
+
     private ushort NoticeName() =>
         NoticeNames.Select(name => opcodes.Find(PacketDirection.ServerToClient, name)).FirstOrDefault(opcode => opcode is not null)
         ?? throw new ConfigException($"Build '{build}' names no invitation prompt (gspNotifyInvite or gspAskedInvitation).");
@@ -468,12 +538,15 @@ internal sealed class PartyBinding(string protocol, IOpcodeTable opcodes, Packet
                 PartyVisitAnswered answer => await messages.DispatchAsync(protocol, session, answer, ct).ConfigureAwait(false),
                 PartyInviteRequested request => await messages.DispatchAsync(protocol, session, request, ct).ConfigureAwait(false),
                 PartyInviteAccepted accept => await messages.DispatchAsync(protocol, session, accept, ct).ConfigureAwait(false),
+                PartyRecruitmentJoinRequested join => await messages.DispatchAsync(protocol, session, join, ct).ConfigureAwait(false),
                 PartyInviteTokenRefused refusal => await messages.DispatchAsync(protocol, session, refusal, ct).ConfigureAwait(false),
                 PartyVisitRequested request => await messages.DispatchAsync(protocol, session, request, ct).ConfigureAwait(false),
                 PartyVisitTokenAnswered answer => await messages.DispatchAsync(protocol, session, answer, ct).ConfigureAwait(false),
                 PartyLeaveRequested leave => await messages.DispatchAsync(protocol, session, leave, ct).ConfigureAwait(false),
                 PartyKickRequested kick => await messages.DispatchAsync(protocol, session, kick, ct).ConfigureAwait(false),
                 PartyLeaderChangeRequested change => await messages.DispatchAsync(protocol, session, change, ct).ConfigureAwait(false),
+                PartyChatSent chat => await messages.DispatchAsync(protocol, session, chat, ct).ConfigureAwait(false),
+                PartyQuickStartRequested request => await messages.DispatchAsync(protocol, session, request, ct).ConfigureAwait(false),
                 _ => throw new InvalidOperationException($"{name} produced an unknown party message {message.GetType().Name}."),
             };
             if (!handled)
@@ -496,6 +569,7 @@ internal sealed class PartyBinding(string protocol, IOpcodeTable opcodes, Packet
         PacketLayoutContract.RequireSignature(tables, build, "PartyInviteNotice", "Party",
             "is_party:bool,inviter:wstr,address:RelayEndpoint,auto_accept:bool",
             "inviter:wstr,token:u32,address:RelayEndpoint,unknown_36:u32,unknown_40:u32",
-            "inviter:wstr,address:RelayEndpoint,auto_accept:bool");
+            "inviter:wstr,address:RelayEndpoint,auto_accept:bool",
+            "is_party:bool,inviter:wstr,address:RelayEndpoint");
     }
 }

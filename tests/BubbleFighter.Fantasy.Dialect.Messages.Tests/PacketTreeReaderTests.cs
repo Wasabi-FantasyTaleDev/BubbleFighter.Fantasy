@@ -42,6 +42,54 @@ public sealed class PacketTreeReaderTests : IDisposable
         """;
 
     [Fact]
+    public void PrefixReaderLeavesEnclosingFieldsUnreadAndReportsOriginalRange()
+    {
+        var tables = Load(Nested);
+        byte[] nested = Convert.FromHexString("FFFFFFFF01000000010000004100AA01000000070000000100000000000000BB3412785600000000");
+        var reader = new PacketReader([0xCC, .. nested, 0xDD]);
+        Assert.Equal(0xCC, reader.ReadByte());
+        var fields = PacketCodec.ReadPrefix(ref reader, tables, "base", "Envelope");
+        Assert.Equal(1 + nested.Length, reader.Offset);
+        Assert.Equal(1, reader.Remaining);
+        Assert.Equal(0xDD, reader.ReadByte());
+        Assert.Equal(nested, PacketCodec.Write(tables, "base", "Envelope", fields));
+        Assert.Throws<PacketFormatException>(() => PacketCodec.Read(tables, "base", "Envelope", [.. nested, 0xDD]));
+        for (var length = 0; length < nested.Length; length++)
+            Assert.Throws<PacketFormatException>(() => ReadPrefix(tables, "Envelope", nested[..length]));
+    }
+
+    [Fact]
+    public void PrefixReaderRetainsTreeBooleanAndFrameBounds()
+    {
+        var tables = Load(Nested);
+        var bytes = Convert.FromHexString("FFFFFFFF02000000010000004100AA01000000070000000100000000000000BB3412785600000000");
+        Assert.Throws<PacketFormatException>(() => ReadPrefix(tables, "Envelope", bytes, canonical: true));
+        Assert.Throws<PacketFormatException>(() => ReadPrefix(tables, "Envelope", bytes,
+            new PacketReadLimits(MaxValues: 4)));
+        Assert.Throws<PacketFormatException>(() => ReadPrefix(tables, "Envelope", bytes,
+            new PacketReadLimits(MaxDepth: 1)));
+        Assert.Throws<PacketFormatException>(() => ReadPrefix(tables, "Envelope", new byte[ushort.MaxValue + 1]));
+        var oversized = new PacketReader(new byte[ushort.MaxValue + 1]);
+        oversized.ReadByte();
+        try
+        {
+            PacketCodec.ReadPrefix(ref oversized, tables, "base", "Envelope");
+            Assert.Fail("A consumed leading byte must not hide an oversized enclosing packet.");
+        }
+        catch (PacketFormatException)
+        {
+            Assert.Equal(1, oversized.Offset);
+        }
+    }
+
+    private static Dictionary<string, object?> ReadPrefix(PacketTables tables, string structure, byte[] bytes,
+        PacketReadLimits? limits = null, bool canonical = false)
+    {
+        var reader = new PacketReader(bytes);
+        return PacketCodec.ReadPrefix(ref reader, tables, "base", structure, limits, canonical);
+    }
+
+    [Fact]
     public void ScalarReadersPreserveIdenticalNativeBitsAndFloatingPointValues()
     {
         var tables = Load("""

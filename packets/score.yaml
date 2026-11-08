@@ -55,6 +55,9 @@ structs:
       cn-706:
         - unknown_304: empty_list
           offset: 304
+      cn-404:
+        - unknown_304: empty_list
+          offset: 304
     - unknown_320: empty_list
       offset: 320
       except: [cn-324, cn-717]
@@ -66,6 +69,9 @@ structs:
         - unknown_288: empty_list
           offset: 288
       cn-706:
+        - unknown_320: empty_list
+          offset: 320
+      cn-404:
         - unknown_320: empty_list
           offset: 320
     - winner_team: u32
@@ -84,6 +90,10 @@ structs:
         - winner_team: u32
           offset: 296
           default: -1
+      cn-404:
+        - winner_team: u32
+          offset: 296
+          default: -1
     - unknown_300: bool
       offset: 300
       except: [cn-324]
@@ -94,6 +104,9 @@ structs:
         - unknown_268: bool
           offset: 268
       cn-706:
+        - unknown_300: bool
+          offset: 300
+      cn-404:
         - unknown_300: bool
           offset: 300
     - teams: "ScoreTeam[17]"
@@ -109,6 +122,9 @@ structs:
           offset: 12
     - rows: "ScoreRow[16]"
       offset: 336
+      cn-717:
+        - rows: "ScoreRow[16]"          # cn-717 sub_4195B0 / cn-717 sub_889E40 use object +304.
+          offset: 304
       id-400:
         - rows: "ScoreRow[8]"
           offset: 320
@@ -130,6 +146,9 @@ structs:
           offset: 188
     - tails: "ScoreTail[16]"
       offset: 6416
+      cn-717:
+        - tails: "ScoreTail[16]"        # cn-717 sub_4195B0 reads the arrays at +6384 and +6448.
+          offset: 6384
       id-400:
         - tails: "ScoreTail[8]"
           offset: 3136
@@ -145,6 +164,9 @@ structs:
       cn-404:
         - tails: "ScoreTail[12]"
           offset: 4608
+      cn-408:
+        - tails: "ScoreTail[12]"       # cn-408 sub_7B0C60 reads twelve words after twelve 360-byte native rows.
+          offset: 4656
       cn-324:
         - tails: "ScoreTail[8]"
           offset: 2440
@@ -169,6 +191,9 @@ structs:
       cn-706:
         - total: u32
           offset: 84
+      cn-404:
+        - total: u32
+          offset: 84
       cn-324:
         - total: u32
           offset: 76
@@ -184,6 +209,9 @@ structs:
         - unknown_140: u32
           offset: 140
       cn-706:
+        - unknown_156: u32
+          offset: 156
+      cn-404:
         - unknown_156: u32
           offset: 156
       cn-324:
@@ -202,6 +230,9 @@ structs:
         - unknown_204: u32
           offset: 204
       cn-706:
+        - unknown_228: u32
+          offset: 228
+      cn-404:
         - unknown_228: u32
           offset: 228
 
@@ -464,7 +495,8 @@ structs:
       offset: 116
     - unknown_132: u32
       offset: 132
-    - unknown_124: u32
+    # cn-279 sub_888D80 reads row +124 for the selected card's Stock/StockSet identity.
+    - award_display_id: u32
       offset: 124
 
   # ScoreRow of cn-324: the same fields in the same order as kr-812's, without one of the five u32 after
@@ -692,6 +724,10 @@ structs:
       offset: 236
     - unknown_220: "u32"
       offset: 220
+      cn-406:
+        # cn-406 sub_8EB500 reads (session + 1000 + seat * 332) +220 for the primary reward.
+        - award_display_id: u32
+          offset: 220
     - unknown_228: "u32"
       offset: 228
     - unknown_224: "u32"
@@ -732,6 +768,268 @@ structs:
     - unknown_348: "u32"
       offset: 348
       except: [cn-406]
+  # cn-404 sub_7AD390 / cn-404 sub_7AD7F0 serialize rows 356 bytes apart;
+  # cn-404 sub_7AD0D0 resets them. Offsets differ after the four in-round flags.
+  ScoreRow@cn-404:
+    - slot: "u32"
+      offset: 0
+      default: -1
+      vacant: -1
+    - unknown_4: "u32"
+      offset: 4
+    - nickname: "wstr"
+      offset: 8
+    - team: "u32"
+      offset: 36
+    - level: "u32"
+      offset: 40
+    - knock_downs: "u32"
+      offset: 44
+    - kills: "u32"
+      offset: 48
+    - unknown_52: "u32"
+      offset: 52
+    - unknown_56: "u32"
+      offset: 56
+    - unknown_60: "u32"
+      offset: 60
+    - score: "u32"
+      offset: 64
+    - unknown_68: "u32"
+      offset: 68
+    - unknown_72: "u32"
+      offset: 72
+    - unknown_76: "u32"
+      offset: 76
+    - unknown_80: "u32"
+      offset: 80
+    - unknown_84: "u32"
+      offset: 84
+    - unknown_88: "u32"
+      offset: 88
+    - unknown_92: "u32"
+      offset: 92
+    - unknown_96: "u32"
+      offset: 96
+    - unknown_112: "u32"
+      offset: 112
+    - unknown_116: "u32"
+      offset: 116
+    - unknown_120: "u32"
+      offset: 120
+    - unknown_124: "u32"
+      offset: 124
+    - unknown_128: "u32"
+      offset: 128
+    - unknown_132: "u32"
+      offset: 132
+    - unknown_136: "u32"
+      offset: 136
+    - unknown_140: "u32"
+      offset: 140
+    - exp_level_start: "u32"
+      offset: 144
+    - exp_total: "u32"
+      offset: 148
+    - exp_next_level: "u32"
+      offset: 152
+    - exp_gained: "u32"
+      offset: 156
+    - lucci_gained: "u32"
+      offset: 160
+    - unknown_164: "bool"
+      offset: 164
+      default: 1
+      vacant: 0
+    - unknown_165: "bool"
+      offset: 165
+    - unknown_166: "bool"
+      offset: 166
+    - unknown_167: "bool"
+      offset: 167
+    - unknown_220: "bool"
+      offset: 220
+    - unknown_221: "bool"
+      offset: 221
+    - unknown_222: "u8"
+      offset: 222
+    - unknown_172: "u32"
+      offset: 172
+    - badge_images: "list<wstr>"
+      offset: 204
+    - unknown_176: "wstr"
+      offset: 176
+    - unknown_240: "u32"
+      offset: 240
+    - unknown_224: "u32"
+      offset: 224
+    - unknown_232: "u32"
+      offset: 232
+    - unknown_228: "u32"
+      offset: 228
+    - unknown_300: "u32"
+      offset: 300
+    - unknown_304: "bool"
+      offset: 304
+    - unknown_308: "u32"
+      offset: 308
+    - unknown_312: "u32"
+      offset: 312
+      default: -1
+    - unknown_316: "u32"
+      offset: 316
+    - unknown_320: "bool"
+      offset: 320
+    - unknown_321: "bool"
+      offset: 321
+    - unknown_324: "u32"
+      offset: 324
+    - unknown_328: "u32"
+      offset: 328
+    - unknown_332: "bool"
+      offset: 332
+    - unknown_336: "u32"
+      offset: 336
+    - unknown_340: "u32"
+      offset: 340
+    - unknown_344: "u32"
+      offset: 344
+    - unknown_348: "u32"
+      offset: 348
+    - unknown_352: "u32"
+      offset: 352
+
+  # cn-408 sub_7B0C60 reads twelve 360-byte native rows; cn-408 sub_7B0540 sets their defaults.
+  # The empty-name wire row is 241 bytes; late native offsets differ from cn-404 without changing wire widths.
+  ScoreRow@cn-408:
+    - slot: "u32"
+      offset: 0
+      default: -1
+      vacant: -1
+    - unknown_4: "u32"
+      offset: 4
+    - nickname: "wstr"
+      offset: 8
+    - team: "u32"
+      offset: 36
+    - level: "u32"
+      offset: 40
+    - knock_downs: "u32"
+      offset: 44
+    - kills: "u32"
+      offset: 48
+    - unknown_52: "u32"
+      offset: 52
+    - unknown_56: "u32"
+      offset: 56
+    - unknown_60: "u32"
+      offset: 60
+    - score: "u32"
+      offset: 64
+    - unknown_68: "u32"
+      offset: 68
+    - unknown_72: "u32"
+      offset: 72
+    - unknown_76: "u32"
+      offset: 76
+    - unknown_80: "u32"
+      offset: 80
+    - unknown_84: "u32"
+      offset: 84
+    - unknown_88: "u32"
+      offset: 88
+    - unknown_92: "u32"
+      offset: 92
+    - unknown_96: "u32"
+      offset: 96
+    - unknown_112: "u32"
+      offset: 112
+    - unknown_116: "u32"
+      offset: 116
+    - unknown_120: "u32"
+      offset: 120
+    - unknown_124: "u32"
+      offset: 124
+    - unknown_128: "u32"
+      offset: 128
+    - unknown_132: "u32"
+      offset: 132
+    - unknown_136: "u32"
+      offset: 136
+    - unknown_140: "u32"
+      offset: 140
+    - exp_level_start: "u32"
+      offset: 144
+    - exp_total: "u32"
+      offset: 148
+    - exp_next_level: "u32"
+      offset: 152
+    - exp_gained: "u32"
+      offset: 156
+    - lucci_gained: "u32"
+      offset: 160
+    - unknown_164: "bool"
+      offset: 164
+      default: 1
+      vacant: 0
+    - unknown_165: "bool"
+      offset: 165
+    - unknown_166: "bool"
+      offset: 166
+    - unknown_167: "bool"
+      offset: 167
+    - unknown_220: "bool"
+      offset: 220
+    - unknown_221: "bool"
+      offset: 221
+    - unknown_222: "u8"
+      offset: 222
+    - unknown_172: "u32"
+      offset: 172
+    - badge_images: "list<wstr>"
+      offset: 204
+    - unknown_176: "wstr"
+      offset: 176
+    - unknown_244: "u32"
+      offset: 244
+    - unknown_224: "u32"
+      offset: 224
+    - unknown_232: "u32"
+      offset: 232
+    - unknown_228: "u32"
+      offset: 228
+    - unknown_304: "u32"
+      offset: 304
+    - unknown_308: "bool"
+      offset: 308
+    - unknown_312: "u32"
+      offset: 312
+    - unknown_316: "u32"
+      offset: 316
+      default: -1
+    - unknown_320: "u32"
+      offset: 320
+    - unknown_324: "bool"
+      offset: 324
+    - unknown_325: "bool"
+      offset: 325
+    - unknown_328: "u32"
+      offset: 328
+    - unknown_332: "u32"
+      offset: 332
+    - unknown_336: "bool"
+      offset: 336
+    - unknown_340: "u32"
+      offset: 340
+    - unknown_344: "u32"
+      offset: 344
+    - unknown_348: "u32"
+      offset: 348
+    - unknown_352: "u32"
+      offset: 352
+    - unknown_356: "u32"
+      offset: 356
+
   # Native row order: cn-706 sub_786E90; defaults: cn-706 sub_786770.
   ScoreRow@cn-706:
     - slot: "u32"
@@ -824,7 +1122,8 @@ structs:
       offset: 176
     - unknown_244: "u32"
       offset: 244
-    - unknown_224: "u32"
+    # cn-706 sub_987280 and cn-705 sub_985BA0 read row +224 for the selected reward.
+    - award_display_id: "u32"
       offset: 224
     - unknown_232: "u32"
       offset: 232
@@ -894,8 +1193,10 @@ structs:
     - winner_slot: u8
       offset: 452
       # Kept only when <=36, else -1 (kr-1256 sub_429620). In team results this is a team,
-      # not a seat: cn-774 sub_4917E0 -> cn-774 sub_A91FB0 compares 1/2 with local seat+116;
-      # zero selects ResultDraw. A live unspecified winner remains 255 on the wire.
+      # not a seat: cn-774 sub_4917E0 passes any value but -1 through, and cn-774 sub_A91FB0
+      # plays "result_win" when it equals the local seat+116 team and "result_lose" otherwise;
+      # 1 adds RedWin.png, 2 BlueWin.png, any other winner (the zombie allegiances 14 and 15)
+      # Draw.png. Zero selects "result_draw". A live unspecified winner remains 255 on the wire.
       only: [kr-1256]
     - banner_gate: bool
       offset: 456

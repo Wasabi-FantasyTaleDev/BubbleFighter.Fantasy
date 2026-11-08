@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Content, useData, useRoute, withBase } from 'vitepress'
+import { useI18n } from 'vue-i18n'
 import VPNavBarSearch from 'vitepress/dist/client/theme-default/components/VPNavBarSearch.vue'
 import Icon from './Icon.vue'
 import LiquidGlassLink from './LiquidGlassLink.vue'
@@ -10,14 +11,16 @@ import ReleaseNotes from './ReleaseNotes.vue'
 import NoahButton from './noah/components/ui/NoahButton.vue'
 import NoahReveal from './noah/components/ui/NoahReveal.vue'
 import NoahTerminal from './noah/components/ui/NoahTerminal.vue'
-import { languages, labels, routes } from './locales'
+import { languages, translatedLabels, routes } from './locales'
 
 const { lang, frontmatter, isDark, page } = useData()
 const route = useRoute()
+const { t, locale } = useI18n()
+watch(lang, value => { locale.value = value || 'zh-CN' }, { immediate: true })
 const repositoryUrl = 'https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy'
 const terminalCommand = 'curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash\n~/bubblefighter-fantasy/bff'
 const language = computed(() => languages.find(item => item.code === lang.value) || languages[0])
-const text = computed(() => labels[language.value.key])
+const text = computed(() => translatedLabels(t))
 const home = computed(() => frontmatter.value.layout === 'home')
 const mobileOpen = ref(false)
 const backgroundVideo = ref<HTMLVideoElement>()
@@ -53,8 +56,8 @@ const currentPath = computed(() => page.value.relativePath.replace(/^(zh-tw|ko|e
 const currentIndex = computed(() => routes.indexOf(currentPath.value))
 const groups = computed(() => [
   { title: text.value.start, items: [0, 1] },
-  { title: text.value.guides, items: [2, 3, 4, 5, 6, 7, 8] },
-  { title: text.value.project, items: [9, 10] },
+  { title: text.value.guides, items: [2, 3, 4, 5, 6, 7, 8, 9] },
+  { title: text.value.project, items: [10, 11] },
 ])
 const link = (path = '', prefix = language.value.prefix) => withBase(`/${prefix}${path === 'index' ? '' : path}`)
 const closeMenus = () => { mobileOpen.value = false; openHeaderMenu.value = null }

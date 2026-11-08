@@ -197,6 +197,34 @@ public sealed class OpcodeTableTests
     }
 
     [Fact]
+    public void UdpHasIndependentOpcodesAndDoesNotInheritBothTcpRows()
+    {
+        var table = LoadInline("""
+            profile: kr-1256
+            opcodes:
+              - {value: 2, direction: c2s, name: gcpStartGPK, evidence: verified, connection: game}
+              - {value: 2, direction: c2s, name: rcpScene, evidence: verified, connection: relay}
+              - {value: 2, direction: c2s, name: upTrySendUdpToServer, evidence: verified, connection: udp}
+              - {value: 7, direction: c2s, name: gcpShared, evidence: verified, connection: both}
+            """);
+        var udp = table.ForConnection(OpcodeConnection.Udp);
+        var relay = table.ForConnection(OpcodeConnection.Relay);
+        Assert.Equal("gcpStartGPK(2)", table.Describe(PacketDirection.ClientToServer, 2));
+        Assert.Equal("rcpScene(2)", relay.Describe(PacketDirection.ClientToServer, 2));
+        Assert.Equal("upTrySendUdpToServer(2)", udp.Describe(PacketDirection.ClientToServer, 2));
+        Assert.False(udp.TryGet(PacketDirection.ClientToServer, 7, out _));
+        Assert.Null(table.Find(PacketDirection.ClientToServer, "upTrySendUdpToServer"));
+        Assert.Null(relay.Find(PacketDirection.ClientToServer, "upTrySendUdpToServer"));
+        Assert.Same(udp, relay.ForConnection(OpcodeConnection.Udp));
+        Assert.Same(relay, udp.ForConnection(OpcodeConnection.Relay));
+        Assert.Same(table, udp.ForConnection(OpcodeConnection.Game));
+        var registry = new Registry(table);
+        Assert.Same(udp, registry.ForProtocol("kr-1256/udp"));
+        Assert.True(registry.TryForProtocol("kr-1256/udp", out var resolved));
+        Assert.Same(udp, resolved);
+    }
+
+    [Fact]
     public void DuplicateNameInOneScopeFails()
     {
         Assert.Throws<ConfigException>(() => LoadInline("""

@@ -1,0 +1,9 @@
+# Optional admission layer; repository write fencing must precede shared production activation.
+# Mount cluster-account-store.patch.yaml first. Lobby rows must opt in explicitly with
+# require_account_ownership: true and duplicate_login: reject_new.
+- insert:
+    - id: cluster-account-sessions
+      plugin: cluster.account-sessions
+      config:
+        verification_seconds: 2
+        verification_concurrency: 4

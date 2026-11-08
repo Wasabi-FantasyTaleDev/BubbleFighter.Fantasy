@@ -20,6 +20,9 @@ public sealed class PvePointsMountTests
     [InlineData("cn-324", true, false)]
     [InlineData("id-400", true, false)]
     [InlineData("id-1809", true, false)]
+    [InlineData("cn-406", false, false)]
+    [InlineData("cn-705", false, false)]
+    [InlineData("cn-706", false, false)]
     [InlineData("kr-812", false, true)]
     [InlineData("id-400", true, true)]
     public async Task PointRequestsAndRepliesFollowNativeLiveStatePolicy(string build, bool ranks, bool remap)
@@ -78,10 +81,49 @@ public sealed class PvePointsMountTests
         Assert.Empty(fixture.Services.GetAll<IInboundMessageBinding<RoundPvePangReported>>());
     }
 
+    /// <summary>Modern live score deltas do not install result-rank vectors or duplicate their kill counters at initialization.</summary>
+    [Theory]
+    [InlineData("kr-1256")]
+    [InlineData("cn-774")]
+    [InlineData("tw-454")]
+    public async Task ModernUnitReportsAndPointDeltasUseTheSharedBindingAndUnload(string build)
+    {
+        var profile = new ClientProfile(build, build[..2], int.Parse(build[3..]), 0, 0, build);
+        var root = Directory.GetParent(TestBuilds.PacketsDirectory())!.FullName;
+        var table = OpcodeTableLoader.Load(Path.Combine(root, "profiles", build, "opcodes.yaml"), profile)
+            .ForConnection(OpcodeConnection.Game);
+        using var fixture = new MatchMessagesMountTests.Fixture(table);
+        var protocol = build + "/game";
+        var context = fixture.Context(build, protocol, "dialect.rooms");
+        var session = new MatchMessagesMountTests.Session(profile);
+        try
+        {
+            new PvePointsBinding(protocol, table, TestBuilds.All.Tables, build).Mount(context, fixture.Messages);
+            async Task Request(byte[] body) => await fixture.Packets.DispatchAsync(protocol, session,
+                new(table.C2S("gcpPvePangUnit"), body), default);
+            await Request(Convert.FromHexString("0F000000"));
+            Assert.Equal(new RoundPvePangReported(15), Assert.Single(fixture.Messages.Received));
+            await Assert.ThrowsAsync<PacketFormatException>(() => Request(new byte[3]));
+            await Assert.ThrowsAsync<PacketFormatException>(() => Request(new byte[8]));
+            fixture.Messages.HasHandler = false;
+            await Assert.ThrowsAsync<InvalidOperationException>(() => Request(new byte[4]));
+            var sender = Assert.Single(fixture.Services.GetAll<IMessageSender<RoundPvePointsChanged>>());
+            await sender.SendAsync(session, new(1, 0, [new(1, 0, 1)]), default);
+            Assert.Empty(session.Sent);
+            await sender.SendAsync(session, new(1, 11, [new(1, 11, 1)]), default);
+            Assert.Equal(table.S2C("gspNotifyGamePoint"), Assert.Single(session.Sent));
+            Assert.Equal("01000000000000000B000000", Convert.ToHexString(Assert.Single(session.Bodies)));
+            Assert.False(TestBuilds.All.Tables.CapabilityOf(build, "pve_rank_updates"));
+        }
+        finally { await context.UnwindAsync(); }
+        Assert.Empty(fixture.Packets.Handlers);
+        Assert.Empty(fixture.Services.GetAll<IMessageSender<RoundPvePointsChanged>>());
+        Assert.Empty(fixture.Services.GetAll<IInboundMessageBinding<RoundPvePangReported>>());
+    }
+
     /// <summary>Refuses unreviewed native support before publishing a route or service.</summary>
     [Theory]
     [InlineData("cn-279")]
-    [InlineData("cn-706")]
     public void UnreviewedPointSupportCannotBeEnabledByAConfigFlag(string build)
     {
         var profile = new ClientProfile(build, build[..2], int.Parse(build[3..]), 0, 0, build);

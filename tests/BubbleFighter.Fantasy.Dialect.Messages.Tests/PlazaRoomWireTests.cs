@@ -66,17 +66,17 @@ public sealed class PlazaRoomWireTests
         BitConverter.TryWriteBytes(body.AsSpan(0), 1);
         BitConverter.TryWriteBytes(body.AsSpan(4), 0);
         BitConverter.TryWriteBytes(body.AsSpan(8), 0);
-        var (a, b, c) = PlazaRoomWire.ReadReadyStatus(TestBuilds.Packets, "kr-812", body);
-        Assert.True(a);
-        Assert.False(b);
-        Assert.False(c);
+        var request = RoomRequests.ReadReady(TestBuilds.Packets, "kr-812", body);
+        Assert.True(request.Ready);
+        Assert.False(request.InShop);
+        Assert.False(request.InInventory);
     }
 
     [Fact]
     public void ReadyStatusRejectsWrongLength()
     {
-        Assert.Throws<PacketFormatException>(() => PlazaRoomWire.ReadReadyStatus(TestBuilds.Packets, "kr-812", new byte[8]));
-        Assert.Throws<PacketFormatException>(() => PlazaRoomWire.ReadReadyStatus(TestBuilds.Packets, "kr-812", new byte[16]));
+        Assert.Throws<PacketFormatException>(() => RoomRequests.ReadReady(TestBuilds.Packets, "kr-812", new byte[8]));
+        Assert.Throws<PacketFormatException>(() => RoomRequests.ReadReady(TestBuilds.Packets, "kr-812", new byte[16]));
     }
 
     [Fact]

@@ -9,7 +9,7 @@ namespace BubbleFighter.Fantasy.Persistence.Sqlite;
 /// writes mutate the whole snapshot under one transaction, keeping wallet changes serialized with
 /// purchases by construction.
 /// </summary>
-internal sealed partial class SqliteRepositories : IFighterRepository, IPlayerWalletRepository, IPlayerProgressRepository
+internal sealed partial class SqliteRepositories : IFighterRepository, IPlayerWalletRepository, IPlayerBattleRecordsRepository
 {
     public ValueTask<IReadOnlyList<FighterRecord>> ListByUserNumAsync(long userNum, CancellationToken ct) =>
         new(database.Read<IReadOnlyList<FighterRecord>>(db => db.State(userNum)?.Fighters.OrderBy(row => row.Slot).ToArray() ?? [], ct));
@@ -28,6 +28,22 @@ internal sealed partial class SqliteRepositories : IFighterRepository, IPlayerWa
     public ValueTask<PlayerWallet?> FindByUserNumAsync(long userNum, CancellationToken ct) =>
         new(database.Read(db => db.State(userNum)?.Wallet, ct));
 
+    public ValueTask<PlayerWallet> GetOrCreateAsync(PlayerWallet initialWallet, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(initialWallet);
+        if (initialWallet.UserNum <= 0)
+            throw new ArgumentOutOfRangeException(nameof(initialWallet), initialWallet.UserNum, "user_num must be a positive login id.");
+        if (initialWallet.Lucci < 0 || initialWallet.Cash < 0)
+            throw new ArgumentOutOfRangeException(nameof(initialWallet), "A wallet balance cannot be negative.");
+
+        return new(Mutate(initialWallet.UserNum, state =>
+        {
+            state.Wallet ??= initialWallet;
+            state.Progress ??= new(initialWallet.UserNum, state.Level, 0);
+            return state.Wallet;
+        }, ct));
+    }
+
     public ValueTask UpsertAsync(PlayerWallet record, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(record);
@@ -38,6 +54,16 @@ internal sealed partial class SqliteRepositories : IFighterRepository, IPlayerWa
             return true;
         }, ct);
         return ValueTask.CompletedTask;
+    }
+
+    public bool IsDurable => true;
+
+    public ValueTask<IReadOnlyList<PlayerBattleRecord>?> ListBattleRecordsAsync(long userNum, CancellationToken ct)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(userNum, 1);
+        return new(database.Read<IReadOnlyList<PlayerBattleRecord>?>(db =>
+            db.State(userNum)?.BattleRecords is { Count: > 0 } records
+                ? records.OrderBy(record => record.ModeId).ToArray() : null, ct));
     }
 
     public ValueTask<PlayerProgress?> FindAsync(long userNum, CancellationToken ct) =>
@@ -60,6 +86,15 @@ internal sealed partial class SqliteRepositories : IFighterRepository, IPlayerWa
                     new(command.UserNum, receipt.AfterLevel, receipt.AfterExp), receipt.LucciEarned, wallet.Lucci);
             var before = state.Progress ?? new PlayerProgress(command.UserNum, state.Level, 0);
             var after = command.AdvanceChecked(before);
+            if (command.BattleRecord is { } battle)
+            {
+                var previous = state.BattleRecords.SingleOrDefault(row => row.ModeId == battle.ModeId);
+                if (previous is null && state.BattleRecords.Count >= db.Options.MaxBattleModesPerPlayer)
+                    throw new InvalidOperationException("The player's battle mode capacity is full; no settlement was stored.");
+                var aggregate = (previous ?? new(battle.ModeId)).Add(battle);
+                if (previous is not null) state.BattleRecords.Remove(previous);
+                state.BattleRecords.Add(aggregate);
+            }
             state.Wallet = wallet with { Lucci = checked(wallet.Lucci + command.LucciEarned) };
             state.Progress = after;
             state.Level = after.Level;

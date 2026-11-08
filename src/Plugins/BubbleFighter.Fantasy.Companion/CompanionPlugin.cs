@@ -12,7 +12,7 @@ namespace BubbleFighter.Fantasy.Companion;
 /// bound to that game session, so server plugins can talk to the launcher of a player they already know.
 /// </summary>
 [Plugin("companion", Description = "Fantasy Tale Nirinsou Link: launch-bound WebSocket channel between launchers and server plugins.",
-    Provides = [typeof(ICompanionTicketIssuer), typeof(ICompanionHub)])]
+    Provides = [typeof(ICompanionTicketIssuer), typeof(ICompanionHub), typeof(ICompanionFederation)])]
 public sealed class CompanionPlugin : IPlugin
 {
     /// <inheritdoc />
@@ -20,15 +20,19 @@ public sealed class CompanionPlugin : IPlugin
     {
         var options = context.Config.Bind<CompanionOptions>();
         var launches = new CompanionLaunches(options, TimeProvider.System, context.Logger);
+        var federation = new CompanionFederation(launches, options, TimeProvider.System, context.Logger);
+        context.Effect(federation);
         var hub = new CompanionHub(launches);
-        var server = await CompanionServer.StartAsync(options, launches, hub, context.Logger, cancellationToken).ConfigureAwait(false);
+        var server = await CompanionServer.StartAsync(options, launches, hub, context.Logger, cancellationToken, federation).ConfigureAwait(false);
         context.Effect(() => server.DisposeAsync().AsTask().GetAwaiter().GetResult());
         var sweep = new Timer(_ => launches.Sweep(), null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
         context.Effect(sweep);
         context.Effect(context.Events.On<LauncherLaunchRedeemed>(launches.Bind));
         context.Effect(context.Events.On<ConnectionClosedEvent>(e => launches.End(e.Connection)));
-        context.Effect(context.Services.Register<ICompanionTicketIssuer>(launches));
+        context.Effect(context.Services.Register<ICompanionTicketIssuer>(federation));
+        context.Effect(context.Services.Register<ICompanionFederation>(federation));
         context.Effect(context.Services.Register<ICompanionHub>(hub));
+        await context.RunTaskAsync("companion-remote-health", federation.RunAsync, cancellationToken).ConfigureAwait(false);
         context.Logger.LogInformation("Nirinsou Link listening on {Address}; launchers connect to {PublicUrl}.", options.Listen, options.EffectivePublicUrl);
     }
 }

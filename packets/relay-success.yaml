@@ -5,6 +5,7 @@ structs:
   # cn-279 sub_701270, cn-406 sub_711050, id-400 sub_794200, id-1809 sub_7BA1A0.
   # This empty signal is not the labelled game-side rspRepJoinRelaySession object.
   # Six consumers construct report 12; CN2011 sends game-side success directly.
+  # cn-735 sub_A112C0, cn-738 sub_A3A470 and cn-742 sub_97D120 also start report 12 without a body read.
   RelayJoinAcceptedSignal: []
   # The kr-1256 reply is not empty on the wire: the server answers with one four-byte word, and
   # kr-1256 sub_9601E0 case 1 (block 0x960278) reads no stream field at all and starts the C2S 12
@@ -18,4 +19,5 @@ structs:
   # cn-406 sub_711C10, id-400 sub_7953D0 and id-1809 sub_7BB040.
   # These signals do not initialize seed tables or acknowledge scene departure.
   # kr-1256 sub_9601E0 case 13 (block 0x960880) also reads no stream field and only reports success.
+  # cn-735 sub_A112C0, cn-738 sub_A3A470 and cn-742 sub_97D120 relay 13 likewise send game 601.
   RelaySceneAcceptedSignal: []

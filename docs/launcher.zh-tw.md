@@ -251,12 +251,15 @@ hook 的預期工作方式：
 |---|---|---|
 | `require` | 無 | 模組安裝並啟用之前拒絕啟動，並提供安裝。 |
 | `disable` | 無 | 連線至本伺服器啟動時關閉該模組，不變更已儲存的選擇。版本本身要求的模組不能被關閉，此時拒絕啟動。 |
-| `recommend` | `sources` | 每個用戶端、每條規則推薦一次，從指定來源安裝（清單為空時允許任何已宣告的來源）。 |
+| `recommend` | `sources`，可選 `default_selected` | 每個用戶端、每條規則推薦一次，從指定來源安裝（清單為空時允許任何已宣告的來源）。初始預設不勾選，只有明確設為 true 時才勾選。 |
 | `min_version` | `version` | 已啟用的模組低於此版本時，啟動前必須更新。 |
 | `max_version` | `version` | 已啟用的模組高於此版本時，改為安裝來源中允許的最高版本；沒有可用版本時拒絕啟動。 |
 | `latest` | 無 | 啟動前將已啟用的模組更新至最新版本。 |
 
-版本採用嚴格的 SemVer。同一模組的兩條規則在版本範圍重疊且符合下列任一條件時衝突：類型相同；其中一條是 `disable`；一條是 `latest`、另一條是 `max_version`；或 `min_version` 高於 `max_version`（兩者相等即鎖定單一版本）。存在衝突、格式錯誤或未知類型的規則時，該列無法啟動。不認得某個規則類型的啟動器會拒絕連線至本伺服器啟動，並提示玩家更新啟動器。
+版本採用嚴格的 SemVer。同一模組的兩條規則在版本範圍重疊且符合下列任一條件時衝突：類型相同；其中一條是 `disable`；一條是 `require`、另一條是 `recommend`；一條是 `latest`、另一條是 `max_version`；或 `min_version` 高於 `max_version`（兩者相等即鎖定單一版本）。存在衝突、格式錯誤或未知類型的規則時，該列無法啟動。不認得某個規則類型的啟動器會拒絕連線至本伺服器啟動，並提示玩家更新啟動器。
+只有 `recommend` 接受 `default_selected`，包括明確指定 false；API 使用可選布林欄位 `defaultSelected`，未指定時省略。它控制推薦項目的初始勾選狀態，不代表必選要求；發布含此欄位的策略前，應先使用相容的啟動器。
+
+空的版本範圍與全部版本重疊。`require` 和 `recommend` 可以分別用於互不重疊的版本，`require` 也可以與 `latest` 用於同一版本。
 
 目錄與每個登入回應都攜帶最低啟動器版本，以及名為 `clientPolicy` 的策略（`version`、`sources`、`plugins`）；規則的 `version` 或 `sources` 只在其類型需要時出現。玩家登入時收到的策略用於啟動；目錄中的副本只在登入前顯示。此策略設定的是相容的啟動器，不證明用戶端完整性，也不表示遊戲登入會檢查已載入的模組。管理 API 請參閱 [WebUI 用戶端策略](plugins.zh-tw.md#client-plugin-policy)。
 
@@ -396,8 +399,9 @@ Fantasy Tale Nirinsou Link（簡稱 Nirinsou）是執行中的啟動器與其啟
 | --- | --- |
 | `companion` | 監聽器與啟動表。啟用後，每個 `/v1/launch` 回覆都帶有 `companion` 物件：`url`、一次性 `ticket`、`launchId` 和 `expiresAt`。 |
 | `companion.notices` | 啟動器彈窗（`ui.notification.show`）與 `popup <文字>` 管理指令，權限為 `game.management.popup`。 |
+| `companion.commands` | 透過共用玩家權限及聊天額度執行已登入遊戲指令。 |
 
-兩列在 core 套件中預設停用，由 `all` 設定啟用。`companion` 的選項：
+三列在 core 套件中預設停用，由 `all` 設定啟用。`companion` 的選項：
 
 | 選項 | 預設值 | 含義 |
 | --- | --- | --- |
@@ -423,6 +427,71 @@ Fantasy Tale Nirinsou Link（簡稱 Nirinsou）是執行中的啟動器與其啟
 payload；格式錯誤、重複、未協商或過快的訊息會以原因代碼關閉連線，啟動器再用新票據重新連線。
 
 監聽器使用明文 `ws`。透過網路存取時，請像啟動器 API 一樣放在 TLS 終止之後，並把 `public_url` 設為 `wss`。
+
+### 遊戲指令請求
+
+`companion.commands` 列提供 `game.command.execute` v1，在 core 中預設關閉，由 `all` 啟用；
+遊戲邏輯列也須啟用 `shared_chat_commands`。僅接受已綁定實際登入遊戲連線的啟動，身分完全取自該連線。
+指令沿用現有解析器、權限與兩個聊天入口共用的連線流量限制，要求玩家仍在遊戲房間內。
+透過此通道執行 `plaza` 時，還必須處於正在進行的普通對局；教學、訓練、等待、載入與結算階段均拒絕。
+房間邏輯在實際離場時再次檢查，一般聊天指令保留既有規則。
+
+協商能力後送出 `request`，外層使用新的 `id`、目前的 `epoch`、類型 `game.command.execute`、版本 `1`。
+payload 僅接受以下兩個字串，操作編號放在 payload 內：
+
+```json
+{"operation_id":"leave-1","command":"plaza"}
+```
+
+裸指令文字可包含其他已註冊指令與參數，不得指定帳號、工作階段或權限。`operation_id` 為 1–64 個 ASCII 字母、數字、底線或連字號。
+`response.payload` 恰有四個欄位：
+
+```json
+{"operation_id":"leave-1","status":"success","code":"success","message":""}
+```
+
+只有操作編號相符且 `status`、`code` 均為 `success` 才代表成功。`status: rejected` 的代碼為
+`not_found`、`invalid_arguments`、`denied`、`busy`、`cancelled`、`invalid_state`、`operation_conflict`。
+`busy` 包括共用聊天額度、執行並行數與結果儲存容量。`status: error`、`code: failed` 表示執行失敗，並不保證沒有產生效果。
+格式錯誤沿用通道的 `kind: error`、`code: invalid_request`；通道容量與已撤銷路由沿用 `busy`、`unavailable`。
+傳輸完成本身不代表指令成功。
+
+同一次啟動、同一個實際遊戲連線內，相同操作編號與文字只執行一次，並行重複請求等待相同結果，WebSocket 重新連線仍可重用。
+相同編號搭配不同文字回覆 `operation_conflict`。重新連線後須更換外層訊息編號與 epoch。
+`max_operations` 預設 4096，限制執行中與保留結果的總數，滿時拒絕新操作，不提前移除可重播結果。
+`retention_seconds` 預設 600 秒，由完成時計算，執行中操作不過期。過期、列或伺服器重新啟動、新建啟動後不再保證去重，
+不應對結果不確定的操作自動換編號重送。`max_input_characters` 預設 4096，也受共用指令限制。
+回覆包含共用指令結果文字，不額外送入遊戲聊天。
+
+### 唯讀遊戲狀態
+
+同一列還提供 `game.session.state` v1。協商後傳送 payload 為 `{}` 的 `request`，回覆包含
+`state`、`in_match`、`can_leave_match`、`is_tutorial` 與可為 null 的 `mode_id`，例如：
+
+```json
+{"state":"match","in_match":true,"can_leave_match":true,"is_tutorial":false,"mode_id":4}
+```
+
+狀態包括 `unknown`、`authenticated`、`main_menu`、`plaza`、`room_waiting`、`room_loading`、
+`room_countdown`、`match`、`result`、`tutorial`、`training`、`migrating`。`mode_id` 是目前客戶端的原生房間模式值，
+未經跨版本正規化。`is_tutorial` 取自實際教學准入狀態，不依人數或猜測的模式判斷。查詢僅讀取正確綁定的伺服器工作階段，
+不接受身分參數、不讀取客戶端記憶體，也不變更遊戲狀態。未知、缺失、不一致或逾時的結果不能授權離場。
+快照不預留離場權限，執行指令時仍重新檢查房間成員與階段。
+
+### 首次登入其他節點
+
+在工作節點啟用 `cluster.ticket-client.companion`，並於簽發節點對應 peer 的 `companion_url` 填入工作節點的明確 HTTP(S) origin。
+兩端均須執行 `companion`。工作節點沿用票據金鑰與版本允許清單信任簽發節點。準備、續簽與狀態私有介面位於
+`/companion/internal/v1/`，傳輸保護要求與私有票據服務相同，金鑰保留於部署機密。
+
+工作節點兌換遊戲票據時，簽發節點先在該處準備相同啟動身分，再重新導向等待中的連線。Launcher 透過原授權 API 續簽，
+依新 grant 的 WebSocket URL 連線至工作節點。僅相符的工作節點遊戲工作階段可完成綁定；其他帳號、版本或另一受信簽發方
+不能代為續簽。工作節點的 `public_url` 必須可供 Launcher 存取，`{host}` 替換為已設定工作節點 origin 的主機名稱。
+
+`companion.max_remote_requests` 預設 16、`max_remote_authorities` 預設 8、`remote_timeout_seconds` 預設 3、
+`remote_probe_seconds` 預設 30、`remote_failure_seconds` 預設 120。確認結束的啟動會清除；暫時無法連線的啟動最多保留至失敗窗口結束。
+簽發節點的 `companion_timeout_milliseconds` 預設 1000，須短於完整票據請求期限。準備失敗時仍繼續遊戲認證，但不建立不實綁定。
+此路徑涵蓋首次選服登入；後續原生跨服房間移轉不會轉移綁定，需要另行接入移轉支援。
 
 ## 疑難排解
 
@@ -466,10 +535,10 @@ payload；格式錯誤、重複、未協商或過快的訊息會以原因代碼�
 `motd`、`icon_url`、`images`、`show_online_players`、`player_limit`、`maintenance`、
 `whitelist_enabled` 和 `roster_enabled` 設定。預設不限制准入及人數，公開名單預設開啟。
 工作階段服務不可用時人數為 null，`show_online_players: false` 時為 -1。只計算已驗證的
-遊戲玩家，按帳號去重，排除已關閉連線及已識別的對局連線。尚未接入持久化峰值儲存，因此不提供歷史最高人數。
+遊戲玩家，按帳號去重，排除已關閉連線及已識別的對局連線。設定統計群組後可提供持久化的觀測峰值，詳見下文。
 
 `GET /v1/players` 不需要 Bearer，回傳 `schema: 1`、`enabled`、`players` 和 `truncated`。
-每位玩家只有 `name` 和 `level`。`roster_enabled: false` 回傳空名單且不讀取工作階段登錄表；
+每位玩家包含 `name`、`level` 和 `buildId`。`roster_enabled: false` 回傳空名單且不讀取工作階段登錄表；
 名單開啟但登錄表不可用時回傳 HTTP 503 `player_state_unavailable`。
 `max_roster_players` 限制單次筆數，預設 1000，範圍 1–10000；`truncated: true` 表示
 實際線上玩家更多。人數與名單公開開關互相獨立。HTTP 模組讀取 `ISessionRegistry`，透過
@@ -508,3 +577,29 @@ payload；格式錯誤、重複、未協商或過快的訊息會以原因代碼�
 `launcher_languages` 將介面語言標籤對應到資源名稱；預設設定將 `zh-CN` 對應到 `zh-Hans`，
 將 `zh-TW` 對應到 `zh-Hant`，其他標籤直接比對資源名稱。目前沒有越南語字典，`vi` 使用部署預設語言。
 沒有啟動票據語言資訊的連線同樣使用部署預設語言。語言設定持續到連線關閉，並保留至首次建立角色完成。
+
+### 群服人數與觀測峰值 {#aggregate-presence}
+
+在 `launcher.http` 設定 `presence_group`，透過 `ILauncherPresenceDirectory` 讀取明確的統計群組；留空保留單服行為。`presentation.onlinePlayers` 是新鮮回報中去重後的帳號數，`playerLimit` 仍為本節點准入容量。目錄增加 `presenceGroup`、`presenceComplete` 和可選的 `peakOnlinePlayers`。節點離線、舊版未回報或資料庫身分不符時，回傳已知人數並標記 `presenceComplete: false`；此數為下界，不改用本機人數。
+
+`GET /v1/players` 每張 `{name, level}` 卡片增加 `buildId`，啟用名單的回應增加 `complete`。`truncated` 僅表示 `max_roster_players` 截斷；`complete: false` 另表示缺少回報或部分卡片未公開。僅取人數時不回傳卡片。關閉 `roster_enabled` 時不讀取本地登錄表或群服名單來源。帳號編號、登入名稱、節點金鑰和連線位址不進入公開卡片。
+
+在 `cluster.directory.presence_groups` 設定 `id`、不重複的實體 `nodes`、已驗證的 `persistent_domain_id` 和 `peak_state_path`。成員須屬同一宣告資料域。正式成員需明確列出；測試及獨立地區節點即使仍可 Automatic，也不因此納入統計。自動／手選別名不重複計數，同資料庫帳號跨版本及節點去重，遷移時優先採用非遷移中的登入擁有者。版本容量不作為歷史峰值相加。
+
+先升級目錄，再開啟 `cluster.node.report_launcher_presence`；預設關閉，舊心跳 JSON 不變。回報依賴本地 `launcher.http` 人數服務與持久化資料庫身分。Launcher 的 `max_presence_players` 與目錄的 `max_presence_players_per_node` 預設均為 4096；心跳本文限制仍有效，超限明確失敗，不靜默截斷。
+
+峰值為有效心跳或群組讀取中**觀測到的最大去重人數**，也包含部分涵蓋時已知人數的下界；不是連續時間精確最大值，不重建實作前歷史。僅增加時原子寫入有界且不含玩家資料的檢查點，重啟恢復。指紋包含群組、資料庫身分和排序後實體成員；成員變更須換路徑或明確離線重設。損壞或不符的檢查點阻止啟用，不清除歷史。請備份此檔；重設須先停止唯一目錄寫入者，封存／移除檔案再重啟。
+
+目錄本地提供 `ILauncherPresenceDirectory`。工作節點可掛載 `cluster.launcher-presence`，設定 `node_id`、`directory_url`、`access_key`、`group`，以現有節點認證讀取 `/v1/nodes/{node}/presence/{group}?roster=true|false`，僅群組成員可讀。用戶端限制併發、時限、回應位元組與人數；失敗對外為 HTTP 503 `player_state_unavailable`，不捏造零人數。私有接口及檢查點不作為公開名單或認證權威。
+
+未執行公開 API 的遊戲節點可掛載 `launcher.presence-local`，只提供私有人數來源，不改變票據簽發。其 `roster_enabled` 預設關閉，須明確開啟才分享卡片；`max_presence_players` 控制回報預算。本地來源只能掛載一個。
+
+
+```yaml
+# Part of cluster.directory.config; both nodes must already be configured in nodes.
+presence_groups:
+  - id: public
+    nodes: [primary, worker]
+    persistent_domain_id: "${BFF_CLUSTER_DATA_DOMAIN_ID}"
+    peak_state_path: data/presence-public.json
+```

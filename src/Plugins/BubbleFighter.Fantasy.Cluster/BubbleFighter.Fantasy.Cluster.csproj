@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Opt-in server directory, node leases and room discovery.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../BubbleFighter.Fantasy.Abstractions/BubbleFighter.Fantasy.Abstractions.csproj" />
+    <ProjectReference Include="../../BubbleFighter.Fantasy.Contracts/BubbleFighter.Fantasy.Contracts.csproj" />
+    <InternalsVisibleTo Include="BubbleFighter.Fantasy.Cluster.Tests" />
+    <InternalsVisibleTo Include="BubbleFighter.Fantasy.InGame.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>BubbleFighter.Fantasy.Lobby.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

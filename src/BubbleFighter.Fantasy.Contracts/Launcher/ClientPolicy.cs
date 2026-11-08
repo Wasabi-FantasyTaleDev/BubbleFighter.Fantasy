@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json.Serialization;
 
 namespace BubbleFighter.Fantasy.Contracts.Launcher;
 
@@ -38,7 +39,12 @@ public sealed record ClientPluginRules(string Id, string? Name, string? Descript
 /// <param name="Version">The version bound, for the version rule types only.</param>
 /// <param name="Sources">Source names to install from, for the recommendation type only; empty allows any declared source.</param>
 public sealed record ClientPolicyRule(string Id, string Type, IReadOnlyList<string> Builds, string? Version = null,
-    IReadOnlyList<string>? Sources = null);
+    IReadOnlyList<string>? Sources = null)
+{
+    /// <summary>Gets the initial recommendation check state; omission means unchecked and other rule types cannot specify it.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? DefaultSelected { get; init; }
+}
 
 /// <summary>Which optional field a rule type takes; the management interface builds its form from this.</summary>
 public enum ClientPolicyRuleField
@@ -90,7 +96,7 @@ public static class ClientPolicyRuleTypes
 
     /// <summary>Gets every known type, in the order the management interface lists them.</summary>
     public static IReadOnlyList<ClientPolicyRuleType> All { get; } =
-        [new Simple(Require, []), new Simple(Disable, [Require, Recommend, MinVersion, MaxVersion, Latest]),
+        [new Simple(Require, [Recommend]), new Simple(Disable, [Require, Recommend, MinVersion, MaxVersion, Latest]),
             new SourcesType(), new MinimumType(), new Simple(MaxVersion, [Latest], ClientPolicyRuleField.Version), new Simple(Latest, [MaxVersion])];
 
     /// <summary>Finds a type by name.</summary>
@@ -113,6 +119,7 @@ public static class ClientPolicyRuleTypes
     {
         public override string Name => Recommend;
         public override ClientPolicyRuleField Field => ClientPolicyRuleField.Sources;
+        public override IReadOnlyList<string> Conflicts => [Require];
     }
 
     // Only a minimum above the maximum conflicts; equal bounds pin one exact version.
@@ -204,7 +211,8 @@ public static class ClientPolicyRules
         var sourcesValid = type.Field == ClientPolicyRuleField.Sources
             ? rule.Sources is { } list && list.All(Name) && list.Distinct(StringComparer.Ordinal).Count() == list.Count
             : rule.Sources is null;
-        if (!versionValid || !sourcesValid) throw new ClientPolicyException("client_policy_invalid", plugin, rule.Id);
+        if (!versionValid || !sourcesValid || rule.DefaultSelected is not null && rule.Type != ClientPolicyRuleTypes.Recommend)
+            throw new ClientPolicyException("client_policy_invalid", plugin, rule.Id);
         if (rule.Sources?.FirstOrDefault(name => !sources.Contains(name)) is not null)
             throw new ClientPolicyException("client_policy_unknown_source", plugin, rule.Id);
     }

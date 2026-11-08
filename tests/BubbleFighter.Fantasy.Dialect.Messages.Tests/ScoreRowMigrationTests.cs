@@ -15,9 +15,9 @@ public sealed class ScoreRowMigrationTests
     [InlineData("cn-717", 4492, "4386775334E5872F21730EF4BCD472E1B3B71F9DD7A51CDB5AFAC1A84B7DFC1A", 4528, "86EBEA8A1D95681C6CA01BDDA9ED7F99B813F8D86530A68D734374123EE4B1EA")]
     [InlineData("id-400", 2252, "B0FA06DFD52E0002762A239A5C2FEDC1C38B717690A15447E211C2300900762C", 2288, "2E12B65799D9CF0BCCE440BBA5F21D5435D5E13B62336FEE206D534773DA88AC")]
     [InlineData("id-1809", 4276, "14D6141D0C7625B5407712BBA2A7482824A0BB3CD71E84047C88B1FEA9FEBA4C", 4312, "2F81DECFBDE09F52ACA274D046C6E11B7D2EA8DAAA946DEC0A37B3F554497229")]
-    [InlineData("cn-706", 3328, "89FE34E4C6874AC10610657291729A193BDAF0C6F528F6327721D3D24AF9892B", 3364, "43CDC1782B8602F835FCEAA3A6DAF47E056D178A6E4E2F3F8CAEF8477FEAD4AB")]
+    [InlineData("cn-706", 3328, "89FE34E4C6874AC10610657291729A193BDAF0C6F528F6327721D3D24AF9892B", 3364, "EF289B81598B430D2536212CF5F093E0C41470E9A0B290C6D5223473E633152B")]
     [InlineData("cn-324", 1996, "9256FC5195F0B07A09ABC0C535606F91F204DE281D0EFB3C946918D2F2246EC6", 2032, "FF3FD9205DB8F6A5F050BA6A0F86E224F4548D4B3F6D9295015450DB30321622")]
-    [InlineData("cn-279", 1408, "B89665D58E69B4E326A9F8948E81CC19D2D8F7536DB8251C347051C0E4FBC0FB", 1422, "57FBD7AD555E72442496DFFFD1266E76A33505C5B161BC5C6D18A9110DC73062")]
+    [InlineData("cn-279", 1408, "B89665D58E69B4E326A9F8948E81CC19D2D8F7536DB8251C347051C0E4FBC0FB", 1422, "A9B9A82E9EB5CAEA523B5418236D9AE7D35F8D258BB73D07BE411ABE244C4FC2")]
     public void FullBodiesPinVacantAndRewardedRows(string build, int vacantLength, string vacantHash,
         int occupiedLength, string occupiedHash)
     {
@@ -33,9 +33,20 @@ public sealed class ScoreRowMigrationTests
         AssertBody(vacant, vacantLength, vacantHash);
         AssertBody(occupied, occupiedLength, occupiedHash);
 
+        // cn-279 sub_888D80 and cn-706 sub_987280 consume the newly mapped award word.
+        // With no award, the complete occupied body must retain its earlier byte pin.
+        var noAwardHash = build switch
+        {
+            "cn-279" => "57FBD7AD555E72442496DFFFD1266E76A33505C5B161BC5C6D18A9110DC73062",
+            "cn-706" => "43CDC1782B8602F835FCEAA3A6DAF47E056D178A6E4E2F3F8CAEF8477FEAD4AB",
+            _ => null,
+        };
+        if (noAwardHash is not null)
+            AssertBody(vacant with { Rows = [row with { AwardDisplayId = 0 }] }, occupiedLength, noAwardHash);
+
         void AssertBody(RoundScoreboard message, int length, string hash)
         {
-            var body = PlayRoomCodec.WriteScoreboard(TestBuilds.Packets, build, message);
+            var body = RoundResultWire.WriteScoreboard(TestBuilds.Packets, build, message);
             Assert.Equal(length, body.Length);
             Assert.Equal(hash, Convert.ToHexString(SHA256.HashData(body)));
         }
@@ -44,7 +55,7 @@ public sealed class ScoreRowMigrationTests
     public void Cn2015HeaderPlacesWinnerAndFlagImmediatelyAfterTeamCount()
     {
         // cn-717 sub_4195B0: count, winner, bool, 17 four-word team rows, 16 player rows.
-        var body = PlayRoomCodec.WriteScoreboard(TestBuilds.Packets, "cn-717",
+        var body = RoundResultWire.WriteScoreboard(TestBuilds.Packets, "cn-717",
             new RoundScoreboard(0, 2, [11, 1], []));
         Assert.Equal(17, BitConverter.ToInt32(body));
         Assert.Equal(2, BitConverter.ToInt32(body, 4));
@@ -65,7 +76,7 @@ public sealed class ScoreRowMigrationTests
     public void NativeFixedRowsAndTailsEndExactlyAtTheBodyBoundary(string build, int seats, int rowBytes, int tailWords)
     {
         // id-400 sub_781180, id-1809 sub_415730 and cn-706 sub_786E90 use these fixed loops.
-        var body = PlayRoomCodec.WriteScoreboard(TestBuilds.Packets, build,
+        var body = RoundResultWire.WriteScoreboard(TestBuilds.Packets, build,
             new RoundScoreboard(0, 2, [11, 1], []));
         const int rowStart = 20 + 17 * 16;
         Assert.Equal(2, BitConverter.ToInt32(body, 12));
@@ -93,7 +104,7 @@ public sealed class ScoreRowMigrationTests
         // screen leaves a row without it out (id-400 sub_6DE480). In the written row the flag follows slot,
         // unknown_4, the nickname, 24 words and the five experience/Lucci words.
         var row = new RoundScoreboardRow(0, "Fighter", 1, 12, new RoundSeatStats(0, 0, 0, 0, 0), null);
-        var body = PlayRoomCodec.WriteScoreboard(TestBuilds.Packets, build, new RoundScoreboard(0, 0, [0, 0], [row]));
+        var body = RoundResultWire.WriteScoreboard(TestBuilds.Packets, build, new RoundScoreboard(0, 0, [0, 0], [row]));
         const int rowStart = 20 + 17 * 16;
         var flag = rowStart +4 + 4 + (4 + 2 * "Fighter".Length) + 24 * 4 + 5 * 4;
         Assert.Equal(1, body[flag]);
@@ -102,10 +113,10 @@ public sealed class ScoreRowMigrationTests
     [Fact]
     public void Id2014VacantScoreboardSharesTheNativeInitialBlockDefaults()
     {
-        var body = PlayRoomCodec.WriteScoreboard(TestBuilds.Packets, "id-400",
+        var body = RoundResultWire.WriteScoreboard(TestBuilds.Packets, "id-400",
             new RoundScoreboard(0, 0, [0, 0], []));
         Assert.Equal(PacketCodec.Write(TestBuilds.Packets, "id-400", "ScoreData",
-            PlayRoomCodec.ScoreboardValues(TestBuilds.Packets, "id-400", new RoundScoreboard(0, 0, [0, 0], []))), body);
+            RoundResultWire.ScoreboardValues(TestBuilds.Packets, "id-400", new RoundScoreboard(0, 0, [0, 0], []))), body);
         Assert.Equal(PlayValues.TimeOverEndBody.Scoreboard, TestBuilds.Of("id-400").Play.Score.TimeOverEnd);
         Assert.Equal(PlayValues.TimeOverEndBody.TeamTotals, TestBuilds.Of("cn-706").Play.Score.TimeOverEnd);
     }

@@ -85,6 +85,16 @@ internal sealed class RoomQuickMatcher(RoomRegistry registry, RoomFlow rooms, In
         }
     }
 
+    internal ValueTask HandleCancelAsync(ISession session, RoomMatchCancelled request, CancellationToken ct)
+    {
+        lock (_gate)
+        {
+            if (_pending.TryGetValue(session.Id, out var pending))
+                pending.Cancellation.Cancel();
+        }
+        return ValueTask.CompletedTask;
+    }
+
     internal void OnConnectionClosed(ConnectionClosedEvent closed)
     {
         lock (_gate)

@@ -15,12 +15,13 @@ internal sealed partial class RoundFlow
         if (_registry.TryGet(session.Id) is not { } room) return ValueTask.CompletedTask;
         lock (room.Gate)
         {
+            if (RespawnIsDisabled(room)) return ValueTask.CompletedTask;
             if (room.Phase != RoomPhase.Playing || !_options.PveRevivalModes.Contains(room.ModeId)
                 || room.FindByGame(session.Id) is not { } seat) return ValueTask.CompletedTask;
             // The native death input can precede its timed respawn report on the same connection.
-            if (!seat.AwaitingRespawn || seat.LastDeathActor is null)
+            if (!seat.Life.ServerTimedWait || seat.Life.DeathActor is null)
             {
-                seat.PveRevivalRequested = true;
+                seat.Life.RequestRevivalEarly();
                 return ValueTask.CompletedTask;
             }
         }
@@ -36,7 +37,8 @@ internal sealed partial class RoundFlow
             int ownedActor;
             lock (room.Gate)
             {
-                if (room.Phase != RoomPhase.Playing || room.FindByGame(session.Id) is not { AwaitingRespawn: true, InstantRevivalPending: false, LastDeathActor: { } deathActor } dead)
+                if (RespawnIsDisabled(room)) return;
+                if (room.Phase != RoomPhase.Playing || room.FindByGame(session.Id) is not { Life: { ServerTimedWait: true, RevivalOffered: false, DeathActor: { } deathActor } } dead)
                     return;
                 if (consumeItem ? _options.InstantRevivalItemId <= 0 : !_options.PveRevivalModes.Contains(room.ModeId))
                     return;
@@ -56,7 +58,8 @@ internal sealed partial class RoundFlow
                 }
                 _logger.LogInformation("Session {Session} consumed instant revival item {Item}; remaining={Count}.", session.Id, _options.InstantRevivalItemId, remaining);
             }
-            lock (room.Gate) seat.InstantRevivalPending = true;
+            // The offer completes through the client's spawn acceptance on the game connection, not a match link.
+            lock (room.Gate) seat.Life.Grant(link: null);
             if (_reviving.TryRemove(session.Id, out var wait)) wait.Shorten(_options.RespawnDelayMaxMs);
             await _spawnOffered!.SendAsync(session, new RoundSpawnOffered(ownedActor, seat.Slot), operationCt).ConfigureAwait(false);
         }, ct).ConfigureAwait(false);

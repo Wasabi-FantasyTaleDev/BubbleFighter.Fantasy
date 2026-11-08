@@ -9,7 +9,7 @@ namespace BubbleFighter.Fantasy.Dialect.Messages;
 
 /// <summary>Publishes native relay success signals after the shared lifecycle has validated a room lease.</summary>
 [Plugin("dialect.match-replies", Description = "Native legacy match success signals.",
-    Requires = [typeof(IOpcodeTableRegistry)], OptionalMany = [typeof(IOpcodeTable)],
+    Requires = [typeof(IOpcodeTableRegistry)], OptionalMany = [typeof(IOpcodeTable), typeof(IMatchUdpRelayDirectory), typeof(IUdpDatagramEndpoint)],
     ProvidesMany = [typeof(IMessageSender<MatchAuthenticationAccepted>)],
     ConditionalProvidesMany = [typeof(IMessageSender<MatchSceneAccepted>)])]
 public sealed class MatchRepliesPlugin : IPlugin
@@ -52,6 +52,34 @@ public sealed class MatchRepliesPlugin : IPlugin
         var acceptedOpcode = opcodes.S2C("rspRelayJoinAccepted_");
         ushort? settingsOpcode = nativeSequence ? opcodes.S2C("rspRelayHandshakeSettings_") : null;
         ushort? sceneOpcode = report || nativeSequence ? opcodes.S2C("rspRelaySceneAccepted_") : null;
+        if (options.UdpEnabled)
+        {
+            if (string.IsNullOrWhiteSpace(options.UdpProtocol) || options.UdpProtocol.Any(char.IsWhiteSpace))
+                throw new ConfigException("UDP relay requires an explicit datagram endpoint protocol without whitespace.");
+            if (!tables.CapabilityOf(build, "udp_relay_movement"))
+                throw new ConfigException($"UDP relay has not been audited for '{build}'.");
+            var probeBytes = PacketCodec.Write(tables, build, "UdpRelayProbeReply", new Dictionary<string, object?>()).Length;
+            if (probeBytes is not (4 or 8))
+                throw new ConfigException("Native UDP probe identities must contain four or eight bytes.");
+            PacketLayoutContract.RequireSignature(tables, build, "UdpRelayOffer", "UDP relay offer",
+                probeBytes == 4 ? "unknown_0:u16,unknown_2:u32" : "unknown_0:u16,unknown_2:u64");
+
+            var directories = context.Services.GetAll<IMatchUdpRelayDirectory>()
+                .Where(directory => directory.Protocol == options.Protocol).ToArray();
+            if (directories.Length != 1)
+                throw new ConfigException($"UDP relay protocol '{options.Protocol}' requires exactly one directory; found {directories.Length}.");
+            var endpoints = context.Services.GetAll<IUdpDatagramEndpoint>()
+                .Where(endpoint => endpoint.Protocol == options.UdpProtocol).ToArray();
+            if (endpoints.Length != 1)
+                throw new ConfigException($"UDP relay protocol '{options.UdpProtocol}' requires exactly one enabled endpoint; found {endpoints.Length}.");
+            _ = opcodes.S2C("rspUdpBypassInfo");
+            _ = opcodes.S2C("rspUdpBypassReady_");
+            var udpPort = options.UdpAdvertisePort == 0
+                ? checked((ushort)endpoints[0].LocalEndPoint.Port)
+                : checked((ushort)options.UdpAdvertisePort);
+            if (udpPort == 0)
+                throw new ConfigException("udp_advertise_port or the bound UDP listener port must be nonzero.");
+        }
         var accepted = PacketCodec.Write(tables, build, "RelayJoinAcceptedSignal", new Dictionary<string, object?>());
         var settings = nativeSequence
             ? PacketCodec.Write(tables, build, "RelayHandshakeSettings", new Dictionary<string, object?>())
@@ -103,6 +131,7 @@ public sealed class MatchRepliesPlugin : IPlugin
             }
             await SendAsync(session, sceneOpcode.Value,
                 PacketCodec.Write(tables, build, "RelaySceneAcceptedSignal", new Dictionary<string, object?>()), ct).ConfigureAwait(false);
+
         }
 
         private byte[] Seeds(string structure, int entity, params (string Name, object?[] Values)[] vectors)
@@ -133,4 +162,15 @@ public sealed class MatchRepliesOptions
     /// <summary>Gets or sets the directory containing the native relay success-signal tables.</summary>
     [Required]
     public string PacketsDirectory { get; set; } = "packets";
+
+    /// <summary>Gets or sets whether this relay dialect offers its audited UDP path to initialized match sessions.</summary>
+    public bool UdpEnabled { get; set; }
+
+    /// <summary>Gets or sets the datagram endpoint protocol that receives the advertised UDP traffic.</summary>
+    [StringLength(128)]
+    public string UdpProtocol { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the externally reachable UDP port, or zero to use the bound listener port.</summary>
+    [Range(0, 65535)]
+    public int UdpAdvertisePort { get; set; }
 }

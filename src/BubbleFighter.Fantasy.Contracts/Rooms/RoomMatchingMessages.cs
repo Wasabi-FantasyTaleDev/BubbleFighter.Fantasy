@@ -11,3 +11,7 @@ public sealed record RoomMatchRequested(int ModeId, bool DedicatedQueue, bool Re
 /// <summary>Displays the native matching search or failure response.</summary>
 /// <param name="Searching">Whether the server accepted a search rather than refusing it.</param>
 public sealed record RoomMatchNotified(bool Searching) : IMessage;
+
+/// <summary>Cancels the session's pending quick-match search, for the builds whose
+/// leave-matching request names no queue entry.</summary>
+public sealed record RoomMatchCancelled : IMessage;

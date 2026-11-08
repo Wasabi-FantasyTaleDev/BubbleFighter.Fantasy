@@ -1,0 +1,12 @@
+# Optional node reporter. Register the node and its private key at the directory first.
+# Configure HTTP or HTTPS explicitly for the operator-managed directory origin.
+- insert:
+    - id: cluster-node
+      plugin: cluster.node
+      config:
+        node_id: "${BFF_CLUSTER_NODE_ID}"
+        directory_url: "${BFF_CLUSTER_DIRECTORY_URL}"
+        heartbeat_key: "${BFF_CLUSTER_NODE_KEY}"
+        builds: [kr-1256]
+        heartbeat_seconds: 3
+        request_timeout_seconds: 2

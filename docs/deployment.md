@@ -1,7 +1,7 @@
 ---
 title: "Deployment"
 description: "Run the server reproducibly with release builds, Docker Compose, backups and rollback."
-updated: 2026-10-18
+updated: 2026-11-07
 ---
 
 This page is for running Bubble Fighter Fantasy for other people. It covers the release build, the Docker Compose setups in this repository, manual installation on Linux and Windows, persistent data and backups, logs, network security, and how to upgrade and roll back safely.
@@ -34,6 +34,29 @@ A deployment has four network and storage concerns:
 | MySQL | Reachable from the server only; never public. | `127.0.0.1:3306`, database `bf_game_db`. |
 
 Provision client data on local storage and mount or copy it read-only where possible. The server only reads it.
+
+## Optional shared pet equipment slot
+
+The `equipment` row's `pet_shared_slot` option defaults to `false`. Enabling it permits one worn pet, identified by function `10001` in that build's own `Config/ShopItem2.xml`. Wearing a second pet fails; remove the current pet before wearing another. The rule also checks the final target inside the inventory transaction, and normalizes historical multiple-pet selections when the equipment view is read. Ownership, quantities and unrelated flag bits are preserved.
+
+| Builds in the `all` profile | Pet slot opt-in |
+| --- | --- |
+| `kr-812`, `kr-1256`, `cn-406`, `cn-404`, `cn-408`, `cn-706`, `cn-717`, `id-400`, `id-1809`, `cn-774`, `tw-454` | Available with the build's client data and persisted equipment provider. |
+| `cn-279`, `cn-324` | Refused at activation: their current catalogs have no pet rows and no native pet selection path has been established. |
+
+For example, add this to `profiles/kr-1256/local.patch.yaml` to opt in on that build. A `replace` block replaces the entire row configuration, so retain any other deployment overrides. For another supported build, use its profile directory and copy its effective `protocol`, `client_profile` and `version_major` values.
+
+```yaml
+- replace:
+    id: equipment
+    config:
+      protocol: kr-1256/game
+      client_profile: kr-1256
+      version_major: 1256
+      pet_shared_slot: true
+```
+
+Keep `persist_worn_state: true` and the inventory-view provider enabled. Missing client data, an unsupported build or overlapping equipment groups causes an explicit error. This option covers owned-pet equipment and restoration from the inventory store. It does not implement feeding, growth, evolution or ability changes; those require persistent per-pet state and their own verified operations. Validate equip, refusal of a second pet, removal and login restoration with the intended native client before deploying the option.
 
 ## Build a release directory
 

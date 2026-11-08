@@ -1,0 +1,147 @@
+version: 1
+# The matching-board feed: the pre-switch pump family that fills DlgMatchingBoard's rows, the
+# waiting dialog's user list, and the match-waiting status line. The pump runs on every packet
+# before each build's opcode jump table (kr-1256 sub_8A0E60, cn-774 sub_A45E50, tw-454 sub_6213B0)
+# and consumes one contiguous S2C range: kr-1256 and cn-774 number it 173-178, tw-454 170-175
+# (the whole family shifted by three). cn-774 and tw-454 follow the kr-1256 tables through
+# builds.yaml; every field whose purpose is not displayed by a consumer stays unknown.
+structs:
+  # kr-1256 173 / cn-774 173 / tw-454 170. The pumps route it to the matching-denied popup
+  # (kr-1256 sub_8A2B10 builds it from the aMatchingDenied string); no document reactor runs.
+  MatchBoardDeny@kr-812: []
+  MatchBoardDeny@kr-1256:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u8
+      offset: 8
+    - deny_tail: 'optional<0x3A,MatchBoardDenyTail>'
+      offset: 9
+      default: 186
+    - unknown_10: u32
+      offset: 10
+  # The optional record after the 0x3A tag: one byte, two words and a counted string.
+  MatchBoardDenyTail:
+    - unknown_tail_byte: u8
+    - unknown_tail_word: u32
+    - unknown_tail_word2: u32
+    - unknown_tail_string: wstr
+  # kr-1256 174 / cn-774 174 / tw-454 171. Upserts one entry into the MatchingDocument's room map
+  # (kr-1256 sub_8A8300 / cn-774 sub_A4B4C0 / tw-454 sub_5E26D0) and runs the per-room row reactor
+  # (kr-1256 sub_622C80 / cn-774 sub_776830 / tw-454 sub_50C660). kr-1256 sub_8A0390 reads a second
+  # optional record through kr-1256 sub_10D5BE0 and kr-1256 sub_1119DB0 after the optional title.
+  MatchBoardRoomUpsert@kr-812: []
+  MatchBoardRoomUpsert@kr-1256:
+    - room: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - title: 'optional<0x3A,MatchBoardTitleTail>'
+      offset: 16
+      default: 186
+    - unknown_40: 'optional<0x3A,MatchBoardWordListTail>'
+      offset: 40
+      default: 186
+      except: [cn-774, tw-454]
+  MatchBoardTitleTail:
+    - title: wstr
+      offset: 17
+  # kr-1256 175 / cn-774 175 / tw-454 172. Updates the entry's counts and carries one trailing flag
+  # byte the consumers turn into a document state (kr-1256 sub_D91AE0 on the entry's notify object).
+  MatchBoardCountFlag@kr-812: []
+  MatchBoardCountFlag@kr-1256:
+    - room: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - unknown_16: u32
+      offset: 16
+    - unknown_20: u8
+      offset: 20
+  # kr-1256 176 / cn-774 176 / tw-454 173. Same stores without the flag; kr-1256 conditions a full
+  # board refresh on it, and tw-454 clears its matching-dialog enable byte.
+  MatchBoardCount@kr-812: []
+  MatchBoardCount@kr-1256:
+    - room: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - unknown_16: u32
+      offset: 16
+  # kr-1256 177 / cn-774 177 / tw-454 174. Same stores again; the consumers set their entry flag to
+  # one (kr-1256 sub_D91AE0(entry+184, 1)).
+  MatchBoardCountSet@kr-812: []
+  MatchBoardCountSet@kr-1256:
+    - room: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - unknown_16: u32
+      offset: 16
+  # kr-1256 178 / cn-774 178 / tw-454 175. The name batch: one map of entry keys to display names
+  # followed by the full board refresh (kr-1256 sub_622BF0 / cn-774 sub_776690 / tw-454 sub_50C4F0).
+  # cn-774 and tw-454 carry one map. kr-1256 sub_10DB250 appends a second map whose values use
+  # kr-1256 sub_10D5BE0: an optional word and counted word vector, not a string.
+  MatchBoardNames@kr-812: []
+  MatchBoardNames@cn-774:
+    - names: list<MatchBoardNameEntry>
+  MatchBoardNames@kr-1256:
+    - names: list<MatchBoardNameEntry>
+    # kr-1256 appends a second map of 0x3A-tagged optional strings after the first list.
+    - states: list<MatchBoardStateEntry>
+  MatchBoardNameEntry:
+    - key: u32
+      offset: 0
+    - name: wstr
+      offset: 4
+  MatchBoardStateEntry:
+    - key: u32
+      offset: 0
+    - state: 'optional<0x3A,MatchBoardWordListTail>'
+      offset: 4
+      default: 186
+  # kr-1256 sub_1119DB0 reads one word before kr-1256 sub_10C7280 reads a counted word vector.
+  MatchBoardWordListTail:
+    - unknown_0: u32
+      offset: 0
+    - unknown_4: list<u32>
+      offset: 4
+  # The waiting dialog's user list: kr-1256 118 / cn-774 118 / tw-454 116. The consumer copies the
+  # list into the RoomStage8vs8 wait-list object (kr-1256 sub_E7D7B0 into +0xC64, cn-774 sub_ED2DE0
+  # into +0xC08, tw-454 sub_E6E1F0 into +0xA7C); the element tails grow per build.
+  WaitUserList@kr-812: []
+  WaitUserList@kr-1256:
+    - users: list<WaitUserEntry>
+      offset: 4
+  WaitUserEntry@kr-812: []
+  WaitUserEntry@kr-1256:
+    - name: wstr
+    - unknown_tail: u32
+  WaitUserEntry@cn-774:
+    - name: wstr
+    - unknown_tail: u32
+    - unknown_tail_byte: u8
+  WaitUserEntry@tw-454:
+    - name: wstr
+    - unknown_tail: u32
+    - unknown_tail_byte: u8
+    - unknown_tail_byte2: u8
+  # The match-waiting status line: kr-1256 969 / cn-774 968 / tw-454 967, the same four-field body
+  # in all three. kr-1256 (kr-1256 sub_9C9A20) and cn-774 (cn-774 sub_BC5890) parse and discard it;
+  # tw-454 (tw-454 sub_AA3CA0 through tw-454 sub_5E7CA0) feeds it into its status-list object and
+  # toggles the matching dialog's enable byte.
+  MatchWaitingInfo@kr-812: []
+  MatchWaitingInfo@kr-1256:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: wstr
+    - unknown_16: u32

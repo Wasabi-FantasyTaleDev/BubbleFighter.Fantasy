@@ -3,6 +3,20 @@
 # listed; see profiles/opcode-policy.md. The generated research catalog for this build
 # lives at profiles/cn-706/opcode-catalog.yaml.
 opcodes:
+  - value: 32836
+    direction: c2s
+    connection: both
+    name: gppDead
+    name_source: label@cn-706
+    evidence: verified
+    source: "cn-706 sub_4C9270 stamps 32836 for Packet_gppDead; cn-706 sub_4BBD50 writes one actor word through cn-706 sub_9DB6D0"
+  - value: 32836
+    direction: s2c
+    connection: both
+    name: gppDead
+    name_source: label@cn-706
+    evidence: verified
+    source: "cn-706 native case 0x8044 calls cn-706 sub_4D7590; cn-706 sub_4BBB70 reads one actor word, then the consumer resolves the Character and raises event 102"
   - value: 508
     direction: c2s
     connection: game
@@ -245,8 +259,7 @@ opcodes:
     name: rcpReqRegisterPeer
     name_source: label@cn-706
     evidence: verified
-    source: "sender sub_799530 on the relay connection, opcode setter sub_AA5AD0(8)"
-    notes: "the same number is auto-labelled gppWanderLean in the sender catalog; the packet's own vtable proves it is this relay packet"
+    source: "cn-706 sub_799530 stamps relay8 with peer identity after more than320 unacknowledged movements"
   - value: 11
     direction: c2s
     connection: relay
@@ -332,16 +345,25 @@ opcodes:
     source: "Packet_gcpReportBadProgram class and opcode setter sub_AA5AD0 in sender sub_4E7080 (cn-706)"
   - value: 23
     direction: c2s
+    connection: game
     name: gcpReqCenterUserCnt
     name_source: label@cn-706
-    evidence: inferred
-    source: "Packet_gcpReqCenterUserCnt class and opcode setter sub_AA5AD0 in sender sub_4BE720 (cn-706)"
+    evidence: verified
+    source: "cn-706 sub_7CC030 selects Packet_gcpReqCenterUserCnt and stamps 23; the native writer has no body"
   - value: 26
     direction: c2s
+    connection: game
+    name: Unknown26
+    name_source: none
+    evidence: unverified
+    source: "cn-706 sub_452C60 emits game 26 from a separate lobby event; its purpose is not established. The map contact request is game 948 in cn-706 sub_4E2AF0."
+  - value: 948
+    direction: c2s
+    connection: game
     name: gcpPortalMove
     name_source: label@cn-706
-    evidence: inferred
-    source: "Packet_gcpPortalMove class and opcode setter sub_AA5AD0 in sender sub_452C60 (cn-706)"
+    evidence: verified
+    source: "cn-706 sub_5350D0 -> sub_4E2AF0 builds Packet_gcpPortalMove and stamps 948; reader cn-706 sub_4BA1F0 reads three position words and one region u16; packets/portal.yaml"
   - value: 101
     direction: c2s
     name: gcpRepUserPoll
@@ -420,6 +442,13 @@ opcodes:
     name_source: label@cn-706
     evidence: inferred
     source: "Packet_gcpReqChangePartyLeader class and opcode setter sub_AA5AD0 in sender sub_8B24B0 (cn-706)"
+  - value: 304
+    direction: c2s
+    name: gcpSendPartyChatMsg
+    name_source: label@cn-706
+    evidence: verified
+    source: "cn-706 sub_8B29D0 stamps 304 on Packet_gcpSendPartyChatMsg; reader cn-706 sub_567230"
+    notes: "Chat box line outside a room: one string. The client draws nothing until S2C gspReceivePartyChatMsg answers."
   - value: 305
     direction: c2s
     name: gcpReqPartyRecruiting
@@ -470,16 +499,18 @@ opcodes:
     source: "Packet_gcpRepPingUser class and opcode setter sub_AA5AD0 in sender sub_796C60 (cn-706)"
   - value: 519
     direction: c2s
+    connection: game
     name: gcpReqSelectAward
     name_source: label@cn-706
-    evidence: inferred
-    source: "Packet_gcpReqSelectAward class and opcode setter sub_AA5AD0 in sender sub_987160 (cn-706)"
+    evidence: verified
+    source: "cn-706 sub_987160 sends card and local seat; cn-706 sub_733050 reads two u32"
   - value: 607
     direction: c2s
+    connection: game
     name: gcpReportTableSetHolePunchingEnd
     name_source: label@cn-706
-    evidence: inferred
-    source: "Packet_gcpReportTableSetHolePunchingEnd class and opcode setter sub_AA5AD0 in sender sub_79A060 (cn-706)"
+    evidence: verified
+    source: "cn-706 sub_79A060 stamps607 with empty body"
   - value: 701
     direction: c2s
     name: gcpGameReportMapLoadingComplete
@@ -496,14 +527,14 @@ opcodes:
     direction: c2s
     name: gcpEatItem
     name_source: label@cn-706
-    evidence: inferred
-    source: "Packet_gcpEatItem class and opcode setter sub_AA5AD0 in sender sub_4C5820 (cn-706)"
+    evidence: verified
+    source: "cn-706 sub_4C5820 stamps 707 with object reference and kind; reader cn-706 sub_733050 reads two u32"
   - value: 708
     direction: c2s
     name: gcpUseItem
     name_source: label@cn-706
-    evidence: inferred
-    source: "Packet_gcpUseItem class and opcode setter sub_AA5AD0 in sender sub_4C5EF0 (cn-706)"
+    evidence: verified
+    source: "cn-706 sub_4C5EF0 stamps 708 with an empty body; reader cn-706 sub_8A6530 returns without reading"
   - value: 709
     direction: c2s
     name: gcpReqAddObject
@@ -556,8 +587,8 @@ opcodes:
     direction: c2s
     name: gcpReqCreateItem
     name_source: label@cn-706
-    evidence: inferred
-    source: "Packet_gcpReqCreateItem class and opcode setter sub_AA5AD0 in sender sub_4CD250 (cn-706)"
+    evidence: verified
+    source: "cn-706 sub_4CD250 stamps 728; reader cn-706 sub_4B9FA0 reads six f32 followed by three u32"
   - value: 729
     direction: c2s
     name: gcpReqCreateWeaponObject
@@ -588,6 +619,12 @@ opcodes:
     name_source: label@cn-706
     evidence: inferred
     source: "Packet_gcpEatEventBox class and opcode setter sub_AA5AD0 in sender sub_4C5C20 (cn-706)"
+  - value: 733
+    direction: s2c
+    name: gspGameShowResult_
+    name_source: coined
+    evidence: verified
+    source: "cn-706 sub_7890E0 case 733 consumes no body and calls cn-706 sub_55DC20; that handler requires a nonzero word at result-state +896 before moving the result stage at +40 to 3"
   - value: 734
     direction: c2s
     name: gcpReqCreateEventBox
@@ -646,8 +683,8 @@ opcodes:
     direction: c2s
     name: gcpSwitchItemSlot
     name_source: label@cn-706
-    evidence: inferred
-    source: "Packet_gcpSwitchItemSlot class and opcode setter sub_AA5AD0 in sender sub_4DE540 (cn-706)"
+    evidence: verified
+    source: "cn-706 sub_4DE540 stamps 744 with an empty body; reader cn-706 sub_8A6530 returns without reading"
   - value: 745
     direction: c2s
     name: gcpBFRunnerOver
@@ -856,8 +893,8 @@ opcodes:
     direction: c2s
     name: gcpPveUseCountItem
     name_source: label@cn-706
-    evidence: inferred
-    source: "Packet_gcpPveUseCountItem class and opcode setter sub_AA5AD0 in sender sub_4C5F70 (cn-706)"
+    evidence: verified
+    source: "cn-706 sub_4C5F70 stamps 921; reader cn-706 sub_4BBB70 reads one u32; cn-706 sub_5BBCF0 sends a selected nonempty slot and cn-706 sub_77C930 draws three slots"
   - value: 923
     direction: c2s
     name: gcpPvePangUnit
@@ -886,8 +923,8 @@ opcodes:
     direction: c2s
     name: gcpMissionProcess
     name_source: label@cn-706
-    evidence: inferred
-    source: "Packet_gcpMissionProcess class and opcode setter sub_AA5AD0 in sender sub_4C6090 (cn-706)"
+    evidence: verified
+    source: "cn-706 sub_4C6090 stamps 927 and writes mission reference, NPC kind and zero; reader cn-706 sub_7A23F0 reads three u32; citizen/hostile reporters cn-706 sub_5AF010 and cn-706 sub_5B1A40"
   - value: 929
     direction: c2s
     name: gcpMakeUserTitle
@@ -986,16 +1023,18 @@ opcodes:
     source: "Packet_gcpReqNotifyChangeLevelIcon class and opcode setter sub_AA5AD0 in sender sub_66A9C0 (cn-706)"
   - value: 2010
     direction: c2s
+    connection: game
     name: gcpBombMissionOver
     name_source: label@cn-706
-    evidence: inferred
-    source: "Packet_gcpBombMissionOver class and opcode setter sub_AA5AD0 in sender sub_4E3720 (cn-706)"
+    evidence: verified
+    source: "cn-706 sub_4E3720 stamps 2010 and serializes the winner and two operator user numbers."
   - value: 2011
     direction: c2s
+    connection: game
     name: gcpBombState
     name_source: label@cn-706
-    evidence: inferred
-    source: "Packet_gcpBombState class and opcode setter sub_AA5AD0 in sender sub_4E31E0 (cn-706)"
+    evidence: verified
+    source: "cn-706 sub_4E31E0 stamps 2011 and serializes the operator, state and three coordinates."
   - value: 2013
     direction: c2s
     name: gcpRoomReqIntrudeGame
@@ -1016,10 +1055,11 @@ opcodes:
     source: "Packet_gcpGoMapItemSync class and opcode setter sub_AA5AD0 in sender sub_78F9A0 (cn-706)"
   - value: 2017
     direction: c2s
+    connection: game
     name: gcpDropCaptain
     name_source: label@cn-706
-    evidence: inferred
-    source: "Packet_gcpDropCaptain class and opcode setter sub_AA5AD0 in sender sub_431A60 (cn-706)"
+    evidence: verified
+    source: "cn-706 sub_424060 reports the local Captain death through the one-seat gcpDropCaptain builder."
   - value: 2018
     direction: c2s
     name: gcpReqClanInfo
@@ -1052,10 +1092,11 @@ opcodes:
     source: "cn-706 dispatcher sub_7C8720 case 5: Packet_gspReqHackShieldCheck"
   - value: 9
     direction: s2c
+    connection: game
     name: gspRepMoveChannel
     name_source: label@cn-706
-    evidence: inferred
-    source: "cn-706 dispatcher sub_7C8720 case 9: Packet_gspRepMoveChannel"
+    evidence: verified
+    source: "cn-706 sub_7C8720 case 9 calls cn-706 sub_7AC450; cn-706 reader sub_4BA810"
   - value: 11
     direction: s2c
     name: gspRepMoveInto
@@ -1082,10 +1123,11 @@ opcodes:
     source: "cn-706 dispatcher sub_7C8720 case 15: Packet_gspQueryBadProgram"
   - value: 18
     direction: s2c
+    connection: game
     name: gspRepUniquenessCheck
     name_source: label@cn-706
-    evidence: inferred
-    source: "cn-706 dispatcher sub_7C8720 case 18: Packet_gspRepUniquenessCheck"
+    evidence: verified
+    source: "cn-706 sub_7C8720 case 18 calls cn-706 sub_7A9D60; cn-706 reader sub_87EC00"
   - value: 20
     direction: s2c
     name: gspDisconnectFromRestriction
@@ -1600,8 +1642,8 @@ opcodes:
     direction: s2c
     name: gspPortalMove
     name_source: label@cn-706
-    evidence: inferred
-    source: "cn-706 dispatcher sub_7C8720 case 958: Packet_gspPortalMove"
+    evidence: verified
+    source: "cn-706 dispatcher sub_7C8720 case 958 -> cn-706 sub_7C6B60 applies map-kind spring/portal movement; Packet_gspPortalMove reader cn-706 sub_7A2580 reads word, region u16, seat word; packets/portal.yaml"
   - value: 959
     direction: s2c
     name: gspNotifyMsg
@@ -1784,12 +1826,12 @@ opcodes:
     name_source: mirrored
     evidence: inferred
     source: "Packet_gspRoomLeaveSlot class exists in cn-706; kr-812 assigns it 511, and the named neighbours 307 and 603 match kr-812"
-  - value: 521
+  - value: 520
     direction: s2c
     name: gspRepAutoStart
-    name_source: mirrored
-    evidence: inferred
-    source: "Packet_gspRepAutoStart class exists in cn-706; kr-812 assigns it 521, and the named neighbours 307 and 603 match kr-812"
+    name_source: label@cn-706
+    evidence: verified
+    source: "cn-706 sub_576ED0 checks opcode 520; cn-706 sub_576F00 reads Packet_gspRepAutoStart and applies the automatic-start state."
   - value: 701
     direction: s2c
     name: gspGameMapLoadingComplete
@@ -1802,6 +1844,12 @@ opcodes:
     name_source: mirrored
     evidence: inferred
     source: "Packet_gspGameEverybodyLoadingComplete class exists in cn-706; kr-812 assigns it 702, and the named neighbours 603 and 800 match kr-812"
+  - value: 702
+    direction: c2s
+    name: gcpGameReportMapData
+    name_source: label@cn-706
+    evidence: verified
+    source: "cn-706 sender sub_4C4300 builds Packet_gcpGameReportMapData and stamps 702 at its end; the supply surface routes the map report through it (packets/map-supplies.yaml)"
   - value: 703
     direction: s2c
     name: gspGameCountDown
@@ -1858,6 +1906,13 @@ opcodes:
     name_source: label@cn-706
     evidence: inferred
     source: "Packet_gcpReqLeaveSession is the only class constructed before the calls of the stamping helper sub_63A5C0 (cn-706)"
+  - value: 501
+    direction: c2s
+    name: gcpRoomSendChatMsg
+    name_source: label@cn-706
+    evidence: verified
+    source: "cn-706 sub_7CC0A0 stamps 501 on Packet_gcpRoomSendChatMsg; reader cn-706 sub_8AE2D0"
+    notes: "Waiting-room chat box line: bool32 team-only flag, then the text. The client draws nothing until S2C gspRoomReceiveChatMsg answers."
   - value: 502
     direction: c2s
     name: gcpRoomSendChatModuleMsg
@@ -1884,16 +1939,17 @@ opcodes:
     source: "Packet_gcpRoomSendAmpMsg is the only class constructed before the calls of the stamping helper sub_7CC110 (cn-706)"
   - value: 603
     direction: c2s
+    connection: game
     name: gcpReportHolePunchingEnd
     name_source: label@cn-706
-    evidence: inferred
-    source: "Packet_gcpReportHolePunchingEnd is the only class constructed before the calls of the stamping helper sub_799AF0 (cn-706)"
+    evidence: verified
+    source: "cn-706 sub_799AF0 stamps603 with occupied-seat and successful-peer counts"
   - value: 710
     direction: c2s
     name: gcpGameUpdateScore
     name_source: label@cn-706
-    evidence: inferred
-    source: "Packet_gcpGameUpdateScore is the only class constructed before the calls of the stamping helper sub_4E7520 (cn-706)"
+    evidence: verified
+    source: "cn-706 sub_4D8400 and cn-706 sub_4D80B0 construct Packet_gcpGameUpdateScore; cn-706 sub_4E7520 stamps 710; cn-706 sub_4B9630 writes the sixteen-byte body"
   - value: 807
     direction: c2s
     name: gcpReqInventoryThrowItem
@@ -3040,10 +3096,11 @@ opcodes:
     source: "Packet_gspRepPingUser class exists in cn-706; kr-812 assigns it 518, and the named neighbours 513 and 521 match kr-812"
   - value: 519
     direction: s2c
+    connection: game
     name: gspHordeModeRewardList
-    name_source: mirrored
-    evidence: inferred
-    source: "Packet_gspHordeModeRewardList class exists in cn-706; kr-812 assigns it 519, and the named neighbours 513 and 521 match kr-812"
+    name_source: label@cn-706
+    evidence: verified
+    source: "cn-706 sub_7890E0 case 519 calls cn-706 sub_7924B0; cn-706 sub_7A2420 reads a counted u32 vector"
   - value: 522
     direction: s2c
     name: gspSetSessionSigData
@@ -3064,10 +3121,11 @@ opcodes:
     source: "Packet_gspReceiveSessionInit class exists in cn-706; kr-812 assigns it 524, and the named neighbours 521 and 603 match kr-812"
   - value: 607
     direction: s2c
+    connection: game
     name: gspTryHolePunching
     name_source: mirrored
-    evidence: inferred
-    source: "Packet_gspTryHolePunching class exists in cn-706; kr-812 assigns it 607, and the named neighbours 603 and 701 match kr-812"
+    evidence: verified
+    source: "cn-706 sub_7890E0 case607 -> cn-706 sub_793880: u16 port, u32 identity, u8 unknown"
   - value: 609
     direction: s2c
     name: gspNotifyUdpToServerReceived
@@ -3076,46 +3134,47 @@ opcodes:
     source: "Packet_gspNotifyUdpToServerReceived class exists in cn-706; kr-812 assigns it 609, and the named neighbours 603 and 701 match kr-812"
   - value: 610
     direction: s2c
+    connection: game
     name: gspTableSetHolePunching
-    name_source: mirrored
-    evidence: inferred
-    source: "Packet_gspTableSetHolePunching class exists in cn-706; kr-812 assigns it 610, and the named neighbours 603 and 701 match kr-812"
+    name_source: label@cn-706
+    evidence: verified
+    source: "cn-706 sub_79A340/cn-706 sub_798520: slot, identity, counted local IPv4, local port, outer IPv4 and port"
   - value: 711
     direction: s2c
     name: gspGameCreateGameItem
     name_source: label@cn-706
-    evidence: inferred
-    source: "cn-706 play dispatcher sub_4C32D0 case 711 builds Packet_gspGameCreateGameItem"
+    evidence: verified
+    source: "cn-706 sub_4C32D0 case 711 calls cn-706 sub_4D23A0; reader cn-706 sub_4B91B0 reads the ten-word creation envelope"
   - value: 712
     direction: s2c
     name: gspItemEaten
     name_source: label@cn-706
-    evidence: inferred
-    source: "cn-706 play dispatcher sub_4C32D0 case 712 builds Packet_gspItemEaten"
+    evidence: verified
+    source: "cn-706 sub_4C32D0 case 712 calls cn-706 sub_4CE110; reader cn-706 sub_733050 reads seat and object reference"
   - value: 713
     direction: s2c
     name: gspAddItemToSlot
     name_source: label@cn-706
-    evidence: inferred
-    source: "cn-706 play dispatcher sub_4C32D0 case 713 builds Packet_gspAddItemToSlot"
+    evidence: verified
+    source: "cn-706 sub_4C32D0 case 713 calls cn-706 sub_4D0DE0; reader cn-706 sub_7A23F0 reads three u32; mode 16 increments the per-kind count"
   - value: 714
     direction: s2c
     name: gspItemUsed
     name_source: label@cn-706
-    evidence: inferred
-    source: "cn-706 play dispatcher sub_4C32D0 case 714 builds Packet_gspItemUsed"
+    evidence: verified
+    source: "cn-706 sub_4C32D0 case 714 calls cn-706 sub_4D0AE0; reader cn-706 sub_7A23F0 reads three u32"
   - value: 715
     direction: s2c
     name: gspPveItemUsed
     name_source: label@cn-706
-    evidence: inferred
-    source: "cn-706 play dispatcher sub_4C32D0 case 715 builds Packet_gspPveItemUsed"
+    evidence: verified
+    source: "cn-706 sub_4C32D0 case 715 calls cn-706 sub_4D0B70; reader cn-706 sub_7A23F0 reads seat, kind and unknown_12; assembly cn-706 0x4D0BD5 forwards kind to cn-706 sub_4DE040"
   - value: 729
     direction: s2c
     name: gspGameBroadcastPlayerScoreData
-    name_source: mirrored
-    evidence: inferred
-    source: "Packet_gspGameBroadcastPlayerScoreData class exists in cn-706; kr-812 assigns it 729, and the named neighbours 708 and 800 match kr-812"
+    name_source: label@cn-706
+    evidence: verified
+    source: "cn-706 sub_7890E0 case 0x2D9 routes to cn-706 sub_7914E0, which reads Packet_gspGameBroadcastPlayerScoreData through cn-706 sub_7889C0 and cn-706 sub_786E90; cn-706 sub_792F60 copies its native score object"
   - value: 730
     direction: s2c
     name: gspGameRespawnCharacter
@@ -3136,16 +3195,18 @@ opcodes:
     source: "Packet_gspGameTimeOverEnd class exists in cn-706; kr-812 assigns it 732, and the named neighbours 708 and 800 match kr-812"
   - value: 734
     direction: s2c
+    connection: game
     name: gspGameAwardDialog
     name_source: label@cn-706
-    evidence: inferred
-    source: "cn-706 session dispatcher sub_7890E0 case 734 builds Packet_gspGameAwardDialog"
+    evidence: verified
+    source: "cn-706 sub_7890E0 case 734 opens the native award dialog; cn-706 sub_8A6530 consumes an empty body"
   - value: 736
     direction: s2c
+    connection: game
     name: gspGameReturnAfterAward_
     name_source: coined
     evidence: verified
-    source: "cn-706 sub_7890E0 case 736 (0x2E0) calls cn-706 sub_791BF0 without reading a body; it raises event 177, which closes the award dialog"
+    source: "cn-706 sub_7890E0 case 736 calls cn-706 sub_791BF0 without a body, closes the award UI and restores the room stage"
   - value: 737
     direction: s2c
     name: gspGamePreCountDown
@@ -3178,22 +3239,24 @@ opcodes:
     source: "Packet_gspGamePrepareMoleEvent class exists in cn-706; kr-812 assigns it 742, and the named neighbours 708 and 800 match kr-812"
   - value: 743
     direction: s2c
+    connection: game
     name: gspRepAwardSelectSuccess
-    name_source: mirrored
-    evidence: inferred
-    source: "Packet_gspRepAwardSelectSuccess class exists in cn-706; kr-812 assigns it 743, and the named neighbours 708 and 800 match kr-812"
+    name_source: label@cn-706
+    evidence: verified
+    source: "cn-706 sub_7890E0 case 743 calls cn-706 sub_793C70; cn-706 sub_7A23F0 reads card, seat and optional second card"
   - value: 744
     direction: s2c
+    connection: game
     name: gspRepAwardSelectFail
     name_source: label@cn-706
-    evidence: inferred
-    source: "cn-706 session dispatcher sub_7890E0 case 744 builds Packet_gspRepAwardSelectFail"
+    evidence: verified
+    source: "cn-706 sub_7890E0 case 744; cn-706 sub_8A6530 reads an empty refusal"
   - value: 747
     direction: s2c
     name: gspSwitchItemSlot
     name_source: label@cn-706
-    evidence: inferred
-    source: "cn-706 play dispatcher sub_4C32D0 case 747 builds Packet_gspSwitchItemSlot"
+    evidence: verified
+    source: "cn-706 sub_4C32D0 case 747 calls cn-706 sub_4DE5C0; reader cn-706 sub_4B9F60 reads four u32"
   - value: 748
     direction: s2c
     name: gspGameItemSpec
@@ -3233,27 +3296,27 @@ opcodes:
   - value: 924
     direction: s2c
     name: gspMapMissionInfo
-    name_source: mirrored
-    evidence: inferred
-    source: "Packet_gspMapMissionInfo class exists in cn-706; kr-812 assigns it 924, and the named neighbours 923 and 933 match kr-812"
+    name_source: label@cn-706
+    evidence: verified
+    source: "cn-706 sub_7890E0 case 924 calls cn-706 sub_78B5F0; reader cn-706 sub_7886B0 delegates to cn-706 sub_796770; element cn-706 sub_72BDF0 reads six u32, counted wstr vector and bool32"
   - value: 925
     direction: s2c
     name: gspResMissionStart
-    name_source: mirrored
-    evidence: inferred
-    source: "Packet_gspResMissionStart class exists in cn-706; kr-812 assigns it 925, and the named neighbours 923 and 933 match kr-812"
+    name_source: label@cn-706
+    evidence: verified
+    source: "cn-706 sub_7890E0 case 925 calls cn-706 sub_78B890; reader cn-706 sub_4BBB70 reads one u32 mission index"
   - value: 926
     direction: s2c
     name: gspResMissionTimeOut
-    name_source: mirrored
-    evidence: inferred
-    source: "Packet_gspResMissionTimeOut class exists in cn-706; kr-812 assigns it 926, and the named neighbours 923 and 933 match kr-812"
+    name_source: label@cn-706
+    evidence: verified
+    source: "cn-706 sub_7890E0 case 926 calls cn-706 sub_78B9A0; reader cn-706 sub_4BBB70 reads one u32 mission index"
   - value: 927
     direction: s2c
     name: gspResMissionOK
-    name_source: mirrored
-    evidence: inferred
-    source: "Packet_gspResMissionOK class exists in cn-706; kr-812 assigns it 927, and the named neighbours 923 and 933 match kr-812"
+    name_source: label@cn-706
+    evidence: verified
+    source: "cn-706 sub_7890E0 case 927 calls cn-706 sub_78BAB0; reader cn-706 sub_733050 reads two u32; zero result advances the completed index"
   - value: 928
     direction: s2c
     name: gspNotifyGamePoint
@@ -3269,9 +3332,9 @@ opcodes:
   - value: 930
     direction: s2c
     name: gspPveItemInfo
-    name_source: mirrored
-    evidence: inferred
-    source: "Packet_gspPveItemInfo class exists in cn-706; kr-812 assigns it 930, and the named neighbours 923 and 933 match kr-812"
+    name_source: label@cn-706
+    evidence: verified
+    source: "cn-706 sub_7890E0 case 930 calls cn-706 sub_78BF10; reader cn-706 sub_7886D0 reads a count and three-u32 entries through cn-706 sub_7A23F0"
   - value: 931
     direction: s2c
     name: gspCompensationItemNoti
@@ -3323,3 +3386,162 @@ opcodes:
     name_source: label@cn-706
     evidence: inferred
     source: "Packet_gcpReqPresentDeleteReceive is constructed before the stamping call of cn-706 sub_8E9330 / sub_8EA8B0: removing a gift from the received list (id); layout in packets/present.yaml"
+  - value: 608
+    direction: s2c
+    connection: game
+    name: gspStopUdpDiscovery_
+    name_source: coined
+    evidence: verified
+    source: "cn-706 sub_7890E0 case608 clears discovery"
+  - value: 611
+    direction: s2c
+    connection: game
+    name: gspUdpPeerTableEnd_
+    name_source: coined
+    evidence: verified
+    source: "cn-706 sub_7890E0 case611 -> cn-706 sub_79A060 sends empty C2S607"
+  - value: 612
+    direction: s2c
+    connection: game
+    name: gspUdpPeerPunchStart_
+    name_source: coined
+    evidence: verified
+    source: "cn-706 sub_7890E0 case612 -> cn-706 sub_79A0F0 starts native UDP6/8"
+  - value: 613
+    direction: s2c
+    connection: game
+    name: gspUdpPeerPunchFinish_
+    name_source: coined
+    evidence: verified
+    source: "cn-706 sub_7890E0 case613 -> cn-706 sub_799AF0 finalizes peer attempts"
+  - value: 2
+    direction: c2s
+    connection: udp
+    name: upTrySendUdpToServer
+    name_source: mirrored
+    evidence: verified
+    source: "cn-706 sub_798A00 stamps UDP2 with identity, local IPv4 and local port"
+  - value: 9
+    direction: c2s
+    connection: relay
+    name: rcpReqUnRegisterPeer
+    name_source: label@cn-706
+    evidence: verified
+    source: "cn-706 sub_799AF0 stamps relay9 with a successfully punched peer identity"
+  - value: 32885
+    direction: c2s
+    connection: both
+    name: gppWanderLean
+    name_source: mirrored
+    evidence: verified
+    source: "cn-706 sub_799690 sends32885; cn-706 sub_79B000/cn-706 sub_4BAA90 consumes the15-byte body"
+  - value: 32922
+    direction: c2s
+    connection: both
+    name: gppWanderLeanOptimize
+    name_source: label@cn-706
+    evidence: verified
+    source: "cn-706 sub_799690 sends32922; cn-706 sub_79B260 consumes u32 actor, u16 tick and mask-selected packed movement"
+  - value: 32885
+    direction: s2c
+    connection: both
+    name: gppWanderLean
+    name_source: mirrored
+    evidence: verified
+    source: "cn-706 sub_799690 sends32885; cn-706 sub_79B000/cn-706 sub_4BAA90 consumes the15-byte body"
+  - value: 32922
+    direction: s2c
+    connection: both
+    name: gppWanderLeanOptimize
+    name_source: label@cn-706
+    evidence: verified
+    source: "cn-706 sub_799690 sends32922; cn-706 sub_79B260 consumes u32 actor, u16 tick and mask-selected packed movement"
+
+  - value: 12
+    direction: c2s
+    connection: relay
+    name: rcpReqReportHackCheckData
+    name_source: label@cn-706
+    evidence: verified
+    source: "cn-706 sub_79C8B0 case1 constructs the named report through cn-706 sub_79BEF0; cn-706 sub_79D850 stamps relay12; packets/relay-validation.yaml"
+
+  - value: 601
+    direction: s2c
+    connection: game
+    name: gspConnectToRelayServer
+    name_source: label@cn-706
+    evidence: verified
+    source: "cn-706 sub_7C8720 compares601, calls cn-706 sub_7AE3F0; cn-706 sub_7A1640 reads endpoint and key"
+
+  - value: 1
+    direction: s2c
+    connection: relay
+    name: rspRelayJoinAccepted_
+    name_source: coined
+    evidence: verified
+    source: "cn-706 sub_79C8B0 case1 accepts an empty join signal and sends the native scene validation report"
+
+  - value: 5
+    direction: s2c
+    connection: relay
+    name: rspSendDefSeedTable
+    name_source: label@cn-706
+    evidence: verified
+    source: "cn-706 sub_79C8B0 case 5 calls cn-706 sub_4BE150; Packet_rspSendDefSeedTable reader cn-706 sub_4BA380 reads actor and counted bytes, installed by cn-706 sub_50C9E0"
+
+  - value: 13
+    direction: s2c
+    connection: relay
+    name: rspRelaySceneAccepted_
+    name_source: coined
+    evidence: verified
+    source: "cn-706 sub_79C8B0 case13 reads no body and completes native scene admission"
+  - value: 16
+    direction: s2c
+    connection: game
+    name: gspRepCenterUserCnt
+    name_source: label@cn-706
+    evidence: verified
+    source: "cn-706 sub_7C8720 case 16 calls cn-706 sub_7A92C0; cn-706 reader sub_79FCF0"
+  - value: 10
+    direction: s2c
+    connection: game
+    name: gspDisconnectMovedUser
+    name_source: label@cn-706
+    evidence: verified
+    source: "cn-706 sub_7C8720 case 10 calls cn-706 sub_7ADED0; empty-body pending promotion closes the previous source"
+  - value: 24
+    direction: c2s
+    connection: game
+    name: gcpReqUniquenessCheck
+    name_source: label@cn-706
+    evidence: verified
+    source: "cn-706 sub_7A9F40 selects Packet_gcpReqUniquenessCheck and stamps 24; the native writer carries one user-number word"
+  - value: 972
+    direction: s2c
+    connection: game
+    name: gspBombState
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-706 sub_4C32D0 case 972 reads Packet_gspBombState and applies its state, timer, position and trailing flag."
+  - value: 973
+    direction: s2c
+    connection: game
+    name: gspObserver
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-706 sub_4C32D0 case 973 calls cn-706 sub_4E3290, which resolves the scene-object word for mode 19."
+  - value: 981
+    direction: s2c
+    connection: game
+    name: gspCreateCaptain
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-706 sub_7890E0 case 981 calls cn-706 sub_78AAA0, which reads one seat word and dispatches Captain event 309."
+  - value: 516
+    direction: c2s
+    connection: game
+    name: gcpRoomSendRecMsg
+    name_source: label@cn-706
+    evidence: verified
+    source: cn-706 sub_7CC1F0 stamps the native recruitment-text request; cn-706 sub_567230 reads one counted UTF-16 message

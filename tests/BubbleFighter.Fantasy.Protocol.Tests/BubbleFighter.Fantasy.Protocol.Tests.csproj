@@ -17,6 +17,10 @@
     <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Protocol\BubbleFighter.Fantasy.Protocol.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Dialect.Messages\BubbleFighter.Fantasy.Dialect.Messages.csproj" />
+    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Lobby\BubbleFighter.Fantasy.Lobby.csproj" />
+  </ItemGroup>
+  <ItemGroup>
     <Content Include="..\..\profiles\kr-1256\opcodes.yaml" Link="opcodes.yaml" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>

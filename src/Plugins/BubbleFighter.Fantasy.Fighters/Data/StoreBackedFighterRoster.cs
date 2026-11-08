@@ -6,10 +6,10 @@ namespace BubbleFighter.Fantasy.Fighters.Data;
 
 /// <summary>
 /// A roster whose unlocked set is the player's character bag
-/// (<see cref="IInventoryRepository"/>, S2C 802) and whose equipped id is the
-/// stored fighter slot (<see cref="IFighterRepository"/>). Buying a character
-/// item unlocks it because the bag is the same store the shop writes to, and
-/// the equipped id survives a restart because it lives in the fighters table.
+/// (<see cref="IInventoryRepository"/>, S2C 802) and whose equipped id uses the
+/// current build's <see cref="IEquipmentSelection"/> when available. Profiles without
+/// that service retain the stored fighter slot (<see cref="IFighterRepository"/>).
+/// Buying a character unlocks it through the same ownership store the shop writes to.
 /// A player with no stored fighter slot is seeded with the catalog default on
 /// first read, mirroring the lobby's starter-inventory seeding.
 /// </summary>
@@ -62,6 +62,12 @@ public sealed class StoreBackedFighterRoster(
         var unlocked = await ListUnlockedAsync(userNum, ct).ConfigureAwait(false);
         if (!unlocked.Contains(itemId))
             throw new InvalidOperationException($"User {userNum} has not unlocked item {itemId}.");
+        if (selection is not null)
+        {
+            if (await selection.ApplyAsync(userNum, itemId, true, ct).ConfigureAwait(false) is null)
+                throw new InvalidOperationException($"Character {itemId} cannot occupy the current build's equipment slot.");
+            return;
+        }
         var stored = await FindStoredAsync(userNum, ct).ConfigureAwait(false);
         if (stored is null)
         {
@@ -100,6 +106,7 @@ public sealed class StoreBackedFighterRoster(
             var bag = await selection.ReadAsync(userNum, ct).ConfigureAwait(false);
             var selected = bag.LastOrDefault(row => (row.Flags & 1) != 0 && catalog.Find(row.ItemId) is not null);
             if (selected is not null) return selected.ItemId;
+            throw new InvalidOperationException("The current build's equipment selection has no renderable character.");
         }
         var stored = await FindStoredAsync(userNum, ct).ConfigureAwait(false);
         if (stored is not null && stored.EquippedItemId is >= 300000 and <= 301999)

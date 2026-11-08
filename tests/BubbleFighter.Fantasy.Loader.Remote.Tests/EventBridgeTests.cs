@@ -18,7 +18,7 @@ public sealed class EventBridgeTests
     /// <summary>All execution paths preserve notification modes, exact integers, mixed middleware and bail semantics.</summary>
     [Theory]
     [InlineData("python", false)]
-    [InlineData("typescript", false)]
+    [SdkData("typescript", false)]
     [InlineData("go", false)]
     [InlineData("rust", false)]
     [InlineData("go", true)]
@@ -58,7 +58,7 @@ public sealed class EventBridgeTests
     /// <summary>A publisher in each SDK runs native listeners and an SDK listener, including its scoped terminal.</summary>
     [Theory]
     [InlineData("python", false)]
-    [InlineData("typescript", false)]
+    [SdkData("typescript", false)]
     [InlineData("go", false)]
     [InlineData("rust", false)]
     [InlineData("go", true)]
@@ -87,8 +87,8 @@ public sealed class EventBridgeTests
 
     /// <summary>Native service dependencies resolve identically when the provider and listener use different languages.</summary>
     [Theory]
-    [InlineData("python", "typescript")]
-    [InlineData("typescript", "go")]
+    [SdkData("python", "typescript")]
+    [SdkData("typescript", "go")]
     [InlineData("go", "rust")]
     [InlineData("rust", "python")]
     public async Task EventCallbackResolvesAServiceFromAnotherLanguage(string listener, string provider)
@@ -108,8 +108,8 @@ public sealed class EventBridgeTests
 
     /// <summary>Publishers and listeners in different SDK processes participate in one native event pipeline.</summary>
     [Theory]
-    [InlineData("python", "typescript")]
-    [InlineData("typescript", "go")]
+    [SdkData("python", "typescript")]
+    [SdkData("typescript", "go")]
     [InlineData("go", "rust")]
     [InlineData("rust", "python")]
     public async Task PublisherAndListenerCanUseDifferentLanguages(string publisher, string listener)
@@ -135,7 +135,7 @@ public sealed class EventBridgeTests
     /// <summary>SDK message middleware crosses the loader boundary, sends the intercepted session, and continues once.</summary>
     [Theory]
     [InlineData("python", false)]
-    [InlineData("typescript", false)]
+    [SdkData("typescript", false)]
     [InlineData("go", false)]
     [InlineData("rust", false)]
     [InlineData("go", true)]
@@ -160,7 +160,7 @@ public sealed class EventBridgeTests
     /// <summary>Self-removal preserves the running callback result and prevents another admission.</summary>
     [Theory]
     [InlineData("python", false)]
-    [InlineData("typescript", false)]
+    [SdkData("typescript", false)]
     [InlineData("go", false)]
     [InlineData("rust", false)]
     [InlineData("go", true)]

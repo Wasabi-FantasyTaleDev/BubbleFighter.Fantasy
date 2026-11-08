@@ -149,6 +149,56 @@ structs:
       also: [cn-706]
       except: [id-400, cn-324]
 
+  # cn-735 sub_4254D0 and cn-735 sub_4253E0 read/write this reordered header and the GameSetting at +136.
+  # cn-738 sub_429050 and cn-738 sub_428F60 move the bool to +116; cn-742 sub_42CA80 confirms that suffix.
+  # cn-735 sub_8332B0 copies +4 to session+12, which cn-735 sub_9F9FE0 changes to playing state4;
+  # cn-738 sub_A27250 and cn-742 sub_967130 independently set that same session state on round start.
+  SessionSetting@cn-735:
+    - room_id: u16
+      offset: 0
+    - session_state: u32
+      offset: 4
+    - title: wstr
+      offset: 8
+    - occupants: u16
+      offset: 36
+    - unknown_38: u16
+      offset: 38
+    - open_seats: u16
+      offset: 40
+    - has_password: bool
+      offset: 42
+    - master_nickname: wstr
+      offset: 44
+    - kind: u32
+      offset: 72
+    - game_setting: GameSetting
+      offset: 136
+    - unknown_76: u32
+      offset: 76
+      default: -1
+      menu: 0
+    - unknown_80: f64
+      offset: 80
+    - unknown_88: wstr
+      offset: 88
+    - unknown_116: u32
+      offset: 116
+      cn-738:
+        - unknown_116: bool
+          offset: 116
+    - unknown_120: u32
+      offset: 120
+    - unknown_124: u32
+      offset: 124
+    - unknown_128: u32
+      offset: 128
+    - unknown_132: bool
+      offset: 132
+      cn-738:
+        - unknown_132: u32
+          offset: 132
+
   # GameSetting: the mode, map and options of a room. Nested in SessionSetting at +80; cn-324 and cn-279
   # send a second, standalone copy in gspGotoRoom.
   # Readers: kr-812 sub_4188F0 (writer kr-812 sub_4185C0), id-400 sub_5DAE00 (writer id-400 sub_5DAB70),
@@ -231,6 +281,10 @@ structs:
       except: [cn-717]
     - unknown_252: u32
       offset: 252
+      # cn-717 sub_41A510 reads the index at +176 after the retained flags at +172.
+      cn-717:
+        - unknown_176: u32
+          offset: 176
     - unknown_256: wstr
       offset: 256
     - unknown_284: wstr
@@ -286,55 +340,100 @@ structs:
       offset: 476
       only: [cn-706, cn-404]
 
-  # cn-735 (also cn-738 and cn-742, which are based on it): the block starts with three u32 and three
-  # bools, then the four map strings, and flattens the nested block cn-735 sub_406590 as bool + empty
-  # pair list + bool + empty u32/wstr list (reader cn-735 sub_424D40, writer cn-735 sub_424B10).
-  # No field of this build's block has been given a meaning yet, so every name is its wire position.
+  # cn-735 sub_424D40, cn-738 sub_4288C0 and cn-742 sub_42C270 read this complete block.
+  # cn-735 sub_9EF7C0 copies it into GameSession+144; cn-735 sub_51AB80 reads +148 as the mode.
+  # cn-735 sub_406DC0, cn-735 sub_407680, cn-738 sub_406E10 and cn-738 sub_4077B0 read the option vectors;
+  # cn-742 sub_406FE0 delegates to cn-742 sub_4076B0 and cn-742 sub_407F50 for the same two vectors.
   GameSetting@cn-735:
-    - unknown_n0: u32
-    - unknown_n1: u32
-    - unknown_n2: u32
-    - unknown_n3: bool
-    - unknown_n4: bool
-    - unknown_n5: bool
-    - unknown_n6: u32
-    - unknown_n7: u32
-    - unknown_n8: u32
-    - unknown_n9: u32
-    - unknown_n10: u32
-    - unknown_n11: wstr
-    - unknown_n12: wstr
-    - unknown_n13: wstr
-    - unknown_n14: wstr
-    - unknown_n15: u32
-    - unknown_n16: wstr
-    - unknown_n17: wstr
-    - unknown_n18: wstr
-    - unknown_n19: wstr
-    - unknown_n20: wstr
-    - unknown_n21: wstr
-    - unknown_n22: u32
-    - unknown_n23: u32
-    - unknown_n24: bool
-    - unknown_n25: empty_list
-    - unknown_n26: bool
-    - unknown_n27: empty_list
-    - unknown_n28: bool
-    - unknown_n29: bool
-    - unknown_n30: bool
-    - unknown_n31: bool
-    - unknown_n32: bool
-    - unknown_n33: bool
-    - unknown_n34: bool
-    - unknown_n35: u8
-    - unknown_n36: bool
-    - unknown_n37: empty_list
-    - unknown_n38: u32
-    - unknown_n39: u32
-    - unknown_n40: u32
-    - unknown_n41: wstr
-    - unknown_n42: wstr
-    - unknown_n43: u32
+    - mode: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - unknown_16: bool
+      offset: 16
+    - unknown_17: bool
+      offset: 17
+    - unknown_18: bool
+      offset: 18
+    - unknown_20: u32
+      offset: 20
+    - unknown_24: u32
+      offset: 24
+    - unknown_28: u32
+      offset: 28
+    - unknown_32: u32
+      offset: 32
+    - unknown_36: u32
+      offset: 36
+    - unknown_40: wstr
+      offset: 40
+    - unknown_72: wstr
+      offset: 72
+    - unknown_104: wstr
+      offset: 104
+    - unknown_132: wstr
+      offset: 132
+    - unknown_160: u32
+      offset: 160
+    - unknown_164: wstr
+      offset: 164
+    - unknown_196: wstr
+      offset: 196
+    - unknown_228: wstr
+      offset: 228
+    - unknown_260: wstr
+      offset: 260
+    - unknown_292: wstr
+      offset: 292
+    - unknown_324: wstr
+      offset: 324
+    - unknown_356: u32
+      offset: 356
+    - unknown_360: u32
+      offset: 360
+    - unknown_364: bool
+      offset: 364
+    - unknown_365: list<GameSettingPair>
+      offset: 365
+    - unknown_381: bool
+      offset: 381
+    - unknown_382: list<GameSettingKeyedText>
+      offset: 382
+    - unknown_398: bool
+      offset: 398
+    - unknown_399: bool
+      offset: 399
+    - unknown_400: bool
+      offset: 400
+    - unknown_401: bool
+      offset: 401
+    - unknown_402: bool
+      offset: 402
+    - unknown_403: bool
+      offset: 403
+    - unknown_404: bool
+      offset: 404
+    - unknown_412: u8
+      offset: 412
+    - unknown_416: bool
+      offset: 416
+    # cn-735 sub_41CF80, cn-738 sub_41EC30 and cn-742 sub_423670 read counted UTF-16 strings.
+    - unknown_420: list<wstr>
+      offset: 420
+    - unknown_436: u32
+      offset: 436
+    - unknown_440: u32
+      offset: 440
+    - unknown_444: u32
+      offset: 444
+    - unknown_448: wstr
+      offset: 448
+    - unknown_476: wstr
+      offset: 476
+    - unknown_504: u32
+      offset: 504
 
   # cn-324 and cn-279 (reader cn-324 sub_57D5E0, cn-279 0x41E380): the same leading fields as kr-812 in
   # the same order (mode, then the four map strings), and nothing after the run of u32.
@@ -607,6 +706,406 @@ structs:
     # +272; the change request sender kr-812 sub_6D0280 stamps that local word (dword_E82674+212) as its
     # third field. kr-812 sub_691CD0 copies the word at +272, so it is on every UserSlot record.
     - level_icon: u32
+      offset: 272
+
+  # cn-735 sub_425A50: the enum stores its byte at +128; the four flags start at +132.
+  UserSlot@cn-735:
+    - occupied: bool
+      offset: 4
+      menu: 1
+    - closed: bool
+      offset: 5
+      menu: 1
+    - seated: bool
+      offset: 6
+      menu: 1
+    # cn-735 sub_9FECF0 compares +7 with the local seat before cn-735 sub_655D80 registers a controlled actor.
+    - controller_slot: u8
+      offset: 7
+      default: 255
+      menu: 255
+    - user_number: u32
+      offset: 8
+    - nickname: wstr
+      offset: 12
+    - character_type: u16
+      offset: 40
+      menu: 10
+    - color_index: u16
+      offset: 42
+    - team: u8
+      offset: 128
+      menu: character_type
+    - level: u32
+      offset: 44
+      vacant: 0
+      menu: 8
+    # cn-735 sub_9F25D0 clears this flag when the local seat becomes master.
+    - ready: bool
+      offset: 132
+    - unknown_133: bool
+      offset: 133
+      menu: 1
+    - unknown_134: bool
+      offset: 134
+      menu: 1
+    - unknown_135: bool
+      offset: 135
+      menu: 1
+    - unknown_60: u32
+      offset: 60
+    - unknown_64: u32
+      offset: 64
+    - equipped_items: list<u32>
+      offset: 68
+    - unknown_84: u32
+      offset: 84
+    - unknown_88: u32
+      offset: 88
+    - unknown_108: u32
+      offset: 108
+      default: -1
+    - unknown_114: bool
+      offset: 114
+    - unknown_136: u32
+      offset: 136
+    - unknown_140: bool
+      offset: 140
+    - unknown_144: u32
+      offset: 144
+      default: -1
+    - unknown_48: u16
+      offset: 48
+      default: 65535
+    - unknown_50: u16
+      offset: 50
+      default: 65535
+    - unknown_52: u16
+      offset: 52
+      default: 65535
+    - unknown_54: u16
+      offset: 54
+      default: 65535
+    - unknown_56: u16
+      offset: 56
+      default: 65535
+    - unknown_156: u32
+      offset: 156
+    - unknown_160: u32
+      offset: 160
+      default: 1
+      menu: 0
+    - unknown_148: bool
+      offset: 148
+    - unknown_176: u32
+      offset: 176
+      default: -1
+    - unknown_180: wstr
+      offset: 180
+    - unknown_208: bool
+      offset: 208
+    - unknown_209: bool
+      offset: 209
+    - unknown_212: u32
+      offset: 212
+    - unknown_216: u32
+      offset: 216
+      default: 1
+    # The nested ArenaLevel reader consumes one word, except for the two-word CN742 record.
+    - unknown_224: u32
+      offset: 224
+    # cn-735 sub_426E90: seven words, a bool32 and an eight-byte value; no ArenaRating float.
+    - unknown_236: u32
+      offset: 236
+    - unknown_240: u32
+      offset: 240
+    - unknown_244: u32
+      offset: 244
+    - unknown_248: u32
+      offset: 248
+    - unknown_252: u32
+      offset: 252
+    - unknown_256: u32
+      offset: 256
+    - unknown_260: u32
+      offset: 260
+    - unknown_264: bool
+      offset: 264
+    - unknown_272: f64
+      offset: 272
+    # cn-735 sub_655B90 creates occupied seats with zero here during scene load; cn-735 sub_9F9530 handles later arrivals.
+    - unknown_152: u32
+      offset: 152
+    - unknown_284: u32
+      offset: 284
+    - unknown_280: u32
+      offset: 280
+
+  # cn-738 sub_4295D0: the enum stores its byte at +128; the four flags start at +132.
+  UserSlot@cn-738:
+    - occupied: bool
+      offset: 4
+      menu: 1
+    - closed: bool
+      offset: 5
+      menu: 1
+    - seated: bool
+      offset: 6
+      menu: 1
+    # cn-738 sub_A2BEE0 compares +7 with the local seat before cn-738 sub_6902E0 registers a controlled actor.
+    - controller_slot: u8
+      offset: 7
+      default: 255
+      menu: 255
+    - user_number: u32
+      offset: 8
+    - nickname: wstr
+      offset: 12
+    - character_type: u16
+      offset: 40
+      menu: 10
+    - color_index: u16
+      offset: 42
+    - team: u8
+      offset: 128
+      menu: character_type
+    - level: u32
+      offset: 44
+      vacant: 0
+      menu: 8
+    - ready: bool
+      offset: 132
+    - unknown_133: bool
+      offset: 133
+      menu: 1
+    - unknown_134: bool
+      offset: 134
+      menu: 1
+    - unknown_135: bool
+      offset: 135
+      menu: 1
+    - unknown_60: u32
+      offset: 60
+    - unknown_64: u32
+      offset: 64
+    - equipped_items: list<u32>
+      offset: 68
+    - unknown_84: u32
+      offset: 84
+    - unknown_88: u32
+      offset: 88
+    - unknown_108: u32
+      offset: 108
+      default: -1
+    - unknown_114: bool
+      offset: 114
+    - unknown_136: u32
+      offset: 136
+    - unknown_140: bool
+      offset: 140
+    - unknown_144: u32
+      offset: 144
+      default: -1
+    - unknown_48: u16
+      offset: 48
+      default: 65535
+    - unknown_50: u16
+      offset: 50
+      default: 65535
+    - unknown_52: u16
+      offset: 52
+      default: 65535
+    - unknown_54: u16
+      offset: 54
+      default: 65535
+    - unknown_56: u16
+      offset: 56
+      default: 65535
+    - unknown_156: u32
+      offset: 156
+    - unknown_160: u32
+      offset: 160
+      default: 1
+      menu: 0
+    - unknown_148: bool
+      offset: 148
+    - unknown_164: u32
+      offset: 164
+      default: -1
+    - unknown_168: wstr
+      offset: 168
+    - unknown_196: bool
+      offset: 196
+    - unknown_197: bool
+      offset: 197
+    - unknown_200: u32
+      offset: 200
+    - unknown_204: u32
+      offset: 204
+      default: 1
+    # The nested ArenaLevel reader consumes one word, except for the two-word CN742 record.
+    - unknown_212: u32
+      offset: 212
+    # cn-738 sub_42A470: seven words, a bool32 and an eight-byte value; no ArenaRating float.
+    - unknown_220: u32
+      offset: 220
+    - unknown_224: u32
+      offset: 224
+    - unknown_228: u32
+      offset: 228
+    - unknown_232: u32
+      offset: 232
+    - unknown_236: u32
+      offset: 236
+    - unknown_240: u32
+      offset: 240
+    - unknown_244: u32
+      offset: 244
+    - unknown_248: bool
+      offset: 248
+    - unknown_256: f64
+      offset: 256
+    # cn-738 sub_690070 creates occupied seats with zero here during scene load; cn-738 sub_A26780 handles later arrivals.
+    - unknown_152: u32
+      offset: 152
+    - unknown_268: u32
+      offset: 268
+    - unknown_264: u32
+      offset: 264
+
+  # cn-742 sub_42D560: the enum stores its byte at +128; the four flags start at +132.
+  UserSlot@cn-742:
+    - occupied: bool
+      offset: 4
+      menu: 1
+    - closed: bool
+      offset: 5
+      menu: 1
+    - seated: bool
+      offset: 6
+      menu: 1
+    # cn-742 sub_96C660 compares +7 with the local seat before cn-742 sub_5E6AF0 registers a controlled actor.
+    - controller_slot: u8
+      offset: 7
+      default: 255
+      menu: 255
+    - user_number: u32
+      offset: 8
+    - nickname: wstr
+      offset: 12
+    - character_type: u16
+      offset: 40
+      menu: 10
+    - color_index: u16
+      offset: 42
+    - team: u8
+      offset: 128
+      menu: character_type
+    - level: u32
+      offset: 44
+      vacant: 0
+      menu: 8
+    - ready: bool
+      offset: 132
+    - unknown_133: bool
+      offset: 133
+      menu: 1
+    - unknown_134: bool
+      offset: 134
+      menu: 1
+    - unknown_135: bool
+      offset: 135
+      menu: 1
+    - unknown_60: u32
+      offset: 60
+    - unknown_64: u32
+      offset: 64
+    - equipped_items: list<u32>
+      offset: 68
+    - unknown_84: u32
+      offset: 84
+    - unknown_88: u32
+      offset: 88
+    - unknown_108: u32
+      offset: 108
+      default: -1
+    - unknown_114: bool
+      offset: 114
+    - unknown_136: u32
+      offset: 136
+    - unknown_140: bool
+      offset: 140
+    - unknown_144: u32
+      offset: 144
+      default: -1
+    - unknown_48: u16
+      offset: 48
+      default: 65535
+    - unknown_50: u16
+      offset: 50
+      default: 65535
+    - unknown_52: u16
+      offset: 52
+      default: 65535
+    - unknown_54: u16
+      offset: 54
+      default: 65535
+    - unknown_56: u16
+      offset: 56
+      default: 65535
+    - unknown_156: u32
+      offset: 156
+    - unknown_160: u32
+      offset: 160
+      default: 1
+      menu: 0
+    - unknown_148: bool
+      offset: 148
+    - unknown_164: u32
+      offset: 164
+      default: -1
+    - unknown_168: wstr
+      offset: 168
+    - unknown_196: bool
+      offset: 196
+    - unknown_197: bool
+      offset: 197
+    - unknown_200: u32
+      offset: 200
+    - unknown_204: u32
+      offset: 204
+      default: 1
+    # The nested ArenaLevel reader consumes one word, except for the two-word CN742 record.
+    - unknown_212: u32
+      offset: 212
+    # cn-742 sub_4014C0 reads both words before SocialSystemInfo.
+    - unknown_216: u32
+      offset: 216
+    # cn-742 sub_42E7B0: seven words, a bool32 and an eight-byte value; no ArenaRating float.
+    - unknown_228: u32
+      offset: 228
+    - unknown_232: u32
+      offset: 232
+    - unknown_236: u32
+      offset: 236
+    - unknown_240: u32
+      offset: 240
+    - unknown_244: u32
+      offset: 244
+    - unknown_248: u32
+      offset: 248
+    - unknown_252: u32
+      offset: 252
+    - unknown_256: bool
+      offset: 256
+    - unknown_264: f64
+      offset: 264
+    # cn-742 sub_5E6870 creates occupied seats with zero here during scene load; cn-742 sub_966630 handles later arrivals.
+    - unknown_152: u32
+      offset: 152
+    - unknown_276: u32
+      offset: 276
+    - unknown_272: u32
       offset: 272
 
   # id-400: reader id-400 sub_5F1FF0, a 192-byte object reset by id-400 sub_5F1D20. Against kr-812 it has one flag
@@ -980,8 +1479,8 @@ structs:
       default: -1
       menu: 0
 
-  # cn-279: reader 0x4496E0. The occupied flag and a matching user number let cn-279 0x77F3F0 create the
-  # local actor; cn-279 0x870BC0 installs its equipment. Roles are placed as in cn-324 (inferred).
+  # cn-279 sub_4496E0 reads the slot. cn-279 sub_77F3F0 creates its actor from the identity and +16
+  # character selector; cn-279 sub_685920 renders its +20 level and cn-279 sub_870BC0 installs equipment.
   UserSlot@cn-279:
     # cn-279 sub_4496E0 reads this row inside GotoRoom's list (cn-279 sub_453640).
     # cn-279 sub_4EBFF0 reads two bytes; sub_4EBFD0 reads bool32 through sub_4EBBE0.
@@ -1010,20 +1509,21 @@ structs:
     # the player's team (the S2C 504 handler writes it, kr-812 sub_7FCF50); 0 on the main menu
     - team: u8
       offset: 92
-    # FighterConfig key = character item id - 300000 (kr-812 sub_6CBFF0 hands it to the actor builder
-    # kr-812 sub_92B160)
-    - character_type: u32
+    # cn-279 sub_685920 passes +20 to cn-279 sub_779CC0, which selects rank frame level - 1.
+    - level: u32
       offset: 20
+      vacant: 1
+      menu: level
     - ready: bool                       # ready mark; changing team is refused while it is set
       offset: 93
     - unknown_94: bool
       offset: 94
     - unknown_95: bool
       offset: 95
-    # a per-player number with no proven reader; the level is sent here (inferred)
-    - level: u32
+    # cn-279 sub_701BD0 passes +32/+36 to cn-279 sub_582CB0 as the outer IPv4 endpoint.
+    # cn-279 sub_4494A0 resets both words to zero; cn-279 sub_7032E0 installs peer discovery values.
+    - outer_ipv4: u32
       offset: 32
-      vacant: 1
     - unknown_36: u32
       offset: 36
     - unknown_40: empty_list            # cn-279 sub_420350 reads the count and four-byte elements
@@ -1073,9 +1573,11 @@ structs:
     - seated: bool
       offset: 6
       menu: 1
-    - unknown_128: u8
+    # cn-706 sub_4C0B80 compares seat +128 with the local seat before registering a controlled actor.
+    - controller_slot: u8
       offset: 128
       default: 255
+      menu: 255
     # the player's number; the client finds its own seat by it (kr-812 sub_7FCDA0)
     - user_number: u32
       offset: 8
@@ -1101,10 +1603,12 @@ structs:
       offset: 125
     - unknown_126: bool
       offset: 126
-      default: 1
+      # cn-706 sub_5676A0 restores this waiting-room UI flag from the seat record.
+      menu: 1
     - unknown_127: bool
       offset: 127
-      default: 1
+      # cn-706 sub_5676A0 restores this waiting-room UI flag from the seat record.
+      menu: 1
     - unknown_60: u32
       offset: 60
     - unknown_64: u32
@@ -1186,6 +1690,7 @@ structs:
   # cn-324 sub_45B640 (u32, u32, u32, a u32 list and a u8 list), cn-279 sub_448840,
   # cn-406 sub_41D060 and cn-706 sub_4B8470. Full vectors are needed for native relay validation;
   # the current outbound room/equipment projections retain empty flags, attributes and expiry vectors.
+  # cn-735 sub_686EF0, cn-738 sub_6BFF00 and cn-742 sub_61B760 retain all seven fields and vector types.
   EquippedItemList:
     - user_number: u32                  # whose items these are
       offset: 4
@@ -1219,22 +1724,44 @@ structs:
   # cn-706 sub_61BC60.
   gspGotoRoom:
     - session_setting: SessionSetting   # the session being entered
+      # cn-735 sub_A4D6F0, cn-738 sub_A76920 and cn-742 sub_9BD720 read these native members in order.
+      cn-735:
+        - session_setting: SessionSetting
+          offset: 8
     - game_setting: GameSetting         # a standalone copy, written over the session's (cn-324 sub_57DB50)
       offset: 136
       only: [cn-324]
     - master_slot: u32                  # seat index of the room master (kr-812 +680, read by kr-812 sub_68EAD0)
+      cn-735:
+        - master_slot: u32
+          offset: 656
     - local_slot: u32                   # the receiver's own seat index (kr-812 +684, room context +840)
+      cn-735:
+        - local_slot: u32
+          offset: 660
     - user_slots: "list<UserSlot>"      # every seat of the room; the main menu sends the local player alone
+      cn-735:
+        - user_slots: "list<UserSlot>"
+          offset: 664
     - equipped_item_lists: "list<EquippedItemList>"  # one entry per seat, in seat order
       also: [cn-279]
       cn-324:
         - equipped_item_lists: "list<EquippedItemList>"
           offset: 232
           menu: empty
+      cn-735:
+        - equipped_item_lists: "list<EquippedItemList>"
+          offset: 680
     # kr-812 sub_820060 tests object +720 before kr-812 sub_47ADE0 builds the party transition notice.
     - party_transition: bool
+      cn-735:
+        - party_transition: bool
+          offset: 696
     - unknown_n6: u32
       except: [cn-324]
+      cn-735:
+        - unknown_700: u32
+          offset: 700
 
   # cn-406 readers: SessionSetting sub_56A160, GameSetting sub_569BE0, UserSlot sub_57E8A0, gspGotoRoom sub_57EBC0.
   SessionSetting@cn-406:
@@ -1246,7 +1773,9 @@ structs:
     offset: 12
   - occupants: u16
     offset: 40
-  - unknown_42: u16
+  # sub_56A160 reads only two words between the title and the password flag; the room list draws this
+  # second one as the room's maximum ("occupants/maximum"), so it carries the open seats here.
+  - open_seats: u16
     offset: 42
   - has_password: bool
     offset: 44
@@ -1806,13 +2335,17 @@ structs:
   GameSettingPair:                      # kr-1256 sub_113FE90
   - unknown_0: u32
     only: [kr-1256]
+    also: [cn-735]
   - unknown_4: u32
     only: [kr-1256]
+    also: [cn-735]
   GameSettingKeyedText:                 # kr-1256 sub_10C9350
   - unknown_0: u32
     only: [kr-1256]
+    also: [cn-735]
   - unknown_4: wstr
     only: [kr-1256]
+    also: [cn-735]
   # cn-774 sub_494610 reads the same u16 key and counted word list through cn-774 sub_456D30.
   GameSettingCountedRow:                # kr-1256 sub_10D2EA0, the list read by kr-1256 sub_998FB0
   - unknown_0: u16

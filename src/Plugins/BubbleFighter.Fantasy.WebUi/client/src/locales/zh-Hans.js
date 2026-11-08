@@ -1,6 +1,7 @@
 // Simplified Chinese. Same keys and {placeholders} as en.js, one entry per line.
 export default {
   'plugins.policy.sourcesButton': '推荐插件源',
+  'plugins.policy.defaultSelected': '初始勾选',
   'plugins.policy.type.require': '必需',
   'plugins.policy.type.disable': '禁用',
   'plugins.policy.type.recommend': '推荐',

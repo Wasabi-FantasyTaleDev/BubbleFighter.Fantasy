@@ -65,6 +65,19 @@ public sealed class RepositoryGuardTests
             repo.FindByUserNumAsync(0, CancellationToken.None).AsTask());
     }
 
+    [Fact]
+    public async Task WalletGetOrCreateRejectsInvalidValuesBeforeOpeningAConnection()
+    {
+        var repo = new MySqlPlayerWalletRepository(new UnusedFactory());
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            repo.GetOrCreateAsync(new(0, 1, 1), CancellationToken.None).AsTask());
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            repo.GetOrCreateAsync(new(7, -1, 1), CancellationToken.None).AsTask());
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            repo.GetOrCreateAsync(new(7, 1, -1), CancellationToken.None).AsTask());
+    }
+
     private sealed class UnusedFactory : IDbConnectionFactory
     {
         public ValueTask<System.Data.Common.DbConnection> OpenAsync(CancellationToken ct) =>

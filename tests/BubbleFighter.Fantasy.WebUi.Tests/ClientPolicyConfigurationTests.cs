@@ -31,11 +31,16 @@ public sealed class ClientPolicyConfigurationTests
         Assert.Same(original, launcher.Config!["client_policy"]);
     }
 
-    [Fact]
-    public void TheProjectedRowBindsBackToTheSamePolicy()
+    [Theory]
+    [InlineData(null)]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TheProjectedRowBindsBackToTheSamePolicy(bool? selected)
     {
+        var sample = Sample with { Plugins = [Sample.Plugins[0] with
+            { Rules = [.. Sample.Plugins[0].Rules.Take(2), Sample.Plugins[0].Rules[2] with { DefaultSelected = selected }] }] };
         PluginRow[] rows = [new() { Id = "launcher", Plugin = "launcher.http", Source = "native" }];
-        var row = SetupClientPolicyConfiguration.Apply(rows, Sample)[0];
+        var row = SetupClientPolicyConfiguration.Apply(rows, sample)[0];
         var bound = new PluginConfig(row).Bind<LauncherOptions>().ClientPolicy.ToContract();
         Assert.Equal(Sample.Sources, bound.Sources);
         var plugin = Assert.Single(bound.Plugins);
@@ -44,7 +49,8 @@ public sealed class ClientPolicyConfigurationTests
         Assert.Equal("2.0.0", plugin.Rules[1].Version);
         Assert.Null(plugin.Rules[1].Sources);
         Assert.Equal(["official"], plugin.Rules[2].Sources!);
-        Assert.Equal(InstallationRevision(Sample), InstallationRevision(bound));
+        Assert.Equal(selected, plugin.Rules[2].DefaultSelected);
+        Assert.Equal(InstallationRevision(sample), InstallationRevision(bound));
     }
 
     [Fact]

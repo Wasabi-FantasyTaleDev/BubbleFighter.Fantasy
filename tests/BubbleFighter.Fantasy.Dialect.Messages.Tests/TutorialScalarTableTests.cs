@@ -20,20 +20,20 @@ public sealed class TutorialScalarTableTests
         Assert.Equal(new byte[] { 4, 3, 2, 1 },
             TutorialWire.WriteMasterSlot(TestBuilds.Packets, build, 0x01020304));
         Assert.Equal(new byte[] { 255, 255, 255, 255 },
-            TutorialWire.WriteStartNewWave(TestBuilds.Packets, build, -1));
-        Assert.Equal(-1, TutorialWire.ReadStartNewWave(TestBuilds.Packets, build,
+            NpcWire.WriteStartNewWave(TestBuilds.Packets, build, -1));
+        Assert.Equal(-1, NpcWire.ReadStartNewWave(TestBuilds.Packets, build,
             new byte[] { 255, 255, 255, 255 }));
-        var spawn = TutorialWire.WriteCreateMobsFromSpawnGroup(TestBuilds.Packets, build, 0x01020304);
+        var spawn = NpcWire.WriteCreateMobsFromSpawnGroup(TestBuilds.Packets, build, 0x01020304);
         Assert.Equal(new byte[] { 4, 3, 2, 1 }, spawn);
-        Assert.Equal(0x01020304, TutorialWire.ReadCreateMobsFromSpawnGroup(TestBuilds.Packets, build, spawn));
+        Assert.Equal(0x01020304, NpcWire.ReadCreateMobsFromSpawnGroup(TestBuilds.Packets, build, spawn));
         Assert.True(TutorialWire.ReadEndStage(TestBuilds.Packets, build, new byte[] { 1, 0, 0, 0 }));
         Assert.False(TutorialWire.ReadEndStage(TestBuilds.Packets, build, new byte[4]));
         Assert.Throws<PacketFormatException>(() =>
             TutorialWire.ReadEndStage(TestBuilds.Packets, build, new byte[] { 2, 0, 0, 0 }));
         foreach (var malformed in new[] { new byte[3], new byte[5] })
         {
-            Assert.Throws<PacketFormatException>(() => TutorialWire.ReadStartNewWave(TestBuilds.Packets, build, malformed));
-            Assert.Throws<PacketFormatException>(() => TutorialWire.ReadCreateMobsFromSpawnGroup(TestBuilds.Packets, build, malformed));
+            Assert.Throws<PacketFormatException>(() => NpcWire.ReadStartNewWave(TestBuilds.Packets, build, malformed));
+            Assert.Throws<PacketFormatException>(() => NpcWire.ReadCreateMobsFromSpawnGroup(TestBuilds.Packets, build, malformed));
             Assert.Throws<PacketFormatException>(() => TutorialWire.ReadEndStage(TestBuilds.Packets, build, malformed));
         }
     }

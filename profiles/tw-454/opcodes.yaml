@@ -4,6 +4,84 @@ profile: tw-454
 # packet name through an address into the image (dispatcher sub_AACF80
 # --exe). See profiles/opcode-policy.md.
 opcodes:
+  - value: 117
+    direction: c2s
+    connection: game
+    name: gcpReqFighterInfo
+    name_source: label@kr-1256
+    evidence: verified
+    source: "tw-454 sub_8D91C0 stamps 117 and writes the target account and session word; menu callers tw-454 sub_5F4920 and tw-454 sub_7D37C0 pass the clicked player's account. Matches kr-1256 sub_9319E0."
+  - value: 510
+    direction: c2s
+    connection: game
+    name: gcpReqKickFromSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_7D37C0 confirms a room-player removal, stamps 510 and writes one counted UTF-16 target nickname; matched to kr-812 Packet_gcpReqKickFromSession builder kr-812 sub_5C8730 and reader kr-812 sub_5C8FD0"
+  - value: 513
+    direction: s2c
+    connection: game
+    name: gspRepKickFromSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A578B0 case 0x201 dispatches to tw-454 sub_A5F3C0; tw-454 sub_A5F3C0 reads two counted UTF-16 nicknames and a u32 result, matched to kr-812 Packet_gspRepKickFromSession handler kr-812 sub_8014B0 and reader kr-812 sub_80AE00"
+    notes: "Requester nickname, removed nickname, result; zero announces removal in RoomStage8vs8, while nonzero results display a failure to the requester."
+  - value: 20005
+    direction: c2s
+    connection: relay
+    name: rcpReqUdpBypassDisable
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A741B0 sends an empty relay TCP20005 after the UDP liveness check fails"
+  - value: 19
+    direction: s2c
+    connection: udp
+    name: rspUdpBypassVerify_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_A77C50 handles UDP 19 from the configured relay endpoint"
+  - value: 20002
+    direction: c2s
+    connection: udp
+    name: rcpUdpBypassVerifyAck
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A77C50 answers UDP 19 with UDP 20002 carrying the offered cookie"
+  - value: 20001
+    direction: c2s
+    connection: udp
+    name: rcpUdpBypassAck
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A79210 case 18 copies its eight-byte cookie into UDP 20001"
+  - value: 20003
+    direction: c2s
+    connection: udp
+    name: rcpUdpBypassWanderLean
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A78CC0 wraps movement 32885 with the eight-byte relay cookie"
+  - value: 20004
+    direction: c2s
+    connection: udp
+    name: rcpUdpBypassWanderLeanOptimize
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A78CC0 wraps masked movement 32923 with the eight-byte relay cookie"
+  - value: 18
+    direction: s2c
+    connection: relay
+    name: rspUdpBypassInfo
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A79210 case 18 reads the u16 UDP destination port and eight-byte cookie"
+  - value: 20
+    direction: s2c
+    connection: relay
+    name: rspUdpBypassReady_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_A79210 case 20 sets the UDP-ready byte without reading a body"
   - value: 510
     direction: s2c
     connection: game
@@ -140,6 +218,7 @@ opcodes:
     name_source: mirrored
     evidence: captured
     source: "local run 2026-09-27: 96-byte opcode 1 whose first u32 is 454"
+    notes: "tw-454 sub_ECB490 writes u32, seven counted UTF-16 strings, u32, fifteen counted UTF-16 strings; tw-454 sub_451260 writes the final three strings. The 96-byte captured form has empty strings."
   - value: 3
     direction: c2s
     name: gcpReqLogin
@@ -166,10 +245,12 @@ opcodes:
     source: "tw-454 sub_AE57F0 checks CreateUserStage, stamps 31 and writes u32 character count followed by UTF-16LE name; matches kr-1256 sub_5CCC60, cn-774 sub_6BD920 and the role of kr-812 C2S 15 Packet_gcpReqCheckCreateUserName"
   - value: 53
     direction: c2s
-    name: Unknown53
-    name_source: none
-    evidence: inferred
-    source: "builder sub_4DCE50; the kr-1256 and cn-774 channel move carries the same number"
+    connection: game
+    name: gcpReqLobbyState_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_4DCE50 stamps 53 and writes one u32 state id: 80 enters matching, sent by the MainMenuStage vftable method tw-454 sub_8A9850 after the profile and window guards and by the DlgEasyMatchPop start action tw-454 sub_4DC890, and 60 leaves matching while the session state word (tw-454 dword_163FD20+2436) still reads 80, sent by tw-454 sub_CD01D0"
+    notes: "Five independent sites read the session state 80 as the matching state. The pairing with the S2C 126 notification is structural (the originating stages' gates handle 126), not client-proven. No packet-name strings exist in this build."
   - value: 518
     direction: c2s
     name: gcpRepPingUser
@@ -185,17 +266,20 @@ opcodes:
     source: "builder sub_8F2510; the kr-1256 and cn-774 main-menu probe carries the same number"
   - value: 1500
     direction: c2s
+    connection: game
     name: gcpReqDynamicConfig
     name_source: mirrored
-    evidence: captured
-    source: "builder sub_A7C220; local run 2026-09-27: 30 bytes sent ahead of gcpFirstConnect"
-    notes: "named after S2C 1500 gspRepDynamicConfig"
+    evidence: verified
+    source: "tw-454 sub_A7C220 stamps1500; tw-454 sub_628A00 writes a u16 mask and ascending selected checksums"
+
   - value: 1500
     direction: s2c
+    connection: game
     name: gspRepDynamicConfig
     name_source: label@tw-454
     evidence: verified
-    source: "sub_AACF80 compares the opcode with 0x5DC before its jumptables and stores label 0x1397B84 \"gspRepDynamicConfig\" (0xAB0259)"
+    source: "tw-454 sub_AACF80 selects1500; tw-454 sub_A9E440 reads a u16 mask and leaves configuration unchanged when zero"
+
   - value: 522
     direction: s2c
     name: gspSessionSignatureData
@@ -252,22 +336,28 @@ opcodes:
     source: "dispatcher sub_AACF80 jumptable case 8 stores \"gspRepGPKCSAuth\""
   - value: 10
     direction: s2c
+    connection: game
     name: gspRepMoveChannel
     name_source: label@tw-454
     evidence: verified
-    source: "dispatcher sub_AACF80 jumptable case 10 stores \"gspRepMoveChannel\""
+    source: "tw-454 sub_AACF80 dispatches game10 to tw-454 sub_A83A50"
+
   - value: 11
     direction: s2c
+    connection: game
     name: gspDisconnectingMovedUser
     name_source: label@tw-454
     evidence: verified
-    source: "dispatcher sub_AACF80 jumptable case 11 stores \"gspDisconnectingMovedUser\""
+    source: "tw-454 sub_AACF80 dispatches game11 to tw-454 sub_A84660"
+
   - value: 12
     direction: s2c
+    connection: game
     name: gspDisconnectMovedUser
     name_source: label@tw-454
     evidence: verified
-    source: "dispatcher sub_AACF80 jumptable case 12 stores \"gspDisconnectMovedUser\""
+    source: "tw-454 sub_AACF80 dispatches game12 to tw-454 sub_A84880"
+
   - value: 13
     direction: s2c
     name: gspRepMoveInto
@@ -294,10 +384,12 @@ opcodes:
     source: "dispatcher sub_AACF80 jumptable case 17 stores \"gspQueryBadProgram\""
   - value: 18
     direction: s2c
+    connection: game
     name: gspRepCenterUserCnt
     name_source: label@tw-454
     evidence: verified
-    source: "dispatcher sub_AACF80 jumptable case 18 stores \"gspRepCenterUserCnt\""
+    source: "tw-454 sub_AACF80 dispatches game18 to tw-454 sub_A7EE70"
+
   - value: 19
     direction: s2c
     name: gspCenterList
@@ -306,10 +398,12 @@ opcodes:
     source: "dispatcher sub_AACF80 jumptable case 19 stores \"gspCenterList\""
   - value: 20
     direction: s2c
+    connection: game
     name: gspRepUniquenessCheck
     name_source: label@tw-454
     evidence: verified
-    source: "dispatcher sub_AACF80 jumptable case 20 stores \"gspRepUniquenessCheck\""
+    source: "tw-454 sub_AACF80 dispatches game20 to tw-454 sub_A7FAD0"
+
   - value: 21
     direction: s2c
     name: gspDisconnectOpenWeb
@@ -414,6 +508,55 @@ opcodes:
     name_source: label@tw-454
     evidence: verified
     source: "dispatcher sub_AACF80 jumptable case 116 stores \"gspRepWaitUserList\""
+    notes: "The body is a u32 count then that many {counted string, u32, u8, u8} records (32-byte elements, reader tw-454 sub_EBC660); the consumer copies the list into the RoomStage8vs8 wait-list object at +0xA7C. The element tail grows by two bytes over kr-1256's."
+  - value: 170
+    direction: s2c
+    connection: game
+    name: gspMatchBoardDeny_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_6213B0 pump case 0xAA reads it with the optional reader tw-454 sub_EC86F0 and routes the parsed values to tw-454 sub_622A60; no document reactor runs"
+    notes: ""
+  - value: 171
+    direction: s2c
+    connection: game
+    name: gspMatchBoardRoomUpsert_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 pump case 0xAB reads it with the optional reader tw-454 sub_EC8610, upserts the entry through tw-454 sub_5E26D0 and runs the per-room row reactor tw-454 sub_50C660"
+    notes: ""
+  - value: 172
+    direction: s2c
+    connection: game
+    name: gspMatchBoardCountFlag_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 pump case 0xAC parses it inline through tw-454 sub_5E2840 and runs the per-room row reactor"
+    notes: ""
+  - value: 173
+    direction: s2c
+    connection: game
+    name: gspMatchBoardCount_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 pump case 0xAD parses it inline through tw-454 sub_5E2950 and runs the per-room row reactor; tw-454 clears its matching-dialog enable byte on it"
+    notes: ""
+  - value: 174
+    direction: s2c
+    connection: game
+    name: gspMatchBoardCountSet_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 pump case 0xAE parses it inline through tw-454 sub_5E2A40 and runs the per-room row reactor"
+    notes: ""
+  - value: 175
+    direction: s2c
+    connection: game
+    name: gspMatchBoardNames_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 pump case 0xAF reads it with tw-454 sub_EC9000 and runs the full board refresh tw-454 sub_50C4F0"
+    notes: ""
   - value: 117
     direction: s2c
     name: gspInvitationFailed
@@ -768,6 +911,70 @@ opcodes:
     name_source: label@tw-454
     evidence: verified
     source: "dispatcher sub_AACF80 jumptable case 686 stores \"gspArea32GameExit\""
+  - value: 711
+    direction: s2c
+    connection: game
+    name: gspExtremeRacingTimer_
+    name_source: coined
+    evidence: verified
+    source: "the racing hub tw-454 sub_D530A0 (reached from the strategy vtable slot 24) case 0x2C7 reads {key, duration, flag} and applies them through tw-454 sub_D54440 with the codes 2500, 20000 and 210000 (tw-454 sub_544A10 arms the stage timer with the second word through tw-454 sub_EDB430); matched to kr-1256 gspExtremeRacingTimer_ by the verified reader chain"
+    notes: "packets/extreme-racing.yaml ExtremeRacingTimer@kr-1256 states the body; the tw-454 hub drives the same three codes plus the HUD text paths."
+  - value: 712
+    direction: s2c
+    connection: game
+    name: gspExtremeRacingRound_
+    name_source: coined
+    evidence: verified
+    source: "the racing hub tw-454 sub_D530A0 case 0x2C8 reads two words and passes the second to tw-454 sub_544700, which stores the round and re-arms the 3x5x5 slot grid; matched to kr-1256 gspExtremeRacingRound_"
+    notes: "packets/extreme-racing.yaml ExtremeRacingRound@kr-1256 states the body."
+  - value: 714
+    direction: s2c
+    connection: game
+    name: gspExtremeRacingUpdatePlayRecord_
+    name_source: coined
+    evidence: verified
+    source: "the racing hub tw-454 sub_D530A0 case 0x2CA reads the mode word then the counted record list (each record deserialized by tw-454 sub_D550E0 through the tw-454 ExtremeRacing::UpdatePlayRecord vtable 0x13C87FC), applied by tw-454 sub_D54830; matched to kr-1256 gspExtremeRacingUpdatePlayRecord_"
+    notes: "packets/extreme-racing.yaml ExtremeRacingRecords@kr-1256 states the record shape (confirmed identical on tw-454: the reader tw-454 sub_D550E0 reads the seat word, the pair count, then count x {u8 tag, u32 value}); the applier dispatches the mode into three consumer sets."
+  - value: 711
+    direction: c2s
+    connection: game
+    name: gcpExtremeRacingGoal_
+    name_source: coined
+    evidence: verified
+    source: "the racing tick tw-454 sub_4CB190 stamps 711 in its type-5 zone branch with one 4-byte zone id (stored into ChrLocalPlayer+22076), sent on the game connection; matched to kr-1256 gcpExtremeRacingGoal_"
+    notes: "packets/extreme-racing.yaml ExtremeRacingGoal@kr-1256 states the body; once per zone per local player with cooldowns."
+  - value: 32934
+    direction: c2s
+    connection: both
+    name: gppExtremeRacingCheckPoint_
+    name_source: coined
+    evidence: verified
+    source: "the racing tick tw-454 sub_4CB190 stamps 0x80A6 (32934) in its type-10 zone branch with {character+440, id/10, id%10} through the peer session; matched to kr-1256 gppExtremeRacingCheckPoint_"
+    notes: "The peer consumer is tw-454 sub_70E250."
+  - value: 32934
+    direction: s2c
+    connection: both
+    name: gppExtremeRacingCheckPoint_
+    name_source: coined
+    evidence: verified
+    source: "the peer consumer tw-454 sub_70E250 case 32934 reads three 4-byte words into tw-454 sub_72FCC0; matched to kr-1256 gppExtremeRacingCheckPoint_"
+    notes: "The client consumes the peer echo; the server relays the sender's payload to the peers."
+  - value: 763
+    direction: c2s
+    connection: game
+    name: gcpExtremeRacingCheckPointList_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_7108D0 builds the counted sBFRUNNERCHECKPOINT list (value at record+268) and stamps 763 at buffer+2; the kr-1256 peer frame has no tw analog of this list form"
+    notes: "The checkpoint-list form: cn-774's catalog records the same sender (cn-774 sub_89DAB0, untabled there) and kr-1256 states no row at 763 either."
+  - value: 712
+    direction: c2s
+    connection: game
+    name: gcpExtremeRacingCoin_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_D39130 stamps 712 with one dword (the coin id at ExtremeCoin+572); mirrored to the baseline's kr-1256 row, whose builder kr-1256 sub_BF45D0 matches this one field for field"
+    notes: "One dword: the picked coin's id."
   - value: 749
     direction: s2c
     name: gspChangePirateAssaultSkillLevel
@@ -978,6 +1185,14 @@ opcodes:
     name_source: label@tw-454
     evidence: verified
     source: "dispatcher sub_AACF80 jumptable case 831 stores \"gspRepPresentDeleteSend\""
+  - value: 832
+    direction: c2s
+    connection: game
+    name: gcpReqInventoryChangeWeaponPresetIdx
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_C07A40 stamps C2S 832 and writes [u32 context][u8 slot]; the UI click tw-454 sub_4C8370 passes the context from object +440 and the slot from the five-slot match; the body matches kr-1256 sub_808F10 byte for byte"
+    notes: "The change request carries a u32 context word and a u8 slot (0-4); no enumerate request exists (server push only)"
   - value: 832
     direction: s2c
     name: gspRepPresentDeleteReceive
@@ -1202,10 +1417,11 @@ opcodes:
     source: "dispatcher sub_AACF80 jumptable case 951 stores \"gspNexonGuard\""
   - value: 952
     direction: s2c
+    connection: game
     name: gspPortalMove
     name_source: label@tw-454
     evidence: verified
-    source: "dispatcher sub_AACF80 jumptable case 952 stores \"gspPortalMove\""
+    source: "tw-454 sub_A9E510 reads word, region u16 and seat word, invokes the native region action and clears local pending contact; packets/portal.yaml"
   - value: 953
     direction: s2c
     name: gspNotifyMsg
@@ -1284,6 +1500,7 @@ opcodes:
     name_source: label@tw-454
     evidence: verified
     source: "dispatcher sub_AACF80 jumptable case 967 stores \"gspRepMatchWaitingInfo\""
+    notes: "The body is two u32 words, a counted string and one more u32; tw-454 sub_AA3CA0 parses it and tw-454 sub_5E7CA0 feeds the values into the status-list object (a minus-one word clears it) and toggles the matching dialog's enable byte - the only build of the three that consumes it."
   - value: 970
     direction: s2c
     name: gspSurelyChangeName
@@ -1785,6 +2002,30 @@ opcodes:
     source: "tw-454 sub_AB2AE0 stamps 111, called when the gspNotifyInvite prompt (sub_A86A70) is refused; kr-812 sub_81DEA0 builds Packet_gcpReqMoveToFriendAccept on the same branch"
     notes: "wstr inviter nickname"
     connection: game
+  - value: 202
+    direction: c2s
+    name: gcpReqLeaveParty
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_AB1C50 stamps 202 on an empty TcpPacket; sent by tw-454 sub_B9D450 (guards tw-454 sub_8E50A0, member count > 1, tw-454 sub_A7BB40 mode 1) and by tw-454 sub_A7BB40 mode 2 after its leave confirm; matched to kr-812 Packet_gcpReqLeaveParty (kr-812 sub_677300)"
+    notes: "empty body; the opcode-catalog row 'gcpReqJoinParty' is a false s2c-same-number pair with gspRepJoinParty (S2C 202 reads one word, sub_B9C0B0) and must not be used"
+    connection: game
+  - value: 302
+    direction: c2s
+    name: gcpReqKickFromParty
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_B9FD40 stamps 302 and writes one prefixed wide string; reached from the kick confirm wrapper and the party menu; pairs with the build's own S2C 302 gspRepKickFromParty (tw-454 sub_B9DD90)"
+    notes: "wstr target"
+    connection: game
+  - value: 303
+    direction: c2s
+    name: gcpReqChangePartyLeader
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_B9FEA0 stamps 303 and writes one prefixed wide string, the target member, via the guard wrapper tw-454 sub_BA0340; pairs with the build's own S2C 303 gspRepChangePartyLeader (tw-454 sub_B9E400)"
+    notes: "wstr target"
+    connection: game
   - value: 109
     direction: c2s
     name: gcpReqInvite
@@ -1817,6 +2058,62 @@ opcodes:
     source: "tw-454 sub_AB2D00 stamps 114 when the gspAskedVisitation prompt (tw-454 sub_A88970) is accepted"
     notes: "u32 token"
     connection: game
+  - value: 130
+    direction: c2s
+    name: gcpReqScienceLabCompound_
+    name_source: coined
+    evidence: verified
+    source: "DlgCompound slot-5 wrapper tw-454 sub_DF5CA0 (flag +1318 -> tw-454 sub_DF6870) -> sender tw-454 sub_DF5CF0 stamps 130; the shared RequestScienceLab class (vtable 0x1312374, writer tw-454 sub_479B90) carries vector<u64> material keys and one u64"
+    notes: "The tw-454 C2S lab block matches cn-774's (130, 131, 133-138). The u64 is the obfuscated global counter plus one, as on the other builds. Reply S2C 149 (kind 0) - tw's S2C block sits two under kr-1256's."
+  - value: 131
+    direction: c2s
+    name: gcpReqScienceLabCompoundUnlimited_
+    name_source: coined
+    evidence: verified
+    source: "DlgCompoundUnlimited slot-5 wrapper tw-454 sub_DE17A0 (flag +1249 -> tw-454 sub_DE1AE0) -> sender tw-454 sub_DE2000 stamps 131; the shared class carries the card-backed keys and u64 zero"
+    notes: "Reply S2C 150 (kind 7)."
+  - value: 133
+    direction: c2s
+    name: gcpReqScienceLabEnchant_
+    name_source: coined
+    evidence: verified
+    source: "DlgEnchant slot-5 wrapper tw-454 sub_DFB0C0 -> tw-454 sub_DFBBB0 -> sender tw-454 sub_DFB150 stamps 133; the shared class carries the selected content key (or the card key plus attachments) and the 0/1 flag (1 iff the stored key equals slotHolder+348)"
+    notes: "Reply S2C 152 (kind 2)."
+  - value: 134
+    direction: c2s
+    name: gcpReqScienceLabPetCompound_
+    name_source: coined
+    evidence: verified
+    source: "DlgPetCompound slot-5 wrapper tw-454 sub_DF14A0 -> tw-454 sub_DF1D60 -> sender tw-454 sub_DF1620 stamps 134; the shared class carries the registered material keys and u64 zero"
+    notes: "Reply S2C 153 (kind 3)."
+  - value: 135
+    direction: c2s
+    name: gcpReqScienceLabMakeItemAdvanced_
+    name_source: coined
+    evidence: verified
+    source: "DlgMakeItemAdvanced slot-5 wrapper tw-454 sub_DE5430 -> tw-454 sub_DE5970 -> sender tw-454 sub_DE54C0 stamps 135; the shared class carries the card key plus the attached list and the selected item key"
+    notes: "Reply S2C 154 (kind 6)."
+  - value: 136
+    direction: c2s
+    name: gcpReqScienceLabChangeUnlimited_
+    name_source: coined
+    evidence: verified
+    source: "DlgChangeUnlimited slot-5 wrapper tw-454 sub_DEEC40 -> tw-454 sub_DEF150 -> sender tw-454 sub_DEECD0 stamps 136; the shared class carries the single selected key and u64 zero"
+    notes: "Reply S2C 155 (kind 4)."
+  - value: 137
+    direction: c2s
+    name: gcpReqScienceLabModification_
+    name_source: coined
+    evidence: verified
+    source: "DlgScienceLabModification slot-5 wrapper tw-454 sub_DE9A90 -> tw-454 sub_DE9D60 -> sender tw-454 sub_DEA1E0 stamps 137; the shared class carries one key per selected-parts node and u64 zero"
+    notes: "Reply S2C 156 (kind 8)."
+  - value: 138
+    direction: c2s
+    name: gcpReqScienceLabModificationDelete_
+    name_source: coined
+    evidence: verified
+    source: "DlgScienceLabModification vftable slot 62 (+0xF8) wrapper tw-454 sub_DE9590 -> sender tw-454 sub_DEA4B0 stamps 138; the shared class carries the slot holder's single key and the part-node value"
+    notes: "Reply S2C 157 (kind 8, the same kind as 137's reply)."
   - value: 32792
     direction: c2s
     connection: both
@@ -2203,12 +2500,53 @@ opcodes:
   - value: 126
     direction: s2c
     connection: game
-    name: gspRoomWaitingDialog_
+    name: gspNotifyMatch
+    name_source: mirrored
+    evidence: verified
+    source: "Two stage gates consume it: LobbyStage tw-454 sub_89BD50 case 126 and MainMenuStage tw-454 sub_8A8CD0 case 126. Both parse through tw-454 sub_8A1DC0 (u32 result, u32 unknown, wstr) and result 0 constructs DlgWaiting (tw-454 sub_B42490), the kr-812 sub_687640 gate's own semantics, so the kr-812 label mirrors"
+    notes: "Supersedes the coined gspRoomWaitingDialog_ now that the handler match across builds is established. The quick-match request trigger on this build is not established."
+  - value: 551
+    direction: s2c
+    connection: game
+    name: gspLmgReply_
     name_source: coined
     evidence: verified
-    source: "tw-454 sub_89BD50 handles 126 as the native waiting-wall control with two words and a counted UTF-16 string"
+    source: "gate tw-454 sub_89BD50 case 551 reads a leading u16 subId and routes through tw-454 sub_63F7A0 into the SubPacketDispatchEntry1Impl registry (keys Reply*@LmgProtocol) after the client-state check tw-454 sub_49B580"
+    notes: "Per-key minigame replies whose bodies the handlers read conditionally on the subId; no body table until a binding consumes them. No packet-name strings exist in this build."
+  - value: 552
+    direction: s2c
+    connection: game
+    name: gspLmgSyncState_
+    name_source: coined
+    evidence: verified
+    source: "gate tw-454 sub_89BD50 case 552 reads a u32 and a u16 subId into tw-454 sub_8A0CB0, which dispatches into the LmgSync registry"
+    notes: "Minigame state update; body LmgSyncState shared with cn-774 in packets/lobby-minigame.yaml."
+  - value: 524
+    direction: s2c
+    connection: game
+    name: Unknown524
+    name_source: none
+    evidence: verified
+    source: "MainMenuStage gate tw-454 sub_8A8CD0 case 524 reads four u32 words and calls tw-454 sub_8E02C0"
+    notes: "Purpose not established; the consumer tw-454 sub_8E02C0 rebuilds a positioned UI-marker list in the main UI manager. No body table."
 
   # Native relay handshake; game and relay directions use independent numeric spaces.
+  - value: 551
+    direction: c2s
+    connection: game
+    name: gcpLmgRequest_
+    name_source: coined
+    evidence: verified
+    source: "the lobby-minigame senders tw-454 sub_DC2290 (subcommand 1), tw-454 sub_637390 (10), tw-454 sub_DC3380 (11) and tw-454 sub_DC3A70 (12) each stamp 551 and write the u16 subcommand first; the shapes match the cn-774 family declared in packets/lobby-minigame.yaml, with tw-454 sub_46C330 widening two bytes to u32 before writing two u16 values, and tw-454 sub_DC3380 appending one byte widened to u32"
+    notes: "The subcommands pair with the Reply*@LmgProtocol registry keys the tw-454 LobbyMinigameContext constructor built (1 ReplyShootBasketball, 10 ReplyStartFishing, 11 ReplyLiftFishingRod, 12 ReplyFortune). No packet-name strings exist in this build."
+  - value: 552
+    direction: c2s
+    connection: game
+    name: gcpLmgSync_
+    name_source: coined
+    evidence: verified
+    source: "the minigame state senders tw-454 sub_63D7E0 (100 ShootFire), tw-454 sub_DC41B0 (101 ChangeState, states 203 and 207), tw-454 sub_63E1A0 (200 CastFishing) and tw-454 sub_63E430 (201 LiftFishing) each stamp 552 and write the u16 subcommand and one u32; they are the registered LmgSync handlers"
+    notes: "The subcommands pair with the *@LmgSync registry keys built in the tw-454 LobbyMinigameContext constructor."
   - value: 1
     direction: c2s
     connection: relay
@@ -2316,7 +2654,32 @@ opcodes:
     name: gcpRespawn
     name_source: label@kr-812
     evidence: verified
-    source: "tw-454 sub_717A20 writes actor, one caller word and one widened byte; matched to the kr-812 respawn sender and tw-454 sub_729D30 grant consumer"
+    source: "tw-454 sub_717A20 writes [u32 actor][u32 spawn index][u32 item reset] plainly; the death-state decision tw-454 sub_589530 sends it with the cached index or the 10*team+random fallback, and the item-reset word reads the itemResetOnRespawn settings through tw-454 sub_5CE8A0"
+    notes: "12 plain bytes, no marker framing; supersedes the earlier actor/caller-word/widened-byte reading"
+  - value: 603
+    direction: c2s
+    connection: game
+    name: gcpRequestRespawnIdx
+    name_source: label@cn-717
+    evidence: verified
+    source: "tw-454 sub_717BB0 writes [u32 actor][u32 spawn index] with the actor from the character object"
+    notes: "verified from the builder"
+  - value: 612
+    direction: c2s
+    connection: game
+    name: gcpGameReqUseRespawnItem
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_7F5950 checks the actor's revival state and tw-454 sub_C06710(91) before stamping 612 and writing one u32 actor word; mode 24 bypasses the item check and does not send this request"
+    notes: "The one-u32 actor body continues the legacy kr-812 sub_50E8A0 shape; the revival item id in the TW catalog is 91 and the client never decrements it."
+  - value: 613
+    direction: c2s
+    connection: game
+    name: gcpGameReqExtendRespawn
+    name_source: label@cn-717
+    evidence: verified
+    source: "tw-454 sub_C9D9A0 writes [u32 my actor][u32 wait delta] with the same 0.429296875 scale constant (tw-454 0x13EF348) and the dead-state guard chain; registered for UI event 176"
+    notes: "verified from the builder"
   - value: 603
     direction: s2c
     connection: game
@@ -2366,50 +2729,310 @@ opcodes:
     name_source: coined
     evidence: verified
     source: "tw-454 sub_7191E0 stamps 625 with no payload writes; the completion and elimination paths invoke it once their stage is over"
+  - value: 628
+    direction: c2s
+    connection: game
+    name: gcpReqCreateItem
+    name_source: label@cn-717
+    evidence: verified
+    source: "tw-454 sub_71AE40, sub_71B030, sub_78D180 and sub_83DF20 stamp 628 and write the same 33-byte body as kr-1256's (lifetimes 20000/10000/10000/10000, the kind 14 variant included); the eleven kill and mode handlers through tw-454 sub_83DF20 feed it"
+    notes: "33 bytes; byte-identical"
+  - value: 629
+    direction: c2s
+    connection: game
+    name: gcpReqCreateWeaponObject
+    name_source: label@cn-717
+    evidence: verified
+    source: "tw-454 sub_71B220 stamps 629 and writes the same eleven words as kr-1256's; the pickup path tw-454 sub_78DAB0 feeds it"
+    notes: "44 bytes; byte-identical"
+  - value: 630
+    direction: c2s
+    connection: game
+    name: gcpPickUpWeapon
+    name_source: label@cn-717
+    evidence: verified
+    source: "tw-454 sub_78D7F0 stamps 630 and writes [u32 weapon object][u32 actor]; the tick callers tw-454 sub_9ADDE0 and sub_C94AD0 feed it"
+    notes: "8 bytes; byte-identical"
+  - value: 631
+    direction: c2s
+    connection: game
+    name: gcpEatStar
+    name_source: label@cn-717
+    evidence: verified
+    source: "tw-454 sub_710B80 stamps 631 and writes [u32 actor][u32 item object]; the star item overlap handler feeds it"
+    notes: "8 bytes; byte-identical"
+  - value: 632
+    direction: c2s
+    connection: game
+    name: gcpReqCreateStar
+    name_source: label@cn-717
+    evidence: verified
+    source: "tw-454 sub_71BA70 stamps 632 and writes the same nine words as kr-1256's and cn-774's"
+    notes: "36 bytes; byte-identical"
+  - value: 633
+    direction: c2s
+    connection: game
+    name: gcpEatEventBox
+    name_source: label@cn-717
+    evidence: verified
+    source: "tw-454 sub_710C90 stamps 633 and writes [u32 actor][u32 item object]; the event box overlap handler feeds it"
+    notes: "8 bytes; byte-identical"
+  - value: 634
+    direction: c2s
+    connection: game
+    name: gcpReqCreateEventBox
+    name_source: label@cn-717
+    evidence: verified
+    source: "tw-454 sub_71BA70's family stamps 634 and writes the same nine words as kr-1256's; the kill and drop handler tw-454 sub_76AB70 feeds it"
+    notes: "36 bytes; byte-identical"
+  - value: 635
+    direction: c2s
+    connection: game
+    name: gcpEatLucci
+    name_source: label@cn-717
+    evidence: verified
+    source: "tw-454 sub_710DA0 stamps 635 and writes [u32 actor][u32 item object]; the lucci overlap handler feeds it"
+    notes: "8 bytes; byte-identical"
+  - value: 636
+    direction: c2s
+    connection: game
+    name: gcpReqCreateLucci
+    name_source: label@cn-717
+    evidence: verified
+    source: "tw-454 sub_71BE10 and sub_71C3A0 stamp 636 and write the same nine words as kr-1256's and cn-774's"
+    notes: "36 bytes; byte-identical"
+  - value: 637
+    direction: c2s
+    connection: game
+    name: gcpEatChocolate
+    name_source: label@cn-717
+    evidence: verified
+    source: "tw-454 sub_84C7C0 stamps 637 and writes [u32 actor][u32 item object], but the sender has no callers in this build"
+    notes: "Dead code: the client never emits it; the chocolate eat is server-driven (the S2C 621 notice)"
+  - value: 638
+    direction: c2s
+    connection: game
+    name: gcpReqCreateChocolate
+    name_source: label@cn-717
+    evidence: verified
+    source: "tw-454 sub_71C3A0's family stamps 638 and writes the same nine words as kr-1256's and cn-774's"
+    notes: "36 bytes; byte-identical"
+  - value: 639
+    direction: c2s
+    connection: game
+    name: gcpEatSpawner
+    name_source: label@cn-717
+    evidence: verified
+    source: "tw-454 sub_851F50 stamps 639 and writes [u32 actor][u32 item object][u32 zero], but the sender has no callers in this build"
+    notes: "Dead code: the client never emits it; the spawner activation is server-driven (the S2C 623 notice)"
+  - value: 640
+    direction: c2s
+    connection: game
+    name: gcpReqCreateSpawner
+    name_source: label@cn-717
+    evidence: verified
+    source: "tw-454 sub_71BC50 stamps 640 and writes the position and direction triplets and two trailing words; the spawner path tw-454 sub_85EA70 feeds it"
+    notes: "32 bytes; the field order differs from kr-1256's and cn-774's - packets/object-economy.yaml states each layout"
+  - value: 641
+    direction: c2s
+    connection: game
+    name: gcpEatHeart
+    name_source: label@cn-717
+    evidence: verified
+    source: "tw-454 sub_84DBF0 stamps 641 and writes [u32 actor][u32 item object], but the sender has no callers in this build"
+    notes: "Dead code: tw-454 never emits it, unlike kr-1256"
+  - value: 642
+    direction: c2s
+    connection: game
+    name: gcpReqCreateHeart
+    name_source: label@cn-717
+    evidence: verified
+    source: "tw-454 sub_71C1C0 stamps 642 and writes the same nine words as kr-1256's; the kill-drop dispatcher feeds it"
+    notes: "36 bytes; byte-identical to kr-1256's"
 
-  # Native action feed; shared packet data selects reporting identities and life events.
+  - value: 607
+    direction: s2c
+    connection: game
+    name: gspGameBigDropEventTick_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 dispatcher case 607, zero-byte body; the client logs starSpawnBig and lucci-bigdrop-splash timers"
+    notes: "Big-drop event tick"
+
+  - value: 609
+    direction: s2c
+    connection: game
+    name: gspGameCreateGameItem
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_70B3F0 case 609 invokes tw-454 sub_720F80, reading object, classification, position, kind, three vector words and one team byte (37 bytes)"
+  - value: 614
+    direction: s2c
+    connection: game
+    name: gspGameCreateStar
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 constructs GoStarItem and GoBigStarItem from the nine u32 words; the label mirrors the legacy star create"
+    notes: "Star create notice"
+
+  - value: 615
+    direction: s2c
+    connection: game
+    name: gspStarEaten
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 reads two u32 words; the client logs bigstarchr"
+    notes: "Big-star eaten notice"
+
+  - value: 616
+    direction: s2c
+    connection: game
+    name: gspGameCreateEventBox_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 constructs the event box from nine u32 words; type 1 is GoEventBoxItem and type 3 the horde-award variant"
+    notes: "Event box create notice"
+
+  - value: 617
+    direction: s2c
+    connection: game
+    name: gspEventBoxEaten_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 reads two u32 words; the client logs pigboxChr or PigboxEat"
+    notes: "Event box eaten notice"
+
+  - value: 618
+    direction: s2c
+    connection: game
+    name: gspGameCreateLucci
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 constructs GoLucciItem and GoBigLucciItem from the nine u32 words; the label mirrors the legacy lucci create"
+    notes: "Lucci create notice"
+
+  - value: 619
+    direction: s2c
+    connection: game
+    name: gspLucciEaten
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 reads two u32 words; the client logs biglucciChr or lucciEat"
+    notes: "Lucci eaten notice"
+
+  - value: 620
+    direction: s2c
+    connection: game
+    name: gspGameCreateChocolate_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 constructs the chocolate item from ten words including the position and direction"
+    notes: "Chocolate create notice"
+
+  - value: 621
+    direction: s2c
+    connection: game
+    name: gspChocolateEaten_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 reads two u32 words; the client logs chocolateChr"
+    notes: "Chocolate eaten notice"
+
+  - value: 622
+    direction: s2c
+    connection: game
+    name: gspGameCreateSpawner_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 constructs the spawner item from ten words"
+    notes: "Spawner create notice"
+
+  - value: 623
+    direction: s2c
+    connection: game
+    name: gspSpawnerEaten_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 reads two u32 words; the client logs GuardianCall"
+    notes: "Spawner eaten notice"
+
+  - value: 624
+    direction: s2c
+    connection: game
+    name: gspGameCreateHeart_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 constructs the heart item from ten words"
+    notes: "Heart create notice"
+
+  - value: 625
+    direction: s2c
+    connection: game
+    name: gspHeartEaten_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 reads two u32 words; the client logs heartChr"
+    notes: "Heart eaten notice"
+
+  - value: 645
+    direction: s2c
+    connection: game
+    name: gspGameCreateWeaponObject_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 constructs the WeaponObject from twelve u32 words; tw-454 sub_721380"
+    notes: "Weapon object create notice"
+
+  - value: 646
+    direction: s2c
+    connection: game
+    name: gspPickUpWeapon_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 reads two u32 words; the weapon pickup notice"
+    notes: "Weapon pickup notice"
   - value: 32779
     direction: c2s
     connection: both
-    name: Unknown32779
-    name_source: none
+    name: gppDash
+    name_source: label@kr-812
     evidence: verified
-    source: "tw-454 sub_712F20 writes actor and Boolean word"
+    source: "tw-454 sub_712F20 writes actor and bool32 for dash; matches kr-812 sub_50F510 Packet_gppDash builder"
   - value: 32779
     direction: s2c
     connection: both
-    name: Unknown32779
-    name_source: none
+    name: gppDash
+    name_source: label@kr-812
     evidence: verified
-    source: "tw-454 sub_70B3F0 consumes actor and Boolean word in case 32779"
+    source: "tw-454 sub_70B3F0 consumes actor and bool32 for dash; matches kr-812 sub_523A60 Packet_gppDash consumer"
   - value: 32780
     direction: c2s
     connection: both
-    name: Unknown32780
-    name_source: none
+    name: gppRoll
+    name_source: label@kr-812
     evidence: verified
-    source: "tw-454 sub_80BB80 writes actor, word and two bytes"
+    source: "tw-454 sub_80BB80 writes actor, word and two bytes for roll; matches kr-812 sub_50F630 Packet_gppRoll builder"
   - value: 32780
     direction: s2c
     connection: both
-    name: Unknown32780
-    name_source: none
+    name: gppRoll
+    name_source: label@kr-812
     evidence: verified
-    source: "tw-454 sub_70B3F0 consumes actor, word and two bytes in case 32780"
+    source: "tw-454 sub_70B3F0 consumes actor, word and two bytes for roll; matches kr-812 sub_523AF0 Packet_gppRoll consumer"
   - value: 32781
     direction: c2s
     connection: both
-    name: Unknown32781
-    name_source: none
+    name: gppJump
+    name_source: label@kr-812
     evidence: verified
-    source: "tw-454 sub_7130B0 writes actor, word and Boolean word in signed case -32755"
+    source: "tw-454 sub_7130B0 writes actor, word and bool32 for jump; matches kr-812 sub_50F750 Packet_gppJump builder"
   - value: 32781
     direction: s2c
     connection: both
-    name: Unknown32781
-    name_source: none
+    name: gppJump
+    name_source: label@kr-812
     evidence: verified
-    source: "tw-454 sub_70D9E0 consumes actor, word and Boolean word in signed case -32755"
+    source: "tw-454 sub_70D9E0 consumes actor, word and bool32 for jump; matches kr-812 sub_523B80 Packet_gppJump consumer"
   - value: 32782
     direction: c2s
     connection: both
@@ -2907,6 +3530,666 @@ opcodes:
     direction: c2s
     connection: game
     name: gcpGameReportMapData
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_70F410 writes a u32 and fourteen counted vectors; positions, kinds, byte teams, maximum and minimum milliseconds precede the remaining native map vectors"
+  - value: 32885
+    direction: s2c
+    connection: udp
+    name: gppWanderLean
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_A77DA0 dispatches the native UDP movement body after the datagram header"
+
+  - value: 32923
+    direction: s2c
+    connection: udp
+    name: gppWanderLeanOptimize
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_A77DA0 dispatches the native UDP movement body after the datagram header"
+
+  - value: 22
+    direction: c2s
+    connection: game
+    name: gcpReqCenterUserCnt
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_AB1D30 stamps22 with no body; tw-454 sub_A7C220 selects the auxiliary status path"
+
+  - value: 23
+    direction: c2s
+    connection: game
+    name: gcpReqUniquenessCheck
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_AB2850 establishes23 and the retained-user word for auxiliary uniqueness"
+
+  - value: 54
+    direction: c2s
+    connection: game
+    name: gcpReqMoveInto
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_A7C220 selects54 and writes two retained words on the migration path"
+
+  - value: 55
+    direction: c2s
+    connection: game
+    name: gcpAcknowledgePendingPromotion_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_A84660 promotes pending to current and stamps55 with no body on the retained source"
+
+  - value: 917
+    direction: c2s
+    connection: game
+    name: gcpPveUseCountItem
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_582F10 stamps 917 and writes [u32 slot]; the hotkey dispatcher tw-454 sub_581B30 calls it with slots 1..3"
+    notes: "Renumbered from cn-406's 921; the body shape is preserved"
+
+
+  - value: 919
+    direction: c2s
+    connection: game
+    name: gcpPvePangUnit
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_710EB0 stamps 919 and writes [u32 unit id]; the mission-NPC handlers tw-454 sub_832400 and sub_835CA0 feed it with the NpcTurret RTTI cast and kind match"
+    notes: "Renumbered from cn-406's 923; the body shape is preserved"
+
+
+  - value: 916
+    direction: c2s
+    connection: game
+    name: Unknown916
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_8F2830 stamps 916 with no body write; the request purpose is not established"
+
+
+  - value: 923
+    direction: c2s
+    connection: game
+    name: gcpMissionProcess
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_710FB0 stamps 923 and writes [u32 mission index][u32 NPC kind][u32 zero]; the citizen rescue path tw-454 sub_82EEC0 feeds it"
+    notes: "Renumbered from cn-406's 927; the body shape is preserved. Wire order is mission index first, NPC kind second, zero word third"
+
+
+  - value: 921
+    direction: s2c
+    connection: game
+    name: gspMapMissionInfo
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_A5CC00 parses the 44-byte sMissionInfo_From_Svr records (reader tw-454 sub_A72920) and rebuilds the mission list"
+    notes: "One counted vector; native 44-byte records contain six words, a string vector and bool32 on the wire"
+
+
+  - value: 922
+    direction: s2c
+    connection: game
+    name: gspResMissionStart
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_A5CEA0 reads one u32 and announces from the aZombierushMiss string table (24 chars) with balloon effects at +300/+400"
+    notes: "Renumbered from cn-406's 925; the announce and balloon paths are preserved"
+
+
+  - value: 923
+    direction: s2c
+    connection: game
+    name: gspResMissionTimeOut
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_A578B0; one u32, the mission index kept"
+    notes: "Renumbered from cn-406's 926; the mission index is kept for the advance"
+
+
+  - value: 924
+    direction: s2c
+    connection: game
+    name: gspResMissionOK
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_A578B0; two u32 words (flag and mission index); flag 0 advances the index"
+    notes: "Renumbered from cn-406's 927; the flag-0 advance path is preserved"
+
+
+  - value: 925
+    direction: s2c
+    connection: game
+    name: gspNotifyGamePoint
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_A578B0; three u32 words (seat bounded at 36, subtract flag, amount); the per-seat points land in the round object's table at v3+34544"
+    notes: "Renumbered from cn-406's 928; the seat bound widened from 32 to 36"
+
+
+  - value: 926
+    direction: s2c
+    connection: game
+    name: gspNotifyRankInfo
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_A5D060 reads the state, the counted u32 vector and the counted sResultRankInfo 24-byte rank rows"
+    notes: "Renumbered from cn-406's 929; rank rows contain five wire words; their native 24-byte size includes a vtable"
+
+
+  - value: 927
+    direction: s2c
+    connection: game
+    name: gspPveItemInfo
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_A578B0; the counted sPVESLOTITEMINFO entries"
+    notes: "Renumbered from cn-406's 930; each counted entry carries three wire words; its native size includes a vtable"
+
+
+  - value: 928
+    direction: s2c
+    connection: game
+    name: gspPveStatusNotice_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_A578B0; one counted string routed to the notice list at dword_163DE3C+1248"
+    notes: "Modern extra absent from cn-406"
+  - value: 605
+    direction: c2s
+    connection: game
+    name: gcpEatItem
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_7106A0 writes the item object id and resolved item kind, two u32 words"
+  - value: 606
+    direction: c2s
+    connection: game
+    name: gcpUseItem
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_786480 stamps 606 without payload writes after the held-item and use-timer checks"
+  - value: 644
+    direction: c2s
+    connection: game
+    name: gcpSwitchItemSlot
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_732F90 stamps an empty 644; tw-454 sub_7EC7B0 sends it only with a held alternate slot and marks the switch pending"
+  - value: 610
+    direction: s2c
+    connection: game
+    name: gspItemEaten
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_70B3F0 case 610 reads seat and object u32 words and removes the matching world object"
+  - value: 611
+    direction: s2c
+    connection: game
+    name: gspAddItemToSlot
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_70B3F0 case 611 invokes tw-454 sub_71F170, reading seat, kind and native item slot (12 bytes); mode 16 uses its counted inventory"
+  - value: 612
+    direction: s2c
+    connection: game
+    name: gspItemUsed
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_70B3F0 case 612 reads seat, kind and item slot, clears that slot and applies the local native effect through tw-454 sub_784AE0 / tw-454 sub_71EF80"
+  - value: 613
+    direction: s2c
+    connection: game
+    name: gspPveItemUsed
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_70B3F0 case 613 reads three words and applies the local kind effect without clearing the held slot through tw-454 sub_784AE0 / tw-454 sub_71EF80"
+  - value: 647
+    direction: s2c
+    connection: game
+    name: gspSwitchItemSlot
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_70B3F0 case 647 clears the pending switch and installs the selected slot and kind; four u32 words, final nonzero result rejects the selection"
+
+  - value: 941
+    direction: c2s
+    connection: game
+    name: gcpReqRecheckMap
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_A48CC0 stamps 941 and writes the current session map as a counted UTF-16 string, matching the native map-recheck builder"
+  - value: 2015
+    direction: c2s
+    connection: game
+    name: gcpBombState
     name_source: label@kr-812
     evidence: verified
-    source: "tw-454 sub_70F410 stamps 579 and serializes the native map-data report; recorded without parsing; matched to the corresponding kr-812 packet builder"
+    source: "tw-454 sub_737DC0 stamps 2015 and writes two words plus three floats; matched to kr-812 gcpBombState."
+  - value: 2014
+    direction: c2s
+    connection: game
+    name: gcpBombMissionOver
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_738440 stamps 2014 and writes one winner byte and two operator words; matched to kr-812 gcpBombMissionOver."
+  - value: 2011
+    direction: c2s
+    connection: game
+    name: Unknown2011
+    name_source: none
+    evidence: verified
+    source: "tw-454 sub_7D37C0 stamps 2011 with an EMPTY body - zero appends between the packet ctor and the send through the game connection dword_163FD20 - gated on a config value fetched by a fixed key comparing equal to the built string (equality test tw-454 sub_453030) and a seat state dword != 36"
+    notes: "The purpose is unknown: no name evidence; a config-gated, state-checked empty request sent per entry of a room-member list. The state dword is the seat record's +116 field (base dword_163DEAC + 280 * user_number + 20168), the same field the S2C 511 gspRoomLeaveSlot fill path copies from the parsed UserSlot (tw-454 sub_A5A0B0); packets/room.yaml documents no UserSlot field at +116, and what state 36 means is unestablished."
+  - value: 2021
+    direction: c2s
+    connection: game
+    name: gcpDropCaptain
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_56D2B0 stamps 2021 on local Captain death and writes one seat word; matched to kr-812 gcpDropCaptain."
+  - value: 971
+    direction: s2c
+    connection: game
+    name: gspBombState
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_70B3F0 case 971 decodes the Bomb broadcast and calls tw-454 sub_5661B0; matched to kr-812 gspBombState."
+  - value: 972
+    direction: s2c
+    connection: game
+    name: gspObserver
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_737F30 reads one scene-object word and gates its observer transition on mode 19; matched to kr-812 gspObserver."
+  - value: 980
+    direction: s2c
+    connection: game
+    name: gspCreateCaptain
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A578B0 case 980 dispatches to tw-454 sub_56E1E0, which appoints the Captain from one seat word; matched to kr-812 gspCreateCaptain."
+  - value: 608
+    direction: c2s
+    connection: game
+    name: gcpGameUpdateScore
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_56E420 sends the Captain kill through tw-454 sub_73B320, which stamps 608 and writes the 16-byte full score report; matched to kr-812 gcpGameUpdateScore."
+  - value: 939
+    direction: c2s
+    connection: game
+    name: gcpPortalMove
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_737900 writes game 939 as position xyz and region u16; matched to kr-812 sub_529E80 Packet_gcpPortalMove; tw-454 sub_A9E510 consumes the native movement authorization; packets/portal.yaml"
+  - value: 32922
+    direction: c2s
+    connection: both
+    name: gppTeleportPortal
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_7133D0 writes actor and position xyz under 32922; tw-454 sub_730630 resolves that character and applies native teleport effects; matched to kr-812 sub_50FA90 / kr-812 sub_523F20 Packet_gppTeleportPortal; packets/portal.yaml"
+
+  # The native HordeWaveMgr exchange and its shared NPC operation adapters.
+  - value: 903
+    direction: c2s
+    connection: game
+    name: gcpReqStartNewWave
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_C87FC0; matched kr-812 sub_A09070"
+    notes: "One u32 next-wave index; sets the start latch until S2C 904."
+  - value: 904
+    direction: s2c
+    connection: game
+    name: gspRepStartNewWave
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_CB9140 case 904 -> tw-454 sub_C895C0; matched kr-812 sub_A301C0 case 904"
+    notes: "One u32 wave; releases the host start latch and starts the wave on every member."
+  - value: 904
+    direction: c2s
+    connection: game
+    name: gcpReqEndWave
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_C893D0; matched kr-812 sub_A09100"
+    notes: "One u32 cleared-wave index."
+  - value: 905
+    direction: s2c
+    connection: game
+    name: gspRepEndWave
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_CB9140 case 905 -> tw-454 sub_C89F40; matched kr-812 sub_A301C0 case 905"
+    notes: "One u32 cleared-wave index; releases the end latch."
+  - value: 905
+    direction: c2s
+    connection: game
+    name: gcpReqEndAllWave
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_C894D0; matched kr-812 sub_A09190"
+    notes: "Empty request after the final wave."
+  - value: 906
+    direction: s2c
+    connection: game
+    name: gspRepEndAllWave
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_CB9140 case 906; matched kr-812 sub_A301C0 case 906"
+    notes: "Empty reply sets the horde completion state to 1."
+  - value: 908
+    direction: c2s
+    connection: game
+    name: gcpReqWaveAllSpawnMobs
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_C895C0 -> tw-454 sub_EC42B0 / tw-454 sub_EC3DC0; matched kr-812 sub_A092B0"
+    notes: "u32 wave, u16, u32 and counted spawn records; only the local host sends the table."
+  - value: 908
+    direction: s2c
+    connection: game
+    name: gspResetWaveMobs_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_CB9140 case 908 -> tw-454 sub_C92E60"
+    notes: "Empty reset removes previous NPCs before the next spawn table."
+  - value: 909
+    direction: s2c
+    connection: game
+    name: gspRepWaveAllSpawnMobs
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_CB9140 case 909 -> tw-454 sub_C87760 -> tw-454 sub_EC4830 / tw-454 sub_EC3E90; matched kr-812 sub_A07E90"
+    notes: "The host releases its table latch; other members install the same complete table."
+  - value: 32857
+    direction: c2s
+    connection: both
+    name: gppCreateMobsFromSpawnGroup
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_8FBCE0; tw-454 sub_8F9160 case 32857 -> tw-454 sub_8F8B80; matched kr-812 sub_6E1350"
+    notes: "One u32 spawn-group key."
+  - value: 32857
+    direction: s2c
+    connection: both
+    name: gppCreateMobsFromSpawnGroup
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_8FBCE0; tw-454 sub_8F9160 case 32857 -> tw-454 sub_8F8B80; matched kr-812 sub_6E1350"
+    notes: "One u32 spawn-group key."
+  - value: 32862
+    direction: c2s
+    connection: both
+    name: gppCreateSpawnGroupMemberMob
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_8FC680; tw-454 sub_8F9160 case 32862 -> tw-454 sub_8FC8A0; matched kr-812 sub_6E1930"
+    notes: "Two u32 words, a counted UTF-16 string and four u32 words."
+  - value: 32862
+    direction: s2c
+    connection: both
+    name: gppCreateSpawnGroupMemberMob
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_8FC680; tw-454 sub_8F9160 case 32862 -> tw-454 sub_8FC8A0; matched kr-812 sub_6E1930"
+    notes: "Two u32 words, a counted UTF-16 string and four u32 words."
+  - value: 32892
+    direction: c2s
+    connection: both
+    name: gppCreateAIObject
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_85EA70; tw-454 sub_70B3F0 case 32892 -> tw-454 sub_722270; matched kr-812 sub_647CD0"
+    notes: "32 bytes: two u32 words, eight bytes and four u32 words."
+  - value: 32892
+    direction: s2c
+    connection: both
+    name: gppCreateAIObject
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_85EA70; tw-454 sub_70B3F0 case 32892 -> tw-454 sub_722270; matched kr-812 sub_647CD0"
+    notes: "32 bytes: two u32 words, eight bytes and four u32 words."
+  - value: 32866
+    direction: c2s
+    connection: both
+    name: gppHordeMobReplay
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_CA9FE0 / tw-454 sub_CAA370; tw-454 sub_CB9140 -> tw-454 sub_CA9CE0; matched kr-812 sub_A225A0"
+    notes: "Two u32 words, a counted UTF-16 string and one u32 word."
+  - value: 32866
+    direction: s2c
+    connection: both
+    name: gppHordeMobReplay
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_CA9FE0 / tw-454 sub_CAA370; tw-454 sub_CB9140 -> tw-454 sub_CA9CE0; matched kr-812 sub_A225A0"
+    notes: "Two u32 words, a counted UTF-16 string and one u32 word."
+  - value: 32873
+    direction: c2s
+    connection: both
+    name: gppWaveSetMobSpawnGroup
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_CADBA0; tw-454 sub_CB9140 -> tw-454 sub_C87B50; matched kr-812 sub_A25B40"
+    notes: "Two u8 fields and one u32 word."
+  - value: 32873
+    direction: s2c
+    connection: both
+    name: gppWaveSetMobSpawnGroup
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_CADBA0; tw-454 sub_CB9140 -> tw-454 sub_C87B50; matched kr-812 sub_A25B40"
+    notes: "Two u8 fields and one u32 word."
+  - value: 32922
+    direction: s2c
+    connection: both
+    name: gppTeleportPortal
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_7133D0 writes actor and position xyz under 32922; tw-454 sub_730630 resolves that character and applies native teleport effects; matched to kr-812 sub_50FA90 / kr-812 sub_523F20 Packet_gppTeleportPortal; packets/portal.yaml"
+  - value: 305
+    direction: c2s
+    connection: game
+    name: gcpReqPartyRecruiting
+    name_source: label@kr-812
+    evidence: verified
+    source: tw-454 sub_B64150 stamps 305 and writes a four-byte recruitment toggle; tw-454 sub_B64110 cancels the active sign; matched to kr-812
+      Packet_gcpReqPartyRecruiting
+  - value: 516
+    direction: c2s
+    connection: game
+    name: gcpRoomSendRecMsg
+    name_source: label@kr-812
+    evidence: verified
+    source: tw-454 sub_A7D2F0 stamps 516 and writes one counted UTF-16 message before tw-454 sub_B9B180 toggles recruitment; matched to kr-812 Packet_gcpRoomSendRecMsg
+  - value: 516
+    direction: s2c
+    connection: game
+    name: gspRoomReceiveRecruitMsg
+    name_source: label@kr-812
+    evidence: verified
+    source: tw-454 sub_A60EC0 reads a u16 seat and counted UTF-16 text and calls tw-454 sub_A65E20 for the installed actor bubble; matched to kr-812
+      Packet_gspRoomReceiveRecruitMsg
+
+  - value: 2067
+    direction: c2s
+    name: gcpReqRheaForm_
+    name_source: coined
+    evidence: verified
+    connection: game
+    source: "tw-454 sub_717CC0"
+    notes: "Rhea form request: scene actor u32, active bool32; native input owns charge and expiry. packets/character-form.yaml."
+  - value: 1538
+    direction: s2c
+    name: gspRheaForm_
+    name_source: coined
+    evidence: verified
+    connection: game
+    source: "tw-454 sub_70B3F0 -> tw-454 sub_7397F0"
+    notes: "Scene actor u32, active bool32; applies Rhea form 29/2000, preserves HP ratio, clears local pending latch. Send accepted changes to owner and peers."
+  - value: 33287
+    direction: c2s
+    connection: both
+    name: gppScriptZombieConversion_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_9AE730 writes team:u8, seat:u32, operation:u32, zombie kind and weapon through the peer route."
+  - value: 33287
+    direction: s2c
+    connection: game
+    name: gppScriptZombieConversion_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_715220 applies the authorized zombie character and clears the local pending latch on receipt."
+  - value: 33290
+    direction: c2s
+    connection: both
+    name: gppSetAddableObjectVisible_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_88BB00 calls tw-454 sub_714840 to send counted narrow name, bool32 visibility and script sequence on the peer route."
+  - value: 33290
+    direction: s2c
+    connection: game
+    name: gppSetAddableObjectVisible_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_7155C0 reads counted narrow name, bool32 visibility and script sequence and installs the sequence only on receipt, including for the producer."
+  - value: 33291
+    direction: c2s
+    connection: both
+    name: gppCreateBreakableObject_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_88BB90 calls tw-454 sub_714A30 to send counted narrow name, float32 health and script sequence on the peer route."
+  - value: 33291
+    direction: s2c
+    connection: game
+    name: gppCreateBreakableObject_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_715700 reads counted narrow name, float32 health and script sequence and installs the sequence only on receipt, including for the producer."
+  - value: 33292
+    direction: c2s
+    connection: both
+    name: gppArea32MapEffect_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_88BC90 calls tw-454 sub_714BF0 to send three wide strings, bool32 visibility, unknown word and script sequence on the peer route."
+  - value: 33292
+    direction: s2c
+    connection: game
+    name: gppArea32MapEffect_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_715830 reads three wide strings, bool32 visibility, unknown word and script sequence and installs the sequence only on receipt, including for the producer."
+  - value: 624
+    direction: c2s
+    connection: game
+    name: gcpReqEndStage
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_7192C0 stamps 624 and writes the outcome word; the Zombie Escape SendGameResult callback passes humanWon xor 1. Matched to kr-812 Packet_gcpReqEndStage."
+  - value: 32774
+    direction: c2s
+    connection: both
+    name: gppDeleteObject
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_711A70 writes; tw-454 sub_70B3F0 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "One object word, resolved by tw-454 sub_705AC0."
+  - value: 32774
+    direction: s2c
+    connection: both
+    name: gppDeleteObject
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_711A70 writes; tw-454 sub_70B3F0 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "One object word, resolved by tw-454 sub_705AC0."
+  - value: 32841
+    direction: c2s
+    connection: both
+    name: gppIniPacket
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_8F9D10 writes; tw-454 sub_8FA2A0 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "Counted UTF-16 document; native newSpawn command."
+  - value: 32841
+    direction: s2c
+    connection: both
+    name: gppIniPacket
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_8F9D10 writes; tw-454 sub_8FA2A0 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "Counted UTF-16 document; native newSpawn command."
+  - value: 32865
+    direction: c2s
+    connection: both
+    name: gppMobLuaMessage
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_8FB3C0 writes; tw-454 sub_8FBA90 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "One selector word and a counted UTF-16 document; zero selects all mobs."
+  - value: 32865
+    direction: s2c
+    connection: both
+    name: gppMobLuaMessage
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_8FB3C0 writes; tw-454 sub_8FBA90 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "One selector word and a counted UTF-16 document; zero selects all mobs."
+  - value: 32891
+    direction: c2s
+    connection: both
+    name: gppDummyUnitMotion
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_7320E0 writes; tw-454 sub_731FD0 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "One actor word, counted UTF-16 motion and one word; non-master applies the motion."
+  - value: 32891
+    direction: s2c
+    connection: both
+    name: gppDummyUnitMotion
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_7320E0 writes; tw-454 sub_731FD0 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "One actor word, counted UTF-16 motion and one word; non-master applies the motion."
+  - value: 32893
+    direction: c2s
+    connection: both
+    name: gppAgentMoveTo
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_735710 writes; tw-454 sub_735880 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "Actor word, slot word and three position words; consumer checks slot and actor identity."
+  - value: 32893
+    direction: s2c
+    connection: both
+    name: gppAgentMoveTo
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_735710 writes; tw-454 sub_735880 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "Actor word, slot word and three position words; consumer checks slot and actor identity."
+  - value: 32894
+    direction: c2s
+    connection: both
+    name: gppUseItemDirect
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_7327F0 writes; tw-454 sub_732DB0 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "Two words; direct-use item consumer tw-454 sub_7328F0."
+  - value: 32894
+    direction: s2c
+    connection: both
+    name: gppUseItemDirect
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_7327F0 writes; tw-454 sub_732DB0 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "Two words; direct-use item consumer tw-454 sub_7328F0."

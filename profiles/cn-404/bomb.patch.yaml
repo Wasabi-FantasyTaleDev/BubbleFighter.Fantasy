@@ -1,0 +1,10 @@
+# Explicit opt-in to the build-audited bomb exchange; native-client acceptance remains required.
+- set:
+    id: dialect.rooms
+    config:
+      bomb_mission: true
+- set:
+    id: ingame
+    config:
+      bomb_round_series: true
+      respawn_disabled_mode_ids: [19]

@@ -25,10 +25,13 @@ public sealed class ClientDataGeneratorTests : IDisposable
     public void CopiesDataArchivesButExtractsOnlySelectedMembersOfMixedArchives()
     {
         Pack("Packs/Config_00000.pkn", [("Config/ShopItem2.xml", "shop"), ("Config/Other.xml", "other")]);
-        Pack("Packs/Maps_00000.pkn", [("Maps/Example.xml", "map"), ("Maps/Example.dds", "texture")]);
+        Pack("Packs/Maps_00000.pkn", [("Maps/Example.xml", "map"), ("Maps/Area/Nested/track.wb", "world-block"), ("Maps/Example.dds", "texture")]);
         new ClientDataGenerator().Generate("kr-812", Client, Output, 100, 1048576, default);
         Assert.True(File.Exists(Path.Combine(Output, "data/Packs/Config_00000.pkn")));
         Assert.Equal("map", File.ReadAllText(Path.Combine(Output, "dataraw/Maps/Example.xml")));
+        Assert.Equal("world-block", File.ReadAllText(Path.Combine(Output, "dataraw/Maps/Area/Nested/track.wb")));
+        Assert.Contains("dataraw/Maps/Area/Nested/track.wb\tPacks/Maps_00000.pkn\tMaps/Area/Nested/track.wb\t",
+            File.ReadAllText(Path.Combine(Output, "sources.tsv")));
         Assert.False(File.Exists(Path.Combine(Output, "dataraw/Maps/Example.dds")));
         Assert.False(File.Exists(Path.Combine(Output, "data/Packs/Maps_00000.pkn")));
         Assert.Contains("sources.tsv", Directory.GetFiles(Output).Select(Path.GetFileName));

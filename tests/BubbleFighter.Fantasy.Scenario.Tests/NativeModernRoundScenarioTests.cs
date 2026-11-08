@@ -1,4 +1,6 @@
 using System.Buffers.Binary;
+using System.Net;
+using System.Net.Sockets;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Packets;
@@ -11,15 +13,20 @@ using Xunit.Abstractions;
 namespace BubbleFighter.Fantasy.Scenario.Tests;
 
 /// <summary>Drives complete native modern rounds through two independent encrypted game and relay connections.</summary>
+[Collection("Native match listener ports")]
 public sealed class NativeModernRoundScenarioTests(ITestOutputHelper output)
 {
     private static readonly PacketTables Tables = PacketTables.Load(SharedDialectRows.PacketsDirectory());
 
-    /// <summary>Both modern regional dialects must compose loading, relay admission, gameplay and return twice.</summary>
+    /// <summary>All three modern dialects must compose loading, relay admission, gameplay and return twice.</summary>
     [Theory]
-    [InlineData("cn-774")]
-    [InlineData("tw-454")]
-    public async Task NativeClientsCompleteTwoRounds(string build)
+    [InlineData("kr-1256", false)]
+    [InlineData("kr-1256", true)]
+    [InlineData("cn-774", false)]
+    [InlineData("tw-454", false)]
+    [InlineData("cn-774", true)]
+    [InlineData("tw-454", true)]
+    public async Task NativeClientsCompleteTwoRounds(string build, bool udp)
     {
         var projection = (IReadOnlyDictionary<string, object?>)Tables.ValuesOf(build)["room_projection_fields"]!;
         var modeField = (string)projection["mode"]!;
@@ -28,7 +35,11 @@ public sealed class NativeModernRoundScenarioTests(ITestOutputHelper output)
         var finishName = FeedName("Unknown38277");
         var table = OpcodeTableLoader.Load(Path.Combine(RepositoryRoot(), "profiles", build, "opcodes.yaml"), TestWireDialects.Get(build).Profile);
         var relayTable = table.ForConnection(OpcodeConnection.Relay);
-        await using var server = await ScenarioServer.StartAsync((game, relay) => Rows(build, game, relay), build, minimumPort: 7500);
+        await using var server = await ScenarioServer.StartAsync((game, relay) => Rows(build, game, relay, udp), build, minimumPort: 7500);
+        using var udpA = udp ? OpenUdp() : null;
+        using var udpB = udp ? OpenUdp() : null;
+        var cookies = new Dictionary<SimActor, byte[]>();
+        byte[]? staleEnvelope = null;
         var a = await server.ConnectAsync("nativeA" + build.Replace("-", "", StringComparison.Ordinal));
         var b = await server.ConnectAsync("nativeB" + build.Replace("-", "", StringComparison.Ordinal));
         await Login(a);
@@ -87,14 +98,44 @@ public sealed class NativeModernRoundScenarioTests(ITestOutputHelper output)
             var endA = a.Cursor;
             var endB = b.Cursor;
             var peer = relayB.Cursor;
-            await relayA.Send(relayTable.C2S("gppWanderLean"), Movement(actorA));
-            var movement = await relayB.WaitFor(relayTable.S2C("gppWanderLean"), peer);
-            Assert.Equal(Movement(actorA), movement.Payload);
+            if (udp)
+            {
+                foreach (var relayClient in new[] { relayA, relayB })
+                {
+                    var udpOffer = await relayClient.WaitFor(relayTable.S2C("rspUdpBypassInfo"), 0);
+                    Assert.Equal(10, udpOffer.Payload.Length);
+                    Assert.Equal(server.RelayPort, BinaryPrimitives.ReadUInt16LittleEndian(udpOffer.Payload));
+                    cookies.Add(relayClient, udpOffer.Payload.AsSpan(2).ToArray());
+                }
+                await Probe(udpA!, relayA);
+                if (round == 0) await Probe(udpB!, relayB);
+                if (staleEnvelope is not null)
+                {
+                    await udpA!.SendToAsync(Frame(20003, staleEnvelope), SocketFlags.None,
+                        new IPEndPoint(IPAddress.Loopback, server.RelayPort), server.Ct);
+                    using var noStale = CancellationTokenSource.CreateLinkedTokenSource(server.Ct);
+                    noStale.CancelAfter(TimeSpan.FromMilliseconds(200));
+                    await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+                        await relayB.WaitFor(relayTable.S2C("gppWanderLean"), peer).WaitAsync(noStale.Token));
+                }
+                staleEnvelope = cookies[relayA].Concat(Movement(actorA)).ToArray();
+                await SendUdp(udpA!, relayA, 20003, Movement(actorA));
+                if (round == 0) Assert.Equal(Movement(actorA), await ReceiveUdp(udpB!, relayTable.S2C("gppWanderLean"), relayB));
+                else Assert.Equal(Movement(actorA), (await relayB.WaitFor(relayTable.S2C("gppWanderLean"), peer)).Payload);
+            }
+            else
+            {
+                await relayA.Send(relayTable.C2S("gppWanderLean"), Movement(actorA));
+                Assert.Equal(Movement(actorA), (await relayB.WaitFor(relayTable.S2C("gppWanderLean"), peer)).Payload);
+            }
             peer = relayB.Cursor;
-            await a.Send(table.C2S("gppWanderLeanOptimize"), Body("MovementSample", new()
-            { ["actor"] = actorA, ["tick"] = (ushort)8, ["mask"] = (byte)1, ["x"] = 9.5f + round }));
-            var merged = PacketCodec.Read(Tables, build, "MovementReport",
-                (await relayB.WaitFor(relayTable.S2C("gppWanderLean"), peer)).Payload);
+            var delta = Body("MovementSample", new()
+            { ["actor"] = actorA, ["tick"] = (ushort)8, ["mask"] = (byte)1, ["x"] = 9.5f + round });
+            if (udp) await SendUdp(udpA!, relayA, 20004, delta);
+            else await a.Send(table.C2S("gppWanderLeanOptimize"), delta);
+            var mergedBody = udp && round == 0 ? await ReceiveUdp(udpB!, relayTable.S2C("gppWanderLean"), relayB)
+                : (await relayB.WaitFor(relayTable.S2C("gppWanderLean"), peer)).Payload;
+            var merged = PacketCodec.Read(Tables, build, "MovementReport", mergedBody);
             Assert.Equal(9.5f + round, merged["x"]);
             Assert.Equal(2.5f, merged["y"]);
             Assert.Equal(3.5f, merged["z"]);
@@ -107,38 +148,92 @@ public sealed class NativeModernRoundScenarioTests(ITestOutputHelper output)
             var death = Body("Unknown38282", new() { ["victim"] = actorB, ["source"] = actorA });
             await relayB.Send(relayTable.C2S(hitName), death);
             Assert.Equal(death, (await relayA.WaitFor(relayTable.S2C(hitName), peer)).Payload);
+            foreach (var (client, cursor) in new[] { (a, endA), (b, endB) })
+            {
+                var knockdownScore = await client.WaitFor(frame => IsTeamScore(frame, 1, 0),
+                    "knockdown without a team kill", cursor);
+                Assert.Equal(0, BinaryPrimitives.ReadUInt16LittleEndian(knockdownScore.Payload.AsSpan(1)));
+            }
             peer = relayB.Cursor;
             var popped = Body("Unknown38277", new()
                 { ["unknown_0"] = true, ["victim"] = actorB, ["actor"] = actorA });
             await relayA.Send(relayTable.C2S(finishName), popped);
             Assert.Equal(popped, (await relayB.WaitFor(relayTable.S2C(finishName), peer)).Payload);
-            var liveScore = await a.WaitFor(table.S2C("gspUpdateScoreData"), endA);
-            Assert.Equal(1, BinaryPrimitives.ReadUInt16LittleEndian(liveScore.Payload.AsSpan(1)));
+            foreach (var (client, cursor) in new[] { (a, endA), (b, endB) })
+            {
+                var liveScore = await client.WaitFor(frame => IsTeamScore(frame, 1, 1),
+                    "pop credited to the attacking team", cursor);
+                Assert.Equal(1, BinaryPrimitives.ReadUInt16LittleEndian(liveScore.Payload.AsSpan(1)));
+            }
             peer = relayA.Cursor;
             await relayB.Send(relayTable.C2S("Unknown32836"), Body("Dead", new() { ["actor"] = actorB }));
             await relayA.WaitFor(relayTable.S2C("Unknown32836"), peer);
             var resetCursor = b.Cursor;
-            await b.Send(table.C2S("gcpRespawn"), Body("RoundResetRequest", new() { ["actor"] = actorB }));
-            await b.WaitFor(table.S2C("gspRespawn"), resetCursor);
+            await b.Send(table.Find(PacketDirection.ClientToServer, "gcpRespawn") ?? table.C2S("Unknown602"),
+                Body("RoundResetRequest", new() { ["actor"] = actorB }));
+            await b.WaitFor(table.Find(PacketDirection.ServerToClient, "gspRespawn") ?? table.S2C("Unknown632"), resetCursor);
             await relayB.Send(relayTable.C2S("Unknown32926"), Body("RoundResetConfirmation", new() { ["actor"] = actorB }));
             // Native-life rounds finish on the server clock, not the per-death client stage report.
-            await a.Send(table.C2S("gcpReqEndStage_"), []);
+            await a.Send(table.Find(PacketDirection.ClientToServer, "gcpReqEndStage_") ?? table.C2S("Unknown625"), []);
             foreach (var (client, cursor) in new[] { (a, endA), (b, endB) })
             {
-                await client.WaitFor(table.S2C("gspRoundResultOpen_"), cursor);
-                var board = await client.WaitFor(table.S2C("gspRoundScoreboard_"), cursor);
+                await client.WaitFor(ResultOpcode("gspRoundResultOpen_", "Unknown612"), cursor);
+                var board = await client.WaitFor(ResultOpcode("gspRoundScoreboard_", "Unknown614"), cursor);
                 Assert.Equal((byte)2, board.Payload[0]);
                 Assert.Equal((byte)1, board.Payload[1]);
                 Assert.Equal(1, BinaryPrimitives.ReadInt32LittleEndian(board.Payload.AsSpan(2)));
                 Assert.Equal(1, BinaryPrimitives.ReadInt32LittleEndian(board.Payload.AsSpan(6)));
                 Assert.Equal(0, BinaryPrimitives.ReadInt32LittleEndian(board.Payload.AsSpan(18)));
                 Assert.Equal(3UL, BinaryPrimitives.ReadUInt64LittleEndian(board.Payload.AsSpan(30)));
-                await client.WaitFor(table.S2C("gspRoundRewardStage_"), cursor);
-                await client.WaitFor(table.S2C("gspRoundStageReset_"), cursor);
+                await client.WaitFor(ResultOpcode("gspRoundRewardStage_", "Unknown615"), cursor);
+                await client.WaitFor(ResultOpcode("gspRoundStageReset_", "Unknown620"), cursor);
+            }
+        }
+
+        bool IsTeamScore(SimFrame frame, byte team, ushort total) =>
+            frame.Opcode == table.S2C("gspUpdateScoreData") && frame.Payload.Length >= 3
+            && frame.Payload[0] == team && BinaryPrimitives.ReadUInt16LittleEndian(frame.Payload.AsSpan(1)) == total;
+
+        async Task Probe(Socket socket, SimActor relay)
+        {
+            var cursor = relay.Cursor;
+            await socket.SendToAsync(Frame(20001, cookies[relay]), SocketFlags.None,
+                new IPEndPoint(IPAddress.Loopback, server.RelayPort), server.Ct);
+            Assert.Empty(await ReceiveUdp(socket, relayTable.ForConnection(OpcodeConnection.Udp).S2C("rspUdpBypassVerify_"), relay));
+            await SendUdp(socket, relay, 20002, []);
+            await relay.WaitFor(relayTable.S2C("rspUdpBypassReady_"), cursor);
+        }
+
+        async Task SendUdp(Socket socket, SimActor relay, ushort opcode, byte[] body) =>
+            await socket.SendToAsync(Frame(opcode, cookies[relay].Concat(body).ToArray()), SocketFlags.None,
+                new IPEndPoint(IPAddress.Loopback, server.RelayPort), server.Ct);
+
+        async Task<byte[]> ReceiveUdp(Socket socket, ushort opcode, SimActor relay)
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(server.Ct);
+            timeout.CancelAfter(TimeSpan.FromSeconds(10));
+            var buffer = new byte[4096];
+            while (true)
+            {
+                var received = await socket.ReceiveFromAsync(buffer, SocketFlags.None, new IPEndPoint(IPAddress.Any, 0), timeout.Token);
+                Assert.Equal(new IPEndPoint(IPAddress.Loopback, server.RelayPort), received.RemoteEndPoint);
+                Assert.True(received.ReceivedBytes >= 6);
+                var actual = BinaryPrimitives.ReadUInt16LittleEndian(buffer);
+                if (actual == relayTable.ForConnection(OpcodeConnection.Udp).S2C("rspUdpBypassVerify_") && actual != opcode)
+                {
+                    Assert.Equal(6, received.ReceivedBytes);
+                    await SendUdp(socket, relay, 20002, []);
+                    continue;
+                }
+                Assert.Equal(opcode, actual);
+                return buffer.AsSpan(6, received.ReceivedBytes - 6).ToArray();
             }
         }
 
         string FeedName(string key) => (string)((IReadOnlyDictionary<string, object?>)feed[key]!)["opcode"]!;
+
+        ushort ResultOpcode(string name, string unnamed) =>
+            table.Find(PacketDirection.ServerToClient, name) ?? table.S2C(unnamed);
 
         byte[] Body(string structure, Dictionary<string, object?> values) => PacketCodec.Write(Tables, build, structure, values);
 
@@ -146,7 +241,7 @@ public sealed class NativeModernRoundScenarioTests(ITestOutputHelper output)
         {
             var hello = new byte[96];
             BinaryPrimitives.WriteInt32LittleEndian(hello, TestWireDialects.Get(build).Profile.ClientVersionMajor);
-            await client.Send(table.C2S("gcpFirstConnect"), hello);
+            await client.Send(table.C2S(PatchRequestName(table)), hello);
             await client.WaitFor(table.S2C("gspRepGamePatch"), 0);
             await client.Send(table.C2S("gcpReqLogin"), SimActor.LauncherLogin(client.Name));
             await client.WaitFor(table.S2C("gspGotoRoom"), 0);
@@ -178,9 +273,29 @@ public sealed class NativeModernRoundScenarioTests(ITestOutputHelper output)
                 ["unknown_28"] = seat.User, ["entity_id"] = actor, ["nickname"] = seat.Name,
             }));
             await relay.WaitFor(relayTable.S2C("rspRelaySceneAccepted_"), 0);
+
             await client.Send(table.C2S("gcpReportRelayConnected"), Body("RelayConnectionReport", new() { ["unknown_4"] = true }));
             return relay;
         }
+    }
+
+    private static Socket OpenUdp()
+    {
+        for (var port = 7600; port < 7700; port++)
+        {
+            var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            try { socket.Bind(new IPEndPoint(IPAddress.Loopback, port)); return socket; }
+            catch (SocketException) { socket.Dispose(); }
+        }
+        throw new InvalidOperationException("No isolated UDP scenario port available.");
+    }
+
+    private static byte[] Frame(ushort opcode, byte[] body)
+    {
+        var frame = new byte[6 + body.Length];
+        BinaryPrimitives.WriteUInt16LittleEndian(frame, opcode);
+        body.CopyTo(frame, 6);
+        return frame;
     }
 
     private static byte[] Movement(int actor)
@@ -196,7 +311,7 @@ public sealed class NativeModernRoundScenarioTests(ITestOutputHelper output)
         return body;
     }
 
-    private static List<PluginRow> Rows(string build, int gamePort, int relayPort)
+    private static List<PluginRow> Rows(string build, int gamePort, int relayPort, bool udp)
     {
         var profile = TestWireDialects.Get(build).Profile;
         var rows = new List<PluginRow>();
@@ -204,8 +319,9 @@ public sealed class NativeModernRoundScenarioTests(ITestOutputHelper output)
             "core.client-profiles", "core.opcode-tables", "core.wire-dialects", "persistence.memory" })
             Add(plugin, plugin);
         Add("dialect", "dialect", TestWireDialects.RowConfig(build));
+        var opcodes = OpcodeTableLoader.Load(Path.Combine(RepositoryRoot(), "profiles", build, "opcodes.yaml"), profile);
         Add("protocol", "protocol", new() { ["opcode_table_path"] = Path.Combine(RepositoryRoot(), "profiles", build, "opcodes.yaml"),
-            ["patch_request_name"] = "gcpFirstConnect", ["bootstrap_status"] = 2 });
+            ["patch_request_name"] = PatchRequestName(opcodes), ["bootstrap_status"] = 2 });
         Add("dialect.messages", "dialect.messages", TestWireDialects.MessagesConfig(new()
         {
             ["protocol"] = build + "/game", ["login"] = true, ["main_menu_init"] = true,
@@ -214,6 +330,7 @@ public sealed class NativeModernRoundScenarioTests(ITestOutputHelper output)
         Add("dialect.rooms", "dialect.rooms", TestWireDialects.ModernRoomsConfig(new()
         {
             ["protocol"] = build + "/game", ["relay_protocol"] = build + "/relay", ["waiting_rooms_only"] = false,
+            ["udp_protocol"] = udp ? build + "/udp" : "",
         }));
         Add("lobby", "lobby", new() { ["protocol"] = build + "/game", ["auto_create_players"] = true, ["authentication"] = "open",
             ["inventory_source"] = "mysql", ["money_source"] = "mysql" });
@@ -222,9 +339,16 @@ public sealed class NativeModernRoundScenarioTests(ITestOutputHelper output)
             ["version_major"] = profile.ClientVersionMajor, ["enabled"] = true, ["publish_equipped_view_push"] = true });
         Add("game-listener", "net.tcp", new() { ["listen"] = $"127.0.0.1:{gamePort}", ["protocol"] = build + "/game" });
         Add("relay-listener", "net.tcp", new() { ["listen"] = $"127.0.0.1:{relayPort}", ["protocol"] = build + "/relay" });
+        if (udp)
+        {
+            Add("udp-listener", "net.udp", new() { ["listen"] = $"127.0.0.1:{relayPort}", ["protocol"] = build + "/udp" });
+            Add("match-udp-directory", "match-udp-directory", new() { ["protocol"] = build + "/relay" });
+            Add("match-udp-relay-setup", "match-udp-relay-setup", new()
+            { ["game_protocol"] = build + "/game", ["relay_protocol"] = build + "/relay" });
+        }
         Add("dialect.match", "dialect.match", new() { ["protocol"] = build + "/relay", ["native_handshake"] = "capability", ["packets_directory"] = SharedDialectRows.PacketsDirectory() });
         Add("dialect.match-offers", "dialect.match-offers", new() { ["protocol"] = build + "/game", ["packets_directory"] = SharedDialectRows.PacketsDirectory() });
-        Add("dialect.match-replies", "dialect.match-replies", new() { ["protocol"] = build + "/relay", ["packets_directory"] = SharedDialectRows.PacketsDirectory() });
+        Add("dialect.match-replies", "dialect.match-replies", new() { ["protocol"] = build + "/relay", ["packets_directory"] = SharedDialectRows.PacketsDirectory(), ["udp_enabled"] = udp, ["udp_protocol"] = build + "/udp" });
         Add("match-connection", "match-connection", new() { ["protocol"] = build + "/relay", ["capability_authentication"] = true, ["require_capability_scene_report"] = true });
         Add("ingame", "ingame", new()
         {
@@ -245,6 +369,9 @@ public sealed class NativeModernRoundScenarioTests(ITestOutputHelper output)
             ClientBuild = new(profile.Region, profile.ClientVersionMajor, profile.ResourceVersion), Lineage = Tables.LineageOf(build).ToArray(),
         });
     }
+
+    private static string PatchRequestName(IOpcodeTable table) => table.All.Single(entry =>
+        entry.Direction == PacketDirection.ClientToServer && entry.Name is "gcpFirstConnect" or "gcpReqGamePatch").Name;
 
     private static string RepositoryRoot() => Directory.GetParent(SharedDialectRows.PacketsDirectory())!.FullName;
 }

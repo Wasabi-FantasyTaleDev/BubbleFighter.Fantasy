@@ -13,6 +13,22 @@ public sealed class PlayerSessionTests
     private static readonly PlayerIdentity Player = new(7, "user", "nick", 3);
 
     [Fact]
+    public void MigrationHomeIsImmutableAndOnlyInstalledBeforeTheFirstScene()
+    {
+        var player = new PlayerSession(Player, 1);
+        player.SetMigrationHome(new("first", 50));
+        Assert.Equal("first", player.MigrationHome!.NodeId);
+        Assert.Throws<InvalidOperationException>(() => player.SetMigrationHome(new("other", 60)));
+        player.MoveTo(SessionPhase.MainMenu);
+        player.MoveTo(SessionPhase.Migrating);
+        Assert.Equal(50, player.MigrationHome.Channel);
+        var ordinary = new PlayerSession(Player, 2);
+        ordinary.MoveTo(SessionPhase.MainMenu);
+        Assert.Throws<InvalidOperationException>(() => ordinary.SetMigrationHome(new("other", 60)));
+    }
+
+
+    [Fact]
     public void LauncherLanguageIsConnectionLocalAndReleasedEvenBeforeAuthentication()
     {
         var scope = new PlayerSessionScope();

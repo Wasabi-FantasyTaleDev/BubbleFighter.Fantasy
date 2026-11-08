@@ -35,8 +35,8 @@ internal sealed class PetSharedSlotPolicy(
         // Another protocol's pet set is not this row's workbook; its requests pass through.
         if (request.Protocol != protocol || !request.Worn || !petItemIds.Contains(request.ItemId))
             return await next(ct).ConfigureAwait(false);
-        // The character bag's worn flags are the view the selection itself commits against;
-        // slotless items are never repaired from the legacy equipped-bag snapshot.
+        // The early refusal reads the character bag. The contributed position checks the final
+        // target and any legacy fallback again inside the inventory transaction.
         var bag = await inventory.ListSlotsAsync(request.UserNum, InventoryBag.CharacterBag,
             InventoryLimits.MaxInventorySlotsPerBag, ct).ConfigureAwait(false);
         foreach (var row in bag)

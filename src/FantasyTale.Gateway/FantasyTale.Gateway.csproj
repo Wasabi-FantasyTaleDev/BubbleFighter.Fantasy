@@ -1,0 +1,62 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <Product>Fantasy Tale Gateway</Product>
+    <Title>Fantasy Tale Gateway</Title>
+    <AssemblyTitle>Fantasy Tale Gateway</AssemblyTitle>
+    <AssemblyName>FantasyTale.Gateway</AssemblyName>
+    <RootNamespace>FantasyTale.Gateway</RootNamespace>
+    <Description>Fantasy Tale Gateway for local game protocol capabilities.</Description>
+    <PublishAot>true</PublishAot>
+    <SelfContained>true</SelfContained>
+    <RuntimeFrameworkVersion Condition="'$(RuntimeFrameworkVersion)' == ''">10.0.14</RuntimeFrameworkVersion>
+    <PublishTrimmed>true</PublishTrimmed>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <TrimMode>full</TrimMode>
+    <IsAotCompatible>true</IsAotCompatible>
+    <OptimizationPreference>Size</OptimizationPreference>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <EventSourceSupport>false</EventSourceSupport>
+    <StackTraceSupport>false</StackTraceSupport>
+    <UseSystemResourceKeys>true</UseSystemResourceKeys>
+    <DebugType>None</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <StripSymbols>true</StripSymbols>
+    <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
+    <PublishDocumentationFiles>false</PublishDocumentationFiles>
+  </PropertyGroup>
+  <Target Name="UseServicedAotCompiler" BeforeTargets="ProcessFrameworkReferences">
+    <ItemGroup>
+      <!-- CVE-2026-111497 is fixed in the .NET 10.0.14 runtime and native compiler. -->
+      <KnownILCompilerPack Update="Microsoft.DotNet.ILCompiler"
+          Condition="'%(KnownILCompilerPack.TargetFramework)' == 'net10.0' and $([MSBuild]::VersionLessThan('%(KnownILCompilerPack.ILCompilerPackVersion)', '10.0.14'))">
+        <ILCompilerPackVersion>10.0.14</ILCompilerPackVersion>
+      </KnownILCompilerPack>
+    </ItemGroup>
+  </Target>
+  <ItemGroup>
+    <ProjectReference Include="..\BubbleFighter.Fantasy.Wire\BubbleFighter.Fantasy.Wire.csproj" />
+    <ProjectReference Include="../../tools/GatewayData/GatewayData.csproj" ReferenceOutputAssembly="false" Private="false"
+                      GlobalPropertiesToRemove="RuntimeIdentifier;SelfContained;PublishAot;PublishTrimmed;PublishDir" />
+  </ItemGroup>
+  <Target Name="CompileGatewayData" BeforeTargets="CoreCompile" DependsOnTargets="ResolveProjectReferences">
+    <MSBuild Projects="../../tools/GatewayData/GatewayData.csproj" Targets="GetTargetPath"
+             RemoveProperties="RuntimeIdentifier;SelfContained;PublishAot;PublishTrimmed;PublishDir"
+             Properties="Configuration=$(Configuration)">
+      <Output TaskParameter="TargetOutputs" ItemName="_GatewayDataTool" />
+    </MSBuild>
+    <Exec Command="dotnet &quot;@(_GatewayDataTool)&quot; &quot;$(RepoRoot).&quot; &quot;$(IntermediateOutputPath)GatewayBuilds.g.cs&quot;" />
+    <ItemGroup>
+      <Compile Include="$(IntermediateOutputPath)GatewayBuilds.g.cs" />
+    </ItemGroup>
+  </Target>
+  <Target Name="CopyGatewayCapabilities" AfterTargets="CopyFilesToOutputDirectory" DependsOnTargets="CompileGatewayData">
+    <Copy SourceFiles="$(IntermediateOutputPath)GatewayBuilds.g.capabilities.json"
+          DestinationFiles="$(TargetDir)FantasyTale.Gateway.capabilities.json" />
+  </Target>
+  <Target Name="PublishGatewayCapabilities" AfterTargets="Publish" DependsOnTargets="CompileGatewayData">
+    <Copy SourceFiles="$(IntermediateOutputPath)GatewayBuilds.g.capabilities.json"
+          DestinationFiles="$(PublishDir)FantasyTale.Gateway.capabilities.json" />
+  </Target>
+</Project>

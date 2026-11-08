@@ -16,6 +16,8 @@ public sealed class SpawnGroupRelayTests
     [InlineData("cn-324")]
     [InlineData("id-400")]
     [InlineData("cn-406")]
+    [InlineData("cn-705")]
+    [InlineData("cn-706")]
     public async Task NativeLocalSpawnRequestIsForwardedToPeersWithoutAnEchoToTheHost(string build)
     {
         var (schema, play) = TestBuilds.Of(build);
@@ -25,7 +27,7 @@ public sealed class SpawnGroupRelayTests
         var router = new PeerRouter(peer, build);
         using var handler = new TutorialHandler(TestBuilds.Packets, build, schema, play.Tutorial, play.MatchStart,
             play.Wire, new Tables(), NullLogger.Instance, messages: router);
-        var body = TutorialWire.WriteCreateMobsFromSpawnGroup(TestBuilds.Packets, build, 1);
+        var body = NpcWire.WriteCreateMobsFromSpawnGroup(TestBuilds.Packets, build, 1);
 
         await handler.HandleCreateMobsFromSpawnGroupAsync(host, new InboundPacket(32857, body), default);
 
@@ -36,12 +38,9 @@ public sealed class SpawnGroupRelayTests
         Assert.False(Assert.IsType<RoundFeedSent>(router.Message).IncludeSender);
     }
 
+    /// <summary>cn-279 sub_702660 sends an ordinary-round group without a local copy, so its sender still needs the reply.</summary>
     [Theory]
-    [InlineData("kr-812")]
-    [InlineData("cn-717")]
-    [InlineData("id-1809")]
     [InlineData("cn-279")]
-    [InlineData("cn-706")]
     public async Task NativeNetworkSpawnRequestRetainsItsHostReply(string build)
     {
         var (schema, play) = TestBuilds.Of(build);
@@ -49,9 +48,62 @@ public sealed class SpawnGroupRelayTests
         var host = new RecordingSession(1, build);
         using var handler = new TutorialHandler(TestBuilds.Packets, build, schema, play.Tutorial, play.MatchStart,
             play.Wire, new Tables(), NullLogger.Instance);
-        var body = TutorialWire.WriteCreateMobsFromSpawnGroup(TestBuilds.Packets, build, 2);
+        var body = NpcWire.WriteCreateMobsFromSpawnGroup(TestBuilds.Packets, build, 2);
         await handler.HandleCreateMobsFromSpawnGroupAsync(host, new InboundPacket(32857, body), default);
         Assert.Equal(body, Assert.Single(host.Sent).Payload);
+    }
+
+    /// <summary>
+    /// A normal stage that queues its own group (kr-812 sub_4620A0, cn-717 sub_472FE0, id-1809 sub_447910) expands it
+    /// once, and peers wait for the concrete members.
+    /// </summary>
+    [Theory]
+    [InlineData("kr-812")]
+    [InlineData("cn-717")]
+    [InlineData("id-1809")]
+    public async Task QueuedOrdinarySpawnGroupDoesNotExpandAgainFromAServerEcho(string build)
+    {
+        var (schema, play) = TestBuilds.Of(build);
+        var host = new RecordingSession(1, build);
+        var peer = new RecordingSession(2, build);
+        var router = new PeerRouter(peer, build);
+        using var handler = new TutorialHandler(TestBuilds.Packets, build, schema, play.Tutorial, play.MatchStart,
+            play.Wire, new Tables(), NullLogger.Instance, messages: router);
+        await handler.HandleCreateMobsFromSpawnGroupAsync(host,
+            new(32857, NpcWire.WriteCreateMobsFromSpawnGroup(TestBuilds.Packets, build, 2)), default);
+        Assert.Empty(host.Sent);
+        Assert.Empty(peer.Sent);
+        Assert.Null(router.Message);
+    }
+
+    /// <summary>
+    /// Multiplayer NPC creation and life points return to their sender only where it keeps no local copy
+    /// (cn-279 sub_702660); elsewhere the sender already applied them and a second copy would duplicate the NPC.
+    /// </summary>
+    [Theory]
+    [InlineData("cn-279", true)]
+    [InlineData("cn-406", false)]
+    [InlineData("cn-717", false)]
+    [InlineData("kr-812", false)]
+    public async Task MultiplayerNpcUpdatesFollowTheBuildsSenderEcho(string build, bool echo)
+    {
+        var (schema, play) = TestBuilds.Of(build);
+        var host = new RecordingSession(1, build);
+        var peer = new RecordingSession(2, build);
+        var router = new PeerRouter(peer, build);
+        using var handler = new TutorialHandler(TestBuilds.Packets, build, schema, play.Tutorial, play.MatchStart,
+            play.Wire, new Tables(), NullLogger.Instance, messages: router);
+        var body = new byte[] { 1, 0, 0, 0 };
+
+        await handler.HandleCreateSpawnGroupMemberMobAsync(host, new InboundPacket(32862, body), default);
+        Assert.Equal(echo, Assert.IsType<RoundFeedSent>(router.Message).IncludeSender);
+        await handler.HandleCreateAIObjectAsync(host, new InboundPacket(32892, body), default);
+        Assert.Equal(echo, Assert.IsType<RoundFeedSent>(router.Message).IncludeSender);
+        await handler.HandleLifePointAsync(host, new InboundPacket(32920, body), default);
+        Assert.Equal(echo, Assert.IsType<RoundFeedSent>(router.Message).IncludeSender);
+
+        Assert.Empty(host.Sent);
+        Assert.Equal(new ushort[] { 32862, 32892, 32920 }, peer.Sent.Select(sent => sent.Opcode));
     }
 
     private sealed class RecordingSession(long id, string build) : ISession
@@ -96,8 +148,11 @@ public sealed class SpawnGroupRelayTests
     {
         public ClientProfile Profile => throw new NotSupportedException();
         public OpcodeConnection Connection => OpcodeConnection.Game;
-        public IEnumerable<OpcodeEntry> All => [new(32857, PacketDirection.ServerToClient,
-            "gppCreateMobsFromSpawnGroup", Evidence.Verified, null, null)];
+        public IEnumerable<OpcodeEntry> All => new (ushort Code, string Name)[]
+        {
+            (32857, "gppCreateMobsFromSpawnGroup"), (32862, "gppCreateSpawnGroupMemberMob"),
+            (32892, "gppCreateAIObject"), (32920, "gppLifePoint"),
+        }.Select(item => new OpcodeEntry(item.Code, PacketDirection.ServerToClient, item.Name, Evidence.Verified, null, null));
         public IOpcodeTable ForConnection(OpcodeConnection connection) => this;
         public bool TryGet(PacketDirection d, ushort value, out OpcodeEntry? e) => throw new NotSupportedException();
         public string Describe(PacketDirection d, ushort value) => throw new NotSupportedException();

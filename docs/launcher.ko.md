@@ -251,12 +251,15 @@ Bubble Fighter 클라이언트 패치는 훅 플러그인으로 제공됩니다.
 |---|---|---|
 | `require` | 없음 | 플러그인이 설치되고 활성화될 때까지 실행을 거부하고 설치를 제안합니다. |
 | `disable` | 없음 | 이 서버로 실행할 때 저장된 선택은 바꾸지 않고 플러그인을 끕니다. 빌드 자체가 요구하는 플러그인은 끌 수 없으며 이 경우 실행을 거부합니다. |
-| `recommend` | `sources` | 클라이언트와 규칙마다 한 번 플러그인을 추천하고 지정한 소스에서 설치합니다(목록이 비어 있으면 선언된 모든 소스 허용). |
+| `recommend` | `sources`, 선택적 `default_selected` | 클라이언트와 규칙마다 한 번 플러그인을 추천하고 지정한 소스에서 설치합니다(목록이 비어 있으면 선언된 모든 소스 허용). 처음에는 선택하지 않으며, true로 지정한 경우에만 선택합니다. |
 | `min_version` | `version` | 활성화된 플러그인이 이 버전보다 낮으면 실행 전에 업데이트해야 합니다. |
 | `max_version` | `version` | 활성화된 플러그인이 이 버전보다 높으면 소스에서 허용되는 가장 높은 버전으로 교체합니다. 사용할 수 있는 버전이 없으면 실행을 거부합니다. |
 | `latest` | 없음 | 실행 전에 활성화된 플러그인을 최신 버전으로 업데이트합니다. |
 
-버전은 엄격한 SemVer입니다. 한 플러그인의 두 규칙은 빌드 범위가 겹치고 다음 중 하나에 해당하면 충돌합니다. 유형이 같은 경우, 한쪽이 `disable`인 경우, 한쪽이 `latest`이고 다른 쪽이 `max_version`인 경우, 또는 `min_version`이 `max_version`보다 높은 경우(같으면 한 버전으로 고정)입니다. 충돌하거나 형식이 잘못되었거나 알 수 없는 규칙이 있으면 해당 행이 시작되지 않습니다. 규칙 유형을 모르는 런처는 이 서버로의 실행을 거부하고 플레이어에게 런처 업데이트를 요청합니다.
+버전은 엄격한 SemVer입니다. 한 플러그인의 두 규칙은 빌드 범위가 겹치고 다음 중 하나에 해당하면 충돌합니다. 유형이 같은 경우, 한쪽이 `disable`인 경우, 한쪽이 `require`이고 다른 쪽이 `recommend`인 경우, 한쪽이 `latest`이고 다른 쪽이 `max_version`인 경우, 또는 `min_version`이 `max_version`보다 높은 경우(같으면 한 버전으로 고정)입니다. 충돌하거나 형식이 잘못되었거나 알 수 없는 규칙이 있으면 해당 행이 시작되지 않습니다. 규칙 유형을 모르는 런처는 이 서버로의 실행을 거부하고 플레이어에게 런처 업데이트를 요청합니다.
+`default_selected`는 `recommend`에서만 허용되며 명시적인 false도 여기에 포함됩니다. API에서는 선택적 불리언 필드 `defaultSelected`를 사용하며 지정하지 않으면 생략합니다. 이 값은 추천 항목의 초기 선택 상태이며 실행 필수 조건이 아닙니다. 이 필드를 포함한 정책을 게시하기 전에 호환되는 런처를 사용하세요.
+
+빈 빌드 범위는 모든 빌드와 겹칩니다. 서로 겹치지 않는 빌드에는 `require`와 `recommend`를 각각 적용할 수 있으며, `require`와 `latest`는 같은 빌드에 함께 적용할 수 있습니다.
 
 카탈로그와 모든 로그인 응답에는 최소 런처 버전과 `clientPolicy`(`version`, `sources`, `plugins`) 정책이 포함되며, 규칙의 `version`이나 `sources`는 해당 유형이 사용할 때만 들어갑니다. 실행에는 플레이어가 로그인할 때 받은 정책이 사용되고, 카탈로그의 사본은 로그인 전에 표시하는 용도입니다. 이 정책은 호환 런처를 구성할 뿐이며 클라이언트 무결성을 증명하거나 게임 로그인 시 로드된 모드를 검사하지 않습니다. 관리 API는 [WebUI 클라이언트 정책](plugins.ko.md#client-plugin-policy)을 참조하세요.
 
@@ -396,8 +399,9 @@ WebSocket 채널입니다. 게임 위에 뜨는 런처 팝업처럼 원래 게�
 | --- | --- |
 | `companion` | 리스너와 실행 표. 켜면 모든 `/v1/launch` 응답에 `companion` 객체(`url`, 일회용 `ticket`, `launchId`, `expiresAt`)가 들어갑니다. |
 | `companion.notices` | 런처 팝업(`ui.notification.show`)과 `popup <텍스트>` 관리 명령, 권한 `game.management.popup`. |
+| `companion.commands` | 공유 플레이어 권한과 채팅 제한을 사용하는 인증된 게임 명령 요청. |
 
-두 행은 core 번들에서 꺼져 있고 `all` 프로필이 켭니다. `companion` 옵션:
+세 행은 core 번들에서 꺼져 있고 `all` 프로필이 켭니다. `companion` 옵션:
 
 | 옵션 | 기본값 | 의미 |
 | --- | --- | --- |
@@ -427,6 +431,76 @@ payload를 가진 JSON이며, 형식이 틀리거나 중복되거나 협상되�
 
 리스너는 평문 `ws`입니다. 네트워크로 접속할 때는 런처 API와 마찬가지로 TLS 종료 뒤에 두고 `public_url`을 `wss`로
 설정하세요.
+
+### 게임 명령 요청
+
+`companion.commands` 행은 `game.command.execute` v1을 제공합니다. core에서는 꺼져 있고 `all`에서 켜지며,
+게임 행에도 `shared_chat_commands`가 필요합니다. 실제 로그인 게임 연결에 바인딩된 실행만 호출할 수 있습니다.
+신원은 해당 연결에서 가져오고, 기존 명령 해석기와 권한 및 두 채팅 입력이 공유하는 연결 제한을 그대로 사용합니다.
+명령에는 게임 방 참여 상태가 필요합니다. 이 채널의 `plaza`는 진행 중인 일반 경기에서만 허용하며,
+튜토리얼, 훈련, 대기, 로딩, 결과 단계에서는 거부합니다. 방 소유자는 실제 퇴장 시 상태를 다시 확인합니다.
+일반 채팅 명령은 기존 규칙을 유지합니다.
+
+기능을 협상한 후 새 `id`, 현재 `epoch`, 타입 `game.command.execute`, 버전 `1`로 `request`를 보냅니다.
+payload에는 다음 두 문자열만 허용되며 작업 식별자는 payload 안에 둡니다.
+
+```json
+{"operation_id":"leave-1","command":"plaza"}
+```
+
+접두사 없는 명령에는 다른 등록 명령과 인수도 사용할 수 있습니다. 계정, 세션, 권한은 지정할 수 없습니다.
+`operation_id`는 ASCII 영문자, 숫자, 밑줄, 하이픈으로 된 1–64자입니다. `response.payload`의 필드는 정확히 네 개입니다.
+
+```json
+{"operation_id":"leave-1","status":"success","code":"success","message":""}
+```
+
+작업 식별자가 일치하고 `status`와 `code`가 모두 `success`여야 성공입니다. `status: rejected`의 코드는
+`not_found`, `invalid_arguments`, `denied`, `busy`, `cancelled`, `invalid_state`, `operation_conflict`입니다.
+`busy`에는 공유 채팅 제한, 실행 동시성, 결과 저장 용량이 포함됩니다. `status: error`, `code: failed`는 실행 실패이며,
+효과가 전혀 없었다는 보장은 아닙니다. 잘못된 payload는 기존 채널의 `kind: error`, `code: invalid_request`를 사용합니다.
+채널 용량과 해제된 경로는 기존 `busy`, `unavailable`을 유지합니다. 전송 완료만으로 성공을 판단하지 마세요.
+
+같은 실행과 정확히 같은 게임 연결에서 동일 식별자와 명령은 한 번만 실행하며 동시 중복 요청과 WebSocket 재연결은
+동일 결과를 받습니다. 같은 식별자의 다른 명령은 `operation_conflict`입니다. 재연결 시 외부 메시지 id와 epoch를 바꿉니다.
+`max_operations` 기본값 4096은 실행 중 및 보관 결과의 총수를 제한하며 가득 차면 새 작업을 거부하고 기존 결과를 지우지 않습니다.
+`retention_seconds` 기본값 600은 완료 후부터 계산하고 실행 중 작업은 만료시키지 않습니다. 만료, 행/서버 재시작,
+새 실행 이후에는 중복 방지가 유지되지 않습니다. 불확실한 작업을 새 식별자로 자동 재전송하지 마세요.
+`max_input_characters` 기본값은 4096이며 공유 명령 제한도 적용됩니다. 결과 문자는 응답에만 들어가고 게임 채팅에 추가로 삽입되지 않습니다.
+
+### 읽기 전용 게임 상태
+
+같은 행은 `game.session.state` v1도 제공합니다. 협상 후 payload가 `{}`인 `request`를 보내면
+`state`, `in_match`, `can_leave_match`, `is_tutorial`, null 허용 `mode_id`를 반환합니다.
+
+```json
+{"state":"match","in_match":true,"can_leave_match":true,"is_tutorial":false,"mode_id":4}
+```
+
+상태는 `unknown`, `authenticated`, `main_menu`, `plaza`, `room_waiting`, `room_loading`,
+`room_countdown`, `match`, `result`, `tutorial`, `training`, `migrating`입니다. `mode_id`는 현재 클라이언트의
+원래 방 모드 값이며 빌드 간 정규화하지 않습니다. `is_tutorial`은 실제 튜토리얼 입장 상태에서 가져오며 인원수나
+추측한 모드로 판단하지 않습니다. 정확히 바인딩된 서버 세션만 읽고 신원 인수를 받지 않으며 클라이언트 메모리를
+읽거나 게임 상태를 바꾸지 않습니다. 알 수 없거나 누락, 불일치, 시간 초과인 결과로 퇴장을 허용하면 안 됩니다.
+이 스냅샷은 퇴장을 예약하지 않으며 실행 시 방 참여와 단계를 다시 확인합니다.
+
+### 다른 노드에서 최초 로그인
+
+작업 노드의 `cluster.ticket-client.companion`을 켜고 발급 노드의 해당 peer에 `companion_url`을 명시적인
+작업 노드 HTTP(S) origin으로 설정합니다. 양쪽 모두 `companion`이 필요합니다. 작업 노드는 기존 티켓 키와 빌드
+허용 목록으로 발급 노드를 신뢰합니다. 준비, 갱신, 상태 비공개 경로는 `/companion/internal/v1/` 아래에 있으며
+비공개 티켓 서비스와 같은 전송 보호를 적용합니다. 키는 배포 비밀에 보관합니다.
+
+작업 노드가 게임 티켓을 사용하면 발급 노드가 그곳에 같은 실행 신원을 준비한 뒤 대기 연결을 재지정합니다.
+Launcher는 원래 인증 API에서 갱신하고 새 grant의 WebSocket URL로 작업 노드에 연결합니다. 일치하는 작업 노드
+게임 세션만 바인딩할 수 있으며 다른 계정, 빌드, 신뢰된 다른 발급자는 갱신할 수 없습니다. 작업 노드 `public_url`은
+Launcher에서 접근할 수 있어야 하고 `{host}`는 설정한 작업 노드 origin의 호스트로 바뀝니다.
+
+`companion.max_remote_requests` 기본값은 16, `max_remote_authorities`는 8, `remote_timeout_seconds`는 3,
+`remote_probe_seconds`는 30, `remote_failure_seconds`는 120입니다. 종료가 확인된 실행은 제거하고 연결할 수 없는
+실행은 실패 기간 안에서만 유지합니다. 발급 노드의 `companion_timeout_milliseconds` 기본값은 1000이며 전체 티켓
+요청 기한보다 짧아야 합니다. 준비가 실패해도 게임 인증은 계속되지만 바인딩을 만들지 않습니다. 이 경로는 최초
+게임 서버 선택에 적용됩니다. 이후 기본 방 이동은 바인딩을 이전하지 않으며 별도의 이동 지원이 필요합니다.
 
 ## 문제 해결
 
@@ -471,10 +545,10 @@ payload를 가진 JSON이며, 형식이 틀리거나 중복되거나 협상되�
 `whitelist_enabled`, `roster_enabled`로 설정합니다. 기본값은 접속 제한 없음, 인원 제한 없음,
 공개 명단 활성화입니다. 세션 서비스를 사용할 수 없으면 인원은 null이고,
 `show_online_players: false`이면 -1입니다. 인증된 게임 플레이어만 계정별로 집계하고,
-종료된 연결과 확인된 경기 연결은 제외합니다. 영구 최고 인원 저장소가 연결되지 않아 과거 최고 인원은 제공하지 않습니다.
+종료된 연결과 확인된 경기 연결은 제외합니다. 인원 그룹을 설정하면 영구 관측 최고 인원을 제공할 수 있습니다(아래 참고).
 
 인증 없이 호출하는 `GET /v1/players`는 `schema: 1`, `enabled`, `players`, `truncated`를
-반환합니다. 플레이어별 필드는 `name`과 `level`뿐입니다. `roster_enabled: false`이면 세션
+반환합니다. 플레이어별 필드는 `name`, `level`, `buildId`입니다. `roster_enabled: false`이면 세션
 레지스트리를 읽지 않고 빈 명단을 반환합니다. 활성화 상태에서 레지스트리가 없으면 HTTP 503
 `player_state_unavailable`입니다. `max_roster_players`는 응답 크기를 제한하며 기본 1000,
 범위 1–10000입니다. `truncated: true`는 실제 접속자가 더 많다는 뜻입니다. 인원수와 명단
@@ -523,3 +597,29 @@ payload를 가진 JSON이며, 형식이 틀리거나 중복되거나 협상되�
 리소스 이름과 직접 일치합니다. 현재 베트남어 사전은 없으므로 `vi`는 배포 기본 언어를 사용합니다.
 실행 티켓 언어 정보가 없는 연결도 기본 언어를 사용합니다. 언어 설정은 연결이 닫힐 때까지
 유지되며 최초 캐릭터 생성 중에도 유지됩니다.
+
+### 그룹 인원과 관측 최고 인원 {#aggregate-presence}
+
+`launcher.http`의 `presence_group`을 지정하면 `ILauncherPresenceDirectory`에서 해당 그룹을 읽습니다. 비워 두면 기존 단일 서버 동작을 유지합니다. `presentation.onlinePlayers`는 최신 보고에서 계정별로 중복을 제거한 인원이며 `playerLimit`는 로컬 접속 허용 한도입니다. 카탈로그에는 `presenceGroup`, `presenceComplete`, 선택적 `peakOnlinePlayers`가 추가됩니다. 노드가 끊겼거나 구형 보고를 사용하거나 데이터베이스 신원이 다르면 알려진 인원만 반환하고 `presenceComplete: false`로 표시합니다. 이는 하한이며 로컬 인원으로 대체하지 않습니다.
+
+`GET /v1/players`의 `{name, level}` 카드에 `buildId`가 추가되고 활성 명단 응답에는 `complete`가 추가됩니다. `truncated`는 `max_roster_players` 제한만 뜻하며 `complete: false`는 누락 보고 또는 비공개 카드를 뜻합니다. 인원만 요청하면 카드를 반환하지 않습니다. `roster_enabled`를 끄면 로컬 레지스트리와 그룹 명단 소스를 읽지 않습니다. 계정 번호, 로그인 이름, 노드 키, 연결 주소는 공개 카드에 포함하지 않습니다.
+
+`cluster.directory.presence_groups`에 `id`, 중복 없는 실제 `nodes`, 검증된 `persistent_domain_id`, `peak_state_path`를 설정합니다. 구성원은 하나의 선언된 데이터 범위를 공유해야 합니다. 운영 구성원을 명시적으로 선택하세요. 테스트 또는 독립 지역 노드가 Automatic 후보여도 통계에 자동 포함되지 않습니다. 자동/수동 별칭은 추가 인원이 아니며 같은 데이터베이스 계정은 빌드와 노드를 넘어 한 번만 셉니다. 이동 중인 이전 소유자보다 이동하지 않는 로그인 소유자를 우선합니다. 빌드별 수용량을 최고 인원으로 더하지 않습니다.
+
+디렉터리를 먼저 업그레이드한 뒤 `cluster.node.report_launcher_presence`를 켜세요. 기본값은 꺼짐이며 기존 하트비트 JSON은 유지됩니다. 보고에는 로컬 `launcher.http` 인원 서비스와 영구 데이터베이스 신원이 필요합니다. Launcher의 `max_presence_players`와 디렉터리의 `max_presence_players_per_node` 기본값은 모두 4096입니다. 하트비트 본문 제한도 적용되며 초과하면 명시적으로 실패합니다.
+
+최고 인원은 유효 하트비트 또는 그룹 조회에서 **관측된 최대 고유 계정 수**이며 부분 보고의 알려진 하한도 포함합니다. 연속 시간의 정확한 최대값이나 기능 도입 전 이력을 복원하는 값은 아닙니다. 증가할 때만 플레이어 정보가 없는 작은 체크포인트를 원자적으로 기록하고 재시작 시 복원합니다. 지문은 그룹, 데이터베이스 신원, 정렬된 실제 구성원을 포함합니다. 구성원이 바뀌면 다른 경로를 사용하거나 명시적으로 오프라인 초기화해야 합니다. 손상되거나 일치하지 않는 파일은 활성화를 실패시키며 기록을 지우지 않습니다. 파일을 백업하세요. 초기화하려면 유일한 디렉터리 작성자를 중지하고 파일을 보관/제거한 뒤 재시작합니다.
+
+디렉터리는 로컬 `ILauncherPresenceDirectory`를 제공합니다. 작업 노드는 `cluster.launcher-presence`에 `node_id`, `directory_url`, `access_key`, `group`을 설정하여 기존 노드 인증으로 `/v1/nodes/{node}/presence/{group}?roster=true|false`를 읽습니다. 그룹 구성원만 읽을 수 있습니다. 클라이언트는 동시 요청, 기한, 응답 바이트, 인원을 제한합니다. 실패 시 공개 HTTP 503 `player_state_unavailable`를 반환하며 0명으로 꾸미지 않습니다. 비공개 인터페이스와 체크포인트는 공개 명단 또는 인증 기관이 아닙니다.
+
+공개 API를 실행하지 않는 게임 노드는 `launcher.http` 대신 `launcher.presence-local`을 사용할 수 있습니다. 비공개 소유자 소스만 제공하며 티켓 발급은 바꾸지 않습니다. `roster_enabled` 기본값은 false이므로 카드를 공유하려면 명시적으로 켜고 `max_presence_players`로 보고 예산을 지정하세요. 로컬 소스는 하나만 연결해야 합니다.
+
+
+```yaml
+# Part of cluster.directory.config; both nodes must already be configured in nodes.
+presence_groups:
+  - id: public
+    nodes: [primary, worker]
+    persistent_domain_id: "${BFF_CLUSTER_DATA_DOMAIN_ID}"
+    peak_state_path: data/presence-public.json
+```

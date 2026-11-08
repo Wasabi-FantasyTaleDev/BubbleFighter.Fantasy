@@ -7,6 +7,22 @@ namespace BubbleFighter.Fantasy.Persistence.Memory.Tests;
 /// <summary>Checks that the memory identity store shares atomic state with the memory bags.</summary>
 public sealed class MemoryPlayerRepositoryTests
 {
+    /// <summary>Retained identity lookup neither provisions unknown accounts nor mistakes a bag-only entry for a player.</summary>
+    [Fact]
+    public async Task RetainedLookupReadsOnlyCreatedIdentitiesWithoutAllocatingMissingPlayers()
+    {
+        var table = new MemoryPlayerTable(2);
+        var players = new MemoryPlayerRepository(table);
+        Assert.True(players.SupportsRetainedAccountLookup);
+        Assert.Null(await players.FindByUserNumAsync(70, default));
+        var created = await players.CreateAsync("known", "Nickname", default);
+        Assert.Equal(created, await players.FindByUserNumAsync(created.UserNum, default));
+        await new MemoryInventoryRepository(table).ReplaceSlotsAsync(70, InventoryBag.CharacterBag, [], default);
+        Assert.Null(await players.FindByUserNumAsync(70, default));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => players.FindByUserNumAsync(0, default).AsTask());
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => players.FindByUserNumAsync(created.UserNum, new CancellationToken(true)).AsTask());
+    }
+
     /// <summary>Native character creation seeds the shared bags and tutorial state.</summary>
     [Fact]
     public async Task CharacterCreationSeedsSharedInventoryAndTutorial()
@@ -42,6 +58,7 @@ public sealed class MemoryPlayerRepositoryTests
 
         Assert.Equal(0, await players.RenameWithItemAsync(created.UserNum, "NewAlice", 100104, default));
         Assert.Equal("NewAlice", (await players.FindByUsernameAsync("alice", default))!.Nickname);
+        Assert.Equal("NewAlice", (await players.FindByUserNumAsync(created.UserNum, default))!.Nickname);
         Assert.Equal("NewAlice", (await fighters.ListByUserNumAsync(created.UserNum, default)).Single().Nickname);
         Assert.DoesNotContain(await inventory.ListSlotsAsync(created.UserNum, InventoryBag.CharacterBag, 256, default), row => row.ItemId == 100104);
         Assert.DoesNotContain(await inventory.ListSlotsAsync(created.UserNum, InventoryBag.EquippedBag, 256, default), row => row.ItemId == 100104);

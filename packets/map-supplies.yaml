@@ -116,6 +116,7 @@ structs:
       offset: 164
   # kr-812 sub_530570 / cn-717 sub_5677F0 / id-400 sub_480290 / id-1809 sub_4D54D0
   # read the same ten-word envelope. cn-279 sub_403820 ends with three floats instead.
+  # cn-706 sub_4B91B0 reads the same ten words (writer cn-706 sub_4B9120).
   SupplyCreate:
     - object_id: u32 # cn-324 sub_45C7D0
       offset: 4
@@ -135,17 +136,18 @@ structs:
     - unknown_28: u32
       offset: 28
       cn-279:
-        - unknown_28: f32
+        # cn-279 sub_403820 reads the vector; cn-279 sub_81FF70 applies it through cn-279 sub_40A9F0 as initial velocity.
+        - velocity_x: f32
           offset: 28
     - unknown_32: u32
       offset: 32
       cn-279:
-        - unknown_32: f32
+        - velocity_y: f32
           offset: 32
     - unknown_36: u32
       offset: 36
       cn-279:
-        - unknown_36: f32
+        - velocity_z: f32
           offset: 36
     # The team of a box the host scheduled: the first constructor argument of GoItemBox (kr-812 sub_636F20) is
     # this word, 1 chooses the model ItemCube_red, 2 ItemCube_blue and 0 ItemCube (only for a random box, the
@@ -163,7 +165,9 @@ structs:
     - kind: u32
       offset: 8
   SupplyDropRequest:
+    # cn-279 sub_7C41A0 sends position and initial velocity in the six-float envelope read by cn-279 sub_404180.
     # cn-406 sub_41F500/sub_41F480 write/read the same six floats and three words.
+    # cn-706 sub_4BA110 writes and sub_4B9FA0 reads the same nine consecutive words (C2S 728, sender sub_4CD250).
     - x: f32 # cn-324 sub_46D020 writes position, velocity, item kind and two words; reader cn-324 sub_45D320.
       offset: 4
     - y: f32
@@ -178,13 +182,17 @@ structs:
       offset: 24
     - kind: u32
       offset: 28
-    - unknown_32: u32
+    # Hurt-drop senders copy the victim's team: kr-812 sub_62B430; cn-324 sub_53E260;
+    # cn-406 sub_524DE0; cn-404 sub_5DAA70; cn-408 sub_5DD000; cn-705 sub_5BDE00;
+    # cn-706 sub_5BE5C0; cn-717 sub_67F590; id-400 sub_594DA0; id-1809 sub_5DE950.
+    - team: u32
       offset: 32
       except: [cn-279] # cn-279 sub_404180 reads only six floats and a final kind word.
     - unknown_36: u32 # cn-324 sub_46D020 supplies 10000; cn-324 sub_46CF40 supplies 20000.
       offset: 36
       except: [cn-279]
   SupplyPicked:
+    # kr-812 sub_515290 accepts seat -1 as removal without the character pickup event.
     - seat: u32 # cn-324 sub_46DBE0 indexes the player array with this seat; reader cn-324 sub_408DF0.
       offset: 4
     - object_id: u32
@@ -204,7 +212,8 @@ structs:
       except: [cn-279]
   # S2C gspItemUsed: the same readers as gspAddItemToSlot in every build above.
   # cn-324 0x46FE85 passes item_slot to vtable+264; 0x46FEA5/0x46FEB5 use kind for the direct effect sender.
-  # cn-279 sub_81BB50 reads the seat and the kind in the same two words.
+  # cn-279 sub_81BB50 reads seat and kind in two words and invokes the item's use callback. Its king's
+  # no-object kind 104 request (cn-279 sub_732F00) uses this reply too; cn-279 sub_884050 sends the native attribute.
   SupplyItemUsed:
     - seat: u32
       offset: 4
@@ -214,7 +223,7 @@ structs:
       offset: 12
       except: [cn-279]
   # S2C gspSwitchItemSlot. kr-812 sub_80A400 reads four words; cn-717 sub_8CB120, id-400 sub_481C20,
-  # id-1809 sub_4D6EC0, cn-706 sub_4B9F60, cn-406 sub_7137B0 and cn-324 sub_6FE600 match.
+  # id-1809 sub_4D6EC0, cn-706 sub_4B9F60, cn-705 sub_79E000, cn-406 sub_7137B0 and cn-324 sub_6FE600 match.
   # cn-406 sub_440770 uses the empty reader/writer sub_5129E0 for the switch request.
   # cn-279 has no such packet class.
   # cn-324 sub_47C140 clears the switch-pending flag even on rejection.
@@ -231,3 +240,102 @@ structs:
     - result: u32 # Zero accepts the new selection; nonzero leaves it unchanged.
       offset: 16
       except: [cn-279]
+
+  # kr-1256 sub_10D14C0, cn-774 sub_8C77E0 and tw-454 sub_70F410 write a word and fourteen vectors.
+  # Builders kr-1256 sub_6DA5D0, cn-774 sub_89C6B0 and tw-454 sub_70F410 classify red/blue as 1/2.
+  SupplyMapReport@kr-1256:
+    - unknown_0: u32
+      offset: 0
+    - positions: list<SupplyPosition>
+      offset: 4
+    - kinds: list<u32>
+      offset: 16
+    - team: list<u8>
+      offset: 28 # The serializer narrows each native word to one byte.
+    - regeneration_max_ms: list<u32>
+      offset: 40
+    - regeneration_min_ms: list<u32> # The builders use itemBoxRegenMinTime 15000 and itemBoxRegenMaxTime 30000.
+      offset: 52
+    - unknown_64: list<u32>
+      offset: 64
+    - unknown_76: list<SupplyPosition>
+      offset: 76
+    - unknown_88: list<u32>
+      offset: 88
+    - unknown_100: list<u32>
+      offset: 100
+    - unknown_112: list<u32>
+      offset: 112
+    - unknown_124: list<SupplyPosition>
+      offset: 124
+    - unknown_136: list<u32>
+      offset: 136
+    - unknown_148: list<u32>
+      offset: 148
+    - unknown_160: list<wstr>
+      offset: 160
+
+  # Nine words then a byte: kr-1256 sub_6ED050, cn-774 sub_8ACC60 and tw-454 sub_720F80.
+  SupplyCreate@kr-1256:
+    - object_id: u32
+      offset: 0
+    - creation_class: u32 # 20000 selects the alternate constructor in each cited modern consumer.
+      offset: 4
+      default: 10000
+    - x: f32
+      offset: 8
+    - y: f32
+      offset: 12
+    - z: f32
+      offset: 16
+    - kind: u32
+      offset: 20
+    - unknown_24: u32
+      offset: 24
+    - unknown_28: u32
+      offset: 28
+    - unknown_32: u32
+      offset: 32
+    - team: u8
+      offset: 36
+
+  # kr-1256 sub_708C10 / cn-774 sub_8C8140 / tw-454 sub_71AE40: six floats, kind, byte, classification.
+  SupplyDropRequest@kr-1256:
+    - x: f32
+      offset: 0
+    - y: f32
+      offset: 4
+    - z: f32
+      offset: 8
+    - velocity_x: f32
+      offset: 12
+    - velocity_y: f32
+      offset: 16
+    - velocity_z: f32
+      offset: 20
+    - kind: u32
+      offset: 24
+    - unknown_28: u8
+      offset: 28
+    - creation_class: u32
+      offset: 32
+
+  # kr-1256 sub_6D55D0 case 658 has no rejection word; failure repeats the unchanged selection.
+  SupplyItemSlotChanged@kr-1256:
+    - seat: u32
+      offset: 0
+    - item_slot: u32
+      offset: 4
+    - kind: u32
+      offset: 8
+
+  # cn-774 sub_897E80 case 647 and tw-454 sub_70B3F0 case 647 retain the fourth result word.
+  SupplyItemSlotChanged@cn-774:
+    - seat: u32
+      offset: 0
+    - item_slot: u32
+      offset: 4
+    - kind: u32
+      offset: 8
+    - result: u32
+      offset: 12

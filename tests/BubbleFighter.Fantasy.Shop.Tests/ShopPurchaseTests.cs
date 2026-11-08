@@ -379,6 +379,19 @@ public sealed class ShopPurchaseTests
         Assert.Equal(0, r.ReadInt32());
     }
 
+    [Theory]
+    [InlineData(4000001, ShopPurchaseRefusal.LucciShort)]
+    [InlineData(4000002, ShopPurchaseRefusal.CashShort)]
+    public async Task AShortBalanceNamesItsCurrency(int key, ShopPurchaseRefusal expected)
+    {
+        var money = new FakeMoneyRepository(new PlayerWallet(SampleUserNum, 100, 0));
+        var purchaser = NewPurchaser(money, new FakeInventoryRepository(), new FakeInventoryPushService(),
+            new FakeShopPurchaseStore());
+        var refused = await Assert.ThrowsAsync<PurchaseRejectedException>(() => purchaser.CommitOfferAsync(
+            Session(6), SampleUserNum, Catalog().FindPurchase(key)!, CancellationToken.None).AsTask());
+        Assert.Equal(expected, refused.Refusal);
+    }
+
     [Fact]
     public async Task MissingWalletRowIsSeededWithTheStartingBalances()
     {
@@ -551,6 +564,12 @@ public sealed class ShopPurchaseTests
 
         public ValueTask<PlayerWallet?> FindByUserNumAsync(long userNum, CancellationToken ct) =>
             ValueTask.FromResult(_stored is not null && _stored.UserNum == userNum ? _stored : null);
+
+        public ValueTask<PlayerWallet> GetOrCreateAsync(PlayerWallet initialWallet, CancellationToken ct)
+        {
+            _stored ??= initialWallet;
+            return ValueTask.FromResult(_stored);
+        }
 
         public ValueTask UpsertAsync(PlayerWallet record, CancellationToken ct)
         {

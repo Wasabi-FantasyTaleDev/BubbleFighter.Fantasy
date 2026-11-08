@@ -1,10 +1,11 @@
 using BubbleFighter.Fantasy.Abstractions.Persistence;
 using BubbleFighter.Fantasy.Contracts.Clans;
+using BubbleFighter.Fantasy.Contracts.Cluster;
 
 namespace BubbleFighter.Fantasy.Persistence.MySql;
 
 /// <summary>Clan open and membership persistence over the tables from migration 0015.</summary>
-public sealed class MySqlClanStore(IDbConnectionFactory connections) : IClanStore
+public sealed class MySqlClanStore(IDbConnectionFactory connections, IAccountMutationFence? authority = null) : IClanStore
 {
     /// <inheritdoc />
     public async ValueTask RememberOpenAsync(ClanOpenRecord record, CancellationToken ct)
@@ -18,6 +19,7 @@ public sealed class MySqlClanStore(IDbConnectionFactory connections) : IClanStor
             return;
 
         await using var session = await SugarSession.OpenAsync(connections, ct).ConfigureAwait(false);
+        await using var transaction = await session.BeginWriteAsync(record.UserNum, authority, ct).ConfigureAwait(false);
         var row = new ClanOpenRow { UserNum = record.UserNum, Kind = (int)record.Kind };
         // opened_at takes the column default on insert and CURRENT_TIMESTAMP on update.
         var rows = await SugarSql.UpsertAsync(session.Db, row, [nameof(ClanOpenRow.OpenedAt)],
@@ -25,6 +27,7 @@ public sealed class MySqlClanStore(IDbConnectionFactory connections) : IClanStor
         // A repeated open in the same second can be a no-op with UseAffectedRows enabled.
         if (rows < 0 || rows > 2)
             throw new InvalidOperationException($"clan_opens upsert for user_num {record.UserNum} wrote {rows} row(s).");
+        await transaction.CommitAsync().ConfigureAwait(false);
     }
 
     /// <inheritdoc />

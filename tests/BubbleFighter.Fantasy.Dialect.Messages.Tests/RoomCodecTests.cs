@@ -271,7 +271,7 @@ public sealed class RoomCodecTests
         Assert.Equal(0, r.ReadUInt16());
         Assert.Equal(0, r.ReadUInt16());
         Assert.Equal(0, r.ReadByte());
-        Assert.Equal(3, r.ReadInt32());
+        Assert.Equal(1, r.ReadInt32());
         Assert.Equal(0, r.ReadInt32());
         Assert.Equal(0, r.ReadInt32());
         Assert.Equal(0, r.ReadInt32());
@@ -313,7 +313,7 @@ public sealed class RoomCodecTests
         {
             UserSlot = schema.UserSlot.Select(field => field.Name switch
             {
-                "level" => field with { Value = RoomFieldValue.Constant, Constant = 7 },
+                "outer_ipv4" => field with { Constant = 7 },
                 "unknown_36" => field with { Constant = 0x11223344 },
                 _ => field,
             }).ToArray(),
@@ -484,13 +484,13 @@ public sealed class RoomCodecTests
     [InlineData("cn-735", "cn-717", "kr-812")]
     [InlineData("cn-738", "cn-735", "cn-717", "kr-812")]
     [InlineData("cn-742", "cn-738", "cn-735", "cn-717", "kr-812")]
-    public void MidCnRoomBuildsResolveTheCn735Layout(params string[] lineage)
+    public void MidCnRoomBuildsResolveTheirNativeMenuLayout(params string[] lineage)
     {
         var choice = TestBuilds.All.Schemas.Require(lineage);
-        Assert.Equal("cn-735", choice.Profile);
-        Assert.Equal(lineage[0] == "cn-735" ? VariantMatch.Exact : VariantMatch.Inherited, choice.Match);
+        Assert.Equal(lineage[0], choice.Profile);
+        Assert.Equal(VariantMatch.Exact, choice.Match);
         var room = new MainMenuRoomOpened(11, "admin", 300001, [300001, 202001]);
-        Assert.Equal(RoomCodec.WriteMainMenu(room, TestBuilds.Of("cn-735").Schema),
+        Assert.Equal(GotoRoomGotoMenuGoldenCodec.WriteMainMenu(room, additionalArenaWord: lineage[0] == "cn-742"),
             RoomCodec.WriteMainMenu(room, choice.Value));
     }
 }

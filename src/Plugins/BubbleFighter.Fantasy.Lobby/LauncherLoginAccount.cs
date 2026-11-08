@@ -35,6 +35,18 @@ internal static class LauncherLoginAccount
     internal static bool IsTicketForm(string account) =>
         account.StartsWith(Prefix, StringComparison.Ordinal) || IsTicket(account);
 
+    internal static ValueTask<LauncherTicketIdentity?> ResolveIdentityAsync(string account, string build, bool enabled,
+        ILauncherTicketService? tickets, bool requireTicket, CancellationToken cancellationToken)
+    {
+        var marked = account.StartsWith(Prefix, StringComparison.Ordinal);
+        if (!marked && !IsTicket(account))
+            return ValueTask.FromResult<LauncherTicketIdentity?>(requireTicket ? null : new(account));
+        var token = marked ? account[Prefix.Length..] : account;
+        return !enabled || tickets is null || !IsTicket(token)
+            ? ValueTask.FromResult<LauncherTicketIdentity?>(null)
+            : tickets.RedeemIdentityAsync(token, build, cancellationToken);
+    }
+
     private static bool IsTicket(ReadOnlySpan<char> token)
     {
         if (token.Length != TicketLength) return false;

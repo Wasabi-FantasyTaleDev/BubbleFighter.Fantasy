@@ -15,8 +15,8 @@ namespace BubbleFighter.Fantasy.InGame.Handlers;
 /// The plaza side of the room flow: who is present in the walkable lobby, where they reported
 /// themselves, and the enter and leave announcements between them. A player seated in a room is
 /// never present: entering a room removes them, and leaving a room or being kicked puts them back.
-/// The entry burst and its position walk are the build codec's (they are wire shape); this
-/// part only decides who hears about whom, and in which order.
+/// The build codec installs the native scene; this part decides who hears about membership
+/// and actual movement reports, and in which order.
 /// </summary>
 internal sealed partial class RoomFlow
 {
@@ -58,7 +58,7 @@ internal sealed partial class RoomFlow
     internal async ValueTask EnterPlazaAsync(ISession session, CancellationToken ct, bool partyTransition = false)
     {
         var (userNum, nickname) = SessionPlayer.RequireIdentity(session);
-        var equipment = await SeatCharacter.ResolveEquipmentAsync(session, userNum, _selection, _characters, ct).ConfigureAwait(false);
+        var equipment = await ResolveEquipmentAsync(session, userNum, ct).ConfigureAwait(false);
         await _plaza.Executor.ExecuteAsync(
             operationCt => EnterPlazaCoreAsync(session, userNum, nickname, equipment, operationCt, partyTransition), ct).ConfigureAwait(false);
     }
@@ -67,14 +67,21 @@ internal sealed partial class RoomFlow
     private async ValueTask EnterPlazaCoreAsync(ISession session, int userNum, string nickname, SeatEquipment equipment,
         CancellationToken ct, bool partyTransition = false)
     {
+        // A player who moved here may still be shown for the node it left; its own seat replaces that one.
+        if (_plaza.FindRemote(userNum) is { } shadow)
+            await RemoveRemotePlazaMemberAsync(shadow.UserNumber, ct).ConfigureAwait(false);
+        // A new scene resets movement counters; peers must discard the previous actor before seeing the same identity again.
+        if (_plaza.Find(session.Id) is { Reserved: false })
+            await LeavePlazaCoreAsync(session.Id, ct).ConfigureAwait(false);
         var seat = _plaza.Enter(session, userNum, nickname, equipment);
+        PreparePlazaRecruitment(seat);
         PlazaMember you;
         PlazaMember[] present;
         int[] memberOrder;
         lock (_plaza.Gate)
         {
             you = seat.ToMember();
-            memberOrder = [.. _plaza.Snapshot().Where(other => _registry.TryGet(other.SessionId) is null).Select(other => other.Slot)];
+            memberOrder = [.. _plaza.Snapshot().Where(other => _registry.TryGet(other.SessionId) is null).Select(other => other.Slot).Order()];
             present = _plaza.Snapshot()
                 .Where(other => other.SessionId != seat.SessionId && _registry.TryGet(other.SessionId) is null)
                 .Select(other => other.ToMember())
@@ -84,12 +91,11 @@ internal sealed partial class RoomFlow
             throw new InvalidOperationException("Plaza enter requested on a build without the plaza encoders.");
         await _plazaEntered.SendAsync(session, new PlazaEntered(you, present)
             { MemberOrder = memberOrder, PartyTransition = partyTransition }, ct).ConfigureAwait(false);
-        // The entrant also receives where everyone stands, so its client can place the avatars the
-        // seat records created; a member who has not reported yet has no position to replay and the
-        // codec keeps that member at its plaza spawn (kr-1256 sub_91FB80).
+        // Only actual reports can be replayed; native scene construction owns the entry position.
         foreach (var member in _options?.PlazaReplayPositionsOnEnter != false ? present : [])
         {
             var (userNumber, sequence, position) = _plaza.LastPosition(member.UserNumber);
+            if (position.IsEmpty) continue;
             await _plazaPositionReceived.SendAsync(session, new PlazaPositionReceived(userNumber, sequence, position, member.EntrySeed), ct)
                 .ConfigureAwait(false);
         }
@@ -97,9 +103,11 @@ internal sealed partial class RoomFlow
         {
             if (other.SessionId == seat.SessionId || _registry.TryGet(other.SessionId) is not null)
                 continue;
-            await NotifyScenePeerAsync(other.Game, _plazaMemberEntered, new PlazaMemberEntered(you), ct).ConfigureAwait(false);
+            await NotifyScenePeerAsync(other.Game!, _plazaMemberEntered, new PlazaMemberEntered(you), ct).ConfigureAwait(false);
         }
         ScenePhase.Entered(session, SessionPhase.Plaza, _logger);
+        await ReplayPlazaRecruitmentAsync(session, ct).ConfigureAwait(false);
+        PublishPlaza(new(PlazaFederationEventKind.Entered, you.UserNumber, you, default));
         _logger.LogInformation("Session {Id} entered the plaza at seat {Slot}; {Count} player(s) present.",
             session.Id, seat.Slot, present.Length);
     }
@@ -112,19 +120,21 @@ internal sealed partial class RoomFlow
     private async ValueTask LeavePlazaCoreAsync(long sessionId, CancellationToken ct)
     {
         var left = _plaza.Remove(sessionId);
+        if (left is not null) ClearPlazaRecruitment(left);
         if (left is null || left.Reserved)
             return;
+        if (!left.Remote) PublishPlaza(new(PlazaFederationEventKind.Left, left.UserNumber, null, default));
         if (_plazaMemberLeft is null)
             throw new InvalidOperationException("Plaza leave on a build without a plaza-leave encoder.");
         var notice = new PlazaMemberLeft(left.ToMember());
         foreach (var other in _plaza.Sessions())
         {
             // A member whose own connection is closing leaves on its own; it must not stop the others hearing.
-            if (other.Game.Connection.IsClosed || _registry.TryGet(other.SessionId) is not null)
+            if (other.Game!.Connection.IsClosed || _registry.TryGet(other.SessionId) is not null)
                 continue;
             try
             {
-                await _plazaMemberLeft.SendAsync(other.Game, notice, ct).ConfigureAwait(false);
+                await _plazaMemberLeft.SendAsync(other.Game!, notice, ct).ConfigureAwait(false);
             }
             catch (IOException)
             {
@@ -141,8 +151,10 @@ internal sealed partial class RoomFlow
     /// control, gated on its own connection and channel state; the move-to-menu answer alone is
     /// what switches its stage back.
     /// </summary>
-    public ValueTask HandlePlazaMenuReturnAsync(ISession session, PlazaMenuReturnRequested request, CancellationToken ct) =>
-        RunSceneAsync(session, async (group, token) =>
+    public async ValueTask HandlePlazaMenuReturnAsync(ISession session, PlazaMenuReturnRequested request, CancellationToken ct)
+    {
+        long? returnGeneration = null;
+        await RunSceneAsync(session, async (group, token) =>
         {
             await CloseTutorialForSceneAsync(session, token).ConfigureAwait(false);
             var fromPlaza = _plaza.Find(session.Id) is not null;
@@ -153,7 +165,10 @@ internal sealed partial class RoomFlow
                     if (_registry.TryGet(member.Id) is null && _plaza.Find(member.Id) is not null)
                         await ReturnMenuSceneAsync(member, new() { PartyTransition = true }, followCt).ConfigureAwait(false);
                 }, token).ConfigureAwait(false);
-        }, ct);
+            returnGeneration = CaptureHomeReturn(session);
+        }, ct).ConfigureAwait(false);
+        await ReturnHomeAfterSceneAsync(session, returnGeneration, ct).ConfigureAwait(false);
+    }
 
     private async ValueTask ReturnMenuSceneAsync(ISession session, PlazaMenuReturnRequested request, CancellationToken ct)
     {
@@ -168,7 +183,7 @@ internal sealed partial class RoomFlow
             if (_mainMenu is null)
                 throw new InvalidOperationException("Selection scene return requires a main-menu session encoder.");
             var (userNum, nickname) = SessionPlayer.RequireIdentity(session);
-            var equipment = await SeatCharacter.ResolveEquipmentAsync(session, userNum, _selection, _characters, ct).ConfigureAwait(false);
+            var equipment = await ResolveEquipmentAsync(session, userNum, ct).ConfigureAwait(false);
             // cn-324 sub_707520 only switches the stage; it retains the selection scene's
             // session. Reuse the login installer before constructing the menu avatar.
             await _mainMenu.SendAsync(session, new MainMenuRoomOpened(userNum, nickname, equipment.CharacterId,
@@ -186,7 +201,7 @@ internal sealed partial class RoomFlow
         if (_menuReturn is null)
             throw new InvalidOperationException("Plaza menu return requested on a build without the encoder.");
         var (menuUser, menuName) = SessionPlayer.RequireIdentity(session);
-        var menuEquipment = await SeatCharacter.ResolveEquipmentAsync(session, menuUser, _selection, _characters, ct).ConfigureAwait(false);
+        var menuEquipment = await ResolveEquipmentAsync(session, menuUser, ct).ConfigureAwait(false);
         var menuMember = new PlazaMember(0, menuUser, menuName, SessionPlayer.ResolveLevel(session),
             menuEquipment.CharacterId, menuEquipment.ItemIds ?? [menuEquipment.CharacterId]) { ColorIndex = SessionPlayer.ResolveColorIndex(session) };
         await _menuReturn.SendAsync(session, request with { You = menuMember }, ct).ConfigureAwait(false);
@@ -222,12 +237,13 @@ internal sealed partial class RoomFlow
             member.PositionSequence++;
             member.LastPosition = request.Body;
             var received = new PlazaPositionReceived(member.UserNumber, member.PositionSequence, request.Body, member.EntrySeed);
+            PublishPlaza(new(PlazaFederationEventKind.Moved, member.UserNumber, null, request.Body.ToArray()));
             foreach (var other in _plaza.Sessions())
             {
                 if (_registry.TryGet(other.SessionId) is not null
                     || (other.SessionId == session.Id && _options?.PlazaEchoPositions == false))
                     continue;
-                await NotifyScenePeerAsync(other.Game, _plazaPositionReceived, received, operationCt).ConfigureAwait(false);
+                await NotifyScenePeerAsync(other.Game!, _plazaPositionReceived, received, operationCt).ConfigureAwait(false);
             }
         }, ct).ConfigureAwait(false);
     }
@@ -235,13 +251,16 @@ internal sealed partial class RoomFlow
     /// <summary>
     /// One player is present in the plaza, with what a seat record and a position broadcast need.
     /// </summary>
-    internal sealed class PlazaMemberState
+    internal sealed partial class PlazaMemberState
     {
         /// <summary>The game session this member rides.</summary>
         internal required long SessionId { get; init; }
 
-        /// <summary>The game-connection session.</summary>
-        internal required ISession Game { get; init; }
+        /// <summary>The game-connection session; null for a player present on another node of the cluster.</summary>
+        internal required ISession? Game { get; init; }
+
+        /// <summary>Whether the player is present on another node and is shown here through the plaza federation.</summary>
+        internal bool Remote => Game is null;
 
         /// <summary>Holds admission capacity without exposing a player whose scene has not been installed.</summary>
         internal bool Reserved { get; set; }
@@ -266,7 +285,7 @@ internal sealed partial class RoomFlow
         /// <summary>The worn items.</summary>
         internal IReadOnlyList<int> EquippedItemIds { get; set; } = [];
 
-        /// <summary>The value fixed at this entry from which receivers derive the spawn position.</summary>
+        /// <summary>The identity of this plaza entry, used to distinguish reentry from a state refresh.</summary>
         internal int EntrySeed { get; set; }
 
         /// <summary>The per-entry position sequence, incremented once per broadcast.</summary>
@@ -275,7 +294,8 @@ internal sealed partial class RoomFlow
         /// <summary>The last reported position body, verbatim.</summary>
         internal ReadOnlyMemory<byte> LastPosition { get; set; }
 
-        internal PlazaMember ToMember() => new(Slot, UserNumber, Nickname, Math.Max(1, Level), CharacterItemId, EquippedItemIds, EntrySeed) { ColorIndex = ColorIndex };
+        internal PlazaMember ToMember() => new(Slot, UserNumber, Nickname, Math.Max(1, Level), CharacterItemId, EquippedItemIds, EntrySeed)
+            { ColorIndex = ColorIndex, Recruitment = Recruitment };
     }
 
     /// <summary>
@@ -349,9 +369,8 @@ internal sealed partial class RoomFlow
                 seat.ColorIndex = SessionPlayer.ResolveColorIndex(session);
                 seat.CharacterItemId = equipment.CharacterId;
                 seat.EquippedItemIds = equipment.ItemIds ?? [equipment.CharacterId];
-                // The spawn placement every client is shown counts as the first position.
-                seat.PositionSequence = 1;
-                // Wraps harmlessly: only the value's spread matters, not its order.
+                seat.PositionSequence = 0;
+                // Only equality matters: a later entry invalidates the previous actor and its movement history.
                 seat.EntrySeed = unchecked(++_entries);
                 seat.LastPosition = ReadOnlyMemory<byte>.Empty;
                 return seat;
@@ -382,7 +401,7 @@ internal sealed partial class RoomFlow
         {
             lock (Gate)
             {
-                return _members.FirstOrDefault(member => member.Game.Connection.Id == connectionId);
+                return _members.FirstOrDefault(member => member.Game?.Connection.Id == connectionId);
             }
         }
 
@@ -393,8 +412,62 @@ internal sealed partial class RoomFlow
                 return [.. _members.Where(member => !member.Reserved)];
         }
 
-        /// <summary>The live game sessions, for broadcasts.</summary>
-        public IReadOnlyList<PlazaMemberState> Sessions() => Snapshot();
+        /// <summary>The installed members connected to this node, for broadcasts; remote members have no session.</summary>
+        public IReadOnlyList<PlazaMemberState> Sessions()
+        {
+            lock (Gate)
+                return [.. _members.Where(member => !member.Reserved && !member.Remote)];
+        }
+
+        /// <summary>The members shown here for other nodes.</summary>
+        public IReadOnlyList<PlazaMemberState> RemoteMembers()
+        {
+            lock (Gate)
+                return [.. _members.Where(member => member.Remote)];
+        }
+
+        /// <summary>
+        /// Seats or refreshes a player present on another node. Returns the seat and whether it is new, or null when
+        /// the player is connected here or every seat is taken (the client's array holds 36).
+        /// </summary>
+        public (PlazaMemberState Seat, bool Added)? EnterRemote(PlazaMember member)
+        {
+            lock (Gate)
+            {
+                var existing = _members.FirstOrDefault(candidate => candidate.UserNumber == member.UserNumber);
+                if (existing is { Remote: false }) return null;
+                var added = existing is null;
+                if (existing is null)
+                {
+                    if (_members.Count >= _capacity) return null;
+                    existing = new PlazaMemberState
+                    {
+                        // Negative ids never collide with a connection's session id.
+                        SessionId = -(long)member.UserNumber,
+                        Game = null,
+                        Slot = Enumerable.Range(0, _capacity).First(candidate => _members.All(other => other.Slot != candidate)),
+                        UserNumber = member.UserNumber,
+                        PositionSequence = 0,
+                        EntrySeed = member.EntrySeed,
+                    };
+                    _members.Add(existing);
+                }
+                existing.Nickname = member.Nickname;
+                existing.Level = member.Level;
+                existing.ColorIndex = member.ColorIndex;
+                existing.CharacterItemId = member.CharacterItemId;
+                existing.EquippedItemIds = member.EquippedItemIds;
+                existing.Recruitment = member.Recruitment;
+                return (existing, added);
+            }
+        }
+
+        /// <summary>Finds a member shown for another node by its account number.</summary>
+        public PlazaMemberState? FindRemote(int userNumber)
+        {
+            lock (Gate)
+                return _members.FirstOrDefault(member => member.Remote && member.UserNumber == userNumber);
+        }
 
         /// <summary>A member's last reported position and its sequence, by user number.</summary>
         public (int UserNumber, int Sequence, ReadOnlyMemory<byte> Position) LastPosition(int userNumber)

@@ -50,7 +50,7 @@ public sealed class PacketCatalogNames
                     if (document.Profile == "kr-1256" && (value >= 2000 || row.Name.StartsWith("gpp", StringComparison.Ordinal))) continue;
                     connection = "game";
                 }
-                if (connection is not ("game" or "relay" or "both")) throw new ConfigException($"Invalid diagnostic connection in '{path}': {connection}");
+                if (connection is not ("game" or "relay" or "udp" or "both")) throw new ConfigException($"Invalid diagnostic connection in '{path}': {connection}");
                 foreach (var scope in connection == "both" ? new[] { "game", "relay" } : [connection])
                 {
                     var key = (scope, direction, value);

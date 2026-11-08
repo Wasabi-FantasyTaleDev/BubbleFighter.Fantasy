@@ -6,6 +6,7 @@ using BubbleFighter.Fantasy.Contracts.Presents;
 using BubbleFighter.Fantasy.Contracts.Shop;
 using BubbleFighter.Fantasy.Contracts.Wallet;
 using BubbleFighter.Fantasy.Contracts.Settings;
+using BubbleFighter.Fantasy.Contracts.Cluster;
 using System.ComponentModel.DataAnnotations;
 using System.Data.Common;
 using System.Net;
@@ -30,6 +31,7 @@ namespace BubbleFighter.Fantasy.Persistence.MySql;
 /// <c>IPlayerRepository</c> from the lobby row.
 /// </summary>
 [Plugin("persistence.mysql", Description = "MySQL persistence via MySqlConnector and SqlSugar.",
+    Optional = [typeof(IAccountMutationFence)],
     Provides = [
         typeof(IDbConnectionFactory),
         typeof(IMigrationRunner),
@@ -40,12 +42,14 @@ namespace BubbleFighter.Fantasy.Persistence.MySql;
         typeof(IShopSessionStore),
         typeof(IFighterRepository),
         typeof(IInventoryRepository),
+        typeof(IInventoryLoadoutStore),
         typeof(IPlayerWalletRepository),
         typeof(BubbleFighter.Fantasy.Contracts.Progress.IPlayerProgressRepository),
+        typeof(BubbleFighter.Fantasy.Contracts.Progress.IPlayerBattleRecordsRepository),
         typeof(IShopPurchaseStore),
         typeof(IPresentStore),
         typeof(BubbleFighter.Fantasy.Contracts.Messenger.IMessengerStore),
-        typeof(IPlayerInventoryState), typeof(IPlayerSettingsRepository)])]
+        typeof(IPlayerInventoryState), typeof(IPlayerSettingsRepository), typeof(IPersistentDataDomainIdentity)])]
 public sealed class MySqlPlugin : IPlugin
 {
     /// <inheritdoc />
@@ -54,7 +58,8 @@ public sealed class MySqlPlugin : IPlugin
         var options = context.Config.Bind<MySqlOptions>();
         var builder = options.CreateBuilder();
         var factory = new MySqlConnectionFactory(builder.ConnectionString);
-        var settings = new MySqlPlayerSettings(factory, options.CustomizedKeys);
+        var authority = options.RequireAccountWriteAuthority ? context.Services.Get<IAccountMutationFence>() : null;
+        var settings = new MySqlPlayerSettings(factory, options.CustomizedKeys, authority);
         var runner = new MigrationRunner(factory, context.Logger, typeof(MySqlPlugin).Assembly);
 
         MySqlConnectionFactory.WarnIfUnencryptedRemote(builder, context.Logger);
@@ -71,21 +76,25 @@ public sealed class MySqlPlugin : IPlugin
         }
 
         context.Effect(context.Services.Register<IDbConnectionFactory>(factory));
+        context.Effect(context.Services.Register<IPersistentDataDomainIdentity>(new MySqlPersistentDataDomainIdentity(factory)));
         context.Effect(context.Services.Register<IMigrationRunner>(runner));
         context.Effect(context.Services.Register<IPlayerSettingsRepository>(settings));
         context.Effect(context.Services.Register<ILauncherAccountRepository>(new MySqlLauncherAccounts(factory)));
         context.Effect(context.Services.Register<ILauncherSessionStore>(new MySqlLauncherSessions(factory)));
-        context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Progress.ITutorialStageStore>(new MySqlTutorialStages(factory)));
-        context.Effect(context.Services.Register<IShopSessionStore>(new MySqlShopSessionStore(factory)));
-        context.Effect(context.Services.Register<IClanStore>(new MySqlClanStore(factory)));
-        context.Effect(context.Services.Register<IFighterRepository>(new MySqlFighterRepository(factory)));
-        context.Effect(context.Services.Register<IInventoryRepository>(new MySqlInventoryRepository(factory)));
-        context.Effect(context.Services.Register<IPlayerWalletRepository>(new MySqlPlayerWalletRepository(factory)));
-        context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Progress.IPlayerProgressRepository>(
-            new MySqlPlayerProgressRepository(factory)));
-        context.Effect(context.Services.Register<IPlayerInventoryState>(new MySqlPlayerInventoryState(factory)));
-        context.Effect(context.Services.Register<IShopPurchaseStore>(new MySqlShopPurchaseStore(factory)));
-        context.Effect(context.Services.Register<IPresentStore>(new MySqlPresentStore(factory)));
+        context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Progress.ITutorialStageStore>(new MySqlTutorialStages(factory, authority)));
+        context.Effect(context.Services.Register<IShopSessionStore>(new MySqlShopSessionStore(factory, authority)));
+        context.Effect(context.Services.Register<IClanStore>(new MySqlClanStore(factory, authority)));
+        context.Effect(context.Services.Register<IFighterRepository>(new MySqlFighterRepository(factory, authority)));
+        var inventory = new MySqlInventoryRepository(factory, authority, options.MaxLoadoutsPerPlayer);
+        context.Effect(context.Services.Register<IInventoryRepository>(inventory));
+        context.Effect(context.Services.Register<IInventoryLoadoutStore>(inventory));
+        context.Effect(context.Services.Register<IPlayerWalletRepository>(new MySqlPlayerWalletRepository(factory, authority)));
+        var progress = new MySqlPlayerProgressRepository(factory, authority, options.MaxBattleModesPerPlayer);
+        context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Progress.IPlayerProgressRepository>(progress));
+        context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Progress.IPlayerBattleRecordsRepository>(progress));
+        context.Effect(context.Services.Register<IPlayerInventoryState>(new MySqlPlayerInventoryState(factory, authority)));
+        context.Effect(context.Services.Register<IShopPurchaseStore>(new MySqlShopPurchaseStore(factory, authority)));
+        context.Effect(context.Services.Register<IPresentStore>(new MySqlPresentStore(factory, authority)));
         context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Messenger.IMessengerStore>(new MySqlMessengerStore(factory)));
 
         if (options.AutoMigrate)
@@ -100,6 +109,17 @@ public sealed class MySqlPlugin : IPlugin
 /// <summary>Configuration for the <see cref="MySqlPlugin"/> row.</summary>
 public sealed class MySqlOptions : IValidatableOptions
 {
+    /// <summary>Gets or sets the maximum number of recorded game modes per player without evicting history.</summary>
+    [Range(1, 4096)]
+    public int MaxBattleModesPerPlayer { get; set; } = 128;
+
+    /// <summary>Gets or sets the number of independently saved client-build loadouts allowed per player.</summary>
+    [Range(1, 256)]
+    public int MaxLoadoutsPerPlayer { get; set; } = 32;
+
+    /// <summary>Gets or sets whether player mutations require this node's retained account authority.</summary>
+    public bool RequireAccountWriteAuthority { get; set; }
+
     /// <summary>Gets or sets the per-account scope, row and name budgets for saved customized keys.</summary>
     [Required]
     public CustomizedKeyLimits CustomizedKeys { get; set; } = new();

@@ -1,3 +1,4 @@
+using BubbleFighter.Fantasy.Contracts.Cluster;
 using BubbleFighter.Fantasy.Abstractions.Persistence;
 using BubbleFighter.Fantasy.Contracts.Progress;
 using SqlSugar;
@@ -5,7 +6,7 @@ using SqlSugar;
 namespace BubbleFighter.Fantasy.Persistence.MySql;
 
 /// <summary>Keeps tutorial-room stage clears in <c>tutorial_stage_clears</c>.</summary>
-public sealed class MySqlTutorialStages(IDbConnectionFactory connections) : ITutorialStageStore
+public sealed class MySqlTutorialStages(IDbConnectionFactory connections, IAccountMutationFence? authority = null) : ITutorialStageStore
 {
     // INSERT IGNORE stays raw: SqlSugar has no IGNORE form, and its upsert would change which errors are swallowed.
     private const string InsertIgnoreSql = """
@@ -30,15 +31,20 @@ public sealed class MySqlTutorialStages(IDbConnectionFactory connections) : ITut
     {
         ArgumentNullException.ThrowIfNull(clear);
         await using var session = await SugarSession.OpenAsync(connections, ct).ConfigureAwait(false);
+        await using var transaction = await session.BeginWriteAsync(userNum, authority, ct).ConfigureAwait(false);
         var db = session.Db;
         // INSERT IGNORE reports one row only for the first clear; the UPDATE then keeps the better records.
         var inserted = await SugarSql.ExecuteOnConnectionAsync(db, InsertIgnoreSql,
             [("@user", userNum), ("@stage", clear.Stage), ("@count", clear.BestCount),
              ("@seconds", clear.BestSeconds), ("@now", DateTime.UtcNow)], ct).ConfigureAwait(false);
         if (inserted == 1)
+        {
+            await transaction.CommitAsync().ConfigureAwait(false);
             return true;
+        }
 
         await BestRecordUpdate(db, userNum, clear).ExecuteCommandAsync(ct).ConfigureAwait(false);
+        await transaction.CommitAsync().ConfigureAwait(false);
         return false;
     }
 

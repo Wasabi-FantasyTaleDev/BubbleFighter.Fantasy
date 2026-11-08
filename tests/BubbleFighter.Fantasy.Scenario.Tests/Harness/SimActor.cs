@@ -89,7 +89,8 @@ internal sealed class SimActor
     /// Logs in to the in-process server using the test actor's name as its launcher session,
     /// then waits for the main-menu install before starting the bounded test keepalive.
     /// </summary>
-    public async Task Login()
+    /// <param name="pollConfiguration">Whether idle polling also requests configuration; transcript scripts disable it to keep unrelated replies outside their steps.</param>
+    public async Task Login(bool pollConfiguration = true)
     {
         var from = Cursor;
         await SendReference(C2SVersion);
@@ -105,11 +106,10 @@ internal sealed class SimActor
         await SendReference(C2SSessionProbe);
         await SendReference(C2SKeepalive);
         await WaitFor(S2CSceneInstall, from);
-        _client.StartKeepalive(TimeSpan.FromSeconds(15),
-        [
-            (C2SEnvironment, _fixtures.Last(C2SEnvironment)),
-            (C2SKeepalive, _fixtures.First(C2SKeepalive)),
-        ]);
+        List<(ushort Opcode, byte[] Payload)> heartbeat = [];
+        if (pollConfiguration) heartbeat.Add((C2SEnvironment, _fixtures.Last(C2SEnvironment)));
+        heartbeat.Add((C2SKeepalive, _fixtures.First(C2SKeepalive)));
+        _client.StartKeepalive(TimeSpan.FromSeconds(15), heartbeat);
     }
 
     /// <summary>Enters the plaza (C2S 106) and waits for the scene install.</summary>

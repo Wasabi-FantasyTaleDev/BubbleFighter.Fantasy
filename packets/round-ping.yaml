@@ -1,0 +1,9 @@
+version: 1
+structs:
+  # kr-812 sub_6DB1B0 reads the two words of Packet_gppPing at object offsets 4 and 8.
+  # kr-1256 sub_7629A0 writes the same pair; kr-1256 sub_6D55D0 case 32840 reads them.
+  RoundPing:
+    - unknown_4: u32 # kr-1256 sub_6D55D0 compares this with the result of kr-1256 sub_9E1580.
+      offset: 4
+    - unknown_8: u32 # kr-1256 sub_762570 compares the saved send clock and measures elapsed time.
+      offset: 8

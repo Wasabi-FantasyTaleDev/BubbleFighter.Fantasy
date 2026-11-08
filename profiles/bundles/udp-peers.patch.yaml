@@ -1,0 +1,60 @@
+# Optional room-local native peer setup for cn-279, cn-324, cn-406, cn-404, cn-408, cn-705, cn-706 and id-400.
+# Apply to one build with --patch; no profile enables it by default.
+# Discovery uses the authenticated game server's IPv4 address and this advertised UDP port.
+# Successful peers exchange movement directly; failed paths retain the native TCP match relay.
+# The native peer coordinator requires initialized relay leases, including its TCP fallback.
+# Builds with dormant baseline relay rows opt in here; their scene-seed rows remain untouched.
+- replace:
+    id: relay-listener
+    disabled: false
+- replace:
+    id: dialect.match
+    disabled: false
+- replace:
+    id: dialect.match-offers
+    disabled: false
+- replace:
+    id: dialect.match-replies
+    disabled: false
+- replace:
+    id: match-connection
+    disabled: false
+- set:
+    id: ingame
+    config:
+      udp_enabled: ${BFF_UDP_ENABLED:-true}
+      native_match_relay: true
+      match_transport_fallback: true
+- set:
+    id: dialect.rooms
+    config:
+      select_match_relay: true
+- insert:
+    - id: udp-listener
+      plugin: net.udp
+      config:
+        enabled: ${BFF_UDP_ENABLED:-true}
+        listen: "${BFF_BIND_HOST:-0.0.0.0}:${BFF_UDP_PORT}"
+        protocol: "${BFF_PROFILE_ID}/udp"
+        max_datagram_bytes: 1400
+    - id: dialect.udp-peers
+      plugin: dialect.udp-peers
+      config:
+        protocol: "${BFF_PROFILE_ID}/game"
+        packets_directory: packets
+    - id: match-udp-peers
+      plugin: match-udp-peers
+      config:
+        enabled: ${BFF_UDP_ENABLED:-true}
+        protocol: "${BFF_PROFILE_ID}/game"
+        udp_protocol: "${BFF_PROFILE_ID}/udp"
+        advertise_port: ${BFF_UDP_PUBLIC_PORT:-0}
+        max_rounds: 128
+        max_peers: 1024
+        tick_ms: 50
+        discovery_timeout_ms: 3000
+        discovery_refresh_ms: 1000
+        table_timeout_ms: 2000
+        punch_window_ms: 1000
+        punch_retry_ms: 250
+        control_timeout_ms: 2000

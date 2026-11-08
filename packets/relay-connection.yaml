@@ -18,6 +18,7 @@ structs:
   # cn-774 sub_1069F40/sub_1069FD0 and tw-454 sub_EB5730/sub_EB57C0 independently
   # write/read the same three words, two halfwords and final word (20 bytes).
   # The six field meanings remain unproven; a common 20-byte size is not key compatibility.
+  # cn-735 sub_A13B80, cn-738 sub_A3C330 and cn-742 sub_97F430 independently read the same six widths.
   RelaySessionKey:
     - unknown_4: u32
       offset: 4
@@ -88,6 +89,19 @@ structs:
       only: [kr-1256]
     - unknown_n4: wstr
       only: [kr-1256]
+  # cn-735 sub_A12480, cn-738 sub_A3B630 and cn-742 sub_97EA80 write the key,
+  # one byte, two words and a counted string; the last two fields are absent from cn-717's join.
+  RelayJoinRequest@cn-735:
+    - key: RelaySessionKey
+      offset: 4
+    - unknown_28: u8
+      offset: 28
+    - unknown_32: u32
+      offset: 32
+    - unknown_36: u32
+      offset: 36
+    - unknown_40: wstr
+      offset: 40
   # gcpReportRelayConnected kr-812 sub_844CE0/sub_80C160;
   # cn-717 sub_AB0B70/sub_8C3780; cn-324 sub_6F9DF0/sub_798810;
   # cn-279 sub_46DFA0/sub_44FC80; cn-406 sub_713E80/sub_7151D0;
@@ -126,8 +140,8 @@ structs:
       only: [kr-1256]
   # kr-1256 relay S2C 22 (kr-1256 sub_9601E0 case 22, block 0x96113C): a four-byte word compared to zero,
   # then six one-byte values. kr-1256 sub_9601E0 at 0x96115F keeps only "the word is not zero" (a true value
-  # enables the optional adaptive sampler) and copies the six bytes into its handshake record. No legacy
-  # build has relay 22. cn-774 sub_B593D0 and tw-454 sub_A79210 case 22 read the same ten bytes;
+  # enables the optional adaptive sampler) and copies the six bytes into its handshake record.
+  # cn-774 sub_B593D0 and tw-454 sub_A79210 case 22 read the same ten bytes;
   # modern descendants inherit these fields.
   RelayHandshakeSettings:
     - unknown_n0: bool    # the four-byte word; only its zero/nonzero result is kept
@@ -144,3 +158,21 @@ structs:
       only: [kr-1256]
     - unknown_n6: u8
       only: [kr-1256]
+
+  # cn-735 sub_A12DC0, cn-738 sub_A3BD10 and cn-742 sub_97EE10 read a bool32 and six bytes.
+  # Their relay-1 scene path still uses RelayValidationReport, not the modern reconnect-map exchange.
+  RelayHandshakeSettings@cn-735:
+    - unknown_n0: bool
+      offset: 1
+    - unknown_n1: u8
+      offset: 2
+    - unknown_n2: u8
+      offset: 3
+    - unknown_n3: u8
+      offset: 4
+    - unknown_n4: u8
+      offset: 5
+    - unknown_n5: u8
+      offset: 6
+    - unknown_n6: u8
+      offset: 7

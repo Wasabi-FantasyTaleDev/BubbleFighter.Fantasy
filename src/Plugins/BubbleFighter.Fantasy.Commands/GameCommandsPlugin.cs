@@ -22,6 +22,9 @@ public sealed class GameCommandsPlugin : IPlugin
         var commands = context.Services.Get<ICommandRegistry>();
         Add("start", [], "Start the current waiting room.", []);
         Add("mode", ["set"], "Change the current waiting room's mode.", [new("mode", CommandArgumentKind.Integer)]);
+        Add("udp", [], "Toggle this room's UDP preference, force on/off (on also enables single-player testing), or show each member's transport with status.",
+            [new("state", CommandArgumentKind.Text, Optional: true)]);
+        Add("plaza", [], "Leave the current room at once, even during a round, and go to the plaza; the seat is released as on a disconnect.", []);
         return ValueTask.CompletedTask;
 
         void Add(string name, string[] aliases, string description, CommandArgument[] arguments)
@@ -94,10 +97,11 @@ internal sealed class GameCommandEndpoints(int capacity) : IGameCommandEndpoints
             player.Identity.UserNum.ToString(CultureInfo.InvariantCulture) != invocation.Caller.Subject.Id)
             return new(CommandStatus.InvalidState, "The player's room is no longer available.");
         CommandResult? result = null;
+        IOwnedTask? operation = null;
         try
         {
             match.Owner.Lifetime.ThrowIfCancellationRequested();
-            var operation = await match.Owner.RunTaskAsync("game-command:" + invocation.Command, async token =>
+            operation = await match.Owner.RunTaskAsync("game-command:" + invocation.Command, async token =>
             {
                 // A lookup snapshot cannot keep a removed or replaced registration callable.
                 if (!Current(match))
@@ -109,7 +113,12 @@ internal sealed class GameCommandEndpoints(int capacity) : IGameCommandEndpoints
             }, ct).ConfigureAwait(false);
             await operation.Completion.ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (match.Owner.Lifetime.IsCancellationRequested && !ct.IsCancellationRequested)
+        catch (OperationCanceledException) when ((operation is null || operation.Completion.IsCanceled)
+            && (match.Owner.Lifetime.IsCancellationRequested || ct.IsCancellationRequested))
+        {
+            return new(CommandStatus.Cancelled, "The gameplay command was cancelled.");
+        }
+        catch (ObjectDisposedException) when (operation is null && match.Owner.Lifetime.IsCancellationRequested)
         {
             return new(CommandStatus.Cancelled, "The gameplay owner stopped.");
         }

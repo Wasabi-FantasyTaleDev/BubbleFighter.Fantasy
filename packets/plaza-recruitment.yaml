@@ -1,0 +1,117 @@
+version: 1
+structs:
+  # Toggle readers: kr-812 sub_80C160, cn-279 sub_44FC80, cn-324 sub_798810,
+  # cn-406 sub_7151D0, cn-404 sub_8A2A80, cn-408 sub_9B68E0, cn-706 sub_87EC00,
+  # cn-717 sub_8C3780, id-400 sub_63B780 and id-1809 sub_7BEBE0 each read a four-byte boolean.
+  # tw-454 sub_B64150 also writes a four-byte boolean; its native UI is the separate-text family.
+  PlazaRecruitmentRequest:
+    - active: bool
+      offset: 4
+  # kr-1256 sub_6353D0 and cn-774 sub_7B4D80 publish three document settings and the text.
+  # Their first setting is not the legacy start/cancel bit: cancellation has its own empty request.
+  PlazaRecruitmentRequest@kr-1256:
+    - unknown_0: u32
+      offset: 0
+    - member_limit: u32
+      offset: 4
+    - category: u8
+      offset: 8
+    - message: wstr
+      offset: 12
+  PlazaRecruitmentRequest@tw-454:
+    - active: bool
+      offset: 4
+  # One counted UTF-16 string: kr-812 sub_5C8FD0, cn-279 sub_481C90, cn-324 sub_6FDDF0,
+  # cn-406 sub_75A200, cn-404 sub_68E480, cn-408 sub_7B1F10, cn-706 sub_567230,
+  # cn-717 sub_740F00, id-400 sub_89DD10, id-1809 sub_68D480 and tw-454 sub_A7D2F0.
+  PlazaRecruitmentTextRequest:
+    - message: wstr
+      offset: 4
+      except: [kr-1256, cn-774]
+      also: [tw-454]
+  # Reply readers: kr-812 sub_80AC10, cn-279 sub_449F50, cn-324 sub_6EB610,
+  # cn-406 sub_7005A0, cn-404 sub_7AEEE0, cn-408 sub_7B23B0, cn-706 sub_788590,
+  # cn-717 sub_88F2E0, id-400 sub_782870 and id-1809 sub_7A5DD0 read seat-u16 then text.
+  # tw-454 sub_A60EC0 reads the same fields and resolves the installed seat before displaying its bubble.
+  PlazaRecruitmentTextReply:
+    - slot: u16
+      offset: 4
+      except: [kr-1256, cn-774]
+      also: [tw-454]
+    - message: wstr
+      offset: 8
+      except: [kr-1256, cn-774]
+      also: [tw-454]
+
+  # kr-1256 sub_93F660 and cn-774 sub_B3B500 write category-u8 followed by zero-based page-u32.
+  PlazaRecruitmentListRequest:
+    - category: u8
+      offset: 0
+      only: [kr-1256]
+      except: [tw-454]
+    - page: u32
+      offset: 4
+      only: [kr-1256]
+      except: [tw-454]
+
+  # kr-1256 sub_11389D0 and cn-774 sub_1060D50 read each 80-byte native document object.
+  # kr-1256 sub_62EF20 and cn-774 sub_7AE500 bind nickname and endpoint to the join callback.
+  PlazaRecruitmentDocument:
+    - user_number: u32
+      offset: 0
+      only: [kr-1256]
+      except: [tw-454]
+    - nickname: wstr
+      offset: 4
+      only: [kr-1256]
+      except: [tw-454]
+    - unknown_28: u32 # Native arena-symbol value; no arena grade is inferred from ordinary experience.
+      offset: 28
+      only: [kr-1256]
+      except: [tw-454]
+    - address: RelayEndpoint
+      offset: 32
+      only: [kr-1256]
+      except: [tw-454]
+    - message: wstr
+      offset: 40
+      only: [kr-1256]
+      except: [tw-454]
+    - category: u8
+      offset: 64
+      only: [kr-1256]
+      except: [tw-454]
+    - member_count: u32 # Both native UIs format +68 / +72 in their member-count label.
+      offset: 68
+      only: [kr-1256]
+      except: [tw-454]
+    - member_limit: u32
+      offset: 72
+      only: [kr-1256]
+      except: [tw-454]
+    - unknown_76: u32 # Native remaining-time label; its time unit is not established.
+      offset: 76
+      only: [kr-1256]
+      except: [tw-454]
+
+  # kr-1256 sub_9BDEA0 and cn-774 sub_BBC140 install the counted vector, total and page, ten entries per page.
+  PlazaRecruitmentListReply:
+    - entries: list<PlazaRecruitmentDocument>
+      offset: 0
+      only: [kr-1256]
+      except: [tw-454]
+    - total: u32
+      offset: 12
+      only: [kr-1256]
+      except: [tw-454]
+    - page: u32
+      offset: 16
+      only: [kr-1256]
+      except: [tw-454]
+
+  # kr-1256 sub_9BDB80 and cn-774 sub_BBBDB0/sub_BBBEF0 consume one byte; zero selects the general failure text.
+  PlazaRecruitmentFailure:
+    - reason: u8
+      offset: 0
+      only: [kr-1256]
+      except: [tw-454]

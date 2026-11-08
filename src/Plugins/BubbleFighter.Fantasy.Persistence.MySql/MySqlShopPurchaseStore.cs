@@ -1,3 +1,4 @@
+using BubbleFighter.Fantasy.Contracts.Cluster;
 using BubbleFighter.Fantasy.Contracts.Inventory;
 using BubbleFighter.Fantasy.Contracts.Presents;
 using BubbleFighter.Fantasy.Contracts.Shop;
@@ -11,7 +12,7 @@ namespace BubbleFighter.Fantasy.Persistence.MySql;
 /// Commits each purchase in one transaction under the per-player lock (<see cref="MySqlPlayerLock"/>),
 /// so it is serialized against inventory appends and other purchases for the same player.
 /// </summary>
-public sealed class MySqlShopPurchaseStore(IDbConnectionFactory connections) : IShopPurchaseStore
+public sealed class MySqlShopPurchaseStore(IDbConnectionFactory connections, IAccountMutationFence? authority = null) : IShopPurchaseStore
 {
     /// <inheritdoc />
     public async ValueTask<ShopPurchaseResult?> PurchaseAsync(ShopPurchaseCommand command, CancellationToken ct)
@@ -20,7 +21,7 @@ public sealed class MySqlShopPurchaseStore(IDbConnectionFactory connections) : I
         var user = command.SeedWallet.UserNum;
         await using var session = await SugarSession.OpenAsync(connections, ct).ConfigureAwait(false);
         var db = session.Db;
-        await using var tx = await session.BeginAsync().ConfigureAwait(false);
+        await using var tx = await session.BeginWriteAsync(user, authority, ct).ConfigureAwait(false);
         await MySqlPlayerLock.AcquireAsync(db, user, ct).ConfigureAwait(false);
         // The no-op duplicate update creates a missing wallet atomically instead of read-then-insert;
         // updated_at takes the column default on insert.

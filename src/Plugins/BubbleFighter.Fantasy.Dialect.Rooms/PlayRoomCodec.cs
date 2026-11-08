@@ -19,44 +19,51 @@ namespace BubbleFighter.Fantasy.Dialect.Rooms;
 internal sealed partial class PlayRoomCodec(
     string protocol, string lineage, RoomSchema schema, PlayValues play,
     IOpcodeTableRegistry tables, ILogger logger, PacketTables packetTables)
-    : IInboundMessageBinding<RoomListRequested>, IInboundMessageBinding<RoomCreateRequested>,
+    : IInboundMessageBinding<RoomCreateRequested>,
       IInboundMessageBinding<RoomJoinRequested>, IInboundMessageBinding<RoomLeaveRequested>,
       IInboundMessageBinding<RoomReadyRequested>, IInboundMessageBinding<RoomTeamChangeRequested>,
       IInboundMessageBinding<RoomStartRequested>, IInboundMessageBinding<RoomSettingsChangeRequested>,
       IMessageSender<RoomSettingsChanged>, IInboundMessageBinding<RoomRoundSettingsChangeRequested>,
       IInboundMessageBinding<RoomMasterChangeRequested>, IMessageSender<RoomMasterChangeReplied>,
       IInboundMessageBinding<RoomChatSent>, IMessageSender<RoomChatReceived>, IInboundMessageBinding<RoomSeatLockRequested>,
+      IInboundMessageBinding<RoomSessionChatSent>, IMessageSender<RoomSessionChatReceived>,
       IMessageSender<RoomSeatLockChanged>, IInboundMessageBinding<RoomKickRequested>, IMessageSender<RoomMemberKicked>,
-      IInboundMessageBinding<RoundLoadReported>, IInboundMessageBinding<RoundFeedSent>,
-      IInboundMessageBinding<RoundRespawnRequested>, IInboundMessageBinding<RoundSpawnAccepted>,
+      IInboundMessageBinding<RoundLoadReported>,
+      IInboundMessageBinding<RoundRespawnRequested>,
       IInboundMessageBinding<RoundDeathReported>, IInboundMessageBinding<RoundKillCreditReported>,
       IInboundMessageBinding<RoundFinishingBlowReported>, IInboundMessageBinding<RoundStarReported>,
-      IMessageSender<RoundSpawnOffered>, IMessageSender<RoundPlayerRespawned>,
-      IInboundMessageBinding<RoundTauntReported>, IMessageSender<RoundRespawnWaitChanged>,
+      IMessageSender<RoundSpawnOffered>,
+      IMessageSender<RoundRespawnWaitChanged>,
       IMessageSender<RoundPlayerLoaded>, IMessageSender<RoundCountdownStarted>, IMessageSender<RoundStarted>,
-      IMessageSender<RoundFeedReceived>, IInboundMessageBinding<RoundEndRequested>, IMessageSender<RoundEnded>,
-      IMessageSender<RoundScoreUpdated>, IMessageSender<RoundScoreboard>, IMessageSender<ResultStageAdvanced>,
-      IMessageSender<RoomListSnapshot>, IMessageSender<RoomEntered>, IMessageSender<RoomSeatUpdated>,
+      IInboundMessageBinding<RoundEndRequested>,
+      IMessageSender<RoomEntered>, IMessageSender<RoomSeatUpdated>,
       IMessageSender<RoomSeatVacated>, IMessageSender<RoomMasterChanged>, IMessageSender<RoomJoinRefused>,
-      IMessageSender<RoomLeft>, IMessageSender<RoomMatchStarting>, IMessageSender<RoundWaveChanged>, IRoundResultSequencePolicy
+      IMessageSender<RoomLeft>, IRoundSeriesEntrySender, IMessageSender<RoundWaveChanged>,
+      IInboundMessageBinding<RoundNpcReported>, IMessageSender<RoundNpcAcknowledged>,
+      IInboundMessageBinding<TutorialScoreReported>, IMessageSender<TutorialScoreUpdated>
 {
+    private readonly RoundSeriesFields? _seriesFields = RoundSeriesFields.Load(packetTables, lineage);
+    public int RoundsToWin => _seriesFields?.RoundsToWin ?? 2;
+    private readonly RoundResultSender _resultSender = new(protocol, packetTables, lineage,
+        session => tables.Get(session.Profile.Id), play.Score);
     private RoomRoundSettingFields? _roundSettingFields;
+    internal string UdpProtocol { get; init; } = string.Empty;
+    internal int UdpKeepaliveMs { get; init; } = 1000;
     internal bool EchoDirectItemEffects { get; init; }
     /// <summary>Gets whether an ordinary round's loading gate selects the match relay for seats still on it.</summary>
     internal bool SelectMatchRelay { get; init; }
     /// <summary>Gets whether the row reads the clients' star-count reports (the <c>star_items</c> option and capability).</summary>
     internal bool StarReports { get; init; }
+    /// <summary>Gets whether the row reads the Captain-kill report kind (the <c>captain_mode</c> option and capability).</summary>
+    internal bool CaptainKills { get; init; }
     internal Func<ISession, RoomReadyRequested, CancellationToken, ValueTask<bool>>? ReadyRequestFirst { get; init; }
-    // The session item that remembers how many rows the client's last list request asked for.
-    private const string PageSizeItem = "legacy.room.list.page-size";
 
     // The first number of the peer gameplay feed.
-    private const ushort FeedBase = 0x8000;
 
     public string Protocol => protocol;
 
-    /// <inheritdoc />
-    public bool EndBeforeScoreboard => Score.TimeOverEnd == PlayValues.TimeOverEndBody.Scoreboard;
+    /// <summary>Reports the independently audited bomb series entry capability, not merely bomb-state support.</summary>
+    public bool SupportsMode(int modeId) => modeId == (int)GameModeId.Bomb && _seriesFields is not null;
 
     /// <summary>
     /// Gets what sees a load report before the round does, or null: a build whose one-seat tutorial
@@ -64,6 +71,12 @@ internal sealed partial class PlayRoomCodec(
     ///
     /// </summary>
     internal Func<ISession, InboundPacket, CancellationToken, ValueTask<bool>>? LoadReportFirst { get; init; }
+
+    /// <summary>
+    /// Gets the channel the plaza's scene move places the entrant in: the row's
+    /// <see cref="RoomsOptions.PlayerChannel"/>, 60 ("Free") unless the row says otherwise.
+    /// </summary>
+    internal int PlayerChannel { get; init; } = RoomsOptions.FreeChannel;
 
     /// <summary>Gets the native tutorial's stage-end handler, consulted before the typed multiplayer round.</summary>
     internal Func<ISession, InboundPacket, CancellationToken, ValueTask<bool>>? EndStageFirst { get; init; }
@@ -87,12 +100,17 @@ internal sealed partial class PlayRoomCodec(
         _ = packetTables.Resolve(lineage, "RoundCountdown");
         _ = packetTables.Resolve(lineage, "RoundStartGame");
         _ = packetTables.Resolve(lineage, "TutorialMasterSlot");
-        _ = packetTables.Resolve(lineage, "TutorialWave");
+        _ = packetTables.Resolve(lineage, "NpcWave");
         MountWaitingControls(context);
         var services = context.Services;
         var messages = services.Get<IMessageRouter>();
         var router = services.Get<IPacketRouter>();
         var table = tables.ForProtocol(protocol);
+        if (play.Score.HordeStageOutcome)
+        {
+            _ = table.S2C("gspHordeStageCleared_");
+            _ = table.S2C("gspHordeStageFailed_");
+        }
         _ = packetTables.Resolve(lineage, "RoundEndGame");
         _ = packetTables.Resolve(lineage, "RoundTimeOverTotals");
         _ = packetTables.Resolve(lineage, "RoomEnterGame");
@@ -107,40 +125,54 @@ internal sealed partial class PlayRoomCodec(
         _ = packetTables.Resolve(lineage, "RoomGameSettingChangeRequest");
         _ = SettingChangeFields.Require(packetTables, lineage);
         if (play.NpcWaves)
+        {
+            _ = table.S2C("Unknown908");
+            _ = table.S2C("gspRepWaveAllSpawnMobs");
             context.Effect(services.RegisterMany<IMessageSender<RoundWaveChanged>>(this));
-        context.Effect(services.RegisterMany<IInboundMessageBinding<RoomListRequested>>(this));
+            context.Effect(services.RegisterMany<IInboundMessageBinding<RoundNpcReported>>(this));
+            context.Effect(services.RegisterMany<IMessageSender<RoundNpcAcknowledged>>(this));
+        }
         context.Effect(services.RegisterMany<IInboundMessageBinding<RoomCreateRequested>>(this));
         context.Effect(services.RegisterMany<IInboundMessageBinding<RoomLeaveRequested>>(this));
         context.Effect(services.RegisterMany<IInboundMessageBinding<RoomStartRequested>>(this));
         context.Effect(services.RegisterMany<IInboundMessageBinding<RoundLoadReported>>(this));
-        context.Effect(services.RegisterMany<IInboundMessageBinding<RoundFeedSent>>(this));
         context.Effect(services.RegisterMany<IMessageSender<RoundPlayerLoaded>>(this));
         context.Effect(services.RegisterMany<IMessageSender<RoundCountdownStarted>>(this));
         context.Effect(services.RegisterMany<IMessageSender<RoundStarted>>(this));
-        context.Effect(services.RegisterMany<IMessageSender<RoundFeedReceived>>(this));
         context.Effect(services.RegisterMany<IInboundMessageBinding<RoundEndRequested>>(this));
-        context.Effect(services.RegisterMany<IMessageSender<RoundEnded>>(this));
+        context.Effect(services.RegisterMany<IMessageSender<RoundEnded>>(_resultSender));
         context.Effect(services.RegisterMany<IInboundMessageBinding<RoundRespawnRequested>>(this));
-        context.Effect(services.RegisterMany<IInboundMessageBinding<RoundSpawnAccepted>>(this));
+        var respawn = new RoundRespawnBinding(protocol, table, packetTables, lineage, tables);
+        respawn.Mount(context);
         context.Effect(services.RegisterMany<IInboundMessageBinding<RoundDeathReported>>(this));
         context.Effect(services.RegisterMany<IMessageSender<RoundSpawnOffered>>(this));
-        context.Effect(services.RegisterMany<IMessageSender<RoundPlayerRespawned>>(this));
         // The taunt only moves a wait the round itself times, and only where the build can be told.
         var tauntEnd = play.Wire.ServerRevives && table.Find(PacketDirection.ServerToClient, "gspGameExtendRespawn") is not null
             ? table.Find(PacketDirection.ClientToServer, "gppHumiliationEnd")
             : null;
         if (tauntEnd is not null)
-        {
-            context.Effect(services.RegisterMany<IInboundMessageBinding<RoundTauntReported>>(this));
             context.Effect(services.RegisterMany<IMessageSender<RoundRespawnWaitChanged>>(this));
-        }
-        context.Effect(services.RegisterMany<IMessageSender<RoomListSnapshot>>(this));
+        // The gameplay feed is the shared RoundFeedBinding; this build's data selects how it is read.
+        var relayProtocol = protocol[..protocol.LastIndexOf('/')] + "/relay";
+        new RoundFeedBinding(protocol, relayProtocol, table, tables.ForProtocol(relayProtocol), packetTables, lineage)
+        {
+            EchoDirectItemEffects = EchoDirectItemEffects, AcceptRelayFrames = SelectMatchRelay, TauntEnd = tauntEnd,
+            UdpProtocol = UdpProtocol, UdpKeepaliveMs = UdpKeepaliveMs,
+        }.Mount(context);
         context.Effect(services.RegisterMany<IMessageSender<RoomEntered>>(this));
         context.Effect(services.RegisterMany<IMessageSender<RoomSeatUpdated>>(this));
         context.Effect(services.RegisterMany<IMessageSender<RoomSeatVacated>>(this));
         context.Effect(services.RegisterMany<IMessageSender<RoomMasterChanged>>(this));
         context.Effect(services.RegisterMany<IMessageSender<RoomLeft>>(this));
         context.Effect(services.RegisterMany<IMessageSender<RoomMatchStarting>>(this));
+        // The room list is the shared codec's; a legacy row shows the room's native game setting. A table that does
+        // not name the list yet leaves it unbound and says so, as for the other play-room requests.
+        if (table.Find(PacketDirection.ClientToServer, "gcpReqListSession") is { } listRequest
+            && table.Find(PacketDirection.ServerToClient, "gspRepListSession") is { } listReply)
+            new RoomListCodec(protocol, listRequest, listReply, packetTables, lineage, logger,
+                room => GameSetting(room.BuildSettings)).Mount(context);
+        else
+            logger.LogWarning("dialect.rooms: {Protocol} does not name the room list; its rooms cannot list until the table does.", protocol);
 
         // A request every build with play rooms has. A table that does not name it yet leaves that
         // one request unbound and says so loudly; it must not keep the other builds from starting.
@@ -162,12 +194,6 @@ internal sealed partial class PlayRoomCodec(
         }
 
 
-        On("gcpReqListSession", (session, body) =>
-        {
-            var (page, pageSize) = PlazaRoomWire.ReadListSession(packetTables, lineage, body);
-            session.Items[PageSizeItem] = (int)pageSize;
-            return new RoomListRequested(page);
-        });
         On("gcpReqCreateSession", (session, body) =>
         {
             var request = PlazaRoomWire.ReadCreateRoom(body, schema);
@@ -214,46 +240,8 @@ internal sealed partial class PlayRoomCodec(
             var handle = (int)PacketCodec.ReadScalars(packetTables, lineage, "RoundSpawnIndexRequest", body)["actor"];
             return new RoundRespawnRequested(handle) { ActorSeat = PlayerSeatOf(handle) };
         });
-        OnWhereNamed("gcpRespawn", (_, body) =>
-        {
-            return ReadSpawnAcceptance(packetTables, lineage, body);
-        });
-        // The peer gameplay feed (gpp*, numbers from 0x8000) arrives on the game connection when no
-        // relay is offered (demux sub_80D4C0); the round flow passes it on unread. Numbers a row
-        // registered a handler for are that handler's. Awaiting this observer preserves arrival order
-        // and applies transport backpressure without accumulating detached forwarding tasks.
-        context.Effect(context.Events.OnAsync<PacketReceivedEvent>(async (received, ct) =>
-        {
-            if (received.HasHandler || received.ProtocolName != protocol || received.Packet.Opcode < FeedBase)
-                return;
-            await messages.DispatchAsync(protocol, received.Session,
-                new RoundFeedSent(received.Packet.Opcode, received.Packet.Payload.ToArray())
-                {
-                    // cn-324 sub_47BCA0 sends only; sub_47BD30 applies the item to the receiving character.
-                    IncludeSender = EchoDirectItemEffects && received.Packet.Opcode == table.C2S("gppUseItemDirect"),
-                }, ct).ConfigureAwait(false);
-            // gppHumiliationEnd (cn-324 sender sub_46B190): u32 the taunter's handle, u32 the dead
-            // player's. It is passed on like the rest of the feed and also moves the dead player's wait.
-            if (received.Packet.Opcode == tauntEnd && received.Packet.Payload.Length == 8)
-            {
-                await messages.DispatchAsync(protocol, received.Session,
-                    new RoundTauntReported(BitConverter.ToInt32(received.Packet.Payload.Span[4..])), ct).ConfigureAwait(false);
-            }
-        }));
-        // With the match relay selected the client sends its gpp frames on the relay (cn-324 sub_6F7F10, kr-812
-        // sub_80D4C0); the relay's own rows claim only its handshake and seeds, so every other peer frame is handed to
-        // this protocol as if the seat's game connection carried it, keeping one stream for the handlers above.
-        if (SelectMatchRelay)
-        {
-            var relayProtocol = protocol[..protocol.LastIndexOf('/')] + "/relay";
-            context.Effect(context.Events.OnAsync<PacketReceivedEvent>(async (received, ct) =>
-            {
-                if (received.HasHandler || received.ProtocolName != relayProtocol || received.Packet.Opcode < FeedBase
-                    || !received.Session.TryFeature<IMatchGameLink>(out var link) || link.Game.Connection.IsClosed)
-                    return;
-                await router.DispatchAsync(protocol, link.Game, received.Packet, ct).ConfigureAwait(false);
-            }));
-        }
+        // The shared respawn binding reads the body; this family's route keeps its malformed-body handling.
+        OnWhereNamed("gcpRespawn", (_, body) => respawn.Read(body));
         if (play.HostStart)
         {
             On("gcpUserHostStart", (_, body) =>
@@ -263,35 +251,7 @@ internal sealed partial class PlayRoomCodec(
             });
         }
         MountPlaza(context);
-        MountResult(context);
-    }
-
-    /// <summary>
-    /// <c>gspRepListSession</c> (reader <c>sub_680780</c>): the page number, whether another page
-    /// follows, then one <c>SessionSetting</c> per room on this page.
-    ///
-    /// </summary>
-    public ValueTask SendAsync(ISession session, RoomListSnapshot message, CancellationToken ct)
-    {
-        var pageSize = session.Items.TryGetValue(PageSizeItem, out var stored) && stored is int size && size > 0 ? size : message.Rooms.Count;
-        var skip = Math.Max(0, message.Cursor) * Math.Max(1, pageSize);
-        var page = message.Rooms.Skip(skip).Take(Math.Max(1, pageSize)).ToArray();
-        var rows = page.Select(room => RoomCodec.PlaySessionValues(schema,
-            new RoomValues(RoomCodec.PlayRoomKind, [])
-            {
-                // kr-812 sub_679670 distinguishes waiting (2) from active matches (4).
-                Play = true, RoomId = room.RoomId, Title = room.Name, Mode = room.ModeId,
-                SessionState = room.MatchInProgress ? 4 : 2, MasterNickname = room.MasterNickname,
-                Occupants = room.Occupants, OpenSeats = room.Capacity, HasPassword = room.HasPassword,
-                GameSetting = GameSetting(room.BuildSettings),
-            })).ToArray();
-        var body = PacketCodec.Write(packetTables, lineage, "RoomListReply", new Dictionary<string, object?>
-        {
-            ["page"] = message.Cursor,
-            ["more"] = message.Rooms.Count > skip + page.Length,
-            ["rooms"] = rows,
-        });
-        return session.SendAsync(S2C(session, "gspRepListSession"), body, ct);
+        MountScoreReports(context);
     }
 
     /// <summary>Decodes the waiting selection while retaining the master's complete native settings change.</summary>
@@ -382,13 +342,28 @@ internal sealed partial class PlayRoomCodec(
     }
 
     /// <summary>
-    /// The start burst, as recorded at s2c#152-153: every seated player's slot with its start position
-    /// index set, then <c>gspRoomEnterGame</c> (reader <c>sub_80AE90</c>) with the round's map key. The
+    /// Installs every seated player's start position before <c>gspRoomEnterGame</c>
+    /// (reader <c>kr-812 sub_80AE90</c>) with the round's map key. The
     /// third u32 after the key is 3; the client stores it as the session state.
     ///
     /// </summary>
     public async ValueTask SendAsync(ISession session, RoomMatchStarting message, CancellationToken ct)
     {
+        if (message.Series is { } series)
+        {
+            if (!SupportsMode(message.Room.ModeId))
+                throw new ConfigException("Round-series entry is not supported for this room's mode.");
+            _seriesFields!.Validate(series);
+            if (series.RoundIndex == 0)
+            {
+                var settings = SettingsAsSent(message.Room.BuildSettings);
+                if (settings.IsEmpty)
+                    settings = PlazaRoomWire.ApplyGameSettingMode(schema,
+                        PlazaRoomWire.ApplyGameSettingChange(schema, packetTables, lineage, default, default), message.Room.ModeId);
+                await session.SendAsync(S2C(session, "gspRoomChangeGameSetting"),
+                    PlazaRoomWire.ApplyGameSettingSeries(schema, settings.Span, _seriesFields!, series.RoundIndex), ct).ConfigureAwait(false);
+            }
+        }
         foreach (var seat in message.Room.Seats)
         {
             var body = RoomCodec.WriteSeatEnvelope(packetTables, lineage, schema, seat.Slot,
@@ -401,10 +376,16 @@ internal sealed partial class PlayRoomCodec(
         // client's Lua alert, id-400 sub_85CFE0), so a round the server starts on the room's key enters its stage.
         if (mapKey == message.Room.MapKey && StageOf(message.Room) is { Length: > 0 } stage)
             mapKey = stage;
+        // The relay join (kr-812 sub_810C20 case 1) compares the signature's mode word, stored by kr-812 sub_8071A0 at
+        // GameInfo+21064, with the round mode at GameInfo+96; a mismatch arms kr-812 sub_8E51A0, which quits silently
+        // within ten seconds. Without this packet the word keeps its constructor value 0xFFFF.
+        await SendWhereNamedAsync(session, "gspSetSessionSigData",
+            () => RoundEntryWire.WriteSignature(packetTables, lineage, message.Room.ModeId), ct)
+            .ConfigureAwait(false);
         var scoreboard = EntryScoreboardValues(packetTables, lineage, message.Room);
         await session.SendAsync(S2C(session, "gspRoomEnterGame"),
-            TutorialWire.WriteRoomEnterGame(packetTables, lineage, unknown0: 0, unknown1: mapKey, unknown4: 3,
-                scoreboardValues: scoreboard), ct).ConfigureAwait(false);
+            RoundEntryWire.Write(packetTables, lineage, unknown0: 0, mapKey: mapKey, roomState: 3,
+                scoreboardValues: scoreboard, series: message.Series), ct).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -427,7 +408,7 @@ internal sealed partial class PlayRoomCodec(
         // cn-324 sub_6EED20 and id-400 sub_786480 install the received rows rather than deriving a roster from slots.
         var rows = room.Seats.Select(seat => new RoundScoreboardRow(seat.Slot, seat.Nickname,
             seat.Team == 0 ? 2 : seat.Team, seat.Level, new RoundSeatStats(seat.Slot, 0, 0, 0, 0), null)).ToArray();
-        return ScoreboardValues(tables, build, new RoundScoreboard(room.RoomId, 0, [0, 0], rows));
+        return RoundResultWire.ScoreboardValues(tables, build, new RoundScoreboard(room.RoomId, 0, [0, 0], rows));
     }
 
     /// <summary><c>gspGameMapLoadingComplete</c> (reader <c>sub_80A910</c>): the seat index of the player who loaded.</summary>
@@ -443,71 +424,24 @@ internal sealed partial class PlayRoomCodec(
     public ValueTask SendAsync(ISession session, RoundStarted message, CancellationToken ct) =>
         RoundStartSender.SendStartedAsync(packetTables, lineage, tables.Get(session.Profile.Id), session, message, ct);
 
-    /// <summary>
-    /// <c>gspGameEndGame</c> (reader <c>kr-812 sub_6DB1B0</c>): <c>u32 unused, u32 outcome</c>. The handler
-    /// <c>kr-812 sub_803DF0</c> reads the second word, stores it as the result stage's gate and sets the
-    /// win flag from it; a win is <c>00 00 00 00 03 00 00 00</c>.
-    ///
-    /// </summary>
-    public async ValueTask SendAsync(ISession session, RoundEnded message, CancellationToken ct)
-    {
-        ArgumentNullException.ThrowIfNull(message);
-        var shape = play.Score;
-        if (HordeOutcomeNotification(shape, message) is { } notification)
-            await session.SendAsync(S2C(session, notification), ReadOnlyMemory<byte>.Empty, ct).ConfigureAwait(false);
-        await session.SendAsync(S2C(session, "gspGameEndGame"),
-            WriteGameEndForRecipient(packetTables, lineage, shape, message), ct).ConfigureAwait(false);
-    }
-
-    internal static string? HordeOutcomeNotification(PlayValues.ScoreValues shape, RoundEnded message)
-    {
-        // cn-324 sub_438500 sets HordeModeMgr+5328 from these empty notifications.
-        // cn-324 sub_43A4C0 / sub_43B560 / sub_43C810 consume it instead of team totals.
-        if (!shape.HordeStageOutcome || (GameModeId)message.ModeId is not (GameModeId.Horde or GameModeId.HordeZhe or GameModeId.HordeTutor))
-            return null;
-        return message.Outcome == RoundOutcome.Won ? "gspHordeStageCleared_" : "gspHordeStageFailed_";
-    }
-
-    /// <summary>
-    /// Writes the two-word <c>gspGameEndGame</c> body. The build table selects the outcome word:
-    /// kr-812 and cn-324 use the second; cn-324 sub_408DF0 ret 4 changes ESP before 0x6F1AE0 reads object +8.
-    ///
-    /// </summary>
-    /// <param name="tables">Audited packet layouts.</param>
-    /// <param name="build">Native client build.</param>
-    /// <param name="outcome">The recipient's outcome.</param>
-    /// <param name="outcomeFirst">Whether the outcome is the first word.</param>
-    /// <returns>The packet body.</returns>
-    internal static byte[] WriteGameEnd(PacketTables tables, string build, RoundOutcome outcome, bool outcomeFirst = false)
-    {
-        return WriteEndWord(tables, build, OutcomeWord(outcome), outcomeFirst);
-    }
-
-    internal static byte[] WriteGameEndForRecipient(PacketTables tables, string build, PlayValues.ScoreValues shape, RoundEnded message)
-    {
-        var word = OutcomeWord(message.Outcome);
-        // cn-324 sub_63B230 / kr-812 sub_5ACB20 compare result 2 with local team in native horde stage kind 10.
-        if (shape.NpcTeamOutcome && (GameModeId)message.ModeId is GameModeId.Npc or GameModeId.Horde or GameModeId.HordeZhe or GameModeId.HordeTutor && message.Outcome != RoundOutcome.Draw)
-        {
-            var team = message.RecipientTeam == 0 ? 2 : message.RecipientTeam;
-            if (team is not (1 or 2)) throw new InvalidOperationException("Native horde results require a red or blue team.");
-            var blueWins = message.Outcome == RoundOutcome.Won ? team == 2 : team == 1;
-            word = blueWins ? 2 : 3;
-        }
-        return WriteEndWord(tables, build, word, shape.OutcomeFirst);
-    }
-
-    private static byte[] WriteEndWord(PacketTables tables, string build, int word, bool outcomeFirst) =>
-        PacketCodec.Write(tables, build, "RoundEndGame", new Dictionary<string, object?>
-        {
-            ["unknown_4"] = outcomeFirst ? word : 0,
-            ["unknown_8"] = outcomeFirst ? 0 : word,
-        });
-
     /// <summary>Sends the room chat line using the client's audited string and suffix layout.</summary>
     public ValueTask SendAsync(ISession session, RoomChatReceived message, CancellationToken ct) =>
         session.SendAsync(S2C(session, "gspRoomReceiveChatModuleMsg"),
-            WriteChat(packetTables, lineage, message.Slot, message.Nickname, message.Channel, message.Text), ct);
+            RoomChatBinding.Write(packetTables, lineage, message), ct);
+
+    /// <summary>
+    /// Sends a waiting-room chat line as S2C gspRoomReceiveChatMsg (packets/room-control.yaml RoomSessionChatReceived);
+    /// the client names the speaker by the slot and colours a team-only line itself (cn-717 sub_885700).
+    /// </summary>
+    public ValueTask SendAsync(ISession session, RoomSessionChatReceived message, CancellationToken ct) =>
+        session.SendAsync(S2C(session, "gspRoomReceiveChatMsg"), WriteSessionChat(packetTables, lineage, message), ct);
+
+    /// <summary>Writes one RoomSessionChatReceived body; the unproven string, colour word and flag keep their defaults.</summary>
+    internal static byte[] WriteSessionChat(PacketTables packetTables, string build, RoomSessionChatReceived message) =>
+        PacketCodec.Write(packetTables, build, "RoomSessionChatReceived", new Dictionary<string, object?>
+        {
+            ["slot"] = checked((ushort)message.Slot), ["team_only"] = message.TeamOnly, ["text"] = message.Text,
+        });
 
     /// <summary>Sends the native slot word and closed bool32 (kr-812 sub_93C4E0).</summary>
     public ValueTask SendAsync(ISession session, RoomSeatLockChanged message, CancellationToken ct) =>
@@ -528,16 +462,6 @@ internal sealed partial class PlayRoomCodec(
                 ["result"] = 0,
             }), ct);
 
-    /// <summary>Writes a room chat line with the build's native unknown suffix defaults.</summary>
-    internal static byte[] WriteChat(PacketTables tables, string build, int slot, string nickname, int channel, string text) =>
-        PacketCodec.Write(tables, build, "RoomChatReceived", new Dictionary<string, object?>
-        {
-            ["slot"] = checked((ushort)slot),
-            ["nickname"] = nickname,
-            ["channel"] = channel,
-            ["text"] = text,
-        });
-
     /// <summary>
     /// <c>gspRequestRespawnIdx</c> (reader <c>kr-812 sub_503AD0</c>, handler <c>kr-812 sub_51E4F0</c>): the handle,
     /// the spawn index and a flag. With the flag set the client answers <c>gcpRespawn</c> carrying
@@ -555,15 +479,6 @@ internal sealed partial class PlayRoomCodec(
         return session.SendAsync(S2C(session, "gspRequestRespawnIdx"),
             WriteRespawnIndexRequest(packetTables, lineage, message.Actor, message.SpawnIndex), ct);
     }
-
-    /// <summary>
-    /// <c>gspRespawn</c> confirms the actor's revival (kr-812 sub_503530 / kr-812 sub_51E2C0);
-    /// the native peer consumer completes its local state transition (kr-812 sub_51E440).
-    /// CN2011 revives without a packet flag (cn-279 sub_81B470); the table supplies that difference.
-    ///
-    /// </summary>
-    public ValueTask SendAsync(ISession session, RoundPlayerRespawned message, CancellationToken ct) =>
-        session.SendAsync(S2C(session, "gspRespawn"), WriteRespawn(packetTables, lineage, message.Actor, message.SpawnIndex), ct);
 
     /// <summary>
     /// <c>gspGameExtendRespawn</c> (cn-324 handler <c>sub_472CA0</c>): the handle and a signed number
@@ -585,21 +500,9 @@ internal sealed partial class PlayRoomCodec(
     internal static byte[] WriteRespawnIndexRequest(PacketTables tables, string build, int handle, int spawnIndex) =>
         WriteSpawn(tables, build, "RoundSpawnOffer", handle, spawnIndex);
 
-    /// <summary>Writes the build's actor/index confirmation and any native revival fields.</summary>
-    internal static byte[] WriteRespawn(PacketTables tables, string build, int handle, int spawnIndex) =>
-        WriteSpawn(tables, build, "RoundSpawnConfirmation", handle, spawnIndex);
-
     /// <summary>Writes the actor reference for a native client-selected respawn prompt.</summary>
     internal static byte[] WriteRespawnPrompt(PacketTables tables, string build, int handle) =>
         PacketCodec.Write(tables, build, "RoundRespawnPrompt", new Dictionary<string, object?> { ["actor"] = handle });
-
-    /// <summary>Reads a complete native spawn acceptance, preserving signed actor and index bits.</summary>
-    internal static RoundSpawnAccepted ReadSpawnAcceptance(PacketTables tables, string build, ReadOnlySpan<byte> body)
-    {
-        var fields = PacketCodec.ReadScalars(tables, build, "RoundSpawnAcceptance", body);
-        var handle = (int)fields["actor"];
-        return new RoundSpawnAccepted(handle, (int)fields["spawn_index"]) { ActorSeat = PlayerSeatOf(handle) };
-    }
 
     private static byte[] WriteSpawn(PacketTables tables, string build, string structure, int handle, int spawnIndex) =>
         PacketCodec.Write(tables, build, structure, new Dictionary<string, object?>
@@ -607,9 +510,6 @@ internal sealed partial class PlayRoomCodec(
             ["actor"] = handle, ["spawn_index"] = spawnIndex,
         });
 
-    /// <summary>A feed packet goes out under the number it came in with.</summary>
-    public ValueTask SendAsync(ISession session, RoundFeedReceived message, CancellationToken ct) =>
-        session.SendAsync(message.Code, message.Payload, ct);
 
     // The creator's own GameSetting goes back as sent when it follows this build's layout, with the
     // master's latest change applied; empty leaves the block to the build's table. Until the master changes
@@ -687,12 +587,14 @@ internal sealed partial class PlayRoomCodec(
     /// <summary>Writes the wave index consumed by cn-324 sub_413A00 / cn-324 sub_413E20.</summary>
     public ValueTask SendAsync(ISession session, RoundWaveChanged message, CancellationToken ct) =>
         session.SendAsync(S2C(session, message.Started ? "gspRepStartNewWave" : "gspRepEndWave"),
-            TutorialWire.WriteStartNewWave(packetTables, lineage, message.Wave), ct);
+            NpcWire.WriteStartNewWave(packetTables, lineage, message.Wave), ct);
 
     private static RoomSlotValues Slot(RoomMemberView seat) =>
         new(true, false, seat.UserNum, seat.Nickname, seat.CharacterItemId,
             seat.EquippedItemIds.Count > 0 ? seat.EquippedItemIds : [seat.CharacterItemId], seat.Ready)
         {
             Team = seat.Team == 0 ? 2 : seat.Team, Level = seat.Level, ColorIndex = seat.ColorIndex,
+            ControllerSlot = seat.Slot,
+            InventorySelection = seat.InventorySelection,
         };
 }

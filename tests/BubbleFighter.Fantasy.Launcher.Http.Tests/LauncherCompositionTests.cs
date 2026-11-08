@@ -13,6 +13,24 @@ namespace BubbleFighter.Fantasy.Launcher.Http.Tests;
 
 public sealed class LauncherCompositionTests
 {
+    [Fact]
+    public async Task PrivatePresenceNodeStartsWithoutAccountsOrTicketServicesAndUnloadsCleanly()
+    {
+        var host = new PluginHost([
+            Row("sessions", "core.session-registry"), Row("presence", "launcher.presence-local"),
+        ], PluginCatalog.ScanAssemblies([typeof(LocalPresencePlugin).Assembly, typeof(SessionRegistryPlugin).Assembly]),
+            NullLoggerFactory.Instance);
+        try
+        {
+            await host.StartAsync(default);
+            Assert.All(host.Instances, instance => Assert.Equal(PluginState.Active, instance.State));
+            var reloaded = await host.ReloadAsync("presence", default);
+            Assert.Equal(new[] { "presence" }, reloaded.ReloadedRowIds);
+        }
+        finally { await host.ShutdownAsync(default); }
+        Assert.All(host.Instances, instance => Assert.Equal(PluginState.Unloaded, instance.State));
+    }
+
     // The ticket provider must activate before lobby and match services. Request-only HTTP tests
     // bypass these declarations, so exercise the real launcher row in both composition orders.
     [Theory]

@@ -9,6 +9,7 @@ using BubbleFighter.Fantasy.Contracts.Inventory;
 using BubbleFighter.Fantasy.Contracts.Match;
 using BubbleFighter.Fantasy.Packets;
 using BubbleFighter.Fantasy.Dialect.Rooms;
+using BubbleFighter.Fantasy.Protocol;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -24,14 +25,22 @@ public sealed class PrologueStartTests
     [InlineData("cn-279")]
     [InlineData("id-400")]
     [InlineData("id-1809")]
+    [InlineData("cn-406")]
+    [InlineData("cn-705")]
+    [InlineData("cn-706")]
     public async Task WaveTableReachesHostAndPeerExactlyOnceInNativeOrder(string build)
     {
         var (schema, play) = TestBuilds.Of(build);
         var host = new TutorialSession(build);
         var peer = new TutorialSession(build);
-        var router = new TutorialLifecycleRouter(peer);
+        var profile = new ClientProfile(build, build[..2], int.Parse(build[3..]), 0, 0, build);
+        var path = Path.Combine(Directory.GetParent(TestBuilds.PacketsDirectory())!.FullName, "profiles", build, "opcodes.yaml");
+        var table = OpcodeTableLoader.Load(path, profile);
+        var codec = new PlayRoomCodec(build + "/game", build, schema, play, new TutorialTables(table),
+            NullLogger.Instance, TestBuilds.Packets);
+        var router = new TutorialLifecycleRouter(peer, codec);
         using var handler = new TutorialHandler(TestBuilds.Packets, build, schema, play.Tutorial,
-            play.MatchStart, play.Wire, new TutorialTables(new TutorialTable()), NullLogger.Instance,
+            play.MatchStart, play.Wire, new TutorialTables(table), NullLogger.Instance,
             oneSeatWaves: play.OneSeatWaves, messages: router);
         // The bounded table is forwarded without reinterpretation.
         var body = Convert.FromHexString("010000000100030000000400000000000000040000002E00440061006F0000000000000000000101F4010000040000002E00440061006F0000000000000000000102E8030000040000002E00440061006F0000000000000000000103DC050000040000002E00440061006F0000000000000000000104");
@@ -43,7 +52,9 @@ public sealed class PrologueStartTests
             Assert.Empty(session.Sent[0].Payload);
             Assert.Equal(body, session.Sent[1].Payload);
         }
-        Assert.All(router.Messages, message => Assert.False(Assert.IsType<RoundFeedSent>(message).IncludeSender));
+        var report = Assert.IsType<RoundNpcReported>(Assert.Single(router.Messages));
+        Assert.Equal(RoundNpcOperation.SpawnTable, report.Operation);
+        Assert.Equal(body, report.Payload.ToArray());
     }
 
     [Theory]
@@ -53,6 +64,7 @@ public sealed class PrologueStartTests
     [InlineData("cn-279", 2)]
     [InlineData("id-400", 2)]
     [InlineData("id-1809", 3)]
+    [InlineData("cn-705", 3)]
     [InlineData("cn-706", 3)]
     public async Task SharedStartSenderPreservesTutorialGatesAndOrdinaryDefaults(string build, int fields)
     {
@@ -227,16 +239,18 @@ public sealed class PrologueStartTests
         Assert.False(await handler.TryHandleMapLoadingCompleteAsync(session, loading, default));
     }
 
+    /// <summary>An explicitly configured callback waits for its matching map before opening the shared tutorial round.</summary>
     [Theory]
-    [InlineData("cn-706", 15)]
-    public async Task ClientDrivenTutorialAdmitsOnlyAtNativeCallbackAndSharesLoadingAndCompletion(string build, int mode)
+    [InlineData("cn-705", 103, 54, 8, 4)]
+    public async Task ConfiguredCallbackTutorialAdmitsOnlyAtCallbackAndSharesLoadingAndCompletion(
+        string build, int mode, int enterBytes, int suffixOffset, int suffixWord)
     {
         var (schema, play) = TestBuilds.Of(build);
         Assert.Equal(mode == 103, play.OneSeatWaves);
         var session = new TutorialSession(build);
         var lifecycle = new TutorialLifecycleRouter();
         using var handler = new TutorialHandler(TestBuilds.Packets, build, schema, play.Tutorial,
-            play.MatchStart, play.Wire, new TutorialTables(new TutorialTable()),
+            TutorialMatchStart.RepAutoStart, play.Wire, new TutorialTables(new TutorialTable()),
             NullLogger.Instance, oneSeatWaves: play.OneSeatWaves, messages: lifecycle, sharedLifecycle: true);
         const string map = "rel_prologue_01";
         var playBody = PacketCodec.Write(TestBuilds.Packets, build, "TutorialPlayRequest",
@@ -267,9 +281,9 @@ public sealed class PrologueStartTests
         Assert.Equal(!play.OneSeatWaves, opened.NativeSupplies);
         Assert.Equal(99999000, opened.TimeLimitMs);
         Assert.Equal(510, session.Sent[^1].Opcode);
-        Assert.Equal(build == "id-400" ? 2302 : 54, session.Sent[^1].Payload.Length);
-        Assert.Equal(4, BitConverter.ToInt32(session.Sent[^1].Payload, session.Sent[^1].Payload.Length -
-            (build == "id-400" ? 4 : 8)));
+        Assert.Equal(enterBytes, session.Sent[^1].Payload.Length);
+        // cn-406 sub_700680 ends at the first suffix word; cn-705/cn-706 keep the third word and one bool32.
+        Assert.Equal(suffixWord, BitConverter.ToInt32(session.Sent[^1].Payload, session.Sent[^1].Payload.Length - suffixOffset));
         Assert.True(await handler.TryHandleEnterGameAsync(session, enter, default));
         Assert.Equal(5, session.Sent.Count);
         Assert.Single(lifecycle.Messages);
@@ -278,10 +292,9 @@ public sealed class PrologueStartTests
         Assert.Equal(5, session.Sent.Count);
         if (play.OneSeatWaves)
         {
-            // The horde-tutor round ends through the shared wave round, not the single-stage word.
-            Assert.False(await handler.TryHandleEndStageAsync(session, new(724, new byte[4]), default));
-            await handler.ClearTutorialStateAsync(session, default);
-            Assert.IsType<TutorialRoundClosed>(lifecycle.Messages[2]);
+            Assert.True(await handler.TryHandleEndStageAsync(session, new(724, new byte[4]), default));
+            Assert.Single(lifecycle.Messages, message => message is BubbleFighter.Fantasy.Contracts.Lobby.InitialTutorialCompleted);
+            Assert.Single(lifecycle.Messages, message => message is TutorialRoundClosed);
             Assert.False(await handler.TryHandleEnterGameAsync(session, enter, default));
             return;
         }
@@ -293,15 +306,16 @@ public sealed class PrologueStartTests
         Assert.False(await handler.TryHandleEnterGameAsync(session, enter, default));
     }
 
+    /// <summary>Leaving an explicitly configured callback tutorial removes the pending admission.</summary>
     [Theory]
-    [InlineData("cn-706")]
-    public async Task LeavingPendingClientTutorialClearsItsNativeCallback(string build)
+    [InlineData("cn-705")]
+    public async Task LeavingConfiguredCallbackTutorialClearsItsPendingCallback(string build)
     {
         var (schema, play) = TestBuilds.Of(build);
         var session = new TutorialSession(build);
         var lifecycle = new TutorialLifecycleRouter();
         using var handler = new TutorialHandler(TestBuilds.Packets, build, schema, play.Tutorial,
-            play.MatchStart, play.Wire, new TutorialTables(new TutorialTable()),
+            TutorialMatchStart.RepAutoStart, play.Wire, new TutorialTables(new TutorialTable()),
             NullLogger.Instance, messages: lifecycle, sharedLifecycle: true);
         var fields = TestBuilds.Packets.Resolve(build, "TutorialPlayRequest");
         var values = fields.Where(field => field.Type == "wstr")
@@ -314,15 +328,37 @@ public sealed class PrologueStartTests
         Assert.False(await handler.TryHandleEnterGameAsync(session, new(503, ReadOnlyMemory<byte>.Empty), default));
     }
 
-    /// <summary>
-    /// ID2014 and ID2015 start the prologue as KR2015 does: the server sends gspRoomEnterGame right after
-    /// the room burst (id-400 sub_786480 takes case 0 without an armed automatic start), never the
-    /// gspRepAutoStart that runs the room's five-second countdown first.
-    /// </summary>
+    /// <summary>Leaving the initial tutorial early records it as done, so the next login does not offer it again.</summary>
     [Theory]
+    [InlineData("cn-324")]
+    public async Task LeavingTheInitialTutorialEndsItsOffer(string build)
+    {
+        var (schema, play) = TestBuilds.Of(build);
+        Assert.NotEqual(TutorialMatchStart.RepAutoStart, play.MatchStart);
+        var session = new TutorialSession(build);
+        var lifecycle = new TutorialLifecycleRouter();
+        using var handler = new TutorialHandler(TestBuilds.Packets, build, schema, play.Tutorial,
+            play.MatchStart, play.Wire, new TutorialTables(new TutorialTable()),
+            NullLogger.Instance, outcomeFirst: play.Score.OutcomeFirst,
+            scoreRowFields: schema.ScoreRow, score: play.Score, messages: lifecycle, sharedLifecycle: true);
+        var values = TestBuilds.Packets.Resolve(build, "TutorialPlayRequest").Where(field => field.Type == "wstr")
+            .ToDictionary(field => field.Name, _ => (object?)play.Tutorial.OldMapKey);
+        await handler.HandlePlayTutorialAsync(session,
+            new(107, PacketCodec.Write(TestBuilds.Packets, build, "TutorialPlayRequest", values)), default);
+        Assert.DoesNotContain(lifecycle.Messages, message => message is BubbleFighter.Fantasy.Contracts.Lobby.InitialTutorialCompleted);
+        // The ordinary room flow still owns this build's leave; the tutorial only records the end of its offer.
+        Assert.False(await handler.TryHandleLeaveAsync(session, new(407, ReadOnlyMemory<byte>.Empty), default));
+        Assert.Single(lifecycle.Messages, message => message is BubbleFighter.Fantasy.Contracts.Lobby.InitialTutorialCompleted);
+    }
+
+    /// <summary>Audited immediate-entry clients open the prologue after the room burst and share loading admission.</summary>
+    [Theory]
+    [InlineData("cn-406", 2118)]
     [InlineData("id-400", 2302)]
     [InlineData("id-1809", 54)]
-    public async Task IdPrologueStartsWithoutTheAutomaticStartCountdown(string build, int enterLength)
+    [InlineData("cn-705", 54)]
+    [InlineData("cn-706", 54)]
+    public async Task PrologueStartsWithoutTheAutomaticStartCountdown(string build, int enterLength)
     {
         var (schema, play) = TestBuilds.Of(build);
         Assert.Equal(TutorialMatchStart.RoomEnterGame, play.MatchStart);
@@ -350,6 +386,95 @@ public sealed class PrologueStartTests
         Assert.Equal(99999000, opened.TimeLimitMs);
         Assert.True(await handler.TryHandleMapLoadingCompleteAsync(session, new(701, new byte[16]), default));
         Assert.IsType<RoundLoadReported>(lifecycle.Messages[1]);
+    }
+
+    /// <summary>The August client's selected tutorial opens immediately and records one stage clear through the shared lifecycle.</summary>
+    [Fact]
+    public async Task China705SelectedTutorialEntersLoadsAndClearsWithoutACallback()
+    {
+        const string build = "cn-705";
+        const string map = "sin_mission_wall_lv_01";
+        var (schema, play) = TestBuilds.Of(build);
+        Assert.Equal(TutorialMatchStart.RoomEnterGame, play.MatchStart);
+        var session = new TutorialSession(build);
+        var lifecycle = new TutorialLifecycleRouter();
+        using var handler = new TutorialHandler(TestBuilds.Packets, build, schema, play.Tutorial,
+            play.MatchStart, play.Wire, new TutorialTables(new TutorialTable()), NullLogger.Instance,
+            oneSeatWaves: play.OneSeatWaves, messages: lifecycle, sharedLifecycle: true, resultMs: 1);
+        var values = new Dictionary<string, object?>
+        {
+            ["time_attack_time_limit_ms"] = 90000,
+            ["difficulty"] = 1,
+        };
+        foreach (var field in TestBuilds.Packets.Resolve(build, "TutorialPlayRequest").Where(field => field.Type == "wstr"))
+            values[field.Name] = map;
+        await handler.HandlePlayTutorialAsync(session,
+            new(107, PacketCodec.Write(TestBuilds.Packets, build, "TutorialPlayRequest", values)), default);
+        Assert.Equal(new ushort[] { 110, 505, 503, 510 }, session.Sent.Select(frame => frame.Opcode));
+        var opened = Assert.IsType<TutorialRoundOpened>(Assert.Single(lifecycle.Messages));
+        Assert.Equal(15, opened.ModeId);
+        Assert.Equal(map, opened.MapKey);
+        Assert.Equal(90000, opened.TimeLimitMs);
+        Assert.True(opened.NativeSupplies);
+        Assert.True(await handler.TryHandleMapLoadingCompleteAsync(session, new(701, new byte[16]), default));
+        Assert.IsType<RoundLoadReported>(lifecycle.Messages[1]);
+        Assert.False(await handler.TryHandleMapLoadingCompleteAsync(session, new(701, new byte[16]), default));
+        session.Sent.Clear();
+        Assert.True(await handler.TryHandleEndStageAsync(session, new(724, new byte[] { 1, 0, 0, 0 }), default));
+        Assert.Equal(new ushort[] { 711, 732, 110 }, session.Sent.Select(frame => frame.Opcode));
+        Assert.Single(lifecycle.Messages, message => message is TutorialStageCleared { MapKey: map });
+        Assert.Single(lifecycle.Messages, message => message is TutorialRoundClosed);
+        Assert.DoesNotContain(lifecycle.Messages, message => message is BubbleFighter.Fantasy.Contracts.Lobby.InitialTutorialCompleted);
+        Assert.False(await handler.TryHandleEndStageAsync(session, new(724, new byte[] { 1, 0, 0, 0 }), default));
+        Assert.False(await handler.TryHandleLeaveAsync(session, new(407, ReadOnlyMemory<byte>.Empty), default));
+    }
+
+    /// <summary>Native wave completion and confirmed exit finish onboarding once without clearing a numbered stage.</summary>
+    [Theory]
+    [InlineData("cn-406", 0)]
+    [InlineData("cn-406", 1)]
+    [InlineData("cn-406", 2)]
+    [InlineData("kr-812", 0)]
+    [InlineData("id-400", 0)]
+    [InlineData("id-1809", 0)]
+    [InlineData("cn-705", 0)]
+    [InlineData("cn-705", 1)]
+    [InlineData("cn-705", 2)]
+    [InlineData("cn-706", 0)]
+    [InlineData("cn-706", 1)]
+    [InlineData("cn-706", 2)]
+    public async Task WaveTutorialCompletionAndExitEndTheInitialOfferOnce(string build, int exitKind)
+    {
+        var (schema, play) = TestBuilds.Of(build);
+        var session = new TutorialSession(build);
+        var lifecycle = new TutorialLifecycleRouter();
+        var profile = session.Profile;
+        var path = Path.Combine(Directory.GetParent(TestBuilds.PacketsDirectory())!.FullName, "profiles", build, "opcodes.yaml");
+        var table = OpcodeTableLoader.Load(path, profile);
+        using var handler = new TutorialHandler(TestBuilds.Packets, build, schema, play.Tutorial,
+            play.MatchStart, play.Wire, new TutorialTables(table), NullLogger.Instance,
+            oneSeatWaves: play.OneSeatWaves, outcomeFirst: play.Score.OutcomeFirst,
+            messages: lifecycle, sharedLifecycle: true);
+        var values = new Dictionary<string, object?> { ["time_attack_time_limit_ms"] = 99999000, ["difficulty"] = 1 };
+        foreach (var field in TestBuilds.Packets.Resolve(build, "TutorialPlayRequest").Where(field => field.Type == "wstr"))
+            values[field.Name] = "rel_prologue_01";
+        await handler.HandlePlayTutorialAsync(session,
+            new(107, PacketCodec.Write(TestBuilds.Packets, build, "TutorialPlayRequest", values)), default);
+        session.Sent.Clear();
+        if (exitKind == 0)
+            await handler.HandleEndAllWaveAsync(session, new(905, ReadOnlyMemory<byte>.Empty), default);
+        else if (exitKind == 1)
+            Assert.True(await handler.TryHandleEndStageAsync(session, new(724, new byte[4]), default));
+        else
+            Assert.True(await handler.TryHandleLeaveAsync(session, new(407, ReadOnlyMemory<byte>.Empty), default));
+        Assert.Single(lifecycle.Messages, message => message is BubbleFighter.Fantasy.Contracts.Lobby.InitialTutorialCompleted);
+        Assert.Single(lifecycle.Messages, message => message is TutorialRoundClosed);
+        Assert.DoesNotContain(lifecycle.Messages, message => message is TutorialStageCleared);
+        Assert.Equal(new[] { table.S2C("gspGameEndGame"), table.S2C("gspGotoRoom") }, session.Sent.Select(frame => frame.Opcode));
+        Assert.Equal(exitKind == 0 ? 3 : 2, BitConverter.ToInt32(session.Sent[0].Payload, play.Score.OutcomeFirst ? 0 : 4));
+        Assert.False(await handler.TryHandleEndStageAsync(session, new(724, new byte[] { 1, 0, 0, 0 }), default));
+        Assert.False(await handler.TryHandleLeaveAsync(session, new(407, ReadOnlyMemory<byte>.Empty), default));
+        Assert.Single(lifecycle.Messages, message => message is BubbleFighter.Fantasy.Contracts.Lobby.InitialTutorialCompleted);
     }
 
     /// <summary>The menu a tutorial returns to seats the worn character, not the Dao placeholder.</summary>
@@ -393,6 +518,38 @@ public sealed class PrologueStartTests
     private static IEnumerable<byte[]> Windows(byte[] body) =>
         Enumerable.Range(0, body.Length - 3).Select(i => body[i..(i + 4)]);
 
+    /// <summary>
+    /// A tutorial bypasses the ordinary local queue (kr-812 sub_7FF340, cn-717 sub_882D40, id-1809 sub_7A9BD0) and
+    /// still requires its group acknowledgement.
+    /// </summary>
+    [Theory]
+    [InlineData("kr-812")]
+    [InlineData("cn-717")]
+    [InlineData("id-1809")]
+    public async Task QueuedBuildTutorialRetainsSpawnGroupEchoUntilItLeavesTheTutorial(string build)
+    {
+        var (schema, play) = TestBuilds.Of(build);
+        var session = new TutorialSession(build);
+        var lifecycle = new TutorialLifecycleRouter();
+        using var handler = new TutorialHandler(TestBuilds.Packets, build, schema, play.Tutorial,
+            play.MatchStart, play.Wire, new TutorialTables(new TutorialTable()), NullLogger.Instance,
+            oneSeatWaves: play.OneSeatWaves, messages: lifecycle, sharedLifecycle: true);
+        var values = new Dictionary<string, object?> { ["time_attack_time_limit_ms"] = 99999000, ["difficulty"] = 1 };
+        foreach (var field in TestBuilds.Packets.Resolve(build, "TutorialPlayRequest").Where(field => field.Type == "wstr"))
+            values[field.Name] = "rel_prologue_01";
+        await handler.HandlePlayTutorialAsync(session,
+            new(107, PacketCodec.Write(TestBuilds.Packets, build, "TutorialPlayRequest", values)), default);
+        session.Sent.Clear();
+        var group = new InboundPacket(32857, NpcWire.WriteCreateMobsFromSpawnGroup(TestBuilds.Packets, build, 2));
+        await handler.HandleCreateMobsFromSpawnGroupAsync(session, group, default);
+        Assert.Equal((ushort)32857, Assert.Single(session.Sent).Opcode);
+        Assert.Equal(group.Payload.ToArray(), session.Sent[0].Payload);
+        await handler.ClearTutorialStateAsync(session, default);
+        session.Sent.Clear();
+        await handler.HandleCreateMobsFromSpawnGroupAsync(session, group, default);
+        Assert.Empty(session.Sent);
+    }
+
     private sealed class WornBag(IReadOnlyList<InventorySlotRecord> rows) : IInventoryRepository
     {
         public ValueTask<IReadOnlyList<InventorySlotRecord>> ListSlotsAsync(long userNum, InventoryBag bag, int maxCount, CancellationToken ct) =>
@@ -403,7 +560,8 @@ public sealed class PrologueStartTests
             throw new NotSupportedException();
     }
 
-    private sealed class TutorialLifecycleRouter(TutorialSession? peer = null) : IMessageRouter
+    private sealed class TutorialLifecycleRouter(TutorialSession? peer = null,
+        IMessageSender<RoundNpcAcknowledged>? npc = null) : IMessageRouter
     {
         public List<IMessage> Messages { get; } = [];
         public IReadOnlyList<MessageHandlerRegistration> Handlers => [];
@@ -414,6 +572,12 @@ public sealed class PrologueStartTests
             Messages.Add(message);
             if (peer is not null && message is RoundFeedSent feed)
                 await peer.SendAsync(feed.Code, feed.Payload, ct);
+            if (peer is not null && npc is not null && message is RoundNpcReported report)
+            {
+                var reply = new RoundNpcAcknowledged(report.Operation, report.Payload);
+                await npc.SendAsync(session, reply, ct);
+                await npc.SendAsync(peer, reply, ct);
+            }
             return true;
         }
     }
@@ -477,6 +641,7 @@ public sealed class PrologueStartTests
             (702, "gspGameEverybodyLoadingComplete"), (703, "gspGameCountDown"), (704, "gspGameStartGame"),
             (705, "gspGamePreCountDown"), (520, "gspRepAutoStart"),
             (711, "gspGameEndGame"), (108, "gspGotoMenu"),
+            (32857, "gppCreateMobsFromSpawnGroup"),
             (908, "Unknown908"), (909, "gspRepWaveAllSpawnMobs"), (922, "gspResSingleStageInfo"), (732, "gspGameTimeOverEnd"), (733, "gspGameShowResult_"),
         }.Select(item => new OpcodeEntry(item.Code, PacketDirection.ServerToClient, item.Name,
             Evidence.Verified, null, null));

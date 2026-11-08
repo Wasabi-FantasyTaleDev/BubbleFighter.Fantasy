@@ -100,7 +100,7 @@ public sealed class UserStatTableTests
     public void ARunOfTheWrongLengthIsRefused()
     {
         var value = Value();
-        Fighter(value)["unknown_80"] = new int[48];
+        Fighter(value)["unknown_108"] = new int[41];
         Assert.Throws<ArgumentException>(() => PacketCodec.Write(Tables, "kr-812", "UserStat", value));
     }
 
@@ -138,9 +138,12 @@ public sealed class UserStatTableTests
         ["unknown_28"] = 7, ["unknown_32"] = 8, ["unknown_36"] = "", ["unknown_64"] = 10,
         ["fighter"] = new Dictionary<string, object?>
         {
-            ["unknown_4"] = 101, ["nickname"] = "", ["unknown_36"] = 103, ["level"] = 104, ["unknown_44"] = 105,
+            ["user_number"] = 101, ["nickname"] = "", ["character_type"] = 103, ["level"] = 104, ["primary_escapes"] = 105,
             ["unknown_48"] = 0x0102030405060708L, ["unknown_56"] = 107, ["unknown_64"] = unchecked((long)0xFEDCBA9876543210),
-            ["unknown_72"] = 109, ["unknown_76"] = true, ["unknown_80"] = Enumerable.Range(111, 49).ToArray(),
+            ["unknown_72"] = 109, ["unknown_76"] = true, ["unknown_80"] = 111,
+            ["primary_wins"] = 112, ["primary_losses"] = 113, ["primary_draws"] = 114,
+            ["primary_knockdowns"] = 115, ["primary_kills"] = 116, ["primary_rescues"] = 117,
+            ["unknown_108"] = Enumerable.Range(118, 42).ToArray(),
             ["unknown_284"] = Array.Empty<object>(), ["unknown_276"] = 161, ["unknown_280"] = 162, ["unknown_300"] = 163,
             ["unknown_304"] = 164, ["unknown_312"] = 165, ["unknown_320"] = Enumerable.Range(166, 8).ToArray(),
             ["unknown_360"] = Enumerable.Range(174, 8).ToArray(), ["unknown_392"] = "", ["unknown_356"] = 183,

@@ -60,6 +60,23 @@ public sealed class CharacterCreationBindingTests
         Assert.Throws<PacketFormatException>(() => binding.Read("CharacterNameRequest", Convert.FromHexString("01040000")));
     }
 
+    /// <summary>Both CN2014 builds decode their four-field request and retain exact reply bodies.</summary>
+    [Theory]
+    [InlineData("cn-404")]
+    [InlineData("cn-408")]
+    public void TheCn2014CreationBodiesMatchTheSharedTable(string build)
+    {
+        var binding = CreateBinding(build);
+        var body = Convert.FromHexString("0200000061006200020000000000000000000000");
+        var values = binding.Read("CharacterCreateRequest", body);
+        Assert.Equal("ab", values["nickname"]);
+        Assert.Equal(2, values["character_type"]);
+        Assert.Throws<PacketFormatException>(() => binding.Read("CharacterCreateRequest", body[..^1]));
+        Assert.Throws<PacketFormatException>(() => binding.Read("CharacterCreateRequest", [.. body, 0]));
+        Assert.Equal(Convert.FromHexString("000000000200000061006200"), binding.Write("CharacterNameReply", new() { ["result"] = 0, ["nickname"] = "ab" }));
+        Assert.Equal(new byte[4], binding.Write("CharacterCreateReply", new() { ["result"] = 0 }));
+    }
+
     [Fact]
     public void NativeNameCheckAndCreationRepliesPinTheirExactBytes()
     {

@@ -17,7 +17,7 @@ public sealed class ServiceProviderTests
     /// <summary>Caller cancellation reaches the individual SDK callback without stopping its provider row.</summary>
     [Theory]
     [InlineData("python")]
-    [InlineData("typescript")]
+    [SdkData("typescript")]
     [InlineData("go")]
     [InlineData("rust")]
     public async Task CallerCancellationSignalsActualProviderWorkAndAllowsAnotherCall(string language)
@@ -123,7 +123,7 @@ public sealed class ServiceProviderTests
     /// <summary>A second SDK row resolves a provider registered by the first row in the same runtime.</summary>
     [Theory]
     [InlineData("python", false)]
-    [InlineData("typescript", false)]
+    [SdkData("typescript", false)]
     [InlineData("go", false)]
     [InlineData("rust", false)]
     [InlineData("go", true)]
@@ -140,7 +140,7 @@ public sealed class ServiceProviderTests
     /// <summary>Native getter and ValueTask callers round-trip records and exact int64 identities through each SDK.</summary>
     [Theory]
     [InlineData("python", false)]
-    [InlineData("typescript", false)]
+    [SdkData("typescript", false)]
     [InlineData("go", false)]
     [InlineData("rust", false)]
     [InlineData("go", true)]
@@ -170,7 +170,7 @@ public sealed class ServiceProviderTests
     /// <summary>Mixed native and SDK decorators invoke their selected inner layers in registry priority order.</summary>
     [Theory]
     [InlineData("python", false)]
-    [InlineData("typescript", false)]
+    [SdkData("typescript", false)]
     [InlineData("go", false)]
     [InlineData("rust", false)]
     [InlineData("go", true)]
@@ -195,7 +195,7 @@ public sealed class ServiceProviderTests
     /// <summary>Many registrations expose descending priority with stable registration order for ties.</summary>
     [Theory]
     [InlineData("python", false)]
-    [InlineData("typescript", false)]
+    [SdkData("typescript", false)]
     [InlineData("go", false)]
     [InlineData("rust", false)]
     [InlineData("go", true)]
@@ -218,7 +218,7 @@ public sealed class ServiceProviderTests
     /// <summary>SDK consumers select native and remote many providers in the same priority order, then release the snapshot.</summary>
     [Theory]
     [InlineData("python", false)]
-    [InlineData("typescript", false)]
+    [SdkData("typescript", false)]
     [InlineData("go", false)]
     [InlineData("rust", false)]
     [InlineData("go", true)]
@@ -240,7 +240,7 @@ public sealed class ServiceProviderTests
     /// <summary>An optional extension activates with an empty collection on every supported backend.</summary>
     [Theory]
     [InlineData("python", false)]
-    [InlineData("typescript", false)]
+    [SdkData("typescript", false)]
     [InlineData("go", false)]
     [InlineData("rust", false)]
     [InlineData("go", true)]

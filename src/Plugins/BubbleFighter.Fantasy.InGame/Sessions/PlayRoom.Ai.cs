@@ -13,6 +13,7 @@ public sealed partial class PlayRoom
 
     internal bool PutBot(RoomMemberView appearance)
     {
+        ExpireAdmissions();
         if (Phase != RoomPhase.Waiting || appearance.Ai is null)
             return false;
         if (_bots.TryGetValue(appearance.Slot, out var existing))
@@ -60,14 +61,16 @@ public sealed partial class PlayRoom
         || _bots.Values.Any(bot => RoomRegistry.SceneEntity(bot.Appearance.Slot) == actor
             && bot.Appearance.Ai is { } ai && ai.ControllerSlot == human.Slot && ai.ControllerUserNum == human.UserNum);
 
+    /// <summary>Whether the actor is a seat's or a bot's character, as opposed to an NPC a client runs.</summary>
+    internal bool IsMemberCharacter(int actor) => Seats.Any(seat => RoomRegistry.SceneEntity(seat.Slot) == actor)
+        || _bots.Values.Any(bot => RoomRegistry.SceneEntity(bot.Appearance.Slot) == actor);
+
     internal void ResetBotRoundState()
     {
         foreach (var bot in _bots.Values)
         {
             bot.Movement = null;
-            bot.Life = SeatLife.Alive;
-            bot.DeathCleaned = false;
-            bot.ResetRelay = null;
+            bot.Life.Reset();
         }
     }
 }

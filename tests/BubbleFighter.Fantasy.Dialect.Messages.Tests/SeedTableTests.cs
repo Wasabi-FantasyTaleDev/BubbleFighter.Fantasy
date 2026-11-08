@@ -12,6 +12,13 @@ public sealed class SeedTableTests
         "kr-812", "cn-717", "cn-324", "cn-406", "id-400", "id-1809",
     };
 
+    /// <summary>Includes builds whose ordinary defence table is audited independently of critical tables.</summary>
+    public static TheoryData<string> DefenceBuilds => new()
+    {
+        "kr-812", "cn-717", "cn-324", "cn-406", "cn-404", "cn-408", "id-400", "id-1809",
+        "kr-1256", "cn-705", "cn-706", "cn-774", "tw-454",
+    };
+
     /// <summary>Ensures every audited build has the same counted-vector critical table bytes.</summary>
     [Theory, MemberData(nameof(NativeBuilds))]
     public void CriticalTableUsesTwoCountedWordVectors(string build)
@@ -33,7 +40,7 @@ public sealed class SeedTableTests
     }
 
     /// <summary>Ensures the defence table is an actor ID followed by a counted byte vector.</summary>
-    [Theory, MemberData(nameof(NativeBuilds))]
+    [Theory, MemberData(nameof(DefenceBuilds))]
     public void DefenceTableUsesCountedBytes(string build)
     {
         var bytes = PacketCodec.Write(TestBuilds.Packets, build, "RelayDefenceSeedTable", new Dictionary<string, object?>
@@ -44,6 +51,10 @@ public sealed class SeedTableTests
         Assert.Equal(Convert.FromHexString("4433221102000000AABB"), bytes);
         Assert.Equal(bytes, PacketCodec.Write(TestBuilds.Packets, build, "RelayDefenceSeedTable",
             PacketCodec.Read(TestBuilds.Packets, build, "RelayDefenceSeedTable", bytes)));
+        Assert.Throws<PacketFormatException>(() => PacketCodec.Read(TestBuilds.Packets, build,
+            "RelayDefenceSeedTable", bytes[..^1]));
+        Assert.Throws<PacketFormatException>(() => PacketCodec.Read(TestBuilds.Packets, build,
+            "RelayDefenceSeedTable", [.. bytes, 0]));
     }
 
     /// <summary>Ensures the cancellation table is an actor ID followed by a counted word vector.</summary>
@@ -60,7 +71,7 @@ public sealed class SeedTableTests
             PacketCodec.Read(TestBuilds.Packets, build, "RelayCriticalSeedCancelTable", bytes)));
     }
 
-    /// <summary>Leaves CN2011's unsupported native seed structures empty and its capability disabled.</summary>
+    /// <summary>Preserves CN2011's local-only defence by leaving the later native seed family empty and disabled.</summary>
     [Fact]
     public void Cn2011DoesNotClaimNativeSeedTables()
     {

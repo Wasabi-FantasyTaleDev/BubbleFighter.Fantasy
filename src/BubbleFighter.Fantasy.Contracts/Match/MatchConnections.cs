@@ -1,4 +1,5 @@
 using BubbleFighter.Fantasy.Abstractions.Protocol;
+using System.Net;
 
 namespace BubbleFighter.Fantasy.Contracts.Match;
 
@@ -106,4 +107,90 @@ public interface IMatchCapabilityDirectory : IMatchRoomDirectory
     /// <exception cref="InvalidOperationException">The session is already bound, the key is unknown, ambiguous,
     /// revoked before binding, or no longer valid in the room phase.</exception>
     ValueTask<MatchSeatBinding> BindCapabilityAsync(ISession session, MatchCapabilityAuthenticate authentication, CancellationToken ct);
+}
+
+/// <summary>Owns authenticated UDP endpoints attached to current match relay sessions.</summary>
+public enum MatchUdpRelayState
+{
+    /// <summary>The authenticated registration is absent or no longer current.</summary>
+    Absent,
+    /// <summary>The current registration has not received a UDP offer.</summary>
+    Registered,
+    /// <summary>An offer was sent but no source endpoint is bound.</summary>
+    Offered,
+    /// <summary>The initial probe bound an endpoint, which has not answered the server challenge.</summary>
+    Bound,
+    /// <summary>The bound endpoint answered the server challenge and may carry movement.</summary>
+    Verified,
+    /// <summary>The client requested TCP fallback for this registration.</summary>
+    Disabled,
+}
+
+/// <summary>Owns authenticated UDP endpoints attached to current match relay sessions.</summary>
+public interface IMatchUdpRelayDirectory
+{
+    /// <summary>Gets the relay protocol that owns this directory's authenticated sessions.</summary>
+    string Protocol { get; }
+
+    /// <summary>Registers an initialized relay session and its current-lease predicate. The predicate is invoked outside directory locks.</summary>
+    /// <returns>A registration whose disposal invalidates the session's UDP identity and endpoint.</returns>
+    IDisposable Register(ISession session, Func<bool> isCurrent);
+
+    /// <summary>Issues the one opaque UDP token for an authenticated, initialized match connection.</summary>
+    ValueTask<ReadOnlyMemory<byte>> IssueAsync(ISession session, int identityBytes, CancellationToken ct);
+
+    /// <summary>Binds a token to its first source endpoint after the native probe arrives.</summary>
+    bool TryBind(ReadOnlySpan<byte> token, IPEndPoint remoteEndPoint, out ISession? session);
+
+    /// <summary>Resolves a datagram only when its token, endpoint, room seat, and round lease remain current.</summary>
+    bool TryResolve(ReadOnlySpan<byte> token, IPEndPoint remoteEndPoint, out ISession? session);
+
+    /// <summary>Disables UDP for a current authenticated lease; absent or stale leases are ignored.</summary>
+    void Disable(ISession session);
+
+    /// <summary>Gets a bounded snapshot of initialized registrations, including ones without a UDP offer.</summary>
+    IReadOnlyList<ISession> RegisteredSessions();
+
+    /// <summary>Gets the current handshake state without retaining an endpoint or token snapshot.</summary>
+    MatchUdpRelayState StateOf(ISession session);
+
+    /// <summary>
+    /// Gets the state a disabled registration was in when the client asked for TCP, which tells why it fell back:
+    /// <see cref="MatchUdpRelayState.Offered"/> means no UDP probe ever reached the server. Absent when not disabled.
+    /// </summary>
+    MatchUdpRelayState DisabledFrom(ISession session) => MatchUdpRelayState.Absent;
+
+    /// <summary>Confirms that the source-bound endpoint answered the native challenge; returns true only on the first confirmation.</summary>
+    bool Verify(ISession session);
+
+    /// <summary>Invalidates the previous token and endpoint while preserving the initialized TCP registration.</summary>
+    void Reset(ISession session);
+
+    /// <summary>Gets a bounded snapshot of registered sessions with a UDP endpoint, for transport liveness probes.</summary>
+    IReadOnlyList<ISession> BoundSessions();
+
+    /// <summary>Gets the current endpoint only after its challenge reply has been verified.</summary>
+    bool TryGetEndpoint(ISession session, out IPEndPoint? remoteEndPoint);
+
+    /// <summary>Gets the current UDP endpoint and the exact identity issued to that session.</summary>
+    bool TryGetTarget(ISession session, out IPEndPoint? remoteEndPoint, out ReadOnlyMemory<byte> identity);
+}
+
+/// <summary>Build-specific relay controls consumed by the room-scoped UDP setup owner.</summary>
+public interface IMatchUdpRelayControl
+{
+    /// <summary>Gets the authenticated relay protocol served by these controls.</summary>
+    string Protocol { get; }
+
+    /// <summary>Gets the bound listener port before any external NAT mapping is applied.</summary>
+    ushort BoundPort { get; }
+
+    /// <summary>Gets the native identity width from this build's UDP packet layout.</summary>
+    int IdentityBytes { get; }
+
+    /// <summary>Sends the native UDP offer using a newly issued identity.</summary>
+    ValueTask OfferAsync(ISession session, ushort port, ReadOnlyMemory<byte> identity, CancellationToken ct);
+
+    /// <summary>Clears the client's bypass destination and ready flags using the native zero-valued offer.</summary>
+    ValueTask WithdrawAsync(ISession session, CancellationToken ct);
 }

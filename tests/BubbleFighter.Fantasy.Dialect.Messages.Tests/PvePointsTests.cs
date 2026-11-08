@@ -15,6 +15,11 @@ public sealed class PvePointsTests
     [InlineData("id-400")]
     [InlineData("id-1809")]
     [InlineData("cn-406")]
+    [InlineData("cn-706")]
+    [InlineData("cn-705")]
+    [InlineData("kr-1256")]
+    [InlineData("cn-774")]
+    [InlineData("tw-454")]
     public void PointPacketsHavePinnedWidths(string build)
     {
         var tables = TestBuilds.All.Tables;
@@ -33,6 +38,7 @@ public sealed class PvePointsTests
     [InlineData("id-400")]
     [InlineData("id-1809")]
     [InlineData("cn-706")]
+    [InlineData("cn-406")]
     public void RankRowsExcludeTheNativeVtableAndKeepBothVectorPrefixes(string build)
     {
         var body = PvePointsBinding.EncodeRanks(TestBuilds.All.Tables, build, [new(1, 25, 1)]);

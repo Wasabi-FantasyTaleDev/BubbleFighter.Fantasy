@@ -376,16 +376,21 @@ Every rule has an `id` that is unique within its plugin, a `type`, and an option
 |---|---|---|
 | `require` | none | Refuses to launch until the plugin is installed and enabled, and offers to install it. |
 | `disable` | none | Turns the plugin off for launches to this server without changing the saved selection. A plugin the build itself requires cannot be turned off; the launch is refused instead. |
-| `recommend` | `sources` | Offers the plugin once per client and rule, installing from the named sources (an empty list allows any declared source). |
+| `recommend` | `sources`, optional `default_selected` | Offers the plugin once per client and rule, installing from the named sources (an empty list allows any declared source). The initial check state is false unless explicitly set to true. |
 | `min_version` | `version` | An enabled plugin older than this version must be updated before launch. |
 | `max_version` | `version` | An enabled plugin newer than this version is replaced by the highest allowed version from the sources; the launch is refused if none is available. |
 | `latest` | none | An enabled plugin is updated to its newest version before launch. |
 
+Only `recommend` accepts `default_selected`, including an explicit false. The API spells this optional Boolean `defaultSelected` and omits it when unspecified. It controls the initial recommendation check state, not a launch requirement; use a compatible Launcher before publishing policies that include the field.
+
 Versions are strict SemVer. Two rules of one plugin conflict when their builds overlap and any of
-these holds: they have the same type; one is `disable`; one is `latest` and the other
+these holds: they have the same type; one is `disable`; one is `require` and the other
+`recommend`; one is `latest` and the other
 `max_version`; or a `min_version` is above a `max_version` (equal bounds pin one version). A
 conflicting, malformed or unknown rule stops the row from starting. A Launcher that does not know a
 rule type refuses launches to the server and asks the player to update the Launcher.
+An empty build scope overlaps every build. Disjoint `require` and `recommend` scopes are valid,
+and `require` may share a build with `latest`.
 
 The catalog and every sign-in response carry the minimum launcher version and the policy as
 `clientPolicy` (`version`, `sources`, `plugins`), with each rule's `version` or `sources` only when
@@ -551,8 +556,9 @@ before.
 | --- | --- |
 | `companion` | The listener and the launch table. With it, every `/v1/launch` reply carries a `companion` object: `url`, a one-time `ticket`, the `launchId` and `expiresAt`. |
 | `companion.notices` | Launcher popups (`ui.notification.show`) and the `popup <text>` management command, permission `game.management.popup`. |
+| `companion.commands` | Authenticated game command requests using the shared player permissions and chat budget. |
 
-Both rows are disabled in the core bundle and enabled by the `all` profile. Options of `companion`:
+All three rows are disabled in the core bundle and enabled by the `all` profile. Options of `companion`:
 
 | Option | Default | Meaning |
 | --- | --- | --- |
@@ -584,6 +590,88 @@ closes the connection with a reason code, and the launcher reconnects with a fre
 
 The listener is plain `ws`. Over a network, put it behind TLS termination and set a `wss` `public_url`,
 as for the launcher API itself.
+
+### Game command requests
+
+The `companion.commands` row advertises `game.command.execute` v1. It is disabled in the core bundle
+and enabled in `all`; the gameplay owner must enable `shared_chat_commands`. Only a launch bound to an
+authenticated game session can invoke it. Identity comes from that session. Command text uses the
+existing command dispatcher, permissions and the same connection rate window as both chat inputs.
+A gameplay room is required. Through this channel, `plaza` additionally requires an ordinary round
+that is currently playing. Tutorials, training, waiting rooms, loading and results are refused.
+The room owner checks again when executing departure; normal chat commands retain their existing rules.
+
+Send a negotiated `request` with a fresh envelope `id`, the current `epoch`, type `game.command.execute`,
+version `1`, and exactly this payload (the operation identifier is inside the payload):
+
+```json
+{"operation_id":"leave-1","command":"plaza"}
+```
+
+The bare text may name any registered command and its arguments. The payload accepts no account,
+session or permission fields. `operation_id` is 1–64 ASCII letters, digits, underscores or hyphens.
+`response.payload` contains exactly four fields:
+
+```json
+{"operation_id":"leave-1","status":"success","code":"success","message":""}
+```
+
+Only matching `operation_id` with `status: success` and `code: success` establishes command success.
+`status: rejected` carries `not_found`, `invalid_arguments`, `denied`, `busy`, `cancelled`,
+`invalid_state` or `operation_conflict`; `busy` includes the shared chat budget and execution/storage
+capacity. `status: error`, `code: failed` means execution failed, and does not prove that no effect
+occurred. Malformed payloads retain the channel's `kind: error`, `code: invalid_request`; channel
+capacity and withdrawn routes retain `busy` and `unavailable`. Transport completion alone is not success.
+
+Within the same launch and exact game session, identical operation identifiers and command text share
+one in-flight execution and its terminal result, including after a WebSocket reconnect. Reusing an
+identifier for different text returns `operation_conflict`. Reconnect with a fresh envelope id and epoch.
+The row's `max_operations` (default 4096) bounds pending and retained results; when full, new operations
+are rejected without evicting replayable results. `retention_seconds` (default 600) starts on completion;
+pending operations are never expired. After expiry, row/server restart or a new launch, replay protection
+does not persist. Do not automatically resubmit an uncertain operation with a new identifier.
+`max_input_characters` defaults to 4096; shared command input limits also apply. Replies carry the shared
+command result text; they do not inject it into game chat.
+
+### Read-only game state
+
+The same row advertises `game.session.state` v1. Send a negotiated `request` with an empty object
+payload `{}`. The reply payload contains `state`, `in_match`, `can_leave_match`, `is_tutorial` and
+nullable `mode_id`, for example:
+
+```json
+{"state":"match","in_match":true,"can_leave_match":true,"is_tutorial":false,"mode_id":4}
+```
+
+States are `unknown`, `authenticated`, `main_menu`, `plaza`, `room_waiting`, `room_loading`,
+`room_countdown`, `match`, `result`, `tutorial`, `training` and `migrating`. `mode_id` is the current
+client's native room mode, without cross-build normalization. `is_tutorial` comes from the admitted
+tutorial state, never from player count or a guessed mode. The query reads the exact bound server
+session; it accepts no identity arguments and neither reads client memory nor changes game state.
+An unknown, absent, inconsistent or timed-out result must not authorize departure. This snapshot
+does not reserve a departure: the command rechecks current room membership and phase.
+
+### First login on another node
+
+Enable `cluster.ticket-client.companion` on the worker and set its matching authority peer's
+`companion_url` to the worker's explicit HTTP(S) origin. Both nodes require `companion`. The worker
+uses its existing ticket key and build allowlist to trust that authority. Private preparation,
+renewal and status endpoints live under `/companion/internal/v1/`; protect the transport as for
+the private ticket authority. Keys stay in deployment secrets.
+
+When a worker redeems a game ticket, the authority prepares the same launch identity there before
+redirecting the pending connection. The launcher reconnects through its original authorization API
+and follows the renewed grant's worker WebSocket URL. Only the matching worker game session can
+bind the launch. Another account, build or trusted authority cannot renew it. A worker's `public_url`
+must be reachable by launchers; `{host}` resolves to the configured worker origin's host.
+
+`companion.max_remote_requests` defaults to 16, `max_remote_authorities` to 8,
+`remote_timeout_seconds` to 3, `remote_probe_seconds` to 30 and `remote_failure_seconds` to 120.
+Confirmed ended launches are removed; unreachable launches are retained only within that failure
+window. The authority's `companion_timeout_milliseconds` defaults to 1000 and must be shorter than
+its complete ticket deadline. If preparation fails, game authentication continues without a
+companion binding. This route covers initial game-server selection; later native room migration
+does not transfer the binding and requires separate migration support.
 
 ## Troubleshooting
 
@@ -639,11 +727,10 @@ row with `motd`, `icon_url`, `images`, `show_online_players`, `player_limit`,
 `maintenance`, `whitelist_enabled` and `roster_enabled`. Defaults preserve open admission,
 unlimited capacity and an enabled public roster. `onlinePlayers` is null when the session service
 is unavailable, or -1 when `show_online_players: false`. Counts include authenticated game
-players, deduplicate accounts and exclude closed and identified match connections. A historical
-peak is not supplied because no durable peak store is connected.
+players, deduplicate accounts and exclude closed and identified match connections. An observed peak is optional when a population group is configured (see below).
 
 `GET /v1/players` needs no bearer. Its response contains `schema: 1`, `enabled`, `players`
-(each has only `name` and `level`) and `truncated`. `roster_enabled: false` returns an empty list
+(each has `name`, `level` and `buildId`) and `truncated`. `roster_enabled: false` returns an empty list
 without reading the session registry. Otherwise an unavailable registry returns HTTP 503
 `player_state_unavailable`. `max_roster_players` bounds the list (default 1000, range 1–10000);
 `truncated: true` means more players are online than are listed. Counters and roster disclosure
@@ -694,3 +781,29 @@ are `zh-CN` to `zh-Hans` and `zh-TW` to `zh-Hant`. Other tags use their resource
 there is currently no Vietnamese dictionary, so `vi` uses the deployment default. Connections
 without launch-ticket language context also use that default. The language registration lasts
 until the connection closes and remains available through first-time character creation.
+
+### Aggregate populations and observed peaks {#aggregate-presence}
+
+Set `launcher.http.presence_group` to an explicit group identity to use `ILauncherPresenceDirectory`; leave it empty for the existing standalone behavior. `presentation.onlinePlayers` then counts unique accounts across the group's fresh reports, while `playerLimit` retains its separate local admission meaning. The catalog adds `presenceGroup`, `presenceComplete` and optional `peakOnlinePlayers`. When a member is offline, still running an older reporter, or proves a different database, the known population remains available with `presenceComplete: false`; it is a lower bound, not a local fallback.
+
+`GET /v1/players` adds `buildId` to each `{name, level}` card and `complete` to enabled roster responses. `truncated` describes only the public `max_roster_players` limit; `complete: false` separately describes missing reports or undisclosed cards. A count-only request never returns cards. Disabling `roster_enabled` skips both the local registry and aggregate roster source. Reported account numbers, login names, node keys and connection addresses never appear in the public cards.
+
+Configure `cluster.directory.presence_groups` with `id`, distinct physical `nodes`, the verified `persistent_domain_id` and `peak_state_path`. Members must share one declared data scope. Select the intended production members explicitly: test or independent regional nodes stay outside that group even when they remain eligible in an automatic selector. Automatic/manual aliases never become additional members. Accounts are deduplicated across builds and nodes within the verified database; a non-migrating owner is preferred over its outgoing copy. Per-build capacity is not added to obtain a historical peak.
+
+Enable `cluster.node.report_launcher_presence` only after upgrading the directory; its default is false and old heartbeat JSON remains unchanged. Reporting requires the local `launcher.http` presence service and persistent database identity. `max_presence_players` on the Launcher row and `max_presence_players_per_node` on the directory bound private observations (both default 4096). Heartbeat body limits still apply; oversize reports fail explicitly rather than silently truncating counts.
+
+The peak is the maximum unique population **observed in accepted heartbeat snapshots or group reads**, including a known lower bound during partial coverage. It is not an exact continuous-time maximum or a reconstruction of earlier server history. Only increases write the bounded atomic checkpoint, which contains no player data. Restarting restores that checkpoint. Its fingerprint includes group identity, database identity and sorted physical members; changing membership requires another checkpoint path, or an intentional offline reset. A corrupt or mismatched checkpoint fails activation rather than erasing history. Back up the checkpoint with other deployment state. To reset, stop its sole directory writer, archive/remove that file, then restart.
+
+The directory publishes `ILauncherPresenceDirectory` locally. Workers may mount `cluster.launcher-presence` with `node_id`, `directory_url`, `access_key` and `group`; it reads `/v1/nodes/{node}/presence/{group}?roster=true|false` using the existing private node authentication. Only configured group members may read it. This client bounds concurrent requests, deadlines, response bytes and players; failure becomes public HTTP 503 `player_state_unavailable`, not a fabricated zero. Neither the private group endpoint nor checkpoint is a public roster or an authentication authority.
+
+Reporting nodes without the public API can mount `launcher.presence-local` instead of `launcher.http`. It provides only the private owner source and does not change ticket issuance. Its `roster_enabled` defaults to false; enable it explicitly to share cards, and set `max_presence_players` to the report budget. Mount exactly one local source.
+
+
+```yaml
+# Part of cluster.directory.config; both nodes must already be configured in nodes.
+presence_groups:
+  - id: public
+    nodes: [primary, worker]
+    persistent_domain_id: "${BFF_CLUSTER_DATA_DOMAIN_ID}"
+    peak_state_path: data/presence-public.json
+```

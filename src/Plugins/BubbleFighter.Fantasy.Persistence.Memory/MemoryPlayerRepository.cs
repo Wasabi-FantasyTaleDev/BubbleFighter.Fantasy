@@ -10,6 +10,9 @@ namespace BubbleFighter.Fantasy.Persistence.Memory;
 /// </summary>
 public sealed partial class MemoryPlayerRepository(MemoryPlayerTable table) : IPlayerRepository
 {
+    /// <inheritdoc />
+    public bool SupportsRetainedAccountLookup => true;
+
     private readonly object _identityGate = new();
     private long _nextUserNum;
 
@@ -28,6 +31,19 @@ public sealed partial class MemoryPlayerRepository(MemoryPlayerTable table) : IP
         {
             var entry = FindByUsername(username);
             return ValueTask.FromResult(entry is null ? null : Record(entry));
+        }
+    }
+
+    /// <inheritdoc />
+    public ValueTask<PlayerRecord?> FindByUserNumAsync(long userNum, CancellationToken ct)
+    {
+        RequireUserNum(userNum);
+        ct.ThrowIfCancellationRequested();
+        lock (_identityGate)
+        {
+            var entry = table.Find(userNum);
+            return ValueTask.FromResult(entry is not null && _entries.TryGetValue(entry.Username, out var known)
+                && ReferenceEquals(known, entry) ? Record(entry) : null);
         }
     }
 

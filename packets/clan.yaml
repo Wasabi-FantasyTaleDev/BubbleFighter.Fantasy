@@ -2,13 +2,9 @@ version: 1
 # Clan game-connection bodies. The structures below are stated as the enabled build (kr-1256) sends and
 # reads them today; the legacy baseline's own readers differ and are stated beside each modern table.
 #
-# Open question, recorded here instead of smoothed over: every clan passport reader listed below consumes
-# five pieces, the first of them a leading 32-bit word before the name, so an empty passport would be
-# 20 bytes. The server has always written the 16-byte body this table states (name, word, word, byte list)
-# and the enabled build keeps that body until a real session is read against it, so the leading word is
-# NOT stated as a body field in ClanPassport@kr-1256. The kr-1256 reader's export carries the
-# "bad sp value at call has been detected, the output may be wrong" warning, which is why the five-piece
-# reading is a question and not a proven field. Resolve it before the body changes.
+# kr-1256 sub_99C1D0 reads a leading word before the counted name, then two words and a byte
+# vector; its empty passport is 20 bytes. cn-774 sub_BA3C80 reads the same five pieces.
+# The leading read is the stream call at kr-1256 0x99C267-0x99C26F, with size 4 and object offset 0.
 #
 # Readers, build-qualified:
 #   ClanPassport         kr-812 sub_844AB0, kr-1256 sub_99C1D0, cn-774 sub_BA3C80
@@ -29,13 +25,15 @@ structs:
       offset: 40
     - unknown_44: list<u8>  # u32 count (kr-812 sub_A56B30), then that many 1-byte entries (kr-812 sub_A56BB0); always sent empty
       offset: 44
-  # The enabled build's passport (S2C 21). This is the 16-byte body the server sends today when empty:
-  # empty name (4), word (4), word (4), empty byte list (4). See the open question at the top of this file:
-  # kr-1256 sub_99C1D0 fills the same pieces at +4, +28, +32 and a byte vector at +36, and the client may
-  # read one leading word before the name that this body does not carry. cn-774 sub_BA3C80 reads the same
-  # five pieces in this order (with the leading word), so cn-774 inherits this table and carries the same
-  # question; tw-454's reader was not read.
+  # The enabled build's passport (S2C 21): an empty body is 20 bytes - leading word (4), empty name (4),
+  # word (4), word (4), empty byte list (4). kr-1256 sub_99C1D0 fills the leading word at object +0 (the
+  # stream call at kr-1256 0x99C267-0x99C26F reads 4 bytes there before the name), then the pieces
+  # at +4, +28, +32 and the byte vector at +36.
+  # cn-774 sub_BA3C80 reads the same five pieces in this order and inherits this table; tw-454's reader was
+  # not read.
   ClanPassport@kr-1256:
+    - unknown_0: u32        # kr-1256 sub_99C1D0 reads 4 bytes into the object at +0 before the name (stream->Read at slot +0x2C, 0x99C267-0x99C26F); purpose unproven
+      offset: 0
     - clan_name: wstr       # kr-1256 sub_99C1D0 reads the prefixed wide name at +4 (u32 character count, then UTF-16LE)
       offset: 4
     - unknown_28: u32       # kr-1256 sub_99C1D0 reads 4 bytes at +28; purpose unproven

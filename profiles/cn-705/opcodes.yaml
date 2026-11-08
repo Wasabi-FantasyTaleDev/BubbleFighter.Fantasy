@@ -11,6 +11,13 @@
 # catalog rows at those numbers are not promoted. The research catalog for this build is
 # profiles/cn-705/opcode-catalog.yaml.
 opcodes:
+  - value: 10
+    direction: s2c
+    connection: game
+    name: gspDisconnectMovedUser
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-705 sub_7C6C40 case 10 invokes cn-705 sub_7AC770 without a body; pending replaces current, the previous source closes, and readiness clears, matching kr-812 sub_81C550"
   - value: 508
     direction: c2s
     connection: game
@@ -23,7 +30,7 @@ opcodes:
     name: gcpFirstConnect
     name_source: label@cn-706
     evidence: inferred
-    source: cn-706's reviewed row for gcpFirstConnect; cn-705 sub_79AFC0/sub_79BE00/sub_7A3850 stamps 1 without a binned label
+    source: cn-706's reviewed row for gcpFirstConnect; cn-705 sub_79AFC0/cn-705 sub_79BE00/sub_7A3850 stamps 1 without a binned label
   - value: 1
     direction: s2c
     name: gspDisconnect
@@ -41,7 +48,7 @@ opcodes:
     name: gcpReqLogin
     name_source: label@cn-706
     evidence: inferred
-    source: cn-706's reviewed row for gcpReqLogin; cn-705 sub_795200/sub_795270 stamps 3 without a binned label
+    source: cn-706's reviewed row for gcpReqLogin; cn-705 sub_795200/cn-705 sub_795270 stamps 3 without a binned label
   - value: 3
     direction: s2c
     name: gspRepLogin
@@ -65,13 +72,13 @@ opcodes:
     name: gcpReqGotoMenu
     name_source: label@cn-706
     evidence: inferred
-    source: cn-706's reviewed row for gcpReqGotoMenu; cn-705 sub_594F00/sub_596DF0/sub_620250 stamps 105 without a binned label
+    source: cn-706's reviewed row for gcpReqGotoMenu; cn-705 sub_594F00/cn-705 sub_596DF0/sub_620250 stamps 105 without a binned label
   - value: 106
     direction: c2s
     name: gcpReqGotoLobby
     name_source: label@cn-706
     evidence: inferred
-    source: cn-706's reviewed row for gcpReqGotoLobby; cn-705 sub_576A90/sub_7926F0/sub_9461E0 stamps 106 without a binned label
+    source: cn-706's reviewed row for gcpReqGotoLobby; cn-705 sub_576A90/cn-705 sub_7926F0/sub_9461E0 stamps 106 without a binned label
   - value: 108
     direction: s2c
     name: gspGotoMenu
@@ -101,13 +108,13 @@ opcodes:
     name: gcpReqIDPCRoomAuth
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_612C30/sub_798390 stamps 9 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_612C30/cn-705 sub_798390 stamps 9 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 22
     direction: c2s
     name: gcpHsReportLog
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_4C8300/sub_4E6D90/sub_4E6E00/sub_86C3D0 stamps 22 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_4C8300/cn-705 sub_4E6D90/sub_4E6E00/sub_86C3D0 stamps 22 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 107
     direction: c2s
     name: gcpReqPlayTutorial
@@ -131,13 +138,13 @@ opcodes:
     name: gcpReqCreateTutorialSession
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_61A650/sub_945E30 stamps 406 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_61A650/cn-705 sub_945E30 stamps 406 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 503
     direction: c2s
     name: gcpRoomReqEnterGame
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_622AB0/sub_6FB640 stamps 503 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_622AB0/cn-705 sub_6FB640 stamps 503 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 505
     direction: c2s
     name: gcpRoomReqReadyStatus
@@ -167,7 +174,7 @@ opcodes:
     name: gcpEnterInventory
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_656570/sub_6566A0 stamps 802 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_656570/cn-705 sub_6566A0 stamps 802 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 801
     direction: s2c
     name: gspInventoryUpdateAllInventorySlot
@@ -185,7 +192,7 @@ opcodes:
     name: gcpReqShopBuy
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_8C0930/sub_8C2410/sub_944590 stamps 808 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_8C0930/cn-705 sub_8C2410/sub_944590 stamps 808 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 813
     direction: s2c
     name: gspRepShopBuy
@@ -203,13 +210,13 @@ opcodes:
     name: gcpReqCashInven
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_8D5DC0/sub_8D8C50 stamps 826 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_8D5DC0/cn-705 sub_8D8C50 stamps 826 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 920
     direction: c2s
     name: gcpReqSingleStageInfo
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_661B00/sub_669F00 stamps 920 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_661B00/cn-705 sub_669F00 stamps 920 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 922
     direction: s2c
     name: gspResSingleStageInfo
@@ -221,35 +228,35 @@ opcodes:
     name: gcpReqSeasonLadder
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_594DE0/sub_596D80 stamps 2004 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_594DE0/cn-705 sub_596D80 stamps 2004 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 1
     direction: c2s
     connection: relay
     name: rcpReqJoinRelaySession
     name_source: label@cn-706
     evidence: inferred
-    source: cn-706's reviewed row for rcpReqJoinRelaySession; cn-705 sub_79AFC0/sub_79BE00/sub_7A3850 stamps 1 without a binned label
+    source: cn-706's reviewed row for rcpReqJoinRelaySession; cn-705 sub_79AFC0/cn-705 sub_79BE00/sub_7A3850 stamps 1 without a binned label
   - value: 8
     direction: c2s
     connection: relay
     name: rcpReqRegisterPeer
-    name_source: label@cn-706
-    evidence: inferred
-    source: cn-706's reviewed row for rcpReqRegisterPeer; cn-705 sub_797DD0 stamps 8 without a binned label
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_797DD0 stamps relay8 with peer identity after more than320 unacknowledged movements"
   - value: 11
     direction: c2s
     connection: relay
     name: rcpSetDamageAffectingAttribute
     name_source: label@cn-706
     evidence: inferred
-    source: cn-706's reviewed row for rcpSetDamageAffectingAttribute; cn-705 sub_4C81B0/sub_4E6CA0/sub_4E6D10 stamps 11 without a binned label
+    source: cn-706's reviewed row for rcpSetDamageAffectingAttribute; cn-705 sub_4C81B0/cn-705 sub_4E6CA0/sub_4E6D10 stamps 11 without a binned label
   - value: 23
     direction: c2s
     connection: relay
     name: rcpRepHackCheckPing
     name_source: label@cn-706
     evidence: inferred
-    source: cn-706's reviewed row for rcpRepHackCheckPing; cn-705 sub_4BE480/sub_4E67A0/sub_7CA470/sub_86DF80 stamps 23 without a binned label
+    source: cn-706's reviewed row for rcpRepHackCheckPing; cn-705 sub_4BE480/cn-705 sub_4E67A0/sub_7CA470/sub_86DF80 stamps 23 without a binned label
   - value: 20005
     direction: c2s
     connection: relay
@@ -262,7 +269,7 @@ opcodes:
     name: gcpRepPing
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_79C190/sub_7B0AE0 stamps 6 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_79C190/cn-705 sub_7B0AE0 stamps 6 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 7
     direction: c2s
     name: gcpRepHackShieldCheck
@@ -274,61 +281,62 @@ opcodes:
     name: gcpReqMoveChannel
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_79C120/sub_943E50 stamps 12 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_79C120/cn-705 sub_943E50 stamps 12 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 13
     direction: c2s
     name: gcpReqMoveChannelByType
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_4E6F00/sub_4E6F70/sub_609E20 stamps 13 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_4E6F00/cn-705 sub_4E6F70/sub_609E20 stamps 13 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 15
     direction: c2s
     name: gcpReqCheckCreateUserName
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_4E71D0/sub_4E7240/sub_800200 stamps 15 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_4E71D0/cn-705 sub_4E7240/sub_800200 stamps 15 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 16
     direction: c2s
     name: gcpReqCreateUserInfo
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_4E6FF0/sub_4E7060/sub_8002F0 stamps 16 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_4E6FF0/cn-705 sub_4E7060/sub_8002F0 stamps 16 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 17
     direction: c2s
     name: gcpLoginAfterCreateUserInfo
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_7952F0/sub_795360/sub_8004E0 stamps 17 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_7952F0/cn-705 sub_795360/sub_8004E0 stamps 17 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 18
     direction: c2s
     name: gcpNotifyCloseProgram
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_4BE110/sub_4E64C0/sub_867630 stamps 18 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_4BE110/cn-705 sub_4E64C0/sub_867630 stamps 18 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 19
     direction: c2s
     name: gcpReportLastCrash
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_4E6540/sub_7CA710 stamps 19 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_4E6540/cn-705 sub_7CA710 stamps 19 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 21
     direction: c2s
     name: gcpReportBadProgram
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_4E66B0/sub_4E6720/sub_7B0B60 stamps 21 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_4E66B0/cn-705 sub_4E6720/sub_7B0B60 stamps 21 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 23
     direction: c2s
     name: gcpReqCenterUserCnt
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_4BE480/sub_4E67A0/sub_7CA470/sub_86DF80 stamps 23 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_4BE480/cn-705 sub_4E67A0/sub_7CA470/sub_86DF80 stamps 23 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 26
     direction: c2s
-    name: gcpPortalMove
-    name_source: label@cn-705
-    evidence: inferred
-    source: cn-705 sub_452260/sub_4E2210/sub_4E7440 stamps 26 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    connection: game
+    name: Unknown26
+    name_source: none
+    evidence: unverified
+    source: "cn-705 sub_452260 emits a separate lobby event; its purpose is not established. Map contacts use game 948 in cn-705 sub_4E2210."
   - value: 101
     direction: c2s
     name: gcpRepUserPoll
@@ -364,7 +372,7 @@ opcodes:
     name: gcpReqMatch
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_5638C0/sub_5639B0/sub_563AA0/sub_5952B0 stamps 112 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_5638C0/cn-705 sub_5639B0/sub_563AA0/sub_5952B0 stamps 112 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 114
     direction: c2s
     name: gcpReqOnlineMatchRankInfo
@@ -388,7 +396,7 @@ opcodes:
     name: gcpReqGotoGuild
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_66CF50/sub_945B50/sub_945C90 stamps 118 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_66CF50/cn-705 sub_945B50/sub_945C90 stamps 118 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 119
     direction: c2s
     name: gcpReqRecommendSend
@@ -407,18 +415,25 @@ opcodes:
     name_source: label@cn-705
     evidence: inferred
     source: cn-705 sub_8B0CE0 stamps 303 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+  - value: 304
+    direction: c2s
+    name: gcpSendPartyChatMsg
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_8B1140 stamps 304 on Packet_gcpSendPartyChatMsg; reader cn-705 sub_786AE0"
+    notes: "Chat box line outside a room: one string. The client draws nothing until S2C gspReceivePartyChatMsg answers."
   - value: 305
     direction: c2s
     name: gcpReqPartyRecruiting
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_8807E0/sub_881690/sub_945DA0 stamps 305 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_8807E0/cn-705 sub_881690/sub_945DA0 stamps 305 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 306
     direction: c2s
     name: gcpReqPartyQuickStart
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_61A6C0/sub_61F930/sub_6201C0 stamps 306 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_61A6C0/cn-705 sub_61F930/sub_6201C0 stamps 306 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 504
     direction: c2s
     name: gcpRoomReqEnterRoundGame
@@ -436,7 +451,7 @@ opcodes:
     name: gcpRoomChangeGameSetting
     name_source: label@cn-706
     evidence: inferred
-    source: cn-706's reviewed row for gcpRoomChangeGameSetting; cn-705 sub_576CC0/sub_632710 stamps 513 without a binned label
+    source: cn-706's reviewed row for gcpRoomChangeGameSetting; cn-705 sub_576CC0/cn-705 sub_632710 stamps 513 without a binned label
   - value: 515
     direction: c2s
     name: gcpRoomChangeTeam
@@ -457,16 +472,18 @@ opcodes:
     source: cn-705 sub_795540 stamps 518 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 519
     direction: c2s
+    connection: game
     name: gcpReqSelectAward
     name_source: label@cn-705
-    evidence: inferred
-    source: cn-705 sub_985A80 stamps 519 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    evidence: verified
+    source: "cn-705 sub_985A80 sends card and local seat; cn-705 sub_4BA7A0 reads two u32"
   - value: 607
     direction: c2s
+    connection: game
     name: gcpReportTableSetHolePunchingEnd
     name_source: label@cn-705
-    evidence: inferred
-    source: cn-705 sub_7988E0 stamps 607 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    evidence: verified
+    source: "cn-705 sub_7988E0 stamps607 with empty body"
   - value: 701
     direction: c2s
     name: gcpGameReportMapLoadingComplete
@@ -482,15 +499,15 @@ opcodes:
   - value: 707
     direction: c2s
     name: gcpEatItem
-    name_source: label@cn-706
-    evidence: inferred
-    source: cn-706's reviewed row for gcpEatItem; cn-705 sub_4C5230 stamps 707 without a binned label
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_4C5230 stamps 707 with object reference and kind; reader cn-705 sub_4BA7A0 reads two u32"
   - value: 708
     direction: c2s
     name: gcpUseItem
-    name_source: label@cn-706
-    evidence: inferred
-    source: cn-706's reviewed row for gcpUseItem; cn-705 sub_4C58F0 stamps 708 without a binned label
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_4C58F0 stamps 708 with an empty body; reader cn-705 sub_613270 returns without reading"
   - value: 709
     direction: c2s
     name: gcpReqAddObject
@@ -542,9 +559,9 @@ opcodes:
   - value: 728
     direction: c2s
     name: gcpReqCreateItem
-    name_source: label@cn-706
-    evidence: inferred
-    source: cn-706's reviewed row for gcpReqCreateItem; cn-705 sub_4CCB80/sub_4CCC60/sub_52EFD0/sub_5BDE00 stamps 728 without a binned label
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_4CCB80 stamps 728; reader cn-705 sub_4B9E00 reads six f32 followed by three u32"
   - value: 729
     direction: c2s
     name: gcpReqCreateWeaponObject
@@ -632,9 +649,9 @@ opcodes:
   - value: 744
     direction: c2s
     name: gcpSwitchItemSlot
-    name_source: label@cn-706
-    evidence: inferred
-    source: cn-706's reviewed row for gcpSwitchItemSlot; cn-705 sub_4DDC60 stamps 744 without a binned label
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_4DDC60 stamps 744 with an empty body; reader cn-705 sub_613270 returns without reading"
   - value: 745
     direction: c2s
     name: gcpBFRunnerOver
@@ -664,7 +681,7 @@ opcodes:
     name: gcpReqInventoryEquip
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_575B30/sub_646700/sub_8FE630 stamps 803 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_575B30/cn-705 sub_646700/sub_8FE630 stamps 803 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 805
     direction: c2s
     name: gcpReqInventoryUseItem
@@ -682,13 +699,13 @@ opcodes:
     name: gcpReqPresentNewReceive
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_8E8B00/sub_8E9080 stamps 810 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_8E8B00/cn-705 sub_8E9080 stamps 810 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 813
     direction: c2s
     name: gcpReqPresentReceiveSubList
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_8E62A0/sub_8E7A40/sub_8E90F0 stamps 813 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_8E62A0/cn-705 sub_8E7A40/sub_8E90F0 stamps 813 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 816
     direction: c2s
     name: gcpReqPresentSend
@@ -730,19 +747,19 @@ opcodes:
     name: gcpReqGuildLineBoard
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_87C960/sub_87CA90/sub_945EC0 stamps 900 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_87C960/cn-705 sub_87CA90/sub_945EC0 stamps 900 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 901
     direction: c2s
     name: gcpReqGuildLineBoardWrite
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_66C790/sub_945F70 stamps 901 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_66C790/cn-705 sub_945F70 stamps 901 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 902
     direction: c2s
     name: gcpReqGuildLineBoardDelete
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_66C870/sub_946080 stamps 902 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_66C870/cn-705 sub_946080 stamps 902 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 903
     direction: c2s
     name: gcpReqStartNewWave
@@ -796,7 +813,7 @@ opcodes:
     name: gcpReqManufactureList
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_7B1CB0/sub_959860 stamps 912 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_7B1CB0/cn-705 sub_959860 stamps 912 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 913
     direction: c2s
     name: gcpReqManufactureStart
@@ -832,7 +849,7 @@ opcodes:
     name: gcpReqOpenTreasureChest
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_720D80/sub_727900/sub_7297E0 stamps 918 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_720D80/cn-705 sub_727900/sub_7297E0 stamps 918 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 919
     direction: c2s
     name: gcpReqGuildInfo
@@ -842,15 +859,15 @@ opcodes:
   - value: 921
     direction: c2s
     name: gcpPveUseCountItem
-    name_source: label@cn-706
-    evidence: inferred
-    source: cn-706's reviewed row for gcpPveUseCountItem; cn-705 sub_4C5970 stamps 921 without a binned label
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_4C5970 stamps 921; its one-u32 reader is cn-705 sub_4BAA30 and cn-705 sub_5BBA50 sends the selected nonempty counted slot"
   - value: 923
     direction: c2s
     name: gcpPvePangUnit
-    name_source: label@cn-706
-    evidence: inferred
-    source: cn-706's reviewed row for gcpPvePangUnit; cn-705 sub_4C5A00 stamps 923 without a binned label
+    name_source: mirrored
+    evidence: verified
+    source: "cn-705 sub_4C5A00 stamps 923 and cn-705 sub_905720 writes one unit word; cn-705 sub_4BAA30 reads it; matched to cn-706 gcpPvePangUnit"
   - value: 924
     direction: c2s
     name: gcpPveCombo
@@ -872,9 +889,9 @@ opcodes:
   - value: 927
     direction: c2s
     name: gcpMissionProcess
-    name_source: label@cn-706
-    evidence: inferred
-    source: cn-706's reviewed row for gcpMissionProcess; cn-705 sub_4C5A90 stamps 927 without a binned label
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_4C5A90 stamps 927 and writes mission reference, NPC kind and zero; reader cn-705 sub_80C530 reads three u32; citizen/hostile reporters cn-705 sub_5AECD0 and cn-705 sub_5B1860"
   - value: 929
     direction: c2s
     name: gcpMakeUserTitle
@@ -910,7 +927,7 @@ opcodes:
     name: gcpResClientDamageData
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_4E72C0/sub_7C0350 stamps 939 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_4E72C0/cn-705 sub_7C0350 stamps 939 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 941
     direction: c2s
     name: gcpSynthesisProcess
@@ -1585,10 +1602,11 @@ opcodes:
     source: cn-705 dispatcher sub_7C6C40 case 955 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
   - value: 958
     direction: s2c
+    connection: game
     name: gspPortalMove
     name_source: label@cn-705
-    evidence: inferred
-    source: cn-705 dispatcher sub_7C6C40 case 958 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+    evidence: verified
+    source: "cn-705 sub_7A0E20 reads word, region u16 and seat word; cn-705 sub_7C5070 authorizes native map-region motion and clears local pending contact; packets/portal.yaml"
   - value: 959
     direction: s2c
     name: gspNotifyMsg
@@ -1684,13 +1702,13 @@ opcodes:
     name: gcpReqEvent
     name_source: mirrored
     evidence: inferred
-    source: cn-706's reviewed row for gcpReqEvent; cn-705 sub_4A0AE0/sub_615D90/sub_651210/sub_71F900/sub_71FBD0/sub_7336F0 stamps 117 without a binned label
+    source: cn-706's reviewed row for gcpReqEvent; cn-705 sub_4A0AE0/cn-705 sub_615D90/sub_651210/sub_71F900/sub_71FBD0/sub_7336F0 stamps 117 without a binned label
   - value: 2022
     direction: c2s
     name: gcpGameUpdateScoreOptimze
-    name_source: label@cn-706
-    evidence: inferred
-    source: cn-706's reviewed row for gcpGameUpdateScoreOptimze; cn-705 sub_4C1D00/sub_4D7B70/sub_4E6C30 stamps 2022 without a binned label
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_672680 constructs Packet_gcpGameUpdateScoreOptimze for local NPC finishing; cn-705 sub_4E6C30 stamps 2022 and cn-705 sub_4B9510 reads the six-byte body"
   - value: 704
     direction: c2s
     name: gcpRespawn
@@ -1708,7 +1726,7 @@ opcodes:
     name: gcpReqEventProcess
     name_source: mirrored
     evidence: inferred
-    source: cn-706's reviewed row for gcpReqEventProcess; cn-705 sub_419040/sub_43ECA0/sub_562690/sub_7336F0/sub_7359A0/sub_8158E0 stamps 940 without a binned label
+    source: cn-706's reviewed row for gcpReqEventProcess; cn-705 sub_419040/cn-705 sub_43ECA0/sub_562690/sub_7336F0/sub_7359A0/sub_8158E0 stamps 940 without a binned label
   - value: 2006
     direction: c2s
     name: gcpReqSeasonLadderGetRankListNo
@@ -1769,12 +1787,12 @@ opcodes:
     name_source: mirrored
     evidence: inferred
     source: cn-706's reviewed row for gspRoomLeaveSlot; cn-705 dispatcher sub_7C6C40 holds the same case
-  - value: 521
+  - value: 520
     direction: s2c
     name: gspRepAutoStart
-    name_source: mirrored
-    evidence: inferred
-    source: cn-706's reviewed row for gspRepAutoStart; cn-705 dispatcher sub_7C6C40 holds the same case
+    name_source: label@cn-705
+    evidence: verified
+    source: cn-705 sub_576720 accepts 520; cn-705 sub_576750 reads Packet_gspRepAutoStart through vtable C49264, reader cn-705 sub_97C3E0
   - value: 701
     direction: s2c
     name: gspGameMapLoadingComplete
@@ -1822,7 +1840,7 @@ opcodes:
     name: gcpReqMoveInto
     name_source: label@cn-706
     evidence: inferred
-    source: cn-706's reviewed row for gcpReqMoveInto; cn-705 sub_4E70E0/sub_4E7150 stamps 14 without a binned label
+    source: cn-706's reviewed row for gcpReqMoveInto; cn-705 sub_4E70E0/cn-705 sub_4E7150 stamps 14 without a binned label
   - value: 113
     direction: c2s
     name: gcpReqOnlineMatchTeamInfoLoad
@@ -1841,6 +1859,13 @@ opcodes:
     name_source: label@cn-706
     evidence: inferred
     source: cn-706's reviewed row for gcpReqLeaveSession; cn-705 sub_639A20 stamps 404 without a binned label
+  - value: 501
+    direction: c2s
+    name: gcpRoomSendChatMsg
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_7CA4E0 stamps 501 on Packet_gcpRoomSendChatMsg; reader cn-705 sub_79F3D0"
+    notes: "Waiting-room chat box line: bool32 team-only flag, then the text. The client draws nothing until S2C gspRoomReceiveChatMsg answers."
   - value: 502
     direction: c2s
     name: gcpRoomSendChatModuleMsg
@@ -1867,16 +1892,17 @@ opcodes:
     source: cn-705 sub_7CA550 stamps 520 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 603
     direction: c2s
+    connection: game
     name: gcpReportHolePunchingEnd
-    name_source: label@cn-706
-    evidence: inferred
-    source: cn-706's reviewed row for gcpReportHolePunchingEnd; cn-705 sub_798390 stamps 603 without a binned label
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_798390 stamps603 with occupied-seat and successful-peer counts"
   - value: 710
     direction: c2s
     name: gcpGameUpdateScore
     name_source: label@cn-705
     evidence: verified
-    source: cn-705 sub_4E6BC0 stamps 710 with Packet_gcpGameUpdateScore (kind word prepared by its callers, e.g. cn-705 sub_4CCB80); the value and name agree with cn-706's reviewed row
+    source: "cn-705 sub_4D7B70 and cn-705 sub_4D7820 construct Packet_gcpGameUpdateScore; cn-705 sub_4E6BC0 stamps 710 and cn-705 sub_4B9400 writes the sixteen-byte body with a one-byte kind"
   - value: 807
     direction: c2s
     name: gcpReqInventoryThrowItem
@@ -2343,7 +2369,7 @@ opcodes:
     name: gppHordeMobReplay
     name_source: label@cn-705
     evidence: inferred
-    source: cn-705 sub_9A5760/sub_9A5AF0 stamps 32866 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    source: cn-705 sub_9A5760/cn-705 sub_9A5AF0 stamps 32866 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
   - value: 32873
     direction: c2s
     connection: both
@@ -3019,10 +3045,11 @@ opcodes:
     source: cn-706's reviewed row for gspRepPingUser; cn-705 dispatcher sub_7C6C40 holds the same case
   - value: 519
     direction: s2c
+    connection: game
     name: gspHordeModeRewardList
-    name_source: mirrored
-    evidence: inferred
-    source: cn-706's reviewed row for gspHordeModeRewardList; cn-705 dispatcher sub_7C6C40 holds the same case
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_787C80 case 519 calls cn-705 sub_791050; cn-705 sub_7A0D00 reads a counted u32 vector"
   - value: 522
     direction: s2c
     name: gspSetSessionSigData
@@ -3043,10 +3070,11 @@ opcodes:
     source: cn-706's reviewed row for gspReceiveSessionInit; cn-705 dispatcher sub_7C6C40 holds the same case
   - value: 607
     direction: s2c
+    connection: game
     name: gspTryHolePunching
     name_source: mirrored
-    evidence: inferred
-    source: cn-706's reviewed row for gspTryHolePunching; cn-705 dispatcher sub_7C6C40 holds the same case
+    evidence: verified
+    source: "cn-705 sub_787C80 case607 -> cn-705 sub_792430: u16 port, u32 identity, u8 unknown"
   - value: 609
     direction: s2c
     name: gspNotifyUdpToServerReceived
@@ -3055,46 +3083,47 @@ opcodes:
     source: cn-706's reviewed row for gspNotifyUdpToServerReceived; cn-705 dispatcher sub_7C6C40 holds the same case
   - value: 610
     direction: s2c
+    connection: game
     name: gspTableSetHolePunching
-    name_source: mirrored
-    evidence: inferred
-    source: cn-706's reviewed row for gspTableSetHolePunching; cn-705 dispatcher sub_7C6C40 holds the same case
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_798BB0/cn-705 sub_796DC0: slot, identity, counted local IPv4, local port, outer IPv4 and port"
   - value: 711
     direction: s2c
     name: gspGameCreateGameItem
-    name_source: label@cn-706
-    evidence: inferred
-    source: cn-706's reviewed row for gspGameCreateGameItem; cn-705 dispatcher sub_7C6C40 holds the same case
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_4C2CD0 case 711 calls cn-705 sub_4D1C50; reader cn-705 sub_4B9090 reads the ten-word creation envelope"
   - value: 712
     direction: s2c
     name: gspItemEaten
-    name_source: label@cn-706
-    evidence: inferred
-    source: cn-706's reviewed row for gspItemEaten; cn-705 dispatcher sub_7C6C40 holds the same case
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_4C2CD0 case 712 calls cn-705 sub_4CDA40; reader cn-705 sub_4BA7A0 reads seat and object reference"
   - value: 713
     direction: s2c
     name: gspAddItemToSlot
-    name_source: label@cn-706
-    evidence: inferred
-    source: cn-706's reviewed row for gspAddItemToSlot; cn-705 dispatcher sub_7C6C40 holds the same case
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_4C2CD0 case 713 calls cn-705 sub_4D0710; reader cn-705 sub_80C530 reads three u32; mode 16 increments the per-kind count"
   - value: 714
     direction: s2c
     name: gspItemUsed
-    name_source: label@cn-706
-    evidence: inferred
-    source: cn-706's reviewed row for gspItemUsed; cn-705 dispatcher sub_7C6C40 holds the same case
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_4C2CD0 case 714 calls cn-705 sub_4D0410; reader cn-705 sub_80C530 reads three u32"
   - value: 715
     direction: s2c
     name: gspPveItemUsed
-    name_source: label@cn-706
-    evidence: inferred
-    source: cn-706's reviewed row for gspPveItemUsed; cn-705 dispatcher sub_7C6C40 holds the same case
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_4C2CD0 case 715 calls cn-705 sub_4D04A0; reader cn-705 sub_80C530 reads seat, kind and unknown_12; the local actor forwards kind to cn-705 sub_4DD760"
   - value: 729
     direction: s2c
     name: gspGameBroadcastPlayerScoreData
-    name_source: mirrored
-    evidence: inferred
-    source: cn-706's reviewed row for gspGameBroadcastPlayerScoreData; cn-705 dispatcher sub_7C6C40 holds the same case
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_787C80 case 729 calls cn-705 sub_790080; cn-705 sub_7858D0 reads twelve ScoreRow records and cn-705 sub_791950 installs the scoreboard"
   - value: 730
     direction: s2c
     name: gspGameRespawnCharacter
@@ -3110,21 +3139,23 @@ opcodes:
   - value: 732
     direction: s2c
     name: gspGameTimeOverEnd
-    name_source: mirrored
-    evidence: inferred
-    source: cn-706's reviewed row for gspGameTimeOverEnd; cn-705 dispatcher sub_7C6C40 holds the same case
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_787C80 case 732 calls cn-705 sub_790570; cn-705 sub_787450 reads two u8 team totals"
   - value: 734
     direction: s2c
+    connection: game
     name: gspGameAwardDialog
-    name_source: label@cn-706
-    evidence: inferred
-    source: cn-706's reviewed row for gspGameAwardDialog; cn-705 dispatcher sub_7C6C40 holds the same case
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_787C80 case 734 opens the native award dialog; cn-705 sub_613270 consumes an empty body"
   - value: 736
     direction: s2c
+    connection: game
     name: gspGameReturnAfterAward_
     name_source: coined
-    evidence: inferred
-    source: cn-706's reviewed row for gspGameReturnAfterAward_; cn-705 dispatcher sub_7C6C40 holds the same case
+    evidence: verified
+    source: "cn-705 sub_787C80 case 736 calls cn-705 sub_790790 without a body, closes the award UI and restores the room stage"
   - value: 737
     direction: s2c
     name: gspGamePreCountDown
@@ -3157,22 +3188,24 @@ opcodes:
     source: cn-706's reviewed row for gspGamePrepareMoleEvent; cn-705 dispatcher sub_7C6C40 holds the same case
   - value: 743
     direction: s2c
+    connection: game
     name: gspRepAwardSelectSuccess
-    name_source: mirrored
-    evidence: inferred
-    source: cn-706's reviewed row for gspRepAwardSelectSuccess; cn-705 dispatcher sub_7C6C40 holds the same case
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_787C80 case 743 calls cn-705 sub_792820; cn-705 sub_80C530 reads card, seat and optional second card"
   - value: 744
     direction: s2c
+    connection: game
     name: gspRepAwardSelectFail
-    name_source: label@cn-706
-    evidence: inferred
-    source: cn-706's reviewed row for gspRepAwardSelectFail; cn-705 dispatcher sub_7C6C40 holds the same case
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_787C80 case 744; cn-705 sub_613270 reads an empty refusal"
   - value: 747
     direction: s2c
     name: gspSwitchItemSlot
-    name_source: label@cn-706
-    evidence: inferred
-    source: cn-706's reviewed row for gspSwitchItemSlot; cn-705 dispatcher sub_7C6C40 holds the same case
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_4C2CD0 case 747 calls cn-705 sub_4DDCE0; reader cn-705 sub_79E000 reads four u32"
   - value: 748
     direction: s2c
     name: gspGameItemSpec
@@ -3212,33 +3245,33 @@ opcodes:
   - value: 924
     direction: s2c
     name: gspMapMissionInfo
-    name_source: mirrored
-    evidence: inferred
-    source: cn-706's reviewed row for gspMapMissionInfo; cn-705 dispatcher sub_7C6C40 holds the same case
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_787C80 case 924 calls cn-705 sub_78A180; reader cn-705 sub_7871C0 delegates to cn-705 sub_795050; element reader cn-705 sub_72AD50 reads six u32, a counted wstr vector and bool32"
   - value: 925
     direction: s2c
     name: gspResMissionStart
-    name_source: mirrored
-    evidence: inferred
-    source: cn-706's reviewed row for gspResMissionStart; cn-705 dispatcher sub_7C6C40 holds the same case
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_787C80 case 925 calls cn-705 sub_78A400; reader cn-705 sub_4BAA30 reads one u32 mission index"
   - value: 926
     direction: s2c
     name: gspResMissionTimeOut
-    name_source: mirrored
-    evidence: inferred
-    source: cn-706's reviewed row for gspResMissionTimeOut; cn-705 dispatcher sub_7C6C40 holds the same case
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_787C80 case 926 calls cn-705 sub_78A510; reader cn-705 sub_4BAA30 reads one u32 mission index"
   - value: 927
     direction: s2c
     name: gspResMissionOK
-    name_source: mirrored
-    evidence: inferred
-    source: cn-706's reviewed row for gspResMissionOK; cn-705 dispatcher sub_7C6C40 holds the same case
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_787C80 case 927 calls cn-705 sub_78A620; reader cn-705 sub_4BA7A0 reads two u32; zero result advances the completed index"
   - value: 928
     direction: s2c
     name: gspNotifyGamePoint
     name_source: mirrored
-    evidence: inferred
-    source: cn-706's reviewed row for gspNotifyGamePoint; cn-705 dispatcher sub_7C6C40 holds the same case
+    evidence: verified
+    source: "cn-705 sub_787C80 case 928 dispatches cn-705 sub_78A740; cn-705 sub_80C530 reads seat/subtract/amount and the consumer updates the live per-seat point counters; matched to cn-706 gspNotifyGamePoint"
   - value: 929
     direction: s2c
     name: gspNotifyRankInfo
@@ -3248,9 +3281,9 @@ opcodes:
   - value: 930
     direction: s2c
     name: gspPveItemInfo
-    name_source: mirrored
-    evidence: inferred
-    source: cn-706's reviewed row for gspPveItemInfo; cn-705 dispatcher sub_7C6C40 holds the same case
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_787C80 case 930 calls cn-705 sub_78AAC0; reader cn-705 sub_787220 reads a count and three-u32 entries through cn-705 sub_80C530"
   - value: 931
     direction: s2c
     name: gspCompensationItemNoti
@@ -3299,4 +3332,134 @@ opcodes:
     name: gcpReqPresentDeleteReceive
     name_source: label@cn-706
     evidence: inferred
-    source: cn-706's reviewed row for gcpReqPresentDeleteReceive; cn-705 sub_8E7A40/sub_8E8F30 stamps 823 without a binned label
+    source: cn-706's reviewed row for gcpReqPresentDeleteReceive; cn-705 sub_8E7A40/cn-705 sub_8E8F30 stamps 823 without a binned label
+  - value: 608
+    direction: s2c
+    connection: game
+    name: gspStopUdpDiscovery_
+    name_source: coined
+    evidence: verified
+    source: "cn-705 sub_787C80 case608 clears discovery"
+  - value: 611
+    direction: s2c
+    connection: game
+    name: gspUdpPeerTableEnd_
+    name_source: coined
+    evidence: verified
+    source: "cn-705 sub_787C80 case611 -> cn-705 sub_7988E0 sends empty C2S607"
+  - value: 612
+    direction: s2c
+    connection: game
+    name: gspUdpPeerPunchStart_
+    name_source: coined
+    evidence: verified
+    source: "cn-705 sub_787C80 case612 -> cn-705 sub_798970 starts native UDP6/8"
+  - value: 613
+    direction: s2c
+    connection: game
+    name: gspUdpPeerPunchFinish_
+    name_source: coined
+    evidence: verified
+    source: "cn-705 sub_787C80 case613 -> cn-705 sub_798390 finalizes peer attempts"
+  - value: 2
+    direction: c2s
+    connection: udp
+    name: upTrySendUdpToServer
+    name_source: mirrored
+    evidence: verified
+    source: "cn-705 sub_7972A0 stamps UDP2 with identity, local IPv4 and local port"
+  - value: 9
+    direction: c2s
+    connection: relay
+    name: rcpReqUnRegisterPeer
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_798390 stamps relay9 with a successfully punched peer identity"
+  - value: 32885
+    direction: c2s
+    connection: both
+    name: gppWanderLean
+    name_source: mirrored
+    evidence: verified
+    source: "cn-705 sub_797F30 sends32885; cn-705 sub_7998A0/cn-705 sub_4BA9C0 consumes the15-byte body"
+  - value: 32922
+    direction: c2s
+    connection: both
+    name: gppWanderLeanOptimize
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_797F30 sends32922; cn-705 sub_799B00 consumes u32 actor, u16 tick and mask-selected packed movement"
+  - value: 32885
+    direction: s2c
+    connection: both
+    name: gppWanderLean
+    name_source: mirrored
+    evidence: verified
+    source: "cn-705 sub_797F30 sends32885; cn-705 sub_7998A0/cn-705 sub_4BA9C0 consumes the15-byte body"
+  - value: 32922
+    direction: s2c
+    connection: both
+    name: gppWanderLeanOptimize
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_797F30 sends32922; cn-705 sub_799B00 consumes u32 actor, u16 tick and mask-selected packed movement"
+
+  - value: 12
+    direction: c2s
+    connection: relay
+    name: rcpReqReportHackCheckData
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_79B180 case1 constructs the named report through cn-705 sub_79A7F0; cn-705 sub_79C120 stamps relay12; packets/relay-validation.yaml"
+
+  - value: 601
+    direction: s2c
+    connection: game
+    name: gspConnectToRelayServer
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_7C6C40 compares601, calls cn-705 sub_7ACC90; cn-705 sub_7A0040 reads endpoint and key"
+
+  - value: 1
+    direction: s2c
+    connection: relay
+    name: rspRelayJoinAccepted_
+    name_source: coined
+    evidence: verified
+    source: "cn-705 sub_79B180 case1 accepts an empty join signal and sends the native scene validation report"
+
+  - value: 5
+    direction: s2c
+    connection: relay
+    name: rspSendDefSeedTable
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_79B180 case 5 calls cn-705 sub_4BDEF0; Packet_rspSendDefSeedTable reader cn-705 sub_4BA2D0 reads actor and counted bytes, installed by cn-705 sub_50BF10"
+
+  - value: 13
+    direction: s2c
+    connection: relay
+    name: rspRelaySceneAccepted_
+    name_source: coined
+    evidence: verified
+    source: "cn-705 sub_79B180 case13 reads no body and completes native scene admission"
+  - value: 702
+    direction: c2s
+    name: gcpGameReportMapData
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_4C3CF0 stamps 702 and builds the map vectors; reader cn-705 sub_4B9820 reads one u32 and fifteen counted vectors; matches cn-706 sub_4C4300/sub_4B9A50"
+  - value: 733
+    direction: s2c
+    connection: game
+    name: gspGameShowResult_
+    name_source: coined
+    evidence: verified
+    source: "cn-705 sub_787C80 case 733 reads no body and calls cn-705 sub_55D1D0; it requires result-state +880 before advancing stage +32 to 3"
+  - value: 948
+    direction: c2s
+    connection: game
+    name: gcpPortalMove
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_4E2210 stamps game 948 and relay 26 separately; cn-705 sub_4BA080 reads position xyz and region u16; packets/portal.yaml"

@@ -51,6 +51,7 @@ internal sealed record SeatEquipment(int CharacterId, IReadOnlyList<int>? ItemId
 {
     internal void Apply(RoomSeat seat)
     {
+        seat.InventorySelection = null;
         seat.CharacterId = CharacterId;
         seat.EquippedItemIds = ItemIds;
     }

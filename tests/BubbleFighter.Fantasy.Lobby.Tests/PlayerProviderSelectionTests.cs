@@ -17,7 +17,12 @@ public sealed class PlayerProviderSelectionTests
         ((RegistryProxy)registry).PlayerRepository = supplied;
         var resolved = LobbyPlugin.ResolvePlayerRepository(registry);
         Assert.Same(supplied, resolved);
+        Assert.True(resolved.SupportsRetainedAccountLookup);
         Assert.Equal(player, await resolved.FindByUsernameAsync("known", default));
+        Assert.Equal(player, await resolved.FindByUserNumAsync(player.UserNum, default));
+        Assert.Null(await resolved.FindByUserNumAsync(long.MaxValue, default));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => resolved.FindByUserNumAsync(0, default).AsTask());
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => resolved.FindByUserNumAsync(player.UserNum, new CancellationToken(true)).AsTask());
     }
 
     [Fact]

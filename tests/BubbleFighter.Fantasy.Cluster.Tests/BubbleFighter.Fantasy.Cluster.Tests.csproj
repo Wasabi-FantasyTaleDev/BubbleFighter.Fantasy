@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsPackable>false</IsPackable><GenerateDocumentationFile>false</GenerateDocumentationFile></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../src/Plugins/BubbleFighter.Fantasy.Protocol/SessionFeatures.cs" Link="Production/SessionFeatures.cs" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" /><PackageReference Include="xunit" /><PackageReference Include="xunit.runner.visualstudio" />
+    <ProjectReference Include="../../src/Plugins/BubbleFighter.Fantasy.Cluster/BubbleFighter.Fantasy.Cluster.csproj" />
+    <ProjectReference Include="../../src/BubbleFighter.Fantasy.Kernel/BubbleFighter.Fantasy.Kernel.csproj" />
+  </ItemGroup>
+</Project>

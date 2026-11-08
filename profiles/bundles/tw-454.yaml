@@ -18,7 +18,7 @@
     bootstrap_status: 2
     # A crash report (19) after a crashed session, and a 30-byte opcode 1500 on every
     # launch (local run), arrive ahead of gcpFirstConnect.
-    pre_handshake_opcodes: [19, 1500]
+    pre_handshake_opcodes: [gcpReportLastCrash, gcpReqDynamicConfig]
     bootstrap_command_line: "http://bf.dn.nexoncdn.co.kr/PatchData"
     # The address and port the client reaches this listener on (its login.ini or launch
     # arguments). The gate values follow cn-324, the same client family.
@@ -42,14 +42,32 @@
   plugin: dialect.messages
   config:
     protocol: tw-454/game
+    # Every client sits on channel 60, "Free" (one shared lobby instead of split channels). The login reply's
+    # channel word is what the round start reads its FighterConfigChannel column from (kr-812 sub_818680,
+    # sub_587690); BFF_PLAYER_CHANNEL also feeds dialect.rooms player_channel and the cluster move. 0 = off.
+    login_channel: ${BFF_PLAYER_CHANNEL:-60}
     login: true
     main_menu_init: true
+    party: true
     inventory: true
     equipment_view: true
+    # tw-454 sub_8D91C0 request and sub_A97DD0 full reply; opt in for native-client acceptance.
+    fighter_info: ${BFF_TW_454_FIGHTER_INFO:-false}
     equipment: true
     # The customized-key update and login restoration (packets/customized-keys.yaml; builder tw-454
     # sub_6F5B50, consumer tw-454 sub_AA49B0) for the player.settings row of the player-settings bundle.
     customized_keys: true
+    # The gift box (packets/present.yaml): the client's own senders are tw-454 sub_BDA7E0 (both list pages),
+    # tw-454 sub_BD3D00 (purchase), tw-454 sub_BBC770 (the take and discard stamps of the receive dialog), tw-454 sub_BDC410 (the
+    # thank-you), tw-454 sub_BD5CD0 and tw-454 sub_BDAB80 (the deletes) and tw-454 sub_8DDFC0 (close); the list replies are read by
+    # tw-454 sub_A935D0 (three words plus the 88-byte record walk) and tw-454 sub_A93740 (two words plus the
+    # vector). Needs the build's present_box capability and the shop row of the modern-commerce bundle.
+    # Opt in on both the dialect.messages and shop rows for native-client acceptance.
+    present_box: false
+    # The expired-item notice (packets/inventory.yaml ExpiredItems): tw-454 sub_AACF80 case 807 ->
+    # tw-454 sub_A8B9C0 -> tw-454 sub_45AA50 reads the counted u32 id list (cn-774's chain verbatim), and its consumer
+    # is armed from the startup singletons; the burst is cn-774's, so the step lands last.
+    expired_item_notices: true
 - id: lobby
   plugin: lobby
   parent_id: inventoryview
@@ -67,9 +85,18 @@
     # logs in, for a trusted LAN only. BFF_LOGIN_AUTHENTICATION sets it for every build at once.
     authentication: ${BFF_LOGIN_AUTHENTICATION:-ticket}
     online_players: true
+    fighter_info: ${BFF_TW_454_FIGHTER_INFO:-false}
 - id: commands.players
   plugin: commands.players
   parent_id: lobby
   disabled: true
   config:
     protocol: "tw-454/game"
+- id: party
+  plugin: party
+  parent_id: inventoryview
+  config:
+    protocol: tw-454/game
+    max_members: 8
+    invite_timeout_ms: 30000
+    max_pending_invites: 1024

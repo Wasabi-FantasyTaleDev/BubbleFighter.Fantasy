@@ -123,7 +123,7 @@ public sealed class PartyScenarioTests
             PinBytes("refused", PartyPins.Kr1256Refused, (await a.WaitAsync(ca, 119, TimeSpan.FromSeconds(10), ct)).Payload);
             Assert.Single(a.Since(ca));
 
-            // A invites again: the token is new. A refusal with the old token and kind 2 do nothing.
+            // A invites again: the token is new. A stale refusal cannot consume it, nor can a document join.
             ca = a.Cursor; cb = b.Cursor;
             await a.SendAsync(110, [.. Text("partyb"), .. Word(0)], ct, 0);
             var secondPrompt = await b.WaitAsync(cb, 121, TimeSpan.FromSeconds(10), ct);
@@ -133,10 +133,15 @@ public sealed class PartyScenarioTests
             PinBytes("delivered2", PartyPins.Kr1256Delivered, (await a.WaitAsync(ca, 120, TimeSpan.FromSeconds(10), ct)).Payload);
             ca = a.Cursor; cb = b.Cursor;
             await b.SendAsync(111, Word((int)first), ct, 0);
+            // kr-1256 sub_631590 uses kind 2 for recruitment; a non-recruiting target returns visitation failure.
             await b.SendAsync(115, Accept(2), ct, 0);
-            await Task.Delay(500, ct);
+            var rejected = await b.WaitAsync(cb, 123, TimeSpan.FromSeconds(10), ct);
+            var rejection = PacketCodec.Read(tables, "kr-1256", "VisitationFailed", rejected.Payload);
+            Assert.Equal("partya", rejection["nickname"]);
+            Assert.Equal(20u, Convert.ToUInt32(rejection["code"]));
             Assert.Empty(a.Since(ca));
-            Assert.Empty(b.Since(cb));
+            Assert.Single(b.Since(cb));
+            cb = b.Cursor;
 
             // kr-1256 sub_9A8DF0 sends kind 1; kr-1256 sub_9A9710 sends kind 0 for a granted visit.
             await b.SendAsync(115, Accept(acceptKind), ct, 0);

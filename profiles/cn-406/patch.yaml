@@ -1,8 +1,16 @@
 - set:
+    id: dialect.scene-seeds
+    config:
+      # cn-406 sub_473880 consumes seed decisions without adding the equipped weapon's chance.
+      weapon_critical_bonuses: true
+      weapon_workbook_max_bytes: 33554432
+- set:
     id: protocol
     config:
       # Gameplay assignments are audited in opcodes.yaml; catalog guesses remain diagnostic only.
       use_catalog_candidates: false
+      # cn-406 sub_717FF0 sends the empty gcpStartGPK marker before a retained move on an auxiliary connection.
+      auxiliary_prefix: [gcpStartGPK]
 - set:
     id: admin.http
     config:
@@ -14,7 +22,6 @@
 - set:
     id: dialect.messages
     config:
-      server_notices: false
       # This build's customized-key builder and login consumer are not audited; only kr-812's are.
       customized_keys: false
 - set:
@@ -23,35 +30,190 @@
       menu_only: false
       browser_only: false
       supply_items: true
-      horde_lottery: false
-      counted_pve_items: false
+      horde_lottery: true
+      # The mode-16 surfaces are wired by rows 921/923/924-930 (audited from this build's own client: dispatcher
+      # cn-406 sub_700EE0 cases 924-929); the cooperative mode itself stays off through the per-build values below.
+      counted_pve_items: true
       # The zombie battle's team change (S2C 504) reaches cn-406 sub_682280, the counterpart of kr-812
-      # sub_776870; the cooperative zombie mode stays off through zombie_conversion_mode_id: 0.
+      # sub_776870; the death path sends the empty C2S 515 from cn-406 sub_699330.
       zombie_conversion: true
-      pve_points: false
-      rescue_missions: false
-      # Matching is enabled separately after its native selectors are audited.
-      quick_matching: false
-      instant_revival: false
-      tutorial_move_in: false
+      pve_points: true
+      rescue_missions: true
+      # Quick matching: the selectors are audited (ordinary cn-406 sub_56EEC0; dedicated 101/16/13
+      # cn-406 sub_582D10 / cn-406 sub_582F10 / cn-406 sub_583250; requeue cn-406 sub_581EA0) has no cancel
+      # packet - the server expires its queues and tolerates re-requests.
+      quick_matching: true
+      # The audited revival pair (C2S 714 consumable, C2S 925 empty) mounts the shared binding.
+      instant_revival: true
+      # cn-406 sub_57AF10 gates the first-login pirate request (sub_719C10, choice 10) on move readiness.
+      tutorial_move_in: true
 - set:
     id: ingame
     config:
-      # No native instant-revival binding is enabled for this build.
-      instant_revival_item_id: 0
-      lottery_modes: []
-      counted_item_mode_id: 0
-      counted_item_kinds: []
-      counted_immediate_item_kinds: []
-      zombie_conversion_mode_id: 0
-      pve_point_mode_id: 0
-      rescue_mode_id: 0
-      # The shop row is inventory-only here, so nothing can grant the tutorial first-clear gift yet.
-      tutorial_gifts: false
+      # The client's rightRespawn action checks the bag count of item 100443 (cn-406 sub_4E4D80),
+      # matching the legacy bundle's consumable.
+      instant_revival_item_id: 100443
+      # The empty C2S 925 does not establish consumable use; preserve the death-report respawn
+      # timing in pirate rounds (the cn-324 precedent).
+      pve_revival_modes: []
+      lottery_modes: [101, 102, 103]
+      # Stock and currency-only StockSet identities are validated against this build at activation.
+      lottery_grouped_draw: true
+      lottery_items:
+        - {"group": "crew", "item_id": 100207, "display_id": 1012004, "days": 30, "weight": 3, "note": "crew item 100207, native amount 30"}
+        - {"group": "crew", "item_id": 100206, "display_id": 1012003, "days": 30, "weight": 3, "note": "crew item 100206, native amount 30"}
+        - {"group": "crew", "item_id": 100204, "display_id": 1012001, "days": 30, "weight": 3, "note": "crew item 100204, native amount 30"}
+        - {"group": "crew", "item_id": 100203, "display_id": 1012000, "days": 30, "weight": 3, "note": "crew item 100203, native amount 30"}
+        - {"group": "crew", "item_id": 100207, "display_id": 1011999, "days": 1, "weight": 25, "note": "crew item 100207, native amount 1"}
+        - {"group": "crew", "item_id": 100206, "display_id": 1011998, "days": 1, "weight": 25, "note": "crew item 100206, native amount 1"}
+        - {"group": "crew", "item_id": 100204, "display_id": 1011996, "days": 1, "weight": 25, "note": "crew item 100204, native amount 1"}
+        - {"group": "crew", "item_id": 100203, "display_id": 1011995, "days": 1, "weight": 25, "note": "crew item 100203, native amount 1"}
+        - {"group": "crew", "item_id": 100207, "display_id": 1011422, "days": 7, "weight": 12, "note": "crew item 100207, native amount 7"}
+        - {"group": "crew", "item_id": 100206, "display_id": 1011421, "days": 7, "weight": 12, "note": "crew item 100206, native amount 7"}
+        - {"group": "crew", "item_id": 100204, "display_id": 1011419, "days": 7, "weight": 12, "note": "crew item 100204, native amount 7"}
+        - {"group": "crew", "item_id": 100203, "display_id": 1011418, "days": 7, "weight": 12, "note": "crew item 100203, native amount 7"}
+        - {"group": "crew", "item_id": 100207, "display_id": 1011417, "days": 3, "weight": 60, "note": "crew item 100207, native amount 3"}
+        - {"group": "crew", "item_id": 100206, "display_id": 1011416, "days": 3, "weight": 60, "note": "crew item 100206, native amount 3"}
+        - {"group": "crew", "item_id": 100204, "display_id": 1011414, "days": 3, "weight": 60, "note": "crew item 100204, native amount 3"}
+        - {"group": "crew", "item_id": 100203, "display_id": 1011413, "days": 3, "weight": 60, "note": "crew item 100203, native amount 3"}
+        - {"group": "small_parts", "item_id": 100212, "display_id": 1012024, "days": 30, "weight": 3, "note": "small_parts item 100212, native amount 30"}
+        - {"group": "small_parts", "item_id": 100211, "display_id": 1012023, "days": 30, "weight": 3, "note": "small_parts item 100211, native amount 30"}
+        - {"group": "small_parts", "item_id": 100210, "display_id": 1012022, "days": 30, "weight": 3, "note": "small_parts item 100210, native amount 30"}
+        - {"group": "small_parts", "item_id": 100209, "display_id": 1012021, "days": 30, "weight": 3, "note": "small_parts item 100209, native amount 30"}
+        - {"group": "small_parts", "item_id": 100208, "display_id": 1012020, "days": 30, "weight": 3, "note": "small_parts item 100208, native amount 30"}
+        - {"group": "small_parts", "item_id": 100212, "display_id": 1012019, "days": 7, "weight": 12, "note": "small_parts item 100212, native amount 7"}
+        - {"group": "small_parts", "item_id": 100211, "display_id": 1012018, "days": 7, "weight": 12, "note": "small_parts item 100211, native amount 7"}
+        - {"group": "small_parts", "item_id": 100210, "display_id": 1012017, "days": 7, "weight": 12, "note": "small_parts item 100210, native amount 7"}
+        - {"group": "small_parts", "item_id": 100209, "display_id": 1012016, "days": 7, "weight": 12, "note": "small_parts item 100209, native amount 7"}
+        - {"group": "small_parts", "item_id": 100208, "display_id": 1012015, "days": 7, "weight": 12, "note": "small_parts item 100208, native amount 7"}
+        - {"group": "small_parts", "item_id": 100212, "display_id": 1012014, "days": 3, "weight": 60, "note": "small_parts item 100212, native amount 3"}
+        - {"group": "small_parts", "item_id": 100211, "display_id": 1012013, "days": 3, "weight": 60, "note": "small_parts item 100211, native amount 3"}
+        - {"group": "small_parts", "item_id": 100210, "display_id": 1012012, "days": 3, "weight": 60, "note": "small_parts item 100210, native amount 3"}
+        - {"group": "small_parts", "item_id": 100209, "display_id": 1012011, "days": 3, "weight": 60, "note": "small_parts item 100209, native amount 3"}
+        - {"group": "small_parts", "item_id": 100208, "display_id": 1012010, "days": 3, "weight": 60, "note": "small_parts item 100208, native amount 3"}
+        - {"group": "small_parts", "item_id": 100212, "display_id": 1012009, "days": 1, "weight": 25, "note": "small_parts item 100212, native amount 1"}
+        - {"group": "small_parts", "item_id": 100211, "display_id": 1012008, "days": 1, "weight": 25, "note": "small_parts item 100211, native amount 1"}
+        - {"group": "small_parts", "item_id": 100210, "display_id": 1012007, "days": 1, "weight": 25, "note": "small_parts item 100210, native amount 1"}
+        - {"group": "small_parts", "item_id": 100209, "display_id": 1012006, "days": 1, "weight": 25, "note": "small_parts item 100209, native amount 1"}
+        - {"group": "small_parts", "item_id": 100208, "display_id": 1012005, "days": 1, "weight": 25, "note": "small_parts item 100208, native amount 1"}
+        - {"group": "mid_parts", "item_id": 100217, "display_id": 1012044, "days": 30, "weight": 3, "note": "mid_parts item 100217, native amount 30"}
+        - {"group": "mid_parts", "item_id": 100216, "display_id": 1012043, "days": 30, "weight": 3, "note": "mid_parts item 100216, native amount 30"}
+        - {"group": "mid_parts", "item_id": 100215, "display_id": 1012042, "days": 30, "weight": 3, "note": "mid_parts item 100215, native amount 30"}
+        - {"group": "mid_parts", "item_id": 100214, "display_id": 1012041, "days": 30, "weight": 3, "note": "mid_parts item 100214, native amount 30"}
+        - {"group": "mid_parts", "item_id": 100213, "display_id": 1012040, "days": 30, "weight": 3, "note": "mid_parts item 100213, native amount 30"}
+        - {"group": "mid_parts", "item_id": 100217, "display_id": 1012039, "days": 7, "weight": 12, "note": "mid_parts item 100217, native amount 7"}
+        - {"group": "mid_parts", "item_id": 100216, "display_id": 1012038, "days": 7, "weight": 12, "note": "mid_parts item 100216, native amount 7"}
+        - {"group": "mid_parts", "item_id": 100215, "display_id": 1012037, "days": 7, "weight": 12, "note": "mid_parts item 100215, native amount 7"}
+        - {"group": "mid_parts", "item_id": 100214, "display_id": 1012036, "days": 7, "weight": 12, "note": "mid_parts item 100214, native amount 7"}
+        - {"group": "mid_parts", "item_id": 100213, "display_id": 1012035, "days": 7, "weight": 12, "note": "mid_parts item 100213, native amount 7"}
+        - {"group": "mid_parts", "item_id": 100217, "display_id": 1012034, "days": 3, "weight": 60, "note": "mid_parts item 100217, native amount 3"}
+        - {"group": "mid_parts", "item_id": 100216, "display_id": 1012033, "days": 3, "weight": 60, "note": "mid_parts item 100216, native amount 3"}
+        - {"group": "mid_parts", "item_id": 100215, "display_id": 1012032, "days": 3, "weight": 60, "note": "mid_parts item 100215, native amount 3"}
+        - {"group": "mid_parts", "item_id": 100214, "display_id": 1012031, "days": 3, "weight": 60, "note": "mid_parts item 100214, native amount 3"}
+        - {"group": "mid_parts", "item_id": 100213, "display_id": 1012030, "days": 3, "weight": 60, "note": "mid_parts item 100213, native amount 3"}
+        - {"group": "mid_parts", "item_id": 100217, "display_id": 1012029, "days": 1, "weight": 25, "note": "mid_parts item 100217, native amount 1"}
+        - {"group": "mid_parts", "item_id": 100216, "display_id": 1012028, "days": 1, "weight": 25, "note": "mid_parts item 100216, native amount 1"}
+        - {"group": "mid_parts", "item_id": 100215, "display_id": 1012027, "days": 1, "weight": 25, "note": "mid_parts item 100215, native amount 1"}
+        - {"group": "mid_parts", "item_id": 100214, "display_id": 1012026, "days": 1, "weight": 25, "note": "mid_parts item 100214, native amount 1"}
+        - {"group": "mid_parts", "item_id": 100213, "display_id": 1012025, "days": 1, "weight": 25, "note": "mid_parts item 100213, native amount 1"}
+        - {"group": "common", "item_id": 100141, "display_id": 1011441, "days": 7, "weight": 12, "note": "common item 100141, native amount 7"}
+        - {"group": "common", "item_id": 100144, "display_id": 1011591, "days": 3, "weight": 60, "note": "common item 100144, native amount 3"}
+        - {"group": "common", "item_id": 205004, "display_id": 1011674, "quantity": 10, "stackable": true, "weight": 1, "note": "common item 205004, native amount 10"}
+        - {"group": "common", "item_id": 100144, "display_id": 1011566, "days": 7, "weight": 12, "note": "common item 100144, native amount 7"}
+        - {"group": "common", "item_id": 100144, "display_id": 1011565, "days": 1, "weight": 25, "note": "common item 100144, native amount 1"}
+        - {"group": "common", "item_id": 100044, "display_id": 1011506, "days": 1, "weight": 25, "note": "common item 100044, native amount 1"}
+        - {"group": "common", "item_id": 100086, "display_id": 1011505, "days": 1, "weight": 25, "note": "common item 100086, native amount 1"}
+        - {"group": "common", "item_id": 100046, "display_id": 1011504, "days": 1, "weight": 25, "note": "common item 100046, native amount 1"}
+        - {"group": "common", "item_id": 100086, "display_id": 1011502, "days": 3, "weight": 60, "note": "common item 100086, native amount 3"}
+        - {"group": "common", "item_id": 100044, "display_id": 1011483, "days": 3, "weight": 60, "note": "common item 100044, native amount 3"}
+        - {"group": "common", "item_id": 205002, "display_id": 1011473, "quantity": 10, "stackable": true, "weight": 1, "note": "common item 205002, native amount 10"}
+        - {"group": "common", "item_id": 100046, "display_id": 1011446, "days": 3, "weight": 60, "note": "common item 100046, native amount 3"}
+        - {"group": "common", "item_id": 100141, "display_id": 1011443, "days": 3, "weight": 60, "note": "common item 100141, native amount 3"}
+        - {"group": "common", "item_id": 100141, "display_id": 1011440, "days": 1, "weight": 25, "note": "common item 100141, native amount 1"}
+        - {"group": "common", "item_id": 100044, "display_id": 1011305, "days": 7, "weight": 12, "note": "common item 100044, native amount 7"}
+        - {"group": "common", "item_id": 100046, "display_id": 1011301, "days": 7, "weight": 12, "note": "common item 100046, native amount 7"}
+        - {"group": "common", "item_id": 100086, "display_id": 1011299, "days": 7, "weight": 12, "note": "common item 100086, native amount 7"}
+        - {"group": "coin", "display_id": 2100061, "lucci": 100, "weight": 1, "note": "native currency bundle 100"}
+        - {"group": "coin", "display_id": 2100062, "lucci": 300, "weight": 1, "note": "native currency bundle 300"}
+        - {"group": "coin", "display_id": 2100063, "lucci": 500, "weight": 1, "note": "native currency bundle 500"}
+        - {"group": "coin", "display_id": 2100064, "lucci": 1000, "weight": 1, "note": "native currency bundle 1000"}
+        - {"group": "coin", "display_id": 2100065, "lucci": 3000, "weight": 1, "note": "native currency bundle 3000"}
+        - {"group": "coin", "display_id": 2100210, "lucci": 200, "weight": 1, "note": "native currency bundle 200"}
+        - {"group": "coin", "display_id": 2100244, "lucci": 800, "weight": 1, "note": "native currency bundle 800"}
+        - {"group": "coin", "display_id": 2100245, "lucci": 1200, "weight": 1, "note": "native currency bundle 1200"}
+        - {"group": "coin", "display_id": 2100246, "lucci": 1500, "weight": 1, "note": "native currency bundle 1500"}
+        - {"group": "coin", "display_id": 2100247, "lucci": 2000, "weight": 1, "note": "native currency bundle 2000"}
+        - {"group": "coin", "display_id": 2100248, "lucci": 2500, "weight": 1, "note": "native currency bundle 2500"}
+        - {"group": "coin", "display_id": 2100249, "lucci": 3200, "weight": 1, "note": "native currency bundle 3200"}
+        - {"group": "coin", "display_id": 2100544, "lucci": 10, "weight": 1, "note": "native currency bundle 10"}
+        - {"group": "coin", "display_id": 2100582, "lucci": 150, "weight": 1, "note": "native currency bundle 150"}
+        - {"group": "coin", "display_id": 2100583, "lucci": 50, "weight": 1, "note": "native currency bundle 50"}
+        - {"group": "coin", "display_id": 2100605, "lucci": 5000, "weight": 1, "note": "native currency bundle 5000"}
+        - {"group": "coin", "display_id": 2100606, "lucci": 10000, "weight": 1, "note": "native currency bundle 10000"}
+        - {"group": "coin", "display_id": 2110030, "lucci": 8888, "weight": 1, "note": "native currency bundle 8888"}
+        - {"group": "coin", "display_id": 2110044, "lucci": 4000, "weight": 1, "note": "native currency bundle 4000"}
+        - {"group": "coin", "display_id": 2110136, "lucci": 888, "weight": 1, "note": "native currency bundle 888"}
+      # Cooperative zombie boss rooms (16) have no start button in clients before kr-812, as in cn-324; the
+      # server starts them full. Pirate rooms keep their start button here (only the Indonesian builds lack it).
+      auto_start_mode_ids: [16]
+      # Cooperative zombie (mode 16): cn-406 sub_523370/sub_523650 drive three counted
+      # slots; its ItemSpecZombiePve enables 229 shieldMedipack, 146 bazookaPVE and 136 airBomb.
+      # cn-406 sub_433C30 counts grants by kind; booster 101 and grenade supply 17 apply on pickup.
+      counted_item_mode_id: 16
+      counted_item_kinds: [229, 146, 136]
+      counted_item_slot_count: 3
+      counted_immediate_item_kinds: [101, 17]
+      # Death with no lives left sends the empty C2S 515 (cn-406 sub_699330); the server answers
+      # S2C 504 with team 15 and cn-406 sub_69A9D0 performs the conversion.
+      zombie_conversion_mode_id: 16
+      zombie_round_time_limit_ms: 600000
+      # cn-406 sub_519F70 loads serverPangScoreUnitnum into NPC+47140; cn-406 sub_518670 reports it.
+      # Own AiFighterConfig maps ZombiePve units to 0..15; awards use the shared server policy.
+      pve_point_mode_id: 16
+      # Rescue scheduling: mission ids pair MissionInfo_Clt.xml grade-1 rows with the map INIs' citizen
+      # names; the first start follows the client's own 20000 ms balloon cadence and six 27500 ms cycles
+      # fit before the boss at 185000 (rescue_stop_time_ms). Duration and cooldown are reconstruction.
+      rescue_mode_id: 16
+      rescue_start_times_ms: [20000, 47500, 75000, 102500, 130000, 157500]
+      rescue_duration_ms: 20000
+      rescue_cooldown_ms: 7500
+      rescue_stop_time_ms: 185000
+      rescue_mission_ids: [1, 4, 7, 10, 13, 16, 19, 22]
+      # 13 is Mos (ms_citizen5), 16 Ethi (ms_citizen6), 19 Marid (ms_citizen7) and 22 Uni (ms_citizen4)
+      # per the map INI's CHR_PROPERTY comments.
+      rescue_citizen_names: [ms_citizen, ms_citizen1, ms_citizen2, ms_citizen3, ms_citizen5, ms_citizen6, ms_citizen7, ms_citizen4]
+      # Native mission-zombie group sizes per map (CHR_MS_RAND_SPAWNER_G_0..5); rel_zombie04_1_Oneway
+      # declares MAXINGAMEMISSIONCNT=0.
+      rescue_map_enemy_counts:
+        - map_key: rel_zombie_01
+          enemy_counts: [2, 3, 3, 3, 4, 4]
+        - map_key: rel_zombie02_Twobridge
+          enemy_counts: [2, 3, 3, 3, 4, 4]
+        - map_key: rel_zombie03_Circle
+          enemy_counts: [2, 3, 3, 4, 4, 4]
+        - map_key: rel_zombie04_1_Oneway
+          enemy_counts: []
+        - map_key: rel_zombie04_Oneway
+          enemy_counts: [2, 2, 3, 3, 4, 4]
+        - map_key: rel_zombie05_Tear
+          enemy_counts: [2, 2, 3, 3, 4, 4]
+        - map_key: rel_zombie06_Frontal
+          enemy_counts: [2, 2, 3, 3, 4, 4]
+      # The tutorial first-clear gift: cn-406's MapMeta carries IsItemAward on all 24 numbered
+      # sin_mission_* stages (prologue's StockSet 2110130 sits at stageNum 0 and never reaches this
+      # flow), and every gift id resolves in this build's own ShopItem2 workbook with valid terms.
+      tutorial_gifts: true
+
+# The full item shop. The catalog reply (S2C 800) is written from this build's inherited shop.catalog
+# values (packets/builds.yaml, id-400's token / u16 stocks / landing_defaults / main / none variant);
+# purchases charge the stored wallet and grant the bag through the legacy bundle's grant_purchased_items;
+# the empty C2S 825 cash check (builds.yaml cash_check_request) answers with the S2C 105 stat the waiting
+# dialog resumes on. The gift box runs on the audited present rows: all sixteen are verified and the
+# four one-pair readings (no badge words) are stated in packets/present.yaml's except lists.
 - set:
     id: shop
     config:
-      inventory_only: true
+      present_box: true
 
 # Life-counted items: this build's executable has no "endurance" ShopItem duration type (no item kind 3) and no Life
 # notice text, so the daily life rule and life stock are off (packets/builds.yaml life_items: false).
@@ -63,9 +225,11 @@
     id: shop
     config:
       life_items: false
-# No party opcode row is reviewed into this build's table: the party packets stay unbound.
-- remove: party
 - set:
-    id: dialect.messages
+    id: dialect.rooms
     config:
-      party: false
+      plaza_recruitment: true
+- set:
+    id: ingame
+    config:
+      plaza_recruitment: true

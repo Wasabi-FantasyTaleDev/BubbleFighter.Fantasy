@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Kernel;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -8,7 +9,45 @@ namespace BubbleFighter.Fantasy.Kernel.Tests;
 
 public sealed class PacketRouterDrainTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RouterDecoratorsRequireExplicitDeploymentOptIn(bool enabled)
+    {
+        var services = new ServiceRegistry();
+        var context = new PluginContext(new PluginRow
+        {
+            Id = "router", Plugin = "core.packet-router", Source = "test",
+            Config = new Dictionary<string, object?> { ["decoratable"] = enabled },
+        }, services, new EventBus(NullLogger.Instance), NullLogger.Instance);
+        try
+        {
+            await new PacketRouterPlugin().ActivateAsync(context, default);
+            if (enabled)
+            {
+                var observed = false;
+                using var decorator = services.Decorate<IPacketRouter>(inner => new ForwardingRouter(inner, () => observed = true));
+                var router = services.Get<IPacketRouter>();
+                using var handler = router.Register("p", 7, (_, _, _) => ValueTask.CompletedTask);
+                await router.DispatchAsync("p", new MessageRouterTests.Session(), Packet, default);
+                Assert.True(observed);
+            }
+            else Assert.Throws<InvalidOperationException>(() => services.Decorate<IPacketRouter>(inner => inner));
+        }
+        finally { await context.UnwindAsync(); }
+    }
+
     private static readonly InboundPacket Packet = new(7, ReadOnlyMemory<byte>.Empty);
+
+    private sealed class ForwardingRouter(IPacketRouter inner, Action observed) : IPacketRouter
+    {
+        public IDisposable Register(string protocolName, ushort opcode, PacketHandler handler) => inner.Register(protocolName, opcode, handler);
+        public ValueTask DispatchAsync(string protocolName, ISession session, InboundPacket packet, CancellationToken ct)
+        {
+            observed();
+            return inner.DispatchAsync(protocolName, session, packet, ct);
+        }
+    }
 
     private static PacketRouterPlugin.PacketRouter Router(TimeSpan drain) =>
         new(new EventBus(NullLogger.Instance), drain, NullLogger.Instance);

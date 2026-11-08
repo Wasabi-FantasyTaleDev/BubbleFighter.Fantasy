@@ -84,6 +84,7 @@ export function wireRule(rule, types) {
   return {
     id: rule.id, type: rule.type, builds: [...rule.builds],
     ...(field === 'version' ? { version: rule.version.trim() } : {}),
-    ...(field === 'sources' ? { sources: [...rule.sources] } : {})
+    ...(field === 'sources' ? { sources: [...rule.sources] } : {}),
+    ...(rule.type === 'recommend' && typeof rule.defaultSelected === 'boolean' ? { defaultSelected: rule.defaultSelected } : {})
   }
 }

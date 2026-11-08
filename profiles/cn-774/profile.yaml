@@ -10,6 +10,10 @@ experimental: true
 parent: kr-1256
 description: Chinese 2019 client build, ClientVersion_Major 774.
 vars:
+  # No audited native server notice consumer; rejected home returns remain logged.
+  MIGRATION_HOME_NOTICE: "false"
+  # The game port players reach; the migration destination advertises it.
+  GAME_PUBLIC_PORT: "${CN_774_PUBLIC_PORT:-7190}"
   BFF_MODERN_RELAY_PORT: "${CN_774_RELAY_PORT:-7191}"
   BFF_MODERN_RELAY_PUBLIC_PORT: "${CN_774_RELAY_PUBLIC_PORT:-7191}"
 bundles:

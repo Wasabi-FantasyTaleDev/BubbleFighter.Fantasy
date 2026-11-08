@@ -1,0 +1,338 @@
+# The DynamicConfig content kr-1256 is served: one entry per registry bit, each
+# naming its schema in packets/dynamic-config.yaml and carrying the content rows that schema
+# marshals. The values are stated decoded, field by field, so
+# marshaling them reproduces those bodies byte for byte. Operators edit these rows to change
+# what the server serves; a bit whose schema or content is missing is simply not served (the
+# client applies the set bits in ascending order and abandons the frame at the first bad one).
+# This file deliberately uses the .yml suffix: the packets directory's schema reader reads
+# *.yaml layout files only, and these rows are content, not a layout.
+# kr-1254 decoder evidence per slot is cited in packets/dynamic-config.yaml; the kr-1256
+# registration sites are listed at DynamicConfigReply there.
+slots:
+          1:
+            schema: PartyLadderContext
+            content:
+              flag_a: 1
+              flag_b: 0
+              unknown_8: 3
+              unknown_9: 15
+              unknown_11: 16
+
+          2:
+            schema: SeasonLadderContext
+            content:
+              flag_0: 0
+              unknown_4: 1
+              flag_6: 0
+              flag_10: 0
+              unknown_14: 3
+              unknown_15: 1
+              flag_17: 1
+              # The season-ladder payout table: the table maps every item id to
+              # itself with the enable flag 1.
+              payout_map: [{key: 100418, unknown_4: 100418, unknown_8: 1}, {key: 100419, unknown_4: 100419, unknown_8: 1}, {key: 100420, unknown_4: 100420, unknown_8: 1}, {key: 100421, unknown_4: 100421, unknown_8: 1}, {key: 100422, unknown_4: 100422, unknown_8: 1}, {key: 100530, unknown_4: 100530, unknown_8: 1}, {key: 100531, unknown_4: 100531, unknown_8: 1}, {key: 100532, unknown_4: 100532, unknown_8: 1}, {key: 100533, unknown_4: 100533, unknown_8: 1}, {key: 100534, unknown_4: 100534, unknown_8: 1}, {key: 100553, unknown_4: 100553, unknown_8: 1}, {key: 100554, unknown_4: 100554, unknown_8: 1}, {key: 100555, unknown_4: 100555, unknown_8: 1}, {key: 100556, unknown_4: 100556, unknown_8: 1}, {key: 100557, unknown_4: 100557, unknown_8: 1}, {key: 100685, unknown_4: 100685, unknown_8: 1}, {key: 100686, unknown_4: 100686, unknown_8: 1}, {key: 100687, unknown_4: 100687, unknown_8: 1}, {key: 100688, unknown_4: 100688, unknown_8: 1}, {key: 100689, unknown_4: 100689, unknown_8: 1}, {key: 100717, unknown_4: 100717, unknown_8: 1}, {key: 100718, unknown_4: 100718, unknown_8: 1}, {key: 100719, unknown_4: 100719, unknown_8: 1}, {key: 100720, unknown_4: 100720, unknown_8: 1}, {key: 100721, unknown_4: 100721, unknown_8: 1}, {key: 100722, unknown_4: 100722, unknown_8: 1}, {key: 100723, unknown_4: 100723, unknown_8: 1}, {key: 100724, unknown_4: 100724, unknown_8: 1}, {key: 100725, unknown_4: 100725, unknown_8: 1}, {key: 100726, unknown_4: 100726, unknown_8: 1}, {key: 100762, unknown_4: 100762, unknown_8: 1}, {key: 100763, unknown_4: 100763, unknown_8: 1}, {key: 100764, unknown_4: 100764, unknown_8: 1}, {key: 100765, unknown_4: 100765, unknown_8: 1}, {key: 100766, unknown_4: 100766, unknown_8: 1}, {key: 100767, unknown_4: 100767, unknown_8: 1}, {key: 100768, unknown_4: 100768, unknown_8: 1}, {key: 100862, unknown_4: 100862, unknown_8: 1}, {key: 100863, unknown_4: 100863, unknown_8: 1}, {key: 100864, unknown_4: 100864, unknown_8: 1}, {key: 100865, unknown_4: 100865, unknown_8: 1}, {key: 100866, unknown_4: 100866, unknown_8: 1}, {key: 100900, unknown_4: 100900, unknown_8: 1}, {key: 100901, unknown_4: 100901, unknown_8: 1}, {key: 100902, unknown_4: 100902, unknown_8: 1}, {key: 100903, unknown_4: 100903, unknown_8: 1}, {key: 100904, unknown_4: 100904, unknown_8: 1}, {key: 100941, unknown_4: 100941, unknown_8: 1}, {key: 100942, unknown_4: 100942, unknown_8: 1}, {key: 100943, unknown_4: 100943, unknown_8: 1}, {key: 100944, unknown_4: 100944, unknown_8: 1}, {key: 100945, unknown_4: 100945, unknown_8: 1}, {key: 100956, unknown_4: 100956, unknown_8: 1}, {key: 100957, unknown_4: 100957, unknown_8: 1}, {key: 100958, unknown_4: 100958, unknown_8: 1}, {key: 100959, unknown_4: 100959, unknown_8: 1}, {key: 100960, unknown_4: 100960, unknown_8: 1}, {key: 101023, unknown_4: 101023, unknown_8: 1}, {key: 101024, unknown_4: 101024, unknown_8: 1}, {key: 101025, unknown_4: 101025, unknown_8: 1}, {key: 101026, unknown_4: 101026, unknown_8: 1}, {key: 101027, unknown_4: 101027, unknown_8: 1}, {key: 101175, unknown_4: 101175, unknown_8: 1}, {key: 101176, unknown_4: 101176, unknown_8: 1}, {key: 101177, unknown_4: 101177, unknown_8: 1}, {key: 101178, unknown_4: 101178, unknown_8: 1}, {key: 101179, unknown_4: 101179, unknown_8: 1}, {key: 101214, unknown_4: 101214, unknown_8: 1}, {key: 101215, unknown_4: 101215, unknown_8: 1}, {key: 101216, unknown_4: 101216, unknown_8: 1}, {key: 101217, unknown_4: 101217, unknown_8: 1}, {key: 101218, unknown_4: 101218, unknown_8: 1}, {key: 110075, unknown_4: 110075, unknown_8: 1}, {key: 110076, unknown_4: 110076, unknown_8: 1}, {key: 110077, unknown_4: 110077, unknown_8: 1}, {key: 110078, unknown_4: 110078, unknown_8: 1}, {key: 110079, unknown_4: 110079, unknown_8: 1}, {key: 110090, unknown_4: 110090, unknown_8: 1}, {key: 110091, unknown_4: 110091, unknown_8: 1}, {key: 110092, unknown_4: 110092, unknown_8: 1}, {key: 110093, unknown_4: 110093, unknown_8: 1}, {key: 110094, unknown_4: 110094, unknown_8: 1}, {key: 110096, unknown_4: 110096, unknown_8: 1}, {key: 110097, unknown_4: 110097, unknown_8: 1}, {key: 110098, unknown_4: 110098, unknown_8: 1}, {key: 110099, unknown_4: 110099, unknown_8: 1}, {key: 110100, unknown_4: 110100, unknown_8: 1}, {key: 190076, unknown_4: 190076, unknown_8: 1}, {key: 201014, unknown_4: 201014, unknown_8: 3}, {key: 201024, unknown_4: 201024, unknown_8: 1}, {key: 201044, unknown_4: 201044, unknown_8: 1}, {key: 201075, unknown_4: 201075, unknown_8: 1}, {key: 201127, unknown_4: 201127, unknown_8: 1}, {key: 202016, unknown_4: 202016, unknown_8: 3}, {key: 202025, unknown_4: 202025, unknown_8: 1}, {key: 202034, unknown_4: 202034, unknown_8: 1}, {key: 202044, unknown_4: 202044, unknown_8: 1}, {key: 202127, unknown_4: 202127, unknown_8: 1}, {key: 203016, unknown_4: 203016, unknown_8: 3}, {key: 203024, unknown_4: 203024, unknown_8: 1}, {key: 203034, unknown_4: 203034, unknown_8: 1}, {key: 203044, unknown_4: 203044, unknown_8: 1}, {key: 203127, unknown_4: 203127, unknown_8: 1}, {key: 204015, unknown_4: 204015, unknown_8: 3}, {key: 204026, unknown_4: 204026, unknown_8: 1}, {key: 204034, unknown_4: 204034, unknown_8: 1}, {key: 204044, unknown_4: 204044, unknown_8: 1}, {key: 204127, unknown_4: 204127, unknown_8: 1}, {key: 205002, unknown_4: 205002, unknown_8: 2}, {key: 205003, unknown_4: 205003, unknown_8: 2}, {key: 205004, unknown_4: 205004, unknown_8: 2}, {key: 205005, unknown_4: 205005, unknown_8: 2}, {key: 205006, unknown_4: 205006, unknown_8: 2}, {key: 205007, unknown_4: 205007, unknown_8: 2}, {key: 205009, unknown_4: 205009, unknown_8: 2}, {key: 205010, unknown_4: 205010, unknown_8: 2}, {key: 205012, unknown_4: 205012, unknown_8: 2}, {key: 205013, unknown_4: 205013, unknown_8: 2}, {key: 205014, unknown_4: 205014, unknown_8: 2}, {key: 205017, unknown_4: 205017, unknown_8: 2}, {key: 205018, unknown_4: 205018, unknown_8: 2}, {key: 205020, unknown_4: 205020, unknown_8: 2}, {key: 205021, unknown_4: 205021, unknown_8: 2}, {key: 205022, unknown_4: 205022, unknown_8: 2}, {key: 205024, unknown_4: 205024, unknown_8: 2}, {key: 205025, unknown_4: 205025, unknown_8: 2}, {key: 205030, unknown_4: 205030, unknown_8: 2}, {key: 205031, unknown_4: 205031, unknown_8: 2}, {key: 205033, unknown_4: 205033, unknown_8: 3}, {key: 205034, unknown_4: 205034, unknown_8: 2}, {key: 205035, unknown_4: 205035, unknown_8: 2}, {key: 205039, unknown_4: 205039, unknown_8: 2}, {key: 205040, unknown_4: 205040, unknown_8: 2}, {key: 205042, unknown_4: 205042, unknown_8: 2}, {key: 205043, unknown_4: 205043, unknown_8: 2}, {key: 205048, unknown_4: 205048, unknown_8: 2}, {key: 205050, unknown_4: 205050, unknown_8: 2}, {key: 205051, unknown_4: 205051, unknown_8: 2}, {key: 205052, unknown_4: 205052, unknown_8: 2}, {key: 205053, unknown_4: 205053, unknown_8: 2}, {key: 205054, unknown_4: 205054, unknown_8: 2}, {key: 205056, unknown_4: 205056, unknown_8: 2}, {key: 205058, unknown_4: 205058, unknown_8: 2}, {key: 205060, unknown_4: 205060, unknown_8: 2}, {key: 205067, unknown_4: 205067, unknown_8: 2}, {key: 205068, unknown_4: 205068, unknown_8: 2}, {key: 205073, unknown_4: 205073, unknown_8: 2}, {key: 205074, unknown_4: 205074, unknown_8: 2}, {key: 205075, unknown_4: 205075, unknown_8: 2}, {key: 205098, unknown_4: 205098, unknown_8: 2}, {key: 207001, unknown_4: 207001, unknown_8: 3}, {key: 207015, unknown_4: 207015, unknown_8: 1}, {key: 207016, unknown_4: 207016, unknown_8: 1}, {key: 207017, unknown_4: 207017, unknown_8: 1}, {key: 207018, unknown_4: 207018, unknown_8: 1}, {key: 207019, unknown_4: 207019, unknown_8: 1}, {key: 207023, unknown_4: 207023, unknown_8: 1}, {key: 207024, unknown_4: 207024, unknown_8: 1}, {key: 207026, unknown_4: 207026, unknown_8: 1}, {key: 207038, unknown_4: 207038, unknown_8: 1}, {key: 207048, unknown_4: 207048, unknown_8: 1}, {key: 207055, unknown_4: 207055, unknown_8: 1}, {key: 207056, unknown_4: 207056, unknown_8: 1}, {key: 207914, unknown_4: 207914, unknown_8: 1}, {key: 207972, unknown_4: 207972, unknown_8: 2}, {key: 300001, unknown_4: 300001, unknown_8: 3}, {key: 300002, unknown_4: 300002, unknown_8: 2}, {key: 300003, unknown_4: 300003, unknown_8: 2}, {key: 300004, unknown_4: 300004, unknown_8: 2}, {key: 300005, unknown_4: 300005, unknown_8: 2}, {key: 300006, unknown_4: 300006, unknown_8: 2}, {key: 300007, unknown_4: 300007, unknown_8: 2}, {key: 300008, unknown_4: 300008, unknown_8: 2}, {key: 300010, unknown_4: 300010, unknown_8: 2}, {key: 300011, unknown_4: 300011, unknown_8: 2}, {key: 300012, unknown_4: 300012, unknown_8: 2}, {key: 300014, unknown_4: 300014, unknown_8: 2}, {key: 300019, unknown_4: 300019, unknown_8: 2}, {key: 301001, unknown_4: 301001, unknown_8: 2}, {key: 301002, unknown_4: 301002, unknown_8: 2}, {key: 301003, unknown_4: 301003, unknown_8: 2}, {key: 301004, unknown_4: 301004, unknown_8: 2}, {key: 301005, unknown_4: 301005, unknown_8: 2}, {key: 301006, unknown_4: 301006, unknown_8: 2}, {key: 301007, unknown_4: 301007, unknown_8: 2}, {key: 301008, unknown_4: 301008, unknown_8: 2}, {key: 301009, unknown_4: 301009, unknown_8: 2}, {key: 301010, unknown_4: 301010, unknown_8: 2}, {key: 301011, unknown_4: 301011, unknown_8: 2}, {key: 301012, unknown_4: 301012, unknown_8: 2}, {key: 301013, unknown_4: 301013, unknown_8: 2}, {key: 301014, unknown_4: 301014, unknown_8: 2}, {key: 301015, unknown_4: 301015, unknown_8: 2}, {key: 301016, unknown_4: 301016, unknown_8: 2}, {key: 301017, unknown_4: 301017, unknown_8: 2}, {key: 301018, unknown_4: 301018, unknown_8: 2}, {key: 301019, unknown_4: 301019, unknown_8: 2}, {key: 301020, unknown_4: 301020, unknown_8: 2}, {key: 301021, unknown_4: 301021, unknown_8: 2}, {key: 301022, unknown_4: 301022, unknown_8: 2}, {key: 301023, unknown_4: 301023, unknown_8: 2}, {key: 301024, unknown_4: 301024, unknown_8: 2}, {key: 301025, unknown_4: 301025, unknown_8: 2}, {key: 301026, unknown_4: 301026, unknown_8: 2}]
+              vec_a: [102978, 102640, 102274, 103244, 190222, 190321, 103077, 103078, 103265, 103266, 103290, 120626, 101988, 102974, 103243, 101923, 101996, 190241, 102611, 102615, 100017, 100112, 100312, 100398, 100679, 101046, 101918, 101955, 101990, 102326, 102360, 102816, 103280, 103305, 103373, 103376, 103388, 103441, 103475, 103618, 103619, 103620, 103621, 103622, 103623, 103672, 103992, 103996, 103997, 104002, 104032, 104033, 104034, 104085, 104086, 104087, 104050]
+              fixed_0: 201014
+              fixed_1: 202016
+              fixed_2: 203016
+              fixed_3: 204015
+              fixed_4: 207001
+              fixed_5: 205033
+              fixed_6: 300001
+              vec_pairs: []
+              vec_b: [31]
+              marker: 58
+              flag_block_0: 0
+              flag_block_1: 0
+              flag_block_2: 1
+              flag_block_3: 0
+              flag_block_4: 1
+              flag_block_5: 1
+              flag_block_6: 1
+              unknown_tail: 0
+
+          3:
+            schema: LobbyMinigameContext
+            content:
+              flag_a: 1
+              unknown_4: 50
+              unknown_6: 2000
+              unknown_8: 500
+              unknown_10: 4000
+              flag_12: 1
+              unknown_16: 400
+              unknown_18: 400
+              unknown_20: 120
+              unknown_22: 10
+              unknown_24: 15
+              unknown_26: 8
+              unknown_28: 190083
+              unknown_32: 101606
+              flag_36: 1
+              unknown_40: 200
+
+          4:
+            schema: MysteryStoreContext
+            content:
+              start: 43177.0 # OLE date: 2018-03-18
+              end: 43202.0 # OLE date: 2018-04-12
+
+          5:
+            schema: BubblePointStoreContext
+            content:
+              item_id: 101825
+              label: "버블포인트"
+              dlg_path: "Ui/BubblePointStore/DlgBubblePointStore.ui"
+              card_path: "Ui/BubblePointStore/UiBubblePointDPCard.ui"
+              unknown_tail_a: 0
+              unknown_tail_b: 0
+
+          6:
+            schema: MatchDeskContext
+            content:
+              entries:
+                - desk_id: 2
+                  kind_a: 1
+                  kind_b: 10
+                  unknown_6: 3000
+                  unknown_8: 100
+                  unknown_10: 2000
+                  unknown_12: 12000
+                  mode_ids: [1002]
+                  flag_a: 0
+                  rotations:
+                    - mode_id: 1002
+                      maps: []
+                  flag_b: 0
+                  unknown_44: 0
+                  unknown_48: 64
+                  unknown_52: 1
+                  flag_c: 0
+                - desk_id: 3
+                  kind_a: 1
+                  kind_b: 10
+                  unknown_6: 3000
+                  unknown_8: 100
+                  unknown_10: 2000
+                  unknown_12: 12000
+                  mode_ids: [1003]
+                  flag_a: 0
+                  rotations:
+                    - mode_id: 1003
+                      maps: []
+                  flag_b: 0
+                  unknown_44: 0
+                  unknown_48: 64
+                  unknown_52: 1
+                  flag_c: 0
+                - desk_id: 203
+                  kind_a: 2
+                  kind_b: 8
+                  unknown_6: 3000
+                  unknown_8: 100
+                  unknown_10: 2000
+                  unknown_12: 12000
+                  mode_ids: [3003]
+                  flag_a: 0
+                  rotations:
+                    - mode_id: 3003
+                      maps: []
+                  flag_b: 0
+                  unknown_44: 0
+                  unknown_48: 16
+                  unknown_52: 1
+                  flag_c: 0
+                - desk_id: 537
+                  kind_a: 4
+                  kind_b: 23
+                  unknown_6: 3000
+                  unknown_8: 100
+                  unknown_10: 2000
+                  unknown_12: 12000
+                  mode_ids: [10016]
+                  flag_a: 0
+                  rotations:
+                    - mode_id: 10016
+                      maps: []
+                  flag_b: 0
+                  unknown_44: 0
+                  unknown_48: 4096
+                  unknown_52: 43
+                  flag_c: 0
+                - desk_id: 502
+                  kind_a: 4
+                  kind_b: 70
+                  unknown_6: 3000
+                  unknown_8: 100
+                  unknown_10: 2000
+                  unknown_12: 12000
+                  mode_ids: [10010]
+                  flag_a: 1
+                  rotations:
+                    - mode_id: 10010
+                      maps: ["rel_Sudden08_Finalzone", "rel_Sudden00_Survival", "rel_Sudden07_Apartment", "rel_Village00_boomhill", "rel_Desert00_beguy", "rel_Forest00_floopy"]
+                  flag_b: 0
+                  unknown_44: 0
+                  unknown_48: 4096
+                  unknown_52: 30
+                  flag_c: 0
+                - desk_id: 505
+                  kind_a: 4
+                  kind_b: 71
+                  unknown_6: 3000
+                  unknown_8: 100
+                  unknown_10: 2000
+                  unknown_12: 12000
+                  mode_ids: [10012]
+                  flag_a: 0
+                  rotations:
+                    - mode_id: 10012
+                      maps: []
+                  flag_b: 0
+                  unknown_44: 0
+                  unknown_48: 4096
+                  unknown_52: 44
+                  flag_c: 0
+                - desk_id: 52
+                  kind_a: 3
+                  kind_b: 11
+                  unknown_6: 3000
+                  unknown_8: 100
+                  unknown_10: 2000
+                  unknown_12: 12000
+                  mode_ids: [1035]
+                  flag_a: 0
+                  rotations:
+                    - mode_id: 1035
+                      maps: []
+                  flag_b: 0
+                  unknown_44: 0
+                  unknown_48: 131072
+                  unknown_52: 1
+                  flag_c: 0
+
+          8:
+            schema: PirateAssaultContext
+            content:
+              tiers:
+                - tier_key: 0
+                  ops:
+                    - op_code: 1
+                      unknown_4: 1
+                      operand: 10.0
+                      op_name: "add"
+                      second_operand: 0.20000000298023224
+                      second_op_name: "add"
+                    - op_code: 2
+                      unknown_4: 100
+                      operand: 1.100000023841858
+                      op_name: "multiply"
+                      second_operand: 0.20000000298023224
+                      second_op_name: "add"
+                - tier_key: 1
+                  ops:
+                    - op_code: 1
+                      unknown_4: 1
+                      operand: 10.0
+                      op_name: "add"
+                      second_operand: 0.004999999888241291
+                      second_op_name: "add"
+                    - op_code: 2
+                      unknown_4: 100
+                      operand: 1.100000023841858
+                      op_name: "multiply"
+                      second_operand: 0.004999999888241291
+                      second_op_name: "add"
+                - tier_key: 2
+                  ops:
+                    - op_code: 1
+                      unknown_4: 1
+                      operand: 10.0
+                      op_name: "add"
+                      second_operand: 0.05000000074505806
+                      second_op_name: "add"
+                    - op_code: 2
+                      unknown_4: 100
+                      operand: 1.100000023841858
+                      op_name: "multiply"
+                      second_operand: 0.05000000074505806
+                      second_op_name: "add"
+                - tier_key: 3
+                  ops:
+                    - op_code: 1
+                      unknown_4: 1
+                      operand: 10.0
+                      op_name: "add"
+                      second_operand: 0.0010000000474974513
+                      second_op_name: "add"
+                    - op_code: 2
+                      unknown_4: 100
+                      operand: 1.100000023841858
+                      op_name: "multiply"
+                      second_operand: 0.0010000000474974513
+                      second_op_name: "add"
+                - tier_key: 4
+                  ops:
+                    - op_code: 1
+                      unknown_4: 1
+                      operand: 10.0
+                      op_name: "add"
+                      second_operand: 2.0
+                      second_op_name: "add"
+                    - op_code: 2
+                      unknown_4: 100
+                      operand: 1.100000023841858
+                      op_name: "multiply"
+                      second_operand: 2.0
+                      second_op_name: "add"
+                - tier_key: 5
+                  ops:
+                    - op_code: 1
+                      unknown_4: 1
+                      operand: 10.0
+                      op_name: "add"
+                      second_operand: 0.0020000000949949026
+                      second_op_name: "add"
+                    - op_code: 2
+                      unknown_4: 100
+                      operand: 1.100000023841858
+                      op_name: "multiply"
+                      second_operand: 0.0020000000949949026
+                      second_op_name: "add"
+              binding_flag: 1
+              binding_map_key: 1001
+              binding_map_name: "rel_NPCpirateclassic02_portVillage04"
+              binding_count: 4
+
+          9:
+            schema: TwirlingRouletteContext
+            content:
+              start: 42361.0 # OLE date: 2015-12-23
+              end: 58317.0 # OLE date: 2059-08-30
+              flag: 1
+
+          12:
+            schema: SeasonArenaContext
+            content:
+              arena_count: 256
+              # The words are F3E00008 EECC3DFA FFF2F187 000007FE 00000000 00000000 00140000 00000400.
+              bitmask: [4091543560, 4006362618, 4294111623, 2046, 0, 0, 1310720, 1024]
+
+          13:
+            schema: LuxuryClubContext
+            content:
+              state: 1
+
+          14:
+            schema: CreationContent
+            # ui_path and character_types are not restated here: the creation block supplies them
+            # from the lobby config so the form and the wire stay one decision.
+            content:
+              preview_overrides: [{unknown_16: 10, unknown_20: 2003651}, {unknown_16: 19, unknown_20: 2003652}, {unknown_16: 25, unknown_20: 2003653}, {unknown_16: 27, unknown_20: 2003654}]
+              unknown_52: 1049974101 # f32 0.293
+              unknown_56: 110
+
+          16:
+            schema: GameSpecPatch
+            content:
+              marker: 186 # 0xBA, the no-patch marker

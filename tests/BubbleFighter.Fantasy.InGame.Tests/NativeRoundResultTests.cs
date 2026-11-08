@@ -28,14 +28,15 @@ public sealed class NativeRoundResultTests
         var profile = TestWireDialects.Get(build).Profile;
         var table = OpcodeTableLoader.Load(Path.Combine(Directory.GetParent(SharedDialectRows.PacketsDirectory())!.FullName,
             "profiles", build, "opcodes.yaml"), profile);
-        var adapter = new RoundResultBinding(build + "/game", table, packets, build, [1], NullLogger.Instance);
+        var binding = new RoundResultBinding(build + "/game", table, packets, build, [1], NullLogger.Instance);
         var context = new PluginContext(new PluginRow { Id = "result", Plugin = "result", Source = "test" },
             new ServiceRegistry(), new EventBus(NullLogger.Instance), NullLogger.Instance);
         try
         {
             await new PacketRouterPlugin().ActivateAsync(context, default);
             await new MessageRouterPlugin().ActivateAsync(context, default);
-            adapter.Mount(context);
+            binding.Mount(context);
+            var adapter = Assert.IsType<RoundResultSender>(Assert.Single(context.Services.GetAll<IMessageSender<RoundScoreboard>>()));
             var code = table.S2C(build == "kr-1256" ? "Unknown614" : "gspRoundScoreboard_");
             foreach (var winner in new[] { 0, 1, 2 })
             {
@@ -89,8 +90,8 @@ public sealed class NativeRoundResultTests
                 return ValueTask.CompletedTask;
             }));
             new RoomCommandsBinding(protocol, table, tables, build, NullLogger.Instance, roundsBound: true).Mount(binding);
-            var adapter = new RoundResultBinding(protocol, table, tables, build, [1], NullLogger.Instance);
-            adapter.Mount(binding);
+            new RoundResultBinding(protocol, table, tables, build, [1], NullLogger.Instance).Mount(binding);
+            var adapter = Assert.IsType<RoundResultSender>(Assert.Single(services.GetAll<IMessageSender<RoundScoreboard>>()));
             Assert.True(adapter.EndBeforeScoreboard);
             Assert.True(adapter.SingleScoreboard);
 

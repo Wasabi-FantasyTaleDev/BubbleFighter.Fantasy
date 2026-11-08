@@ -10,6 +10,12 @@ public sealed record InventoryWearGroup(int FirstItemId, int LastItemId, int Leg
     /// <summary>Gets the explicit item identities sharing a client body part or accessory slot, or null for a numeric position.</summary>
     public IReadOnlyList<int>? ItemIds { get; init; }
 
+    /// <summary>
+    /// Gets whether wearing another item in an occupied position is refused within the inventory transaction.
+    /// Rewearing the current item and removing an item remain allowed; ordinary positions still replace their occupant.
+    /// </summary>
+    public bool RejectWhenOccupied { get; init; }
+
     /// <summary>Tests whether the item belongs to this equipment position.</summary>
     public bool Contains(int itemId) => ItemIds is { } ids ? ids.Contains(itemId) : itemId >= FirstItemId && itemId <= LastItemId;
 }
@@ -21,13 +27,13 @@ public static class InventoryWearSelection
     /// Normalizes exclusive positions and optionally changes one owned item's worn state.
     /// Character-bag selections take precedence; the legacy update snapshot is consulted only for an empty position.
     /// Input order breaks historical duplicate selections; stores may order it by last update time.
-    /// Unknown flag bits are preserved. An unknown requested item returns null before any changes.
+    /// Unknown flag bits are preserved. An unknown requested item or a forbidden occupied position returns null before any changes.
     /// </summary>
     /// <param name="rows">The complete both-bag snapshot to rewrite; the character bag is authoritative and is not modified.</param>
     /// <param name="groups">The position rules. Numeric ranges must be positive, mutually disjoint and contain their legacy default.</param>
     /// <param name="itemId">The item whose worn state changes, or null to repair the current selections only.</param>
     /// <param name="worn">The target worn state of <paramref name="itemId"/> when it is given.</param>
-    /// <returns>Every input row with its worn bit rewritten, or null when the requested item is not in the character bag.</returns>
+    /// <returns>Every input row with its worn bit rewritten, or null when ownership or an occupied-position rule refuses the request.</returns>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when the row or bag bounds are exceeded.</exception>
     /// <exception cref="ArgumentException">Thrown when a position range is invalid or overlaps another numeric position.</exception>
     /// <exception cref="InvalidOperationException">Thrown when a required position lacks its initial item in the character bag.</exception>
@@ -36,18 +42,30 @@ public static class InventoryWearSelection
     {
         ArgumentNullException.ThrowIfNull(rows);
         ArgumentNullException.ThrowIfNull(groups);
-        if (rows.Count > 2 * InventoryLimits.MaxInventorySlotsPerBag || groups.Count > 64)
+        if (rows.Count > 2 * InventoryLimits.MaxInventorySlotsPerBag || groups.Count > InventoryLimits.MaxWearGroups)
             throw new ArgumentOutOfRangeException(nameof(rows));
         if (rows.GroupBy(row => row.Bag).Any(bag => bag.Count() > InventoryLimits.MaxInventorySlotsPerBag))
             throw new ArgumentOutOfRangeException(nameof(rows), "Each inventory bag must stay within its slot limit.");
         foreach (var group in groups)
             if (group.FirstItemId <= 0 || group.LastItemId < group.FirstItemId || !group.Contains(group.LegacyDefaultItemId)
-                || group.ItemIds is { } members && (group.RequireEquipped || members.Count == 0 || members.Count > 65536 || members.Any(id => id <= 0))
+                || group.ItemIds is { } members && (group.RequireEquipped || members.Count == 0
+                    || members.Count > InventoryLimits.MaxItemsPerWearGroup || members.Any(id => id <= 0))
                 || groups.Any(other => !ReferenceEquals(other, group) && group.ItemIds is null && other.ItemIds is null
                     && other.FirstItemId <= group.LastItemId && other.LastItemId >= group.FirstItemId))
                 throw new ArgumentException("Equipment ranges must be positive, disjoint and contain their legacy default.", nameof(groups));
         var bag = rows.Where(row => row.Bag == InventoryBag.CharacterBag).ToArray();
         if (itemId is { } requested && (requested <= 0 || !bag.Any(row => row.ItemId == requested))) return null;
+        if (worn && itemId is { } selectedItem)
+        {
+            foreach (var group in groups.Where(group => group.RejectWhenOccupied && group.Contains(selectedItem)))
+            {
+                var current = bag.Where(row => group.Contains(row.ItemId) && (row.Flags & 1) != 0).ToArray();
+                if (current.Length == 0)
+                    current = rows.Where(row => row.Bag == InventoryBag.EquippedBag && group.Contains(row.ItemId)
+                        && (row.Flags & 1) != 0 && bag.Any(owned => owned.ItemId == row.ItemId)).ToArray();
+                if (current.Any(row => row.ItemId != selectedItem)) return null;
+            }
+        }
         var selections = new Dictionary<InventoryWearGroup, int>();
         foreach (var group in groups.Where(group => group.ItemIds is null))
         {

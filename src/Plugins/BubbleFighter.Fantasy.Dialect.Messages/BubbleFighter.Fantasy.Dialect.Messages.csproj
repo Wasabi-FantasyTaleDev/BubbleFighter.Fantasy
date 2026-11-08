@@ -10,6 +10,7 @@
     <InternalsVisibleTo Include="BubbleFighter.Fantasy.Dialect.Messages.Tests" />
     <InternalsVisibleTo Include="BubbleFighter.Fantasy.Lobby.Tests" />
     <InternalsVisibleTo Include="BubbleFighter.Fantasy.MatchConnection.Tests" />
+    <InternalsVisibleTo Include="BubbleFighter.Fantasy.Dialect.Rooms" />
     <InternalsVisibleTo Include="BubbleFighter.Fantasy.Shop.Tests" />
   </ItemGroup>
 </Project>

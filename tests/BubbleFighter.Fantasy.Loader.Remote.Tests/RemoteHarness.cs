@@ -35,11 +35,36 @@ public sealed class NodeFactAttribute : FactAttribute
     }
 }
 
+/// <summary>
+/// A theory row naming SDK languages. A row that needs the TypeScript SDK is left out while Node.js or the built SDK
+/// is missing, so a fresh checkout reports one skipped <see cref="TypeScriptSdkTests"/> test instead of failing every
+/// TypeScript row with an exited process; the other languages' rows still run.
+/// </summary>
+/// <param name="data">The row's arguments, as an <see cref="InlineDataAttribute"/> takes them.</param>
+[AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]
+public sealed class SdkDataAttribute(params object[] data) : Xunit.Sdk.DataAttribute
+{
+    /// <inheritdoc />
+    public override IEnumerable<object[]> GetData(System.Reflection.MethodInfo testMethod) =>
+        data.Contains("typescript") && !Node.Ready ? [] : [data];
+}
+
+/// <summary>Reports, as one skipped test, that the TypeScript rows of the SDK theories were left out.</summary>
+public sealed class TypeScriptSdkTests
+{
+    /// <summary>Passes when the TypeScript SDK can run; skipped with the build command when it cannot.</summary>
+    [NodeFact]
+    public void TheTypeScriptSdkIsBuiltSoItsTheoryRowsRun() => Assert.True(Node.Ready);
+}
+
 /// <summary>Finds a Node.js runtime and the built TypeScript example entry point.</summary>
 internal static class Node
 {
     /// <summary>Gets the runtime command, or null when none runs.</summary>
     public static readonly string? Command = Probe();
+
+    /// <summary>Gets whether the runtime starts and the SDK is built, so TypeScript plugin processes can run.</summary>
+    public static bool Ready => Command is not null && File.Exists(ExampleEntry);
 
     /// <summary>Gets the compiled entry point of the TypeScript echo example.</summary>
     public static string ExampleEntry => Path.Combine(Python.RepoRoot, "sdk", "typescript", "dist", "examples", "echo-lobby", "main.js");

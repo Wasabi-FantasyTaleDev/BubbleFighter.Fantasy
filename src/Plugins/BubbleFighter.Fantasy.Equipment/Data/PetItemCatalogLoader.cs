@@ -1,5 +1,6 @@
 using System.Globalization;
 using BubbleFighter.Fantasy.Contracts.ClientData;
+using BubbleFighter.Fantasy.Contracts.Inventory;
 
 namespace BubbleFighter.Fantasy.Equipment.Data;
 
@@ -73,6 +74,8 @@ internal static class PetItemCatalogLoader
                 throw new InvalidOperationException($"Pet item table {file.Name} repeats itemId {id}.");
             if (Number(row, "function") == PetFunctionId)
                 pets.Add(id);
+            if (pets.Count > InventoryLimits.MaxItemsPerWearGroup)
+                throw new InvalidOperationException($"Pet item table {file.Name} exceeds the equipment item limit.");
         }
 
         if (pets.Count == 0)

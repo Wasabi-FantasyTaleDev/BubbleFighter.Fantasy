@@ -2,6 +2,20 @@ profile: cn-324
 # Opcode assignments for the Chinese 324 client. C2S and S2C are separate numeric spaces.
 # Only rows with evidence are listed; see profiles/opcode-policy.md.
 opcodes:
+  - value: 32885
+    direction: c2s
+    connection: both
+    name: gppWanderLean
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_6F8530 stamps32885 for the native movement record; cn-324 sub_6F7760 reads its 15-byte body"
+  - value: 32885
+    direction: s2c
+    connection: both
+    name: gppWanderLean
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_6F97B0 consumes the native movement record using cn-324 sub_6F7760"
   - value: 507
     direction: c2s
     connection: game
@@ -140,7 +154,7 @@ opcodes:
     name: gspRepLogin
     name_source: label@cn-324
     evidence: verified
-    source: "client reader sub_6FDB00: eight u32, wstr at +36, u32 at +40; Packet_gspRepLogin ctor sub_6FDA50"
+    source: "cn-324 sub_714540 case 3 calls cn-324 sub_703CA0, which reads through cn-324 sub_6FD9C0: u32 result, wstr account, u32 user number, wstr nickname, four u32, f64 server time, wstr unknown_48, u32 unknown_52; cn-324 sub_6FDA50 constructs Packet_gspRepLogin"
     notes: "no trailer; same family as id-400"
   - value: 16
     direction: s2c
@@ -151,10 +165,12 @@ opcodes:
     notes: "u32 count, then per gate u32 key, u32 subKey, u32 unknown1, u32 IPv4, u16 port (18-byte gate); sub_78CE60 compares the advertised ip/port against the connection the client already holds, and a single-gate list ends the splash loop"
   - value: 117
     direction: c2s
-    name: Unknown117
-    name_source: none
-    evidence: captured
-    notes: "empty 5-byte frame; the main menu heartbeat family"
+    name: gcpReqKeepAlivePing
+    name_source: label@cn-324
+    evidence: verified
+    connection: game
+    source: "cn-324 sub_78B580 constructs Packet_gcpReqKeepAlivePing; cn-324 sub_793E20 stamps 117 and invokes its empty serializer cn-324 nullsub_3 at 0x5C7C90"
+    notes: "Empty body. The application timer sends on the current game connection and immediately rearms for 10000 ms, with no response-wait state; cn-324 sub_714540 has no keep-alive reply handler. S2C 117 belongs to the separate gspNotifyMatch space."
   - value: 111
     direction: c2s
     name: gcpReqMatch
@@ -321,12 +337,26 @@ opcodes:
     name_source: label@cn-324
     evidence: inferred
     source: "Packet_gcpReqChangePartyLeader class and opcode setter sub_91B110 in sender sub_5B6850 (cn-324)"
+  - value: 304
+    direction: c2s
+    name: gcpSendPartyChatMsg
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_7C9820 stamps 304 on Packet_gcpSendPartyChatMsg; reader cn-324 sub_6FDDF0"
+    notes: "Chat box line outside a room: one string. The client draws nothing until S2C gspReceivePartyChatMsg answers."
   - value: 305
     direction: c2s
     name: gcpReqPartyRecruiting
     name_source: label@cn-324
     evidence: inferred
     source: "Packet_gcpReqPartyRecruiting class and opcode setter sub_91B110 in sender sub_79BC00 (cn-324)"
+  - value: 501
+    direction: c2s
+    name: gcpRoomSendChatMsg
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_718560 stamps 501 on Packet_gcpRoomSendChatMsg; reader cn-324 sub_6FD8F0"
+    notes: "Waiting-room chat box line: bool32 team-only flag, then the text. The client draws nothing until S2C gspRoomReceiveChatMsg answers."
   - value: 502
     direction: c2s
     name: gcpRoomSendChatModuleMsg
@@ -379,12 +409,6 @@ opcodes:
     name_source: label@cn-324
     evidence: inferred
     source: "Packet_gcpReportSuperPeerPingFail class and opcode setter sub_91B110 in sender sub_57C550 (cn-324)"
-  - value: 607
-    direction: c2s
-    name: gcpReportTableSetHolePunchingEnd
-    name_source: label@cn-324
-    evidence: inferred
-    source: "Packet_gcpReportTableSetHolePunchingEnd class and opcode setter sub_91B110 in sender sub_6F8E90 (cn-324)"
   - value: 701
     direction: c2s
     name: gcpGameReportMapLoadingComplete
@@ -792,8 +816,15 @@ opcodes:
     direction: s2c
     name: gspRepMoveChannel
     name_source: label@cn-324
-    evidence: inferred
-    source: "cn-324 dispatcher sub_714540 case 8: Packet_gspRepMoveChannel"
+    evidence: verified
+    source: "cn-324 sub_714540 case 8 invokes cn-324 sub_705240; reader cn-324 sub_6FE130 consumes result and NetAddress through cn-324 sub_44CA80, then result zero opens pending via cn-324 sub_705710; inherited ChannelMoveOffer layout in packets/channel-transfer.yaml"
+  - value: 9
+    direction: s2c
+    connection: game
+    name: gspDisconnectMovedUser
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_714540 case 9 installs native label gspDisconnectMovedUser and invokes cn-324 sub_705980 without reading a body; pending dword_C0FDB8 replaces current dword_C0FDB4 and the previous source closes"
   - value: 10
     direction: s2c
     name: gspRepMoveInto
@@ -1302,8 +1333,8 @@ opcodes:
     direction: s2c
     name: gspDebugClientDamageData
     name_source: label@cn-324
-    evidence: inferred
-    source: "cn-324 dispatcher sub_714540 case 951: Packet_gspDebugClientDamageData"
+    evidence: verified
+    source: "cn-324 main dispatcher sub_714540 case 0x3B7 runs cn-324 sub_712440 into the reader cn-324 sub_6FD020 (vtable 0xB151BC)"
   - value: 952
     direction: s2c
     name: gspSynthesisProcess
@@ -1529,8 +1560,8 @@ opcodes:
     direction: c2s
     name: gcpStartGPK
     name_source: label@cn-324
-    evidence: inferred
-    source: "Packet_gcpStartGPK is the only class constructed before the calls of the stamping helper sub_718480 (cn-324)"
+    evidence: verified
+    source: "cn-324 sub_7001F0 constructs Packet_gcpStartGPK and sends its empty body through cn-324 sub_718480, which stamps game C2S 2 before the Center status request"
   - value: 13
     direction: c2s
     name: gcpReqMoveInto
@@ -2153,14 +2184,14 @@ opcodes:
     connection: both
     name: gppHordeMobReplay
     name_source: label@cn-324
-    evidence: inferred
+    evidence: verified
     source: "Packet_gppHordeMobReplay class and opcode setter sub_91B110 in sender sub_429C50 (cn-324)"
   - value: 32873
     direction: c2s
     connection: both
     name: gppWaveSetMobSpawnGroup
     name_source: label@cn-324
-    evidence: inferred
+    evidence: verified
     source: "Packet_gppWaveSetMobSpawnGroup class and opcode setter sub_91B110 in sender sub_444AC0 (cn-324)"
   - value: 32876
     direction: c2s
@@ -2869,6 +2900,15 @@ opcodes:
     name_source: label@cn-324
     evidence: inferred
     source: "Packet_gppSetNoTargetByMob class, stamped 32876 in sender sub_843130 (cn-324); read back under the same number"
+  - value: 32883
+    direction: s2c
+    connection: relay
+    name: gppFireBullet2
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 wave dispatcher sub_438500 case 0x8073 runs cn-324 sub_429AB0; the shared base reader cn-324 sub_411530 reads two u32 words"
+    notes: "[u32 character id][u32 bool flag]; the handler RT-casts +4 to Character and stores the flag at +35536. S2C only (no C2S sender); id-1809 dropped this number"
+
   - value: 32877
     direction: s2c
     connection: both
@@ -3094,9 +3134,9 @@ opcodes:
   - value: 506
     direction: s2c
     name: gspRoomChangeInventory
-    name_source: mirrored
-    evidence: inferred
-    source: "Packet_gspRoomChangeInventory class exists in cn-324; kr-812 assigns it 506, and the named neighbours 505 and 509 match kr-812"
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_6EC0B0 case 506 dispatches cn-324 sub_6EDF70; cn-324 sub_6EB2E0 reads three words and a counted word vector. The consumer indexes the room seat with the first word, writes the character selector at +16 and the vector into signed shorts at +24 onward."
   - value: 507
     direction: s2c
     name: gspRoomRepChangeMaster
@@ -3139,24 +3179,12 @@ opcodes:
     name_source: mirrored
     evidence: inferred
     source: "Packet_gspHordeModeRewardList class exists in cn-324; kr-812 assigns it 519, and the named neighbours 513 and 521 match kr-812"
-  - value: 607
-    direction: s2c
-    name: gspTryHolePunching
-    name_source: mirrored
-    evidence: inferred
-    source: "Packet_gspTryHolePunching class exists in cn-324; kr-812 assigns it 607, and the named neighbours 603 and 701 match kr-812"
   - value: 609
     direction: s2c
     name: gspNotifyUdpToServerReceived
     name_source: mirrored
     evidence: inferred
     source: "Packet_gspNotifyUdpToServerReceived class exists in cn-324; kr-812 assigns it 609, and the named neighbours 603 and 701 match kr-812"
-  - value: 610
-    direction: s2c
-    name: gspTableSetHolePunching
-    name_source: mirrored
-    evidence: inferred
-    source: "Packet_gspTableSetHolePunching class exists in cn-324; kr-812 assigns it 610, and the named neighbours 603 and 701 match kr-812"
   - value: 729
     direction: s2c
     name: gspGameBroadcastPlayerScoreData
@@ -3470,3 +3498,268 @@ opcodes:
     name_source: label@cn-324
     evidence: verified
     source: "cn-324 sub_5D0C10 builds Packet_gcpReqFighterInfo (vtable 0xAF16F8, deserializer sub_408DF0: two words) and calls sub_5DB160, which stamps 112 through sub_91B110; layout in packets/fighter-info.yaml"
+
+  - value: 607
+    direction: s2c
+    connection: game
+    name: gspTryHolePunching
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_6EC0B0 case607 -> cn-324 sub_6F3A60: u16 port, u32 probe identity, u8 unknown"
+
+  - value: 608
+    direction: s2c
+    connection: game
+    name: gspStopUdpDiscovery_
+    name_source: coined
+    evidence: verified
+    source: "cn-324 sub_6EC0B0 case608 clears the UDP discovery pending flag without reading a body"
+
+  - value: 610
+    direction: s2c
+    connection: game
+    name: gspTableSetHolePunching
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_6EC0B0 case610 -> cn-324 sub_6F9140: native peer table row"
+
+  - value: 611
+    direction: s2c
+    connection: game
+    name: gspUdpPeerTableEnd_
+    name_source: coined
+    evidence: verified
+    source: "cn-324 sub_6EC0B0 case611: cn-324 sub_6F8E90 sends empty C2S607"
+
+  - value: 612
+    direction: s2c
+    connection: game
+    name: gspUdpPeerPunchStart_
+    name_source: coined
+    evidence: verified
+    source: "cn-324 sub_6EC0B0 case612 starts native peer hole punching"
+
+  - value: 613
+    direction: s2c
+    connection: game
+    name: gspUdpPeerPunchFinish_
+    name_source: coined
+    evidence: verified
+    source: "cn-324 sub_6EC0B0 case613 -> cn-324 sub_6F8940 finalizes peer attempts"
+
+  - value: 607
+    direction: c2s
+    connection: game
+    name: gcpReportTableSetHolePunchingEnd
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_6F8E90 constructs the empty native table-end acknowledgment607"
+
+  - value: 603
+    direction: c2s
+    connection: game
+    name: gcpReportHolePunchingEnd
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_6F8940 emits603 with occupied-seat and successful-peer counts"
+
+  - value: 2
+    direction: c2s
+    connection: udp
+    name: upTrySendUdpToServer
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_6F7AC0 sends native UDP2 with probe identity, local IPv4 and local port"
+
+  - value: 8
+    direction: c2s
+    connection: relay
+    name: rcpReqRegisterPeer
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_6F8530 requests relay delivery when direct movement fails"
+
+  - value: 9
+    direction: c2s
+    connection: relay
+    name: rcpReqUnRegisterPeer
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_6F8940 unregisters successfully punched peers from the relay"
+
+  - value: 102
+    direction: s2c
+    connection: game
+    name: gspRepCreateSession
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 session-list dispatcher sub_580700 case 'f' runs Packet_gspRepCreateSession (vtable 0xAE974C) through cn-324 sub_410910 and the handler cn-324 sub_582180"
+    notes: "u32 result; 0 succeeds silently and nonzero values select canned client messages. The room data itself travels in gspGotoRoom/gspRoomSetSession"
+  - value: 722
+    direction: s2c
+    connection: game
+    name: gspGameCreateChocolate
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 game dispatcher sub_465090 case 722 runs cn-324 sub_45CA20 (vtable 0xACF230) — the same reader lucci-drops.yaml cites for cn-324's LucciCreate"
+    notes: "The LucciCreate shape byte for byte; the client builds the item only on kind 1"
+  - value: 723
+    direction: s2c
+    connection: game
+    name: gspChocolateEaten
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_465090 case 723 runs the shared two-word reader cn-324 sub_408DF0; the handler RT-casts +8 to GoChocolateItem"
+    notes: "The LucciPicked shape (character first, object second)"
+  - value: 724
+    direction: s2c
+    connection: game
+    name: gspGameCreateSpawner
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_465090 case 724 runs cn-324 sub_45EF40; the handler passes the first five words to the spawner builder"
+    notes: "Eight u32 words — not the lucci nine-word body; SpawnerCreateNoticeLegacy@cn-324 in packets/object-economy.yaml"
+  - value: 725
+    direction: s2c
+    connection: game
+    name: gspSpawnerEaten
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_465090 case 725 runs the shared two-word reader; cn-324 sub_46E930 destroys the GoSpawnerItem"
+    notes: "The LucciPicked shape"
+  - value: 726
+    direction: s2c
+    connection: game
+    name: gspGameCreateHeart
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_465090 case 726 runs cn-324 sub_45CA20 — the same LucciCreate reader"
+    notes: "The LucciCreate shape byte for byte"
+  - value: 727
+    direction: s2c
+    connection: game
+    name: gspHeartEaten
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_465090 case 727 runs the shared two-word reader"
+    notes: "The LucciPicked shape"
+  - value: 744
+    direction: s2c
+    connection: game
+    name: gspGameCreateWeaponObject
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_465090 case 744 runs cn-324 sub_45C8F0 (vtable 0xACF1D0)"
+    notes: "Ten u32 words plus a bool32 tail — differs from kr-1256's twelve-word notice; LegacyWeaponCreateNotice@cn-324"
+  - value: 745
+    direction: s2c
+    connection: game
+    name: gspPickUpWeapon
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_465090 case 745 runs cn-324 sub_408DF0 (vtable 0xACF1DC); the handler maps the character through (id - 1000000) / 100000"
+    notes: "[u32 weapon object][u32 actor] — the field order is the reverse of kr-1256's pickup notice"
+  - value: 900
+    direction: s2c
+    connection: game
+    name: gspRepGuildLineBoard
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 main dispatcher sub_714540 compares 900 directly and runs cn-324 sub_711640 into the reader cn-324 sub_6FE500 (vtable 0xB156CC); the element reader cn-324 sub_6FB3C0 walks GuildLineBoardRecord (vtable 0xB15330)"
+    notes: "u32 plus counted GuildLineBoardRecord — the guild-board.yaml shapes kr-812 declares"
+  - value: 910
+    direction: s2c
+    connection: game
+    name: gspMergeCountOrDayItemList
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_714540 case 0x38E runs cn-324 sub_708F80 into the reader cn-324 sub_6FE110 (vtable 0xB155A0)"
+    notes: "u32 count then count sMERGEINFO two-word entries, the same shape kr-1256 and the id builds read"
+  - value: 950
+    direction: s2c
+    connection: game
+    name: gspNotifyRankInfo2
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 room dispatcher sub_6EC0B0 case 0x3B6 runs Packet_gspNotifyRankInfo2 (vtable 0xB10C4C, reader cn-324 sub_6EB980; element reader cn-324 sub_6FCA60)"
+    notes: "u32 count then counted {u32, wstr, u32} entries (16-byte stride); the id builds number the same frame 949 and read their damage sync here instead"
+  - value: 32912
+    direction: s2c
+    connection: relay
+    name: gppZombieStoneActive
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 wave dispatcher case 0x8090 runs the deserializer and the handler walks 64 entity slots RT-casting to ChrZombieStone"
+    notes: "[bool32 active][u8 variant]; the variant selects one of two stone attachment effects"
+  - value: 32872
+    direction: s2c
+    connection: relay
+    name: gppWaveKeyMobGroupData
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 wave dispatcher case 0x8068 runs the deserializer and the handler re-keys the fields into the wave-key to mob-group registry"
+    notes: "Five u32 words and a counted string; no C2S sender exists in any build"
+
+  - value: 511
+    name: gcpRoomChangeInventory
+    direction: c2s
+    connection: game
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_598700 constructs Packet_gcpRoomChangeInventory; cn-324 sub_598F40 stamps 511; cn-324 sub_597A30 reads two words and a counted word vector. The UI writes five signed UserSlot shorts at +24..+32."
+  - value: 11
+    direction: c2s
+    connection: relay
+    name: rcpSetDamageAffectingAttribute
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_482370 stamps 11 after cn-324 sub_469180 fills it; layout packets/relay-hp.yaml RelayDamageAttributeReport"
+  - value: 13
+    direction: c2s
+    connection: relay
+    name: rcpReqDamageCalcAndBroadcast
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_4826C0 stamps 13 from cn-324 sub_473D50; layout packets/relay-hp.yaml RelayDamageRequest"
+  - value: 14
+    direction: c2s
+    connection: relay
+    name: rcpCharacterRespawn
+    name_source: label@cn-324
+    evidence: inferred
+    source: "cn-324 senders sub_482830 stamp relay 14; layout packets/relay-hp.yaml RelayCharacterRespawnReport"
+  - value: 15
+    direction: c2s
+    connection: relay
+    name: rcpChangeChrType
+    name_source: label@cn-324
+    evidence: inferred
+    source: "cn-324 senders sub_482920 stamp relay 15; layout packets/relay-hp.yaml RelayCharacterTypeReport"
+  - value: 16
+    direction: c2s
+    connection: relay
+    name: rcpHpRecover
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_4827B0 stamps 16; layout packets/relay-hp.yaml RelayHpRecoverReport"
+  - value: 22
+    direction: c2s
+    connection: relay
+    name: rcpSetChrState
+    name_source: label@cn-324
+    evidence: inferred
+    source: "cn-324 senders sub_4692C0, cn-324 sub_482460 stamp relay 22; layout packets/relay-hp.yaml RelayCharacterStateReport"
+  - value: 7
+    direction: s2c
+    connection: relay
+    name: rspHpDeltaBroadcast
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_6FA120 case 7 calls cn-324 sub_460C20; layout packets/relay-hp.yaml RelayHpDelta"
+  - value: 514
+    direction: c2s
+    connection: game
+    name: gcpRoomSendRecMsg
+    name_source: label@cn-324
+    evidence: verified
+    source: cn-324 sub_7186B0 stamps the native recruitment-text request; cn-324 sub_6FDDF0 reads one counted UTF-16 message

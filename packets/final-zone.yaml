@@ -1,0 +1,326 @@
+version: 1
+# The GameArea32Strategy family includes FinalZone (mode 30). These bodies are not an activation policy.
+# kr-1256 sub_9E1EB0 dispatches unhandled game packets in 600..764 to strategy slot 28;
+# kr-1256 sub_CD7DE0 delegates the Area32 cases to kr-1256 sub_CD7EE0.
+structs:
+  Area32TrapRequest: []
+
+  # kr-1256 sub_4FC800 writes actor, specification 560, placement stage 1/3 and the target position on C2S 686.
+  Area32TrapRequest@kr-1256:
+    - actor: u32
+      offset: 0
+    - item_spec_id: u32
+      offset: 4
+    - stage: u32
+      offset: 8
+    - x: f32
+      offset: 12
+    - y: f32
+      offset: 16
+    - z: f32
+      offset: 20
+
+  Area32TrapSpawn: []
+
+  # kr-1256 sub_CD7EE0 case 0x2B1 reads seven words; kr-1256 sub_D36490 creates GoBoobyTrapRod.
+  # kr-1256 sub_501120 acknowledges stage 1/3 as local state 2/4 and sends the endpoint link after stage 3.
+  Area32TrapSpawn@kr-1256:
+    - actor: u32
+      offset: 0
+    - object_id: u32
+      offset: 4
+    - item_spec_id: u32
+      offset: 8
+    - stage: u32
+      offset: 12
+    - x: f32
+      offset: 16
+    - y: f32
+      offset: 20
+    - z: f32
+      offset: 24
+
+  Area32TrapLink: []
+
+  # kr-1256 sub_6E4850 writes three handles, a 16-bit weapon and a word vector; kr-1256 sub_6D97D0 reads case 0x81FB.
+  # kr-1256 sub_6FBDF0 resolves both endpoints, creates the trap and clears the local owner's placement state.
+  Area32TrapLink@kr-1256:
+    - actor: u32
+      offset: 0
+    - first_object_id: u32
+      offset: 4
+    - second_object_id: u32
+      offset: 8
+    - weapon_id: u16
+      offset: 12
+    - unknown_16: 'list<u32>'
+      offset: 16
+
+  Area32DroneSpawn: []
+
+  # kr-1256 sub_CD7EE0 case 0x2B4 reads two words; kr-1256 sub_CDB420 seeds before kr-1256 sub_D34970.
+  Area32DroneSpawn@kr-1256:
+    - object_id: u32
+      offset: 0
+    - seed: u32
+      offset: 4
+
+  Area32DroneDestroyed: []
+
+  # kr-1256 sub_D38160 writes the drone handle, its position, and an uninterpreted damaging-object word on C2S 689.
+  Area32DroneDestroyed@kr-1256:
+    - object_id: u32
+      offset: 0
+    - x: f32
+      offset: 4
+    - y: f32
+      offset: 8
+    - z: f32
+      offset: 12
+    - unknown_16: u32
+      offset: 16
+
+  Area32DroneBoxSpawn: []
+
+  # kr-1256 sub_CD7EE0 case 0x2B5 reads seven words; word 5 becomes the box handle and word 6 seeds kr-1256 sub_D35740.
+  Area32DroneBoxSpawn@kr-1256:
+    - drone: Area32DroneDestroyed
+      offset: 0
+    - box_object_id: u32
+      offset: 20
+    - seed: u32
+      offset: 24
+
+  Area32GoldenSupplyRequest: []
+
+  # kr-1256 sub_770380 writes the script's spawn index and position to C2S 690.
+  Area32GoldenSupplyRequest@kr-1256:
+    - spawn_index: u32
+      offset: 0
+    - x: f32
+      offset: 4
+    - y: f32
+      offset: 8
+    - z: f32
+      offset: 12
+
+  Area32GoldenSupplySpawn: []
+
+  # kr-1256 sub_CD7EE0 case 0x2B6 reads six words; kr-1256 sub_CDB7E0 seeds contents, creates the box and calls the script.
+  Area32GoldenSupplySpawn@kr-1256:
+    - spawn: Area32GoldenSupplyRequest
+      offset: 0
+    - box_object_id: u32
+      offset: 16
+    - seed: u32
+      offset: 20
+
+  Area32ItemDrop: []
+
+  # kr-1256 sub_7091B0 writes eight words, a bool32 and reinforcement for each returned item.
+  # kr-1256 sub_6F6BA0 supplies the descriptor; the server-assigned object handle is absent here.
+  Area32ItemDrop@kr-1256:
+    - item_spec_id: u32
+      offset: 0
+    - quantity: u32
+      offset: 4
+    - x: f32
+      offset: 8
+    - y: f32
+      offset: 12
+    - z: f32
+      offset: 16
+    - unknown_20: u32
+      offset: 20
+    - unknown_24: u32
+      offset: 24
+    - unknown_28: u32
+      offset: 28
+    - temporary: bool
+      offset: 32
+    - reinforcement: Area32Reinforcement
+      offset: 36
+
+  Area32ItemsDrop: []
+
+  # kr-1256 sub_7091B0 writes a count followed by the native item return descriptors on C2S 685.
+  Area32ItemsDrop@kr-1256:
+    - items: 'list<Area32ItemDrop>'
+      offset: 0
+
+  Area32MapItem: []
+
+  # kr-1256 sub_10C3030 reads ten words then reinforcement; kr-1256 sub_CDB180 looks up the spec,
+  # sets the handle/quantity/position and creates GoGenItem. kr-1256 sub_D38C70 uses the bool for expiration.
+  Area32MapItem@kr-1256:
+    - object_id: u32
+      offset: 0
+    - item_spec_id: u32
+      offset: 4
+    - quantity: u32
+      offset: 8
+    - x: f32
+      offset: 12
+    - y: f32
+      offset: 16
+    - z: f32
+      offset: 20
+    - unknown_24: u32
+      offset: 24
+    - unknown_28: u32
+      offset: 28
+    - unknown_32: u32
+      offset: 32
+    - temporary: bool
+      offset: 36
+    - reinforcement: Area32Reinforcement
+      offset: 40
+
+  Area32ItemsSpawn: []
+
+  # kr-1256 sub_CD7EE0 case 0x2AF reads a counted vector through kr-1256 sub_10C1A80 and kr-1256 sub_10C3030.
+  # kr-1256 sub_CDB180 creates each object directly; it does not require a preceding seed message.
+  Area32ItemsSpawn@kr-1256:
+    - items: 'list<Area32MapItem>'
+      offset: 0
+
+  Area32ItemSeed: []
+
+  # kr-1256 sub_CD7EE0 case 0x2A9 reads three words; kr-1256 sub_CDA8A0 seeds the generator,
+  # then passes word 2 as the object-id base and word 1 as the count limit to kr-1256 sub_D36270.
+  Area32ItemSeed@kr-1256:
+    - seed: u32
+      offset: 0
+    - maximum_count: u32
+      offset: 4
+    - first_object_id: u32
+      offset: 8
+
+  Area32ItemPickup: []
+
+  # kr-1256 sub_4FFE40 writes item handle then character handle. kr-1256 sub_CD7EE0 case 0x2AA
+  # reads the same pair; kr-1256 sub_CDAC10 applies the item and removes it from the map-item registry.
+  Area32ItemPickup@kr-1256:
+    - object_id: u32
+      offset: 0
+    - actor: u32
+      offset: 4
+
+  Area32PlayerEliminated: []
+
+  # kr-1256 sub_CD7EE0 case 0x2B0 reads two words. kr-1256 sub_CDC4A0 resolves the character,
+  # updates the survivor HUD and triggers the local dead player's backpack-drop path.
+  Area32PlayerEliminated@kr-1256:
+    - actor: u32
+      offset: 0
+    - survivors_remaining: u32
+      offset: 4
+
+  Area32MapEffect: []
+
+  # kr-1256 sub_76F4F0 forwards the script's helper/effect/sound names and visibility to kr-1256 sub_6E0850.
+  # kr-1256 sub_6E12D0 reads the three strings and three words, applies the effect, and stores the script sequence.
+  # cn-774 sub_8A1C20 / cn-774 sub_8A2870 and tw-454 sub_714BF0 / tw-454 sub_715830 match this shared script body.
+  Area32MapEffect@kr-1256:
+    - dummy: wstr
+      offset: 0
+    - effect: wstr
+      offset: 24
+    - sound: wstr
+      offset: 48
+    - visible: bool
+      offset: 72
+    - unknown_76: u32
+      offset: 76
+    - sequence: u32
+      offset: 80
+
+  Area32Reinforcement: []
+
+  # kr-1256 sub_1152110 reads two counted word vectors through kr-1256 sub_1137C30.
+  Area32Reinforcement@kr-1256:
+    - unknown_4: 'list<u32>'
+      offset: 4
+    - unknown_20: 'list<u32>'
+      offset: 20
+
+  Area32BackpackEntry: []
+
+  # kr-1256 sub_11550E0 reads three words then reinforcement; kr-1256 sub_CA54B0 loads weaponId into spec+32,
+  # kr-1256 sub_D38C70 copies it to object+704, and kr-1256 sub_D39120 projects it into the second entry word.
+  Area32BackpackEntry@kr-1256:
+    - item_spec_id: u32
+      offset: 0
+    - weapon_id: u32
+      offset: 4
+    - quantity: u32
+      offset: 8
+    - reinforcement: Area32Reinforcement
+      offset: 12
+
+  Area32BackpackDrop: []
+
+  # kr-1256 sub_CDC4A0 supplies the local actor handle, position and a second vector to kr-1256 sub_6DD420.
+  # kr-1256 sub_7083A0 writes seven words, a wide string, then the entries via kr-1256 sub_10C02E0.
+  Area32BackpackDrop@kr-1256:
+    - owner_actor: u32
+      offset: 0
+    - x: f32
+      offset: 4
+    - y: f32
+      offset: 8
+    - z: f32
+      offset: 12
+    - unknown_16: u32
+      offset: 16
+    - unknown_20: u32
+      offset: 20
+    - unknown_24: u32
+      offset: 24
+    - unknown_28: wstr
+      offset: 28
+    - items: 'list<Area32BackpackEntry>'
+      offset: 52
+
+  Area32BackpackSpawn: []
+
+  # kr-1256 sub_CD3000 reads an object handle followed by the drop descriptor; kr-1256 sub_CDAEC0
+  # creates the GoBackpack with that handle, location, owner and contents.
+  Area32BackpackSpawn@kr-1256:
+    - object_id: u32
+      offset: 0
+    - contents: Area32BackpackDrop
+      offset: 4
+
+  Area32BackpackPickup: []
+
+  # kr-1256 sub_4622D0 writes the open container handle and the selected entry's item-spec key.
+  Area32BackpackPickup@kr-1256:
+    - object_id: u32
+      offset: 0
+    - item_spec_id: u32
+      offset: 4
+
+  Area32BackpackPicked: []
+
+  # kr-1256 sub_CD7EE0 case 0x2AC reads three words and passes words 1/2/0 to kr-1256 sub_4627C0.
+  # kr-1256 sub_6D2040 passes the room user number through kr-1256 sub_514DE0, kr-1256 sub_476230 and kr-1256 sub_4B83B0 to character+580.
+  Area32BackpackPicked@kr-1256:
+    - user_number: u32
+      offset: 0
+    - object_id: u32
+      offset: 4
+    - item_spec_id: u32
+      offset: 8
+
+  Area32WaterTimer: []
+
+  # kr-1256 sub_CD7EE0 case 0x2AD reads bool32, word, word. kr-1256 sub_45BED0 switches on
+  # word 1 as an integer stage and adds word 2 to the native millisecond timer; neither word is a float.
+  Area32WaterTimer@kr-1256:
+    - active: bool
+      offset: 0
+    - stage: u32
+      offset: 4
+    - duration_ms: u32
+      offset: 8

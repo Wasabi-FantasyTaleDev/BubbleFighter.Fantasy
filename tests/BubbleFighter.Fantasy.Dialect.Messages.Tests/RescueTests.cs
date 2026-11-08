@@ -16,6 +16,7 @@ public sealed class RescueTests
     [InlineData("id-400")]
     [InlineData("id-1809")]
     [InlineData("cn-706")]
+    [InlineData("cn-406")]
     public void MissionListHasNativeWordAndStringFraming(string build)
     {
         var body = RescueBinding.EncodePrepared(TestBuilds.All.Tables, build,
@@ -46,6 +47,7 @@ public sealed class RescueTests
     [InlineData("id-400")]
     [InlineData("id-1809")]
     [InlineData("cn-706")]
+    [InlineData("cn-406")]
     public void ProgressHasExactlyThreeWords(string build)
     {
         var body = Convert.FromHexString("020000006600000000000000");

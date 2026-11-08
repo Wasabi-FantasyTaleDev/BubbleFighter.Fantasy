@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Match;
+using BubbleFighter.Fantasy.Contracts.Cluster;
 using BubbleFighter.Fantasy.Contracts.Progress;
 using BubbleFighter.Fantasy.Contracts.Rooms;
 using BubbleFighter.Fantasy.InGame.Handlers;
@@ -18,19 +19,70 @@ public sealed partial class RoundFlowTests
     private sealed class FakeProgress(Dictionary<long, PlayerProgress> stored) : IPlayerProgressRepository
     {
         public List<PlayerProgress> Recorded { get; } = [];
+        public List<RoundSettlementCommand> Commands { get; } = [];
+        internal Action<long>? BeforeSettle;
 
         public ValueTask<PlayerProgress?> FindAsync(long userNum, CancellationToken ct) =>
             ValueTask.FromResult(stored.GetValueOrDefault(userNum));
 
         public ValueTask<RoundSettlementResult> SettleRoundAsync(RoundSettlementCommand command, CancellationToken ct)
         {
+            BeforeSettle?.Invoke(command.UserNum);
             var before = stored[command.UserNum];
             var progress = command.AdvanceChecked(before);
             lock (Recorded)
+            {
+                Commands.Add(command);
                 Recorded.Add(progress);
+            }
             stored[progress.UserNum] = progress;
             return ValueTask.FromResult(new RoundSettlementResult(RoundSettlementOutcome.Settled, before, progress,
                 command.LucciEarned, command.LucciEarned));
+        }
+    }
+
+    [Fact]
+    public async Task RoundSettlementSelectsEachSeatsOriginalSessionAndRestoresTheTriggeringScope()
+    {
+        var stored = new Dictionary<long, PlayerProgress>();
+        var progress = new FakeProgress(stored);
+        var (context, _, _) = ResultContext(progress);
+        var scopes = new RoundMutationScopes();
+        context.Effect(context.Services.Register<IAccountMutationScopes>(scopes));
+        var rig = SettlementRig(context);
+        try
+        {
+            var room = await StartedRoundAsync(rig);
+            ToResult(room, stored);
+            var sessions = room.Seats.Where(seat => seat.UserNum > 0).ToDictionary(seat => (long)seat.UserNum, seat => seat.Game);
+            Assert.True(sessions.Count > 1);
+            progress.BeforeSettle = user => Assert.Same(sessions[user], scopes.Current);
+            var triggering = sessions.Values.First();
+            using (scopes.Enter(triggering))
+            {
+                var rewards = await rig.Round.GrantRewardsAsync(room, room.StartGeneration, RoundEndReason.StageReported, default);
+                Assert.Equal(sessions.Count, rewards.Count);
+                Assert.Same(triggering, scopes.Current);
+            }
+            Assert.Null(scopes.Current);
+        }
+        finally { await rig.Registry.StopAllAsync(); await context.UnwindAsync(); }
+    }
+
+    private sealed class RoundMutationScopes : IAccountMutationScopes
+    {
+        private readonly AsyncLocal<ISession?> _current = new();
+        internal ISession? Current => _current.Value;
+        public IDisposable Bind(ISession session, IAccountOwnership ownership) => throw new NotSupportedException();
+        public IDisposable Enter(ISession session)
+        {
+            var previous = _current.Value;
+            _current.Value = session;
+            return new ScopeRemoval(() => _current.Value = previous);
+        }
+        private sealed class ScopeRemoval(Action remove) : IDisposable
+        {
+            public void Dispose() => remove();
         }
     }
 

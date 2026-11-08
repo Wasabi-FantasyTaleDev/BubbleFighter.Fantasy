@@ -20,3 +20,59 @@
       build_values: true
       starting_lucci: 10000000
       starting_cash: 10000000
+
+# The modern gift box: both rows together (the shop row's service and the dialect row's bindings).
+# The capability is inherited true and the layouts are restated in packets/present.yaml per build;
+# the claim rides the inventory push path each profile already publishes.
+- set:
+    id: dialect.messages
+    config:
+      present_box: true
+- set:
+    id: shop
+    config:
+      present_box: true
+
+# cn-774 sub_89E020 / cn-774 sub_8D7D20 establish the score-unit request and point delta.
+- set:
+    id: dialect.rooms
+    config:
+      pve_points: true
+      # cn-774 sub_959650 waits for the wave reply; cn-774 sub_958DE0 waits for the spawn-table reply.
+      npc_rounds: true
+- set:
+    id: ingame
+    config:
+      # Own AiFighterConfig maps ZombiePve units to 0..15. Awards are configurable server policy.
+      pve_point_mode_id: 16
+      pve_point_unit_values: [4, 3, 10, 11, 15, 15, 20, 20, 15, 15, 20, 20, 15, 15, 20, 20]
+
+# Own ItemSpec4 sheets define these kinds; the enabled ItemSpecItem rows define mode 3.
+- set:
+    id: dialect.rooms
+    config:
+      supply_items: true
+      counted_pve_items: true
+- set:
+    id: ingame
+    config:
+      native_item_slot_count: 2
+      random_supply_item_kinds: [101, 102, 104, 108, 109, 112, 115, 122, 124, 126, 127, 129, 130, 135, 136, 138, 141, 146, 147, 220, 229, 230, 231, 235, 236, 300, 302, 303]
+      immediate_supply_item_kinds: [10, 11, 15, 16]
+      item_mode_ids: [3]
+      item_mode_kinds: [104, 101, 109, 112, 122, 115, 126, 127, 129, 130, 108, 136, 138, 141, 300, 302, 303]
+
+      # Own mode-16 hotkeys select 1..3; this three-item selection is configurable server policy.
+      counted_item_mode_id: 16
+      counted_item_slot_count: 3
+      counted_item_kinds: [229, 146, 136]
+      # Other enabled cooperative pickups apply their native effect without occupying a numbered slot.
+      counted_immediate_item_kinds: [17, 101, 102, 124, 135, 147, 220, 303]
+- set:
+    id: dialect.rooms
+    config:
+      plaza_recruitment: true
+- set:
+    id: ingame
+    config:
+      plaza_recruitment: true

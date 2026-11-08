@@ -1,0 +1,92 @@
+version: 1
+# Modern science-lab operation bodies. Requests use the shared class written by
+# kr-1256 sub_114B300, cn-774 sub_48CE60 and tw-454 sub_479B90; the operation's
+# dialog selects the opcode. Opcode tables record each build's independent assignments.
+# The runtime option answers closed. Recipes, costs, results and item mutations are absent.
+structs:
+
+  # C2S RequestScienceLab (kr-1256 vtable 0x163be5c, writer kr-1256 sub_114B300, reader
+  # kr-1256 sub_114B340): the vector is the client's inventory/item-card keys and the u64
+  # argument's meaning is per operation (kr-1256 131 sends an obfuscated counter plus one,
+  # 132/135/137/138 send zero, 134 a 0/1 flag, 136 the selected item key, 139 the part-node
+  # value). One structure serves every operation; only the opcode differs.
+  ScienceLabRequest:
+    - keys: list<u64>
+      offset: 4
+    - argument: u64
+      offset: 16
+
+  # kr-1256 sub_10E2550 reads result, three counted u64 vectors and a trailing u64.
+  # cn-774 sub_BD8070 and tw-454 sub_AB45B0 read the same body via counted u64
+  # helpers cn-774 sub_48DB40 and tw-454 sub_47ABA0. The closed result is build data:
+  # kr-1256 sub_DF5130 uses 5; cn-774 sub_E975C0 and tw-454 sub_E09730 use 4.
+  # Vector meanings remain unproven across operations and retain their object offsets.
+  ScienceLabReply:
+    - result: u32
+      offset: 0
+    - unknown_4: list<u64>
+      offset: 4
+    - unknown_16: list<u64>
+      offset: 16
+    - unknown_28: list<u64>
+      offset: 28
+    - unknown_40: u64
+      offset: 40
+
+  # State data coverage only: kr-1256 sub_9D2FF0 case 109 reads the first u32 and
+  # availability bool, then kr-1256 sub_11504D0 reads the remaining fields. The local
+  # startup entry 307 gates parsing; kr-1256 sub_859A20/sub_833590 use availability
+  # for the lab control. No C2S trigger for this response pair has been established.
+  LaboratoryState:
+    - unknown_0: u32
+      offset: 0
+    - available: bool
+      offset: 4
+    - unknown_8: bool
+      offset: 8
+    - unknown_12: list<u32>
+      offset: 12
+    - unknown_24: wstr
+      offset: 24
+    - unknown_168: u32
+      offset: 168
+    - unknown_172: u16
+      offset: 172
+      # kr-1256 sub_11504D0 reads two bytes; cn-774 sub_478BB0 reads four. Empty
+      # collections produce 34-byte KR and 36-byte CN bodies, without implying UI activation.
+      cn-774:
+        - unknown_172: u32
+    - unknown_184: list<LaboratoryRecipeEntry>
+      offset: 184
+    - unknown_192: list<LaboratoryCaptionEntry>
+      offset: 192
+
+  LaboratoryRecipeEntry:
+    - key: u32
+      offset: 0
+    - values: list<u32>
+      offset: 4
+
+  LaboratoryCaptionEntry:
+    - key: u32
+      offset: 0
+    - captions: list<wstr>
+      offset: 4
+
+  # kr-1256 sub_10D7930 reads a u16, a counted u32 list and five wide strings;
+  # kr-1256 sub_9D2890 gates S2C 110 on startup entry 307 before sub_833610 consumes it.
+  LaboratoryItems:
+    - count: u16
+      offset: 0
+    - items: list<u32>
+      offset: 4
+    - caption1: wstr
+      offset: 16
+    - caption2: wstr
+      offset: 40
+    - caption3: wstr
+      offset: 64
+    - caption4: wstr
+      offset: 88
+    - caption5: wstr
+      offset: 112

@@ -285,7 +285,7 @@ opcodes:
     name: gcpReqJoinSession
     name_source: label@cn-404
     evidence: inferred
-    source: "cn-404 stamping helper sub_62D760 sets 403, beside sub_62D6F0 (113), as id-400 sub_5E7AB0/sub_5E7A40; Packet_gcpReqJoinSession class present"
+    source: "cn-404 stamping helper sub_62D760 sets 403, beside sub_62D6F0 (113), as id-400 sub_5E7AB0/id-400 sub_5E7A40; Packet_gcpReqJoinSession class present"
     notes: "u32 room number, u32 unknown1, u32 unknown2, wstr password, u16 unknown4; a refusal is S2C gspRepJoinSession, success is S2C gspGotoRoom kind 2"
   - value: 404
     direction: c2s
@@ -571,6 +571,13 @@ opcodes:
     name_source: label@cn-404
     evidence: inferred
     source: "cn-404 sender sub_8D6280 stamps 303 through sub_AD4AE0 (Packet_gcpReqChangePartyLeader); Packet_gcpReqChangePartyLeader reader and writer bodies match id-400's"
+  - value: 304
+    direction: c2s
+    name: gcpSendPartyChatMsg
+    name_source: label@cn-404
+    evidence: verified
+    source: "cn-404 sub_8D6740 stamps 304 on Packet_gcpSendPartyChatMsg; reader cn-404 sub_68E480"
+    notes: "Chat box line outside a room: one string. The client draws nothing until S2C gspReceivePartyChatMsg answers."
   - value: 305
     direction: c2s
     name: gcpReqPartyRecruiting
@@ -603,10 +610,11 @@ opcodes:
     source: "cn-404 sender sub_9B7BD0 stamps 519 through sub_AD4AE0 (Packet_gcpReqSelectAward); Packet_gcpReqSelectAward reader and writer bodies match id-400's"
   - value: 607
     direction: c2s
+    connection: game
     name: gcpReportTableSetHolePunchingEnd
     name_source: label@cn-404
-    evidence: inferred
-    source: "cn-404 sender sub_7BF960 stamps 607 through sub_AD4AE0 (Packet_gcpReportTableSetHolePunchingEnd); Packet_gcpReportTableSetHolePunchingEnd reader and writer bodies match id-400's"
+    evidence: verified
+    source: "cn-404 sub_7BF960 stamps607 with empty body"
   - value: 704
     direction: c2s
     name: gcpRespawn
@@ -641,8 +649,8 @@ opcodes:
     direction: c2s
     name: gcpGameUpdateScore
     name_source: label@cn-404
-    evidence: inferred
-    source: "cn-404 sender sub_4B7620/sub_4BB620/sub_4CBF40 stamps 710 through sub_AD4AE0 (Packet_gcpGameUpdateScore); Packet_gcpGameUpdateScore reader and writer bodies match id-400's"
+    evidence: verified
+    source: "cn-404 sub_4BB620 stamps 710; cn-404 sub_4CBF40, cn-404 sub_4CBC20 and cn-404 sub_4CE360 report bubble/rescue/finishing; cn-404 sub_4AEA80 and cn-404 sub_4AEAF0 write/read eight words"
   - value: 711
     direction: c2s
     name: gcpGameUpdateDamagePoint
@@ -1071,16 +1079,18 @@ opcodes:
     source: "cn-404 sender sub_68B510 stamps 2007 through sub_AD4AE0 (Packet_gcpReqNotifyChangeLevelIcon); Packet_gcpReqNotifyChangeLevelIcon reader and writer bodies match id-400's"
   - value: 2010
     direction: c2s
+    connection: game
     name: gcpBombMissionOver
     name_source: label@cn-404
-    evidence: inferred
-    source: "cn-404 sender sub_4D7310 stamps 2010 through sub_AD4AE0 (Packet_gcpBombMissionOver); Packet_gcpBombMissionOver reader and writer bodies match id-400's"
+    evidence: verified
+    source: "cn-404 sub_4D7310 stamps 2010 and serializes the winner and two operator user numbers."
   - value: 2011
     direction: c2s
+    connection: game
     name: gcpBombState
     name_source: label@cn-404
-    evidence: inferred
-    source: "cn-404 sender sub_4D6DD0 stamps 2011 through sub_AD4AE0 (Packet_gcpBombState); Packet_gcpBombState reader and writer bodies match id-400's"
+    evidence: verified
+    source: "cn-404 sub_4D6DD0 stamps 2011 and serializes the operator, state and three coordinates."
   - value: 2014
     direction: c2s
     name: gcpUserState
@@ -1095,10 +1105,11 @@ opcodes:
     source: "cn-404 sender sub_7B5F50 stamps 2016 through sub_AD4AE0 (Packet_gcpGoMapItemSync); Packet_gcpGoMapItemSync reader and writer bodies match id-400's"
   - value: 2017
     direction: c2s
+    connection: game
     name: gcpDropCaptain
     name_source: label@cn-404
-    evidence: inferred
-    source: "cn-404 sender sub_4301C0 stamps 2017 through sub_AD4AE0 (Packet_gcpDropCaptain); Packet_gcpDropCaptain reader and writer bodies match id-400's"
+    evidence: verified
+    source: "cn-404 sub_4230C0 reports the local Captain death through the one-seat gcpDropCaptain builder."
   - value: 2018
     direction: c2s
     name: gcpReqClanInfo
@@ -1107,10 +1118,11 @@ opcodes:
     source: "cn-404 sender sub_43FEC0 stamps 2018 through sub_AD4AE0 (Packet_gcpReqClanInfo); Packet_gcpReqClanInfo reader and writer bodies match id-400's"
   - value: 9
     direction: s2c
+    connection: game
     name: gspRepMoveChannel
     name_source: label@cn-404
-    evidence: inferred
-    source: "cn-404 dispatcher sub_7C1B70/sub_7EC320/sub_7F8CC0 case 9 (Packet_gspRepMoveChannel); Packet_gspRepMoveChannel reader and writer bodies match id-400's"
+    evidence: verified
+    source: "cn-404 sub_7EC320 case 9 calls cn-404 sub_7D13F0; cn-404 reader sub_638200"
   - value: 11
     direction: s2c
     name: gspRepMoveInto
@@ -1137,10 +1149,11 @@ opcodes:
     source: "cn-404 dispatcher sub_7C1B70/sub_7EC320 case 15 (Packet_gspQueryBadProgram); Packet_gspQueryBadProgram reader and writer bodies match id-400's"
   - value: 18
     direction: s2c
+    connection: game
     name: gspRepUniquenessCheck
     name_source: label@cn-404
-    evidence: inferred
-    source: "cn-404 dispatcher sub_7EC320 case 18 (Packet_gspRepUniquenessCheck); Packet_gspRepUniquenessCheck reader and writer bodies match id-400's"
+    evidence: verified
+    source: "cn-404 sub_7EC320 case 18 calls cn-404 sub_7CED50; cn-404 reader sub_8A2A80"
   - value: 19
     direction: s2c
     name: gspDisconnectOpenWeb
@@ -1647,10 +1660,11 @@ opcodes:
     source: "cn-404 dispatcher sub_7EC320 case 955 (Packet_gspEvolveResult); Packet_gspEvolveResult reader and writer bodies match id-400's"
   - value: 958
     direction: s2c
+    connection: game
     name: gspPortalMove
     name_source: label@cn-404
-    evidence: inferred
-    source: "cn-404 dispatcher sub_7EC320 case 958 (Packet_gspPortalMove); Packet_gspPortalMove reader and writer bodies match id-400's"
+    evidence: verified
+    source: "cn-404 sub_7C7840 reads word, region u16 and seat word; cn-404 sub_7EA9D0 authorizes native map-region motion and clears local pending contact; packets/portal.yaml"
   - value: 959
     direction: s2c
     name: gspNotifyMsg
@@ -1819,6 +1833,13 @@ opcodes:
     name_source: label@cn-404
     evidence: inferred
     source: "cn-404 stamping helper sub_62D6F0 sets 113, as id-400 sub_5E7A40"
+  - value: 501
+    direction: c2s
+    name: gcpRoomSendChatMsg
+    name_source: label@cn-404
+    evidence: verified
+    source: "cn-404 sub_7EFA10 stamps 501 on Packet_gcpRoomSendChatMsg; reader cn-404 sub_8D1F90"
+    notes: "Waiting-room chat box line: bool32 team-only flag, then the text. The client draws nothing until S2C gspRoomReceiveChatMsg answers."
   - value: 502
     direction: c2s
     name: gcpRoomSendChatModuleMsg
@@ -1852,10 +1873,11 @@ opcodes:
     source: "cn-404 sender sub_7EFA80 stamps 520 through sub_AD4AE0 (Packet_gcpRoomSendAmpMsg); Packet_gcpRoomSendAmpMsg reader and writer bodies match id-400's"
   - value: 603
     direction: c2s
+    connection: game
     name: gcpReportHolePunchingEnd
     name_source: label@cn-404
-    evidence: inferred
-    source: "cn-404 sender sub_7BF410 stamps 603 through sub_AD4AE0 (Packet_gcpReportHolePunchingEnd); Packet_gcpReportHolePunchingEnd reader and writer bodies match id-400's"
+    evidence: verified
+    source: "cn-404 sub_7BF410 stamps603 with occupied-seat and successful-peer counts"
   - value: 807
     direction: c2s
     name: gcpReqInventoryThrowItem
@@ -1936,10 +1958,11 @@ opcodes:
     source: "cn-404 sender sub_75DD60 stamps 945 through sub_AD4AE0 (Packet_gcpReqIgnoreMissionSet); Packet_gcpReqIgnoreMissionSet reader and writer bodies match id-400's"
   - value: 948
     direction: c2s
+    connection: game
     name: gcpPortalMove
     name_source: label@cn-404
-    evidence: inferred
-    source: "cn-404 sender sub_4D66E0 stamps 948 through sub_AD4AE0 (Packet_gcpPortalMove); Packet_gcpPortalMove reader and writer bodies match id-400's"
+    evidence: verified
+    source: "cn-404 sub_4D66E0 stamps game 948 and relay 26 separately; cn-404 sub_4AF5C0 reads position xyz and region u16; packets/portal.yaml"
   - value: 951
     direction: c2s
     name: gcpReqAddGiftTest
@@ -1988,7 +2011,7 @@ opcodes:
     name: gcpReportSuperPeerConnected
     name_source: mirrored
     evidence: inferred
-    source: "cn-404 sub_7C1B70/sub_7C1AE0/sub_7C2A20 build Packet_gcpReportSuperPeerConnected and call the helper cn-404 sub_7C2CD0, which stamps 602"
+    source: "cn-404 sub_7C1B70/cn-404 sub_7C1AE0/sub_7C2A20 build Packet_gcpReportSuperPeerConnected and call the helper cn-404 sub_7C2CD0, which stamps 602"
   - value: 32772
     direction: c2s
     connection: both
@@ -3459,10 +3482,11 @@ opcodes:
     source: "cn-404 dispatcher sub_7AFA70 case 519 (Packet_gspHordeModeRewardList); Packet_gspHordeModeRewardList reader and writer bodies match id-400's"
   - value: 607
     direction: s2c
+    connection: game
     name: gspTryHolePunching
     name_source: mirrored
-    evidence: inferred
-    source: "cn-404 dispatcher sub_7AFA70 case 607 (Packet_gspTryHolePunching); Packet_gspTryHolePunching reader and writer bodies match id-400's"
+    evidence: verified
+    source: "cn-404 sub_7AFA70 case607 -> cn-404 sub_7B99B0: u16 port, u32 identity, u8 unknown"
   - value: 609
     direction: s2c
     name: gspNotifyUdpToServerReceived
@@ -3471,10 +3495,11 @@ opcodes:
     source: "cn-404 dispatcher sub_7AFA70 case 609 (Packet_gspNotifyUdpToServerReceived); Packet_gspNotifyUdpToServerReceived reader and writer bodies match id-400's"
   - value: 610
     direction: s2c
+    connection: game
     name: gspTableSetHolePunching
-    name_source: mirrored
-    evidence: inferred
-    source: "cn-404 dispatcher sub_7AFA70 case 610 (Packet_gspTableSetHolePunching); Packet_gspTableSetHolePunching reader and writer bodies match id-400's"
+    name_source: label@cn-404
+    evidence: verified
+    source: "cn-404 sub_7BFC30/cn-404 sub_7BDDD0: slot, identity, counted local IPv4, local port, outer IPv4 and port"
   - value: 711
     direction: s2c
     name: gspGameCreateGameItem
@@ -3528,7 +3553,7 @@ opcodes:
     name: gspGameBroadcastPlayerScoreData
     name_source: label@cn-404
     evidence: verified
-    source: "cn-404 dispatcher sub_7AFA70 case 729 (Packet_gspGameBroadcastPlayerScoreData); Packet_gspGameBroadcastPlayerScoreData reader and writer bodies match id-400's"
+    source: "cn-404 sub_7AFA70 case 729 dispatches cn-404 sub_7B7AA0; cn-404 sub_7AD7F0 reads the score data; cn-404 sub_7B8F00 and cn-404 sub_7B90A0 copy it to the session"
   - value: 730
     direction: s2c
     name: gspGameRespawnCharacter
@@ -3722,3 +3747,192 @@ opcodes:
     name_source: label@cn-404
     evidence: inferred
     source: "Packet_gcpReqPresentDeleteReceive is constructed before the stamping call of cn-404 sub_90BF00 / sub_90D3F0: removing a gift from the received list (id); layout in packets/present.yaml"
+  - value: 608
+    direction: s2c
+    connection: game
+    name: gspStopUdpDiscovery_
+    name_source: coined
+    evidence: verified
+    source: "cn-404 sub_7AFA70 case608 clears discovery"
+  - value: 611
+    direction: s2c
+    connection: game
+    name: gspUdpPeerTableEnd_
+    name_source: coined
+    evidence: verified
+    source: "cn-404 sub_7AFA70 case611 -> cn-404 sub_7BF960 sends empty C2S607"
+  - value: 612
+    direction: s2c
+    connection: game
+    name: gspUdpPeerPunchStart_
+    name_source: coined
+    evidence: verified
+    source: "cn-404 sub_7AFA70 case612 -> cn-404 sub_7BF9F0 starts native UDP6/8"
+  - value: 613
+    direction: s2c
+    connection: game
+    name: gspUdpPeerPunchFinish_
+    name_source: coined
+    evidence: verified
+    source: "cn-404 sub_7AFA70 case613 -> cn-404 sub_7BF410 finalizes peer attempts"
+  - value: 2
+    direction: c2s
+    connection: udp
+    name: upTrySendUdpToServer
+    name_source: mirrored
+    evidence: verified
+    source: "cn-404 sub_7BE2E0 stamps UDP2 with identity, local IPv4 and local port"
+  - value: 8
+    direction: c2s
+    connection: relay
+    name: rcpReqRegisterPeer
+    name_source: label@cn-404
+    evidence: verified
+    source: "cn-404 sub_7BED50 stamps relay8 with peer identity after more than320 unacknowledged movements"
+  - value: 9
+    direction: c2s
+    connection: relay
+    name: rcpReqUnRegisterPeer
+    name_source: label@cn-404
+    evidence: verified
+    source: "cn-404 sub_7BF410 stamps relay9 with a successfully punched peer identity"
+  - value: 32885
+    direction: c2s
+    connection: both
+    name: gppWanderLean
+    name_source: mirrored
+    evidence: verified
+    source: "cn-404 sub_7BEFA0 sends32885; cn-404 sub_7C0C00/cn-404 sub_4AFF50 consumes the15-byte body"
+  - value: 32923
+    direction: c2s
+    connection: both
+    name: gppWanderLeanOptimize
+    name_source: label@cn-404
+    evidence: verified
+    source: "cn-404 sub_7BEFA0 sends32923; cn-404 sub_7C0920 consumes u32 actor, u16 tick and mask-selected packed movement"
+  - value: 32885
+    direction: s2c
+    connection: both
+    name: gppWanderLean
+    name_source: mirrored
+    evidence: verified
+    source: "cn-404 sub_7BEFA0 sends32885; cn-404 sub_7C0C00/cn-404 sub_4AFF50 consumes the15-byte body"
+  - value: 32923
+    direction: s2c
+    connection: both
+    name: gppWanderLeanOptimize
+    name_source: label@cn-404
+    evidence: verified
+    source: "cn-404 sub_7BEFA0 sends32923; cn-404 sub_7C0920 consumes u32 actor, u16 tick and mask-selected packed movement"
+  - value: 16
+    direction: s2c
+    connection: game
+    name: gspRepCenterUserCnt
+    name_source: label@cn-404
+    evidence: verified
+    source: "cn-404 sub_7EC320 case 16 calls cn-404 sub_7CE530; cn-404 reader sub_7C5DC0"
+  - value: 10
+    direction: s2c
+    connection: game
+    name: gspDisconnectMovedUser
+    name_source: label@cn-404
+    evidence: verified
+    source: "cn-404 sub_7EC320 case 10 calls cn-404 sub_7D2A40; empty-body pending promotion closes the previous source"
+  - value: 23
+    direction: c2s
+    connection: game
+    name: gcpReqCenterUserCnt
+    name_source: label@cn-404
+    evidence: verified
+    source: "cn-404 sub_7EF9A0 selects Packet_gcpReqCenterUserCnt and stamps 23; the native writer has no body"
+  - value: 24
+    direction: c2s
+    connection: game
+    name: gcpReqUniquenessCheck
+    name_source: label@cn-404
+    evidence: verified
+    source: "cn-404 sub_7CEF20 selects Packet_gcpReqUniquenessCheck and stamps 24; the native writer carries one user-number word"
+  - value: 11
+    direction: c2s
+    connection: relay
+    name: rcpSetDamageAffectingAttribute
+    name_source: label@cn-404
+    evidence: inferred
+    source: "cn-404 senders sub_4BCEF0, cn-404 sub_4DB040, cn-404 sub_4DB0B0 stamp relay 11; layout packets/relay-hp.yaml RelayDamageAttributeReport"
+  - value: 13
+    direction: c2s
+    connection: relay
+    name: rcpReqDamageCalcAndBroadcast
+    name_source: label@cn-404
+    evidence: inferred
+    source: "cn-404 senders sub_4DB310 stamp relay 13; layout packets/relay-hp.yaml RelayDamageRequest"
+  - value: 14
+    direction: c2s
+    connection: relay
+    name: rcpCharacterRespawn
+    name_source: label@cn-404
+    evidence: inferred
+    source: "cn-404 senders sub_4DB4F0 stamp relay 14; layout packets/relay-hp.yaml RelayCharacterRespawnReport"
+  - value: 15
+    direction: c2s
+    connection: relay
+    name: rcpChangeChrType
+    name_source: label@cn-404
+    evidence: inferred
+    source: "cn-404 senders sub_4DB570, cn-404 sub_4DB5E0 stamp relay 15; layout packets/relay-hp.yaml RelayCharacterTypeReport"
+  - value: 16
+    direction: c2s
+    connection: relay
+    name: rcpHpRecover
+    name_source: label@cn-404
+    evidence: inferred
+    source: "cn-404 senders sub_4DB390, cn-404 sub_4DB400 stamp relay 16; layout packets/relay-hp.yaml RelayHpRecoverReport"
+  - value: 22
+    direction: c2s
+    connection: relay
+    name: rcpSetChrState
+    name_source: label@cn-404
+    evidence: inferred
+    source: "cn-404 senders sub_4BD040, cn-404 sub_4DB130, cn-404 sub_4DB1A0 stamp relay 22; layout packets/relay-hp.yaml RelayCharacterStateReport"
+  - value: 7
+    direction: s2c
+    connection: relay
+    name: rspHpDeltaBroadcast
+    name_source: label@cn-404
+    evidence: inferred
+    source: "cn-404 dispatcher sub_7C1B70, cn-404 sub_7EC320 route relay 7; layout packets/relay-hp.yaml RelayHpDelta"
+  - value: 972
+    direction: s2c
+    connection: game
+    name: gspBombState
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-404 sub_4B8510 case 972 reads Packet_gspBombState and applies its state, timer, position and trailing flag."
+  - value: 973
+    direction: s2c
+    connection: game
+    name: gspObserver
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-404 sub_4B8510 case 973 calls cn-404 sub_4D6E80, which resolves the scene-object word for mode 19."
+  - value: 981
+    direction: s2c
+    connection: game
+    name: gspCreateCaptain
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-404 sub_7AFA70 case 981 calls cn-404 sub_7B13E0, which reads one seat word and dispatches Captain event 309."
+  - value: 516
+    direction: c2s
+    connection: game
+    name: gcpRoomSendRecMsg
+    name_source: label@cn-404
+    evidence: verified
+    source: cn-404 sub_7EFB60 stamps the native recruitment-text request; cn-404 sub_68E480 reads one counted UTF-16 message
+  - value: 516
+    direction: s2c
+    connection: game
+    name: gspRoomReceiveRecruitMsg
+    name_source: label@cn-404
+    evidence: verified
+    source: cn-404 sub_7AFA70 case 516 reaches cn-404 sub_7B5D60; cn-404 sub_7AEEE0 reads a u16 plaza seat then one counted UTF-16 message

@@ -1,6 +1,181 @@
 version: 1
 structs:
+  # id-400 sub_798AB0 and id-1809 sub_8C2550 write two counted UTF-16 strings.
+  # id-400 sub_5E9050 and id-1809 sub_632750 continue stage setup immediately after sending.
+  gcpReqIDPCRoomAuth:
+    - unknown_4: wstr
+      offset: 4
+    - unknown_32: wstr
+      offset: 32
+  # cn-774 sub_609D70 stamps 827 without writing a body; cn-774 sub_641B80 rearms its timer immediately.
+  # cn-774 sub_63ED80 also sends it from the cash dialog without installing a response-wait state.
+  gcpReqCheckCash_: []
+  # cn-324 sub_78B580 constructs Packet_gcpReqKeepAlivePing; cn-324 sub_793E20 stamps its opcode.
+  # Both serializer slots at cn-324 0xB21114 point to cn-324 nullsub_3 at 0x5C7C90: no body fields.
+  # This empty shape is enabled only by a build's verified named opcode; it does not establish other builds' support.
+  gcpReqKeepAlivePing: []
+  # kr-812 sub_845700. Empty strings give a 96-byte body, but strings need not be empty.
+  gcpFirstConnect:
+    - client_version: u32
+      offset: 4
+    - unknown_8: wstr
+      offset: 8
+    - unknown_36: wstr
+      offset: 36
+    - unknown_64: wstr
+      offset: 64
+    - unknown_92: wstr
+      offset: 92
+    - unknown_120: wstr
+      offset: 120
+    - unknown_148: wstr
+      offset: 148
+    - unknown_176: wstr
+      offset: 176
+    - unknown_204: u32
+      offset: 204
+    - unknown_208: wstr
+      offset: 208
+    - unknown_236: wstr
+      offset: 236
+    - unknown_264: wstr
+      offset: 264
+    - unknown_292: wstr
+      offset: 292
+    - unknown_320: wstr
+      offset: 320
+    - unknown_348: wstr
+      offset: 348
+    - unknown_376: wstr
+      offset: 376
+    - unknown_404: wstr
+      offset: 404
+    - unknown_432: wstr
+      offset: 432
+    - unknown_460: wstr
+      offset: 460
+    - unknown_488: wstr
+      offset: 488
+    - unknown_516: wstr
+      offset: 516
+    - unknown_544: wstr
+      offset: 544
+    - unknown_572: wstr
+      offset: 572
+    - unknown_600: wstr
+      offset: 600
+  # cn-324 sub_6FC2E0 initializes single-word string handles; cn-279 sub_44E390
+  # writes the same order. Object offsets differ from the kr-812 inline strings.
+  gcpFirstConnect@cn-324:
+    - client_version: u32
+      offset: 4
+    - unknown_8: wstr
+      offset: 8
+    - unknown_12: wstr
+      offset: 12
+    - unknown_16: wstr
+      offset: 16
+    - unknown_20: wstr
+      offset: 20
+    - unknown_24: wstr
+      offset: 24
+    - unknown_28: wstr
+      offset: 28
+    - unknown_32: wstr
+      offset: 32
+    - unknown_36: u32
+      offset: 36
+    - unknown_40: wstr
+      offset: 40
+    - unknown_44: wstr
+      offset: 44
+    - unknown_48: wstr
+      offset: 48
+    - unknown_52: wstr
+      offset: 52
+    - unknown_56: wstr
+      offset: 56
+    - unknown_60: wstr
+      offset: 60
+    - unknown_64: wstr
+      offset: 64
+    - unknown_68: wstr
+      offset: 68
+    - unknown_72: wstr
+      offset: 72
+    - unknown_76: wstr
+      offset: 76
+    - unknown_80: wstr
+      offset: 80
+    - unknown_84: wstr
+      offset: 84
+    - unknown_88: wstr
+      offset: 88
+    - unknown_92: wstr
+      offset: 92
+    - unknown_96: wstr
+      offset: 96
+  # kr-1256 sub_99DD00 -> sub_10C6440; cn-774 sub_105BE90; tw-454 sub_ECB490.
+  # The native object has no packet vtable: two words surround seven counted UTF-16 strings,
+  # followed by fifteen more strings. All-empty strings produce 96 bytes, not a fixed-size body.
+  gcpFirstConnect@kr-1256:
+    - client_version: u32
+      offset: 0
+    - unknown_4: wstr
+      offset: 4
+    - unknown_28: wstr
+      offset: 28
+    - unknown_52: wstr
+      offset: 52
+    - unknown_76: wstr
+      offset: 76
+    - unknown_100: wstr
+      offset: 100
+    - unknown_124: wstr
+      offset: 124
+    - unknown_148: wstr
+      offset: 148
+    - unknown_172: u32
+      offset: 172
+    - unknown_176: wstr
+      offset: 176
+    - unknown_200: wstr
+      offset: 200
+    - unknown_224: wstr
+      offset: 224
+    - unknown_248: wstr
+      offset: 248
+    - unknown_272: wstr
+      offset: 272
+    - unknown_296: wstr
+      offset: 296
+    - unknown_320: wstr
+      offset: 320
+    - unknown_344: wstr
+      offset: 344
+    - unknown_368: wstr
+      offset: 368
+    - unknown_392: wstr
+      offset: 392
+    - unknown_416: wstr
+      offset: 416
+    - unknown_440: wstr
+      offset: 440
+    - unknown_464: wstr
+      offset: 464
+    - unknown_488: wstr
+      offset: 488
+    - unknown_512: wstr
+      offset: 512
+  # kr-812 sub_8178B0 and cn-324 sub_7034B0 read bool32, then a counted UTF-16 string.
+  gspRepGamePatch:
+    - requires_patch: bool
+      offset: 4
+    - command_line: wstr
+      offset: 8
   CenterStatus:
+    # kr-1256 sub_9A1470 reads the same word, wstring and two occupancy words;
+    # the consuming connection stores identity/name at +2604/+2608 and occupancy at +2580/+2584.
     - center_id: u32 # cn-324 sub_703640 stores this at ServerConnection +2340; cn-279 sub_6F05D0 at +2328.
       offset: 4
     - name: wstr # kr-812 sub_845080; cn-324 sub_6FABB0 / sub_703640; cn-279 sub_405360 omits the name.
@@ -23,13 +198,16 @@ structs:
         - capacity: u32
           offset: 12
   CenterAvailabilityRequest:
+    # kr-1256 sub_9D76C0 writes one retained user-number word, without a string or tail.
     - user_num: u32 # cn-324 sub_410910; cn-279 sub_44EA60.
       offset: 4
   CenterAvailabilityReply:
     # Native readers consume four bytes before converting to bool, not the one-byte object storage width.
-    # kr-812 sub_8184B0 -> sub_A56BD0; cn-324 sub_798810 -> sub_8A3680;
+    # kr-812 sub_8184B0 -> sub_A56BD0; cn-324 sub_703B50 -> sub_8A3680;
     # cn-279 sub_6F1C10 -> sub_4EBFD0 -> sub_4EBBE0; cn-717 sub_89E600 -> sub_B14700;
     # id-400 sub_7A15D0 -> sub_9DD0F0; id-1809 sub_7C55C0 -> sub_9F5830;
-    # cn-706 sub_7A9D60 -> sub_9DB800. True removes the auxiliary connection.
+    # kr-1256 sub_9A2500 reads one four-byte word and follows the same retirement/failure branches.
+    # cn-706 sub_7A9D60 -> sub_9DB800. True removes the matching unselected auxiliary;
+    # false invokes the native login-failure path (cn-324 sub_78A7C0 closes the selected socket).
     - unavailable: bool
       offset: 4

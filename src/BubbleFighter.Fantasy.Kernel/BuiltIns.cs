@@ -47,6 +47,9 @@ public sealed class ConnectionProtocolRegistryPlugin : IPlugin
 /// <summary>Configuration for the <see cref="PacketRouterPlugin"/> row.</summary>
 public sealed class PacketRouterOptions
 {
+    /// <summary>Gets or sets whether this deployment exposes the packet router through a stable decorator chain.</summary>
+    public bool Decoratable { get; set; }
+
     /// <summary>
     /// Gets or sets how long removing a handler waits for calls already running in it. The
     /// removal first stops new calls and cancels the running ones; a handler that ignores
@@ -74,7 +77,8 @@ public sealed class PacketRouterPlugin : IPlugin
     {
         var options = context.Config.Bind<PacketRouterOptions>();
         var router = new PacketRouter(context.Events, TimeSpan.FromMilliseconds(options.DrainTimeoutMs), context.Logger);
-        context.Effect(context.Services.Register<IPacketRouter>(router));
+        context.Effect(options.Decoratable ? context.Services.RegisterDecoratable<IPacketRouter>(router)
+            : context.Services.Register<IPacketRouter>(router));
         return ValueTask.CompletedTask;
     }
 

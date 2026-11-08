@@ -86,7 +86,7 @@ opcodes:
   - {value: 513, direction: c2s, name: gcpRoomChangeGameSetting, grade: label, name_source: label@cn-706, connection_hint: game, senders: [577470, 633400]}
   - {value: 514, direction: c2s, name: Unknown514, grade: none, name_source: none, connection_hint: game, senders: [577320]}
   - {value: 515, direction: c2s, name: gcpRoomChangeTeam, grade: label, name_source: label@cn-706, connection_hint: game, senders: [5772B0, 947D80]}
-  - {value: 516, direction: c2s, name: Unknown516, grade: none, name_source: none, connection_hint: game, senders: [7CC1F0]}
+  - {value: 516, direction: c2s, name: gcpRoomSendRecMsg, grade: runtime, name_source: label@cn-706, connection_hint: game, senders: [7CC1F0], evidence: verified, source: cn-706 sub_7CC1F0 stamps the native recruitment-text request; cn-706 sub_567230 reads one counted UTF-16 message}
   - {value: 517, direction: c2s, name: gcpReqPingUser, grade: label, name_source: label@cn-706, connection_hint: game, senders: [4C2320, 4E73F0, 56D890, 622F90]}
   - {value: 518, direction: c2s, name: gcpRepPingUser, grade: label, name_source: label@cn-706, connection_hint: game, senders: [796C60]}
   - {value: 519, direction: c2s, name: gcpReqSelectAward, grade: label, name_source: label@cn-706, connection_hint: game, senders: [987160]}
@@ -467,3 +467,4 @@ opcodes:
   - {value: 982, direction: s2c, name: gspResChangeCouplering, grade: label, name_source: label@cn-706, connection_hint: game}
   - {value: 983, direction: s2c, name: gspUpdateClanInfoToClanServer, grade: label, name_source: label@cn-706, connection_hint: game}
   - {value: 984, direction: s2c, name: gspResChangeClanMarkNoty, grade: label, name_source: label@cn-706, connection_hint: game}
+  - {value: 516, direction: s2c, connection: game, name: gspRoomReceiveRecruitMsg, name_source: label@cn-706, evidence: verified, source: cn-706 sub_7890E0 case 516 reaches cn-706 sub_78F7B0; cn-706 sub_788590 reads a u16 plaza seat then one counted UTF-16 message, grade: runtime, method: own-client-reader, connection_hint: game}

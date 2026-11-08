@@ -1,4 +1,5 @@
 using BubbleFighter.Fantasy.Contracts.Inventory;
+using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using Microsoft.Extensions.Logging;
 
@@ -13,12 +14,13 @@ namespace BubbleFighter.Fantasy.InventoryView;
 /// <param name="selection">Reads the worn set the derived bar and the page seeding come from; may be null.</param>
 /// <param name="persistPresetPages">Whether the preset bar is served from persisted pages (the
 /// <c>persist_preset_pages</c> row switch, default off).</param>
+/// <param name="events">Publishes the completed local snapshot after every dialect frame succeeds.</param>
 internal sealed class EquippedViewPush(ILogger logger,
     IMessageSender<LocalEquipmentViewUpdated> localSender,
     IMessageSender<RemoteEquipmentViewUpdated> remoteSender,
     IPlayerInventoryState? playerState = null,
     IEquipmentSelection? selection = null,
-    bool persistPresetPages = false) : IEquippedViewPush, IWeaponPresetPageSource
+    bool persistPresetPages = false, IEventBus? events = null) : IEquippedViewPush, IWeaponPresetPageSource
 {
     /// <inheritdoc />
     public ValueTask<WeaponPresetPage[]?> ReadAsync(long userNum, CancellationToken ct) =>
@@ -67,8 +69,12 @@ internal sealed class EquippedViewPush(ILogger logger,
         var pages = persistPresetPages && playerState is not null
             ? await ReadOrMaterializePagesAsync(playerState, userNum, primary, special, ct).ConfigureAwait(false)
             : null;
-        await localSender.SendAsync(session,
-            new(userNum, characterId, snapshot, activeSlot, primary, special, pages), ct).ConfigureAwait(false);
+        var published = new LocalEquipmentViewUpdated(userNum, characterId, Array.AsReadOnly(snapshot), activeSlot,
+            primary, special, pages is null ? null : Array.AsReadOnly(pages.ToArray()));
+        await localSender.SendAsync(session, published, ct).ConfigureAwait(false);
+        if (events is not null)
+            await events.SerialAsync(new EquipmentViewPublished(localSender.Protocol, session, published, selectionChange), ct)
+                .ConfigureAwait(false);
         logger.LogInformation(
             "Session {Id} equipment view published: identity={Identity} character={Character} activeSlot={ActiveSlot} equipped=[{Equipped}] presetPages={PresetPages}.",
             session.Id, userNum, characterId, activeSlot, string.Join(", ", snapshot),

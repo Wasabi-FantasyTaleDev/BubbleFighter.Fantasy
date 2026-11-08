@@ -53,8 +53,8 @@ public sealed class ClanMountTests
 
         Assert.Equal(
             [
-                // gspClanPassport (S2C 21): empty name, word, word, empty byte list = 16 bytes.
-                "gspClanPassport=00000000000000000000000000000000",
+                // gspClanPassport (S2C 21): leading word, empty name, word, word, empty byte list = 20 bytes.
+                "gspClanPassport=0000000000000000000000000000000000000000",
                 // gspReqClanMarkInfo (S2C 140): word, empty counted table = 8 bytes.
                 "gspReqClanMarkInfo=0000000000000000",
                 // gspResGuildInfo (S2C 918): i64, bool32 false, bool32 false = 16 bytes.

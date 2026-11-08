@@ -44,7 +44,7 @@ public sealed class FighterInfoModernPins
         return new FighterInfoBinding(build + "/game", table, WireLengthSupport.Tables, build);
     }
 
-    private static byte[] Found(string build) => Binding(build).Write(new FighterInfoReplied(Player));
+    private static byte[] Found(string build) => Binding(build).Write(new FighterInfoReplied(Player, new FighterAppearance(300001, [300001])));
 
     private static byte[] NotFound(string build) => Binding(build).Write(new FighterInfoReplied(null));
 

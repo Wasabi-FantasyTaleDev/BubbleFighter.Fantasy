@@ -21,9 +21,11 @@ internal static class RoundSettler
     /// <param name="attempts">How many attempts in all, 1 or more.</param>
     /// <param name="logger">Logs a failed attempt before the next one.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <param name="battleRecord">Accepted match counters, or null when recording is disabled.</param>
     /// <returns>The stored settlement; the last failure is thrown when every attempt failed.</returns>
     internal static async ValueTask<RoundSettlementResult> SettleAsync(IPlayerProgressRepository progress, LevelTable levels,
-        string matchId, long userNum, int expEarned, int lucciEarned, int attempts, ILogger logger, CancellationToken ct)
+        string matchId, long userNum, int expEarned, int lucciEarned, int attempts, ILogger logger, CancellationToken ct,
+        RoundBattleRecord? battleRecord = null)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(expEarned);
         ArgumentOutOfRangeException.ThrowIfLessThan(attempts, 1);
@@ -33,7 +35,7 @@ internal static class RoundSettler
             var before = Math.Max(stored.Exp, levels.Start(Math.Max(1, stored.Level)));
             var total = checked(before + expEarned);
             return new PlayerProgress(userNum, levels.LevelFor(total), total);
-        });
+        }) { BattleRecord = battleRecord };
         for (var attempt = 1; ; attempt++)
         {
             try

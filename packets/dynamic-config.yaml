@@ -37,11 +37,93 @@ structs:
     - checksum_30: 'when<mask&0x40000000,u32>'
     - checksum_31: 'when<mask&0x80000000,u32>'
 
+  # cn-735 sub_51B400 writes a u16 mask and 10 possible checksum words in ascending bit order.
+  DynamicConfigRequest@cn-735:
+    - mask: u16
+    - checksum_0: 'when<mask&0x1,u32>'
+    - checksum_1: 'when<mask&0x2,u32>'
+    - checksum_2: 'when<mask&0x4,u32>'
+    - checksum_3: 'when<mask&0x8,u32>'
+    - checksum_4: 'when<mask&0x10,u32>'
+    - checksum_5: 'when<mask&0x20,u32>'
+    - checksum_6: 'when<mask&0x40,u32>'
+    - checksum_7: 'when<mask&0x80,u32>'
+    - checksum_8: 'when<mask&0x100,u32>'
+    - checksum_9: 'when<mask&0x200,u32>'
+
+  # cn-774 sub_8114E0 writes a u16 mask and 16 possible checksum words in ascending bit order.
+  # tw-454 sub_628A00 independently writes the same sixteen-category request.
+  DynamicConfigRequest@cn-774:
+    - mask: u16
+    - checksum_0: 'when<mask&0x1,u32>'
+    - checksum_1: 'when<mask&0x2,u32>'
+    - checksum_2: 'when<mask&0x4,u32>'
+    - checksum_3: 'when<mask&0x8,u32>'
+    - checksum_4: 'when<mask&0x10,u32>'
+    - checksum_5: 'when<mask&0x20,u32>'
+    - checksum_6: 'when<mask&0x40,u32>'
+    - checksum_7: 'when<mask&0x80,u32>'
+    - checksum_8: 'when<mask&0x100,u32>'
+    - checksum_9: 'when<mask&0x200,u32>'
+    - checksum_10: 'when<mask&0x400,u32>'
+    - checksum_11: 'when<mask&0x800,u32>'
+    - checksum_12: 'when<mask&0x1000,u32>'
+    - checksum_13: 'when<mask&0x2000,u32>'
+    - checksum_14: 'when<mask&0x4000,u32>'
+    - checksum_15: 'when<mask&0x8000,u32>'
+
   # kr-1256 sub_9D2FF0 case 1500 reads a mask, not a count. Only the audited category is published.
+
+  # kr-1256 sub_9D2FF0 case 1500 reads a mask, not a count, then walks the set bits ascending: per
+  # bit kr-1256 sub_65F370 reads one compressed byte count and that many bytes, inflates it, restamps
+  # the slot's registry entry and applies the slot decoder. A failed bit abandons the rest of the
+  # packet, so a server must only set bits whose blobs it actually frames. The mask bits are the
+  # registry ids kr-1256 sub_65F0C0 registers (kr-1256 sub_53D0E0 -> 14, kr-1256 sub_83DD70 -> 3,
+  # kr-1256 sub_8A0AA0 -> 6, kr-1256 sub_917970 -> 8, kr-1256 sub_92A6E0 -> 4/5/7/9/13,
+  # kr-1256 sub_994780 -> 12, kr-1256 sub_728060 -> 16, and three more sites inside the
+  # registration init that carry 1, 2 and 11; ids 10 and 15 register at runtime only).
   DynamicConfigReply:
     - mask: u32
-    - creation: 'when<mask&0x4000,DynamicConfigBlob>'
+    - slot_1: 'when<mask&0x2,DynamicConfigBlob>'
       only: [kr-1256]
+    - slot_2: 'when<mask&0x4,DynamicConfigBlob>'
+      only: [kr-1256]
+    - slot_3: 'when<mask&0x8,DynamicConfigBlob>'
+      only: [kr-1256]
+    - slot_4: 'when<mask&0x10,DynamicConfigBlob>'
+      only: [kr-1256]
+    - slot_5: 'when<mask&0x20,DynamicConfigBlob>'
+      only: [kr-1256]
+    - slot_6: 'when<mask&0x40,DynamicConfigBlob>'
+      only: [kr-1256]
+    - slot_7: 'when<mask&0x80,DynamicConfigBlob>'
+      only: [kr-1256]
+    - slot_8: 'when<mask&0x100,DynamicConfigBlob>'
+      only: [kr-1256]
+    - slot_9: 'when<mask&0x200,DynamicConfigBlob>'
+      only: [kr-1256]
+    - slot_10: 'when<mask&0x400,DynamicConfigBlob>'
+      only: [kr-1256]
+    - slot_11: 'when<mask&0x800,DynamicConfigBlob>'
+      only: [kr-1256]
+    - slot_12: 'when<mask&0x1000,DynamicConfigBlob>'
+      only: [kr-1256]
+    - slot_13: 'when<mask&0x2000,DynamicConfigBlob>'
+      only: [kr-1256]
+    - slot_14: 'when<mask&0x4000,DynamicConfigBlob>'
+      only: [kr-1256]
+    - slot_15: 'when<mask&0x8000,DynamicConfigBlob>'
+      only: [kr-1256]
+    - slot_16: 'when<mask&0x10000,DynamicConfigBlob>'
+      only: [kr-1256]
+
+  # cn-735 sub_51B4E0 returns on a zero u16 mask without replacing native configuration.
+  DynamicConfigReply@cn-735:
+    - mask: u16
+  # cn-774 sub_8115F0 and tw-454 sub_A9E440 likewise accept a zero u16 mask.
+  # Nonzero category bodies are not established by these zero-mask bootstrap replies.
+  DynamicConfigReply@cn-774:
+    - mask: u16
 
   # kr-1256 sub_65F370 reads one compressed byte count and wraps those bytes in a zlib stream.
   DynamicConfigBlob:
@@ -68,3 +150,226 @@ structs:
       offset: 16
     - unknown_20: u32
       offset: 20
+
+  # ---------------------------------------------------------------------------
+  # Per-slot content schemas. The wire order follows each slot's client decoder: the per-slot
+  # parse is the decoder object's virtual +4, called with the inflated stream by kr-1254
+  # sub_65F1D0 (kr-1256 sub_65F370). Decoder addresses are kr-1254 (the kr-1254 export's decode
+  # bodies); the kr-1256 side is verified at its registration sites (kr-1256 sub_65F0C0, listed
+  # at DynamicConfigReply above) and the ids match one for one. An independent parser consumes
+  # each slot's inflated body exactly with the schema stated here.
+  # ---------------------------------------------------------------------------
+
+  # Slot 1, xxPL.dch, PartyLadderContext (decoder kr-1254 sub_914ED0). Twelve bytes.
+  PartyLadderContext:
+    - flag_a: u32 # kr-1254 sub_914ED0 stores it as the manager's bool at +0
+      offset: 0
+    - flag_b: u32 # bool at +1
+      offset: 4
+    - unknown_8: u8 # +2
+      offset: 8
+    - unknown_9: u16 # +4
+      offset: 9
+    - unknown_11: u8 # +8
+      offset: 11
+
+  # Slot 2, xxSL.dch, SeasonLadderContext (decoder kr-1254 sub_994140; helpers kr-1254 sub_998BE0
+  # for the key pair map, kr-1254 sub_11447D0 for the word pairs). The trailing flag block and
+  # word are only present when the marker byte is 58; the reader branches on it, and the served
+  # generation always carries 58, so the table states the taken branch and the content keeps the
+  # marker.
+  SeasonLadderPayout:
+    - key: u32
+      offset: 0
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+
+  SeasonLadderChoice:
+    - unknown_0: u32
+      offset: 0
+    - unknown_4: u32
+      offset: 4
+
+  SeasonLadderContext:
+    - flag_0: u32 # bool
+      offset: 0
+    - unknown_4: u16
+      offset: 4
+    - flag_6: u32 # bool
+      offset: 6
+    - flag_10: u32 # bool
+      offset: 10
+    - unknown_14: u8
+      offset: 14
+    - unknown_15: u16
+      offset: 15
+    - flag_17: u32 # bool
+      offset: 17
+    - payout_map: "list<SeasonLadderPayout>" # the served content is the identity map with flag 1
+    - vec_a: "list<u32>"
+    - fixed_0: u32
+    - fixed_1: u32
+    - fixed_2: u32
+    - fixed_3: u32
+    - fixed_4: u32
+    - fixed_5: u32
+    - fixed_6: u32
+    - vec_pairs: "list<SeasonLadderChoice>"
+    - vec_b: "list<u32>"
+    - marker: u8
+    - flag_block_0: u32 # present when marker is 58; bool
+    - flag_block_1: u32
+    - flag_block_2: u32
+    - flag_block_3: u32
+    - flag_block_4: u32
+    - flag_block_5: u32
+    - flag_block_6: u32
+    - unknown_tail: u32
+
+  # Slot 3, xxLMG.dch, LobbyMinigameConfig (decoder kr-1254 sub_83D970). Forty-two bytes.
+  LobbyMinigameContext:
+    - flag_a: u32
+      offset: 0
+    - unknown_4: u16
+      offset: 4
+    - unknown_6: u16
+      offset: 6
+    - unknown_8: u16
+      offset: 8
+    - unknown_10: u16
+      offset: 10
+    - flag_12: u32
+      offset: 12
+    - unknown_16: u16
+      offset: 16
+    - unknown_18: u16
+      offset: 18
+    - unknown_20: u16
+      offset: 20
+    - unknown_22: u16
+      offset: 22
+    - unknown_24: u16
+      offset: 24
+    - unknown_26: u16
+      offset: 26
+    - unknown_28: u32 # an item id in the served content
+      offset: 28
+    - unknown_32: u32 # an item id in the served content
+      offset: 32
+    - flag_36: u32
+      offset: 36
+    - unknown_40: u16
+      offset: 40
+
+  # Slot 4, xxMSTY, MysteryStore (decoder kr-1254 sub_E5E360). Two OLE automation dates
+  # (1899-12-30 epoch) read as two eight-byte blocks.
+  MysteryStoreContext:
+    - start: f64
+      offset: 0
+    - end: f64
+      offset: 8
+
+  # Slot 5, xxBPST, BubblePointStore (decoder kr-1254 sub_E04FE0).
+  BubblePointStoreContext:
+    - item_id: u32
+      offset: 0
+    - label: wstr
+    - dlg_path: wstr
+    - card_path: wstr
+    - unknown_tail_a: u32
+    - unknown_tail_b: u32
+
+  # Slot 6, xxasfasdfasdf.dch, MatchDesk (decoder kr-1254 sub_89FFC0; entry reader
+  # kr-1254 sub_8A3990, list reader kr-1254 sub_1137180). The rotation map values are counted
+  # wide strings; an empty list means the client falls back to the server's map rotation.
+  MatchDeskRotation:
+    - mode_id: u32
+      offset: 0
+    - maps: "list<wstr>"
+
+  MatchDeskEntry:
+    - desk_id: u32
+      offset: 0
+    - kind_a: u8
+      offset: 4
+    - kind_b: u8
+      offset: 5
+    - unknown_6: u16
+      offset: 6
+    - unknown_8: u16
+      offset: 8
+    - unknown_10: u16
+      offset: 10
+    - unknown_12: u16
+      offset: 12
+    - mode_ids: "list<u32>"
+    - flag_a: u32
+    - rotations: "list<MatchDeskRotation>"
+    - flag_b: u32
+    - unknown_44: u32
+    - unknown_48: u32
+    - unknown_52: u32
+    - flag_c: u32
+
+  MatchDeskContext:
+    - entries: "list<MatchDeskEntry>"
+      offset: 0
+
+  # Slot 8, xxPA, PirateAssaultMgr (decoder kr-1254 sub_917490; entry vector kr-1254 sub_11535F0,
+  # op record kr-1254 sub_1153F30). The op code picks add (1) or multiply (2) and the wide names
+  # repeat it in the served content. The four trailing fields' reader-level names are not
+  # established; the byte split is exact.
+  PirateAssaultOp:
+    - op_code: u32
+      offset: 0
+    - unknown_4: u32
+      offset: 4
+    - operand: f32
+      offset: 8
+    - op_name: wstr
+    - second_operand: f32
+    - second_op_name: wstr
+
+  PirateAssaultTier:
+    - tier_key: u16
+      offset: 0
+    - ops: "list<PirateAssaultOp>"
+
+  PirateAssaultContext:
+    - tiers: "list<PirateAssaultTier>"
+      offset: 0
+    - binding_flag: u32
+    - binding_map_key: u32
+    - binding_map_name: wstr
+    - binding_count: u32
+
+  # Slot 9, xxTR, TwirlingRoulette (decoder kr-1254 sub_E688B0). Two OLE automation dates and a
+  # bool.
+  TwirlingRouletteContext:
+    - start: f64
+      offset: 0
+    - end: f64
+      offset: 8
+    - flag: u32
+      offset: 16
+
+  # Slot 12, sasaXtt.dch, SeasonArenaContext (decoder kr-1254 sub_993D20; bitmask reader
+  # kr-1254 sub_1119300). Arena i is enabled iff bit (i mod 32) of bitmask[i / 32] is set.
+  SeasonArenaContext:
+    - arena_count: u32
+      offset: 0
+    - bitmask: "list<u32>"
+
+  # Slot 13, xxLXY, ClientLuxuryClub (decoder kr-1254 sub_E89E00). Four bytes.
+  LuxuryClubContext:
+    - state: u32
+      offset: 0
+
+  # Slot 16, DpDpDxx, GameSpecRepo::PatchConfigDecoder (decoder kr-1254 sub_727D30 ->
+  # kr-1254 sub_749520). The marker byte 58 (':') would introduce a counted patch spec; the
+  # served content carries 186 (0xBA), the no-patch marker, and nothing else.
+  GameSpecPatch:
+    - marker: u8
+      offset: 0

@@ -11,7 +11,9 @@ Chinese: [README.zh.md](README.zh.md).
 | `room.yaml` | The room structures: `SessionSetting`, `GameSetting`, `UserSlot`, `EquippedItemList`, `gspGotoRoom`. |
 | `room-details.yaml` | Audited master-change requests/replies, round-setting requests, room inventory notifications; round-map bindings also require the named game opcode and audited target mapping in `builds.yaml`. |
 | `recruit.yaml` | Shared amplifier request and legacy recruitment messages; modern recruitment bodies are excluded. |
+| `plaza-recruitment.yaml` | Native plaza sign toggles and text, modern document publication and paged lists; admission stays with shared party logic. |
 | `round-feed-native.yaml` | Native combat bodies with audited field-order differences; table coverage does not register a feed route or enable rounds. |
+| `map-scripts.yaml` | Counted native object names, visibility, breakable health and opaque script sequences for the three modern builds. `final-zone.yaml` retains the shared effect layout. |
 | `score.yaml` | The scoreboard: `ScoreRow`, one seat of `gspGameBroadcastPlayerScoreData`. |
 | `score-reports.yaml` | Native inbound score envelopes; table coverage does not enable unreviewed event kinds or opcode routes. |
 | `inventory.yaml` | `InventoryUpdate` and `InventorySlot`: the bag on S2C 801/802. |
@@ -23,12 +25,16 @@ Chinese: [README.zh.md](README.zh.md).
 | `user-stat.yaml` | `UserStat` (S2C `gspUserStat`, the wallet and FighterInfo) and its `FighterInfo` and `EloRating`. |
 | `fighter-info.yaml` | `FighterInfoRequest` and `FighterInfoReply`: the player menu's "view info" (C2S `gcpReqFighterInfo`, S2C `gspRepFighterInfo`) of the legacy builds and of the kr-1256 family (`FighterInfoReply@kr-1256`). |
 | `clan.yaml` | The clan game-connection bodies (`ClanPassport`, `ClanMarkInfo`, `ClanGuildInfo`, `ClanAttendanceState`) and the empty clan request frames, with the kr-1256 shapes stated beside the kr-812 baseline. |
+| `udp-peers.yaml` | Native peer discovery, endpoint tables, hole-punch controls and relay membership messages; layouts do not enable listeners or direct movement. |
+| `round-movement.yaml` | Native full/masked movement and UDP relay probe, identity, control and header layouts, including build-specific cookie widths. |
 | `relay-connection.yaml` | Audited native relay endpoints, keys, offers, joins and connection reports. Table presence does not enable a relay listener or handshake. |
 | `relay-validation.yaml` | Native post-join validation reports and signature data; CN2011 uses a direct-success sequence instead. |
 | `relay-success.yaml` | Empty native join/scene success signals; does not initialize scene seed tables or enable listeners. |
 | `relay-seeds.yaml` | Audited native relay seed-table structures; table presence does not enable seed handling. |
+| `critical-transitions.yaml` | Native installed-weapon and timed-effect reports for the explicitly audited seeded clients. |
 | `damagers.yaml` | In-round damager bodies the server relays unchanged, such as `SplashDamagerByDamager` (32900) and the seven spawns of `packets/damagers.yaml`. |
 | any other `*.yaml` | More structures. Every file in this folder is read; a plugin can ship its own. |
+| `dynamic-config-content.yml` | The kr-1256 native DynamicConfig generation's per-slot content rows (not a layout; the `.yml` suffix keeps this reader from reading it as one). The schemas live in `dynamic-config.yaml`; the wire serves the bits the content file names. |
 
 Every file starts with `version: 1`. That is the version of this file format, not of the game: the
 server refuses a file whose version it does not know, so the format can change later without old files
@@ -116,6 +122,11 @@ bounds are checked before allocating the corresponding container; scalar collect
 also fit the remaining body. The native 65,535-byte body ceiling always applies. Callers can use
 stricter limits and canonical booleans for their audited message. Reading a structure does not
 register an opcode, grant a capability or authenticate a connection.
+
+`PacketCodec.ReadPrefix` reads one structure at the current `PacketReader` cursor and leaves its
+enclosing suffix unread. Cursor offsets identify the original byte range without re-encoding it.
+It applies the same per-call tree bounds; validate the whole enclosing packet separately to enforce
+its total tree budget and reject trailing bytes.
 
 ## A field
 
@@ -216,6 +227,32 @@ bff packets json id-400                 # everything about one build as JSON, fo
 
 Structure is data; meaning is code.
 
+`tutorial_score_builds` explicitly lists the audited selected-tutorial consumers. Descendants do not
+inherit activation unless named. `tutorial_score_help_field` selects that build's native `ScoreRow`
+word for the rescue goal; it must exist and differ from the bubble and finishing counters. These
+values affect the authenticated solo tutorial restatement, not ordinary round scoring or rewards.
+`tutorial_score_npc_finish_fields`, when stated, maps `victim`, `scorer` and `auxiliary` to distinct native words in the
+audited eight-word NPC finishing envelope. Zero actor references, the negative victim-seat
+sentinel and the remaining zero words must match before that seat is used; the shared
+tutorial handler still checks the live solo player. Omission keeps reference attribution only.
+Inherited mappings are inactive unless `tutorial_score_builds` explicitly names the build.
+`weapon_critical_seed_builds` explicitly lists the seeded clients audited for the optional
+`weapon_critical_bonuses` setting on `dialect.scene-seeds`. Descendants are not activated implicitly.
+`weapon_critical_mode_fields` maps each audited mode to its own weapon specification replacement field.
+`weapon_critical_view_refresh` states whether an in-round equipment view rebuilds installed weapons:
+CN324 preserves its installed specifications; the other four audited builds rebuild from the published
+worn set and accepted room overrides under their native feature gates.
+The plugin option defaults off; the audited cn-324, cn-406, cn-404, cn-408 and id-400 profiles enable it.
+Every positive mode retains ordinary weapon and equipment contributions; the seven mapped native mode
+paths apply one resource replacement. Native weapon reports revise only their owned primary or sidearm
+slot. Audited effect triggers refresh the native duration, and expiry removes the timed contribution.
+Equal probabilities advance the accepted input revision without reinstalling a table or resetting its
+cursor. Missing resources or opening equipment fail before countdown publication. Completed local view
+and preset publications reconcile their exact immutable equipment snapshot on the current room executor;
+preset page indexes and opaque page words do not stand in for installed weapon specifications. Completion
+establishes sender success, not client receipt or application. Clients that calculate these contributions
+locally are excluded.
+
 Native feature support belongs under `capabilities` in `builds.yaml`. The baseline states each
 audited capability; descendants inherit it and override only differences. Dialects use
 `PacketTables.CapabilityOf(build, name)` before enabling a feature. Unknown or malformed values
@@ -253,6 +290,8 @@ means on the wire is up to the plugin that writes it. A structure name may appea
 
 `play` in `builds.yaml` states how a build's tutorial and play rooms differ in the packets whose shapes are still written in code. Its sub-blocks are `tutorial` (`old_map_key`, `select_kind`, `skip_enter`, `old_mode`, `wave_map_key`, `master_slot_packet`), `wire` (`server_revives`, `pre_count_down_first`, `unchosen_map_key`, `unchosen_map_theme`, `spawn_group_applies_locally`, `unchosen_difficulty_mode`, `unchosen_difficulty_map_key`, `restate_left_room`, `plaza_entry_settle_ms`) and `score` (`wide_report`, `live_score_packet`, `outcome_first`, `time_over_end`, `npc_team_outcome`, `rescue_credit`, `horde_stage_outcome`, `star_report`, and the four star report kinds `star_small_gained`, `star_big_gained`, `star_small_lost` and `star_big_lost`), beside the flat keys `match_start`, `host_start`, `one_seat_waves`, `npc_waves`, `score_reports` and `tutorial_skip_start`. The legacy room dialect reads them with `PlayValues.Of`, which rejects an unknown key, a value that is not one of its key's names, or a missing `match_start` or `host_start` at startup.
 
+`play.score.zombie_result_cause` selects the audited zombie banner's shared terminal-cause word instead of the recipient's reward outcome. It defaults to false; CN2012 enables it, and descendants without an audited consumer explicitly disable it. It does not change rewards, health or result timing.
+
 `room_projection_fields` describes the modern typed waiting room's mode field, ordered map fallbacks and ordinary-room gate overlay. `clear_mask` removes only the audited blocking bits from `flags`; unrelated bits, including the round-map selector bit, survive. `clear_words` and `clear_booleans` name the remaining audited gates. The binding validates all aliases and their types before mounting. An inherited map whose aliases do not exist in a later build is an error, not permission to use the baseline offsets.
 
 `round_score_row_marker` names the native `ScoreRow` leading word that the modern result adapter fills for a seated row. It must identify that row's first `u32` field; it does not assign a recovered meaning to the unknown field. Level and reward values use the shared named fields, while each row's table determines their wire positions. A result tail's conditional strings remain absent through explicit default gate values from its own table.
@@ -271,9 +310,17 @@ name, duplicate numeric assignment, collision with an existing feed family or no
 before the binding publishes services. No numeric equality between those spaces is assumed.
 
 Optional `life_event` and `life_actor` adapt a validated native report to the shared life handler.
-A `finished` event also requires `life_initiator`; `life_success` gates a successful report and
+An optional `builds` list limits a route to explicitly audited members, including when a descendant
+inherits its map. Unlisted builds keep their remaining routes or their existing pass-through policy.
+A stated list must contain distinct known build names and cannot be empty.
+A `finished` event also requires `life_initiator`. For `bubbled` or `died`, an optional
+`life_initiator` names the attacking character; for `released`, it names the rescuer. Generic
+notifications omit it and award no attributed credit. The shared round logic accounts for each
+native bubble, completed rescue and death once. `life_success` gates a successful report and
 `life_death_flag` distinguishes immediate death from bubbling. These selectors must name fields in
 the selected structure with the expected widths. `nested: true` selects the complete table reader,
 including absent-tag validation for native reset confirmations. The baseline action bodies and
 reporting roles are evidenced beside their structures in `round-feed.yaml`; damager-spawn and
 writer-only relay-motion routes retain their separately documented handling.
+
+`round_series_fields` maps the audited settings flag and optional settings index, entry index, attacker and state, cumulative team-win field, and native `rounds_to_win` (two or three). Legacy entries use their nested suffix and fixed team rows; modern entries use the direct stage body and masked result head. The dialect validates selectors and widths before advertising series support. `captain_score_fields` names victim and killer seat fields in the complete native score report; full-width values must agree with the character references before the shared Captain handler receives a report. Neither mapping enables a deployment option.

@@ -76,9 +76,10 @@ public sealed class LoginInventoryResolver(IInventoryRepository inventory, bool 
         {
             var seededBag = _starter.Slots(userNum, InventoryBag.CharacterBag, _clock.GetUtcNow());
             var seededEquipped = _starter.Slots(userNum, InventoryBag.EquippedBag, _clock.GetUtcNow());
-            await inventory.ReplaceSlotsAsync(userNum, InventoryBag.CharacterBag, seededBag, ct).ConfigureAwait(false);
-            await inventory.ReplaceSlotsAsync(userNum, InventoryBag.EquippedBag, seededEquipped, ct).ConfigureAwait(false);
-            return new InventorySnapshot(seededBag, seededEquipped);
+            // Another node may commit a purchase after the empty reads; seed through the same atomic append as top-ups.
+            characterBag = await inventory.AppendMissingItemsAsync(userNum, InventoryBag.CharacterBag, seededBag, ct).ConfigureAwait(false);
+            equippedBag = await inventory.AppendMissingItemsAsync(userNum, InventoryBag.EquippedBag, seededEquipped, ct).ConfigureAwait(false);
+            return new InventorySnapshot(characterBag, equippedBag);
         }
 
         var toppedBag = TopUpStarter(characterBag, userNum, InventoryBag.CharacterBag);
@@ -151,11 +152,7 @@ public sealed class LoginMoneyResolver(IPlayerWalletRepository money, int starti
     /// <param name="ct">Cancellation token.</param>
     public async ValueTask<PlayerWallet> ResolveAsync(long userNum, CancellationToken ct)
     {
-        var stored = await money.FindByUserNumAsync(userNum, ct).ConfigureAwait(false);
-        if (stored is not null)
-            return stored;
         var seeded = new PlayerWallet(userNum, startingLucci, startingCash);
-        await money.UpsertAsync(seeded, ct).ConfigureAwait(false);
-        return seeded;
+        return await money.GetOrCreateAsync(seeded, ct).ConfigureAwait(false);
     }
 }

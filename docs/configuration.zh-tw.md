@@ -1,7 +1,7 @@
 ---
 title: "伺服器設定"
 description: "組合模組 profile、設定環境變數、連接埠與持久性。"
-updated: 2026-10-18
+updated: 2026-11-07
 ---
 
 Bubble Fighter Fantasy 沒有固定的一組伺服器元件。`profiles/` 下的一個 **profile** 決定執行哪些模組資料列、服務哪個用戶端組建、開啟哪些監聽連接埠，以及使用哪種儲存方式。本頁說明 profile 如何變成執行中的伺服器、設定檔案的位置、環境變數與連接埠的運作方式，以及如何切換持久性與用戶端資料。
@@ -219,6 +219,42 @@ SQLite 資料列要求絕對 `database_path`，該選項拒絕相對路徑。請
 
 記憶體提供者是基於處理程序內字典的有界儲存，提供相同的儲存庫介面。狀態在關閉時消失，其資料列刻意不發佈資料庫工廠。記憶體與 MySQL 互斥。
 
+### 戰績記錄
+
+`ingame` 的 `record_battle_statistics` 預設為 `false`。啟用時需要明確支援戰績的進度儲存、等級表與共用結算傳送器。它依遊戲模式記錄已接受的泡封、擊爆、營救、死亡與分數，並保存最終結果。對局中退出記錄為逃跑，不發完成獎勵；完成記錄在顯示結算前提交，退出結算畫面不會抹除已完成對局。載入失敗與被取消的對局不偽造結果。
+
+Memory、MySQL 和 SQLite 均支援此選項。MySQL 遷移 `0039` 新增 `player_battle_records`；SQLite schema `9` 在玩家快照加入各模式統計。兩種持久化儲存將統計、進度、錢包獎勵與原有對局憑據放進同一交易，重新開啟資料庫後記錄保留，重複提交同一對局不會再次累計。舊憑據不會因重試附帶統計而被補登。升級前備份儲存；舊 SQLite 讀取器拒絕 schema `9`。不會重建先前未記錄的歷史。所有儲存提供 `max_battle_modes_per_player`（預設 `128`），MySQL 與 SQLite 允許 `1..4096`。模式容量滿時拒絕整筆新結算，不淘汰歷史。Memory 仍屬暫存，另提供 `max_battle_settlements_per_player`（預設 `4096`）；持久化儲存保留原有資料庫結算憑據。
+
+爆破系列在下一回合載入期間保留同一個對局身分與累計計數。已有回合結束後，若對手在局間退出，剩餘終局成員會在下一次離場可能取消顯示之前完成記錄；只有首次載入不算已進行對局。結算重試次數有限，最終失敗會寫入日誌；沒有用於恢復任意持續儲存故障的持久化 outbox。
+
+### 人物外觀與已記錄戰績
+
+`lobby.fighter_info` 讀取被查詢線上帳號角色背包中目前穿戴的物品，過濾過期與壽命耗盡項，並在人物資料回應前發布該目標的裝備快取。角色缺失、角色選擇不唯一或登入工作階段已被替換時，不回傳成功快照。查詢唯讀，範圍是同一 build、同一資料域的線上玩家；不會預覽獨立預設頁或偽造逐實例屬性。
+
+獨立選項 `lobby.fighter_battle_statistics` 預設為 `false`。開啟時需要 `fighter_info` 與同一資料域的戰績儲存。原生主頁面「無道具／道具」只接收模式 `1`、`3` 的已記錄總數：勝、負、平、逃、泡封、擊爆與營救。其他模式、伺服器個人分數與競技場等級不投影。用戶端根據各項計數自行計算場次與勝率，保留其自身對平局的處理規則。
+
+沒有已知主模式記錄，或真實數值會使客戶端的有號計算溢位時，回傳原生失敗回應；不會截斷、縮放或代入全零生涯。關閉該選項時，外觀查詢保留原生建構子的統計預設值，這些預設值不代表真實歷史。Memory 只涵蓋目前行程實際記錄過的對局，不重建原服生涯或排位資格規則。
+
+已審計主頁面結構涵蓋 `kr-1256`（KR2026）、`kr-812`、`id-400`、`id-1809`、`cn-324`、`cn-717`、`cn-774`、`tw-454`、`cn-279`、`cn-406`、`cn-706`、`cn-404`、`cn-408`。TW454 完整人物資料交換另由 `BFF_TW_454_FIGHTER_INFO=false` 控制；設為 `true` 才同時開啟方言與大廳繫結。結構涵蓋不代表原生用戶端驗收通過。
+
+在隔離的單 build profile 中，將以下 patch 與 `tools/local-checks/isolated-memory.patch.yaml` 一起套用。`set` 保留原有協定、等級與結果設定；缺少能力時啟動失敗，不產生假資料。
+
+```yaml
+- set:
+    id: ingame
+    config:
+      record_battle_statistics: true
+- set:
+    id: lobby
+    config:
+      online_players: true
+      fighter_info: true
+      fighter_battle_statistics: true
+```
+### 情侶關係儲存
+
+記憶體資料列也提供作為基礎準備的 `ICoupleStore` 關係契約。其 `couples` 對應具有獨立上限：`max_relationships`（預設 4096，範圍 1–65536）、`max_pending_invitations`（1024，1–65536）、`max_pending_per_account`（16，1–1024）、`max_completed_invitations`（1024，1–65536）、`max_message_length`（512 個 UTF-16 程式碼單元，1–4096）及 `max_authority_length`（128 個 UTF-16 程式碼單元，1–1024）。接受邀請與分手會在同一處理程序內原子更新雙方關係。已完成回執有容量限制，可能被淘汰；呼叫端必須始終使用伺服器產生的全新邀請識別碼。此契約尚無 MySQL 或 SQLite 提供者，不消耗戒指，也不啟用原生情侶請求、登入還原或跨節點通知。僅有封包結構表涵蓋不代表這些玩法已經啟用。
+
 ### 本機隔離檢查
 
 `tools/local-checks/isolated-memory.patch.yaml` 停用 `persistence.mysql` 並啟用 `persistence.memory`。由於命令列修補檔最後套用，它會覆寫指向真實資料庫的開發者 `.env` 或 `local.patch.yaml`。每次本機 `run`（包括 `--dump-config` 檢查）都要附加它；下文「本機隔離檢查」配方提供了完整命令。處理程序停止後記憶體資料即遺失，該修補檔絕不能取代正式環境的持久性設定。
@@ -239,6 +275,12 @@ client-data/
 若兩個目錄都不存在，`clientdata` 資料列會在啟用時失敗，錯誤訊息會指出它尋找的兩個路徑，伺服器無法完成啟動。啟動遊戲 profile 前請準備好資料。這些檔案是唯讀輸入：伺服器不會寫入 `client-data`，因此 Docker 設定以唯讀方式掛載它。
 
 `management` 與 `setup` 不掛載用戶端資料資料列。首次安裝流程可以將準備好的資料匯入其狀態目錄；參見[安裝](installation.md)。
+
+已安裝用戶端的上傳流程與 `tools/client-data/bfdata.py` 使用同一套產生規則。地圖 `.wb` 資源（包括巢狀的 `Maps/<Directory>/track.wb`）按原用戶端路徑解包到 `dataraw`，並在 `sources.tsv` 記錄來源與 SHA-256；準備好的 `data`/`dataraw` 匯入也會保留這些檔案。舊資料樹若缺少地圖 WB，請先從對應版本用戶端重新產生到新目錄，再啟用讀取它的功能。共用的 `WorldBlockFile` helper 讀取器保留名稱、位置與旋轉，供不同模式使用；伺服器不硬編碼地圖座標。
+
+CN2011（`cn-279`）設定 `ingame.item_mode_fallback_point_count: 4`，在普通道具模式房主地圖報告沒有隨機箱點時啟用伺服器補充策略：從目前地圖的 `#sp_star_` helper 選取最多四個相異且空間分散的位置，沒有星點時使用 `#ic_` helper，以 `supply_default_min_ms` / `supply_default_max_ms`（預設 15–30 秒）更新中立 kind-0 箱。週期更新屬於伺服器策略，不代表原版用戶端存在固定隨機箱標記。原生已報告的隨機點繼續保留，其他 profile 預設為零。`item_mode_fallback_maximum_file_bytes` 預設 8388608，`item_mode_fallback_maximum_candidates` 預設 4096；地圖資源缺失、不支援或無效時會明確拒絕該報告，不猜測座標。
+
+CN279 保留年級權重表中的十七種道具與一個原生持有欄位。碰撞時由用戶端抽取道具，伺服器驗證結果。CN279 還啟用 `item_mode_resolve_invalid_random_pickups`：對存在且符合拾取條件的隨機箱，若請求種類為零或不在允許池中，伺服器從允許池均勻抽取一次；有效用戶端結果繼續保留，固定種類箱與不合格物件不能使用該策略。關閉時，未解析的零種類請求被拒絕且不消耗箱子。補救分布屬於伺服器策略，不等同於原生年級權重。原生行動計量掉落保留初始速度；空出欄位後，仍存在且曾因滿欄被拒絕的箱會換用新物件 ID，掉落箱重建時靜止。使用道具會廣播給包含使用者在內的所有參與者，團隊醫療包 129 也走原生效果路徑；伺服器不為此另建 HP 帳本。這些自動化路徑仍需原生用戶端驗收。
 
 ## 常用設定
 
@@ -346,6 +388,8 @@ BFF_PUBLIC_HOST=<public-address-clients-use>
 
 **`player-settings`** 掛載 `player.settings`，即玩家自訂按鍵的類型化儲存。封包本身由 `dialect.messages` 資料列的 `customized_keys` 選項綁定，由 `kr-812`、`kr-1256`、`cn-774` 與 `tw-454` 宣告；其他 profile 需先稽核其原生控制名稱與封包路徑。每個 `player.settings` 資料列都需要 `protocol`，並使用依 profile 的 `scope`，避免混淆不同組建的名稱。持久性提供者依帳號儲存對應；MySQL 透過移轉 `0032_customized_keys.sql` 儲存。每個提供者用 `customized_keys` 設定每帳號預算（`max_scopes` 1–64、`max_mappings` 1–512、`max_name_characters` 1–1024，三者組合必須能放入封包主體）。超出預算會直接失敗，而不會驅逐其他已儲存對應。
 
+`dialect.messages.config.science_lab` 預設為 `false`。`kr-1256`、`cn-774` 和 `tw-454` 已驗證的操作資料列允許此選項對八種實驗室操作統一回傳客戶端的實驗室關閉結果（KR 為 5，CN/TW 為 4）。啟用要求每組請求與回覆均已驗證且版面配置齊全，資料表不完整會直接失敗。這不是完整實驗室：尚無配方、費用、成功機率、獎勵或物品變更，也尚未建立可信的實驗室狀態開啟請求鏈。啟用此選項不會發布實驗室狀態或開啟介面。KR 狀態的 34 位元組、CN 狀態的 36 位元組和 KR 空物品清單的 26 位元組固定測試僅代表資料涵蓋範圍。
+
 過期物品捨棄也以同樣方式宣告：`dialect.messages` 資料列的 `inventory_actions` 選項綁定 `gcpReqInventoryThrowItem`/`gspRepInventoryThrowItem`（每個 legacy 組建和 `kr-1256` 均開啟），組建自己的 bundle 內的 `inventory.throw` 資料列透過儲存裝備服務移除該物品。行為被刻意限制得很窄：只移除一個已驗證玩家兩個背包中的該過期物品；若有符合的權益仍有效，整個移除會被拒絕；組建的類別 6 排除規則會被遵守。比賽中的請求會被拒絕。真實用戶端驗收仍待進行；僅憑封包表涵蓋不足以在另一個組建上宣告該選項。
 
 **`launcher.http`** 是選用的公用啟動器 API。它預設停用，與管理工作分離。它接受 `minimum_launcher_version`（留空則關閉檢查）與 `client_policy`，即啟動器執行的依模組分類的型別化規則；規則只引用商店識別與已宣告的商店來源，絕不包含可執行檔路徑。設定最低版本後，較舊的啟動器會收到 HTTP 426。每個大廳列的 `authentication` 選項（`BFF_LOGIN_AUTHENTICATION`，預設 `ticket`）只接受能兌換啟動器票據的登入，此時需要本列處於啟用狀態；`open` 接受任何帳號名稱，只適用於可信任的區域網路。[啟動器](launcher.md)頁面說明此 API、用戶端預設、帳號與票據流程以及面向營運者的設定。
@@ -361,13 +405,135 @@ BFF_PUBLIC_HOST=<public-address-clients-use>
 
 撤銷舊工作階段時也會清除它在本行程中的存取憑證與待用遊戲票據。監聽器啟動前刪除過期更新工作階段，之後在登入時最多每小時清理一次。帳號上限由儲存層執行，因此伺服器重新啟動後仍然有效。
 
+## 可選 UDP 傳輸
+
+UDP 由 `net.udp` 外掛提供。遊戲登入、房間准入與對局身分驗證繼續使用 TCP；UDP 承載已審查的原生移動與探索流量。所有現有設定預設都不會掛載 UDP 接聽器。
+
+| 可選修補檔 | 已審查設定 | 傳輸方式 |
+| --- | --- | --- |
+| `profiles/bundles/udp-relay.patch.yaml` | `kr-812`、`cn-717`、`id-1809`、`kr-1256`、`cn-774`、`tw-454` | 透過伺服器 UDP 端點傳遞已驗證移動；接收者未綁定端點時退回 TCP。 |
+| `profiles/bundles/udp-peers.patch.yaml` | `cn-279`、`cn-324`、`cn-406`、`id-400`、`cn-404`、`cn-408`、`cn-705`、`cn-706` | 伺服器協調端點探索及玩家之間的直接移動傳輸；失敗路徑保留對局 TCP 傳遞。 |
+
+將其中一種修補檔套用到對應的單版本設定。兩種修補檔互為替代，其不帶版本前綴的列識別碼不適合直接用於 `all`。`BFF_UDP_PORT` 指定空閒 UDP 連接埠，`BFF_BIND_HOST` 指定接聽位址，`BFF_UDP_PUBLIC_PORT` 可選填外部對應的 UDP 連接埠（零表示通告實際綁定連接埠）。UDP 轉送獨立於遊戲與中繼 TCP 連接埠。玩家端點探索使用已驗證遊戲伺服器的 IPv4 位址，中繼旁路使用中繼伺服器的 IPv4 位址，因此外部 UDP 對應必須使用相應公網位址。
+
+例如，先將一般 TCP/管理連接埠改到本機空閒連接埠並準備該版本用戶端資料，再執行：
+
+```powershell
+$env:BFF_MYSQL_PASSWORD = "isolated-unused"
+$env:BFF_MYSQL_HOST = "127.0.0.1"
+$env:BFF_MYSQL_PORT = "1"
+$env:BFF_LOGIN_AUTHENTICATION = "open"
+$env:BFF_BIND_HOST = "127.0.0.1"
+$env:BFF_UDP_PORT = "7603"
+dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile cn-324 --patch tools/local-checks/isolated-memory.patch.yaml --patch profiles/bundles/udp-peers.patch.yaml
+```
+
+掛載任一可選 UDP 補丁後，`BFF_UDP_ENABLED` 預設為 `true`。設為 `false` 可保留 TCP 運作，同時不開啟 UDP 接聽器、不啟動 UDP 協商。單人房間預設使用 TCP。只有對局開始、所有 relay 初始化且端點驗證完成後，才允許使用 UDP 移動。
+
+UDP 設定僅限正式遊戲房間。CN279、CN324、CN406 和 ID400 的原生遊戲場景不傳送探索探測，因此在等待房間中準備端點並確認 peer 表。完整房間安裝會使已準備的表失效；控制訊息與房間操作共用序列佇列，不能越過房間安裝或場景切換。打洞和直接移動仍須等待對局開始且全部 relay 初始化。其他已審計版本在此屏障後發起協商。登入及自動場景、主選單、大廳、廣場和單人訓練均不協商 UDP；房間強制開關也不能繞過此限制。
+
+房主可用 `!udp on` 強制協商 UDP（包括單人房間）、用 `!udp off` 保持 TCP，或用 `!udp` 切換目前房間偏好。房間命令無法開啟部署中不可用或已全域關閉的 UDP。未驗證或無法連線的路徑保留 TCP 備援。所有外掛命令都等價接受 `/`、`!`、`！`，這些字元僅用來觸發命令解析；遊戲內提示使用 `!`，因為 `/` 可能被客戶端原生命令攔截。管理後台與主控台也支援直接輸入 `udp on` 等無前綴命令，其用法提示使用 `/`。
+
+房間內任何成員都可以輸入 `!udp status` 查看是否在使用 UDP：傳輸方式（經伺服器的 `relay` 或直連的 `peer`）、房間偏好，以及每名成員的 `UDP`、`NEGOTIATING` 或 `TCP` 狀態和原因，例如等待對局開始、已送出邀請但未收到 UDP 探測、已驗證，或客戶端退回 TCP。伺服器關閉 UDP 或該客戶端版本沒有 UDP 設定時也會說明。`!plaza` 立即離開目前房間（對局中也可以）並進入廣場：座位按主動退出的方式釋放，因此對局會結算離開者，其他人繼續對局，最後一名玩家離開時房間會被刪除。退回 TCP 時會說明原因：沒有 UDP 探測到達伺服器、挑戰回覆在返回途中遺失、依座位列出的探索或節點表逾時、比賽連線已關閉，或玩家之間沒有直連路徑。
+
+`match-udp-directory.max_sessions` 限制旁路驗證租約數量。`match-udp-peers` 的 `max_rounds`/`max_peers` 限制保留的對局與玩家數量；探索、端點表確認、打洞及控制訊息的期限均可設定。私網端點候選只會在觀察到相同公網 IPv4 位址的玩家之間分享。換房、換局、斷線、消費者卸載與中繼替換會撤銷相應路徑。目前僅支援 IPv4，無法保證任意 NAT 或防火牆都允許玩家直接互通。
+
+封包表也審查了 `cn-735`、`cn-738`、`cn-742` 的旁路封包：四位元組 cookie 與浮點移動座標。其傳輸轉接器已有隔離線路測試，但研究設定尚未掛載中繼修補檔所需的完整房間/對局元件。這表示封包涵蓋範圍，不代表可用的端到端設定。自動化通訊端場景模擬原生用戶端協定，真實遊戲用戶端驗收仍須另行進行。
+
+多版本伺服器應將對應補丁的操作放入各個目標版本的可選 `local.patch.yaml`，使用不帶版本前綴的插件列 ID。共用 profile 的補丁先於各版本插件列執行，因此不能在 `all` 的補丁裡修改 `kr-812.dialect.rooms` 等帶前綴的列。每個版本應使用獨立 UDP 連接埠。peer 補丁同時啟用必要的原生 relay；`cn-705` 與 `cn-706` 預設保持這些列停用，且此補丁不會啟用場景種子表權限。
+
+UDP 通訊端訂閱、租約註冊、房間佇列回呼、使用 Span/out 參數的查詢與 IP 端點記錄目前需要原生插件；遠端 SDK 尚無這些操作的轉接器。可序列化的房間快照和中繼控制操作仍透過契約 schema 提供。
+
+`match-udp-peers` 支援 `punch_retry_ms`（預設 250；0 關閉重試），在 `punch_window_ms` 內重複傳送原生開始打洞指令，不延長視窗、不更換節點識別值。直連路徑仍要求目前已驗證的對局連線回報對應玩家的成員關係。`!udp status` 區分未收到原生結果和用戶端回報成功路徑為零；僅憑這些結果不能認定是防火牆或 NAT 故障。
+
+對只在等待房間執行探測的版本，`discovery_refresh_ms`（預設 1000；0 關閉重新整理）會在房間等待階段使用相同玩家身分重複傳送原生單次探測請求。進入載入後停止重送，因為這些用戶端在載入階段不再傳送探索。公網端點或本機候選位址變更時，重新傳送清單並再次等待確認。在初始化完成的回合開始打洞前停止探索。
+
 ## 驗證與安全
+
+`nodes[].authentication` 明確設定 `authority_id`、`api_url`、`mode`（`master-issued` 或 `own-authority`）與 `policy_mode: authority`。同一認證身分只能對應一個由管理員設定的 HTTP 或 HTTPS 來源，採用該服務的目錄與所選用戶端策略，不跨獨立認證服務隱式繼承或合併策略。缺少中繼資料不授權認證信任。
+
+可選 `cluster-ticket-authority.patch.yaml` 在本機 Launcher 票據簽發器旁掛載 `cluster.ticket-authority`。各可信節點須有不同的兌換金鑰與明確的用戶端版本清單。私有 `POST /v1/nodes/{node}/tickets/redeem` 單次消費 `{ticket,build}` 並回傳帳號、Launcher 語言及啟動身分。`cluster-ticket-client.patch.yaml` 在工作節點掛載遠端提供者以取代本機票據提供者；遊戲登入策略必須要求票據。設定 `BFF_CLUSTER_TICKET_URL`、`BFF_CLUSTER_NODE_ID`、`BFF_CLUSTER_REDEMPTION_KEY`，認證位址的 HTTP 或 HTTPS 由管理員明確選擇。非同步請求有界，不重新導向、重試或回退為帳號名稱。逾時前票據可能已消費，須取得新啟動票據。獨立認證服務須使用自身已登入的 Launcher 工作階段與啟動票據。此功能尚非全域工作階段歸屬或原生選服認證整合。
 
 - 未知設定鍵與無效值會使組合或啟用失敗，絕不會被忽略。啟用失敗的資料列會連同狀態與診斷一起回報，而不是被靜默跳過。
 - `--dump-config` 會列印插補後的值，其中包括憑證。在問題報告中分享前請先去除識別資訊。
 - 絕不提交 `.env` 或 `local.patch.yaml`；兩者都被 Git 忽略，且都可能包含機密或本機專用路徑。
 - 每次本機 `run` 都附加 `--patch tools/local-checks/isolated-memory.patch.yaml`。這是防止開發者 `.env` 連到真實資料庫的唯一可靠辦法。
 - profile 或修補檔的修改在下次啟動時生效：profile 只在啟動時組合一次。管理 API 可以重新載入單一資料列，但那是模組生命週期操作，不是套用新 profile 的方式。重新載入行為見[模組](plugins.md)。
+
+## 可選伺服器探索
+
+schema-1 伺服器目錄新增回應欄位 `generated_at_utc` 與目標欄位 `observed_at_utc`、`expires_at_utc`、`status_revision`（Contracts 4.5.0）。時間戳使用 UTC RFC3339；首次接受回報前，三個目標欄位皆為 null。目標欄位描述同一次由來源維護的回報。重複讀取或重新註冊同一租約不會續期；過期的手動入口保留過期中繼資料，撤銷租約或時鐘變化可縮短到期時間。到期時間不超過來源剩餘租期映射至 UTC 的截止點。修訂值只能作不透明的相等比較，不是可排序版本或租約憑證。用於分配時必須拒絕缺失、格式錯誤或過期的中繼資料；產生新回應不會為目標續期。這些公開的新鮮度欄位不授予帳號准入，也不將票據綁定至後端成員；自動啟動仍須取得明確准入的本次候選集合，其有效期同時受回報與認證授權的到期時間約束。
+
+選用的 `cluster-launch-selection.patch.yaml` 在票據簽發端掛載 `cluster.launch-selection`。透過 `BFF_CLUSTER_NODE_ID`、`BFF_CLUSTER_AUTHORITY_ID`、`BFF_CLUSTER_AUTHORITY_URL`、`BFF_CLUSTER_DATA_SCOPE`、`BFF_CLUSTER_AUTOMATIC_SELECTOR_ID` 明確設定本機節點、認證權威識別及確切 API 來源、持久化範圍和自動入口識別。已認證的 `POST /v1/launch` 攜帶 `serverSelection: true` 後，回傳與票據綁定的 `serverSelection`，包含 `schema`、`grantId`、`build`、`authorityId`、`policyRevision`、`dataScope`、`expiresAtUtc`、`generated_at_utc`、`servers`。已授權成員池可以包含離線或尚未回報的設定節點；這表示可認證範圍，不代表目前可分配。快照固定本次啟動的原生入口識別、實體節點識別和端點綁定。票據保留原有期限並受授權 bearer 限制，不會因短心跳租約而縮短慢啟動登入時間。`POST /v1/launch/servers` 使用相同認證工作階段及 `{ticket,build,grantId}`，只更新原有綁定內的回報狀態，不消耗或替換票據、不新增成員、不更換端點、不延長來源期限。票據已消耗、授權已過期或無效時回傳 HTTP 409 `admission_closed`，讓更新循環可於正常登入後結束。可信工作節點兌換時，在一次性消耗的同一把鎖內檢查已認證節點是否屬於票據成員；本機兌換使用明確設定的本機節點識別。一般啟動維持原有行為。此 API 不代表原生重新導向、共用儲存或跨節點房間准入已完成。只有明確啟用 Center 的 gateway 模式且目錄存在自動入口時，掛載簽發端選服行後，所有已認證票據都受範圍限制，省略標記也無法繞過；明確傳入 `serverSelection: false` 回傳 HTTP 409 `server_selection_required`。`launcher.http` 的 `max_selection_targets` 限制每個授權保留的入口端點總次數，預設 128。 每個已授權工作節點必須對應唯一的標準手動入口，且端點綁定一致；簽發端在發布服務前檢查所有已設定版本，缺少或有歧義的原生對應會使啟用失敗。即使透過自動入口更新，也不能更換該標準入口識別。
+
+單服 profile 預設不掛載 `cluster.directory` 與 `cluster.node`。`profiles/bundles/cluster-directory.patch.yaml` 為 `kr-1256` 同時掛載目錄及回報模組；`cluster-node.patch.yaml` 只掛載回報模組。明確設定 `builds` 與各節點的 `endpoints`，透過部署機密提供各不相同的隨機 `BFF_CLUSTER_NODE_KEY`。私有監聽預設為 `127.0.0.1:8093`；回報位址的 HTTP 或 HTTPS 由管理員明確選擇，不自動升級。
+
+可選的 `profiles/bundles/cluster-room-directory.patch.yaml` 掛載 `cluster.room-directory`，提供 `IFederatedRoomDiscovery`。必須設定 `node_id`、`directory_url`、`access_key` 與明確的 `builds` 允許清單。每次呼叫都經過驗證讀取目前房間列表；請求失敗時不會傳回舊快取。`max_rooms`、`max_response_bytes`、`max_concurrent_requests`、`request_timeout_seconds` 分別限制房間數、緩衝位元組數、並行請求數與整個讀取過程的期限。超出並行預算會直接報錯，不排隊。重新導向、無效回應與未設定的版本也會明確失敗。房間目錄成員關係獨立於帳號資料，只控制可見範圍；探索服務不授予入房權限、不預留座位，也不修改原生房間列表。單服 profile 不掛載該列。Contracts 4.6.0 新增探索介面。
+
+`cluster.directory.room_preparation_permits` 可選啟用僅供已認證節點使用的準備許可介面，預設 false。來源節點向 `/v1/nodes/{source}/room-preparations` 提交目前租約權杖、世代及目標節點、目標世代、用戶端版本、原生房號、房間建立識別與帳號編號。簽發要求節點租約新鮮且版本就緒、非空資料與入房範圍相同、共享房間可見範圍、明確的同一 master-issued 認證權威與同一已回報權威資料庫識別。目標節點使用自身節點金鑰與目前程序租約，在 `/v1/nodes/{destination}/room-preparations/claim` 一次性兌換，並重新核驗租約、端點權威及準確的等待中房間；已釋放節點與重用房號不能繼承許可。來源節點可在簽發路徑以已認證 DELETE 取消自身許可。`max_room_preparation_permits` 限制保存數量，預設 512；`room_preparation_permit_lifetime_ms` 設定單調時鐘有效期，預設 10000，允許 100..60000。目錄只保存權杖雜湊，不接收房間密碼。此許可僅授權目標節點準備，不預留座位、不認證原生遊戲連線、不移轉帳號占用，也不啟用跨節點房間點選。友好伺服器與獨立目錄仍僅分享可見資訊。
+
+已發布的實際遊戲房間透過 `IPublishedRoomDirectory`（Contracts 4.7.0）提供分離的原生列表快照。每次建立都有獨立的 `instanceId`，不依賴可重複使用的房間編號；心跳保留原生列表所需的房主暱稱、模式及設定，不包含密碼、帳號記錄或工作階段前綴。目錄及探索用戶端均檢查原生中繼資料與摘要的一致性，並以 `max_room_settings_bytes`（預設 65536）限制所有設定區塊與回合選擇的總位元組數。隱藏房間、訓練及教學房間不會發布。這些中繼資料尚不會將遠端項目投射到原生列表，也不授權跨節點入房。
+
+可選修補檔 `profiles/bundles/cluster-room-browser.patch.yaml` 為每個 `client_build` 掛載一個 `cluster.room-browser`，使用認證目錄並提供 `IRoomBrowser`（Contracts 4.8.0）。`node_id` 必須與目錄用戶端一致。瀏覽狀態與其遊戲連線同生共滅，連線數已由監聽器限制。`max_aliases_per_connection` 限制單一連線生命週期內的房間身分數量（預設值與上限皆為 32767，即原生有號 16 位元別名）。本節點使用即時快照取代心跳舊資料；其他節點完整的原生房間資料使用獨立正數別名，重排不改變別名，連線內不回收舊身分。點選遠端房間時重新查詢目錄並核對節點世代與房間建立身分；加入提示不是認證。目標消失、重建或無法取得時拒絕加入，不會退回恰好同號的本機房間。更新失敗清除可見別名，連線關閉或外掛卸載釋放狀態。僅已認證的遊戲主連線可瀏覽；本機加入維持密碼、容量及階段檢查，另核對建立身分。僅在掛載下述移轉修補檔、且目錄於兩個節點的 `native_migration_builds` 皆列出該版本時，點擊遠端房間才會發起已登入移轉，否則拒絕。單機設定不掛載此列。
+
+可選的 `profiles/bundles/cluster-plaza-federation.patch.yaml` 掛載 `cluster.plaza-federation`，在節點之間共享廣場：同一客戶端版本的玩家無論登入哪個節點，都能在廣場中看到彼此。在目錄列設定 `plaza_federation: true`，並在每個節點列出共享的 `builds`，`node_id`、`directory_url`、`access_key` 與心跳列相同。只有 `data_scope` 相同且非空、心跳證明了該範圍資料庫的節點才共享廣場；擁有獨立資料的友好伺服器互相不可見。每個節點提交本地廣場的進入、移動和離開（`flush_interval_ms`，預設 100），並以一個請求為所有版本長輪詢其他節點的變化（`poll_wait_seconds`）。遠端玩家在本地廣場佔一個座位，以與本地玩家相同的座位與位置封包顯示，客戶端看不出差別。租約失效的節點會帶走其玩家；重新連線或目錄重啟後，節點會收到快照並重新送出自己的廣場。`max_queued_events`、`max_plaza_events` 與 `max_plaza_members` 限制佇列大小；客戶端廣場仍為 36 個座位。Contracts 4.25.0 新增 `IPlazaFederationEndpoint`。
+
+可選修補檔 `profiles/bundles/cluster-migration.patch.yaml` 包含節點層級的移轉列（broker、arrivals、destination），`cluster-migration-build.patch.yaml` 包含各版本的列（瀏覽、來源、准入，以及 `lobby`、`dialect.messages`、`ingame` 開關）。先掛載 node、room-directory、account-store、account-sessions 與 write-fencing 修補檔，再掛載這兩個，並於目錄設定 `migrations: true` 與 `native_migration_builds`。目標端點的 `listener_id` 指遊戲監聽列：單一版本設定為 `game-listener`，多版本設定為 `<build>.game-listener`。須於來源列設定 `channel`、於准入列設定 `channels`，取該版本經核查的值；修補檔本身不填寫，未核查的版本會啟動失敗，而不會繼承其他版本的值。用戶端只接受其允許頻道的移轉回覆：kr-812 無條件允許 50、60、80，cn-324 允許 50、60 而拒絕 80。每個被持有的帳號佔用一個資料庫連線，資料庫連線上限必須涵蓋所有節點的線上玩家。
+
+該按版本修補檔還會設定 `protocol.config.accept_retained_moves: true`，使移轉用戶端的 `gcpReqMoveInto` 可以在修補請求之前開啟目標連線；其處理程式仍須授權繼續交握。啟動清單只寫封包名稱，不寫數字：`pre_handshake_opcodes` 與 `alternate_handshake_sequence` 接受用戶端到伺服器的封包名稱，由各版本透過自己的操作碼表解析；數字、未知名稱、伺服器到用戶端的名稱或僅限中繼連線的名稱都會在啟動時終止伺服器。用戶端在每條輔助連線上先送出空標記的版本，於其設定檔中以 `auxiliary_prefix` 宣告一次（cn-279、cn-324 與 cn-406 送出 `gcpStartGPK`）。`answer_center_status: true` 將原生選服的狀態查詢辨識為該前綴加 `gcpReqCenterUserCnt`；明確設定的 `alternate_handshake_sequence` 仍然優先。目標端點公布設定檔自身的版本及其 `GAME_PUBLIC_PORT` 設定檔變數（取自 `<BUILD>_PUBLIC_PORT`）；多版本設定檔需以每個版本一項的端點清單取代它。
+
+對於預置的 13 版本 `all` 設定，使用 `profiles/all/migration.patch.yaml` 取代單版本的節點層級遷移補丁。該補丁逐一指定 `<build>.game-listener`，並透過各版本的 `<BUILD>_PUBLIC_PORT` 公布連接埠，預設使用該版本的預置連接埠。將 `cluster-migration-build.patch.yaml` 的操作附加到各版本可選的 `local.patch.yaml`，隨後明確設定來源端 `channel: 60` 與准入端 `channels: [60]`。這些操作使用不帶前綴的列 ID；組合時，來源端與准入列會映射到該版本自己的 `inventoryview` 子樹。節點、房間目錄、帳號所有權、工作階段及寫入保護列只在共享設定層掛載一次。將節點回報器及房間目錄的版本清單設為選定版本。在目錄權威端啟用遷移，逐一列出參與節點支援的版本，並設定相符的資料、加入及房間目錄範圍。獨立資料庫必須保持獨立範圍，不能僅憑目錄探索獲得共享帳號遷移權限。單服 `all` 設定維持不變。
+
+`home_unavailable_notice_enabled` 預設 `true`，要求存在原生通知傳送器。遷移補丁透過版本變數 `MIGRATION_HOME_NOTICE`，僅為沒有已確認通知處理能力的 cn-406、cn-774、tw-454 關閉它。返服遭拒時一律記錄警告，並讓玩家攜帶帳號權限留在訪問節點。
+
+保留身分遷入服務按各版本的 `inventoryview` 子樹隔離，同一版本的大廳與遷入處理僅共用本版本的登入服務。
+
+`ingame` 列可透過 `room_admission_reservations: true` 啟用目的房間名額預留，為每個版本發布可卸載的 `IRoomAdmissionDirectory`（Contracts 4.9.0）。`room_admission_lifetime_ms` 預設 10000，範圍 100–60000。預留數量受房間座位數限制，採用單調時鐘到期，並固定房間建立身分與帳號。一般加入及機器人不能占用預留名額；取消、到期、房主關閉座位、房間開始或關閉及卸載都會釋放未用名額。使用時再次核對房間密碼，要求同帳號、同版本且獨立完成認證的遊戲主連線，並維持原選單或廣場場景，再沿用正常入房及成員通知。預留不等於認證或帳號所有權；尚未串接遠端房間點選、目的原生通訊端認證和來源節點所有權移轉。單機預設不啟用。
+
+`launcher.http` 的 `center: { enabled: false, mode: gateway }` 設定預設關閉；明確設定 `enabled: true` 才啟用，省略 mode 時使用 `gateway`，只有明確指定 `native` 才由伺服器承擔 Center。`GET /v1/catalog` 與 `GET /v1/servers/{build}` 回傳相同的頂層 `center: {enabled,mode}` 物件。舊 catalog 沒有宣告 Center，或僅指定 mode 而未啟用時，一律視為關閉。Launcher 先讀 catalog；關閉或 native 模式保留遊戲端點，不需目錄 API 或 Gateway。只有明確啟用 gateway 才讀取 schema-1 目錄，並要求兩處 Center 宣告一致。Launcher 仍為一個入口，選項在遊戲原生 UI 顯示。只有服務端公布 `automatic: true` 入口才啟用自動分配，其 `targets` 限定候選池；沒有自動入口時僅手動選服，不簽發授權。關閉或 native 模式即使掛載選服服務，也不簽發授權；明確請求回傳 HTTP 409 `server_selection_unavailable`。選項與實體節點的身分、名稱、端點保持獨立。這些設定本身不實作選服後認證或跨節點入房。
+
+手動入口允許空 `nodes` 清單，以保留不可選項而不猜測目標位址；自動入口仍須設定候選。啟動器介面保留空入口，讀取端必須維持其不可選，不解析或連線至虛構位址。
+
+入口支援選填的 `short_name`：長度為 1..128 個 UTF-16 程式碼單元，不能全為空白、不能含控制字元，代理項必須成對。目錄和啟動授權均以 `short_name` 回傳；未設定時仍退回完整 `name`。健康重新整理保留授權時的兩個名稱。簡短地區名稱須明確設定，不從完整名稱推導；名稱不會改變端點或驗證繫結。
+
+`selectors[].nodes` 控制可見性，手動選項有零個或一個節點。`selectors[].automatic` 只回傳租約有效、就緒、未排空、未滿員的候選，成員須宣告相同且非空的 `data_scope`。`nodes[].data_scope`、`nodes[].join_scope` 是不透明宣告；空值不授權共享或加入，相同名稱也不實作這些能力。`nodes[].room_directories` 獨立控制房間摘要共享，友好伺服器可只互通目錄而保留獨立帳號。
+
+自動選項還必須設定 `persistent_domain_id`，以 `SELECT REPLACE(domain_id, '-', '') FROM cluster_data_domain WHERE singleton_id = 1` 讀取權威資料庫標識。MySQL 遷移 0035 只初始化一次。先在權威資料庫執行遷移，再以 `auto_migrate: false` 啟動工作節點；共享資料的工作節點必須連線至同一權威資料庫。每次心跳在請求期限內重新讀取標識，只有相符候選才能進入自動分配池。設定錯誤的節點不會移除健康且相符的候選。同一已固定資料域的手動入口仍保留顯示，但回報標識不符時標記為離線。還原的資料庫副本會保留標識，所以此檢查用於發現設定錯誤，不能證明資料庫身分或即時複寫；獨立運行的副本須在啟用分配前使用不同標識。沒有標識服務的節點只能以空 `data_scope` 回報，不能進入自動分配池。
+
+註冊建立具代際隔離的租約，遞增序號心跳續期。過期移除自動候選與房間，手動選項保留離線狀態。就緒需宿主就緒及已註冊遊戲監聽服務。回報僅含已認證登入人數和正式遊戲房間摘要，不含密碼或玩家身分；實際跨服路由完成前，遠端房間一律為 `joinAllowed: false`。
+
+節點、選項、房間、本文大小、連線及期限均有上限。`lease_seconds` 須大於 `heartbeat_seconds + request_timeout_seconds`，錯誤組合使回報失敗。`draining` 停止自動分配並保留手動狀態及房間摘要。探索不提供共享持久化、全域工作階段權威、跨服加入、隊伍互通或中繼遷移；正式接納多節點玩家前須分別實作與驗證。
+
+可選行 `persistence.mysql-account-ownership` 提供帳號佔用原語 `IAccountOwnershipStore`。完成遷移 0036 後才能掛載 `profiles/bundles/cluster-account-store.patch.yaml`，並設定 `BFF_CLUSTER_ACCOUNT_CONNECTION_STRING` 和權威資料庫識別碼；依據資料庫記憶體設定 `max_owners`。每個佔用使用獨立、停用連線池的連線立即嘗試取得命名鎖。驗證同時檢查原始鎖和固定的資料庫識別碼，失去佔用後不會自動重新取得。卸載會等待進行中的取得作業結束並關閉現有佔用。此原語尚未接入遊戲登入或隔離儲存庫寫入，不能單獨保證共用節點登入安全；單服設定不載入它。 取得佔用會傳回持有原生連線的生命週期控制代碼，遠端 SDK 尚無對應結果轉接器，契約清單明確標記此取得操作不受支援。
+
+可選行 `cluster.account-sessions` 將帳號佔用接入遊戲登入。先掛載帳號儲存補丁，再掛載 `profiles/bundles/cluster-account-sessions.patch.yaml`，並對每個大廳設定 `require_account_ownership: true` 和 `duplicate_login: reject_new`。缺少接入服務時啟動失敗。工作階段只為開啟中的遊戲連線建立，其數量由監聽器的連線上限決定；`verification_seconds` 和 `verification_concurrency` 限制背景檢查。失去權威會關閉連線；卸載會取消等待中的接入、關閉已接入連線並等待清理完成。`IAccountSession` 特徵允許驗證佔用，但不移交其生命週期。此層尚未隔離進行中的儲存庫寫入和角色建立；完成這些寫入路徑的隔離與排空前，不要啟用共用正式資料庫。隨附的單服設定均不掛載這兩個補丁。
+
+帳號交接還要求遷移 0037，並在 `persistence.mysql-account-ownership` 上明確設定與目錄身分一致的 `node_id`。預設空值保留一般佔用功能，不發布 `IAccountHandoffStore`。來源節點只能登記自己的交接；資料庫僅允許記錄中的目標節點認領、來源節點撤回。`cluster.account-sessions` 只有在該儲存服務存在時才發布 `IAccountSessionHandoff`。遠端 SDK 無法傳輸原生佔用控制代碼、遷移 IP 位址或代理回呼註冊，這些方法在提供轉接器前明確不受支援。此設定不會在單服設定中啟用原生遷移。
+
+可選的 `cluster.migration-broker` 要求與 `cluster.node` 使用相同的 `node_id`、`directory_url`，`access_key` 為該節點的私有金鑰。目錄必須開啟 `migrations`（預設 false）。請求攜帶目前租約憑據，使用 snake_case JSON，經 TLS 或安全通道傳輸；診斷記錄不包含密碼。共用帳號遷移要求加入範圍、資料範圍、認證權威和實際持久資料域識別碼一致；訪客要求明確的加入信任與不同資料範圍。僅啟用傳輸不會啟用原生遷移或預留席位。收件匣已滿回傳 503，重複識別碼或失效租約回傳 409，未收到回覆回傳 504。
+
+| 外掛行 | 設定項 | 預設值 | 範圍 |
+|---|---|---|---|
+| `cluster.directory` | `max_pending_migrations` | 256 | 1..4096 每個目標 |
+| `cluster.directory` | `migration_request_timeout_ms` | 5000 | 500..30000 |
+| `cluster.migration-broker` | `migration_request_timeout_ms` | 5000 | 500..30000 |
+| `cluster.migration-broker` | `max_concurrent_requests` | 4 | 1..32 |
+| `cluster.migration-broker` | `max_body_bytes` | 65536 | 1024..1048576 |
+| `cluster.migration-broker` | `poll_wait_seconds` | 20 | 1..25 |
+| `cluster.migration-broker` | `http_timeout_ms` | 35000 | 1000..90000 |
+| `cluster.migration-broker` | `retry_delay_ms` | 1000 | 100..30000 |
+
+HTTP 逾時必須大於輪詢等待與回呼時限。目標收件匣由一個受管工作輪詢；出站並行容量耗盡時立即拒絕新請求。
+
+可選列 `cluster.migration-destination` 需要 broker、arrivals、心跳身分及帳號工作階段交接服務。`node_id` 必須與心跳身分一致；`endpoints` 包含 1..64 個不同的 `{ client_build, listener_id, host, port }` 項目。host 必須是標準 DNS 名稱，目的端逐次請求解析並要求取得 IPv4 位址。房間請求還需要對應版本的 `IRoomAdmissionDirectory`。缺少端點、目的租約世代失效或 DNS 解析失敗時拒絕準備；回原服請求不預留房間座位。此列尚不認證原生遊戲連線，也不啟用遠端房間點選。
+
+必填的 `listener_id` 是目的端傳輸列的完整 ID，包含設定前綴。啟用時必須恰好找到一個具有該 ID、且使用對應版本遊戲協定的可見活動監聽器。待遷入記錄保留此 ID，取用時核對 `ConnectionAcceptedEvent` 實際觀測到的連線；未被觀測、已關閉、非 IP 或來自其他監聽器的連線，即使版本、帳號編號和位址相同，也不能取走記錄。遭拒的嘗試會保留記錄供正確連線使用。此檢查不授予帳號權限，原生遷入處理器仍須先認領交接，再載入玩家狀態。
+
+`arrival_lifetime_ms` 預設 10000（100..60000），`cleanup_interval_ms` 預設 1000（100..10000），`operation_timeout_ms` 預設 5000（100..30000）。房間的 `room_admission_lifetime_ms` 應涵蓋到達期間及準備耗時。掛載 `cluster.migration-arrivals` 並設定 `max_arrivals`（預設 64，1..4096）：等待到達和已過期但仍待清理的記錄共用此容量。過期到達不能被消耗；取消失敗會記錄錯誤並重試，期間不釋放容量。卸載在操作期限內取消剩餘預留並報告失敗。成功取走到達記錄的使用者負責後續入房或取消該預留。
+
+`INodeLeaseSource` 與 `IMigrationArrivalCleanup` 是共享 Contracts 4.12.0 服務，使獨立載入的插件保持相同介面身分。租約記錄可透過 SDK 序列化，但其持有權杖是私密資訊，診斷文字不包含權杖。到達清理記錄包含 IP 位址，且完成操作保留物件身分限制，因此仍需原生轉接器。
+
+可選 `profiles/bundles/cluster-account-write-fencing.patch.yaml` 要求先掛載帳號儲存與工作階段補丁、執行遷移 0036，並在大廳啟用帳號佔用。它設定 `core.packet-router.decoratable: true`、啟用 `persistence.mysql.require_account_write_authority` 並掛載 `cluster.account-mutations`；未明確開啟裝飾的普通路由仍直接呼叫。`IAccountMutationScopes` 將不可變佔用控制代碼繫結至原始遊戲工作階段，封包分發選擇該工作階段，對局逐人結算與獎勵卡發放則選擇收款玩家的原始工作階段；延遲舊工作不能借用後來工作階段的權限。受保護的 MySQL 寫入在修改玩家狀態前，使用同一連線與交易鎖定並驗證權威資料列；佔用接管等待已准入的交易結束。缺失或已替換的權限直接失敗，不重新取得。新帳號角色建立在交易內初始化，修改既有帳號需要其佔用。Contracts 4.4.0 提供這些原生生命週期與交易介面，遠端 SDK 明確拒絕呼叫。此功能不設定共用儲存、不自動保護無關外掛，也不實作跨節點加入房間；啟用共用正式資料前仍須審核其餘全部寫入者。單服設定不掛載此補丁。
 
 ## 遇到問題時
 
@@ -378,6 +544,163 @@ BFF_PUBLIC_HOST=<public-address-clients-use>
 
 依序排查的清單見[疑難排解](troubleshooting.md)。
 
+## 對局取消與開局規則
+
+以下 `ingame` 行選項適用於所有版本。對局載入或進行中有玩家斷線時，對局會被取消：不顯示結算，其餘所有玩家都被送回廣場，方式與等待房間中離開的玩家相同。`cancel_round_on_disconnect`（預設 `true`）可關閉此行為，此時斷線的玩家只是單獨離開。玩家主動離開房間或輸入 `!plaza` 通常讓其他人繼續對局。啟用殭屍逃生後，Lua 房主離開會取消本局且不發獎勵。`load_timeout_ms`（預設 `60000`，`0` 表示不限，最大 `600000`）在屆時仍有玩家未完成載入時以同樣方式取消對局；該值應大於最慢用戶端的地圖載入與比賽連線建立時間。
+
+在殭屍模式中，只有所有在場玩家都被感染時殭屍才獲勝；連線已經關閉的玩家不算作倖存者。
+
+兩條開局規則預設關閉。`start_min_players`（0–32，座位與 AI 玩家合計）在人數不足時拒絕房主開局。`start_requires_team_balance` 在紅藍隊伍模式中，依 `assign_spawn_teams_on_start` 為無隊伍玩家分隊之後，兩隊人數相差超過一人時拒絕房主開局；否則無隊伍的玩家計入紅隊。用戶端沒有這類規則的拒絕原因，因此伺服器只記錄日誌，房間繼續等待。原生自動開局不受檢查。
+
 ## 下一步
 
 繼續閱讀[部署](deployment.md)以建置並執行發行版本，或閱讀[模組](plugins.md)了解這些資料列的實際作用。
+
+## 現代版本等待房間踢人
+
+`dialect.rooms.config.room_kicking` 預設為 `false`。在 kr-1256、cn-774 和 tw-454 上啟用後，已審核的暱稱請求與移除通知接入共用的房主權限邏輯。只有等待房間的房主能移除另一位在房玩家；通知先於座位移除送出，被移除玩家返回廣場。此選項要求 `modern_rooms: true`，不能與 `plaza_only` 同用；缺少任一原生封包名稱或格式時，啟用失敗。
+
+`dialect.rooms.config.npc_rounds` 用於應答現代版對局房主的原生波次管理器，海盜模式依賴它推進。kr-1256 設定包預設開啟。在海盜模式房間中，房主的波次開始、波次結束與刷怪表應答送給所有成員，全部波次結束的應答只送給房主；其他模式忽略這些請求。一般對局中的刷怪請求會檢查格式但暫不轉發，因為其傳輸方式尚未確認。初始教學使用同一綁定，仍只應答其單人房主。此選項要求 `modern_rooms: true` 並掛載對局綁定。
+
+單版本隔離試驗時，在 `--patch tools/local-checks/isolated-memory.patch.yaml` 之外增加 `--patch profiles/bundles/modern-room-kicking.patch.yaml`。使用 `all` 部署時，將修補檔中的 `set` 操作複製到各目標版本被忽略的 `local.patch.yaml`，列 ID 使用不帶前綴的 `dialect.rooms`。真實用戶端驗收前保持關閉。此選項不改變舊版既有的踢人綁定。
+
+## 帶類型的快速配對
+
+對於已審核此能力的組建，`dialect.rooms.config.quick_matching` 掛載原生配對請求。`quick_match_default_mode_id` 選擇共用配對模式（0–65535，預設 0 拒絕請求）。類型 1 開始配對，類型 2 更新配對；各自不同的原生尾部皆完整驗證。隊伍加入與清單項目請求在流程實作前回傳原生拒絕。隨附現代版本設定保持關閉，等待真實用戶端驗收。
+
+## 原生選服登入銜接
+
+可選項 `dialect.messages.config.center_migration_prelogin` 預設為 `false`，且要求同時啟用一般登入。對 kr-1256，同時設定 `protocol.config.pre_handshake_opcodes: [gcpReqMoveInto]`，才能在修補請求之前接收全新的原生選服連線。介接器嚴格驗證雙字欄位長度、零保留身分及值為 0 或 1 的階段旗標，拒絕已登入或重複請求，並傳送原生修補回覆以繼續一般登入。僅在目前封包分派期間可用的 `IInitialHandshakeContinuation` 在分派結束時失效，且僅在處理器成功返回後生效。它不會標記版本已驗證、兌換票據、安裝玩家身分或授權遷移。大廳仍須要求有效的一次性 Launcher 票據，帳號名稱不能取代票據。單服預設設定維持不變。伺服器封包測試通過不代表真實用戶端已驗收。
+
+`dialect.messages.native_migration` 預設關閉。它與 `center_migration_prelogin` 共用原生移動請求的單一路由：零編號仍要求明確啟用預登入選項，非零編號則分派為 `MoveIntoRequested`。分派本身不解除首包握手限制，也不授予帳號占用。此選項另提供由資料表校驗的遷入回覆與連線切換訊息，只有 opcode 表宣告確認及完成封包時才掛載這對訊息。目的端准入處理器必須先校驗綁定監聽器的待遷入記錄、認領帳號權限並安裝玩家狀態，才能要求握手續接。目的端准入由下述可選 `cluster.migration-admission` 行提供；來源協調由 `cluster.migration-source` 提供，部署接線仍須明確啟用。
+
+
+可選的 `cluster.migration-admission` 行在目標預留完成後協調共用帳號入房遷移，應放在能看見對應版本大廳與房間服務的位置。啟用 `lobby.native_migration`（預設 false）與 `dialect.messages.native_migration`；大廳另需帳號所有權、持久化保留身分查詢、儲存型背包與錢包，且不允許角色建立預覽。獨立協調外掛避免大廳與房間服務形成循環依賴。Contracts 4.16.0 新增 `IRetainedPlayerAdmission`；安裝結果是原生玩家狀態，遠端 SDK 尚無配接器。
+
+`channels` 必須明確列出已證明適用於該版本的原生頻道值，來源頻道不在清單中時拒絕遷入。kr-812 的 50、60、80 才會通過 kr-812 sub_A4A440 的無條件分支，其餘命名頻道依賴用戶端權限。不能直接把現代版登入頻道用於舊版。`max_migrations` 預設 64（1..4096），`timeout_ms` 預設 10000（100..60000），`cleanup_interval_ms` 預設 1000（100..10000）。等待確認與清理失敗共用容量；逾期、斷線或租約變更會釋放預留與帳號占用，清理失敗保留容量等待重試，卸載回報未完成的清理。
+
+准入消費監聽器與位址綁定的一次性記錄，檢查目標租約，拒絕超出玩家模型正有號整數範圍的身分，並在讀取保留身分、解析背包與錢包前認領精確的帳號交接。不會建立身分或重複發放每日登入獎勵。只有玩家狀態安裝且連線提升傳送成功後才繼續初始握手。需要提升確認的版本保持認證階段，收到確認後完成提升並走一般房間准入；其他版本在立即提升後入房。返服遷入使用下述可選主選單准入，訪客仍被拒絕。訪客及部署接線尚未完成；發布的設定未掛載此行，仍需真實用戶端驗收。
+
+可選的 `cluster.migration-source` 行將重新驗證後的遠端房間點擊接至原生遷出流程。它需要遷移代理、節點租約、帳號連線交接、線上玩家目錄，以及與 `client_build` 相符的唯一 `ChannelMoveOffered` 傳送器。必須明確設定 `channel`（1..255），且目的端須允許該頻道。`max_migrations` 預設 64（1..4096），`operation_timeout_ms` 與 `migration_timeout_ms` 預設 10000（100..60000），`cleanup_interval_ms` 預設 1000（100..10000）。發佈設定未掛載此行。
+
+只有目前持有登入的主選單或廣場遊戲連線可以遷出。房間流程持有場景鎖；已掛載的隊伍目錄必須支援原子單人預留：撤銷既有邀請，並在清理前拒絕涉及該玩家的新邀請及入隊。單人預留以設定的待處理邀請容量為上限。準備前玩家進入 `Migrating` 階段，目的端先預留精確房間實例，來源再釋放帳號寫入權限，最後傳送資料表定義的原生轉服通知。逾時、回覆遺失、傳送失敗或連線失效時，取消精確目的端請求並只撤回本次交接；目的端已認領時關閉來源連線，不重新一般搶占帳號。清理失敗保留容量及單人預留以供重試。Contracts 4.17.0 新增來源介面及原生通知；需要生命週期所有權的隊伍預留尚無遠端 SDK 介接器。
+
+共用帳號遷移在連續造訪多個房間時保留首次登入節點與原生頻道（Contracts 4.18.0）。來源外掛另需 `IMigrationTargetDirectory`，並在 `home_unavailable_notice_enabled` 為 true 時要求唯一原生 `ServerNotice` 傳送器。代理透過認證查詢重新解析原服租約，複核就緒狀態、容量、加入範圍、持久域與帳號簽發方；查詢本身不授予待遷入記錄或帳號權限。原服拒絕或無法使用時，玩家留在目前節點並在啟用通知時收到 `home_unavailable_notice`（1..512 字元）。
+
+InGame 的 `return_on_leave` 預設 `home`，設為 `stay` 則留在造訪節點。`return_delay_ms` 預設 1500（0..60000）。先完成正常離房清理與對局離房結算，再等待返服。等待期間不占用場景鎖；斷線、連線被取代或任何場景代數變更都會取消舊返服請求，之後可透過退出廣場重試。原服的 InGame 須啟用 `home_migration_admission: true`，並具備 `room_admission_reservations` 與原生主選單傳送器。返服準備不預留房間席位。完成相同的帳號認領與連線提升後，目的端使用保留裝備還原來源節點的閒置場景，不重複提示教學。返服請求攜帶 `home_scene`（`MainMenu` 或 `Plaza`），入房請求一律使用 `MainMenu`。從廣場返服時沿用原生廣場安裝流程，避免額外跳回主選單；未提供廣場編碼器的版本退回主選單。Contracts 4.21.0 為 `MigrationRequest` 與 `IMigrationHomeAdmission.EnterAsync` 增加場景參數。掛載隊伍目錄時，目的端在等待提升確認及場景安裝期間持有原子單人預留；清理失敗時持續保留，直到資源釋放。發布設定仍保持關閉，等待部署與真實用戶端驗收。
+
+隊長會帶著隊伍一起移動。隊長前往遠端房間或返回原服時，同一版本、位於主選單或廣場的每名線上隊員會在隊長的遷移邀請送出後立即收到同一目的地的邀請：兩個客戶端系列都會在收到任何已接受的遷移邀請時開啟待定連線，無需自行先請求。隊員遷移不使用單人預留；返服只帶走原服與隊長相同的隊員。在房間或對局中的隊員，或被目的地拒絕的隊員（例如房間已滿），留在原節點並保留本地隊伍；隊長的遷移不會撤銷。非隊長隊員不能單獨遷出，也不會自行發起返服。每個請求在 `party_leader` 中寫明隊長，單人遷移時節點傳輸省略該欄位；目的地透過 `IPartyDirectory.RejoinAsync` 把每名到達者重新加入已到達隊長的隊伍，到達順序不限，未配對的到達者在其到達時限過後捨棄。Contracts 4.23.0 新增這兩項。尚未經原生客戶端確認。
+
+目錄的 `nodes[].native_migration_builds` 預設為空清單。僅列出已部署原生遷出、監聽器綁定目標准入與連線提升處理器，並已核對用戶端路徑的版本；項目必須唯一且對應已設定端點。目錄啟用 `migrations: true` 後，兩端都列出該版本，才會將共用帳號遠端房間標為可加入或接受遷移請求，返服也受此檢查。加入提示另需兩端租約有效、版本就緒、目的端有容量、加入範圍與房間目錄相符、持久資料庫身分及帳號簽發方完全一致。清單不授予席位預留或帳號所有權，準備階段仍會重新驗證路徑；訪客准入完成前，獨立資料域僅提供探索。
+
+預留房間在玩家遷入前關閉、開局或變更密碼時，准入協調器會釋放席位並安裝保留玩家狀態的主選單，同時繼續持有目標節點的帳號寫入權。`cluster.migration-admission` 要求每個版本恰有一個 `IMigrationRoomRecovery` 服務；InGame 在 `home_migration_admission: true` 時發佈此服務。恢復作業等到原握手訊息處理結束後，再套用 `return_on_leave` 和 `return_delay_ms`。期間切換場景會取消返回，`stay` 則保留玩家在目標節點。恢復工作佔用 `max_migrations` 容量，在准入鎖外執行。如果主選單安裝失敗，仍會關閉連線並釋放已認領的資源。Contracts 4.19.0 新增此恢復服務，原生主選單訊息格式不變。
+
+房間服務發佈 `IRemoteRoomMigrationEndpoint`（Contracts 4.20.0），`cluster.migration-source` 為其 `client_build` 綁定恰好一個端點。房間發佈、節點心跳與遷移因此能一起啟動：房間服務不再等待本身依賴心跳的遷移來源。重複來源或缺少匹配的房間端點會導致啟用失敗。卸載來源時拒絕新的遠端入房，並等待正在執行的入房與返回原服呼叫結束後才釋放；重新載入來源或心跳不會重新載入房間服務。無需增加設定列，也不會預設啟用遷移。
+
+舊版房間配接器分別控制連線就緒與自動教學。`dialect.rooms.config.tutorial_move_in` 啟用原生主選單移入回覆；`automatic_tutorial`（預設 `true`）獨立控制隨後傳送的自動教學通知。需要略過首次教學的測試部署可設定 `automatic_tutorial: false`，同時保留房間操作所需的就緒回覆。單次登入的 `OfferTutorial: false` 同樣只抑制教學通知。
+
+## 可選房間物件經濟
+
+現代版房間方言與舊版共用相同的可選物件經濟綁定：`supply_items`、`lucci_drops`、`star_items`、`horde_lottery`、`instant_revival`、`pve_points`、`rescue_missions`、`counted_pve_items`。每項綁定仍要求自身已確認的封包能力，不支援的選項會在啟用時失敗。kr-1256、cn-774、tw-454 設定啟用補給、合作模式計數道具及 PvE 即時計分。模式 3 使用自身啟用的道具池和兩個普通持有槽。模式 16 初始化三個計數槽；槽內道具選擇及其餘立即生效的合作模式拾取道具，均為來自各版本自身已啟用 ItemSpec 資料的可設定伺服器策略。現代版地圖回報有十四個向量，隊伍元素為單位元組；產生、丟棄訊息分別為 37、33 位元組。KR 切槽回覆有三個欄位，CN、TW 額外攜帶第四個結果欄位。原生客戶端驗收仍待完成。
+
+
+`dialect.rooms.config.weapon_objects` 預設為 `false`。僅在版本宣告已核對的 `weapon_objects` 能力時掛載原生武器掉落建立和拾取，目前為 cn-324。共用 `ingame` 行以 `max_weapon_objects_per_round` 限制每局累計建立數量（預設 256，範圍 1..65536），物件識別值從 `weapon_object_id_base` 之後分配（預設 `0x64000000`）。此區間應與玩家及其他對局物件識別值分開。拾取僅接受回報玩家自身角色，同一物件只能消耗一次；對局重設清除狀態。自動檢查不等於實機驗收。
+
+### 用戶端顯示等級
+
+每個用戶端版本在 `packets/builds.yaml` 中宣告 `display_level_max`，數值來自該版本自身 `Images/Icons/LevelMark.smf` 的圖示影格數。傳送玩家狀態、隊伍成員、廣場／房間座位、玩家資料、等待清單和結算時，超過上限的等級顯示為該版本的最高等級。資料庫等級、經驗和獎勵計算保留真實值。例如，194 級在 cn-324、cn-406 顯示為 180 級，在 kr-812 仍顯示為 194 級。新增版本必須宣告其自身資源支援的正整數上限。
+
+### 早期暫時房間裝備
+
+`dialect.rooms.config.room_inventory_selection` 預設為 `false`，要求同名封包版本能力。CN2011、CN2012 的設定啟用此項，並將房間行放在各自隔離的 `clientdata` 行之下。它將早期 `gcpRoomChangeInventory` / `gspRoomChangeInventory` 路徑與 `weapon_presets` 分開掛載。CN2011 透過 `room_inventory_selection_count` 宣告四個選擇值，CN2012 宣告五個；`room_inventory_selection_fields` 指定 `UserSlot` 中原生角色與武器短整數的欄位。綁定要求該版本的用戶端資料，依據 `Config/FighterConfig.xml` 與 `Config/WeaponSpecDetail.xml` 驗證角色和武器規格識別值，拒絕未知值，尚未確認用途的尾部選擇值只接受空值。玩家只能修改自己尚未準備的等待房間席位。房間快照保留該選擇，不發放持有道具，一般換裝或離開房間後清除。原生按鈕可見性是另一項問題：CN2012 初始化時隱藏舊按鈕，因此伺服器掛載此路徑不等於已具備可用的原生入口或通過實機驗證。
+
+### 隊長對局
+
+`dialect.rooms.config.captain_mode` 預設為 `false`，需要該版本獨立審核的 `captain_mode` 能力。支援 kr-812、cn-717、id-400、id-1809、cn-404、cn-408、cn-706、kr-1256、cn-774 和 tw-454，使用完整的 legacy 或 modern 對局配接器；僅選單、瀏覽器、廣場及等待房間配接器拒絕此選項。 模式 20 在對局開始後為每隊隨機指定一名在線隊長，變身、武器及技能由客戶端處理。隊長本人的死亡回報會把身分交給存活隊友；無人可選時等待共用復活流程。普通擊殺與隊長擊殺共用同一次死亡計分，擊殺隊長只增加一個普通團隊分，沿用共用時限、團隊總分、平手、結算及獎勵規則。隊長離開時會在有存活隊友後替換。此選項不傳送 `gspCaptainEvent`，不授權未經審核的版本，也不代表已通過原生客戶端驗收。 `ingame.config.captain_ultra_item_kind`（legacy 套件為 104，0 關閉）讓目前隊長的 ULTRA 請求只回給隊長本人，之後由客戶端自行把 ULTRA 顯示給其他玩家；其他玩家及已倒下隊長的請求不會得到回應，也不會重複任命。
+
+### 蕾雅角色技能
+
+`dialect.rooms.config.rhea_character_skill` 預設為 `false`。套用對應版本的 `rhea-character-skill.patch.yaml`，可為 kr-1256、cn-774 或 tw-454 啟用已核實的變身協定，需要完整的現代對局配接器及該版本的原生能力。只有目前穿戴角色物品 300029 的玩家，才能為目前回合、目前生命中的自身角色請求變身。接受的變化同步給本人和房內玩家；重複啟動會被忽略，已結束狀態的重複結束請求僅向本人確認。死亡、復活和轉化會清除已存變身狀態。充能及結束時機仍由原生客戶端控制；此選項不增加伺服器計時強制校驗，也不代表已通過原生客戶端驗收。
+
+### 爆破對局
+
+`dialect.rooms.config.bomb_mission` 啟用已審核的原生炸彈操作與結果繫結。`ingame.config.bomb_round_series` 進一步啟用連續回合，逐局交換攻守，將勝局數與擊殺總分分別記錄。legacy 格式為三局兩勝；kr-1256、cn-774 和 tw-454 為五局三勝。兩項預設均為 `false`，完整系列支援 kr-812、cn-717、id-400、id-1809、cn-404、cn-408、cn-706、kr-1256、cn-774 和 tw-454，需要共用結果介面及已審核的連續回合入場傳送器。套用對應的 `profiles/<build>/bomb.patch.yaml` 可啟用兩項並從一般復活流程中排除模式 19，要求具備觀察模式支援。modern 明確啟用修補同時將模式 19、20 加入計分板選擇。CN2013 cn-406 的模式工廠沒有這兩個專用分支，因此保持排除；此結論不代表其他 CN2013 修訂。
+
+`dialect.rooms.config.extreme_racing` 預設為 `false`，需要已審核的 `extreme_racing` 版本能力（目前僅 kr-1256），並需要 `modern_rooms` 及其對局繫結；cn-774 和 tw-454 已有經過審核的計時、回合、記錄、終點、金幣與檢查點資料列，但競速能力仍關閉並拒絕此選項，等待完整對局審核。套用 `profiles/kr-1256/extreme-racing.patch.yaml` 即可啟用。模式 24 隨後進行 `ingame.config.extreme_racing_rounds` 個競速回合（1 至 5，預設 3）。每回合開始時啟動競速計時（`extreme_racing_round_ms`，預設 180000）。首位抵達終點後啟動終點倒數（`extreme_racing_finish_countdown_ms`，預設 10000）；倒數或競速計時結束，或所有在線玩家都完成時，該回合結束。完成者依名次獲得 `extreme_racing_place_points` 分數（預設 10、8、6、5、4、3、2、1），競速記錄板顯示本回合與累計分數，回合之間暫停 `extreme_racing_intermission_ms`（預設 5000，須大於 1000）。最後一回合後執行一次共用結算：分數較高的隊伍獲勝；房間不是兩隊時，分數最高的玩家獲勝。共用對局時限不會結束競速。檢查點觸發會被轉送，使每名玩家的進度標記前進；標記與復活點由客戶端自行配置。需要伺服器物件清單的地圖物件（砲台、金幣和石塊）不會產生。回合數、計時與分數屬於伺服器規則，原生客戶端驗收尚未完成。
+
+伺服器依據具體操作人、隊伍與目前回合驗證安裝、取消和拆除。原生房主用戶端回報爆炸與目標結果；一般回合時間到期後，已安裝炸彈保留自身倒數。各局沿用共用載入、角色生命與取消流程，整場只結算一次獎勵，並保留同一場次識別值。一整隊主動離開會判該隊整場棄權，不增加未進行的勝局；現有斷線取消策略保持生效。此選項不啟用未經審核的版本，也不代表已通過原生用戶端驗證。
+
+### FinalZone
+
+`dialect.rooms.config.final_zone` 預設為 `false`。套用 `profiles/kr-1256/final-zone.patch.yaml` 可啟用模式 23、25、30、45 共用的 Area32 互動，需要 modern 對局繫結、`final_zone` 版本能力及記分板模式 30，目前僅審核 kr-1256。補丁同時保留記分板模式 1、19、20、24，可在其他模式補丁之後套用，但不會自行開啟這些模式。
+
+透過 `client-data` 匯入對應用戶端的 `Config/GameSpec/GenItemSetting.yaml`、`Config/GenDroneSpec.csv`、`Config/SurvivalMode.xml`、`ServerShared/MapMeta.xml`，以及所選地圖的 `GenClusterTable.csv`、`GenSpawnTable.csv`、`GenSpotList.csv`。使用無人機或金色補給的地圖還需要 `GenDroneRewardTable.csv`。公寓地圖關閉了無人機，原始資源也沒有這張表。資源缺失或格式錯誤會在倒數前報錯。目前明確物品產生路徑支援一般生成物，包括 `rel_Sudden08_Finalzone` 地圖；使用獨立 `AutoItem` 地形物件類別的地圖（包括 `rel_space04_64room`）會被拒絕。可選開局包的原生消耗與發放互動尚未接入，因此裝備開局包也會在倒數前被拒絕。
+
+伺服器在對局開始後發布地面物品，每個物件只授予一名領取者，依據已發放數量驗證主動丟棄與一次死亡背包，並使用原生使用者編號轉移背包內容。洪水階段遵循地圖資源時序。無人機使用受限的房間計時器，補給箱與房主去重後的金色補給申請採用原生獎勵種子。陷阱每個端點消耗一根已持有的桿，只允許放置者連接已確認的兩個端點；必要確認包含傳送者。玩家淘汰後不能復活，存活人數只更新一次，有競爭者的對局在只剩一人時進行一次結算，模式 25 則按最後存活的隊伍結算。模式 45 接入共用物資和淘汰流程，獨有的殭屍機制另行實作。一般分數與時限不會結束 FinalZone。取消、房間銷毀與最終結算都會停止模式計時器。
+
+資源與物件限制位於 `ingame.config`：
+
+| 設定鍵 | 預設值 | 限制 |
+|---|---:|---|
+| `final_zone_first_object_id` | 65536 | 首個預留世界編號，整個範圍必須低於玩家編號。 |
+| `final_zone_maximum_objects` | 16384 | 每局不重用的編號總量，由物品、背包、無人機、補給與陷阱桿共用。 |
+| `final_zone_maximum_quantity` | 100000 | 每個物品規格可發放或保留的最大數量。 |
+| `final_zone_maximum_drones` | 1 | 同時活動的無人機數。 |
+| `final_zone_maximum_golden_supplies` | 3 | 每局不同金色補給申請數，零表示不發放。 |
+| `final_zone_maximum_file_bytes` | 4194304 | 每個匯入資源的位元組數。 |
+| `final_zone_maximum_rows` | 16384 | 每張地圖表的列數。 |
+| `final_zone_maximum_item_specs` | 4096 | 物品規格與開局包識別數量。 |
+| `final_zone_maximum_alternatives` | 256 | 單個產生欄位中的候選數。 |
+| `final_zone_maximum_bonus_items` | 64 | 單次產生選擇附帶的物件數。 |
+
+此功能仍是受開關保護的增量。台帳限制已發放數量，但尚未完整重現原生背包欄位、武器變體與即時彈藥消耗。模式 30 的同盟與背刺行為尚未得到證實。自動檢查與資源匯入不代表原生用戶端驗證，也不代表地圖機制全部涵蓋。
+
+## 原生廣場招募
+
+支援的十三個設定已啟用原生廣場招募。自訂設定需在 `dialect.rooms` 與 `ingame` 兩列設定 `plaza_recruitment: true`，並掛載對應的 `party` 列。兩個選項預設均為 `false`；缺少原生繫結、隊伍目錄或廣場支援時，啟用會失敗。`ingame.plaza_recruitment_text_length` 預設限制為 128 個 UTF-16 字元，可設定 1–1024。發布與修改共用聊天限流視窗，取消招募不受該視窗阻止。
+
+只有目前廣場隊長能招募。原生木牌標誌、文字氣泡、隊伍成員與場景跟隨共同更新；取消、離開、切換場景與失去隊長身分會清除舊木牌。KR1256 與 CN2019 還提供每頁十筆的原生招募清單，使用隊長選定的分類與人數上限。清單只允許加入本節點隊長的隊伍；顯示遠端玩家的廣場外觀不代表可以跨節點入隊。入場位置由原生客戶端決定，伺服器只重播真實的位置回報。
+
+## 可選的裝備防禦表
+
+裝備普通防禦預設關閉。在 `kr-812`、`cn-324`、`cn-406`、`cn-404`、`cn-408`、`cn-705`、`cn-706`、`id-400`、`id-1809`、`cn-717`、`cn-774`、`tw-454` 或 `kr-1256` 加上 `--patch profiles/bundles/defence-seeds.patch.yaml` 即可啟用。補丁也會啟用傳送防禦表所需的原生 TCP relay，包括 `cn-705`、`cn-706` 預設停用的相關外掛列，無須開啟 UDP。使用 `all` 時，將補丁操作放入各指定版本的 `local.patch.yaml`；共用補丁無法修改稍後附加的版本列。`cn-705` 可作為獨立設定使用，但不在 `all` 中。缺少已核實能力或授權列的版本會拒絕此補丁。
+
+CN2011（`cn-279`）在原生傷害流程中於本機計算普通裝備防禦，不使用此種子表補丁。
+
+授權外掛讀取對應版本的 `Config/ShopItem2.xml` 與 `defence_seed` 規則。回合開始時凍結穿戴物品 ID，向每個接收端傳送每名受擊者相同的 1000 位元組表，減傷仍由原生客戶端套用。暴擊與抵消表保持獨立；啟用 `cn-705` 或 `cn-706` 的防禦不會啟用尚未核實的暴擊交換。關閉時保留原本的零防禦交換，僅防禦外掛列保持停用。
+
+表內頻數均衡，近似本地整數隨機取值分布，不重現客戶端隨機序列。目前投影涵蓋目錄中的 min/max、設定的 RC/KR/BB 套裝效果及端點精度；`cn-774` 與 `tw-454` 均採用各自的 RC/KR/BB 規則和單精度端點。暫不投影實例屬性、變身專屬屬性及獨立特殊修正。CN2019 的 AI 角色採用不同的種子編碼，不在這套玩家投影範圍內。正式啟用前需要原生客戶端驗收。`defence_items_client_path` 選擇活頁簿；`defence_workbook_max_bytes` 限制大小，預設 268435456 位元組。
+
+## 新版殭屍模式
+
+對 `kr-1256`、`cn-774` 和 `tw-454`，套用 `profiles/<build>/script-zombies.patch.yaml`，同時在 `dialect.rooms` 與 `ingame` 列啟用 `script_zombies`，接入一般模式 8。兩項預設關閉，等待原生用戶端驗收。原生房主指令碼依裝備權重選出多個小殭屍，伺服器將初始數量限制為在線人數除以 4 後無條件進位，再由角色所屬用戶端的原生確認完成隊伍 34 變身。人類開局為隊伍 1。之後的感染與殭屍復活須有角色擁有者的死亡或復活依據；一般死亡回報不會結束回合。全部感染確認完成後殭屍獲勝，到伺服器時限仍有人類存活則人類獲勝。
+
+`ingame.script_zombie_round_time_limit_ms` 預設 `180000`，範圍為 `1..3600000`。模式 8 必須啟用原生生命與復活，`dialect.rooms.result_scoreboard_modes` 必須包含 `8`。兩列的 `script_zombies` 必須一致。此選用修補可與已審核的炸彈、隊長、跑酷及 FinalZone 修補疊加，保留各自計分板。其他模式維持版本宣告的 peer feed 策略。這三個版本均關閉通用轉送，因此共用變身操作不會在已啟用模式之外被轉送。原生指令碼房主離開時會取消回合且不結算，因為選擇狀態尚不能移交另一用戶端。
+
+本次接入為單回合，指令碼的十回合要求尚未組成伺服器連續比賽。幽靈模式 28、原版模式 43、殭屍生存模式 44 各有不同原生規則，不由此選項啟用。原生用戶端實機驗收仍待完成。
+
+## 幽靈殭屍
+
+為 `kr-1256` 或 `cn-774` 套用 `profiles/<build>/ghost-zombies.patch.yaml`，即可在房間適配器與對局列同時啟用 `ghost_zombies`。模式 28 與普通模式 8、逃生模式 32 共用轉換綁定。原生房主選擇一名殭屍王（201 或 203），使用武器 110290；指令碼隨後重複的零武器選擇不會再次授予轉換。已確認殭屍王的死亡清理使存活人類獲勝；殭屍王或房主離開則取消對局，不發獎勵。其他人類經自身死亡／重生流程變為小殭屍。
+
+普通與幽靈殭屍還會同步目前角色擁有者發出的原生 ULTRA 啟動與計時結束恢復，保留共用 HP 和生命代次。充能仍由原生計量槽負責。目前未實作指令碼的十回合系列。TW454 沒有完整幽靈指令碼路徑的核實證據，因此拒絕啟用。修補保留其他已啟用計分板，原生用戶端實機驗收仍待完成。
+
+## 殭屍逃生
+
+`dialect.rooms.config.zombie_escape` / `ingame.config.zombie_escape` 預設為 `false`。kr-1256、cn-774 或 tw-454 的單一版本設定可套用 `profiles/bundles/zombie-escape.patch.yaml`；使用 `all` 時，將操作放入各選定版本被忽略的 `local.patch.yaml`。啟用需要現代對局繫結、該版本已審核的 `zombie_escape` 能力及計分板模式 32。修補檔保留計分板模式 1、8、19、20、23、24、25、30、32、45，但不會自行開啟各模式的獨立選項。請使用對應客戶端的殭屍逃生地圖與腳本，原生客戶端驗收尚未完成。
+
+房間方言與對局外掛必須啟用相同的殭屍模式。普通殭屍與殭屍逃離共用一個型別化變身繫結，同時啟用不會重複註冊原生操作。選用修補保留已支援的所有生存模式結算表；返回等候房間時恢復開局前選擇的隊伍。
+
+客戶端房主腳本負責初始殭屍抽籤、分離的殭屍出生點、準備門、檢查點按鈕、定時門、感染量表及撤離條件。伺服器驗證房主有上限的初始選擇，允許每名玩家自身的後續感染或重生變身，向全體參與者回傳獲准的 peer 變身，並使用共用生命、結果及獎勵結算流程。初始名額為目前線上玩家人數除以五後無條件進位。腳本可透過感染量表直接感染仍存活的玩家；按鈕掃描並未證實僅限人類觸發。
+
+房主透過原生關卡結果回報人類撤離。沒有線上人類剩餘，或伺服器時限屆滿時，殭屍獲勝。`ingame.config.zombie_escape_round_time_limit_ms` 預設為 600000，範圍是 1..3600000。一般死亡關卡回報不會結束此模式。對局中拒絕新玩家加入。Lua 房主離開會取消本局且不發獎勵，因為無法重播其私有計時與檢查點狀態；其他斷線遵循已設定的取消策略。
+
+此選項透過共用結果流程結算一個關卡。原生腳本寫入遊戲次數三，但三關系列語義尚未證實，本次未實作。自動測試不代表原生地圖機制與介面行為已全部驗收。
+
+## 依客戶端版本儲存穿戴方案
+
+`inventory.loadouts` 列讓各版本獨立儲存已穿戴角色、服裝、武器、武器預設頁及目前預設欄位。`build_key` 使用穩定的設定身分，例如 `kr-1256` 或 `cn-279`；執行相同版本的節點使用相同鍵。帳號的道具所有權、數量、期限、錢包及進度繼續共用。客戶端庫存畫面只顯示自身 `ShopItem2.xml` 中存在的物品，角色也會核對 `FighterConfig.xml`。不相容物品仍歸帳號所有，切回支援它的版本後即可再次看到。
+
+首次使用時，系統從舊紀錄繼承相容的選擇，並透過既有穿戴規則補齊必要裝備位置。後續變更只影響目前版本。預設初始化不會覆寫已儲存的預設頁。此列位於 `clientdata` 下，隔離 `IInventoryRepository` 與 `IPlayerInventoryState`，使用共用儲存提供的 `IInventoryLoadoutStore`。自訂設定應將大廳、裝備畫面、裝備、商店、房間協定與遊戲邏輯的使用者放在此子樹中。
+
+Memory、MySQL 與 SQLite 提供者都有 `max_loadouts_per_player`，預設為 `32`，範圍 `1..256`。達上限後拒絕新增版本方案，不移除既有方案。MySQL 移轉 `0038` 新增 `player_loadouts`；SQLite 結構 `8` 增加方案快照並保留舊帳號狀態。升級前請備份持久儲存。回退 MySQL 程式時保留新增表；舊 SQLite 讀取器會拒絕結構 `8`，回退需要相容讀取器。請勿用舊存檔覆蓋玩家的新進度。

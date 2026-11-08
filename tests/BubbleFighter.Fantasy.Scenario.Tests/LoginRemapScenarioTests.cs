@@ -168,20 +168,24 @@ public sealed class LoginRemapScenarioTests
             (503, "c2s", "gcpRoomReqEnterGame"), (2025, "c2s", "gcpUserHostStart"),
             (986, "s2c", "gspUpdateScoreData"), (729, "s2c", "gspGameBroadcastPlayerScoreData"),
             (732, "s2c", "gspGameTimeOverEnd"), (733, "s2c", "gspGameShowResult_"),
+            (948, "c2s", "gcpPortalMove"), (958, "s2c", "gspPortalMove"),
         };
         if (build is 812 or 717)
             entries.AddRange(
             [
                 (710, "c2s", "gcpGameUpdateScore"),
+                (2023, "c2s", "gcpGameUpdateScoreOptimze"),
                 (701, "c2s", "gcpGameReportMapLoadingComplete"), (32857, "c2s", "gppCreateMobsFromSpawnGroup"),
                 (903, "c2s", "gcpReqStartNewWave"), (908, "c2s", "gcpReqWaveAllSpawnMobs"),
+                (908, "s2c", "Unknown908"), (909, "s2c", "gspRepWaveAllSpawnMobs"),
+                (32836, "c2s", "gppDead"), (32836, "s2c", "gppDead"),
                 (32892, "c2s", "gppCreateAIObject"), (32862, "c2s", "gppCreateSpawnGroupMemberMob"),
             ]);
         // The protocol row resolves the bootstrap frames by name; they stay at 1 and 2 in every remap.
         var handshake = $"  - value: 1\n    direction: c2s\n    name: gcpFirstConnect\n    name_source: label@{profile}\n    evidence: verified\n"
             + $"  - value: 2\n    direction: s2c\n    name: gspRepGamePatch\n    name_source: label@{profile}\n    evidence: verified\n";
         return $"profile: {profile}\nopcodes:\n" + handshake + string.Concat(entries.Select(e =>
-            $"  - value: {e.Value + shift}\n    direction: {e.Direction}\n    name: {e.Name}\n    name_source: {(e.Name.EndsWith('_') ? "coined" : "label@" + profile)}\n    evidence: verified\n"));
+            $"  - value: {e.Value + shift}\n    direction: {e.Direction}\n    name: {e.Name}\n    name_source: {(e.Name.StartsWith("Unknown", StringComparison.Ordinal) ? "none" : e.Name.EndsWith('_') ? "coined" : "label@" + profile)}\n    connection: {(e.Name == "gppDead" ? "both" : "game")}\n    evidence: verified\n"));
     }
 
     private static byte[] WithoutServerTime(byte[] payload)

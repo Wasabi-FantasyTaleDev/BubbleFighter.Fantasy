@@ -1,6 +1,12 @@
 # Profile patch for cn-408: applied after the bundle rows (see profiles/kr-1256/patch.yaml
 # for the supported operations). The admin API moves off 8080 so this profile can run
 # beside the other builds on one machine.
+- set:
+    id: dialect.scene-seeds
+    config:
+      # cn-408 sub_505330 consumes seed decisions without adding the equipped weapon's chance.
+      weapon_critical_bonuses: true
+      weapon_workbook_max_bytes: 33554432
 - replace:
     id: admin.http
     config:
@@ -10,8 +16,9 @@
     config:
       file: logs/{date}/packets-cn-408_{timestamp}.log
       preview_bytes: 96
-# Reward cards stay off, as on cn-404: this build's Config/ShopItem2.xml differs from cn-404's and has no
-# reviewed reward table of its own.
+# The opt-in reward pool uses this build's own Config/ShopItem2.xml: the award dialog, selection, reveal and
+# close rows are audited (dispatcher cn-408 sub_7B2F40 cases 734/743/744, sender cn-408 sub_9BFA10 stamps
+# C2S gcpReqSelectAward), and the pool below validates against this workbook's Stock and StockSet rows.
 - set:
     id: dialect.rooms
     config:
@@ -21,8 +28,179 @@
     config:
       # Pirate (horde) rooms start on the native five-second countdown once every seat is taken or
       # closed: the RoomStage gate cn-408 sub_58AD20 has cn-404 sub_5887F0's body.
-      auto_start_mode_ids: [101, 102]
+      auto_start_mode_ids: [101, 102, 16]
+      # Native mode 103 is the prologue horde-tutor stage; the wave rounds are 101 and 102.
       lottery_modes: []
+      # Native Stock and StockSet identities are validated when reward cards are enabled. cn-408's
+      # workbook is a strict superset of cn-404's, so this pool is identical to cn-404's.
+      lottery_grouped_draw: true
+      lottery_items:
+        - { group: crew, item_id: 100207, display_id: 1012004, days: 30, weight: 3, note: "crew item 100207, native amount 30" }
+        - { group: crew, item_id: 100206, display_id: 1012003, days: 30, weight: 3, note: "crew item 100206, native amount 30" }
+        - { group: crew, item_id: 100204, display_id: 1012001, days: 30, weight: 3, note: "crew item 100204, native amount 30" }
+        - { group: crew, item_id: 100203, display_id: 1012000, days: 30, weight: 3, note: "crew item 100203, native amount 30" }
+        - { group: crew, item_id: 100207, display_id: 1011999, days: 1, weight: 25, note: "crew item 100207, native amount 1" }
+        - { group: crew, item_id: 100206, display_id: 1011998, days: 1, weight: 25, note: "crew item 100206, native amount 1" }
+        - { group: crew, item_id: 100204, display_id: 1011996, days: 1, weight: 25, note: "crew item 100204, native amount 1" }
+        - { group: crew, item_id: 100203, display_id: 1011995, days: 1, weight: 25, note: "crew item 100203, native amount 1" }
+        - { group: crew, item_id: 100207, display_id: 1011422, days: 7, weight: 12, note: "crew item 100207, native amount 7" }
+        - { group: crew, item_id: 100206, display_id: 1011421, days: 7, weight: 12, note: "crew item 100206, native amount 7" }
+        - { group: crew, item_id: 100204, display_id: 1011419, days: 7, weight: 12, note: "crew item 100204, native amount 7" }
+        - { group: crew, item_id: 100203, display_id: 1011418, days: 7, weight: 12, note: "crew item 100203, native amount 7" }
+        - { group: crew, item_id: 100207, display_id: 1011417, days: 3, weight: 60, note: "crew item 100207, native amount 3" }
+        - { group: crew, item_id: 100206, display_id: 1011416, days: 3, weight: 60, note: "crew item 100206, native amount 3" }
+        - { group: crew, item_id: 100204, display_id: 1011414, days: 3, weight: 60, note: "crew item 100204, native amount 3" }
+        - { group: crew, item_id: 100203, display_id: 1011413, days: 3, weight: 60, note: "crew item 100203, native amount 3" }
+        - { group: small_parts, item_id: 100212, display_id: 1012024, days: 30, weight: 3, note: "small_parts item 100212, native amount 30" }
+        - { group: small_parts, item_id: 100211, display_id: 1012023, days: 30, weight: 3, note: "small_parts item 100211, native amount 30" }
+        - { group: small_parts, item_id: 100210, display_id: 1012022, days: 30, weight: 3, note: "small_parts item 100210, native amount 30" }
+        - { group: small_parts, item_id: 100209, display_id: 1012021, days: 30, weight: 3, note: "small_parts item 100209, native amount 30" }
+        - { group: small_parts, item_id: 100208, display_id: 1012020, days: 30, weight: 3, note: "small_parts item 100208, native amount 30" }
+        - { group: small_parts, item_id: 100212, display_id: 1012019, days: 7, weight: 12, note: "small_parts item 100212, native amount 7" }
+        - { group: small_parts, item_id: 100211, display_id: 1012018, days: 7, weight: 12, note: "small_parts item 100211, native amount 7" }
+        - { group: small_parts, item_id: 100210, display_id: 1012017, days: 7, weight: 12, note: "small_parts item 100210, native amount 7" }
+        - { group: small_parts, item_id: 100209, display_id: 1012016, days: 7, weight: 12, note: "small_parts item 100209, native amount 7" }
+        - { group: small_parts, item_id: 100208, display_id: 1012015, days: 7, weight: 12, note: "small_parts item 100208, native amount 7" }
+        - { group: small_parts, item_id: 100212, display_id: 1012014, days: 3, weight: 60, note: "small_parts item 100212, native amount 3" }
+        - { group: small_parts, item_id: 100211, display_id: 1012013, days: 3, weight: 60, note: "small_parts item 100211, native amount 3" }
+        - { group: small_parts, item_id: 100210, display_id: 1012012, days: 3, weight: 60, note: "small_parts item 100210, native amount 3" }
+        - { group: small_parts, item_id: 100209, display_id: 1012011, days: 3, weight: 60, note: "small_parts item 100209, native amount 3" }
+        - { group: small_parts, item_id: 100208, display_id: 1012010, days: 3, weight: 60, note: "small_parts item 100208, native amount 3" }
+        - { group: small_parts, item_id: 100212, display_id: 1012009, days: 1, weight: 25, note: "small_parts item 100212, native amount 1" }
+        - { group: small_parts, item_id: 100211, display_id: 1012008, days: 1, weight: 25, note: "small_parts item 100211, native amount 1" }
+        - { group: small_parts, item_id: 100210, display_id: 1012007, days: 1, weight: 25, note: "small_parts item 100210, native amount 1" }
+        - { group: small_parts, item_id: 100209, display_id: 1012006, days: 1, weight: 25, note: "small_parts item 100209, native amount 1" }
+        - { group: small_parts, item_id: 100208, display_id: 1012005, days: 1, weight: 25, note: "small_parts item 100208, native amount 1" }
+        - { group: mid_parts, item_id: 100217, display_id: 1012044, days: 30, weight: 3, note: "mid_parts item 100217, native amount 30" }
+        - { group: mid_parts, item_id: 100216, display_id: 1012043, days: 30, weight: 3, note: "mid_parts item 100216, native amount 30" }
+        - { group: mid_parts, item_id: 100215, display_id: 1012042, days: 30, weight: 3, note: "mid_parts item 100215, native amount 30" }
+        - { group: mid_parts, item_id: 100214, display_id: 1012041, days: 30, weight: 3, note: "mid_parts item 100214, native amount 30" }
+        - { group: mid_parts, item_id: 100213, display_id: 1012040, days: 30, weight: 3, note: "mid_parts item 100213, native amount 30" }
+        - { group: mid_parts, item_id: 100217, display_id: 1012039, days: 7, weight: 12, note: "mid_parts item 100217, native amount 7" }
+        - { group: mid_parts, item_id: 100216, display_id: 1012038, days: 7, weight: 12, note: "mid_parts item 100216, native amount 7" }
+        - { group: mid_parts, item_id: 100215, display_id: 1012037, days: 7, weight: 12, note: "mid_parts item 100215, native amount 7" }
+        - { group: mid_parts, item_id: 100214, display_id: 1012036, days: 7, weight: 12, note: "mid_parts item 100214, native amount 7" }
+        - { group: mid_parts, item_id: 100213, display_id: 1012035, days: 7, weight: 12, note: "mid_parts item 100213, native amount 7" }
+        - { group: mid_parts, item_id: 100217, display_id: 1012034, days: 3, weight: 60, note: "mid_parts item 100217, native amount 3" }
+        - { group: mid_parts, item_id: 100216, display_id: 1012033, days: 3, weight: 60, note: "mid_parts item 100216, native amount 3" }
+        - { group: mid_parts, item_id: 100215, display_id: 1012032, days: 3, weight: 60, note: "mid_parts item 100215, native amount 3" }
+        - { group: mid_parts, item_id: 100214, display_id: 1012031, days: 3, weight: 60, note: "mid_parts item 100214, native amount 3" }
+        - { group: mid_parts, item_id: 100213, display_id: 1012030, days: 3, weight: 60, note: "mid_parts item 100213, native amount 3" }
+        - { group: mid_parts, item_id: 100217, display_id: 1012029, days: 1, weight: 25, note: "mid_parts item 100217, native amount 1" }
+        - { group: mid_parts, item_id: 100216, display_id: 1012028, days: 1, weight: 25, note: "mid_parts item 100216, native amount 1" }
+        - { group: mid_parts, item_id: 100215, display_id: 1012027, days: 1, weight: 25, note: "mid_parts item 100215, native amount 1" }
+        - { group: mid_parts, item_id: 100214, display_id: 1012026, days: 1, weight: 25, note: "mid_parts item 100214, native amount 1" }
+        - { group: mid_parts, item_id: 100213, display_id: 1012025, days: 1, weight: 25, note: "mid_parts item 100213, native amount 1" }
+        - { group: common, item_id: 100141, display_id: 1011441, days: 7, weight: 12, note: "common item 100141, native amount 7" }
+        - { group: common, item_id: 100144, display_id: 1011591, days: 3, weight: 60, note: "common item 100144, native amount 3" }
+        - { group: common, item_id: 205004, display_id: 1011674, quantity: 10, stackable: true, weight: 1, note: "common item 205004, native amount 10" }
+        - { group: common, item_id: 100144, display_id: 1011566, days: 7, weight: 12, note: "common item 100144, native amount 7" }
+        - { group: common, item_id: 100144, display_id: 1011565, days: 1, weight: 25, note: "common item 100144, native amount 1" }
+        - { group: common, item_id: 100044, display_id: 1011506, days: 1, weight: 25, note: "common item 100044, native amount 1" }
+        - { group: common, item_id: 100086, display_id: 1011505, days: 1, weight: 25, note: "common item 100086, native amount 1" }
+        - { group: common, item_id: 100046, display_id: 1011504, days: 1, weight: 25, note: "common item 100046, native amount 1" }
+        - { group: common, item_id: 100086, display_id: 1011502, days: 3, weight: 60, note: "common item 100086, native amount 3" }
+        - { group: common, item_id: 100044, display_id: 1011483, days: 3, weight: 60, note: "common item 100044, native amount 3" }
+        - { group: common, item_id: 205002, display_id: 1011473, quantity: 10, stackable: true, weight: 1, note: "common item 205002, native amount 10" }
+        - { group: common, item_id: 100046, display_id: 1011446, days: 3, weight: 60, note: "common item 100046, native amount 3" }
+        - { group: common, item_id: 100141, display_id: 1011443, days: 3, weight: 60, note: "common item 100141, native amount 3" }
+        - { group: common, item_id: 100141, display_id: 1011440, days: 1, weight: 25, note: "common item 100141, native amount 1" }
+        - { group: common, item_id: 100044, display_id: 1011305, days: 7, weight: 12, note: "common item 100044, native amount 7" }
+        - { group: common, item_id: 100046, display_id: 1011301, days: 7, weight: 12, note: "common item 100046, native amount 7" }
+        - { group: common, item_id: 100086, display_id: 1011299, days: 7, weight: 12, note: "common item 100086, native amount 7" }
+        - group: crew_set
+          display_id: 2100535
+          weight: 3
+          note: "crew_set, 30 days"
+          components:
+            - { item_id: 100203, display_id: 1012000, days: 30 }
+            - { item_id: 100204, display_id: 1012001, days: 30 }
+            - { item_id: 100205, display_id: 1012002, days: 30 }
+            - { item_id: 100206, display_id: 1012003, days: 30 }
+            - { item_id: 100207, display_id: 1012004, days: 30 }
+        - group: crew_set
+          display_id: 2100143
+          weight: 80
+          note: "crew_set, 3 days"
+          components:
+            - { item_id: 100203, display_id: 1011413, days: 3 }
+            - { item_id: 100204, display_id: 1011414, days: 3 }
+            - { item_id: 100205, display_id: 1011415, days: 3 }
+            - { item_id: 100206, display_id: 1011416, days: 3 }
+            - { item_id: 100207, display_id: 1011417, days: 3 }
+        - group: crew_set
+          display_id: 2100074
+          weight: 17
+          note: "crew_set, 7 days"
+          components:
+            - { item_id: 100203, display_id: 1011418, days: 7 }
+            - { item_id: 100204, display_id: 1011419, days: 7 }
+            - { item_id: 100205, display_id: 1011420, days: 7 }
+            - { item_id: 100206, display_id: 1011421, days: 7 }
+            - { item_id: 100207, display_id: 1011422, days: 7 }
+        - group: small_set
+          display_id: 2100539
+          weight: 3
+          note: "small_set, 30 days"
+          components:
+            - { item_id: 100208, display_id: 1012020, days: 30 }
+            - { item_id: 100209, display_id: 1012021, days: 30 }
+            - { item_id: 100210, display_id: 1012022, days: 30 }
+            - { item_id: 100211, display_id: 1012023, days: 30 }
+            - { item_id: 100212, display_id: 1012024, days: 30 }
+        - group: small_set
+          display_id: 2100538
+          weight: 17
+          note: "small_set, 7 days"
+          components:
+            - { item_id: 100208, display_id: 1012015, days: 7 }
+            - { item_id: 100209, display_id: 1012016, days: 7 }
+            - { item_id: 100210, display_id: 1012017, days: 7 }
+            - { item_id: 100211, display_id: 1012018, days: 7 }
+            - { item_id: 100212, display_id: 1012019, days: 7 }
+        - group: small_set
+          display_id: 2100537
+          weight: 80
+          note: "small_set, 3 days"
+          components:
+            - { item_id: 100208, display_id: 1012010, days: 3 }
+            - { item_id: 100209, display_id: 1012011, days: 3 }
+            - { item_id: 100210, display_id: 1012012, days: 3 }
+            - { item_id: 100211, display_id: 1012013, days: 3 }
+            - { item_id: 100212, display_id: 1012014, days: 3 }
+        - group: mid_set
+          display_id: 2100543
+          weight: 3
+          note: "mid_set, 30 days"
+          components:
+            - { item_id: 100213, display_id: 1012040, days: 30 }
+            - { item_id: 100214, display_id: 1012041, days: 30 }
+            - { item_id: 100215, display_id: 1012042, days: 30 }
+            - { item_id: 100216, display_id: 1012043, days: 30 }
+            - { item_id: 100217, display_id: 1012044, days: 30 }
+        - group: mid_set
+          display_id: 2100542
+          weight: 17
+          note: "mid_set, 7 days"
+          components:
+            - { item_id: 100213, display_id: 1012035, days: 7 }
+            - { item_id: 100214, display_id: 1012036, days: 7 }
+            - { item_id: 100215, display_id: 1012037, days: 7 }
+            - { item_id: 100216, display_id: 1012038, days: 7 }
+            - { item_id: 100217, display_id: 1012039, days: 7 }
+        - group: mid_set
+          display_id: 2100541
+          weight: 80
+          note: "mid_set, 3 days"
+          components:
+            - { item_id: 100213, display_id: 1012030, days: 3 }
+            - { item_id: 100214, display_id: 1012031, days: 3 }
+            - { item_id: 100215, display_id: 1012032, days: 3 }
+            - { item_id: 100216, display_id: 1012033, days: 3 }
+            - { item_id: 100217, display_id: 1012034, days: 3 }
+        - { group: coin, display_id: 2100063, lucci: 500, weight: 10, note: "500 Lucci" }
+        - { group: coin, display_id: 2100062, lucci: 300, weight: 25, note: "300 Lucci" }
+        - { group: coin, display_id: 2100061, lucci: 100, weight: 65, note: "100 Lucci" }
 
 # Life-counted items: this build's executable has no "endurance" ShopItem duration type (no item kind 3) and no Life
 # notice text, so the daily life rule and life stock are off (packets/builds.yaml life_items: false).
@@ -41,3 +219,11 @@
     id: dialect.messages
     config:
       customized_keys: false
+- set:
+    id: dialect.rooms
+    config:
+      plaza_recruitment: true
+- set:
+    id: ingame
+    config:
+      plaza_recruitment: true

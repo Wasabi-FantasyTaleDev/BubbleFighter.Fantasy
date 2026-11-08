@@ -1,9 +1,11 @@
 using BubbleFighter.Fantasy.Contracts.Players;
+using BubbleFighter.Fantasy.Contracts.Progress;
 using BubbleFighter.Fantasy.Contracts.Inventory;
 using BubbleFighter.Fantasy.Contracts.Match;
 using BubbleFighter.Fantasy.Contracts.Wallet;
 using BubbleFighter.Fantasy.Contracts.Lobby;
 using BubbleFighter.Fantasy.Contracts.Launcher;
+using BubbleFighter.Fantasy.Contracts.Cluster;
 using BubbleFighter.Fantasy.Contracts.Sessions;
 using BubbleFighter.Fantasy.Abstractions.Net;
 using System.ComponentModel.DataAnnotations;
@@ -30,6 +32,12 @@ public sealed class LobbyOptions : IValidatableOptions
 {
     /// <summary>Gets or sets whether marked launcher tickets resolve native login accounts through the launcher service.</summary>
     public bool LauncherTickets { get; set; }
+
+    /// <summary>Gets or sets whether this lobby publishes retained-player installation for native migration.</summary>
+    public bool NativeMigration { get; set; }
+
+    /// <summary>Gets or sets whether login must retain a shared account hold before installing local player state.</summary>
+    public bool RequireAccountOwnership { get; set; }
 
     /// <summary>
     /// Gets or sets how a game login proves its account. <c>ticket</c> accepts only launch tickets redeemed through the
@@ -65,6 +73,12 @@ public sealed class LobbyOptions : IValidatableOptions
     /// the request and the reply.
     /// </summary>
     public bool FighterInfo { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether fighter inspection requires recorded battle history from a capable provider.
+    /// Missing or unrepresentable primary-page history receives the native failure reply. Disabled by default.
+    /// </summary>
+    public bool FighterBattleStatistics { get; set; }
 
     /// <summary>Gets or sets the retained legacy notice template; native item-use replies now provide rename feedback.</summary>
     [Required, MaxLength(256)]
@@ -250,6 +264,10 @@ public sealed class LobbyOptions : IValidatableOptions
     /// <inheritdoc />
     public IEnumerable<ValidationResult> Validate()
     {
+        if (NativeMigration && (!RequireAccountOwnership || InventorySource != "mysql" || MoneySource != "mysql"
+            || CharacterCreationPreview || RecordingAlwaysCreateCharacter))
+            yield return new ValidationResult("native_migration requires account ownership, stored inventory and money, and no creation preview.",
+                [nameof(NativeMigration)]);
         if (RecordingAlwaysCreateCharacter && !CharacterCreationPreview)
             yield return new ValidationResult("recording_always_create_character requires character_creation_preview.",
                 [nameof(RecordingAlwaysCreateCharacter)]);
@@ -286,6 +304,10 @@ public sealed class LobbyOptions : IValidatableOptions
                 $"duplicate_login must be 'kick_old' or 'reject_new'; got '{DuplicateLogin}'.",
                 [nameof(DuplicateLogin)]);
         }
+
+        if (RequireAccountOwnership && DuplicateLogin != "reject_new")
+            yield return new ValidationResult("require_account_ownership requires duplicate_login: reject_new; cross-node takeover is not implemented.",
+                [nameof(RequireAccountOwnership), nameof(DuplicateLogin)]);
 
         if (StarterItemIds is null || StarterItemIds.Length == 0 || StarterItemIds.Length > InventoryLimits.MaxInventorySlotsPerBag)
             yield return new ValidationResult(
@@ -330,14 +352,15 @@ public sealed class LobbyOptions : IValidatableOptions
 /// </summary>
 [Plugin("lobby", Description = "Login and main-menu logic shared by every client build.",
     Requires = [typeof(IMessageRouter)],
-    Optional = [typeof(IPlayerRepository), typeof(IPaintItemCatalog), typeof(ILauncherTicketService), typeof(IEquipmentSelection), typeof(IDbConnectionFactory), typeof(IInventoryRepository), typeof(IPlayerWalletRepository), typeof(IHostReadiness)], OptionalMany = [typeof(IMessageSender<ServerNotice>), typeof(IInboundMessageBinding<InventoryItemUseRequested>), typeof(IMessageSender<InventoryItemUseReplied>), typeof(IMessageSender<UserStatUpdated>), typeof(IInboundMessageBinding<CharacterNameRequested>), typeof(IInboundMessageBinding<CharacterCreateRequested>), typeof(IInboundMessageBinding<CharacterLoginRequested>), typeof(IMessageSender<CharacterCreationOpened>), typeof(IMessageSender<CharacterNameReplied>), typeof(IMessageSender<CharacterCreateReplied>), typeof(IInboundMessageBinding<BubbleFighter.Fantasy.Contracts.Lobby.MainMenuInitRequest>), typeof(IMessageSender<EmptySessionSignature>), typeof(IInboundMessageBinding<LoginRequested>), typeof(IMessageSender<LoginSucceeded>), typeof(IMessageSender<LoginRejected>), typeof(IMessageSender<InventoryReplaced>), typeof(IMessageSender<InventoryPurchaseApplied>), typeof(IMessageSender<InventorySlotsUpdated>), typeof(IMessageSender<ItemsExpired>), typeof(IInboundMessageBinding<FighterInfoRequested>), typeof(IMessageSender<FighterInfoReplied>)],
-    ConditionalProvides = [typeof(IInventoryPushService), typeof(IInventoryExpiry), typeof(IInventoryItemRemoval), typeof(IOnlinePlayers)])]
+    Optional = [typeof(IAccountMutationFence), typeof(IAccountSessionAdmission), typeof(IPlayerRepository), typeof(IPlayerBattleRecordsRepository), typeof(IPaintItemCatalog), typeof(ILauncherTicketService), typeof(IEquipmentSelection), typeof(IDbConnectionFactory), typeof(IInventoryRepository), typeof(IPlayerWalletRepository), typeof(IHostReadiness)], OptionalMany = [typeof(IMessageSender<ServerNotice>), typeof(IInboundMessageBinding<InventoryItemUseRequested>), typeof(IMessageSender<InventoryItemUseReplied>), typeof(IMessageSender<UserStatUpdated>), typeof(IInboundMessageBinding<CharacterNameRequested>), typeof(IInboundMessageBinding<CharacterCreateRequested>), typeof(IInboundMessageBinding<CharacterLoginRequested>), typeof(IMessageSender<CharacterCreationOpened>), typeof(IMessageSender<CharacterNameReplied>), typeof(IMessageSender<CharacterCreateReplied>), typeof(IInboundMessageBinding<BubbleFighter.Fantasy.Contracts.Lobby.MainMenuInitRequest>), typeof(IMessageSender<EmptySessionSignature>), typeof(IInboundMessageBinding<LoginRequested>), typeof(IMessageSender<LoginSucceeded>), typeof(IMessageSender<LoginRejected>), typeof(IMessageSender<InventoryReplaced>), typeof(IMessageSender<InventoryPurchaseApplied>), typeof(IMessageSender<InventorySlotsUpdated>), typeof(IMessageSender<ItemsExpired>), typeof(IInboundMessageBinding<FighterInfoRequested>), typeof(IMessageSender<FighterInfoReplied>)],
+    ConditionalProvides = [typeof(IRetainedPlayerAdmission), typeof(IInventoryPushService), typeof(IInventoryExpiry), typeof(IInventoryItemRemoval), typeof(IOnlinePlayers)])]
 public sealed class LobbyPlugin : IPlugin
 {
     /// <inheritdoc />
     public ValueTask ActivateAsync(IPluginContext context, CancellationToken cancellationToken)
     {
         var options = context.Config.Bind<LobbyOptions>();
+        var accountAdmission = ResolveAccountAdmission(options, context.Services);
         if (options.BuildValues)
         {
             var build = LobbyBuildValues.Apply(options, context.Row.LineageOrBuild());
@@ -354,7 +377,7 @@ public sealed class LobbyPlugin : IPlugin
         var messages = context.Services.Get<IMessageRouter>();
         var starter = options.BuildStarterKit();
 
-        IPlayerRepository players = ResolvePlayerRepository(context.Services);
+        IPlayerRepository players = ResolvePlayerRepository(context.Services, options.RequireAccountOwnership);
         context.Logger.LogInformation("Lobby using {Repository} for players.", players.GetType().Name);
 
         LoginInventoryResolver? inventory = null;
@@ -414,14 +437,23 @@ public sealed class LobbyPlugin : IPlugin
         if (options.OnlinePlayers)
             context.Effect(context.Services.Register<IOnlinePlayers>(playerSessions));
 
+        if (options.FighterBattleStatistics && !options.FighterInfo)
+            throw new ConfigException("fighter_battle_statistics requires fighter_info: true.");
         if (options.FighterInfo)
         {
             if (!options.OnlinePlayers)
                 throw new ConfigException("fighter_info requires online_players: true, because the target is found among the logged-in players.");
+            if (!context.Services.TryGet<IInventoryRepository>(out var fighterInventory) || fighterInventory is null)
+                throw new ConfigException("fighter_info requires IInventoryRepository for the target's current equipment.");
             RequireBinding<FighterInfoRequested>(context, p);
             var fighterReplies = RequireSender<FighterInfoReplied>(context, p);
+            IPlayerBattleRecordsRepository? fighterRecords = null;
+            if (options.FighterBattleStatistics
+                && (!context.Services.TryGet(out fighterRecords) || fighterRecords is null))
+                throw new ConfigException("fighter_battle_statistics requires IPlayerBattleRecordsRepository in the same data domain.");
             context.Effect(messages.For(context).On<FighterInfoRequested>(p,
-                (session, request, ct) => FighterInfoHandler.HandleAsync(playerSessions, fighterReplies, session, request, ct)));
+                (session, request, ct) => FighterInfoHandler.HandleAsync(playerSessions, fighterInventory, fighterReplies,
+                    session, request, ct, fighterRecords)));
         }
 
         // A build whose codec decodes the main-menu probe gets its empty signature reply.
@@ -504,7 +536,14 @@ public sealed class LobbyPlugin : IPlugin
             context.Logger.LogWarning("Lobby {Protocol} runs with authentication: open. Any client that reaches this port "
                 + "can log in as any account; use it only on a trusted network.", options.Protocol);
         context.Services.TryGet<IHostReadiness>(out var readiness);
-        var handlers = new Handlers(options, players, inventory, money, playerSessions, starter, context.Logger, creation, creationOpened, tickets, expiry, lifeRule, context.Events, readiness);
+        if (options.NativeMigration)
+        {
+            if (!players.PersistsState || !players.SupportsRetainedAccountLookup)
+                throw new ConfigException("native_migration requires persistent retained account lookup.");
+            context.Effect(context.Services.Register<IRetainedPlayerAdmission>(new RetainedPlayerAdmission(
+                p, players, playerSessions, inventory!, money!)));
+        }
+        var handlers = new Handlers(options, players, inventory, money, playerSessions, starter, context.Logger, creation, creationOpened, tickets, expiry, lifeRule, context.Events, readiness, accountAdmission);
         context.Effect(messages.For(context).On<InitialTutorialCompleted>(p, (session, _, ct) =>
         {
             if (!session.TryFeature<IPlayerSession>(out var player))
@@ -536,11 +575,19 @@ public sealed class LobbyPlugin : IPlugin
         return ValueTask.CompletedTask;
     }
 
-    internal static IPlayerRepository ResolvePlayerRepository(IServiceRegistry services)
+    internal static IPlayerRepository ResolvePlayerRepository(IServiceRegistry services, bool requireAccountWriteAuthority = false)
     {
         if (services.TryGet<IPlayerRepository>(out var supplied) && supplied is not null) return supplied;
+        var authority = requireAccountWriteAuthority ? services.Get<IAccountMutationFence>() : null;
         return services.TryGet<IDbConnectionFactory>(out var database) && database is not null
-            ? new MySqlPlayerRepository(database) : new InMemoryPlayerRepository();
+            ? new MySqlPlayerRepository(database, authority) : new InMemoryPlayerRepository();
+    }
+
+    internal static IAccountSessionAdmission? ResolveAccountAdmission(LobbyOptions options, IServiceRegistry services)
+    {
+        if (!options.RequireAccountOwnership) return null;
+        return services.TryGet<IAccountSessionAdmission>(out var admission) && admission is not null
+            ? admission : throw new ConfigException("require_account_ownership needs an active IAccountSessionAdmission provider.");
     }
 
     private static void RequireBinding<T>(IPluginContext context, string protocol) where T : IMessage
@@ -576,7 +623,7 @@ public sealed class LobbyPlugin : IPlugin
         ILauncherTicketService? tickets,
         InventoryExpirySweep? expiry = null,
         LoginLifeRule? lifeRule = null,
-        IEventBus? events = null, IHostReadiness? readiness = null)
+        IEventBus? events = null, IHostReadiness? readiness = null, IAccountSessionAdmission? accountAdmission = null)
     {
         private readonly DuplicateLoginGuard _duplicateLogins = new(playerSessions, options.DuplicateLoginPolicy, logger);
 
@@ -592,9 +639,21 @@ public sealed class LobbyPlugin : IPlugin
                 return;
             }
             // Character creation resumes only from this connection's completed, server-owned pending state.
-            var launchIdentity = afterCreation ? new LauncherTicketIdentity(request.Account)
-                : LauncherLoginAccount.ResolveIdentity(request.Account, session.Profile.Id,
-                    options.LauncherTickets || options.RequiresTicket, tickets, options.RequiresTicket);
+            LauncherTicketIdentity? launchIdentity;
+            try
+            {
+                launchIdentity = afterCreation ? new LauncherTicketIdentity(request.Account)
+                    : await LauncherLoginAccount.ResolveIdentityAsync(request.Account, session.Profile.Id,
+                        options.LauncherTickets || options.RequiresTicket, tickets, options.RequiresTicket, ct).ConfigureAwait(false);
+            }
+            catch (Exception error) when (error is HttpRequestException or IOException or System.Text.Json.JsonException
+                || error is OperationCanceledException && !ct.IsCancellationRequested)
+            {
+                logger.LogWarning("Session {Id} login authority unavailable for build {Build} ({FailureType}).",
+                    session.Id, session.Profile.Id, error.GetType().Name);
+                await session.Connection.CloseAsync("login authority unavailable").ConfigureAwait(false);
+                return;
+            }
             if (launchIdentity is null)
             {
                 // Never log the refused value: it may be a password typed into an in-game login box.
@@ -609,9 +668,11 @@ public sealed class LobbyPlugin : IPlugin
             var username = string.IsNullOrWhiteSpace(launchIdentity.Username) ? options.FallbackUsername : launchIdentity.Username.Trim();
             logger.LogInformation("Session {Id} requested login as '{User}'.", session.Id, username);
             var needsCreation = false;
+            PlayerRecord? creationAccount = null;
             if (creation is not null && !afterCreation)
             {
                 var existing = await players.FindByUsernameAsync(username, ct).ConfigureAwait(false);
+                creationAccount = existing;
                 var hasCreatedCharacter = existing is not null
                     && await players.HasCreatedCharacterAsync(existing.UserNum, ct).ConfigureAwait(false);
                 needsCreation = options.RecordingAlwaysCreateCharacter || existing is null
@@ -623,6 +684,12 @@ public sealed class LobbyPlugin : IPlugin
             }
             if (needsCreation && creation is not null)
             {
+                if (creationAccount is not null && accountAdmission is not null
+                    && !await accountAdmission.TryAdmitAsync(session, creationAccount.UserNum, ct).ConfigureAwait(false))
+                {
+                    await rejected.SendAsync(session, new LoginRejected(LoginRejection.AccountNotFound), ct).ConfigureAwait(false);
+                    return;
+                }
                 creation.Open(session, username);
                 await creationOpened!.SendAsync(session, new(), ct).ConfigureAwait(false);
                 return;
@@ -694,13 +761,35 @@ public sealed class LobbyPlugin : IPlugin
                 player = player with { Nickname = nickname };
 
             // Legacy clients render level zero as an uninitialised icon during the first menu
-            // snapshot. Keep the persisted value untouched, but publish the same level floor
-            // used by room seats so login, plaza and room projections cannot disagree.
+            // snapshot. Keep persisted progress unchanged when projecting the session identity.
             var identity = new PlayerIdentity(
                 checked((int)player.UserNum), player.Username, player.Nickname, Math.Max(1, player.Level)) { ColorIndex = player.ColorIndex };
-            var claim = await _duplicateLogins.ClaimAsync(session, identity).ConfigureAwait(false);
-            if (claim.Status == LoginClaimStatus.RefusedDuplicate)
+            if (accountAdmission is not null
+                && !await accountAdmission.TryAdmitAsync(session, player.UserNum, ct).ConfigureAwait(false))
+            {
+                logger.LogWarning("Session {Id} login refused: account {UserNum} could not acquire its shared authority.", session.Id, player.UserNum);
                 return new AccountResult(AccountOutcome.DuplicateRefused, player, null);
+            }
+
+            LoginClaim claim;
+            try { claim = await _duplicateLogins.ClaimAsync(session, identity).ConfigureAwait(false); }
+            catch (Exception claimError)
+            {
+                if (accountAdmission is not null)
+                {
+                    try { await accountAdmission.ReleaseAsync(session).ConfigureAwait(false); }
+                    catch (Exception releaseError)
+                    {
+                        throw new AggregateException("Local login failed and its shared account hold could not retire.", claimError, releaseError);
+                    }
+                }
+                throw;
+            }
+            if (claim.Status == LoginClaimStatus.RefusedDuplicate)
+            {
+                if (accountAdmission is not null) await accountAdmission.ReleaseAsync(session).ConfigureAwait(false);
+                return new AccountResult(AccountOutcome.DuplicateRefused, player, null);
+            }
 
             logger.LogInformation("Session {Id} authenticated as {UserNum} '{Nick}'.", session.Id, player.UserNum, player.Nickname);
             return new AccountResult(AccountOutcome.Attached, player, claim.Session);

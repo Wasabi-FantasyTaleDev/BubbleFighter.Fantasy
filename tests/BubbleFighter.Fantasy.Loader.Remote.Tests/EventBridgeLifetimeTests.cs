@@ -124,7 +124,7 @@ public sealed class EventBridgeLifetimeTests
     /// <summary>All process SDKs receive native cancellation while their listener remains owned until it returns.</summary>
     [Theory]
     [InlineData("python")]
-    [InlineData("typescript")]
+    [SdkData("typescript")]
     [InlineData("go")]
     [InlineData("rust")]
     public async Task NativeCancellationReachesEachSdkListener(string language)

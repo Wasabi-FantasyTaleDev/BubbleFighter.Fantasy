@@ -16,7 +16,7 @@
     # gcpFirstConnect; kr-1256 names the same slot gcpReqGamePatch.
     patch_request_name: gcpFirstConnect
     bootstrap_status: 2
-    pre_handshake_opcodes: [19]
+    pre_handshake_opcodes: [gcpReportLastCrash]
     bootstrap_command_line: "http://bf.dn.nexoncdn.co.kr/PatchData"
     center_gates:
       - key: 6
@@ -37,6 +37,10 @@
     # No play-room row is mounted here, so this row answers the plaza request itself.
     typed_plaza_enter: false
     protocol: "cn-735/game"
+    # Every client sits on channel 60, "Free" (one shared lobby instead of split channels). The login reply's
+    # channel word is what the round start reads its FighterConfigChannel column from (kr-812 sub_818680,
+    # sub_587690); BFF_PLAYER_CHANNEL also feeds dialect.rooms player_channel and the cluster move. 0 = off.
+    login_channel: ${BFF_PLAYER_CHANNEL:-60}
 - id: lobby
   plugin: lobby
   config:

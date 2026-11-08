@@ -5,6 +5,85 @@ profile: cn-774
 # below come from there. See profiles/opcode-policy.md.
 opcodes:
   - value: 510
+    direction: c2s
+    connection: game
+    name: gcpReqKickFromSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_B6C020 confirms a room-player removal, stamps 510 and writes one counted UTF-16 target nickname; matched to kr-812 Packet_gcpReqKickFromSession builder kr-812 sub_5C8730 and reader kr-812 sub_5C8FD0"
+  - value: 513
+    direction: s2c
+    connection: game
+    name: gspRepKickFromSession
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8D7D20 case 0x201 dispatches to cn-774 sub_8DF970; cn-774 sub_8DF970 reads two counted UTF-16 nicknames and a u32 result, matched to kr-812 Packet_gspRepKickFromSession handler kr-812 sub_8014B0 and reader kr-812 sub_80AE00"
+    notes: "Requester nickname, removed nickname, result; zero announces removal in RoomStage8vs8, while nonzero results display a failure to the requester."
+  - value: 827
+    direction: c2s
+    connection: game
+    name: gcpReqCheckCash_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_609D70 stamps 827 without a body; cn-774 sub_63ED80 sends it from DlgBubbleCashIntro and cn-774 sub_641B80 rearms its cash refresh timer immediately after sending"
+    notes: "The sender does not gate native stage progression on the cash reply. Gateway validates this auxiliary request without supplying account balances."
+  - value: 20005
+    direction: c2s
+    connection: relay
+    name: rcpReqUdpBypassDisable
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_B545C0 sends an empty relay TCP20005 after the UDP liveness check fails"
+  - value: 19
+    direction: s2c
+    connection: udp
+    name: rspUdpBypassVerify_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_B578A0 handles UDP 19 from the configured relay endpoint"
+  - value: 20002
+    direction: c2s
+    connection: udp
+    name: rcpUdpBypassVerifyAck
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_B578A0 answers UDP 19 with UDP 20002 carrying the offered cookie"
+  - value: 20001
+    direction: c2s
+    connection: udp
+    name: rcpUdpBypassAck
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_B593D0 case 18 copies its eight-byte cookie into UDP 20001"
+  - value: 20003
+    direction: c2s
+    connection: udp
+    name: rcpUdpBypassWanderLean
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_B58DB0 wraps movement 32885 with the eight-byte relay cookie"
+  - value: 20004
+    direction: c2s
+    connection: udp
+    name: rcpUdpBypassWanderLeanOptimize
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_B58DB0 wraps masked movement 32923 with the eight-byte relay cookie"
+  - value: 18
+    direction: s2c
+    connection: relay
+    name: rspUdpBypassInfo
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_B593D0 case 18 reads the u16 UDP destination port and eight-byte cookie"
+  - value: 20
+    direction: s2c
+    connection: relay
+    name: rspUdpBypassReady_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_B593D0 case 20 sets the UDP-ready byte without reading a body"
+  - value: 510
     direction: s2c
     connection: game
     name: gspRoomEnterGame
@@ -161,6 +240,7 @@ opcodes:
     name_source: mirrored
     evidence: captured
     source: "local run: 96-byte opcode 1 whose first u32 is 774"
+    notes: "cn-774 sub_105BE90 writes u32, seven counted UTF-16 strings, u32, fifteen counted UTF-16 strings; cn-774 sub_451330 writes the final four strings. The 96-byte captured form has empty strings."
   - value: 19
     direction: c2s
     name: gcpReportLastCrash
@@ -169,11 +249,12 @@ opcodes:
     source: "mirrors cn-717"
   - value: 1500
     direction: c2s
+    connection: game
     name: gcpReqDynamicConfig
     name_source: mirrored
-    evidence: captured
-    source: "builders sub_B9E890 and sub_BA4360; local run: 30 bytes sent ahead of gcpFirstConnect"
-    notes: "named after S2C 1500 gspRepDynamicConfig (dispatcher sub_BCF090 case 1500), as on kr-1256"
+    evidence: verified
+    source: "cn-774 sub_B9E790 stamps1500; cn-774 sub_8114E0 writes a u16 mask and ascending selected checksums"
+
   - value: 4
     direction: c2s
     name: gcpRepPing
@@ -183,10 +264,12 @@ opcodes:
     notes: "named after S2C 4 gspReqPing, as on kr-1256 (builder sub_9E9640, also empty)"
   - value: 53
     direction: c2s
-    name: Unknown53
-    name_source: none
-    evidence: inferred
-    source: "builder sub_64DCD0 writes one i32; aligned with kr-1256 C2S 53 (sub_56FB50) by label alignment"
+    connection: game
+    name: gcpReqLobbyState_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_64DCD0 stamps 53 and writes one u32 state id: 80 enters matching, sent by the MainMenuStage button handler cn-774 sub_A3CB10 after the guard chain (cn-774 sub_B9E070(2), cn-774 sub_B337A0, party count and name checks), and 60 leaves matching while the session state word (cn-774 dword_177D9C4+2484) still reads 80, sent by cn-774 sub_C81EF0; the shared cn-774 sub_64D4D0 also carries the DlgChannelPop tagged states 30, 80, 20 and 60 (cn-774 sub_64D320)"
+    notes: "Five independent sites read the session state 80 as the matching state, and the server writes the word. The pairing with the S2C 126-analog notification is structural (the originating stages' gates handle 128), not client-proven. No packet-name strings exist in this build."
   - value: 521
     direction: c2s
     name: Unknown521
@@ -262,22 +345,28 @@ opcodes:
     source: "dispatcher sub_BCF090 jumptable case 6 stores \"gspReqXignCodeCheck\""
   - value: 10
     direction: s2c
+    connection: game
     name: gspRepMoveChannel
     name_source: label@cn-774
     evidence: verified
-    source: "dispatcher sub_BCF090 jumptable case 10 stores \"gspRepMoveChannel\""
+    source: "cn-774 sub_BCF090 dispatches game10 to cn-774 sub_BA61D0"
+
   - value: 11
     direction: s2c
+    connection: game
     name: gspDisconnectingMovedUser
     name_source: label@cn-774
     evidence: verified
-    source: "dispatcher sub_BCF090 jumptable case 11 stores \"gspDisconnectingMovedUser\""
+    source: "cn-774 sub_BCF090 dispatches game11 to cn-774 sub_BA6D70"
+
   - value: 12
     direction: s2c
+    connection: game
     name: gspDisconnectMovedUser
     name_source: label@cn-774
     evidence: verified
-    source: "dispatcher sub_BCF090 jumptable case 12 stores \"gspDisconnectMovedUser\""
+    source: "cn-774 sub_BCF090 dispatches game12 to cn-774 sub_BA6F60"
+
   - value: 13
     direction: s2c
     name: gspRepMoveInto
@@ -304,16 +393,20 @@ opcodes:
     source: "dispatcher sub_BCF090 jumptable case 17 stores \"gspQueryBadProgram\""
   - value: 18
     direction: s2c
+    connection: game
     name: gspRepCenterUserCnt
     name_source: label@cn-774
     evidence: verified
-    source: "dispatcher sub_BCF090 jumptable case 18 stores \"gspRepCenterUserCnt\""
+    source: "cn-774 sub_BCF090 dispatches game18 to cn-774 sub_BA1800"
+
   - value: 20
     direction: s2c
+    connection: game
     name: gspRepUniquenessCheck
     name_source: label@cn-774
     evidence: verified
-    source: "dispatcher sub_BCF090 jumptable case 20 stores \"gspRepUniquenessCheck\""
+    source: "cn-774 sub_BCF090 dispatches game20 to cn-774 sub_BA2480"
+
   - value: 21
     direction: s2c
     name: gspDisconnectOpenWeb
@@ -410,6 +503,7 @@ opcodes:
     name_source: label@cn-774
     evidence: verified
     source: "dispatcher sub_BCF090 jumptable case 118 stores \"gspRepWaitUserList\""
+    notes: "The body is a u32 count then that many {counted string, u32, u8} records (32-byte elements, reader cn-774 sub_105A540); the consumer copies the list into the RoomStage8vs8 wait-list object at +0xC08. The element tail grows by one byte over kr-1256's."
   - value: 119
     direction: s2c
     name: gspInvitationFailed
@@ -680,6 +774,54 @@ opcodes:
     name_source: label@cn-774
     evidence: verified
     source: "dispatcher sub_BCF090 jumptable case 172 stores \"gspRepRemoveBlockUser\""
+  - value: 173
+    direction: s2c
+    connection: game
+    name: gspMatchBoardDeny_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_A45E50 pump case 0xAD reads it with the optional reader cn-774 sub_1061F40 and routes the parsed values to the denial notice cn-774 sub_A47530; no document reactor runs"
+    notes: ""
+  - value: 174
+    direction: s2c
+    connection: game
+    name: gspMatchBoardRoomUpsert_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 pump case 0xAE reads it with the optional reader cn-774 sub_1061E60, upserts the entry through cn-774 sub_A4B4C0 and runs the per-room row reactor cn-774 sub_776830"
+    notes: ""
+  - value: 175
+    direction: s2c
+    connection: game
+    name: gspMatchBoardCountFlag_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 pump case 0xAF parses it inline through cn-774 sub_A4B670 and runs the per-room row reactor cn-774 sub_776830"
+    notes: ""
+  - value: 176
+    direction: s2c
+    connection: game
+    name: gspMatchBoardCount_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 pump case 0xB0 parses it inline through cn-774 sub_A4B7C0, runs the per-room row reactor and the manager refresh cn-774 sub_A46880"
+    notes: ""
+  - value: 177
+    direction: s2c
+    connection: game
+    name: gspMatchBoardCountSet_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 pump case 0xB1 parses it inline through cn-774 sub_A4B900 and runs the per-room row reactor"
+    notes: ""
+  - value: 178
+    direction: s2c
+    connection: game
+    name: gspMatchBoardNames_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 pump case 0xB2 reads it with cn-774 sub_1062750 and runs the full board refresh cn-774 sub_776690"
+    notes: "One map only; kr-1256 appends a second map of 0x3A-tagged optional word-vector records."
   - value: 201
     direction: s2c
     name: gspUpdateParty
@@ -782,6 +924,62 @@ opcodes:
     name_source: label@cn-774
     evidence: verified
     source: "dispatcher sub_BCF090 jumptable case 686 stores \"gspArea32GameExit\""
+  - value: 711
+    direction: s2c
+    connection: game
+    name: gspExtremeRacingTimer_
+    name_source: coined
+    evidence: verified
+    source: "the racing hub cn-774 sub_D8A460 case 0x2C7 reads three 4-byte words (code, duration, flag) and applies them through cn-774 sub_D8B880, mirroring kr-1256's timer frame; matched to kr-1256 gspExtremeRacingTimer_ by the reader chain"
+    notes: "packets/extreme-racing.yaml ExtremeRacingTimer@kr-1256 states the body; the cn-774 reader behavior is verified identical (codes 2500, 20000, 210000)."
+  - value: 712
+    direction: s2c
+    connection: game
+    name: gspExtremeRacingRound_
+    name_source: coined
+    evidence: verified
+    source: "the racing hub cn-774 sub_D8A460 case 0x2C8 reads two words, resolves the stage through the ExtremeRacingGameStage cast and passes the second word to cn-774 sub_84B0A0; matched to kr-1256 gspExtremeRacingRound_"
+    notes: "packets/extreme-racing.yaml ExtremeRacingRound@kr-1256 states the body."
+  - value: 714
+    direction: s2c
+    connection: game
+    name: gspExtremeRacingUpdatePlayRecord_
+    name_source: coined
+    evidence: verified
+    source: "the racing hub cn-774 sub_D8A460 case 0x2CA reads the scope word then the counted record list (the wire reader cn-774 sub_D8C480 reads seat u16 plus counted {u8 field, u32 value} pairs - the same shape kr-1256 states); matched to kr-1256 gspExtremeRacingUpdatePlayRecord_"
+    notes: "packets/extreme-racing.yaml ExtremeRacingRecords@kr-1256 states the body; the cn-774 applier chain (cn-774 sub_D8C550/sub_D8BC70/sub_10568A0) mirrors kr-1256's scope handling."
+  - value: 32934
+    direction: c2s
+    connection: both
+    name: gppExtremeRacingCheckPoint_
+    name_source: coined
+    evidence: verified
+    source: "the racing tick cn-774 sub_5BE4A0 stamps 0x80A6 (32934, rendered -32602) in its type-10 zone branch with {character+440, id/10, id%10} at TcpPacket+2; matched to kr-1256 gppExtremeRacingCheckPoint_"
+    notes: "The checkpoint peer frame; the consumer is cn-774 sub_89B780 (case 32934). The connection is both per the peer-session relay model."
+  - value: 32934
+    direction: s2c
+    connection: both
+    name: gppExtremeRacingCheckPoint_
+    name_source: coined
+    evidence: verified
+    source: "the peer consumer cn-774 sub_89B780 case 32934 checks and reads the relayed checkpoint frame; matched to kr-1256 gppExtremeRacingCheckPoint_"
+    notes: "The peer echo the sender needs to advance its own mark."
+  - value: 712
+    direction: c2s
+    connection: game
+    name: gcpExtremeRacingCoin_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_D3ADA0 stamps 712 with the coin object's dword at +572 and sends through the game-session global; the one-shot byte at +564 and elapsed check at +588/+592 gate the send, matching kr-1256 sub_BF45D0"
+    notes: "One dword: the collected coin's field at +572. The aLucciEat effect the same sender triggers after the write identifies `this` as the coin object."
+  - value: 711
+    direction: c2s
+    connection: game
+    name: gcpExtremeRacingGoal_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5BE4A0 word-writes 711 at TcpPacket+2 with one word (the goal's round), mirroring kr-1256 sub_B0D760's goal report"
+    notes: "packets/extreme-racing.yaml ExtremeRacingGoal@kr-1256 states the body; once per round per local player."
   - value: 750
     direction: s2c
     name: gspChangePirateAssaultAbilityLevel
@@ -974,6 +1172,14 @@ opcodes:
     name_source: label@cn-774
     evidence: verified
     source: "dispatcher sub_BCF090 jumptable case 831 stores \"gspRepPresentDeleteSend\""
+  - value: 832
+    direction: c2s
+    connection: game
+    name: gcpReqInventoryChangeWeaponPresetIdx
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_9A9700 stamps C2S 832 and writes [u32 context][u8 slot] via packet vtable+48; the UI click cn-774 sub_5BAB30 passes the clicked weapon's context from object +440 and the slot from the five-slot record match; the body matches kr-1256 sub_808F10 byte for byte"
+    notes: "The change request carries a u32 context word and a u8 slot (0-4); no enumerate request exists (server push only)"
   - value: 832
     direction: s2c
     name: gspRepPresentDeleteReceive
@@ -1198,10 +1404,11 @@ opcodes:
     source: "dispatcher sub_BCF090 jumptable case 951 stores \"gspNexonGuard\""
   - value: 952
     direction: s2c
+    connection: game
     name: gspPortalMove
     name_source: label@cn-774
     evidence: verified
-    source: "dispatcher sub_BCF090 jumptable case 952 stores \"gspPortalMove\""
+    source: "cn-774 sub_BC14A0 reads word, region u16 and seat word, invokes the native region action and clears local pending contact; packets/portal.yaml"
   - value: 953
     direction: s2c
     name: gspNotifyMsg
@@ -1274,6 +1481,7 @@ opcodes:
     name_source: label@cn-774
     evidence: verified
     source: "dispatcher sub_BCF090 jumptable case 968 stores \"gspRepMatchWaitingInfo\""
+    notes: "The body is two u32 words, a counted string and one more u32; cn-774 sub_BC5890 parses and discards it, the same swallow shape as kr-1256's 969."
   - value: 971
     direction: s2c
     name: gspSurelyChangeName
@@ -1390,10 +1598,12 @@ opcodes:
     source: "dispatcher sub_BCF090 jumptable case 1002 stores \"gspResGodOfFighterPlayableTime\""
   - value: 1500
     direction: s2c
+    connection: game
     name: gspRepDynamicConfig
     name_source: label@cn-774
     evidence: verified
-    source: "dispatcher sub_BCF090 jumptable case 1500 stores \"gspRepDynamicConfig\""
+    source: "cn-774 sub_BCF090 selects1500; cn-774 sub_8115F0 reads a u16 mask and leaves configuration unchanged when zero"
+
   - value: 1501
     direction: s2c
     name: gspGameSpecReloadCheck
@@ -1731,6 +1941,69 @@ opcodes:
     name_source: label@cn-717
     evidence: inferred
     source: "builder sub_EC9250; name aligned from cn-717 C2S 122 Packet_gcpReqSocialSystemReport (label alignment, run cn-717 C2S 113..122 -> 117..126, shape [4 4 4 4 S S], similarity 1.0)"
+  - value: 108
+    direction: c2s
+    name: Unknown108
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_ED36C0, UiRoomStageUserList vtable slot 72, stamps empty 108 and sends through the game-session global with a 10000 ms throttle"
+    notes: "Matches the timer path kr-1256 sub_E7E020. Neither sender establishes a laboratory-state response trigger."
+  - value: 130
+    direction: c2s
+    name: gcpReqScienceLabCompound_
+    name_source: coined
+    evidence: verified
+    source: "DlgCompound slot-4 wrapper cn-774 sub_E70A30 (flag +1622 -> cn-774 sub_E716E0) -> sender cn-774 sub_E70BB0 stamps 130; the shared RequestScienceLab class (vtable 0x13FB994, writer cn-774 sub_48CE60) carries vector<u64> material keys and one u64"
+    notes: "The cn-774 C2S lab block sits one under kr-1256's (130, 131, 133-138). The u64 is the obfuscated global counter plus one, as on kr-1256. Reply S2C 151 (kind 0)."
+  - value: 131
+    direction: c2s
+    name: gcpReqScienceLabCompoundUnlimited_
+    name_source: coined
+    evidence: verified
+    source: "DlgCompoundUnlimited slot-4 wrapper cn-774 sub_E75760 -> cn-774 sub_E75AA0 -> sender cn-774 sub_E75FC0 stamps 131; the shared class carries the card-backed keys and u64 zero"
+    notes: "Reply S2C 152 (kind 7)."
+  - value: 133
+    direction: c2s
+    name: gcpReqScienceLabEnchant_
+    name_source: coined
+    evidence: verified
+    source: "DlgEnchant slot-4 wrapper cn-774 sub_E78BA0 -> cn-774 sub_E79680 -> sender cn-774 sub_E78C30 stamps 133; the shared class carries the selected content key (or the card key plus attachments) and the 0/1 flag"
+    notes: "Reply S2C 154 (kind 2)."
+  - value: 134
+    direction: c2s
+    name: gcpReqScienceLabPetCompound_
+    name_source: coined
+    evidence: verified
+    source: "DlgPetCompound slot-4 wrapper cn-774 sub_E7FDC0 -> cn-774 sub_E80540 -> sender cn-774 sub_E7FE10 stamps 134; the shared class carries the registered material keys and u64 zero"
+    notes: "Reply S2C 155 (kind 3)."
+  - value: 135
+    direction: c2s
+    name: gcpReqScienceLabMakeItemAdvanced_
+    name_source: coined
+    evidence: verified
+    source: "DlgMakeItemAdvanced slot-4 wrapper cn-774 sub_E7CBA0 -> cn-774 sub_E7D110 -> sender cn-774 sub_E7CC30 stamps 135; the shared class carries the card key plus the attached list and the selected item key"
+    notes: "Reply S2C 156 (kind 6)."
+  - value: 136
+    direction: c2s
+    name: gcpReqScienceLabChangeUnlimited_
+    name_source: coined
+    evidence: verified
+    source: "DlgChangeUnlimited slot-4 wrapper cn-774 sub_E6DD80 -> cn-774 sub_E6E2B0 -> sender cn-774 sub_E6DE10 stamps 136; the shared class carries the single selected key and u64 zero"
+    notes: "Reply S2C 157 (kind 4)."
+  - value: 137
+    direction: c2s
+    name: gcpReqScienceLabModification_
+    name_source: coined
+    evidence: verified
+    source: "DlgScienceLabModification slot-4 wrapper cn-774 sub_E8ACC0 -> cn-774 sub_E8AF90 -> sender cn-774 sub_E8B410 stamps 137; the shared class carries one key per selected-parts node and u64 zero"
+    notes: "Reply S2C 158 (kind 8)."
+  - value: 138
+    direction: c2s
+    name: gcpReqScienceLabModificationDelete_
+    name_source: coined
+    evidence: verified
+    source: "DlgScienceLabModification vftable slot 72 (+0x120) wrapper cn-774 sub_E8A7C0 -> sender cn-774 sub_E8B6A0 stamps 138; the shared class carries the slot holder's single key and the part-node value"
+    notes: "Reply S2C 159 (kind 8, the same kind as 137's reply)."
   - value: 515
     direction: c2s
     connection: game
@@ -1738,6 +2011,22 @@ opcodes:
     name_source: label@kr-812
     evidence: verified
     source: "cn-774 sub_535610 stamps 515 and writes three ordinary team-toggle words (-1,0,0); matched to kr-812 gcpRoomChangeTeam"
+  - value: 551
+    direction: c2s
+    connection: game
+    name: gcpLmgRequest_
+    name_source: coined
+    evidence: verified
+    source: "the lobby-minigame senders cn-774 sub_E32F70 (subcommand 1), cn-774 sub_9DCAA0 (10, packed writer cn-774 sub_47AE10), cn-774 sub_E34210 (11) and cn-774 sub_E34770 (12) each stamp 551 and write the u16 subcommand first; the bodies live in packets/lobby-minigame.yaml and the subcommands pair with the Reply*@LmgProtocol registry keys built in cn-774 sub_9D8810"
+    notes: "Lobby-minigame request family: the subcommands pair with the Reply*@LmgProtocol registry keys (1 ReplyShootBasketball, 10 ReplyStartFishing, 11 ReplyLiftFishingRod, 12 ReplyFortune). No packet-name strings exist in this build."
+  - value: 552
+    direction: c2s
+    connection: game
+    name: gcpLmgSync_
+    name_source: coined
+    evidence: verified
+    source: "the minigame state senders cn-774 sub_9E3240 (100 ShootFire), cn-774 sub_E34EC0 (101 ChangeState, arguments 203 and 207 among others), cn-774 sub_9E3BF0 (200 CastFishing) and cn-774 sub_9E3E80 (201 LiftFishing) each stamp 552 and write the u16 subcommand and one u32; they are themselves the registered LmgSync handlers"
+    notes: "The subcommands pair with the *@LmgSync registry keys built in cn-774 sub_9D8810 (the LobbyMinigameContext constructor)."
   - value: 518
     direction: c2s
     name: gcpRepPingUser
@@ -1753,22 +2042,27 @@ opcodes:
     source: "builder sub_739BC0; name aligned from cn-717 C2S 519 Packet_gcpReqSelectAward (label alignment, run cn-717 C2S 517..520 -> 517..520, shape [4 4], similarity 1.0)"
   - value: 602
     direction: c2s
+    connection: game
     name: gcpRespawn
-    name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_8A4650; name aligned from cn-717 C2S 704 Packet_gcpRespawn (label alignment, run cn-717 C2S 704..715 -> 602..613, shape [4 4 4], similarity 1.0)"
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_8A4650 stamps 602 and writes [u32 actor][u32 spawn index][u32 item reset] plainly; the death-state decision cn-774 sub_5B4100 sends it with the cached index or the 10*team+random fallback, and the item-reset word reads the itemResetOnRespawn settings through cn-774 sub_8CE8E0"
+    notes: "12 plain bytes, no marker framing; the label alignment from cn-717 stands"
   - value: 603
     direction: c2s
+    connection: game
     name: gcpRequestRespawnIdx
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_8A47C0; name aligned from cn-717 C2S 705 Packet_gcpRequestRespawnIdx (label alignment, run cn-717 C2S 704..715 -> 602..613, shape [4 4], similarity 1.0)"
+    evidence: verified
+    source: "cn-774 sub_8A47C0 writes [u32 actor][u32 spawn index] with the actor from the character object"
+    notes: "verified from the builder"
   - value: 605
     direction: c2s
+    connection: game
     name: gcpEatItem
-    name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_89D8D0; name aligned from cn-717 C2S 707 Packet_gcpEatItem (label alignment, run cn-717 C2S 704..715 -> 602..613, shape [4 4], similarity 1.0)"
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_89D8D0 writes the item object id and resolved item kind, two u32 words"
   - value: 609
     direction: c2s
     name: gcpGameUpdateDamagePoint
@@ -1777,100 +2071,282 @@ opcodes:
     source: "builder sub_CBF7F0; name aligned from cn-717 C2S 711 Packet_gcpGameUpdateDamagePoint (label alignment, run cn-717 C2S 704..715 -> 602..613, shape [4 4 4], similarity 1.0)"
   - value: 613
     direction: c2s
+    connection: game
     name: gcpGameReqExtendRespawn
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_96F3D0; name aligned from cn-717 C2S 715 Packet_gcpGameReqExtendRespawn (label alignment, run cn-717 C2S 704..715 -> 602..613, shape [4 4], similarity 1.0)"
+    evidence: verified
+    source: "cn-774 sub_96F3D0 writes [u32 my actor][u32 wait delta] with the same 0.429296875 scale constant (cn-774 0x14E4AD4) and the dead-state guard chain; registered for UI event 175"
+    notes: "verified from the builder"
+  - value: 612
+    direction: c2s
+    connection: game
+    name: gcpGameReqUseRespawnItem
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_5AAAC0 stamps 612 and writes one u32 actor word from the character object; the pre-send check cn-774 sub_9A83C0(91) counts the revival item in the bag, and the key handler cn-774 sub_5BA630 reaches it in the dead state 401"
+    notes: "The one-u32 actor body continues the legacy kr-812 sub_50E8A0 shape; the revival item id in the CN catalog is 91 and the client never decrements it. The UDP relay case 32836 (a teammate revive ping) runs the same flow through cn-774 sub_8B6250."
   - value: 628
     direction: c2s
+    connection: game
     name: gcpReqCreateItem
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_8C8140; name aligned from cn-717 C2S 728 Packet_gcpReqCreateItem (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4 4 4 4 4 4 4 4], similarity 0.89)"
+    evidence: verified
+    source: "cn-774 sub_8C8140 stamps 628 and writes the same 33-byte body as kr-1256's (position and direction triplets, kind, one byte, lifetime); the callers cn-774 sub_528FA0, sub_84DC40, sub_8A7AE0 and sub_8A7BA0 feed it"
+    notes: "33 bytes; byte-identical to the kr-1256 body"
   - value: 629
     direction: c2s
+    connection: game
     name: gcpReqCreateWeaponObject
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_8C8280; name aligned from cn-717 C2S 729 Packet_gcpReqCreateWeaponObject (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4 4 4 4 4 4 4 4 4], similarity 0.95)"
+    evidence: verified
+    source: "cn-774 sub_8C8280 via sub_8A7C60 stamps 629 and writes the same eleven words as kr-1256's"
+    notes: "44 bytes; byte-identical"
   - value: 630
     direction: c2s
+    connection: game
     name: gcpPickUpWeapon
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_529530; name aligned from cn-717 C2S 730 Packet_gcpPickUpWeapon (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4], similarity 1.0)"
+    evidence: verified
+    source: "cn-774 sub_529530 stamps 630 and writes [u32 weapon object][u32 actor]; the tick callers cn-774 sub_9664A0 and sub_CC4120 feed it"
+    notes: "8 bytes; byte-identical"
   - value: 631
     direction: c2s
+    connection: game
     name: gcpEatStar
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_89DD80; name aligned from cn-717 C2S 731 Packet_gcpEatStar (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4], similarity 1.0)"
+    evidence: verified
+    source: "cn-774 sub_89DD80 and sub_89DE60 stamp 631 and write [u32 actor][u32 item object]; the star item slot 34 handlers cn-774 sub_D44B10 and sub_D53970 feed it"
+    notes: "8 bytes; byte-identical"
   - value: 632
     direction: c2s
+    connection: game
     name: gcpReqCreateStar
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_8A8700; name aligned from cn-717 C2S 732 Packet_gcpReqCreateStar (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4 4 4 4 4 4 4 4], similarity 1.0)"
+    evidence: verified
+    source: "cn-774 sub_89DF40 stamps 632 and writes the same nine words as kr-1256's; the kill drop cn-774 sub_5111E0 through sub_5117C0 and sub_8B9D00 feed it"
+    notes: "36 bytes; byte-identical"
   - value: 633
     direction: c2s
+    connection: game
     name: gcpEatEventBox
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_89DE60; name aligned from cn-717 C2S 733 Packet_gcpEatEventBox (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4], similarity 1.0)"
+    evidence: verified
+    source: "cn-774 sub_89DF40's family stamps 633 and writes [u32 actor][u32 item object]; the event box handlers cn-774 sub_D4B020 and sub_D4B5E0 feed it"
+    notes: "8 bytes; byte-identical"
   - value: 634
     direction: c2s
+    connection: game
     name: gcpReqCreateEventBox
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_8A88B0; name aligned from cn-717 C2S 734 Packet_gcpReqCreateEventBox (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4 4 4 4 4 4 4 4], similarity 1.0)"
+    evidence: verified
+    source: "cn-774 sub_8A88B0 stamps 634 and writes the same nine words as kr-1256's and tw-454's, but the sender has no callers, no function-pointer store and no vtable row in this build"
+    notes: "Dead code: cn-774 never emits it, unlike kr-1256 and tw-454"
   - value: 635
     direction: c2s
+    connection: game
     name: gcpEatLucci
-    name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_89DF40; name aligned from cn-717 C2S 735 Packet_gcpEatLucci (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4], similarity 1.0)"
+    name_source: label@kr-1256
+    evidence: verified
+    source: "cn-774 sub_89DE60's family stamps 635 and writes [u32 actor][u32 item object]; the lucci handlers cn-774 sub_D44250 and sub_D4FC30 feed it"
+    notes: "8 bytes; byte-identical"
   - value: 636
     direction: c2s
+    connection: game
     name: gcpReqCreateLucci
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_8A8A60; name aligned from cn-717 C2S 736 Packet_gcpReqCreateLucci (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4 4 4 4 4 4 4 4], similarity 1.0)"
+    evidence: verified
+    source: "cn-774 sub_89DF40's family stamps 636 and writes the same nine words as kr-1256's; the kill drop cn-774 sub_5111E0 through sub_511FF0, the chocolate drop cn-774 sub_8BF690 and sub_975720 feed it"
+    notes: "36 bytes; byte-identical"
   - value: 637
     direction: c2s
+    connection: game
     name: gcpEatChocolate
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_D46830; name aligned from cn-717 C2S 737 Packet_gcpEatChocolate (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4], similarity 1.0)"
+    evidence: verified
+    source: "cn-774 sub_D46830 stamps 637 and writes [u32 actor][u32 item object], but the sender has no callers in this build"
+    notes: "Dead code: the client never emits it; the chocolate eat is server-driven (the S2C 621 notice)"
   - value: 638
     direction: c2s
+    connection: game
     name: gcpReqCreateChocolate
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_8BF690; name aligned from cn-717 C2S 738 Packet_gcpReqCreateChocolate (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4 4 4 4 4 4 4 4], similarity 1.0)"
+    evidence: verified
+    source: "cn-774 sub_8BF690 stamps 638 (the chocolate drop inlined from cn-774 sub_8B9A20 and sub_8BAC20) and writes the same nine words as kr-1256's"
+    notes: "36 bytes; byte-identical"
   - value: 639
     direction: c2s
+    connection: game
     name: gcpEatSpawner
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_D53250; name aligned from cn-717 C2S 739 Packet_gcpEatSpawner (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4 4], similarity 1.0)"
+    evidence: verified
+    source: "cn-774 sub_D53250 stamps 639 and writes [u32 actor][u32 item object][u32 zero], but the sender has no callers in this build"
+    notes: "Dead code: the client never emits it; the spawner activation is server-driven (the S2C 623 notice)"
   - value: 640
     direction: c2s
+    connection: game
     name: gcpReqCreateSpawner
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_AF65B0; name aligned from cn-717 C2S 740 Packet_gcpReqCreateSpawner (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4 4 4 4 4 4 4], similarity 1.0)"
+    evidence: verified
+    source: "cn-774 sub_AF65B0 stamps 640 and writes the spawner id, the character index, the position x, three zero words, the check-out word and the slot index, and stamps relay 32892 for the same event; the function-pointer store dword_177BB04 drives it"
+    notes: "32 bytes; the field order differs from kr-1256's and tw-454's - packets/object-economy.yaml states each layout"
   - value: 641
     direction: c2s
+    connection: game
     name: gcpEatHeart
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_D4C690; name aligned from cn-717 C2S 741 Packet_gcpEatHeart (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4], similarity 1.0)"
+    evidence: verified
+    source: "cn-774 sub_D4C690 stamps 641 and writes [u32 actor][u32 item object], but the sender has no callers in this build"
+    notes: "Dead code: cn-774 never emits it, unlike kr-1256 and tw-454"
   - value: 642
     direction: c2s
+    connection: game
     name: gcpReqCreateHeart
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_512AB0; name aligned from cn-717 C2S 742 Packet_gcpReqCreateHeart (label alignment, run cn-717 C2S 724..742 -> 624..642, shape [4 4 4 4 4 4 4 4 4], similarity 0.88)"
+    evidence: verified
+    source: "cn-774 sub_512AB0 stamps 642 and writes [u32 weapon-slot context][u32 word] - a two-word body, not the nine-word create-heart body kr-1256 sub_6E8F10 and tw-454 sub_71C1C0 write"
+    notes: "Overloaded number: cn-774's 642 is a two-word weapon-slot request, not the heart create; the body layout is stated in packets/object-economy.yaml"
+
+  - value: 607
+    direction: s2c
+    connection: game
+    name: gspGameBigDropEventTick_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 dispatcher case 607, zero-byte body; the client logs starSpawnBig and lucci-bigdrop-splash timers"
+    notes: "Big-drop event tick"
+
+  - value: 609
+    direction: s2c
+    connection: game
+    name: gspGameCreateGameItem
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_897E80 case 609 invokes cn-774 sub_8ACC60, reading object, classification, position, kind, three vector words and one team byte (37 bytes)"
+  - value: 614
+    direction: s2c
+    connection: game
+    name: gspGameCreateStar
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 constructs GoStarItem and GoBigStarItem from the nine u32 words; the label mirrors the legacy star create"
+    notes: "Star create notice"
+
+  - value: 615
+    direction: s2c
+    connection: game
+    name: gspStarEaten
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 reads two u32 words; the client logs bigstarchr"
+    notes: "Big-star eaten notice"
+
+  - value: 616
+    direction: s2c
+    connection: game
+    name: gspGameCreateEventBox_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 constructs the event box from nine u32 words; type 1 is GoEventBoxItem and type 3 the horde-award variant"
+    notes: "Event box create notice"
+
+  - value: 617
+    direction: s2c
+    connection: game
+    name: gspEventBoxEaten_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 reads two u32 words; the client logs pigboxChr or PigboxEat"
+    notes: "Event box eaten notice"
+
+  - value: 618
+    direction: s2c
+    connection: game
+    name: gspGameCreateLucci
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 constructs GoLucciItem and GoBigLucciItem from the nine u32 words; the label mirrors the legacy lucci create"
+    notes: "Lucci create notice"
+
+  - value: 619
+    direction: s2c
+    connection: game
+    name: gspLucciEaten
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 reads two u32 words; the client logs biglucciChr or lucciEat"
+    notes: "Lucci eaten notice"
+
+  - value: 620
+    direction: s2c
+    connection: game
+    name: gspGameCreateChocolate_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 constructs the chocolate item from ten words including the position and direction"
+    notes: "Chocolate create notice"
+
+  - value: 621
+    direction: s2c
+    connection: game
+    name: gspChocolateEaten_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 reads two u32 words; the client logs chocolateChr"
+    notes: "Chocolate eaten notice"
+
+  - value: 622
+    direction: s2c
+    connection: game
+    name: gspGameCreateSpawner_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 constructs the spawner item from ten words"
+    notes: "Spawner create notice"
+
+  - value: 623
+    direction: s2c
+    connection: game
+    name: gspSpawnerEaten_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 reads two u32 words; the client logs GuardianCall"
+    notes: "Spawner eaten notice"
+
+  - value: 624
+    direction: s2c
+    connection: game
+    name: gspGameCreateHeart_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 constructs the heart item from ten words"
+    notes: "Heart create notice"
+
+  - value: 625
+    direction: s2c
+    connection: game
+    name: gspHeartEaten_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 reads two u32 words; the client logs heartChr"
+    notes: "Heart eaten notice"
+
+  - value: 645
+    direction: s2c
+    connection: game
+    name: gspGameCreateWeaponObject_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 constructs the WeaponObject from twelve u32 words; cn-774 sub_D547A0 (twelve u32, object size 704)"
+    notes: "Weapon object create notice"
+
+  - value: 646
+    direction: s2c
+    connection: game
+    name: gspPickUpWeapon_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 reads two u32 words; the weapon pickup notice"
+    notes: "Weapon pickup notice"
   - value: 815
     direction: c2s
     name: gcpReqPresentReceiveSubList
@@ -1879,16 +2355,20 @@ opcodes:
     source: "builder sub_7CAFA0; name aligned from cn-717 C2S 813 Packet_gcpReqPresentReceiveSubList (label alignment, run cn-717 C2S 806..813 -> 808..815, shape [4 4], similarity 1.0)"
   - value: 903
     direction: c2s
-    name: gcpReqManufactureStart
-    name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_959650; name aligned from cn-717 C2S 913 Packet_gcpReqManufactureStart (label alignment, run cn-717 C2S 913..916 -> 903..906, shape [4 4 4], similarity 1.0)"
+    connection: game
+    name: gcpReqStartNewWave
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_959650 writes the next wave as one u32 and sets the start latch; matched kr-812 sub_A09070"
+    notes: "cn-774 sub_98B110 dispatches the reply to cn-774 sub_95ABC0, which releases the latch."
   - value: 906
     direction: c2s
-    name: gcpReqManufactureImmediate
-    name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_959650; name aligned from cn-717 C2S 916 Packet_gcpReqManufactureImmediate (label alignment, run cn-717 C2S 913..916 -> 903..906, shape [4 4 4], similarity 1.0)"
+    connection: game
+    name: Unknown906
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_959650 sends an empty HordeWaveMgr request; no manufacturing fields are written."
+    notes: "No inbound route is enabled for this request."
   - value: 922
     direction: c2s
     name: gcpCompensationItemNoti
@@ -1897,10 +2377,13 @@ opcodes:
     source: "builder sub_CD0B90; name aligned from cn-717 C2S 926 Packet_gcpCompensationItemNoti (label alignment, run cn-717 C2S 918..930 -> 914..926, shape [S], similarity 1.0)"
   - value: 923
     direction: c2s
+    connection: game
     name: gcpMissionProcess
-    name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_89E0F0; name aligned from cn-717 C2S 927 Packet_gcpMissionProcess (label alignment, run cn-717 C2S 918..930 -> 914..926, shape [4 4 4], similarity 1.0)"
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_89E0F0 stamps 923 and writes [u32 mission index][u32 NPC kind][u32 zero]; the citizen rescue path cn-774 sub_5B0950 sends only 923"
+    notes: "Renumbered from cn-406's 927; the body shape is preserved. Wire order is mission index first, NPC kind second, zero word third"
+
   - value: 926
     direction: c2s
     name: gcpSetUserTitle
@@ -2033,6 +2516,30 @@ opcodes:
     evidence: inferred
     source: "cn-774 sub_BD6550 stamps 110, called when the gspAskedInvitation prompt (sub_BA8CD0) is refused; same role as kr-1256 C2S 111 sub_9D7750"
     notes: "one u32: the token of the S2C 121 prompt"
+    connection: game
+  - value: 202
+    direction: c2s
+    name: gcpReqLeaveParty
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_B04F30 stamps 202 on an empty TcpPacket; sent by the party menu's leave item (cn-774 sub_B01B80, guards cn-774 sub_B337A0 and member count > 1) and by cn-774 sub_B9E070 mode 2 after its leave confirm; matched to kr-812 Packet_gcpReqLeaveParty (kr-812 sub_677300, empty writer kr-812 sub_5C8FC0)"
+    notes: "empty body"
+    connection: game
+  - value: 302
+    direction: c2s
+    name: gcpReqKickFromParty
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_B04310 stamps 302 and writes one prefixed wide string (u32 count then UTF-16); reached from the party member context menu's kick item (cn-774 sub_B6C020) and the confirm wrapper cn-774 sub_B04470; pairs with the build's own S2C 302 gspRepKickFromParty (cn-774 sub_B023B0)"
+    notes: "wstr target"
+    connection: game
+  - value: 303
+    direction: c2s
+    name: gcpReqChangePartyLeader
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_B04790 stamps 303 inline and writes one prefixed wide string, the target member, from the context menu's handover item; pairs with the build's own S2C 303 gspRepChangePartyLeader (cn-774 sub_B02A20)"
+    notes: "wstr target"
     connection: game
   - value: 109
     direction: c2s
@@ -2446,10 +2953,35 @@ opcodes:
   - value: 128
     direction: s2c
     connection: game
-    name: gspRoomWaitingDialog_
+    name: gspNotifyMatch
+    name_source: mirrored
+    evidence: verified
+    source: "Two stage gates consume it: cn-774 sub_9ECF50 case 128 and the MainMenuStage gate cn-774 sub_A3C2A0 case 128. Both parse through cn-774 sub_9F3B80 (u32 result, u32 unknown, wstr) and result 0 opens dialog 1608 carrying DlgFindingRoom.ui (ctor cn-774 sub_80DA60), the kr-812 sub_687640 gate's own semantics, so the kr-812 label mirrors"
+    notes: "Supersedes the coined gspRoomWaitingDialog_ now that the handler match across builds is established. The client opens matching with C2S 53 {80} (cn-774 sub_A3CB10), the server then drives the waiting UI through this push, and result 20 makes the client answer with an automatic C2S 402 quick create (cn-774 sub_BD8520 through the gate helpers), while non-zero results are the native refusal toasts."
+  - value: 551
+    direction: s2c
+    connection: game
+    name: gspLmgReply_
     name_source: coined
     evidence: verified
-    source: "cn-774 sub_9ECF50 handles 128 as the native waiting-wall control with two words and a counted UTF-16 string"
+    source: "gate cn-774 sub_9ECF50 case 551 reads the gamer name and a u16 subId, resolves the gamer by name and dispatches through cn-774 sub_9E52D0 into the SubPacketDispatchEntry1Impl registry the LobbyMinigameContext constructor cn-774 sub_9D8810 built"
+    notes: "Per-key minigame replies whose bodies the handlers read conditionally on the subId; no body table until a binding consumes them. No packet-name strings exist in this build."
+  - value: 552
+    direction: s2c
+    connection: game
+    name: gspLmgSyncState_
+    name_source: coined
+    evidence: verified
+    source: "gate cn-774 sub_9ECF50 case 552 reads a u32 and a u16 subId into cn-774 sub_9F24C0, which dispatches through cn-774 sub_9E52D0 into the LmgSync registry"
+    notes: "Minigame state update; body LmgSyncState in packets/lobby-minigame.yaml."
+  - value: 524
+    direction: s2c
+    connection: game
+    name: Unknown524
+    name_source: none
+    evidence: verified
+    source: "MainMenuStage gate cn-774 sub_A3C2A0 case 524 reads four u32 words and calls cn-774 sub_B2E5F0"
+    notes: "Purpose not established; the consumer cn-774 sub_B2E5F0 is not minigame-shaped. No body table."
 
   # Native relay handshake; game and relay directions use independent numeric spaces.
   - value: 1
@@ -2607,45 +3139,45 @@ opcodes:
   - value: 32779
     direction: c2s
     connection: both
-    name: Unknown32779
-    name_source: none
+    name: gppDash
+    name_source: label@kr-812
     evidence: verified
-    source: "cn-774 sub_89FFA0 writes 8-byte actor and Boolean word"
+    source: "cn-774 sub_89FFA0 writes actor and bool32 for dash; matches kr-812 sub_50F510 Packet_gppDash builder"
   - value: 32779
     direction: s2c
     connection: both
-    name: Unknown32779
-    name_source: none
+    name: gppDash
+    name_source: label@kr-812
     evidence: verified
-    source: "cn-774 sub_897E80 consumes 8-byte actor and Boolean word in case 32779"
+    source: "cn-774 sub_897E80 consumes actor and bool32 for dash; matches kr-812 sub_523A60 Packet_gppDash consumer"
   - value: 32780
     direction: c2s
     connection: both
-    name: Unknown32780
-    name_source: none
+    name: gppRoll
+    name_source: label@kr-812
     evidence: verified
-    source: "cn-774 sub_ADA540 writes 10-byte actor, word and two bytes"
+    source: "cn-774 sub_ADA540 writes actor, word and two bytes for roll; matches kr-812 sub_50F630 Packet_gppRoll builder"
   - value: 32780
     direction: s2c
     connection: both
-    name: Unknown32780
-    name_source: none
+    name: gppRoll
+    name_source: label@kr-812
     evidence: verified
-    source: "cn-774 sub_897E80 consumes 10-byte actor, word and two bytes in case 32780"
+    source: "cn-774 sub_897E80 consumes actor, word and two bytes for roll; matches kr-812 sub_523AF0 Packet_gppRoll consumer"
   - value: 32781
     direction: c2s
     connection: both
-    name: Unknown32781
-    name_source: none
+    name: gppJump
+    name_source: label@kr-812
     evidence: verified
-    source: "cn-774 sub_8A01C0 writes three-word jump record"
+    source: "cn-774 sub_8A01C0 writes actor, word and bool32 for jump; matches kr-812 sub_50F750 Packet_gppJump builder"
   - value: 32781
     direction: s2c
     connection: both
-    name: Unknown32781
-    name_source: none
+    name: gppJump
+    name_source: label@kr-812
     evidence: verified
-    source: "cn-774 sub_89AE50 selects signed opcode -32755 and consumes actor, word and Boolean word before the character jump transition"
+    source: "cn-774 sub_89AE50 consumes actor, word and bool32 for jump; matches kr-812 sub_523B80 Packet_gppJump consumer"
   - value: 32782
     direction: c2s
     connection: both
@@ -3143,6 +3675,688 @@ opcodes:
     direction: c2s
     connection: game
     name: gcpGameReportMapData
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_89C6B0 / cn-774 sub_8C77E0 writes a u32 and fourteen counted vectors; positions, kinds, byte teams, maximum and minimum milliseconds precede the remaining native map vectors"
+  - value: 32885
+    direction: s2c
+    connection: udp
+    name: gppWanderLean
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_92F740 dispatches the native UDP movement body after the datagram header"
+
+  - value: 32923
+    direction: s2c
+    connection: udp
+    name: gppWanderLeanOptimize
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_92F740 dispatches the native UDP movement body after the datagram header"
+
+  - value: 22
+    direction: c2s
+    connection: game
+    name: gcpReqCenterUserCnt
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_A2DB20 stamps22 with no body; cn-774 sub_B9E790 selects the auxiliary status path"
+
+  - value: 23
+    direction: c2s
+    connection: game
+    name: gcpReqUniquenessCheck
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_8C7460 establishes23 and the retained-user word for auxiliary uniqueness"
+
+  - value: 54
+    direction: c2s
+    connection: game
+    name: gcpReqMoveInto
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_B9E790 selects54 and writes two retained words on the migration path"
+
+  - value: 55
+    direction: c2s
+    connection: game
+    name: gcpAcknowledgePendingPromotion_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_BA6D70 promotes pending to current and stamps55 with no body on the retained source"
+
+  - value: 917
+    direction: c2s
+    connection: game
+    name: gcpPveUseCountItem
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_59A740 stamps 917 and writes [u32 slot]; the hotkey dispatcher cn-774 sub_599140 calls it with slots 1..3, gated on four cooldown timers and an FNV-hashed inventory-bucket lookup"
+    notes: "Renumbered from cn-406's 921; the body shape is preserved"
+
+
+  - value: 919
+    direction: c2s
+    connection: game
+    name: gcpPvePangUnit
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_89E020 stamps 919 and writes [u32 unit id]; the mission-NPC handlers with the NpcTurret RTTI cast and kind match feed it"
+    notes: "Renumbered from cn-406's 923; the body shape is preserved"
+
+
+  - value: 916
+    direction: c2s
+    connection: game
+    name: Unknown916
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_B32EA0 stamps 916 with no body write; the request purpose is not established"
+
+
+  - value: 921
+    direction: s2c
+    connection: game
+    name: gspMapMissionInfo
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_8DD0A0 parses the 44-byte sMissionInfo_From_Svr records (reader cn-774 sub_8F1E20) and rebuilds the mission list"
+    notes: "One counted vector; native 44-byte records contain six words, a string vector and bool32 on the wire"
+
+
+  - value: 922
+    direction: s2c
+    connection: game
+    name: gspResMissionStart
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_8DD410 reads one u32 and announces from the string table (24 chars) with balloon effects at +300/+400"
+    notes: "Renumbered from cn-406's 925; the announce and balloon paths are preserved"
+
+
+  - value: 923
+    direction: s2c
+    connection: game
+    name: gspResMissionTimeOut
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_8D7D20; one u32, the mission index kept"
+    notes: "Renumbered from cn-406's 926; the mission index is kept for the advance"
+
+
+  - value: 924
+    direction: s2c
+    connection: game
+    name: gspResMissionOK
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_8D7D20; two u32 words (flag and mission index); flag 0 advances the index"
+    notes: "Renumbered from cn-406's 927; the flag-0 advance path is preserved"
+
+
+  - value: 925
+    direction: s2c
+    connection: game
+    name: gspNotifyGamePoint
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_8D7D20; three u32 words (seat bounded at 36, subtract flag, amount); the per-seat points land in the round object's table"
+    notes: "Renumbered from cn-406's 928; the seat bound widened from 32 to 36"
+
+
+  - value: 926
+    direction: s2c
+    connection: game
+    name: gspNotifyRankInfo
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_8DD5D0 reads the state, the counted u32 vector and the counted sResultRankInfo 24-byte rank rows (reader cn-774 sub_49B960; three summed words and a stored word)"
+    notes: "Renumbered from cn-406's 929; rank rows contain five wire words; their native 24-byte size includes a vtable"
+
+
+  - value: 927
+    direction: s2c
+    connection: game
+    name: gspPveItemInfo
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_8D7D20; the counted sPVESLOTITEMINFO entries (reader cn-774 sub_495D20)"
+    notes: "Renumbered from cn-406's 930; each counted entry carries three wire words; its native size includes a vtable"
+
+
+  - value: 928
+    direction: s2c
+    connection: game
+    name: gspPveStatusNotice_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_8D7D20; one counted string routed to the notice list at dword_177BAA4+1224"
+    notes: "Modern extra absent from cn-406"
+  - value: 606
+    direction: c2s
+    connection: game
+    name: gcpUseItem
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_522B80 stamps 606 without payload writes after the held-item and use-timer checks"
+  - value: 644
+    direction: c2s
+    connection: game
+    name: gcpSwitchItemSlot
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_8BF3E0 stamps an empty 644; cn-774 sub_5A1500 sends it only with a held alternate slot and marks the switch pending"
+  - value: 610
+    direction: s2c
+    connection: game
+    name: gspItemEaten
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_897E80 case 610 reads seat and object u32 words and removes the matching world object"
+  - value: 611
+    direction: s2c
+    connection: game
+    name: gspAddItemToSlot
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_897E80 case 611 invokes cn-774 sub_8AB6F0, reading seat, kind and native item slot (12 bytes); mode 16 uses its counted inventory"
+  - value: 612
+    direction: s2c
+    connection: game
+    name: gspItemUsed
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_897E80 case 612 reads seat, kind and item slot, clears that slot and applies the local native effect through cn-774 sub_5215A0"
+  - value: 613
+    direction: s2c
+    connection: game
+    name: gspPveItemUsed
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_897E80 case 613 reads three words and applies the local kind effect without clearing the held slot through cn-774 sub_5215A0"
+  - value: 647
+    direction: s2c
+    connection: game
+    name: gspSwitchItemSlot
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_897E80 case 647 clears the pending switch and installs the selected slot and kind; four u32 words, final nonzero result rejects the selection"
+  - value: 2016
+    direction: c2s
+    connection: game
+    name: gcpBombState
     name_source: label@kr-812
     evidence: verified
-    source: "cn-774 sub_8C77E0 stamps 579 and serializes the native map-data report; recorded without parsing; matched to the corresponding kr-812 packet builder"
+    source: "cn-774 sub_8C4000 stamps 2016 and writes two words plus three floats; matched to kr-812 gcpBombState."
+  - value: 2015
+    direction: c2s
+    connection: game
+    name: gcpBombMissionOver
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8C46A0 stamps 2015 and writes one winner byte and two operator words; matched to kr-812 gcpBombMissionOver."
+  - value: 2022
+    direction: c2s
+    connection: game
+    name: gcpDropCaptain
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_4EA650 stamps 2022 on local Captain death and writes one seat word; matched to kr-812 gcpDropCaptain."
+  - value: 972
+    direction: s2c
+    connection: game
+    name: gspBombState
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_897E80 case 972 decodes the Bomb broadcast and calls cn-774 sub_4E26B0; matched to kr-812 gspBombState."
+  - value: 973
+    direction: s2c
+    connection: game
+    name: gspObserver
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8C4140 reads one scene-object word and gates its observer transition on mode 19; matched to kr-812 gspObserver."
+  - value: 981
+    direction: s2c
+    connection: game
+    name: gspCreateCaptain
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8D7D20 case 981 dispatches to cn-774 sub_4EB540, which appoints the Captain from one seat word; matched to kr-812 gspCreateCaptain."
+  - value: 608
+    direction: c2s
+    connection: game
+    name: gcpGameUpdateScore
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_4EB780 sends the Captain kill through cn-774 sub_8C7C40, which stamps 608 and writes the 16-byte full score report; matched to kr-812 gcpGameUpdateScore."
+  - value: 939
+    direction: c2s
+    connection: game
+    name: gcpPortalMove
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_8C3CB0 writes game 939 as position xyz and region u16; matched to kr-812 sub_529E80 Packet_gcpPortalMove; cn-774 sub_BC14A0 consumes the native movement authorization; packets/portal.yaml"
+  - value: 32922
+    direction: c2s
+    connection: both
+    name: gppTeleportPortal
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_AE3BC0 writes actor and position xyz under 32922; cn-774 sub_8BC720 resolves that character and applies native teleport effects; matched to kr-812 sub_50FA90 / kr-812 sub_523F20 Packet_gppTeleportPortal; packets/portal.yaml"
+  - value: 32922
+    direction: s2c
+    connection: both
+    name: gppTeleportPortal
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_AE3BC0 writes actor and position xyz under 32922; cn-774 sub_8BC720 resolves that character and applies native teleport effects; matched to kr-812 sub_50FA90 / kr-812 sub_523F20 Packet_gppTeleportPortal; packets/portal.yaml"
+  - value: 305
+    direction: c2s
+    connection: game
+    name: gcpReqPublishPartyRecruitment_
+    name_source: coined
+    evidence: verified
+    source: cn-774 sub_7B4D80 publishes two u32 settings, one byte and counted UTF-16 recruitment text; the first setting is not the legacy toggle
+  - value: 306
+    direction: c2s
+    connection: game
+    name: gcpReqCancelPartyRecruiting_
+    name_source: coined
+    evidence: verified
+    source: cn-774 sub_B12920 stamps 306 with an empty body to cancel recruitment
+  - value: 308
+    direction: c2s
+    connection: game
+    name: gcpReqPartyRecruitDocuments_
+    name_source: coined
+    evidence: verified
+    source: cn-774 sub_B3B500 stamps 308 with a byte filter and zero-based u32 page
+
+  # The native HordeWaveMgr exchange and its shared NPC operation adapters.
+  - value: 904
+    direction: s2c
+    connection: game
+    name: gspRepStartNewWave
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_98B110 case 904 -> cn-774 sub_95ABC0; matched kr-812 sub_A301C0 case 904"
+    notes: "One u32 wave; releases the host start latch and starts the wave on every member."
+  - value: 904
+    direction: c2s
+    connection: game
+    name: gcpReqEndWave
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_95AA30; matched kr-812 sub_A09100"
+    notes: "One u32 cleared-wave index."
+  - value: 905
+    direction: s2c
+    connection: game
+    name: gspRepEndWave
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_98B110 case 905 -> cn-774 sub_95B540; matched kr-812 sub_A301C0 case 905"
+    notes: "One u32 cleared-wave index; releases the end latch."
+  - value: 905
+    direction: c2s
+    connection: game
+    name: gcpReqEndAllWave
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_95AB00; matched kr-812 sub_A09190"
+    notes: "Empty request after the final wave."
+  - value: 906
+    direction: s2c
+    connection: game
+    name: gspRepEndAllWave
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_98B110 case 906; matched kr-812 sub_A301C0 case 906"
+    notes: "Empty reply sets the horde completion state to 1."
+  - value: 908
+    direction: c2s
+    connection: game
+    name: gcpReqWaveAllSpawnMobs
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_95ABC0 -> cn-774 sub_1056B00 / cn-774 sub_10566D0; matched kr-812 sub_A092B0"
+    notes: "u32 wave, u16, u32 and counted spawn records; only the local host sends the table."
+  - value: 908
+    direction: s2c
+    connection: game
+    name: gspResetWaveMobs_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_98B110 case 908 -> cn-774 sub_9649F0"
+    notes: "Empty reset removes previous NPCs before the next spawn table."
+  - value: 909
+    direction: s2c
+    connection: game
+    name: gspRepWaveAllSpawnMobs
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_98B110 case 909 -> cn-774 sub_958DE0 -> cn-774 sub_1057310 / cn-774 sub_10567A0; matched kr-812 sub_A07E90"
+    notes: "The host releases its table latch; other members install the same complete table."
+  - value: 32857
+    direction: c2s
+    connection: both
+    name: gppCreateMobsFromSpawnGroup
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_AEE980; cn-774 sub_AEBC40 case 32857 -> cn-774 sub_AEB660; matched kr-812 sub_6E1350"
+    notes: "One u32 spawn-group key."
+  - value: 32857
+    direction: s2c
+    connection: both
+    name: gppCreateMobsFromSpawnGroup
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_AEE980; cn-774 sub_AEBC40 case 32857 -> cn-774 sub_AEB660; matched kr-812 sub_6E1350"
+    notes: "One u32 spawn-group key."
+  - value: 32862
+    direction: c2s
+    connection: both
+    name: gppCreateSpawnGroupMemberMob
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_AEF340; cn-774 sub_AEBC40 case 32862 -> cn-774 sub_AEF560; matched kr-812 sub_6E1930"
+    notes: "Two u32 words, a counted UTF-16 string and four u32 words."
+  - value: 32862
+    direction: s2c
+    connection: both
+    name: gppCreateSpawnGroupMemberMob
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_AEF340; cn-774 sub_AEBC40 case 32862 -> cn-774 sub_AEF560; matched kr-812 sub_6E1930"
+    notes: "Two u32 words, a counted UTF-16 string and four u32 words."
+  - value: 32892
+    direction: c2s
+    connection: both
+    name: gppCreateAIObject
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_AF65B0; cn-774 sub_897E80 case 32892 -> cn-774 sub_8ADDC0; matched kr-812 sub_647CD0"
+    notes: "32 bytes: two u32 words, eight bytes and four u32 words."
+  - value: 32892
+    direction: s2c
+    connection: both
+    name: gppCreateAIObject
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_AF65B0; cn-774 sub_897E80 case 32892 -> cn-774 sub_8ADDC0; matched kr-812 sub_647CD0"
+    notes: "32 bytes: two u32 words, eight bytes and four u32 words."
+  - value: 32866
+    direction: c2s
+    connection: both
+    name: gppHordeMobReplay
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_97BD60 / cn-774 sub_97C110; cn-774 sub_98B110 -> cn-774 sub_97BA60; matched kr-812 sub_A225A0"
+    notes: "Two u32 words, a counted UTF-16 string and one u32 word."
+  - value: 32866
+    direction: s2c
+    connection: both
+    name: gppHordeMobReplay
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_97BD60 / cn-774 sub_97C110; cn-774 sub_98B110 -> cn-774 sub_97BA60; matched kr-812 sub_A225A0"
+    notes: "Two u32 words, a counted UTF-16 string and one u32 word."
+  - value: 32873
+    direction: c2s
+    connection: both
+    name: gppWaveSetMobSpawnGroup
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_97F770; cn-774 sub_98B110 -> cn-774 sub_9591C0; matched kr-812 sub_A25B40"
+    notes: "Two u8 fields and one u32 word."
+  - value: 32873
+    direction: s2c
+    connection: both
+    name: gppWaveSetMobSpawnGroup
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_97F770; cn-774 sub_98B110 -> cn-774 sub_9591C0; matched kr-812 sub_A25B40"
+    notes: "Two u8 fields and one u32 word."
+  # These writers stamp Lambda::TcpPacket opcode word 1 and send through the game
+  # session cn-774 dword_177D9C4. Their packet purposes have not been established.
+  - value: 116
+    direction: c2s
+    name: Unknown116
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_B52E50 stamps 116 once cn-774 sub_B527A0 accepts its target and sends through the game connection global"
+    notes: "Body: two u32 words (the two arguments), then the caller's helper object built by cn-774 sub_45FBA0 serializes into the packet through its own virtual method before the send; the tail shape is that object's."
+  - value: 139
+    direction: c2s
+    name: Unknown139
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_E703D0 stamps 139 and sends through the game connection global when the notified object matches this[391] and its byte at +280 is set"
+    notes: "Empty request; no appends between the stamp and the send."
+  - value: 140
+    direction: c2s
+    name: Unknown140
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_E93450 stamps 140 from one branch of the switch on cn-774 sub_E93A30's result and sends through the game connection global"
+    notes: "Empty request; no appends between the stamp and the send."
+  - value: 143
+    direction: c2s
+    name: Unknown143
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_E58A60 stamps 143 after the modal wait cn-774 sub_F54E60 returns 257 and sends through the game connection global"
+    notes: "Body is written entirely by the helper cn-774 sub_108BCE0; no inline appends, so the field list is the helper's."
+  - value: 146
+    direction: c2s
+    name: Unknown146
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_ECCD90 stamps 146 and sends through the game connection global when a scan over a member list fails to find the entry; the string comes from the second argument through cn-774 sub_44F700"
+    notes: "Body: one u32 taken from the first argument, then a u32 character count and that many UTF-16 code units."
+  - value: 802
+    direction: c2s
+    name: Unknown802
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_7F29F0 stamps 802 and sends through the game connection global while the state word reads 1200 with two matching counters and cn-774 dword_177BAA4+712 set"
+    notes: "Body: one 8-byte block copied from the state object cn-774 dword_177BB28+320."
+  - value: 811
+    direction: c2s
+    name: Unknown811
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_640590 stamps 811 and sends through the game connection global after the modal wait cn-774 sub_F54E60 returns 257 and a 1000 ms cooldown elapses"
+    notes: "Body: one u32 read through the handle object (the dword behind *v47)."
+  - value: 831
+    direction: c2s
+    name: Unknown831
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_785D10 stamps 831 and sends through the game connection global when the sorted map at cn-774 dword_177D114 holds the node with key 702"
+    notes: "Empty request; no appends between the stamp and the send."
+  - value: 931
+    direction: c2s
+    name: Unknown931
+    name_source: none
+    evidence: verified
+    source: "cn-774 sub_4D66B0 stamps 931 and sends one constant dword through the game connection global"
+    notes: "Body: one u32, the constant 1."
+
+  - value: 2071
+    direction: c2s
+    name: gcpReqRheaForm_
+    name_source: coined
+    evidence: verified
+    connection: game
+    source: "cn-774 sub_8A48A0"
+    notes: "Rhea form request: scene actor u32, active bool32; native input owns charge and expiry. packets/character-form.yaml."
+  - value: 1539
+    direction: s2c
+    name: gspRheaForm_
+    name_source: coined
+    evidence: verified
+    connection: game
+    source: "cn-774 sub_897E80 -> cn-774 sub_8C5800"
+    notes: "Scene actor u32, active bool32; applies Rhea form 29/2000, preserves HP ratio, clears local pending latch. Send accepted changes to owner and peers."
+  - value: 33287
+    direction: c2s
+    connection: both
+    name: gppScriptZombieConversion_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_CC51C0 writes team:u8, seat:u32, operation:u32, zombie kind and weapon through the peer route."
+  - value: 33287
+    direction: s2c
+    connection: game
+    name: gppScriptZombieConversion_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_8A2250 applies the authorized zombie character and clears the local pending latch on receipt."
+  - value: 33290
+    direction: c2s
+    connection: both
+    name: gppSetAddableObjectVisible_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_91FA40 calls cn-774 sub_8A1870 to send counted narrow name, bool32 visibility and script sequence on the peer route."
+  - value: 33290
+    direction: s2c
+    connection: game
+    name: gppSetAddableObjectVisible_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_8A2600 reads counted narrow name, bool32 visibility and script sequence and installs the sequence only on receipt, including for the producer."
+  - value: 33291
+    direction: c2s
+    connection: both
+    name: gppCreateBreakableObject_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_91FB40 calls cn-774 sub_8A1A60 to send counted narrow name, float32 health and script sequence on the peer route."
+  - value: 33291
+    direction: s2c
+    connection: game
+    name: gppCreateBreakableObject_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_8A2740 reads counted narrow name, float32 health and script sequence and installs the sequence only on receipt, including for the producer."
+  - value: 33292
+    direction: c2s
+    connection: both
+    name: gppArea32MapEffect_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_91FC40 calls cn-774 sub_8A1C20 to send three wide strings, bool32 visibility, unknown word and script sequence on the peer route."
+  - value: 33292
+    direction: s2c
+    connection: game
+    name: gppArea32MapEffect_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_8A2870 reads three wide strings, bool32 visibility, unknown word and script sequence and installs the sequence only on receipt, including for the producer."
+  - value: 624
+    direction: c2s
+    connection: game
+    name: gcpReqEndStage
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8A5EE0 stamps 624 and writes the outcome word; the Zombie Escape SendGameResult callback passes humanWon xor 1. Matched to kr-812 Packet_gcpReqEndStage."
+  - value: 32774
+    direction: c2s
+    connection: both
+    name: gppDeleteObject
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_89EC50 writes; cn-774 sub_897E80 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "One object word, resolved by cn-774 sub_891DC0."
+  - value: 32774
+    direction: s2c
+    connection: both
+    name: gppDeleteObject
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_89EC50 writes; cn-774 sub_897E80 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "One object word, resolved by cn-774 sub_891DC0."
+  - value: 32841
+    direction: c2s
+    connection: both
+    name: gppIniPacket
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_AEC7C0 writes; cn-774 sub_AECD50 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "Counted UTF-16 document; native newSpawn command."
+  - value: 32841
+    direction: s2c
+    connection: both
+    name: gppIniPacket
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_AEC7C0 writes; cn-774 sub_AECD50 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "Counted UTF-16 document; native newSpawn command."
+  - value: 32865
+    direction: c2s
+    connection: both
+    name: gppMobLuaMessage
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_AEE060 writes; cn-774 sub_AEE730 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "One selector word and a counted UTF-16 document; zero selects all mobs."
+  - value: 32865
+    direction: s2c
+    connection: both
+    name: gppMobLuaMessage
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_AEE060 writes; cn-774 sub_AEE730 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "One selector word and a counted UTF-16 document; zero selects all mobs."
+  - value: 32891
+    direction: c2s
+    connection: both
+    name: gppDummyUnitMotion
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_8BE4A0 writes; cn-774 sub_8BE390 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "One actor word, counted UTF-16 motion and one word; non-master applies the motion."
+  - value: 32891
+    direction: s2c
+    connection: both
+    name: gppDummyUnitMotion
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_8BE4A0 writes; cn-774 sub_8BE390 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "One actor word, counted UTF-16 motion and one word; non-master applies the motion."
+  - value: 32893
+    direction: c2s
+    connection: both
+    name: gppAgentMoveTo
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_8C1D10 writes; cn-774 sub_8C1E80 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "Actor word, slot word and three position words; consumer checks slot and actor identity."
+  - value: 32893
+    direction: s2c
+    connection: both
+    name: gppAgentMoveTo
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_8C1D10 writes; cn-774 sub_8C1E80 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "Actor word, slot word and three position words; consumer checks slot and actor identity."
+  - value: 32894
+    direction: c2s
+    connection: both
+    name: gppUseItemDirect
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_8BEC00 writes; cn-774 sub_8BF200 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "Two words; direct-use item consumer cn-774 sub_8BED00."
+  - value: 32894
+    direction: s2c
+    connection: both
+    name: gppUseItemDirect
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_8BEC00 writes; cn-774 sub_8BF200 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "Two words; direct-use item consumer cn-774 sub_8BED00."

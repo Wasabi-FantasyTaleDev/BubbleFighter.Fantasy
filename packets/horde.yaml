@@ -8,8 +8,12 @@ version: 1
 # Packet_gcpReqStartNewWave, Packet_gcpReqEndWave and Packet_gcpReqEndAllWave), and its dispatcher
 # kr-812 sub_A301C0 handles the replies in cases 0x388..0x38D, but those handlers read nothing from
 # the packet object, so no kr-812 reply field is established: every reply field below is the
-# kr-1256 family's (the `only: [kr-1256]` rows, which the builds based on kr-1256 inherit
-# unverified). The drops and the pickup are kr-1256's own numbering (kr-812 numbers its award-drop
+# kr-1256 family's (the `only: [kr-1256]` rows). cn-774 independently matches the wave structures:
+# cn-774 sub_959650 / cn-774 sub_95AA30 / cn-774 sub_95AB00 produce the requests; cn-774 sub_98B110
+# dispatches the replies to cn-774 sub_95ABC0 / cn-774 sub_95B540 / cn-774 sub_958DE0. tw-454 independently
+# matches them: tw-454 sub_C87FC0 / tw-454 sub_C893D0 / tw-454 sub_C894D0 write the requests; tw-454
+# sub_CB9140 dispatches to tw-454 sub_C895C0 / tw-454 sub_C89F40 / tw-454 sub_C87760. Other descendants
+# inherit these layouts unverified. The drops and the pickup are kr-1256's own numbering (kr-812 numbers its award-drop
 # family differently and its C2S 2027 is another packet), so their fields are kr-1256's too.
 structs:
   # C2S 903: the next wave the host asks to start. kr-1256 sub_7B9820 (the wave manager update)
@@ -60,6 +64,8 @@ structs:
     - mobs: list<HordeWaveSpawnMob>
       only: [kr-1256]
   # kr-1256 sub_1158DD0 reads each 60-byte in-memory record through its virtual stream reader.
+  # cn-774 sub_1056B00 / cn-774 sub_1057310 count the same records; cn-774 sub_10566D0 / cn-774 sub_10567A0 write/read them.
+  # tw-454 sub_EC42B0 / tw-454 sub_EC4830 count those records; tw-454 sub_EC3DC0 / tw-454 sub_EC3E90 write/read them.
   HordeWaveSpawnMob:
     - unknown_4: u32
       offset: 4

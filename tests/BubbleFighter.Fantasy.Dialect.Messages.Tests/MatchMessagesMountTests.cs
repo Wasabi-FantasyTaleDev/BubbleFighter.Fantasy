@@ -5,7 +5,9 @@ using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Net;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Match;
+using BubbleFighter.Fantasy.Contracts.Lobby;
 using BubbleFighter.Fantasy.Dialect.Messages;
+using BubbleFighter.Fantasy.Dialect.Rooms;
 using BubbleFighter.Fantasy.Kernel;
 using BubbleFighter.Fantasy.Protocol;
 using BubbleFighter.Fantasy.Tests;
@@ -17,6 +19,40 @@ namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
 /// <summary>Exercises installed native request adapters against reviewed connection-scoped tables.</summary>
 public sealed class MatchMessagesMountTests
 {
+    /// <summary>Disabling automatic teaching preserves the native menu's connection-ready reply.</summary>
+    [Theory]
+    [InlineData(false, null, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, false)]
+    [InlineData(true, null, true)]
+    [InlineData(true, true, true)]
+    public async Task TutorialOfferDoesNotControlConnectionReadiness(bool automaticTutorial, bool? offer, bool notified)
+    {
+        var profile = Profile("cn-324");
+        var root = Directory.GetParent(TestBuilds.PacketsDirectory())!.FullName;
+        var table = OpcodeTableLoader.Load(Path.Combine(root, "profiles", "cn-324", "opcodes.yaml"), profile)
+            .ForConnection(OpcodeConnection.Game);
+        var binding = new RoomBinding("cn-324/game", TestBuilds.Of("cn-324").Schema, new Tables(table),
+            true, TestBuilds.Packets, "cn-324", 60, automaticTutorial);
+        var session = new Session(profile);
+        await binding.SendAsync(session, new MainMenuRoomOpened(42, "Player", 300001, [300001])
+        {
+            OfferTutorial = offer,
+        }, default);
+        var readiness = table.S2C("gspRepMoveInto");
+        var index = session.Sent.IndexOf(readiness);
+        Assert.True(index >= 0);
+        Assert.Equal("010000003C00000000000000", Convert.ToHexString(session.Bodies[index]));
+        Assert.True(index > session.Sent.IndexOf(table.S2C("gspGotoMenu")));
+        var notification = table.S2C("gspNotifyAutoTutorial_");
+        Assert.Equal(notified, session.Sent.Contains(notification));
+        if (notified)
+        {
+            Assert.True(session.Sent.IndexOf(notification) > index);
+            Assert.Empty(session.Bodies[session.Sent.IndexOf(notification)]);
+        }
+    }
+
     [Theory]
     [InlineData("kr-812", false)]
     [InlineData("cn-717", false)]

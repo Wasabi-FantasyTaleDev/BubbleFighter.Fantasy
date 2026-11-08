@@ -21,10 +21,18 @@ namespace BubbleFighter.Fantasy.Shop.Presents;
 /// receiver is notified only while logged in to the same build. Another build's player sees the gift, and the icon, at
 /// the next login to the build it was sent from.
 /// </remarks>
+/// <remarks>
+/// Taking a gift publishes the committed bag through one of the two paths its family mounts: the legacy purchase
+/// state sender (bag restate plus user-stat, the encoding the legacy family's purchase dialog already sends) or,
+/// on the builds whose shop dialog owns the purchase publications, the lobby inventory push plus the money-stat
+/// balance sender, the same pair the modern purchase path sends. A state sender takes precedence when present;
+/// activation requires at least one publication path.
+/// </remarks>
 internal sealed class PresentService(
     ShopOptions options, ShopCatalog catalog, ConditionalShopPurchaser purchaser,
     Func<ShopStockRow, PurchaseGrantTerm> resolve, IInventoryRepository inventory, IPresentStore store,
-    ShopOpenScope open, IMessageSender<ShopStateUpdated> state, IMessageSender<ShopBalanceUpdated> balance,
+    ShopOpenScope open, IMessageSender<ShopStateUpdated>? state, IInventoryPushService? push,
+    IMessageSender<ShopBalanceUpdated> balance,
     IMessageSender<PresentSendReplied> sendReplies, IMessageSender<PresentListReplied> listReplies,
     IMessageSender<PresentActionReplied> actionReplies, IMessageSender<PresentNoticeSent> notices,
     ISessionRegistry? sessions, TimeProvider clock, ILogger logger)
@@ -186,7 +194,15 @@ internal sealed class PresentService(
         }
         if (result is null)
             return (false, present.StockKey);
-        await state.SendAsync(session, new(me, result.Wallet, result.Grants, false), ct).ConfigureAwait(false);
+        if (state is not null)
+            await state.SendAsync(session, new(me, result.Wallet, result.Grants, false), ct).ConfigureAwait(false);
+        else
+        {
+            // The modern purchase path publishes the committed bag through the lobby push and the wallet through
+            // the money stat; a gift taken in that family rides the same pair, so the dialog and the bag agree.
+            await push!.PushPurchaseAsync(session, me.UserNum, result.Grants, ct).ConfigureAwait(false);
+            await balance.SendAsync(session, new(me, result.Wallet), ct).ConfigureAwait(false);
+        }
         logger.LogInformation("Gift {Id} ({Key}) taken by player {Player}: {Items} item(s) granted.",
             id, present.StockKey, me.UserNum, result.Grants.Count);
         return (true, present.StockKey);

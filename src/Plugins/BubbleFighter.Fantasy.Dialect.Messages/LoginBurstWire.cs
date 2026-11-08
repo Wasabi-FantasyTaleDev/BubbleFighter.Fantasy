@@ -173,6 +173,8 @@ internal static class LoginBurstWire
     /// <param name="build">The client build whose table is checked.</param>
     /// <exception cref="ConfigException">A consumed field is missing or has another type.</exception>
     internal static void RequireSessionSignature(PacketTables tables, string build) =>
-        PacketLayoutContract.RequireFields(tables, build, "SessionSignatureData", "Login burst",
-            ("unknown_4", "u16"), ("unknown_6", "u8"), ("unknown_8", "list<u8>"));
+        // cn-735 sub_A0BB20 retains the same wire widths with the enum and vector at native +12/+16.
+        PacketLayoutContract.RequireSignature(tables, build, "SessionSignatureData", "Login burst",
+            "unknown_4:u16,unknown_6:u8,unknown_8:list<u8>",
+            "unknown_4:u16,unknown_12:u8,unknown_16:list<u8>");
 }

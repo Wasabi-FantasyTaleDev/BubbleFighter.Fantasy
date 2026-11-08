@@ -42,8 +42,11 @@ internal sealed partial class RoundFlow
     {
         ct.ThrowIfCancellationRequested();
         if (!_options.NativeMatchRelay)
-            throw new InvalidOperationException("Native match connection reporting is disabled.");
-        var (room, _) = _registry.RequireGame(session);
+        {
+            _logger.LogDebug("Session {Id} native match report ignored because the transport is disabled.", session.Id);
+            return;
+        }
+        if (FindGameReportRoom(session) is not { } room) return;
         // Native close reports have no generation, so an old false report cannot revoke a newer lease.
         if (!report.Connected)
         {
@@ -61,7 +64,10 @@ internal sealed partial class RoundFlow
             {
                 var seat = room.FindByGame(session.Id);
                 if (seat is null || !ReferenceEquals(seat.Game, session) || session.Connection.IsClosed)
-                    throw new InvalidOperationException("Native match connection report requires its live game seat.");
+                {
+                    _logger.LogDebug("Session {Id} native match report ignored after its game seat departed.", session.Id);
+                    return;
+                }
                 if (room.Phase is RoomPhase.Waiting or RoomPhase.Result)
                 {
                     _logger.LogInformation("Session {Id} reported late native match success in {Phase}.", session.Id, room.Phase);
@@ -70,7 +76,10 @@ internal sealed partial class RoundFlow
                 if (!seat.SceneReady || !seat.EndpointAdvertised || seat.NativeCapability?.Generation != room.StartGeneration
                     || !seat.RelayInitialized || seat.RelayGeneration != room.StartGeneration
                     || seat.Relay is null || seat.Relay.Connection.IsClosed)
-                    throw new InvalidOperationException("Native match connection report has no initialized current-round relay.");
+                {
+                    _logger.LogWarning("Session {Id} native match success ignored without an initialized current-round relay.", session.Id);
+                    return;
+                }
                 seat.RelayConfirmed = true;
             }
             await StartCountdownWhenAllLoadedAsync(room, operationCt).ConfigureAwait(false);
@@ -106,30 +115,77 @@ internal sealed partial class RoundFlow
 
     // Runs on the room's executor once the countdown went out, when every seat's character exists: the seed appliers
     // look the actor up by its entity and drop a table without one (cn-324 sub_460820, kr-812 sub_506290). A seat
-    // playing over its game connection has no relay to receive them. A failed seat is logged and the round goes on,
-    // because its tables only decide critical hits.
-    private async ValueTask SendSeedTablesAsync(PlayRoom room, RoomSeat[] members, int generation, CancellationToken ct)
+    // playing over its game connection has no relay to receive them. A failed seat is logged and the round goes on:
+    // its tables decide critical hits and damage reduction, and the tables already installed still decide both.
+    private async ValueTask SendSeedTablesAsync(PlayRoom room, PreparedSeed[] seeds, CancellationToken ct)
     {
-        foreach (var member in members)
+        foreach (var seed in seeds)
         {
-            ISession? relay;
-            MatchSeedTablesRequested request;
-            lock (room.Gate)
-            {
-                relay = UsesGameLink(room, member) ? null : MatchLink(room, member);
-                request = new(room.Id, generation, RoomRegistry.SceneEntity(member.Slot), member.PreviousRound);
-            }
-            if (relay is null)
-                continue;
             try
             {
-                await _seedTables!.SendAsync(relay, request, ct).ConfigureAwait(false);
+                await _seedTables!.SendAsync(seed.Relay, seed.Request, ct).ConfigureAwait(false);
+                lock (room.Gate)
+                {
+                    var member = room.Seats.SingleOrDefault(seat => seat.Slot == seed.Slot);
+                    if (member?.Critical is { } state && ReferenceEquals(state.Opening, seed.Request))
+                        state.OpeningCompleted = true;
+                }
             }
             catch (Exception failure) when (failure is not OperationCanceledException)
             {
-                _logger.LogError(failure, "Room {Room} slot {Slot}: the round's seed tables could not be sent.", room.Id, member.Slot);
+                lock (room.Gate)
+                {
+                    var member = room.Seats.SingleOrDefault(seat => seat.Slot == seed.Slot);
+                    if (member?.Critical is { } state && ReferenceEquals(state.Opening, seed.Request))
+                        state.Failure = failure;
+                }
+                _logger.LogError(failure, "Room {Room} slot {Slot}: the round's seed tables could not be sent.", room.Id, seed.Slot);
             }
         }
+    }
+
+    private sealed record PreparedSeed(ISession Relay, int Slot, MatchSeedTablesRequested Request);
+
+    // Freeze all seats before invoking validators. Resource errors must precede every countdown and table send.
+    // Every occupant's actor exists on every client, playing over the relay or not, so the roster names them all.
+    private PreparedSeed[] PrepareSeedTables(PlayRoom room, RoomSeat[] members, int generation)
+    {
+        var seeds = new List<PreparedSeed>(members.Length);
+        lock (room.Gate)
+        {
+            var equipment = members.ToDictionary(member => member.Slot, member =>
+                member.EquippedItemIds is { } items
+                    ? new MatchSeedEquipment(room.ModeId, items,
+                        member.InventorySelection?.WeaponSelections[0], member.InventorySelection?.WeaponSelections[1])
+                    : null);
+            var roster = new MatchSeedRoster(members.Select(member =>
+                new MatchSeedOccupant(RoomRegistry.SceneEntity(member.Slot), equipment[member.Slot])));
+            foreach (var member in members)
+            {
+                var relay = UsesGameLink(room, member) ? null : MatchLink(room, member);
+                if (relay is null) continue;
+                seeds.Add(new(relay, member.Slot,
+                    new(room.Id, generation, RoomRegistry.SceneEntity(member.Slot), member.PreviousRound)
+                    {
+                        Equipment = equipment[member.Slot],
+                        Roster = roster,
+                    }));
+            }
+        }
+        foreach (var seed in seeds) _seedInputs?.Validate(seed.Request);
+        if (_criticalAuthority is not null)
+        {
+            lock (room.Gate)
+            {
+                foreach (var seed in seeds)
+                {
+                    var member = room.Seats.Single(seat => seat.Slot == seed.Slot);
+                    member.ClearCritical();
+                    member.Critical = new(seed.Relay, seed.Request, _lifetime);
+                }
+            }
+        }
+        return seeds.ToArray();
     }
 
     // The previous-round history the next round's critical table keys on (CriticalHitTable rows prevWin, prevDraw,

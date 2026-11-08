@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\BubbleFighter.Fantasy.Kernel\BubbleFighter.Fantasy.Kernel.csproj" />
+    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Net.Udp\BubbleFighter.Fantasy.Net.Udp.csproj" />
+  </ItemGroup>
+</Project>

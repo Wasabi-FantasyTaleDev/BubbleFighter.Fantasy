@@ -26,14 +26,14 @@ namespace BubbleFighter.Fantasy.Persistence.Sqlite;
 /// <see cref="SqliteOptions.MaxDatabaseBytes"/>, and configured with WAL, <c>synchronous=FULL</c> and
 /// foreign keys. Writes run in one transaction that the ORM joins and that ends with a truncating WAL
 /// checkpoint; if that checkpoint fails after a commit, the store refuses all further operations
-/// rather than reporting a committed transaction as rolled back. Schema versions 1 through 6 are
+/// rather than reporting a committed transaction as rolled back. Schema versions 1 through 8 are
 /// migrated in order, each in its own transaction; fresh files are created at version 1 and stamped
 /// with the application id.
 /// </summary>
 internal sealed class SqliteDatabase : IDisposable
 {
-    // Schema v6 fixes the identity, wallet, inventory and settlement row shapes; raising it means writing a migration step below.
-    private const int SchemaVersion = 7;
+    // Schema v9 admits durable per-mode battle aggregates in the coupled player snapshot.
+    private const int SchemaVersion = 9;
     private const int ApplicationId = 0x42464653;
     private readonly object _gate = new();
     private readonly FileStream _lease;
@@ -83,6 +83,8 @@ internal sealed class SqliteDatabase : IDisposable
             MaxMovementActors = options.MaxMovementActors, BusyTimeoutMs = options.BusyTimeoutMs,
             MaxPurchaseHistoryPerPlayer = options.MaxPurchaseHistoryPerPlayer,
             CustomizedKeys = options.CustomizedKeys,
+            MaxLoadoutsPerPlayer = options.MaxLoadoutsPerPlayer,
+            MaxBattleModesPerPlayer = options.MaxBattleModesPerPlayer,
         };
         Directory.CreateDirectory(Path.GetDirectoryName(Options.DatabasePath)!);
         // Keep the lease file after release: deleting it would permit two owners of different inodes.
@@ -103,7 +105,7 @@ internal sealed class SqliteDatabase : IDisposable
             var version = Convert.ToInt32(RawScalar("PRAGMA user_version"), CultureInfo.InvariantCulture);
             var application = Convert.ToInt32(RawScalar("PRAGMA application_id"), CultureInfo.InvariantCulture);
             var tables = UserTableCount();
-            if (version != SchemaVersion && version is not (1 or 2 or 3 or 4 or 5 or 6) && !(version == 0 && application == 0 && tables == 0))
+            if (version != SchemaVersion && version is not (1 or 2 or 3 or 4 or 5 or 6 or 7 or 8) && !(version == 0 && application == 0 && tables == 0))
                 throw new InvalidDataException($"Unsupported SQLite save schema {version}.");
             if (version != 0 && application != ApplicationId)
                 throw new InvalidDataException("SQLite save belongs to another application.");
@@ -231,6 +233,22 @@ internal sealed class SqliteDatabase : IDisposable
                     CREATE INDEX ix_messenger_requests_sender ON messenger_requests(sender);
                     """, transaction);
                 RawExecute("PRAGMA user_version=7", transaction);
+                transaction.Commit();
+                version = 7;
+            }
+            if (version == 7)
+            {
+                // Version 8 admits additive per-build loadout snapshots; legacy ownership and presets stay intact.
+                using var transaction = _connection.BeginTransaction();
+                RawExecute("PRAGMA user_version=8", transaction);
+                transaction.Commit();
+                version = 8;
+            }
+            if (version == 8)
+            {
+                // Version 9 adds optional battle aggregates; absent history remains unknown.
+                using var transaction = _connection.BeginTransaction();
+                RawExecute("PRAGMA user_version=9", transaction);
                 transaction.Commit();
             }
             ValidateExistingState();
@@ -448,6 +466,21 @@ internal sealed class SqliteDatabase : IDisposable
 
     private void ValidateState(long user, SaveState state)
     {
+        if (state.BattleRecords is null || state.BattleRecords.Count > Options.MaxBattleModesPerPlayer
+            || state.BattleRecords.Any(record => record is null || record.ModeId <= 0
+                || record.Wins < 0 || record.Draws < 0 || record.Losses < 0 || record.Escapes < 0
+                || record.Knockdowns < 0 || record.Kills < 0 || record.Rescues < 0 || record.Deaths < 0 || record.Score < 0)
+            || state.BattleRecords.Select(record => record.ModeId).Distinct().Count() != state.BattleRecords.Count)
+            throw new InvalidDataException("SQLite battle records have invalid counters, duplicate modes or exceed max_battle_modes_per_player.");
+        foreach (var record in state.BattleRecords) _ = record.Matches;
+        if (state.Loadouts is null || state.Loadouts.Count > Options.MaxLoadoutsPerPlayer)
+            throw new InvalidDataException("SQLite build loadouts are null or exceed max_loadouts_per_player.");
+        foreach (var (key, loadout) in state.Loadouts)
+        {
+            InventoryLoadoutScope.ValidateKey(key);
+            if (loadout is null) throw new InvalidDataException("SQLite build loadout is null.");
+            _ = loadout.Copy();
+        }
         if (state.CustomizedKeys is null || state.CustomizedKeys.Count > Options.CustomizedKeys.MaxScopes)
             throw new InvalidDataException("SQLite customized-key scopes are null or exceed their capacity.");
         try
@@ -506,6 +539,12 @@ internal sealed class SqliteDatabase : IDisposable
 // Schema-versioned domain snapshots keep all of a player's coupled state in one atomic row.
 internal sealed class SaveState
 {
+    // Older snapshots have no recorded history; it must not be reconstructed from level or experience.
+    public List<PlayerBattleRecord> BattleRecords { get; set; } = [];
+
+    // Older snapshots have no build selections; their shared state remains the one-time migration source.
+    public Dictionary<string, InventoryLoadoutState> Loadouts { get; set; } = new(StringComparer.Ordinal);
+
     // Older saves have no customized overrides; adding this field does not rewrite their other state.
     public Dictionary<string, CustomizedKey[]> CustomizedKeys { get; set; } = new(StringComparer.Ordinal);
 

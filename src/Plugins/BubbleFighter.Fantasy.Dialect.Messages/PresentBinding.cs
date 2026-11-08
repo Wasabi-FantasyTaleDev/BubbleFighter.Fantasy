@@ -9,7 +9,8 @@ namespace BubbleFighter.Fantasy.Dialect.Messages;
 /// Adapts the legacy gift box ("Present") packets to the shared gift messages. The byte layouts are the structures of
 /// packets/present.yaml; the opcodes come from the build's own table. Requests: the gift purchase (kr-812 sub_95C1C0),
 /// the two page requests (kr-812 sub_840530), the four single-gift actions (kr-812 sub_844A30) and the empty new-gift
-/// query that the client sends when it closes the box (kr-812 sub_962090). Replies are the matching gspRepPresent*
+/// query that the legacy client sends when it closes the box (kr-812 sub_962090) — the modern family has no such
+/// request, so that route binds only where the build's table names it. Replies are the matching gspRepPresent*
 /// classes, dispatched by kr-812 sub_837170 cases 815 to 828.
 /// </summary>
 internal sealed class PresentBinding(string protocol, IOpcodeTable opcodes, PacketTables tables, string build)
@@ -65,10 +66,12 @@ internal sealed class PresentBinding(string protocol, IOpcodeTable opcodes, Pack
 
         // The requests the binding parses and the replies it writes, with the fields stated in every build
         // that mounts the present box; per-build trailing fields (the task-bar count) are not required here.
+        // The second purchase-request string is never consumed and its unknown name is per build (the modern
+        // restatement names it unknown_24 where kr-812 names it unknown_32), so it is not required.
         PacketLayoutContract.RequireFields(tables, build, "PresentListRequest", "Present box",
             ("start", "u32"), ("count", "u32"));
         PacketLayoutContract.RequireFields(tables, build, "PresentSendRequest", "Present box",
-            ("receiver_nickname", "wstr"), ("unknown_32", "wstr"), ("item_key", "u32"), ("message", "wstr"));
+            ("receiver_nickname", "wstr"), ("item_key", "u32"), ("message", "wstr"));
         PacketLayoutContract.RequireFields(tables, build, "PresentIdRequest", "Present box", ("id", "u32"));
         PacketLayoutContract.RequireFields(tables, build, "PresentReceiveReply", "Present box",
             ("result", "u32"), ("id", "u32"), ("item_key", "u32"));
@@ -84,7 +87,9 @@ internal sealed class PresentBinding(string protocol, IOpcodeTable opcodes, Pack
             ("status", "u32"), ("total", "u32"));
         PacketLayoutContract.RequireFields(tables, build, "PresentSendSubList", "Present box",
             ("status", "u32"), ("total", "u32"));
-        var noticeRequest = opcodes.C2S("gcpReqPresentNewReceive");
+        // Optional routes require a runtime declaration; a catalog guess must not invent a modern query.
+        var noticeRequest = opcodes.All.FirstOrDefault(entry => entry.Direction == PacketDirection.ClientToServer
+            && entry.Name == "gcpReqPresentNewReceive")?.Value;
         var sendRequest = opcodes.C2S("gcpReqPresentSend");
         var receivedListRequest = opcodes.C2S("gcpReqPresentReceiveSubList");
         var sentListRequest = opcodes.C2S("gcpReqPresentSendSubList");
@@ -111,12 +116,16 @@ internal sealed class PresentBinding(string protocol, IOpcodeTable opcodes, Pack
         context.Effect(context.Services.RegisterMany<IMessageSender<PresentNoticeSent>>(this));
 
         var packets = context.Services.Get<IPacketRouter>();
-        context.Effect(packets.Register(protocol, noticeRequest, (session, packet, ct) =>
-        {
-            if (!packet.Payload.IsEmpty)
-                throw new PacketFormatException("The new-gift query must be empty.", packet.Payload.Length);
-            return Dispatch(messages, session, new PresentNoticeRequested(), ct);
-        }));
+        // The legacy client asks for the new-gift state when it closes the box (kr-812 sub_962090); the modern
+        // family has no such request (no kr-1256 sender stamps a new-gift query; the icon rides the S2C push at
+        // login and after every action), so the route binds only where the build's table names the request.
+        if (noticeRequest is { } notice)
+            context.Effect(packets.Register(protocol, notice, (session, packet, ct) =>
+            {
+                if (!packet.Payload.IsEmpty)
+                    throw new PacketFormatException("The new-gift query must be empty.", packet.Payload.Length);
+                return Dispatch(messages, session, new PresentNoticeRequested(), ct);
+            }));
         context.Effect(packets.Register(protocol, sendRequest, (session, packet, ct) =>
             Dispatch(messages, session, ReadSend(tables, build, packet.Payload.Span), ct)));
         context.Effect(packets.Register(protocol, receivedListRequest, (session, packet, ct) =>
@@ -178,7 +187,10 @@ internal sealed class PresentBinding(string protocol, IOpcodeTable opcodes, Pack
             })),
             PresentAction.Throw => (_throwReplyOpcode, PacketCodec.Write(tables, build, "PresentThrowReply", new Dictionary<string, object?>
             {
+                // kr-1256 sub_9BB3A0 stores the third word as the session's gift count (+904); the builds
+                // whose reply carries no such word ignore the value (packets/present.yaml only: [kr-1256]).
                 ["status"] = message.Succeeded ? StatusOk : StatusFailed, ["id"] = Word(message.Id),
+                ["pending_count"] = message.PendingCount,
             })),
             PresentAction.DeleteReceived => (_deleteReceivedReplyOpcode, PacketCodec.Write(tables, build, "PresentDeleteReceivedReply", new Dictionary<string, object?>
             {

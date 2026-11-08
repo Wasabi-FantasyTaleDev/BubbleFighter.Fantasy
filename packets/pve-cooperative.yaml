@@ -1,0 +1,100 @@
+version: 1
+# Modern cooperative bodies. These tables do not enable gameplay routes.
+structs:
+  # C2S 917. kr-1256 sub_502350, cn-774 sub_59A740, tw-454 sub_582F10: one u32 slot (1..3),
+  # gated on four cooldown timers and an FNV-hashed inventory-bucket lookup.
+  # The legacy name gcpPveUseCountItem mirrors (renumbered from cn-406's 921).
+  PveUseCountItemRequest@kr-812: []
+  PveUseCountItemRequest@kr-1256:
+    - slot: u32
+  # C2S 919. kr-1256 sub_6DC720, cn-774 sub_89E020, tw-454 sub_710EB0: one u32 unit id.
+  # The legacy name gcpPvePangUnit mirrors (renumbered from cn-406's 923).
+  PvePangUnitRequest@kr-812: []
+  PvePangUnitRequest@kr-1256:
+    - unit: u32
+  # C2S 923. kr-1256 sub_6DC830, cn-774 sub_89E0F0, tw-454 sub_710FB0: the mission index
+  # first, the NPC kind second, and a zero word — the legacy body preserved.
+  # The legacy name gcpMissionProcess mirrors (renumbered from cn-406's 927).
+  MissionProcessRequest@kr-812: []
+  MissionProcessRequest@kr-1256:
+    - mission_index: u32
+    - npc_kind: u32
+    - unknown_12: u32
+      default: 0
+  # kr-1256 sub_10C15D0, cn-774 sub_8F1E20 and tw-454 sub_A72920 read one vector count.
+  # kr-1256 sub_1158FE0, cn-774 sub_8F1D90 and tw-454 sub_9E78D0 read each record below.
+  MapMissionInfoNotice@kr-812: []
+  MapMissionInfoNotice@kr-1256:
+    - missions: list<MapMissionInfoRecord>
+  MapMissionInfoRecord:
+    - unknown_4: u32
+    - unknown_8: u32
+    - unknown_12: u32
+    - unknown_16: u32
+    - unknown_20: u32
+    - unknown_24: u32
+    - arguments: list<wstr>
+      offset: 28
+    - unknown_40: bool
+      offset: 40
+  # S2C 922. kr-1256 sub_9E5790, cn-774 sub_8DD410, tw-454 sub_A5CEA0: one u32 word; the
+  # client announces from the ZombieRushMiss string table and schedules balloon effects.
+  # The legacy name gspResMissionStart mirrors (renumbered from cn-406's 925).
+  ResMissionStartNotice@kr-812: []
+  ResMissionStartNotice@kr-1256:
+    - unknown_4: u32
+  # S2C 923. inline in each build's pump: one u32; the mission index is kept. The legacy
+  # name gspResMissionTimeOut mirrors (renumbered from cn-406's 926).
+  ResMissionTimeOutNotice@kr-812: []
+  ResMissionTimeOutNotice@kr-1256:
+    - mission_index: u32
+  # S2C 924. inline: two u32 words (flag and mission index); flag 0 advances the index.
+  # The legacy name gspResMissionOK mirrors (renumbered from cn-406's 927).
+  ResMissionOkNotice@kr-812: []
+  ResMissionOkNotice@kr-1256:
+    - flag: u32
+    - mission_index: u32
+  # S2C 925. inline: three u32 words (seat bounded at 36, a subtract flag, the amount);
+  # the per-seat points land in the round object's own table. The legacy name
+  # gspNotifyGamePoint mirrors (renumbered from cn-406's 928).
+  NotifyGamePointNotice@kr-812: []
+  NotifyGamePointNotice@kr-1256:
+    - seat: u32
+    - subtract_flag: u32
+    - amount: u32
+  # S2C 926. kr-1256 sub_9E59D0, cn-774 sub_8DD5D0, tw-454 sub_A5D060: a u32 state, a
+  # counted u32 vector, and a counted set of 24-byte rank rows (three summed words and a
+  # stored word). The legacy name gspNotifyRankInfo mirrors (renumbered from cn-406's 929).
+  NotifyRankInfoNotice@kr-812: []
+  NotifyRankInfoNotice@kr-1256:
+    - state: u32
+    - vector_values: list<u32>
+    - ranks: list<RankRow>
+  # kr-1256 sub_11475E0, cn-774 sub_49B960 and tw-454 sub_A72800 read five words;
+  # the native 24-byte object includes its vtable, which is not transmitted.
+  RankRow:
+    - seat: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - unknown_16: u32
+      offset: 16
+    - unknown_20: u32
+      offset: 20
+  # S2C 927. kr-1256 sub_9E04A0, inline in cn-774 and tw-454: a u32 count then that many
+  # 16-byte sPVESLOTITEMINFO entries (three u32 words each). The legacy name gspPveItemInfo
+  # mirrors (renumbered from cn-406's 930).
+  PveItemInfoNotice@kr-812: []
+  PveItemInfoNotice@kr-1256:
+    - items: list<PveSlotItemEntry>
+  PveSlotItemEntry:
+    - unknown_4: u32
+    - unknown_8: u32
+    - unknown_12: u32
+  # S2C 928. inline: one counted string routed to the notice list. Modern extra, absent
+  # from cn-406.
+  PveStatusNotice@kr-812: []
+  PveStatusNotice@kr-1256:
+    - message: wstr

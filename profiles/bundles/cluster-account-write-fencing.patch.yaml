@@ -1,0 +1,14 @@
+# Optional transaction fencing; mount the account store and account sessions patches first.
+# Every lobby using this persistence provider must require account ownership and reject_new duplicates.
+# This does not enable a shared database topology or audit unrelated background mutation plugins.
+- set:
+    id: core.packet-router
+    config:
+      decoratable: true
+- set:
+    id: persistence.mysql
+    config:
+      require_account_write_authority: true
+- insert:
+    - id: cluster-account-mutations
+      plugin: cluster.account-mutations

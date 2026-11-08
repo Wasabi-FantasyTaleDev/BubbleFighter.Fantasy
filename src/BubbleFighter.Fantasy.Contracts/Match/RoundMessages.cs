@@ -83,6 +83,18 @@ public sealed record RoundFeedSent(ushort Code, ReadOnlyMemory<byte> Payload) : 
     /// when the packet names no actor (a damager key, or a feed the dialect does not read).
     /// </summary>
     public IReadOnlyList<int>? ReportedActors { get; init; }
+
+    /// <summary>Gets game session ids whose direct peer path replaces this relay delivery; actor and round validation still apply.</summary>
+    public IReadOnlySet<long>? DirectPeerRecipients { get; init; }
+
+    /// <summary>Gets an audited installed weapon specification reported by this frame, before room ownership checks.</summary>
+    public RoundCriticalWeaponState? CriticalWeaponState { get; init; }
+
+    /// <summary>Gets the native timed-effect beneficiary when both audited trigger gates are nonzero.</summary>
+    public int? CriticalEffectActor { get; init; }
+
+    /// <summary>Gets the audited race checkpoint whose current-round and monotonic-progress checks precede forwarding.</summary>
+    public RoundExtremeRacingCheckpoint? ExtremeRacingCheckpoint { get; init; }
 }
 
 /// <summary>A feed packet from another player of the round, passed on unread.</summary>
@@ -127,21 +139,78 @@ public sealed record RoundSpawnOffered(int Actor, int SpawnIndex) : IMessage
     public bool IndexRequested { get; init; }
 }
 
-/// <summary>A dead player's client comes back at a spawn point: the one it was offered, or the one it chose when its respawn time ran out.</summary>
-/// <param name="Actor">The reference the offer carried.</param>
-/// <param name="SpawnIndex">The spawn point the client took.</param>
+/// <summary>Who receives the grant that answers a <see cref="RoundSpawnAccepted"/>.</summary>
+public enum RoundRespawnAudience
+{
+    /// <summary>Every member of the round, whose clients each bring the character back.</summary>
+    Room,
+
+    /// <summary>Only the requester, whose client brings its character back and tells the others itself.</summary>
+    Requester,
+}
+
+/// <summary>What completes a granted respawn.</summary>
+public enum RoundRespawnCompletion
+{
+    /// <summary>The grant itself: the character is alive once it is sent.</summary>
+    Grant,
+
+    /// <summary>The requester's confirmation on the match link the grant was given on.</summary>
+    MatchConfirmation,
+}
+
+/// <summary>Which respawn requests the round grants.</summary>
+public enum RoundRespawnAdmission
+{
+    /// <summary>Any request naming the sender's own character, whatever its life; a wrong owner is dropped.</summary>
+    Owner,
+
+    /// <summary>
+    /// Only a dead character whose death presentation is over, in a round whose lives the clients report; the
+    /// sender may name a character it controls, and naming another seat's character is refused loudly.
+    /// </summary>
+    CleanedDeath,
+}
+
+/// <summary>A build's rules for granting a respawn, stated in its build data and carried by each request.</summary>
+/// <param name="Audience">Who receives the grant.</param>
+/// <param name="Completion">What completes the grant.</param>
+/// <param name="Admission">Which requests are granted.</param>
+public sealed record RoundRespawnRules(RoundRespawnAudience Audience, RoundRespawnCompletion Completion, RoundRespawnAdmission Admission)
+{
+    /// <summary>Gets the rules of a build whose grant goes to the whole round and revives at once, for any owned request.</summary>
+    public static RoundRespawnRules RoomGrant { get; } = new(RoundRespawnAudience.Room, RoundRespawnCompletion.Grant, RoundRespawnAdmission.Owner);
+}
+
+/// <summary>
+/// A player's client asks to bring its character back into the round: at the spawn point it was offered or chose, or
+/// with a native request body the grant repeats. The build's <see cref="Rules"/> decide whether and how it is granted;
+/// the answer is <see cref="RoundPlayerRespawned"/>.
+/// </summary>
+/// <param name="Actor">The reference the request names.</param>
+/// <param name="SpawnIndex">The spawn point the client took, or 0 for a build whose request names none.</param>
 public sealed record RoundSpawnAccepted(int Actor, int SpawnIndex) : IMessage
 {
     /// <summary>Gets the player seat decoded by the dialect, or null when that build has no proven actor mapping.</summary>
     public int? ActorSeat { get; init; }
+
+    /// <summary>Gets the native request body for a build whose grant repeats it; empty otherwise.</summary>
+    public ReadOnlyMemory<byte> Request { get; init; }
+
+    /// <summary>Gets the build's rules for granting this request.</summary>
+    public RoundRespawnRules Rules { get; init; } = RoundRespawnRules.RoomGrant;
 }
 
-/// <summary>Sent to every member of the round: a player is alive again.</summary>
+/// <summary>The grant of a <see cref="RoundSpawnAccepted"/>, sent to the audience its rules name.</summary>
 /// <param name="RoomId">The room.</param>
-/// <param name="Slot">The seat of the player who came back.</param>
-/// <param name="Actor">The build's reference to that player's character, as its client sent it.</param>
+/// <param name="Slot">The seat of the player who came back, or of the controller for a bot.</param>
+/// <param name="Actor">The build's reference to that character, as its client sent it.</param>
 /// <param name="SpawnIndex">The spawn point the player came back at.</param>
-public sealed record RoundPlayerRespawned(int RoomId, int Slot, int Actor, int SpawnIndex) : IMessage;
+public sealed record RoundPlayerRespawned(int RoomId, int Slot, int Actor, int SpawnIndex) : IMessage
+{
+    /// <summary>Gets the request body being granted, for a build whose grant repeats it; empty otherwise.</summary>
+    public ReadOnlyMemory<byte> Request { get; init; }
+}
 
 /// <summary>
 /// A player finished taunting a dead player. On a build whose round times the respawn, each taunt

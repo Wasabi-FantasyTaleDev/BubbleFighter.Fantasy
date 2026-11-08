@@ -1,3 +1,4 @@
+using BubbleFighter.Fantasy.Contracts.Cluster;
 using BubbleFighter.Fantasy.Contracts.Players;
 using System.Collections.Concurrent;
 using BubbleFighter.Fantasy.Abstractions.Persistence;
@@ -11,8 +12,11 @@ namespace BubbleFighter.Fantasy.Lobby.Data;
 /// MySQL-backed repository over the <c>players</c> table created by the persistence
 /// plugin's migrations.
 /// </summary>
-public sealed partial class MySqlPlayerRepository(IDbConnectionFactory connections) : IPlayerRepository
+public sealed partial class MySqlPlayerRepository(IDbConnectionFactory connections, IAccountMutationFence? authority = null) : IPlayerRepository
 {
+    /// <inheritdoc />
+    public bool SupportsRetainedAccountLookup => true;
+
     /// <inheritdoc />
     public bool PersistsState => true;
 
@@ -24,6 +28,7 @@ public sealed partial class MySqlPlayerRepository(IDbConnectionFactory connectio
     {
         await using var db = await connections.OpenAsync(ct).ConfigureAwait(false);
         await using var tx = await db.BeginTransactionAsync(ct).ConfigureAwait(false);
+        if (authority is not null) await authority.VerifyAsync(db, tx, userNum, ct).ConfigureAwait(false);
         try
         {
             var present = await db.QuerySingleOrDefaultAsync<long?>(new CommandDefinition(
@@ -93,21 +98,32 @@ public sealed partial class MySqlPlayerRepository(IDbConnectionFactory connectio
     public async ValueTask CompleteTutorialAsync(long userNum, CancellationToken ct)
     {
         await using var db = await connections.OpenAsync(ct).ConfigureAwait(false);
+        await using var tx = await db.BeginTransactionAsync(ct).ConfigureAwait(false);
+        if (authority is not null) await authority.VerifyAsync(db, tx, userNum, ct).ConfigureAwait(false);
         await db.ExecuteAsync(new CommandDefinition(
             "UPDATE player_onboarding SET tutorial_completed=1 WHERE user_num=@userNum",
-            new { userNum }, cancellationToken: ct)).ConfigureAwait(false);
+            new { userNum }, tx, cancellationToken: ct)).ConfigureAwait(false);
+        await tx.CommitAsync(ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public async ValueTask<PlayerRecord?> CreateCharacterAsync(string username, string nickname, StarterKit kit, CancellationToken ct)
     {
         await using var db = await connections.OpenAsync(ct).ConfigureAwait(false);
+        var observed = authority is null ? null : await FindByUsernameAsync(username, ct).ConfigureAwait(false);
         await using var tx = await db.BeginTransactionAsync(ct).ConfigureAwait(false);
+        if (observed is not null) await authority!.VerifyAsync(db, tx, observed.UserNum, ct).ConfigureAwait(false);
         try
         {
             var existing = await db.QuerySingleOrDefaultAsync<Row>(new CommandDefinition(
                 "SELECT user_num AS UserNum,level AS Level,color_index AS ColorIndex FROM players WHERE username=@username FOR UPDATE",
                 new { username }, tx, cancellationToken: ct)).ConfigureAwait(false);
+            // A newly observed competing account needs its own admission before it can be initialized.
+            if (authority is not null && existing?.UserNum != observed?.UserNum)
+            {
+                await tx.RollbackAsync(ct).ConfigureAwait(false);
+                return null;
+            }
             var userNum = existing?.UserNum ?? await db.ExecuteScalarAsync<long>(new CommandDefinition(
                 "INSERT INTO players(username,nickname,level,created_at) VALUES(@username,@nickname,1,UTC_TIMESTAMP()); SELECT LAST_INSERT_ID();",
                 new { username, nickname }, tx, cancellationToken: ct)).ConfigureAwait(false);
@@ -192,6 +208,18 @@ public sealed partial class MySqlPlayerRepository(IDbConnectionFactory connectio
     }
 
     /// <inheritdoc />
+    public async ValueTask<PlayerRecord?> FindByUserNumAsync(long userNum, CancellationToken ct)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(userNum);
+        ct.ThrowIfCancellationRequested();
+        await using var db = await connections.OpenAsync(ct).ConfigureAwait(false);
+        var row = await db.QuerySingleOrDefaultAsync<Row>(new CommandDefinition(
+            "SELECT user_num AS UserNum, username AS Username, nickname AS Nickname, level AS Level, color_index AS ColorIndex FROM players WHERE user_num = @userNum",
+            new { userNum }, cancellationToken: ct)).ConfigureAwait(false);
+        return row is null ? null : new PlayerRecord(row.UserNum, row.Username, row.Nickname, row.Level) { ColorIndex = row.ColorIndex };
+    }
+
+    /// <inheritdoc />
     public async ValueTask<PlayerRecord> CreateAsync(string username, string nickname, CancellationToken ct)
     {
         await using var db = await connections.OpenAsync(ct).ConfigureAwait(false);
@@ -208,6 +236,9 @@ public sealed partial class MySqlPlayerRepository(IDbConnectionFactory connectio
 /// </summary>
 public sealed class InMemoryPlayerRepository : IPlayerRepository
 {
+    /// <inheritdoc />
+    public bool SupportsRetainedAccountLookup => true;
+
     private readonly Lock _creationGate = new();
     private readonly HashSet<long> _tutorialCompleted = [];
     private readonly HashSet<long> _createdCharacters = [];
@@ -256,6 +287,14 @@ public sealed class InMemoryPlayerRepository : IPlayerRepository
     /// <inheritdoc />
     public ValueTask<PlayerRecord?> FindByUsernameAsync(string username, CancellationToken ct) =>
         ValueTask.FromResult(_players.TryGetValue(username, out var p) ? p : null);
+
+    /// <inheritdoc />
+    public ValueTask<PlayerRecord?> FindByUserNumAsync(long userNum, CancellationToken ct)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(userNum);
+        ct.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(_players.Values.SingleOrDefault(player => player.UserNum == userNum));
+    }
 
     /// <inheritdoc />
     public ValueTask<PlayerRecord> CreateAsync(string username, string nickname, CancellationToken ct)

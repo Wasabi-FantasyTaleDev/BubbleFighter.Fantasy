@@ -8,6 +8,16 @@ namespace BubbleFighter.Fantasy.InGame.Handlers;
 
 internal sealed partial class RoomFlow
 {
+    internal ValueTask HandleTutorialSelectionOpeningAsync(ISession session, TutorialSelectionOpening request, CancellationToken ct) =>
+        RunSceneAsync(session, async (_, token) =>
+        {
+            if (!SessionPlayer.IsPastLoginBurst(session))
+                throw new InvalidOperationException("Tutorial selection requires the completed login burst.");
+            if (_registry.TryGet(session.Id) is not null)
+                throw new InvalidOperationException("Tutorial selection requires an unseated player.");
+            await LeavePlazaForRoomAsync(session, token).ConfigureAwait(false);
+        }, ct);
+
     internal async ValueTask HandleInitialTutorialAsync(ISession session, InitialTutorialRequested request,
         IMessageSender<InitialTutorialEntered> sender, CancellationToken ct)
     {
@@ -20,7 +30,7 @@ internal sealed partial class RoomFlow
         if (request.Team == 0)
             throw new InvalidOperationException("Initial tutorial admission requires an assigned player team.");
         var (user, _) = SessionPlayer.RequireIdentity(session);
-        var equipment = await SeatCharacter.ResolveEquipmentAsync(session, user, _selection, _characters, ct).ConfigureAwait(false);
+        var equipment = await ResolveEquipmentAsync(session, user, ct).ConfigureAwait(false);
         var tutorials = new TutorialRoomFlow(_registry);
         var admission = new TutorialRoundOpened(request.ModeId, request.MapKey, equipment.CharacterId,
             equipment.ItemIds ?? [equipment.CharacterId], request.Team, _options?.StartTimerMs ?? 0, request.TimeLimitMs, true)
@@ -64,8 +74,22 @@ internal sealed partial class RoomFlow
         return HandlePlazaMenuReturnAsync(session, new PlazaMenuReturnRequested(), ct);
     }
 
-    internal async ValueTask HandleInitialTutorialNpcAsync(ISession session, InitialTutorialNpcReported request,
-        IMessageSender<InitialTutorialNpcAcknowledged> sender, CancellationToken ct)
+    internal ValueTask HandleInitialTutorialNpcAsync(ISession session, InitialTutorialNpcReported request,
+        IMessageSender<InitialTutorialNpcAcknowledged> sender, CancellationToken ct) =>
+        AnswerTutorialHostAsync(session, operationCt =>
+            sender.SendAsync(session, new(request.Operation, request.Payload), operationCt), ct);
+
+    /// <summary>Whether the session plays the solo initial tutorial, whose NPC operations only its host sees.</summary>
+    internal bool PlaysSoloTutorial(ISession session) =>
+        _registry.TryGet(session.Id) is { Tutorial.GameConnectionOnly: true };
+
+    /// <summary>Answers the solo tutorial host's ordinary wave and spawn operations, which only it applies.</summary>
+    internal ValueTask HandleTutorialNpcAsync(ISession session, RoundNpcReported request,
+        IMessageSender<RoundNpcAcknowledged> sender, CancellationToken ct) =>
+        AnswerTutorialHostAsync(session, operationCt =>
+            sender.SendAsync(session, new(request.Operation, request.Payload), operationCt), ct);
+
+    private async ValueTask AnswerTutorialHostAsync(ISession session, Func<CancellationToken, ValueTask> answer, CancellationToken ct)
     {
         var room = _registry.TryGet(session.Id)
             ?? throw new InvalidOperationException("Tutorial NPC operations require an admitted solo room.");
@@ -79,7 +103,7 @@ internal sealed partial class RoomFlow
                     || room.Seats.Count != 1 || seat?.Slot != room.MasterSlot)
                     throw new InvalidOperationException("Tutorial NPC operations require the active solo host.");
             }
-            await sender.SendAsync(session, new(request.Operation, request.Payload), operationCt).ConfigureAwait(false);
+            await answer(operationCt).ConfigureAwait(false);
         }, ct).ConfigureAwait(false);
     }
 }

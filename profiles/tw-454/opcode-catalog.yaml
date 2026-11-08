@@ -16,15 +16,17 @@ dispatcher: null
 summary:
   c2s_conflict: 2
   c2s_cross: 20
-  c2s_none: 189
+  c2s_none: 291
   c2s_ordered: 4
-  c2s_pair: 46
-  c2s_reviewed: 5
+  c2s_pair: 94
+  c2s_reviewed: 10
+  c2s_runtime: 2
   c2s_shape: 27
   c2s_strong: 10
   c2s_weak: 1
   s2c_label: 248
   s2c_reviewed: 2
+  s2c_runtime: 1
 opcodes:
   - {value: 0, direction: c2s, name: Unknown0, grade: none, name_source: none, connection_hint: game, senders: [656070, 7F0CF0, 82CEC0, A578B0, A75280, A75D20]}
   - {value: 1, direction: c2s, name: gcpFirstConnect, grade: reviewed, method: own-reviewed-table, name_source: reviewed@tw-454, connection_hint: game}
@@ -109,7 +111,7 @@ opcodes:
   - {value: 301, direction: c2s, name: Unknown301, grade: none, name_source: none, connection_hint: game, senders: [BAB9A0]}
   - {value: 302, direction: c2s, name: gcpReqKickFromParty, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [B9FD40], note: pairs with gspRepKickFromParty at the same number}
   - {value: 303, direction: c2s, name: gcpReqChangePartyLeader, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [B9FEA0], note: pairs with gspRepChangePartyLeader at the same number}
-  - {value: 305, direction: c2s, name: Unknown305, grade: none, name_source: none, connection_hint: game, senders: [B64150]}
+  - {value: 305, direction: c2s, name: gcpReqPartyRecruiting, grade: runtime, name_source: label@kr-812, connection_hint: game, senders: [B64150], evidence: verified, source: tw-454 sub_B64150 stamps 305 and writes a four-byte recruitment toggle; tw-454 sub_B64110 cancels the active sign; matched to kr-812 Packet_gcpReqPartyRecruiting}
   - {value: 401, direction: c2s, name: Unknown401, grade: none, name_source: none, connection_hint: game, senders: [8A0E00]}
   - {value: 403, direction: c2s, name: gppHordeMobReplay, grade: shape, method: shape-match, name_source: 'shape@kr-812,cn-717,id-400,id-1809', note: 'write widths vs 2015 serializers, score 1.0'}
   - {value: 404, direction: c2s, name: Unknown404, grade: none, name_source: none, connection_hint: game, senders: [A6B600]}
@@ -127,7 +129,7 @@ opcodes:
   - {value: 513, direction: c2s, name: gcpRoomChangeGameSetting, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [7E3120], via: cn-774>tw-454, from_op: 513}
   - {value: 514, direction: c2s, name: Unknown514, grade: none, name_source: none, connection_hint: game, senders: [7E2FC0]}
   - {value: 515, direction: c2s, name: Unknown515, grade: none, name_source: none, connection_hint: game, senders: [796FB0]}
-  - {value: 516, direction: c2s, name: Unknown516, grade: none, name_source: none, connection_hint: game, senders: [A7D2F0]}
+  - {value: 516, direction: c2s, name: gcpRoomSendRecMsg, grade: runtime, name_source: label@kr-812, connection_hint: game, senders: [A7D2F0], evidence: verified, source: tw-454 sub_A7D2F0 stamps 516 and writes one counted UTF-16 message before tw-454 sub_B9B180 toggles recruitment; matched to kr-812 Packet_gcpRoomSendRecMsg}
   - {value: 517, direction: c2s, name: Unknown517, grade: none, name_source: none, connection_hint: game, senders: [73B220]}
   - {value: 518, direction: c2s, name: gcpRepPingUser, grade: shape, method: shape-global, name_source: 'shape@kr-812,cn-717,id-400,id-1809', note: 'monotone assignment, score 1.0'}
   - {value: 519, direction: c2s, name: Unknown519, grade: none, name_source: none, connection_hint: game, senders: [C82380]}
@@ -223,12 +225,12 @@ opcodes:
   - {value: 900, direction: c2s, name: gcpReqGuildLineBoard, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [8F53C0], note: pairs with gspRepGuildLineBoard at the same number}
   - {value: 901, direction: c2s, name: gcpReqGuildLineBoardWrite, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [8F54D0], note: pairs with gspRepGuildLineBoardWrite at the same number}
   - {value: 902, direction: c2s, name: gcpReqGuildLineBoardDelete, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [8F5600], note: pairs with gspRepGuildLineBoardDelete at the same number}
-  - {value: 903, direction: c2s, name: Unknown903, grade: none, name_source: none, connection_hint: game, senders: [C87FC0]}
-  - {value: 904, direction: c2s, name: Unknown904, grade: none, name_source: none, connection_hint: game, senders: [C893D0]}
-  - {value: 905, direction: c2s, name: Unknown905, grade: none, name_source: none, connection_hint: game, senders: [C894D0]}
+  - {value: 903, direction: c2s, name: gcpReqStartNewWave, grade: reviewed, method: own-reviewed-table, name_source: mirrored, connection_hint: game, senders: [C87FC0], note: 'tw-454 sub_C87FC0 writes one wave word and latches until tw-454 sub_C895C0 handles the start reply'}
+  - {value: 904, direction: c2s, name: gcpReqEndWave, grade: reviewed, method: own-reviewed-table, name_source: mirrored, connection_hint: game, senders: [C893D0], note: 'tw-454 sub_C893D0 writes the cleared wave word read by tw-454 sub_C89F40'}
+  - {value: 905, direction: c2s, name: gcpReqEndAllWave, grade: reviewed, method: own-reviewed-table, name_source: mirrored, connection_hint: game, senders: [C894D0], note: 'tw-454 sub_C894D0 sends an empty final-wave request; tw-454 sub_CB9140 case 906 completes it'}
   - {value: 906, direction: c2s, name: Unknown906, grade: none, name_source: none, connection_hint: game, senders: [C87FC0]}
   - {value: 907, direction: c2s, name: Unknown907, grade: none, name_source: none, connection_hint: game, senders: [C87FC0]}
-  - {value: 908, direction: c2s, name: Unknown908, grade: none, name_source: none, connection_hint: game, senders: [C895C0]}
+  - {value: 908, direction: c2s, name: gcpReqWaveAllSpawnMobs, grade: reviewed, method: own-reviewed-table, name_source: mirrored, connection_hint: game, senders: [C895C0], note: 'tw-454 sub_C895C0 writes the complete host spawn table read by tw-454 sub_C87760'}
   - {value: 909, direction: c2s, name: gcpCreateUnit, grade: strong, name_source: label@cn-717, connection_hint: game, senders: [73B7F0], via: cn-774>tw-454, from_op: 909}
   - {value: 911, direction: c2s, name: Unknown911, grade: none, name_source: none, connection_hint: game, senders: [8DB970]}
   - {value: 912, direction: c2s, name: Unknown912, grade: none, name_source: none, connection_hint: game, senders: [9DA410]}
@@ -268,6 +270,7 @@ opcodes:
   - {value: 2008, direction: c2s, name: gppSetAttribute, grade: shape, method: shape-global, name_source: 'shape@kr-812,cn-717,id-1809', note: 'monotone assignment, score 0.86'}
   - {value: 2009, direction: c2s, name: Unknown2009, grade: none, name_source: none, connection_hint: game, senders: [6245E0]}
   - {value: 2010, direction: c2s, name: Unknown2010, grade: none, name_source: none, connection_hint: game, senders: [5E9400]}
+  - {value: 2011, direction: c2s, name: Unknown2011, grade: none, name_source: none, connection_hint: game, senders: [7D37C0]}
   - {value: 2012, direction: c2s, name: Unknown2012, grade: none, name_source: none, connection_hint: game, senders: [4AF640]}
   - {value: 2014, direction: c2s, name: gppNearDamager, grade: shape, method: shape-global, name_source: 'shape@kr-812,cn-717,id-400,id-1809', note: 'monotone assignment, score 0.75'}
   - {value: 2015, direction: c2s, name: gppDamageObject, grade: shape, method: shape-global, name_source: 'shape@kr-812,cn-717,id-400,id-1809', note: 'monotone assignment, score 1.0'}
@@ -330,6 +333,162 @@ opcodes:
   - {value: 20005, direction: c2s, name: Unknown20005, grade: none, name_source: none, connection_hint: game, senders: [A741B0]}
   - {value: 20006, direction: c2s, name: Unknown20006, grade: none, name_source: none, connection_hint: game, senders: [A7A930]}
   - {value: 20007, direction: c2s, name: Unknown20007, grade: none, name_source: none, connection_hint: game, senders: [8858D0]}
+  - {value: 32770, direction: c2s, name: Unknown32770, grade: none, name_source: none, connection_hint: relay, senders: [A77720, A779B0], note: 'four UDP sites (tw-454 sub_A77720, tw-454 sub_A779B0); UdpPacket ctor, no Stream appends, one direct 4-byte field write at +2, sent by UDP peer sendto tw-454 sub_FD60A0'}
+  - {value: 32772, direction: c2s, name: gppSplashDamager, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [716AE0], note: pairs with gppSplashDamager at the same number}
+  - {value: 32774, direction: c2s, name: Unknown32774, grade: none, name_source: none, connection_hint: relay, senders: [711A70]}
+  - {value: 32778, direction: c2s, name: Unknown32778, grade: none, name_source: none, connection_hint: relay, senders: [749A80]}
+  - {value: 32779, direction: c2s, name: gppDash, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [712F20], note: pairs with gppDash at the same number}
+  - {value: 32780, direction: c2s, name: gppRoll, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [80BB80], note: pairs with gppRoll at the same number}
+  - {value: 32781, direction: c2s, name: gppJump, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [7130B0], note: pairs with gppJump at the same number}
+  - {value: 32782, direction: c2s, name: Unknown32782, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [93F3A0], note: pairs with Unknown32782 at the same number}
+  - {value: 32783, direction: c2s, name: Unknown32783, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [93ED90], note: pairs with Unknown32783 at the same number}
+  - {value: 32784, direction: c2s, name: Unknown32784, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [713520], note: pairs with Unknown32784 at the same number}
+  - {value: 32785, direction: c2s, name: Unknown32785, grade: none, name_source: none, connection_hint: relay, senders: [713650]}
+  - {value: 32786, direction: c2s, name: Unknown32786, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [7137A0], note: pairs with Unknown32786 at the same number}
+  - {value: 32787, direction: c2s, name: Unknown32787, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [717DD0], note: pairs with Unknown32787 at the same number}
+  - {value: 32788, direction: c2s, name: Unknown32788, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [717FE0], note: pairs with Unknown32788 at the same number}
+  - {value: 32789, direction: c2s, name: Unknown32789, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [718250], note: pairs with Unknown32789 at the same number}
+  - {value: 32790, direction: c2s, name: Unknown32790, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [812310], note: pairs with Unknown32790 at the same number}
+  - {value: 32791, direction: c2s, name: Unknown32791, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [7188F0], note: pairs with Unknown32791 at the same number}
+  - {value: 32792, direction: c2s, name: gppKickFail, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [812580], note: pairs with gppKickFail at the same number}
+  - {value: 32794, direction: c2s, name: Unknown32794, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [718600], note: pairs with Unknown32794 at the same number}
+  - {value: 32795, direction: c2s, name: Unknown32795, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [718340], note: pairs with Unknown32795 at the same number}
+  - {value: 32796, direction: c2s, name: Unknown32796, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [718700], note: pairs with Unknown32796 at the same number}
+  - {value: 32798, direction: c2s, name: Unknown32798, grade: none, name_source: none, connection_hint: relay, senders: [7EF2E0]}
+  - {value: 32800, direction: c2s, name: Unknown32800, grade: none, name_source: none, connection_hint: relay, senders: [787340]}
+  - {value: 32801, direction: c2s, name: Unknown32801, grade: none, name_source: none, connection_hint: relay, senders: [718B10]}
+  - {value: 32805, direction: c2s, name: Unknown32805, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [717010], note: pairs with Unknown32805 at the same number}
+  - {value: 32806, direction: c2s, name: Unknown32806, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [7172E0], note: pairs with Unknown32806 at the same number}
+  - {value: 32809, direction: c2s, name: Unknown32809, grade: none, name_source: none, connection_hint: relay, senders: [8251C0]}
+  - {value: 32810, direction: c2s, name: Unknown32810, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [717530], note: pairs with Unknown32810 at the same number}
+  - {value: 32811, direction: c2s, name: Unknown32811, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [718C00], note: pairs with Unknown32811 at the same number}
+  - {value: 32812, direction: c2s, name: Unknown32812, grade: none, name_source: none, connection_hint: relay, senders: [718F70]}
+  - {value: 32813, direction: c2s, name: Unknown32813, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [718DA0], note: pairs with Unknown32813 at the same number}
+  - {value: 32815, direction: c2s, name: Unknown32815, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [718A10], note: pairs with Unknown32815 at the same number}
+  - {value: 32816, direction: c2s, name: Unknown32816, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [813DB0], note: pairs with Unknown32816 at the same number}
+  - {value: 32818, direction: c2s, name: Unknown32818, grade: none, name_source: none, connection_hint: relay, senders: [758510]}
+  - {value: 32821, direction: c2s, name: Unknown32821, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [822EE0], note: pairs with Unknown32821 at the same number}
+  - {value: 32823, direction: c2s, name: Unknown32823, grade: none, name_source: none, connection_hint: relay, senders: [983DF0]}
+  - {value: 32824, direction: c2s, name: Unknown32824, grade: none, name_source: none, connection_hint: relay, senders: [78C820]}
+  - {value: 32828, direction: c2s, name: Unknown32828, grade: none, name_source: none, connection_hint: relay, senders: [719070]}
+  - {value: 32829, direction: c2s, name: Unknown32829, grade: none, name_source: none, connection_hint: relay, senders: [78A730]}
+  - {value: 32830, direction: c2s, name: Unknown32830, grade: none, name_source: none, connection_hint: relay, senders: [4C9960]}
+  - {value: 32831, direction: c2s, name: Unknown32831, grade: none, name_source: none, connection_hint: relay, senders: [4C95C0]}
+  - {value: 32832, direction: c2s, name: Unknown32832, grade: none, name_source: none, connection_hint: relay, senders: [71C580]}
+  - {value: 32833, direction: c2s, name: Unknown32833, grade: none, name_source: none, connection_hint: relay, senders: [71C910]}
+  - {value: 32834, direction: c2s, name: Unknown32834, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [713280], note: pairs with Unknown32834 at the same number}
+  - {value: 32835, direction: c2s, name: Unknown32835, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [7F98B0], note: pairs with Unknown32835 at the same number}
+  - {value: 32836, direction: c2s, name: Unknown32836, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [717100], note: pairs with Unknown32836 at the same number}
+  - {value: 32837, direction: c2s, name: gppKickEnd, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [7171F0], note: pairs with gppKickEnd at the same number}
+  - {value: 32840, direction: c2s, name: Unknown32840, grade: none, name_source: none, connection_hint: relay, senders: [885B70], note: sent by the routing sender tw-454 sub_A74520, not the relay-session sender tw-454 sub_6323B0}
+  - {value: 32841, direction: c2s, name: Unknown32841, grade: none, name_source: none, connection_hint: relay, senders: [8F9D10]}
+  - {value: 32842, direction: c2s, name: Unknown32842, grade: none, name_source: none, connection_hint: relay, senders: [8FA810]}
+  - {value: 32843, direction: c2s, name: Unknown32843, grade: none, name_source: none, connection_hint: relay, senders: [8FAAD0]}
+  - {value: 32844, direction: c2s, name: Unknown32844, grade: none, name_source: none, connection_hint: relay, senders: [867AA0]}
+  - {value: 32845, direction: c2s, name: Unknown32845, grade: none, name_source: none, connection_hint: relay, senders: [8FAF10]}
+  - {value: 32846, direction: c2s, name: Unknown32846, grade: none, name_source: none, connection_hint: relay, senders: [8FB0A0]}
+  - {value: 32847, direction: c2s, name: Unknown32847, grade: none, name_source: none, connection_hint: relay, senders: [868C50]}
+  - {value: 32848, direction: c2s, name: Unknown32848, grade: none, name_source: none, connection_hint: relay, senders: [812580]}
+  - {value: 32849, direction: c2s, name: Unknown32849, grade: none, name_source: none, connection_hint: relay, senders: [86E130]}
+  - {value: 32852, direction: c2s, name: Unknown32852, grade: none, name_source: none, connection_hint: relay, senders: [86D7A0]}
+  - {value: 32853, direction: c2s, name: Unknown32853, grade: none, name_source: none, connection_hint: relay, senders: [86DDB0]}
+  - {value: 32857, direction: c2s, name: Unknown32857, grade: none, name_source: none, connection_hint: relay, senders: [8FBCE0]}
+  - {value: 32859, direction: c2s, name: Unknown32859, grade: none, name_source: none, connection_hint: relay, senders: [8F8CA0]}
+  - {value: 32860, direction: c2s, name: Unknown32860, grade: none, name_source: none, connection_hint: relay, senders: [8FBF80]}
+  - {value: 32861, direction: c2s, name: Unknown32861, grade: none, name_source: none, connection_hint: relay, senders: [8FC330]}
+  - {value: 32862, direction: c2s, name: Unknown32862, grade: none, name_source: none, connection_hint: relay, senders: [8FC680]}
+  - {value: 32863, direction: c2s, name: Unknown32863, grade: none, name_source: none, connection_hint: relay, senders: [8F8CA0]}
+  - {value: 32864, direction: c2s, name: Unknown32864, grade: none, name_source: none, connection_hint: relay, senders: [8FCA50]}
+  - {value: 32865, direction: c2s, name: Unknown32865, grade: none, name_source: none, connection_hint: relay, senders: [8FB3C0]}
+  - {value: 32866, direction: c2s, name: Unknown32866, grade: none, name_source: none, connection_hint: relay, senders: [CA9FE0, CAA370]}
+  - {value: 32873, direction: c2s, name: Unknown32873, grade: none, name_source: none, connection_hint: relay, senders: [CADBA0]}
+  - {value: 32876, direction: c2s, name: Unknown32876, grade: none, name_source: none, connection_hint: relay, senders: [C5DCE0]}
+  - {value: 32877, direction: c2s, name: gppMobDropBombOnDead, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [71CAA0], note: pairs with gppMobDropBombOnDead at the same number}
+  - {value: 32878, direction: c2s, name: Unknown32878, grade: none, name_source: none, connection_hint: relay, senders: [71A9A0]}
+  - {value: 32879, direction: c2s, name: Unknown32879, grade: none, name_source: none, connection_hint: relay, senders: [71A9A0]}
+  - {value: 32880, direction: c2s, name: Unknown32880, grade: none, name_source: none, connection_hint: relay, senders: [71A9A0]}
+  - {value: 32882, direction: c2s, name: Unknown32882, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [71CF30], note: pairs with Unknown32882 at the same number}
+  - {value: 32884, direction: c2s, name: Unknown32884, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [A75020], note: pairs with Unknown32884 at the same number; the stamp site writes through a typed pointer (no cast spelling) and sends via the routing sender tw-454 sub_A74E00}
+  - {value: 32885, direction: c2s, name: gppWanderLean, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [A75450], note: pairs with gppWanderLean at the same number; the stamp site writes through a typed pointer (no cast spelling) and sends on the game session tw-454 dword_163FD20}
+  - {value: 32886, direction: c2s, name: Unknown32886, grade: none, name_source: none, connection_hint: relay, senders: [7128C0]}
+  - {value: 32887, direction: c2s, name: Unknown32887, grade: none, name_source: none, connection_hint: relay, senders: [712C00]}
+  - {value: 32888, direction: c2s, name: Unknown32888, grade: none, name_source: none, connection_hint: relay, senders: [C5D970]}
+  - {value: 32889, direction: c2s, name: Unknown32889, grade: none, name_source: none, connection_hint: relay, senders: [72AC20]}
+  - {value: 32890, direction: c2s, name: Unknown32890, grade: none, name_source: none, connection_hint: relay, senders: [732280]}
+  - {value: 32891, direction: c2s, name: Unknown32891, grade: none, name_source: none, connection_hint: relay, senders: [7320E0]}
+  - {value: 32892, direction: c2s, name: Unknown32892, grade: none, name_source: none, connection_hint: relay, senders: [85EA70]}
+  - {value: 32893, direction: c2s, name: Unknown32893, grade: none, name_source: none, connection_hint: relay, senders: [735710]}
+  - {value: 32894, direction: c2s, name: Unknown32894, grade: none, name_source: none, connection_hint: relay, senders: [7327F0]}
+  - {value: 32895, direction: c2s, name: Unknown32895, grade: none, name_source: none, connection_hint: relay, senders: [732E00]}
+  - {value: 32896, direction: c2s, name: Unknown32896, grade: none, name_source: none, connection_hint: relay, senders: [82A300]}
+  - {value: 32897, direction: c2s, name: Unknown32897, grade: none, name_source: none, connection_hint: relay, senders: [736A60]}
+  - {value: 32898, direction: c2s, name: gppFireBullet3, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [7162C0], note: pairs with gppFireBullet3 at the same number}
+  - {value: 32899, direction: c2s, name: gppStormDamager, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [713EA0], note: pairs with gppStormDamager at the same number}
+  - {value: 32900, direction: c2s, name: gppSplashDamagerByDamager, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [713910], note: pairs with gppSplashDamagerByDamager at the same number}
+  - {value: 32902, direction: c2s, name: Unknown32902, grade: none, name_source: none, connection_hint: relay, senders: [7165A0]}
+  - {value: 32905, direction: c2s, name: Unknown32905, grade: none, name_source: none, connection_hint: relay, senders: [7112F0]}
+  - {value: 32907, direction: c2s, name: Unknown32907, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [711B60], note: pairs with Unknown32907 at the same number}
+  - {value: 32908, direction: c2s, name: Unknown32908, grade: none, name_source: none, connection_hint: relay, senders: [83A9D0]}
+  - {value: 32909, direction: c2s, name: Unknown32909, grade: none, name_source: none, connection_hint: relay, senders: [4C8E80]}
+  - {value: 32910, direction: c2s, name: gppStormDamagerItemId, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [713D10], note: pairs with gppStormDamagerItemId at the same number}
+  - {value: 32911, direction: c2s, name: Unknown32911, grade: none, name_source: none, connection_hint: relay, senders: [718150]}
+  - {value: 32913, direction: c2s, name: Unknown32913, grade: none, name_source: none, connection_hint: relay, senders: [83BF30]}
+  - {value: 32914, direction: c2s, name: Unknown32914, grade: none, name_source: none, connection_hint: relay, senders: [839E80]}
+  - {value: 32915, direction: c2s, name: Unknown32915, grade: none, name_source: none, connection_hint: relay, senders: [4C9220]}
+  - {value: 32916, direction: c2s, name: Unknown32916, grade: none, name_source: none, connection_hint: relay, senders: [846290]}
+  - {value: 32918, direction: c2s, name: Unknown32918, grade: none, name_source: none, connection_hint: relay, senders: [736FE0]}
+  - {value: 32921, direction: c2s, name: Unknown32921, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [76A4C0], note: pairs with Unknown32921 at the same number}
+  - {value: 32922, direction: c2s, name: gppTeleportPortal, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [7133D0], note: pairs with gppTeleportPortal at the same number}
+  - {value: 32923, direction: c2s, name: gppWanderLeanOptimize, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [A75450], note: pairs with gppWanderLeanOptimize at the same number; the stamp site writes through a typed pointer (no cast spelling) and sends via the routing sender tw-454 sub_A74E00}
+  - {value: 32924, direction: c2s, name: Unknown32924, grade: none, name_source: none, connection_hint: relay, senders: [7114D0]}
+  - {value: 32925, direction: c2s, name: Unknown32925, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [7167C0], note: pairs with Unknown32925 at the same number}
+  - {value: 32926, direction: c2s, name: Unknown32926, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [729D30, 846F00, D43F50], note: pairs with Unknown32926 at the same number}
+  - {value: 32927, direction: c2s, name: Unknown32927, grade: none, name_source: none, connection_hint: relay, senders: [57D050]}
+  - {value: 32928, direction: c2s, name: Unknown32928, grade: none, name_source: none, connection_hint: relay, senders: [57D050]}
+  - {value: 32929, direction: c2s, name: Unknown32929, grade: none, name_source: none, connection_hint: relay, senders: [E72680]}
+  - {value: 32930, direction: c2s, name: Unknown32930, grade: none, name_source: none, connection_hint: relay, senders: [7848A0]}
+  - {value: 32931, direction: c2s, name: Unknown32931, grade: none, name_source: none, connection_hint: relay, senders: [5787A0]}
+  - {value: 32932, direction: c2s, name: Unknown32932, grade: none, name_source: none, connection_hint: relay, senders: [739D90]}
+  - {value: 32933, direction: c2s, name: Unknown32933, grade: none, name_source: none, connection_hint: relay, senders: [5825C0]}
+  - {value: 32934, direction: c2s, name: Unknown32934, grade: none, name_source: none, connection_hint: relay, senders: [4CB190]}
+  - {value: 33269, direction: c2s, name: Unknown33269, grade: none, name_source: none, connection_hint: relay, senders: [580010]}
+  - {value: 33270, direction: c2s, name: Unknown33270, grade: none, name_source: none, connection_hint: relay, senders: [71B7A0]}
+  - {value: 33271, direction: c2s, name: Unknown33271, grade: none, name_source: none, connection_hint: relay, senders: [726560]}
+  - {value: 33272, direction: c2s, name: Unknown33272, grade: none, name_source: none, connection_hint: relay, senders: [7EF0B0]}
+  - {value: 33273, direction: c2s, name: Unknown33273, grade: none, name_source: none, connection_hint: relay, senders: [7EF570]}
+  - {value: 33274, direction: c2s, name: Unknown33274, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [C5F0B0], note: pairs with Unknown33274 at the same number}
+  - {value: 33275, direction: c2s, name: Unknown33275, grade: none, name_source: none, connection_hint: relay, senders: [57F1D0]}
+  - {value: 33276, direction: c2s, name: Unknown33276, grade: none, name_source: none, connection_hint: relay, senders: [71CD10]}
+  - {value: 33278, direction: c2s, name: gppNearDamager, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [716E50], note: pairs with gppNearDamager at the same number}
+  - {value: 33280, direction: c2s, name: Unknown33280, grade: none, name_source: none, connection_hint: relay, senders: [7184E0]}
+  - {value: 33281, direction: c2s, name: Unknown33281, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [7FE6C0], note: pairs with Unknown33281 at the same number}
+  - {value: 33282, direction: c2s, name: Unknown33282, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [7FE6C0], note: pairs with Unknown33282 at the same number}
+  - {value: 33283, direction: c2s, name: Unknown33283, grade: none, name_source: none, connection_hint: relay, senders: [587500]}
+  - {value: 33284, direction: c2s, name: Unknown33284, grade: none, name_source: none, connection_hint: relay, senders: [7173E0]}
+  - {value: 33285, direction: c2s, name: Unknown33285, grade: none, name_source: none, connection_hint: relay, senders: [80FBA0]}
+  - {value: 33286, direction: c2s, name: Unknown33286, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [714590], note: pairs with Unknown33286 at the same number}
+  - {value: 33287, direction: c2s, name: Unknown33287, grade: none, name_source: none, connection_hint: relay, senders: [9AE730]}
+  - {value: 33288, direction: c2s, name: Unknown33288, grade: none, name_source: none, connection_hint: relay, senders: [795050]}
+  - {value: 33289, direction: c2s, name: Unknown33289, grade: none, name_source: none, connection_hint: relay, senders: [7952B0]}
+  - {value: 33290, direction: c2s, name: Unknown33290, grade: none, name_source: none, connection_hint: relay, senders: [714840]}
+  - {value: 33291, direction: c2s, name: Unknown33291, grade: none, name_source: none, connection_hint: relay, senders: [714A30]}
+  - {value: 33292, direction: c2s, name: Unknown33292, grade: none, name_source: none, connection_hint: relay, senders: [714BF0]}
+  - {value: 33293, direction: c2s, name: Unknown33293, grade: none, name_source: none, connection_hint: relay, senders: [714F00]}
+  - {value: 33295, direction: c2s, name: Unknown33295, grade: none, name_source: none, connection_hint: relay, senders: [7167C0]}
+  - {value: 33296, direction: c2s, name: Unknown33296, grade: none, name_source: none, connection_hint: relay, senders: [7130B0]}
+  - {value: 33297, direction: c2s, name: Unknown33297, grade: none, name_source: none, connection_hint: relay, senders: [738570]}
+  - {value: 33298, direction: c2s, name: Unknown33298, grade: none, name_source: none, connection_hint: relay, senders: [7146B0]}
+  - {value: 33299, direction: c2s, name: Unknown33299, grade: none, name_source: none, connection_hint: relay, senders: [71C740]}
+  - {value: 33300, direction: c2s, name: Unknown33300, grade: none, name_source: none, connection_hint: relay, senders: [80BE70]}
+  - {value: 33301, direction: c2s, name: Unknown33301, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [711690, 8408F0], note: pairs with Unknown33301 at the same number}
+  - {value: 34268, direction: c2s, name: Unknown34268, grade: none, name_source: none, connection_hint: relay, senders: [71B430]}
+  - {value: 34269, direction: c2s, name: Unknown34269, grade: none, name_source: none, connection_hint: relay, senders: [57E7F0]}
+  - {value: 34270, direction: c2s, name: Unknown34270, grade: none, name_source: none, connection_hint: relay, senders: [57E7F0]}
+  - {value: 34271, direction: c2s, name: Unknown34271, grade: none, name_source: none, connection_hint: relay, senders: [71B680]}
+  - {value: 34272, direction: c2s, name: Unknown34272, grade: none, name_source: none, connection_hint: relay, senders: [57E7F0]}
+  - {value: 34273, direction: c2s, name: Unknown34273, grade: none, name_source: none, connection_hint: relay, senders: [D17F80]}
+  - {value: 38269, direction: c2s, name: Unknown38269, grade: none, name_source: none, connection_hint: relay, senders: [580010]}
+  - {value: 38270, direction: c2s, name: Unknown38270, grade: none, name_source: none, connection_hint: relay, senders: [580010]}
   - {value: 1, direction: s2c, name: gspDisconnect, grade: label, name_source: label@tw-454, connection_hint: game}
   - {value: 2, direction: s2c, name: gspRepGamePatch, grade: label, name_source: label@tw-454, connection_hint: game}
   - {value: 3, direction: s2c, name: gspRepLogin, grade: label, name_source: label@tw-454, connection_hint: game}
@@ -580,3 +739,9 @@ opcodes:
   - {value: 1547, direction: s2c, name: gspGalleryReward, grade: label, name_source: label@tw-454, connection_hint: game}
   - {value: 1549, direction: s2c, name: gspRepGetPirateAssaultTopRanking, grade: label, name_source: label@tw-454, connection_hint: game}
   - {value: 1550, direction: s2c, name: gspRepGetPirateAssaultUserRanking, grade: label, name_source: label@tw-454, connection_hint: game}
+  - {value: 516, direction: s2c, connection: game, name: gspRoomReceiveRecruitMsg, name_source: label@kr-812, evidence: verified, source: tw-454 sub_A60EC0 reads a u16 seat and counted UTF-16 text and calls tw-454 sub_A65E20 for the installed actor bubble; matched to kr-812 Packet_gspRoomReceiveRecruitMsg, grade: runtime, method: own-client-reader, connection_hint: game}
+# Transport paths for the packet writers above:
+# tw-454 sub_6323B0 sends through the relay session; tw-454 sub_FD60A0 sends UDP.
+# tw-454 sub_A74520 routes 32840. tw-454 sub_A74E00 routes 32884 and 32923;
+# tw-454 sub_A75450 sends 32885 through game-session global tw-454 dword_163FD20.
+# connection_hint remains a catalog heuristic; the live table owns transport selection.

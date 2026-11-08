@@ -1,3 +1,4 @@
+using BubbleFighter.Fantasy.Contracts.Rooms;
 using System.Buffers;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Dialect.Rooms;
@@ -61,14 +62,10 @@ public sealed class RoomAdmissionTableTests
         if (tailWidth == 4) writer.WriteInt32(-1);
         var body = buffer.WrittenSpan.ToArray();
         Assert.Equal(20 + tailWidth, body.Length);
-        var request = PlazaRoomWire.ReadJoinSession(TestBuilds.Packets, build, body);
-        Assert.Equal(404, request.RoomId);
-        Assert.Equal(-1, request.Unknown1);
-        Assert.Equal(int.MinValue, request.Unknown2);
-        Assert.Equal("Ω가", request.Password);
-        Assert.Equal(tailWidth == 2 ? ushort.MaxValue : tailWidth == 4 ? -1 : 0, request.Unknown4);
-        Assert.Throws<PacketFormatException>(() => PlazaRoomWire.ReadJoinSession(TestBuilds.Packets, build, body[..^1]));
-        Assert.Throws<PacketFormatException>(() => PlazaRoomWire.ReadJoinSession(TestBuilds.Packets, build, [.. body, 0]));
+        // The unproven words and the build's own tail are consumed exactly; only the id and password are used.
+        Assert.Equal(new RoomJoinRequested(404, "Ω가"), RoomRequests.ReadJoin(TestBuilds.Packets, build, body));
+        Assert.Throws<PacketFormatException>(() => RoomRequests.ReadJoin(TestBuilds.Packets, build, body[..^1]));
+        Assert.Throws<PacketFormatException>(() => RoomRequests.ReadJoin(TestBuilds.Packets, build, [.. body, 0]));
     }
 
     [Theory]

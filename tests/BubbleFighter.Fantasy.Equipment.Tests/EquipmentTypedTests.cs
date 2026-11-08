@@ -285,6 +285,9 @@ public sealed class EquipmentTypedTests
                 root.Effect(h._services.Register<IEquipmentSelection>(h.State));
                 root.Effect(h._services.Register<IEquippedViewPush>(h.State));
                 root.Effect(h._services.Register<IInventoryPushService>(h.State));
+                // The kr-1256 row now mounts the preset switch on its capability; the harness needs the
+                // persistence face the real mysql row publishes.
+                root.Effect(h._services.Register<IPlayerInventoryState>(new ZeroPresetState()));
                 await new BubbleFighter.Fantasy.Dialect.Messages.MessagesPlugin().ActivateAsync(h.Context("dialect.messages"), default);
                 await new EquipmentPlugin().ActivateAsync(h.Context("equipment", new() { ["persist_worn_state"] = persisted, ["enabled"] = enabled }), default);
                 return h;

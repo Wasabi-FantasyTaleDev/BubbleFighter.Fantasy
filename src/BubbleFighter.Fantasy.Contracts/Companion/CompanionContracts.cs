@@ -25,6 +25,24 @@ public interface ICompanionTicketIssuer
 
     /// <summary>Grants a fresh connection ticket for a live launch owned by <paramref name="account"/>, or null when there is none.</summary>
     CompanionGrant? Renew(string account, string launchId);
+
+    /// <summary>Renews at the authenticated node that currently owns the launch, including a configured remote node.</summary>
+    ValueTask<CompanionGrant?> RenewAsync(string account, string launchId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(Renew(account, launchId));
+    }
+}
+
+/// <summary>Connects trusted game-ticket redemption to the node that will bind the resulting game session.</summary>
+public interface ICompanionFederation
+{
+    /// <summary>Prepares an exact launch at a configured node before redirecting its launcher; never searches by account alone.</summary>
+    ValueTask<bool> RedirectAsync(string account, string build, string launchId, string nodeId,
+        Uri companionOrigin, string nodeKey, CancellationToken cancellationToken);
+
+    /// <summary>Trusts one configured ticket authority to prepare and renew launches for the allowed builds; dispose to revoke.</summary>
+    IDisposable TrustAuthority(string key, IReadOnlyList<string> builds);
 }
 
 /// <summary>The launcher account and game session a companion message came from.</summary>

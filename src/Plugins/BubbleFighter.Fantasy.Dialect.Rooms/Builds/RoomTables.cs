@@ -28,7 +28,7 @@ internal sealed class RoomTables
     [
         RoomFieldValue.SessionState, RoomFieldValue.RoomId, RoomFieldValue.Title, RoomFieldValue.Occupants, RoomFieldValue.OpenSeats,
         RoomFieldValue.HasPassword, RoomFieldValue.Occupied, RoomFieldValue.Closed, RoomFieldValue.Ready, RoomFieldValue.Team,
-        RoomFieldValue.SpawnIndex, RoomFieldValue.Level, RoomFieldValue.MasterSlot, RoomFieldValue.LocalSlot,
+        RoomFieldValue.SpawnIndex, RoomFieldValue.ControllerSlot, RoomFieldValue.Level, RoomFieldValue.MasterSlot, RoomFieldValue.LocalSlot,
     ];
 
     private static readonly Dictionary<string, RoomFieldValue> Roles = BuildRoles();
@@ -41,6 +41,9 @@ internal sealed class RoomTables
         // Native validation can carry these vectors; room projections currently supply none of their values.
         ["list<u8>"] = RoomFieldType.EmptyVector, ["list<ItemAttr>"] = RoomFieldType.EmptyVector,
         ["list<ItemExpiredTime>"] = RoomFieldType.EmptyVector,
+        // Empty projections write only the count; received game settings retain their complete table values.
+        ["list<GameSettingPair>"] = RoomFieldType.EmptyVector,
+        ["list<GameSettingKeyedText>"] = RoomFieldType.EmptyVector, ["list<wstr>"] = RoomFieldType.EmptyVector,
         [SessionSetting] = RoomFieldType.SessionSetting, [GameSetting] = RoomFieldType.GameSetting,
         ["list<UserSlot>"] = RoomFieldType.UserSlots, ["list<EquippedItemList>"] = RoomFieldType.EquippedItemLists,
     };
@@ -77,9 +80,12 @@ internal sealed class RoomTables
     /// Thrown for anything <see cref="PacketTables.Load"/> rejects, a field type this plugin cannot write,
     /// a <c>menu</c> value that is neither a number, a known name nor <c>empty</c>, or an unknown play value.
     /// </exception>
-    public static RoomTables Load(string packetsDirectory)
+    public static RoomTables Load(string packetsDirectory) => Load(PacketTables.Load(packetsDirectory));
+
+    /// <summary>Builds room projections from an already admitted packet snapshot without rereading files.</summary>
+    internal static RoomTables Load(PacketTables tables)
     {
-        var tables = PacketTables.Load(packetsDirectory);
+        var packetsDirectory = tables.Directory;
         var builds = new RoomTables(tables);
         var summary = new List<string>();
         foreach (var build in tables.Builds)
@@ -87,8 +93,21 @@ internal sealed class RoomTables
             var where = $"'{packetsDirectory}' build '{build}'";
             var values = tables.ValuesOf(build);
             // Feature values, including initial_tutorial_routes, are validated by their owning rows.
-            if (values.Keys.FirstOrDefault(key => key is not ("needs_idle_party" or "play" or "capabilities" or "room_setting_change_fields" or "room_round_setting_fields" or "room_projection_fields" or "room_unchosen_map" or "room_unchosen_difficulty" or "room_setting_change_map" or "room_ai_seat" or "round_score_row_marker" or "round_feed" or "shop" or "lobby" or "login" or "inventory" or "equipment" or "family" or "initial_tutorial_routes")) is { } unknown)
+            if (values.Keys.FirstOrDefault(key => key is not ("weapon_critical_seed_builds" or "weapon_critical_mode_fields" or "weapon_critical_defaults" or "weapon_critical_view_refresh" or "defence_seed"
+                    or "npc_local_spawn_group_builds" or "npc_peer_transport_builds" or "plaza_recruitment_active_field" or "plaza_recruitment_text_field" or "party_invitation_failure_codes" or "party_visit_failure_codes")
+                && key is not ("captain_score_fields" or "round_series_fields" or "room_inventory_selection_count" or "room_inventory_selection_fields" or "plaza_recruitment_field" or "display_level_max" or "needs_idle_party" or "room_chat_colour" or "room_list_paging" or "play" or "capabilities" or "room_setting_change_fields" or "room_round_setting_fields" or "room_projection_fields" or "room_unchosen_map" or "room_unchosen_difficulty" or "room_setting_change_map" or "room_ai_seat" or "round_score_row_marker" or "round_feed" or "round_feed_passthrough" or "respawn" or "shop" or "lobby" or "login" or "inventory" or "equipment" or "family" or "initial_tutorial_routes" or "tutorial_score_builds" or "tutorial_score_help_field" or "tutorial_score_npc_finish_fields" or "collected_lucci_builds" or "collected_lucci_field" or "gateway_center_group" or "gateway_reserved_center" or "dynamic_config" or "laboratory_closed_result")) is { } unknown)
                 throw new ConfigException($"{where} has the unknown value '{unknown}'.");
+            if (values.TryGetValue("tutorial_score_builds", out var tutorialScores)
+                && (tutorialScores is not string[] audited || audited.Length == 0
+                    || audited.Distinct(StringComparer.Ordinal).Count() != audited.Length
+                    || audited.Any(candidate => !tables.Builds.Contains(candidate, StringComparer.Ordinal))))
+                throw new ConfigException($"{where}: 'tutorial_score_builds' must list distinct known client builds.");
+            if (tutorialScores is string[] supportedTutorials && supportedTutorials.Contains(build, StringComparer.Ordinal))
+                _ = PlayRoomCodec.TutorialHelpField(tables, build);
+            _ = PlayRoomCodec.TutorialNpcFinishFields(tables, build);
+            _ = RoundResultWire.CollectedLucciField(tables, build);
+            if (tables.CapabilityOf(build, "captain_mode"))
+                _ = new CaptainScoreCodec(tables, build);
             // A build of another family (its own value or its base's) is served by that family's room binding.
             if (values.TryGetValue("family", out var family))
             {
@@ -97,6 +116,7 @@ internal sealed class RoomTables
                 summary.Add($"{build}: the modern family, not served by this room writer");
                 continue;
             }
+            _ = NativeDisplayLevel.Project(tables, build, 1);
             var needsIdleParty = !values.TryGetValue("needs_idle_party", out var rawParty) || (rawParty as string) switch
             {
                 "true" => true,

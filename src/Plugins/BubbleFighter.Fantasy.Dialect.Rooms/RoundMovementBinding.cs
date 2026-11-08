@@ -4,7 +4,6 @@ using BubbleFighter.Fantasy.Contracts.Match;
 using BubbleFighter.Fantasy.Contracts.Movement;
 using BubbleFighter.Fantasy.Packets;
 using Microsoft.Extensions.Logging;
-using BubbleFighter.Fantasy.Dialect.Rooms;
 
 namespace BubbleFighter.Fantasy.Dialect.Rooms;
 
@@ -16,9 +15,10 @@ namespace BubbleFighter.Fantasy.Dialect.Rooms;
 /// gppWanderLeanOptimize, in wider fields (four-byte floats for kr-812's two-byte coordinates).
 /// </summary>
 internal sealed class RoundMovementBinding(string protocol, string relayProtocol, IOpcodeTable game, IOpcodeTable relay, PacketTables tables,
-    string build, ILogger logger) : IInboundMessageBinding<RoundMovementReported>, IMessageSender<RoundMovementRelayed>
+    string build, ILogger logger, string udpProtocol, int udpKeepaliveMs = 1000) : IInboundMessageBinding<RoundMovementReported>, IMessageSender<RoundMovementRelayed>
 {
     private ushort _relayed;
+    private UdpMovementTransport? _udp;
 
     public string Protocol => protocol;
 
@@ -40,6 +40,13 @@ internal sealed class RoundMovementBinding(string protocol, string relayProtocol
             _ = relay.Find(PacketDirection.ClientToServer, name)
                 ?? throw new ConfigException($"The modern typed movement requires relay C2S {name}.");
         }
+        if (!string.IsNullOrWhiteSpace(udpProtocol))
+            _udp = UdpMovementTransport.Mount(context, udpProtocol, relayProtocol, tables, build, relay, udpKeepaliveMs,
+                async (session, opcode, body, ct) =>
+                {
+                    await context.Services.Get<IPacketRouter>().DispatchAsync(relayProtocol, session,
+                        new(opcode, body), ct).ConfigureAwait(false);
+                });
         context.Effect(context.Services.RegisterMany<IInboundMessageBinding<RoundMovementReported>>(this));
         context.Effect(context.Services.RegisterMany<IMessageSender<RoundMovementRelayed>>(this));
         Bind("gppWanderLean", body =>
@@ -70,11 +77,12 @@ internal sealed class RoundMovementBinding(string protocol, string relayProtocol
     public ValueTask SendAsync(ISession session, RoundMovementRelayed message, CancellationToken ct)
     {
         var movement = message.Movement;
-        return session.SendAsync(_relayed, PacketCodec.Write(tables, build, "MovementReport", new Dictionary<string, object?>
+        var body = PacketCodec.Write(tables, build, "MovementReport", new Dictionary<string, object?>
         {
             ["object_id"] = message.ActorId, ["x"] = movement.X, ["y"] = movement.Y, ["z"] = movement.Z,
             ["yaw"] = movement.Yaw, ["pitch"] = movement.Pitch, ["state"] = movement.State, ["tick"] = message.Tick,
-        }), ct);
+        });
+        return _udp is null ? session.SendAsync(_relayed, body, ct) : _udp.SendAsync(session, _relayed, body, ct);
     }
 
     private static int Int(IReadOnlyDictionary<string, object?> values, string name) => Convert.ToInt32(values[name]);

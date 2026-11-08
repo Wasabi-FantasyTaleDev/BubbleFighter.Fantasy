@@ -22,11 +22,11 @@ public sealed partial class MatchActionRelayTests
     public async Task InvalidPangDoesNotAwardPoints(string state)
     {
         using var h = await LifeHarnessAsync();
-        h.HostSeat.Life = SeatLife.Bubble;
+        h.HostSeat.Life.Bubble();
         var body = Pang();
         switch (state)
         {
-            case "alive": h.HostSeat.Life = SeatLife.Alive; break;
+            case "alive": h.HostSeat.Life.Release(); break;
             case "same-team": h.GuestSeat.Team = h.HostSeat.Team; break;
             case "self": BinaryPrimitives.WriteInt32LittleEndian(body.AsSpan(4), 1100000); break;
             case "unknown-victim": BinaryPrimitives.WriteInt32LittleEndian(body.AsSpan(4), 1000004); break;
@@ -57,16 +57,16 @@ public sealed partial class MatchActionRelayTests
     public async Task ResetRequiresADeadOwnerWithCleanup(string state)
     {
         using var h = await LifeHarnessAsync();
-        h.HostSeat.Life = SeatLife.Dead;
-        h.HostSeat.DeathCleaned = true;
+        h.HostSeat.Life.Die();
+        h.HostSeat.Life.CleanDeath();
         var sender = h.HostGame;
         var body = Convert.FromHexString("40420F00BABA00000000");
         var granted = false;
         switch (state)
         {
-            case "alive": h.HostSeat.Life = SeatLife.Alive; break;
-            case "bubble": h.HostSeat.Life = SeatLife.Bubble; break;
-            case "no-cleanup": h.HostSeat.DeathCleaned = false; break;
+            case "alive": h.HostSeat.Life.Revive(); break;
+            case "bubble": h.HostSeat.Life.Revive(); h.HostSeat.Life.Bubble(); break;
+            case "no-cleanup": h.HostSeat.Life.Revive(); h.HostSeat.Life.Die(); break;
             case "result": h.Room.MarkResult(); break;
             case "relay-closed": await h.Host.Connection.CloseAsync("test"); break;
             case "other-mode": h.Room.ModeId = 7; break;
@@ -92,8 +92,8 @@ public sealed partial class MatchActionRelayTests
     public async Task AResetNamingAnEntityNoSeatOwnsIsDroppedAndAnotherSeatsCharacterIsRefused()
     {
         using var h = await LifeHarnessAsync();
-        h.HostSeat.Life = SeatLife.Dead;
-        h.HostSeat.DeathCleaned = true;
+        h.HostSeat.Life.Die();
+        h.HostSeat.Life.CleanDeath();
         var body = Convert.FromHexString("40420F00BABA00000000");
         BinaryPrimitives.WriteInt32LittleEndian(body, 1000004);
         await h.DispatchAsync(602, body, h.HostGame, "kr-1256/game");
@@ -107,7 +107,7 @@ public sealed partial class MatchActionRelayTests
     public async Task NewRoundClearsScoresAndLifeWithoutPublishingOldUpdates()
     {
         using var h = await LifeHarnessAsync();
-        h.HostSeat.Life = SeatLife.Bubble;
+        h.HostSeat.Life.Bubble();
         h.Host.BeforeSend = () =>
         {
             h.Room.ResetToWaiting(); h.Room.MarkStarting();
@@ -115,7 +115,7 @@ public sealed partial class MatchActionRelayTests
         };
         await h.DispatchAsync(38277, Pang(), h.Guest);
         Assert.Equal(0, h.Room.Scoring.TeamTotals[0] + h.Room.Scoring.TeamTotals[1]);
-        Assert.Equal(SeatLife.Alive, h.HostSeat.Life);
+        Assert.Equal(SeatLife.Alive, h.HostSeat.Life.State);
         Assert.Empty(h.HostGame.Sent);
     }
 

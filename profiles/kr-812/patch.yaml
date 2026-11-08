@@ -1,6 +1,11 @@
 # Profile patch for kr-812: applied after the bundle rows (see profiles/kr-1256/patch.yaml
 # for the supported operations). The admin API moves off 8080 so this profile can run
 # beside kr-1256 on one machine.
+- set:
+    id: ingame
+    config:
+      # kr-812 sub_6378A0 latches refused boxes; sub_515290 supports removal without a pickup effect.
+      renew_full_slot_supplies: true
 - replace:
     id: admin.http
     config:
@@ -10,3 +15,11 @@
     config:
       file: logs/{date}/packets-kr-812_{timestamp}.log
       preview_bytes: 96
+- set:
+    id: dialect.rooms
+    config:
+      plaza_recruitment: true
+- set:
+    id: ingame
+    config:
+      plaza_recruitment: true

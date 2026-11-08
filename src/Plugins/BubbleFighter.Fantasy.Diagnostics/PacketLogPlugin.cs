@@ -63,8 +63,16 @@ public sealed class PacketLogPlugin : IPlugin
             queue.Enqueue(new(DateTime.UtcNow, level, line, packet));
         }
 
+        context.Effect(context.Events.On<BootstrapGreetingWrittenEvent>(e =>
+            Log(LogLevel.Information, ConnectionStageLog.Greeting(e))));
+        context.Effect(context.Events.On<FirstInboundFrameEvent>(e =>
+            Log(LogLevel.Information, ConnectionStageLog.FirstFrame(e))));
+
         context.Effect(context.Events.On<PacketReceivedEvent>(e =>
         {
+            if (ConnectionStageLog.CenterFrame(tables, e.Session, e.ProtocolName,
+                PacketDirection.ClientToServer, e.Packet.Opcode, e.Packet.Payload.Length) is { } stage)
+                Log(LogLevel.Information, stage);
             var name = Describe(e.ProtocolName, PacketDirection.ClientToServer, e.Packet.Opcode);
             capture?.Record(e.Session, e.ProtocolName, "c2s", e.Packet.Opcode, name, e.Packet.Payload, e.HasHandler);
             if (e.HasHandler)
@@ -82,6 +90,9 @@ public sealed class PacketLogPlugin : IPlugin
 
         context.Effect(context.Events.On<PacketSentEvent>(e =>
         {
+            if (ConnectionStageLog.CenterFrame(tables, e.Session, e.ProtocolName,
+                PacketDirection.ServerToClient, e.Opcode, e.PayloadLength) is { } stage)
+                Log(LogLevel.Information, stage);
             var name = Describe(e.ProtocolName, PacketDirection.ServerToClient, e.Opcode);
             if (capture is not null)
             {
@@ -93,10 +104,10 @@ public sealed class PacketLogPlugin : IPlugin
         }));
 
         context.Effect(context.Events.On<ConnectionAcceptedEvent>(e =>
-            Log(LogLevel.Information, $"accept listener={e.ListenerId} conn={e.Connection.RemoteEndPoint} id={e.Connection.Id}")));
+            Log(LogLevel.Information, ConnectionStageLog.Accepted(e))));
 
         context.Effect(context.Events.On<ConnectionClosedEvent>(e =>
-            Log(LogLevel.Information, $"close conn={e.Connection.RemoteEndPoint} id={e.Connection.Id} reason={e.Reason}")));
+            Log(LogLevel.Information, ConnectionStageLog.Closed(e))));
 
         context.Effect(context.Events.On<ClientVersionMismatchEvent>(e =>
             Log(LogLevel.Warning, $"version-mismatch session={e.Session.Id} reported={e.Reported} expected={e.Expected}")));

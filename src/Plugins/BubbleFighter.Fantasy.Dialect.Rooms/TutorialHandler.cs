@@ -12,18 +12,7 @@ using Microsoft.Extensions.Logging;
 
 namespace BubbleFighter.Fantasy.Dialect.Rooms;
 
-/// <summary>
-/// Tutorial select scene and one-seat start path for legacy builds. CreateTutorial opens
-/// <c>TutorialRoomStage</c> (GotoRoom kind 5); the stage then asks for
-/// <c>gspResSingleStageInfo</c>. PlayTutorial seats the player in a one-seat play room
-/// (GotoRoom kind 2) then starts play: kr-812 / cn-717 send <c>gspRoomEnterGame</c> with the
-/// PlayTutorial map key; id-400 sends <c>gspRepAutoStart</c> true.
-/// cn-717 then waits for <c>gcpGameReportMapLoadingComplete</c> and replies with the
-/// MapLoading / EverybodyLoading / CountDown / StartGame chain (RoomStage dispatcher
-/// <c>sub_87EFE0</c> cases 0x2BD–0x2C0). Login is unchanged: it still uses kind 1 plus
-/// <c>gspGotoMenu</c>.
-///
-/// </summary>
+/// <summary>Handles legacy tutorial selection, configured entry, loading and completion through the shared tutorial lifecycle.</summary>
 internal sealed class TutorialHandler : IDisposable
 {
     private const int DefaultCharacterItemId = 300001;
@@ -115,6 +104,9 @@ internal sealed class TutorialHandler : IDisposable
     private readonly bool _skipStart;
     private readonly bool _useOldMap;
     private readonly bool _spawnGroupAppliesLocally;
+    private readonly bool _ordinarySpawnGroupAppliesLocally;
+    // cn-279 sub_702660 sends ordinary-round peer frames without a local copy, so their sender needs them back.
+    private readonly bool _echoRoomFeed;
 
     public TutorialHandler(
         PacketTables packetTables,
@@ -154,9 +146,9 @@ internal sealed class TutorialHandler : IDisposable
         _ = _packetTables.Resolve(_build, "RoundCountdown");
         _ = _packetTables.Resolve(_build, "RoundStartGame");
         _ = _packetTables.Resolve(_build, "TutorialMasterSlot");
-        _ = _packetTables.Resolve(_build, "TutorialWave");
+        _ = _packetTables.Resolve(_build, "NpcWave");
         _ = _packetTables.Resolve(_build, "TutorialPlayRequest");
-        _ = _packetTables.Resolve(_build, "TutorialSpawnGroup");
+        _ = _packetTables.Resolve(_build, "NpcSpawnGroup");
         _ = _packetTables.Resolve(_build, "TutorialEndStage");
         _ = _packetTables.Resolve(_build, "TutorialStageInfo");
         _ = _packetTables.Resolve(_build, "RoomEnterGame");
@@ -173,6 +165,15 @@ internal sealed class TutorialHandler : IDisposable
         _skipStart = tutorialSkipStart;
         _useOldMap = tutorialUseOldMap;
         _spawnGroupAppliesLocally = wire.SpawnGroupAppliesLocally;
+        if (packetTables.ValuesOf(build).TryGetValue("npc_local_spawn_group_builds", out var localSpawnBuilds))
+        {
+            if (localSpawnBuilds is not string[] builds || builds.Length == 0
+                || builds.Distinct(StringComparer.Ordinal).Count() != builds.Length
+                || builds.Any(candidate => !packetTables.Builds.Contains(candidate, StringComparer.Ordinal)))
+                throw new ConfigException("npc_local_spawn_group_builds must list distinct known client builds.");
+            _ordinarySpawnGroupAppliesLocally = builds.Contains(build, StringComparer.Ordinal);
+        }
+        _echoRoomFeed = packetTables.CapabilityOf(build, "round_feed_echo_sender");
         _maxTutorialSessions = maxTutorialSessions;
         _tables = tables;
         _logger = logger;
@@ -198,6 +199,8 @@ internal sealed class TutorialHandler : IDisposable
     // Opens the tutorial select scene: gspGotoRoom of the build's select kind with no tutorial mode or map.
     private async ValueTask SendTutorialSelectAsync(ISession session, PlayerContext player, CancellationToken ct)
     {
+        if (_sharedLifecycle)
+            await DispatchLifecycleAsync(session, new TutorialSelectionOpening(), ct).ConfigureAwait(false);
         var table = _tables.Get(session.Profile.Id);
         // WriteTutorialSelect forces mode 0 and empty map strings so PlayTutorial's mode 103 /
         // Directory / CurrentMap / key never ride on the select GotoRoom. The kind is the build's
@@ -381,6 +384,7 @@ internal sealed class TutorialHandler : IDisposable
             player.Room.CharacterItemId, player.Room.EquippedItemIds, false)
         {
             Team = tutorialTeam,
+            ControllerSlot = TutorialSeat,
         };
         var room = RoomCodec.WriteRoomEnvelope(_packetTables, _build, _room,
             new RoomValues(RoomCodec.PlayRoomKind, [tutorialSlot])
@@ -535,12 +539,21 @@ internal sealed class TutorialHandler : IDisposable
     /// <summary>Returns a client-driven tutorial to the menu even before its hidden room exists.</summary>
     internal async ValueTask<bool> TryHandleLeaveAsync(ISession session, InboundPacket packet, CancellationToken ct)
     {
-        bool pending;
+        bool pending, initial, ownsLeave;
         lock (_tutorialGate)
         {
-            if (_matchStart != TutorialMatchStart.RepAutoStart || !_tutorialSessions.ContainsKey(session.Id))
+            if (!_tutorialSessions.TryGetValue(session.Id, out var entry))
                 return false;
+            initial = entry.Old || entry.Waves;
+            ownsLeave = entry.Waves || _matchStart == TutorialMatchStart.RepAutoStart;
             pending = _pendingClientStarts.ContainsKey(session.Id);
+        }
+        // Leaving the initial tutorial ends its offer even where the ordinary room flow handles the leave itself.
+        if (!ownsLeave)
+        {
+            if (initial)
+                await CompleteInitialTutorialAsync(session, ct).ConfigureAwait(false);
+            return false;
         }
         if (packet.Payload.Length != 0)
             throw new PacketFormatException("Tutorial leave request must be empty.", 0);
@@ -549,6 +562,8 @@ internal sealed class TutorialHandler : IDisposable
             await HandleEndStageAsync(session, new(packet.Opcode, new byte[4]), ct).ConfigureAwait(false);
             return true;
         }
+        if (initial)
+            await CompleteInitialTutorialAsync(session, ct).ConfigureAwait(false);
         await ClearTutorialStateAsync(session, ct).ConfigureAwait(false);
         // The menu seat shows the worn character (UserSlot character_type, kr-812 sub_6CBFF0).
         var player = await ResolvePlayerAsync(session, ct).ConfigureAwait(false);
@@ -660,7 +675,7 @@ internal sealed class TutorialHandler : IDisposable
         int spawnGroup;
         try
         {
-            spawnGroup = TutorialWire.ReadCreateMobsFromSpawnGroup(_packetTables, _build, packet.Payload.Span);
+            spawnGroup = NpcWire.ReadCreateMobsFromSpawnGroup(_packetTables, _build, packet.Payload.Span);
         }
         catch (PacketFormatException ex)
         {
@@ -672,10 +687,19 @@ internal sealed class TutorialHandler : IDisposable
         }
 
         var table = _tables.Get(session.Profile.Id);
-        var body = TutorialWire.WriteCreateMobsFromSpawnGroup(_packetTables, _build, spawnGroup);
+        var body = NpcWire.WriteCreateMobsFromSpawnGroup(_packetTables, _build, spawnGroup);
+        if (_ordinarySpawnGroupAppliesLocally)
+        {
+            lock (_tutorialGate)
+            {
+                // kr-812 sub_6DE5B0 expands only on the master; kr-812 sub_4620A0 already queues its own
+                // request in ordinary rounds. Tutorials bypass that queue (kr-812 sub_7FF340).
+                if (!_tutorialSessions.ContainsKey(session.Id)) return;
+            }
+        }
         if (_spawnGroupAppliesLocally)
         {
-            await TryDispatchRoomFeedAsync(session, table.S2C("gppCreateMobsFromSpawnGroup"), body, ct).ConfigureAwait(false);
+            await TryDispatchRoomFeedAsync(session, table.S2C("gppCreateMobsFromSpawnGroup"), body, false, ct).ConfigureAwait(false);
             _logger.LogInformation(
                 "Session {Id} CreateMobs: forwarded spawn group {Group} to peers; sender executes its native local queue.",
                 session.Id, spawnGroup);
@@ -698,7 +722,7 @@ internal sealed class TutorialHandler : IDisposable
         int wave;
         try
         {
-            wave = TutorialWire.ReadStartNewWave(_packetTables, _build, packet.Payload.Span);
+            wave = NpcWire.ReadStartNewWave(_packetTables, _build, packet.Payload.Span);
         }
         catch (PacketFormatException ex)
         {
@@ -710,7 +734,7 @@ internal sealed class TutorialHandler : IDisposable
         }
 
         var table = _tables.Get(session.Profile.Id);
-        var body = TutorialWire.WriteStartNewWave(_packetTables, _build, wave);
+        var body = NpcWire.WriteStartNewWave(_packetTables, _build, wave);
         if (await TryDispatchRoomWaveAsync(session, wave, true, ct).ConfigureAwait(false)) return;
         await session.SendAsync(table.S2C("gspRepStartNewWave"), body, ct).ConfigureAwait(false);
         _logger.LogInformation(
@@ -733,7 +757,7 @@ internal sealed class TutorialHandler : IDisposable
         int wave;
         try
         {
-            wave = TutorialWire.ReadStartNewWave(_packetTables, _build, packet.Payload.Span);
+            wave = NpcWire.ReadStartNewWave(_packetTables, _build, packet.Payload.Span);
         }
         catch (PacketFormatException ex)
         {
@@ -746,7 +770,7 @@ internal sealed class TutorialHandler : IDisposable
 
         var table = _tables.Get(session.Profile.Id);
         if (await TryDispatchRoomWaveAsync(session, wave, false, ct).ConfigureAwait(false)) return;
-        await session.SendAsync(table.S2C("gspRepEndWave"), TutorialWire.WriteStartNewWave(_packetTables, _build, wave), ct)
+        await session.SendAsync(table.S2C("gspRepEndWave"), NpcWire.WriteStartNewWave(_packetTables, _build, wave), ct)
             .ConfigureAwait(false);
         _logger.LogInformation(
             "Session {Id} tutorial wave: S2C gspRepEndWave wave {Wave}.",
@@ -773,12 +797,16 @@ internal sealed class TutorialHandler : IDisposable
             return;
         }
 
-        var table = _tables.Get(session.Profile.Id);
-        if (await TryDispatchRoomFeedAsync(session, table.S2C("Unknown908"), ReadOnlyMemory<byte>.Empty, ct).ConfigureAwait(false))
+        bool tutorial;
+        lock (_tutorialGate) tutorial = _tutorialSessions.ContainsKey(session.Id);
+        if (!tutorial)
         {
-            // RoundFeedSent excludes its sender; the host still needs the direct reply below.
-            await TryDispatchRoomFeedAsync(session, table.S2C("gspRepWaveAllSpawnMobs"), packet.Payload, ct).ConfigureAwait(false);
+            if (_messages is null || !await _messages.DispatchAsync(session.Profile.Id + "/game", session,
+                    new RoundNpcReported(RoundNpcOperation.SpawnTable, packet.Payload.ToArray()), ct).ConfigureAwait(false))
+                throw new InvalidOperationException("A multiplayer NPC wave table has no round handler.");
+            return;
         }
+        var table = _tables.Get(session.Profile.Id);
         await session.SendAsync(table.S2C("Unknown908"), ReadOnlyMemory<byte>.Empty, ct)
             .ConfigureAwait(false);
         await session.SendAsync(table.S2C("gspRepWaveAllSpawnMobs"), packet.Payload, ct)
@@ -810,7 +838,7 @@ internal sealed class TutorialHandler : IDisposable
         }
 
         var table = _tables.Get(session.Profile.Id);
-        if (await TryDispatchRoomFeedAsync(session, table.S2C("gppCreateAIObject"), packet.Payload, ct).ConfigureAwait(false)) return;
+        if (await TryDispatchRoomFeedAsync(session, table.S2C("gppCreateAIObject"), packet.Payload, _echoRoomFeed, ct).ConfigureAwait(false)) return;
         await session.SendAsync(table.S2C("gppCreateAIObject"), packet.Payload, ct).ConfigureAwait(false);
         _logger.LogInformation(
             "Session {Id} tutorial CreateAIObject: echoed gppCreateAIObject ({Bytes} bytes, {Hex}).",
@@ -819,11 +847,8 @@ internal sealed class TutorialHandler : IDisposable
 
     /// <summary>
     /// Ends the round when the host reports every wave done (<c>gcpReqEndAllWave</c>, 905, empty).
-    /// The host reports the per-wave end with <c>gcpReqEndWave</c> and the stage with
-    /// <c>gcpReqEndStage</c>, but a one-seat tutorial has no typed round for those reports to reach,
-    /// so it answers this one: the round's end, then the empty <c>gspGameShowResult_</c> that opens
-    /// the result scene, then <c>gspGotoRoom</c> back to the lobby.
-    ///
+    /// A one-seat prologue records initial-tutorial completion and returns to the menu;
+    /// ordinary cooperative rounds dispatch their wave completion to the shared round handler.
     /// </summary>
     /// <param name="session">The session that reported the end.</param>
     /// <param name="packet">The report, which carries nothing.</param>
@@ -841,12 +866,27 @@ internal sealed class TutorialHandler : IDisposable
                 throw new InvalidOperationException("A multiplayer NPC round end has no round handler.");
             return;
         }
+        await FinishWaveTutorialAsync(session, true, ct).ConfigureAwait(false);
+    }
+
+    private async ValueTask FinishWaveTutorialAsync(ISession session, bool completed, CancellationToken ct)
+    {
+        TutorialEntry entry;
+        lock (_tutorialGate)
+        {
+            if (!_tutorialSessions.TryGetValue(session.Id, out entry))
+                throw new InvalidOperationException("Wave tutorial completion requires an active tutorial.");
+        }
+        // cn-406 sub_8F1C20 reports wave completion followed by EndStage(1); sub_792F30 sends
+        // EndStage(0) on exit. Both end the initial offer, as the classic tutorial already does.
+        if (entry.Waves || entry.Old)
+            await CompleteInitialTutorialAsync(session, ct).ConfigureAwait(false);
         if (_sharedLifecycle)
             await DispatchLifecycleAsync(session, new TutorialRoundClosed(), ct).ConfigureAwait(false);
         var table = _tables.Get(session.Profile.Id);
         await session.SendAsync(
             table.S2C("gspGameEndGame"),
-            PlayRoomCodec.WriteGameEnd(_packetTables, _build, RoundOutcome.Won, _outcomeFirst),
+            RoundResultWire.WriteGameEnd(_packetTables, _build, completed ? RoundOutcome.Won : RoundOutcome.Lost, _outcomeFirst),
             ct).ConfigureAwait(false);
         // No result scene follows a tutorial: it ends straight into the lobby, and the empty
         // gspGameShowResult_ that opens a played round's result scene leaves cn-324's scene without
@@ -868,15 +908,22 @@ internal sealed class TutorialHandler : IDisposable
         _awaitingLoadComplete.TryRemove(session.Id, out _);
         player.Session.MoveTo(SessionPhase.Plaza);
         player.Session.MoveTo(SessionPhase.MainMenu);
-        _logger.LogInformation("Session {Id} tutorial stage end: S2C gspGameEndGame win + gspGotoRoom main menu.", session.Id);
+        _logger.LogInformation("Session {Id} wave tutorial ended: completed={Completed}, returned to main menu.", session.Id, completed);
     }
 
-    /// <summary>Consumes native single-stage tutorial completion, leaving wave rounds to their owner.</summary>
+    private async ValueTask CompleteInitialTutorialAsync(ISession session, CancellationToken ct)
+    {
+        if (_messages is not null
+            && !await _messages.DispatchAsync(session.Profile.Id + "/game", session, new InitialTutorialCompleted(), ct).ConfigureAwait(false))
+            throw new InvalidOperationException("Initial tutorial completion has no persistence handler.");
+    }
+
+    /// <summary>Consumes a native stage end only while this session owns a tutorial.</summary>
     public async ValueTask<bool> TryHandleEndStageAsync(ISession session, InboundPacket packet, CancellationToken ct)
     {
         lock (_tutorialGate)
         {
-            if (!_tutorialSessions.TryGetValue(session.Id, out var entry) || entry.Waves)
+            if (!_tutorialSessions.ContainsKey(session.Id))
                 return false;
         }
         await HandleEndStageAsync(session, packet, ct).ConfigureAwait(false);
@@ -890,13 +937,18 @@ internal sealed class TutorialHandler : IDisposable
         TutorialEntry entry;
         lock (_tutorialGate)
         {
-            if (!_tutorialSessions.TryGetValue(session.Id, out entry) || entry.Waves)
-                throw new InvalidOperationException("Stage-end request requires an active native single-stage tutorial.");
+            if (!_tutorialSessions.TryGetValue(session.Id, out entry))
+                throw new InvalidOperationException("Stage-end request requires an active native tutorial.");
+        }
+        if (entry.Waves)
+        {
+            await FinishWaveTutorialAsync(session, completed, ct).ConfigureAwait(false);
+            return;
         }
         // Only the old tutorial is the initial tutorial; a tutorial-room stage is recorded as a stage clear instead.
-        if (completed && entry.Old && _messages is not null
-            && !await _messages.DispatchAsync(session.Profile.Id + "/game", session, new InitialTutorialCompleted(), ct).ConfigureAwait(false))
-            throw new InvalidOperationException("Initial tutorial completion has no persistence handler.");
+        // Leaving the initial tutorial early also ends its offer, so the next login does not open it again.
+        if (entry.Old)
+            await CompleteInitialTutorialAsync(session, ct).ConfigureAwait(false);
         // The clear is reported while the round still runs, so its time is measured from the round's start.
         if (completed && !entry.Old && _sharedLifecycle)
             await DispatchLifecycleAsync(session, new TutorialStageCleared(entry.MapKey), ct).ConfigureAwait(false);
@@ -914,7 +966,7 @@ internal sealed class TutorialHandler : IDisposable
         // cn-279 sub_705DF0 consumes the stage end; cn-279 sub_6FF6C0 maps
         // GotoRoom kind 1 back to MainMenuStage without a multiplayer result scene.
         await session.SendAsync(table.S2C("gspGameEndGame"),
-            PlayRoomCodec.WriteGameEnd(_packetTables, _build, completed ? RoundOutcome.Won : RoundOutcome.Lost, _outcomeFirst), ct)
+            RoundResultWire.WriteGameEnd(_packetTables, _build, completed ? RoundOutcome.Won : RoundOutcome.Lost, _outcomeFirst), ct)
             .ConfigureAwait(false);
         // gspGameEndGame alone shows the time-over (GAME OVER) cue in mode 15 (kr-812 sub_803DF0). gspGameTimeOverEnd then
         // moves the result object to its stage step, where mode 15 shows the stage's own clear or fail panel from its
@@ -925,7 +977,7 @@ internal sealed class TutorialHandler : IDisposable
             if (_scoreMs > 0)
                 await Task.Delay(_scoreMs, ct).ConfigureAwait(false);
             if (table.Find(PacketDirection.ServerToClient, "gspGameTimeOverEnd") is { } timeOverEnd)
-                await session.SendAsync(timeOverEnd, PlayRoomCodec.WriteScoreboard(_packetTables, _build,
+                await session.SendAsync(timeOverEnd, RoundResultWire.WriteScoreboard(_packetTables, _build,
                     StageScoreboard(player.Room.Nickname, completed)), ct).ConfigureAwait(false);
         }
         if (_resultMs > 0)
@@ -1009,7 +1061,7 @@ internal sealed class TutorialHandler : IDisposable
     public async ValueTask HandleLifePointAsync(ISession session, InboundPacket packet, CancellationToken ct)
     {
         var table = _tables.Get(session.Profile.Id);
-        if (await TryDispatchRoomFeedAsync(session, table.S2C("gppLifePoint"), packet.Payload, ct).ConfigureAwait(false)) return;
+        if (await TryDispatchRoomFeedAsync(session, table.S2C("gppLifePoint"), packet.Payload, _echoRoomFeed, ct).ConfigureAwait(false)) return;
         await session.SendAsync(table.S2C("gppLifePoint"), packet.Payload, ct).ConfigureAwait(false);
         _logger.LogInformation(
             "Session {Id} tutorial LifePoint: echoed gppLifePoint ({Bytes} bytes, {Hex}).",
@@ -1038,7 +1090,7 @@ internal sealed class TutorialHandler : IDisposable
         }
 
         var table = _tables.Get(session.Profile.Id);
-        if (await TryDispatchRoomFeedAsync(session, table.S2C("gppCreateSpawnGroupMemberMob"), packet.Payload, ct).ConfigureAwait(false)) return;
+        if (await TryDispatchRoomFeedAsync(session, table.S2C("gppCreateSpawnGroupMemberMob"), packet.Payload, _echoRoomFeed, ct).ConfigureAwait(false)) return;
         await session.SendAsync(table.S2C("gppCreateSpawnGroupMemberMob"), packet.Payload, ct)
             .ConfigureAwait(false);
         _logger.LogInformation(
@@ -1046,12 +1098,13 @@ internal sealed class TutorialHandler : IDisposable
             session.Id, packet.Payload.Length, Convert.ToHexString(packet.Payload.Span));
     }
 
-    private async ValueTask<bool> TryDispatchRoomFeedAsync(ISession session, ushort code, ReadOnlyMemory<byte> payload, CancellationToken ct)
+    private async ValueTask<bool> TryDispatchRoomFeedAsync(ISession session, ushort code, ReadOnlyMemory<byte> payload,
+        bool includeSender, CancellationToken ct)
     {
         lock (_tutorialGate)
             if (_tutorialSessions.ContainsKey(session.Id)) return false;
         if (_messages is null || !await _messages.DispatchAsync(session.Profile.Id + "/game", session,
-                new RoundFeedSent(code, payload.ToArray()), ct).ConfigureAwait(false))
+                new RoundFeedSent(code, payload.ToArray()) { IncludeSender = includeSender }, ct).ConfigureAwait(false))
             throw new InvalidOperationException("A multiplayer NPC update has no round handler.");
         return true;
     }
@@ -1095,7 +1148,7 @@ internal sealed class TutorialHandler : IDisposable
         if (_scoreRowFields.Count == 0 || _score is null)
             return null;
         var board = new RoundScoreboard(0, 0, [0, 0], []);
-        return PlayRoomCodec.ScoreboardValues(_packetTables, _build, board);
+        return RoundResultWire.ScoreboardValues(_packetTables, _build, board);
     }
 
     private static PlayerContext RequirePlayer(ISession session)

@@ -78,6 +78,10 @@
   plugin: dialect.messages
   config:
     protocol: "${BFF_PROFILE_ID}/game"
+    # Every client sits on channel 60, "Free" (one shared lobby instead of split channels). The login reply's
+    # channel word is what the round start reads its FighterConfigChannel column from (kr-812 sub_818680,
+    # sub_587690); BFF_PLAYER_CHANNEL also feeds dialect.rooms player_channel and the cluster move. 0 = off.
+    login_channel: ${BFF_PLAYER_CHANNEL:-60}
     enable_purchases: true
     max_shop_sessions: 512
     packets_directory: packets
@@ -109,8 +113,12 @@
     customized_keys: true
 - id: dialect.rooms
   plugin: dialect.rooms
+  parent_id: inventory.loadouts
   config:
     protocol: "${BFF_PROFILE_ID}/game"
+    # The plaza and tutorial move replies place the player on the same channel as the login (see
+    # dialect.messages login_channel); a channel must be a FighterConfigChannel column, which 50 is not.
+    player_channel: ${BFF_PLAYER_CHANNEL:-60}
     # The audited legacy family uses the actor request and consumable 100443.
     instant_revival: true
     # Native mode/result selectors are audited; dedicated queue stages remain separate.
@@ -146,18 +154,34 @@
 # The relay's seed authority: each seat's critical, defence and cancellation tables when its round starts, the critical
 # chance taken from this build's Config/CriticalHitTable.xml. The seeded-critical builds read their critical hits only
 # from these tables (cn-324 sub_4A94C0); a build without the seed capability turns this row off in its patch.yaml.
+# Their ordinary defence reads the defence table too (kr-812 sub_557230), so every seat receives every occupant's
+# table filled with that occupant's local roll, worked out from the build's own ShopItem2 rows (defence_seed in
+# packets/builds.yaml).
 - id: dialect.scene-seeds
   plugin: dialect.scene-seeds
   parent_id: clientdata
   config:
     protocol: "${BFF_PROFILE_ID}/relay"
     packets_directory: packets
+    defence_seeds: false
+- id: inventory.loadouts
+  plugin: inventory.loadouts
+  parent_id: clientdata
+  isolated_services:
+    - BubbleFighter.Fantasy.Contracts.Inventory.IInventoryRepository
+    - BubbleFighter.Fantasy.Contracts.Inventory.IPlayerInventoryState
+    - BubbleFighter.Fantasy.Contracts.Inventory.IWeaponPresetPageSource
+    - BubbleFighter.Fantasy.Contracts.Fighters.IFighterRoster
+    - BubbleFighter.Fantasy.Contracts.Fighters.ISeatCharacterResolver
+  config:
+    build_key: "${BFF_PROFILE_ID}"
 - id: inventoryview
   plugin: inventoryview
-  parent_id: clientdata
+  parent_id: inventory.loadouts
   # One fresh service realm per build for the per-build singletons: in the all-builds profile each
   # build subtree publishes its own copies, and nothing here sees another build's.
   isolated_services:
+    - BubbleFighter.Fantasy.Contracts.Lobby.IRetainedPlayerAdmission
     - BubbleFighter.Fantasy.Contracts.Inventory.IInventoryPushService
     - BubbleFighter.Fantasy.Contracts.Inventory.IEquipmentSelection
     - BubbleFighter.Fantasy.Contracts.Inventory.IInventoryExpiry
@@ -319,6 +343,10 @@
     # feverDrink (cn-324 sub_508FC0 -> event 55 -> cn-324 sub_667CC0 -> cn-324 sub_4672B0(0x68, -1)); the round
     # answers only this exact request from this round's king, so a build whose king never sends it is unaffected.
     zombie_king_ultra_item_kind: 104
+    # The Captain's ULTRA (mode 20, only where dialect.rooms captain_mode mounts the exchange): with the gauge ready,
+    # SHIFT raises the Captain manager's event 55 and its handler sends the same no-object request for kind 104
+    # (cn-706 sub_57CB50 -> cn-706 sub_428D10; kr-812 sub_430DB0). Only the current Captain is answered.
+    captain_ultra_item_kind: 104
     zombie_pvp_round_time_limit_ms: 180000
     # Star modes: kr-812 sub_661AF0 starts mode 5 with StarModeSpec +16 stars and mode 6 with +148 (by team);
     # the server adds up the clients' reports and decides the round when time runs out.
@@ -937,6 +965,7 @@
     shop_item_client_path: "Config/ShopItem2.xml"
     max_shop_item_bytes: 134217728
     max_enter_shop_frame_bytes: 65000
+    max_enter_shop_cards: 0
     prefer_longest_duration: true
     prefer_longest_guns: true
     prefer_longest_clothes: true

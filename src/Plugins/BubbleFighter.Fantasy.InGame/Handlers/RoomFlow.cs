@@ -1,6 +1,7 @@
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Net;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
+using BubbleFighter.Fantasy.Contracts.Cluster;
 using BubbleFighter.Fantasy.Contracts.Fighters;
 using BubbleFighter.Fantasy.Contracts.Inventory;
 using BubbleFighter.Fantasy.Contracts.Rooms;
@@ -26,6 +27,7 @@ internal sealed partial class RoomFlow
     private readonly RoomRegistry _registry;
     private readonly ILogger _logger;
     private readonly IEquipmentSelection? _selection;
+    private readonly IAccountMutationScopes? _mutations;
     private readonly ISeatCharacterResolver? _characters;
     private readonly IMessageSender<RoomEntered>? _enteredSender;
     private readonly IMessageSender<RoomSeatUpdated>? _seatUpdatedSender;
@@ -45,6 +47,7 @@ internal sealed partial class RoomFlow
     private readonly IMessageSender<RoomMatchStarting>? _matchStarting;
     private readonly IMessageSender<RoomSettingsChanged>? _settingsChanged;
     private readonly IMessageSender<RoomChatReceived>? _chat;
+    private readonly IMessageSender<RoomSessionChatReceived>? _sessionChat;
     private readonly IMessageSender<RoomSeatLockChanged>? _seatLock;
     private readonly IMessageSender<RoomMemberKicked>? _kicked;
     private readonly IMessageSender<PlazaEntered>? _plazaEntered;
@@ -71,13 +74,29 @@ internal sealed partial class RoomFlow
 
     internal void BindCommands(IPluginContext context, string scope, bool enabled) => _commands.BindShared(context, scope, enabled);
 
+    internal void BindSessionState(IPluginContext context) => context.Effect(context.Services.RegisterMany<IGameSessionStateReader>(
+        new GameSessionStateReader(_registry, context.Lifetime, () => PlazaBound && _left is not null)));
+
+    internal Func<ISession, CancellationToken, bool>? CommandAdmission { set => _commands.AdmitInput = value; }
+
+    /// <summary>Supplies the live UDP status providers that <c>!udp status</c> reads.</summary>
+    internal Func<IReadOnlyList<BubbleFighter.Fantasy.Contracts.Match.IUdpTransportStatus>>? UdpStatus
+    {
+        set => _commands.UdpStatus = value;
+    }
+
     internal ModeCatalog Modes { get; set; } = new();
+    internal Action<PlayRoom>? ScriptZombiesStarting { get; set; }
+    internal Func<ISession, ScriptZombieConversion, CancellationToken, ValueTask>? ScriptZombieConversionRequested { get; set; }
 
     /// <summary>
     /// Gets or sets what runs on the room's executor after a player left a room that is not waiting,
     /// so a starting round can stop waiting for that player.
     /// </summary>
     internal Func<PlayRoom, CancellationToken, ValueTask>? SeatLeftDuringRound { get; set; }
+
+    internal Func<PlayRoom, RoomSeat, CancellationToken, ValueTask>? BeforeSeatLeaves { get; set; }
+    internal Action<PlayRoom>? ZombieEscapeStarting { get; set; }
 
     /// <summary>Builds the flow over the build's room encoders.</summary>
     /// <param name="registry">The room registry.</param>
@@ -91,14 +110,15 @@ internal sealed partial class RoomFlow
     /// <param name="texts">Game-facing localized messages supplied by the localization plugin.</param>
     /// <param name="parties">Current party membership, when the party plugin is mounted.</param>
     /// <param name="online">Connections for this game's party members.</param>
+    /// <param name="mutations">Binds equipment normalization to the session whose appearance is resolved.</param>
     public RoomFlow(RoomRegistry registry, RoomSenders senders, ILogger logger,
         IEquipmentSelection? selection = null, ISeatCharacterResolver? characters = null, int plazaCapacity = 36,
         InGameOptions? options = null, CancellationToken lifetime = default, IGameText? texts = null,
-        IPartyDirectory? parties = null, IOnlinePlayers? online = null)
+        IPartyDirectory? parties = null, IOnlinePlayers? online = null, IAccountMutationScopes? mutations = null)
         : this(registry, senders, logger, selection, characters, plazaCapacity, options, lifetime, texts, parties, online,
             static () => Environment.TickCount64,
             static (delay, ct) => new(Task.Delay(delay, ct)),
-            static (delay, ct) => new(Task.Delay(delay, ct)))
+            static (delay, ct) => new(Task.Delay(delay, ct)), mutations)
     {
     }
 
@@ -107,11 +127,12 @@ internal sealed partial class RoomFlow
         InGameOptions? options, CancellationToken lifetime, IGameText? texts,
         IPartyDirectory? parties, IOnlinePlayers? online,
         Func<long> autoStartNow, Func<TimeSpan, CancellationToken, ValueTask> autoStartDelay,
-        Func<TimeSpan, CancellationToken, ValueTask> zombieKingDelay)
+        Func<TimeSpan, CancellationToken, ValueTask> zombieKingDelay, IAccountMutationScopes? mutations = null)
     {
         _registry = registry;
         _logger = logger;
         _selection = selection;
+        _mutations = mutations;
         _characters = characters;
         _parties = parties;
         _online = online;
@@ -126,8 +147,17 @@ internal sealed partial class RoomFlow
         _joinRefused = senders.JoinRefused;
         _left = senders.Left;
         _matchStarting = senders.MatchStarting;
+        if (options?.BombRoundSeries == true
+            && _matchStarting is not IRoundSeriesEntrySender)
+            throw new ConfigException("bomb_round_series requires an audited round-series entry sender.");
+        if (options?.BombRoundSeries == true
+            && !((IRoundSeriesEntrySender)_matchStarting!).SupportsMode((int)GameModeId.Bomb))
+            throw new ConfigException("bomb_round_series is not supported by this round-series entry sender.");
+        if (options?.BombRoundSeries == true && ((IRoundSeriesEntrySender)_matchStarting!).RoundsToWin is < 2 or > 3)
+            throw new ConfigException("bomb_round_series requires an audited best-of-three or best-of-five format.");
         _settingsChanged = senders.SettingsChanged;
         _chat = senders.Chat;
+        _sessionChat = senders.SessionChat;
         _seatLock = senders.SeatLock;
         _kicked = senders.Kicked;
         _plazaEntered = senders.PlazaEntered;
@@ -157,7 +187,12 @@ internal sealed partial class RoomFlow
         _texts = texts;
         _roomNotices = new RoomNotices(_notices, _texts);
         _commands = new GameCommandHandler(registry, StartFromCommandAsync, _roomNotices,
-            (room, mode, ct) => ApplyModeAsync(room, mode, null, ct), canStart: _matchStarting is not null);
+            (room, mode, ct) => ApplyModeAsync(room, mode, null, ct), canStart: _matchStarting is not null,
+            udpEnabled: options?.UdpEnabled ?? false)
+        {
+            LeaveToPlaza = LeaveToPlazaAsync,
+            LeavePlayingMatchToPlaza = (session, ct) => LeaveToPlazaAsync(session, ct, null, null, requirePlayingMatch: true),
+        };
         if (options is { AutoStartModeIds.Length: > 0 } && (_autoStart is null || _notices is null || _texts is null))
             throw new InvalidOperationException("Automatic room start requires native countdown, notice and localization services.");
         _plaza = new PlazaPresence(plazaCapacity);
@@ -197,7 +232,7 @@ internal sealed partial class RoomFlow
             return;
         }
 
-        var equipment = await SeatCharacter.ResolveEquipmentAsync(session, userNum, _selection, _characters, ct).ConfigureAwait(false);
+        var equipment = await ResolveEquipmentAsync(session, userNum, ct).ConfigureAwait(false);
         if (PlazaBound)
             await LeavePlazaForRoomAsync(session, ct).ConfigureAwait(false);
         // A "#id#" tag in the title forces the mode and is not part of the title the room shows.
@@ -231,43 +266,36 @@ internal sealed partial class RoomFlow
     public ValueTask HandleListAsync(ISession session, RoomListRequested request, IMessageSender<RoomListSnapshot> sender,
         CancellationToken ct)
     {
-        var open = _registry.OpenRooms();
-        var rows = new List<RoomListEntry>(open.Count);
-        foreach (var room in open)
-        {
-            lock (room.Gate)
-            {
-                var master = room.Seats.FirstOrDefault(seat => seat.Slot == room.MasterSlot)?.Nickname ?? string.Empty;
-                // Closed seats cannot be joined, so the row counts only the open ones.
-                rows.Add(new RoomListEntry(room.Id, room.RoomName, master, room.ModeId, room.OccupantCount,
-                    room.MaxSeats - room.ClosedSlots.Count, room.Password.Length > 0, room.BuildSettings)
-                    { MatchInProgress = room.Phase != RoomPhase.Waiting });
-            }
-        }
+        if (Browser is not null) return ListBrowserAsync(session, request, sender, ct);
+        var rows = _registry.SnapshotListedRooms(matchRoomsOnly: false, ct).Select(room => room.Entry).ToArray();
         return sender.SendAsync(session, new RoomListSnapshot(request.Cursor, rows), ct);
     }
 
     /// <summary>Seats the player in a listed room, or answers with the reason no seat was given.</summary>
     public ValueTask HandleJoinAsync(ISession session, RoomJoinRequested request, CancellationToken ct) =>
-        RunSceneAsync(session, (group, token) => JoinSceneAsync(session, request, group, token), ct);
+        RunSceneAsync(session, (group, token) => Browser is null
+            ? JoinSceneAsync(session, request, group, token)
+            : JoinBrowserAsync(session, request, group, token), ct);
 
-    private async ValueTask JoinSceneAsync(ISession session, RoomJoinRequested request, SceneGroup? group, CancellationToken ct)
+    private async ValueTask JoinSceneAsync(ISession session, RoomJoinRequested request, SceneGroup? group, CancellationToken ct,
+        Guid? expectedInstance = null, PreparedAdmission? admission = null)
     {
         var (userNum, nickname) = SessionPlayer.RequireIdentity(session);
         if (_registry.TryGet(session.Id) is { } current)
             throw new InvalidOperationException($"Session {session.Id} asked to join room {request.RoomId} while seated in room {current.Id}.");
-        if (_registry.FindJoinable(request.RoomId) is not { } target)
+        if (_registry.FindJoinable(request.RoomId) is not { } target
+            || expectedInstance is { } instance && target.InstanceId != instance)
         {
             await RefuseAsync(session, request.RoomId, RoomJoinRefusal.NoRoom, ct).ConfigureAwait(false);
             return;
         }
 
-        var equipment = await SeatCharacter.ResolveEquipmentAsync(session, userNum, _selection, _characters, ct).ConfigureAwait(false);
+        var equipment = await ResolveEquipmentAsync(session, userNum, ct).ConfigureAwait(false);
         try
         {
             await target.Executor.ExecuteAsync(
                 operationCt => JoinCoreAsync(session, request, target, userNum, nickname, equipment, operationCt,
-                    partyTransition: group is not null), ct).ConfigureAwait(false);
+                    partyTransition: group is not null, expectedInstance: expectedInstance, admission: admission), ct).ConfigureAwait(false);
             // The plaza has its own executor, so its seat is vacated once the room's callback is over.
             if (PlazaBound && _registry.TryGet(session.Id) is not null)
                 await LeavePlazaForRoomAsync(session, ct).ConfigureAwait(false);
@@ -283,12 +311,17 @@ internal sealed partial class RoomFlow
 
     private async ValueTask JoinCoreAsync(ISession session, RoomJoinRequested request, PlayRoom target,
         int userNum, string nickname, SeatEquipment equipment, CancellationToken ct, bool notifyRefusal = true,
-        bool partyTransition = false)
+        bool partyTransition = false, Guid? expectedInstance = null, PreparedAdmission? admission = null)
     {
         RoomJoinRefusal? refusal;
+        (PlayRoom Room, RoomSeat Seat)? joinedRoom = null;
         lock (target.Gate)
         {
-            refusal = target.Phase switch
+            refusal = expectedInstance is { } instance && (target.InstanceId != instance
+                || !ReferenceEquals(_registry.Find(target.Id), target) || !target.Listed)
+                ? RoomJoinRefusal.NoRoom : admission is not null
+                ? IsAdmissionSession(session, admission) ? target.ValidateAdmission(admission.Reservation, userNum) : RoomJoinRefusal.NoRoom
+                : target.Phase switch
             {
                 RoomPhase.Waiting when target.IsFull => RoomJoinRefusal.Full,
                 RoomPhase.Waiting when target.Password.Length > 0 && request.Password != target.Password => RoomJoinRefusal.WrongPassword,
@@ -296,6 +329,9 @@ internal sealed partial class RoomFlow
                 RoomPhase.Closed => RoomJoinRefusal.NoRoom,
                 _ => RoomJoinRefusal.Started,
             };
+            if (refusal is null)
+                joinedRoom = _registry.Join(session, target.Id, userNum, nickname, equipment.CharacterId, equipment.ItemIds,
+                    admission?.Reservation);
         }
         if (refusal is { } reason)
         {
@@ -304,7 +340,7 @@ internal sealed partial class RoomFlow
             return;
         }
 
-        var (room, joined) = _registry.Join(session, target.Id, userNum, nickname, equipment.CharacterId, equipment.ItemIds);
+        var (room, joined) = joinedRoom ?? throw new InvalidOperationException("Accepted room admission did not install a seat.");
         _logger.LogInformation("Session {Id} joined room {Room} slot={Slot} character={Character}.",
             session.Id, room.Id, joined.Slot, joined.CharacterId);
         // The joiner gets the whole room; the members already inside get only the new seat.
@@ -363,7 +399,8 @@ internal sealed partial class RoomFlow
                 seat.Nickname = change.Nickname;
                 newMember = seat.ToMember();
                 observers = _plaza.Sessions().Where(member => member.SessionId != seat.SessionId
-                    && _registry.TryGet(member.SessionId) is null).Select(member => member.Game).ToArray();
+                    && _registry.TryGet(member.SessionId) is null).Select(member => member.Game!).ToArray();
+                if (!seat.Remote) PublishPlaza(new(PlazaFederationEventKind.Entered, newMember.UserNumber, newMember, default));
             }
             if (_plazaMemberLeft is null || _plazaMemberEntered is null) return;
             foreach (var observer in observers)
@@ -427,18 +464,52 @@ internal sealed partial class RoomFlow
     }
 
     /// <summary>Takes the player out of their room, tells the members who stay and confirms to the leaver.</summary>
-    public ValueTask HandleLeaveAsync(ISession session, RoomLeaveRequested request, CancellationToken ct) =>
-        RunSceneAsync(session, async (group, token) =>
+    public async ValueTask HandleLeaveAsync(ISession session, RoomLeaveRequested request, CancellationToken ct)
+    {
+        long? returnGeneration = null;
+        await RunSceneAsync(session, async (group, token) =>
         {
             var source = _registry.TryGet(session.Id);
             var canFollow = source is not null && source.Phase == RoomPhase.Waiting;
             await LeaveSceneAsync(session, group is not null && canFollow, token).ConfigureAwait(false);
             if (canFollow && PlazaBound)
                 await FollowRoomLeaveAsync(group, source!, token).ConfigureAwait(false);
-        }, ct);
+            if (source is not null) returnGeneration = CaptureHomeReturn(session);
+        }, ct).ConfigureAwait(false);
+        await ReturnHomeAfterSceneAsync(session, returnGeneration, ct).ConfigureAwait(false);
+    }
+
+    // !plaza and a cancelled round: the seat is released as on a voluntary leave, in any phase (a round settles the
+    // leaver and an empty room closes), then the player gets the plaza a waiting-room leaver gets.
+    private ValueTask<bool> LeaveToPlazaAsync(ISession session, CancellationToken ct) =>
+        LeaveToPlazaAsync(session, ct, null, null);
+
+    // A delayed cancellation owns only the room and start that scheduled it.
+    internal ValueTask<bool> ReturnCancelledPlayerAsync(ISession session, PlayRoom room, int generation, CancellationToken ct) =>
+        LeaveToPlazaAsync(session, ct, room, generation);
+
+    private async ValueTask<bool> LeaveToPlazaAsync(ISession session, CancellationToken ct,
+        PlayRoom? cancelledRoom, int? cancelledGeneration, bool requirePlayingMatch = false)
+    {
+        if (_registry.TryGet(session.Id) is null) return false;
+        long? returnGeneration = null;
+        await RunSceneAsync(session, async (_, token) =>
+        {
+            if (_registry.TryGet(session.Id) is not { } current) return;
+            if (cancelledRoom is not null && (!ReferenceEquals(current, cancelledRoom)
+                || current.StartGeneration != cancelledGeneration || !current.RoundCancelled)) return;
+            await LeaveSceneAsync(session, false, token, cancelledSource: cancelledRoom,
+                cancelledGeneration: cancelledGeneration, requirePlayingMatch: requirePlayingMatch).ConfigureAwait(false);
+            if (_registry.TryGet(session.Id) is null)
+                returnGeneration = CaptureHomeReturn(session);
+        }, ct).ConfigureAwait(false);
+        await ReturnHomeAfterSceneAsync(session, returnGeneration, ct).ConfigureAwait(false);
+        return _registry.TryGet(session.Id) is null;
+    }
 
     private async ValueTask LeaveSceneAsync(ISession session, bool partyTransition, CancellationToken ct,
-        SceneGroup? followingGroup = null, PlayRoom? followingSource = null)
+        SceneGroup? followingGroup = null, PlayRoom? followingSource = null,
+        PlayRoom? cancelledSource = null, int? cancelledGeneration = null, bool requirePlayingMatch = false)
     {
         if (_registry.TryGet(session.Id) is not { } room)
         {
@@ -452,7 +523,15 @@ internal sealed partial class RoomFlow
             if (followingGroup is not null && (!FollowerIsCurrent(followingGroup, session)
                 || !ReferenceEquals(room, followingSource) || room.Phase != RoomPhase.Waiting)) return;
             lock (room.Gate)
+            {
+                if (requirePlayingMatch && (!room.IsMatchRoom || room.Phase != RoomPhase.Playing || room.RoundCancelled
+                    || !ReferenceEquals(room.FindByGame(session.Id)?.Game, session)
+                    || !session.TryFeature<IPlayerSession>(out var player) || player.Phase is not (SessionPhase.Room or SessionPhase.Match))) return;
+                if (cancelledSource is not null && (!ReferenceEquals(room, cancelledSource)
+                    || room.StartGeneration != cancelledGeneration || !room.RoundCancelled
+                    || !ReferenceEquals(_registry.TryGet(session.Id), room))) return;
                 view = View(room);
+            }
             left = await LeaveCoreAsync(room, session.Id, operationCt).ConfigureAwait(false);
         }, ct).ConfigureAwait(false);
         if (left is null) return;
@@ -470,6 +549,12 @@ internal sealed partial class RoomFlow
     /// </summary>
     public async ValueTask HandleTeamChangeAsync(ISession session, RoomTeamChangeRequested request, CancellationToken ct)
     {
+        if (request.ZombieConversion is { } conversion)
+        {
+            if (ScriptZombieConversionRequested is { } handle)
+                await handle(session, conversion, ct).ConfigureAwait(false);
+            return;
+        }
         var (room, _) = _registry.RequireGame(session);
         if (_options?.ZombieConversionModeId > 0 && room.ModeId == _options.ZombieConversionModeId
             && room.Phase == RoomPhase.Playing)
@@ -642,6 +727,12 @@ internal sealed partial class RoomFlow
                 _logger.LogWarning("Room {Room}: native automatic start requires the master's resolved map; received '{Map}'.", room.Id, request.MapKey);
                 return;
             }
+            if (!nativeAutoStart && !request.Force && StartRuleRefusal(room) is { } refusal)
+            {
+                _logger.LogInformation("Session {Id} start of room {Room} refused by the start rules: {Refusal}.",
+                    session.Id, room.Id, refusal);
+                return;
+            }
             var draw = _options?.ServerMapDraw == true ? DrawRoundMap(room, request) : null;
             if (_options?.ServerMapDraw == true && draw is null)
             {
@@ -649,7 +740,16 @@ internal sealed partial class RoomFlow
                     room.Id, room.ModeId, request.MapSelection);
                 return;
             }
+            if (_options?.UsesScriptZombieMode(room.ModeId) == true && room.Bots.Count != 0)
+                throw new InvalidOperationException("Script zombie selection requires native player-controlled participants.");
+            if (ZombieEscapeStarting is not null && room.ModeId == (int)GameModeId.ZombieEscape && room.Bots.Count != 0)
+            {
+                _logger.LogWarning("Room {Room}: Zombie Escape requires human-controlled participants.", room.Id);
+                return;
+            }
             room.MarkStarting();
+            if (_options?.BombRoundSeries == true && room.ModeId == (int)GameModeId.Bomb)
+                room.BeginBombSeries(((IRoundSeriesEntrySender)_matchStarting!).RoundsToWin);
             // kr-812 sub_816300 copies session+132 and session+188 into separate request strings.
             room.RoundMapKey = draw?.Map ?? (request.MapKey.Length > 0 ? request.MapKey : room.MapKey);
             room.RoundStageKey = draw?.Stage ?? "";
@@ -670,12 +770,15 @@ internal sealed partial class RoomFlow
                     member.Team = ZombiePvpHumanTeam;
                     humanTeams.Add(new(member.Slot, ZombiePvpHumanTeam));
                 }
+            ScriptZombiesStarting?.Invoke(room);
+            ZombieEscapeStarting?.Invoke(room);
             room.AutoStartCancellation?.Cancel();
             members = [.. room.Seats];
             PrepareRescues(room);
             starting = new RoomMatchStarting(View(room), room.RoundMapKey)
             {
                 StageKey = room.RoundStageKey, IsMission = draw?.IsMission == true,
+                Series = SeriesEntry(room),
             };
         }
         foreach (var change in humanTeams)
@@ -690,7 +793,27 @@ internal sealed partial class RoomFlow
             await sender.SendAsync(member.Game, starting, ct).ConfigureAwait(false);
         }
         _logger.LogInformation("Room {Room} round loading on {Map} for {Count} member(s).", room.Id, starting.MapKey, members.Length);
+        ArmLoadTimeout(room);
     }
+
+    // Runs on the existing result sequence's executor step after its cancellation ownership is released.
+    internal async ValueTask ContinueSeriesAsync(PlayRoom room, int completedGeneration, CancellationToken ct)
+    {
+        RoomSeat[] members;
+        RoomMatchStarting starting;
+        lock (room.Gate)
+        {
+            if (!room.ContinueBombSeries(completedGeneration)) return;
+            members = [.. room.Seats];
+            starting = new(View(room), room.RoundMapKey) { StageKey = room.RoundStageKey, Series = SeriesEntry(room) };
+        }
+        foreach (var member in members)
+            await _matchStarting!.SendAsync(member.Game, starting, ct).ConfigureAwait(false);
+        ArmLoadTimeout(room);
+    }
+
+    private static RoundSeriesEntry? SeriesEntry(PlayRoom room) => room.BombSeries is { } series
+        ? new(series.RoundIndex, series.AttackingTeam) : null;
 
     /// <summary>
     /// Shows a chat line to the speaker's audience: the room when they are seated, the plaza when
@@ -735,13 +858,40 @@ internal sealed partial class RoomFlow
             {
                 var line = new RoomChatReceived(0, speaker.Slot, speaker.Nickname, request.Channel, request.Text);
                 foreach (var other in _plaza.Sessions())
-                    await _chat.SendAsync(other.Game, line, operationCt).ConfigureAwait(false);
+                    await _chat.SendAsync(other.Game!, line, operationCt).ConfigureAwait(false);
                 return;
             }
             // The main menu has no audience: the sender hears their own line alone.
             var (userNum, nickname) = SessionPlayer.RequireIdentity(session);
             await _chat.SendAsync(session, new RoomChatReceived(0, 0, nickname, request.Channel, request.Text), operationCt)
                 .ConfigureAwait(false);
+        }, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Shows a waiting-room chat line to the room: every member, or only the speaker's team when the speaker chose
+    /// team chat. The speaker hears their own line too, because the client draws nothing until this answer arrives
+    /// (kr-812 sub_8145C0, cn-717 sub_899D30). A speaker who is not seated has no audience and is not answered.
+    /// </summary>
+    public async ValueTask HandleSessionChatAsync(ISession session, RoomSessionChatSent request, CancellationToken ct)
+    {
+        if (await _commands.TryHandleAsync(session, request.Text, ct).ConfigureAwait(false))
+            return;
+        if (_sessionChat is null || _registry.TryGet(session.Id) is not { } room)
+            return;
+        await room.Executor.ExecuteAsync(async operationCt =>
+        {
+            RoomSeat[] audience;
+            RoomSessionChatReceived line;
+            lock (room.Gate)
+            {
+                if (room.FindByGame(session.Id) is not { } speaker)
+                    return;
+                audience = request.TeamOnly ? [.. room.Seats.Where(seat => seat.Team == speaker.Team)] : [.. room.Seats];
+                line = new RoomSessionChatReceived(room.Id, speaker.Slot, request.TeamOnly, request.Text);
+            }
+            foreach (var member in audience)
+                await _sessionChat.SendAsync(member.Game, line, operationCt).ConfigureAwait(false);
         }, ct).ConfigureAwait(false);
     }
 
@@ -834,7 +984,7 @@ internal sealed partial class RoomFlow
                 return room.Executor.ExecuteAsync(async operationCt =>
                 {
                     if (_registry.TryGetSessionOfConnection(connectionId, out var sessionId))
-                        await LeaveCoreAsync(room, sessionId, operationCt).ConfigureAwait(false);
+                        await LeaveCoreAsync(room, sessionId, operationCt, disconnected: true).ConfigureAwait(false);
                     _registry.DetachConnection(connectionId);
                 });
             }
@@ -864,12 +1014,15 @@ internal sealed partial class RoomFlow
         }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
     }
 
-    // Runs on the room's executor: the vacated seat first, then the new master when the master left.
-    private async ValueTask<RoomMemberView?> LeaveCoreAsync(PlayRoom room, long sessionId, CancellationToken ct)
+    // Runs on the room's executor: the vacated seat first, then the new master when the master left. A dropped
+    // connection (disconnected) during a loading or playing round cancels the round for everyone; a leave plays on.
+    private async ValueTask<RoomMemberView?> LeaveCoreAsync(PlayRoom room, long sessionId, CancellationToken ct,
+        bool disconnected = false)
     {
         int slot;
         bool wasMaster;
         RoomMemberView left;
+        RoomSeat departing;
         lock (room.Gate)
         {
             var seat = room.FindByGame(sessionId);
@@ -881,19 +1034,26 @@ internal sealed partial class RoomFlow
             slot = seat.Slot;
             wasMaster = slot == room.MasterSlot;
             left = View(seat);
+            departing = seat;
         }
 
+        if (BeforeSeatLeaves is { } recordDeparture)
+            await recordDeparture(room, departing, ct).ConfigureAwait(false);
         _registry.Detach(sessionId);
         RoomSeat[] remaining;
         int newMaster;
         RoomSeatUpdated? masterRecord = null;
         bool inRound;
+        bool cancelRound;
         lock (room.Gate)
         {
             remaining = [.. room.Seats];
             if (remaining.Length == 0)
                 return left;
             inRound = room.Phase != RoomPhase.Waiting;
+            cancelRound = (disconnected && _options?.CancelRoundOnDisconnect == true
+                || wasMaster && (room.ScriptZombies is not null || room.ZombieEscape is not null)
+                || room.ScriptZombies?.KingSlot == slot) && TryCancelRoundCore(room);
             newMaster = room.MasterSlot;
             if (wasMaster)
             {
@@ -931,7 +1091,17 @@ internal sealed partial class RoomFlow
         }
         _logger.LogInformation("Room {Room} slot {Slot} left; {Count} member(s) told{Master}.",
             room.Id, slot, remaining.Length, wasMaster ? $", master moved to slot {newMaster}" : "");
-        if (inRound && SeatLeftDuringRound is { } hook)
+        if (cancelRound)
+        {
+            ReturnCancelledRound(room, wasMaster && (room.ScriptZombies is not null || room.ZombieEscape is not null)
+                ? "the native zombie script master left" : room.ScriptZombies?.KingSlot == slot
+                    ? "the ghost zombie king left" : $"slot {slot} disconnected");
+            return left;
+        }
+        bool cancelled;
+        lock (room.Gate)
+            cancelled = room.RoundCancelled;
+        if (inRound && !cancelled && SeatLeftDuringRound is { } hook)
             await hook(room, ct).ConfigureAwait(false);
         return left;
     }
@@ -1004,6 +1174,13 @@ internal sealed partial class RoomFlow
             await NotifyScenePeerAsync(member.Game, _uiChanged, update, ct).ConfigureAwait(false);
     }
 
+    private async ValueTask<SeatEquipment> ResolveEquipmentAsync(ISession session, int userNum, CancellationToken ct)
+    {
+        // Normalization writes inventory; followers need their own authority on the leader's asynchronous flow.
+        using var authority = _mutations?.Enter(session);
+        return await SeatCharacter.ResolveEquipmentAsync(session, userNum, _selection, _characters, ct).ConfigureAwait(false);
+    }
+
     private async ValueTask SendEnteredAsync(ISession session, PlayRoom room, CancellationToken ct,
         RoomEntryReason reason = RoomEntryReason.Unspecified, bool partyTransition = false)
     {
@@ -1012,6 +1189,7 @@ internal sealed partial class RoomFlow
         {
             var seat = room.FindByGame(session.Id)
                 ?? throw new InvalidOperationException($"Session {session.Id} holds no seat in room {room.Id}.");
+            room.PeerInstallationVersion = checked(room.PeerInstallationVersion + 1);
             entered = new RoomEntered(View(room), seat.Slot) { Reason = reason, PartyTransition = partyTransition };
         }
         await _entered.SendAsync(session, entered, ct).ConfigureAwait(false);
@@ -1055,7 +1233,7 @@ internal sealed partial class RoomFlow
 
     private static RoomMemberView View(RoomSeat seat) => new(seat.Slot, seat.UserNum, seat.Nickname, Math.Max(1, seat.Level),
         seat.Team, seat.Ready, seat.CharacterId != 0 ? seat.CharacterId : seat.LocalCharacterId,
-        seat.EquippedItemIds ?? []) { InShop = seat.InShop, InInventory = seat.InInventory, ColorIndex = seat.ColorIndex };
+        seat.EquippedItemIds ?? []) { InShop = seat.InShop, InInventory = seat.InInventory, ColorIndex = seat.ColorIndex, InventorySelection = seat.InventorySelection };
 }
 
 /// <summary>The encoders a build's dialect publishes for the room flow; the first four are needed by every room.</summary>
@@ -1068,6 +1246,7 @@ internal sealed partial class RoomFlow
 /// <param name="MatchStarting">Tells a member the round is loading; null on a build whose start is not bound.</param>
 /// <param name="SettingsChanged">Shows a member the room's new settings; null on a build without a settings change.</param>
 /// <param name="Chat">Shows a member a chat line; null on a build whose room chat is not bound.</param>
+/// <param name="SessionChat">Shows a member a waiting-room chat line; null on a build without that chat pair.</param>
 /// <param name="SeatLock">Shows a member a closed or opened seat; null on a build whose seat lock is not bound.</param>
 /// <param name="Kicked">Tells a member who was removed; null on a build whose kick is not bound.</param>
 /// <param name="PlazaEntered">Sends an entrant the whole plaza; null on a build without the plaza encoders.</param>
@@ -1109,7 +1288,8 @@ internal sealed record RoomSenders(
     IMessageSender<MainMenuRoomOpened>? MainMenu = null,
     IMessageSender<RoomUiChanged>? UiChanged = null,
     IMessageSender<RoomProbeAcknowledged>? ProbeAcknowledged = null,
-    IMessageSender<RoomMasterChangeReplied>? MasterChangeReply = null)
+    IMessageSender<RoomMasterChangeReplied>? MasterChangeReply = null,
+    IMessageSender<RoomSessionChatReceived>? SessionChat = null)
 {
     /// <summary>Resolves the encoders published for <paramref name="protocol"/>; a missing required one is a configuration error.</summary>
     public static RoomSenders Resolve(IPluginContext context, string protocol) => new(
@@ -1137,5 +1317,6 @@ internal sealed record RoomSenders(
         PlaySenders.Optional<MainMenuRoomOpened>(context, protocol),
         PlaySenders.Optional<RoomUiChanged>(context, protocol),
         PlaySenders.Optional<RoomProbeAcknowledged>(context, protocol),
-        PlaySenders.Optional<RoomMasterChangeReplied>(context, protocol));
+        PlaySenders.Optional<RoomMasterChangeReplied>(context, protocol),
+        PlaySenders.Optional<RoomSessionChatReceived>(context, protocol));
 }

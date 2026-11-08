@@ -1,0 +1,73 @@
+# Node-wide migration rows for the shipped all-builds profile. Mount the account ownership,
+# sessions, fencing and room-directory bundles first. Each build also needs the per-build
+# migration patch in its local override, with channel and admission channels explicitly set.
+- insert:
+    - id: cluster-migration-broker
+      plugin: cluster.migration-broker
+      config:
+        node_id: "${BFF_CLUSTER_NODE_ID}"
+        directory_url: "${BFF_CLUSTER_DIRECTORY_URL}"
+        access_key: "${BFF_CLUSTER_NODE_KEY}"
+    - id: cluster-migration-arrivals
+      plugin: cluster.migration-arrivals
+    - id: cluster-migration-destination
+      plugin: cluster.migration-destination
+      config:
+        node_id: "${BFF_CLUSTER_NODE_ID}"
+        endpoints:
+          - client_build: kr-1256
+            listener_id: kr-1256.game-listener
+            host: "${BFF_PUBLIC_DOMAIN}"
+            port: ${KR_1256_PUBLIC_PORT:-7100}
+          - client_build: kr-812
+            listener_id: kr-812.game-listener
+            host: "${BFF_PUBLIC_DOMAIN}"
+            port: ${KR_812_PUBLIC_PORT:-7110}
+          - client_build: id-400
+            listener_id: id-400.game-listener
+            host: "${BFF_PUBLIC_DOMAIN}"
+            port: ${ID_400_PUBLIC_PORT:-7120}
+          - client_build: id-1809
+            listener_id: id-1809.game-listener
+            host: "${BFF_PUBLIC_DOMAIN}"
+            port: ${ID_1809_PUBLIC_PORT:-7130}
+          - client_build: cn-324
+            listener_id: cn-324.game-listener
+            host: "${BFF_PUBLIC_DOMAIN}"
+            port: ${CN_324_PUBLIC_PORT:-7140}
+          - client_build: cn-717
+            listener_id: cn-717.game-listener
+            host: "${BFF_PUBLIC_DOMAIN}"
+            port: ${CN_717_PUBLIC_PORT:-7150}
+          - client_build: cn-774
+            listener_id: cn-774.game-listener
+            host: "${BFF_PUBLIC_DOMAIN}"
+            port: ${CN_774_PUBLIC_PORT:-7190}
+          - client_build: tw-454
+            listener_id: tw-454.game-listener
+            host: "${BFF_PUBLIC_DOMAIN}"
+            port: ${TW_454_PUBLIC_PORT:-7200}
+          - client_build: cn-279
+            listener_id: cn-279.game-listener
+            host: "${BFF_PUBLIC_DOMAIN}"
+            port: ${CN_279_PUBLIC_PORT:-7210}
+          - client_build: cn-406
+            listener_id: cn-406.game-listener
+            host: "${BFF_PUBLIC_DOMAIN}"
+            port: ${CN_406_PUBLIC_PORT:-7230}
+          - client_build: cn-706
+            listener_id: cn-706.game-listener
+            host: "${BFF_PUBLIC_DOMAIN}"
+            port: ${CN_706_PUBLIC_PORT:-7220}
+          - client_build: cn-404
+            listener_id: cn-404.game-listener
+            host: "${BFF_PUBLIC_DOMAIN}"
+            port: ${CN_404_PUBLIC_PORT:-7240}
+          - client_build: cn-408
+            listener_id: cn-408.game-listener
+            host: "${BFF_PUBLIC_DOMAIN}"
+            port: ${CN_408_PUBLIC_PORT:-7250}
+- set:
+    id: cluster-account-store
+    config:
+      node_id: "${BFF_CLUSTER_NODE_ID}"

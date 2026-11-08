@@ -1,5 +1,5 @@
 version: 1
-# Portal move: the game connection's scene transition request and its reply, plus the relay connection's
+# Portal move: the game connection's map-region contact request and its reply, plus the relay connection's
 # companion frame the same client action sends. The structures are stated as kr-812 sends and reads them;
 # the kr-1256 client writes and reads the same bodies.
 #
@@ -9,27 +9,36 @@ version: 1
 # resolved by name from each build's table, never by the number alone.
 structs:
   # kr-812 C2S gcpPortalMove (948), sender kr-812 sub_529E80 (Packet_gcpPortalMove),
-  # deserializer kr-812 sub_52FC40: three four-byte words then a two-byte word (14 bytes).
+  # deserializer kr-812 sub_52FC40: three position components then a two-byte region key (14 bytes).
   # The kr-1256 C2S 939 builder kr-1256 sub_7037D0 writes the same four pieces in this order.
+  # cn-706 sub_5350D0 -> cn-706 sub_4E2AF0 supplies the character position and map region key;
+  # cn-706 sub_4BA1F0 reads the same widths. cn-706 sub_7C6B60 uses the reply to start native map motion.
+  # Position provenance: kr-812 sub_580E10; cn-406 sub_49DD30; cn-404 sub_52FAD0; cn-408 sub_531C80;
+  # cn-705 sub_534770; cn-717 sub_5BD350; id-400 sub_502150; id-1809 sub_54FD90.
+  # Modern contact writers: kr-1256 sub_7037D0, cn-774 sub_8C3CB0 and tw-454 sub_737900 (game 939).
   PortalMoveRequest:
-    - unknown_4: u32
+    - position_x: f32
       offset: 4
-    - unknown_8: u32
+    - position_y: f32
       offset: 8
-    - unknown_12: u32
+    - position_z: f32
       offset: 12
-    - unknown_16: u16
+    - portal_id: u16
       offset: 16
 
-  # kr-812 S2C gspPortalMove (958), deserializer kr-812 sub_83B7C0: a four-byte word, a two-byte word and
-  # another four-byte word (10 bytes). The kr-1256 S2C 953 handler kr-1256 sub_9C3DF0 reads four, two and
-  # four bytes in this order and applies the scene transition through kr-1256 sub_6D3390/sub_9E1530.
+  # The native readers consume word, region u16, seat word; zero enters the movement path and -1 denies it.
+  # kr-812 sub_83B7C0 -> kr-812 sub_833A60; cn-406 sub_716120 -> cn-406 sub_737680.
+  # cn-404 sub_7C7840 -> cn-404 sub_7EA9D0; cn-408 sub_7CADE0 -> cn-408 sub_7EE050.
+  # cn-705 sub_7A0E20 -> cn-705 sub_7C5070; cn-706 sub_7A2580 -> cn-706 sub_7C6B60.
+  # cn-717 sub_8C42C0 -> cn-717 sub_8BC220; id-400 sub_79A030 -> id-400 sub_7BD5D0.
+  # id-1809 sub_7BFDC0 -> id-1809 sub_7E0C60; kr-1256 sub_9C3DF0 reads the stream directly.
+  # cn-774 sub_BC14A0 and tw-454 sub_A9E510 read the same stream and invoke native region actions.
   PortalMoveReply:
     - unknown_4: u32
       offset: 4
-    - unknown_8: u16
+    - portal_id: u16
       offset: 8
-    - unknown_12: u32
+    - seat: u32
       offset: 12
 
   # Relay C2S 26 rcpPortalMove, sent by the same client action next to the game request: kr-812 sender
@@ -40,3 +49,17 @@ structs:
       offset: 4
     - unknown_8: u16
       offset: 8
+
+  # Native peer teleport: the character handle followed by three position components (16 bytes).
+  # kr-1256 sub_8F3380 -> kr-1256 sub_6FCB20; cn-774 sub_AE3BC0 -> cn-774 sub_8BC720;
+  # tw-454 sub_7133D0 -> tw-454 sub_730630. Each writer stamps 32922 and queues its local copy.
+  # These stream frames have no shared native packet-object offsets.
+  PortalTeleport:
+    - actor: u32
+      only: [kr-1256]
+    - position_x: f32
+      only: [kr-1256]
+    - position_y: f32
+      only: [kr-1256]
+    - position_z: f32
+      only: [kr-1256]

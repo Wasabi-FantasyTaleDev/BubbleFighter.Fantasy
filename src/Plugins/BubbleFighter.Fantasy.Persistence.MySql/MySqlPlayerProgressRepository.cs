@@ -1,12 +1,47 @@
+using BubbleFighter.Fantasy.Contracts.Cluster;
 using BubbleFighter.Fantasy.Abstractions.Persistence;
 using BubbleFighter.Fantasy.Contracts.Progress;
 using SqlSugar;
 
 namespace BubbleFighter.Fantasy.Persistence.MySql;
 
-/// <summary>MySQL store for <c>players.level</c> / <c>players.exp</c> and round Lucci credits.</summary>
-public sealed class MySqlPlayerProgressRepository(IDbConnectionFactory connections) : IPlayerProgressRepository
+/// <summary>MySQL progress, reward and battle-statistics store with one account-locked transaction per match receipt.</summary>
+public sealed class MySqlPlayerProgressRepository : IPlayerBattleRecordsRepository
 {
+    private readonly IDbConnectionFactory connections;
+    private readonly IAccountMutationFence? authority;
+    private readonly int maxBattleModes;
+
+    /// <summary>Creates a progress store whose battle aggregates share the account mutation transaction.</summary>
+    /// <param name="connections">Connections to the account database.</param>
+    /// <param name="authority">Optional account ownership fence for clustered writes.</param>
+    /// <param name="maxBattleModesPerPlayer">Maximum distinct recorded modes per player.</param>
+    public MySqlPlayerProgressRepository(IDbConnectionFactory connections, IAccountMutationFence? authority = null,
+        int maxBattleModesPerPlayer = 128)
+    {
+        ArgumentNullException.ThrowIfNull(connections);
+        ArgumentOutOfRangeException.ThrowIfLessThan(maxBattleModesPerPlayer, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(maxBattleModesPerPlayer, 4096);
+        this.connections = connections;
+        this.authority = authority;
+        maxBattleModes = maxBattleModesPerPlayer;
+    }
+
+    /// <inheritdoc />
+    public bool IsDurable => true;
+
+    /// <inheritdoc />
+    public async ValueTask<IReadOnlyList<PlayerBattleRecord>?> ListBattleRecordsAsync(long userNum, CancellationToken ct)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(userNum, 1);
+        await using var session = await SugarSession.OpenAsync(connections, ct).ConfigureAwait(false);
+        var rows = await session.Db.Queryable<BattleRecordRow>().Where(row => row.UserNum == userNum)
+            .OrderBy(row => row.ModeId).Take(maxBattleModes + 1).ToListAsync(ct).ConfigureAwait(false);
+        if (rows.Count > maxBattleModes)
+            throw new InvalidDataException("The player's battle records exceed max_battle_modes_per_player.");
+        return rows.Count == 0 ? null : rows.Select(row => row.ToRecord()).ToArray();
+    }
+
     /// <inheritdoc />
     public async ValueTask<PlayerProgress?> FindAsync(long userNum, CancellationToken ct)
     {
@@ -30,7 +65,7 @@ public sealed class MySqlPlayerProgressRepository(IDbConnectionFactory connectio
         var match = command.MatchId;
         await using var session = await SugarSession.OpenAsync(connections, ct).ConfigureAwait(false);
         var db = session.Db;
-        await using var tx = await session.BeginAsync().ConfigureAwait(false);
+        await using var tx = await session.BeginWriteAsync(user, authority, ct).ConfigureAwait(false);
         // The player's row lock serializes settlements and every other progress write of this player, so the receipt
         // lookup and the read below see the latest committed state (the primary key is the backstop).
         await MySqlPlayerLock.AcquireAsync(db, user, ct).ConfigureAwait(false);
@@ -47,6 +82,21 @@ public sealed class MySqlPlayerProgressRepository(IDbConnectionFactory connectio
             throw new InvalidOperationException($"players row for user_num {user} not found.");
         var before = new PlayerProgress(user, players[0].Level, players[0].Exp);
         var after = command.AdvanceChecked(before);
+        if (command.BattleRecord is { } battle)
+        {
+            var rows = await db.Queryable<BattleRecordRow>().Where(row => row.UserNum == user && row.ModeId == battle.ModeId)
+                .Take(1).ToListAsync(ct).ConfigureAwait(false);
+            if (rows.Count == 0 && await db.Queryable<BattleRecordRow>().Where(row => row.UserNum == user)
+                    .CountAsync(ct).ConfigureAwait(false) >= maxBattleModes)
+                throw new InvalidOperationException("The player's battle mode capacity is full; no settlement was stored.");
+            var aggregate = (rows.Count == 0 ? new PlayerBattleRecord(battle.ModeId) : rows[0].ToRecord()).Add(battle);
+            var replacement = BattleRecordRow.From(user, aggregate);
+            var changed = rows.Count == 0
+                ? await db.Insertable(replacement).ExecuteCommandAsync(ct).ConfigureAwait(false)
+                : await db.Updateable(replacement).ExecuteCommandAsync(ct).ConfigureAwait(false);
+            if (changed != 1)
+                throw new InvalidOperationException($"Battle record for user_num {user} wrote no row.");
+        }
         var level = after.Level;
         var exp = after.Exp;
         if (await db.Updateable<PlayerRow>().SetColumns(p => p.Level == level).SetColumns(p => p.Exp == exp)
@@ -59,13 +109,13 @@ public sealed class MySqlPlayerProgressRepository(IDbConnectionFactory connectio
                 .SetColumns(w => w.UpdatedAt == SqlFunc.MappingColumn(default(DateTime), "UTC_TIMESTAMP()"))
                 .Where(w => w.UserNum == user).ExecuteCommandAsync(ct).ConfigureAwait(false) != 1)
             throw new InvalidOperationException($"player_wallets row for user_num {user} not found.");
-        var row = new RoundSettlementRow
+        var settlementRow = new RoundSettlementRow
         {
             MatchId = match, UserNum = user, BeforeLevel = before.Level, BeforeExp = before.Exp,
             AfterLevel = after.Level, AfterExp = after.Exp, LucciEarned = lucci,
             SettledAtUnixMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
         };
-        if (await db.Insertable(row).ExecuteCommandAsync(ct).ConfigureAwait(false) != 1)
+        if (await db.Insertable(settlementRow).ExecuteCommandAsync(ct).ConfigureAwait(false) != 1)
             throw new InvalidOperationException($"round_settlements insert for user_num {user} wrote no row.");
         var balance = await BalanceAsync(db, user, ct).ConfigureAwait(false);
         await tx.CommitAsync().ConfigureAwait(false);

@@ -91,7 +91,7 @@ public sealed class InitialTutorialScenarioTests
         wave = player.Cursor;
         await player.Send(32857, new byte[] { 3, 0, 0, 0 });
         Assert.Equal(new byte[] { 3, 0, 0, 0 }, (await player.WaitFor(32857, wave)).Payload);
-        var member = ParityRun.Body("TutorialSpawnMember", new()
+        var member = ParityRun.Body("NpcSpawnMember", new()
         {
             ["unknown_0"] = 7, ["unknown_4"] = 3, ["unknown_8"] = "npc-preset",
             ["unknown_32"] = new[] { 0x3F800000, 0, 0, 0 },
@@ -101,9 +101,9 @@ public sealed class InitialTutorialScenarioTests
         Assert.Equal(member, (await player.WaitFor(32862, wave)).Payload);
         foreach (var (opcode, structure, values) in new (ushort, string, Dictionary<string, object?>)[]
         {
-            (32892, "TutorialSpawnActor", new() { ["unknown_0"] = new[] { 7, 3, 1, 2, 5, 0, 0, 0, 0 } }),
-            (32866, "TutorialActorReplay", new() { ["unknown_0"] = 7, ["unknown_4"] = 3, ["unknown_8"] = "npc-replay", ["unknown_32"] = 1 }),
-            (32873, "TutorialWaveMobGroup", new() { ["unknown_0"] = (byte)1, ["unknown_1"] = (byte)2, ["unknown_2"] = 7 }),
+            (32892, "NpcSpawnActor", new() { ["unknown_0"] = new[] { 7, 3, 1, 2, 5, 0, 0, 0, 0 } }),
+            (32866, "NpcActorReplay", new() { ["unknown_0"] = 7, ["unknown_4"] = 3, ["unknown_8"] = "npc-replay", ["unknown_32"] = 1 }),
+            (32873, "NpcWaveMobGroup", new() { ["unknown_0"] = (byte)1, ["unknown_1"] = (byte)2, ["unknown_2"] = 7 }),
             (32876, "TutorialSpawnPointReplay", new() { ["unknown_0"] = 7, ["unknown_4"] = true }),
         })
         {
@@ -149,10 +149,10 @@ public sealed class InitialTutorialScenarioTests
         System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(impossible.AsSpan(10), int.MaxValue);
         Assert.Throws<PacketFormatException>(() => PacketCodec.Read(ParityRun.Tables, "kr-1256", "HordeWaveTable", impossible));
         Assert.Equal(14, ParityRun.Body("HordeWaveTable", new()).Length);
-        Assert.Equal(36, ParityRun.Body("TutorialSpawnActor", new()).Length);
-        Assert.Equal(28, ParityRun.Body("TutorialSpawnMember", new()).Length);
-        Assert.Equal(16, ParityRun.Body("TutorialActorReplay", new()).Length);
-        Assert.Equal(6, ParityRun.Body("TutorialWaveMobGroup", new()).Length);
+        Assert.Equal(36, ParityRun.Body("NpcSpawnActor", new()).Length);
+        Assert.Equal(28, ParityRun.Body("NpcSpawnMember", new()).Length);
+        Assert.Equal(16, ParityRun.Body("NpcActorReplay", new()).Length);
+        Assert.Equal(6, ParityRun.Body("NpcWaveMobGroup", new()).Length);
         Assert.Equal(8, ParityRun.Body("TutorialSpawnPointReplay", new()).Length);
     }
 
@@ -171,12 +171,15 @@ public sealed class InitialTutorialScenarioTests
         Assert.Contains(kind == "not_a_tutorial" ? "initial_tutorial_kind" : "no implemented route", error.ToString());
     }
 
-    /// <summary>NPC requests cannot be acknowledged from the menu or from an ordinary waiting room.</summary>
-    /// <param name="ordinaryRoom">Admits the player to an ordinary room before sending the tutorial-only request.</param>
+    /// <summary>
+    /// NPC requests are not acknowledged from the menu or from an ordinary waiting room. They reach the shared round
+    /// flow, which ignores a report without a playing horde round, so the connection stays open.
+    /// </summary>
+    /// <param name="ordinaryRoom">Admits the player to an ordinary room before sending the request.</param>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task TutorialNpcRequestsRequireTheirOwnSoloRoom(bool ordinaryRoom)
+    public async Task NpcRequestsOutsideAPlayingRoundAreNotAnswered(bool ordinaryRoom)
     {
         await using var server = await ParityRun.StartAsync(initialTutorial: true);
         var player = await server.ConnectAsync("unadmittedNpcHost");
@@ -190,7 +193,7 @@ public sealed class InitialTutorialScenarioTests
         }
         var from = player.Cursor;
         await player.Send(903, new byte[] { 1, 0, 0, 0 });
-        await Assert.ThrowsAsync<IOException>(() => player.WaitFor(904, from));
+        await Assert.ThrowsAsync<TimeoutException>(() => player.WaitFor(904, from));
         Assert.DoesNotContain(player.Since(from), frame => frame.Opcode == 904);
     }
 

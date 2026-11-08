@@ -2,6 +2,90 @@ profile: cn-717
 # Opcode assignments for the Chinese 717 client. C2S and S2C are separate numeric spaces.
 # Only rows with evidence are listed; see profiles/opcode-policy.md.
 opcodes:
+  - value: 20005
+    direction: c2s
+    connection: relay
+    name: rcpReqUdpBypassDisable
+    name_source: label@cn-717
+    evidence: verified
+    source: "cn-717 sub_895C70 sends an empty relay TCP20005 after the UDP liveness check fails"
+  - value: 32885
+    direction: c2s
+    connection: both
+    name: gppWanderLean
+    name_source: label@cn-717
+    evidence: verified
+    source: "cn-717 sub_892D60 writes32885; sub_894C20 dispatches its UDP copy to sub_894730"
+  - value: 32885
+    direction: s2c
+    connection: both
+    name: gppWanderLean
+    name_source: label@cn-717
+    evidence: verified
+    source: "cn-717 sub_892D60 writes32885; sub_894C20 dispatches its UDP copy to sub_894730"
+  - value: 32922
+    direction: c2s
+    connection: both
+    name: gppWanderLeanOptimize
+    name_source: label@cn-717
+    evidence: verified
+    source: "cn-717 sub_892D60 writes32922; sub_894C20 dispatches its UDP copy to sub_894980"
+  - value: 32922
+    direction: s2c
+    connection: both
+    name: gppWanderLeanOptimize
+    name_source: label@cn-717
+    evidence: verified
+    source: "cn-717 sub_892D60 writes32922; sub_894C20 dispatches its UDP copy to sub_894980"
+  - value: 18
+    direction: s2c
+    connection: relay
+    name: rspUdpBypassInfo
+    name_source: label@cn-717
+    evidence: verified
+    source: "cn-717 sub_896050 case18 calls sub_896CE0, reading u16 port + u32 cookie"
+  - value: 19
+    direction: s2c
+    connection: udp
+    name: rspUdpBypassVerify_
+    name_source: coined
+    evidence: verified
+    source: "cn-717 sub_894C20 receives UDP19; sub_894BE0 checks relay source and calls sub_895BC0"
+  - value: 20
+    direction: s2c
+    connection: relay
+    name: rspUdpBypassReady_
+    name_source: coined
+    evidence: verified
+    source: "cn-717 sub_896050 case20 sets the relay UDP-ready byte at2464 without a body"
+  - value: 20001
+    direction: c2s
+    connection: udp
+    name: rcpUdpBypassAck
+    name_source: label@cn-717
+    evidence: verified
+    source: "cn-717 sub_896CE0 sends Packet_rcpUdpBypassAck containing the four-byte offered cookie"
+  - value: 20002
+    direction: c2s
+    connection: udp
+    name: rcpUdpBypassVerifyAck
+    name_source: label@cn-717
+    evidence: verified
+    source: "cn-717 sub_895BC0 sends the four-byte relay cookie in response to UDP19"
+  - value: 20003
+    direction: c2s
+    connection: udp
+    name: rcpUdpBypassWanderLean
+    name_source: label@cn-717
+    evidence: verified
+    source: "cn-717 sub_895D00 wraps32885 with the four-byte relay cookie as20003"
+  - value: 20004
+    direction: c2s
+    connection: udp
+    name: rcpUdpBypassWanderLeanOptimize
+    name_source: label@cn-717
+    evidence: verified
+    source: "cn-717 sub_895D00 wraps32922 with the four-byte relay cookie as20004"
   - value: 508
     direction: c2s
     connection: game
@@ -517,10 +601,11 @@ opcodes:
     source: "Packet_gcpReportBadProgram class and opcode setter sub_BF35F0 in sender sub_5640A0 (cn-717)"
   - value: 22
     direction: c2s
+    connection: game
     name: gcpReqCenterUserCnt
     name_source: label@cn-717
-    evidence: inferred
-    source: "Packet_gcpReqCenterUserCnt class and opcode setter sub_BF35F0 in sender sub_5456A0 (cn-717)"
+    evidence: verified
+    source: "cn-717 sub_982DA0 selects Packet_gcpReqCenterUserCnt and stamps 22; the native writer has no body"
   - value: 25
     direction: c2s
     name: gcpReqClanPassport
@@ -635,6 +720,13 @@ opcodes:
     name_source: label@cn-717
     evidence: inferred
     source: "Packet_gcpReqChangePartyLeader class and opcode setter sub_BF35F0 in sender sub_9CC530 (cn-717)"
+  - value: 304
+    direction: c2s
+    name: gcpSendPartyChatMsg
+    name_source: label@cn-717
+    evidence: verified
+    source: "cn-717 sub_9CCA60 stamps 304 on Packet_gcpSendPartyChatMsg; reader cn-717 sub_740F00"
+    notes: "Chat box line outside a room: one string. The client draws nothing until S2C gspReceivePartyChatMsg answers."
   - value: 305
     direction: c2s
     name: gcpReqPartyRecruiting
@@ -707,7 +799,7 @@ opcodes:
     name: gcpGameUpdateScoreOptimze
     name_source: label@cn-717
     evidence: verified
-    source: "Packet_gcpGameUpdateScoreOptimze is built and stamped 2023 with sub_BF35F0 in sub_53FE50 and sub_555BA0 (cn-717)"
+    source: "cn-717 sub_564430 stamps 2023; cn-717 sub_746410 reports an NPC finishing blow as kind 2 with a scorer seat; cn-717 sub_567B80 writes u8 kind, u32 auxiliary and u8 reporter seat"
     notes: "6 bytes as in kr-812: u8 kind, u32 killer serial, u8 killer seat."
   - value: 704
     direction: c2s
@@ -1235,14 +1327,14 @@ opcodes:
     direction: c2s
     name: gcpBombMissionOver
     name_source: label@cn-717
-    evidence: inferred
-    source: "Packet_gcpBombMissionOver class and opcode setter sub_BF35F0 in sender sub_560CB0 (cn-717)"
+    evidence: verified
+    source: "cn-717 sub_560CB0 stamps 2011; cn-717 sub_7F4370 reads winner, planter and defuser"
   - value: 2012
     direction: c2s
     name: gcpBombState
     name_source: label@cn-717
-    evidence: inferred
-    source: "Packet_gcpBombState class and opcode setter sub_BF35F0 in sender sub_560640 (cn-717)"
+    evidence: verified
+    source: "cn-717 sub_560640 stamps 2012; cn-717 sub_5390D0 reads operator, state and three position words"
   - value: 2014
     direction: c2s
     name: gcpRoomReqIntrudeGame
@@ -1319,10 +1411,11 @@ opcodes:
     source: "cn-717 dispatcher sub_8C0080 case 1: Packet_gspDisconnect"
   - value: 9
     direction: s2c
+    connection: game
     name: gspRepMoveChannel
     name_source: label@cn-717
-    evidence: inferred
-    source: "cn-717 dispatcher sub_8C0080 case 9: Packet_gspRepMoveChannel"
+    evidence: verified
+    source: "cn-717 sub_8C0080 case 9 calls cn-717 sub_8A1050; cn-717 reader sub_8C9DB0"
   - value: 11
     direction: s2c
     name: gspRepMoveInto
@@ -1349,10 +1442,11 @@ opcodes:
     source: "cn-717 dispatcher sub_8C0080 case 15: Packet_gspQueryBadProgram"
   - value: 18
     direction: s2c
+    connection: game
     name: gspRepUniquenessCheck
     name_source: label@cn-717
-    evidence: inferred
-    source: "cn-717 dispatcher sub_8C0080 case 18: Packet_gspRepUniquenessCheck"
+    evidence: verified
+    source: "cn-717 sub_8C0080 case 18 calls cn-717 sub_89E600; cn-717 reader sub_8C3780"
   - value: 20
     direction: s2c
     name: gspDisconnectBlockIP
@@ -1835,10 +1929,11 @@ opcodes:
     source: "cn-717 dispatcher sub_8C0080 case 955: Packet_gspEvolveResult"
   - value: 958
     direction: s2c
+    connection: game
     name: gspPortalMove
     name_source: label@cn-717
-    evidence: inferred
-    source: "cn-717 dispatcher sub_8C0080 case 958: Packet_gspPortalMove"
+    evidence: verified
+    source: "cn-717 sub_8C42C0 reads word, region u16 and seat word; cn-717 sub_8BC220 authorizes native map-region motion and clears local pending contact; packets/portal.yaml"
   - value: 959
     direction: s2c
     name: gspNotifyMsg
@@ -1982,9 +2077,9 @@ opcodes:
   - value: 2018
     direction: c2s
     name: gcpDropCaptain
-    name_source: mirrored
-    evidence: inferred
-    source: "Packet_gcpDropCaptain class exists in cn-717; kr-812 assigns it 2018, and the named neighbours 2017 and 2019 match kr-812"
+    name_source: label@cn-717
+    evidence: verified
+    source: "cn-717 sub_431430 builds the local death seat; cn-717 sub_43FB90 stamps 2018; cn-717 sub_88E6C0 writes one word"
   - value: 5
     direction: s2c
     name: gspReqHackShieldCheck
@@ -2018,9 +2113,9 @@ opcodes:
   - value: 505
     direction: s2c
     name: gspRoomChangeGameSetting
-    name_source: mirrored
-    evidence: inferred
-    source: "Packet_gspRoomChangeGameSetting class exists in cn-717; kr-812 assigns it 505, and the named neighbours 503 and 510 match kr-812"
+    name_source: label@cn-717
+    evidence: verified
+    source: "cn-717 sub_87EFE0 case 505 -> cn-717 sub_881980; cn-717 sub_419EF0 applies the settings before room entry"
   - value: 511
     direction: s2c
     name: gspRoomLeaveSlot
@@ -2100,8 +2195,8 @@ opcodes:
     direction: c2s
     name: gcpGameUpdateScore
     name_source: label@cn-717
-    evidence: inferred
-    source: "Packet_gcpGameUpdateScore is the only class constructed before the calls of the stamping helper sub_5643C0 (cn-717)"
+    evidence: verified
+    source: "cn-717 sub_5643C0 stamps 710; cn-717 sub_555260 reports bubble kinds 1/22 and cn-717 sub_5545B0 reports rescue kind 4; cn-717 sub_5437F0 places the scorer at object +12 and cn-717 sub_567BE0 writes the mixed-width report"
   - value: 807
     direction: c2s
     name: gcpReqInventoryThrowItem
@@ -2134,10 +2229,11 @@ opcodes:
     source: "Packet_gcpReqPresentThrow is the only class constructed before the calls of the stamping helper sub_9EDFA0 (cn-717)"
   - value: 948
     direction: c2s
+    connection: game
     name: gcpPortalMove
     name_source: label@cn-717
-    evidence: inferred
-    source: "Packet_gcpPortalMove is the only class constructed before the calls of the stamping helper sub_55FDA0 (cn-717)"
+    evidence: verified
+    source: "cn-717 sub_55FDA0 stamps game 948 and relay 26 separately; cn-717 sub_566C70 reads position xyz and region u16; packets/portal.yaml"
   - value: 2002
     direction: c2s
     name: gcpReqSetSecondPassword
@@ -2151,6 +2247,13 @@ opcodes:
     evidence: inferred
     source: "Packet_gcpReqArena is the only class constructed before the calls of the stamping helper sub_425050 (cn-717)"
 
+  - value: 501
+    direction: c2s
+    name: gcpRoomSendChatMsg
+    name_source: label@cn-717
+    evidence: verified
+    source: "cn-717 sub_8C2980 stamps 501 on Packet_gcpRoomSendChatMsg; reader cn-717 sub_8CFCB0"
+    notes: "Waiting-room chat box line: bool32 team-only flag, then the text. The client draws nothing until S2C gspRoomReceiveChatMsg answers."
   - value: 502
     direction: c2s
     name: gcpRoomSendChatModuleMsg
@@ -3829,9 +3932,9 @@ opcodes:
   - value: 729
     direction: s2c
     name: gspGameBroadcastPlayerScoreData
-    name_source: mirrored
-    evidence: inferred
-    source: "Packet_gspGameBroadcastPlayerScoreData class exists in cn-717; kr-812 assigns it 729, and the named neighbours 708 and 800 match kr-812"
+    name_source: label@cn-717
+    evidence: verified
+    source: "cn-717 sub_87EFE0 case 729 invokes cn-717 sub_887E90 and its named packet; cn-717 sub_4195B0 reads the full score and cn-717 sub_889C60 / cn-717 sub_889E40 copy it to the native play state; cn-717 sub_76C4D0 consumes goal fields 44/48/56"
   - value: 730
     direction: s2c
     name: gspGameRespawnCharacter
@@ -3992,9 +4095,9 @@ opcodes:
   - value: 982
     direction: s2c
     name: gspCreateCaptain
-    name_source: mirrored
-    evidence: inferred
-    source: "Packet_gspCreateCaptain class exists in cn-717; kr-812 assigns it 982, and the named neighbours 980 and 983 match kr-812"
+    name_source: label@cn-717
+    evidence: verified
+    source: "cn-717 sub_87EFE0 case 982 -> cn-717 sub_881080; cn-717 sub_8C4210 reads the seat consumed by cn-717 sub_435330"
   - value: 986
     direction: s2c
     name: gspUpdateScoreData
@@ -4068,3 +4171,110 @@ opcodes:
     name_source: label@cn-717
     evidence: inferred
     source: "cn-717 dispatcher sub_8C0080 case 819: Packet_gspRepPresentSendSubList constructor path; reader sub_8C8A80; layout in packets/present.yaml"
+
+  - value: 32885
+    direction: s2c
+    connection: udp
+    name: gppWanderLean
+    name_source: mirrored
+    evidence: verified
+    source: "cn-717 sub_894C20 dispatches the native UDP movement body after the datagram header"
+
+  - value: 32922
+    direction: s2c
+    connection: udp
+    name: gppWanderLeanOptimize
+    name_source: mirrored
+    evidence: verified
+    source: "cn-717 sub_894C20 dispatches the native UDP movement body after the datagram header"
+  - value: 16
+    direction: s2c
+    connection: game
+    name: gspRepCenterUserCnt
+    name_source: label@cn-717
+    evidence: verified
+    source: "cn-717 sub_8C0080 case 16 calls cn-717 sub_89D9A0; cn-717 reader sub_8CFC20"
+  - value: 10
+    direction: s2c
+    connection: game
+    name: gspDisconnectMovedUser
+    name_source: label@cn-717
+    evidence: verified
+    source: "cn-717 sub_8C0080 case 10 calls cn-717 sub_8A2830; empty-body pending promotion closes the previous source"
+  - value: 23
+    direction: c2s
+    connection: game
+    name: gcpReqUniquenessCheck
+    name_source: label@cn-717
+    evidence: verified
+    source: "cn-717 sub_8C2C90 selects Packet_gcpReqUniquenessCheck and stamps 23; the native writer carries one user-number word"
+  - value: 11
+    direction: c2s
+    connection: relay
+    name: rcpSetDamageAffectingAttribute
+    name_source: label@cn-717
+    evidence: inferred
+    source: "cn-717 senders sub_545550, cn-717 sub_5644A0, cn-717 sub_564510 stamp relay 11; layout packets/relay-hp.yaml RelayDamageAttributeReport"
+  - value: 13
+    direction: c2s
+    connection: relay
+    name: rcpReqDamageCalcAndBroadcast
+    name_source: label@cn-717
+    evidence: inferred
+    source: "cn-717 senders sub_564770 stamp relay 13; layout packets/relay-hp.yaml RelayDamageRequest"
+  - value: 14
+    direction: c2s
+    connection: relay
+    name: rcpCharacterRespawn
+    name_source: label@cn-717
+    evidence: inferred
+    source: "cn-717 senders sub_5648E0, cn-717 sub_8C2910 stamp relay 14; layout packets/relay-hp.yaml RelayCharacterRespawnReport"
+  - value: 15
+    direction: c2s
+    connection: relay
+    name: rcpChangeChrType
+    name_source: label@cn-717
+    evidence: inferred
+    source: "cn-717 senders sub_564960, cn-717 sub_5649D0 stamp relay 15; layout packets/relay-hp.yaml RelayCharacterTypeReport"
+  - value: 16
+    direction: c2s
+    connection: relay
+    name: rcpHpRecover
+    name_source: label@cn-717
+    evidence: inferred
+    source: "cn-717 senders sub_5647F0, cn-717 sub_564860 stamp relay 16; layout packets/relay-hp.yaml RelayHpRecoverReport"
+  - value: 22
+    direction: c2s
+    connection: relay
+    name: rcpSetChrState
+    name_source: label@cn-717
+    evidence: inferred
+    source: "cn-717 senders sub_5456A0, cn-717 sub_564590 stamp relay 22; layout packets/relay-hp.yaml RelayCharacterStateReport"
+  - value: 7
+    direction: s2c
+    connection: relay
+    name: rspHpDeltaBroadcast
+    name_source: label@cn-717
+    evidence: inferred
+    source: "cn-717 dispatcher sub_896050 route relay 7; layout packets/relay-hp.yaml RelayHpDelta"
+  - value: 973
+    direction: s2c
+    connection: game
+    name: gspBombState
+    name_source: label@cn-717
+    evidence: verified
+    source: "cn-717 sub_540B30 dispatches 973 to cn-717 sub_4295F0; cn-717 sub_5385C0 reads five words and bool32"
+  - value: 974
+    direction: s2c
+    connection: game
+    name: gspObserver
+    name_source: label@cn-717
+    evidence: verified
+    source: "cn-717 sub_540B30 dispatches 974 to cn-717 sub_5606F0; cn-717 sub_8C4210 reads the scene-object key"
+  - value: 516
+    direction: c2s
+    connection: game
+    name: gcpRoomSendRecMsg
+    name_source: label@cn-717
+    evidence: verified
+    source: cn-717 sub_8C2B40 stamps the native recruitment-text request; cn-717 sub_740F00 reads one counted UTF-16 message

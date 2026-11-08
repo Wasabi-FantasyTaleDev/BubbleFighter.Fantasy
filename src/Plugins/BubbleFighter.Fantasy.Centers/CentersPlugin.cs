@@ -34,9 +34,10 @@ public sealed class CentersPlugin : IPlugin
                 throw new InvalidOperationException("Center status request arrived on an unconfigured listener.");
             return status.SendAsync(session, new(entry.Id, entry.Name, entry.Users, entry.Capacity), ct);
         }));
-        // TODO: separate center routing and population tracking; these entries share the same backend.
+        // cn-324 sub_703B50 and kr-812 sub_8184B0: true retires the unselected auxiliary;
+        // false enters the terminal-login path. These entries alias one shared backend.
         context.Effect(messages.On<CenterAvailabilityRequested>(options.Protocol,
-            (session, _, ct) => availability.SendAsync(session, new(false), ct)));
+            (session, _, ct) => availability.SendAsync(session, new(true), ct)));
         return ValueTask.CompletedTask;
     }
 
@@ -57,11 +58,11 @@ public sealed class CentersOptions : IValidatableOptions
     /// <inheritdoc />
     public IEnumerable<ValidationResult> Validate()
     {
-        if (Entries.Length is < 1 or > 32 || Entries.Any(entry => entry.Id < 0 || string.IsNullOrWhiteSpace(entry.Name)
+        if (Entries.Length < 1 || Entries.Any(entry => entry.Id < 0 || string.IsNullOrWhiteSpace(entry.Name)
             || entry.Name.Length > 128 || string.IsNullOrWhiteSpace(entry.ListenerId) || entry.Users < 0 || entry.Capacity < 1
             || entry.Users > entry.Capacity) || Entries.Select(entry => entry.Id).Distinct().Count() != Entries.Length
             || Entries.Select(entry => entry.ListenerId).Distinct(StringComparer.Ordinal).Count() != Entries.Length)
-            yield return new ValidationResult("Center entries require 1..32 unique ids and listeners, bounded names and valid occupancies.", [nameof(Entries)]);
+            yield return new ValidationResult("Center entries require at least one unique id and listener, bounded names and valid occupancies.", [nameof(Entries)]);
     }
 }
 

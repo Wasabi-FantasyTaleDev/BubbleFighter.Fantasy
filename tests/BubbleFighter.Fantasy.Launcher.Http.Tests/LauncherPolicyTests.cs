@@ -209,8 +209,11 @@ public sealed class LauncherPolicyTests
         Assert.Equal("tester", fixture.Sessions.Account(second.GetProperty("accessToken").GetString()!));
     }
 
-    [Fact]
-    public async Task CatalogLoginAndRefreshCarryTheSameClientPolicyWithoutManagementLabels()
+    [Theory]
+    [InlineData(null)]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CatalogLoginAndRefreshCarryTheSameClientPolicyWithoutManagementLabels(bool? defaultSelected)
     {
         var policy = new LauncherClientPolicyOptions
         {
@@ -224,7 +227,7 @@ public sealed class LauncherPolicyTests
                     [
                         new() { Id = "need", Type = "require", Builds = ["build-a"] },
                         new() { Id = "off", Type = "disable", Builds = ["build-b"] },
-                        new() { Id = "offer", Type = "recommend", Builds = ["build-a"], Sources = ["official"] },
+                        new() { Id = "offer", Type = "recommend", Builds = ["build-c"], Sources = ["official"], DefaultSelected = defaultSelected },
                         new() { Id = "floor", Type = "min_version", Builds = ["build-a"], Version = "1.2.0" },
                     ],
                 },
@@ -250,7 +253,10 @@ public sealed class LauncherPolicyTests
             var rules = plugin.GetProperty("rules").EnumerateArray().ToArray();
             Assert.Equal(["need", "off", "offer", "floor"], rules.Select(r => r.GetProperty("id").GetString()));
             Assert.Equal(["id", "type", "builds"], rules[0].EnumerateObject().Select(p => p.Name));
-            Assert.Equal(["id", "type", "builds", "sources"], rules[2].EnumerateObject().Select(p => p.Name));
+            Assert.Equal(defaultSelected is null ? new[] { "id", "type", "builds", "sources" }
+                : new[] { "id", "type", "builds", "sources", "defaultSelected" }, rules[2].EnumerateObject().Select(p => p.Name));
+            if (defaultSelected is { } selected) Assert.Equal(selected, rules[2].GetProperty("defaultSelected").GetBoolean());
+            Assert.Equal("build-c", Assert.Single(rules[2].GetProperty("builds").EnumerateArray()).GetString());
             Assert.Equal(["id", "type", "builds", "version"], rules[3].EnumerateObject().Select(p => p.Name));
             Assert.Equal("1.2.0", rules[3].GetProperty("version").GetString());
         }
@@ -267,6 +273,8 @@ public sealed class LauncherPolicyTests
     [InlineData("unknown-type")]
     [InlineData("conflict")]
     [InlineData("unknown-source")]
+    [InlineData("stray-default-false")]
+    [InlineData("stray-default-true")]
     public async Task InvalidPolicyFailsBeforeListenerBinding(string scenario)
     {
         var options = Fixture.Options();
@@ -284,6 +292,8 @@ public sealed class LauncherPolicyTests
             case "unknown-type": plugin.Rules[0].Type = "teleport"; break;
             case "conflict": plugin.Rules = [.. plugin.Rules, new() { Id = "r2", Type = "disable" }]; break;
             case "unknown-source": plugin.Rules = [new() { Id = "r1", Type = "recommend", Sources = ["missing"] }]; break;
+            case "stray-default-false": plugin.Rules[0].DefaultSelected = false; break;
+            case "stray-default-true": plugin.Rules[0].DefaultSelected = true; break;
         }
         await Assert.ThrowsAsync<ValidationException>(() => LauncherServer.StartAsync(options, new MemoryLauncherAccounts(10), new LauncherSessions(options, new MemoryLauncherSessions(10))));
     }

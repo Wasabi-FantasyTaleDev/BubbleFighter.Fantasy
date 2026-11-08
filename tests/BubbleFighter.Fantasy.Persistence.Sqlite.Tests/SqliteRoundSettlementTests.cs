@@ -74,7 +74,7 @@ public sealed class SqliteRoundSettlementTests : IDisposable
         connection.Open();
         using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA user_version";
-        Assert.Equal(7L, command.ExecuteScalar());
+        Assert.Equal(9L, command.ExecuteScalar());
     }
 
     private void Execute(string sql)

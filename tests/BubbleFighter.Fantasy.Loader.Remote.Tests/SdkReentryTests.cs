@@ -11,7 +11,7 @@ public sealed class SdkReentryTests
     /// <summary>Every supported SDK and execution mode completes nested routing through actual mounted rows.</summary>
     [Theory]
     [InlineData("python", false)]
-    [InlineData("typescript", false)]
+    [SdkData("typescript", false)]
     [InlineData("go", false)]
     [InlineData("rust", false)]
     [InlineData("go", true)]

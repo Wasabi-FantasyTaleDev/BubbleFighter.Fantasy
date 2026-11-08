@@ -73,7 +73,7 @@ internal sealed class PlazaSceneBinding(string protocol, IOpcodeTable table, Pac
             throw new InvalidOperationException("The plaza's profile order must name every occupied seat exactly once.");
         var seats = order.Select(slot => Seat(bySlot[slot])).ToArray();
         // kr-1256 sub_9AC490 kind 3 installs 36 plaza seats; sub_9064B0 then creates the own party avatar.
-        await session.SendAsync(S2C("gspGotoRoom"), Install(seats, message.You.Slot, 3, message.PartyTransition), ct).ConfigureAwait(false);
+        await session.SendAsync(S2C("gspGotoRoom"), Install(seats, message.You.Slot, 3, message.PartyTransition, session), ct).ConfigureAwait(false);
         await session.SendAsync(S2C("gspUpdateParty"), RoomRecords.Party(packets, build, Seat(message.You), session), ct).ConfigureAwait(false);
         await session.SendAsync(S2C("gspGotoLobby"), PacketCodec.Write(packets, build, "RoomSceneTransition", new Dictionary<string, object?>()), ct).ConfigureAwait(false);
     }
@@ -116,11 +116,12 @@ internal sealed class PlazaSceneBinding(string protocol, IOpcodeTable table, Pac
         await PublishViewAsync(session, member.UserNumber, member.CharacterItemId, member.EquippedItemIds, false, ct).ConfigureAwait(false);
     }
 
-    private byte[] Install(IReadOnlyList<RoomMemberView> seats, int localSlot, int kind, bool partyTransition = false) =>
-        PlazaRecords.Install(packets, build, seats, localSlot, kind, partyTransition);
+    private byte[] Install(IReadOnlyList<RoomMemberView> seats, int localSlot, int kind, bool partyTransition = false, ISession? recipient = null) =>
+        PlazaRecords.Install(packets, build, seats, localSlot, kind, partyTransition, recipient);
 
     private static RoomMemberView Seat(PlazaMember member) =>
-        new(member.Slot, member.UserNumber, member.Nickname, member.Level, 0, false, member.CharacterItemId, member.EquippedItemIds);
+        new(member.Slot, member.UserNumber, member.Nickname, member.Level, 0, false, member.CharacterItemId, member.EquippedItemIds)
+            { ColorIndex = member.ColorIndex, Recruitment = member.Recruitment };
 
     private ushort S2C(string name) => _s2c[name];
     private async ValueTask PublishViewAsync(ISession session, int userNum, int characterId,

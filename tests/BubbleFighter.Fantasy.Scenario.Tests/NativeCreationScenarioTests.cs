@@ -148,7 +148,7 @@ public sealed class NativeCreationScenarioTests
     }
 
     // S2C 3 gspRepLogin in the kr-1256 table form: result 0, a server-issued session id, the created user number
-    // and nickname, the selected character type, channel 99, a zero server time and
+    // and nickname, the selected character type, channel 60, a zero server time and
     // national result 1. The optional 0x3A block is absent and marked by the field's default tag byte 0.
     private static int CheckLogin(byte[] payload, string nickname, int characterType)
     {
@@ -160,7 +160,7 @@ public sealed class NativeCreationScenarioTests
         Assert.Equal(nickname, reader.ReadWideStringPrefixed());
         Assert.Equal(characterType, reader.ReadInt32());
         Assert.Equal(0, reader.ReadInt32());  // unknown_64
-        Assert.Equal(99, reader.ReadInt32()); // channel_id arms the room-list poll
+        Assert.Equal(60, reader.ReadInt32()); // channel_id selects the Free channel
         Assert.Equal(0, reader.ReadInt32());  // unknown_72
         reader.ReadDouble();                  // server_time, not pinned
         Assert.Equal(0, reader.ReadInt32());  // unknown_88
@@ -174,11 +174,17 @@ public sealed class NativeCreationScenarioTests
     {
         Assert.Equal(1 << 14, BinaryPrimitives.ReadInt32LittleEndian(payload));
         var plain = Inflate(payload[4..]);
-        Assert.Equal(76, plain.Length);
+        // The shipped generation: the form, the four choices, the four preview overrides and the
+        // two trailing words (the shipped f32 0.293 and 110).
+        Assert.Equal(108, plain.Length);
         var content = PacketCodec.Read(tables, "kr-1256", "CreationContent", plain);
         Assert.Equal("Ui/DlgCreateUser3.ui", content["ui_path"]);
         Assert.Equal(new object?[] { 10, 19, 25, 27 }, Assert.IsType<object?[]>(content["character_types"]));
-        Assert.Empty(Assert.IsType<object?[]>(content["preview_overrides"]));
+        Assert.Equal(new object?[] { 10, 2003651, 19, 2003652, 25, 2003653, 27, 2003654 },
+            Assert.IsType<object?[]>(content["preview_overrides"]).SelectMany(value => value is Dictionary<string, object?> pair
+                ? new[] { pair["unknown_16"], pair["unknown_20"] } : new object?[] { null }).ToArray());
+        Assert.Equal(1049974101, content["unknown_52"]);
+        Assert.Equal(110, content["unknown_56"]);
     }
 
     // S2C 201 solo party snapshot: state 2, the created member and the profile entry carrying the equipped

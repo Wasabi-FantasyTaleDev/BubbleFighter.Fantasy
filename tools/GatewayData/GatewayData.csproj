@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- This executable is a compiler tool dependency, never a runtime executable reference. -->
+    <ShouldBeValidatedAsExecutableReference>false</ShouldBeValidatedAsExecutableReference>
+    <Description>Compiles the canonical packet and profile data for Fantasy Tale Gateway.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/BubbleFighter.Fantasy.Kernel/BubbleFighter.Fantasy.Kernel.csproj" />
+    <ProjectReference Include="../../src/BubbleFighter.Fantasy.Packets/BubbleFighter.Fantasy.Packets.csproj" />
+    <ProjectReference Include="../../src/BubbleFighter.Fantasy.Wire/BubbleFighter.Fantasy.Wire.csproj" />
+    <Compile Include="../../src/Plugins/BubbleFighter.Fantasy.Protocol/OpcodeTable.cs" Link="OpcodeTable.cs" />
+  </ItemGroup>
+</Project>

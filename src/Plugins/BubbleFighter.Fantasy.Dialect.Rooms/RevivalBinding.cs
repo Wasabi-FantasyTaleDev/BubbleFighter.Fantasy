@@ -24,11 +24,8 @@ internal sealed class RevivalBinding(string protocol, IOpcodeTable table, Packet
         // The consumable request carries the actor reference; the PvE request has no body at all. Both are checked
         // against the build's own table at load so a re-typed field fails the row, not the first revival.
         PacketLayoutContract.RequireFields(tables, build, "InstantRevivalRequest", "Consumable revival", ("actor", "u32"));
-        PacketLayoutContract.RequireEmpty(tables, build, "PveRevivalRequest", "PvE revival");
         _ = tables.Resolve(build, "InstantRevivalRequest");
-        _ = tables.Resolve(build, "PveRevivalRequest");
         context.Effect(context.Services.RegisterMany<IInboundMessageBinding<RoundInstantRevivalRequested>>(this));
-        context.Effect(context.Services.RegisterMany<IInboundMessageBinding<RoundPveRevivalRequested>>(this));
         var router = context.Services.Get<IPacketRouter>();
         context.Effect(router.Register(protocol, table.C2S("gcpGameReqUseRespawnItem"), async (session, packet, ct) =>
         {
@@ -36,12 +33,21 @@ internal sealed class RevivalBinding(string protocol, IOpcodeTable table, Packet
             if (!await messages.DispatchAsync(protocol, session, request, ct).ConfigureAwait(false))
                 throw new InvalidOperationException("Consumable revival has no typed handler.");
         }));
-        context.Effect(router.Register(protocol, table.C2S("gcpPveUseRevival"), async (session, packet, ct) =>
+        // The empty PvE revival exists on the legacy builds only; the modern family carries no such
+        // sender, so its route requires an explicit game row rather than a diagnostic name fallback.
+        if (table.All.SingleOrDefault(entry => entry.Direction == PacketDirection.ClientToServer
+            && entry.Name == "gcpPveUseRevival") is { } pveRevival)
         {
-            if (packet.Payload.Length != 0) throw new PacketFormatException("PvE revival must be empty.", 0);
-            if (!await messages.DispatchAsync(protocol, session, new RoundPveRevivalRequested(), ct).ConfigureAwait(false))
-                throw new InvalidOperationException("PvE revival has no typed handler.");
-        }));
+            PacketLayoutContract.RequireEmpty(tables, build, "PveRevivalRequest", "PvE revival");
+            _ = tables.Resolve(build, "PveRevivalRequest");
+            context.Effect(context.Services.RegisterMany<IInboundMessageBinding<RoundPveRevivalRequested>>(this));
+            context.Effect(router.Register(protocol, pveRevival.Value, async (session, packet, ct) =>
+            {
+                if (packet.Payload.Length != 0) throw new PacketFormatException("PvE revival must be empty.", 0);
+                if (!await messages.DispatchAsync(protocol, session, new RoundPveRevivalRequested(), ct).ConfigureAwait(false))
+                    throw new InvalidOperationException("PvE revival has no typed handler.");
+            }));
+        }
     }
 
     internal static RoundInstantRevivalRequested ReadInstant(PacketTables tables, string build, ReadOnlySpan<byte> body)

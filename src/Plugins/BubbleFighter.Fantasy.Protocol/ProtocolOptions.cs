@@ -80,11 +80,39 @@ public sealed class ProtocolOptions
     public bool RequirePatchHandshakeFirst { get; set; } = true;
 
     /// <summary>
-    /// Gets or sets the C2S opcodes a client may send before the patch handshake without
+    /// Gets or sets the C2S opcode names a client may send before the patch handshake without
     /// being closed, such as a build's crash report sent first on the next launch. They are
-    /// dispatched as usual and the handshake is still required after them.
+    /// dispatched as usual and the handshake is still required after them unless their handler
+    /// uses the packet-scoped IInitialHandshakeContinuation after validating an application handshake.
+    /// Such a continuation grants no account authentication or client-version verification.
     /// </summary>
-    public IReadOnlyList<ushort> PreHandshakeOpcodes { get; set; } = [];
+    public IReadOnlyList<string> PreHandshakeOpcodes { get; set; } = [];
+
+    /// <summary>Gets or sets one exact ordered alternative admission sequence of one to eight distinct C2S opcode names, or an empty list to disable it. Every packet must have an empty payload; completing the sequence admits the connection without verifying its client version.</summary>
+    public IReadOnlyList<string> AlternateHandshakeSequence { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the empty C2S markers, by name, that this client build sends first on every auxiliary
+    /// connection before its center status query or retained move (cn-324 <c>sub_7001F0</c> sends
+    /// <c>gcpStartGPK</c>); empty for builds that send the request directly. Build data, read only when
+    /// <see cref="AnswerCenterStatus"/> or <see cref="AcceptRetainedMoves"/> derives a sequence.
+    /// </summary>
+    public IReadOnlyList<string> AuxiliaryPrefix { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets whether auxiliary center status queries are admitted. When
+    /// <see cref="AlternateHandshakeSequence"/> is empty, the sequence becomes <see cref="AuxiliaryPrefix"/>
+    /// followed by <c>gcpReqCenterUserCnt</c>, resolved per build.
+    /// </summary>
+    public bool AnswerCenterStatus { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether a migrated player's retained move (<c>gcpReqMoveInto</c>) may open a connection
+    /// before the patch handshake. It is added to <see cref="PreHandshakeOpcodes"/>; a build with an
+    /// <see cref="AuxiliaryPrefix"/> also gets the derived center status sequence, because the client sends
+    /// the move on that same auxiliary path.
+    /// </summary>
+    public bool AcceptRetainedMoves { get; set; }
 
     /// <summary>Gets or sets the removed unauthenticated greeting flag; true is rejected with migration guidance.</summary>
     public bool SendInGameGreeting { get; set; }

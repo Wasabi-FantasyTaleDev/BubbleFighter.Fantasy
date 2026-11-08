@@ -85,10 +85,27 @@ public sealed class PluginBoundaryTests
             // clients (kr-1256 sub_808F10's family check, kr-812 sub_97A8D0's /1000 gate); words 4 and 8
             // stay unknown until their consuming paths establish their purpose.
             ["Inventory.WeaponPresetPage"] = [0, 4, 8],
+            // kr-1256 sub_10C3030 preserves three descriptor words for kr-1256 sub_CDB180;
+            // their individual meanings remain unproven and retain the packet-table offsets.
+            ["Match.FinalZoneMapItem"] = [24, 28, 32],
+            // kr-1256 sub_1152110 reads two counted vectors through kr-1256 sub_1137C30.
+            ["Match.FinalZoneReinforcement"] = [4, 20],
             // The 20-byte relay session key kr-1256 sub_1159210 writes and sub_11592A0 reads (verified
             // layout, formerly the InGame.Wire record). Its six words have no traced purpose; the room
             // registry mints them randomly and the match connection compares them byte for byte.
             ["Match.RelaySessionKey"] = [0, 1, 2, 3, 4, 5],
+            // kr-1256 sub_7083A0 writes these backpack parameters; kr-1256 sub_CD3000
+            // reads them for kr-1256 sub_CDAEC0 without establishing their individual meanings.
+            ["Match.RoundFinalZoneBackpackDropped"] = [16, 20, 24, 28],
+            // kr-1256 sub_D38160 copies the damaging object's word after the drone position.
+            ["Match.RoundFinalZoneDroneDestroyed"] = [16],
+            // kr-1256 sub_6E12D0 retains this native effect parameter between visibility and sequence.
+            ["Match.RoundFinalZoneMapEffectChanged"] = [76],
+            // kr-1256 sub_6E4850 writes the opaque weapon vector consumed by kr-1256 sub_6FBDF0.
+            ["Match.RoundFinalZoneTrapLinked"] = [16],
+            // cn-324 sub_45D090 writes these weapon parameters at object offsets 32/36/40;
+            // cn-324 sub_471630 consumes them without establishing their individual meanings.
+            ["Match.RoundWeaponDropRequested"] = [32, 36, 40],
             // kr-1256 sub_10D9410 retains the final ItemAttr word and text; their kind-specific
             // meanings remain unproven, so room presets preserve the packet table's offset names.
             ["Rooms.RoomItemAttribute"] = [28, 32],
@@ -153,9 +170,9 @@ public sealed class PluginBoundaryTests
         Assert.All(plugins, plugin =>
         {
             Assert.StartsWith(plugin.Id == "fighters" ? "2.0.0" : "1.0.0", plugin.Version);
-            Assert.Equal("8.16.0.0", plugin.ContractVersions["BubbleFighter.Fantasy.Abstractions"]);
+            Assert.Equal("8.19.0.0", plugin.ContractVersions["BubbleFighter.Fantasy.Abstractions"]);
             Assert.All(plugin.ContractVersions, pair => Assert.Equal(
-                pair.Key == "BubbleFighter.Fantasy.Contracts" ? contractsVersion : "8.16.0.0", pair.Value));
+                pair.Key == "BubbleFighter.Fantasy.Contracts" ? contractsVersion : "8.19.0.0", pair.Value));
         });
         // Shared plugins name no client builds: a build is added with profile and packet-table data alone.
         Assert.All(new[] { "protocol", "dialect", "lobby", "ingame", "shop", "equipment", "inventoryview", "centers",

@@ -6,6 +6,31 @@ namespace BubbleFighter.Fantasy.Lobby.Tests;
 public sealed class LauncherLoginAccountTests
 {
     [Fact]
+    public async Task AsyncResolverAwaitsAuthorityAndNeverUsesSynchronousRedemption()
+    {
+        var service = new AsyncTickets();
+        var pending = LauncherLoginAccount.ResolveIdentityAsync(new string('a', 64), "cn-324", true, service, true, default).AsTask();
+        Assert.False(pending.IsCompleted);
+        service.Result.SetResult(new("remote-player", "en"));
+        Assert.Equal(new LauncherTicketIdentity("remote-player", "en"), await pending);
+        Assert.Null(await LauncherLoginAccount.ResolveIdentityAsync("plain-account", "cn-324", true, service, true, default));
+        Assert.Null(await LauncherLoginAccount.ResolveIdentityAsync("bff-ticket:short", "cn-324", true, service, true, default));
+        Assert.Equal(1, service.Calls);
+    }
+
+    private sealed class AsyncTickets : ILauncherTicketService
+    {
+        internal readonly TaskCompletionSource<LauncherTicketIdentity?> Result = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal int Calls;
+        public string? Redeem(string ticket, string build) => throw new InvalidOperationException("Synchronous redemption must not run.");
+        public ValueTask<LauncherTicketIdentity?> RedeemIdentityAsync(string ticket, string build, CancellationToken cancellationToken)
+        {
+            Calls++;
+            return new(Result.Task.WaitAsync(cancellationToken));
+        }
+    }
+
+    [Fact]
     public void OlderTicketProvidersPreserveUsernameWithUnspecifiedUserLanguage()
     {
         var identity = LauncherLoginAccount.ResolveIdentity(new string('a', 64), "cn-406", true, new Tickets());

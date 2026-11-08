@@ -53,9 +53,9 @@ public sealed class InventoryUseKr1256Pins
             ["cash"] = 678,
             ["fighter"] = new Dictionary<string, object?>
             {
-                ["unknown_4"] = 1001,
+                ["user_number"] = 1001,
                 ["nickname"] = "nick",
-                ["unknown_32"] = 1,
+                ["character_type"] = 1,
                 ["level"] = 10,
                 ["unknown_504"] = "nick",
                 ["social"] = new Dictionary<string, object?>(),

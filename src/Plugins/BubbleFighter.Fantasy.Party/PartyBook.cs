@@ -20,6 +20,34 @@ internal sealed class PartyBook(int maxMembers, int maxPendingInvites, TimeSpan 
     private readonly Dictionary<(int Inviter, int Target), PendingInvite> _pending = [];
     private readonly Dictionary<uint, (int Inviter, int Target)> _byToken = [];
     private uint _lastToken;
+    private readonly Dictionary<int, SoloReservation> _reserved = [];
+
+    public bool SupportsSoloReservation => true;
+
+    public int MaximumMembers => maxMembers;
+
+    public IDisposable? TryReserveSolo(int userNum)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(userNum);
+        lock (_gate)
+        {
+            if (_partyOf.ContainsKey(userNum) || _reserved.ContainsKey(userNum) || _reserved.Count >= maxPendingInvites)
+                return null;
+            ForgetInvites(userNum);
+            var reservation = new SoloReservation(this, userNum);
+            _reserved.Add(userNum, reservation);
+            return reservation;
+        }
+    }
+
+    private sealed class SoloReservation(PartyBook book, int userNum) : IDisposable
+    {
+        public void Dispose()
+        {
+            lock (book._gate)
+                if (book._reserved.GetValueOrDefault(userNum) == this) book._reserved.Remove(userNum);
+        }
+    }
 
     // One invitation waiting for an answer: when it runs out, the word its prompt carries and the invited player's
     // connection (null when the caller does not bind it to one).
@@ -55,6 +83,8 @@ internal sealed class PartyBook(int maxMembers, int maxPendingInvites, TimeSpan 
         if (inviter.UserNum == target.UserNum) return PartyInviteResult.Self;
         lock (_gate)
         {
+            if (_reserved.ContainsKey(inviter.UserNum) || _reserved.ContainsKey(target.UserNum))
+                return PartyInviteResult.Refused;
             var now = clock.GetTimestamp();
             foreach (var key in _pending.Where(pair => pair.Value.Expires <= now).Select(pair => pair.Key).ToArray())
                 Forget(key);
@@ -140,6 +170,8 @@ internal sealed class PartyBook(int maxMembers, int maxPendingInvites, TimeSpan 
     {
         lock (_gate)
         {
+            if (_reserved.ContainsKey(inviter.UserNum) || _reserved.ContainsKey(joiner.UserNum))
+                return PartyInviteResult.Refused;
             if (_partyOf.ContainsKey(joiner.UserNum)) return PartyInviteResult.Refused;
             if (!_partyOf.TryGetValue(inviter.UserNum, out var party))
             {

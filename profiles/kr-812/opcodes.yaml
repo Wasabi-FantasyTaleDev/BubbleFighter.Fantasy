@@ -3,6 +3,90 @@ profile: kr-812
 # Only rows with evidence are listed; see profiles/opcode-policy.md. This build keeps
 # its Packet_gcp*/gsp* class names, so most rows can carry label@kr-812.
 opcodes:
+  - value: 20005
+    direction: c2s
+    connection: relay
+    name: rcpReqUdpBypassDisable
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_810830 sends an empty relay TCP20005 after the UDP liveness check fails"
+  - value: 32885
+    direction: c2s
+    connection: both
+    name: gppWanderLean
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_80DBB0 writes32885; sub_80FA60 dispatches its UDP copy to sub_80F540"
+  - value: 32885
+    direction: s2c
+    connection: both
+    name: gppWanderLean
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_80DBB0 writes32885; sub_80FA60 dispatches its UDP copy to sub_80F540"
+  - value: 32922
+    direction: c2s
+    connection: both
+    name: gppWanderLeanOptimize
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_80DBB0 writes32922; sub_80FA60 dispatches its UDP copy to sub_80F7A0"
+  - value: 32922
+    direction: s2c
+    connection: both
+    name: gppWanderLeanOptimize
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_80DBB0 writes32922; sub_80FA60 dispatches its UDP copy to sub_80F7A0"
+  - value: 18
+    direction: s2c
+    connection: relay
+    name: rspUdpBypassInfo
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_810C20 case18 calls sub_8117F0, reading u16 port + u32 cookie"
+  - value: 19
+    direction: s2c
+    connection: udp
+    name: rspUdpBypassVerify_
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_80FA60 receives UDP19; sub_80FA20 checks relay source and calls sub_810780"
+  - value: 20
+    direction: s2c
+    connection: relay
+    name: rspUdpBypassReady_
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_810C20 case20 sets the relay UDP-ready byte at2464 without a body"
+  - value: 20001
+    direction: c2s
+    connection: udp
+    name: rcpUdpBypassAck
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_8117F0 sends Packet_rcpUdpBypassAck containing the four-byte offered cookie"
+  - value: 20002
+    direction: c2s
+    connection: udp
+    name: rcpUdpBypassVerifyAck
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_810780 sends the four-byte relay cookie in response to UDP19"
+  - value: 20003
+    direction: c2s
+    connection: udp
+    name: rcpUdpBypassWanderLean
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_8108C0 wraps32885 with the four-byte relay cookie as20003"
+  - value: 20004
+    direction: c2s
+    connection: udp
+    name: rcpUdpBypassWanderLeanOptimize
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_8108C0 wraps32922 with the four-byte relay cookie as20004"
   - value: 508
     direction: c2s
     connection: game
@@ -404,6 +488,13 @@ opcodes:
     evidence: verified
     source: "MainMenu control this+780 in sub_688390 -> sub_689C90; sender sub_9BE750 SETOP 405, Packet_gcpReqCreateTutorialSession vtable D4204C, reader nullsub 0x5C8FC0"
     notes: "empty body; reply is S2C gspGotoRoom kind 5 (TutorialRoomStage / SetStage 8)"
+  - value: 501
+    direction: c2s
+    name: gcpRoomSendChatMsg
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_839A60 stamps 501 on Packet_gcpRoomSendChatMsg; reader kr-812 sub_8456D0"
+    notes: "Waiting-room chat box line: bool32 team-only flag, then the text. The client draws nothing until S2C gspRoomReceiveChatMsg answers."
   - value: 502
     direction: c2s
     name: gcpRoomSendChatModuleMsg
@@ -780,8 +871,8 @@ opcodes:
     name: gcpReqInventoryUseItem
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 rename confirmation sub_95A140 calls kr-812 sub_978020, whose obfuscated stamping path contains literal 805 and calls kr-812 sub_B25E90; request RTTI resolves vtable D8A088 to Packet_gcpReqInventoryUseItem, writer kr-812 sub_8B9490 and reader kr-812 sub_8B9660"
-    notes: "Number inferred from the native rename sender's obfuscated data flow; confirm the setter argument in the client before upgrading to verified. S2C 805 is a separate inventory-view packet."
+    source: "RTTI .?AUPacket_gcpReqInventoryUseItem@@ at kr-812 0xE7AD3C with vtable 0xD8A088 (serialize kr-812 sub_8B9490, deserialize kr-812 sub_8B9660); the literal 805 is stamped inside kr-812 sub_978020, the shared sender every bag-item use funnel reaches from seven call-site families (the type-3 name-change dialog kr-812 sub_95A140 among them)"
+    notes: "Body u32, u32, wstr (kr-812 sub_8B9490 writes this[1], this[2], this+3). The client's own validator kr-812 sub_812AD0 and the catalog TYPE at record+292 drive which dialog and parameter each item uses; no per-item switch exists client-side. Reply at S2C 810; the item is never consumed client-side. The opcode stamp and u32-to-slot assignment through the virtualized sender remain inferred; the literal and reply symmetry alone do not close that data flow."
   - value: 806
     direction: c2s
     name: gcpReqInventoryDeleteItem
@@ -1152,10 +1243,11 @@ opcodes:
     source: "Packet_gcpGMConsole class and opcode setter sub_B25E90 in sender sub_7A9630 (kr-812)"
   - value: 948
     direction: c2s
+    connection: game
     name: gcpPortalMove
     name_source: label@kr-812
-    evidence: inferred
-    source: "Packet_gcpPortalMove is the only class constructed before the calls of the stamping helper sub_529E80 (kr-812)"
+    evidence: verified
+    source: "kr-812 sub_529E80 stamps game 948 and relay 26 separately; kr-812 sub_52FC40 reads position xyz and region u16; packets/portal.yaml"
   - value: 950
     direction: c2s
     name: gcpReqRecheckMap
@@ -2165,8 +2257,14 @@ opcodes:
     direction: s2c
     name: gspRepMoveChannel
     name_source: label@kr-812
-    evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 9: Packet_gspRepMoveChannel constructor path"
+    evidence: verified
+    source: "kr-812 sub_837170 case 9 invokes kr-812 sub_81AB20, which reads a result word and NetAddress through kr-812 sub_5026F0; result zero creates pending via kr-812 sub_81B680"
+  - value: 10
+    direction: s2c
+    name: gspDisconnectMovedUser
+    name_source: label@cn-324
+    evidence: verified
+    source: "kr-812 sub_837170 case 10 invokes kr-812 sub_81C550 without reading a body; the consumer promotes pending dword_E94B28 to current dword_E94B24 and closes the previous current connection. Its body matches cn-324 sub_705980, which cn-324 sub_714540 case 9 installs under the label gspDisconnectMovedUser"
   - value: 11
     direction: s2c
     name: gspRepMoveInto
@@ -2452,6 +2550,12 @@ opcodes:
     name_source: label@kr-812
     evidence: inferred
     source: "kr-812 dispatcher sub_837170 case 307: Packet_gspNotifyKickMember constructor path"
+  - value: 308
+    direction: s2c
+    name: gspRepPartyQuickStart
+    name_source: label@kr-812
+    evidence: verified
+    source: "stage dispatcher kr-812 sub_68D530 case 0x134 -> kr-812 sub_68EF10 reads one u32 kind through kr-812 sub_A56C10 and starts the kind's stage (1 -> mode 101 via kr-812 sub_68E450, 2 -> 16 via kr-812 sub_68E640, 3 -> 13 via kr-812 sub_68E9A0, 4 -> the wait dialog kr-812 sub_68F010); the stage-local consumer kr-812 sub_6875C0 exits the stage on kind 0."
   - value: 501
     direction: s2c
     name: gspRoomSetSession
@@ -2859,8 +2963,9 @@ opcodes:
     direction: s2c
     name: gspRepInventoryUseItem
     name_source: label@kr-812
-    evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 810: Packet_gspRepInventoryUseItem constructor path"
+    evidence: verified
+    source: "kr-812 dispatcher sub_837170 case 0x32A (810) -> kr-812 sub_825070 constructs Packet_gspRepInventoryUseItem (vtable 0xD6F510, the same u32,u32,wstr shape) and switches on the resolved catalog record TYPE (record+292) and the result word"
+    notes: "Body u32 result, u32 itemId (resolved through kr-812 sub_992C60; a 0 lookup aborts; the type word is read from record+292 of that returned element, element base +340), wstr data. Per-type result codes the client handles: type 2 subtype 1 win/draw/lose and win-rate reset 0 done, 8 all-zero, else code echo; type 2 subtype 2 flee-count reset in the same shape; name-change 9 in use, 10 banned, 11 length, 12 invalid characters, 0 success with separator-split data; gift 0/nonzero; generic type 10 0/nonzero; pet feeding types 19/20 any nonzero refuses with the full counter and type 21 result 1 growth too low, 0 success; clan expansion -102 master only, -101 full, -100 failed, 0 success. Consumption arrives via the inventory-update family, not this reply. The request-side type fetch goes through an obfuscated thunk, so record+292 is reply-side verified."
   - value: 811
     direction: s2c
     name: gspRepInventoryDeleteItem
@@ -3218,10 +3323,11 @@ opcodes:
     source: "kr-812 dispatcher sub_837170 case 956: Packet_gspGMConsole constructor path"
   - value: 958
     direction: s2c
+    connection: game
     name: gspPortalMove
     name_source: label@kr-812
-    evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 958: Packet_gspPortalMove constructor path"
+    evidence: verified
+    source: "kr-812 sub_83B7C0 reads word, region u16 and seat word; kr-812 sub_833A60 authorizes native map-region motion and clears local pending contact; packets/portal.yaml"
   - value: 959
     direction: s2c
     name: gspNotifyMsg
@@ -4225,3 +4331,75 @@ opcodes:
     name_source: label@kr-812
     evidence: inferred
     source: "kr-812 dispatcher sub_837170 case 819: Packet_gspRepPresentSendSubList constructor path; reader sub_83F590; layout in packets/present.yaml"
+
+  - value: 32885
+    direction: s2c
+    connection: udp
+    name: gppWanderLean
+    name_source: mirrored
+    evidence: verified
+    source: "kr-812 sub_80FA60 dispatches the native UDP movement body after the datagram header"
+
+  - value: 32922
+    direction: s2c
+    connection: udp
+    name: gppWanderLeanOptimize
+    name_source: mirrored
+    evidence: verified
+    source: "kr-812 sub_80FA60 dispatches the native UDP movement body after the datagram header"
+  - value: 11
+    direction: c2s
+    connection: relay
+    name: rcpSetDamageAffectingAttribute
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 senders sub_510980, kr-812 sub_52DA50, kr-812 sub_52DAC0 stamp relay 11; layout packets/relay-hp.yaml RelayDamageAttributeReport"
+  - value: 13
+    direction: c2s
+    connection: relay
+    name: rcpReqDamageCalcAndBroadcast
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 senders sub_52DD90 stamp relay 13; layout packets/relay-hp.yaml RelayDamageRequest"
+  - value: 14
+    direction: c2s
+    connection: relay
+    name: rcpCharacterRespawn
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 senders sub_52DF00, kr-812 sub_8399F0 stamp relay 14; layout packets/relay-hp.yaml RelayCharacterRespawnReport"
+  - value: 15
+    direction: c2s
+    connection: relay
+    name: rcpChangeChrType
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 senders sub_52DF80, kr-812 sub_52DFF0 stamp relay 15; layout packets/relay-hp.yaml RelayCharacterTypeReport"
+  - value: 16
+    direction: c2s
+    connection: relay
+    name: rcpHpRecover
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 senders sub_52DE10, kr-812 sub_52DE80 stamp relay 16; layout packets/relay-hp.yaml RelayHpRecoverReport"
+  - value: 22
+    direction: c2s
+    connection: relay
+    name: rcpSetChrState
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-812 senders sub_510AD0, kr-812 sub_52DBB0 stamp relay 22; layout packets/relay-hp.yaml RelayCharacterStateReport"
+  - value: 7
+    direction: s2c
+    connection: relay
+    name: rspHpDeltaBroadcast
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_810C20 case 7 calls kr-812 sub_506540; layout packets/relay-hp.yaml RelayHpDelta"
+  - value: 516
+    direction: c2s
+    connection: game
+    name: gcpRoomSendRecMsg
+    name_source: label@kr-812
+    evidence: verified
+    source: kr-812 sub_839C20 stamps the native recruitment-text request; kr-812 sub_5C8FD0 reads one counted UTF-16 message

@@ -4,6 +4,12 @@ namespace BubbleFighter.Fantasy.InGame;
 
 public sealed partial class InGameOptions
 {
+    /// <summary>
+    /// Gets or sets whether accepted match counters are stored with settlement receipts. Requires a
+    /// battle-record-capable progress provider; disabled until its persistence and native display are accepted.
+    /// </summary>
+    public bool RecordBattleStatistics { get; set; }
+
     /// <summary>Gets or sets whether independent score-based rewards replace the original deployment formula.</summary>
     public bool ScoreBasedRewards { get; set; }
 

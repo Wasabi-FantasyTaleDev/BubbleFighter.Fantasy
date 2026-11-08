@@ -29,6 +29,7 @@ internal sealed class LauncherClientPolicy
                 var item = new Dictionary<string, object> { ["id"] = rule.Id, ["type"] = rule.Type, ["builds"] = rule.Builds.ToArray() };
                 if (rule.Version is not null) item["version"] = rule.Version;
                 if (rule.Sources is not null) item["sources"] = rule.Sources.ToArray();
+                if (rule.DefaultSelected is { } selected) item["defaultSelected"] = selected;
                 return item;
             }).ToArray(),
         }).ToArray(),

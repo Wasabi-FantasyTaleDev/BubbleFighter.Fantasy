@@ -1,0 +1,11 @@
+# Explicit opt-in to the audited ordinary mode-8 script; native-client acceptance remains required.
+# Keep the cumulative scoreboard modes used by the other audited optional modern exchanges.
+- set:
+    id: dialect.rooms
+    config:
+      script_zombies: true
+      result_scoreboard_modes: [1, 8, 19, 20, 32]
+- set:
+    id: ingame
+    config:
+      script_zombies: true

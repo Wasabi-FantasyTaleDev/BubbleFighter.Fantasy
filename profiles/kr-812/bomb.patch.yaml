@@ -1,0 +1,11 @@
+# Explicitly opt in to the audited, experimental bomb series and its no-respawn rule.
+# Other modes retain the default-allow respawn policy. Native-client acceptance is still required.
+- set:
+    id: dialect.rooms
+    config:
+      bomb_mission: true
+- set:
+    id: ingame
+    config:
+      bomb_round_series: true
+      respawn_disabled_mode_ids: [19]

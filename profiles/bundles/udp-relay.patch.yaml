@@ -1,0 +1,40 @@
+# Optional native UDP movement relay for kr-812, cn-717, id-1809, kr-1256, cn-774 and tw-454.
+# Apply to one build with --patch; no profile enables it by default.
+# BFF_UDP_PORT is the local UDP socket port. BFF_UDP_PUBLIC_PORT is its external NAT mapping.
+# Game and match admission still use the existing authenticated TCP connections.
+- insert:
+    - id: udp-listener
+      plugin: net.udp
+      config:
+        enabled: ${BFF_UDP_ENABLED:-true}
+        listen: "${BFF_BIND_HOST:-0.0.0.0}:${BFF_UDP_PORT}"
+        protocol: "${BFF_PROFILE_ID}/udp"
+        max_datagram_bytes: 1400
+    - id: match-udp-directory
+      plugin: match-udp-directory
+      config:
+        protocol: "${BFF_PROFILE_ID}/relay"
+        max_sessions: 1024
+    - id: match-udp-relay-setup
+      plugin: match-udp-relay-setup
+      config:
+        enabled: ${BFF_UDP_ENABLED:-true}
+        game_protocol: "${BFF_PROFILE_ID}/game"
+        relay_protocol: "${BFF_PROFILE_ID}/relay"
+        advertise_port: ${BFF_UDP_PUBLIC_PORT:-0}
+- set:
+    id: ingame
+    config:
+      udp_enabled: ${BFF_UDP_ENABLED:-true}
+- set:
+    id: dialect.match-replies
+    config:
+      udp_enabled: ${BFF_UDP_ENABLED:-true}
+      udp_protocol: "${BFF_PROFILE_ID}/udp"
+      udp_advertise_port: ${BFF_UDP_PUBLIC_PORT:-0}
+- set:
+    id: dialect.rooms
+    config:
+      udp_enabled: ${BFF_UDP_ENABLED:-true}
+      udp_protocol: "${BFF_PROFILE_ID}/udp"
+      udp_keepalive_ms: 1000

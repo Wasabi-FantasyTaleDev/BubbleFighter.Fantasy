@@ -9,13 +9,19 @@
     frame: modern_8
 - id: dialect.rooms
   plugin: dialect.rooms
+  parent_id: inventory.loadouts
   config:
     # The typed room families of the modern family: room commands, plaza scene, round start, result screens,
     # the action feed and the movement relay, each through the kr-1256 bodies in packets/*.yaml. The S2C 585
     # loading words stay the binding's 1, 0, 1 default, the same words the ingame row's start flags carry.
     protocol: kr-1256/game
+    # The plaza and tutorial move replies place the player on the same channel as the login (see
+    # dialect.messages login_channel); a channel must be a FighterConfigChannel column, which 50 is not.
+    player_channel: ${BFF_PLAYER_CHANNEL:-60}
     relay_protocol: kr-1256/relay
     modern_rooms: true
+    # The pirate battle's host waits on the server for each wave and spawn table (kr-1256 sub_7B9820, sub_7B90D0).
+    npc_rounds: true
     packets_directory: packets
     # The first-run tutorial entry stays opt-in until native scene acceptance is complete.
     initial_tutorial: false
@@ -27,6 +33,10 @@
   plugin: dialect.messages
   config:
     protocol: kr-1256/game
+    # Every client sits on channel 60, "Free" (one shared lobby instead of split channels). The login reply's
+    # channel word is what the round start reads its FighterConfigChannel column from (kr-812 sub_818680,
+    # sub_587690); BFF_PLAYER_CHANNEL also feeds dialect.rooms player_channel and the cluster move. 0 = off.
+    login_channel: ${BFF_PLAYER_CHANNEL:-60}
     # The login burst, reply and main-menu install are the build's login values in packets/builds.yaml; the
     # burst order and the modern reply values live there, not in this row.
     login: true
@@ -38,7 +48,8 @@
     # Party invitation, accept, refusal and membership packets (packets/party.yaml): the invitation prompt is
     # S2C 121 gspAskedInvitation (reader kr-1256 sub_99ABC0), the result is S2C 120/119 (handler
     # kr-1256 sub_9A7A30) and the list is S2C 201 (handler kr-1256 sub_9064B0); needs the party capability
-    # of packets/builds.yaml and the party row. Leave, kick and leader requests stay off until audited.
+    # of packets/builds.yaml and the party row. Leave, kick and leader are audited from the client's own
+    # senders (kr-1256 sub_90B630 / kr-1256 sub_90A770 / kr-1256 sub_90A950) and routed by the shared binding.
     party: true
     server_notices: true
     # Wear and removal requests and their results; turn this off together with the equipment row.
@@ -64,11 +75,14 @@
     # belong to the legacy multi-endpoint selector (the optional center-selector patch, never mounted here).
     # The kr-1256 center requests are unread, so no modern CenterStatus layout is invented.
     center_directory: false
-    # The gift box stays off. Its client readers are in packets/present.yaml, but the kr-1256 shop row's
-    # catalog branch (ShopPlugin, catalog_schema kr1256) does not mount PresentService, and the three
-    # kr-1256 present requests gcpReqPresentNewReceive/gcpReqPresentReceive/gcpReqPresentThrow have no
-    # opcode rows yet. Both belong to the S6 shop task (Claude); turning the option on before them would
-    # fail every present route at activation.
+    # The gift box (packets/present.yaml): the page requests (kr-1256 sub_E49DC0), the purchase request
+    # (kr-1256 sub_650770), the thank-you request (kr-1256 sub_E4BB30) and the single-gift requests
+    # (kr-1256 sub_E45350 / kr-1256 sub_E4A180) are the client's own senders, the list replies are read by
+    # kr-1256 sub_9B8240 (three words plus the 88-byte record walk) and kr-1256 sub_9B8400 (two words plus
+    # the vector), and the shop row serves the flows with the shared purchase terms. Needs the build's
+    # present_box capability and the opcode rows of profiles/kr-1256/opcodes.yaml.
+    # Opt in on both the dialect.messages and shop rows for native-client acceptance.
+    present_box: false
     # The player menu's "view info" (packets/fighter-info.yaml): kr-1256 sender sub_9319E0 (C2S 118),
     # reader sub_99A430, handler sub_9BCE60 (S2C 133). Needs the lobby row's fighter_info.
     fighter_info: true
@@ -92,6 +106,8 @@
   plugin: protocol
   config:
     opcode_table_path: profiles/kr-1256/opcodes.yaml
+    # kr-1256 sub_99EAD0 rejects every greeting status except 4 before patch processing.
+    bootstrap_status: 4
     # The mandatory first packet, the patch-request slot; the legacy builds name it gcpFirstConnect.
     patch_request_name: gcpReqGamePatch
 - id: game-listener
@@ -126,6 +142,7 @@
     max_paint_items: 256
 - id: lobby
   plugin: lobby
+  parent_id: inventoryview
   config:
     protocol: "kr-1256/game"
     auto_create_players: true
@@ -165,6 +182,7 @@
     protocol: "kr-1256/game"
 - id: equipment
   plugin: equipment
+  parent_id: inventoryview
   config:
     protocol: "kr-1256/game"
     client_profile: "kr-1256"

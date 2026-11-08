@@ -163,9 +163,12 @@ structs:
     # cn-406 sub_59E0E0/sub_59E120 read and write the same three bool32 fields.
     - ready: bool
       offset: 4
-    - unknown_5: bool
+    # kr-812 sub_5C5F10 sends state 3 (+5) while the UI manager's shop window (+608, opened by kr-812
+    # sub_6C3A20, which sends gcpEnterShop) exists, and state 2 (+6) while its inventory window (+612, kr-812
+    # sub_6C3D20, gcpEnterInventory) exists; kr-1256 sub_9785E0 writes the same mutually exclusive states.
+    - in_shop: bool
       offset: 5
-    - unknown_6: bool
+    - in_inventory: bool
       offset: 6
 
   # Readers: kr-812 sub_5C8D90, cn-717 sub_60CDA0, id-400 sub_567520,
@@ -222,25 +225,29 @@ structs:
       offset: 148
     - unknown_152: bool
       offset: 152
+      # cn-735 sub_424F60, cn-738 sub_428AE0 and cn-742 sub_42C520 end thirteen words with one byte.
+      cn-735:
+        - unknown_152: u8
+          offset: 152
       # kr-1256 ends the request with one byte and one word after the fourteen words (create and start alike)
       kr-1256:
         - unknown_n18: u8
         - unknown_n19: u32
     - unknown_153: bool
       offset: 153
-      except: [kr-1256]
+      except: [kr-1256, cn-735]
     - unknown_155: bool
       offset: 155
-      except: [kr-1256]
+      except: [kr-1256, cn-735]
     - unknown_156: bool
       offset: 156
-      except: [kr-1256]
+      except: [kr-1256, cn-735]
     - unknown_154: bool
       offset: 154
-      except: [kr-1256]
+      except: [kr-1256, cn-735]
     - unknown_157: bool
       offset: 157
-      except: [id-400, kr-1256]
+      except: [id-400, kr-1256, cn-735]
       also: [cn-706] # cn-706 sub_567120 has six bools, unlike its id-400 layout base.
 
   # Early strings occupy one word each; MapMetaData starts at request+24.

@@ -1,0 +1,12 @@
+# Optional issuer-side launch membership; mount cluster.directory and launcher.http as well.
+# The authentication origin and persistent scope must match the directory's explicit node declarations.
+# This does not configure a shared database or enable a native Gateway redirect.
+- insert:
+    - id: cluster-launch-selection
+      plugin: cluster.launch-selection
+      config:
+        local_node_id: ${BFF_CLUSTER_NODE_ID}
+        authority_id: ${BFF_CLUSTER_AUTHORITY_ID}
+        authority_url: ${BFF_CLUSTER_AUTHORITY_URL}
+        data_scope: ${BFF_CLUSTER_DATA_SCOPE}
+        automatic_selector_id: ${BFF_CLUSTER_AUTOMATIC_SELECTOR_ID:-1}

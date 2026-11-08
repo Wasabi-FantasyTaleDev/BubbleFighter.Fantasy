@@ -68,3 +68,6 @@
 - replace:
     id: companion.notices
     disabled: false
+- replace:
+    id: companion.commands
+    disabled: false

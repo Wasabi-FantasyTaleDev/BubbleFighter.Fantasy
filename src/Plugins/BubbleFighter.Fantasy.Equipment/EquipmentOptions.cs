@@ -71,6 +71,10 @@ public sealed class EquipmentOptions : IValidatableOptions
     /// </summary>
     public bool PetSharedSlot { get; set; }
 
+    /// <summary>Gets or sets the packet-table directory containing the native pet equipment capability.</summary>
+    [Required]
+    public string PacketsDirectory { get; set; } = "packets";
+
     /// <summary>
     /// Gets or sets the client path of the workbook the pet rule reads, through
     /// <c>IClientDataStore</c>. Every mounted build carries the catalog at the same client

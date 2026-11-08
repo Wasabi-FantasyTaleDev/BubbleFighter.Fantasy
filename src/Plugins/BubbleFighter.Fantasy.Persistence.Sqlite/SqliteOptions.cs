@@ -7,6 +7,14 @@ namespace BubbleFighter.Fantasy.Persistence.Sqlite;
 /// <summary>Defines the explicit local database location and limits for the SQLite provider.</summary>
 public sealed class SqliteOptions : IValidatableOptions
 {
+    /// <summary>Gets or sets the maximum number of recorded game modes per player without evicting history.</summary>
+    [Range(1, 4096)]
+    public int MaxBattleModesPerPlayer { get; set; } = 128;
+
+    /// <summary>Gets or sets the number of independently saved client-build loadouts allowed per player.</summary>
+    [Range(1, 256)]
+    public int MaxLoadoutsPerPlayer { get; set; } = 32;
+
     /// <summary>Gets or sets the per-account scope, row and name budgets for saved customized keys.</summary>
     [Required]
     public CustomizedKeyLimits CustomizedKeys { get; set; } = new();

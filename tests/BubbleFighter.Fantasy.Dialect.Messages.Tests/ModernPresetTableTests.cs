@@ -138,8 +138,8 @@ public sealed class ModernPresetTableTests
 
     [Theory]
     [InlineData("kr-1256", true)] // kr-1256 sub_9C3880 reads the tabled list.
-    [InlineData("cn-774", false)] // its entry shape is not proven
-    [InlineData("tw-454", false)]
+    [InlineData("cn-774", true)] // cn-774 sub_BC1040 reads the tabled list; the entry restatement was audited.
+    [InlineData("tw-454", true)] // tw-454 sub_A9E170 reads the tabled list; the entry restatement was audited.
     public void OnlyTheBuildsWhoseListIsReadHaveTheCapability(string build, bool enabled)
     {
         Assert.Equal(enabled, TestBuilds.Packets.CapabilityOf(build, "weapon_presets"));

@@ -1,0 +1,25 @@
+version: 1
+structs:
+  MapObjectVisibility: []
+
+  # kr-1256 sub_6E03D0 / kr-1256 sub_6E0FD0, cn-774 sub_8A1870 / cn-774 sub_8A2600,
+  # tw-454 sub_714840 / tw-454 sub_7155C0: counted narrow bytes, boolean word, script sequence.
+  MapObjectVisibility@kr-1256:
+    - name: "list<u8>"
+      offset: 0
+    - visible: bool
+      offset: 24
+    - sequence: u32
+      offset: 28
+
+  BreakableMapObject: []
+
+  # kr-1256 sub_6E0630 / kr-1256 sub_6E1150, cn-774 sub_8A1A60 / cn-774 sub_8A2740,
+  # tw-454 sub_714A30 / tw-454 sub_715700: the first trailing word is passed in xmm1 as health.
+  BreakableMapObject@kr-1256:
+    - name: "list<u8>"
+      offset: 0
+    - hit_points: f32
+      offset: 24
+    - sequence: u32
+      offset: 28

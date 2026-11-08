@@ -43,6 +43,7 @@ public sealed class PresetWireTests
     [InlineData("id-400")]
     [InlineData("id-1809")]
     [InlineData("cn-706")]
+    [InlineData("cn-406")]
     public void RefusalStatusIsPreservedRatherThanEncodedAsSuccess(string build)
     {
         Assert.Equal(Convert.FromHexString("0201000000"),
@@ -82,6 +83,7 @@ public sealed class PresetWireTests
     [InlineData("id-400")]
     [InlineData("id-1809")]
     [InlineData("cn-706")]
+    [InlineData("cn-406")]
     public void EveryAuditedPresetBuildPreservesTheRecordedBar(string build)
     {
         var expected = Convert.FromHexString("011A010000050000001015030010150300000000000000000000000000050000000101000000050000000000000000");

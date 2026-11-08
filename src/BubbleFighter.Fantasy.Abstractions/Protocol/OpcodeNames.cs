@@ -39,7 +39,7 @@ public static class OpcodeNames
     /// <summary>Splits a protocol name into its profile id and connection.</summary>
     /// <param name="protocol">A connection protocol named <c>&lt;profile&gt;/&lt;connection&gt;</c>.</param>
     /// <returns>The profile id and the connection.</returns>
-    /// <exception cref="ConfigException">Thrown when the name has no profile part or its connection is neither <c>game</c> nor <c>relay</c>.</exception>
+    /// <exception cref="ConfigException">Thrown when the name has no profile part or its connection is not <c>game</c>, <c>relay</c> or <c>udp</c>.</exception>
     public static (string Profile, OpcodeConnection Connection) ParseProtocol(string protocol)
     {
         var slash = protocol.IndexOf('/');
@@ -47,12 +47,12 @@ public static class OpcodeNames
             throw new ConfigException($"Connection protocol '{protocol}' does not name a profile (expected '<profile>/<connection>').");
         return TryParseConnection(protocol[(slash + 1)..], out var connection)
             ? (protocol[..slash], connection)
-            : throw new ConfigException($"Connection protocol '{protocol}' names connection '{protocol[(slash + 1)..]}'; expected 'game' or 'relay'.");
+            : throw new ConfigException($"Connection protocol '{protocol}' names connection '{protocol[(slash + 1)..]}'; expected 'game', 'relay' or 'udp'.");
     }
 
     private static bool TryParseConnection(string text, out OpcodeConnection connection)
     {
-        connection = text switch { "game" => OpcodeConnection.Game, "relay" => OpcodeConnection.Relay, _ => OpcodeConnection.Both };
+        connection = text switch { "game" => OpcodeConnection.Game, "relay" => OpcodeConnection.Relay, "udp" => OpcodeConnection.Udp, _ => OpcodeConnection.Both };
         return connection != OpcodeConnection.Both;
     }
 

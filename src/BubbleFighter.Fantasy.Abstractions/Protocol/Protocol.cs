@@ -54,7 +54,7 @@ public enum Evidence
 /// <param name="NameSource">
 /// Where <paramref name="Name"/> comes from, separate from the opcode's own evidence:
 /// <c>label@&lt;profile&gt;</c> for a label found in that client build, <c>mirrored</c> for a
-/// name derived from the paired opposite-direction label, <c>coined</c> for a name given to a
+/// name justified by a matched client reader or writer, <c>coined</c> for a name given to a
 /// packet whose purpose the client code proves but no build labels (such names end in <c>_</c>),
 /// <c>none</c> for <c>UnknownNNN</c>, or <see langword="null"/> when the row has not been
 /// classified yet.
@@ -78,23 +78,26 @@ public enum OpcodeConnection
 
     /// <summary>A packet the client dispatches identically on both connections.</summary>
     Both,
+
+    /// <summary>Connectionless UDP datagrams; never inherits rows marked Both for the two TCP connections.</summary>
+    Udp,
 }
 
 /// <summary>
 /// One connection's view of a client profile's opcode table. C2S and S2C are separate numeric
 /// spaces, and so are the game and relay connections; lookups only see the rows of
-/// <see cref="Connection"/> plus rows marked <see cref="OpcodeConnection.Both"/>.
+/// <see cref="Connection"/> plus TCP rows marked <see cref="OpcodeConnection.Both"/>.
 /// </summary>
 public interface IOpcodeTable
 {
     /// <summary>Gets the profile this table belongs to.</summary>
     ClientProfile Profile { get; }
 
-    /// <summary>Gets the connection this view resolves; <see cref="OpcodeConnection.Game"/> or <see cref="OpcodeConnection.Relay"/>.</summary>
+    /// <summary>Gets the connection this view resolves; <see cref="OpcodeConnection.Game"/>, <see cref="OpcodeConnection.Relay"/> or <see cref="OpcodeConnection.Udp"/>.</summary>
     OpcodeConnection Connection { get; }
 
     /// <summary>Gets the same profile's view for another connection.</summary>
-    /// <param name="connection">The connection; <see cref="OpcodeConnection.Game"/> or <see cref="OpcodeConnection.Relay"/>.</param>
+    /// <param name="connection">The connection; <see cref="OpcodeConnection.Game"/>, <see cref="OpcodeConnection.Relay"/> or <see cref="OpcodeConnection.Udp"/>.</param>
     /// <returns>The view.</returns>
     /// <exception cref="ArgumentOutOfRangeException">Thrown for <see cref="OpcodeConnection.Both"/>.</exception>
     IOpcodeTable ForConnection(OpcodeConnection connection);

@@ -1,6 +1,7 @@
 using System.Buffers;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Lobby;
+using BubbleFighter.Fantasy.Contracts.Rooms;
 using BubbleFighter.Fantasy.Packets;
 
 namespace BubbleFighter.Fantasy.Dialect.Rooms;
@@ -146,6 +147,9 @@ internal enum RoomFieldValue
     /// <summary>The slot's start position index, <c>UserSlot</c> +129: 0xFF until the round is set up.</summary>
     SpawnIndex,
 
+    /// <summary>The room seat whose client controls this character, or 255 outside a controlled room.</summary>
+    ControllerSlot,
+
     /// <summary>The seated player's level.</summary>
     Level,
 
@@ -189,11 +193,17 @@ internal sealed record RoomSlotValues(bool Occupied, bool Closed, int UserNumber
     /// <summary>Gets the persisted avatar material color index; zero keeps the native default.</summary>
     public ushort ColorIndex { get; init; }
 
+    /// <summary>Gets a temporary native selection whose slot fields are named by the build data.</summary>
+    public BubbleFighter.Fantasy.Contracts.Rooms.RoomInventorySelection? InventorySelection { get; init; }
+
     /// <summary>Gets the player's team byte.</summary>
     public int Team { get; init; }
 
     /// <summary>Gets the start position index; 0xFF outside a starting round.</summary>
     public int SpawnIndex { get; init; } = 0xFF;
+
+    /// <summary>Gets the controlling player's room seat; 255 retains the native unassigned value.</summary>
+    public int ControllerSlot { get; init; } = 0xFF;
 
     /// <summary>Gets the player's level.</summary>
     public int Level { get; init; } = 1;
@@ -513,7 +523,8 @@ internal static class RoomCodec
     /// <returns>The S2C 503 body.</returns>
     internal static byte[] WritePlaySlot(MainMenuRoomOpened room, PacketTables tables, string build,
         RoomSchema schema, int slot, int team = 0) =>
-        WriteSeatEnvelope(tables, build, schema, slot, Seated(room, ready: false) with { SpawnIndex = slot, Team = team });
+        WriteSeatEnvelope(tables, build, schema, slot,
+            Seated(room, ready: false) with { SpawnIndex = slot, ControllerSlot = slot, Team = team });
 
     /// <summary>Writes one play-room <c>UserSlot</c>.</summary>
     /// <param name="w">The writer.</param>
@@ -558,7 +569,8 @@ internal static class RoomCodec
         Write(w, values.Play ? PlayTable(schema.PlaySessionSetting) : schema.SessionSetting, schema, values, null, legacyReady: false);
 
     private static RoomSlotValues Seated(MainMenuRoomOpened room, bool ready) =>
-        new(true, false, room.UserNumber, room.Nickname, room.CharacterItemId, room.EquippedItemIds, ready) { ColorIndex = room.ColorIndex };
+        new(true, false, room.UserNumber, room.Nickname, room.CharacterItemId, room.EquippedItemIds, ready)
+        { ColorIndex = room.ColorIndex, Level = room.Level };
 
     private static RoomValues PlayOf(RoomSlotValues slot) => new(PlayRoomKind, [slot]) { Play = true };
 
@@ -624,13 +636,17 @@ internal static class RoomCodec
                 RoomFieldType.Equipped => slot?.EquippedItemIds ?? [],
                 RoomFieldType.EmptyVector => null,
                 RoomFieldType.Bool => NumericValue(field, room, slot, forceReady) != 0,
-                RoomFieldType.U32 => unchecked((int)NumericValue(field, room, slot, forceReady)),
+                RoomFieldType.U32 => field.Value == RoomFieldValue.Level && slot is { Occupied: true }
+                    ? NativeDisplayLevel.Project(schema.Tables, schema.Build, slot.Level)
+                    : unchecked((int)NumericValue(field, room, slot, forceReady)),
                 RoomFieldType.U8 => checked((byte)NumericValue(field, room, slot, forceReady)),
                 RoomFieldType.U16 => checked((ushort)NumericValue(field, room, slot, forceReady)),
                 RoomFieldType.F32 or RoomFieldType.F64 => NumericValue(field, room, slot, forceReady),
                 _ => throw new InvalidOperationException($"Unexpected room field {field.Name}: {field.Type}."),
             });
         }
+        if (slot?.InventorySelection is { } selection)
+            RoomInventoryProjection.Apply(schema.Tables, schema.Build, values, selection);
         return values;
     }
 
@@ -664,13 +680,18 @@ internal static class RoomCodec
 
     /// <summary>Writes the native seat envelope with separately scoped user and equipment values.</summary>
     internal static byte[] WriteSeatEnvelope(PacketTables tables, string build, RoomSchema schema,
-        int index, RoomSlotValues slot, bool leaving = false)
+        int index, RoomSlotValues slot, bool leaving = false, bool? canRecruit = null,
+        PlazaRecruitmentState? recruitment = null)
     {
         ValidateLayouts(tables, build);
+        var user = PlaySeatValues(schema, slot, equipment: false);
+        if (canRecruit is { } allowed)
+            NativePlazaRecruitment.Project(tables, build, user, allowed);
+        NativePlazaRecruitment.Project(tables, build, user, recruitment);
         return PacketCodec.Write(tables, build, leaving ? "RoomSeatLeave" : "RoomSeatUpdate", new Dictionary<string, object?>
         {
             ["slot"] = index,
-            ["user"] = PlaySeatValues(schema, slot, equipment: false),
+            ["user"] = user,
             ["equipment"] = PlaySeatValues(schema, slot, equipment: true),
         });
     }
@@ -714,6 +735,7 @@ internal static class RoomCodec
             RoomFieldValue.Ready => slot is { Occupied: true, Ready: true } ? 1 : 0,
             RoomFieldValue.Team => slot is not null && (slot.Occupied || slot.Departed) ? slot.Team : 0,
             RoomFieldValue.SpawnIndex => slot?.SpawnIndex ?? 0xFF,
+            RoomFieldValue.ControllerSlot => slot is { Occupied: true } ? slot.ControllerSlot : 0xFF,
             RoomFieldValue.Level => slot is not null && (slot.Occupied || slot.Departed) ? slot.Level : field.Vacant ?? 0,
             RoomFieldValue.MasterSlot => room.MasterSlot,
             RoomFieldValue.LocalSlot => room.LocalSlot,
@@ -755,7 +777,9 @@ internal static class RoomCodec
                     w.WriteUInt16(checked((ushort)value));
                     break;
                 case RoomFieldType.U32:
-                    w.WriteInt32(unchecked((int)value));
+                    w.WriteInt32(field.Value == RoomFieldValue.Level && slot is { Occupied: true }
+                        ? NativeDisplayLevel.Project(schema.Tables, schema.Build, slot.Level)
+                        : unchecked((int)value));
                     break;
                 case RoomFieldType.Bool:
                     w.WriteBool32(value != 0);

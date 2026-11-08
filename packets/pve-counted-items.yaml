@@ -1,7 +1,10 @@
 version: 1
 structs:
   # sPVESLOTITEMINFO. kr-812 sub_9D95D0 reads three words; cn-717 sub_7F4370, id-400 sub_72E4D0,
-  # id-1809 sub_4D8130, cn-706 sub_7A23F0 and cn-324 sub_6EB8B0 match. cn-279 has no such class.
+  # id-1809 sub_4D8130, cn-706 sub_7A23F0 and cn-324 sub_6EB8B0 match. cn-406 sub_715B70 reads the
+  # same three words (sPVESLOTITEMINFO entries, constructor cn-406 sub_70D270). cn-279 has no such class.
+  # cn-705 sub_80C530 reads the same entry; cn-705 sub_787220 reads its counted vector.
+  # Modern entry readers kr-1256 sub_1159070, cn-774 sub_495D20 and tw-454 sub_47ECE0 read three words.
   PveItemSlot:
     - unknown_4: u32 # Purpose unproven.
       offset: 4
@@ -14,20 +17,33 @@ structs:
       except: [cn-279]
   # S2C gspPveItemInfo. kr-812 sub_80B420 reads a u32 count, then each 16-byte entry; cn-717 sub_8900F0,
   # id-400 sub_782B30, id-1809 sub_7A5FB0, cn-706 sub_7886D0 and cn-324 sub_6EB890 match.
+  # cn-406 sub_700730 reads the count and entries the same way (dispatcher case 930 handler sub_703CB0,
+  # writer twin cn-406 sub_716040).
   # cn-324 sub_6F52A0 is the nested vector reader called by that packet entry.
   # cn-324 sub_6EEB10 replaces the session list.
+  # cn-705 sub_78AAC0 and cn-706 sub_78BF10 replace the same session list for opcode 930.
+  # Modern list consumers kr-1256 sub_9E1EB0 / kr-1256 sub_9E04A0, cn-774 sub_8D7D20 and tw-454 sub_A578B0
+  # install the same vector for opcode 927; the record keeps its native vtable off the wire.
   PveItemsPrepared:
     - items: list<PveItemSlot>
       offset: 4
       except: [cn-279]
   # C2S gcpPveUseCountItem. kr-812 sub_80A910 reads one word; cn-717 sub_8C4210, id-400 sub_93D120,
-  # id-1809 sub_4D60C0, cn-706 sub_4BBB70 and cn-324 sub_410910 match. cn-279 has no such class.
+  # id-1809 sub_4D60C0, cn-706 sub_4BBB70 and cn-324 sub_410910 match. cn-406 sub_42A520 stamps C2S 921
+  # and its writer cn-406 sub_420D90 emits the same word. cn-279 has no such class.
+  # cn-705 sub_4C5970/cn-706 sub_4C5F70 send the selected slot through this one-word request.
+  # Mode-16 slots 1..3: kr-1256 sub_501310 / kr-1256 sub_502350, cn-774 sub_599140 / cn-774 sub_59A740,
+  # tw-454 sub_581B30 / tw-454 sub_582F10; the sender checks and decrements the character's per-kind count.
   PveItemUseRequest:
     - item_slot: u32 # cn-324 sub_53CAB0 passes the UI slot to sub_467720, which stamps C2S 921.
       offset: 4
       except: [cn-279]
   # S2C gspPveItemUsed. kr-812 sub_9D95D0 reads three words; cn-717 sub_7F4370, id-400 sub_72E4D0,
-  # id-1809 sub_4D8130, cn-706 sub_7A23F0 and cn-324 sub_6EB8B0 match. cn-279 has no such class.
+  # id-1809 sub_4D8130, cn-706 sub_7A23F0 and cn-324 sub_6EB8B0 match. cn-406 sub_715B70 reads the same
+  # three words (row 715). cn-279 has no such class.
+  # cn-705 sub_4D04A0/cn-706 sub_4D0B70 select the local seat and forward kind to native effect 32894.
+  # Modern local effects preserve the held slot: kr-1256 sub_6D55D0 case640 -> kr-1256 sub_491940,
+  # cn-774 sub_897E80 case613 -> cn-774 sub_5215A0, tw-454 sub_70B3F0 case613 -> tw-454 sub_784AE0.
   PveItemUsed:
     - seat: u32 # cn-324 sub_46FED0 resolves the first word as a player seat and checks local control.
       offset: 4

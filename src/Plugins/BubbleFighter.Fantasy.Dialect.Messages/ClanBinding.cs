@@ -28,12 +28,13 @@ internal sealed class ClanBinding(string protocol, IOpcodeTable opcodes, PacketT
 
     /// <summary>
     /// The empty body each structure must write for this build; the lengths are the client readers' own: the
-    /// passport 16 (kr-1256 sub_99C1D0), mark list 8 (kr-1256 sub_99CFA0), guild info 16 (kr-1256 sub_9B2690) and attendance
-    /// state 4 (kr-1256 sub_10C5590). A layout that disagrees is a configuration error, not a client surprise.
+    /// passport 20 (kr-1256 sub_99C1D0, whose leading word the raw .text bytes pin before the name), mark list 8
+    /// (kr-1256 sub_99CFA0), guild info 16 (kr-1256 sub_9B2690) and attendance state 4 (kr-1256 sub_10C5590).
+    /// A layout that disagrees is a configuration error, not a client surprise.
     /// </summary>
     private static readonly (string Structure, int Length)[] EmptyBodies =
     [
-        ("ClanPassport", 16), ("ClanMarkInfo", 8), ("ClanGuildInfo", 16), ("ClanAttendanceState", 4),
+        ("ClanPassport", 20), ("ClanMarkInfo", 8), ("ClanGuildInfo", 16), ("ClanAttendanceState", 4),
     ];
 
     public string Protocol => protocol;

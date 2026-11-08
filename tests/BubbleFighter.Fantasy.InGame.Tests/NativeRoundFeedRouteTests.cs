@@ -15,6 +15,33 @@ namespace BubbleFighter.Fantasy.InGame.Tests;
 /// <summary>Pins native route selection independently of Korean numbers, reporting offsets and body widths.</summary>
 public sealed class NativeRoundFeedRouteTests
 {
+    /// <summary>Matched native action labels retain their byte shapes and both connection routes.</summary>
+    [Theory]
+    [InlineData("kr-1256", "gppDash", 32779, "40420F0001000000", 8)]
+    [InlineData("kr-1256", "gppRoll", 32780, "40420F0078563412E7A5", 10)]
+    [InlineData("kr-1256", "gppJump", 32781, "40420F000000A03F01000000", 12)]
+    [InlineData("cn-774", "gppDash", 32779, "40420F0001000000", 8)]
+    [InlineData("cn-774", "gppRoll", 32780, "40420F0078563412E7A5", 10)]
+    [InlineData("cn-774", "gppJump", 32781, "40420F000000A03F01000000", 12)]
+    [InlineData("tw-454", "gppDash", 32779, "40420F0001000000", 8)]
+    [InlineData("tw-454", "gppRoll", 32780, "40420F0078563412E7A5", 10)]
+    [InlineData("tw-454", "gppJump", 32781, "40420F000000A03F01000000", 12)]
+    public async Task NamedNativeActionsKeepTheirWireIdentityAndRouting(string build, string name,
+        int opcode, string hex, int length)
+    {
+        var root = Directory.GetParent(SharedDialectRows.PacketsDirectory())!.FullName;
+        var table = OpcodeTableLoader.Load(Path.Combine(root, "profiles", build, "opcodes.yaml"),
+            TestWireDialects.Get(build).Profile);
+        foreach (var connection in new[] { OpcodeConnection.Game, OpcodeConnection.Relay })
+        {
+            var scoped = table.ForConnection(connection);
+            Assert.Equal(opcode, scoped.C2S(name));
+            Assert.Equal(opcode, scoped.S2C(name));
+        }
+        Assert.Equal(length, Convert.FromHexString(hex).Length);
+        await NativeCombatUsesTheActualProfile(build, opcode, hex, [1000000], null, null, false);
+    }
+
     /// <summary>The deployed profile data must resolve every inherited action in all three opcode spaces.</summary>
     [Theory]
     [InlineData("cn-774")]
@@ -27,7 +54,10 @@ public sealed class NativeRoundFeedRouteTests
             TestWireDialects.Get(build).Profile);
         var relay = game.ForConnection(OpcodeConnection.Relay);
         var routes = RoundFeedRoute.Load(tables, build, game, relay);
-        Assert.Equal(39, routes.Length);
+        Assert.Equal(46, routes.Length);
+        Assert.Equal(new[] { "NpcAgentMove", "NpcDirectItem", "NpcDummyMotion", "NpcIni", "NpcLuaMessage", "NpcObjectDelete" },
+            routes.Where(route => route.Structure.StartsWith("Npc", StringComparison.Ordinal)).Select(route => route.Structure).Order());
+        Assert.Equal("PortalTeleport", routes.Single(route => route.GameInbound == game.C2S("gppTeleportPortal")).Structure);
         Assert.All(routes, route =>
         {
             Assert.Equal(route.GameInbound, route.RelayInbound);
@@ -56,26 +86,39 @@ public sealed class NativeRoundFeedRouteTests
 
     /// <summary>Actual native profiles preserve combat bytes, ownership and shared life events on both listeners.</summary>
     [Theory]
+    [InlineData("kr-1256", 38273, "40420F00E0C810000000A03FE7", new[] { 1000000, 1100000 }, RoundLifeEvent.Released, 1100000, true)]
+    [InlineData("kr-1256", 38282, "40420F00E0C810000000A03F000020C000007040EFBEADDE00000000010000007856341200000000", new[] { 1000000 }, RoundLifeEvent.Bubbled, 1100000, true)]
+    [InlineData("kr-1256", 38282, "40420F00E0C810000000A03F000020C000007040EFBEADDE01000000010000007856341200000000", new[] { 1000000 }, RoundLifeEvent.Died, 1100000, true)]
     [InlineData("cn-774", 33301, "785634120000A03F000020C000007040EFBEADDEE0C81000", null, null, null, false)]
     [InlineData("cn-774", 32925, "40420F00A5010002000300040005000600EFBEADDEE778563412EFCDAB89BC9A", new[] { 1000000 }, null, null, false)]
-    [InlineData("cn-774", 38273, "40420F00E0C81000EFBEADDEE7", new[] { 1000000, 1100000 }, RoundLifeEvent.Released, null, true)]
+    [InlineData("cn-774", 38273, "40420F00E0C81000EFBEADDEE7", new[] { 1000000, 1100000 }, RoundLifeEvent.Released, 1100000, true)]
     [InlineData("cn-774", 38280, "E0C8100040420F00E7", new[] { 1100000, 1000000 }, null, null, true)]
-    [InlineData("cn-774", 38282, "40420F00E0C810000000A03F000020C000007040EFBEADDE00000000010000007856341200000000", new[] { 1000000 }, RoundLifeEvent.Bubbled, null, true)]
-    [InlineData("cn-774", 38282, "40420F00E0C810000000A03F000020C000007040EFBEADDE01000000010000007856341200000000", new[] { 1000000 }, RoundLifeEvent.Died, null, true)]
+    [InlineData("cn-774", 38282, "40420F00E0C810000000A03F000020C000007040EFBEADDE00000000010000007856341200000000", new[] { 1000000 }, RoundLifeEvent.Bubbled, 1100000, true)]
+    [InlineData("cn-774", 38282, "40420F00E0C810000000A03F000020C000007040EFBEADDE01000000010000007856341200000000", new[] { 1000000 }, RoundLifeEvent.Died, 1100000, true)]
     [InlineData("cn-774", 38277, "0100000040420F00E0C810000000A03F000020C00000704000000000EFBEADDE", new[] { 1100000, 1000000 }, RoundLifeEvent.Finished, 1100000, true)]
     [InlineData("cn-774", 38277, "0000000040420F00E0C810000000A03F000020C00000704000000000EFBEADDE", new[] { 1100000, 1000000 }, null, null, true)]
     [InlineData("tw-454", 33301, "785634120000A03F000020C000007040E0C81000", null, null, null, false)]
     [InlineData("tw-454", 32925, "40420F00A5010002000300040005000600EFBEADDEE778563412EFCDAB89BC9A", new[] { 1000000 }, null, null, false)]
-    [InlineData("tw-454", 33282, "40420F00E0C81000EFBEADDEE7", new[] { 1000000, 1100000 }, RoundLifeEvent.Released, null, true)]
+    [InlineData("tw-454", 33282, "40420F00E0C81000EFBEADDEE7", new[] { 1000000, 1100000 }, RoundLifeEvent.Released, 1100000, true)]
     [InlineData("tw-454", 33281, "E0C8100040420F00E7", new[] { 1100000, 1000000 }, null, null, true)]
-    [InlineData("tw-454", 32787, "40420F00E0C810000000A03F000020C000007040EFBEADDE00000000010000007856341200000000", new[] { 1000000 }, RoundLifeEvent.Bubbled, null, true)]
-    [InlineData("tw-454", 32787, "40420F00E0C810000000A03F000020C000007040EFBEADDE01000000010000007856341200000000", new[] { 1000000 }, RoundLifeEvent.Died, null, true)]
+    [InlineData("tw-454", 32787, "40420F00E0C810000000A03F000020C000007040EFBEADDE00000000010000007856341200000000", new[] { 1000000 }, RoundLifeEvent.Bubbled, 1100000, true)]
+    [InlineData("tw-454", 32787, "40420F00E0C810000000A03F000020C000007040EFBEADDE01000000010000007856341200000000", new[] { 1000000 }, RoundLifeEvent.Died, 1100000, true)]
     [InlineData("tw-454", 32795, "0100000040420F00E0C810000000A03F000020C00000704000000000EFBEADDE", new[] { 1100000, 1000000 }, RoundLifeEvent.Finished, 1100000, true)]
     [InlineData("tw-454", 32795, "0000000040420F00E0C810000000A03F000020C00000704000000000EFBEADDE", new[] { 1100000, 1000000 }, null, null, true)]
     [InlineData("tw-454", 32796, "40420F00E0C810000000A03F000020C000007040EFBEADDE01000000", new[] { 1000000, 1100000 }, null, null, true)]
     [InlineData("tw-454", 32806, "40420F00FFFFFFFF", new[] { 1000000 }, RoundLifeEvent.Released, null, true)]
     [InlineData("tw-454", 32805, "40420F00", new[] { 1000000 }, RoundLifeEvent.BubbleExpired, null, true)]
     [InlineData("tw-454", 33274, "40420F0001000000", new[] { 1000000 }, null, null, false)]
+    [InlineData("kr-812", 32836, "40420F00", new[] { 1000000 }, RoundLifeEvent.DeathCleaned, null, false)]
+    [InlineData("cn-324", 32836, "40420F00", new[] { 1000000 }, RoundLifeEvent.DeathCleaned, null, false)]
+    [InlineData("cn-406", 32836, "40420F00", new[] { 1000000 }, RoundLifeEvent.DeathCleaned, null, false)]
+    [InlineData("cn-279", 32836, "40420F00", new[] { 1000000 }, RoundLifeEvent.DeathCleaned, null, true)]
+    [InlineData("id-400", 32836, "40420F00", new[] { 1000000 }, RoundLifeEvent.DeathCleaned, null, false)]
+    [InlineData("cn-404", 32836, "40420F00", new[] { 1000000 }, RoundLifeEvent.DeathCleaned, null, false)]
+    [InlineData("cn-408", 32836, "40420F00", new[] { 1000000 }, RoundLifeEvent.DeathCleaned, null, false)]
+    [InlineData("cn-706", 32836, "40420F00", new[] { 1000000 }, RoundLifeEvent.DeathCleaned, null, false)]
+    [InlineData("cn-717", 32836, "40420F00", new[] { 1000000 }, RoundLifeEvent.DeathCleaned, null, false)]
+    [InlineData("id-1809", 32836, "40420F00", new[] { 1000000 }, RoundLifeEvent.DeathCleaned, null, false)]
     public async Task NativeCombatUsesTheActualProfile(string build, int code, string hex, int[]? actors,
         RoundLifeEvent? kind, int? initiator, bool echo)
     {
@@ -117,7 +160,7 @@ public sealed class NativeRoundFeedRouteTests
                 Assert.Equal(code, feed[^1].Code);
                 Assert.Equal(body, feed[^1].Payload.ToArray());
                 Assert.Equal(actors, feed[^1].ReportedActors);
-                Assert.True(feed[^1].OnRelay);
+                Assert.Equal(tables.ValuesOf(build).GetValueOrDefault("round_feed_passthrough") is not "true", feed[^1].OnRelay);
                 Assert.Equal(echo, feed[^1].IncludeSender);
                 Assert.Equal(lifeCount + (kind is null ? 0 : 1), life.Count);
                 if (kind is not null)
@@ -143,6 +186,132 @@ public sealed class NativeRoundFeedRouteTests
 
         PluginContext Context(string id) => new(new PluginRow { Id = id, Plugin = id, Source = "test" },
             services, events, NullLogger.Instance);
+    }
+
+    /// <summary>CN2011 executes its ordinary peer actions only after their echo; later clients apply their own copy.</summary>
+    [Theory]
+    [InlineData("cn-279", true)]
+    [InlineData("cn-324", false)]
+    [InlineData("cn-406", false)]
+    [InlineData("kr-812", false)]
+    public async Task PassthroughEchoPolicyAppliesToBothInputsAndUnwinds(string build, bool echo)
+    {
+        var tables = PacketTables.Load(SharedDialectRows.PacketsDirectory());
+        var root = Directory.GetParent(SharedDialectRows.PacketsDirectory())!.FullName;
+        var game = OpcodeTableLoader.Load(Path.Combine(root, "profiles", build, "opcodes.yaml"), TestWireDialects.Get(build).Profile);
+        var services = new ServiceRegistry();
+        var events = new EventBus(NullLogger.Instance);
+        var infrastructure = new PluginContext(new PluginRow { Id = "infrastructure", Plugin = "test", Source = "test" }, services, events, NullLogger.Instance);
+        var binding = new PluginContext(new PluginRow { Id = "feed", Plugin = "test", Source = "test" }, services, events, NullLogger.Instance);
+        var reports = new List<(long Session, RoundFeedSent Message)>();
+        var session = new RecordingSession(7, game.Profile);
+        var relaySession = new RecordingSession(8, game.Profile);
+        using var link = relaySession.Features.Register<IMatchGameLink>(new TestGameLink(session));
+        try
+        {
+            await new PacketRouterPlugin().ActivateAsync(infrastructure, default);
+            await new MessageRouterPlugin().ActivateAsync(infrastructure, default);
+            var messages = services.Get<IMessageRouter>().For(infrastructure);
+            infrastructure.Effect(messages.On<RoundFeedSent>(build + "/game", (sender, message, _) =>
+            {
+                reports.Add((sender.Id, message));
+                return ValueTask.CompletedTask;
+            }));
+            new RoundFeedBinding(build + "/game", build + "/relay", game, game.ForConnection(OpcodeConnection.Relay), tables, build)
+            {
+                AcceptRelayFrames = true,
+            }.Mount(binding);
+            // cn-279 sub_81E2F0 and sub_81DAE0 send these through cn-279 sub_702660.
+            var frames = new List<(ushort Code, byte[] Payload)>
+            {
+                (32781, Convert.FromHexString("785634120000A03F01")),
+                (32775, Convert.FromHexString("785634120000A03F01")),
+            };
+            if (build == "cn-279")
+                // cn-279 sub_884050 -> cn-279 sub_818940 sends the confirmed ULTRA's attribute on the game connection.
+                frames.Add((game.C2S("gppSetAttribute"), Convert.FromHexString("40420F000B000000401F0000")));
+            foreach (var (code, payload) in frames)
+            {
+                await services.Get<IPacketRouter>().DispatchAsync(build + "/game", session, new(code, payload), default);
+                await services.Get<IPacketRouter>().DispatchAsync(build + "/relay", relaySession, new(code, payload), default);
+                Assert.Equal(2, reports.Count(report => report.Message.Code == code));
+                Assert.All(reports.Where(report => report.Message.Code == code), report =>
+                {
+                    Assert.Equal(session.Id, report.Session);
+                    Assert.Equal(echo, report.Message.IncludeSender);
+                    Assert.Equal(payload, report.Message.Payload.ToArray());
+                });
+            }
+            await binding.UnwindAsync();
+            await services.Get<IPacketRouter>().DispatchAsync(build + "/game", session, new(32781, new byte[9]), default);
+            Assert.Equal(frames.Count * 2, reports.Count);
+        }
+        finally
+        {
+            await binding.UnwindAsync();
+            await infrastructure.UnwindAsync();
+        }
+    }
+
+    private sealed record TestGameLink(ISession Game) : IMatchGameLink;
+
+    /// <summary>Modern builds do not forward the unclaimed conversion operation with script support disabled.</summary>
+    [Theory]
+    [InlineData("kr-1256")]
+    [InlineData("cn-774")]
+    [InlineData("tw-454")]
+    public async Task UnclaimedModernConversionIsNotForwardedOnEitherInput(string build)
+    {
+        var tables = PacketTables.Load(SharedDialectRows.PacketsDirectory());
+        Assert.Equal("false", tables.ValuesOf(build)["round_feed_passthrough"]);
+        var root = Directory.GetParent(SharedDialectRows.PacketsDirectory())!.FullName;
+        var game = OpcodeTableLoader.Load(Path.Combine(root, "profiles", build, "opcodes.yaml"), TestWireDialects.Get(build).Profile);
+        var services = new ServiceRegistry();
+        var events = new EventBus(NullLogger.Instance);
+        var infrastructure = new PluginContext(new PluginRow { Id = "infrastructure", Plugin = "test", Source = "test" }, services, events, NullLogger.Instance);
+        var binding = new PluginContext(new PluginRow { Id = "feed", Plugin = "test", Source = "test" }, services, events, NullLogger.Instance);
+        var reports = new List<RoundFeedSent>();
+        var session = new RecordingSession(7, game.Profile);
+        var relaySession = new RecordingSession(8, game.Profile);
+        using var link = relaySession.Features.Register<IMatchGameLink>(new TestGameLink(session));
+        try
+        {
+            await new PacketRouterPlugin().ActivateAsync(infrastructure, default);
+            await new MessageRouterPlugin().ActivateAsync(infrastructure, default);
+            var messages = services.Get<IMessageRouter>().For(infrastructure);
+            infrastructure.Effect(messages.On<RoundFeedSent>(build + "/game", (_, message, _) =>
+            {
+                reports.Add(message);
+                return ValueTask.CompletedTask;
+            }));
+            new RoundFeedBinding(build + "/game", build + "/relay", game, game.ForConnection(OpcodeConnection.Relay), tables, build)
+            {
+                AcceptRelayFrames = true,
+            }.Mount(binding);
+            var body = ScriptZombieBinding.WritePeer(tables, build, new(1, 34, 0, 204, 110288));
+            foreach (var (protocol, sender) in new[] { (build + "/game", session), (build + "/relay", relaySession) })
+                await services.Get<IPacketRouter>().DispatchAsync(protocol, sender,
+                    new(game.C2S("gppScriptZombieConversion_"), body), default);
+            Assert.Empty(reports);
+        }
+        finally
+        {
+            await binding.UnwindAsync();
+            await infrastructure.UnwindAsync();
+        }
+    }
+
+    /// <summary>An inherited route cannot activate for a descendant absent from its audited membership.</summary>
+    [Theory]
+    [InlineData("cn-774", 0)]
+    [InlineData("tw-454", 1)]
+    public void RouteMembershipRequiresTheExactBuild(string auditedBuild, int expected)
+    {
+        using var fixture = new Tables("      Rescue: { builds: [" + auditedBuild
+            + "], opcode: gppRescue_, structure: RoundRescueNative, actors: [victim] }");
+        var table = Opcodes(0);
+        Assert.Equal(expected, RoundFeedRoute.Load(fixture.Packets, "tw-454", table,
+            table.ForConnection(OpcodeConnection.Relay)).Length);
     }
 
     private const string Routes = """
@@ -241,8 +410,13 @@ public sealed class NativeRoundFeedRouteTests
     [InlineData("opcode: gppRescue_, structure: RoundRescueNative, actors: [victim], life_event: invented", "unsupported")]
     [InlineData("opcode: gppRescue_, structure: RoundRescueNative, actors: [victim], life_event: released", "life_actor")]
     [InlineData("opcode: gppRescue_, structure: RoundRescueNative, actors: [victim], life_actor: victim", "incompatible")]
+    [InlineData("opcode: gppRescue_, structure: RoundRescueNative, actors: [victim], life_event: reset_confirmed, life_actor: victim, life_initiator: rescuer", "incompatible")]
+    [InlineData("opcode: gppRescue_, structure: RoundRescueNative, actors: [victim], life_event: released, life_actor: victim, life_initiator: unknown_8", "as u32")]
     [InlineData("opcode: gppRescue_, structure: RoundRescueNative, actors: [victim], enabled: maybe", "true or false")]
     [InlineData("opcode: gppRescue_, structure: RoundRescueNative, actors: [victim], surprise: true", "unknown key")]
+    [InlineData("builds: [], opcode: gppRescue_, structure: RoundRescueNative, actors: [victim]", "distinct known audited builds")]
+    [InlineData("builds: [tw-454, tw-454], opcode: gppRescue_, structure: RoundRescueNative, actors: [victim]", "distinct known audited builds")]
+    [InlineData("builds: [unknown], opcode: gppRescue_, structure: RoundRescueNative, actors: [victim]", "distinct known audited builds")]
     public void InvalidRoutesPublishNothing(string route, string diagnostic)
     {
         using var fixture = new Tables("      Rescue: { " + route + " }");
@@ -434,7 +608,7 @@ public sealed class NativeRoundFeedRouteTests
         {
             Directory.CreateDirectory(_directory);
             // This isolated two-action fixture does not claim a complete native round or reset route.
-            File.WriteAllText(Path.Combine(_directory, "builds.yaml"), "version: 1\nbuilds:\n  kr-812: {}\n  cn-774:\n    base: kr-812\n  tw-454:\n    base: cn-774\n    round_feed:\n" + routes + "\n");
+            File.WriteAllText(Path.Combine(_directory, "builds.yaml"), "version: 1\nbuilds:\n  kr-812:\n    capabilities: { round_ping: false }\n  cn-774:\n    base: kr-812\n  tw-454:\n    base: cn-774\n    round_feed:\n" + routes + "\n");
             File.Copy(Path.Combine(SharedDialectRows.PacketsDirectory(), "round-feed-native.yaml"), Path.Combine(_directory, "native.yaml"));
             File.WriteAllText(Path.Combine(_directory, "reset.yaml"), "version: 1\nstructs:\n  RoundResetConfirmation:\n    - actor: u32\n");
             Packets = PacketTables.Load(_directory);

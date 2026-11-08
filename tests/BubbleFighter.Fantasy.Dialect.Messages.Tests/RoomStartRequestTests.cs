@@ -1,3 +1,4 @@
+using BubbleFighter.Fantasy.Contracts.Rooms;
 using System.Buffers;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Dialect.Rooms;
@@ -85,13 +86,17 @@ public sealed class RoomStartRequestTests
     [InlineData("cn-706")]
     public void ReadyRequestIsExactlyThreeBool32Fields(string build)
     {
-        var body = Convert.FromHexString("010000000000000001000000");
-
-        Assert.Equal((true, false, true), PlazaRoomWire.ReadReadyStatus(TestBuilds.Packets, build, body));
+        // kr-812 sub_5C5F10 sends one state: ready, shop (+5) or inventory (+6), each a canonical bool32.
+        Assert.Equal(new RoomReadyRequested(true),
+            RoomRequests.ReadReady(TestBuilds.Packets, build, Convert.FromHexString("010000000000000000000000")));
+        Assert.Equal(new RoomReadyRequested(false) { InShop = true },
+            RoomRequests.ReadReady(TestBuilds.Packets, build, Convert.FromHexString("000000000100000000000000")));
+        var inventory = Convert.FromHexString("000000000000000001000000");
+        Assert.Equal(new RoomReadyRequested(false) { InInventory = true }, RoomRequests.ReadReady(TestBuilds.Packets, build, inventory));
         Assert.Throws<PacketFormatException>(() =>
-            PlazaRoomWire.ReadReadyStatus(TestBuilds.Packets, build, body.AsSpan(0, 8)));
-        Assert.Throws<PacketFormatException>(() =>
-            PlazaRoomWire.ReadReadyStatus(TestBuilds.Packets, build, [.. body, 0]));
+            RoomRequests.ReadReady(TestBuilds.Packets, build, Convert.FromHexString("010000000000000001000000")));
+        Assert.Throws<PacketFormatException>(() => RoomRequests.ReadReady(TestBuilds.Packets, build, inventory.AsSpan(0, 8)));
+        Assert.Throws<PacketFormatException>(() => RoomRequests.ReadReady(TestBuilds.Packets, build, [.. inventory, 0]));
     }
 
     [Fact]

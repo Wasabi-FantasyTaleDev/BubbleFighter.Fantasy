@@ -28,14 +28,31 @@ TRX_NAMESPACE = "{http://microsoft.com/schemas/VisualStudio/TeamTest/2010}"
 # Projects whose tests assert timing, share network ports or need a quiet machine: they run alone,
 # after the parallel batch, so they never compete with another test host.
 SERIAL_PROJECTS = (
+    # Installation fixtures enforce short database cancellation deadlines while initializing real schemas.
+    "BubbleFighter.Fantasy.WebUi.Tests",
     "BubbleFighter.Fantasy.Scenario.Tests",
     "BubbleFighter.Fantasy.Architecture.Tests",
     "BubbleFighter.Fantasy.Loader.Remote.Tests",
     "BubbleFighter.Fantasy.Net.Tcp.Tests",
+    "BubbleFighter.Fantasy.Net.Udp.Tests",
+    # Loopback directory, ticket and broker fixtures also enforce short cancellation deadlines.
+    "BubbleFighter.Fantasy.Cluster.Tests",
 )
 
 # These fixtures are required by specific LocalClientData cases, never an entire project.
 LOCAL_DATA_PREREQUISITES: dict[str, tuple[str, str]] = {
+    "BubbleFighter.Fantasy.InGame.Tests (CN2011 desert WB)": (
+        "client-data/cn-279/dataraw/Maps/rel_Desert04_Pharaoh/track.wb",
+        "ItemModeNativeResourceTests traverses the native CN2011 map records and selects their helper positions",
+    ),
+    "BubbleFighter.Fantasy.InGame.Tests (CN2011 forest WB)": (
+        "client-data/cn-279/dataraw/Maps/rel_Forest01_Hill/track.wb",
+        "ItemModeNativeResourceTests traverses the native CN2011 map records and selects their helper positions",
+    ),
+    "BubbleFighter.Fantasy.InGame.Tests (CN2011 village WB)": (
+        "client-data/cn-279/dataraw/Maps/rel_Village01_Byway/track.wb",
+        "ItemModeNativeResourceTests traverses the native CN2011 map records and selects their helper positions",
+    ),
     "BubbleFighter.Fantasy.Equipment.Tests": (
         "client-data/kr-812/data/Config/Config.bfz",
         "EquipmentSelectionTests reads each build's shop table from its client-data archives",
@@ -83,10 +100,11 @@ def run(command: list[str], log: Path, environment: dict[str, str]) -> None:
 
 
 def projects() -> list[Path]:
-    """Discover tracked test projects, including projects outside the solution."""
+    """Discover tracked and newly added test projects, including projects outside the solution."""
     paths = subprocess.check_output(
-        ["git", "ls-files", "tests/*/*.csproj"], cwd=ROOT, text=True).splitlines()
-    result = sorted(ROOT / path for path in paths if Path(path).parent.name.endswith(".Tests"))
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "tests/*/*.csproj"],
+        cwd=ROOT, text=True).splitlines()
+    result = sorted({ROOT / path for path in paths if Path(path).parent.name.endswith(".Tests")})
     if not result:
         raise RuntimeError("No tracked test projects were found.")
     return result
@@ -131,6 +149,9 @@ def test_command(project: Path, directory: Path, public: bool, no_build: bool = 
                 "--results-directory", str(directory)]
     if public:
         command += ["--filter", "Category!=LocalClientData"]
+    if is_serial(project):
+        # The quiet phase must also serialize fixture classes inside each test host.
+        command += ["--", "xUnit.ParallelizeTestCollections=false", "xUnit.MaxParallelThreads=1"]
     return command
 
 
@@ -195,7 +216,8 @@ def main() -> int:
     jobs = args.jobs if args.jobs is not None else max(1, (os.cpu_count() or 2) // 2)
     output = Path(args.results_directory).resolve()
     output.mkdir(parents=True, exist_ok=False)
-    environment = dict(os.environ, BFF_MYSQL_PASSWORD="isolated-memory-unused")
+    environment = dict(os.environ, BFF_MYSQL_PASSWORD="isolated-unused",
+                       BFF_MYSQL_HOST="127.0.0.1", BFF_MYSQL_PORT="1", BFF_LOGIN_AUTHENTICATION="open")
     environment.pop("BFF_MYSQL_VERIFY_CONNECTION", None)
     environment["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1"
     if environment.get("CI", "").lower() == "true":

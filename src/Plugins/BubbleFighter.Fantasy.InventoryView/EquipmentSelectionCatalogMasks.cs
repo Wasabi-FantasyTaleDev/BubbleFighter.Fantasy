@@ -15,11 +15,14 @@ namespace BubbleFighter.Fantasy.InventoryView;
 /// </summary>
 /// <param name="inventory">Persistence for the worn state; supplies the bag the current character is read from.</param>
 /// <param name="masks">The parsed catalog positions and exclusivity rules.</param>
-internal sealed class EquipmentSelectionCatalogMasks(IInventoryRepository inventory, ItemCatalogMasks masks) : IEquipmentSelection
+/// <param name="contributions">Protocol-owned optional positions committed with the catalog selections.</param>
+internal sealed class EquipmentSelectionCatalogMasks(IInventoryRepository inventory, ItemCatalogMasks masks,
+    EquipmentWearGroups contributions) : IEquipmentSelection
 {
     /// <summary>Normalizes the worn set against the catalog positions without changing any item.</summary>
     public async ValueTask<IReadOnlyList<InventorySlotRecord>> ReadAsync(long userNum, CancellationToken ct) =>
-        await inventory.UpdateWornSelectionAsync(userNum, masks.Groups, null, false, ct).ConfigureAwait(false)
+        await inventory.UpdateWornSelectionAsync(userNum, await contributions.ResolveAsync(masks.Groups, ct).ConfigureAwait(false),
+            null, false, ct).ConfigureAwait(false)
         ?? throw new InvalidOperationException("Equipment normalization returned no inventory.");
 
     /// <summary>Refuses an exclusivity violation before persistence, then commits through the shared atomic selection.</summary>
@@ -31,7 +34,8 @@ internal sealed class EquipmentSelectionCatalogMasks(IInventoryRepository invent
             if (!masks.AllowsCharacter(itemId, character))
                 return null;
         }
-        return await inventory.UpdateWornSelectionAsync(userNum, masks.Groups, itemId, worn, ct).ConfigureAwait(false);
+        return await inventory.UpdateWornSelectionAsync(userNum, await contributions.ResolveAsync(masks.Groups, ct).ConfigureAwait(false),
+            itemId, worn, ct).ConfigureAwait(false);
     }
 
     /// <summary>Reads the bag's worn seat item; the same bag the commit normalizes, read once before it.</summary>

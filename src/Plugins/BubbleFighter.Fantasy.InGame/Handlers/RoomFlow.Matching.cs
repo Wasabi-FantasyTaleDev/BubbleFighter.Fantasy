@@ -20,7 +20,7 @@ internal sealed partial class RoomFlow
     private async ValueTask<bool> TryMatchSceneAsync(ISession session, PlayRoom target, int modeId, SceneGroup? group, CancellationToken ct)
     {
         var (userNum, nickname) = SessionPlayer.RequireIdentity(session);
-        var equipment = await SeatCharacter.ResolveEquipmentAsync(session, userNum, _selection, _characters, ct).ConfigureAwait(false);
+        var equipment = await ResolveEquipmentAsync(session, userNum, ct).ConfigureAwait(false);
         try
         {
             await target.Executor.ExecuteAsync(async operationCt =>

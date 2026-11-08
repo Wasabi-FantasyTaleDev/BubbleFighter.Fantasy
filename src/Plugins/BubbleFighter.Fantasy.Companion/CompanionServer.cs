@@ -37,7 +37,8 @@ internal sealed class CompanionServer : IAsyncDisposable
     /// <summary>Gets the bound addresses, including the port chosen when listen uses zero.</summary>
     internal IReadOnlyCollection<string> Addresses => _app.Urls.ToArray();
 
-    internal static async Task<CompanionServer> StartAsync(CompanionOptions options, CompanionLaunches launches, CompanionHub hub, ILogger logger, CancellationToken ct)
+    internal static async Task<CompanionServer> StartAsync(CompanionOptions options, CompanionLaunches launches, CompanionHub hub,
+        ILogger logger, CancellationToken ct, CompanionFederation? federation = null)
     {
         var builder = WebApplication.CreateSlimBuilder();
         builder.Logging.ClearProviders();
@@ -46,7 +47,7 @@ internal sealed class CompanionServer : IAsyncDisposable
             k.Listen(IPEndPoint.Parse(options.Listen));
             k.Limits.MaxConcurrentConnections = options.MaxConnections;
             k.Limits.MaxConcurrentUpgradedConnections = options.MaxConnections;
-            k.Limits.MaxRequestBodySize = 0;
+            k.Limits.MaxRequestBodySize = options.MessageBytes;
             k.Limits.RequestHeadersTimeout = TimeSpan.FromSeconds(options.HandshakeSeconds);
         });
         builder.WebHost.UseShutdownTimeout(TimeSpan.FromSeconds(options.ShutdownSeconds));
@@ -55,6 +56,28 @@ internal sealed class CompanionServer : IAsyncDisposable
         // The launcher runs its own heartbeat, so the transport's ping is off.
         app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = Timeout.InfiniteTimeSpan });
         app.Map(Path, server.AcceptAsync);
+        if (federation is not null)
+            app.MapPost(CompanionFederation.Prefix + "{operation}", async (HttpContext context, string operation) =>
+            {
+                context.Response.Headers.CacheControl = "no-store";
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted, server._stopping.Token);
+                timeout.CancelAfter(TimeSpan.FromSeconds(options.RemoteTimeoutSeconds));
+                if (!context.Request.HasJsonContentType()) return Results.StatusCode(415);
+                CompanionFederation.Identity? identity;
+                try { identity = await context.Request.ReadFromJsonAsync<CompanionFederation.Identity>(CompanionFederation.Json, timeout.Token).ConfigureAwait(false); }
+                catch (JsonException) { return Results.BadRequest(); }
+                catch (OperationCanceledException) when (timeout.IsCancellationRequested) { return Results.StatusCode(408); }
+                if (!CompanionFederation.ValidIdentity(identity)) return Results.BadRequest();
+                if (federation.Authorize(context.Request.Headers.Authorization.ToString(), identity!.Build) is not { } authority)
+                    return Results.Unauthorized();
+                return operation switch
+                {
+                    "launches" => federation.Import(identity, authority) ? Results.NoContent() : Results.StatusCode(409),
+                    "tickets" => federation.RenewImported(identity, authority) is { } grant ? Results.Json(grant, CompanionFederation.Json) : Results.NotFound(),
+                    "status" => federation.Exists(identity, authority) ? Results.NoContent() : Results.NotFound(),
+                    _ => Results.NotFound(),
+                };
+            });
         await app.StartAsync(ct).ConfigureAwait(false);
         return server;
     }

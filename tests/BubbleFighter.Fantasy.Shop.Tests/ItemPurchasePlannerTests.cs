@@ -87,13 +87,57 @@ public sealed class ItemPurchasePlannerTests
         Assert.Throws<PurchaseRejectedException>(() => ItemPurchasePlanner.Plan(1,
             [new(1, PurchaseGrantKind.Days, 7, 360, false)], [Slot(1)], Now));
         Assert.Throws<PurchaseRejectedException>(() => ItemPurchasePlanner.Plan(1,
-            [new(1, PurchaseGrantKind.Permanent, 1, 360, false)], [Slot(1) with { Lifetime = InventoryLifetime.Until(Now.AddDays(7)) }], Now));
-        Assert.Throws<PurchaseRejectedException>(() => ItemPurchasePlanner.Plan(1,
             [new(1, PurchaseGrantKind.Count, 3, 10, false)], [Slot(1) with { Quantity = 9 }], Now));
         Assert.Throws<PurchaseRejectedException>(() => ItemPurchasePlanner.Plan(1,
             [new(1, PurchaseGrantKind.Count, 1, 10, true)], [Slot(1)], Now));
         Assert.Throws<PurchaseRejectedException>(() => ItemPurchasePlanner.Plan(1,
             [new(1, PurchaseGrantKind.Count, 1, 10, false)], [Slot(1), Slot(1) with { SlotKey = 50 }], Now));
+    }
+
+    [Fact]
+    public void PermanentStockUpgradesATimedCopyInPlace()
+    {
+        var timed = Slot(1) with { Lifetime = InventoryLifetime.Until(Now.AddDays(7)), Flags = 1 };
+        var grant = Assert.Single(ItemPurchasePlanner.Plan(1,
+            [new(1, PurchaseGrantKind.Permanent, 1, 360, false)], [timed], Now));
+        Assert.Same(timed, grant.ExpectedSlot);
+        Assert.Equal(1, grant.Quantity);
+        Assert.Equal(InventoryLifetime.Permanent, grant.Lifetime);
+    }
+
+    [Fact]
+    public async Task TimedUpgradeKeepsTheSlotAndClearsTheDeadline()
+    {
+        var table = new MemoryPlayerTable(1);
+        var inventory = new MemoryInventoryRepository(table);
+        var timed = Slot(2) with { Lifetime = InventoryLifetime.Until(Now.AddDays(7)) };
+        await inventory.ReplaceSlotsAsync(1, InventoryBag.CharacterBag, [timed], default);
+        var purchaser = new ConditionalShopPurchaser(new MemoryShopPurchaseStore(table), inventory, new Clock(), 2);
+        var result = await purchaser.CommitAsync(Command, [new(2, PurchaseGrantKind.Permanent, 1, 360, false)], default);
+        var upgraded = Assert.Single(await inventory.ListSlotsAsync(1, InventoryBag.CharacterBag, 512, default));
+        Assert.Equal(timed.SlotKey, upgraded.SlotKey);
+        Assert.Equal(InventoryLifetime.Permanent, upgraded.Lifetime);
+        Assert.Equal(upgraded, Assert.Single(result!.Grants));
+    }
+
+    [Fact]
+    public void RefusalsNameTheReasonTheClientShows()
+    {
+        Refused(ShopPurchaseRefusal.AlreadyOwned, [new(1, PurchaseGrantKind.Permanent, 1, 360, false)],
+            Slot(1) with { Lifetime = InventoryLifetime.Permanent });
+        Refused(ShopPurchaseRefusal.AlreadyOwned, [new(1, PurchaseGrantKind.Days, 7, 360, false)],
+            Slot(1) with { Lifetime = InventoryLifetime.Permanent });
+        Refused(ShopPurchaseRefusal.AlreadyOwned, [new(1, PurchaseGrantKind.Count, 1, 10, true)], Slot(1));
+        Refused(ShopPurchaseRefusal.LimitReached, [new(1, PurchaseGrantKind.Count, 3, 10, false)], Slot(1) with { Quantity = 9 });
+        Refused(ShopPurchaseRefusal.LimitReached, [new(1, PurchaseGrantKind.Days, 7, 10, false)],
+            Slot(1) with { Lifetime = InventoryLifetime.Until(Now.AddDays(5)) });
+        Refused(ShopPurchaseRefusal.NoMoreAllowed, [new(1, PurchaseGrantKind.Life, 5, 10, false)],
+            Slot(1) with { Lifetime = InventoryLifetime.Life, Quantity = 2 });
+        Refused(ShopPurchaseRefusal.Unspecified, [new(1, PurchaseGrantKind.Days, 7, 360, false)], Slot(1));
+
+        static void Refused(ShopPurchaseRefusal expected, PurchaseGrantTerm[] terms, InventorySlotRecord existing) =>
+            Assert.Equal(expected, Assert.Throws<PurchaseRejectedException>(() =>
+                ItemPurchasePlanner.Plan(1, terms, [existing], Now)).Refusal);
     }
 
     [Fact]

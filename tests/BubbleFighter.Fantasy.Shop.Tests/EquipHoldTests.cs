@@ -398,6 +398,12 @@ public sealed class EquipHoldTests
         public ValueTask<PlayerWallet?> FindByUserNumAsync(long userNum, CancellationToken ct) =>
             ValueTask.FromResult(_stored is not null && _stored.UserNum == userNum ? _stored : null);
 
+        public ValueTask<PlayerWallet> GetOrCreateAsync(PlayerWallet initialWallet, CancellationToken ct)
+        {
+            _stored ??= initialWallet;
+            return ValueTask.FromResult(_stored);
+        }
+
         public ValueTask UpsertAsync(PlayerWallet record, CancellationToken ct)
         {
             _stored = record;

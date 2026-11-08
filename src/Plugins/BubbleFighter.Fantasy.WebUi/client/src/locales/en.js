@@ -3,6 +3,7 @@
 // exactly one 'key': 'value', entry per line). Use {name} placeholders, never string concatenation.
 export default {
   'plugins.policy.sourcesButton': 'Recommended sources',
+  'plugins.policy.defaultSelected': 'Initially checked',
   'plugins.policy.type.require': 'Required',
   'plugins.policy.type.disable': 'Disabled',
   'plugins.policy.type.recommend': 'Recommended',

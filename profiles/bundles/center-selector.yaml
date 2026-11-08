@@ -5,7 +5,7 @@
 - set:
     id: protocol
     config:
-      pre_handshake_opcodes: [2, 22, 23]
+      pre_handshake_opcodes: [gcpStartGPK, gcpReqCenterUserCnt, gcpReqUniquenessCheck]
       # cn-324 sub_78DA40 promotes an auxiliary socket and sends login without a second patch request.
       require_patch_handshake_first: false
       center_gates:

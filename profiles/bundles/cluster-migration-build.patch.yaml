@@ -1,0 +1,58 @@
+# Optional per-build half of cluster-migration.patch.yaml; apply it to one build whose native move is
+# audited, then set that build's own channel and channels on the source and admission rows. Admission
+# refuses to start without channels, so an unaudited build cannot inherit another build's values.
+# Audited values: the move reply is accepted only for channels the client admits unconditionally.
+#   admits [50, 60, 80]: kr-812 sub_81C6F0 -> sub_A4A440 (byte_A4A4D8), id-1809 sub_7C9890 ->
+#     sub_9E5570, cn-717 sub_8A29C0 -> sub_B03B40, cn-706 sub_7AE070 -> sub_9CEEA0, cn-404 sub_7D2BE0 ->
+#     sub_9FEDA0, cn-408 sub_7D61A0 -> sub_A08400 (each build's own table admits 50, 60 and 80)
+#   admits [50, 60]: cn-324 sub_705B20 -> sub_452520, id-400 sub_7A5270 -> sub_9C7D30,
+#     cn-406 sub_720750 -> sub_932040 (80 falls to the refusing default)
+#   admits [50, 60]: cn-279 sub_6F7DC0 stores any channel without a check
+# The channel lists above are what each client admits, not what to send. Set the source channel to
+# ${BFF_PLAYER_CHANNEL:-60} and include it in the admission channels: it is the channel the login and the
+# plaza already put every player on (dialect.messages login_channel, dialect.rooms player_channel), so a
+# moved player keeps it. Do not use 50: the round start reads the channel's column of the
+# FighterConfigChannel sheet (kr-812 sub_587690, sub_584320) and 50 has none in CN2011, KR2015 or kr-1256,
+# so a player moved on 50 crashes at round start; 60 ("Free") is a column in all three.
+- insert:
+    - id: cluster-room-browser
+      plugin: cluster.room-browser
+      config:
+        node_id: "${BFF_CLUSTER_NODE_ID}"
+        client_build: "${BFF_PROFILE_ID}"
+    # Source and admission sit in the build subtree that isolates its online players and parties.
+    - id: cluster-migration-source
+      plugin: cluster.migration-source
+      parent_id: inventoryview
+      config:
+        client_build: "${BFF_PROFILE_ID}"
+        home_unavailable_notice_enabled: ${MIGRATION_HOME_NOTICE:-true}
+    - id: cluster-migration-admission
+      plugin: cluster.migration-admission
+      parent_id: inventoryview
+- replace:
+    id: lobby
+    parent_id: inventoryview
+- set:
+    id: lobby
+    config:
+      native_migration: true
+      require_account_ownership: true
+      duplicate_login: reject_new
+      inventory_source: mysql
+      money_source: mysql
+- set:
+    id: dialect.messages
+    config:
+      native_migration: true
+# The moved client opens its destination connection with gcpReqMoveInto instead of the patch request; the
+# protocol row resolves that name and the build's auxiliary_prefix through the build's own opcode table.
+- set:
+    id: protocol
+    config:
+      accept_retained_moves: true
+- set:
+    id: ingame
+    config:
+      room_admission_reservations: true
+      home_migration_admission: true

@@ -39,16 +39,10 @@ structs:
       offset: 16
   # Readers: kr-812 sub_80A910, cn-717 sub_8C4210, cn-324 sub_410910,
   # cn-279 sub_44C1A0, id-400 sub_93D120, id-1809 sub_4D60C0, cn-706 sub_4BBB70.
+  # cn-735 sub_9F25D0, cn-738 sub_A205D0 and cn-742 sub_960710 also consume
+  # exactly one seat word before changing the master and clearing that seat's ready flag.
   TutorialMasterSlot:
     - master_slot: u32
-      offset: 4
-  # Start/end wave requests and replies use the scalar readers listed above.
-  TutorialWave:
-    - wave: u32
-      offset: 4
-  # Each build's own gppCreateMobsFromSpawnGroup class uses the scalar reader above.
-  TutorialSpawnGroup:
-    - spawn_group: u32
       offset: 4
   # Each build's own gcpReqEndStage class uses the scalar reader above.
   # cn-279 sub_818630 sends 0/1 for incomplete/completed; validation stays in the codec.
@@ -72,9 +66,10 @@ structs:
       except: [cn-324, id-400]
 
   # Tutorial request wrappers: kr-812 sub_8455F0, cn-717 sub_8CFAF0, id-400 sub_797B80,
-  # id-1809 sub_7BD7C0 and cn-706 sub_79FED0. MapMetaData is nested at object +4.
+  # id-1809 sub_7BD7C0, cn-406 sub_714080, cn-705 sub_79E8C0 and cn-706 sub_79FED0.
+  # MapMetaData is nested at object +4.
   # Inner readers: kr-812 sub_418CD0, cn-717 sub_41A850, id-400 sub_567300,
-  # id-1809 sub_416C60, cn-706 sub_567120; the bool offsets below include the +4 nesting.
+  # id-1809 sub_416C60, cn-406 sub_57E4D0 and cn-706 sub_567120; offsets include the +4 nesting.
   # The thirteen MapMetaData words are the map's rule record, named from the keys kr-1256 sub_AADD50 fills it
   # from (see RoomEnterGameRequest in room-start.yaml).
   TutorialPlayRequest:

@@ -10,6 +10,9 @@ experimental: true
 parent: kr-812
 # Head of the modern family: builds without recoverable packet class names; cn-774 and tw-454 inherit it.
 family: modern
+vars:
+  # The game port players reach; the migration destination advertises it.
+  GAME_PUBLIC_PORT: "${KR_1256_PUBLIC_PORT:-7100}"
 description: Korean client build, ClientVersion_Major 1256, resource patch 1304.
 bundles:
   - core
@@ -17,6 +20,7 @@ bundles:
   - ingame
   - shop
   - player-settings
+  - clan
 patches:
   - patch.yaml
   - ../bundles/shop-supplement-lucci.yaml

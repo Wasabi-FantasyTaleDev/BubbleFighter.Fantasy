@@ -1,0 +1,38 @@
+# Optional single-build example; no shipped profile mounts this patch.
+# Scope labels declare relationships; they do not replicate or authorize data.
+- insert:
+    - id: cluster-directory
+      plugin: cluster.directory
+      config:
+        listen: "${BFF_CLUSTER_LISTEN:-127.0.0.1:8093}"
+        lease_seconds: 15
+        nodes:
+          - id: primary
+            name: Primary
+            data_scope: formal
+            join_scope: ""
+            room_directories: [formal]
+            heartbeat_key: "${BFF_CLUSTER_NODE_KEY}"
+            endpoints:
+              - build: kr-1256
+                host: "${BFF_PUBLIC_HOST:-127.0.0.1}"
+                port: ${KR_1256_GAME_PORT:-7100}
+                capacity: 512
+        selectors:
+          - id: 1
+            name: Automatic
+            automatic: true
+            persistent_domain_id: "${BFF_CLUSTER_DATA_DOMAIN_ID}"
+            nodes: [primary]
+          - id: 2
+            name: Primary
+            nodes: [primary]
+    - id: cluster-node
+      plugin: cluster.node
+      config:
+        node_id: primary
+        directory_url: "${BFF_CLUSTER_DIRECTORY_URL:-http://127.0.0.1:8093}"
+        heartbeat_key: "${BFF_CLUSTER_NODE_KEY}"
+        builds: [kr-1256]
+        heartbeat_seconds: 3
+        request_timeout_seconds: 2

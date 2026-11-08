@@ -3,8 +3,23 @@
 # that puts a player's equipped character and weapons into the profile map the
 # in-room spawner and the appearance rebuilder read; without it a room's
 # character has no equipped set to build from.
+- id: inventory.loadouts
+  plugin: inventory.loadouts
+  parent_id: clientdata
+  isolated_services:
+    - BubbleFighter.Fantasy.Contracts.Inventory.IInventoryRepository
+    - BubbleFighter.Fantasy.Contracts.Inventory.IPlayerInventoryState
+    - BubbleFighter.Fantasy.Contracts.Inventory.IWeaponPresetPageSource
+    - BubbleFighter.Fantasy.Contracts.Fighters.IFighterRoster
+    - BubbleFighter.Fantasy.Contracts.Fighters.ISeatCharacterResolver
+  config:
+    build_key: "${BFF_PROFILE_ID}"
 - id: inventoryview
   plugin: inventoryview
+  parent_id: inventory.loadouts
+  # Retained login admission belongs to this build and its migration siblings.
+  isolated_services:
+    - BubbleFighter.Fantasy.Contracts.Lobby.IRetainedPlayerAdmission
   config:
     protocol: "kr-1256/game"
     client_profile: "kr-1256"
@@ -41,11 +56,23 @@
     # The typed round admits the relay by the round's key, as the shared native path does for the other builds.
     capability_authentication: true
     require_capability_scene_report: true
+# The round's defence tables (S2C 5, read by kr-1256 sub_6CD810). The scene accept above sends zeros; once the
+# countdown is out, every seat receives every occupant's table filled with that occupant's local roll
+# (kr-1256 sub_483620), worked out from the build's own ShopItem2 rows (defence_seed in packets/builds.yaml). The
+# critical tables stay the scene accept's: this build takes no critical tables from the authority.
+- id: dialect.scene-seeds
+  plugin: dialect.scene-seeds
+  disabled: true
+  config:
+    protocol: "kr-1256/relay"
+    packets_directory: packets
+    defence_seeds: true
 # In-session play row (plaza enter, room create/join/ready, battle).
 # Protocol names select the dialect's listeners; the room and round logic is the typed messages the build's
 # dialect row binds. Profile already lists `- ingame`. Do not send these packets on the login 3 to 163 chain.
 - id: ingame
   plugin: ingame
+  parent_id: inventoryview
   config:
     game_protocol: "kr-1256/game"
     relay_protocol: "kr-1256/relay"
@@ -119,6 +146,10 @@
     # The timed score mode's lives follow the clients' bubble, pop and death reports, and a dead player's reset
     # request is granted after its death presentation (kr-1256 sub_6F5E50).
     native_life_mode_ids: [1]
+    # Every mode revives without limit: lives follow the same reports and a dead player's reset is always granted
+    # after its death presentation. Only the timed mode above ends on the clock; a pop by one of the host's NPCs in
+    # the pirate battles kills without scoring.
+    native_life_every_mode: true
     plaza_enter_requires_finished_login: true
     plaza_replay_positions_on_enter: false
     plaza_echo_positions: false

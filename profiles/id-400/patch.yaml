@@ -1,6 +1,11 @@
 # Profile patch for id-400: applied after the bundle rows (see profiles/kr-1256/patch.yaml
 # for the supported operations). The admin API moves off 8080 so this profile can run
 # beside kr-1256 on one machine.
+- set:
+    id: dialect.scene-seeds
+    config:
+      # id-400 sub_4D5870 consumes seed decisions without adding the equipped weapon's chance.
+      weapon_critical_bonuses: true
 - replace:
     id: admin.http
     config:
@@ -21,8 +26,9 @@
     config:
       # Pirate (horde) rooms have no start button: once every seat is taken or closed, the clients run the
       # native five-second countdown (id-400 sub_627C60, reached from gspRepAutoStart through id-400 sub_626970) and the master's client enters.
-      # The tutorial (mode 103) is not a room of this kind and keeps its own start.
-      auto_start_mode_ids: [101, 102]
+      # Cooperative zombie boss rooms (mode 16) have no start button either in any client before kr-812,
+      # as in cn-324. The tutorial (mode 103) is not a room of this kind and keeps its own start.
+      auto_start_mode_ids: [101, 102, 16]
       lottery_items:
       - group: crew
         item_id: 100207
@@ -382,3 +388,11 @@
     id: dialect.messages
     config:
       customized_keys: false
+- set:
+    id: dialect.rooms
+    config:
+      plaza_recruitment: true
+- set:
+    id: ingame
+    config:
+      plaza_recruitment: true

@@ -37,6 +37,7 @@ internal sealed class LoginBinding : IInboundMessageBinding<LoginRequested>, IMe
     private readonly ushort? _optionOpcode;
     private readonly ushort? _firstMoveChannelOpcode;
     private readonly ushort? _gotoRoomOpcode;
+    private readonly int _loginChannel;
 
     /// <summary>
     /// Resolves every packet the build's burst names and checks its structures at activation, so a row that
@@ -53,11 +54,18 @@ internal sealed class LoginBinding : IInboundMessageBinding<LoginRequested>, IMe
     /// <param name="inventory">The bag publication when the row carries the inventory option.</param>
     /// <param name="expired">The expired-item notices when the row publishes them.</param>
     /// <param name="logger">The row's logger.</param>
+    /// <param name="loginChannel">
+    /// The row's <see cref="MessagesOptions.LoginChannel"/>: the channel every accepted reply places the player
+    /// in, or zero for the build's own value.
+    /// </param>
     /// <exception cref="ConfigException">A burst step cannot be carried out for this build.</exception>
     internal LoginBinding(string protocol, LoginValues values, ushort replyOpcode, IOpcodeTable opcodes,
         PacketTables tables, string build, IServiceRegistry services, IEventBus events, InventoryBinding? inventory,
-        ExpiredItemsBinding? expired, ILogger logger)
+        ExpiredItemsBinding? expired, ILogger logger, int loginChannel = 0)
     {
+        if (loginChannel < 0)
+            throw new ConfigException($"'{protocol}' login_channel must be zero or a positive channel, not {loginChannel}.");
+        _loginChannel = loginChannel;
         _protocol = protocol;
         _values = values;
         _replyOpcode = replyOpcode;
@@ -70,6 +78,12 @@ internal sealed class LoginBinding : IInboundMessageBinding<LoginRequested>, IMe
         _expired = expired;
         _logger = logger;
         LoginMessageCodec.RequireLayouts(tables, build, values);
+        // Not an error: these clients still get the channel from the move replies (gspRepMoveInto), so the
+        // operator learns why the login reply does not carry it instead of the value being dropped unseen.
+        if (loginChannel != 0 && !LoginMessageCodec.CarriesChannel(tables, build, values))
+            logger.LogInformation(
+                "'{Protocol}' (build '{Build}'): the login reply has no channel word; login_channel {Channel} reaches these clients only through the move replies.",
+                protocol, build, loginChannel);
         foreach (var step in values.Burst)
         {
             switch (step)
@@ -204,13 +218,16 @@ internal sealed class LoginBinding : IInboundMessageBinding<LoginRequested>, IMe
                 ? LoginMessageCodec.WriteTableModernRejected(message, _tables, _build)
                 : LoginMessageCodec.WriteRejected(message, _values.Shape, _tables, _build), ct);
 
+    // The configured login channel replaces the build's own value in both table forms; zero keeps the build's
+    // (the modern builds' channel_id in packets/builds.yaml, the legacy word's zero, which kr-812 sub_587690
+    // turns into channel 10 at round start).
     private byte[] AcceptedBody(ISession session, LoginAccepted accepted) => _values.Reply switch
     {
         LoginValues.ModernReply => LoginMessageCodec.WriteTableModernAccepted(accepted, $"bff-{session.Id}",
-            _tables, _build, _values.ChannelId),
+            _tables, _build, _loginChannel != 0 ? _loginChannel : _values.ChannelId),
         _ => _values.Shape.LoginResponse
             ? LoginMessageCodec.WriteModernAccepted(accepted)
-            : LoginMessageCodec.WriteAccepted(accepted, _values.Shape, _tables, _build),
+            : LoginMessageCodec.WriteAccepted(accepted, _values.Shape, _tables, _build, _loginChannel),
     };
 
     // The bag publication walks the build's inventory.replaced list. A modern row that has no stored bag

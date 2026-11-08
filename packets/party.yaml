@@ -183,6 +183,8 @@ structs:
       offset: 36
     - auto_accept: bool
       offset: 48
+      # cn-406 reader sub_713F90 stops after the address: a cn-406 invitee is always asked.
+      except: [cn-406]
   # S2C gspRepChangePartyLeader: kr-812 reader sub_80AE00; the handler kr-812 sub_928C50 switches on +60.
   PartyLeaderChangeReply:
     - previous: wstr
@@ -282,42 +284,64 @@ structs:
       offset: 4
       except: [kr-1256, cn-774, tw-454]
 
-  # C2S gcpReqPartyQuickStart: kr-812 sub_80A910 reads one 4-byte word at object +4. The same reader body is
-  # the deserialize slot of other one-word classes, so only the width and the position are proven. The
-  # kr-1256 sender kr-1256 sub_917360 stamps C2S 306 and writes nothing, so that build's request is empty and
-  # is not stated as this structure.
+  # C2S gcpReqPartyQuickStart: kr-812 sub_80A910 reads one 4-byte word at object +4. The word is the kind:
+  # the senders kr-812 sub_68E390 / sub_68E580 set 1 and 2 for the leader's mode-101/16 request and
+  # kr-812 sub_68EF80 sets 4 for the wait request; the client's own validator kr-812 sub_812AD0 gates the
+  # send so a non-leader either shows a message or asks to leave first. The kr-1256 sender kr-1256 sub_917360
+  # stamps C2S 306 and writes nothing, so that build's request is empty and is not stated as this
+  # structure.
   PartyQuickStartRequest:
-    - unknown_4: u32
+    - kind: u32
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+
+  # S2C gspRepPartyQuickStart: the stage dispatcher kr-812 sub_68D530 case 0x134 -> kr-812 sub_68EF10 reads
+  # one 4-byte word through kr-812 sub_A56C10 and starts the kind's stage (1 -> mode 101 via kr-812
+  # sub_68E450, 2 -> 16 via kr-812 sub_68E640, 3 -> 13 via kr-812 sub_68E9A0, 4 -> the wait dialog kr-812
+  # sub_68F010). The stage-local consumer kr-812 sub_6875C0 exits the stage on kind 0, which is the
+  # refusal/cancel form. Inside the starters kr-812 sub_926540 gates building the ordinary room-create
+  # request, so only the leader's client asks for the room; the members wait for the install through the
+  # party follow. No modern row is known.
+  PartyQuickStartReply:
+    - kind: u32
       offset: 4
       except: [kr-1256, cn-774, tw-454]
 
   # C2S gcpSendPartyChatMsg: kr-812 class deserialize kr-812 sub_5C8FD0 reads one wstring at object +4
   # (kr-812 sub_A56D70: a 4-byte character count then UTF-16). The sender kr-812 sub_92A740 stamps C2S 304.
-  # The request carries no channel or recipient; which string of the reply it becomes is not proven.
+  # The chat box sends it when no room object exists (cn-717 sub_9F7700 -> sub_9C9130 -> sub_9CCA60); with a
+  # room it sends C2S 501 instead. The same one-string reader: cn-717 sub_740F00, cn-324 sub_6FDDF0,
+  # cn-279 sub_481C90, cn-406 sub_75A200, cn-404 sub_68E480, cn-408 sub_7B1F10, cn-705 sub_786AE0,
+  # cn-706 sub_567230, id-400 sub_89DD10, id-1809 sub_68D480.
   PartyChatRequest:
-    - unknown_4: wstr
+    - text: wstr
       offset: 4
       except: [kr-1256, cn-774, tw-454]
 
   # S2C gspReceivePartyChatMsg: kr-812 class deserialize kr-812 sub_92AB70 reads a 4-byte word at +4, a
   # wstring at +8, a wstring at +36, a 4-byte word at +64 and a 4-byte boolean at +68. The dispatcher case is
-  # kr-812 sub_9295C0 (case 0x131 of kr-812 sub_837170). The handler's use of the two strings and of the
-  # boolean (a system-versus-party selector is a lead, not a proof) is not established, so every field keeps
-  # its offset name.
+  # kr-812 sub_9295C0 (case 0x131 of kr-812 sub_837170). cn-717 sub_9CB6E0 (case 0x131 of cn-717 sub_8C0080):
+  # with +68 set it draws a fixed system line and ignores the rest; otherwise it finds the party member whose
+  # user number (SoloPartyMember +4) equals +4, names the line after that member and draws +36 with the colour
+  # word +64 (cn-717 sub_721D30 -> sub_841200, the room chat line drawer). A sender outside the receiver's party
+  # list draws nothing. +8 is not read on that path. The same reader: cn-717 sub_9CCF20, cn-324 sub_7C6ED0,
+  # cn-279 sub_480830, cn-406 sub_8127B0, cn-404 sub_8D2130, cn-408 sub_8D6660, cn-705 sub_8ACBC0,
+  # cn-706 sub_8AE560, id-400 sub_89DDA0, id-1809 sub_8C2680 (cn-324 and cn-279 with compact strings).
   PartyChatMessage:
-    - unknown_4: u32
+    - user_number: u32
       offset: 4
       except: [kr-1256, cn-774, tw-454]
     - unknown_8: wstr
       offset: 8
       except: [kr-1256, cn-774, tw-454]
-    - unknown_36: wstr
+    - text: wstr
       offset: 36
       except: [kr-1256, cn-774, tw-454]
-    - unknown_64: u32
+    - colour: u32
       offset: 64
+      default: -1
       except: [kr-1256, cn-774, tw-454]
-    - unknown_68: bool
+    - system: bool
       offset: 68
       except: [kr-1256, cn-774, tw-454]
 

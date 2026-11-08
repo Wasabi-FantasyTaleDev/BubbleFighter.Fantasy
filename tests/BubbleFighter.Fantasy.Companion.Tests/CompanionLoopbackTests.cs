@@ -14,7 +14,7 @@ using Xunit;
 namespace BubbleFighter.Fantasy.Companion.Tests;
 
 /// <summary>Drives the companion listener over a real loopback WebSocket the way the launcher does.</summary>
-public sealed class CompanionLoopbackTests : IAsyncLifetime
+public sealed partial class CompanionLoopbackTests : IAsyncLifetime
 {
     private readonly ManualClock _clock = new();
     private CompanionOptions _options = null!;
@@ -311,8 +311,9 @@ public sealed class CompanionLoopbackTests : IAsyncLifetime
         }
     }
 
-    private sealed class Session(long id, string build) : ISession
+    private sealed class Session(long id, string build) : ISessionWithFeatures
     {
+        public ISessionFeatures Features { get; } = new BubbleFighter.Fantasy.Tests.Shared.TestSessionFeatures();
         public long Id => id;
         public IConnection Connection { get; } = new GameConnection(id);
         public ClientProfile Profile { get; } = new(build, build[..2], int.Parse(build[3..]), 0, 0, build);

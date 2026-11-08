@@ -337,6 +337,8 @@ WebUI: http://127.0.0.1:8080/
 
 預設限制為每次上傳 8 GiB、每次匯入解壓資料 16 GiB、每次匯入 32,768 個檔案、保留 64 份副本、匯入儲存總量 64 GiB、每次匯入最長 20 分鐘。可在 `installation` 列中以 `client_data_upload_bytes`、`client_data_extracted_bytes`、`client_data_file_limit`、`client_data_copy_limit`、`client_data_storage_bytes` 與 `client_data_import_seconds` 調整。再次匯入不會刪除先前成功的副本。
 
+在 Windows 上，掃描程式或其他處理程序可能在檔案寫完後短暫阻止最終目錄重新命名。只有這一步發佈操作會對 Windows 存取、共用或鎖定衝突重試：`client_data_publish_attempts` 預設 20 次，範圍 1–100；間隔 `client_data_publish_retry_ms` 預設 50 毫秒，範圍 1–1000。將次數設為 1 可關閉重試。整體匯入期限和取消仍然生效；不會重送上傳、覆寫既有目標，永久錯誤或其他錯誤仍會回報。
+
 **檢查是否成功：** 助理報告安裝完成，WebUI 切換到管理介面。即使還沒有管理員，下文所述的 `/health` 檢查在助理執行期間也會正常回應。
 
 ## 檢查安裝

@@ -1,4 +1,4 @@
-"""Offscreen smoke test of the GUI against both test clients.
+r"""Offscreen smoke test of the GUI against both test clients.
 
 Run: ``.venv\Scripts\python tools\gui_smoke.py``; set BF_KR812_CLIENT / BF_KR1256_CLIENT to the client folders. Saves screenshots to ``output/screens`` and runs a
 3-item export through the same worker the export dialog uses.
@@ -24,8 +24,8 @@ from bf_item_viewer.ui.main_window import MainWindow  # noqa: E402
 from bf_item_viewer.ui.theme import apply_dark_theme  # noqa: E402
 from bf_item_viewer.ui.workers import ExportWorker  # noqa: E402
 
-CLIENTS = {"kr812": os.environ.get("BF_KR812_CLIENT", r"D:\Software\Games\BFLegacy_KR2015"),
-           "kr1256": os.environ.get("BF_KR1256_CLIENT", r"D:\Software\Games\BFKorea\BubbleFighter")}
+CLIENTS = {"kr812": os.environ.get("BF_KR812_CLIENT", ""),
+           "kr1256": os.environ.get("BF_KR1256_CLIENT", "")}
 CACHE = str(ROOT / ".cache")
 SCREENS = ROOT / "output" / "screens"
 
@@ -96,6 +96,8 @@ def run_export(window: MainWindow, ids: list[int], tag: str) -> None:
 
 
 def main() -> int:
+    if not all(CLIENTS.values()):
+        raise SystemExit("Set BF_KR812_CLIENT and BF_KR1256_CLIENT to your client folders before running this check.")
     app = QApplication.instance() or QApplication(sys.argv[:1])
     apply_dark_theme(app)
     for tag, folder in CLIENTS.items():

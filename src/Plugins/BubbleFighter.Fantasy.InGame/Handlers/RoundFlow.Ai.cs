@@ -1,5 +1,4 @@
 using BubbleFighter.Fantasy.Contracts.Rooms;
-using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.InGame.Sessions;
 
 namespace BubbleFighter.Fantasy.InGame.Handlers;
@@ -7,6 +6,9 @@ namespace BubbleFighter.Fantasy.InGame.Handlers;
 internal sealed partial class RoundFlow
 {
     private bool UsesNativeLife(PlayRoom room) => _options.NativeLifeModeIds.Contains(room.ModeId)
+        || IsFinalZoneMode(room)
+        || IsZombieEscapeMode(room)
+        || _options.NativeLifeEveryMode
         || _options.AiModeIds.Contains(room.ModeId);
 
     private static LifeParticipant? LifeActor(PlayRoom room, int actor)
@@ -22,21 +24,7 @@ internal sealed partial class RoundFlow
     {
         internal int Slot => human?.Slot ?? bot!.Appearance.Slot;
         internal int Team => human?.Team ?? bot!.Appearance.Team;
-        internal SeatLife Life
-        {
-            get => human?.Life ?? bot!.Life;
-            set { if (human is not null) human.Life = value; else bot!.Life = value; }
-        }
-        internal bool DeathCleaned
-        {
-            get => human?.DeathCleaned ?? bot!.DeathCleaned;
-            set { if (human is not null) human.DeathCleaned = value; else bot!.DeathCleaned = value; }
-        }
-        internal ISession? ResetRelay
-        {
-            get => human is not null ? human.ResetRelay : bot!.ResetRelay;
-            set { if (human is not null) human.ResetRelay = value; else bot!.ResetRelay = value; }
-        }
+        internal ParticipantLife Life => human?.Life ?? bot!.Life;
         internal void ClearMovement()
         {
             if (human is not null) human.Movement = null; else bot!.Movement = null;

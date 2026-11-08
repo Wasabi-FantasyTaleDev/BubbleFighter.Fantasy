@@ -10,12 +10,14 @@ structs:
   # cn-279 sub_44C1A0, id-400 sub_93D120, id-1809 sub_4D60C0, cn-406 sub_700770, cn-706 sub_4BBB70.
   # Modern S2C 584 reads that seat directly: kr-1256 sub_9E1EB0 case 0x248, cn-774 sub_8D7D20
   # case 0x248, tw-454 sub_A578B0 case 0x248 -> sub_A61700. All write a byte in the room's loaded-seat array.
+  # cn-735 sub_9F9530, cn-738 sub_A26780 and cn-742 sub_966630 consume the same seat word.
   RoundMapLoadingComplete:
     - seat: u32
       offset: 4
   # kr-812 sub_5C8C00, cn-717 sub_88EE40, id-1809 sub_7A6290 and cn-706 sub_788970; kr-1256 sub_9E1EB0
   # case 0x249 reads the same three bool32 words.
   # cn-774 sub_8D7D20 and tw-454 sub_A578B0 case 0x249 retain all three flags; these are separate from S2C 584.
+  # cn-735 sub_9F9830, cn-738 sub_A26A70 and cn-742 sub_976F80 read all three as bool32 on S2C702.
   RoundEverybodyLoadingComplete:
     - unknown_4: bool
       offset: 4
@@ -30,10 +32,12 @@ structs:
   # Same one-word readers as RoundMapLoadingComplete. Old CN uses gspGamePreCountDown:
   # cn-324 sub_410910 and cn-279 sub_44C1A0; the count-down notification itself consumes no body.
   # kr-1256 sub_9E7080 (S2C 607) reads the same one word.
+  # cn-735 sub_9F9910, cn-738 sub_A26B50 and cn-742 sub_9669B0 consume this word on S2C703.
   RoundCountdown:
     - milliseconds: u32
       offset: 4
   # kr-812 sub_9D95D0, cn-717 sub_7F4370, id-1809 sub_4D8130 and cn-706 sub_7A23F0.
+  # cn-735 sub_9F9FE0, cn-738 sub_A27250 and cn-742 sub_967130 each read all three words on S2C704.
   RoundStartGame:
     - unknown_4: u32
       offset: 4
@@ -52,6 +56,9 @@ structs:
   # 0x3FFFFFFF, which sub_6FEFC0 also writes as the second timer's ceiling. The body is empty. The
   # baseline table is empty because the format requires one. cn-774 sub_8D7D20 and tw-454 sub_A578B0
   # case 0x27E consume the same empty notification at S2C 638 instead of 609.
+  # cn-735 sub_9F0320 and cn-738 sub_A1E3B0 case 0x2E4 call cn-735 sub_CDED50 and
+  # cn-738 sub_CFF130 with 0x3FFFFFFF; cn-742 sub_95E440 calls cn-742 sub_969CE0.
+  # These empty S2C740 notifications update the duration and its ceiling; S2C609 updates a peer port instead.
   RoundClockUnbounded: []
 
   # The kr-1256 seat-info records, S2C 602/603/604/605 (kr-1256 sub_9E1EB0 cases 0x25A-0x25D): one

@@ -4,6 +4,7 @@ using BubbleFighter.Fantasy.Abstractions.Net;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Party;
 using BubbleFighter.Fantasy.Contracts.Players;
+using BubbleFighter.Fantasy.Contracts.Rooms;
 using BubbleFighter.Fantasy.Contracts.Sessions;
 using Microsoft.Extensions.Logging;
 
@@ -19,9 +20,12 @@ namespace BubbleFighter.Fantasy.Party;
     OptionalMany = [typeof(IInboundMessageBinding<PartyInviteRequested>), typeof(IInboundMessageBinding<PartyInviteAccepted>),
         typeof(IInboundMessageBinding<PartyInviteAnswered>), typeof(IInboundMessageBinding<PartyInviteTokenRefused>),
         typeof(IInboundMessageBinding<PartyVisitRequested>), typeof(IInboundMessageBinding<PartyVisitAnswered>),
+        typeof(IInboundMessageBinding<PartyRecruitmentJoinRequested>),
         typeof(IInboundMessageBinding<PartyVisitTokenAnswered>),
         typeof(IInboundMessageBinding<PartyLeaveRequested>),
         typeof(IInboundMessageBinding<PartyKickRequested>), typeof(IInboundMessageBinding<PartyLeaderChangeRequested>),
+        typeof(IInboundMessageBinding<PartyChatSent>), typeof(IMessageSender<PartyChatReceived>),
+        typeof(IInboundMessageBinding<PartyQuickStartRequested>), typeof(IMessageSender<PartyQuickStartAnswered>),
         typeof(IMessageSender<PartyInviteReplied>), typeof(IMessageSender<PartyInviteNotified>), typeof(IMessageSender<PartyUpdated>),
         typeof(IMessageSender<PartyLeaderReplaced>), typeof(IMessageSender<PartyLeft>), typeof(IMessageSender<PartyMemberLeft>),
         typeof(IMessageSender<PartyMemberJoined>), typeof(IMessageSender<PartyKickReplied>), typeof(IMessageSender<PartyKicked>),
@@ -47,7 +51,7 @@ public sealed class PartyPlugin : IPlugin
         var work = new PartyWorkQueue(options.MaxPendingRequests);
         context.Effect(work);
         await context.RunTaskAsync("party-requests", ct => work.RunAsync(SweepAsync, ct), cancellationToken).ConfigureAwait(false);
-        context.Effect(context.Services.Register<IPartyDirectory>(book));
+        context.Effect(context.Services.Register<IPartyDirectory>(new PartyDirectory(book, RejoinAsync)));
         var messages = context.Services.Get<IMessageRouter>().For(context);
 
         On<PartyInviteRequested>(async (session, request, ct) =>
@@ -96,7 +100,8 @@ public sealed class PartyPlugin : IPlugin
             }
             var inviter = Track(inviterSession);
             var notices = new List<PartyNotice>();
-            var result = book.Join(inviter, joiner, notices);
+            var result = RecruitmentFull(inviterSession, inviter.UserNum) ? PartyInviteResult.PartyFull
+                : book.Join(inviter, joiner, notices);
             if (result != PartyInviteResult.Sent)
                 await SendAsync(inviterSession, new PartyInviteReplied(result, joiner.Nickname), ct).ConfigureAwait(false);
             await DeliverAsync(notices, ct).ConfigureAwait(false);
@@ -146,6 +151,12 @@ public sealed class PartyPlugin : IPlugin
                 }
                 failure = result == PartyInviteResult.PartyFull ? PartyVisitFailure.PartyFull : PartyVisitFailure.Unavailable;
             }
+            if (failure is null && hostSession!.TryFeature<IPlazaRecruitmentStatus>(out var recruitment)
+                && recruitment.IsRecruiting)
+            {
+                await AnswerVisitAsync(host!, session, true, ct).ConfigureAwait(false);
+                return;
+            }
             var token = 0u;
             if (failure is null && !visits.Ask(visitor.UserNum, host!.UserNum, hostSession!.Connection.Id, out token))
                 failure = PartyVisitFailure.Unavailable;
@@ -156,6 +167,33 @@ public sealed class PartyPlugin : IPlugin
             }
             if (failure is { } reason)
                 await SendAsync(session, new PartyVisitFailed(reason, request.Target), ct).ConfigureAwait(false);
+        });
+
+        On<PartyRecruitmentJoinRequested>(async (session, request, ct) =>
+        {
+            var visitor = Track(session);
+            var failure = VisitFailure(session, visitor, request.Target, out var hostSession, out var host);
+            if (failure is null)
+            {
+                if (!hostSession!.TryFeature<IPlazaRecruitmentStatus>(out var recruitment) || !recruitment.IsRecruiting
+                    || book.PartyOf(host!.UserNum) is { } party && party.Leader.UserNum != host.UserNum)
+                    failure = PartyVisitFailure.Unavailable;
+                else if ((book.PartyOf(host!.UserNum)?.Members.Count ?? 1) >= recruitment.MemberLimit)
+                    failure = PartyVisitFailure.PartyFull;
+            }
+            if (failure is null)
+            {
+                var notices = new List<PartyNotice>();
+                var result = book.Join(host!, visitor, notices);
+                if (result == PartyInviteResult.Sent)
+                {
+                    await DeliverAsync(notices, ct).ConfigureAwait(false);
+                    await FollowLeaderAsync(session, ct).ConfigureAwait(false);
+                    return;
+                }
+                failure = result == PartyInviteResult.PartyFull ? PartyVisitFailure.PartyFull : PartyVisitFailure.Unavailable;
+            }
+            await SendAsync(session, new PartyVisitFailed(failure.Value, request.Target), ct).ConfigureAwait(false);
         });
 
         On<PartyVisitAnswered>(async (session, answer, ct) =>
@@ -211,6 +249,39 @@ public sealed class PartyPlugin : IPlugin
             await DeliverAsync(notices, ct).ConfigureAwait(false);
         });
 
+        // The party's chat line reaches every member this node tracks, the speaker included: the client draws nothing
+        // until it hears its own line back (cn-717 sub_9CB6E0 names it after the member with the sender's number).
+        // A player outside any party is a party of one and hears only themselves.
+        if (send.ChatReceived is not null)
+            On<PartyChatSent>(async (session, line, ct) =>
+            {
+                var speaker = Track(session);
+                var message = new PartyChatReceived(speaker.UserNum, line.Text);
+                var members = book.PartyOf(speaker.UserNum)?.Members.Select(member => member.UserNum) ?? [speaker.UserNum];
+                await DeliverAsync([.. members.Select(userNum => new PartyNotice(userNum, message))], ct).ConfigureAwait(false);
+            });
+
+        // The quick-start answer goes to every member so each client runs its stage start (kr-812 sub_68EF10); the
+        // leader's client then sends the ordinary room-create request, which the room flow and the party follow
+        // serve. The client's validator kr-812 sub_812AD0 only lets the leader send kinds 1 and 2, so another
+        // member's mode request is refused with kind 0, the form kr-812 sub_6875C0 exits a stage on. Kind 4 is the
+        // wait dialog and is answered to its requester as-is.
+        if (send.QuickStartAnswered is not null)
+            On<PartyQuickStartRequested>(async (session, request, ct) =>
+            {
+                var requester = Track(session);
+                var members = book.PartyOf(requester.UserNum) is { } party
+                    && party.Leader.UserNum == requester.UserNum && request.Kind is 1 or 2
+                        ? party.Members.Select(member => member.UserNum)
+                        : null;
+                if (members is null)
+                {
+                    await SendAsync(session, new PartyQuickStartAnswered(request.Kind == 4 ? 4 : 0), ct).ConfigureAwait(false);
+                    return;
+                }
+                await DeliverAsync([.. members.Select(userNum => new PartyNotice(userNum, new PartyQuickStartAnswered(request.Kind)))], ct).ConfigureAwait(false);
+            });
+
         // A close only signals the owned worker. Sweeping tracked sessions also catches login replacement.
         context.Effect(context.Events.On<ConnectionClosedEvent>(_ => work.Wake()));
         return;
@@ -239,6 +310,7 @@ public sealed class PartyPlugin : IPlugin
                 return PartyVisitFailure.VisitorPlaying;
             if (hostPlayer.Phase is SessionPhase.Match) return PartyVisitFailure.TargetPlaying;
             host = Track(hostSession);
+            if (RecruitmentFull(hostSession, host.UserNum)) return PartyVisitFailure.PartyFull;
             if (book.PartyOf(host.UserNum) is { } party)
             {
                 if (party.Members.Any(member => member.UserNum == visitor.UserNum)) return PartyVisitFailure.SameParty;
@@ -247,6 +319,10 @@ public sealed class PartyPlugin : IPlugin
             // The visitor joins the visited player's party, which the book allows only from outside any party.
             return book.PartyOf(visitor.UserNum) is null ? null : PartyVisitFailure.Unavailable;
         }
+
+        bool RecruitmentFull(ISession hostSession, int userNum) =>
+            hostSession.TryFeature<IPlazaRecruitmentStatus>(out var recruitment) && recruitment.IsRecruiting
+            && (book.PartyOf(userNum)?.Members.Count ?? 1) >= recruitment.MemberLimit;
 
         // An accepted visit becomes an invitation from the visited player that the visitor's client accepts by itself.
         async ValueTask AnswerVisitAsync(PartyMember host, ISession visitorSession, bool accepted, CancellationToken ct)
@@ -257,7 +333,10 @@ public sealed class PartyPlugin : IPlugin
                 await SendAsync(visitorSession, new PartyVisitFailed(PartyVisitFailure.Declined, host.Nickname), ct).ConfigureAwait(false);
                 return;
             }
-            var result = book.Invite(host, visitor, visitorSession.Connection.Id);
+            var hostSession = online.FindByUserNum(host.UserNum);
+            var result = hostSession is null ? PartyInviteResult.Offline
+                : RecruitmentFull(hostSession, host.UserNum) ? PartyInviteResult.PartyFull
+                : book.Invite(host, visitor, visitorSession.Connection.Id);
             if (result != PartyInviteResult.Sent)
             {
                 await SendAsync(visitorSession, new PartyVisitFailed(result switch
@@ -271,6 +350,30 @@ public sealed class PartyPlugin : IPlugin
             if (!await SendAsync(visitorSession, new PartyVisitGranted(host.Nickname), ct).ConfigureAwait(false))
                 book.TakeInvite(host.UserNum, visitor.UserNum, visitorSession.Connection.Id);
         }
+
+        // A party that crossed nodes is rebuilt as a join without an invitation: both members already chose to travel.
+        async ValueTask<bool> RejoinAsync(ISession leaderSession, ISession memberSession, CancellationToken ct)
+        {
+            var joined = false;
+            await work.ExecuteAsync(async token =>
+            {
+                // A connection closed by the move itself must leave before its replacement can be tracked.
+                await SweepAsync(token).ConfigureAwait(false);
+                if (!IsCurrent(leaderSession) || !IsCurrent(memberSession)) return;
+                var leader = Track(leaderSession);
+                var member = Track(memberSession);
+                if (book.PartyOf(leader.UserNum) is { } party && party.Leader.UserNum != leader.UserNum) return;
+                var notices = new List<PartyNotice>();
+                joined = book.Join(leader, member, notices) == PartyInviteResult.Sent;
+                await DeliverAsync(notices, token).ConfigureAwait(false);
+            }, ct).ConfigureAwait(false);
+            return joined;
+        }
+
+        bool IsCurrent(ISession session) => !session.Connection.IsClosed && session.TryFeature<IPlayerSession>(out var player)
+            && online.FindByUserNum(player.Identity.UserNum)?.Connection.Id == session.Connection.Id
+            && (!connections.TryGetValue(player.Identity.UserNum, out var previous)
+                || previous.Session.Connection.Id == session.Connection.Id);
 
         PartyMember Track(ISession session)
         {
@@ -315,6 +418,12 @@ public sealed class PartyPlugin : IPlugin
                     || online.FindByUserNum(notice.UserNum)?.Connection.Id != recipient.Connection.Id) continue;
                 await SendAsync(recipient, notice.Message, ct).ConfigureAwait(false);
             }
+            if (notices.Any(notice => notice.Message is PartyUpdated))
+                await context.Events.SerialAsync(new PartyPlazaMembershipChanged(protocol)
+                {
+                    DepartedUsers = notices.Where(notice => notice.Message is PartyLeft or PartyKicked)
+                        .Select(notice => notice.UserNum).Distinct().ToArray(),
+                }, ct).ConfigureAwait(false);
         }
 
         async ValueTask<bool> SendAsync(ISession recipient, object message, CancellationToken ct)
@@ -349,6 +458,21 @@ public sealed class PartyPlugin : IPlugin
 /// The <see cref="IPartyMembership"/> features this row registers: one per member connection, replaced on every party
 /// list the member is sent and removed when the member is alone again, the connection closes or the row unloads.
 /// </summary>
+// The registered directory: the book's reads and reservations, plus the rebuild that must run on the party worker.
+internal sealed class PartyDirectory(PartyBook book, Func<ISession, ISession, CancellationToken, ValueTask<bool>> rejoin) : IPartyDirectory
+{
+    public int MaximumMembers => book.MaximumMembers;
+
+    public bool SupportsSoloReservation => book.SupportsSoloReservation;
+
+    public IDisposable? TryReserveSolo(int userNum) => book.TryReserveSolo(userNum);
+
+    public PartySnapshot? PartyOf(int userNum) => book.PartyOf(userNum);
+
+    public ValueTask<bool> RejoinAsync(ISession leader, ISession member, CancellationToken cancellationToken) =>
+        rejoin(leader, member, cancellationToken);
+}
+
 internal sealed class PartyMemberships : IDisposable
 {
     private readonly Lock _gate = new();
@@ -394,6 +518,8 @@ internal sealed class PartySenders(IPluginContext context, string protocol)
     // senders; a notice that needs a missing one fails loudly instead of being dropped.
     public IMessageSender<PartyKickReplied>? KickReplied { get; } = OptionalSender<PartyKickReplied>(context, protocol);
     public IMessageSender<PartyLeaderChanged>? LeaderChanged { get; } = OptionalSender<PartyLeaderChanged>(context, protocol);
+    // Party chat exists where the build's dialect binds it; a build without it publishes no sender.
+    public IMessageSender<PartyChatReceived>? ChatReceived { get; } = OptionalSender<PartyChatReceived>(context, protocol);
     private readonly IMessageSender<PartyUpdated> _updated = Sender<PartyUpdated>(context, protocol);
     private readonly IMessageSender<PartyLeaderReplaced> _replaced = Sender<PartyLeaderReplaced>(context, protocol);
     private readonly IMessageSender<PartyLeft> _left = Sender<PartyLeft>(context, protocol);
@@ -405,6 +531,9 @@ internal sealed class PartySenders(IPluginContext context, string protocol)
     private readonly IMessageSender<PartyVisitAsked>? _visitAsked = OptionalSender<PartyVisitAsked>(context, protocol);
     private readonly IMessageSender<PartyVisitFailed>? _visitFailed = OptionalSender<PartyVisitFailed>(context, protocol);
     private readonly IMessageSender<PartyVisitGranted>? _visitGranted = OptionalSender<PartyVisitGranted>(context, protocol);
+    // The quick-start answer exists where the build states both one-kind-word bodies (kr-812 only so far).
+    public IMessageSender<PartyQuickStartAnswered>? QuickStartAnswered { get; } =
+        OptionalSender<PartyQuickStartAnswered>(context, protocol);
 
     /// <summary>Sends one of the party notices the book decides.</summary>
     public ValueTask SendAsync(ISession session, object message, CancellationToken ct) => message switch
@@ -423,6 +552,8 @@ internal sealed class PartySenders(IPluginContext context, string protocol)
         PartyVisitAsked m => Required(_visitAsked).SendAsync(session, m, ct),
         PartyVisitFailed m => Required(_visitFailed).SendAsync(session, m, ct),
         PartyVisitGranted m => Required(_visitGranted).SendAsync(session, m, ct),
+        PartyQuickStartAnswered m => Required(QuickStartAnswered).SendAsync(session, m, ct),
+        PartyChatReceived m => Required(ChatReceived).SendAsync(session, m, ct),
         _ => throw new InvalidOperationException($"No party sender for {message.GetType().Name}."),
     };
 

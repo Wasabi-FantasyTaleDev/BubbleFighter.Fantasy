@@ -1,3 +1,4 @@
+using BubbleFighter.Fantasy.Contracts.Cluster;
 using BubbleFighter.Fantasy.Contracts.Inventory;
 using BubbleFighter.Fantasy.Abstractions.Persistence;
 
@@ -10,7 +11,7 @@ namespace BubbleFighter.Fantasy.Persistence.MySql;
 /// nothing granted reads as the default slot 0 and no pages through the column defaults; writes against an
 /// unknown <c>user_num</c> fail loud instead of dropping the granted state.
 /// </summary>
-public sealed class MySqlPlayerInventoryState(IDbConnectionFactory connections) : IPlayerInventoryState
+public sealed class MySqlPlayerInventoryState(IDbConnectionFactory connections, IAccountMutationFence? authority = null) : IPlayerInventoryState
 {
     /// <inheritdoc />
     public async ValueTask<byte> GetActiveWeaponPresetSlotAsync(long userNum, CancellationToken ct)
@@ -37,6 +38,7 @@ public sealed class MySqlPlayerInventoryState(IDbConnectionFactory connections) 
         }
 
         await using var session = await SugarSession.OpenAsync(connections, ct).ConfigureAwait(false);
+        await using var transaction = await session.BeginWriteAsync(userNum, authority, ct).ConfigureAwait(false);
         var rows = await session.Db.Updateable<PlayerRow>()
             .SetColumns(p => p.ActiveWeaponPresetSlot == slot)
             .Where(p => p.UserNum == userNum)
@@ -46,6 +48,7 @@ public sealed class MySqlPlayerInventoryState(IDbConnectionFactory connections) 
             throw new InvalidOperationException(
                 $"players has no row for user_num {userNum}; the active weapon-preset slot {slot} cannot be stored.");
         }
+        await transaction.CommitAsync().ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -82,7 +85,7 @@ public sealed class MySqlPlayerInventoryState(IDbConnectionFactory connections) 
         var copy = WeaponPresetPages.CopyTable(pages);
 
         await using var session = await SugarSession.OpenAsync(connections, ct).ConfigureAwait(false);
-        await using var transaction = await session.BeginAsync().ConfigureAwait(false);
+        await using var transaction = await session.BeginWriteAsync(userNum, authority, ct).ConfigureAwait(false);
         var db = session.Db;
         // The lock doubles as the existence check: pages attach to a known player row or nothing is written.
         await MySqlPlayerLock.AcquireAsync(db, userNum, ct).ConfigureAwait(false);
@@ -106,7 +109,7 @@ public sealed class MySqlPlayerInventoryState(IDbConnectionFactory connections) 
         RequireUserNum(userNum);
         var copy = WeaponPresetPages.CopyTable(initialPages);
         await using var session = await SugarSession.OpenAsync(connections, ct).ConfigureAwait(false);
-        await using var transaction = await session.BeginAsync().ConfigureAwait(false);
+        await using var transaction = await session.BeginWriteAsync(userNum, authority, ct).ConfigureAwait(false);
         await MySqlPlayerLock.AcquireAsync(session.Db, userNum, ct).ConfigureAwait(false);
         var rows = await session.Db.Queryable<WeaponPresetPageRow>()
             .Where(row => row.UserNum == userNum).OrderBy(row => row.Page).ToListAsync(ct).ConfigureAwait(false);

@@ -16,4 +16,18 @@ public interface IClientDataStore
     /// <returns>The file's bytes.</returns>
     /// <exception cref="FileNotFoundException">The client data has no such file.</exception>
     byte[] Read(string path);
+
+    /// <summary>
+    /// Reads a file with an inclusive uncompressed byte limit. Stores that expose file or archive lengths should
+    /// reject oversized resources before allocation; the default implementation also verifies the returned length.
+    /// </summary>
+    /// <param name="path">The client path.</param>
+    /// <param name="maximumBytes">The largest accepted uncompressed file size.</param>
+    /// <returns>The file's bytes, verified against its archive checksum when applicable.</returns>
+    byte[] Read(string path, int maximumBytes)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(maximumBytes, 1);
+        var bytes = Read(path);
+        return bytes.Length <= maximumBytes ? bytes : throw new InvalidDataException($"Client file '{path}' exceeds its byte limit.");
+    }
 }

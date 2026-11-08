@@ -75,6 +75,7 @@ public sealed class PatchHandshakeCodecTests
         Assert.Equal(WirePins.RepGamePatchS2CFrameCipherHex, Convert.ToHexString(frame));
     }
 
+    /// <summary>The opcode row retains the native builder, variable string serializer and empty-body boundary.</summary>
     [Fact]
     public void OpcodeTableNotesPinHandshakeLayouts()
     {
@@ -85,10 +86,12 @@ public sealed class PatchHandshakeCodecTests
         Assert.True(table.TryGet(PacketDirection.ClientToServer, WirePins.PatchRequestOpcode, out var request));
         Assert.Equal("gcpReqGamePatch", request!.Name);
         Assert.Equal(Evidence.Verified, request.Evidence);
-        Assert.Equal("sub_99DD00", request.Source);
+        Assert.Equal("kr-1256 sub_99DD00 stamps opcode 1 and ClientVersion_Major; kr-1256 sub_10C6440 writes the body", request.Source);
         Assert.NotNull(request.Source);
         Assert.NotNull(request.Notes);
-        Assert.Contains("96-byte", request.Notes, StringComparison.Ordinal);
+        Assert.Contains("seven counted UTF-16 strings", request.Notes, StringComparison.Ordinal);
+        Assert.Contains("fifteen counted UTF-16 strings", request.Notes, StringComparison.Ordinal);
+        Assert.Contains("96 bytes only when all strings are empty", request.Notes, StringComparison.Ordinal);
 
         Assert.True(table.TryGet(PacketDirection.ServerToClient, WirePins.PatchReplyOpcode, out var reply));
         Assert.Equal("gspRepGamePatch", reply!.Name);

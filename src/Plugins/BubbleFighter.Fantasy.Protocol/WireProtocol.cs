@@ -31,6 +31,8 @@ internal sealed class WireProtocol : IConnectionProtocol
     private readonly ILogger _logger;
     private readonly bool _requiresPatchHandshake;
     private readonly ushort _patchRequestOpcode;
+    private readonly ushort[] _preHandshakeOpcodes;
+    private readonly ushort[] _alternateHandshakeSequence;
 
     public WireProtocol(
         string name,
@@ -60,7 +62,16 @@ internal sealed class WireProtocol : IConnectionProtocol
         _logger = logger;
         _requiresPatchHandshake = requiresPatchHandshake;
         _patchRequestOpcode = requiresPatchHandshake ? opcodes.C2S(options.PatchRequestName) : default(ushort);
+        _preHandshakeOpcodes = requiresPatchHandshake ? ResolveNames(opcodes, options.PreHandshakeOpcodes, "pre_handshake_opcodes") : [];
+        _alternateHandshakeSequence = requiresPatchHandshake ? ResolveNames(opcodes, options.AlternateHandshakeSequence, "alternate_handshake_sequence") : [];
     }
+
+    /// <summary>Resolves configured packet names through this build's game C2S view, so one profile line serves every build.</summary>
+    private static ushort[] ResolveNames(IOpcodeTable opcodes, IReadOnlyList<string> names, string key) =>
+        names.Select(name => ushort.TryParse(name, out _)
+            ? throw new ConfigException($"{key} lists '{name}', a number; write the packet name, which each client build resolves to its own opcode.")
+            : opcodes.Find(PacketDirection.ClientToServer, name)
+                ?? throw new ConfigException($"{key} lists '{name}', which opcode table '{opcodes.Profile.Id}' has no game-connection C2S row for.")).ToArray();
 
     /// <inheritdoc />
     public string Name { get; }
@@ -80,7 +91,14 @@ internal sealed class WireProtocol : IConnectionProtocol
     private async ValueTask RunConnectionAsync(IConnection connection, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        await connection.Output.WriteAsync(_greeting, ct).ConfigureAwait(false);
+        var greetingWrite = await connection.Output.WriteAsync(_greeting, ct).ConfigureAwait(false);
+        if (greetingWrite.IsCanceled || greetingWrite.IsCompleted)
+        {
+            await connection.CloseAsync("bootstrap greeting write stopped").ConfigureAwait(false);
+            return;
+        }
+        _events.Emit(new BootstrapGreetingWrittenEvent(connection.Id, _profile.Id, Name, _dialect.Id,
+            _greeting.Length, (ushort)_options.BootstrapStatus));
 
         var cipher = _dialect.CreateDecryptor(PacketDirection.ClientToServer);
         // Keep one outbound cipher for the entire framed stream after the plaintext preamble.
@@ -171,6 +189,8 @@ internal sealed class WireProtocol : IConnectionProtocol
     private async ValueTask ParseAsync(IConnection connection, ISession session, PipeReader reader, CancellationToken ct)
     {
         var handshakePending = _requiresPatchHandshake && _options.EnforceClientVersion;
+        var alternateHandshakeIndex = 0;
+        var firstFrame = true;
         while (!ct.IsCancellationRequested && !connection.IsClosed)
         {
             ReadResult result;
@@ -207,31 +227,66 @@ internal sealed class WireProtocol : IConnectionProtocol
                     return;
                 }
 
-                var preHandshake = handshakePending && _options.PreHandshakeOpcodes.Contains(packet.Opcode);
+                if (firstFrame)
+                {
+                    firstFrame = false;
+                    _events.Emit(new FirstInboundFrameEvent(connection.Id, _profile.Id, Name,
+                        packet.Opcode, packet.Payload.Length));
+                }
+
+                var preHandshake = handshakePending && _preHandshakeOpcodes.Contains(packet.Opcode);
+                // cn-324 sub_7001F0 sends the GPK marker before either the Center query or a retained-player move.
+                // A permitted move still requires its handler to authorize continuation.
+                if (handshakePending && !preHandshake && alternateHandshakeIndex > 0
+                    && packet.Opcode != _alternateHandshakeSequence[alternateHandshakeIndex])
+                {
+                    await connection.CloseAsync("alternate handshake sequence was interrupted").ConfigureAwait(false);
+                    return;
+                }
+                if (handshakePending && alternateHandshakeIndex < _alternateHandshakeSequence.Length
+                    && packet.Opcode == _alternateHandshakeSequence[alternateHandshakeIndex]
+                    && packet.Payload.Length != 0)
+                {
+                    await connection.CloseAsync("alternate handshake sequence packets must have empty payloads").ConfigureAwait(false);
+                    return;
+                }
                 if (handshakePending && packet.Opcode != _patchRequestOpcode && !preHandshake)
                 {
-                    if (!_options.RequirePatchHandshakeFirst)
+                    var sequence = _alternateHandshakeSequence;
+                    if (sequence.Length > 0 && alternateHandshakeIndex < sequence.Length && packet.Opcode == sequence[alternateHandshakeIndex])
                     {
-                        // A later connection opening with something else is a
-                        // reconnect, not a fault. Let the frame through and stop
-                        // waiting for a handshake that is not coming.
+                        alternateHandshakeIndex++;
+                        if (alternateHandshakeIndex == sequence.Length)
+                            handshakePending = false;
+                    }
+                    else if (!_options.RequirePatchHandshakeFirst)
+                    {
                         handshakePending = false;
                     }
                     else
                     {
                         _events.Emit(new ClientVersionMismatchEvent(session, -1, _profile.ClientVersionMajor));
                         _logger.LogWarning(
-                            "Session {SessionId} from {Remote} sent opcode {Opcode} before the patch handshake.",
+                            "Session {SessionId} from {Remote} sent opcode {Opcode} outside the patch or configured alternate handshake sequence.",
                             session.Id, connection.RemoteEndPoint, packet.Opcode);
-                        await connection.CloseAsync($"first packet must be {_options.PatchRequestName}").ConfigureAwait(false);
+                        await connection.CloseAsync($"first packet must be {_options.PatchRequestName} or match the configured alternate sequence").ConfigureAwait(false);
                         return;
                     }
                 }
 
-                if (!await DispatchAsync(connection, session, packet, ct).ConfigureAwait(false))
+                if (preHandshake)
+                {
+                    using var continuation = new InitialHandshakeContinuation();
+                    using var registration = session.RegisterFeature<IInitialHandshakeContinuation>(continuation);
+                    if (!await DispatchAsync(connection, session, packet, ct).ConfigureAwait(false))
+                        return;
+                    if (continuation.Complete() && !connection.IsClosed)
+                        handshakePending = false;
+                }
+                else if (!await DispatchAsync(connection, session, packet, ct).ConfigureAwait(false))
                     return;
 
-                if (handshakePending && !preHandshake)
+                if (handshakePending && !preHandshake && alternateHandshakeIndex == 0)
                 {
                     handshakePending = false;
                     if (!connection.IsClosed)

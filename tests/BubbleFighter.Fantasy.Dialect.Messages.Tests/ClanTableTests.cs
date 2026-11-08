@@ -16,15 +16,15 @@ public sealed class ClanTableTests
 {
     private static PacketTables Tables => TestBuilds.Packets;
 
-    /// <summary>The empty passport is 16 bytes on the enabled build; cn-774 inherits the same table.</summary>
+    /// <summary>The empty passport is 20 bytes on the enabled build; cn-774 inherits the same table.</summary>
     [Theory]
     [InlineData("kr-1256")]
     [InlineData("cn-774")]
-    public void EmptyClanPassportIsSixteenBytes(string build)
+    public void EmptyClanPassportIsTwentyBytes(string build)
     {
         var body = ClanBinding.WritePassport(Tables, build);
-        Assert.Equal(16, body.Length);
-        Assert.Equal("00000000000000000000000000000000", Convert.ToHexString(body));
+        Assert.Equal(20, body.Length);
+        Assert.Equal("0000000000000000000000000000000000000000", Convert.ToHexString(body));
         ReadSub99C1D0(body);
     }
 
@@ -66,13 +66,14 @@ public sealed class ClanTableTests
 
     /// <summary>The clan tables are written empty on every enabled field and leave nothing unread.</summary>
     /// <remarks>
-    /// The passport walk follows the four pieces the table states for kr-1256. The five-piece reading
-    /// that starts with a leading word is the open passport question recorded in <c>packets/clan.yaml</c>
-    /// (kr-1256 sub_99C1D0's decompile is flagged), so it is not asserted here and the 16-byte body is not changed.
+    /// The passport walk follows the five pieces the table states for kr-1256: the leading word the raw
+    /// .text bytes at 0x99C1D0-0x99C550 pin before the name (the decompile is flagged and dropped that
+    /// read), then the name, two words and the byte list.
     /// </remarks>
     private static void ReadSub99C1D0(byte[] body)
     {
         var reader = new PacketReader(body);
+        Assert.Equal(0u, reader.ReadUInt32());
         Assert.Equal(string.Empty, reader.ReadWideStringPrefixed());
         Assert.Equal(0u, reader.ReadUInt32());
         Assert.Equal(0u, reader.ReadUInt32());

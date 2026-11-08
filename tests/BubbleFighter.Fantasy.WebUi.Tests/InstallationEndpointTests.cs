@@ -17,6 +17,7 @@ using BubbleFighter.Fantasy.Persistence.MySql;
 using BubbleFighter.Fantasy.Persistence.Sqlite;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace BubbleFighter.Fantasy.WebUi.Tests;
@@ -52,13 +53,21 @@ public sealed class InstallationEndpointTests
     }
 
     [Fact]
+    public async Task RepeatedClientImportsPublishIndependentRoots()
+    {
+        for (var attempt = 0; attempt < 16; attempt++)
+            await ClientFolderAndPackageProduceIndependentDataRoots();
+    }
+
+    [Fact]
     public async Task ClientFolderAndPackageProduceIndependentDataRoots()
     {
         await using var fixture = await Fixture.StartAsync();
         using var folder = new MultipartFormDataContent();
         folder.Add(new StringContent("folder-data"), "files", "client-data/fixture-build/dataraw/Config/fixture.xml");
         var response = await fixture.Http.PostAsync("/api/setup/client-data?profile=fixture-build&kind=folder", folder);
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(response.StatusCode == HttpStatusCode.OK,
+            $"{response.StatusCode}: {await response.Content.ReadAsStringAsync()}; {fixture.LastError}");
         var firstRoot = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("path").GetString()!;
         var firstFile = Path.Combine(firstRoot, "fixture-build", "dataraw", "Config", "fixture.xml");
         Assert.Equal("folder-data", await File.ReadAllTextAsync(firstFile));
@@ -66,7 +75,8 @@ public sealed class InstallationEndpointTests
         using var package = ZipForm(("client-data/fixture-build/dataraw/Config/fixture.xml", "replacement"),
             ("client-data/fixture-other/dataraw/Config/fixture.xml", "other version"));
         response = await fixture.Http.PostAsync("/api/setup/client-data?profile=fixture-build&kind=zip", package);
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(response.StatusCode == HttpStatusCode.OK,
+            $"{response.StatusCode}: {await response.Content.ReadAsStringAsync()}; {fixture.LastError}");
         var secondRoot = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("path").GetString()!;
         Assert.NotEqual(firstRoot, secondRoot);
         Assert.Equal("folder-data", await File.ReadAllTextAsync(firstFile));
@@ -76,7 +86,8 @@ public sealed class InstallationEndpointTests
         using var clientFolder = new MultipartFormDataContent();
         clientFolder.Add(new ByteArrayContent(ClientPack(("Config/ShopItem2.xml", "shop"))), "files", "Client/Packs/Config_00000.pkn");
         response = await fixture.Http.PostAsync("/api/setup/client-data?profile=fixture-build&kind=folder", clientFolder);
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(response.StatusCode == HttpStatusCode.OK,
+            $"{response.StatusCode}: {await response.Content.ReadAsStringAsync()}; {fixture.LastError}");
         var clientRoot = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("path").GetString()!;
         var generatedPack = Path.Combine(clientRoot, "fixture-build", "data", "Packs", "Config_00000.pkn");
         using var reader = Archive.Open(generatedPack, "Packs/Config_00000.pkn");
@@ -141,10 +152,14 @@ public sealed class InstallationEndpointTests
         Assert.False(System.IO.Directory.Exists(output));
         using var valid = new MultipartFormDataContent();
         valid.Add(new ByteArrayContent(ClientPack(("Config/ShopItem2.xml", "shop"), ("Maps/Example.xml", "map"),
+            ("Maps/Area/Nested/track.wb", "world-block"),
             ("Textures/Example.dds", "unused"))), "files", "Client/Packs/Config_00000.pkn");
         response = await fixture.Http.PostAsync("/api/setup/client-data?profile=fixture-build&kind=folder", valid);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("map", await File.ReadAllTextAsync(Path.Combine(output, "dataraw", "Maps", "Example.xml")));
+        Assert.Equal("world-block", await File.ReadAllTextAsync(Path.Combine(output, "dataraw", "Maps", "Area", "Nested", "track.wb")));
+        Assert.Contains("dataraw/Maps/Area/Nested/track.wb\tPacks/Config_00000.pkn\tMaps/Area/Nested/track.wb\t",
+            await File.ReadAllTextAsync(Path.Combine(output, "sources.tsv")));
         Assert.False(System.IO.Directory.Exists(Path.Combine(output, "data")));
         Assert.False(System.IO.Directory.Exists(Path.Combine(output, "dataraw", "Textures")));
         using var replacement = new MultipartFormDataContent();
@@ -568,6 +583,8 @@ public sealed class InstallationEndpointTests
 
     [Theory]
     [InlineData("{\"policy\":{\"sources\":[],\"plugins\":[{\"id\":\"sample\",\"rules\":[{\"id\":\"a\",\"type\":\"require\",\"builds\":[]},{\"id\":\"b\",\"type\":\"disable\",\"builds\":[\"fixture-build\"]}]}]}}", "client_policy_conflict")]
+    [InlineData("{\"policy\":{\"sources\":[],\"plugins\":[{\"id\":\"sample\",\"rules\":[{\"id\":\"a\",\"type\":\"require\",\"builds\":[]},{\"id\":\"b\",\"type\":\"recommend\",\"builds\":[\"fixture-build\"],\"sources\":[]}]}]}}", "client_policy_conflict")]
+    [InlineData("{\"policy\":{\"sources\":[],\"plugins\":[{\"id\":\"sample\",\"rules\":[{\"id\":\"a\",\"type\":\"recommend\",\"builds\":[],\"sources\":[]},{\"id\":\"b\",\"type\":\"require\",\"builds\":[\"fixture-build\"]}]}]}}", "client_policy_conflict")]
     [InlineData("{\"policy\":{\"sources\":[],\"plugins\":[{\"id\":\"sample\",\"rules\":[{\"id\":\"a\",\"type\":\"teleport\",\"builds\":[]}]}]}}", "client_policy_unknown_type")]
     [InlineData("{\"policy\":{\"sources\":[],\"plugins\":[{\"id\":\"sample\",\"rules\":[{\"id\":\"a\",\"type\":\"recommend\",\"builds\":[],\"sources\":[\"x\"]}]}]}}", "client_policy_unknown_source")]
     [InlineData("{\"policy\":{\"sources\":[],\"plugins\":[{\"id\":\"sample\",\"rules\":[{\"id\":\"a\",\"type\":\"require\",\"builds\":[\"unknown-build\"]}]}]}}", "client_policy_unknown_build")]
@@ -601,6 +618,8 @@ public sealed class InstallationEndpointTests
         Assert.Equal(["require", "disable", "recommend", "min_version", "max_version", "latest"], types.Select(t => t.GetProperty("name").GetString()));
         Assert.Equal(["none", "none", "sources", "version", "version", "none"], types.Select(t => t.GetProperty("field").GetString()));
         Assert.Contains("max_version", types[5].GetProperty("conflicts").EnumerateArray().Select(c => c.GetString()));
+        Assert.Contains("recommend", types[0].GetProperty("conflicts").EnumerateArray().Select(c => c.GetString()));
+        Assert.Contains("require", types[2].GetProperty("conflicts").EnumerateArray().Select(c => c.GetString()));
     }
 
     [Fact]
@@ -698,9 +717,27 @@ public sealed class InstallationEndpointTests
             CancellationToken cancellationToken) => ValueTask.CompletedTask;
     }
 
+    private sealed class LastErrorLog : ILoggerProvider, ILogger
+    {
+        private Exception? _last;
+        internal Exception? Last => Volatile.Read(ref _last);
+        public ILogger CreateLogger(string categoryName) => this;
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Error;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            if (exception is not null) Interlocked.Exchange(ref _last, exception);
+        }
+        public void Dispose() { }
+    }
+
     private sealed class Fixture : IAsyncDisposable
     {
         private PluginHost? _host;
+        private readonly LastErrorLog _errors = new();
+        private ILoggerFactory? _logging;
+        public Exception? LastError => _errors.Last;
         private Dictionary<string, object?> _installationOptions = [];
         private Dictionary<string, object?> _adminOptions = [];
         private string[]? _webUiGrants;
@@ -745,7 +782,8 @@ public sealed class InstallationEndpointTests
                 {
                     new Dictionary<string, object?> { ["kind"] = "webui", ["id"] = Username, ["allow"] = _webUiGrants },
                 } }));
-            _host = new PluginHost(rows, catalog, NullLoggerFactory.Instance);
+            _logging = LoggerFactory.Create(builder => builder.AddProvider(_errors));
+            _host = new PluginHost(rows, catalog, _logging);
             await _host.StartAsync(CancellationToken.None);
             Cookies = new CookieContainer();
             Http = new HttpClient(new HttpClientHandler { CookieContainer = Cookies }) { BaseAddress = new Uri($"http://127.0.0.1:{port}") };
@@ -783,6 +821,8 @@ public sealed class InstallationEndpointTests
             if (_host is null) return;
             await _host.ShutdownAsync(CancellationToken.None);
             _host = null;
+            _logging?.Dispose();
+            _logging = null;
         }
         public async ValueTask DisposeAsync()
         {

@@ -24,10 +24,10 @@ internal static class UserStatWire
         {
             values["fighter"] = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["unknown_4"] = checked((int)userNum),
+                ["user_number"] = checked((int)userNum),
                 ["nickname"] = nickname,
-                ["unknown_32"] = DaoCharacterType,
-                ["level"] = level,
+                ["character_type"] = DaoCharacterType,
+                ["level"] = NativeDisplayLevel.Project(tables, build, level),
                 ["unknown_504"] = nickname,
                 // The social block keeps its constructor defaults; its own +4 must not take the identity above.
                 ["social"] = new Dictionary<string, object?>(StringComparer.Ordinal),
@@ -37,7 +37,7 @@ internal static class UserStatWire
         {
             // The legacy FighterInfo takes the name and level from the enclosing map.
             values["nickname"] = nickname;
-            values["level"] = level;
+            values["level"] = NativeDisplayLevel.Project(tables, build, level);
         }
         return PacketCodec.Write(tables, build, "UserStat", values);
     }
@@ -53,13 +53,14 @@ internal static class UserStatWire
     /// <param name="build">The audited client build.</param>
     internal static void ValidateLayouts(PacketTables tables, string build)
     {
+        _ = NativeDisplayLevel.Project(tables, build, 1);
         PacketLayoutContract.RequireFields(tables, build, "UserStat", "User stat",
             ("color_index", "u32"), ("lucci", "u32"), ("cash", "u32"));
         if (HasModernFighterRows(tables, build))
         {
             PacketLayoutContract.RequireFields(tables, build, "UserStat", "User stat", ("fighter", "FighterInfo"));
             PacketLayoutContract.RequireFields(tables, build, "FighterInfo", "User stat",
-                ("unknown_4", "u32"), ("nickname", "wstr"), ("unknown_32", "u32"),
+                ("user_number", "u32"), ("nickname", "wstr"), ("character_type", "u32"),
                 ("level", "u32"), ("unknown_504", "wstr"), ("social", "SocialSystemInfo"));
         }
         else

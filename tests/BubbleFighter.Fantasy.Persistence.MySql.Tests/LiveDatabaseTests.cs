@@ -5,6 +5,9 @@ using BubbleFighter.Fantasy.Contracts.Progress;
 using BubbleFighter.Fantasy.Contracts.Shop;
 using BubbleFighter.Fantasy.Contracts.Wallet;
 using BubbleFighter.Fantasy.Persistence.MySql;
+using BubbleFighter.Fantasy.Abstractions;
+using BubbleFighter.Fantasy.Contracts.Cluster;
+using BubbleFighter.Fantasy.Kernel;
 using Microsoft.Extensions.Logging.Abstractions;
 using MySqlConnector;
 using Xunit;
@@ -13,7 +16,8 @@ namespace BubbleFighter.Fantasy.Persistence.MySql.Tests;
 
 // Runs the repositories against a real server. Every test returns early unless BFF_MYSQL_VERIFY_CONNECTION
 // names a scratch database (never a live one): the suite migrates it and writes rows with unique player ids.
-public sealed class LiveDatabaseTests
+[Collection("LiveMySqlDatabase")]
+public sealed partial class LiveDatabaseTests
 {
     private static readonly string? ConnectionString = Environment.GetEnvironmentVariable("BFF_MYSQL_VERIFY_CONNECTION");
     private static readonly Lazy<Task<MySqlConnectionFactory>> Ready = new(PrepareAsync);
@@ -56,8 +60,315 @@ public sealed class LiveDatabaseTests
         return Convert.ToInt64(await command.ExecuteScalarAsync());
     }
 
+    [Fact]
+    public async Task BuildLoadoutsPreserveRheaAndIndependentPresetsAcrossRepositoryReopen()
+    {
+        if (await FactoryAsync() is not { } factory) return;
+        var user = await NewPlayerAsync();
+        var store = new MySqlInventoryRepository(factory);
+        InventoryLoadoutScope korean = new("kr-1256", [300001, 300002, 300029, 202001, 204999]);
+        InventoryLoadoutScope older = new("cn-406", [300001, 300002, 202001]);
+        InventoryWearGroup[] groups = [new(300001, 300031, 300001, true), new(202000, 204999, 202001, true)];
+        var rows = korean.SupportedItemIds.Select((id, index) => new InventorySlotRecord(user, InventoryBag.CharacterBag,
+            index + 1, id, 5, (byte)(id is 300029 or 204999 ? 65 : 64))).ToArray();
+        await store.ReplaceSlotsAsync(user, InventoryBag.CharacterBag, rows, default);
+        await store.ReplaceSlotsAsync(user, InventoryBag.EquippedBag, rows.Select(row => row with { Bag = InventoryBag.EquippedBag }).ToArray(), default);
+        var presets = new MySqlPlayerInventoryState(factory);
+        await presets.SetActiveWeaponPresetSlotAsync(user, 4, default);
+        await presets.SetWeaponPresetPagesAsync(user, WeaponPresetPages.SeedFromWorn(204999, 0), default);
+        await store.UpdateLoadoutSelectionAsync(user, korean, groups, null, false, default);
+        var old = await store.UpdateLoadoutSelectionAsync(user, older, groups, null, false, default);
+        Assert.DoesNotContain(old!, row => row.ItemId is 300029 or 204999);
+        Assert.Contains(old!, row => row.ItemId == 300001 && (row.Flags & 1) != 0);
+        await store.UpdateLoadoutSelectionAsync(user, older, groups, 300002, true, default);
+        await store.UpdateLoadoutPresetsAsync(user, older, 1, WeaponPresetPages.SeedFromWorn(202001, 0), false, default);
+        Assert.Null(await store.UpdateLoadoutSelectionAsync(user, older, groups, 300029, true, default));
+        store = new MySqlInventoryRepository(factory);
+        var kr = await store.GetLoadoutAsync(user, korean, default);
+        Assert.Contains(300029, kr.WornItemIds!);
+        Assert.Equal(4, kr.ActivePresetSlot);
+        Assert.All(kr.PresetPages!, page => Assert.Equal(204999, page.Unknown0));
+        var cn = await store.GetLoadoutAsync(user, older, default);
+        Assert.Contains(300002, cn.WornItemIds!);
+        Assert.Equal(1, cn.ActivePresetSlot);
+        Assert.All(cn.PresetPages!, page => Assert.Equal(202001, page.Unknown0));
+        Assert.Equal(rows, await store.ListSlotsAsync(user, InventoryBag.CharacterBag, InventoryLimits.MaxInventorySlotsPerBag, default));
+        Assert.Equal(4, await presets.GetActiveWeaponPresetSlotAsync(user, default));
+    }
+
+    [Fact]
+    public async Task BuildLoadoutWritesSerializeWithSharedAppendsAndPreserveCapacity()
+    {
+        if (await FactoryAsync() is not { } factory) return;
+        var user = await NewPlayerAsync();
+        var store = new MySqlInventoryRepository(factory, maxLoadoutsPerPlayer: 1);
+        InventoryLoadoutScope scope = new("kr-1256", [300001, 300029, 202001]);
+        InventoryWearGroup[] groups = [new(300001, 300031, 300001, true)];
+        await store.ReplaceSlotsAsync(user, InventoryBag.CharacterBag,
+            [new(user, InventoryBag.CharacterBag, 1, 300001, 1, 1), new(user, InventoryBag.CharacterBag, 2, 300029, 1, 0)], default);
+        await Task.WhenAll(Enumerable.Range(0, 8).Select(index => Task.Run(async () =>
+        {
+            if (index == 0) await store.AppendMissingItemsAsync(user, InventoryBag.CharacterBag,
+                [new(user, InventoryBag.CharacterBag, 3, 202001, 5, 0)], default);
+            else await store.UpdateLoadoutSelectionAsync(user, scope, groups, index % 2 == 0 ? 300001 : 300029, true, default);
+        })));
+        Assert.Equal(5, (await store.ListSlotsAsync(user, InventoryBag.CharacterBag, InventoryLimits.MaxInventorySlotsPerBag, default))
+            .Single(row => row.ItemId == 202001).Quantity);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => store.GetLoadoutAsync(user, new("cn-279", [300001]), default).AsTask());
+        Assert.NotNull(await store.UpdateLoadoutSelectionAsync(user, scope, groups, 300029, true, default));
+    }
+
+    [Fact]
+    public async Task BuildLoadoutMutationRejectsAnExpiredAccountAuthority()
+    {
+        if (await FactoryAsync() is not { } factory) return;
+        var domain = await new MySqlPersistentDataDomainIdentity(factory).ReadAsync(default);
+        var unpooled = new MySqlConnectionFactory(new MySqlConnectionStringBuilder(ConnectionString!) { Pooling = false }.ConnectionString);
+        await using var ownership = new MySqlAccountOwnershipStore(unpooled, domain, 1, 5);
+        var user = await NewPlayerAsync();
+        var raw = new MySqlInventoryRepository(factory);
+        await raw.ReplaceSlotsAsync(user, InventoryBag.CharacterBag, [new(user, InventoryBag.CharacterBag, 1, 300001, 1, 1)], default);
+        InventoryLoadoutScope scope = new("cn-279", [300001]);
+        var protectedStore = new MySqlInventoryRepository(factory, new MySqlAccountWriteFence(ownership.Read));
+        Assert.Single(await protectedStore.ListLoadoutSlotsAsync(user, scope, InventoryBag.CharacterBag, 10, default));
+        Assert.Equal(0, await ScalarAsync<int>("SELECT COUNT(*) FROM player_loadouts WHERE user_num=@u", ("@u", user)));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => protectedStore.UpdateLoadoutPresetsAsync(user, scope, 2, null, false, default).AsTask());
+        await using var lease = await ownership.TryAcquireAsync(user, default);
+        Assert.NotNull(lease);
+        await protectedStore.UpdateLoadoutPresetsAsync(user, scope, 1, null, false, default);
+        await lease.DisposeAsync();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => protectedStore.UpdateLoadoutPresetsAsync(user, scope, 3, null, false, default).AsTask());
+        Assert.Equal(1, (await raw.GetLoadoutAsync(user, scope, default)).ActivePresetSlot);
+    }
+
+    [Fact]
+    public async Task BuildLoadoutIdenticalUpdatesWorkWithAffectedRowCounting()
+    {
+        if (await FactoryAsync() is null) return;
+        var user = await NewPlayerAsync();
+        var factory = new MySqlConnectionFactory(new MySqlConnectionStringBuilder(ConnectionString!) { UseAffectedRows = true }.ConnectionString);
+        var store = new MySqlInventoryRepository(factory);
+        InventoryLoadoutScope scope = new("cn-406", [300001]);
+        await store.UpdateLoadoutPresetsAsync(user, scope, 2, null, false, default);
+        await store.UpdateLoadoutPresetsAsync(user, scope, 2, null, false, default);
+        Assert.Equal(2, (await store.GetLoadoutAsync(user, scope, default)).ActivePresetSlot);
+        Assert.Equal(2, (await store.GetLoadoutAsync(user, scope, default)).ActivePresetSlot);
+    }
+
+    [Fact]
+    public async Task AccountWriteFenceRejectsMissingAndReplacedAuthorityWithoutChangingTheWallet()
+    {
+        if (await FactoryAsync() is not { } factory) return;
+        var domain = await new MySqlPersistentDataDomainIdentity(factory).ReadAsync(default);
+        var unpooled = new MySqlConnectionFactory(new MySqlConnectionStringBuilder(ConnectionString!) { Pooling = false }.ConnectionString);
+        await using var first = new MySqlAccountOwnershipStore(unpooled, domain, 1, 5);
+        await using var second = new MySqlAccountOwnershipStore(unpooled, domain, 1, 5);
+        var user = await NewPlayerAsync();
+        var firstWallet = new MySqlPlayerWalletRepository(factory, new MySqlAccountWriteFence(first.Read));
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await firstWallet.UpsertAsync(new(user, 90, 0), default));
+        await using var initialOwner = await first.TryAcquireAsync(user, default);
+        Assert.NotNull(initialOwner);
+        var staleProof = first.Read(user);
+        Assert.NotNull(staleProof);
+        await firstWallet.UpsertAsync(new(user, 10, 0), default);
+        await initialOwner.DisposeAsync();
+        Assert.Null(first.Read(user));
+        await using var nextOwner = await second.TryAcquireAsync(user, default);
+        Assert.NotNull(nextOwner);
+        Assert.NotEqual(staleProof.Token, second.Read(user)!.Token);
+        var staleWallet = new MySqlPlayerWalletRepository(factory, new MySqlAccountWriteFence(_ => staleProof));
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await staleWallet.UpsertAsync(new(user, 99, 0), default));
+        var nextWallet = new MySqlPlayerWalletRepository(factory, new MySqlAccountWriteFence(second.Read));
+        await nextWallet.UpsertAsync(new(user, 20, 0), default);
+        Assert.Equal(20, (await nextWallet.FindByUserNumAsync(user, default))!.Lucci);
+    }
+
+    [Fact]
+    public async Task AccountWriteFenceHandoverWaitsForTheOriginalMutationTransactionAfterSocketLoss()
+    {
+        if (await FactoryAsync() is not { } factory) return;
+        var domain = await new MySqlPersistentDataDomainIdentity(factory).ReadAsync(default);
+        var unpooled = new MySqlConnectionFactory(new MySqlConnectionStringBuilder(ConnectionString!) { Pooling = false }.ConnectionString);
+        await using var first = new MySqlAccountOwnershipStore(unpooled, domain, 1, 10);
+        await using var second = new MySqlAccountOwnershipStore(unpooled, domain, 1, 10);
+        var user = await NewPlayerAsync();
+        await using var initialOwner = await first.TryAcquireAsync(user, default);
+        Assert.NotNull(initialOwner);
+        var proof = first.Read(user);
+        Assert.NotNull(proof);
+        await using var writer = await RawAsync();
+        await using var transaction = await writer.BeginTransactionAsync();
+        var originalFence = new MySqlAccountWriteFence(_ => proof);
+        await originalFence.VerifyAsync(writer, transaction, user, default);
+        var key = MySqlAccountOwnershipStore.LockName(domain, user);
+        // Reuse the observer socket so lock observation does not wait for repeated remote handshakes.
+        await using var observer = await RawAsync();
+        await using var observe = new MySqlCommand("SELECT COALESCE(IS_USED_LOCK(@name), 0)", observer);
+        observe.Parameters.AddWithValue("@name", key);
+        async Task<long> ReadOwnerAsync(CancellationToken ct) => Convert.ToInt64(await observe.ExecuteScalarAsync(ct));
+        var oldConnection = await ReadOwnerAsync(default);
+        await using (var kill = new MySqlCommand("KILL CONNECTION " + oldConnection.ToString(System.Globalization.CultureInfo.InvariantCulture), observer))
+            await kill.ExecuteNonQueryAsync();
+        var pending = second.TryAcquireAsync(user, default).AsTask();
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        while (await ReadOwnerAsync(deadline.Token) is var current
+            && (current == 0 || current == oldConnection))
+        {
+            if (pending.IsCompleted) await pending;
+            await Task.Delay(10, deadline.Token);
+        }
+        Assert.False(pending.IsCompleted);
+        Assert.Null(second.Read(user));
+        await transaction.CommitAsync();
+        await using var nextOwner = await pending.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.NotNull(nextOwner);
+        await using var staleTransaction = await writer.BeginTransactionAsync();
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await originalFence.VerifyAsync(writer, staleTransaction, user, default));
+    }
+
+    [Fact]
+    public async Task AccountHandoffMovesWriteAuthorityToTheNamedMigrationOnly()
+    {
+        if (await FactoryAsync() is not { } factory) return;
+        var domain = await new MySqlPersistentDataDomainIdentity(factory).ReadAsync(default);
+        var unpooled = new MySqlConnectionFactory(new MySqlConnectionStringBuilder(ConnectionString!) { Pooling = false }.ConnectionString);
+        await using var source = new MySqlAccountOwnershipStore(unpooled, domain, 2, 5, "node-a");
+        await using var destination = new MySqlAccountOwnershipStore(unpooled, domain, 2, 5, "node-b");
+        var user = await NewPlayerAsync();
+        var migration = Guid.NewGuid().ToString("N");
+        var sourceWallet = new MySqlPlayerWalletRepository(factory, new MySqlAccountWriteFence(source.Read));
+        var owner = await source.TryAcquireAsync(user, default);
+        Assert.NotNull(owner);
+        await sourceWallet.UpsertAsync(new(user, 10, 0), default);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await source.HandOffAsync(owner, new(user, migration, "other", "node-b", TimeSpan.FromSeconds(30)), default));
+        Assert.True(await owner.IsHeldAsync(default));
+        await source.HandOffAsync(owner, new(user, migration, "node-a", "node-b", TimeSpan.FromSeconds(30)), default);
+        await using var unrelated = new MySqlAccountOwnershipStore(unpooled, domain, 1, 5, "node-c");
+        Assert.Null(await unrelated.TryClaimAsync(user, migration, default));
+        Assert.Null(await unrelated.TryWithdrawAsync(user, migration, default));
+        Assert.Null(await source.TryClaimAsync(user, migration, default));
+        Assert.Null(await destination.TryWithdrawAsync(user, migration, default));
+
+        Assert.Null(source.Read(user));
+        Assert.False(await owner.IsHeldAsync(default));
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await sourceWallet.UpsertAsync(new(user, 99, 0), default));
+        Assert.Null(await destination.TryAcquireAsync(user, default));
+        Assert.Null(await destination.TryClaimAsync(user, Guid.NewGuid().ToString("N"), default));
+        await using var claimed = await destination.TryClaimAsync(user, migration, default);
+        Assert.NotNull(claimed);
+        Assert.Null(await source.TryWithdrawAsync(user, migration, default));
+        var destinationWallet = new MySqlPlayerWalletRepository(factory, new MySqlAccountWriteFence(destination.Read));
+        await destinationWallet.UpsertAsync(new(user, 20, 0), default);
+        Assert.Equal(20, (await destinationWallet.FindByUserNumAsync(user, default))!.Lucci);
+        Assert.Equal("claimed", await ScalarAsync<string>("SELECT state FROM account_handoffs WHERE user_num = @u", ("@u", user)));
+        await claimed.DisposeAsync();
+        Assert.Null(await destination.TryClaimAsync(user, migration, default));
+    }
+
+    [Fact]
+    public async Task WithdrawnAndExpiredHandoffsReturnTheAccountToOrdinaryAdmission()
+    {
+        if (await FactoryAsync() is not { } factory) return;
+        var domain = await new MySqlPersistentDataDomainIdentity(factory).ReadAsync(default);
+        var unpooled = new MySqlConnectionFactory(new MySqlConnectionStringBuilder(ConnectionString!) { Pooling = false }.ConnectionString);
+        await using var source = new MySqlAccountOwnershipStore(unpooled, domain, 2, 5, "node-a");
+        await using var destination = new MySqlAccountOwnershipStore(unpooled, domain, 2, 5, "node-b");
+        var user = await NewPlayerAsync();
+        var migration = Guid.NewGuid().ToString("N");
+        var owner = await source.TryAcquireAsync(user, default);
+        Assert.NotNull(owner);
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await source.HandOffAsync(owner, new(user, migration, "other", "node-b", TimeSpan.FromSeconds(30)), default));
+        Assert.True(await owner.IsHeldAsync(default));
+        await source.HandOffAsync(owner, new(user, migration, "node-a", "node-b", TimeSpan.FromSeconds(30)), default);
+        await using var unrelated = new MySqlAccountOwnershipStore(unpooled, domain, 1, 5, "node-c");
+        Assert.Null(await unrelated.TryClaimAsync(user, migration, default));
+        Assert.Null(await unrelated.TryWithdrawAsync(user, migration, default));
+        Assert.Null(await source.TryClaimAsync(user, migration, default));
+        Assert.Null(await destination.TryWithdrawAsync(user, migration, default));
+        var restored = await source.TryWithdrawAsync(user, migration, default);
+        Assert.NotNull(restored);
+        Assert.NotNull(source.Read(user));
+        Assert.Null(await destination.TryClaimAsync(user, migration, default));
+        Assert.Equal("withdrawn", await ScalarAsync<string>("SELECT state FROM account_handoffs WHERE user_num = @u", ("@u", user)));
+
+        var late = Guid.NewGuid().ToString("N");
+        await source.HandOffAsync(restored, new(user, late, "node-a", "node-b", TimeSpan.FromMilliseconds(200)), default);
+        await Task.Delay(600);
+        Assert.Null(await destination.TryClaimAsync(user, late, default));
+        await using var ordinary = await destination.TryAcquireAsync(user, default);
+        Assert.NotNull(ordinary);
+        Assert.Equal("expired", await ScalarAsync<string>("SELECT state FROM account_handoffs WHERE user_num = @u", ("@u", user)));
+        Assert.Null(await source.TryWithdrawAsync(user, late, default));
+    }
+
+    [Fact]
+    public async Task ClanWritesRequireTheOriginalAccountBinding()
+    {
+        if (await FactoryAsync() is not { } factory) return;
+        var domain = await new MySqlPersistentDataDomainIdentity(factory).ReadAsync(default);
+        var unpooled = new MySqlConnectionFactory(new MySqlConnectionStringBuilder(ConnectionString!) { Pooling = false }.ConnectionString);
+        await using var owners = new MySqlAccountOwnershipStore(unpooled, domain, 1, 5);
+        var mutations = new MySqlAccountMutationScopes(owners.Read);
+        var clans = new MySqlClanStore(factory, new MySqlAccountWriteFence(mutations.Read));
+        var user = await NewPlayerAsync();
+        var opened = new ClanOpenRecord(user, ClanOpenKind.MainOpen);
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await clans.RememberOpenAsync(opened, default));
+        Assert.Null(await clans.FindLastOpenAsync(user, default));
+        await using var first = await owners.TryAcquireAsync(user, default);
+        Assert.NotNull(first);
+        var session = new MutationSession(1);
+        using var firstBinding = mutations.Bind(session, first);
+        using var originalFlow = mutations.Enter(session);
+        await clans.RememberOpenAsync(opened, default);
+        Assert.Equal(opened, await clans.FindLastOpenAsync(user, default));
+        firstBinding.Dispose();
+        await first.DisposeAsync();
+        await using var replacement = await owners.TryAcquireAsync(user, default);
+        Assert.NotNull(replacement);
+        using var replacementBinding = mutations.Bind(session, replacement);
+        var attended = new ClanOpenRecord(user, ClanOpenKind.Attendance);
+        using (mutations.Enter(session)) await clans.RememberOpenAsync(attended, default);
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await clans.RememberOpenAsync(opened, default));
+        Assert.Equal(attended, await clans.FindLastOpenAsync(user, default));
+    }
+
     private static Task<long> CountAsync(string table, long userNum) =>
         ScalarAsync<long>($"SELECT COUNT(*) FROM {table} WHERE user_num = @u", ("@u", userNum));
+
+    [Fact]
+    public async Task ShopWritesRequireTheOriginalAccountBinding()
+    {
+        if (await FactoryAsync() is not { } factory) return;
+        var domain = await new MySqlPersistentDataDomainIdentity(factory).ReadAsync(default);
+        var unpooled = new MySqlConnectionFactory(new MySqlConnectionStringBuilder(ConnectionString!) { Pooling = false }.ConnectionString);
+        await using var owners = new MySqlAccountOwnershipStore(unpooled, domain, 1, 5);
+        var mutations = new MySqlAccountMutationScopes(owners.Read);
+        var shops = new MySqlShopSessionStore(factory, new MySqlAccountWriteFence(mutations.Read));
+        var user = await NewPlayerAsync();
+        var opened = new ShopOpenRecord(user, 11, 1, ShopKind.ItemShop);
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await shops.RememberOpenAsync(opened, default));
+        Assert.Null(await shops.FindLastOpenAsync(user, default));
+        await using var first = await owners.TryAcquireAsync(user, default);
+        Assert.NotNull(first);
+        var session = new MutationSession(1);
+        using var firstBinding = mutations.Bind(session, first);
+        using var originalFlow = mutations.Enter(session);
+        await shops.RememberOpenAsync(opened, default);
+        Assert.Equal(opened, await shops.FindLastOpenAsync(user, default));
+        firstBinding.Dispose();
+        await first.DisposeAsync();
+        await using var replacement = await owners.TryAcquireAsync(user, default);
+        Assert.NotNull(replacement);
+        using var replacementBinding = mutations.Bind(session, replacement);
+        var reopened = new ShopOpenRecord(user, 22, 2, ShopKind.CashShop);
+        using (mutations.Enter(session)) await shops.RememberOpenAsync(reopened, default);
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await shops.RememberOpenAsync(opened, default));
+        Assert.Equal(reopened, await shops.FindLastOpenAsync(user, default));
+    }
 
     private static async Task<int[]> IntListAsync(string sql, long user)
     {
@@ -79,6 +390,173 @@ public sealed class LiveDatabaseTests
     private static ShopPurchaseCommand Purchase(long user, int key, int item, int price, int lucci = 100, int cash = 0, string money = "lucci") =>
         new(new PlayerWallet(user, lucci, cash), key, 7, money, price, 10_000, [new ShopPurchaseGrant(item, 1) { Lifetime = InventoryLifetime.Permanent }]);
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AccountOwnershipPluginActivatesAndReleasesItsPublishedStoreOnUnload(bool reuseSession)
+    {
+        if (await FactoryAsync() is not { } factory) return;
+        var domain = await new MySqlPersistentDataDomainIdentity(factory).ReadAsync(default);
+        var services = new ServiceRegistry();
+        var context = new PluginContext(new PluginRow
+        {
+            Id = "accounts", Plugin = "persistence.mysql-account-ownership", Source = "test",
+            Config = new Dictionary<string, object?>
+            {
+                ["connection_string"] = ConnectionString!, ["persistent_domain_id"] = domain, ["max_owners"] = 2,
+            },
+        }, services, new EventBus(NullLogger.Instance), NullLogger.Instance);
+        var user = await NewPlayerAsync();
+        IAccountOwnership? hold = null;
+        try
+        {
+            await new MySqlAccountOwnershipPlugin().ActivateAsync(context, default);
+            hold = await services.Get<IAccountOwnershipStore>().TryAcquireAsync(user, default);
+            Assert.NotNull(hold);
+            Assert.True(await hold.IsHeldAsync(default));
+            var mutations = services.Get<IAccountMutationScopes>();
+            var session = new MutationSession(1);
+            using var binding = mutations.Bind(session, hold);
+            using var caller = mutations.Enter(session);
+            var fencedWallet = new MySqlPlayerWalletRepository(factory, services.Get<IAccountMutationFence>());
+            await fencedWallet.UpsertAsync(new(user, 17, 0), default);
+            Assert.Equal(17, (await fencedWallet.FindByUserNumAsync(user, default))!.Lucci);
+            var resumeOld = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var delayedOld = Task.Run(async () =>
+            {
+                await resumeOld.Task;
+                await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                    await fencedWallet.UpsertAsync(new(user, 99, 0), default));
+            });
+            try
+            {
+                binding.Dispose();
+                await hold.DisposeAsync();
+                await using var renewed = await services.Get<IAccountOwnershipStore>().TryAcquireAsync(user, default);
+                Assert.NotNull(renewed);
+                var next = reuseSession ? session : new MutationSession(2);
+                using var nextBinding = mutations.Bind(next, renewed);
+                using (mutations.Enter(next))
+                {
+                    await fencedWallet.UpsertAsync(new(user, 19, 0), default);
+                    resumeOld.TrySetResult();
+                    await delayedOld.WaitAsync(TimeSpan.FromSeconds(10));
+                }
+            }
+            finally
+            {
+                resumeOld.TrySetResult();
+                await delayedOld.WaitAsync(TimeSpan.FromSeconds(10));
+            }
+            Assert.Equal(19, (await fencedWallet.FindByUserNumAsync(user, default))!.Lucci);
+        }
+        finally { await context.UnwindAsync(); }
+        Assert.False(services.TryGet<IAccountOwnershipStore>(out _));
+        Assert.False(services.TryGet<IAccountMutationFence>(out _));
+        Assert.False(services.TryGet<IAccountMutationScopes>(out _));
+        Assert.NotNull(hold);
+        Assert.False(await hold.IsHeldAsync(default));
+        var unpooled = new MySqlConnectionFactory(new MySqlConnectionStringBuilder(ConnectionString!) { Pooling = false }.ConnectionString);
+        await using var replacementStore = new MySqlAccountOwnershipStore(unpooled, domain, 1, 3);
+        await using var replacement = await replacementStore.TryAcquireAsync(user, default);
+        Assert.NotNull(replacement);
+        Assert.True(await replacement.IsHeldAsync(default));
+    }
+
+    [Fact]
+    public async Task AccountOwnershipIsExclusiveAcrossIndependentStores()
+    {
+        if (await FactoryAsync() is not { } factory) return;
+        var domain = await new MySqlPersistentDataDomainIdentity(factory).ReadAsync(default);
+        var unpooled = new MySqlConnectionFactory(new MySqlConnectionStringBuilder(ConnectionString!) { Pooling = false }.ConnectionString);
+        await using var first = new MySqlAccountOwnershipStore(unpooled, domain, 2, 3);
+        await using var second = new MySqlAccountOwnershipStore(unpooled, domain, 2, 3);
+        var user = await NewPlayerAsync();
+        var attempts = await Task.WhenAll(first.TryAcquireAsync(user, default).AsTask(), second.TryAcquireAsync(user, default).AsTask());
+        var winner = Assert.Single(attempts, result => result is not null)!;
+        Assert.True(await winner.IsHeldAsync(default));
+        await winner.DisposeAsync();
+        await using var replacement = await second.TryAcquireAsync(user, default);
+        Assert.NotNull(replacement);
+        await winner.DisposeAsync();
+        Assert.False(await winner.IsHeldAsync(default));
+        Assert.True(await replacement.IsHeldAsync(default));
+    }
+
+    [Fact]
+    public async Task AccountOwnershipLosesTheKilledConnectionWithoutReacquiring()
+    {
+        if (await FactoryAsync() is not { } factory) return;
+        var domain = await new MySqlPersistentDataDomainIdentity(factory).ReadAsync(default);
+        var unpooled = new MySqlConnectionFactory(new MySqlConnectionStringBuilder(ConnectionString!) { Pooling = false }.ConnectionString);
+        await using var first = new MySqlAccountOwnershipStore(unpooled, domain, 1, 3);
+        await using var second = new MySqlAccountOwnershipStore(unpooled, domain, 1, 3);
+        var user = await NewPlayerAsync();
+        await using var owner = await first.TryAcquireAsync(user, default);
+        Assert.NotNull(owner);
+        var holder = await ScalarAsync<long>("SELECT IS_USED_LOCK(@name)", ("@name", MySqlAccountOwnershipStore.LockName(domain, user)));
+        Assert.True(holder > 0);
+        _ = await ScalarAsync<long>("KILL CONNECTION " + holder.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        await Assert.ThrowsAnyAsync<System.Data.Common.DbException>(async () => await owner.IsHeldAsync(default));
+        Assert.False(await owner.IsHeldAsync(default));
+        await using var replacement = await second.TryAcquireAsync(user, default);
+        Assert.NotNull(replacement);
+        await owner.DisposeAsync();
+        Assert.True(await replacement.IsHeldAsync(default));
+    }
+
+    [Fact]
+    public async Task AccountOwnershipCannotRecoverAfterItsDomainChanges()
+    {
+        if (await FactoryAsync() is not { } factory) return;
+        var domain = await new MySqlPersistentDataDomainIdentity(factory).ReadAsync(default);
+        var unpooled = new MySqlConnectionFactory(new MySqlConnectionStringBuilder(ConnectionString!) { Pooling = false }.ConnectionString);
+        await using var store = new MySqlAccountOwnershipStore(unpooled, domain.ToUpperInvariant(), 1, 3);
+        await using var owner = await store.TryAcquireAsync(await NewPlayerAsync(), default);
+        Assert.NotNull(owner);
+        Assert.True(await owner.IsHeldAsync(default));
+        try
+        {
+            _ = await ScalarAsync<long>("UPDATE cluster_data_domain SET domain_id = @id WHERE singleton_id = 1", ("@id", Guid.NewGuid().ToString("D")));
+            Assert.False(await owner.IsHeldAsync(default));
+        }
+        finally
+        {
+            _ = await ScalarAsync<long>("UPDATE cluster_data_domain SET domain_id = @id WHERE singleton_id = 1", ("@id", Guid.ParseExact(domain, "N").ToString("D")));
+        }
+        Assert.False(await owner.IsHeldAsync(default));
+    }
+
+    [Fact]
+    public async Task AccountOwnershipRefusesTheWrongDatabaseDomain()
+    {
+        if (await FactoryAsync() is not { } factory) return;
+        var unpooled = new MySqlConnectionFactory(new MySqlConnectionStringBuilder(ConnectionString!) { Pooling = false }.ConnectionString);
+        await using var wrong = new MySqlAccountOwnershipStore(unpooled, Guid.NewGuid().ToString("N"), 1, 3);
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await wrong.TryAcquireAsync(await NewPlayerAsync(), default));
+    }
+
+    [Fact]
+    public async Task AccountOwnershipDisposalReleasesEveryHoldAndRefusesNewWork()
+    {
+        if (await FactoryAsync() is not { } factory) return;
+        var domain = await new MySqlPersistentDataDomainIdentity(factory).ReadAsync(default);
+        var unpooled = new MySqlConnectionFactory(new MySqlConnectionStringBuilder(ConnectionString!) { Pooling = false }.ConnectionString);
+        var first = new MySqlAccountOwnershipStore(unpooled, domain, 2, 3);
+        await using var second = new MySqlAccountOwnershipStore(unpooled, domain, 2, 3);
+        var user1 = await NewPlayerAsync();
+        var user2 = await NewPlayerAsync();
+        Assert.NotNull(await first.TryAcquireAsync(user1, default));
+        Assert.NotNull(await first.TryAcquireAsync(user2, default));
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await first.TryAcquireAsync(await NewPlayerAsync(), default));
+        await first.DisposeAsync();
+        await using var renewed1 = await second.TryAcquireAsync(user1, default);
+        await using var renewed2 = await second.TryAcquireAsync(user2, default);
+        Assert.NotNull(renewed1);
+        Assert.NotNull(renewed2);
+        await Assert.ThrowsAsync<ObjectDisposedException>(async () => await first.TryAcquireAsync(user1, default));
+    }
+
     [Fact]
     public async Task MigrationsApplyFromEmptyAndAreIdempotent()
     {
@@ -92,6 +570,21 @@ public sealed class LiveDatabaseTests
                 "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = @t", ("@t", table)));
         Assert.Equal(0L, await ScalarAsync<long>(
             "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'player_money'"));
+    }
+
+    [Fact]
+    public async Task DatabaseDomainIdentityIsStableAcrossRepositoriesAndRepeatedMigrations()
+    {
+        if (await FactoryAsync() is not { } factory) return;
+        var identity = await new MySqlPersistentDataDomainIdentity(factory).ReadAsync(default);
+        Assert.True(Guid.TryParseExact(identity, "N", out var id));
+        Assert.NotEqual(Guid.Empty, id);
+        await new MigrationRunner(factory, NullLogger.Instance, typeof(MySqlPlugin).Assembly).ApplyAsync(default);
+        var separateConnectionPool = new MySqlConnectionFactory(ConnectionString!);
+        Assert.Equal(identity, await new MySqlPersistentDataDomainIdentity(separateConnectionPool).ReadAsync(default));
+        var textual = new MySqlConnectionStringBuilder(ConnectionString!) { GuidFormat = MySqlGuidFormat.None };
+        Assert.Equal(identity, await new MySqlPersistentDataDomainIdentity(new MySqlConnectionFactory(textual.ConnectionString)).ReadAsync(default));
+        Assert.Equal(1L, await ScalarAsync<long>("SELECT COUNT(*) FROM cluster_data_domain"));
     }
 
     [Fact]
@@ -135,6 +628,32 @@ public sealed class LiveDatabaseTests
         await ScalarAsync<long>("UPDATE accounts SET banned_until = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 1 DAY) WHERE username = @n", ("@n", bannedName));
         Assert.False(await accounts.TrySetInitialPasswordAsync(bannedName, "enrolled", default));
         Assert.Equal("", (await accounts.FindAsync(bannedName, default))!.PasswordHash);
+    }
+
+    [Fact]
+    public async Task ConcurrentWalletInitializationAcrossRepositoriesPreservesTheCommittedWinner()
+    {
+        if (await FactoryAsync() is not { } factory) return;
+        var user = await NewPlayerAsync();
+        var repositories = Enumerable.Range(0, 16).Select(_ => new MySqlPlayerWalletRepository(factory)).ToArray();
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = repositories.Select(async (repository, index) =>
+        {
+            await start.Task;
+            return await repository.GetOrCreateAsync(new(user, 100 + index, index), default);
+        }).ToArray();
+        start.SetResult();
+        var wallets = await Task.WhenAll(calls);
+        Assert.All(wallets, wallet => Assert.Equal(wallets[0], wallet));
+        Assert.Equal(1L, await CountAsync("player_wallets", user));
+
+        var committed = new PlayerWallet(user, 765, 43);
+        await repositories[0].UpsertAsync(committed, default);
+        var timestamp = await ScalarAsync<DateTime>("SELECT updated_at FROM player_wallets WHERE user_num = @u", ("@u", user));
+        var existing = await Task.WhenAll(repositories.Select(repository =>
+            repository.GetOrCreateAsync(new(user, 9999, 9999), default).AsTask()));
+        Assert.All(existing, wallet => Assert.Equal(committed, wallet));
+        Assert.Equal(timestamp, await ScalarAsync<DateTime>("SELECT updated_at FROM player_wallets WHERE user_num = @u", ("@u", user)));
     }
 
     [Fact]

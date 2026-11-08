@@ -74,15 +74,17 @@ public sealed class InventoryViewPlugin : IPlugin
             IEquipmentSelection? selection = null;
             if (context.Services.TryGet<IInventoryRepository>(out var inventory) && inventory is not null)
             {
+                var contributions = new EquipmentWearGroups(context.Events, protocol);
                 IEquipmentSelection inner = options.Selection == "catalog_masks"
-                    ? new EquipmentSelectionCatalogMasks(inventory, CatalogMasks(context, options))
-                    : new EquipmentSelection(inventory, WearLocations(context, options));
+                    ? new EquipmentSelectionCatalogMasks(inventory, CatalogMasks(context, options), contributions)
+                    : new EquipmentSelection(inventory, WearLocations(context, options), contributions);
                 selection = new EquipmentSelectionPolicy(inner, context.Events, protocol, context.Logger);
                 context.Effect(context.Services.Register<IEquipmentSelection>(selection));
                 context.Effect(context.Events.Intercept<EquipmentSelectionReadRequested, IReadOnlyList<InventorySlotRecord>>(
                     (request, next, ct) => request.Protocol == protocol ? selection.ReadAsync(request.UserNum, ct) : next(ct)));
             }
-            var push = new EquippedViewPush(context.Logger, localSender!, remoteSender!, playerState, selection, options.PersistPresetPages);
+            var push = new EquippedViewPush(context.Logger, localSender!, remoteSender!, playerState, selection,
+                options.PersistPresetPages, context.Events);
             context.Effect(context.Services.Register<IEquippedViewPush>(push));
             if (options.PersistPresetPages)
                 context.Effect(context.Services.Register<IWeaponPresetPageSource>(push));

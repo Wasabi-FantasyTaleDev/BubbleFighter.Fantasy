@@ -18,6 +18,14 @@ public sealed class LotteryMountTests
     [InlineData("id-400", false)]
     [InlineData("id-1809", false)]
     [InlineData("kr-812", true)]
+    [InlineData("cn-279", false)]
+    [InlineData("cn-279", true)]
+    [InlineData("cn-406", false)]
+    [InlineData("cn-406", true)]
+    [InlineData("cn-705", false)]
+    [InlineData("cn-705", true)]
+    [InlineData("cn-706", false)]
+    [InlineData("cn-706", true)]
     public async Task AwardCycleUsesNativeBodiesAndProtocolScopedRoutes(string build, bool remap)
     {
         var profile = new ClientProfile(build, build[..2], int.Parse(build[3..]), 0, 0, build);
@@ -46,7 +54,7 @@ public sealed class LotteryMountTests
             var selected = Assert.Single(fixture.Services.GetAll<IMessageSender<RoundLotterySelected>>());
             await selected.SendAsync(session, new(4, 2), default);
             Assert.Equal(table.S2C("gspRepAwardSelectSuccess"), session.Sent[^1]);
-            Assert.Equal("0400000002000000FFFFFFFF", Convert.ToHexString(session.Bodies[^1]));
+            Assert.Equal(build == "cn-279" ? "0400000002000000" : "0400000002000000FFFFFFFF", Convert.ToHexString(session.Bodies[^1]));
             await selected.SendAsync(session, new(4, 2, true), default);
             Assert.Equal(table.S2C("gspRepAwardSelectFail"), session.Sent[^1]);
             Assert.Empty(session.Bodies[^1]);

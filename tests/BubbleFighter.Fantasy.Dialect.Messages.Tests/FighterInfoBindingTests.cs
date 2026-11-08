@@ -19,7 +19,7 @@ namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
 /// Pins the legacy player menu's "view info" packets: the two-word request, the reply's length in every build that has
 /// the class, the success and failure results, and the routes each build mounts.
 /// </summary>
-public sealed class FighterInfoBindingTests
+public sealed partial class FighterInfoBindingTests
 {
     // build, C2S, S2C, FighterInfo bytes with an empty nickname. The FighterInfo sizes are the readers': the UserStat
     // tests pin the same nested type (kr-812 380 - 40, id-400 340 - 40, id-1809 344 - 40, cn-324 256 - 40) and
@@ -36,6 +36,88 @@ public sealed class FighterInfoBindingTests
         { "cn-408", 115, 124, 300 }, // cn-408 sub_6788B0, case 0x7C calls sub_7E7C10
         { "cn-406", 115, 124, 228 }, // cn-406 sub_5CD2A0, case 0x7C calls sub_731830
     };
+
+    /// <summary>The supported builds' native equipment lengths, vector positions and empty-name fighter lengths.</summary>
+    public static readonly TheoryData<string, int, int, int, int> AppearanceBuilds = new()
+    {
+        { "kr-1256", 40, 8, 440, 2 },
+        { "kr-812", 40, 12, 340, 1 },
+        { "id-400", 40, 12, 300, 1 },
+        { "id-1809", 40, 12, 304, 1 },
+        { "cn-324", 32, 12, 216, 1 },
+        { "cn-717", 40, 12, 340, 1 },
+        { "cn-774", 48, 16, 463, 2 },
+        { "tw-454", 44, 16, 455, 2 },
+        { "cn-279", 24, 8, 140, 1 },
+        { "cn-406", 40, 12, 228, 1 },
+        { "cn-706", 40, 12, 300, 1 },
+        { "cn-404", 40, 12, 300, 1 },
+        { "cn-408", 40, 12, 300, 1 },
+    };
+
+    /// <summary>Each dialog receives its target's cache first, with its own native container widths and character type.</summary>
+    [Theory]
+    [MemberData(nameof(AppearanceBuilds))]
+    public async Task TargetEquipmentPrecedesTheNativeFighterReply(string build, int viewLength, int countAt,
+        int fighterLength, int names)
+    {
+        var binding = Binding(build, out var table);
+        var session = new Session();
+        var supplied = new[] { 300007, 202031, 400001 };
+        var appearance = new FighterAppearance(300007, supplied);
+        supplied[1] = 202001;
+        var identity = new PlayerIdentity(77, "target", "Ab", int.MaxValue);
+        await binding.SendAsync(session, new(identity, appearance), default);
+
+        Assert.Equal(2, session.Sent.Count);
+        Assert.Equal(table.S2C("gspInventoryViewUpdateView"), session.Sent[0].Opcode);
+        var view = session.Sent[0].Body;
+        Assert.Equal(viewLength, view.Length);
+        Assert.Equal(77, Int(view, 0));
+        Assert.Equal(300007, Int(view, 4));
+        Assert.Equal(3, Int(view, countAt));
+        Assert.Equal(300007, Int(view, countAt + 4));
+        Assert.Equal(202031, Int(view, countAt + 8));
+        Assert.Equal(400001, Int(view, countAt + 12));
+        Assert.All(view[(countAt + 16)..], value => Assert.Equal((byte)0, value));
+
+        Assert.Equal(table.S2C("gspRepFighterInfo"), session.Sent[1].Opcode);
+        var body = session.Sent[1].Body;
+        var expectedLength = build == "cn-279" ? 4 + fighterLength + 4 + 4
+            : 4 + fighterLength * 2 + names * 4 + 8 + (names == 2 ? 16 : 0);
+        Assert.Equal(expectedLength, body.Length);
+        Assert.Equal(1, Int(body, 0));
+        Assert.Equal(77, Int(body, 4));
+        Assert.Equal(2, Int(body, 8));
+        Assert.Equal("Ab", Encoding.Unicode.GetString(body, 12, 4));
+        Assert.Equal(7, Int(body, 16));
+        Assert.Equal(NativeDisplayLevel.Project(TestBuilds.Packets, build, identity.Level), Int(body, 20));
+        Assert.Equal(int.MaxValue, identity.Level);
+    }
+
+    /// <summary>A partial snapshot cannot publish even the equipment frame.</summary>
+    [Fact]
+    public async Task IncompleteSnapshotFailsBeforeAnySend()
+    {
+        var binding = Binding("kr-812", out _);
+        var session = new Session();
+        await Assert.ThrowsAsync<ArgumentException>(async () =>
+            await binding.SendAsync(session, new(new(77, "target", "Target", 9)), default));
+        await Assert.ThrowsAsync<ArgumentException>(async () =>
+            await binding.SendAsync(session, new(null, new(300007, [300007])), default));
+        Assert.Empty(session.Sent);
+    }
+
+    /// <summary>A failed cache publication cannot open a dialog against the recipient's stale cache.</summary>
+    [Fact]
+    public async Task CachePublicationFailureStopsTheReply()
+    {
+        var binding = Binding("kr-812", out var table);
+        var session = new Session { ThrowOnSend = true };
+        await Assert.ThrowsAsync<IOException>(async () =>
+            await binding.SendAsync(session, new(new(77, "target", "Target", 9), new(300007, [300007])), default));
+        Assert.Equal(table.S2C("gspInventoryViewUpdateView"), Assert.Single(session.Sent).Opcode);
+    }
 
     /// <summary>The request is the clicked account id and the word after it; a short or long body is refused.</summary>
     [Theory]
@@ -62,12 +144,14 @@ public sealed class FighterInfoBindingTests
         _ = request;
         var binding = Binding(build, out var table);
         Assert.Equal((ushort)reply, table.S2C("gspRepFighterInfo"));
-        var body = binding.Write(new FighterInfoReplied(new PlayerIdentity(77, "u77", "Ab", 12)));
+        var body = binding.Write(new FighterInfoReplied(new PlayerIdentity(77, "u77", "Ab", 12), new FighterAppearance(300007, [300007, 202031, 400001])));
         Assert.Equal(4 + (fighter + 4) + fighter + 8, body.Length);
         Assert.Equal(1, Int(body, 0));
+        Assert.Equal(77, Int(body, 4));
         // FighterInfo: a word, the nickname, two words of which the second is the level.
         Assert.Equal(2, Int(body, 8));
         Assert.Equal("Ab", Encoding.Unicode.GetString(body, 12, 4));
+        Assert.Equal(7, Int(body, 16));
         Assert.Equal(12, Int(body, 20));
         // The partner block is not the player's: its nickname is empty and its level zero.
         var partner = 4 + fighter + 4;
@@ -101,7 +185,7 @@ public sealed class FighterInfoBindingTests
     public void Kr812FoundBodyIsPinnedToTheReader()
     {
         var binding = Binding("kr-812", out _);
-        var body = binding.Write(new FighterInfoReplied(new PlayerIdentity(7, "u", "N", 3)));
+        var body = binding.Write(new FighterInfoReplied(new PlayerIdentity(7, "u", "N", 3), new FighterAppearance(300007, [300007, 202031, 400001])));
         Assert.Equal(4 + 342 + 340 + 8, body.Length);
         Assert.Equal(1, Int(body, 0));  // result at +4 of the object
         Assert.Equal(1, Int(body, 8));  // nickname length, FighterInfo +8
@@ -113,6 +197,10 @@ public sealed class FighterInfoBindingTests
     /// <summary>Every build with the class mounts exactly one route, on its own request number, and unwinds it.</summary>
     [Theory]
     [MemberData(nameof(Builds))]
+    [InlineData("cn-279", 112, 121, 140)]
+    [InlineData("kr-1256", 118, 133, 440)]
+    [InlineData("cn-774", 117, 133, 463)]
+    [InlineData("tw-454", 117, 131, 455)]
     public async Task EveryBuildMountsItsRequestRoute(string build, int request, int reply, int fighter)
     {
         _ = (reply, fighter);
@@ -131,7 +219,8 @@ public sealed class FighterInfoBindingTests
             Assert.Single(services.GetAll<IMessageSender<FighterInfoReplied>>());
             Assert.Single(services.GetAll<IInboundMessageBinding<FighterInfoRequested>>());
 
-            var body = Bytes(b => { Word(b, 31); Word(b, 0); });
+            var body = PacketCodec.Write(TestBuilds.Packets, build, "FighterInfoRequest",
+                new Dictionary<string, object?> { ["target_user_number"] = 31 });
             await handler.Value(new Session(), new InboundPacket((ushort)request, body), default);
             Assert.Equal(new FighterInfoRequested(31), Assert.Single(messages.Dispatched));
         }
@@ -180,14 +269,32 @@ public sealed class FighterInfoBindingTests
         finally { await context.UnwindAsync(); }
     }
 
-    /// <summary>cn-279 reads another request and reply, so it has no capability and no reply table.</summary>
+    /// <summary>cn-279 reads a one-word request and its own reply shape with an awards tail instead of a partner.</summary>
     [Fact]
-    public void Cn279HasNoCapabilityAndNoReplyTable()
+    public async Task Cn279HasItsOwnReplyShapeAndTheCapability()
     {
-        Assert.False(TestBuilds.Packets.CapabilityOf("cn-279", "fighter_info"));
+        Assert.True(TestBuilds.Packets.CapabilityOf("cn-279", "fighter_info"));
         Assert.True(TestBuilds.Packets.CapabilityOf("kr-812", "fighter_info"));
-        Assert.Empty(TestBuilds.Packets.Resolve("cn-279", "FighterInfoReply"));
+        var reply = TestBuilds.Packets.Resolve("cn-279", "FighterInfoReply").ToList();
+        Assert.Equal(["result", "fighter", "awards"], reply.Select(candidate => candidate.Name).ToArray());
         Assert.Single(TestBuilds.Packets.Resolve("cn-279", "FighterInfoRequest"));
+        // The awards element carries three words; writing one record adds exactly 12 bytes.
+        var awards = PacketCodec.Write(TestBuilds.Packets, "cn-279", "AwardInfo",
+            new Dictionary<string, object?> { ["unknown_4"] = 2, ["unknown_8"] = 3, ["unknown_12"] = 40 });
+        Assert.Equal(12, awards.Length);
+        // The reply writes empty with the awards count 0: 4 (result) + 144 (FighterInfo@cn-279 with a two-char
+        // name) + 4 (count) = 152; the failure body is 4 bytes shorter.
+        var binding = new FighterInfoBinding("cn-279/game", TestBuilds.Opcodes("cn-279"), TestBuilds.Packets, "cn-279");
+        Assert.Equal(new FighterInfoRequested(31), binding.Read(BitConverter.GetBytes(31)));
+        Assert.Throws<PacketFormatException>(() => binding.Read(new byte[3]));
+        Assert.Throws<PacketFormatException>(() => binding.Read(new byte[5]));
+        var session = new Session();
+        await binding.SendAsync(session, new FighterInfoReplied(new PlayerIdentity(0, "", "ab", 0), new FighterAppearance(300007, [300007, 202031, 400001])), default);
+        Assert.Equal(152, session.Sent[^1].Body.Length);
+        Assert.Equal("01000000", Convert.ToHexString(session.Sent[^1].Body.AsSpan(0, 4)));
+        await binding.SendAsync(session, new FighterInfoReplied(null), default);
+        Assert.Equal(148, session.Sent[^1].Body.Length);
+        Assert.Equal("00000000", Convert.ToHexString(session.Sent[^1].Body.AsSpan(0, 4)));
     }
 
     private static int Int(byte[] body, int at) => BinaryPrimitives.ReadInt32LittleEndian(body.AsSpan(at));
@@ -223,12 +330,17 @@ public sealed class FighterInfoBindingTests
     private sealed class Session : ISession
     {
         internal List<(ushort Opcode, byte[] Body)> Sent { get; } = [];
+        internal bool ThrowOnSend { get; init; }
         public long Id => 1;
         public ClientProfile Profile => new("kr-812", "kr", 812, 0, 0, "kr-812");
         public IConnection Connection => throw new NotSupportedException();
         public ConcurrentDictionary<string, object> Items { get; } = new();
         public ValueTask SendAsync(ushort opcode, ReadOnlyMemory<byte> payload, CancellationToken ct)
-        { Sent.Add((opcode, payload.ToArray())); return ValueTask.CompletedTask; }
+        {
+            Sent.Add((opcode, payload.ToArray()));
+            if (ThrowOnSend) throw new IOException("The target cache publication failed.");
+            return ValueTask.CompletedTask;
+        }
     }
 
     private sealed class Routes : IPacketRouter

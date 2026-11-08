@@ -16,6 +16,41 @@ namespace BubbleFighter.Fantasy.InGame.Tests;
 /// <summary>Checks that each modern profile mounts its native full and optimized movement names.</summary>
 public sealed class ModernMovementBindingTests
 {
+    /// <summary>Pins each audited modern UDP body, including the opaque eight-byte identity prefix.</summary>
+    [Theory]
+    [InlineData("kr-1256")]
+    [InlineData("cn-774")]
+    [InlineData("tw-454")]
+    public void NativeUdpRelayMovementLayoutsArePinned(string build)
+    {
+        var root = FindRoot();
+        var packets = PacketTables.Load(Path.Combine(root, "packets"));
+        var full = PacketCodec.Write(packets, build, "UdpRelayMovement", new Dictionary<string, object?>
+        {
+            ["unknown_0"] = 0x11223344u, ["unknown_4"] = 0x55667788u,
+            ["object_id"] = 1000000, ["x"] = 1.25f, ["y"] = -2.5f, ["z"] = 3.75f,
+            ["yaw"] = (byte)4, ["pitch"] = (byte)5, ["state"] = (byte)6, ["tick"] = (ushort)7,
+        });
+        Assert.Equal(29, full.Length);
+        Assert.Equal("443322118877665540420F000000A03F000020C0000070400405060700", Convert.ToHexString(full));
+
+        var optimized = PacketCodec.Write(packets, build, "UdpRelayMovementOptimize", new Dictionary<string, object?>
+        {
+            ["unknown_0"] = 0x11223344u, ["unknown_4"] = 0x55667788u,
+            ["actor"] = 1000000, ["tick"] = (ushort)8, ["mask"] = (byte)0x21,
+            ["x"] = 9.5f, ["state"] = (byte)10,
+        });
+        Assert.Equal(20, optimized.Length);
+        Assert.Equal("443322118877665540420F00080021000018410A", Convert.ToHexString(optimized));
+
+        var probe = PacketCodec.Write(packets, build, "UdpRelayProbeReply", new Dictionary<string, object?>
+        {
+            ["unknown_0"] = 0x0123456789ABCDEFul,
+        });
+        Assert.Equal(8, probe.Length);
+        Assert.Equal("EFCDAB8967452301", Convert.ToHexString(probe));
+    }
+
     /// <summary>The native movement opcodes resolve and decode through the shared typed binding for CN and TW.</summary>
     [Theory]
     [InlineData("cn-774")]
@@ -50,7 +85,7 @@ public sealed class ModernMovementBindingTests
                 return ValueTask.CompletedTask;
             }));
             new RoundMovementBinding(protocol, relayProtocol, table, table.ForConnection(OpcodeConnection.Relay), packets,
-                build, NullLogger.Instance).Mount(Context("movement"));
+                build, NullLogger.Instance, string.Empty).Mount(Context("movement"));
 
             var session = new RecordingSession(7, TestWireDialects.Get(build).Profile);
             var full = PacketCodec.Write(packets, build, "MovementReport", new Dictionary<string, object?>

@@ -13,8 +13,11 @@ public sealed class ScoreReportTableTests
     [InlineData("id-1809", 16)]
     [InlineData("cn-324", 32)]
     [InlineData("id-400", 32)]
+    [InlineData("cn-404", 32)]
+    [InlineData("cn-408", 32)]
     [InlineData("cn-406", 32)]
     [InlineData("cn-279", 20)]
+    [InlineData("cn-705", 16)]
     [InlineData("cn-706", 16)]
     public void NativeReportShapeConsumesExactlyItsOwnBody(string build, int length)
     {
@@ -41,6 +44,7 @@ public sealed class ScoreReportTableTests
     [InlineData("kr-812")]
     [InlineData("cn-717")]
     [InlineData("id-1809")]
+    [InlineData("cn-705")]
     [InlineData("cn-706")]
     public void OptimizedReportKeepsSixBytesAndReporter(string build)
     {

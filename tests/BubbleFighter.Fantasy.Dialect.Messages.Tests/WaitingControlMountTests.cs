@@ -96,6 +96,9 @@ public sealed class WaitingControlMountTests
             Assert.Equal(new RoomSeatLockRequested(3, true), messages.Received[^1]);
             await Request("gcpReqKickFromSession", Convert.FromHexString("0200000041004200"));
             Assert.Equal(new RoomKickRequested("AB"), messages.Received[^1]);
+            // The waiting-room chat box: bool32 team-only, then the text (kr-812 sub_8456D0, cn-717 sub_8CFCB0).
+            await Request("gcpRoomSendChatMsg", Convert.FromHexString("010000000200000041004200"));
+            Assert.Equal(new RoomSessionChatSent(true, "AB"), messages.Received[^1]);
 
             var settings = PacketCodec.Write(TestBuilds.Packets, build, "RoomGameSettingChangeRequest",
                 new Dictionary<string, object?> { ["map_key"] = "Random", ["mode"] = 1 });
@@ -104,11 +107,11 @@ public sealed class WaitingControlMountTests
             Assert.Equal("Random", change.MapKey);
             Assert.Equal(1, change.ModeId);
             Assert.Equal(settings, change.BuildSettings!.Change.ToArray());
-            Assert.Equal(7, messages.Received.Count);
+            Assert.Equal(8, messages.Received.Count);
 
             await Request("gcpReqJoinSession", [.. join.WrittenSpan, 0]);
             Assert.Equal("malformed gcpReqJoinSession", session.Transport.CloseReason);
-            Assert.Equal(7, messages.Received.Count);
+            Assert.Equal(8, messages.Received.Count);
             Assert.Equal(1, entering);
             if (build == "cn-406" && !preparedRoundMount)
             {
@@ -151,7 +154,7 @@ public sealed class WaitingControlMountTests
             if (preparedRoundMount)
             {
                 await codec.SendAsync(session, new RoundSpawnOffered(1000000, 5) { IndexRequested = true }, default);
-                await codec.SendAsync(session, new RoundPlayerRespawned(7, 0, 1000000, 5), default);
+                await Assert.Single(services.GetAll<IMessageSender<RoundPlayerRespawned>>()).SendAsync(session, new RoundPlayerRespawned(7, 0, 1000000, 5), default);
                 Assert.Equal((ushort)708, session.Sent[^2].Opcode);
                 Assert.Equal((ushort)707, session.Sent[^1].Opcode);
                 Assert.Equal("40420F000500000001000000", Convert.ToHexString(session.Sent[^2].Body));

@@ -20,11 +20,11 @@ public sealed class ResultScalarTableTests
         var shape = TestBuilds.Of(build).Play.Score!;
         Assert.False(shape.OutcomeFirst);
         Assert.Equal(new byte[] { 0, 0, 0, 0, 3, 0, 0, 0 },
-            PlayRoomCodec.WriteGameEnd(TestBuilds.Packets, build, RoundOutcome.Won));
+            RoundResultWire.WriteGameEnd(TestBuilds.Packets, build, RoundOutcome.Won));
         Assert.Equal(new byte[] { 0, 0, 0, 0, 2, 0, 0, 0 },
-            PlayRoomCodec.WriteGameEnd(TestBuilds.Packets, build, RoundOutcome.Lost));
+            RoundResultWire.WriteGameEnd(TestBuilds.Packets, build, RoundOutcome.Lost));
         Assert.Equal(new byte[] { 0, 0, 0, 0, 1, 0, 0, 0 },
-            PlayRoomCodec.WriteGameEnd(TestBuilds.Packets, build, RoundOutcome.Draw));
+            RoundResultWire.WriteGameEnd(TestBuilds.Packets, build, RoundOutcome.Draw));
     }
 
     [Theory]
@@ -35,10 +35,10 @@ public sealed class ResultScalarTableTests
     public void NativeByteTotalsKeepSaturationAndAbsentTeamBehavior(string build)
     {
         Assert.Equal(new byte[] { 11, 1 },
-            PlayRoomCodec.WriteTimeOverTotals(TestBuilds.Packets, build, [11, 1]));
+            RoundResultWire.WriteTimeOverTotals(TestBuilds.Packets, build, [11, 1]));
         Assert.Equal(new byte[] { 0, 255 },
-            PlayRoomCodec.WriteTimeOverTotals(TestBuilds.Packets, build, [-1, 256]));
+            RoundResultWire.WriteTimeOverTotals(TestBuilds.Packets, build, [-1, 256]));
         Assert.Equal(new byte[] { 5, 0 },
-            PlayRoomCodec.WriteTimeOverTotals(TestBuilds.Packets, build, [5]));
+            RoundResultWire.WriteTimeOverTotals(TestBuilds.Packets, build, [5]));
     }
 }

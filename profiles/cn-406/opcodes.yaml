@@ -1,6 +1,210 @@
 # Audited game and relay assignments occupy separate connection spaces.
 # Ordinary rounds and supplies use the shared dialect; mode-specific activation remains separate.
 opcodes:
+- value: 32836
+  direction: s2c
+  connection: both
+  name: gppDead
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_427BE0 case 0x8044 calls cn-406 sub_439B40, which resolves the actor read by cn-406 sub_700770 and raises event 102"
+- value: 32836
+  direction: c2s
+  connection: both
+  name: gppDead
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_42CF00 constructs Packet_gppDead and stamps 32836; cn-406 sub_420D90 writes one actor word; cn-406 sub_439B40 consumes it"
+- value: 32810
+  direction: c2s
+  connection: both
+  name: gppUpdateWeaponInfo
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_42D1F0 stamps 32810; cn-406 sub_41FF30 writes specification, slot, actor and the full timing word; packets/critical-transitions.yaml"
+- value: 32810
+  direction: s2c
+  connection: both
+  name: gppUpdateWeaponInfo
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_4398B0 consumes cn-406 sub_7137B0's four-word report and installs the specification in its native slot; packets/critical-transitions.yaml"
+- value: 32795
+  direction: c2s
+  connection: both
+  name: gppKicked
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_42E4C0 stamps 32795; cn-406 sub_420CC0 writes the 22-byte peer body; packets/critical-transitions.yaml"
+- value: 32795
+  direction: s2c
+  connection: both
+  name: gppKicked
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_43CF70 consumes cn-406 sub_420D30's 22-byte body and gates the initiator's timer on its two byte fields; packets/critical-transitions.yaml"
+- value: 520
+  direction: s2c
+  connection: game
+  name: gspRepAutoStart
+  name_source: label@cn-406
+  evidence: verified
+  source: "RoomStage gate cn-406 sub_5AFB40 opcode 520 -> cn-406 sub_5AFB70; Packet_gspRepAutoStart reader cn-406 sub_7151D0 (vtable BDFEA0) reads one bool32; true with room flag bit1 clear runs the native countdown cn-406 sub_5B0DD0 (as id-400 sub_626970 -> sub_627C60)"
+- value: 107
+  direction: s2c
+  connection: game
+  name: gspReceiveServerNoticeMsg
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 dispatcher sub_738290 case 107 -> cn-406 sub_71BFB0 formats and shows the text; reader cn-406 sub_715220 reads u8 +4, u8 +5, u32 +8 and wstr +12 (as id-400 sub_798E60)"
+- value: 108
+  direction: c2s
+  connection: game
+  name: gcpReqInvite
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 C2S 108 Packet_gcpReqInvite; reader cn-406 sub_714E80 (as id-400 sub_89DC20)"
+- value: 109
+  direction: c2s
+  connection: game
+  name: gcpReqMoveToInviter
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 C2S 109 Packet_gcpReqMoveToInviter; the invite dialog cn-406 sub_721BE0 fills it through cn-406 sub_713FC0 and cn-406 sub_73BC20 stamps 109; reader cn-406 sub_713F90"
+- value: 110
+  direction: c2s
+  connection: game
+  name: gcpReqMoveToFriend
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 C2S 110 Packet_gcpReqMoveToFriend; reader cn-406 sub_75A200 (as id-400 sub_89DD10)"
+- value: 111
+  direction: c2s
+  connection: game
+  name: gcpReqMoveToFriendAccept
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 C2S 111 Packet_gcpReqMoveToFriendAccept; reader cn-406 sub_866440 (as id-400 sub_799F60)"
+- value: 202
+  direction: c2s
+  connection: game
+  name: gcpReqLeaveParty
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 C2S 202 Packet_gcpReqLeaveParty; empty reader cn-406 sub_5129E0 (as id-400 sub_8DCA80)"
+- value: 302
+  direction: c2s
+  connection: game
+  name: gcpReqKickFromParty
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 C2S 302 Packet_gcpReqKickFromParty; reader cn-406 sub_75A200 (as id-400 sub_89DD10)"
+- value: 303
+  direction: c2s
+  connection: game
+  name: gcpReqChangePartyLeader
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 C2S 303 Packet_gcpReqChangePartyLeader; reader cn-406 sub_75A200 (as id-400 sub_89DD10)"
+- value: 111
+  direction: s2c
+  connection: game
+  name: gspRepInvite
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 dispatcher sub_738290 case 111: Packet_gspRepInvite; reader cn-406 sub_713EA0 (as id-400 sub_798DF0)"
+- value: 112
+  direction: s2c
+  connection: game
+  name: gspNotifyInvite
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 dispatcher sub_738290 case 112: Packet_gspNotifyInvite; reader cn-406 sub_713F90 reads is_party, inviter and address, without id-400's +48 word"
+- value: 113
+  direction: s2c
+  connection: game
+  name: gspRepMoveToInviter
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 dispatcher sub_738290 case 113: Packet_gspRepMoveToInviter; reader cn-406 sub_713EA0 (as id-400 sub_798DF0)"
+- value: 114
+  direction: s2c
+  connection: game
+  name: gspRepMoveToFriend
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 dispatcher sub_738290 case 114: Packet_gspRepMoveToFriend; reader cn-406 sub_421090 (as id-400 sub_781D60)"
+- value: 203
+  direction: s2c
+  connection: game
+  name: gspUpdatePartyLeader
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 dispatcher sub_738290 case 203: Packet_gspUpdatePartyLeader; reader cn-406 sub_812640 (as id-400 sub_5E8C70)"
+- value: 204
+  direction: s2c
+  connection: game
+  name: gspNotifyPartyLeaveSuccess
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 dispatcher sub_738290 case 204: Packet_gspNotifyPartyLeaveSuccess; empty reader cn-406 sub_5129E0 (as id-400 sub_8DCA80)"
+- value: 205
+  direction: s2c
+  connection: game
+  name: gspNotifyMemberLeave
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 dispatcher sub_738290 case 205: Packet_gspNotifyMemberLeave; reader cn-406 sub_75A200 (as id-400 sub_89DD10)"
+- value: 206
+  direction: s2c
+  connection: game
+  name: gspNotifyNewMemberJoin
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 dispatcher sub_738290 case 206: Packet_gspNotifyNewMemberJoin; reader cn-406 sub_75A200 (as id-400 sub_89DD10)"
+- value: 302
+  direction: s2c
+  connection: game
+  name: gspRepKickFromParty
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 dispatcher sub_738290 case 302: Packet_gspRepKickFromParty; reader cn-406 sub_713EA0 (as id-400 sub_798DF0)"
+- value: 303
+  direction: s2c
+  connection: game
+  name: gspRepChangePartyLeader
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 dispatcher sub_738290 case 303: Packet_gspRepChangePartyLeader; reader cn-406 sub_700220 (as id-400 sub_782430)"
+- value: 304
+  direction: s2c
+  connection: game
+  name: gspNotifyKickFromParty
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 dispatcher sub_738290 case 304: Packet_gspNotifyKickFromParty; reader cn-406 sub_75A200 (as id-400 sub_89DD10)"
+- value: 305
+  direction: s2c
+  connection: game
+  name: gspReceivePartyChatMsg
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 dispatcher sub_738290 case 305: Packet_gspReceivePartyChatMsg; reader cn-406 sub_8127B0"
+  notes: "Answer to C2S gcpSendPartyChatMsg: user number, two strings, colour word, system flag."
+- value: 307
+  direction: s2c
+  connection: game
+  name: gspNotifyKickMember
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 dispatcher sub_738290 case 307: Packet_gspNotifyKickMember; reader cn-406 sub_812640 (as id-400 sub_5E8C70)"
+- value: 13
+  direction: c2s
+  connection: game
+  name: gcpReqMoveInto
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_717FF0 constructs Packet_gcpReqMoveInto after gcpStartGPK, fills the retained user and stage words, and calls cn-406 sub_73B830, which stamps 13"
 - value: 514
   direction: c2s
   connection: game
@@ -146,6 +350,13 @@ opcodes:
   name_source: label@cn-406
   evidence: verified
   source: "cn-406 sub_42A820 constructs packet vtable 0xBC1E88 and passes it to sub_4485A0, which stamps 713; writer sub_420DD0 and reader sub_420FC0 consume two words"
+- value: 714
+  direction: c2s
+  connection: game
+  name: gcpGameReqUseRespawnItem
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_42A960 constructs Packet_gcpGameReqUseRespawnItem (RTTI .?AUPacket_gcpGameReqUseRespawnItem@@, vtable BC1E94) and stamps 714; writer cn-406 sub_420D90 writes one u32 and reader cn-406 sub_700770 reads one word, the same pair as gspGameRespawnCharacter; the rightRespawn death-screen action cn-406 sub_4E4D80 sends it with the actor handle after checking the bag count of item 100443 (packets/instant-revival.yaml InstantRevivalRequest)"
 - value: 724
   direction: c2s
   name: gcpReqEndStage
@@ -192,6 +403,14 @@ opcodes:
   evidence: verified
   connection: game
   source: cn-406 sub_56EEC0 constructs RTTI vtable BDEA30 and calls sub_5752E0 which stamps 403; writer sub_56A880 consumes three words and one wstr without a tail
+- value: 501
+  direction: c2s
+  connection: game
+  name: gcpRoomSendChatMsg
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_73B8A0 stamps 501 on Packet_gcpRoomSendChatMsg; reader cn-406 sub_714E80"
+  notes: "Waiting-room chat box line: bool32 team-only flag, then the text. The client draws nothing until S2C gspRoomReceiveChatMsg answers."
 - value: 502
   direction: c2s
   name: gcpRoomSendChatModuleMsg
@@ -241,6 +460,14 @@ opcodes:
   evidence: verified
   connection: game
   source: cn-406 dispatcher sub_700EE0 case 505 calls sub_702E30; RTTI vtable C089AC reader sub_41E620 delegates to native GameSetting
+- value: 508
+  direction: s2c
+  connection: game
+  name: gspRoomReceiveChatMsg
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 dispatcher sub_700EE0 case 508: Packet_gspRoomReceiveChatMsg; reader cn-406 sub_700460"
+  notes: "Answer to C2S gcpRoomSendChatMsg: u16 slot, bool32 team-only, two strings, colour word, bool32."
 - value: 509
   direction: s2c
   name: gspRoomReceiveChatModuleMsg
@@ -297,6 +524,14 @@ opcodes:
   evidence: verified
   connection: game
   source: cn-406 dispatcher; reader sub_7151D0 consumes bool32
+- value: 304
+  direction: c2s
+  connection: game
+  name: gcpSendPartyChatMsg
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_816430 stamps 304 on Packet_gcpSendPartyChatMsg; reader cn-406 sub_75A200"
+  notes: "Chat box line outside a room: one string. The client draws nothing until S2C gspReceivePartyChatMsg answers."
 - value: 401
   direction: c2s
   name: gcpReqListSession
@@ -395,6 +630,13 @@ opcodes:
   evidence: verified
   connection: game
   source: cn-406 sub_718950 stores version 406 and sets opcode 1
+- value: 2
+  direction: c2s
+  name: gcpStartGPK
+  name_source: label@cn-406
+  evidence: verified
+  connection: game
+  source: cn-406 sub_7188D0 emits the empty native GPK-start marker on the auxiliary Center connection
 - value: 1
   direction: s2c
   name: gspDisconnect
@@ -438,6 +680,55 @@ opcodes:
   evidence: verified
   connection: game
   source: cn-406 dispatcher sub_738290; reader sub_715150, GateInfo reader sub_7127E0
+- value: 11
+  direction: s2c
+  name: gspNotifyAutoTutorial_
+  name_source: coined
+  evidence: verified
+  connection: game
+  source: "cn-406 sub_738290 case 11 sets byte_D2F981 without reading a body; cn-406 sub_577B10 selects the creation stage and cn-406 sub_57AF10 clears the flag"
+- value: 12
+  direction: s2c
+  name: gspRepCheckCreateUserName
+  name_source: label@cn-406
+  evidence: verified
+  connection: game
+  source: "cn-406 sub_738290 case 12 calls cn-406 sub_71E680; Packet_gspRepCheckCreateUserName reader cn-406 sub_713EA0 reads u32 result @+4 and counted wstr @+8"
+- value: 13
+  direction: s2c
+  name: gspRepCreateUserInfo
+  name_source: label@cn-406
+  evidence: verified
+  connection: game
+  source: "cn-406 sub_738290 case 13 calls cn-406 sub_71E1C0; Packet_gspRepCreateUserInfo reader cn-406 sub_700770 reads one u32 result @+4; zero advances CreateUserStage through cn-406 sub_5570B0"
+- value: 14
+  direction: c2s
+  name: gcpReqCheckCreateUserName
+  name_source: label@cn-406
+  evidence: verified
+  connection: game
+  source: "cn-406 sub_775710 stamps 14 and writes one counted wstr (the name-edit text); packets/character-creation.yaml CharacterNameRequest"
+- value: 15
+  direction: c2s
+  name: gcpReqCreateUserInfo
+  name_source: label@cn-406
+  evidence: verified
+  connection: game
+  source: "cn-406 sub_775800 stamps 15 and fills nickname, selected type and paired value; cn-406 sub_771B20 reads wstr @+4, u32 @+32, u32 @+36 and wstr @+40 with no trailing word"
+- value: 16
+  direction: c2s
+  name: gcpLoginAfterCreateUserInfo
+  name_source: label@cn-406
+  evidence: verified
+  connection: game
+  source: "cn-406 sub_7759F0 stamps 16 on an empty TcpPacket, sent once (this+900 flag); packets/character-creation.yaml"
+- value: 14
+  direction: s2c
+  name: gspQueryBadProgram
+  name_source: label@cn-406
+  evidence: verified
+  connection: game
+  source: "cn-406 sub_738290 case 14 calls cn-406 sub_724700; Packet_gspQueryBadProgram"
 - value: 105
   direction: s2c
   name: gspUserStat
@@ -466,6 +757,20 @@ opcodes:
   evidence: verified
   connection: game
   source: cn-406 reader sub_812580; PartyMember sub_713CB0
+- value: 801
+  direction: c2s
+  connection: game
+  name: gcpEnterShop
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_5CE700 constructs Packet_gcpEnterShop (RTTI .?AUPacket_gcpEnterShop@@, vtable BE7B28) and stamps 801; the writer cn-406 sub_5C3830 writes one u64 token"
+- value: 800
+  direction: s2c
+  connection: game
+  name: gspRepEnterShop
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 dispatcher cn-406 sub_738290 case 800 calls cn-406 sub_724C00; reader cn-406 sub_715470 reads, in wire order, a u32 result, a bool32 has-data flag, the u64 request token, a counted card vector of 120-byte native elements (element reader cn-406 sub_4119E0, ShopItemCardInfo::deserialize at vtable BBF820 slot 1; the Stock element reader cn-406 sub_4117B0 reads u32, u32, bool32, a u16 at +14, u32, u32, u32), a second u64 before the category tree, and the tree (cn-406 sub_7122A0: a u64, then the counted tree driver cn-406 sub_73B370 over 56-byte elements; ShopMainCategory cn-406 sub_5C37D0 is u32 id, wstr, u32 order, counted 44-byte subcategories; ShopSubCategory cn-406 sub_714A10 is u32 id, wstr, u32 order, u32 page_type); has-data=false replaces both vectors with defaults and does not cache the token; the dialog opens main 1000 through cn-406 sub_854AD0, or main 500 when the byte at cn-406 dword_D2F578+296 is 1"
 - value: 801
   direction: s2c
   name: gspInventoryUpdateAllInventorySlot
@@ -508,20 +813,27 @@ opcodes:
   evidence: verified
   connection: game
   source: cn-406 reader sub_41E620; EquippedItemList sub_41D060
+- value: 825
+  direction: c2s
+  connection: game
+  name: gcpReqCheckCash
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_8794E0 sends the cash check while a purchase dialog waits (pending states 1 and 3) through cn-406 sub_83F450, which stamps 825; the serializer nullsub_1 at cn-406 sub_5129E0 is empty, and the S2C 105 gspUserStat reply resumes the waiting purchase through cn-406 sub_71EDC0 -> cn-406 sub_856CC0 -> cn-406 sub_8567B0"
 - value: 808
   direction: c2s
   name: gcpReqShopBuy
   name_source: label@cn-406
   evidence: verified
   connection: game
-  source: cn-406 writer sub_420960 writes u32 and bool32
+  source: "cn-406 writer cn-406 sub_420960 writes one u32 shop key and one bool32 option; the purchase senders cn-406 sub_8ADC30, cn-406 sub_822790 and cn-406 sub_8276B0 stamp 808 (packets/equipment-control.yaml ShopPurchaseRequest)"
 - value: 813
   direction: s2c
   name: gspRepShopBuy
   name_source: label@cn-406
   evidence: verified
   connection: game
-  source: cn-406 reader sub_420FC0 reads two u32
+  source: "cn-406 dispatcher cn-406 sub_738290 case 813 calls cn-406 sub_72ACE0; reader cn-406 sub_420FC0 reads one u32 shop key and one u32 result, and the consumer keeps 1 as success (packets/equipment-control.yaml ShopPurchaseReply)"
 - value: 503
   direction: c2s
   name: gcpRoomReqEnterGame
@@ -662,6 +974,83 @@ opcodes:
   name_source: label@cn-406
   evidence: verified
   source: "cn-406 sub_427BE0 dispatches 715 to sub_433A00; off_BC1C70 is reader sub_715B70; the local actor forwards the effect through sub_440310; packets/map-supplies.yaml"
+- value: 921
+  direction: c2s
+  connection: game
+  name: gcpPveUseCountItem
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_42A520 constructs Packet_gcpPveUseCountItem (vtable BC1EB8) and stamps 921; writer cn-406 sub_420D90 writes one u32 via sub_946460; the mode-16 item hotkey path cn-406 sub_523650 sends it while the stack is non-empty"
+- value: 923
+  direction: c2s
+  connection: game
+  name: gcpPvePangUnit
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_42A5B0 constructs Packet_gcpPvePangUnit (vtable BC1EC4) and stamps 923; writer cn-406 sub_420D90 writes one u32 via sub_946460; the PVE hit handlers cn-406 sub_518670 and sub_51C780 report the struck unit"
+- value: 925
+  direction: c2s
+  connection: game
+  name: gcpPveUseRevival
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_523AA0 constructs Packet_gcpPveUseRevival (RTTI .?AUPacket_gcpPveUseRevival@@, vtable BD564C) and stamps 925 in modes 16 and 101; serializer nullsub_1 at cn-406 sub_5129E0 is empty; cn-406 sub_428AE0 transmits it at once on the round connection (its local queue is a 7 ms self-delivery, not an answer wait - nothing on the client clears it on inbound traffic)"
+- value: 927
+  direction: c2s
+  connection: game
+  name: gcpMissionProcess
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_42A640 constructs Packet_gcpMissionProcess (vtable BC1EDC) and stamps 927; writer cn-406 sub_715C90 writes three u32: the mission list index copied onto the mission NPC at spawn, the NPC kind at object +656 (100 citizen, 101 zombie, 102 poison sac) and a zero word; senders cn-406 sub_515CA0 (citizen rescue) and sub_518670 (mission-zombie kill)"
+- value: 924
+  direction: s2c
+  connection: game
+  name: gspMapMissionInfo
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_700EE0 case 924 calls sub_703370; Packet_gspMapMissionInfo (vtable C08A3C) reader cn-406 sub_700710 delegates to the record vector cn-406 sub_70C3C0 and the element reader cn-406 sub_6AAE30: six u32, a counted wstr vector and a bool32 per mission; packets/pve-rescue-missions.yaml"
+- value: 925
+  direction: s2c
+  connection: game
+  name: gspResMissionStart
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_700EE0 case 925 calls sub_7035F0; Packet_gspResMissionStart (vtable C08A54) reader cn-406 sub_700770 reads one u32 via sub_9465D0; the consumer binds the mission announce and balloon schedule"
+- value: 926
+  direction: s2c
+  connection: game
+  name: gspResMissionTimeOut
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_700EE0 case 926 calls sub_703700; Packet_gspResMissionTimeOut (vtable C08A60) reader cn-406 sub_700770 reads one u32 via sub_9465D0; the consumer plays the fail announce and keeps this index current"
+- value: 927
+  direction: s2c
+  connection: game
+  name: gspResMissionOK
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_700EE0 case 927 calls sub_703810; Packet_gspResMissionOK (vtable C08A6C) reader cn-406 sub_420FC0 reads two u32 via sub_9465D0: zero means success, then the completed mission index the client advances past"
+- value: 928
+  direction: s2c
+  connection: game
+  name: gspNotifyGamePoint
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_700EE0 case 928 calls sub_703930; Packet_gspNotifyGamePoint (vtable C08A78) reader cn-406 sub_715B70 reads three u32 via sub_9465D0: seat bounded at 32, subtract flag and amount; packets/pve-points.yaml"
+- value: 929
+  direction: s2c
+  connection: game
+  name: gspNotifyRankInfo
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_700EE0 case 929 calls sub_7039E0; Packet_gspNotifyRankInfo (vtable C08A84) reader cn-406 sub_700810 reads a u32 state word, a counted u32 vector and counted five-u32 rank rows (record reader cn-406 sub_6FFB10); the HUD sums row words 8, 12 and 16; packets/pve-points.yaml"
+- value: 930
+  direction: s2c
+  connection: game
+  name: gspPveItemInfo
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_700EE0 case 930 calls sub_703CB0; Packet_gspPveItemInfo (vtable C08A48) reader cn-406 sub_700730 reads a u32 count then counted three-u32 entries (element reader cn-406 sub_715B70, writer twin sub_716040); packets/pve-counted-items.yaml"
 - value: 747
   direction: s2c
   connection: game
@@ -765,113 +1154,113 @@ opcodes:
   connection: game
   name: gcpReqPresentNewReceive
   name_source: label@cn-406
-  evidence: inferred
-  source: "Packet_gcpReqPresentNewReceive is constructed before the stamping call of cn-406 sub_849850 / sub_849E30: the close of the gift box asks for the new-gift state (empty body); layout in packets/present.yaml"
+  evidence: verified
+  source: "Packet_gcpReqPresentNewReceive (RTTI .?AUPacket_gcpReqPresentNewReceive@@, vtable C2380C) is constructed and stamped 810 by cn-406 sub_849850 (DlgPresentList page render) and cn-406 sub_849E30 (dialog close); the writer is nullsub_1 at cn-406 sub_5129E0, an empty body"
 - value: 813
   direction: c2s
   connection: game
   name: gcpReqPresentReceiveSubList
   name_source: label@cn-406
-  evidence: inferred
-  source: "Packet_gcpReqPresentReceiveSubList is constructed before the stamping call of cn-406 sub_846FD0 / sub_848750 / sub_849EA0: a page of the received list (start, count); layout in packets/present.yaml"
+  evidence: verified
+  source: "Packet_gcpReqPresentReceiveSubList (vtable C23818) is constructed by cn-406 sub_846FD0, cn-406 sub_848750 and cn-406 sub_849EA0 and stamped 813; writer cn-406 sub_420DD0 sends (start, count) with the count always 4 (DlgPresentList open, tab and page turns, and the post-delete refresh)"
 - value: 814
   direction: c2s
   connection: game
   name: gcpReqPresentSendSubList
   name_source: label@cn-406
-  evidence: inferred
-  source: "Packet_gcpReqPresentSendSubList is constructed before the stamping call of cn-406 sub_849F10: a page of the sent list (start, count); layout in packets/present.yaml"
+  evidence: verified
+  source: "Packet_gcpReqPresentSendSubList (vtable C23824) is constructed and stamped 814 by cn-406 sub_849F10; writer cn-406 sub_420DD0 sends (start, count) as on 813 (DlgPresentList sent-tab open and page turns)"
 - value: 816
   direction: c2s
   connection: game
   name: gcpReqPresentSend
   name_source: label@cn-406
-  evidence: inferred
-  source: "Packet_gcpReqPresentSend is constructed before the stamping call of cn-406 sub_843930: the gift purchase (recipient, empty string, item key, message); layout in packets/present.yaml"
+  evidence: verified
+  source: "Packet_gcpReqPresentSend (vtable C22E38) is constructed and stamped 816 by cn-406 sub_843930; writer cn-406 sub_843830 sends wstr@4, wstr@32, u32@60, wstr@64 - the constructor cn-406 sub_856400 fills recipient, empty string, shop key and message from DlgSendPresent"
 - value: 817
   direction: c2s
   connection: game
   name: gcpReqPresentReceive
   name_source: label@cn-406
-  evidence: inferred
-  source: "Packet_gcpReqPresentReceive is constructed before the stamping call of cn-406 sub_82F8F0: taking a gift (id); layout in packets/present.yaml"
+  evidence: verified
+  source: "Packet_gcpReqPresentReceive (vtable C214C4) is constructed and stamped 817 by cn-406 sub_82F8F0; writer cn-406 sub_420D90 sends one u32 id (DlgConfirmReceivePresent accept via cn-406 sub_82DA90)"
 - value: 818
   direction: c2s
   connection: game
   name: gcpReqPresentThrow
   name_source: label@cn-406
-  evidence: inferred
-  source: "Packet_gcpReqPresentThrow is constructed before the stamping call of cn-406 sub_82F960: throwing a gift away (id); layout in packets/present.yaml"
+  evidence: verified
+  source: "Packet_gcpReqPresentThrow (vtable C214D0) is constructed and stamped 818 by cn-406 sub_82F960; writer cn-406 sub_420D90 sends one u32 id (DlgConfirmReceivePresent discard, confirm result 257)"
 - value: 822
   direction: c2s
   connection: game
   name: gcpReqPresentDeleteSend
   name_source: label@cn-406
-  evidence: inferred
-  source: "Packet_gcpReqPresentDeleteSend is constructed before the stamping call of cn-406 sub_849D50: removing a gift from the sent list (id); layout in packets/present.yaml"
+  evidence: verified
+  source: "Packet_gcpReqPresentDeleteSend (vtable C2383C) is constructed and stamped 822 by cn-406 sub_849D50; writer cn-406 sub_420D90 sends one u32 id (DlgPresentList sent-item menu -> confirm cn-406 sub_845BD0)"
 - value: 823
   direction: c2s
   connection: game
   name: gcpReqPresentDeleteReceive
   name_source: label@cn-406
-  evidence: inferred
-  source: "Packet_gcpReqPresentDeleteReceive is constructed before the stamping call of cn-406 sub_848750 / sub_849CE0: removing a gift from the received list (id); layout in packets/present.yaml"
+  evidence: verified
+  source: "Packet_gcpReqPresentDeleteReceive (vtable C23848) is constructed and stamped 823 by cn-406 sub_849CE0 and cn-406 sub_848750; writer cn-406 sub_420D90 sends one u32 id (received-item menu confirm; also the S2C 822/823 delete-and-refresh helper)"
 - value: 815
   direction: s2c
   connection: game
   name: gspRepPresentNewReceive
   name_source: label@cn-406
-  evidence: inferred
-  source: "cn-406 dispatcher case 815: Packet_gspRepPresentNewReceive constructor path; reader sub_700770; layout in packets/present.yaml"
+  evidence: verified
+  source: "cn-406 dispatcher cn-406 sub_738290 case 815 calls cn-406 sub_72BFC0; Packet_gspRepPresentNewReceive (vtable C0DB60) reader cn-406 sub_700770 reads one u32 and the handler stores word == 1 as the task-bar byte at +792; the dispatcher stores the client's own label string"
 - value: 818
   direction: s2c
   connection: game
   name: gspRepPresentReceiveSubList
   name_source: label@cn-406
-  evidence: inferred
-  source: "cn-406 dispatcher case 818: Packet_gspRepPresentReceiveSubList constructor path; reader sub_715940; layout in packets/present.yaml"
+  evidence: verified
+  source: "cn-406 dispatcher cn-406 sub_738290 case 818 calls cn-406 sub_72C250; Packet_gspRepPresentReceiveSubList (vtable C0DB78) reader cn-406 sub_715940 reads status@+4, total@+8, then the record count and counted records of 88-byte native stride (element reader cn-406 sub_712340) - no pending_count word; the handler stores total at DlgPresentList +748"
 - value: 819
   direction: s2c
   connection: game
   name: gspRepPresentSendSubList
   name_source: label@cn-406
-  evidence: inferred
-  source: "cn-406 dispatcher case 819: Packet_gspRepPresentSendSubList constructor path; reader sub_715A70; layout in packets/present.yaml"
+  evidence: verified
+  source: "cn-406 dispatcher cn-406 sub_738290 case 819 calls cn-406 sub_72C370; Packet_gspRepPresentSendSubList (vtable C0DB90) reader cn-406 sub_715A70 reads status, total and counted records of 120-byte native stride (element reader cn-406 sub_712440)"
 - value: 821
   direction: s2c
   connection: game
   name: gspRepPresentSend
   name_source: label@cn-406
-  evidence: inferred
-  source: "cn-406 dispatcher case 821: Packet_gspRepPresentSend constructor path; reader sub_700770; layout in packets/present.yaml"
+  evidence: verified
+  source: "cn-406 dispatcher cn-406 sub_738290 case 821 calls cn-406 sub_72D2B0; Packet_gspRepPresentSend (vtable C0DBB4) reader cn-406 sub_700770 reads one u32 result and the handler switches the failure texts on it (-51..30, with -22/-23 on the generic line)"
 - value: 822
   direction: s2c
   connection: game
   name: gspRepPresentReceive
   name_source: label@cn-406
-  evidence: inferred
-  source: "cn-406 dispatcher case 822: Packet_gspRepPresentReceive constructor path; reader sub_715B70; layout in packets/present.yaml"
+  evidence: verified
+  source: "cn-406 dispatcher cn-406 sub_738290 case 822 calls cn-406 sub_72DD90; Packet_gspRepPresentReceive (vtable C0DBC0) reader cn-406 sub_715B70 reads three u32 (result, id, item_key); a negative result shows the failure box, otherwise the delete-and-refresh helper runs"
 - value: 823
   direction: s2c
   connection: game
   name: gspRepPresentThrow
   name_source: label@cn-406
-  evidence: inferred
-  source: "cn-406 dispatcher case 823: Packet_gspRepPresentThrow constructor path; reader sub_420FC0; layout in packets/present.yaml"
+  evidence: verified
+  source: "cn-406 dispatcher cn-406 sub_738290 case 823 calls cn-406 sub_72E120; Packet_gspRepPresentThrow (vtable C0DBCC) reader cn-406 sub_420FC0 reads two u32 (status, id); status != 1 shows the failure box, success chains the delete request and the received-list refresh"
 - value: 827
   direction: s2c
   connection: game
   name: gspRepPresentDeleteSend
   name_source: label@cn-406
-  evidence: inferred
-  source: "cn-406 dispatcher case 827: Packet_gspRepPresentDeleteSend constructor path; reader sub_420FC0; layout in packets/present.yaml"
+  evidence: verified
+  source: "cn-406 dispatcher cn-406 sub_738290 case 827 calls cn-406 sub_72F010; Packet_gspRepPresentDeleteSend (vtable C0DBFC) reader cn-406 sub_420FC0 reads two u32; success re-requests the sent list (cn-406 sub_849F10, C2S 814)"
 - value: 828
   direction: s2c
   connection: game
   name: gspRepPresentDeleteReceive
   name_source: label@cn-406
-  evidence: inferred
-  source: "cn-406 dispatcher case 828: Packet_gspRepPresentDeleteReceive constructor path; reader sub_420FC0; layout in packets/present.yaml"
+  evidence: verified
+  source: "cn-406 dispatcher cn-406 sub_738290 case 828 calls cn-406 sub_72F3C0; Packet_gspRepPresentDeleteReceive (vtable C0DC08) reader cn-406 sub_420FC0 reads two u32; success re-requests the received list (cn-406 sub_849EA0, C2S 813)"
 - value: 115
   direction: c2s
   connection: game
@@ -900,3 +1289,441 @@ opcodes:
   name_source: label@cn-406
   evidence: verified
   source: "cn-406 sub_738290 case 812 calls sub_72A910; named vtable C0DB3C reader sub_420FC0 reads item_id:u32 and result:u32 via sub_9465D0; result zero passes the identity to sub_862D60"
+- value: 607
+  direction: s2c
+  connection: game
+  name: gspTryHolePunching
+  name_source: mirrored
+  evidence: verified
+  source: "cn-406 sub_700EE0 case607 -> cn-406 sub_70A1F0: u16 port, u32 identity, u8 unknown"
+
+- value: 608
+  direction: s2c
+  connection: game
+  name: gspStopUdpDiscovery_
+  name_source: coined
+  evidence: verified
+  source: "cn-406 sub_700EE0 case608 stops discovery"
+
+- value: 610
+  direction: s2c
+  connection: game
+  name: gspTableSetHolePunching
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_700EE0 case610 -> cn-406 sub_70F6B0/cn-406 sub_70DBD0: slot, identity, counted local addresses, local port, outer IPv4 and port"
+
+- value: 611
+  direction: s2c
+  connection: game
+  name: gspUdpPeerTableEnd_
+  name_source: coined
+  evidence: verified
+  source: "cn-406 sub_700EE0 case611 -> cn-406 sub_70F400 sends empty C2S607"
+
+- value: 612
+  direction: s2c
+  connection: game
+  name: gspUdpPeerPunchStart_
+  name_source: coined
+  evidence: verified
+  source: "cn-406 sub_700EE0 case612 -> cn-406 sub_70F490 sends native UDP6/8"
+
+- value: 613
+  direction: s2c
+  connection: game
+  name: gspUdpPeerPunchFinish_
+  name_source: coined
+  evidence: verified
+  source: "cn-406 sub_700EE0 case613 -> cn-406 sub_70EEB0 finalizes peer attempts"
+
+- value: 607
+  direction: c2s
+  connection: game
+  name: gcpReportTableSetHolePunchingEnd
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_70F400 stamps607 with empty body"
+
+- value: 603
+  direction: c2s
+  connection: game
+  name: gcpReportHolePunchingEnd
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_70EEB0 stamps603 with occupied-seat and successful-peer counts"
+
+- value: 2
+  direction: c2s
+  connection: udp
+  name: upTrySendUdpToServer
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_70E070 stamps UDP2 with identity, local IPv4 and local port"
+
+- value: 8
+  direction: c2s
+  connection: relay
+  name: rcpReqRegisterPeer
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_70EA80 stamps relay8 with peer identity after failed movement acknowledgments"
+
+- value: 9
+  direction: c2s
+  connection: relay
+  name: rcpReqUnRegisterPeer
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_70EEB0 stamps relay9 with successfully punched peer identity"
+
+- value: 32885
+  direction: c2s
+  connection: both
+  name: gppWanderLean
+  name_source: mirrored
+  evidence: verified
+  source: "cn-406 sub_70EA80 stamps32885; cn-406 sub_41FEC0 reads its15-byte body"
+
+- value: 32885
+  direction: s2c
+  connection: both
+  name: gppWanderLean
+  name_source: mirrored
+  evidence: verified
+  source: "cn-406 sub_70FD40 consumes32885 using cn-406 sub_41FEC0"
+- value: 15
+  direction: s2c
+  connection: game
+  name: gspRepCenterUserCnt
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_738290 case 15 calls cn-406 sub_71C7D0; cn-406 reader sub_714A10"
+- value: 17
+  direction: s2c
+  connection: game
+  name: gspRepUniquenessCheck
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_738290 case 17 calls cn-406 sub_71D000; cn-406 reader sub_7151D0"
+- value: 8
+  direction: s2c
+  connection: game
+  name: gspRepMoveChannel
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_738290 case 8 calls cn-406 sub_71F0B0; cn-406 reader sub_41FC40"
+- value: 9
+  direction: s2c
+  connection: game
+  name: gspDisconnectMovedUser
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_738290 case 9 calls cn-406 sub_7205B0; empty-body pending promotion closes the previous source"
+- value: 22
+  direction: c2s
+  connection: game
+  name: gcpReqCenterUserCnt
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_7D3FB0 selects Packet_gcpReqCenterUserCnt and stamps 22; the native writer has no body"
+- value: 23
+  direction: c2s
+  connection: game
+  name: gcpReqUniquenessCheck
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_73BBB0 selects Packet_gcpReqUniquenessCheck and stamps 23; the native writer carries one user-number word"
+- value: 830
+  direction: c2s
+  connection: game
+  name: gcpReqInventoryChangeWeaponPresetIdx
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_860F20 constructs Packet_gcpReqInventoryChangeWeaponPresetIdx and stamps 830 with context u32 and slot u8; reader cn-406 sub_716180 matches; slots above four and unbound flags are refused before sending"
+- value: 832
+  direction: s2c
+  connection: game
+  name: gspReqInventoryChangeWeaponPresetIdx
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_738290 case 832 calls cn-406 sub_7367E0; reader cn-406 sub_715820 reads slot u8 and status u32; every result clears the send latch, only zero applies the slot"
+- value: 833
+  direction: s2c
+  connection: game
+  name: gspReqWeaponPreSetUpdate
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_738290 case 833 calls cn-406 sub_736990; packet reader cn-406 sub_7157C0 reads active u8 then WeaponPreSetList, whose reader cn-406 sub_710950 reads identity u32 plus counted u32/u8/u8 vectors; cn-406 sub_870E20 materializes five pairs"
+
+- value: 519
+  direction: c2s
+  connection: game
+  name: gcpReqSelectAward
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_8EB3E0 sends card and local seat; cn-406 sub_420FC0 reads two u32"
+
+- value: 734
+  direction: s2c
+  connection: game
+  name: gspGameAwardDialog
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_700EE0 case 734 opens the native award dialog; cn-406 sub_5129E0 consumes an empty body"
+
+- value: 736
+  direction: s2c
+  connection: game
+  name: gspGameReturnAfterAward_
+  name_source: coined
+  evidence: verified
+  source: "cn-406 sub_700EE0 case 736 calls cn-406 sub_7088C0 without a body, closes the award UI and restores the room stage"
+
+- value: 743
+  direction: s2c
+  connection: game
+  name: gspRepAwardSelectSuccess
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_700EE0 case 743 calls cn-406 sub_70A6B0; cn-406 sub_715B70 reads card, seat and optional second card"
+
+- value: 744
+  direction: s2c
+  connection: game
+  name: gspRepAwardSelectFail
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_700EE0 case 744; cn-406 sub_5129E0 reads an empty refusal"
+
+- value: 519
+  direction: s2c
+  connection: game
+  name: gspHordeModeRewardList
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_700EE0 case 519 calls cn-406 sub_708E00; cn-406 sub_715650 reads a counted u32 vector"
+- value: 11
+  direction: c2s
+  connection: relay
+  name: rcpSetDamageAffectingAttribute
+  name_source: label@cn-406
+  evidence: inferred
+  source: "cn-406 senders sub_42C620, cn-406 sub_448610, cn-406 sub_448680 stamp relay 11; layout packets/relay-hp.yaml RelayDamageAttributeReport"
+- value: 13
+  direction: c2s
+  connection: relay
+  name: rcpReqDamageCalcAndBroadcast
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_448870 stamps 13 on the relay channel; reader cn-406 sub_41F9C0; layout packets/relay-hp.yaml RelayDamageRequest"
+- value: 14
+  direction: c2s
+  connection: relay
+  name: rcpCharacterRespawn
+  name_source: label@cn-406
+  evidence: inferred
+  source: "cn-406 senders sub_4489E0, cn-406 sub_448A50 stamp relay 14; layout packets/relay-hp.yaml RelayCharacterRespawnReport"
+- value: 15
+  direction: c2s
+  connection: relay
+  name: rcpChangeChrType
+  name_source: label@cn-406
+  evidence: inferred
+  source: "cn-406 senders sub_448AD0, cn-406 sub_448B40 stamp relay 15; layout packets/relay-hp.yaml RelayCharacterTypeReport"
+- value: 16
+  direction: c2s
+  connection: relay
+  name: rcpHpRecover
+  name_source: label@cn-406
+  evidence: inferred
+  source: "cn-406 senders sub_4488F0, cn-406 sub_448960 stamp relay 16; layout packets/relay-hp.yaml RelayHpRecoverReport"
+- value: 22
+  direction: c2s
+  connection: relay
+  name: rcpSetChrState
+  name_source: label@cn-406
+  evidence: inferred
+  source: "cn-406 senders sub_42C770, cn-406 sub_448700 stamp relay 22; layout packets/relay-hp.yaml RelayCharacterStateReport"
+- value: 7
+  direction: s2c
+  connection: relay
+  name: rspHpDeltaBroadcast
+  name_source: label@cn-406
+  evidence: inferred
+  source: "cn-406 dispatcher sub_711050, cn-406 sub_738290 route relay 7; layout packets/relay-hp.yaml RelayHpDelta"
+- value: 406
+  direction: c2s
+  connection: game
+  name: gcpReqCreateTutorialSession
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_57CA40 constructs the empty class; cn-406 sub_57E100 stamps 406; reader cn-406 sub_5129E0"
+- value: 920
+  direction: c2s
+  connection: game
+  name: gcpReqSingleStageInfo
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_5D91F0 stamps 920 with the empty class; reader cn-406 sub_5129E0"
+- value: 107
+  direction: c2s
+  connection: game
+  name: gcpReqPlayTutorial
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_719C10 constructs MapMetaData and three strings plus difficulty; cn-406 sub_73BA60 stamps 107; reader cn-406 sub_714080 -> cn-406 sub_57E4D0"
+- value: 922
+  direction: s2c
+  connection: game
+  name: gspResSingleStageInfo
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_738290 case 922 calls cn-406 sub_727ED0; reader cn-406 sub_716080 consumes the counted three-word stage records"
+- value: 903
+  direction: c2s
+  connection: game
+  name: gcpReqStartNewWave
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_8F1B00 stamps 903 with one wave word; reader cn-406 sub_700770"
+- value: 904
+  direction: s2c
+  connection: game
+  name: gspRepStartNewWave
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_919CC0 case 904 invokes cn-406 sub_8F1D40, releases the start latch and sends the host wave table; reader cn-406 sub_700770"
+- value: 904
+  direction: c2s
+  connection: game
+  name: gcpReqEndWave
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_8F1B90 stamps 904 with one wave word; reader cn-406 sub_700770"
+- value: 905
+  direction: s2c
+  connection: game
+  name: gspRepEndWave
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_919CC0 case 905 invokes cn-406 sub_8F21A0 to release the end latch; reader cn-406 sub_700770"
+- value: 905
+  direction: c2s
+  connection: game
+  name: gcpReqEndAllWave
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_8F1C20 stamps 905 with the empty class; reader cn-406 sub_5129E0"
+- value: 908
+  direction: c2s
+  connection: game
+  name: gcpReqWaveAllSpawnMobs
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_8F1D40 stamps 908; cn-406 sub_8EF270 reads u32/u16/u32 and a counted mob vector"
+- value: 908
+  direction: s2c
+  connection: game
+  name: Unknown908
+  name_source: none
+  evidence: verified
+  source: "cn-406 sub_919CC0 case 908 calls cn-406 sub_8FAFD0 to remove old actors without reading a packet body"
+- value: 909
+  direction: s2c
+  connection: game
+  name: gspRepWaveAllSpawnMobs
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_919CC0 case 909 invokes cn-406 sub_8F0800; cn-406 sub_8EF270 reads the table; the host clears manager +148 and peers install the groups"
+- value: 32857
+  direction: c2s
+  connection: game
+  name: gppCreateMobsFromSpawnGroup
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_5E4840 stamps 32857 with one group word; reader cn-406 sub_700770"
+- value: 32857
+  direction: s2c
+  connection: game
+  name: gppCreateMobsFromSpawnGroup
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_5E2070 consumes the one-word group request; reader cn-406 sub_700770"
+- value: 32892
+  direction: c2s
+  connection: game
+  name: gppCreateAIObject
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_541270 stamps 32892; cn-406 sub_421140 reads two words, an eight-byte identity and four words"
+- value: 32892
+  direction: s2c
+  connection: game
+  name: gppCreateAIObject
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_427BE0 case 32892 invokes cn-406 sub_435DB0; reader cn-406 sub_421140"
+- value: 32862
+  direction: c2s
+  connection: game
+  name: gppCreateSpawnGroupMemberMob
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_5E4DC0 stamps 32862; cn-406 sub_5DEB80 reads two words, a wide string and four words"
+- value: 32862
+  direction: s2c
+  connection: game
+  name: gppCreateSpawnGroupMemberMob
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_5E4EB0 consumes the member record read by cn-406 sub_5DEB80"
+- value: 32921
+  direction: c2s
+  connection: game
+  name: gppLifePoint
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_42C200 stamps 32921; cn-406 sub_4206B0 reads two words and bool32"
+- value: 32921
+  direction: s2c
+  connection: game
+  name: gppLifePoint
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_427BE0 case 32921 invokes cn-406 sub_42C2A0; reader cn-406 sub_4206B0 reads two words and bool32"
+- value: 948
+  direction: c2s
+  connection: game
+  name: gcpPortalMove
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_444780 stamps game 948 and relay 26 separately; cn-406 sub_41F6D0 reads position xyz and region u16; packets/portal.yaml"
+- value: 958
+  direction: s2c
+  connection: game
+  name: gspPortalMove
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_716120 reads word, region u16 and seat word; cn-406 sub_737680 authorizes native map-region motion and clears local pending contact; packets/portal.yaml"
+- value: 305
+  direction: c2s
+  connection: game
+  name: gcpReqPartyRecruiting
+  name_source: label@cn-406
+  evidence: verified
+  source: cn-406 sub_7E5A80 stamps 305 for Packet_gcpReqPartyRecruiting; cn-406 sub_7151D0 reads its four-byte boolean
+- value: 516
+  direction: c2s
+  connection: game
+  name: gcpRoomSendRecMsg
+  name_source: label@cn-406
+  evidence: verified
+  source: cn-406 sub_73B9F0 stamps the native recruitment-text request; cn-406 sub_75A200 reads one counted UTF-16 message
+- value: 516
+  direction: s2c
+  connection: game
+  name: gspRoomReceiveRecruitMsg
+  name_source: label@cn-406
+  evidence: verified
+  source: cn-406 sub_700EE0 case 516 reaches cn-406 sub_706C20; cn-406 sub_7005A0 reads a u16 plaza seat then one counted UTF-16 message

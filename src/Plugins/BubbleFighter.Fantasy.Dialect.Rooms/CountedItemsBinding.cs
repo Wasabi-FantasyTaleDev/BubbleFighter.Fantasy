@@ -12,13 +12,20 @@ namespace BubbleFighter.Fantasy.Dialect.Rooms;
 /// passes the UI slot to <c>sub_467720</c>, which stamps the request), the prepared 16-byte slot list
 /// (S2C <c>gspPveItemInfo</c>, kr-812 <c>sub_80B420</c> and matches) and the three-word used notice
 /// (S2C <c>gspPveItemUsed</c>, kr-812 <c>sub_9D95D0</c>; cn-324 <c>sub_46FED0</c> resolves the first
-/// word as a player seat and checks local control) — packets/pve-counted-items.yaml. cn-279 has no
-/// such class.
+/// word as a player seat and checks local control) — packets/pve-counted-items.yaml. cn-279 instead
+/// confirms direct effects through gspItemUsed (cn-279 sub_81BB50), using SupplyItemUsed from
+/// packets/map-supplies.yaml; it has no counted inventory.
 /// </summary>
 internal sealed class CountedItemsBinding(string protocol, IOpcodeTable table, PacketTables tables, string build)
     : IInboundMessageBinding<RoundCountedItemUseRequested>, IMessageSender<RoundCountedItemsPrepared>, IMessageSender<RoundCountedItemUsed>
 {
+    private readonly bool _usesItemUsed = tables.CapabilityOf(build, "direct_supply_effect_uses_item_used");
+
     public string Protocol => protocol;
+
+    private string EffectOpcode => _usesItemUsed ? "gspItemUsed" : "gspPveItemUsed";
+
+    private string EffectStructure => _usesItemUsed ? "SupplyItemUsed" : "PveItemUsed";
 
     internal void Mount(IPluginContext context, IMessageRouter messages)
     {
@@ -42,8 +49,8 @@ internal sealed class CountedItemsBinding(string protocol, IOpcodeTable table, P
         if (!tables.CapabilityOf(build, "direct_supply_effects"))
             throw new ConfigException("Direct supply effects require an audited native effect consumer.");
         // The used seat and kind this sender writes; the supply row alone reaches this check without Mount.
-        PacketLayoutContract.RequireFields(tables, build, "PveItemUsed", "Counted items", ("seat", "u32"), ("kind", "u32"));
-        _ = table.S2C("gspPveItemUsed");
+        PacketLayoutContract.RequireFields(tables, build, EffectStructure, "Direct item effects", ("seat", "u32"), ("kind", "u32"));
+        _ = table.S2C(EffectOpcode);
         context.Effect(context.Services.RegisterMany<IMessageSender<RoundCountedItemUsed>>(this));
     }
 
@@ -51,7 +58,7 @@ internal sealed class CountedItemsBinding(string protocol, IOpcodeTable table, P
         session.SendAsync(table.S2C("gspPveItemInfo"), EncodePrepared(tables, build, message.Kinds), ct);
 
     public ValueTask SendAsync(ISession session, RoundCountedItemUsed message, CancellationToken ct) =>
-        session.SendAsync(table.S2C("gspPveItemUsed"), PacketCodec.Write(tables, build, "PveItemUsed",
+        session.SendAsync(table.S2C(EffectOpcode), PacketCodec.Write(tables, build, EffectStructure,
             new Dictionary<string, object?> { ["seat"] = message.Seat, ["kind"] = message.Kind }), ct);
 
     internal static byte[] EncodePrepared(PacketTables tables, string build, IReadOnlyList<int> kinds)

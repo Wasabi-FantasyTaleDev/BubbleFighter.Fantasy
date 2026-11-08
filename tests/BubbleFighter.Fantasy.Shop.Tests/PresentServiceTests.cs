@@ -55,6 +55,7 @@ public sealed partial class PresentServiceTests
         public Recorder<PresentListReplied> Lists { get; } = new();
         public Recorder<PresentActionReplied> Actions { get; } = new();
         public Recorder<PresentNoticeSent> Notices { get; } = new();
+        public InventoryPushRecorder Push { get; } = new();
         public Registry Sessions { get; } = new();
         public ShopOptions Options { get; } = new()
         {
@@ -68,8 +69,11 @@ public sealed partial class PresentServiceTests
         public Session SenderSession { get; private set; } = null!;
         public Session ReceiverSession { get; private set; } = null!;
 
-        public Fixture(Func<ShopStateUpdated, ISession, ValueTask>? stateFailure = null)
+        public Fixture(Func<ShopStateUpdated, ISession, ValueTask>? stateFailure = null, string build = Build,
+            bool inventoryPush = false)
         {
+            Options.ClientProfile = build;
+            Options.Protocol = build + "/game";
             Players = new MemoryPlayerRepository(Table);
             Presents = new MemoryPresentStore(Table, Players);
             Purchases = new MemoryShopPurchaseStore(Table, Presents);
@@ -88,7 +92,8 @@ public sealed partial class PresentServiceTests
                 ? term.ForStock(stock) : throw new PurchaseRejectedException($"Item {stock.ItemId} has no purchase terms.");
             State.OnSend = stateFailure;
             Service = new PresentService(Options, catalog, new ConditionalShopPurchaser(Purchases, Inventory, TimeProvider.System, 2),
-                resolve, Inventory, Presents, Open, State, Balance, Sends, Lists, Actions, Notices, Sessions, TimeProvider.System,
+                resolve, Inventory, Presents, Open, inventoryPush ? null : State, inventoryPush ? Push : null,
+                Balance, Sends, Lists, Actions, Notices, Sessions, TimeProvider.System,
                 NullLogger.Instance);
         }
 
@@ -98,8 +103,8 @@ public sealed partial class PresentServiceTests
             var receiver = await Players.CreateAsync("account-receiver", "receiver", default);
             SenderPlayer = new(sender.UserNum, "sender");
             ReceiverPlayer = new(receiver.UserNum, "receiver");
-            SenderSession = new Session(1, (int)sender.UserNum, "sender", Build);
-            ReceiverSession = new Session(2, (int)receiver.UserNum, "receiver", Build);
+            SenderSession = new Session(1, (int)sender.UserNum, "sender", Options.ClientProfile);
+            ReceiverSession = new Session(2, (int)receiver.UserNum, "receiver", Options.ClientProfile);
             Sessions.Add(SenderSession);
             Sessions.Add(ReceiverSession);
             if (openShop)
@@ -113,7 +118,7 @@ public sealed partial class PresentServiceTests
         public async Task<PresentRecord> GiftAsync(int key = GiftKey)
         {
             await Service.SendAsync(SenderSession, new PresentSendRequested("receiver", key, "hi"), default);
-            return (await Presents.ListReceivedAsync(Build, ReceiverPlayer.UserNum, 0, 16, default)).Records[0];
+            return (await Presents.ListReceivedAsync(Options.ClientProfile, ReceiverPlayer.UserNum, 0, 16, default)).Records[0];
         }
     }
 
@@ -240,6 +245,76 @@ public sealed partial class PresentServiceTests
         // The receiver pays nothing for a gift (only the seeded starting balance is stored).
         Assert.Equal(100_000, state.Wallet.Lucci);
         Assert.Equal(PresentState.Accepted, (await f.Presents.FindReceivedAsync(Build, f.ReceiverPlayer.UserNum, gift.Id, default))!.State);
+    }
+
+    /// <summary>A modern claim publishes committed inventory, then the wallet, then the success reply exactly once.</summary>
+    [Theory]
+    [InlineData("kr-1256")]
+    [InlineData("cn-774")]
+    [InlineData("tw-454")]
+    public async Task ModernClaimsPublishTheCommittedBagBeforeTheBalanceAndReply(string build)
+    {
+        var f = await new Fixture(build: build, inventoryPush: true).StartAsync();
+        var gift = await f.GiftAsync();
+        var order = new List<string>();
+        f.Push.OnSend = async (session, user, grants) =>
+        {
+            Assert.Same(f.ReceiverSession, session);
+            Assert.Equal(f.ReceiverPlayer.UserNum, user);
+            Assert.Equal(200001, Assert.Single(grants).ItemId);
+            Assert.Equal(PresentState.Accepted,
+                (await f.Presents.FindReceivedAsync(build, user, gift.Id, default))!.State);
+            Assert.Equal(grants, await f.BagOf(f.ReceiverPlayer));
+            order.Add("inventory");
+        };
+        f.Balance.OnSend = (message, session) =>
+        {
+            Assert.Same(f.ReceiverSession, session);
+            Assert.Equal(100_000, message.Wallet.Lucci);
+            order.Add("balance");
+            return ValueTask.CompletedTask;
+        };
+        f.Actions.OnSend = (message, _) =>
+        {
+            order.Add(message.Succeeded ? "accepted" : "rejected");
+            return ValueTask.CompletedTask;
+        };
+
+        await f.Service.ActionAsync(f.ReceiverSession, new(PresentAction.Receive, gift.Id), default);
+        await f.Service.ActionAsync(f.ReceiverSession, new(PresentAction.Receive, gift.Id), default);
+
+        Assert.Equal(["inventory", "balance", "accepted", "rejected"], order);
+        Assert.Single(await f.BagOf(f.ReceiverPlayer));
+        Assert.Single(await f.Purchases.ListRecentAsync(f.ReceiverPlayer.UserNum, 8, default));
+        Assert.Empty(f.State.Items);
+    }
+
+    /// <summary>A failed modern inventory publication cannot repeat a grant that was already committed.</summary>
+    [Theory]
+    [InlineData("kr-1256")]
+    [InlineData("cn-774")]
+    [InlineData("tw-454")]
+    public async Task ModernInventoryPushFailureDoesNotGrantTheGiftAgain(string build)
+    {
+        var f = await new Fixture(build: build, inventoryPush: true).StartAsync();
+        var gift = await f.GiftAsync();
+        f.Balance.Items.Clear();
+        f.Push.OnSend = (_, _, _) => throw new IOException("connection reset");
+
+        await Assert.ThrowsAsync<IOException>(() => f.Service.ActionAsync(f.ReceiverSession,
+            new(PresentAction.Receive, gift.Id), default).AsTask());
+        Assert.Equal(PresentState.Accepted,
+            (await f.Presents.FindReceivedAsync(build, f.ReceiverPlayer.UserNum, gift.Id, default))!.State);
+        Assert.Empty(f.Balance.Items);
+        Assert.Empty(f.Actions.Items);
+        f.Push.OnSend = null;
+        await f.Service.ActionAsync(f.ReceiverSession, new(PresentAction.Receive, gift.Id), default);
+
+        Assert.False(Assert.Single(f.Actions.Items).Succeeded);
+        Assert.Single(await f.BagOf(f.ReceiverPlayer));
+        Assert.Single(await f.Purchases.ListRecentAsync(f.ReceiverPlayer.UserNum, 8, default));
+        Assert.Empty(f.State.Items);
+        Assert.Empty(f.Balance.Items);
     }
 
     [Fact]
@@ -404,6 +479,20 @@ public sealed partial class PresentServiceTests
 
         Assert.Equal(PresentSendStatus.Sent, Assert.Single(f.Sends.Items).Status);
         Assert.Equal(1, await f.Presents.CountPendingAsync(Build, f.ReceiverPlayer.UserNum, default));
+    }
+
+    private sealed class InventoryPushRecorder : IInventoryPushService
+    {
+        public Func<ISession, long, IReadOnlyList<InventorySlotRecord>, ValueTask>? OnSend { get; set; }
+
+        public ValueTask PushPurchaseAsync(ISession session, long userNum, IReadOnlyList<InventorySlotRecord> grants,
+            CancellationToken ct) => OnSend?.Invoke(session, userNum, grants) ?? ValueTask.CompletedTask;
+
+        public ValueTask PushInventoryAsync(ISession session, long userNum, CancellationToken ct) =>
+            throw new NotSupportedException();
+
+        public ValueTask PushSlotUpdateAsync(ISession session, InventorySlotRecord slot, CancellationToken ct) =>
+            throw new NotSupportedException();
     }
 
     private sealed class Recorder<T> : IMessageSender<T> where T : IMessage

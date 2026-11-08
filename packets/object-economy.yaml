@@ -1,0 +1,503 @@
+version: 1
+# The in-round object economy: the create/eat/pickup requests for the items the round spawns and
+# the players consume. One cross-build audit of the three exports verified every sender; the C2S
+# numbering 628-642 is stable across kr-1256, cn-774 and tw-454, the bodies byte-identical except
+# where a row says so. cn-774 stamps the opcode at buffer+2 and tw-454 at buffer+2; kr-1256 at +4.
+# The eat requests are cooldown-gated overlap handlers (item class vtable slot 34); the create
+# requests come from the kill-drop and mode-script paths. The client never decrements its own bag.
+structs:
+  # cn-324 sub_45D090 and cn-324 sub_45D120: position, launch vector, weapon selector, two words and bool32.
+  # cn-324 sub_4CB280 supplies cn-324 sub_46D0F0; cn-324 sub_8A3680 reads four bytes for the boolean.
+  WeaponDropRequest@kr-812: []
+  WeaponDropRequest@cn-324:
+    - x: f32
+      offset: 4
+    - y: f32
+      offset: 8
+    - z: f32
+      offset: 12
+    - velocity_x: f32
+      offset: 16
+    - velocity_y: f32
+      offset: 20
+    - velocity_z: f32
+      offset: 24
+    - weapon_spec: u32
+      offset: 28
+    - unknown_32: u32
+      offset: 32
+    - unknown_36: u32
+      offset: 36
+    - unknown_40: bool
+      offset: 40
+  # C2S 628. kr-1256 sub_708C10 (wrappers sub_6E7380 life 20000, sub_6E7480 life 10000,
+  # sub_4988C0 kind 14), cn-774 sub_8C8140, tw-454 sub_71AE40 and three more tw senders: the
+  # position and direction triplets, the item kind, one byte, and the item lifetime
+  # (20000/10000 ms per the wrappers).
+  ItemCreateRequest@kr-812: []
+  ItemCreateRequest@kr-1256:
+    - pos_x: u32
+    - pos_y: u32
+    - pos_z: u32
+    - dir_x: u32
+    - dir_y: u32
+    - dir_z: u32
+    - kind: u32
+    - unknown_flag: u8
+    - lifetime: u32
+  # C2S 629. kr-1256 sub_708D50 via sub_6E7580, cn-774 sub_8C8280, tw-454 sub_71B220: ten fields
+  # and the byte at object +40 widened to u32; the drop-weapon path of the pickup flow.
+  WeaponCreateRequest@kr-812: []
+  WeaponCreateRequest@kr-1256:
+    - unknown_4: u32
+    - unknown_8: u32
+    - unknown_12: u32
+    - unknown_16: u32
+    - unknown_20: u32
+    - unknown_24: u32
+    - unknown_28: u32
+    - unknown_32: u32
+    - unknown_36: u32
+    - unknown_40: u32
+    - unknown_widened: u32
+  # C2S 630. kr-1256 sub_498F50, cn-774 sub_529530, tw-454 sub_78D7F0: the walked-over weapon
+  # object and the player's character id, in that order in all three builds.
+  WeaponPickupRequest@kr-812: []
+  WeaponPickupRequest@kr-1256:
+    - weapon_object: u32
+      offset: 4
+    - actor: u32
+      offset: 8
+  # C2S 631 / 633 / 635 / 641: the four overlap-eat requests, each two words (the character id and
+  # the item object id) from the item class's vtable slot 34 handlers: kr-1256 sub_6DC3C0 (star),
+  # sub_6DC4E0 (event box), sub_6DC600 (lucci), sub_C131F0 (heart); cn-774 sub_89DD80/sub_89DE60/
+  # sub_89DF40/sub_D4C690; tw-454 sub_710B80/sub_710C90/sub_710DA0/sub_84DBF0. The heart eat is
+  # dead code on cn-774 (its sender has no callers) and live on kr-1256 and tw-454.
+  OverlapEatRequest@kr-812: []
+  OverlapEatRequest@kr-1256:
+    - actor: u32
+      offset: 4
+    - item_object: u32
+      offset: 8
+  # C2S 632 / 636 / 638 / 642(kr,tw): the kill-drop create requests, nine u32 words - the position
+  # and direction triplets, the item kind (1/2 small and big lucci, star kinds), and two trailing
+  # words (cn-774's lucci create carries the constant 5 in the first). kr-1256 sub_6E8580 (star),
+  # sub_6E8B40 (lucci), sub_6E9100 (chocolate), sub_6E8F10 (heart); cn-774 sub_89DF40's family;
+  # tw-454 sub_71BA70/sub_71BE10/sub_71C3A0/sub_71C1C0.
+  KillDropCreateRequest@kr-812: []
+  KillDropCreateRequest@kr-1256:
+    - pos_x: u32
+    - pos_y: u32
+    - pos_z: u32
+    - dir_x: u32
+    - dir_y: u32
+    - dir_z: u32
+    - kind: u32
+    - unknown_28: u32
+    - unknown_32: u32
+  # C2S 634. kr-1256 sub_6E8770 and tw-454 sub_71BA70 send it (the event-box spawn helper
+  # kr-1256 sub_485BE0); cn-774's sender sub_8A88B0 is dead code - the build never emits it.
+  EventBoxCreateRequest@kr-812: []
+  EventBoxCreateRequest@kr-1256:
+    - pos_x: u32
+    - pos_y: u32
+    - pos_z: u32
+    - dir_x: u32
+    - dir_y: u32
+    - dir_z: u32
+    - unknown_28: u32
+    - unknown_32: u32
+    - unknown_36: u32
+  # C2S 640. Three builds, three field layouts over eight u32 words: kr-1256 sub_6E8960 writes the
+  # spawn position, three zero words, the spawner id and the spawner state; cn-774 sub_AF65B0 writes
+  # the spawner id, the character index, the position x, three zero words, the check-out word and the
+  # player's slot index (and stamps relay 32892 for the same event); tw-454 sub_71BC50 writes the
+  # position and direction triplets and two trailing words.
+  SpawnerFireRequest@kr-812: []
+  SpawnerFireRequest@kr-1256:
+    - pos_x: u32
+    - pos_y: u32
+    - pos_z: u32
+    - unknown_16: u32
+    - unknown_20: u32
+    - unknown_24: u32
+    - spawner: u32
+    - spawner_state: u32
+  SpawnerFireRequest@cn-774:
+    - spawner: u32
+    - character_index: u32
+    - pos_x: u32
+    - unknown_16: u32
+    - unknown_20: u32
+    - unknown_24: u32
+    - checkout: u32
+    - slot_index: u32
+  SpawnerFireRequest@tw-454:
+    - pos_x: u32
+    - pos_y: u32
+    - pos_z: u32
+    - dir_x: u32
+    - dir_y: u32
+    - dir_z: u32
+    - unknown_28: u32
+    - unknown_32: u32
+  # The S2C creation and eaten notices. kr-1256 numbers the run 634/641-652/656-657 (the in-round
+  # dispatcher kr-1256 sub_6D55D0); cn-774 and tw-454 number it 607/609/614-625/645-646 (dispatchers
+  # cn-774 sub_897E80 and tw-454 sub_70B3F0). The create bodies read the position and direction
+  # triplets through the item class's own constructor; the eat bodies are two u32 words.
+  # kr-1256 641 / cn-774 and tw-454 614: the star create. kr-1256 sub_C0A050 constructs GoStarItem
+  # and GoBigStarItem; cn-774 sub_D44500 and sub_D53410; tw-454 sub_723A60. Nine u32 words.
+  StarCreateNotice@kr-812: []
+  StarCreateNotice@kr-1256:
+    - pos_x: u32
+    - pos_y: u32
+    - pos_z: u32
+    - dir_x: u32
+    - dir_y: u32
+    - dir_z: u32
+    - kind: u32
+    - unknown_28: u32
+    - unknown_32: u32
+  # kr-1256 642 / cn-774 and tw-454 615: the big-star eaten notice. Two u32 words; the client logs
+  # "bigstarChr" (kr-1256) or "bigstarchr" (tw-454).
+  StarEatenNotice@kr-812: []
+  StarEatenNotice@kr-1256:
+    - actor: u32
+    - item_object: u32
+  # kr-1256 643 / cn-774 and tw-454 616: the event box create. kr-1256 sub_C117E0 constructs
+  # GoEventBoxItem; cn-774 sub_D4ABB0 (type 1) and the horde-award variant (type 3).
+  EventBoxCreateNotice@kr-812: []
+  EventBoxCreateNotice@kr-1256:
+    - pos_x: u32
+    - pos_y: u32
+    - pos_z: u32
+    - dir_x: u32
+    - dir_y: u32
+    - dir_z: u32
+    - kind: u32
+    - unknown_28: u32
+    - unknown_32: u32
+  # kr-1256 644 / cn-774 and tw-454 617: the event box (pigbox) eaten notice. Two u32 words;
+  # the client logs "pigboxChr".
+  EventBoxEatenNotice@kr-812: []
+  EventBoxEatenNotice@kr-1256:
+    - actor: u32
+    - item_object: u32
+  # kr-1256 645 / cn-774 and tw-454 618: the lucci create. kr-1256 sub_C16880 constructs
+  # GoLucciItem and GoBigLucciItem; cn-774 sub_D4F220 and sub_D43750; tw-454 sub_723EB0.
+  LucciCreateNotice@kr-812: []
+  LucciCreateNotice@kr-1256:
+    - pos_x: u32
+    - pos_y: u32
+    - pos_z: u32
+    - dir_x: u32
+    - dir_y: u32
+    - dir_z: u32
+    - kind: u32
+    - unknown_28: u32
+    - unknown_32: u32
+  # kr-1256 646 / cn-774 and tw-454 619: the lucci eaten notice. Two u32 words; the client logs
+  # "lucciEat" or "lucciEatBig".
+  LucciEatenNotice@kr-812: []
+  LucciEatenNotice@kr-1256:
+    - actor: u32
+    - item_object: u32
+  # kr-1256 647 / cn-774 and tw-454 620: the chocolate create. kr-1256 sub_C0C1F0 (three u32
+  # words); cn-774 sub_D46290 and tw-454 sub_84C220 (ten words including the position triplet
+  # and direction).
+  ChocolateCreateNotice@kr-812: []
+  ChocolateCreateNotice@kr-1256:
+    - unknown_4: u32
+    - unknown_8: u32
+    - unknown_12: u32
+  # kr-1256 648 / cn-774 and tw-454 621: the chocolate eaten notice. Two u32 words; the client
+  # logs "chocolateChr" or "chocolateEat".
+  ChocolateEatenNotice@kr-812: []
+  ChocolateEatenNotice@kr-1256:
+    - actor: u32
+    - item_object: u32
+  # kr-1256 649 / cn-774 and tw-454 622: the spawner create. kr-1256 sub_C1A230 (three u32);
+  # cn-774 sub_D52EF0 and tw-454 sub_851BF0 (ten words).
+  SpawnerCreateNotice@kr-812: []
+  SpawnerCreateNotice@kr-1256:
+    - unknown_4: u32
+    - unknown_8: u32
+    - unknown_12: u32
+  # kr-1256 650 / cn-774 and tw-454 623: the spawner eaten (activation) notice. Two u32 words;
+  # cn-774 logs "GuardianCall".
+  SpawnerEatenNotice@kr-812: []
+  SpawnerEatenNotice@kr-1256:
+    - actor: u32
+    - item_object: u32
+  # kr-1256 651 / cn-774 and tw-454 624: the heart create. kr-1256 sub_C12B50 (three u32);
+  # cn-774 sub_D4C0F0 and tw-454 sub_84D650 (ten words).
+  HeartCreateNotice@kr-812: []
+  HeartCreateNotice@kr-1256:
+    - unknown_4: u32
+    - unknown_8: u32
+    - unknown_12: u32
+  # kr-1256 652 / cn-774 and tw-454 625: the heart eaten notice. Two u32 words; the client logs
+  # "heartChr".
+  HeartEatenNotice@kr-812: []
+  HeartEatenNotice@kr-1256:
+    - actor: u32
+    - item_object: u32
+  # kr-1256 656 / cn-774 and tw-454 645: the weapon object create. kr-1256 sub_C1BBB0 (twelve
+  # u32); cn-774 sub_D547A0 (twelve u32, object size 704); tw-454 sub_721380.
+  WeaponObjectCreateNotice@kr-812: []
+  WeaponObjectCreateNotice@kr-1256:
+    - unknown_4: u32
+    - unknown_8: u32
+    - unknown_12: u32
+    - unknown_16: u32
+    - unknown_20: u32
+    - unknown_24: u32
+    - unknown_28: u32
+    - unknown_32: u32
+    - unknown_36: u32
+    - unknown_40: u32
+    - unknown_44: u32
+    - unknown_48: u32
+  # kr-1256 657 / cn-774 and tw-454 646: the weapon pickup notice. Two u32 words; the constructed
+  # class is the same WeaponObject the create notice builds.
+  WeaponPickupNotice@kr-812: []
+  WeaponPickupNotice@kr-1256:
+    - actor: u32
+    - weapon_object: u32
+  # kr-1256 634 / cn-774 and tw-454 607: the big-drop event tick. Zero-byte body; the client
+  # logs "starSpawnBig" or "lucci-bigdrop-splash" timers.
+  BigDropEventTickNotice@kr-812: []
+  # kr-1256 636 / cn-774 and tw-454 609: the item box create. kr-1256 sub_C133F0 (nine u32 plus
+  # one u8); cn-774 sub_D4C880; tw-454 sub_720F80 (logs "needleheight/pitch/speed").
+  ItemBoxCreateNotice@kr-812: []
+  ItemBoxCreateNotice@kr-1256:
+    - pos_x: u32
+    - pos_y: u32
+    - pos_z: u32
+    - dir_x: u32
+    - dir_y: u32
+    - dir_z: u32
+    - kind: u32
+    - unknown_28: u32
+    - unknown_32: u32
+    - unknown_36: u8
+
+  # The legacy spawner create notice: cn-324 sub_45EF40, id-400 sub_480670 and id-1809 sub_4D7FE0
+  # each read eight u32 words, and the handlers pass the first five to the spawner builder. Not the
+  # lucci nine-word body and not kr-1256's three-word notice; kr-812's own reader was not audited.
+  SpawnerCreateNoticeLegacy@kr-812: []
+  SpawnerCreateNoticeLegacy@cn-324:
+    - unknown_4: u32
+    - unknown_8: u32
+    - unknown_12: u32
+    - unknown_16: u32
+    - unknown_20: u32
+    - unknown_24: u32
+    - unknown_28: u32
+    - unknown_32: u32
+  SpawnerCreateNoticeLegacy@id-400:
+    - unknown_4: u32
+    - unknown_8: u32
+    - unknown_12: u32
+    - unknown_16: u32
+    - unknown_20: u32
+    - unknown_24: u32
+    - unknown_28: u32
+    - unknown_32: u32
+  SpawnerCreateNoticeLegacy@id-1809:
+    - unknown_4: u32
+    - unknown_8: u32
+    - unknown_12: u32
+    - unknown_16: u32
+    - unknown_20: u32
+    - unknown_24: u32
+    - unknown_28: u32
+    - unknown_32: u32
+  # The legacy weapon object notices: cn-324 sub_45C8F0, id-400 sub_4803B0 and id-1809 sub_4D55F0
+  # read ten u32 words plus a bool32 tail (44 bytes), and the pickup pair runs object first —
+  # the reverse of kr-1256's actor-first order. cn-324 numbers the create 744 and the pickup 745;
+  # the id builds number the create 745 and the pickup 746.
+  LegacyWeaponCreateNotice@kr-812: []
+  LegacyWeaponCreateNotice@cn-324:
+    - unknown_4: u32
+    - unknown_8: u32
+    - unknown_12: u32
+    - unknown_16: u32
+    - unknown_20: u32
+    - unknown_24: u32
+    - unknown_28: u32
+    - unknown_32: u32
+    - unknown_36: u32
+    - unknown_40: u32
+    - armed: bool
+  LegacyWeaponCreateNotice@id-400:
+    - unknown_4: u32
+    - unknown_8: u32
+    - unknown_12: u32
+    - unknown_16: u32
+    - unknown_20: u32
+    - unknown_24: u32
+    - unknown_28: u32
+    - unknown_32: u32
+    - unknown_36: u32
+    - unknown_40: u32
+    - armed: bool
+  LegacyWeaponCreateNotice@id-1809:
+    - unknown_4: u32
+    - unknown_8: u32
+    - unknown_12: u32
+    - unknown_16: u32
+    - unknown_20: u32
+    - unknown_24: u32
+    - unknown_28: u32
+    - unknown_32: u32
+    - unknown_36: u32
+    - unknown_40: u32
+    - armed: bool
+  LegacyWeaponPickupNotice@kr-812: []
+  LegacyWeaponPickupNotice@cn-324:
+    - weapon_object: u32
+    - actor: u32
+  LegacyWeaponPickupNotice@id-400:
+    - weapon_object: u32
+    - actor: u32
+  LegacyWeaponPickupNotice@id-1809:
+    - weapon_object: u32
+    - actor: u32
+  # The room utility S2C frames the id lineage lost from its catalog: the inventory change
+  # (cn-324's own 511 row states the shape; the id builds read it at 506), and the room chat.
+  # cn-324 sub_782730's 508 reads u16, bool32, two counted strings, a u32 and a bool32.
+  RoomInventoryChangeNotice@kr-812: []
+  RoomInventoryChangeNotice@id-400:
+    - unknown_4: u32
+    - unknown_8: u32
+    - unknown_12: u32
+    - items: list<u32>
+  RoomInventoryChangeNotice@id-1809:
+    - unknown_4: u32
+    - unknown_8: u32
+    - unknown_12: u32
+    - items: list<u32>
+  # The 9xx unit creation and merge frames: one shared body each on the three builds.
+  # cn-324 sub_45D260, id-400 sub_480FD0, id-1809 sub_4D5700 read the seven-word unit frame.
+  CreateUnitNotice@kr-812: []
+  CreateUnitNotice@cn-324:
+    - unknown_4: u32
+    - unknown_8: u32
+    - unknown_12: u32
+    - unknown_16: u32
+    - unknown_20: u32
+    - unknown_24: u32
+    - unknown_28: u32
+    - name: wstr
+    - unknown_40: u64
+    - unknown_48: u32
+  CreateUnitNotice@id-400:
+    - unknown_4: u32
+    - unknown_8: u32
+    - unknown_12: u32
+    - unknown_16: u32
+    - unknown_20: u32
+    - unknown_24: u32
+    - unknown_28: u32
+    - name: wstr
+    - unknown_40: u64
+    - unknown_48: u32
+  CreateUnitNotice@id-1809:
+    - unknown_4: u32
+    - unknown_8: u32
+    - unknown_12: u32
+    - unknown_16: u32
+    - unknown_20: u32
+    - unknown_24: u32
+    - unknown_28: u32
+    - name: wstr
+    - unknown_40: u64
+    - unknown_48: u32
+  # The sDAMAGEINFO body shared by S2C 522 and the 950-block damage sync: a word, two counted
+  # two-word slot vectors and a trailing word (readers cn-324 sub_45C570, id-400 sub_47FEF0,
+  # id-1809 sub_4D5130; element stride 12 bytes).
+  DamageInfoBody@kr-812: []
+  DamageInfoBody@cn-324:
+    - unknown_4: u32
+    - slot_count: u32
+    - slots: list<DamageSlotEntry>
+    - unknown_tail: u32
+    - extra_count: u32
+    - extras: list<DamageSlotEntry>
+    - unknown_last: u32
+  DamageSlotEntry:
+    - unknown_0: u32
+    - unknown_4: u32
+  # The legacy zombie-mode relay-space family: cn-324, id-400 and id-1809 share one body per
+  # packet except where a row says otherwise. cn-324 and id-400 share one relay tail; id-1809
+  # drops two packets and shifts every later number by -1 (the reason ZombieStoneActive is
+  # 32912 on cn-324/id-400 but 32911 on id-1809). kr-812 has no relay-space rows for this family.
+  # All are S2C server-driven except where a C2S row is stated.
+  ZombieStoneActiveNotice@kr-812: []
+  ZombieStoneActiveNotice@cn-324:
+    - active: bool
+    - unknown_variant: u8
+  ZombieStoneActiveNotice@id-400:
+    - active: bool
+    - unknown_variant: u8
+  ZombieStoneActiveNotice@id-1809:
+    - active: bool
+    - unknown_variant: u8
+  # S2C 32872: the wave-key to mob-group mapping frame. No C2S sender exists in any build.
+  WaveKeyMobGroupData@kr-812: []
+  WaveKeyMobGroupData@cn-324:
+    - unknown_4: u32
+    - unknown_8: u32
+    - unknown_12: u32
+    - unknown_16: u32
+    - unknown_20: u32
+    - unknown_24: wstr
+  WaveKeyMobGroupData@id-400:
+    - unknown_4: u32
+    - unknown_8: u32
+    - unknown_12: u32
+    - unknown_16: u32
+    - unknown_20: u32
+    - unknown_24: wstr
+  WaveKeyMobGroupData@id-1809:
+    - unknown_4: u32
+    - unknown_8: u32
+    - unknown_12: u32
+    - unknown_16: u32
+    - unknown_20: u32
+    - unknown_24: wstr
+  # S2C 32873: the mob spawn group assignment frame (two bytes match a wave-node key, the u32
+  # is stored at the node). C2S 32873 is empty on cn-324 and id-400 but id-1809 serializes the
+  # full u8/u8/u32 body.
+  WaveSetMobSpawnGroup@kr-812: []
+  WaveSetMobSpawnGroup@cn-324:
+    - unknown_4: u8
+    - unknown_5: u8
+    - group: u32
+  WaveSetMobSpawnGroup@id-400:
+    - unknown_4: u8
+    - unknown_5: u8
+    - group: u32
+  WaveSetMobSpawnGroup@id-1809:
+    - unknown_4: u8
+    - unknown_5: u8
+    - group: u32
+  # C2S/S2C 32866: the horde mob replay frame. The C2S senders are reached through the Lua wave
+  # layer's stored callbacks. Survey correction: the S2C number is 32866 (not 32883) in all three.
+  HordeMobReplayRequest@kr-812: []
+  HordeMobReplayRequest@cn-324:
+    - unit: u32
+    - unknown_8: u32
+    - replay: wstr
+    - flag: u32
+  HordeMobReplayRequest@id-400:
+    - unit: u32
+    - unknown_8: u32
+    - replay: wstr
+    - flag: u32
+  HordeMobReplayRequest@id-1809:
+    - unit: u32
+    - unknown_8: u32
+    - replay: wstr
+    - flag: u32

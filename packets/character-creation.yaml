@@ -7,20 +7,22 @@ version: 1
 # an empty wstring and one zero word; the meaning of the two words is unproven (see the comment on the field).
 structs:
   # C2S gcpReqCheckCreateUserName. kr-812 sub_5C8FD0 reads one string; cn-717 sub_740F00,
-  # id-400 sub_89DD10, id-1809 sub_68D480 and cn-706 sub_567230 match.
+  # id-400 sub_89DD10, id-1809 sub_68D480 and cn-706 sub_567230 match. cn-406 sub_775710 stamps 14
+  # (one lower than id-400's 15) and writes the same string.
   CharacterNameRequest:
     - nickname: wstr # cn-279 sub_6E8880 builds the name; sub_464460 sends C2S 14.
       offset: 4
   # C2S gcpReqCreateUserInfo. kr-812 sub_8764A0 reads string, two words, string and a trailing word;
   # cn-717 sub_901630 matches. id-400 sub_7F7110, id-1809 sub_8177D0 and cn-706 sub_7FDC90 stop
   # before the trailing word. kr-812 sub_875180 fills +32 from the selected character (this+948) and
-  # +36 from that character's table entry, 1 when absent.
+  # +36 from that character's table entry, 1 when absent. cn-406 sub_771B20 reads the same four fields;
+  # cn-406 sub_775800 fills the selected type from DlgCreateUser+892 and its paired value (1 when absent).
   CharacterCreateRequest:
     - nickname: wstr
       offset: 4
-    - character_type: u32 # kr-1256 sub_9A4E90 takes it from the selected record CreateUserStage+748; meaning unproven.
+    - character_type: u32 # kr-1256 sub_9A4E90 takes it from the selected record CreateUserStage+748; meaning unproven. cn-406 sub_775800 takes it from DlgCreateUser+892.
       offset: 32
-    - unknown_36: u32 # kr-1256 sub_9A4E90 takes it from the same record +1336; purpose unproven.
+    - unknown_36: u32 # kr-1256 sub_9A4E90 takes it from the same record +1336; purpose unproven. cn-406 sub_775800 writes the matched pair's second value.
       offset: 36
     - unknown_40: wstr # kr-1256 sub_9A4E90 writes it empty.
       offset: 40

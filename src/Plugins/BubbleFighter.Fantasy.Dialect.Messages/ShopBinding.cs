@@ -1,3 +1,5 @@
+using System.Globalization;
+using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Inventory;
 using BubbleFighter.Fantasy.Contracts.Shop;
@@ -18,6 +20,7 @@ internal sealed class ShopBinding(string protocol, IOpcodeTable table,
     private readonly ushort _update = table.S2C("gspInventoryUpdateInventorySlots");
     private readonly ushort _stat = table.S2C("gspUserStat");
     private readonly ushort _reply = table.S2C("gspRepShopBuy");
+    private readonly IReadOnlyDictionary<ShopPurchaseRefusal, int> _refusals = RefusalCodes(tables, build);
     private readonly InventoryWire _inventory = new(tables, build);
 
     public string Protocol => protocol;
@@ -70,16 +73,54 @@ internal sealed class ShopBinding(string protocol, IOpcodeTable table,
     }
 
     public ValueTask SendAsync(ISession session, ShopPurchaseReplied message, CancellationToken ct) =>
-        session.SendAsync(_reply, WriteReply(tables, build, message), ct);
+        session.SendAsync(_reply, WriteReply(tables, build, message, _refusals), ct);
 
     /// <summary>Writes u32 shop key and u32 result; kr-812 sub_827550 consumes result 1 as success.</summary>
-    internal static byte[] WriteReply(PacketTables tables, string build, ShopPurchaseReplied message)
+    internal static byte[] WriteReply(PacketTables tables, string build, ShopPurchaseReplied message) =>
+        WriteReply(tables, build, message, RefusalCodes(tables, build));
+
+    // A refusal writes the build's code for its reason, so the client shows that reason's dialog; an unnamed
+    // reason writes 0, which no build has a case for.
+    private static byte[] WriteReply(PacketTables tables, string build, ShopPurchaseReplied message,
+        IReadOnlyDictionary<ShopPurchaseRefusal, int> refusals)
     {
         PacketLayoutContract.RequireFields(tables, build, "ShopPurchaseReply", "Shop purchase",
             ("key", "u32"), ("result", "u32"));
         return PacketCodec.Write(tables, build, "ShopPurchaseReply", new Dictionary<string, object?>
         {
-            ["key"] = message.Key, ["result"] = message.Succeeded ? 1 : 0,
+            ["key"] = message.Key,
+            ["result"] = message.Succeeded ? 1 : refusals.GetValueOrDefault(message.Refusal),
         });
+    }
+
+    /// <summary>
+    /// Reads the build's <c>shop.refusal_codes</c> from <c>packets/builds.yaml</c>: one code per named refusal,
+    /// none of them the success code 1 (kr-812 sub_827550).
+    /// </summary>
+    /// <exception cref="ConfigException">Thrown when a code is missing, unknown, not an integer, or 1.</exception>
+    internal static IReadOnlyDictionary<ShopPurchaseRefusal, int> RefusalCodes(PacketTables tables, string build)
+    {
+        var keys = new Dictionary<string, ShopPurchaseRefusal>(StringComparer.Ordinal)
+        {
+            ["lucci_short"] = ShopPurchaseRefusal.LucciShort,
+            ["cash_short"] = ShopPurchaseRefusal.CashShort,
+            ["already_owned"] = ShopPurchaseRefusal.AlreadyOwned,
+            ["limit_reached"] = ShopPurchaseRefusal.LimitReached,
+            ["no_more_allowed"] = ShopPurchaseRefusal.NoMoreAllowed,
+        };
+        if (!tables.ValuesOf(build).TryGetValue("shop", out var raw) || raw is not IReadOnlyDictionary<string, object?> shop
+            || !shop.TryGetValue("refusal_codes", out var rawCodes) || rawCodes is not IReadOnlyDictionary<string, object?> codes)
+            throw new ConfigException($"Build '{build}' must define shop.refusal_codes in packets/builds.yaml.");
+        if (codes.Keys.FirstOrDefault(key => !keys.ContainsKey(key)) is { } unknown)
+            throw new ConfigException($"Build '{build}' has unknown shop.refusal_codes.{unknown}.");
+        var result = new Dictionary<ShopPurchaseRefusal, int> { [ShopPurchaseRefusal.Unspecified] = 0 };
+        foreach (var (key, refusal) in keys)
+        {
+            if (!codes.TryGetValue(key, out var value) || value is not string text
+                || !int.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var code) || code == 1)
+                throw new ConfigException($"Build '{build}' must define shop.refusal_codes.{key} as an integer other than 1.");
+            result[refusal] = code;
+        }
+        return result;
     }
 }

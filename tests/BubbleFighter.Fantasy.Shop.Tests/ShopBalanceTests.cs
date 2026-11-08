@@ -69,6 +69,8 @@ public sealed class ShopBalanceTests
             Assert.Equal(42, userNum);
             return ValueTask.FromResult(Current);
         }
+        public ValueTask<PlayerWallet> GetOrCreateAsync(PlayerWallet initialWallet, CancellationToken ct) =>
+            throw new InvalidOperationException("A balance check must never create a wallet.");
         public ValueTask UpsertAsync(PlayerWallet wallet, CancellationToken ct) =>
             throw new InvalidOperationException("A balance check must never write a wallet.");
     }

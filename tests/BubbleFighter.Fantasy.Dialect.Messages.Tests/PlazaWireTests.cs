@@ -1,6 +1,7 @@
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Rooms;
 using BubbleFighter.Fantasy.Dialect.Rooms;
+using BubbleFighter.Fantasy.Packets;
 using Xunit;
 
 namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
@@ -17,9 +18,6 @@ public sealed class PlazaWireTests
     // level 10 (s2c#1771's record fields).
     private static readonly PlazaMember Entrant =
         new(0, 282, "TestPlayer01", 10, 300010, [.. Enumerable.Range(100000, 19)]);
-
-    // s2c#1774 gspReceiveSessionChrPos: user number 282, sequence 1, the spawn step of the walk.
-    private const string RecordedPositionLine = "1A 01 00 00 01 00 00 00 D8 52 31 44 58 9C 33 43 E4 FC 04 44 01 7F 00 00 00 00";
 
     // c2s#1839 gcpSendSessionChrPos: unknown1 6, x, y, z, two zero bytes, heading.
     private const string RecordedUpload = "06 00 00 00 D8 52 31 44 58 5C 33 43 E4 FC 04 44 00 00 15 7A 43 C0";
@@ -44,64 +42,36 @@ public sealed class PlazaWireTests
         Assert.Throws<PacketFormatException>(() => PlayRoomCodec.ReadPositionUpload(TestBuilds.Packets, "kr-812", [.. Hex(RecordedUpload), 0]));
     }
 
-    [Fact]
-    public void TheEntryWalkReplaysTheRecordedTwentyOneSteps()
+    /// <summary>The complete native install preserves sparse seat indices and selects the real local slot.</summary>
+    [Theory]
+    [InlineData("kr-812")]
+    [InlineData("cn-279")]
+    [InlineData("cn-324")]
+    [InlineData("cn-404")]
+    [InlineData("cn-406")]
+    [InlineData("cn-408")]
+    [InlineData("cn-706")]
+    [InlineData("cn-717")]
+    [InlineData("id-400")]
+    [InlineData("id-1809")]
+    public void NativePlazaInstallKeepsSparseIndices(string build)
     {
-        // Step one has the reference line's length, identity, state bytes and height; only the
-        // column differs, because the start is random per entry.
-        var recorded = Hex(RecordedPositionLine);
-        var first = PlayRoomCodec.WritePlazaWalkStep(TestBuilds.Packets, "kr-812", 282, 1, 7);
-        Assert.Equal(recorded.Length, first.Length);
-        Assert.Equal(recorded[..8], first[..8]);
-        Assert.Equal(recorded[12..16], first[12..16]);
-        Assert.Equal(recorded[20..], first[20..]);
-
-        // Step two (s2c#1788): the same column, one step lower, idle.
-        var second = PlayRoomCodec.WritePlazaWalkStep(TestBuilds.Packets, "kr-812", 282, 2, 7);
-        Assert.Equal(first[8..12], second[8..12]);
-        Assert.Equal(first[16..20], second[16..20]);
-        Assert.Equal(26, second.Length);
-        Assert.Equal((282, 2), (BitConverter.ToInt32(second, 0), BitConverter.ToInt32(second, 4)));
-        Assert.Equal(179.6107177734375f - 0.25f, BitConverter.ToSingle(second, 12));
-        Assert.Equal([0x00, 0x7F], new[] { second[20], second[21] });
-
-        // The last step lands on the plaza floor and marks the arrival.
-        var last = PlayRoomCodec.WritePlazaWalkStep(TestBuilds.Packets, "kr-812", 282, 21, 7);
-        Assert.Equal(21, BitConverter.ToInt32(last, 4));
-        Assert.Equal(179.6107177734375f - 0.25f * 20 * 20, BitConverter.ToSingle(last, 12));
-        Assert.Equal([0x02, 0x7F], new[] { last[20], last[21] });
-        Assert.Equal(0f, BitConverter.ToSingle(last, 22));
-    }
-
-    [Fact]
-    public void TheSpawnColumnStaysInTheRecordedBoxAndVariesPerEntry()
-    {
-        var seen = new HashSet<(float, float)>();
-        for (var seed = 1; seed <= 200; seed++)
-        {
-            var line = PlayRoomCodec.WritePlazaWalkStep(TestBuilds.Packets, "kr-812", 282, 1, seed);
-            Assert.Equal(26, line.Length);
-            var x = BitConverter.ToSingle(line, 8);
-            var z = BitConverter.ToSingle(line, 16);
-            Assert.InRange(x, 697f, 743f);
-            Assert.InRange(z, 512f, 551f);
-            Assert.Equal(179.6107177734375f, BitConverter.ToSingle(line, 12));
-            seen.Add((x, z));
-        }
-        // 200 entries must not all land on one spot.
-        Assert.True(seen.Count > 100);
-    }
-
-    [Fact]
-    public void EveryReceiverOfOneEntryGetsTheSameSpawnLine()
-    {
-        // The entrant's own burst, a present member's burst and a late joiner's empty-position
-        // line all carry the same member and entry value, so the bytes must be identical.
-        var entrant = Entrant with { EntrySeed = 41 };
-        var forEntrant = PlayRoomCodec.WritePlazaWalkStep(TestBuilds.Packets, "kr-812", entrant.UserNumber, 1, entrant.EntrySeed);
-        var forOthers = PlayRoomCodec.WritePlazaWalkStep(TestBuilds.Packets, "kr-812", entrant.UserNumber, 1, entrant.EntrySeed);
-        Assert.Equal(forEntrant, forOthers);
-        Assert.NotEqual(forEntrant, PlayRoomCodec.WritePlazaWalkStep(TestBuilds.Packets, "kr-812", entrant.UserNumber, 1, 42));
+        var own = Entrant with { Slot = 2 };
+        var peer = new PlazaMember(0, 77, "peer", 9, 300001, [300001]);
+        var body = PlayRoomCodec.WritePlazaInstall(TestBuilds.Packets, build, TestBuilds.Of(build).Schema, new(own, [peer]));
+        var fields = PacketCodec.Read(TestBuilds.Packets, build, "gspGotoRoom", body);
+        Assert.Equal(2, fields["local_slot"]);
+        var setting = Assert.IsType<Dictionary<string, object?>>(fields["session_setting"]);
+        Assert.Equal(3, setting["kind"]);
+        var users = Assert.IsType<object?[]>(fields["user_slots"]);
+        Assert.Equal(3, users.Length);
+        Assert.Equal(77, Assert.IsType<Dictionary<string, object?>>(users[0])["user_number"]);
+        var gap = Assert.IsType<Dictionary<string, object?>>(users[1]);
+        Assert.Equal(false, gap["occupied"]);
+        Assert.Equal(0, gap["user_number"]);
+        Assert.Equal(282, Assert.IsType<Dictionary<string, object?>>(users[2])["user_number"]);
+        Assert.Throws<ArgumentException>(() => PlayRoomCodec.WritePlazaInstall(TestBuilds.Packets, build,
+            TestBuilds.Of(build).Schema, new(own, [peer with { Slot = own.Slot }])));
     }
 
     [Fact]
@@ -130,7 +100,10 @@ public sealed class PlazaWireTests
         int[] worn = [100078, 100111, 100143, 100224, 100241, 100242, 100310, 100311, 100800, 100801, 100802,
             100803, 100804, 101046, 205033, 300010, 201014, 203024, 207001];
         var entrant = new PlazaMember(0, 282, "TestPlayer01", 10, 300010, worn);
-        Assert.Equal(Hex(RecordedSeatRecord), PlayRoomCodec.WritePlazaSeatRecord(TestBuilds.Packets, "kr-812", Schema, entrant));
+        var expected = Hex(RecordedSeatRecord);
+        // kr-812 sub_8F6A20 requires the +140 gate; the old menu-derived snapshot cleared it at wire byte178.
+        expected[178] = 1;
+        Assert.Equal(expected, PlayRoomCodec.WritePlazaSeatRecord(TestBuilds.Packets, "kr-812", Schema, entrant));
     }
 
     [Fact]
@@ -147,9 +120,9 @@ public sealed class PlazaWireTests
         Assert.Equal(282, BitConverter.ToInt32(slot, 17));
         // s2c#1768 gspRoomLeaveSlot: the seat index and the cleared record.
         var left = PlayRoomCodec.WritePlazaLeaveSeat(TestBuilds.Packets, "kr-812", Schema, Entrant);
-        Assert.Equal(220, left.Length);
+        Assert.Equal(196, left.Length);
         Assert.Equal(0, BitConverter.ToInt32(left, 0));
         Assert.Equal(0xFF, left[16]);
-        Assert.Equal(282, BitConverter.ToInt32(left, 17));
+        Assert.Equal(0, BitConverter.ToInt32(left, 17));
     }
 }

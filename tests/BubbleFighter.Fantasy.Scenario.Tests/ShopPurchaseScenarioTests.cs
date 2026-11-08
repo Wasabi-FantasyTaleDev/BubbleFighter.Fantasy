@@ -26,6 +26,8 @@ public sealed class ShopPurchaseScenarioTests
     [InlineData("cn", 717, 12, 380, 44, 825, true)]
     [InlineData("id", 400, 8, 340, 44, 825, false)]
     [InlineData("id", 400, 8, 340, 44, 825, true)]
+    [InlineData("cn", 406, 8, 268, 44, 825, false)]
+    [InlineData("cn", 406, 8, 268, 44, 825, true)]
     [InlineData("cn", 324, 0, 256, 36, 826, false)]
     [InlineData("cn", 324, 0, 256, 36, 826, true)]
     [InlineData("cn", 279, 0, 168, 36, 826, false)]
@@ -122,13 +124,14 @@ public sealed class ShopPurchaseScenarioTests
                 Assert.Equal(1, Int(frames[2].Payload, 4));
                 await CheckBalanceAsync(client, cashCheck == 0 ? (ushort)0 : Op(cashCheck), Op(105), statLength, 2500 - purchase * 1000, 5000, ct);
             }
-            foreach (var (key, option) in new[] { (1000942, 0), (1000942, 1), (204033, 0), (int.MaxValue, 0) })
+            // kr-812 sub_827550 distinguishes insufficient Lucci from unrecognized purchase requests.
+            foreach (var (key, option, result) in new[] { (1000942, 0, -13), (1000942, 1, 0), (204033, 0, 0), (int.MaxValue, 0, 0) })
             {
                 cursor = client.Cursor;
                 await client.SendAsync(Op(808), Buy(key, option), ct, 0);
                 await client.WaitAsync(cursor, Op(813), TimeSpan.FromSeconds(5), ct);
                 var frame = Assert.Single(client.Since(cursor));
-                Assert.Equal(0, Int(frame.Payload, 4));
+                Assert.Equal(result, Int(frame.Payload, 4));
             }
 
             await using var reconnected = await LoginAsync(port, Op(3), Op(105), profile, build, ct);
@@ -159,7 +162,8 @@ public sealed class ShopPurchaseScenarioTests
             cursor = reconnected.Cursor;
             await reconnected.SendAsync(Op(808), Buy(4000001, 0), ct, 0);
             await reconnected.WaitAsync(cursor, Op(813), TimeSpan.FromSeconds(5), ct);
-            Assert.Equal(0, Int(Assert.Single(reconnected.Since(cursor)).Payload, 4));
+            // cn-279 sub_6F09D0 uses 36; kr-812 sub_827550 uses 38 for insufficient cash.
+            Assert.Equal(build == 279 ? 36 : 38, Int(Assert.Single(reconnected.Since(cursor)).Payload, 4));
             await CheckBalanceAsync(reconnected, cashCheck == 0 ? (ushort)0 : Op(cashCheck), Op(105), statLength, 500, 500, ct);
 
             cursor = reconnected.Cursor;
@@ -174,7 +178,7 @@ public sealed class ShopPurchaseScenarioTests
             cursor = reconnected.Cursor;
             await reconnected.SendAsync(Op(808), Buy(1000943, 0), ct, 0);
             await reconnected.WaitAsync(cursor, Op(813), TimeSpan.FromSeconds(5), ct);
-            Assert.Equal(0, Int(Assert.Single(reconnected.Since(cursor)).Payload, 4));
+            Assert.Equal(11, Int(Assert.Single(reconnected.Since(cursor)).Payload, 4));
             cursor = reconnected.Cursor;
             await reconnected.SendAsync(Op(802), [], ct, 0);
             await reconnected.WaitAsync(cursor, Op(801), TimeSpan.FromSeconds(5), ct);

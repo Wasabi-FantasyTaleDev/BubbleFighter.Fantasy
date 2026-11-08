@@ -74,8 +74,8 @@ public sealed class UpdatePartyWireTests
     public void MidCnSchemasDoNotNeedIdleParty(params string[] lineage)
     {
         var choice = TestBuilds.All.Schemas.Require(lineage);
-        Assert.Equal("cn-735", choice.Profile);
-        Assert.Equal(lineage[0] == "cn-735" ? VariantMatch.Exact : VariantMatch.Inherited, choice.Match);
+        Assert.Equal(lineage[0], choice.Profile);
+        Assert.Equal(VariantMatch.Exact, choice.Match);
         Assert.False(UpdatePartyCodec.NeedsIdleParty(choice.Value));
     }
 }

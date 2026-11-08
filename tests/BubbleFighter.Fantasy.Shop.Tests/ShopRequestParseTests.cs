@@ -1,4 +1,5 @@
 using BubbleFighter.Fantasy.Abstractions.Protocol;
+using BubbleFighter.Fantasy.Contracts.Shop;
 using BubbleFighter.Fantasy.Dialect.Messages;
 using BubbleFighter.Fantasy.Packets;
 using Xunit;
@@ -37,6 +38,38 @@ public sealed class ShopRequestParseTests
         Assert.Equal(0x1122334455667788L, parsed.Token);
         Assert.Equal(0, parsed.MainCategory);
         Assert.Throws<PacketFormatException>(() => ShopCatalogBinding.ReadEnterShop(ShopWire.Tables, "id-400", [.. payload, 0]));
+    }
+
+    [Fact]
+    public void EnterShopCn406PinsTheTokenOnlyBodyAndRejectsTail()
+    {
+        // cn-406's writer cn-406 sub_5C3830 sends the u64 token alone (id-400's form); the token-only parse is
+        // pinned for the build itself, not only for its base.
+        var payload = WireLengthSupport.Written(w => w.WriteInt64(0x1122334455667788L));
+        Assert.Equal(8, payload.Length);
+        var parsed = ShopCatalogBinding.ReadEnterShop(ShopWire.Tables, "cn-406", payload);
+        Assert.Equal(0x1122334455667788L, parsed.Token);
+        Assert.Equal(0, parsed.MainCategory);
+        Assert.Throws<PacketFormatException>(() => ShopCatalogBinding.ReadEnterShop(ShopWire.Tables, "cn-406", [.. payload, 0]));
+    }
+
+    [Fact]
+    public void Cn406CashCheckPinsTheEmptyBody()
+    {
+        // cn-406 sub_83F450 stamps C2S 825 on an empty packet (serializer nullsub_1 cn-406 sub_5129E0);
+        // any body byte fails loud instead of being parsed.
+        _ = ShopBinding.ReadBalanceRequest([]);
+        Assert.Throws<PacketFormatException>(() => ShopBinding.ReadBalanceRequest([0]));
+    }
+
+    [Fact]
+    public void Cn406ShopBuyReplyPinsEightBytes()
+    {
+        // ShopPurchaseReply is the kr-812 baseline row; cn-406's cn-406 sub_72ACE0 -> cn-406 sub_420FC0 reads it
+        // unchanged: one u32 shop key, one u32 result, result 1 is success.
+        var payload = ShopBinding.WriteReply(ShopWire.Tables, "cn-406", new ShopPurchaseReplied(0x0F45EE, true));
+        Assert.Equal(8, payload.Length);
+        Assert.Equal("EE450F00" + "01000000", Convert.ToHexString(payload));
     }
 
     [Fact]

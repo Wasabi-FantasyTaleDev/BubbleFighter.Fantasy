@@ -1,112 +1,338 @@
 version: 1
 structs:
-  # The couple (ring) frames of kr-812, which is the only build whose couple bodies were read. Each structure
-  # is the read order of the class's deserializer plus the object offset it stores the field at; every field is
-  # inherited by the legacy family. That inheritance is not independent reader verification for those builds.
-  #
-  # The kr-812 packet classes use their own width helpers: kr-812 sub_A56BD0 reads 4 bytes into a byte field (the bool32 cases), kr-812 sub_A56C10
-  # reads 4 bytes and kr-812 sub_A56D70 reads a prefixed wide string (u32 character count, then that many
-  # UTF-16LE code units). In kr-812 a wide-string field is 28 bytes wide: the deserializers put successive
-  # strings at +8 and +36, and at +8, +36 and +64 in the three-string notice.
-  #
-  # Not tabled: gspResCoupleInvite (kr-812 938). Its deserializer kr-812 sub_83C260 reads a flag at +4, strings
-  # at +8, +36 and +64, and then two further records with their own readers at +92 and +176, whose classes were
-  # not read; a table of the leading fields only would claim a body shorter than the client reads.
-  #
-  # kr-1256 dispatches the same replies at 936-940 and 982 (one or two less than kr-812) and its handlers are
-  # located, but those bodies were not read, so no kr-1256 layout is claimed here and none of the rows below
-  # applies to kr-1256 or to the builds based on it.
+  # Couple layouts do not register handlers or establish ring ownership, consumption or persistence.
+  # Legacy bool fields use four wire bytes even when their object members occupy one byte.
+  # kr-812 sub_A56BD0/sub_A56C10/sub_A56D70 establish bool32/u32/counted UTF-16LE.
+  # Modern strings use the same wire encoding: kr-1256 sub_1126430 via kr-1256 sub_1119C10, cn-774 sub_1093FE0,
+  # tw-454 sub_E91B70. Modern records have no packet-class vtable prefix and 24-byte strings.
+  # cn-279 has no matched couple packet class or opcode. Unreviewed descendants are excluded.
 
-  # C2S gcpReqCoupleInviteExpire: Packet_gcpReqCoupleInviteExpire vtable kr-812 0xd93584, deserializer
-  # kr-812 sub_80C160 stores kr-812 sub_A56BD0 at +4.
+  # C2S expiry: kr-812 sub_80C160, cn-324 sub_798810, id-400 sub_63B780,
+  # cn-404 sub_8A2A80, cn-406 sub_7151D0, cn-408 sub_9B68E0, cn-706 sub_87EC00,
+  # cn-717 sub_8C3780 and id-1809 sub_7BEBE0 all read one bool32, without a string.
   CoupleInviteExpire:
     - unknown_4: bool
       offset: 4
-      except: [kr-1256, cn-774, tw-454]
+      except: [cn-279, kr-1256, cn-735, cn-705]
 
-  # C2S gcpReqCoupleInviteAnswer: vtable kr-812 0xd93590, deserializer kr-812 sub_9FDE70 stores a byte at +4, a byte
-  # at +5, a wide string at +8 and a wide string at +36.
+  # C2S answer: kr-812 sub_9FDE70, id-400 sub_977C60, cn-404 sub_9AEB80,
+  # cn-406 sub_8E2EF0, cn-408 sub_9B6930, cn-706 sub_97D9B0, cn-717 sub_AB0BD0,
+  # id-1809 sub_995530; cn-324 sub_402480 stores the second string at +12.
+  # kr-1256 sub_E881A0 writes opcode 932 from the invitation dialog kr-1256 sub_E83FE0.
+  # Its two bool32 values precede two counted UTF-16LE names; the second flag is not interpreted here.
   CoupleInviteAnswerRequest:
     - unknown_4: bool
       offset: 4
-      except: [kr-1256, cn-774, tw-454]
+      except: [cn-279, cn-774, cn-735, cn-705]
+      kr-1256:
+        - unknown_0: bool
+          offset: 0
     - unknown_5: bool
       offset: 5
-      except: [kr-1256, cn-774, tw-454]
+      except: [cn-279, cn-774, cn-735, cn-705]
+      kr-1256:
+        - unknown_1: bool
+          offset: 1
     - unknown_8: wstr
       offset: 8
-      except: [kr-1256, cn-774, tw-454]
+      except: [cn-279, cn-774, cn-735, cn-705]
+      kr-1256:
+        - unknown_4: wstr
+          offset: 4
     - unknown_36: wstr
       offset: 36
-      except: [kr-1256, cn-774, tw-454]
+      except: [cn-279, cn-774, cn-735, cn-705]
+      cn-324:
+        - unknown_12: wstr
+          offset: 12
+      kr-1256:
+        - unknown_28: wstr
+          offset: 28
 
-  # C2S gcpReqCoupleBreakUp: vtable kr-812 0xd9359c, deserializer kr-812 sub_5C8FD0 stores a wide string at +4.
+  # C2S breakup: kr-812 sub_5C8FD0, cn-324 sub_6FDDF0, id-400 sub_89DD10,
+  # cn-404 sub_68E480, cn-406 sub_75A200, cn-408 sub_7B1F10, cn-706 sub_567230,
+  # cn-717 sub_740F00 and id-1809 sub_68D480 read one counted name.
   CoupleBreakUpRequest:
     - unknown_4: wstr
       offset: 4
-      except: [kr-1256, cn-774, tw-454]
+      except: [cn-279, kr-1256, cn-735, cn-705]
 
-  # C2S gcpReqChangeCouplering: vtable kr-812 0xd19bdc, deserializer kr-812 sub_80A910 stores a word at +4.
+  # C2S ring change: kr-812 sub_80A910, cn-706 sub_4BBB70 and id-1809 sub_4D60C0
+  # read one word. cn-717 sub_8C4260 additionally reads a bool32 into +8.
+  # cn-324 and id-400/cn-404/cn-406/cn-408 have no matched ring-change packet class.
   CoupleChangeRingRequest:
     - unknown_4: u32
       offset: 4
-      except: [kr-1256, cn-774, tw-454]
+      except: [cn-324, id-400, kr-1256, cn-735, cn-705]
+      also: [cn-706]
+    - unknown_8: bool
+      offset: 8
+      only: [cn-717]
+      except: [cn-735]
 
-  # S2C gspResCoupleInviteResult: vtable kr-812 0xd6f270, deserializer kr-812 sub_844570 stores a word at +4 and a
-  # wide string at +8.
+  # C2S confirmation: kr-812 sub_9FDF00 reads the complete equipment record at +68;
+  # kr-812 sub_9FA680/sub_9FA190 install EquippedItemList there before kr-812 sub_9FDC70 sends it.
+  # id-400 sub_977BE0, cn-404 sub_9AEB00, cn-406 sub_8E2E70, cn-408 sub_9B68A0,
+  # cn-706 sub_97D910 and cn-717 sub_AB0C50 stop after the fourth field.
+  # cn-324 sub_402370 uses compact strings. id-1809 has an unverified nested record and is excluded.
+  CoupleConfirmInviteRequest:
+    - unknown_4: bool
+      offset: 4
+      except: [cn-279, kr-1256, id-1809, cn-735, cn-705]
+    - unknown_8: wstr
+      offset: 8
+      except: [cn-279, kr-1256, id-1809, cn-735, cn-705]
+    - unknown_36: u32
+      offset: 36
+      except: [cn-279, kr-1256, id-1809, cn-735, cn-705]
+      cn-324:
+        - unknown_12: u32
+          offset: 12
+    - unknown_40: wstr
+      offset: 40
+      except: [cn-279, kr-1256, id-1809, cn-735, cn-705]
+      cn-324:
+        - unknown_16: wstr
+          offset: 16
+    - equipped_items: EquippedItemList
+      offset: 68
+      except: [cn-324, id-400, id-1809, cn-717, kr-1256]
+
+  # S2C invitation: kr-812 sub_83C260 reads all six fields; kr-812 sub_83C2C0
+  # identifies EquippedItemList at +92 and FighterInfo at +176 through kr-812 sub_40B3F0.
+  # Other builds are excluded until their entire nested invitation shape is verified.
+  CoupleInvite:
+    - unknown_4: bool
+      offset: 4
+      except: [cn-324, id-400, id-1809, cn-717, kr-1256]
+    - unknown_8: wstr
+      offset: 8
+      except: [cn-324, id-400, id-1809, cn-717, kr-1256]
+    - unknown_36: wstr
+      offset: 36
+      except: [cn-324, id-400, id-1809, cn-717, kr-1256]
+    - unknown_64: wstr
+      offset: 64
+      except: [cn-324, id-400, id-1809, cn-717, kr-1256]
+    - equipped_items: EquippedItemList
+      offset: 92
+      except: [cn-324, id-400, id-1809, cn-717, kr-1256]
+    - fighter_info: FighterInfo
+      offset: 176
+      except: [cn-324, id-400, id-1809, cn-717, kr-1256]
+
+  # S2C invitation result: kr-812 sub_844570, cn-324 sub_6FD230, id-400 sub_798DF0,
+  # cn-404 sub_43E890, cn-406 sub_713EA0, cn-408 sub_7CACD0, cn-706 sub_7A1330,
+  # cn-717 sub_8CEE00 and id-1809 sub_7BE230 read word then name.
+  # Modern consumers: kr-1256 sub_9BFAA0, cn-774 sub_BBD850, tw-454 sub_A9A7D0.
   CoupleInviteResult:
     - unknown_4: u32
       offset: 4
-      except: [kr-1256, cn-774, tw-454]
+      except: [cn-279, cn-735, cn-705]
+      kr-1256:
+        - unknown_0: u32
+          offset: 0
     - unknown_8: wstr
       offset: 8
-      except: [kr-1256, cn-774, tw-454]
+      except: [cn-279, cn-735, cn-705]
+      kr-1256:
+        - unknown_4: wstr
+          offset: 4
 
-  # S2C gspResCoupleInviteAnswer: vtable kr-812 0xd6f27c, deserializer kr-812 sub_83C1D0 stores a byte at +4, a wide
-  # string at +8 and a wide string at +36.
+  # S2C answer: kr-812 sub_83C1D0, cn-324 sub_6FD5F0, id-400 sub_798760,
+  # cn-404 sub_7C5F90, cn-406 sub_714C10, cn-408 sub_7C95B0, cn-706 sub_7A0AD0,
+  # cn-717 sub_8C4CF0 and id-1809 sub_7BE290 read bool32 then two names.
+  # Modern: kr-1256 sub_99CBB0 via kr-1256 sub_9C1210, cn-774 sub_BBED80, tw-454 sub_A9BCF0.
   CoupleInviteAnswerReply:
     - unknown_4: bool
       offset: 4
-      except: [kr-1256, cn-774, tw-454]
+      except: [cn-279, cn-735, cn-705]
+      kr-1256:
+        - unknown_0: bool
+          offset: 0
     - unknown_8: wstr
       offset: 8
-      except: [kr-1256, cn-774, tw-454]
+      except: [cn-279, cn-735, cn-705]
+      kr-1256:
+        - unknown_4: wstr
+          offset: 4
     - unknown_36: wstr
       offset: 36
-      except: [kr-1256, cn-774, tw-454]
+      except: [cn-279, cn-735, cn-705]
+      cn-324:
+        - unknown_12: wstr
+          offset: 12
+      kr-1256:
+        - unknown_28: wstr
+          offset: 28
 
-  # S2C gspResCoupleBreakUp: vtable kr-812 0xd6f288, deserializer kr-812 sub_83C1D0 (the invitation answer's own
-  # reader) stores a byte at +4, a wide string at +8 and a wide string at +36.
+  # S2C breakup shares the preceding legacy answer readers except cn-717 sub_88F4D0,
+  # which reads two names then a status word. kr-1256 sub_9C15C0 reads a word and ONE name.
+  # cn-774 sub_BBF1A0 and tw-454 sub_A9C220 instead read two names then a word; status 1
+  # selects the wait message in all three modern consumers. No success semantics are assigned here.
   CoupleBreakUpReply:
     - unknown_4: bool
       offset: 4
-      except: [kr-1256, cn-774, tw-454]
+      except: [cn-279, cn-735, cn-705]
+      cn-717:
+        - unknown_4: wstr
+          offset: 4
+        - unknown_32: wstr
+          offset: 32
+        - unknown_60: u32
+          offset: 60
+      kr-1256:
+        - unknown_0: u32
+          offset: 0
+        - unknown_4: wstr
+          offset: 4
+      cn-774:
+        - unknown_0: wstr
+          offset: 0
+        - unknown_24: wstr
+          offset: 24
+        - unknown_48: u32
+          offset: 48
     - unknown_8: wstr
       offset: 8
-      except: [kr-1256, cn-774, tw-454]
+      except: [cn-279, cn-717, kr-1256, cn-705]
     - unknown_36: wstr
       offset: 36
-      except: [kr-1256, cn-774, tw-454]
+      except: [cn-279, cn-717, kr-1256, cn-705]
+      cn-324:
+        - unknown_12: wstr
+          offset: 12
 
-  # S2C gspResCoupleNotifyPartner: vtable kr-812 0xd6f294, deserializer kr-812 sub_83C170 stores a byte at +4, a word
-  # at +8 and a wide string at +12.
+  # S2C partner notification: kr-812 sub_83C170, cn-324 sub_6FD6E0, id-400 sub_7987C0,
+  # cn-404 sub_7C6020, cn-406 sub_714C70, cn-408 sub_7C9640, cn-706 sub_7A0B60,
+  # cn-717 sub_8C4C90 and id-1809 sub_7BE2F0 read bool32, word, name.
+  # Modern consumers: kr-1256 sub_9C1BD0, cn-774 sub_BBF620, tw-454 sub_A9C7D0.
   CoupleNotifyPartner:
     - unknown_4: bool
       offset: 4
-      except: [kr-1256, cn-774, tw-454]
+      except: [cn-279, cn-735, cn-705]
+      kr-1256:
+        - unknown_0: bool
+          offset: 0
     - unknown_8: u32
       offset: 8
-      except: [kr-1256, cn-774, tw-454]
+      except: [cn-279, cn-735, cn-705]
+      kr-1256:
+        - unknown_4: u32
+          offset: 4
     - unknown_12: wstr
       offset: 12
-      except: [kr-1256, cn-774, tw-454]
+      except: [cn-279, cn-735, cn-705]
+      kr-1256:
+        - unknown_8: wstr
+          offset: 8
 
-  # S2C gspResChangeCouplering: vtable kr-812 0xd6f258, deserializer kr-812 sub_6DB1B0 stores a word at +4 and a word
-  # at +8.
+  # S2C ring change: kr-812 sub_6DB1B0, cn-706 sub_733050 and id-1809 sub_4D7F70
+  # read two words. cn-717 sub_538CF0 also reads bool32 at +12.
+  # Modern consumers kr-1256 sub_9BF1D0, cn-774 sub_BBD210 and tw-454 sub_A9A190
+  # all read two words AND a bool32. The third field must not be omitted.
   CoupleChangeRingReply:
     - unknown_4: u32
       offset: 4
-      except: [kr-1256, cn-774, tw-454]
+      except: [cn-324, id-400, cn-735, cn-705]
+      also: [cn-706]
+      kr-1256:
+        - unknown_0: u32
+          offset: 0
     - unknown_8: u32
       offset: 8
-      except: [kr-1256, cn-774, tw-454]
+      except: [cn-324, id-400, cn-735, cn-705]
+      also: [cn-706]
+      kr-1256:
+        - unknown_4: u32
+          offset: 4
+    - unknown_12: bool
+      offset: 12
+      only: [cn-717]
+      except: [cn-735]
+      kr-1256:
+        - unknown_8: bool
+          offset: 8
+
+  # The cn-324 initial invitation request and inviter-status response are separate from confirmation.
+  # cn-324 sub_6FD8F0 reads bool32/name; cn-324 sub_410910 reads one word.
+  CoupleInitialInviteRequest:
+    - unknown_4: bool
+      offset: 4
+      only: [cn-324]
+      except: [cn-279]
+    - unknown_8: wstr
+      offset: 8
+      only: [cn-324]
+      except: [cn-279]
+  CoupleInviterStatusReply:
+    - unknown_4: u32
+      offset: 4
+      only: [cn-324]
+      except: [cn-279]
+
+  # kr-1256 sub_9C33C0 delegates its complete body to kr-1256 sub_10E1CF0,
+  # the same tagged record consumed by FighterInfo. Tag 0x3A carries u64/u32/u32/bool32;
+  # other tags contain no suffix. cn-774/tw-454 opcode 946 is a different list packet.
+  CoupleMyInfo:
+    - unknown_0: 'optional<0x3A,FighterInfoTail48>'
+      offset: 0
+      only: [kr-1256]
+      except: [cn-774]
+
+  # Modern list envelopes: kr-1256 sub_99CDD0 via kr-1256 sub_9C3410 (S2C 947),
+  # cn-774 sub_BC09B0 and tw-454 sub_A9DAE0 (S2C 946). Each has a counted record list,
+  # a counted word list and one REQUIRED final record. Two zero list counts are not a complete body.
+  # Record vectors: kr-1256 sub_10E1EC0, cn-774 sub_1055070, tw-454 sub_ECC830.
+  # Word vectors: kr-1256 sub_999C00, cn-774 sub_456D30, tw-454 sub_45AA50.
+  CoupleList:
+    - unknown_0: 'list<CoupleListRecord>'
+      offset: 0
+      only: [kr-1256]
+    - unknown_12: 'list<u32>'
+      offset: 12
+      only: [kr-1256]
+    - unknown_24: CoupleListRecord
+      offset: 24
+      only: [kr-1256]
+
+  # The same record appears in the list and mandatory suffix: kr-1256 sub_1145A00,
+  # cn-774 sub_1054C90 and tw-454 sub_ECC6A0. Fields +12/+13 are bool32 on the wire.
+  CoupleListRecord:
+    - unknown_0: u32
+      offset: 0
+      only: [kr-1256]
+    - unknown_4: u32
+      offset: 4
+      only: [kr-1256]
+    - unknown_8: u32
+      offset: 8
+      only: [kr-1256]
+    - unknown_12: bool
+      offset: 12
+      only: [kr-1256]
+    - unknown_13: bool
+      offset: 13
+      only: [kr-1256]
+    - unknown_16: u32
+      offset: 16
+      only: [kr-1256]
+    - unknown_24: u64
+      offset: 24
+      only: [kr-1256]
+    - unknown_32: 'list<CoupleListParticipant>'
+      offset: 32
+      only: [kr-1256]
+
+  # kr-1256 sub_1145DE0/sub_11460C0, cn-774 sub_455E40 and tw-454 sub_455B90:
+  # word, name and bool32. The local word at +32 is initialized to -1 but never read from the wire.
+  CoupleListParticipant:
+    - unknown_0: u32
+      offset: 0
+      only: [kr-1256]
+    - unknown_4: wstr
+      offset: 4
+      only: [kr-1256]
+    - unknown_28: bool
+      offset: 28
+      only: [kr-1256]

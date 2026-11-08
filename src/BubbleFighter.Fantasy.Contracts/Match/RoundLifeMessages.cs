@@ -26,7 +26,10 @@ public enum RoundLifeEvent
     /// <summary>The sender's dead character finished its death presentation, so it may ask for a reset.</summary>
     DeathCleaned,
 
-    /// <summary>The sender's character completed the reset the server granted, on the relay of that grant.</summary>
+    /// <summary>
+    /// The sender's character completed the respawn the server granted (<see cref="RoundPlayerRespawned"/>), on the
+    /// match link of that grant.
+    /// </summary>
     ResetConfirmed,
 }
 
@@ -37,15 +40,9 @@ public enum RoundLifeEvent
 /// <param name="Actor">The character it happened to.</param>
 public sealed record RoundLifeReported(RoundLifeEvent Event, int Actor) : IMessage
 {
-    /// <summary>Gets the character that popped the bubble, for <see cref="RoundLifeEvent.Finished"/>.</summary>
+    /// <summary>
+    /// Gets the source character for a bubble or direct death, the rescuer for a release, or the popper for a finish,
+    /// when the native report names one. A generic life notification carries no attribution.
+    /// </summary>
     public int? Initiator { get; init; }
 }
-
-/// <summary>A dead player asks for its character to be reset into the round.</summary>
-/// <param name="Actor">The character the request names; it must be the sender's own.</param>
-/// <param name="Request">The request body, which the grant repeats.</param>
-public sealed record RoundResetRequested(int Actor, ReadOnlyMemory<byte> Request) : IMessage;
-
-/// <summary>The server grants a reset; the client then resets its character and confirms on the relay.</summary>
-/// <param name="Request">The request body being granted.</param>
-public sealed record RoundResetGranted(ReadOnlyMemory<byte> Request) : IMessage;

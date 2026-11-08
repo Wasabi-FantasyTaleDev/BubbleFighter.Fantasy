@@ -30,7 +30,7 @@ namespace BubbleFighter.Fantasy.Dialect.Messages;
     Optional = [typeof(IPlayerSettingsRepository)],
     OptionalMany = [typeof(IOpcodeTable), typeof(IMessageSender<MainMenuRoomOpened>)],
     Provides = [], ProvidesMany = [],
-    ConditionalProvides = [], ConditionalProvidesMany = [typeof(IInboundMessageBinding<LoginRequested>), typeof(IMessageSender<LoginAccepted>), typeof(IMessageSender<LoginRejected>), typeof(IMessageSender<LoginSucceeded>), typeof(IInboundMessageBinding<MainMenuInitRequest>), typeof(IMessageSender<EmptySessionSignature>), typeof(IMessageSender<MatchSessionSignature>), typeof(IInboundMessageBinding<CenterStatusRequested>), typeof(IInboundMessageBinding<CenterAvailabilityRequested>), typeof(IMessageSender<CenterStatusReplied>), typeof(IMessageSender<CenterAvailabilityReplied>), typeof(IMessageSender<ServerNotice>), typeof(IInboundMessageBinding<InventoryItemUseRequested>), typeof(IMessageSender<InventoryItemUseReplied>), typeof(IMessageSender<UserStatUpdated>), typeof(IInboundMessageBinding<CharacterNameRequested>), typeof(IInboundMessageBinding<CharacterCreateRequested>), typeof(IInboundMessageBinding<CharacterLoginRequested>), typeof(IMessageSender<CharacterCreationOpened>), typeof(IMessageSender<CharacterNameReplied>), typeof(IMessageSender<CharacterCreateReplied>), typeof(IMessageSender<ShopStateUpdated>), typeof(IMessageSender<ShopPurchaseReplied>), typeof(IMessageSender<ShopBalanceUpdated>), typeof(IInboundMessageBinding<ShopBalanceRequested>), typeof(IInboundMessageBinding<ShopPurchaseRequested>), typeof(IInboundMessageBinding<ShopInventoryRequested>), typeof(IInboundMessageBinding<ShopCatalogRequested>), typeof(IInboundMessageBinding<ShopCashCatalogRequested>), typeof(IInboundMessageBinding<ShopCardInfoRequested>), typeof(IInboundMessageBinding<ShopCouponUseRequested>), typeof(IInboundMessageBinding<ShopCashCheckRequested>), typeof(IMessageSender<ShopCatalogPublished>), typeof(IMessageSender<ShopCashCatalogPublished>), typeof(IMessageSender<ShopCardInfoReplied>), typeof(IMessageSender<ShopCouponUseReplied>), typeof(IMessageSender<ShopCashCheckReplied>), typeof(IMessageSender<EquippedArticlesFlushed>), typeof(IMessageSender<InventoryReplaced>), typeof(IMessageSender<InventorySlotsUpdated>), typeof(IMessageSender<InventoryPurchaseApplied>), typeof(IMessageSender<ItemsExpired>), typeof(IMessageSender<LocalEquipmentViewUpdated>), typeof(IMessageSender<RemoteEquipmentViewUpdated>), typeof(IInboundMessageBinding<EquipmentChangeRequested>), typeof(IMessageSender<EquipmentChangeReplied>), typeof(IInboundMessageBinding<WeaponPresetChangeRequested>), typeof(IMessageSender<WeaponPresetChangeReplied>), typeof(IInboundMessageBinding<PartyInviteRequested>), typeof(IInboundMessageBinding<PartyInviteAccepted>), typeof(IInboundMessageBinding<PartyInviteAnswered>), typeof(IInboundMessageBinding<PartyInviteTokenRefused>), typeof(IInboundMessageBinding<PartyLeaveRequested>), typeof(IInboundMessageBinding<PartyKickRequested>), typeof(IInboundMessageBinding<PartyLeaderChangeRequested>), typeof(IMessageSender<PartyInviteReplied>), typeof(IMessageSender<PartyInviteNotified>), typeof(IMessageSender<PartyUpdated>), typeof(IMessageSender<PartyLeaderReplaced>), typeof(IMessageSender<PartyLeft>), typeof(IMessageSender<PartyMemberLeft>), typeof(IMessageSender<PartyMemberJoined>), typeof(IMessageSender<PartyKickReplied>), typeof(IMessageSender<PartyKicked>), typeof(IMessageSender<PartyMemberKicked>), typeof(IMessageSender<PartyLeaderChanged>), typeof(IInboundMessageBinding<PartyVisitRequested>), typeof(IInboundMessageBinding<PartyVisitAnswered>), typeof(IInboundMessageBinding<PartyVisitTokenAnswered>), typeof(IMessageSender<PartyVisitAsked>), typeof(IMessageSender<PartyVisitFailed>), typeof(IMessageSender<PartyVisitGranted>), typeof(IMessageSender<PartyVisitSucceeded>), typeof(IMessageSender<PartyInvitationMoveSucceeded>), typeof(IInboundMessageBinding<ClanServerAckReceived>), typeof(IInboundMessageBinding<ClanMainOpened>), typeof(IInboundMessageBinding<ClanAttendanceCheckedIn>), typeof(IMessageSender<ClanOpened>), typeof(IMessageSender<ClanAttendanceStateUpdated>), typeof(IInboundMessageBinding<FighterInfoRequested>), typeof(IMessageSender<FighterInfoReplied>), typeof(IInboundMessageBinding<PresentSendRequested>), typeof(IInboundMessageBinding<PresentListRequested>), typeof(IInboundMessageBinding<PresentActionRequested>), typeof(IInboundMessageBinding<PresentNoticeRequested>), typeof(IMessageSender<PresentSendReplied>), typeof(IMessageSender<PresentListReplied>), typeof(IMessageSender<PresentActionReplied>), typeof(IMessageSender<PresentNoticeSent>), typeof(IInboundMessageBinding<InventoryThrowRequested>), typeof(IMessageSender<InventoryThrowReplied>), typeof(IInboundMessageBinding<CustomizedKeysUpdated>), typeof(IMessageSender<CustomizedKeysRestored>)])]
+    ConditionalProvides = [], ConditionalProvidesMany = [typeof(IMessageSender<ChannelMoveOffered>), typeof(IInboundMessageBinding<MoveIntoRequested>), typeof(IMessageSender<MoveIntoReplied>), typeof(IMessageSender<PendingConnectionPromoted>), typeof(IInboundMessageBinding<PendingPromotionAcknowledged>), typeof(IMessageSender<PendingPromotionCompleted>), typeof(IInboundMessageBinding<LoginRequested>), typeof(IMessageSender<LoginAccepted>), typeof(IMessageSender<LoginRejected>), typeof(IMessageSender<LoginSucceeded>), typeof(IInboundMessageBinding<MainMenuInitRequest>), typeof(IMessageSender<EmptySessionSignature>), typeof(IMessageSender<MatchSessionSignature>), typeof(IInboundMessageBinding<CenterStatusRequested>), typeof(IInboundMessageBinding<CenterAvailabilityRequested>), typeof(IMessageSender<CenterStatusReplied>), typeof(IMessageSender<CenterAvailabilityReplied>), typeof(IMessageSender<ServerNotice>), typeof(IInboundMessageBinding<InventoryItemUseRequested>), typeof(IMessageSender<InventoryItemUseReplied>), typeof(IMessageSender<UserStatUpdated>), typeof(IInboundMessageBinding<CharacterNameRequested>), typeof(IInboundMessageBinding<CharacterCreateRequested>), typeof(IInboundMessageBinding<CharacterLoginRequested>), typeof(IMessageSender<CharacterCreationOpened>), typeof(IMessageSender<CharacterNameReplied>), typeof(IMessageSender<CharacterCreateReplied>), typeof(IMessageSender<ShopStateUpdated>), typeof(IMessageSender<ShopPurchaseReplied>), typeof(IMessageSender<ShopBalanceUpdated>), typeof(IInboundMessageBinding<ShopBalanceRequested>), typeof(IInboundMessageBinding<ShopPurchaseRequested>), typeof(IInboundMessageBinding<ShopInventoryRequested>), typeof(IInboundMessageBinding<ShopCatalogRequested>), typeof(IInboundMessageBinding<ShopCashCatalogRequested>), typeof(IInboundMessageBinding<ShopCardInfoRequested>), typeof(IInboundMessageBinding<ShopCouponUseRequested>), typeof(IInboundMessageBinding<ShopCashCheckRequested>), typeof(IMessageSender<ShopCatalogPublished>), typeof(IMessageSender<ShopCashCatalogPublished>), typeof(IMessageSender<ShopCardInfoReplied>), typeof(IMessageSender<ShopCouponUseReplied>), typeof(IMessageSender<ShopCashCheckReplied>), typeof(IMessageSender<EquippedArticlesFlushed>), typeof(IMessageSender<InventoryReplaced>), typeof(IMessageSender<InventorySlotsUpdated>), typeof(IMessageSender<InventoryPurchaseApplied>), typeof(IMessageSender<ItemsExpired>), typeof(IMessageSender<LocalEquipmentViewUpdated>), typeof(IMessageSender<RemoteEquipmentViewUpdated>), typeof(IInboundMessageBinding<EquipmentChangeRequested>), typeof(IMessageSender<EquipmentChangeReplied>), typeof(IInboundMessageBinding<WeaponPresetChangeRequested>), typeof(IMessageSender<WeaponPresetChangeReplied>), typeof(IInboundMessageBinding<PartyInviteRequested>), typeof(IInboundMessageBinding<PartyInviteAccepted>), typeof(IInboundMessageBinding<PartyRecruitmentJoinRequested>), typeof(IInboundMessageBinding<PartyInviteAnswered>), typeof(IInboundMessageBinding<PartyInviteTokenRefused>), typeof(IInboundMessageBinding<PartyLeaveRequested>), typeof(IInboundMessageBinding<PartyKickRequested>), typeof(IInboundMessageBinding<PartyLeaderChangeRequested>), typeof(IInboundMessageBinding<PartyQuickStartRequested>), typeof(IMessageSender<PartyQuickStartAnswered>), typeof(IMessageSender<PartyInviteReplied>), typeof(IMessageSender<PartyInviteNotified>), typeof(IMessageSender<PartyUpdated>), typeof(IMessageSender<PartyLeaderReplaced>), typeof(IMessageSender<PartyLeft>), typeof(IMessageSender<PartyMemberLeft>), typeof(IMessageSender<PartyMemberJoined>), typeof(IMessageSender<PartyKickReplied>), typeof(IMessageSender<PartyKicked>), typeof(IMessageSender<PartyMemberKicked>), typeof(IMessageSender<PartyLeaderChanged>), typeof(IInboundMessageBinding<PartyVisitRequested>), typeof(IInboundMessageBinding<PartyVisitAnswered>), typeof(IInboundMessageBinding<PartyVisitTokenAnswered>), typeof(IMessageSender<PartyVisitAsked>), typeof(IMessageSender<PartyVisitFailed>), typeof(IMessageSender<PartyVisitGranted>), typeof(IMessageSender<PartyVisitSucceeded>), typeof(IMessageSender<PartyInvitationMoveSucceeded>), typeof(IInboundMessageBinding<PartyChatSent>), typeof(IMessageSender<PartyChatReceived>), typeof(IInboundMessageBinding<ClanServerAckReceived>), typeof(IInboundMessageBinding<ClanMainOpened>), typeof(IInboundMessageBinding<ClanAttendanceCheckedIn>), typeof(IMessageSender<ClanOpened>), typeof(IMessageSender<ClanAttendanceStateUpdated>), typeof(IInboundMessageBinding<FighterInfoRequested>), typeof(IMessageSender<FighterInfoReplied>), typeof(IInboundMessageBinding<PresentSendRequested>), typeof(IInboundMessageBinding<PresentListRequested>), typeof(IInboundMessageBinding<PresentActionRequested>), typeof(IInboundMessageBinding<PresentNoticeRequested>), typeof(IMessageSender<PresentSendReplied>), typeof(IMessageSender<PresentListReplied>), typeof(IMessageSender<PresentActionReplied>), typeof(IMessageSender<PresentNoticeSent>), typeof(IInboundMessageBinding<InventoryThrowRequested>), typeof(IMessageSender<InventoryThrowReplied>), typeof(IInboundMessageBinding<CustomizedKeysUpdated>), typeof(IMessageSender<CustomizedKeysRestored>), typeof(IMessageSender<LabOperationAnswered>)])]
 public sealed class MessagesPlugin : IPlugin
 {
     // cn-774 carries the same GotoRoom/GotoMenu pair on a different lineage (kr-1256) and is not yet decoded.
@@ -69,6 +69,15 @@ public sealed class MessagesPlugin : IPlugin
         }
         if (options.CenterDirectory)
             new CenterDirectoryBinding(options.Protocol, table, packetTablesOfRow.Value.Tables, packetTablesOfRow.Value.Build).Bind(context, router);
+        if (options.CenterMigrationPrelogin || options.NativeMigration)
+        {
+            if (!options.Login)
+                throw new ConfigException("Native move bindings require ordinary login.");
+            new CenterPreloginBinding(options.Protocol, table, packetTablesOfRow.Value.Tables, packetTablesOfRow.Value.Build,
+                options.CenterMigrationPrelogin, options.NativeMigration).Bind(context);
+            if (options.NativeMigration)
+                new MigrationBinding(options.Protocol, table, packetTablesOfRow.Value.Tables, packetTablesOfRow.Value.Build).Bind(context, router);
+        }
         if (options.Party)
         {
             if (!packetTablesOfRow.Value.Tables.CapabilityOf(packetTablesOfRow.Value.Build, "party"))
@@ -115,6 +124,9 @@ public sealed class MessagesPlugin : IPlugin
                 throw new ConfigException("Inventory item use requires a verified packet layout for this build.");
             new InventoryUseBinding(options.Protocol, table, packetTables, buildName).Bind(context, router);
         }
+        if (options.ScienceLab)
+            new LabBinding(options.Protocol, table, packetTablesOfRow.Value.Tables,
+                packetTablesOfRow.Value.Build).Mount(context);
         if (options.InventoryActions)
             new InventoryActionsBinding(options.Protocol, table, packetTablesOfRow.Value.Tables,
                 packetTablesOfRow.Value.Build).Bind(context, router);
@@ -202,7 +214,15 @@ public sealed class MessagesPlugin : IPlugin
             if (options.EquipmentView)
                 BindEquipmentView(required: true);
             if (options.Equipment)
-                BindEquipment(presets: false);
+            {
+                // The purchases branch mounts the preset switch with the legacy purchase opcodes; the
+                // modern row mounts the same switch on the build's own capability, without them.
+                var presets = table.Find(PacketDirection.ClientToServer, "gcpReqInventoryChangeWeaponPresetIdx") is not null
+                    && packetTablesOfRow.Value.Tables.CapabilityOf(packetTablesOfRow.Value.Build, "weapon_presets");
+                if (presets)
+                    PresetWire.RequirePresets(packetTablesOfRow.Value.Tables, packetTablesOfRow.Value.Build);
+                BindEquipment(presets);
+            }
         }
         BindShopCatalog();
         if (options.Login)
@@ -220,7 +240,7 @@ public sealed class MessagesPlugin : IPlugin
                     $"'{context.Row.Id}' ({options.Protocol}, build '{loginBuild}') names the inventory step in its login.burst but publishes no bag; set inventory: true (or enable_purchases) on this row.");
             LoginBurstWire.RequireUserState(loginTables, loginBuild);
             var binding = new LoginBinding(options.Protocol, loginValues, replyOpcode, table, loginTables, loginBuild,
-                context.Services, context.Events, inventoryBinding, expiredItems, context.Logger);
+                context.Services, context.Events, inventoryBinding, expiredItems, context.Logger, options.LoginChannel);
             context.Effect(context.Services.RegisterMany<IInboundMessageBinding<LoginRequested>>(binding));
             context.Effect(context.Services.RegisterMany<IMessageSender<LoginAccepted>>(binding));
             context.Effect(context.Services.RegisterMany<IMessageSender<LoginRejected>>(binding));
@@ -284,6 +304,11 @@ public sealed class MessagesPlugin : IPlugin
             if (table.Find(PacketDirection.ClientToServer, "gcpReqDynamicConfig") is { } clientEnvironment)
             {
                 var dynamicConfig = table.S2C("gspRepDynamicConfig");
+                // The client fires C2S 1500 (kr-1256 sub_99E860) before login and again after init.
+                // A request whose stamps all match the served generation is answered with the empty
+                // S2C 4 frame (kr-1256 sub_9ACF60 consumes it as the cached-configuration
+                // acknowledgement); only stale categories are re-framed.
+                var configAck = table.Find(PacketDirection.ServerToClient, "gspReqPing");
                 var configuration = new DynamicConfigWire(loginTables, loginBuild);
                 context.Effect(context.Services.Get<IPacketRouter>().Register(options.Protocol, clientEnvironment,
                     (session, packet, ct) =>
@@ -291,7 +316,10 @@ public sealed class MessagesPlugin : IPlugin
                         context.Logger.LogInformation(
                             "Session {Id}: dynamic configuration request ({Bytes} bytes).",
                             session.Id, packet.Payload.Length);
-                        return session.SendAsync(dynamicConfig, configuration.Reply(packet.Payload.Span), ct);
+                        var reply = configuration.Reply(packet.Payload.Span);
+                        return reply is not null ? session.SendAsync(dynamicConfig, reply, ct)
+                            : configAck is { } ack ? session.SendAsync(ack, ReadOnlyMemory<byte>.Empty, ct)
+                            : session.SendAsync(dynamicConfig, LoginBurstWire.WriteDynamicConfigEmpty(loginTables, loginBuild), ct);
                     }));
             }
             if (table.Find(PacketDirection.ClientToServer, "gcpReqUserLaboratoryState") is { } laboratory)
@@ -300,7 +328,7 @@ public sealed class MessagesPlugin : IPlugin
                     (session, packet, _) =>
                     {
                         context.Logger.LogInformation(
-                            "Session {Id} C2S 109 gcpReqUserLaboratoryState ({Bytes} B, builder sub_E7E020). No reply: S2C 109 has no sourced body.",
+                            "Session {Id} inferred laboratory-state request ({Bytes} bytes). No reply: the response trigger is not established.",
                             session.Id, packet.Payload.Length);
                         return ValueTask.CompletedTask;
                     }));
@@ -484,6 +512,34 @@ public sealed class MessagesOptions
     public bool Login { get; set; } = true;
 
     /// <summary>
+    /// Gets or sets the channel every accepted login places the player in. YAML key <c>login_channel</c>;
+    /// default 60 ("Free"). Zero switches it off and keeps each build's own value.
+    /// <para>
+    /// The client keeps one channel number per connection and, at round start, reads the round's movement and
+    /// bubble values from the column of that number in the <c>FighterConfigChannel</c> sheet of
+    /// <c>Config/FighterConfig.xml</c> (kr-812 <c>sub_587690</c> picks the channel, kr-812 <c>sub_584320</c>
+    /// looks it up). A login reply that leaves the word zero puts the player on channel 10 (Junior); a room
+    /// move puts the player on the move's channel. Two players in one room on different channels therefore
+    /// play the same round with different values, and a channel with no column has no row to read.
+    /// </para>
+    /// <para>
+    /// The server runs one shared lobby, not separate channels, so the bundles set every client to channel 60,
+    /// "Free", through <c>${BFF_PLAYER_CHANNEL:-60}</c>; the same variable feeds the room move-in and the
+    /// cluster move, so a player keeps one channel everywhere. Channel 60 is a column of the sheet in the
+    /// oldest and newest clients served (CN2011 and kr-1256) and in KR2015; channel 50, which the move reply
+    /// also admits, is a column in none of them.
+    /// </para>
+    /// <para>
+    /// The value is written to the accepted reply's <c>channel_id</c> word: the legacy table reply where the
+    /// build's <c>LoginReply</c> names it (kr-812 <c>sub_818680</c> stores it at <c>ServerConnection+2432</c>)
+    /// and the modern table reply (kr-1256 <c>sub_9A2770</c>, <c>ServerConnection+2508</c>), where it replaces
+    /// the build's <c>login.channel_id</c>. Builds whose reply has no channel word (the cn-324/cn-279 reply and
+    /// the response pair) log that at activation and take the channel from the move replies only.
+    /// </para>
+    /// </summary>
+    public int LoginChannel { get; set; } = 60;
+
+    /// <summary>
     /// Gets or sets whether the row answers the kr-1256 family's main-menu probe (C2S 521, builders
     /// <c>sub_937560</c>/<c>sub_937920</c>, empty body) with the empty <c>gspSessionSignatureData</c> body. YAML
     /// key <c>main_menu_init</c>; off for builds whose table does not name the probe.
@@ -513,6 +569,12 @@ public sealed class MessagesOptions
     /// <summary>Gets or sets whether to bind native center status and availability messages.</summary>
     public bool CenterDirectory { get; set; }
 
+    /// <summary>Gets or sets whether zero-identity native chooser moves may continue to ordinary ticket login.</summary>
+    public bool CenterMigrationPrelogin { get; set; }
+
+    /// <summary>Gets or sets whether native retained-identity moves are routed to destination admission and promotion handlers.</summary>
+    public bool NativeMigration { get; set; }
+
     /// <summary>
     /// Gets or sets whether to bind the native party packets (invitation, accept, leave, kick, leader handover and the
     /// party list) for the <c>party</c> row, on builds with the <c>party</c> capability in <c>packets/builds.yaml</c>.
@@ -525,6 +587,13 @@ public sealed class MessagesOptions
     /// on builds with the <c>clan</c> capability in <c>packets/builds.yaml</c>. YAML key <c>clan</c>.
     /// </summary>
     public bool Clan { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether the eight audited laboratory requests receive the closed-lab reply.
+    /// Defaults to false and requires every operation's verified request and reply rows. No recipes,
+    /// item mutations or laboratory state opener are implemented. YAML key <c>science_lab</c>.
+    /// </summary>
+    public bool ScienceLab { get; set; }
 
     /// <summary>
     /// Gets or sets whether to bind the player menu's "view info" packets (<c>gcpReqFighterInfo</c> and

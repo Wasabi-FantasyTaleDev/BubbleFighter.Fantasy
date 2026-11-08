@@ -18,6 +18,8 @@ structs:
   # cn-279 sub_41EBB0, id-400 sub_5DBAA0, id-1809 sub_623930, cn-706 sub_603710.
   # cn-406 sub_56AAA0 also consumes these scalars and the SessionSetting vector.
   # Their vector readers consume a u32 count and each SessionSetting via its vtable.
+  # cn-735 sub_82CC40 / cn-738 sub_85B630 read a word, bool32 and counted SessionSetting rows.
+  # cn-742 sub_78F7D0 and cn-742 sub_794830 independently retain that envelope; rows use cn-742 sub_42CC90.
   RoomListReply:
     # kr-1256 (read on the lobby stage by kr-1256 sub_853CF0 through sub_84F550) has three header words
     - page: u32
@@ -46,6 +48,8 @@ structs:
       offset: 0
   # Slot readers: kr-812 sub_80C1B0, cn-717 sub_890F70, cn-324 sub_6EB1B0,
   # cn-279 sub_4499B0, id-400 sub_782540, id-1809 sub_7A5A30, cn-706 sub_788190.
+  # cn-735 sub_9F28D0, cn-738 sub_A208D0 and cn-742 sub_960A10 read the seat word,
+  # their own UserSlot and one EquippedItemList, without a modern team-panel suffix.
   RoomSeatUpdate:
     - slot: u32
       offset: 4
@@ -82,6 +86,15 @@ structs:
       cn-706:
         - equipment: EquippedItemList
           offset: 248
+      cn-735:
+        - equipment: EquippedItemList
+          offset: 296
+      cn-738:
+        - equipment: EquippedItemList
+          offset: 280
+      cn-742:
+        - equipment: EquippedItemList
+          offset: 288
   # S2C gspRoomChangeGameSetting (505), the in-place map update: exactly one GameSetting. kr-812 room
   # dispatcher sub_7FBBB0 case 505 -> kr-812 sub_7FE410 builds Packet_gspRoomChangeGameSetting around one
   # GameSetting (initializer kr-812 sub_417BD0, packet vtable D6922C) and applies it on the arms where
@@ -89,11 +102,15 @@ structs:
   # kr-1256 sub_9DB8A0 reads the MapMeta with the GameSetting reader kr-1256 sub_113D030, installs it
   # through the copy helper kr-1256 sub_113C9A0 and redraws the mode/map board. A map change travels on
   # this frame, never on an S2C 117, whose kind-2 install deletes and rebuilds the room.
+  # cn-735 sub_9F3860, cn-738 sub_A217E0 and cn-742 sub_961970 likewise read one
+  # complete GameSetting through its vtable and apply it to the current room.
   gspRoomChangeGameSetting:
     - game_setting: GameSetting
       offset: 0
   # Leave readers: kr-812 sub_8104E0, cn-717 sub_8C9DB0, cn-324 sub_6FE130,
   # cn-279 sub_44A060, id-400 sub_7828E0, id-1809 sub_7A5E00, cn-706 sub_4BA810.
+  # cn-735 sub_9F31B0, cn-738 sub_A21190 and cn-742 sub_961310 read only the
+  # seat word and UserSlot; the later local copy of that record consumes no packet bytes.
   RoomSeatLeave:
     - slot: u32
       offset: 4
@@ -151,22 +168,31 @@ structs:
         - unknown_n2: "optional<0x3A,RoomCreateTail>"
       # tw-454 sub_668EB0 writes SessionSetting through sub_48B420, then the password and no tag.
       tw-454: []
+      # cn-735 sub_5B0970, cn-738 sub_5EAFA0 and cn-742 sub_53E800 also stop after the password.
+      cn-735: []
   RoomJoinRequest:
     # kr-1256 sub_854C90 writes the clicked row's room id and the typed password only
     - room_id: u32
       offset: 4
     - unknown_8: u32
       offset: 8
-      except: [kr-1256]
+      except: [kr-1256, cn-735]
     - unknown_12: u32
       offset: 12
-      except: [kr-1256]
+      except: [kr-1256, cn-735]
     - password: wstr
       offset: 16
+      cn-735:
+        - password: wstr
+          offset: 8
     - unknown_44: u32
       offset: 44
       except: [cn-324, kr-1256]
       cn-406: []
+      # cn-735 sub_832470, cn-738 sub_85FDC0 and cn-742 sub_55D620 write one word after the password.
+      cn-735:
+        - unknown_36: u32
+          offset: 36
       id-400:
         - unknown_44: u16
           offset: 44
@@ -238,6 +264,46 @@ structs:
     # kr-1256 sends a second string after the text
     - unknown_n2: wstr
       only: [kr-1256]
+  # C2S gcpRoomSendChatMsg (501): the waiting-room chat box. kr-812 sub_8145C0 and cn-717 sub_899D30 send it only
+  # while a room object exists (kr-812 dword_E827CC, cn-717 dword_FFBA20), with the team-only flag the box passes
+  # in (cn-717 sub_6C0660 this+752), and draw nothing locally. Readers: kr-812 sub_8456D0, cn-717 sub_8CFCB0,
+  # cn-324 sub_6FD8F0, cn-279 sub_425D90, cn-406 sub_714E80, cn-404 sub_8D1F90, cn-408 sub_8D6480,
+  # cn-705 sub_79F3D0, cn-706 sub_8AE2D0, id-400 sub_89DC20, id-1809 sub_7BE6C0: bool32, then the text.
+  # cn-324 and cn-279 store the text at +8 in their compact string form; the wire is the same.
+  RoomSessionChatRequest:
+    - team_only: bool
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+    - text: wstr
+      offset: 8
+      except: [kr-1256, cn-774, tw-454]
+  # S2C gspRoomReceiveChatMsg (508), the answer to 501. Readers: kr-812 sub_80AD80, cn-717 sub_88F450, cn-324
+  # sub_6EB390, cn-279 sub_449D40, cn-406 sub_700460, cn-404 sub_7AED80, cn-408 sub_7B2250, cn-705 sub_786E10,
+  # cn-706 sub_788430, id-400 sub_782730, id-1809 sub_7A5C70. The handler (kr-812 sub_802170, cn-717 sub_885700)
+  # names the speaker by `slot` (slot -1 is the system speaker), replaces `colour` with the speaker's team colour
+  # (cn-717 room seat +124: 1 gives -24159, 2 gives -7479809) when `team_only` is set, and draws `text`.
+  # cn-717 sub_889440 tests unknown_68 before taking the speaker-bubble branch; its meaning is not proven.
+  # cn-324 and cn-279 read the same six fields at +4, +6, +8, +12, +16 and +20 (compact strings).
+  RoomSessionChatReceived:
+    - slot: u16
+      offset: 4
+      except: [kr-1256, cn-774, tw-454]
+    - team_only: bool
+      offset: 6
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_8: wstr
+      offset: 8
+      except: [kr-1256, cn-774, tw-454]
+    - text: wstr
+      offset: 36
+      except: [kr-1256, cn-774, tw-454]
+    - colour: u32
+      offset: 64
+      default: -1
+      except: [kr-1256, cn-774, tw-454]
+    - unknown_68: bool
+      offset: 68
+      except: [kr-1256, cn-774, tw-454]
   # C2S and S2C share the slot word and bool32. Readers: kr-812 sub_93C4E0,
   # cn-717 sub_8C4260, cn-324 sub_411530, cn-279 sub_425AA0,
   # id-400 sub_610D40, id-1809 sub_4D7AD0, cn-706 sub_4BB840.
@@ -272,21 +338,47 @@ structs:
   # id-1809 sub_68D480, cn-706 sub_567230.
   RoomKickRequest:
     # cn-406 sub_75A200 reads one counted UTF-16 nickname.
+    # kr-1256 sub_96A730, cn-774 sub_B6C020 and tw-454 sub_7D37C0 write a transient target string.
     - nickname: wstr
       offset: 4
+      kr-1256:
+        - nickname: wstr
   # S2C readers: kr-812 sub_80AE00, cn-717 sub_88F4D0, cn-324 sub_7C6C10,
   # cn-279 sub_480490, id-400 sub_782430, id-1809 sub_8C2580, cn-706 sub_8AE3F0.
   RoomMemberKicked:
     # cn-406 sub_700220 reads two counted UTF-16 names and one result word.
+    # kr-1256 sub_9D8C00 stores the strings at +0/+24 and the result at +48.
+    # cn-774 sub_8DF970 and tw-454 sub_A5F3C0 read the same sequence into stack locals.
     - by_nickname: wstr
       offset: 4
+      kr-1256:
+        - by_nickname: wstr
+          offset: 0
+      cn-774:
+        - by_nickname: wstr
+      tw-454:
+        - by_nickname: wstr
     - nickname: wstr
       offset: 32
+      kr-1256:
+        - nickname: wstr
+          offset: 24
+      cn-774:
+        - nickname: wstr
+      tw-454:
+        - nickname: wstr
       cn-324:
         - nickname: wstr
           offset: 8
     - result: u32
       offset: 60
+      kr-1256:
+        - result: u32
+          offset: 48
+      cn-774:
+        - result: u32
+      tw-454:
+        - result: u32
       cn-324:
         - result: u32
           offset: 12

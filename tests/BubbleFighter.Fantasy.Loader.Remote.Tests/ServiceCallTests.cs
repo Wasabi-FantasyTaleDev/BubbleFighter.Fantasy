@@ -191,7 +191,7 @@ public sealed class ServiceCallTests
 
     [Theory]
     [InlineData("python")]
-    [InlineData("typescript")]
+    [SdkData("typescript")]
     public async Task InterpretedPluginCallsRealMountedMemoryService(string language)
     {
         var key = Guid.NewGuid().ToString("N");
@@ -262,6 +262,7 @@ public sealed class ServiceCallTests
             return null;
         }
         public ValueTask UpsertAsync(PlayerWallet wallet, CancellationToken ct) => throw new NotSupportedException();
+        public ValueTask<PlayerWallet> GetOrCreateAsync(PlayerWallet initialWallet, CancellationToken ct) => throw new NotSupportedException();
     }
 
     private sealed class CancelledWallet : IPlayerWalletRepository
@@ -272,6 +273,7 @@ public sealed class ServiceCallTests
             return null;
         }
         public ValueTask UpsertAsync(PlayerWallet wallet, CancellationToken ct) => throw new NotSupportedException();
+        public ValueTask<PlayerWallet> GetOrCreateAsync(PlayerWallet initialWallet, CancellationToken ct) => throw new NotSupportedException();
     }
 
     private sealed class Online : IOnlinePlayers

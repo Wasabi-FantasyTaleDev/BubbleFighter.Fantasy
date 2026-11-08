@@ -142,6 +142,7 @@ internal sealed partial class RoundFlow
 
     private async ValueTask<ShopPurchaseResult> GrantLotteryItemAsync(RoomSeat member, LotteryItem prize, CancellationToken ct)
     {
+        using var authority = _mutations?.Enter(member.Game);
         for (var attempt = 0; attempt < _options.LotteryGrantRetryCount; attempt++)
         {
             var wallet = await _readWallet!(member.UserNum, ct).ConfigureAwait(false)

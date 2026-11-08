@@ -31,8 +31,15 @@ internal sealed partial class RoundFlow
             lock (room.Gate)
             {
                 if (room.ModeId != _options.PvePointModeId || room.Phase != RoomPhase.Playing
-                    || room.FindByGame(session.Id) is not { Slot: >= 0 and < 32, Team: 2 } player) return;
-                // cn-324 sub_532330 sends the local killer's resource index, never a client-chosen seat.
+                    || room.FindByGame(session.Id) is not { Slot: >= 0 and < 32 } player) return;
+                if (room.ModeId == _options.ZombieConversionModeId && player.Team != 2) return;
+                // cn-324 sub_532330 sends the killed NPC's resource index (+44484), never a client-chosen seat; an NPC
+                // spawned without one reports -1 and scores nothing.
+                if (report.UnitIndex == -1)
+                {
+                    _logger.LogDebug("Room {Room} session {Session} killed an NPC without a score unit.", room.Id, session.Id);
+                    return;
+                }
                 if (report.UnitIndex < 0 || report.UnitIndex >= _options.PvePointUnitValues.Length)
                 {
                     _logger.LogWarning("Room {Room} rejected cooperative score-unit index {Index} from session {Session}.", room.Id, report.UnitIndex, session.Id);

@@ -2,30 +2,33 @@ version: 1
 structs:
   # sMissionInfo_From_Svr. kr-812 sub_7A38E0 reads six words, a counted string vector and a bool32;
   # cn-717 sub_81FAB0, id-400 sub_7273D0, id-1809 sub_74A140, cn-706 sub_72BDF0 and cn-324 sub_69CE90
-  # read the same wire fields (cn-324's object is four bytes shorter). cn-279 has no such class.
+  # read the same wire fields (cn-324's object is four bytes shorter). cn-406 sub_6AAE30 reads the same
+  # fields for the mode-16 zombie missions (record vector reader cn-406 sub_70C3C0 behind the packet
+  # entry cn-406 sub_700710, dispatcher case 924 handler sub_703370). cn-279 has no such class.
+  # cn-705 sub_72AD50 reads the same six words, counted strings and bool32.
   PveRescueMission:
-    - mission_id: u32 # cn-324 sub_69E6B0 matches this value to MissionInfo_Clt.xml's mission_id.
+    - mission_id: u32 # cn-324 sub_69E6B0 matches this value to MissionInfo_Clt.xml's mission_id; cn-406 sub_6AC5C0 matches it the same way.
       offset: 4
       except: [cn-279]
-    - unknown_8: u32 # Consuming purpose unproven.
+    - unknown_8: u32 # Consuming purpose unproven; cn-406 has no consumer either.
       offset: 8
       except: [cn-279]
       default: 0 # Provisional outbound value; no consumer establishes it yet.
-    - unknown_12: u32 # Consuming purpose unproven.
+    - unknown_12: u32 # Consuming purpose unproven; cn-406 has no consumer either.
       offset: 12
       except: [cn-279]
       default: 0 # Provisional outbound value; no consumer establishes it yet.
-    - unknown_16: u32 # Consuming purpose unproven.
+    - unknown_16: u32 # Consuming purpose unproven; cn-406's record constructor stores it as float with no consumer.
       offset: 16
       except: [cn-279]
       default: 0 # Provisional outbound value; no consumer establishes it yet.
-    - start_time_ms: u32 # cn-324 sub_6D7F90 subtracts +20 from the native game elapsed timer.
+    - start_time_ms: u32 # cn-324 sub_6D7F90 subtracts +20 from the native game elapsed timer; cn-406 sub_6EAED0 draws the rescue progress from the same two words on the match clock.
       offset: 20
       except: [cn-279]
     - duration_ms: u32 # cn-324 sub_6D7F90 divides elapsed-since-start by +24 to draw mission progress.
       offset: 24
       except: [cn-279]
-    - arguments: list<wstr> # cn-324 sub_8B3590 consumes killmonster arguments.
+    - arguments: list<wstr> # cn-324 sub_8B3590 consumes killmonster arguments; cn-406 sub_6AB220, sub_6AB480 and sub_6AB500 compare the first argument with the killmonster literal only.
       offset: 28
       except: [cn-279]
     - unknown_44: bool
@@ -41,39 +44,45 @@ structs:
   # kr-812 sub_80C040 reads a count then each 48-byte entry; cn-717 sub_890E00,
   # id-400 sub_78F7A0, id-1809 sub_7B42B0 and cn-706 sub_796770 match.
   # cn-324 sub_6F50A0 uses 44-byte entries. These are object strides, not wire padding.
+  # cn-406 sub_700710 reads the count and entries the same way (dispatcher case 924 handler sub_703370).
+  # cn-705 sub_7871C0 delegates to cn-705 sub_795050; cn-705 sub_78A180 installs the mission vector.
   PveRescueMissionsPrepared:
     - missions: list<PveRescueMission>
       offset: 4
       except: [cn-279]
   # S2C gspResMissionStart. kr-812 sub_80A910 reads one word; cn-717 sub_8C4210, id-400 sub_93D120,
-  # id-1809 sub_4D60C0, cn-706 sub_4BBB70 and cn-324 sub_410910 match.
+  # id-1809 sub_4D60C0, cn-706 sub_4BBB70 and cn-324 sub_410910 match. cn-406 sub_700770 reads the same
+  # word (dispatcher case 925 handler sub_7035F0).
   PveRescueMissionStarted:
     - mission_index: u32 # cn-324 sub_6EE410 selects this list index and calls sub_69D400 to spawn the mission.
       offset: 4
       except: [cn-279]
-  # S2C gspResMissionTimeOut: the same one-word readers as gspResMissionStart.
+  # S2C gspResMissionTimeOut: the same one-word readers as gspResMissionStart. cn-406 sub_700770 reads
+  # the same word (dispatcher case 926 handler sub_703700).
   PveRescueMissionTimedOut:
     - next_mission_index: u32 # cn-324 sub_6EE540 fails the active mission, then stores this next list index.
       offset: 4
       except: [cn-279]
   # S2C gspResMissionOK. kr-812 sub_6DB1B0 reads two words; cn-717 sub_538B70, id-400 sub_782DD0,
-  # id-1809 sub_4D7F70, cn-706 sub_733050 and cn-324 sub_408DF0 match.
+  # id-1809 sub_4D7F70, cn-706 sub_733050 and cn-324 sub_408DF0 match. cn-406 sub_420FC0 reads the same
+  # two words (dispatcher case 927 handler sub_703810).
   PveRescueMissionSucceeded:
-    - unknown_4: u32 # cn-324 sub_6EE670 executes native success only when this word equals zero.
+    - unknown_4: u32 # cn-324 sub_6EE670 executes native success only when this word equals zero; cn-406 sub_703810 keeps the zero-means-success gate.
       offset: 4
       except: [cn-279]
-    - mission_index: u32 # cn-324 sub_6EE670 advances to this index plus one after success.
+    - mission_index: u32 # cn-324 sub_6EE670 advances to this index plus one after success; cn-406 sub_703810 advances the same way.
       offset: 8
       except: [cn-279]
   # C2S gcpMissionProcess. kr-812 sub_9D95D0 reads three words; cn-717 sub_7F4370, id-400 sub_72E4D0,
-  # id-1809 sub_4D8130, cn-706 sub_7A23F0 and cn-324 sub_6EB8B0 match.
+  # id-1809 sub_4D8130, cn-706 sub_7A23F0 and cn-324 sub_6EB8B0 match. cn-406 sub_42A640 stamps C2S 927
+  # and its writer cn-406 sub_715C90 emits the same three words.
   PveRescueMissionProgress:
-    - mission_index: u32 # cn-324 sub_467840 writes the NPC's mission reference to C927's first word.
+    - mission_index: u32 # cn-324 sub_467840 writes the NPC's mission reference to C927's first word; cn-406's mission NPCs copy the mission list index into +46976/+47172 at spawn.
       offset: 4
       except: [cn-279]
-    - character_type: u32 # cn-324 sub_52F630 and sub_532330 pass NPC object +652 as the second word.
+    - character_type: u32 # cn-324 sub_52F630 and sub_532330 pass NPC object +652 as the second word; cn-406's factory stores 100 (citizen), 101 (zombie) or 102 (poison sac) at object +656.
       offset: 8
       except: [cn-279]
-    - unknown_12: u32 # cn-324 sub_467840 writes zero here; a consuming purpose remains unproven.
+    - unknown_12: u32 # cn-324 sub_467840 writes zero here; a consuming purpose remains unproven. cn-406 sub_42A640 hardcodes zero as well.
       offset: 12
       except: [cn-279]

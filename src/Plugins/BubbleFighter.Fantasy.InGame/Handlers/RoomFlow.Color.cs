@@ -20,7 +20,8 @@ internal sealed partial class RoomFlow
                 seat.ColorIndex = change.ColorIndex;
                 member = seat.ToMember();
                 observers = _plaza.Sessions().Where(candidate => candidate.SessionId != seat.SessionId
-                    && _registry.TryGet(candidate.SessionId) is null).Select(candidate => candidate.Game).ToArray();
+                    && _registry.TryGet(candidate.SessionId) is null).Select(candidate => candidate.Game!).ToArray();
+                if (!seat.Remote) PublishPlaza(new(PlazaFederationEventKind.Entered, member.UserNumber, member, default));
             }
             if (_plazaMemberEntered is null) return;
             foreach (var observer in observers)

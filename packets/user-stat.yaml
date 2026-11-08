@@ -83,16 +83,20 @@ structs:
 
   # FighterInfo as kr-812 sub_40BA50 reads it. cn-717 reads the same bytes (cn-717 sub_40D620; its
   # constructor cn-717 sub_40CF80 has the same defaults), although its social object is larger in memory.
+  # The dialog passes user_number and character_type to its cached-equipment model (kr-812 sub_87DD90,
+  # cn-717 sub_909DE0); character_type is the character inventory identity minus 300000.
+  # Primary counters also consumed independently by cn-717 sub_909DE0, cn-404 sub_833330,
+  # cn-408 sub_837760 and cn-706 sub_809B90. Their own Page1/tab resources identify No Item/Item.
   FighterInfo:
-    - unknown_4: u32
+    - user_number: u32
       offset: 4
     - nickname: wstr # kr-812 sub_87DD90 shows +8 as lblTab1Name.
       offset: 8
-    - unknown_36: u32
+    - character_type: u32
       offset: 36
     - level: u32 # kr-812 sub_87DD90 shows +40 as lblTab1Level.
       offset: 40
-    - unknown_44: u32
+    - primary_escapes: u32 # kr-812 sub_87DD90: fourth outcome, after W/D/L.
       offset: 44
     - unknown_48: u64 # eight raw bytes (kr-812 sub_A56C30)
       offset: 48
@@ -104,8 +108,22 @@ structs:
       offset: 72
     - unknown_76: bool # kr-812 sub_A56BD0
       offset: 76
-    - unknown_80: "u32[49]" # 49 separate u32 reads, +80 to +272
+    - unknown_80: u32
       offset: 80
+    - primary_wins: u32 # kr-812 sub_87DD90: primary No Item/Item wins.
+      offset: 84
+    - primary_losses: u32 # kr-812 sub_87DD90: primary No Item/Item losses.
+      offset: 88
+    - primary_draws: u32 # kr-812 sub_87DD90: primary No Item/Item draws.
+      offset: 92
+    - primary_knockdowns: u32 # kr-812 sub_87DD90: primary No Item/Item bubble credits.
+      offset: 96
+    - primary_kills: u32 # kr-812 sub_87DD90: primary No Item/Item finishing blows.
+      offset: 100
+    - primary_rescues: u32 # kr-812 sub_87DD90: primary No Item/Item rescues.
+      offset: 104
+    - unknown_108: "u32[42]" # +108 to +272; other pages are unprojected.
+      offset: 108
     - unknown_284: "list<EloRating>" # elements are 12 bytes in memory, 8 on the wire
       offset: 284
     - unknown_276: u32
@@ -138,16 +156,17 @@ structs:
 
   # id-400 sub_796CC0: kr-812's fields up to the rating list, which sits at +288; then three u32 whose
   # constructor (id-400 sub_7966E0) sets 1000, 0 and 1, a bool, eight u32 and a string.
+  # id-400 sub_802B10 selects the target cache with +4 and passes character_type to the model preview.
   FighterInfo@id-400:
-    - unknown_4: u32
+    - user_number: u32
       offset: 4
     - nickname: wstr
       offset: 8
-    - unknown_36: u32
+    - character_type: u32
       offset: 36
     - level: u32 # id-400 sub_7A38E0 reads +40 as the level.
       offset: 40
-    - unknown_44: u32
+    - primary_escapes: u32 # id-400 sub_802B10: fourth outcome, after W/D/L.
       offset: 44
     - unknown_48: u64
       offset: 48
@@ -159,8 +178,22 @@ structs:
       offset: 72
     - unknown_76: bool
       offset: 76
-    - unknown_80: "u32[49]"
+    - unknown_80: u32
       offset: 80
+    - primary_wins: u32 # id-400 sub_802B10: primary No Item/Item wins.
+      offset: 84
+    - primary_losses: u32 # id-400 sub_802B10: primary No Item/Item losses.
+      offset: 88
+    - primary_draws: u32 # id-400 sub_802B10: primary No Item/Item draws.
+      offset: 92
+    - primary_knockdowns: u32 # id-400 sub_802B10: primary No Item/Item bubble credits.
+      offset: 96
+    - primary_kills: u32 # id-400 sub_802B10: primary No Item/Item finishing blows.
+      offset: 100
+    - primary_rescues: u32 # id-400 sub_802B10: primary No Item/Item rescues.
+      offset: 104
+    - unknown_108: "u32[42]" # +108 to +272; other pages are unprojected.
+      offset: 108
     - unknown_288: "list<EloRating>"
       offset: 288
     - unknown_276: u32
@@ -179,16 +212,17 @@ structs:
       offset: 340
 
   # cn-324 sub_6FBD60, constructor cn-324 sub_6FB9A0 (all zero).
+  # cn-324 sub_74E610 passes user_number (+4), character_type (+12) and the equipment cache to its preview.
   FighterInfo@cn-324:
-    - unknown_4: u32
+    - user_number: u32
       offset: 4
     - nickname: wstr
       offset: 8
-    - unknown_12: u32
+    - character_type: u32
       offset: 12
     - level: u32 # cn-324 sub_704F60 reads +16 as the level.
       offset: 16
-    - unknown_20: u32
+    - primary_escapes: u32 # cn-324 sub_74E610: fourth outcome, after W/D/L.
       offset: 20
     - unknown_24: u64 # cn-324 sub_8A36E0, eight raw bytes
       offset: 24
@@ -198,36 +232,66 @@ structs:
       offset: 40
     - unknown_44: bool # cn-324 sub_8A3680
       offset: 44
-    - unknown_48: "u32[43]" # +48 to +216
+    - unknown_48: u32
       offset: 48
+    - primary_wins: u32 # cn-324 sub_74E610: primary No Item/Item wins.
+      offset: 52
+    - primary_losses: u32 # cn-324 sub_74E610: primary No Item/Item losses.
+      offset: 56
+    - primary_draws: u32 # cn-324 sub_74E610: primary No Item/Item draws.
+      offset: 60
+    - primary_knockdowns: u32 # cn-324 sub_74E610: primary No Item/Item bubble credits.
+      offset: 64
+    - primary_kills: u32 # cn-324 sub_74E610: primary No Item/Item finishing blows.
+      offset: 68
+    - primary_rescues: u32 # cn-324 sub_74E610: primary No Item/Item rescues.
+      offset: 72
+    - unknown_76: "u32[36]" # +76 to +216; other pages are unprojected.
+      offset: 76
 
   # cn-279 sub_44E0D0, constructor cn-279 sub_44DE60 (all zero).
+  # cn-279 sub_83B330 passes user_number (+4), character_type (+12) and the equipment cache to its preview.
   FighterInfo@cn-279:
-    - unknown_4: u32
+    - user_number: u32
       offset: 4
     - nickname: wstr
       offset: 8
-    - unknown_12: u32
+    - character_type: u32
       offset: 12
     - level: u32 # cn-279 sub_6F5F90 reads +16 as the level.
       offset: 16
-    - unknown_20: "u32[31]" # +20 to +140
+    - primary_escapes: u32
       offset: 20
+    - primary_wins: u32 # cn-279 sub_83B330: primary No Item/Item wins.
+      offset: 24
+    - primary_losses: u32 # cn-279 sub_83B330: primary No Item/Item losses.
+      offset: 28
+    - primary_draws: u32 # cn-279 sub_83B330: primary No Item/Item draws.
+      offset: 32
+    - primary_knockdowns: u32 # cn-279 sub_83B330: primary No Item/Item bubble credits.
+      offset: 36
+    - primary_kills: u32 # cn-279 sub_83B330: primary No Item/Item finishing blows.
+      offset: 40
+    - primary_rescues: u32 # cn-279 sub_83B330: primary No Item/Item rescues.
+      offset: 44
+    - unknown_48: "u32[24]" # +48 to +140; other pages are unprojected.
+      offset: 48
 
   # id-1809 sub_7BCA50 (builds.yaml bases id-1809 on kr-812, so this restates it): id-400's fields up to
   # the three u32 after the rating list (+276/+280/+284, same defaults); then +304 as a u32 (the u32
   # reader id-1809 sub_9F5870, where id-400 has a bool), eight u32 at +312, the string at +344, and
   # +308 read last.
+  # id-1809 sub_8237A0 selects the target cache with +4 and passes character_type to the model preview.
   FighterInfo@id-1809:
-    - unknown_4: u32
+    - user_number: u32
       offset: 4
     - nickname: wstr
       offset: 8
-    - unknown_36: u32
+    - character_type: u32
       offset: 36
     - level: u32
       offset: 40
-    - unknown_44: u32
+    - primary_escapes: u32 # id-1809 sub_8237A0: fourth outcome, after W/D/L.
       offset: 44
     - unknown_48: u64
       offset: 48
@@ -239,8 +303,22 @@ structs:
       offset: 72
     - unknown_76: bool # id-1809 sub_9F5830, the bool reader
       offset: 76
-    - unknown_80: "u32[49]"
+    - unknown_80: u32
       offset: 80
+    - primary_wins: u32 # id-1809 sub_8237A0: primary No Item/Item wins.
+      offset: 84
+    - primary_losses: u32 # id-1809 sub_8237A0: primary No Item/Item losses.
+      offset: 88
+    - primary_draws: u32 # id-1809 sub_8237A0: primary No Item/Item draws.
+      offset: 92
+    - primary_knockdowns: u32 # id-1809 sub_8237A0: primary No Item/Item bubble credits.
+      offset: 96
+    - primary_kills: u32 # id-1809 sub_8237A0: primary No Item/Item finishing blows.
+      offset: 100
+    - primary_rescues: u32 # id-1809 sub_8237A0: primary No Item/Item rescues.
+      offset: 104
+    - unknown_108: "u32[42]" # +108 to +272; other pages are unprojected.
+      offset: 108
     - unknown_288: "list<EloRating>"
       offset: 288
     - unknown_276: u32
@@ -261,16 +339,17 @@ structs:
       offset: 308
 
   # cn-406 sub_713260 reads only the prefix, 44 words and the final word; constructor sub_712E40 sets the final word to 1000.
+  # cn-406 sub_77C510 selects the target cache with +4 and passes character_type to the model preview.
   FighterInfo@cn-406:
-  - unknown_4: u32
+  - user_number: u32
     offset: 4
   - nickname: wstr
     offset: 8
-  - unknown_36: u32
+  - character_type: u32
     offset: 36
   - level: u32
     offset: 40
-  - unknown_44: u32
+  - primary_escapes: u32 # cn-406 sub_77C510: fourth outcome, after W/D/L.
     offset: 44
   - unknown_48: u64
     offset: 48
@@ -282,8 +361,22 @@ structs:
     offset: 72
   - unknown_76: bool
     offset: 76
-  - unknown_80: u32[44]
+  - unknown_80: u32
     offset: 80
+  - primary_wins: u32 # cn-406 sub_77C510: primary No Item/Item wins.
+    offset: 84
+  - primary_losses: u32 # cn-406 sub_77C510: primary No Item/Item losses.
+    offset: 88
+  - primary_draws: u32 # cn-406 sub_77C510: primary No Item/Item draws.
+    offset: 92
+  - primary_knockdowns: u32 # cn-406 sub_77C510: primary No Item/Item bubble credits.
+    offset: 96
+  - primary_kills: u32 # cn-406 sub_77C510: primary No Item/Item finishing blows.
+    offset: 100
+  - primary_rescues: u32 # cn-406 sub_77C510: primary No Item/Item rescues.
+    offset: 104
+  - unknown_108: "u32[37]" # +108 to +252; other pages are unprojected.
+    offset: 108
   - unknown_256: u32
     offset: 256
     default: 1000
@@ -291,16 +384,18 @@ structs:
   # kr-1256 FighterInfo: reader kr-1256 sub_115A6D0, constructor kr-1256 sub_1159720 (its defaults). The modern
   # object differs from kr-812's in most of its rows, so it is restated. cn-774 and tw-454 follow it with the
   # differences beside the rows (cn-774 reader cn-774 sub_4682B0, tw-454 reader tw-454 sub_45F700).
+  # kr-1256 sub_5D7BD0 selects the target profile with +4; cn-774 sub_6C8420 and tw-454 sub_AEBF20
+  # pass +4 and character_type (+32) to their cached-equipment model constructors.
   FighterInfo@kr-1256:
-    - unknown_4: u32
+    - user_number: u32
       offset: 4
     - nickname: wstr
       offset: 8
-    - unknown_32: u32
+    - character_type: u32
       offset: 32
     - level: u32 # kr-1256 sub_9A5C40 reads FighterInfo +36 into the local player's level.
       offset: 36
-    - unknown_40: u32
+    - primary_escapes: u32 # kr-1256 sub_5D7BD0, cn-774 sub_6C8420, tw-454 sub_AEBF20: fourth outcome.
       offset: 40
     # kr-1256 sub_10E1CF0 reads the block only after the tag 0x3A.
     - unknown_48: "optional<0x3A,FighterInfoTail48>"
@@ -315,11 +410,43 @@ structs:
           offset: 56
         - unknown_60: u32
           offset: 60
-    - unknown_80: "u32[54]" # 54 separate u32 reads, +80 to +292
+    - primary_wins: u32 # kr-1256 sub_5D7BD0: primary No Item/Item wins.
       offset: 80
       cn-774:
-        - unknown_64: "u32[55]" # +64 to +280
+        - unknown_64: u32
           offset: 64
+        - primary_wins: u32 # cn-774 sub_6C8420 and tw-454 sub_AEBF20.
+          offset: 68
+    - primary_losses: u32 # kr-1256 sub_5D7BD0: primary No Item/Item losses.
+      offset: 84
+      cn-774:
+        - primary_losses: u32 # cn-774 sub_6C8420 and tw-454 sub_AEBF20.
+          offset: 72
+    - primary_draws: u32 # kr-1256 sub_5D7BD0: primary No Item/Item draws.
+      offset: 88
+      cn-774:
+        - primary_draws: u32 # cn-774 sub_6C8420 and tw-454 sub_AEBF20.
+          offset: 76
+    - primary_knockdowns: u32 # kr-1256 sub_5D7BD0: primary No Item/Item bubble credits.
+      offset: 92
+      cn-774:
+        - primary_knockdowns: u32 # cn-774 sub_6C8420 and tw-454 sub_AEBF20.
+          offset: 80
+    - primary_kills: u32 # kr-1256 sub_5D7BD0: primary No Item/Item finishing blows.
+      offset: 96
+      cn-774:
+        - primary_kills: u32 # cn-774 sub_6C8420 and tw-454 sub_AEBF20.
+          offset: 84
+    - primary_rescues: u32 # kr-1256 sub_5D7BD0: primary No Item/Item rescues.
+      offset: 100
+      cn-774:
+        - primary_rescues: u32 # cn-774 sub_6C8420 and tw-454 sub_AEBF20.
+          offset: 88
+    - unknown_104: "u32[48]" # +104 to +292; other pages are unprojected.
+      offset: 104
+      cn-774:
+        - unknown_92: "u32[48]" # +92 to +280
+          offset: 92
     # kr-1256 sub_115B060: u32 count, then 20-byte elements.
     - unknown_304: "list<FighterInfoEntry304>"
       offset: 304

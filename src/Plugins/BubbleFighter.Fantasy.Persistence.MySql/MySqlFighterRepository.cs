@@ -1,10 +1,11 @@
+using BubbleFighter.Fantasy.Contracts.Cluster;
 using BubbleFighter.Fantasy.Contracts.Fighters;
 using BubbleFighter.Fantasy.Abstractions.Persistence;
 
 namespace BubbleFighter.Fantasy.Persistence.MySql;
 
 /// <summary>MySQL store for the <c>fighters</c> table from migration 0004.</summary>
-public sealed class MySqlFighterRepository(IDbConnectionFactory connections) : IFighterRepository
+public sealed class MySqlFighterRepository(IDbConnectionFactory connections, IAccountMutationFence? authority = null) : IFighterRepository
 {
     /// <inheritdoc />
     public async ValueTask<IReadOnlyList<FighterRecord>> ListByUserNumAsync(long userNum, CancellationToken ct)
@@ -53,6 +54,7 @@ public sealed class MySqlFighterRepository(IDbConnectionFactory connections) : I
         }
 
         await using var session = await SugarSession.OpenAsync(connections, ct).ConfigureAwait(false);
+        await using var transaction = await session.BeginWriteAsync(record.UserNum, authority, ct).ConfigureAwait(false);
         var row = new FighterRow
         {
             UserNum = record.UserNum,
@@ -68,5 +70,6 @@ public sealed class MySqlFighterRepository(IDbConnectionFactory connections) : I
             [(nameof(FighterRow.UpdatedAt), "UTC_TIMESTAMP()")], ct).ConfigureAwait(false);
         if (rows < 1)
             throw new InvalidOperationException($"fighters upsert for user_num {record.UserNum} slot {record.Slot} wrote {rows} row(s).");
+        await transaction.CommitAsync().ConfigureAwait(false);
     }
 }

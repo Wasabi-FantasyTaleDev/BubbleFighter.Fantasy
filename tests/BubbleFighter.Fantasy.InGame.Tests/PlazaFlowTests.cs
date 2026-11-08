@@ -15,7 +15,7 @@ namespace BubbleFighter.Fantasy.InGame.Tests;
 /// The typed plaza flow: who hears about an entrant, a leaver and a position, and where a chat
 /// line goes — asserted as messages, the wire being the dialect's.
 /// </summary>
-public sealed class PlazaFlowTests
+public sealed partial class PlazaFlowTests
 {
     private sealed class Sink<T> : IMessageSender<T> where T : IMessage
     {
@@ -63,7 +63,7 @@ public sealed class PlazaFlowTests
         finally { await rig.Registry.StopAllAsync(); }
     }
 
-    private sealed class Rig
+    private sealed class Rig : IAsyncDisposable
     {
         public RoomRegistry Registry { get; }
         public RoomFlow Flow { get; }
@@ -80,12 +80,21 @@ public sealed class PlazaFlowTests
         public Sink<PlazaMenuReturnRequested> MenuReturn { get; } = new();
         public Sink<MainMenuRoomOpened> MainMenu { get; } = new();
 
-        public Rig(InGameOptions? options = null)
+        public Rig(InGameOptions? options = null,
+            BubbleFighter.Fantasy.Contracts.Party.IPartyDirectory? parties = null,
+            BubbleFighter.Fantasy.Contracts.Players.IOnlinePlayers? online = null)
         {
             Registry = new RoomRegistry(new InGameOptions { MaxPlayersPerMatch = 16 });
             Flow = new RoomFlow(Registry, new RoomSenders(Entered, SeatUpdated, SeatVacated, MasterChanged,
                 Left: Left, Chat: Chat, PlazaEntered: PlazaEntered, PlazaMemberEntered: MemberEntered,
-                PlazaMemberLeft: MemberLeft, PlazaPositionReceived: Position, MenuReturn: MenuReturn, MainMenu: MainMenu), NullLogger.Instance, options: options);
+                PlazaMemberLeft: MemberLeft, PlazaPositionReceived: Position, MenuReturn: MenuReturn, MainMenu: MainMenu), NullLogger.Instance,
+                options: options, parties: parties, online: online);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await Flow.StopScenesAsync();
+            await Registry.StopAllAsync();
         }
 
         public static RecordingSession Player(long id, string nickname)
@@ -188,13 +197,13 @@ public sealed class PlazaFlowTests
 
         var firsts = rig.Position.To(first);
         Assert.Equal(3, firsts.Length);
-        Assert.Equal([2, 3, 2], firsts.Select(line => line.Sequence));
+        Assert.Equal([1, 2, 1], firsts.Select(line => line.Sequence));
         Assert.Equal([11, 11, 22], firsts.Select(line => line.UserNumber));
         Assert.All(firsts, line => Assert.Equal(Upload.Span.ToArray(), line.Body.ToArray()));
-        // The second player was also shown where the first one stood on entry: an empty position.
+        // Native entry does not consume a position sequence; only actual reports are relayed.
         var seconds = rig.Position.To(second).Where(line => !line.Body.IsEmpty).ToArray();
         Assert.Equal(3, seconds.Length);
-        Assert.Equal([2, 3, 2], seconds.Select(line => line.Sequence));
+        Assert.Equal([1, 2, 1], seconds.Select(line => line.Sequence));
     }
 
     [Fact]
@@ -310,5 +319,78 @@ public sealed class PlazaFlowTests
         var menu = rig.Chat.Sent.Last(row => row.Message.Text == "menu");
         Assert.Equal(first.Id, menu.Session);
         Assert.Equal(0, menu.Message.RoomId);
+    }
+    /// <summary>A player on another node is seated and announced like a local entrant, moves, and leaves.</summary>
+    [Fact]
+    public async Task RemoteMembersAreShownMovedAndRemovedLikeLocalOnes()
+    {
+        var rig = new Rig();
+        var local = Rig.Player(11, "local");
+        var link = new Link();
+        try
+        {
+            await EnterAsync(rig, local);
+            using var binding = rig.Flow.BindPlazaFederation(link);
+            Assert.Equal(PlazaFederationEventKind.Entered, Assert.Single(link.Changes).Kind);
+            var remote = new PlazaMember(0, 77, "remote", 9, 300014, [300014, 100111]);
+            await rig.Flow.ApplyPlazaFederationAsync(new(false, [new(PlazaFederationEventKind.Entered, 77, remote, default)]), default);
+            var shown = Assert.Single(rig.MemberEntered.To(local)).Member;
+            Assert.Equal((77, "remote", 1), (shown.UserNumber, shown.Nickname, shown.Slot));
+            await rig.Flow.ApplyPlazaFederationAsync(new(false, [new(PlazaFederationEventKind.Moved, 77, null, Upload)]), default);
+            var moved = rig.Position.To(local).Last();
+            Assert.Equal((77, 1), (moved.UserNumber, moved.Sequence));
+            Assert.Equal(Upload.ToArray(), moved.Body.ToArray());
+
+            var late = Rig.Player(22, "late");
+            await EnterAsync(rig, late);
+            Assert.Contains(Assert.Single(rig.PlazaEntered.To(late)).Members, member => member.UserNumber == 77);
+            Assert.Contains(rig.Position.To(late), position => position.UserNumber == 77 && position.Body.Length == Upload.Length);
+
+            await rig.Flow.ApplyPlazaFederationAsync(new(false, [new(PlazaFederationEventKind.Left, 77, null, default)]), default);
+            Assert.Equal(77, rig.MemberLeft.To(local).Last().Member.UserNumber);
+            Assert.DoesNotContain(link.Changes, change => change.UserNumber == 77);
+        }
+        finally { await rig.Registry.StopAllAsync(); }
+    }
+
+    /// <summary>Local entries, moves and leaves are published; a snapshot replaces the remote seats; unbinding clears them.</summary>
+    [Fact]
+    public async Task LocalChangesArePublishedAndSnapshotsReplaceRemoteSeats()
+    {
+        var rig = new Rig();
+        var local = Rig.Player(11, "local");
+        var link = new Link();
+        try
+        {
+            var binding = rig.Flow.BindPlazaFederation(link);
+            await EnterAsync(rig, local);
+            await rig.Flow.HandlePlazaPositionAsync(local, new(Upload), default);
+            Assert.Equal(new[] { PlazaFederationEventKind.Entered, PlazaFederationEventKind.Moved }, link.Changes.Select(change => change.Kind));
+            Assert.Equal("local", link.Changes[0].Member!.Nickname);
+
+            PlazaMember Member(int user) => new(0, user, "r" + user, 1, 300014, [300014]);
+            await rig.Flow.ApplyPlazaFederationAsync(new(false, [new(PlazaFederationEventKind.Entered, 71, Member(71), default),
+                new(PlazaFederationEventKind.Entered, 72, Member(72), default)]), default);
+            await rig.Flow.ApplyPlazaFederationAsync(new(true, [new(PlazaFederationEventKind.Entered, 72, Member(72), default)]), default);
+            Assert.Equal(71, Assert.Single(rig.MemberLeft.To(local)).Member.UserNumber);
+            Assert.Equal(2, rig.MemberEntered.To(local).Count());
+
+            // The local player's own seat wins over a stale remote copy of the same account.
+            await rig.Flow.ApplyPlazaFederationAsync(new(false, [new(PlazaFederationEventKind.Entered, 11, Member(11), default)]), default);
+            Assert.Equal(2, rig.MemberEntered.To(local).Count());
+
+            binding.Dispose();
+            for (var attempt = 0; attempt < 100 && rig.MemberLeft.To(local).Count() < 2; attempt++) await Task.Delay(10);
+            Assert.Equal(72, rig.MemberLeft.To(local).Last().Member.UserNumber);
+            await rig.Flow.HandlePlazaMenuReturnAsync(local, new(), default);
+            Assert.Equal(PlazaFederationEventKind.Moved, link.Changes[^1].Kind);
+        }
+        finally { await rig.Registry.StopAllAsync(); }
+    }
+
+    private sealed class Link : IPlazaFederationLink
+    {
+        internal List<PlazaFederationEvent> Changes { get; } = [];
+        public void Publish(PlazaFederationEvent change) => Changes.Add(change);
     }
 }

@@ -35,13 +35,16 @@ public sealed class ShopPacketNumbersTests
 
     /// <summary>
     /// The two requests the row used to read as a second buy and a second card request are the gift sent-list page
-    /// (kr-1256 sub_E49DC0) and the refund request (kr-1256 sub_D3E0B0); the shop row registers neither.
+    /// (kr-1256 sub_E49DC0) and the cash-inventory slot card's action (kr-1256 sub_D3E0B0, whose wrapper is the
+    /// RTTI-named CashInvenSlotCardContent lambda). The action's purpose is unproven, so the table assigns no refund
+    /// name; the gift page belongs to the gift service rather than the ordinary shop request routes.
     /// </summary>
     [Fact]
-    public void GiftListAndRefundAreNotShopRequests()
+    public void GiftListAndUnknownCashActionAreNotOrdinaryShopRequests()
     {
         Assert.Equal((ushort)816, ShopTablePackets.Table.C2S("gcpReqPresentSendSubList"));
-        Assert.Equal((ushort)817, ShopTablePackets.Table.C2S("gcpReqRefund"));
+        Assert.Equal((ushort)817, ShopTablePackets.Table.C2S("Unknown817"));
+        Assert.Null(ShopTablePackets.Table.Find(PacketDirection.ClientToServer, "gcpReqRefund"));
         Assert.Null(ShopTablePackets.Table.Find(PacketDirection.ClientToServer, "gcpReqShopBuySecond"));
     }
 }

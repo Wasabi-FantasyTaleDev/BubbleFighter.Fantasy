@@ -89,7 +89,7 @@ internal static class PlazaRoomWire
     /// <summary>
     /// C2S <c>gcpReqCreateSession</c> for a play room (kr-812 serialize <c>sub_480D40</c>;
     /// id-1809 serializer <c>sub_450090</c>): the <c>SessionSetting</c> member first, then the
-    /// password wstr and a bool32. The title is the <c>SessionSetting</c> wstr at +12, the mode
+    /// password and the table-defined suffix. The title is the <c>SessionSetting</c> wstr, the mode
     /// and map key are the <c>GameSetting</c> roles of the build's table, and the whole
     /// <c>GameSetting</c> is returned as sent.
     /// </summary>
@@ -98,12 +98,11 @@ internal static class PlazaRoomWire
     /// <returns>The decoded request.</returns>
     public static CreateRoomRequest ReadCreateRoom(ReadOnlySpan<byte> payload, RoomSchema schema)
     {
+        var fields = RoomRequests.ReadCreate(schema.Tables, schema.Build, payload);
         var r = new PacketReader(payload);
         var setting = ReadPlaySessionSetting(ref r, schema);
-        var password = r.ReadWideStringPrefixed();
-        var unknown0 = r.ReadBool32();
-        if (r.Remaining > 0)
-            throw new PacketFormatException($"gcpReqCreateSession has {r.Remaining} trailing byte(s).", r.Offset);
+        var password = (string)fields["password"]!;
+        var unknown0 = fields.TryGetValue("unknown_n2", out var tail) && tail is true;
         return new CreateRoomRequest(setting.Title, setting.Mode, setting.MapKey,
             payload[setting.GameSettingStart..setting.GameSettingEnd].ToArray(), password, unknown0);
     }
@@ -145,20 +144,20 @@ internal static class PlazaRoomWire
             if (field.Type == RoomFieldType.GameSetting)
             {
                 gameStart = r.Offset;
+                // The complete request was bounded first; retain the original nested bytes, including native boolean words.
+                var values = PacketCodec.ReadPrefix(ref r, schema.Tables, schema.Build, "GameSetting");
                 foreach (var inner in schema.GameSetting)
                 {
                     if (inner.Type == RoomFieldType.WStr)
                     {
-                        var text = r.ReadWideStringPrefixed();
+                        var text = (string)values[inner.Name]!;
                         if (inner.Value == RoomFieldValue.CurrentMap)
                             currentMap = text;
                         else if (inner.Value == RoomFieldValue.MapName)
                             mapName = text;
                     }
                     else if (inner is { Type: RoomFieldType.U32, Value: RoomFieldValue.Mode })
-                        mode = r.ReadInt32();
-                    else
-                        ConsumeField(ref r, inner);
+                        mode = (int)values[inner.Name]!;
                 }
                 gameEnd = r.Offset;
             }
@@ -170,20 +169,6 @@ internal static class PlazaRoomWire
 
         // cn-324 sub_59E1C0 writes the selected row to GameSetting+28; +20 is its resource directory.
         return new PlaySessionSetting(title, mode, mapName.Length > 0 ? mapName : currentMap, gameStart, gameEnd);
-    }
-
-    /// <summary>Reads the build-specific join request through the shared packet table.</summary>
-    /// <param name="tables">The packet tables.</param><param name="build">The client build.</param>
-    /// <param name="payload">The request body.</param>
-    /// <returns>The room number, password and three fields whose meanings remain unproven.</returns>
-    public static JoinSessionRequest ReadJoinSession(PacketTables tables, string build, ReadOnlySpan<byte> payload)
-    {
-        PacketLayoutContract.RequireFields(tables, build, "RoomJoinRequest", "Plaza room wire",
-            ("room_id", "u32"), ("unknown_8", "u32"), ("unknown_12", "u32"), ("password", "wstr"));
-        var fields = PacketCodec.ReadScalars(tables, build, "RoomJoinRequest", payload);
-        var tail = fields.TryGetValue("unknown_44", out var value) ? Convert.ToInt32(value) : 0;
-        return new JoinSessionRequest((int)fields["room_id"], (int)fields["unknown_8"],
-            (int)fields["unknown_12"], (string)fields["password"], tail);
     }
 
     /// <summary>
@@ -317,6 +302,35 @@ internal static class PlazaRoomWire
         return buffer.WrittenSpan.ToArray();
     }
 
+    // kr-812 sub_7FE410 accepts this only in the waiting room; sub_7FF340 reads subsequent indices from entry.
+    internal static byte[] ApplyGameSettingSeries(RoomSchema schema, ReadOnlySpan<byte> gameSetting,
+        RoundSeriesFields fields, int roundIndex)
+    {
+        var reader = new PacketReader(gameSetting);
+        var buffer = new ArrayBufferWriter<byte>(gameSetting.Length);
+        var writer = new PacketWriter(buffer);
+        foreach (var field in schema.GameSetting)
+        {
+            var start = reader.Offset;
+            if (field.Name == fields.SettingsFlags)
+            {
+                writer.WriteInt32(reader.ReadInt32() | 1);
+                continue;
+            }
+            if (field.Name == fields.SettingsIndex)
+            {
+                reader.ReadInt32();
+                writer.WriteInt32(roundIndex);
+                continue;
+            }
+            ConsumeField(ref reader, field);
+            writer.WriteBytes(gameSetting[start..reader.Offset]);
+        }
+        if (reader.Remaining != 0)
+            throw new PacketFormatException("Series GameSetting has trailing bytes.", reader.Offset);
+        return buffer.WrittenSpan.ToArray();
+    }
+
     /// <summary>
     /// The <c>gspRepJoinSession</c> result code for a refusal. The kr-812 handler <c>sub_67AE80</c>
     /// switches on it and shows a fixed message per case: 1 the round already started
@@ -333,23 +347,6 @@ internal static class PlazaRoomWire
         BubbleFighter.Fantasy.Contracts.Rooms.RoomJoinRefusal.NoRoom => 5,
         _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, "No result code is known for this refusal."),
     };
-
-    /// <summary>
-    /// C2S <c>gcpRoomReqReadyStatus</c> (kr-812 <c>sub_5C8C00</c> / cn-717 <c>sub_88EE40</c> /
-    /// id-400 <c>sub_613F80</c>): three bool32.
-    /// </summary>
-    /// <param name="tables">The native packet layouts.</param>
-    /// <param name="build">The selected client build.</param>
-    /// <param name="payload">The C2S body.</param>
-    /// <returns>The three ready-status flags.</returns>
-    public static (bool Unknown0, bool Unknown1, bool Unknown2) ReadReadyStatus(PacketTables tables, string build,
-        ReadOnlySpan<byte> payload)
-    {
-        PacketLayoutContract.RequireFields(tables, build, "RoomReadyRequest", "Plaza room wire",
-            ("ready", "bool"), ("unknown_5", "bool"), ("unknown_6", "bool"));
-        var values = PacketCodec.ReadScalars(tables, build, "RoomReadyRequest", payload);
-        return ((bool)values["ready"], (bool)values["unknown_5"], (bool)values["unknown_6"]);
-    }
 
     /// <summary>
     /// C2S <c>gcpUserHostStart</c> (kr-812 send helper <c>sub_5C85E0</c> SETOP 2025; deserialize
@@ -560,14 +557,6 @@ internal readonly record struct CreateSessionRequest(string MapKey, string Passw
 /// <param name="Password">Trailing password wstr after SessionSetting.</param>
 /// <param name="Unknown0">Trailing bool32 after the password.</param>
 internal sealed record CreateRoomRequest(string Title, int Mode, string MapKey, byte[] GameSetting, string Password, bool Unknown0);
-
-/// <summary>Parsed C2S <c>gcpReqJoinSession</c>.</summary>
-/// <param name="RoomId">The room number from the list row.</param>
-/// <param name="Unknown1">Second u32.</param>
-/// <param name="Unknown2">Third u32.</param>
-/// <param name="Password">The password wstr.</param>
-/// <param name="Unknown4">Trailing u32.</param>
-internal readonly record struct JoinSessionRequest(int RoomId, int Unknown1, int Unknown2, string Password, int Unknown4);
 
 /// <summary>What the room flow needs from a decoded play-room <c>SessionSetting</c>.</summary>
 /// <param name="Title">The room title.</param>

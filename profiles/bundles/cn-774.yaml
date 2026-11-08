@@ -18,7 +18,7 @@
     bootstrap_status: 2
     # A crash report (19) after a crashed session, and a 30-byte opcode 1500 on every
     # launch (local run), arrive ahead of gcpFirstConnect.
-    pre_handshake_opcodes: [19, 1500]
+    pre_handshake_opcodes: [gcpReportLastCrash, gcpReqDynamicConfig]
     bootstrap_command_line: "http://bf.dn.nexoncdn.co.kr/PatchData"
     # The address and port the client reaches this listener on (its login.ini or launch
     # arguments). The gate values follow cn-324, the same client family.
@@ -42,8 +42,13 @@
   plugin: dialect.messages
   config:
     protocol: cn-774/game
+    # Every client sits on channel 60, "Free" (one shared lobby instead of split channels). The login reply's
+    # channel word is what the round start reads its FighterConfigChannel column from (kr-812 sub_818680,
+    # sub_587690); BFF_PLAYER_CHANNEL also feeds dialect.rooms player_channel and the cluster move. 0 = off.
+    login_channel: ${BFF_PLAYER_CHANNEL:-60}
     login: true
     main_menu_init: true
+    party: true
     inventory: true
     equipment_view: true
     equipment: true
@@ -53,6 +58,17 @@
     # The customized-key update and login restoration (packets/customized-keys.yaml; builder cn-774
     # sub_761B90, consumer cn-774 sub_BC5A20) for the player.settings row of the player-settings bundle.
     customized_keys: true
+    # The gift box (packets/present.yaml): the client's own senders are cn-774 sub_7CAFA0 (both list pages),
+    # cn-774 sub_7C48B0 (purchase), cn-774 sub_6AEEE0 (the take and discard stamps of the receive dialog), cn-774 sub_7C6940 and
+    # cn-774 sub_7CB300 (the deletes) and cn-774 sub_B2C7E0 (close); the list replies are read by cn-774 sub_BB5CF0 (three
+    # words plus the 88-byte record walk) and cn-774 sub_BB5EE0 (two words plus the vector). Needs the build's
+    # present_box capability and the shop row of the modern-commerce bundle.
+    # Opt in on both the dialect.messages and shop rows for native-client acceptance.
+    present_box: false
+    # The expired-item notice (packets/inventory.yaml ExpiredItems): cn-774 sub_BCF090 case 807 ->
+    # cn-774 sub_BAE370 -> cn-774 sub_456D30 reads the counted u32 id list, and its consumer is armed from the startup
+    # singletons, so the burst's last step lands after the menu like kr-1256's.
+    expired_item_notices: true
 - id: commands.players
   plugin: commands.players
   parent_id: lobby
@@ -78,3 +94,11 @@
     # The build's logged-in players by account, for the player menu's "view info" (one realm per build in `all`).
     online_players: true
     fighter_info: true
+- id: party
+  plugin: party
+  parent_id: inventoryview
+  config:
+    protocol: cn-774/game
+    max_members: 12
+    invite_timeout_ms: 30000
+    max_pending_invites: 1024

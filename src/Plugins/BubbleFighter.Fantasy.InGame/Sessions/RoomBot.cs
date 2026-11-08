@@ -1,6 +1,5 @@
 using BubbleFighter.Fantasy.Contracts.Movement;
 using BubbleFighter.Fantasy.Contracts.Rooms;
-using BubbleFighter.Fantasy.Abstractions.Protocol;
 
 namespace BubbleFighter.Fantasy.InGame.Sessions;
 
@@ -9,7 +8,5 @@ internal sealed class RoomBot(RoomMemberView appearance)
 {
     internal RoomMemberView Appearance { get; set; } = appearance;
     internal PlayerMovementState? Movement { get; set; }
-    internal SeatLife Life { get; set; }
-    internal bool DeathCleaned { get; set; }
-    internal ISession? ResetRelay { get; set; }
+    internal ParticipantLife Life { get; } = new();
 }

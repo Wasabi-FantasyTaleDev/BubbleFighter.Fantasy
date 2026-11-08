@@ -16,7 +16,7 @@ internal sealed partial class RoundFlow
     /// </summary>
     public async ValueTask HandleObjectAddRequestedAsync(ISession session, RoundObjectAddRequested request, CancellationToken ct)
     {
-        var (room, _) = _registry.RequireGame(session);
+        if (FindGameReportRoom(session) is not { } room) return;
         await room.Executor.ExecuteAsync(async operationCt =>
         {
             lock (room.Gate)

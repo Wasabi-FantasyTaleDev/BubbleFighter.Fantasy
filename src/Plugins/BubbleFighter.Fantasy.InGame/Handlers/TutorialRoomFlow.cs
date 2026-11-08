@@ -1,5 +1,6 @@
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Match;
+using BubbleFighter.Fantasy.Contracts.Rooms;
 using BubbleFighter.Fantasy.Contracts.Progress;
 using BubbleFighter.Fantasy.Contracts.Shop;
 using BubbleFighter.Fantasy.InGame.Sessions;
@@ -31,6 +32,42 @@ internal sealed class TutorialRoomFlow(RoomRegistry registry, IReadOnlyDictionar
             if (request.GameConnectionOnly)
                 seat.GameLinkGeneration = room.StartGeneration;
         }
+    }
+
+    /// <summary>Counts authenticated solo-stage events without multiplayer life, rewards or team points.</summary>
+    internal async ValueTask ScoreAsync(ISession session, TutorialScoreReported report,
+        IMessageSender<TutorialScoreUpdated> sender, CancellationToken ct)
+    {
+        if (registry.TryGet(session.Id) is not { } room) return;
+        await room.Executor.ExecuteAsync(async token =>
+        {
+            TutorialScoreUpdated update;
+            lock (room.Gate)
+            {
+                if (room.Phase != RoomPhase.Playing || room.ModeId != (int)GameModeId.SinglePlay
+                    || room.Tutorial is null || room.Seats.Count != 1
+                    || room.FindByGame(session.Id) is not { Slot: 0 } seat || report.Slot != seat.Slot)
+                    return;
+                var before = room.Scoring.Stats(seat.Slot);
+                switch (report.Event)
+                {
+                    case TutorialScoreEvent.Bubble when before.Knockdowns < ushort.MaxValue:
+                        room.Scoring.AddKnockdown(seat.Slot);
+                        break;
+                    case TutorialScoreEvent.Pang when before.Kills < ushort.MaxValue:
+                        room.Scoring.AddKill(seat.Slot, 0);
+                        break;
+                    case TutorialScoreEvent.Help when before.Rescues < ushort.MaxValue:
+                        room.Scoring.AddRescue(seat.Slot);
+                        break;
+                    default:
+                        return;
+                }
+                var stats = room.Scoring.Stats(seat.Slot);
+                update = new(seat.Slot, seat.Nickname, stats.Knockdowns, stats.Kills, stats.Rescues);
+            }
+            await sender.SendAsync(session, update, token).ConfigureAwait(false);
+        }, ct).ConfigureAwait(false);
     }
 
     /// <summary>

@@ -195,6 +195,11 @@ structs:
 
   # 32836: kr-1256 reader kr-1256 sub_6F6900 (i32 actor). kr-812 Packet_gppDead, deserializer
   # kr-812 sub_80A910: one word.
+  # cn-324 sub_469A30 / cn-324 sub_4757B0; cn-406 sub_42CF00 / cn-406 sub_700770;
+  # cn-279 sub_404F00 / cn-279 sub_44C1A0; id-400 sub_8F2850 / id-400 sub_93D120 each transfer one actor word.
+  # cn-404 sub_929C90 / cn-404 sub_7C7870; cn-408 sub_9932E0 / cn-408 sub_7B1F60;
+  # cn-706 sub_4BBD50 / cn-706 sub_4BBB70; cn-717 sub_88E6C0 / cn-717 sub_8C4210;
+  # id-1809 sub_4D7E40 / id-1809 sub_4D60C0. Final death is separate from early score reports.
   Dead:
     - actor: u32
       offset: 4
@@ -677,3 +682,22 @@ structs:
   # stamp the opcode and write no field, so the body is empty in both builds and the structure has no build
   # annotations.
   gcpRoomReqLeaveGame: []
+
+  # 32934, the Extreme Racing checkpoint touch: kr-1256 sub_B0D760 kind 10 sends it through the common peer
+  # sender kr-1256 sub_7AB190 when the local player first passes a racing marker of the current round (stage
+  # +3160 equals index / 10, and the stored progress at character +13812 is lower). Three words: the character
+  # word (character +448), the marker index / 10 (the round) and index % 10 (the marker within the round). The
+  # peer reader kr-1256 sub_6D97D0 (dispatched by kr-1256 sub_6D55D0) resolves the character, casts the strategy
+  # to GameExtremeRacingStrategy and moves that player's indicator mark to marker + 1 (kr-1256 sub_D13900),
+  # flagging it as local when the character is the local player's, so the sender's own mark moves only on the
+  # returned copy.
+  ExtremeRacingCheckPoint:
+    - actor: u32
+      offset: 0
+      only: [kr-1256]
+    - round: u32
+      offset: 4
+      only: [kr-1256]
+    - marker: u32
+      offset: 8
+      only: [kr-1256]

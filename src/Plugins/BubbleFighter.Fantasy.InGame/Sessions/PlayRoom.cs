@@ -20,6 +20,7 @@ public sealed partial class PlayRoom
     internal CancellationTokenSource? AutoStartCancellation { get; set; }
     internal ushort RedScore { get; set; }
     internal BubbleFighter.Fantasy.InGame.Handlers.RoundSupplyState? Supplies { get; set; }
+    internal BubbleFighter.Fantasy.InGame.Handlers.RoundWeaponState? Weapons { get; set; }
     internal BubbleFighter.Fantasy.InGame.Handlers.RoundLucciState? Lucci { get; set; }
     // The star modes' unconsumed stars; the same id-to-kind bookkeeping as the Lucci items.
     internal BubbleFighter.Fantasy.InGame.Handlers.RoundLucciState? Stars { get; set; }
@@ -56,6 +57,9 @@ public sealed partial class PlayRoom
     /// <summary>Gets the room id.</summary>
     public int Id { get; }
 
+    /// <summary>Gets the identity of this creation, independent of the recyclable native room number.</summary>
+    public Guid InstanceId { get; } = Guid.NewGuid();
+
     /// <summary>
     /// Gets the serial queue that membership and seat-state changes (join, leave, ready, team, detach) run on,
     /// so each operation's pushes are built from the seat table it just changed. The registry stops it when the
@@ -66,6 +70,12 @@ public sealed partial class PlayRoom
 
     /// <summary>Gets the lock used by the registry and handlers.</summary>
     public object Gate { get; } = new();
+
+    /// <summary>Gets or sets the room's UDP override; null selects UDP only with multiple connected players.</summary>
+    public bool? UdpOverride { get; set; }
+
+    // Full room installation replaces the client's peer state; read and advance under Gate.
+    internal long PeerInstallationVersion { get; set; }
 
     /// <summary>Gets the current phase.</summary>
     public RoomPhase Phase { get; private set; } = RoomPhase.Waiting;
@@ -166,7 +176,7 @@ public sealed partial class PlayRoom
     public const int PlazaSeatCount = 36;
 
     /// <summary>Whether every seat is taken. Read under <see cref="Gate"/>.</summary>
-    internal bool IsFull => _members.IsFull;
+    internal bool IsFull { get { ExpireAdmissions(); return _members.IsFull; } }
 
     /// <summary>The number of seats the room was created with.</summary>
     internal int MaxSeats => _maxSeats;
@@ -182,6 +192,10 @@ public sealed partial class PlayRoom
     /// </summary>
     internal bool SetSlotClosed(int slot, bool closed)
     {
+        ExpireAdmissions();
+        if (closed)
+            foreach (var hold in _admissions.Values.Where(hold => hold.Slot == slot).ToArray())
+                ReleaseAdmission(hold);
         return _members.SetSlotClosed(slot, closed);
     }
 
@@ -192,6 +206,8 @@ public sealed partial class PlayRoom
     ///
     /// </summary>
     internal bool Listed { get; set; }
+
+    internal bool IsMatchRoom => Listed && Tutorial is null && ModeId != RoomRegistry.TrainingModeId;
 
     /// <summary>
     /// The password the host set in the C2S 402 create dialog, or empty for an open room. A C2S 403
@@ -317,17 +333,65 @@ public sealed partial class PlayRoom
     {
         if (Phase != RoomPhase.Waiting)
             throw new InvalidOperationException($"Room {Id} cannot start from phase {Phase}.");
+        ClearAdmissions();
         CancelResultSequence();
-        Phase = RoomPhase.Starting;
-        StartGeneration++;
         MatchId = Guid.NewGuid().ToString("N");
+        BattleSettlements = null;
         BlueScore = RedScore = 0;
         HordeDropSerial = 0;
         Scoring = new RoundScoring(maxSeats: _maxSeats);
         LifeChecks = new LifeObservations();
         ZombieKingSlot = null;
+        BombSeries = null;
+        ResetRoundParticipants();
+    }
+
+    /// <summary>Starts a new bomb series after the ordinary match start has established its settlement identity.</summary>
+    internal void BeginBombSeries(int roundsToWin = 2)
+    {
+        if (Phase != RoomPhase.Starting || BombSeries is not null)
+            throw new InvalidOperationException($"Room {Id} cannot begin a bomb series from its current state.");
+        BombSeries = new BombSeriesState(roundsToWin);
+        Bomb.Reset(BombSeries.AttackingTeam);
+    }
+
+    /// <summary>Reloads a completed non-final bomb round without replacing cumulative scores or its settlement receipt.</summary>
+    internal bool ContinueBombSeries(int completedGeneration)
+    {
+        if (Phase != RoomPhase.Result || StartGeneration != completedGeneration || BombSeries is not { CanContinue: true } series)
+            return false;
+        if (_resultCancellation is not null)
+            throw new InvalidOperationException($"Room {Id} cannot continue while its result sequence still owns cancellation state.");
+        if (!series.TryContinue(series.RoundIndex))
+            return false;
+        Scoring.ClearPendingVictims();
+        Rescues = null;
+        Supplies = null;
+        Lucci = null;
+        Stars = null;
+        ResetRoundParticipants();
+        return true;
+    }
+
+    private void ResetRoundParticipants()
+    {
+        CancelLoadTimeout();
+        Captains = new CaptainRoster();
+        CancelModeClocks();
+        ExtremeRacing = new ExtremeRacingRoundState();
+        FinalZone = null;
+        ScriptZombies = null;
+        ZombieEscape = null;
+        ZombieBattleParticipants = 0;
+        RoundCancelled = false;
+        Phase = RoomPhase.Starting;
+        StartGeneration++;
+        Weapons = null;
+        RoundEndsAtUtc = null;
+        ResultOpenSent = ResultCloseSent = false;
         DecidedWinnerTeam = null;
         DecidedWinnerSlots = null;
+        Bomb.Reset(BombSeries?.AttackingTeam ?? 1);
         ResetBotRoundState();
         foreach (var seat in Seats)
         {
@@ -337,22 +401,93 @@ public sealed partial class PlayRoom
             seat.RoundInitialized = false;
             seat.SceneReady = false;
             seat.ObjectAdded = false;
-            seat.AwaitingRespawn = false;
-            seat.InstantRevivalPending = false;
-            seat.LastDeathActor = null;
-            seat.PveRevivalRequested = false;
             seat.EndpointAdvertised = false;
             seat.RelayConfirmed = false;
             seat.RelayInitialized = false;
             seat.Movement = null;
-            seat.Life = SeatLife.Alive;
-            seat.DeathCleaned = false;
-            seat.ResetRelay = null;
+            seat.Life.Reset();
+            seat.ClearCritical();
         }
     }
 
-    /// <summary>Gets or sets the seat the zombie battle made its zombie king this round; null before the first conversion.</summary>
+    /// <summary>Gets or sets the current script-owned zombie escape conversion authority.</summary>
+    internal ZombieEscapeRoundState? ZombieEscape { get; set; }
+
+    /// <summary>Gets the Captains of this round's Captain mode; empty in any other round.</summary>
+    internal CaptainRoster Captains { get; private set; } = new();
+
+    /// <summary>Gets this round's ExtremeRacing rounds and points; idle in any other round.</summary>
+    internal ExtremeRacingRoundState ExtremeRacing { get; private set; } = new();
+
+    /// <summary>Gets or sets the race match's single replaceable deadline worker.</summary>
+    internal RoomDeadlineClock? ExtremeRacingClock { get; set; }
+    /// <summary>Gets the single bomb's state and operation owners for this round.</summary>
+    internal BombRoundState Bomb { get; } = new();
+
+    /// <summary>Gets the explicitly enabled bomb series, or null for a match using the ordinary one-round lifecycle.</summary>
+    internal BombSeriesState? BombSeries { get; private set; }
+
+    /// <summary>Gets or sets the native script conversion authority for this round, or null outside modern mode 8.</summary>
+    internal ScriptZombieRoundState? ScriptZombies { get; set; }
+
+    /// <summary>Gets or sets the seat the legacy zombie battle made its king; null before the first conversion.</summary>
     internal int? ZombieKingSlot { get; set; }
+
+    /// <summary>Gets or sets the opening participant count, so a later departure cannot turn a match into solo practice.</summary>
+    internal int ZombieBattleParticipants { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether a disconnect or a load timeout cancelled this round; the round then ends with no result
+    /// while every remaining player is sent to the plaza. Reset at each start.
+    /// </summary>
+    internal bool RoundCancelled
+    {
+        get;
+        set
+        {
+            field = value;
+            if (value) CancelModeClocks();
+        }
+    }
+
+    /// <summary>Gets or sets the plaza return of a cancelled round, retained so a test can observe it end.</summary>
+    internal Task RoundCancelTask { get; set; } = Task.CompletedTask;
+
+    /// <summary>Gets or sets the load-timeout watch armed by the latest start, retained so a test can observe it end.</summary>
+    internal Task LoadTimeoutTask { get; set; } = Task.CompletedTask;
+
+    private LoadTimeoutWatch? _loadTimeout;
+
+    internal sealed class LoadTimeoutWatch(CancellationToken lifetime)
+    {
+        internal CancellationTokenSource Source { get; } = CancellationTokenSource.CreateLinkedTokenSource(lifetime);
+        internal Task Cancellation { get; set; } = Task.CompletedTask;
+    }
+
+    internal LoadTimeoutWatch BeginLoadTimeout(CancellationToken lifetime)
+    {
+        CancelLoadTimeout();
+        return _loadTimeout = new LoadTimeoutWatch(lifetime);
+    }
+
+    internal void CancelLoadTimeout()
+    {
+        lock (Gate)
+            if (_loadTimeout is { } watch && !watch.Source.IsCancellationRequested)
+                watch.Cancellation = watch.Source.CancelAsync();
+    }
+
+    internal async Task ReleaseLoadTimeoutAsync(LoadTimeoutWatch watch)
+    {
+        Task cancellation;
+        lock (Gate)
+        {
+            cancellation = watch.Cancellation;
+            if (ReferenceEquals(_loadTimeout, watch)) _loadTimeout = null;
+        }
+        try { await cancellation.ConfigureAwait(false); }
+        finally { watch.Source.Dispose(); }
+    }
 
     /// <summary>Gets or sets the single king-picker task retained for this room, so a test can observe it end.</summary>
     internal Task ZombieKingTask { get; set; } = Task.CompletedTask;
@@ -376,6 +511,9 @@ public sealed partial class PlayRoom
     ///
     /// </summary>
     public string MatchId { get; private set; } = "";
+
+    // Terminal account identities and counters survive result-screen departures until the next match starts.
+    internal IReadOnlyList<BattleSettlementPlan>? BattleSettlements { get; set; }
 
     /// <summary>The current round's ignored life reports (observation only). Guarded by <see cref="Gate"/>.</summary>
     internal LifeObservations LifeChecks { get; private set; } = new();
@@ -458,6 +596,12 @@ public sealed partial class PlayRoom
     /// <summary>Gets or sets the single result sequence retained for this room, including all display delays.</summary>
     public Task ResultTask { get; set; } = Task.CompletedTask;
 
+    /// <summary>Gets whether a result sequence still owns work that must finish before another sequence can begin.</summary>
+    internal bool HasResultSequence => _resultCancellation is not null;
+
+    /// <summary>Gets or sets whether registry shutdown has permanently stopped this room's background work.</summary>
+    internal bool IsStopping { get; set; }
+
     internal CancellationTokenSource BeginResultSequence(CancellationToken lifetime)
     {
         if (_resultCancellation is not null)
@@ -467,7 +611,7 @@ public sealed partial class PlayRoom
         return _resultCancellation;
     }
 
-    private void CancelResultSequence()
+    internal void CancelResultSequence()
     {
         // CancelAsync never runs registered callbacks inline while Gate is held.
         if (_resultCancellation is { IsCancellationRequested: false } source)
@@ -509,10 +653,17 @@ public sealed partial class PlayRoom
         lock (Gate)
         {
             CancelResultSequence();
+            CancelLoadTimeout();
             Phase = RoomPhase.Waiting;
+            ZombieEscape?.RestoreWaitingTeams(Seats);
+            ZombieEscape = null;
+            CancelModeClocks();
             AutoStartArmed = false;
             Rescues = null;
+            ScriptZombies?.RestoreWaitingTeams(Seats);
+            ScriptZombies = null;
             Supplies = null;
+            Weapons = null;
             Lucci = null;
             Stars = null;
             RoundMapKey = string.Empty;
@@ -527,6 +678,7 @@ public sealed partial class PlayRoom
             foreach (var seat in Seats)
             {
                 seat.RoundStats = null;
+                seat.ClearCritical();
                 seat.NativeCapability = null;
                 seat.Ready = false;
                 seat.InShop = false;
@@ -543,6 +695,8 @@ public sealed partial class PlayRoom
     {
         if (Phase is RoomPhase.Closed or RoomPhase.Result)
             throw new InvalidOperationException($"Room {Id} cannot enter playing from phase {Phase}.");
+        ClearAdmissions();
+        CancelLoadTimeout();
         if (Phase != RoomPhase.Playing)
             PlayingSince = Environment.TickCount64;
         Phase = RoomPhase.Playing;
@@ -553,20 +707,30 @@ public sealed partial class PlayRoom
     {
         if (Phase == RoomPhase.Closed)
             throw new InvalidOperationException($"Room {Id} is closed.");
+        ClearAdmissions();
+        CancelLoadTimeout();
         Phase = RoomPhase.Result;
+        CancelModeClocks();
+        foreach (var seat in Seats) seat.ClearCritical();
     }
 
     /// <summary>Removes a seat. Closes the room when none remain.</summary>
     /// <param name="sessionId">Game or relay session id.</param>
     public void RemoveSession(long sessionId)
     {
+        foreach (var seat in Seats.Where(seat => seat.Game.Id == sessionId || seat.Relay?.Id == sessionId))
+            seat.ClearCritical();
         _members.RemoveAll(s => s.Game.Id == sessionId || s.Relay?.Id == sessionId);
         if (Seats.Count == 0)
         {
+            ClearAdmissions();
             RemoveBots();
             CancelResultSequence();
+            CancelBattleSettlement();
+            CancelLoadTimeout();
             TutorialCancellation?.Cancel();
             Phase = RoomPhase.Closed;
+            CancelModeClocks();
         }
     }
 }

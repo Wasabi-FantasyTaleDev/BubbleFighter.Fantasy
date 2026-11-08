@@ -1,3 +1,4 @@
+using System.Numerics;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 
 namespace BubbleFighter.Fantasy.Contracts.Match;
@@ -30,16 +31,25 @@ public sealed record RoundSuppliesReported(IReadOnlyList<RoundSupplyPoint> Point
 public sealed record RoundSupplyPickupRequested(int ObjectId, int Kind) : IMessage;
 
 /// <summary>Requests a dropped item box at the position reported by a round member.</summary>
-public sealed record RoundSupplyDropRequested(RoundSupplyPoint Point, int CreationClass) : IMessage;
+public sealed record RoundSupplyDropRequested(RoundSupplyPoint Point, int CreationClass) : IMessage
+{
+    /// <summary>Gets the initial velocity reported by the client for this thrown box.</summary>
+    public Vector3 Velocity { get; init; }
+}
 
 /// <summary>Creates one supply object at a reported map point.</summary>
 public sealed record RoundSupplyCreated(int ObjectId, RoundSupplyPoint Point) : IMessage
 {
     /// <summary>The creation classification checked by the client's item-box handler.</summary>
     public int CreationClass { get; init; } = 10000;
+
+    /// <summary>Gets the initial velocity of a thrown box, or zero for a stationary map supply.</summary>
+    public Vector3 Velocity { get; init; }
 }
 
-/// <summary>Confirms one player's successful supply pickup to every round member.</summary>
+/// <summary>Removes one supply object, optionally crediting its successful pickup to a player.</summary>
+/// <param name="Seat">The receiving seat, or -1 for an audited removal without a pickup effect.</param>
+/// <param name="ObjectId">The live supply object being removed.</param>
 public sealed record RoundSupplyPicked(int Seat, int ObjectId) : IMessage
 {
     /// <summary>Gets the confirmed kind to place in the player's item slot, or zero for an immediate supply.</summary>

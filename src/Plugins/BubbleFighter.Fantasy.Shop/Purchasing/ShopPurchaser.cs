@@ -118,20 +118,21 @@ public sealed class ShopPurchaser(
         }
 
         ShopPurchaseResult? result;
+        var refusal = ShopPurchaseRefusal.Unspecified;
         try
         {
             result = await CommitOfferAsync(session, user, card, ct).ConfigureAwait(false);
         }
         catch (PurchaseRejectedException ex)
         {
-            // The item terms refuse it before anything is charged (owned permanent item, a limit passed); the client
-            // gets the failed reply, as the legacy purchase handler sends.
+            // The item terms or the balance refuse it before anything is charged; the reply names the reason.
             logger.LogWarning("Session {Id} shop buy key={Key} refused for player {User}: {Reason}", session.Id, key, user, ex.Message);
             result = null;
+            refusal = ex.Refusal;
         }
         if (result is null)
         {
-            await reply.SendAsync(session, new(key, false), ct).ConfigureAwait(false);
+            await reply.SendAsync(session, new(key, false) { Refusal = refusal }, ct).ConfigureAwait(false);
             return;
         }
 
@@ -178,12 +179,10 @@ public sealed class ShopPurchaser(
         var result = ItemPurchasePolicy is { } policy
             ? await policy.CommitAsync(command, card.Stocks, ct).ConfigureAwait(false)
             : await purchases.PurchaseAsync(command, ct).ConfigureAwait(false);
+        // The store answers no result only when the balance is below the price.
         if (result is null)
-        {
-            logger.LogWarning("Session {Id} shop buy key={Key} refused: insufficient {Money}.",
-                session.Id, key, currency);
-            return null;
-        }
+            throw new PurchaseRejectedException($"Insufficient {currency}.",
+                currency == "cash" ? ShopPurchaseRefusal.CashShort : ShopPurchaseRefusal.LucciShort);
         var granted = result.Grants[0];
 
         // Gated: with the option off the hold store is never touched and the

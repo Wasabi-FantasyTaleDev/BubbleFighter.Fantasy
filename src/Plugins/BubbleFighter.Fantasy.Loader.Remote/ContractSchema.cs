@@ -128,6 +128,8 @@ internal sealed class ContractSchema
         var resultInfo = _nullability.Create(method.ReturnParameter);
         if (result != method.ReturnType && resultInfo.GenericTypeArguments.Length == 1)
             resultInfo = resultInfo.GenericTypeArguments[0];
+        if (method.DeclaringType == typeof(IInitialHandshakeContinuation))
+            reason = "Handshake continuation requires the current native packet dispatch lifetime.";
         var providerReason = reason ?? (method.GetParameters().Any(parameter => parameter.ParameterType == typeof(IPluginContext))
             ? "Caller contexts require an invocation-scoped context adapter." : null);
         return new JsonObject

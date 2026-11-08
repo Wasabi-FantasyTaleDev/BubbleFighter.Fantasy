@@ -16,10 +16,35 @@ public sealed class ClientPolicyRulesTests
     public void EveryTypeWithItsOwnFieldIsAccepted()
     {
         ClientPolicyRules.Validate(One(
-            Rule("a", "require"), Rule("b", "recommend", ["cn-774"], sources: ["official"]), Rule("c", "recommend", ["kr-1256"], sources: []),
+            Rule("a", "require", ["kr-812"]), Rule("b", "recommend", ["cn-774"], sources: ["official"]), Rule("c", "recommend", ["kr-1256"], sources: []),
             Rule("d", "min_version", version: "1.0.0"), Rule("e", "max_version", version: "2.0.0-beta.1")));
         ClientPolicyRules.Validate(One(Rule("a", "latest", ["cn-774"]), Rule("b", "disable", ["kr-1256"]), Rule("c", "require", ["cn-774"])));
         ClientPolicyRules.Validate(ClientPolicy.Empty);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RecommendationCheckStateIsOptional(bool? selected) =>
+        ClientPolicyRules.Validate(One(Rule("offer", "recommend", sources: []) with { DefaultSelected = selected }));
+
+    [Theory]
+    [InlineData("require", false)]
+    [InlineData("require", true)]
+    [InlineData("disable", false)]
+    [InlineData("disable", true)]
+    [InlineData("min_version", false)]
+    [InlineData("min_version", true)]
+    [InlineData("max_version", false)]
+    [InlineData("max_version", true)]
+    [InlineData("latest", false)]
+    [InlineData("latest", true)]
+    public void OtherRuleTypesRejectEvenAnUncheckedRecommendationField(string type, bool selected)
+    {
+        var rule = Typed("rule", type, []) with { DefaultSelected = selected };
+        var error = Assert.Throws<ClientPolicyException>(() => ClientPolicyRules.Validate(One(rule)));
+        Assert.Equal(("client_policy_invalid", "plugin.id", "rule"), (error.Code, error.Plugin, error.Rule));
     }
 
     [Theory]
@@ -30,6 +55,8 @@ public sealed class ClientPolicyRulesTests
     [InlineData("disable", "latest")]
     [InlineData("latest", "max_version")]
     [InlineData("require", "require")]
+    [InlineData("require", "recommend")]
+    [InlineData("recommend", "require")]
     public void ConflictingTypesOnOverlappingBuildsAreRejected(string first, string second)
     {
         var a = Typed("a", first, ["kr-1256", "cn-774"]);
@@ -38,7 +65,19 @@ public sealed class ClientPolicyRulesTests
         Assert.Equal(("client_policy_conflict", "plugin.id", "a", "b"), (error.Code, error.Plugin, error.Rule, error.Other));
         // Every build is an overlap too; separate builds are not.
         Assert.Throws<ClientPolicyException>(() => ClientPolicyRules.Validate(One(a with { Builds = [] }, b)));
+        Assert.Throws<ClientPolicyException>(() => ClientPolicyRules.Validate(One(a, b with { Builds = [] })));
+        Assert.Throws<ClientPolicyException>(() => ClientPolicyRules.Validate(One(a with { Builds = [] }, b with { Builds = [] })));
         ClientPolicyRules.Validate(One(a with { Builds = ["kr-1256"] }, b));
+    }
+
+    [Fact]
+    public void RequiredAndRecommendedRulesForDifferentPluginsDoNotConflict()
+    {
+        ClientPolicyRules.Validate(new([Official],
+        [
+            new("required.plugin", null, null, [Rule("a", "require")]),
+            new("recommended.plugin", null, null, [Rule("b", "recommend", sources: ["official"])]),
+        ]));
     }
 
     [Fact]

@@ -3,6 +3,7 @@ using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Commands;
 using BubbleFighter.Fantasy.Contracts.Administration;
+using BubbleFighter.Fantasy.Contracts.Match;
 using BubbleFighter.Fantasy.Contracts.Rooms;
 using BubbleFighter.Fantasy.InGame.Data;
 using BubbleFighter.Fantasy.InGame.Sessions;
@@ -18,7 +19,7 @@ public sealed class SharedGameCommandTests
     private static readonly ConcurrentDictionary<string, Action<IPluginContext>> Plans = new();
 
     [Plugin("test.shared-game-commands", Requires = [typeof(ICommandExecutor), typeof(ICommandRegistry),
-        typeof(IPermissionRegistry), typeof(IGameCommandEndpoints)])]
+        typeof(IPermissionRegistry), typeof(IGameCommandEndpoints)], ConditionalProvidesMany = [typeof(IGameCommandInput)])]
     public sealed class Adapter : IPlugin
     {
         public ValueTask ActivateAsync(IPluginContext context, CancellationToken cancellationToken)
@@ -30,14 +31,15 @@ public sealed class SharedGameCommandTests
 
     private sealed class Harness : IAsyncDisposable
     {
-        internal readonly RoomFlowTests.Rig Rig = new();
+        internal readonly RoomFlowTests.Rig Rig;
         internal readonly string Owner = Guid.NewGuid().ToString("N");
         internal readonly PluginHost Host;
         internal IPluginContext Context = null!;
         internal ICommandExecutor Executor => Context.Services.Get<ICommandExecutor>();
 
-        internal Harness(bool denyMode = false, Action<IPluginContext>? configure = null, bool enabled = true)
+        internal Harness(bool denyMode = false, Action<IPluginContext>? configure = null, bool enabled = true, bool udpEnabled = false)
         {
+            Rig = new(options: new InGameOptions { UdpEnabled = udpEnabled });
             Plans[Owner] = context =>
             {
                 Context = context;
@@ -66,6 +68,96 @@ public sealed class SharedGameCommandTests
             try { await Host.ShutdownAsync(default).AsTask().WaitAsync(Limit); }
             finally { Plans.TryRemove(Owner, out _); await Rig.Registry.StopAllAsync(); }
         }
+    }
+
+    [Theory]
+    [InlineData("/", true)]
+    [InlineData("!", true)]
+    [InlineData("！", true)]
+    [InlineData("/", false)]
+    [InlineData("!", false)]
+    [InlineData("！", false)]
+    public async Task UdpCommandsShareTriggerSemanticsWithAndWithoutSharedDispatch(string prefix, bool shared)
+    {
+        await using var h = new Harness(enabled: shared, udpEnabled: true);
+        await h.Start();
+        var host = RoomFlowTests.Rig.Player(11, "host");
+        var id = await h.Rig.CreateAsync(host);
+        var room = h.Rig.Registry.Find(id)!;
+        var roster = (IRoomPeerRoster)h.Rig.Registry;
+        Assert.False(roster.Find(id)!.UsesUdp);
+        await h.Rig.Flow.HandleChatAsync(host, new(0, prefix + "udp on"), default);
+        Assert.True(room.UdpOverride);
+        Assert.True(roster.Find(id)!.UsesUdp);
+        await h.Rig.Flow.HandleChatAsync(host, new(0, prefix + "udp"), default);
+        Assert.False(room.UdpOverride);
+        await h.Rig.Flow.HandleChatAsync(host, new(0, prefix + "udp"), default);
+        Assert.True(room.UdpOverride);
+        await h.Rig.Flow.HandleChatAsync(host, new(0, prefix + "udp off"), default);
+        Assert.False(room.UdpOverride);
+        Assert.Empty(h.Rig.Chat.Sent);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task UdpOverrideCannotBeEnabledInTrainingScenes(bool shared)
+    {
+        await using var h = new Harness(enabled: shared, udpEnabled: true);
+        await h.Start();
+        var host = RoomFlowTests.Rig.Player(11, "host");
+        var (room, _) = h.Rig.Registry.CreateTrainingRoom(host, RoomWireSupport.SampleRules(), 11, "host");
+        await h.Rig.Flow.HandleChatAsync(host, new(0, "!udp on"), default);
+        Assert.Null(room.UdpOverride);
+        Assert.False(((IRoomPeerRoster)h.Rig.Registry).Find(room.Id)!.UsesUdp);
+        Assert.False(host.Connection.IsClosed);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task RoomTransportCannotBeChangedByGuestsOrWhenGloballyDisabled(bool shared)
+    {
+        await using var h = new Harness(enabled: shared, udpEnabled: true);
+        await h.Start();
+        var host = RoomFlowTests.Rig.Player(11, "host");
+        var guest = RoomFlowTests.Rig.Player(22, "guest");
+        var id = await h.Rig.CreateAsync(host);
+        await h.Rig.Flow.HandleJoinAsync(guest, new(id, ""), default);
+        await h.Rig.Flow.HandleChatAsync(guest, new(0, "!udp off"), default);
+        Assert.Null(h.Rig.Registry.Find(id)!.UdpOverride);
+        Assert.True(((IRoomPeerRoster)h.Rig.Registry).Find(id)!.UsesUdp);
+        Assert.Equal("command.result.denied:", Assert.Single(h.Rig.Notices.To(guest)).Text);
+        var disabled = new RoomFlowTests.Rig(options: new InGameOptions { UdpEnabled = false });
+        try
+        {
+            if (shared) disabled.Flow.BindCommands(h.Context, "disabled/game", enabled: true);
+            var player = RoomFlowTests.Rig.Player(33, "disabled");
+            var disabledId = await disabled.CreateAsync(player);
+            await disabled.Flow.HandleChatAsync(player, new(0, "!udp on"), default);
+            Assert.Null(disabled.Registry.Find(disabledId)!.UdpOverride);
+            Assert.Equal("command.result.invalidstate:", Assert.Single(disabled.Notices.To(player)).Text);
+        }
+        finally { await disabled.Registry.StopAllAsync(); }
+    }
+
+    [Theory]
+    [InlineData("/")]
+    [InlineData("!")]
+    [InlineData("！")]
+    public async Task LocalStartAndModeFallbackAlsoNormalizeEveryTrigger(string prefix)
+    {
+        await using var h = new Harness(enabled: false);
+        await h.Start();
+        var host = RoomFlowTests.Rig.Player(11, "host");
+        var id = await h.Rig.CreateAsync(host);
+        await h.Rig.Flow.HandleChatAsync(host, new(0, prefix + "set 8"), default);
+        Assert.Equal(8, h.Rig.Registry.Find(id)!.ModeId);
+        await h.Rig.Flow.HandleChatAsync(host, new(0, prefix + "mode 4"), default);
+        Assert.Equal(4, h.Rig.Registry.Find(id)!.ModeId);
+        await h.Rig.Flow.HandleChatAsync(host, new(0, prefix + "start"), default);
+        Assert.Equal(RoomPhase.Starting, h.Rig.Registry.Find(id)!.Phase);
+        Assert.Empty(h.Rig.Chat.Sent);
     }
 
     [Theory]
@@ -414,5 +506,234 @@ public sealed class SharedGameCommandTests
         result = await executor.ExecuteTextAsync(new(actual, actual, SessionId: "11"), "/mode 8");
         Assert.Equal(CommandStatus.InvalidState, result.Status);
         Assert.Equal(4, h.Rig.Registry.Find(roomId)!.ModeId);
+    }
+    [Theory]
+    [InlineData("!", true)]
+    [InlineData("!", false)]
+    [InlineData("/", true)]
+    public async Task UdpStatusShowsTheRoomPreferenceAndEveryMembersPath(string prefix, bool shared)
+    {
+        await using var h = new Harness(enabled: shared, udpEnabled: true);
+        await h.Start();
+        var host = RoomFlowTests.Rig.Player(11, "host");
+        var guest = RoomFlowTests.Rig.Player(22, "guest");
+        var id = await h.Rig.CreateAsync(host);
+        await h.Rig.Flow.HandleJoinAsync(guest, new(id, ""), default);
+        h.Rig.Flow.UdpStatus = () => [new FixedStatus(new()
+        {
+            [host.Id] = new(UdpPathState.Udp, "verified"),
+            [guest.Id] = new(UdpPathState.Negotiating, "offered, no UDP probe received yet"),
+        })];
+        await h.Rig.Flow.HandleChatAsync(guest, new(0, prefix + "udp status"), default);
+        var text = Assert.Single(h.Rig.Notices.To(guest)).Text;
+        Assert.Equal("UDP relay, room on (multiplayer): host UDP (verified); guest NEGOTIATING (offered, no UDP probe received yet)", text);
+        Assert.Null(h.Rig.Registry.Find(id)!.UdpOverride);
+        Assert.Empty(h.Rig.Chat.Sent);
+    }
+
+    [Theory]
+    [InlineData(true, "UDP: not available for this client version on this server. TCP only.")]
+    [InlineData(false, "UDP: off on this server. Every room uses TCP.")]
+    public async Task UdpStatusSaysWhenTheServerOffersNoUdp(bool udpEnabled, string expected)
+    {
+        await using var h = new Harness(udpEnabled: udpEnabled);
+        await h.Start();
+        var host = RoomFlowTests.Rig.Player(11, "host");
+        await h.Rig.CreateAsync(host);
+        h.Rig.Flow.UdpStatus = () => [];
+        await h.Rig.Flow.HandleChatAsync(host, new(0, "!udp status"), default);
+        Assert.Equal(expected, Assert.Single(h.Rig.Notices.To(host)).Text);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task PlazaLeavesEvenARunningRoundAndTheLastLeaverDeletesTheRoom(bool shared)
+    {
+        await using var h = new Harness(enabled: shared);
+        await h.Start();
+        var host = RoomFlowTests.Rig.Player(11, "host");
+        var guest = RoomFlowTests.Rig.Player(22, "guest");
+        var id = await h.Rig.CreateAsync(host);
+        await h.Rig.Flow.HandleJoinAsync(guest, new(id, ""), default);
+        await h.Rig.Flow.HandleReadyAsync(guest, new(true), default);
+        await h.Rig.Flow.HandleStartAsync(host, new("rel_Village07_Easy02"), default);
+        Assert.NotEqual(RoomPhase.Waiting, h.Rig.Registry.Find(id)!.Phase);
+        await h.Rig.Flow.HandleChatAsync(guest, new(0, "!plaza"), default);
+        Assert.Null(h.Rig.Registry.TryGet(guest.Id));
+        Assert.NotNull(h.Rig.Registry.Find(id));
+        Assert.Single(h.Rig.Left.To(guest));
+        await h.Rig.Flow.HandleChatAsync(host, new(0, "!plaza"), default);
+        Assert.Null(h.Rig.Registry.TryGet(host.Id));
+        Assert.Null(h.Rig.Registry.Find(id));
+        Assert.Empty(h.Rig.Chat.Sent);
+    }
+
+    [Fact]
+    public async Task ExternalCommandUsesChatPermissionsAndExactSessionOwnership()
+    {
+        await using var h = new Harness(denyMode: true);
+        await h.Start();
+        using var limit = new Handlers.ChatRateLimit(new InGameOptions(), NullLogger.Instance);
+        h.Rig.Flow.CommandAdmission = limit.Admit;
+        var player = RoomFlowTests.Rig.Player(22, "guest");
+        var id = await h.Rig.CreateAsync(player);
+        var input = Assert.Single(h.Context.Services.GetAll<IGameCommandInput>());
+        Assert.True(input.OwnsSession(player));
+        var impostor = RoomFlowTests.Rig.Player(22, "guest");
+        Assert.False(input.OwnsSession(impostor));
+        Assert.Equal(CommandStatus.InvalidState, (await input.ExecuteTextAsync(impostor, "mode 8", default)).Status);
+        Assert.Equal(CommandStatus.Denied, (await input.ExecuteTextAsync(player, "mode 8", default)).Status);
+        Assert.Equal(4, h.Rig.Registry.Find(id)!.ModeId);
+        Assert.Empty(h.Rig.SettingsChanged.Sent);
+    }
+
+    [Fact]
+    public async Task ExternalCommandsConsumeTheSameConnectionWindowAsChat()
+    {
+        await using var h = new Harness(udpEnabled: true);
+        await h.Start();
+        using var limit = new Handlers.ChatRateLimit(new InGameOptions
+        {
+            ChatRateLimitMessages = 2, ChatRateLimitWindowMs = 3600000,
+        }, NullLogger.Instance);
+        h.Rig.Flow.CommandAdmission = limit.Admit;
+        var player = RoomFlowTests.Rig.Player(11, "host");
+        await h.Rig.CreateAsync(player);
+        await limit.Wrap<RoomChatSent>(h.Rig.Flow.HandleChatAsync)(player, new(0, "!udp status"), default);
+        var input = Assert.Single(h.Context.Services.GetAll<IGameCommandInput>());
+        Assert.Equal(CommandStatus.Success, (await input.ExecuteTextAsync(player, "udp status", default)).Status);
+        Assert.Equal(CommandStatus.Busy, (await input.ExecuteTextAsync(player, "plaza", default)).Status);
+        Assert.NotNull(h.Rig.Registry.TryGet(player.Id));
+    }
+
+    [Fact]
+    public async Task BareExternalPlazaLeavesARunningRoomAndWithdrawnInputCannotRun()
+    {
+        await using var h = new Harness();
+        await h.Start();
+        using var limit = new Handlers.ChatRateLimit(new InGameOptions(), NullLogger.Instance);
+        h.Rig.Flow.CommandAdmission = limit.Admit;
+        var player = RoomFlowTests.Rig.Player(11, "host");
+        await h.Rig.CreateAsync(player);
+        await h.Rig.Flow.HandleStartAsync(player, new("rel_Village07_Easy02"), default);
+        Assert.Equal(CommandStatus.InvalidState, (await Assert.Single(h.Context.Services.GetAll<IGameCommandInput>())
+            .ExecuteTextAsync(player, "plaza", default)).Status);
+        lock (h.Rig.Registry.TryGet(player.Id)!.Gate) h.Rig.Registry.TryGet(player.Id)!.MarkPlaying();
+        var input = Assert.Single(h.Context.Services.GetAll<IGameCommandInput>());
+        Assert.Equal(CommandStatus.Success, (await input.ExecuteTextAsync(player, "plaza", default)).Status);
+        Assert.Null(h.Rig.Registry.TryGet(player.Id));
+        Assert.Single(h.Rig.Left.To(player));
+        Assert.False(input.OwnsSession(player));
+        Assert.Equal(CommandStatus.InvalidState, (await input.ExecuteTextAsync(player, "plaza", default)).Status);
+        await h.Rig.CreateAsync(player);
+        await h.Host.ShutdownAsync(default).AsTask().WaitAsync(Limit);
+        Assert.False(input.OwnsSession(player));
+        Assert.Equal(CommandStatus.InvalidState, (await input.ExecuteTextAsync(player, "plaza", default)).Status);
+    }
+
+    [Theory]
+    [InlineData("caller")]
+    [InlineData("owner")]
+    [InlineData("host")]
+    public async Task ExternalRoomCommandCancellationDrainsEveryOwner(string cancellation)
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var stopped = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Handlers.GameCommandHandler? commands = null;
+        await using var h = new Harness(enabled: false,
+            configure: context => commands!.BindShared(context, "blocking/game", enabled: true));
+        commands = new(h.Rig.Registry, async (_, token) =>
+        {
+            entered.TrySetResult();
+            try { await Task.Delay(Timeout.Infinite, token); }
+            finally { stopped.TrySetResult(); }
+        }) { AdmitInput = (_, _) => true };
+        await h.Start();
+        var player = RoomFlowTests.Rig.Player(11, "host");
+        await h.Rig.CreateAsync(player);
+        var input = Assert.Single(h.Context.Services.GetAll<IGameCommandInput>());
+        var caller = new PluginContext(new() { Id = "external-input", Plugin = "test", Source = "test" },
+            new ServiceRegistry(), new EventBus(NullLogger.Instance), NullLogger.Instance);
+        using var stop = new CancellationTokenSource();
+        CommandResult? result = null;
+        try
+        {
+            var invocation = await caller.RunTaskAsync("external-command", async token =>
+                result = await input.ExecuteTextAsync(player, "start", token), stop.Token);
+            await entered.Task.WaitAsync(Limit);
+
+            if (cancellation == "caller") stop.Cancel();
+            else if (cancellation == "owner") await h.Host.UnloadAsync(h.Owner, default).AsTask().WaitAsync(Limit);
+            else await Task.WhenAll(caller.UnwindAsync().AsTask(), h.Host.ShutdownAsync(default).AsTask()).WaitAsync(Limit);
+
+            await invocation.Completion.WaitAsync(Limit);
+            Assert.True(stopped.Task.IsCompleted);
+            Assert.Equal(CommandStatus.Cancelled, result!.Status);
+            if (cancellation == "caller")
+            {
+                var principal = new CommandPrincipal(PrincipalKind.Game, "11");
+                Assert.Equal(CommandStatus.InvalidState, (await h.Executor.ExecuteTextAsync(
+                    new(principal, principal, SessionId: "99"), "/start")).Status);
+                var healthy = await caller.RunTaskAsync("after-cancellation", _ => ValueTask.CompletedTask);
+                await healthy.Completion.WaitAsync(Limit);
+                healthy = await h.Context.RunTaskAsync("after-cancellation", _ => ValueTask.CompletedTask);
+                await healthy.Completion.WaitAsync(Limit);
+            }
+        }
+        finally
+        {
+            stop.Cancel();
+            await caller.UnwindAsync().AsTask().WaitAsync(Limit);
+        }
+    }
+
+    [Fact]
+    public async Task ExternalInputCallerCancellationBeforeDispatchKeepsBothOwnersHealthy()
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var admission = new ManualResetEventSlim();
+        await using var h = new Harness(udpEnabled: true);
+        await h.Start();
+        h.Rig.Flow.CommandAdmission = (_, token) =>
+        {
+            entered.TrySetResult();
+            admission.Wait(token);
+            return true;
+        };
+        var player = RoomFlowTests.Rig.Player(11, "host");
+        await h.Rig.CreateAsync(player);
+        var input = Assert.Single(h.Context.Services.GetAll<IGameCommandInput>());
+        var caller = new PluginContext(new() { Id = "external-input", Plugin = "test", Source = "test" },
+            new ServiceRegistry(), new EventBus(NullLogger.Instance), NullLogger.Instance);
+        using var stop = new CancellationTokenSource();
+        CommandResult? result = null;
+        try
+        {
+            var invocation = await caller.RunTaskAsync("external-command", async token =>
+                result = await input.ExecuteTextAsync(player, "udp status", token), stop.Token);
+            await entered.Task.WaitAsync(Limit);
+            stop.Cancel();
+            await invocation.Completion.WaitAsync(Limit);
+            Assert.Equal(CommandStatus.Cancelled, result!.Status);
+
+            admission.Set();
+            Assert.Equal(CommandStatus.Success, (await input.ExecuteTextAsync(player, "udp status", default)).Status);
+            var healthy = await caller.RunTaskAsync("after-cancellation", _ => ValueTask.CompletedTask);
+            await healthy.Completion.WaitAsync(Limit);
+        }
+        finally
+        {
+            stop.Cancel();
+            admission.Set();
+            await caller.UnwindAsync().AsTask().WaitAsync(Limit);
+        }
+    }
+
+    private sealed class FixedStatus(Dictionary<long, UdpPathStatus> states) : IUdpTransportStatus
+    {
+        public string Protocol => "test/game";
+        public string Kind => "relay";
+        public UdpPathStatus Describe(ISession game) => states[game.Id];
     }
 }

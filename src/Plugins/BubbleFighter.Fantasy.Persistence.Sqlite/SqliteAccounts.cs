@@ -16,6 +16,9 @@ namespace BubbleFighter.Fantasy.Persistence.Sqlite;
 /// </summary>
 internal sealed partial class SqliteRepositories(SqliteDatabase database) : IPlayerRepository, ILauncherAccountRepository
 {
+    /// <summary>Reads saved identities by primary key without creating a player or changing its saved state.</summary>
+    public bool SupportsRetainedAccountLookup => true;
+
     /// <summary>This provider writes through to disk; identity and onboarding state survive restarts.</summary>
     public bool PersistsState => true;
     /// <summary>Character creation commits the chosen fighter and the starter bags with the identity row.</summary>
@@ -75,6 +78,20 @@ internal sealed partial class SqliteRepositories(SqliteDatabase database) : IPla
 
     public ValueTask<PlayerRecord?> FindByUsernameAsync(string username, CancellationToken ct) => new(database.Read(db =>
         ReadPlayer(db, username), ct));
+
+    /// <summary>Returns the saved identity and display state for an existing positive account number.</summary>
+    ValueTask<PlayerRecord?> IPlayerRepository.FindByUserNumAsync(long userNum, CancellationToken ct)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(userNum);
+        ct.ThrowIfCancellationRequested();
+        return new(database.Read<PlayerRecord?>(db =>
+        {
+            var row = db.Orm.Queryable<PlayerRow>().Where(player => player.UserNum == userNum).First();
+            if (row is null) return null;
+            var state = SaveJson.Decode(row.State);
+            return new(row.UserNum, row.Username, row.Nickname, state.Level) { ColorIndex = state.ColorIndex };
+        }, ct));
+    }
 
     private static PlayerRecord? ReadPlayer(SqliteDatabase db, string username)
     {

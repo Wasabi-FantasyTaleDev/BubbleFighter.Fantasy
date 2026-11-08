@@ -21,7 +21,7 @@ public sealed class RoundFeedLayoutContractTests
     {
         var temporary = Directory.CreateTempSubdirectory("round-feed-contract-");
         var directory = temporary.FullName;
-        File.WriteAllText(Path.Combine(directory, "builds.yaml"), "version: 1\nbuilds:\n  kr-1256:\n    round_feed:\n      Dash: { opcode: Unknown32779, structure: Dash, actors: [actor] }\n");
+        File.WriteAllText(Path.Combine(directory, "builds.yaml"), "version: 1\nbuilds:\n  kr-1256:\n    round_feed:\n      Dash: { opcode: gppDash, structure: Dash, actors: [actor] }\n");
         File.WriteAllText(Path.Combine(directory, "feed.yaml"),
             $"version: 1\nstructs:\n  RoundResetConfirmation:\n    - actor: u32\n  Dash:\n    - actor: {type}\n      offset: 0\n");
         var services = new ServiceRegistry();

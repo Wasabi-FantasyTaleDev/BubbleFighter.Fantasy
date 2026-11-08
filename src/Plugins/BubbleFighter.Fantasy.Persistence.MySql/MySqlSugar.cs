@@ -2,6 +2,7 @@ using System.Data;
 using System.Data.Common;
 using BubbleFighter.Fantasy.Abstractions.Persistence;
 using SqlSugar;
+using BubbleFighter.Fantasy.Contracts.Cluster;
 
 namespace BubbleFighter.Fantasy.Persistence.MySql;
 
@@ -68,6 +69,22 @@ internal sealed class SugarSession : IAsyncDisposable
     /// </summary>
     /// <returns>The transaction; disposing it without a commit rolls it back.</returns>
     public ValueTask<SugarTransaction> BeginAsync() => BeginAsync(IsolationLevel.RepeatableRead);
+
+    /// <summary>Starts a mutation transaction and, when required, locks and validates its account authority until commit.</summary>
+    public async ValueTask<SugarTransaction> BeginWriteAsync(long userNum, IAccountMutationFence? authority, CancellationToken ct)
+    {
+        var transaction = await BeginAsync().ConfigureAwait(false);
+        try
+        {
+            if (authority is not null) await authority.VerifyAsync(_connection, Db.Ado.Transaction as DbTransaction ?? throw new InvalidOperationException("A mutation requires an active transaction."), userNum, ct).ConfigureAwait(false);
+            return transaction;
+        }
+        catch
+        {
+            await transaction.DisposeAsync().ConfigureAwait(false);
+            throw;
+        }
+    }
 
     /// <summary>Starts a transaction at the given isolation level.</summary>
     /// <param name="isolation">The isolation level; the launcher credential writes use SERIALIZABLE.</param>

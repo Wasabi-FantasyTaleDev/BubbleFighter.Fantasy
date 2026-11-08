@@ -1,0 +1,33 @@
+# Opt in only on a build with its audited native_defence_seed_tables capability and an existing authority row.
+# Defence tables travel on the native TCP relay; cn-705 and cn-706 keep these prerequisites dormant by default.
+- replace:
+    id: relay-listener
+    disabled: false
+- replace:
+    id: dialect.match
+    disabled: false
+- replace:
+    id: dialect.match-offers
+    disabled: false
+- replace:
+    id: dialect.match-replies
+    disabled: false
+- replace:
+    id: match-connection
+    disabled: false
+- set:
+    id: ingame
+    config:
+      native_match_relay: true
+      match_transport_fallback: true
+- set:
+    id: dialect.rooms
+    config:
+      select_match_relay: true
+- replace:
+    id: dialect.scene-seeds
+    disabled: false
+- set:
+    id: dialect.scene-seeds
+    config:
+      defence_seeds: true

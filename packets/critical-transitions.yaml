@@ -1,0 +1,43 @@
+version: 1
+structs:
+  # Four u32 words: cn-324 sub_6FE600, cn-406 sub_7137B0, cn-404 sub_4B0E30,
+  # cn-408 sub_4AE6A0 and id-400 sub_481C20. The last word is serialized in full.
+  CriticalWeaponState:
+    - specification: u32
+      offset: 4
+      only: [cn-324, id-400]
+    - slot: u32
+      offset: 8
+      only: [cn-324, id-400]
+    - actor: u32
+      offset: 12
+      only: [cn-324, id-400]
+    - unknown_16: u32
+      offset: 16
+      only: [cn-324, id-400]
+
+  # cn-324 sub_45ED10, cn-406 sub_420D30, cn-404 sub_4B0C90,
+  # cn-408 sub_4B0620 and id-400 sub_482930 read 1,4,4,4,4,4,1 bytes.
+  CriticalEffectTrigger:
+    - unknown_4: u8
+      offset: 4
+      only: [cn-324, id-400]
+    - actor: u32
+      offset: 8
+      only: [cn-324, id-400]
+    - initiator: u32
+      offset: 12
+      only: [cn-324, id-400]
+    - position_x: f32
+      offset: 16
+      only: [cn-324, id-400]
+    - position_y: f32
+      offset: 20
+      only: [cn-324, id-400]
+    - position_z: f32
+      offset: 24
+      only: [cn-324, id-400]
+    # cn-324 sub_478AE0 / cn-406 sub_43CF70 require both bytes before starting initiator's timer.
+    - unknown_28: u8
+      offset: 28
+      only: [cn-324, id-400]

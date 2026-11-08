@@ -65,6 +65,21 @@ public sealed class CompanionOptions : IValidatableOptions
     /// <summary>Gets or sets the graceful unload timeout in seconds.</summary>
     [Range(1, 60)] public int ShutdownSeconds { get; set; } = 5;
 
+    /// <summary>Gets or sets the maximum simultaneous remote launch preparation, renewal and health requests.</summary>
+    [Range(1, 256)] public int MaxRemoteRequests { get; set; } = 16;
+
+    /// <summary>Gets or sets the maximum explicitly trusted remote ticket authorities.</summary>
+    [Range(1, 128)] public int MaxRemoteAuthorities { get; set; } = 8;
+
+    /// <summary>Gets or sets the complete deadline for one remote companion request, in seconds.</summary>
+    [Range(1, 30)] public int RemoteTimeoutSeconds { get; set; } = 3;
+
+    /// <summary>Gets or sets the interval between checks that remote launches still exist, in seconds.</summary>
+    [Range(1, 300)] public int RemoteProbeSeconds { get; set; } = 30;
+
+    /// <summary>Gets or sets how long an unreachable node retains its launch bindings after its last successful check.</summary>
+    [Range(30, 86400)] public int RemoteFailureSeconds { get; set; } = 120;
+
     /// <inheritdoc />
     public IEnumerable<ValidationResult> Validate()
     {
@@ -74,5 +89,7 @@ public sealed class CompanionOptions : IValidatableOptions
             || url.AbsolutePath != CompanionServer.Path)
             yield return new($"public_url must be a ws or wss URL whose path is {CompanionServer.Path}, without query or fragment.", [nameof(PublicUrl)]);
         if (QueueBytes < MessageBytes) yield return new("queue_bytes must hold at least one message of message_bytes.", [nameof(QueueBytes)]);
+        if (RemoteFailureSeconds < RemoteProbeSeconds + RemoteTimeoutSeconds)
+            yield return new("remote_failure_seconds must cover one probe interval and request deadline.", [nameof(RemoteFailureSeconds)]);
     }
 }

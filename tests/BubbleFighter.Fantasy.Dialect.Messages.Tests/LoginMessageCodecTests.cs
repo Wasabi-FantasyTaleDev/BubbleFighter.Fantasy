@@ -28,6 +28,36 @@ public sealed class LoginMessageCodecTests
         Assert.Equal(expected, body);
     }
 
+    /// <summary>
+    /// The configured login channel lands in the word kr-812 sub_818680 stores at ServerConnection+2432 (field
+    /// offset 76, payload byte 72) and changes nothing else; zero leaves the recorded body as it was.
+    /// </summary>
+    [Fact]
+    public void AcceptedReplyCarriesTheLoginChannelInItsChannelWord()
+    {
+        var time = DateTime.FromOADate(BitConverter.ToDouble(Convert.FromHexString("2B7846827A9AE640")));
+        var accepted = new LoginAccepted(0x11A, "testplayer01", "TestPlayer01", time, 300010);
+        var plain = LoginMessageCodec.WriteAccepted(accepted, TestLogin.Of("kr-812"), TestBuilds.Packets, "kr-812");
+        var free = LoginMessageCodec.WriteAccepted(accepted, TestLogin.Of("kr-812"), TestBuilds.Packets, "kr-812", 60);
+        Assert.Equal(0, BitConverter.ToInt32(plain, 72));
+        Assert.Equal(60, BitConverter.ToInt32(free, 72));
+        BitConverter.GetBytes(0).CopyTo(free, 72);
+        Assert.Equal(plain, free);
+    }
+
+    /// <summary>
+    /// Only replies with a channel word can carry the login channel: the kr-812 table reply and the modern table
+    /// reply do; the cn-324 reply has no such word, so those clients take the channel from the move replies.
+    /// </summary>
+    [Theory]
+    [InlineData("kr-812", true)]
+    [InlineData("id-400", true)]
+    [InlineData("kr-1256", true)]
+    [InlineData("cn-324", false)]
+    public void OnlyRepliesWithAChannelWordCarryTheLoginChannel(string build, bool carries) =>
+        Assert.Equal(carries, LoginMessageCodec.CarriesChannel(TestBuilds.Packets, build,
+            LoginValues.From(build, TestBuilds.Packets.ValuesOf(build))));
+
     [Fact]
     public void RejectedReplyKeepsTheReaderShapeWithResultOne()
     {
@@ -264,10 +294,12 @@ public sealed class LoginMessageCodecTests
     [InlineData("cn-742", "cn-738", "cn-735", "cn-717", "kr-812")]
     public void MidCnLoginResponseBuildsKeepCn717RequestAndCn774Reply(params string[] lineage)
     {
-        Assert.Equal("cn-735", TestBuilds.Packets.NearestBuild(lineage));
+        var build = TestBuilds.Packets.NearestBuild(lineage);
+        Assert.NotNull(build);
+        Assert.Equal(lineage[0], build);
         var shape = TestLogin.OfLineage(lineage);
         var accepted = new LoginAccepted(7, "ab", "cd", DateTime.FromOADate(0), 300003);
-        var reply = LoginMessageCodec.WriteAccepted(accepted, shape, TestBuilds.Packets, "cn-735");
+        var reply = LoginMessageCodec.WriteAccepted(accepted, shape, TestBuilds.Packets, build);
         Assert.Equal(LoginMessageCodec.WriteAccepted(accepted, TestLogin.Cn774, TestBuilds.Packets, "cn-735"), reply);
         Assert.Equal(4 + 8 + 4 + 8 + 16 + 8 + 4 + 4, reply.Length);
         Assert.Equal(7, BitConverter.ToInt32(reply, 12));
@@ -278,6 +310,6 @@ public sealed class LoginMessageCodecTests
         Assert.Equal(24, request.Length);
         Assert.Equal("", LoginMessageCodec.ReadRequest(request, shape).Account);
         Assert.Throws<PacketFormatException>(() => LoginMessageCodec.ReadRequest(request, TestLogin.Cn774));
-        Assert.Equal(12, LoginMessageCodec.WriteRejected(new LoginRejected(LoginRejection.AccountNotFound), shape, TestBuilds.Packets, "cn-735").Length);
+        Assert.Equal(12, LoginMessageCodec.WriteRejected(new LoginRejected(LoginRejection.AccountNotFound), shape, TestBuilds.Packets, build).Length);
     }
 }

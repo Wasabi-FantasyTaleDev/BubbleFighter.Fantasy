@@ -6,7 +6,7 @@ namespace BubbleFighter.Fantasy.Protocol;
 
 /// <summary>
 /// An immutable opcode table for one client profile, seen through one connection. The instance
-/// the constructor returns is the game view; <see cref="ForConnection"/> returns the relay view,
+/// the constructor returns is the game view; <see cref="ForConnection"/> returns the relay or UDP view,
 /// which shares the same rows.
 /// </summary>
 public sealed class OpcodeTable : IOpcodeTable, IOpcodeNameFallback
@@ -15,6 +15,7 @@ public sealed class OpcodeTable : IOpcodeTable, IOpcodeNameFallback
     private readonly Dictionary<(PacketDirection Direction, ushort Value), OpcodeEntry> _entries;
     private readonly OpcodeTable _game;
     private readonly OpcodeTable _relay;
+    private readonly OpcodeTable _udp;
 
     /// <summary>Creates the table.</summary>
     /// <param name="profile">The profile the table belongs to.</param>
@@ -28,6 +29,7 @@ public sealed class OpcodeTable : IOpcodeTable, IOpcodeNameFallback
         var all = entries.ToArray();
         _game = this;
         _relay = new OpcodeTable(profile, all, OpcodeConnection.Relay, this);
+        _udp = new OpcodeTable(profile, all, OpcodeConnection.Udp, this);
         Profile = profile;
         Connection = OpcodeConnection.Game;
         _entries = Index(profile, all, OpcodeConnection.Game);
@@ -37,7 +39,8 @@ public sealed class OpcodeTable : IOpcodeTable, IOpcodeNameFallback
     {
         _game = game;
         _fallback = game._fallback;
-        _relay = this;
+        _relay = game;
+        _udp = game;
         Profile = profile;
         Connection = connection;
         _entries = Index(profile, all, connection);
@@ -47,7 +50,7 @@ public sealed class OpcodeTable : IOpcodeTable, IOpcodeNameFallback
     {
         var byValue = new Dictionary<(PacketDirection, ushort), OpcodeEntry>();
         var names = new HashSet<(PacketDirection, string)>();
-        foreach (var entry in all.Where(e => e.Connection == connection || e.Connection == OpcodeConnection.Both))
+        foreach (var entry in all.Where(e => e.Connection == connection || (connection != OpcodeConnection.Udp && e.Connection == OpcodeConnection.Both)))
         {
             if (!byValue.TryAdd((entry.Direction, entry.Value), entry))
                 throw new ConfigException($"Opcode table '{profile.Id}': {connection} {entry.Direction} {entry.Value} is claimed by both {byValue[(entry.Direction, entry.Value)].Name} and {entry.Name}.");
@@ -67,8 +70,9 @@ public sealed class OpcodeTable : IOpcodeTable, IOpcodeNameFallback
     public IOpcodeTable ForConnection(OpcodeConnection connection) => connection switch
     {
         OpcodeConnection.Game => _game,
-        OpcodeConnection.Relay => _relay,
-        _ => throw new ArgumentOutOfRangeException(nameof(connection), connection, "A view resolves either the game or the relay connection."),
+        OpcodeConnection.Relay => _game._relay,
+        OpcodeConnection.Udp => _game._udp,
+        _ => throw new ArgumentOutOfRangeException(nameof(connection), connection, "A view resolves the game, relay or UDP opcode space."),
     };
 
     /// <inheritdoc />
@@ -158,8 +162,9 @@ public static class OpcodeTableLoader
         {
             "game" => OpcodeConnection.Game,
             "relay" => OpcodeConnection.Relay,
+            "udp" => OpcodeConnection.Udp,
             "both" => OpcodeConnection.Both,
-            _ => throw new ConfigException($"Opcode table file '{path}': entry {line} 'connection' must be 'game', 'relay', or 'both'."),
+            _ => throw new ConfigException($"Opcode table file '{path}': entry {line} 'connection' must be 'game', 'relay', 'udp', or 'both'."),
         };
     }
 

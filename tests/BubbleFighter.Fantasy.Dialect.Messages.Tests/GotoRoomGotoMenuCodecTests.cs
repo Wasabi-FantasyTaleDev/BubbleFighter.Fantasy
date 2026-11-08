@@ -18,7 +18,7 @@ public sealed class GotoRoomGotoMenuCodecTests
         // cn-735 SessionSetting sub_4254D0: u16, u32, wstr "", u16 x3, bool, wstr "", then kind.
         Assert.Equal(GotoRoomGotoMenuCodec.MainMenuKind, BitConverter.ToInt32(body, 24));
         // Empty GameSetting is 173 bytes; nickname "admin" and two equipped ids make the
-        // full GotoRoom body 503 bytes on cn-735 / cn-738 / cn-742.
+        // full GotoRoom body 503 bytes on cn-735 / cn-738; cn-742 has one extra ArenaLevel word.
         Assert.Equal(503, body.Length);
         Assert.Equal(4, GotoRoomGotoMenuCodec.WriteGotoMenu(TestBuilds.Packets, "cn-735").Length);
     }

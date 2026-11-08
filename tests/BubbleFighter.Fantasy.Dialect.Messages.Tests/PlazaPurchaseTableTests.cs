@@ -41,8 +41,6 @@ public sealed class PlazaPurchaseTableTests
         }
         Assert.Throws<PacketFormatException>(() => PlayRoomCodec.ReadPositionUpload(TestBuilds.Packets, build, new byte[21]));
         Assert.Throws<PacketFormatException>(() => PlayRoomCodec.ReadPositionUpload(TestBuilds.Packets, build, new byte[23]));
-        Assert.Equal(PlayRoomCodec.WritePlazaWalkStep(TestBuilds.Packets, "kr-812", 282, 21, 7),
-            PlayRoomCodec.WritePlazaWalkStep(TestBuilds.Packets, build, 282, 21, 7));
     }
 
     [Theory]

@@ -1,0 +1,84 @@
+version: 1
+structs:
+  # kr-812 sub_8069D0, cn-279 sub_7047A0 and cn-324 sub_6F3A60 read u16/u32/u8.
+  # The first two fields become the server discovery port and opaque probe identity;
+  # the final byte's purpose is unproven, so it retains its wire offset.
+  # cn-406 sub_70A1F0 and id-400 sub_78CFE0 read the same port/identity/byte sequence.
+  # CN2014 readers: cn-404 sub_7B99B0, cn-408 sub_7BCE50, cn-705 sub_792430, cn-706 sub_793880.
+  # cn-735 sub_9FE400, cn-738 sub_A2B5D0 and cn-742 sub_96BD90 retain these widths on S2C607.
+  UdpPeerDiscoveryOffer:
+    - server_port: u16
+    - probe_identity: u32
+    - unknown_6: u8
+
+  # kr-812 sub_80D000, cn-279 sub_701A40 and cn-324 sub_6F7AC0 send UDP2.
+  # IPv4 words are copied from native in_addr storage, preserving network-order bytes.
+  # cn-406 sub_70E070 and id-400 sub_791510 serialize the same discovery body.
+  # CN2014 writers: cn-404 sub_7BE2E0, cn-408 sub_7C17B0, cn-705 sub_7972A0, cn-706 sub_798A00.
+  # cn-735 sub_A0D0F0, cn-738 sub_A36A70 and cn-742 sub_97C2F0 also stamp UDP2 with this body.
+  UdpPeerDiscovery:
+    - probe_identity: u32
+    - local_ipv4: u32
+    - local_port: u16
+
+  # cn-279 sub_7037B0 dispatches UDP3 to cn-279 sub_701B80, which reads and discards one u32.
+  # This consumer does not change discovery or peer state; the field's meaning is not established.
+  UdpPeerDiscoveryReply:
+    - unknown_0: u32
+
+  # kr-812 sub_806A30, cn-279 sub_704450 and cn-324 sub_6F3AC0 read two u32 words.
+  # The second is narrowed to u16 before updating the seat's observed outer port.
+  # cn-735 sub_9FE460, cn-738 sub_A2B630 and cn-742 sub_96BE00 do the same on S2C609.
+  UdpPeerObservedPort:
+    - slot: u32
+    - outer_port: u32
+
+  # kr-812 sub_810060 reads the native table row used by kr-812 sub_80E910.
+  # cn-279 sub_44C230/cn-279 sub_7032E0 and cn-324 sub_6F7640/cn-324 sub_6F9140 match this order.
+  # Own rows are required too: cn-279 sub_701BD0 reads the local seat's peer identity.
+  # cn-406 sub_70DBD0/cn-406 sub_70F6B0 and id-400 sub_791070/id-400 sub_792B70 read and install the same fields.
+  # cn-404 sub_7BDDD0, cn-408 sub_7C12A0, cn-705 sub_796DC0 and cn-706 sub_798520 match it.
+  # cn-735 sub_A0EB20, cn-738 sub_A383A0 and cn-742 sub_97AD30/cn-742 sub_97C920
+  # read the same fields on S2C610 and install both the local and the remote seat's identity.
+  UdpPeerTableRow:
+    - slot: u32
+    - peer_identity: u32
+    - local_ipv4: 'list<u32>'
+    - local_port: u16
+    - outer_ipv4: u32
+    - outer_port: u16
+
+  # cn-279 sub_70A0F0 and cn-324 sub_6EC0B0 dispatch these without reading a body.
+  # Table-end elicits empty C2S607 (cn-279 sub_7041E0/cn-279 sub_7018A0,
+  # cn-324 sub_6F8E90, kr-812 sub_80E630). Start and finish are separate controls.
+  # Empty controls611/612/613: cn-735 sub_A0E830, cn-735 sub_A0E8B0, cn-735 sub_A0E300;
+  # cn-738 sub_A2B550, cn-738 sub_A38150, cn-738 sub_A37C60;
+  # cn-742 sub_97A9D0, cn-742 sub_97AA80, cn-742 sub_97A410.
+  UdpPeerDiscoveryStopped: []
+  UdpPeerTableEnded: []
+  UdpPeerTableAcknowledged: []
+  UdpPeerPunchStarted: []
+  UdpPeerPunchFinished: []
+
+  # kr-812 sub_80E070 and cn-279 sub_701E00 send C2S603 with occupied-seat
+  # and successful-peer counts. Counts describe client observations, never authority.
+  # cn-735 sub_A0E300, cn-738 sub_A37C60 and cn-742 sub_97A410 write the same two words on C2S603.
+  UdpPeerPunchReported:
+    - occupied_seats: u32
+    - connected_peers: u32
+
+  # cn-279 sub_701BD0 sends UDP6 with its own peer identity and the candidate local
+  # address; cn-279 sub_7030A0 replies with UDP7 carrying the same address word.
+  UdpPeerInnerPunch:
+    - peer_identity: u32
+    - local_ipv4: u32
+
+  # cn-279 sub_701BD0/cn-279 sub_702EE0 send UDP8/9 containing only a peer identity.
+  # cn-279 sub_702E10 validates the identity and candidate IP before retaining its endpoint.
+  UdpPeerOuterPunch:
+    - peer_identity: u32
+
+  # cn-279 sub_701E00 unregisters a successfully punched peer from TCP relay9;
+  # cn-279 sub_702370 re-registers it on relay8 when UDP movement acknowledgements stall.
+  UdpPeerRelayMembership:
+    - peer_identity: u32

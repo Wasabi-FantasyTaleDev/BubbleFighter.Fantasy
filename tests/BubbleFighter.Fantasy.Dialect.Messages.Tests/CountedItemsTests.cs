@@ -10,12 +10,55 @@ namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
 /// <summary>Pins the native counted cooperative item list, use index, and effect confirmation.</summary>
 public sealed class CountedItemsTests
 {
+    /// <summary>CN2011 confirms its no-object ULTRA request with the native two-word item reply, without counted slots.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task EarlyUltraUsesItemReplyAndUnloads(bool remap)
+    {
+        const string build = "cn-279";
+        var profile = new ClientProfile(build, "cn", 279, 0, 0, build);
+        var root = Directory.GetParent(TestBuilds.PacketsDirectory())!.FullName;
+        var full = OpcodeTableLoader.Load(Path.Combine(root, "profiles", build, "opcodes.yaml"), profile).ForConnection(OpcodeConnection.Game);
+        var table = remap ? new OpcodeTable(profile, full.All.Select(entry => entry with { Value = checked((ushort)(entry.Value + 1000)) })) : full;
+        using var fixture = new MatchMessagesMountTests.Fixture(table);
+        var protocol = build + "/game";
+        var context = fixture.Context(build, protocol, "dialect.rooms");
+        var session = new MatchMessagesMountTests.Session(profile);
+        try
+        {
+            new SupplyBinding(protocol, table, TestBuilds.All.Tables, build, 128).Mount(context, fixture.Messages);
+            new CountedItemsBinding(protocol, table, TestBuilds.All.Tables, build).MountEffect(context);
+            Assert.Empty(fixture.Services.GetAll<IInboundMessageBinding<RoundCountedItemUseRequested>>());
+            Assert.Empty(fixture.Services.GetAll<IMessageSender<RoundCountedItemsPrepared>>());
+            Assert.Null(table.Find(PacketDirection.ServerToClient, "gspPveItemUsed"));
+            // cn-279 sub_732F00 passes -1 and 104 to cn-279 sub_8190C0; cn-279 sub_4040E0 writes those two words.
+            await fixture.Packets.DispatchAsync(protocol, session,
+                new(table.C2S("gcpEatItem"), Convert.FromHexString("FFFFFFFF68000000")), default);
+            Assert.Equal(new RoundSupplyPickupRequested(-1, 104), fixture.Messages.Received[^1]);
+            await Assert.Single(fixture.Services.GetAll<IMessageSender<RoundCountedItemUsed>>())
+                .SendAsync(session, new(2, 104), default);
+            Assert.Equal(table.S2C("gspItemUsed"), Assert.Single(session.Sent));
+            Assert.Equal("0200000068000000", Convert.ToHexString(Assert.Single(session.Bodies)));
+            Assert.Equal(8, session.Bodies[0].Length);
+        }
+        finally { await context.UnwindAsync(); }
+        Assert.Empty(fixture.Packets.Handlers);
+        Assert.Empty(fixture.Services.GetAll<IMessageSender<RoundCountedItemUsed>>());
+    }
+
     /// <summary>Routes the native three-slot index and sends audited list/effect bodies through installed services.</summary>
     [Theory]
     [InlineData("kr-812", false)]
     [InlineData("cn-717", false)]
     [InlineData("id-400", false)]
     [InlineData("id-1809", false)]
+    [InlineData("cn-406", false)]
+    [InlineData("cn-705", false)]
+    [InlineData("cn-706", false)]
+    [InlineData("kr-1256", false)]
+    [InlineData("cn-774", false)]
+    [InlineData("tw-454", false)]
     [InlineData("kr-812", true)]
     public async Task ThreeSlotSurfaceUsesReviewedOpcodesAndUnloads(string build, bool remap)
     {
@@ -61,7 +104,9 @@ public sealed class CountedItemsTests
     [InlineData("cn-717")]
     [InlineData("id-400")]
     [InlineData("id-1809")]
+    [InlineData("cn-705")]
     [InlineData("cn-706")]
+    [InlineData("cn-406")]
     public void PreparedListHasAWordCountAndTwelveBytesPerEntry(string build)
     {
         var body = CountedItemsBinding.EncodePrepared(TestBuilds.All.Tables, build, [120, 102, 101, 146, 136]);

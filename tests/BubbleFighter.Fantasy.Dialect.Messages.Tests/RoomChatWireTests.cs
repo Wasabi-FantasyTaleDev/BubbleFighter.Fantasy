@@ -1,3 +1,4 @@
+using BubbleFighter.Fantasy.Contracts.Rooms;
 using BubbleFighter.Fantasy.Dialect.Rooms;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Packets;
@@ -19,7 +20,7 @@ public sealed class RoomChatWireTests
     [InlineData("cn-406", 30)]
     public void ChatSuffixMatchesEachOwnClientReader(string build, int length)
     {
-        var body = PlayRoomCodec.WriteChat(TestBuilds.Packets, build, 2, "A", -1, "B");
+        var body = RoomChatBinding.Write(TestBuilds.Packets, build, new RoomChatReceived(7, 2, "A", -1, "B"));
         Assert.Equal(length, body.Length);
         const string prefix = "0200010000004100FFFFFFFF00000000010000004200FFFFFFFF";
         Assert.Equal(prefix + (length == 34 ? "00000000" : "") + "00000000", Convert.ToHexString(body));
@@ -67,7 +68,7 @@ public sealed class RoomChatWireTests
     public void AChatLineMatchesTheRecordedLength()
     {
         // u16 slot + wstr (4 + 7 x 2) + u32 + empty wstr (4) + wstr (4 + 2 x 2) + u32 + u32 + bool32 = 48.
-        var body = PlayRoomCodec.WriteChat(TestBuilds.Packets, "kr-812", 2, "보신탕집애완견", 0, "님아");
+        var body = RoomChatBinding.Write(TestBuilds.Packets, "kr-812", new RoomChatReceived(7, 2, "보신탕집애완견", 0, "님아"));
 
         Assert.Equal(48, body.Length);
         Assert.Equal(2, BitConverter.ToUInt16(body, 0));

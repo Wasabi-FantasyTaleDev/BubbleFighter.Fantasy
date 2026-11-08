@@ -732,6 +732,9 @@ public sealed class EquipmentSelectionTests
                 ["selection"] = selection, ["fighter_config_path"] = fighterConfigPath,
             }), default);
             root.Effect(h._services.Register<IInventoryPushService>(h.Push()));
+            // The kr-1256 row now mounts the preset switch on its capability; the harness needs the
+            // persistence face the real mysql row publishes.
+            root.Effect(h._services.Register<IPlayerInventoryState>(new ZeroPresetState()));
             await new EquipmentPlugin().ActivateAsync(h.Context("equipment"), default);
             await h.Store.ReplaceSlotsAsync(42, InventoryBag.CharacterBag, StarterInventory.Slots(42, InventoryBag.CharacterBag, DateTimeOffset.UtcNow), default);
             await h.Store.ReplaceSlotsAsync(42, InventoryBag.EquippedBag, StarterInventory.Slots(42, InventoryBag.EquippedBag, DateTimeOffset.UtcNow), default);

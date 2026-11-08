@@ -10,11 +10,17 @@ internal sealed record RoundFeedRoute(ushort GameInbound, ushort RelayInbound, u
     bool EchoSender, bool Nested, RoundLifeEvent? LifeEvent, string? LifeActor, string? Initiator,
     string? Success, string? DeathFlag)
 {
+    internal bool ExtremeRacingCheckpoint { get; init; }
+
     internal static RoundFeedRoute[] Load(PacketTables packets, string build, IOpcodeTable game, IOpcodeTable relay)
     {
         if (game.Connection != OpcodeConnection.Game || relay.Connection != OpcodeConnection.Relay || game.Profile.Id != relay.Profile.Id)
             throw new ConfigException("Round feed requires the same profile's separate game and relay opcode views.");
-        if (packets.ValuesOf(build).GetValueOrDefault("round_feed") is not Dictionary<string, object?> routes || routes.Count == 0)
+        // A build without typed routes passes its feed unread (round_feed_passthrough); a stated map must not be empty.
+        var stated = packets.ValuesOf(build).GetValueOrDefault("round_feed");
+        if (stated is null)
+            return [];
+        if (stated is not Dictionary<string, object?> routes || routes.Count == 0)
             throw new ConfigException($"{build} round_feed must state the audited native action routes.");
         var result = new List<RoundFeedRoute>();
         foreach (var (key, raw) in routes)
@@ -23,10 +29,20 @@ internal sealed record RoundFeedRoute(ushort GameInbound, ushort RelayInbound, u
             if (raw is not Dictionary<string, object?> map)
                 throw new ConfigException($"{where} must be a route map.");
             if (map.Keys.FirstOrDefault(name => name is not ("enabled" or "opcode" or "structure" or "actors" or "echo_sender"
-                or "nested" or "life_event" or "life_actor" or "life_initiator" or "life_success" or "life_death_flag")) is { } unknown)
+                or "builds" or "nested" or "life_event" or "life_actor" or "life_initiator" or "life_success" or "life_death_flag"
+                or "extreme_racing_checkpoint")) is { } unknown)
                 throw new ConfigException($"{where} has unknown key '{unknown}'.");
             if (!Flag("enabled", true))
                 continue;
+            if (map.TryGetValue("builds", out var membership))
+            {
+                if (membership is not string[] builds || builds.Length == 0
+                    || builds.Distinct(StringComparer.Ordinal).Count() != builds.Length
+                    || builds.Any(member => !packets.Builds.Contains(member, StringComparer.Ordinal)))
+                    throw new ConfigException($"{where}.builds must list distinct known audited builds.");
+                if (!builds.Contains(build, StringComparer.Ordinal))
+                    continue;
+            }
             var name = Text("opcode", required: true)!;
             var inbound = game.Find(PacketDirection.ClientToServer, name)
                 ?? throw new ConfigException($"{where} requires game C2S {name}.");
@@ -61,7 +77,8 @@ internal sealed record RoundFeedRoute(ushort GameInbound, ushort RelayInbound, u
             var success = Text("life_success", required: false);
             var deathFlag = Text("life_death_flag", required: false);
             if ((life is null && (lifeActor is not null || initiator is not null || success is not null || deathFlag is not null))
-                || (initiator is not null && life != RoundLifeEvent.Finished)
+                || (initiator is not null && life is not (RoundLifeEvent.Finished or RoundLifeEvent.Bubbled
+                    or RoundLifeEvent.Died or RoundLifeEvent.Released))
                 || (deathFlag is not null && life != RoundLifeEvent.Bubbled)
                 || (life is not null && actors.Length == 0))
                 throw new ConfigException($"{where} has life fields incompatible with its life_event.");
@@ -73,8 +90,15 @@ internal sealed record RoundFeedRoute(ushort GameInbound, ushort RelayInbound, u
                 if (field?.Type is not ("u32" or "bool"))
                     throw new ConfigException($"{where} requires {structure}.{gate} as a u32 or bool life gate.");
             }
+            var extremeRacingCheckpoint = Flag("extreme_racing_checkpoint", false);
+            if (extremeRacingCheckpoint)
+            {
+                if (life is not null || nested || !actors.SequenceEqual(["actor"]))
+                    throw new ConfigException($"{where}.extreme_racing_checkpoint requires a scalar actor route without life events.");
+                PacketLayoutContract.RequireSignature(packets, build, structure, where, "actor:u32,round:u32,marker:u32");
+            }
             result.Add(new(inbound, relayInbound, outbound, structure, actors, Flag("echo_sender", false), nested,
-                life, lifeActor, initiator, success, deathFlag));
+                life, lifeActor, initiator, success, deathFlag) { ExtremeRacingCheckpoint = extremeRacingCheckpoint });
 
             string? Text(string field, bool required)
             {
@@ -92,21 +116,23 @@ internal sealed record RoundFeedRoute(ushort GameInbound, ushort RelayInbound, u
             void Require(string field, string type) =>
                 PacketLayoutContract.RequireFields(packets, build, structure, where, (field, type));
         }
-        if (result.Count == 0 || result.Select(route => route.GameInbound).Distinct().Count() != result.Count
+        if (result.Select(route => route.GameInbound).Distinct().Count() != result.Count
             || result.Select(route => route.RelayInbound).Distinct().Count() != result.Count
             || result.Select(route => route.Outbound).Distinct().Count() != result.Count)
-            throw new ConfigException($"{build} round_feed requires nonempty routes with distinct native C2S and S2C opcodes.");
+            throw new ConfigException($"{build} round_feed requires distinct native C2S and S2C opcodes.");
         return [.. result];
     }
 
     internal (RoundFeedSent Feed, RoundLifeReported? Life) Read(PacketTables packets, string build, ReadOnlySpan<byte> body)
     {
-        var values = Nested ? RoundResetBinding.Read(packets, build, Structure, body)
+        var values = Nested ? RoundRespawnBinding.ReadTagged(packets, build, Structure, body)
             : PacketCodec.ReadScalars(packets, build, Structure, body).ToDictionary(pair => pair.Key, pair => (object?)pair.Value);
         var feed = new RoundFeedSent(Outbound, body.ToArray())
         {
             OnRelay = true, IncludeSender = EchoSender,
             ReportedActors = Actors.Length == 0 ? null : Actors.Select(field => (int)values[field]!).ToArray(),
+            ExtremeRacingCheckpoint = ExtremeRacingCheckpoint
+                ? new((int)values["actor"]!, (int)values["round"]!, (int)values["marker"]!) : null,
         };
         if (LifeEvent is not { } kind || (Success is not null && !Truthy(Success)))
             return (feed, null);

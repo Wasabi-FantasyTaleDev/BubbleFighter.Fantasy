@@ -17,6 +17,8 @@ namespace BubbleFighter.Fantasy.Scenario.Tests;
 /// </summary>
 internal sealed class ScenarioServer : IAsyncDisposable
 {
+    private static readonly Lock PortGate = new();
+    private static readonly HashSet<int> ClaimedFixedPorts = [];
     private readonly PluginHost _host;
     private readonly List<SimClient> _clients = [];
     private readonly CancellationTokenSource _cts = new(TimeSpan.FromMinutes(2));
@@ -169,19 +171,26 @@ internal sealed class ScenarioServer : IAsyncDisposable
     {
         if (minimumPort is { } first)
         {
+            lock (PortGate)
+            {
             for (var port = first; port < first + 200; port += 2)
             {
+                // Do not reuse a recently closed scenario's pair while Windows still retains its TCP endpoints.
+                if (ClaimedFixedPorts.Contains(port) || ClaimedFixedPorts.Contains(port + 1)) continue;
                 using var gameProbe = new TcpListener(IPAddress.Loopback, port);
                 using var relayProbe = new TcpListener(IPAddress.Loopback, port + 1);
                 try
                 {
                     gameProbe.Start();
                     relayProbe.Start();
+                    ClaimedFixedPorts.Add(port);
+                    ClaimedFixedPorts.Add(port + 1);
                     return (port, port + 1);
                 }
                 catch (SocketException) { }
             }
             throw new InvalidOperationException("No pair of scenario listener ports is available in the requested range.");
+            }
         }
         using var game = new TcpListener(IPAddress.Loopback, 0);
         using var relay = new TcpListener(IPAddress.Loopback, 0);

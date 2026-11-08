@@ -32,33 +32,37 @@ public sealed class NativeRoundResetTests
         var root = Directory.GetParent(SharedDialectRows.PacketsDirectory())!.FullName;
         var table = OpcodeTableLoader.Load(Path.Combine(root, "profiles", build, "opcodes.yaml"), profile);
         var protocol = build + "/game";
-        var requestOpcode = table.C2S(build == "kr-1256" ? "Unknown602" : "gcpRespawn");
+        var requestOpcode = table.C2S("gcpRespawn");
         var services = new ServiceRegistry();
         var events = new EventBus(NullLogger.Instance);
         var infrastructure = Context("infrastructure");
         var binding = Context("reset");
         var session = new RecordingSession(7, profile);
-        var requests = new List<RoundResetRequested>();
+        var requests = new List<RoundSpawnAccepted>();
         var observed = new List<PacketReceivedEvent>();
         try
         {
             await new PacketRouterPlugin().ActivateAsync(infrastructure, default);
             await new MessageRouterPlugin().ActivateAsync(infrastructure, default);
             infrastructure.Effect(events.On<PacketReceivedEvent>(observed.Add));
-            infrastructure.Effect(services.Get<IMessageRouter>().For(infrastructure).On<RoundResetRequested>(protocol, (_, request, _) =>
+            infrastructure.Effect(services.Get<IMessageRouter>().For(infrastructure).On<RoundSpawnAccepted>(protocol, (_, request, _) =>
             {
                 requests.Add(request);
                 return ValueTask.CompletedTask;
             }));
-            new RoundResetBinding(protocol, table, tables, build, NullLogger.Instance).Mount(binding);
-            var sender = Assert.Single(services.GetAll<IMessageSender<RoundResetGranted>>());
-            Assert.Single(services.GetAll<IInboundMessageBinding<RoundResetRequested>>());
+            var respawn = new RoundRespawnBinding(protocol, table, tables, build);
+            respawn.Mount(binding);
+            RoomRoutes.Bind(binding, protocol, table, NullLogger.Instance, "gcpRespawn", respawn.Read);
+            var sender = Assert.Single(services.GetAll<IMessageSender<RoundPlayerRespawned>>());
+            Assert.Single(services.GetAll<IInboundMessageBinding<RoundSpawnAccepted>>());
             var body = Convert.FromHexString(hex);
             await Dispatch(body);
             var request = Assert.Single(requests);
             Assert.Equal(1000000, request.Actor);
             Assert.Equal(body, request.Request.ToArray());
-            await sender.SendAsync(session, new(request.Request), default);
+            Assert.Equal(new RoundRespawnRules(RoundRespawnAudience.Requester, RoundRespawnCompletion.MatchConfirmation,
+                RoundRespawnAdmission.CleanedDeath), request.Rules);
+            await sender.SendAsync(session, new RoundPlayerRespawned(1, 0, request.Actor, 0) { Request = request.Request }, default);
             Assert.Equal((byte[])[.. body, 0, 0, 0, 0], session.Body((ushort)replyOpcode));
             for (var length = 0; length < body.Length; length++)
                 await Assert.ThrowsAsync<PacketFormatException>(() => Dispatch(body[..length]));
@@ -71,8 +75,8 @@ public sealed class NativeRoundResetTests
             }
             Assert.Single(requests);
             await binding.UnwindAsync();
-            Assert.Empty(services.GetAll<IMessageSender<RoundResetGranted>>());
-            Assert.Empty(services.GetAll<IInboundMessageBinding<RoundResetRequested>>());
+            Assert.Empty(services.GetAll<IMessageSender<RoundPlayerRespawned>>());
+            Assert.Empty(services.GetAll<IInboundMessageBinding<RoundSpawnAccepted>>());
             await Dispatch(body);
             Assert.False(observed.Last().HasHandler);
             Assert.Single(requests);
@@ -100,14 +104,51 @@ public sealed class NativeRoundResetTests
     {
         var tables = PacketTables.Load(SharedDialectRows.PacketsDirectory());
         var body = Convert.FromHexString(hex);
-        var values = RoundResetBinding.Read(tables, build, "RoundResetConfirmation", body);
+        var values = RoundRespawnBinding.ReadTagged(tables, build, "RoundResetConfirmation", body);
         Assert.Equal(1000000, values["actor"]);
         Assert.Equal(body, PacketCodec.Write(tables, build, "RoundResetConfirmation", values));
         for (var length = 0; length < body.Length; length++)
-            Assert.Throws<PacketFormatException>(() => RoundResetBinding.Read(tables, build, "RoundResetConfirmation", body.AsSpan(0, length)));
-        Assert.Throws<PacketFormatException>(() => RoundResetBinding.Read(tables, build, "RoundResetConfirmation", [.. body, 0]));
+            Assert.Throws<PacketFormatException>(() => RoundRespawnBinding.ReadTagged(tables, build, "RoundResetConfirmation", body.AsSpan(0, length)));
+        Assert.Throws<PacketFormatException>(() => RoundRespawnBinding.ReadTagged(tables, build, "RoundResetConfirmation", [.. body, 0]));
     }
-    /// <summary>A missing or mistyped confirmation actor is rejected before any feed service is published.</summary>
+    /// <summary>An action-only feed mounts without an unrelated reset confirmation layout and removes its services on unload.</summary>
+    [Fact]
+    public async Task ActionFeedDoesNotRequireAnUnselectedResetLayout()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "bff-action-contract-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var services = new ServiceRegistry();
+        var events = new EventBus(NullLogger.Instance);
+        var infrastructure = Context("infrastructure");
+        var binding = Context("feed");
+        try
+        {
+            File.WriteAllText(Path.Combine(directory, "builds.yaml"), "version: 1\nbuilds:\n  kr-1256:\n    capabilities: { round_ping: false }\n    round_feed:\n      Dash: { opcode: gppDash, structure: Dash, actors: [actor] }\n");
+            File.WriteAllText(Path.Combine(directory, "action.yaml"), "version: 1\nstructs:\n  Dash:\n    - actor: u32\n");
+            var tables = PacketTables.Load(directory);
+            var opcodes = OpcodeTableLoader.Load(Path.Combine(AppContext.BaseDirectory, "opcodes.yaml"), TestWireDialects.Get("kr-1256").Profile);
+            await new PacketRouterPlugin().ActivateAsync(infrastructure, default);
+            await new MessageRouterPlugin().ActivateAsync(infrastructure, default);
+            new RoundFeedBinding("kr-1256/game", "kr-1256/relay", opcodes, opcodes.ForConnection(OpcodeConnection.Relay),
+                tables, "kr-1256").Mount(binding);
+            Assert.Single(services.GetAll<IInboundMessageBinding<RoundFeedSent>>());
+            Assert.Single(services.GetAll<IMessageSender<RoundFeedReceived>>());
+            await binding.UnwindAsync();
+            Assert.Empty(services.GetAll<IInboundMessageBinding<RoundFeedSent>>());
+            Assert.Empty(services.GetAll<IMessageSender<RoundFeedReceived>>());
+        }
+        finally
+        {
+            await binding.UnwindAsync();
+            await infrastructure.UnwindAsync();
+            Directory.Delete(directory, recursive: true);
+        }
+
+        PluginContext Context(string id) => new(new PluginRow { Id = id, Plugin = "test", Source = "test" },
+            services, events, NullLogger.Instance);
+    }
+
+    /// <summary>A selected reset route with a missing or mistyped actor is rejected before any feed service is published.</summary>
     [Theory]
     [InlineData("", "RoundResetConfirmation")]
     [InlineData("  RoundResetConfirmation:\n    - actor: u16\n", "actor")]
@@ -117,13 +158,13 @@ public sealed class NativeRoundResetTests
         Directory.CreateDirectory(directory);
         try
         {
-            File.WriteAllText(Path.Combine(directory, "builds.yaml"), "version: 1\nbuilds:\n  kr-1256: {}\n");
-            File.WriteAllText(Path.Combine(directory, "reset.yaml"), "version: 1\nstructs:\n  Unused:\n    - value: u32\n" + structure);
+            File.WriteAllText(Path.Combine(directory, "builds.yaml"), "version: 1\nbuilds:\n  kr-1256:\n    capabilities: { round_ping: false }\n    round_feed:\n      Reset: { opcode: Unknown32926, structure: RoundResetConfirmation, actors: [actor], nested: true, life_event: reset_confirmed, life_actor: actor }\n");
+            File.WriteAllText(Path.Combine(directory, "reset.yaml"), "version: 1\nstructs:\n  Dash:\n    - actor: u32\n" + structure);
             var tables = PacketTables.Load(directory);
             var services = new ServiceRegistry();
             var context = new PluginContext(new PluginRow { Id = "feed", Plugin = "feed", Source = "test" },
                 services, new EventBus(NullLogger.Instance), NullLogger.Instance);
-            var opcodes = new OpcodeTable(TestWireDialects.Get("kr-1256").Profile, []);
+            var opcodes = OpcodeTableLoader.Load(Path.Combine(AppContext.BaseDirectory, "opcodes.yaml"), TestWireDialects.Get("kr-1256").Profile);
             var error = Assert.Throws<ConfigException>(() =>
                 new RoundFeedBinding("kr-1256/game", "kr-1256/relay", opcodes, opcodes.ForConnection(OpcodeConnection.Relay),
                     tables, "kr-1256").Mount(context));

@@ -38,14 +38,14 @@ public sealed class Cn279ResultProgressTests
     [Fact]
     public void VacantRowDoesNotExposeStatsOrProgress()
     {
-        var body = PlayRoomCodec.WriteScoreRowBody(TestBuilds.Packets, "cn-279",
+        var body = RoundResultWire.WriteScoreRowBody(TestBuilds.Packets, "cn-279",
             TestBuilds.Packets.Resolve("cn-279", "ScoreRow"), null);
         Assert.Equal(149, body.Length);
         Assert.Equal(-1, BitConverter.ToInt32(body));
         Assert.Equal(new byte[28], body[92..120]);
     }
 
-    private static byte[] Write(RoundRewardRow? reward) => PlayRoomCodec.WriteScoreRowBody(
+    private static byte[] Write(RoundRewardRow? reward) => RoundResultWire.WriteScoreRowBody(
         TestBuilds.Packets, "cn-279", TestBuilds.Packets.Resolve("cn-279", "ScoreRow"),
         new RoundScoreboardRow(0, "AB", 2, 12, new RoundSeatStats(0, 0, 0, 0, 0), reward));
 }

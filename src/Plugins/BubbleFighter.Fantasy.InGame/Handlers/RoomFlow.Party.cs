@@ -139,7 +139,7 @@ internal sealed partial class RoomFlow
         {
             if (!CanFollowFromMenuOrPlaza(member) || _plaza.Find(member.Id) is not null) return;
             var (user, nickname) = SessionPlayer.RequireIdentity(member);
-            var equipment = await SeatCharacter.ResolveEquipmentAsync(member, user, _selection, _characters, token).ConfigureAwait(false);
+            var equipment = await ResolveEquipmentAsync(member, user, token).ConfigureAwait(false);
             await _plaza.Executor.ExecuteAsync(async operationCt =>
             {
                 if (!FollowerIsCurrent(group!, member) || !CanFollowFromMenuOrPlaza(member)) return;
@@ -172,7 +172,7 @@ internal sealed partial class RoomFlow
         {
             if (!CanFollowFromMenuOrPlaza(member)) return;
             var (user, nickname) = SessionPlayer.RequireIdentity(member);
-            var equipment = await SeatCharacter.ResolveEquipmentAsync(member, user, _selection, _characters, token).ConfigureAwait(false);
+            var equipment = await ResolveEquipmentAsync(member, user, token).ConfigureAwait(false);
             try
             {
                 await room.Executor.ExecuteAsync(async operationCt =>
@@ -197,7 +197,7 @@ internal sealed partial class RoomFlow
         {
             if (!ReferenceEquals(_registry.TryGet(member.Id), source) || source.Phase != RoomPhase.Waiting) return;
             var (user, nickname) = SessionPlayer.RequireIdentity(member);
-            var equipment = await SeatCharacter.ResolveEquipmentAsync(member, user, _selection, _characters, token).ConfigureAwait(false);
+            var equipment = await ResolveEquipmentAsync(member, user, token).ConfigureAwait(false);
             var reserved = false;
             await _plaza.Executor.ExecuteAsync(_ =>
             {
@@ -244,5 +244,6 @@ internal sealed partial class RoomFlow
     {
         await _sceneTransitions.StopAsync().ConfigureAwait(false);
         await _plaza.Executor.StopAsync().ConfigureAwait(false);
+        foreach (var member in _plaza.Snapshot()) ClearPlazaRecruitment(member);
     }
 }

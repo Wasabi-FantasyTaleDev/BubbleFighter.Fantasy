@@ -76,6 +76,51 @@ public sealed class CommandTests
         Assert.All(h.Audit, e => { Assert.Equal("echo", e.Command); Assert.Equal(h.Owner, e.Owner); });
     }
 
+    [Theory]
+    [InlineData(PrincipalKind.Game, "/")]
+    [InlineData(PrincipalKind.Game, "!")]
+    [InlineData(PrincipalKind.Game, "！")]
+    [InlineData(PrincipalKind.WebUi, "/")]
+    [InlineData(PrincipalKind.WebUi, "!")]
+    [InlineData(PrincipalKind.WebUi, "！")]
+    [InlineData(PrincipalKind.WebUi, "")]
+    [InlineData(PrincipalKind.Console, "/")]
+    [InlineData(PrincipalKind.Console, "!")]
+    [InlineData(PrincipalKind.Console, "！")]
+    [InlineData(PrincipalKind.Console, "")]
+    public async Task EveryPluginCommandIgnoresTriggerChoiceAndNonGameInputNeedsNoTrigger(PrincipalKind kind, string prefix)
+    {
+        await using var h = await Harness.Start();
+        CommandInvocation? observed = null;
+        h.Add((invocation, _) =>
+        {
+            observed = invocation;
+            return ValueTask.FromResult(new CommandResult(CommandStatus.Success, string.Join('|', invocation.Arguments)));
+        }, [new("state")], name: "custom-plugin-command");
+        var result = await h.Executor.ExecuteTextAsync(Caller(kind), prefix + "alias-custom-plugin-command on");
+        Assert.Equal(new(CommandStatus.Success, "on"), result);
+        Assert.NotNull(observed);
+        Assert.Equal("custom-plugin-command", observed.Command);
+        Assert.Equal(["on"], observed.Arguments);
+    }
+
+    [Theory]
+    [InlineData(PrincipalKind.Game, "/", "!")]
+    [InlineData(PrincipalKind.Game, "！", "!")]
+    [InlineData(PrincipalKind.WebUi, "!", "/")]
+    [InlineData(PrincipalKind.Console, "", "/")]
+    public async Task UsageUsesTheInitiatingEntryPointRatherThanTheTypedTrigger(PrincipalKind kind, string typed, string shown)
+    {
+        await using var h = await Harness.Start();
+        h.Add(args: [new("number", CommandArgumentKind.Integer), new("reason", Optional: true)]);
+        var result = await h.Executor.ExecuteTextAsync(Caller(kind), typed + "alias-echo wrong");
+        Assert.Equal(CommandStatus.InvalidArguments, result.Status);
+        Assert.Equal("Usage: " + shown + "echo <number> [reason]", result.Message);
+        var delegated = Caller(PrincipalKind.Game) with { Actor = new(PrincipalKind.WebUi, "admin") };
+        Assert.Equal("Usage: /echo <number> [reason]",
+            (await h.Executor.ExecuteTextAsync(delegated, "echo wrong")).Message);
+    }
+
     [Fact]
     public async Task MissingLanguagePreferenceRemainsEmptyForDeploymentFallback()
     {
@@ -109,7 +154,7 @@ public sealed class CommandTests
     }
 
     [Fact]
-    public async Task BareConsoleInputIsExplicitAndSuperusersStillValidateArguments()
+    public async Task BareConsoleInputNeedsNoTriggerAndSuperusersStillValidateArguments()
     {
         await using var h = await Harness.Start();
         h.Add(args: [new("number", CommandArgumentKind.Integer)], allowed: false);

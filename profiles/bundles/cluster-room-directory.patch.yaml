@@ -1,0 +1,14 @@
+# Optional authenticated room discovery. Mount only on nodes enrolled in the directory.
+# Visibility is configured by room_directories at the authority; this row grants no room admission.
+- insert:
+    - id: cluster-room-directory
+      plugin: cluster.room-directory
+      config:
+        node_id: "${BFF_CLUSTER_NODE_ID}"
+        directory_url: "${BFF_CLUSTER_DIRECTORY_URL:-http://127.0.0.1:8093}"
+        access_key: "${BFF_CLUSTER_NODE_KEY}"
+        builds: [kr-1256]
+        max_rooms: 2048
+        max_response_bytes: 1048576
+        max_concurrent_requests: 2
+        request_timeout_seconds: 2

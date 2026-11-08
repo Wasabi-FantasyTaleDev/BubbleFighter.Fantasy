@@ -96,10 +96,10 @@ internal sealed class InstallationClientDataImporter(InstallationOptions options
                 new ClientDataGenerator().Generate(profile, Path.Combine(staging, profile, ".client"), generatedBuild,
                     options.ClientDataFileLimit, Math.Min(options.ClientDataExtractedBytes, _remainingStorage), ct);
                 ct.ThrowIfCancellationRequested();
-                Directory.Move(generatedBuild, finalBuild);
+                await InstallationDirectoryPublisher.SystemFileSystem.MoveAsync(generatedBuild, finalBuild, options, ct).ConfigureAwait(false);
                 return generated;
             }
-            Directory.Move(staging, destination);
+            await InstallationDirectoryPublisher.SystemFileSystem.MoveAsync(staging, destination, options, ct).ConfigureAwait(false);
             complete = true;
             return destination;
         }

@@ -1,0 +1,12 @@
+# Optional occupancy primitive; this does not enable multi-node login or fence repository writes.
+# Every consumer must drain its account work before releasing the connection-bound hold.
+# Each held account keeps one database connection open, so the database's connection limit must cover
+# every node's online players; max_owners (default 512) is this node's share of it.
+- insert:
+    - id: cluster-account-store
+      plugin: persistence.mysql-account-ownership
+      config:
+        connection_string: "${BFF_CLUSTER_ACCOUNT_CONNECTION_STRING}"
+        persistent_domain_id: "${BFF_CLUSTER_DATA_DOMAIN_ID}"
+        connect_timeout_seconds: 5
+        command_timeout_seconds: 3

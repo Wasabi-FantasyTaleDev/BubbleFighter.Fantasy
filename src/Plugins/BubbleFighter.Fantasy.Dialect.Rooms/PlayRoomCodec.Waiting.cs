@@ -39,17 +39,10 @@ internal sealed partial class PlayRoomCodec
                 logger.LogWarning("dialect.rooms: {Protocol} does not name {Name}; its rooms cannot use it until the table does.", protocol, name);
         }
 
-        On("gcpReqJoinSession", (session, body) =>
-        {
-            var request = PlazaRoomWire.ReadJoinSession(packetTables, lineage, body);
-            return new RoomJoinRequested(request.RoomId, request.Password);
-        });
-        On("gcpRoomReqReadyStatus", (_, body) =>
-        {
-            // The first flag is the ready mark; the other two are not used.
-            var (ready, _, _) = PlazaRoomWire.ReadReadyStatus(packetTables, lineage, body);
-            return new RoomReadyRequested(ready);
-        });
+        // The waiting-room requests share the modern family's decoders (RoomRequests): the layouts are each build's
+        // own tables, and every legacy writer sends canonical, mutually exclusive ready/shop/inventory flags.
+        On("gcpReqJoinSession", (_, body) => RoomRequests.ReadJoin(packetTables, lineage, body));
+        On("gcpRoomReqReadyStatus", (_, body) => RoomRequests.ReadReady(packetTables, lineage, body));
         On("gcpRoomChangeGameSetting", (_, body) => ReadSettingsChange(packetTables, lineage, body));
         if (table.Find(PacketDirection.ClientToServer, "gcpRoomChangeRoundSetting") is not null)
         {
@@ -65,36 +58,44 @@ internal sealed partial class PlayRoomCodec
                 });
             }
         }
-        On("gcpRoomChangeTeam", (_, body) =>
+        On("gcpRoomChangeTeam", (_, body) => RoomRequests.ReadTeamChange(packetTables, lineage, body));
+        // kr-812 sub_844570 reads the channel word and UTF-16 text; the one shared chat reader decodes it.
+        On("gcpRoomSendChatModuleMsg", (_, body) => RoomRequests.ReadChat(packetTables, lineage, body), optional: true);
+        // The waiting-room chat box sends C2S gcpRoomSendChatMsg and draws nothing until S2C gspRoomReceiveChatMsg
+        // answers (kr-812 sub_8145C0, cn-717 sub_899D30). A build mounts the pair only when its table names both.
+        if (table.Find(PacketDirection.ClientToServer, "gcpRoomSendChatMsg") is not null)
         {
-            // kr-812 sub_9BEF70 and cn-406 sub_8AF7F0 send no fields; the flow selects the team.
-            if (body.Length != 0)
-                throw new PacketFormatException($"gcpRoomChangeTeam must be empty; got {body.Length} byte(s).", 0);
-            return new RoomTeamChangeRequested();
-        });
-        // kr-812 sub_844570 reads the channel word and UTF-16 text.
-        On("gcpRoomSendChatModuleMsg", (_, body) =>
-        {
-            var fields = PacketCodec.ReadScalars(packetTables, lineage, "RoomChatRequest", body);
-            return new RoomChatSent((int)fields["channel"], (string)fields["text"]);
-        }, optional: true);
-        On("gcpRoomReqOpenCloseSlot", (_, body) =>
-        {
-            var fields = PacketCodec.ReadScalars(packetTables, lineage, "RoomSeatLock", body);
-            return new RoomSeatLockRequested((int)fields["slot"], (bool)fields["closed"]);
-        }, optional: true);
+            _ = table.S2C("gspRoomReceiveChatMsg");
+            PacketLayoutContract.RequireFields(packetTables, lineage, "RoomSessionChatRequest", "Room chat",
+                ("team_only", "bool"), ("text", "wstr"));
+            PacketLayoutContract.RequireFields(packetTables, lineage, "RoomSessionChatReceived", "Room chat",
+                ("slot", "u16"), ("team_only", "bool"), ("text", "wstr"));
+            context.Effect(services.RegisterMany<IInboundMessageBinding<RoomSessionChatSent>>(this));
+            context.Effect(services.RegisterMany<IMessageSender<RoomSessionChatReceived>>(this));
+            On("gcpRoomSendChatMsg", (_, body) => ReadSessionChat(packetTables, lineage, body));
+        }
+        On("gcpRoomReqOpenCloseSlot", (_, body) => RoomRequests.ReadSeatLock(packetTables, lineage, body), optional: true);
+        PacketLayoutContract.RequireFields(packetTables, lineage, "RoomKickRequest", "Room kicking", ("nickname", "wstr"));
         On("gcpReqKickFromSession", (_, body) =>
             new RoomKickRequested((string)PacketCodec.ReadScalars(packetTables, lineage, "RoomKickRequest", body)["nickname"]), optional: true);
         if (table.Find(PacketDirection.ClientToServer, "gcpRoomReqChangeMaster") is not null)
         {
             _ = table.S2C("gspRoomRepChangeMaster");
-            _ = packetTables.Resolve(lineage, "RoomMasterChangeRequest");
+            PacketLayoutContract.RequireFields(packetTables, lineage, "RoomMasterChangeRequest", "Room master change",
+                ("nickname", "wstr"));
             _ = packetTables.Resolve(lineage, "RoomMasterChangeReply");
             context.Effect(services.RegisterMany<IInboundMessageBinding<RoomMasterChangeRequested>>(this));
             context.Effect(services.RegisterMany<IMessageSender<RoomMasterChangeReplied>>(this));
             On("gcpRoomReqChangeMaster", (_, body) => new RoomMasterChangeRequested(
                 (string)PacketCodec.ReadScalars(packetTables, lineage, "RoomMasterChangeRequest", body)["nickname"]));
         }
+    }
+
+    /// <summary>Reads C2S gcpRoomSendChatMsg: the team-only flag and the line (kr-812 sub_8456D0, cn-717 sub_8CFCB0).</summary>
+    internal static RoomSessionChatSent ReadSessionChat(PacketTables packetTables, string build, ReadOnlySpan<byte> body)
+    {
+        var fields = PacketCodec.ReadScalars(packetTables, build, "RoomSessionChatRequest", body);
+        return new RoomSessionChatSent((bool)fields["team_only"], (string)fields["text"]);
     }
 
     private void BindRequest<T>(IPluginContext context, ushort opcode, string name, Func<ISession, ReadOnlySpan<byte>, T> decode) where T : IMessage

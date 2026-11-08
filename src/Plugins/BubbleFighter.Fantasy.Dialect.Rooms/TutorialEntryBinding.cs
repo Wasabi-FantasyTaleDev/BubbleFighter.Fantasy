@@ -10,7 +10,7 @@ namespace BubbleFighter.Fantasy.Dialect.Rooms;
 /// <summary>Adapts the first-run tutorial selection to the configured native solo scene.</summary>
 internal sealed class TutorialEntryBinding(string protocol, IOpcodeTable table, PacketTables packets, string build,
     InitialTutorialRoute route, ILogger logger)
-    : IInboundMessageBinding<InitialTutorialRequested>, IInboundMessageBinding<InitialTutorialExitRequested>,
+    : IInboundMessageBinding<InitialTutorialRequested>,
       IMessageSender<InitialTutorialEntered>
 {
     private IReadOnlyDictionary<string, ushort> _s2c = new Dictionary<string, ushort>();
@@ -22,8 +22,6 @@ internal sealed class TutorialEntryBinding(string protocol, IOpcodeTable table, 
         PacketLayoutContract.RequireFields(packets, build, "TutorialPlayRequest", "Initial tutorial",
             ("map_key", "wstr"), ("map_directory", "wstr"), ("map_name", "wstr"),
             ("unknown_52", "u8"), ("difficulty", "u32"), ("time_attack_time_limit_ms", "u32"));
-        PacketLayoutContract.RequireFields(packets, build, "TutorialEndStage", "Initial tutorial exit",
-            ("unknown_0", "u32"), ("unknown_4", "bool"));
         PacketLayoutContract.RequireFields(packets, build, "GameSetting", "Initial tutorial game setting",
             ("mode", "u16"), ("unknown_44", "wstr"), ("unknown_68", "wstr"), ("unknown_92", "wstr"), ("unknown_116", "wstr"),
             ("unknown_140", "u32"));
@@ -34,20 +32,11 @@ internal sealed class TutorialEntryBinding(string protocol, IOpcodeTable table, 
         PacketLayoutContract.RequireFields(packets, build, "RoomEnterGame", "Initial tutorial scene",
             ("map_key", "wstr"), ("stage_key", "wstr"), ("map_selection", "wstr"), ("room_state", "u32"));
         _s2c = RoomRoutes.Preflight(table, packets, build,
-            ["TutorialPlayRequest", "TutorialEndStage", "gspGotoRoom", "RoomSeatUpdate", "SessionSignatureData", "RoomEnterGame"],
+            ["TutorialPlayRequest", "gspGotoRoom", "RoomSeatUpdate", "SessionSignatureData", "RoomEnterGame"],
             ["gspGotoRoom", "gspRoomSetSlot", "gspSessionSignatureData", "gspRoomEnterGame"]);
         context.Effect(context.Services.RegisterMany<IInboundMessageBinding<InitialTutorialRequested>>(this));
-        context.Effect(context.Services.RegisterMany<IInboundMessageBinding<InitialTutorialExitRequested>>(this));
         context.Effect(context.Services.RegisterMany<IMessageSender<InitialTutorialEntered>>(this));
         RoomRoutes.Bind(context, protocol, table, logger, "gcpReqPlayTutorial", Read);
-        RoomRoutes.Bind(context, protocol, table, logger, "gcpReqEndStage", body =>
-        {
-            var fields = PacketCodec.ReadScalars(packets, build, "TutorialEndStage", body);
-            // kr-1256 sub_7BAC80 exits with 1; kr-1256 sub_7B9820 exits with 0 after failure, both via kr-1256 sub_6E5840.
-            if ((int)fields["unknown_0"]! is not (0 or 1) || (bool)fields["unknown_4"]!)
-                throw new NotSupportedException("The initial tutorial exit requires a native completion or failure confirmation.");
-            return new InitialTutorialExitRequested();
-        });
     }
 
     private InitialTutorialRequested Read(ReadOnlySpan<byte> body)

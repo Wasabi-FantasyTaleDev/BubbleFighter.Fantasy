@@ -10,7 +10,7 @@ namespace BubbleFighter.Fantasy.Persistence.Memory;
 /// list reads it back in that order. Bag storage is keyed per player and per
 /// bag, so the 802 character bag and the 803 container-1 bag never share rows.
 /// </summary>
-public sealed class MemoryInventoryRepository(MemoryPlayerTable table) : IInventoryRepository
+public sealed partial class MemoryInventoryRepository(MemoryPlayerTable table, int maxLoadoutsPerPlayer = 32) : IInventoryLoadoutStore
 {
     /// <inheritdoc />
     public ValueTask<IReadOnlyList<InventorySlotRecord>?> RemoveExpiredItemAsync(long userNum, int itemId,

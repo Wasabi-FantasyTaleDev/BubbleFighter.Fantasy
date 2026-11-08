@@ -131,6 +131,28 @@ internal sealed class ClientDataStore : IClientDataStore, IDisposable
         throw new FileNotFoundException($"clientdata: no client file '{path}' in the archives or the loose files.", path);
     }
 
+    public byte[] Read(string path, int maximumBytes)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(maximumBytes, 1);
+        var key = Normalize(path);
+        if (Loose(key) is { } loose)
+        {
+            using var input = File.OpenRead(loose);
+            if (input.Length > maximumBytes) throw new InvalidDataException($"Client file '{path}' exceeds its byte limit.");
+            var bytes = new byte[checked((int)input.Length)];
+            input.ReadExactly(bytes);
+            return bytes;
+        }
+        if (Holder(key) is { } reader)
+        {
+            var entry = reader.Entries.Last(value => string.Equals(value.Path, key, StringComparison.OrdinalIgnoreCase));
+            if (entry.Size > maximumBytes) throw new InvalidDataException($"Client file '{path}' exceeds its byte limit.");
+            var bytes = reader.Read(key);
+            return bytes.Length <= maximumBytes ? bytes : throw new InvalidDataException($"Client file '{path}' exceeds its byte limit.");
+        }
+        throw new FileNotFoundException($"clientdata: no client file '{path}' in the archives or the loose files.", path);
+    }
+
     public void Dispose()
     {
         foreach (var archive in _archives)

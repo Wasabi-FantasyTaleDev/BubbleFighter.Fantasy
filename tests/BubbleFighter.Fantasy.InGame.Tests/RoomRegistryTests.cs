@@ -5,6 +5,7 @@ using System.Net;
 using BubbleFighter.Fantasy.Abstractions.Net;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Sessions;
+using BubbleFighter.Fantasy.Contracts.Rooms;
 using BubbleFighter.Fantasy.InGame;
 using BubbleFighter.Fantasy.InGame.Sessions;
 using BubbleFighter.Fantasy.Tests.Shared;
@@ -14,6 +15,119 @@ namespace BubbleFighter.Fantasy.InGame.Tests;
 
 public sealed class RoomRegistryTests
 {
+    [Fact]
+    public async Task PublishedRoomsDetachNativeSettingsAndPreserveCreationIdentity()
+    {
+        var registry = new RoomRegistry(new InGameOptions());
+        var bytes = new byte[] { 1, 2, 3 };
+        var change = new byte[] { 4, 5 };
+        var round = new byte[] { 6, 7 };
+        try
+        {
+            var (room, _) = registry.CreateForMode(new RecordingSession(901), 3, "map", "Room", 7, "Host", listed: true);
+            room.Password = "private-password";
+            room.BuildSettings = new("kr-812", bytes, change)
+            {
+                Mode = 3, SessionPrefix = new byte[] { 9, 10 }, RoundSelections = [new(1, round)],
+            };
+            var directory = (IPublishedRoomDirectory)registry;
+            var before = Assert.Single(await directory.ListPublishedAsync(default));
+            Assert.NotEqual(Guid.Empty, before.InstanceId);
+            Assert.Equal(room.InstanceId, before.InstanceId);
+            Assert.Equal("Host", before.Entry.MasterNickname);
+            Assert.Equal("Room", before.Entry.Name);
+            Assert.True(before.Entry.HasPassword);
+            Assert.Equal("map", before.Map);
+            var detached = Assert.IsType<RoomBuildSettings>(before.Entry.BuildSettings);
+            Assert.Empty(detached.SessionPrefix.ToArray());
+            var local = Assert.Single(registry.SnapshotListedRooms(matchRoomsOnly: false, default)).Entry.BuildSettings!;
+            Assert.Equal(new byte[] { 9, 10 }, local.SessionPrefix.ToArray());
+            bytes[0] = 20; change[0] = 21; round[0] = 22;
+            room.RoomName = "Changed";
+            Assert.Equal(new byte[] { 1, 2, 3 }, detached.Bytes.ToArray());
+            Assert.Equal(new byte[] { 4, 5 }, detached.Change.ToArray());
+            Assert.Equal(new byte[] { 6, 7 }, Assert.Single(detached.RoundSelections).Bytes.ToArray());
+            Assert.Equal(3, detached.Mode);
+            var after = Assert.Single(await directory.ListPublishedAsync(default));
+            Assert.Equal(before.InstanceId, after.InstanceId);
+            Assert.Equal("Room", before.Entry.Name);
+            Assert.Equal("Changed", after.Entry.Name);
+            var replacement = new PlayRoom(room.Id, 8, RoomWireSupport.WaitingSetting(), 8);
+            try { Assert.NotEqual(room.InstanceId, replacement.InstanceId); }
+            finally { await replacement.Executor.DisposeAsync(); }
+        }
+        finally { await registry.StopAllAsync(); }
+    }
+
+    [Fact]
+    public async Task PublishedDirectoryExcludesHiddenTrainingTutorialAndClosedRooms()
+    {
+        var registry = new RoomRegistry(new InGameOptions());
+        try
+        {
+            var (room, _) = registry.CreateForMode(new RecordingSession(911), 3, "map", "Room", 7, "Host", listed: false);
+            registry.CreateTrainingRoom(new RecordingSession(912), RoomWireSupport.SampleRules(), 8, "Training");
+            var directory = (IPublishedRoomDirectory)registry;
+            Assert.Empty(await directory.ListPublishedAsync(default));
+            registry.Publish(room);
+            Assert.Single(await directory.ListPublishedAsync(default));
+            lock (room.Gate) room.Tutorial = new(3, "map", 300001, [], 1, 0, 0, true);
+            Assert.Empty(await directory.ListPublishedAsync(default));
+            lock (room.Gate) room.Tutorial = null;
+            Assert.Single(await directory.ListPublishedAsync(default));
+            lock (room.Gate) room.RemoveSession(911);
+            Assert.Empty(await directory.ListPublishedAsync(default));
+            using var cancel = new CancellationTokenSource();
+            cancel.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => directory.ListPublishedAsync(cancel.Token).AsTask());
+        }
+        finally { await registry.StopAllAsync(); }
+    }
+
+    [Fact]
+    public async Task PeerControlsRunAfterQueuedRoomInstallationsAndReceiveAFreshImmutableView()
+    {
+        var rig = new RoomFlowTests.Rig();
+        var host = RoomFlowTests.Rig.Player(801, "host");
+        var guest = RoomFlowTests.Rig.Player(802, "guest");
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        try
+        {
+            var roomId = await rig.CreateAsync(host);
+            var roster = (IRoomPeerRoster)rig.Registry;
+            var before = Assert.Single(roster.Snapshot());
+            var room = rig.Registry.Find(roomId)!;
+            var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var barrier = room.Executor.ExecuteAsync(async ct =>
+            {
+                entered.SetResult();
+                await release.Task.WaitAsync(ct);
+            });
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            var join = rig.Flow.HandleJoinAsync(guest, new(roomId, ""), default).AsTask();
+            var control = roster.ExecuteAsync(roomId, (view, _) =>
+            {
+                Assert.Equal(2, view.Seats.Count);
+                Assert.True(view.InstallationVersion > before.InstallationVersion);
+                Assert.Single(rig.Entered.To(guest));
+                return ValueTask.CompletedTask;
+            }, default).AsTask();
+            Assert.False(control.IsCompleted);
+            release.SetResult();
+            await barrier;
+            await join;
+            Assert.True(await control);
+            Assert.Single(before.Seats);
+            Assert.Equal(2, Assert.Single(roster.Snapshot()).Seats.Count);
+            Assert.False(await roster.ExecuteAsync(ushort.MaxValue, (_, _) => throw new InvalidOperationException(), default));
+        }
+        finally
+        {
+            release.TrySetResult();
+            await rig.Registry.StopAllAsync();
+        }
+    }
+
     [Fact]
     public void CreateThenRequireIsIdempotentAndBounded()
     {
@@ -59,6 +173,31 @@ public sealed class RoomRegistryTests
         Assert.Null(registry.FindJoinable(room.Id));
         Assert.Empty(registry.OpenRooms());
         Assert.Same(room, registry.TryGet(host.Id));
+        room.UdpOverride = true;
+        var view = Assert.IsType<RoomRosterView>(((IRoomRoster)registry).FindBySession(host.Id));
+        Assert.False(view.IsMatchRoom);
+        Assert.False(view.UsesUdp);
+    }
+
+    [Fact]
+    public async Task OnlyPublishedGameplayRoomsCanRequestUdpAndUnknownSessionsHaveNoRoom()
+    {
+        var registry = new RoomRegistry(new InGameOptions());
+        try
+        {
+            var roster = (IRoomRoster)registry;
+            var host = new RecordingSession(24);
+            Assert.Null(roster.FindBySession(host.Id));
+            var (room, _) = registry.CreateForMode(host, 3, "map", "room", 7, "host", listed: false);
+            room.UdpOverride = true;
+            Assert.False(Assert.IsType<RoomRosterView>(roster.FindBySession(host.Id)).UsesUdp);
+            registry.Publish(room);
+            var view = Assert.IsType<RoomRosterView>(roster.FindBySession(host.Id));
+            Assert.True(view.IsMatchRoom);
+            Assert.True(view.UsesUdp);
+            Assert.Equal(RoomStage.Waiting, view.Stage);
+        }
+        finally { await registry.StopAllAsync(); }
     }
 
     [Fact]

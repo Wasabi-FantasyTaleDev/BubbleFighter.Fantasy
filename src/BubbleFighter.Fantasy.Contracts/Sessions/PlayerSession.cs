@@ -1,3 +1,5 @@
+using BubbleFighter.Fantasy.Contracts.Cluster;
+
 namespace BubbleFighter.Fantasy.Contracts.Sessions;
 
 /// <summary>The authenticated player behind a game connection.</summary>
@@ -33,6 +35,9 @@ public enum SessionPhase
 
     /// <summary>In a match, from the start chain to the result stage.</summary>
     Match,
+
+    /// <summary>The source connection is frozen while its account authority moves to another node.</summary>
+    Migrating,
 }
 
 /// <summary>
@@ -51,6 +56,12 @@ public interface IPlayerSession
     /// Match connections may share this state but retain the original owner's id; public presence must count only that owner.
     /// </summary>
     long? LoginConnectionId => null;
+
+    /// <summary>Gets the original login node and channel retained during a remote visit, if this is a migrated connection.</summary>
+    MigrationHome? MigrationHome => null;
+
+    /// <summary>Sets the original login location once, before the retained connection enters a scene.</summary>
+    void SetMigrationHome(MigrationHome home) => throw new NotSupportedException("This player session cannot retain a migration home.");
 
     /// <summary>Updates the committed display nickname while preserving scene phase and generation.</summary>
     void ChangeNickname(string nickname) => throw new NotSupportedException("This player session cannot change its nickname.");
@@ -81,6 +92,7 @@ public sealed class PlayerSession : IPlayerSession
     private SessionPhase _phase = SessionPhase.Authenticated;
     private long _generation;
     private PlayerIdentity _identity;
+    private MigrationHome? _migrationHome;
 
     /// <summary>Creates the state for a freshly authenticated player.</summary>
     /// <param name="identity">The authenticated player.</param>
@@ -98,6 +110,25 @@ public sealed class PlayerSession : IPlayerSession
 
     /// <inheritdoc />
     public long? LoginConnectionId { get; }
+
+    /// <inheritdoc />
+    public MigrationHome? MigrationHome { get { lock (_gate) return _migrationHome; } }
+
+    /// <inheritdoc />
+    public void SetMigrationHome(MigrationHome home)
+    {
+        ArgumentNullException.ThrowIfNull(home);
+        if (home.NodeId is not { Length: > 0 and <= 64 }
+            || !home.NodeId.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or '.')
+            || home.Channel is <= 0 or > byte.MaxValue)
+            throw new ArgumentException("Migration home requires a valid node identity and native channel.", nameof(home));
+        lock (_gate)
+        {
+            if (_phase != SessionPhase.Authenticated || _migrationHome is not null)
+                throw new InvalidOperationException("Migration home must be installed once before the first scene.");
+            _migrationHome = home;
+        }
+    }
 
     /// <inheritdoc />
     public PlayerIdentity Identity { get { lock (_gate) return _identity; } }
@@ -151,8 +182,9 @@ public sealed class PlayerSession : IPlayerSession
     public static bool IsAllowed(SessionPhase from, SessionPhase to) => (from, to) switch
     {
         (SessionPhase.Authenticated, SessionPhase.MainMenu) => true,
-        (SessionPhase.MainMenu, SessionPhase.Plaza or SessionPhase.Room) => true,
-        (SessionPhase.Plaza, SessionPhase.MainMenu or SessionPhase.Room) => true,
+        (SessionPhase.MainMenu, SessionPhase.Plaza or SessionPhase.Room or SessionPhase.Migrating) => true,
+        (SessionPhase.Plaza, SessionPhase.MainMenu or SessionPhase.Room or SessionPhase.Migrating) => true,
+        (SessionPhase.Migrating, SessionPhase.MainMenu or SessionPhase.Plaza) => true,
         (SessionPhase.Room, SessionPhase.Plaza or SessionPhase.Match) => true,
         (SessionPhase.Match, SessionPhase.Room or SessionPhase.Plaza) => true,
         _ => false,

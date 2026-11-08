@@ -136,12 +136,13 @@ public sealed class PacketTablesTests : IDisposable
         string[] Lobby(string build, string key) =>
             (string[])((Dictionary<string, object?>)TestBuilds.Packets.ValuesOf(build)["lobby"]!)[key]!;
 
-        // cn-406 and cn-404 take id-400's Indonesian pair; cn-279 takes cn-324's 2012 starter bag.
-        Assert.Equal(["11", "12"], Lobby("cn-406", "creation_character_types"));
-        Assert.Equal(["11", "12"], Lobby("cn-404", "creation_character_types"));
+        // cn-406 sub_771B70 and cn-404 sub_8279D0 offer Dao/Dizni; cn-279 uses cn-324's starter bag.
+        Assert.Equal(["1", "2"], Lobby("cn-406", "creation_character_types"));
+        Assert.Equal(["1", "2"], Lobby("cn-404", "creation_character_types"));
         Assert.Equal(Lobby("cn-324", "starter_item_ids"), Lobby("cn-279", "starter_item_ids"));
         Assert.Equal(["1", "2"], Lobby("cn-717", "creation_character_types"));
-        Assert.False(TestBuilds.Packets.CapabilityOf("cn-404", "character_creation"));
+        Assert.True(TestBuilds.Packets.CapabilityOf("cn-404", "character_creation"));
+        Assert.True(TestBuilds.Packets.CapabilityOf("cn-406", "character_creation"));
     }
 
     [Fact]

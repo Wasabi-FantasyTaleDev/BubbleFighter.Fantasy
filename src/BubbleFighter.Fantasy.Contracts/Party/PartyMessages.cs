@@ -97,6 +97,15 @@ public sealed record PartyInviteAccepted(bool IsParty, string Inviter) : IMessag
 /// <param name="Answer">The client's answer code.</param>
 public sealed record PartyInviteAnswered(string Inviter, int Answer) : IMessage;
 
+/// <summary>A player types into the chat box outside a room (the legacy C2S gcpSendPartyChatMsg).</summary>
+/// <param name="Text">The line.</param>
+public sealed record PartyChatSent(string Text) : IMessage;
+
+/// <summary>Sent to each member of the speaker's party, the speaker included: a party chat line.</summary>
+/// <param name="UserNum">The speaker's account; the client names the line after the party member with this number.</param>
+/// <param name="Text">The line.</param>
+public sealed record PartyChatReceived(int UserNum, string Text) : IMessage;
+
 /// <summary>A member leaves the party (C2S gcpReqLeaveParty).</summary>
 public sealed record PartyLeaveRequested : IMessage;
 
@@ -168,6 +177,10 @@ public enum PartyVisitFailure
 /// <param name="Target">The visited player's nickname.</param>
 /// <param name="RequiresApproval">Whether this build has a visited-player prompt and its answer packet.</param>
 public sealed record PartyVisitRequested(string Target, bool RequiresApproval = true) : IMessage;
+
+/// <summary>Joins a leader selected from a native recruitment document without an invitation prompt.</summary>
+/// <param name="Target">The recruiting leader's nickname.</param>
+public sealed record PartyRecruitmentJoinRequested(string Target) : IMessage;
 
 /// <summary>
 /// The visited player answers a visit prompt that names the visitor (kr-812 gcpReqMoveToFriendAccept with answer 1
@@ -252,10 +265,31 @@ public sealed record PartyLeaderChanged(string Previous, string Leader, PartyLea
 /// <summary>The party of each logged-in player, read by the room flow to bring members along with their leader.</summary>
 public interface IPartyDirectory
 {
+    /// <summary>Gets the configured maximum membership of parties managed by this directory.</summary>
+    int MaximumMembers => throw new NotSupportedException("This party directory does not expose its member limit.");
+
+    /// <summary>Gets whether this directory can atomically exclude a solo player from invitations and joins.</summary>
+    bool SupportsSoloReservation => false;
+
+    /// <summary>Reserves a player who has no party until disposal; returns null if occupied or capacity is exhausted.</summary>
+    IDisposable? TryReserveSolo(int userNum) => throw new NotSupportedException("This party directory cannot reserve solo players.");
+
     /// <summary>Gets the party of a player.</summary>
     /// <param name="userNum">The account id.</param>
     /// <returns>The party, or <see langword="null"/> when the player is alone.</returns>
     PartySnapshot? PartyOf(int userNum);
+
+    /// <summary>
+    /// Rebuilds a party that moved to this node: adds an arrived member to the arrived leader's party and tells every
+    /// member the new list. Returns false when either connection is no longer current, the leader now follows someone
+    /// else, or the party is full.
+    /// </summary>
+    /// <param name="leader">The leader's current game connection on this node.</param>
+    /// <param name="member">The arrived member's current game connection on this node.</param>
+    /// <param name="cancellationToken">Cancels the wait for the party worker.</param>
+    /// <returns>Whether the member is now in the leader's party.</returns>
+    ValueTask<bool> RejoinAsync(ISession leader, ISession member, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This party directory cannot rebuild a party that moved between nodes.");
 }
 
 /// <summary>

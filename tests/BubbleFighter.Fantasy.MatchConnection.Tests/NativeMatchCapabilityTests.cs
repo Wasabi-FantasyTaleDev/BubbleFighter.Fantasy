@@ -254,6 +254,140 @@ public sealed class NativeMatchCapabilityTests
         Assert.False(registry.TryGetSessionOfConnection(relay.Connection.Id, out _));
     }
 
+    [Theory]
+    [InlineData(4)]
+    [InlineData(8)]
+    public async Task UdpProbeBindsTheIssuedIdentityToOneCurrentRelayEndpoint(int identityBytes)
+    {
+        var (registry, _, seat) = Room("kr-812");
+        var ticket = await registry.IssueCapabilityAsync(seat.Game, 20, default);
+        var replies = new Replies(registry.Protocol);
+        using var udp = new MatchUdpDirectory(new() { Protocol = registry.Protocol });
+        using var lifecycle = new MatchConnectionLifecycle(registry, replies, replies,
+            new() { Protocol = registry.Protocol }, NullLogger.Instance, udp);
+        var relay = new Session(10, "kr-812");
+        await lifecycle.AuthenticateCapabilityAsync(relay, new(ticket), default);
+        await lifecycle.RegisterSceneIdentityAsync(relay, new(1000000, "host"), default);
+        var token = await udp.IssueAsync(relay, identityBytes, default);
+        var endpoint = new System.Net.IPEndPoint(System.Net.IPAddress.Parse("192.0.2.10"), 42000);
+        var otherEndpoint = new System.Net.IPEndPoint(System.Net.IPAddress.Parse("192.0.2.10"), 42001);
+
+        Assert.True(udp.TryBind(token.Span, endpoint, out var bound));
+        Assert.Same(relay, bound);
+        Assert.Equal(MatchUdpRelayState.Bound, udp.StateOf(relay));
+        Assert.False(udp.TryGetEndpoint(relay, out _));
+        Assert.True(udp.Verify(relay));
+        Assert.False(udp.Verify(relay));
+        Assert.True(udp.TryGetEndpoint(relay, out _));
+        Assert.False(udp.TryBind(token.Span, otherEndpoint, out _));
+        Assert.False(udp.TryResolve(new byte[8], endpoint, out _));
+        Assert.True(udp.TryResolve(token.Span, endpoint, out var resolved));
+        Assert.Same(relay, resolved);
+        Assert.True(udp.TryGetTarget(relay, out var target, out var identity));
+        Assert.Equal(endpoint, target);
+        Assert.Equal(token.ToArray(), identity.ToArray());
+
+        udp.Reset(relay);
+        Assert.Equal(MatchUdpRelayState.Registered, udp.StateOf(relay));
+        Assert.False(udp.TryResolve(token.Span, endpoint, out _));
+        Assert.False(udp.TryGetEndpoint(relay, out _));
+        var refreshed = await udp.IssueAsync(relay, identityBytes, default);
+        Assert.NotEqual(token.ToArray(), refreshed.ToArray());
+
+        lifecycle.Disconnect(relay.Connection.Id);
+        Assert.False(udp.TryResolve(token.Span, endpoint, out _));
+        Assert.False(udp.TryGetTarget(relay, out _, out _));
+    }
+
+    [Theory]
+    [InlineData(4)]
+    [InlineData(8)]
+    public async Task UdpDirectoryRejectsStaleDisabledReplacedAndOverCapacityLeases(int bytes)
+    {
+        using var directory = new MatchUdpDirectory(new() { Protocol = "test/relay", MaxSessions = 1 });
+        var session = new Session(50, "kr-812");
+        var current = false;
+        Assert.Throws<InvalidOperationException>(() => directory.Register(session, () => current));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => directory.IssueAsync(session, bytes, default).AsTask());
+        current = true;
+        var registration = directory.Register(session, () => current);
+        Assert.Throws<InvalidOperationException>(() => directory.Register(new Session(51, "kr-812"), () => true));
+        var token = await directory.IssueAsync(session, bytes, default);
+        Assert.Equal(bytes, token.Length);
+        Assert.Contains(token.ToArray(), value => value != 0);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => directory.IssueAsync(session, bytes, default).AsTask());
+        var endpoint = new IPEndPoint(IPAddress.Loopback, 7600);
+        Assert.False(directory.TryResolve(token.Span, endpoint, out _));
+        Assert.True(directory.TryBind(token.Span, endpoint, out _));
+        Assert.Same(session, Assert.Single(directory.BoundSessions()));
+        current = false;
+        Assert.False(directory.TryResolve(token.Span, endpoint, out _));
+        Assert.False(directory.TryGetEndpoint(session, out _));
+        current = true;
+        directory.Disable(session);
+        Assert.Empty(directory.BoundSessions());
+        Assert.False(directory.TryBind(token.Span, endpoint, out _));
+        Assert.False(directory.TryGetEndpoint(session, out _));
+        registration.Dispose();
+        var replacement = new Session(session.Id, "kr-812");
+        using var next = directory.Register(replacement, () => true);
+        var newToken = await directory.IssueAsync(replacement, bytes, default);
+        Assert.NotEqual(token.ToArray(), newToken.ToArray());
+        Assert.False(directory.TryBind(token.Span, endpoint, out _));
+        Assert.True(directory.TryBind(newToken.Span, endpoint, out var bound));
+        Assert.Same(replacement, bound);
+        Assert.False(directory.TryGetEndpoint(session, out _));
+        directory.Dispose();
+        Assert.False(directory.TryBind(newToken.Span, endpoint, out _));
+        Assert.Empty(directory.BoundSessions());
+    }
+
+    /// <summary>Checks expired, closed, duplicate and replaced-session disable requests without invalidating another lease.</summary>
+    [Theory]
+    [InlineData(4)]
+    [InlineData(8)]
+    public async Task LateUdpDisablePreservesOtherLeasesAndDoesNotCloseTheConnection(int bytes)
+    {
+        using var directory = new MatchUdpDirectory(new() { Protocol = "kr-812/relay" });
+        var session = new Session(10, "kr-812");
+        directory.Disable(session);
+        var current = true;
+        using var registration = directory.Register(session, () => current);
+        var token = await directory.IssueAsync(session, bytes, default);
+        var endpoint = new IPEndPoint(IPAddress.Loopback, 7600);
+        Assert.True(directory.TryBind(token.Span, endpoint, out _));
+        Assert.True(directory.Verify(session));
+        current = false;
+        directory.Disable(session);
+        current = true;
+        Assert.True(directory.TryGetEndpoint(session, out _));
+        Assert.Equal(MatchUdpRelayState.Verified, directory.StateOf(session));
+        Assert.False(session.Connection.IsClosed);
+
+        await session.Connection.CloseAsync("test relay ended");
+        directory.Disable(session);
+        registration.Dispose();
+        var replacement = new Session(session.Id, "kr-812");
+        using var next = directory.Register(replacement, () => true);
+        var replacementToken = await directory.IssueAsync(replacement, bytes, default);
+        Assert.True(directory.TryBind(replacementToken.Span, endpoint, out _));
+        Assert.True(directory.Verify(replacement));
+        directory.Disable(session);
+        directory.Disable(new Session(session.Id, "kr-812"));
+        Assert.True(directory.TryGetEndpoint(replacement, out _));
+        Assert.True(directory.TryResolve(replacementToken.Span, endpoint, out var resolved));
+        Assert.Same(replacement, resolved);
+        Assert.False(replacement.Connection.IsClosed);
+
+        directory.Disable(replacement);
+        directory.Disable(replacement);
+        Assert.Equal(MatchUdpRelayState.Disabled, directory.StateOf(replacement));
+        Assert.False(directory.TryResolve(replacementToken.Span, endpoint, out _));
+        Assert.False(replacement.Connection.IsClosed);
+        directory.Dispose();
+        directory.Disable(replacement);
+    }
+
     [Fact]
     public async Task ClosedReplacementCannotDisplaceAnInitializedNativeSeat()
     {

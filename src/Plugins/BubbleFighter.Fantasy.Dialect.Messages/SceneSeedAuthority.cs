@@ -29,7 +29,7 @@ internal sealed class CriticalHitChances
     /// <param name="maxBytes">The workbook size cap.</param>
     /// <returns>The parsed chances.</returns>
     /// <exception cref="ConfigException">The workbook lacks a category or column, holds a value outside 0-100, or
-    /// states a non-zero defence chance, whose byte scale on the wire is unproven.</exception>
+    /// states a non-zero defence chance, whose seed-value distribution is not established.</exception>
     internal static CriticalHitChances Load(IClientDataStore data, string path, string sheet, int maxBytes)
     {
         IReadOnlyList<IReadOnlyList<string>> rows;
@@ -61,10 +61,10 @@ internal sealed class CriticalHitChances
             if (values.ContainsKey(name))
                 throw new ConfigException($"'{path}' sheet '{sheet}' states category '{name}' twice.");
             var chance = Number(row[attack], name, "crtAttackFactor");
-            // cn-324 sub_4A9540 scales the defence byte by a constant whose meaning is not established, so only
-            // the shipped all-zero column is accepted.
+            // cn-324 sub_4A9540 scales each defence byte by approximately 0.01. Its nonzero table distribution
+            // is not established, so only the shipped all-zero column is accepted.
             if (Number(row[defence], name, "crtDefenceFactor") != 0)
-                throw new ConfigException($"'{path}' category '{name}' states a defence chance; its seed byte scale is unproven.");
+                throw new ConfigException($"'{path}' category '{name}' states a defence chance; its seed-value distribution is unproven.");
             values[name] = chance;
         }
         var missing = Categories.Where(name => !values.ContainsKey(name)).ToArray();
@@ -100,13 +100,24 @@ internal sealed class CriticalHitChances
 }
 
 /// <summary>
-/// Issues every seat's native seed tables for a starting round. The client never generates these bits; its only
-/// writers are the relay appliers (cn-324 sub_460820 -> sub_4A91A0, kr-812 sub_506290 -> sub_556FB0).
+/// Issues every seat's native seed tables for a starting round. The seeded player paths consume the installed
+/// decisions directly (cn-324 sub_4A94C0 and cn-406 sub_472B20), independently of builds that roll locally. A relay
+/// whose scene accept already installs the critical and cancellation tables (kr-1256) is issued defence tables only:
+/// it is built without critical opcodes and chances.
 /// </summary>
-internal sealed class SceneSeedAuthority(string protocol, string build, PacketTables tables, ushort criticalOpcode,
-    ushort defenceOpcode, ushort cancelOpcode, CriticalHitChances chances, int maxSessions, Random random)
-    : IMessageSender<MatchSeedTablesRequested>
+internal sealed partial class SceneSeedAuthority(string protocol, string build, PacketTables tables, ushort? criticalOpcode,
+    ushort defenceOpcode, ushort? cancelOpcode, CriticalHitChances? chances, int maxSessions, Random random,
+    WeaponCriticalCatalog? weapons = null, DefenceSeedCatalog? defences = null)
+    : IMessageSender<MatchSeedTablesRequested>, IMatchSeedInputValidator, IMatchCriticalSeedAuthority
 {
+    // The critical family is all or nothing: its two opcodes and its chances, and weapon contributions need it.
+    private readonly bool _critical = (criticalOpcode, cancelOpcode, chances) switch
+    {
+        ({ }, { }, { }) => true,
+        (null, null, null) when weapons is null => false,
+        _ => throw new ArgumentException("Critical seed tables need both opcodes and the chances; weapons need all three."),
+    };
+
     // The expander copies 32 words into each of the first two weapon-slot tables and leaves the other three zero
     // (cn-324 sub_4998C0 stops at 32 words; kr-812 sub_54A660 is its counterpart). The roll reads the table of the
     // current weapon slot, Character+6452 (cn-324 sub_4A94C0; the slot setter is cn-324 sub_4CD3C0).
@@ -117,37 +128,153 @@ internal sealed class SceneSeedAuthority(string protocol, string build, PacketTa
     internal const int BitsPerTable = 1000;
 
     private readonly Lock _gate = new();
-    private readonly Dictionary<long, (int Generation, int EntityId)> _issued = [];
+    private readonly Dictionary<long, Issuance> _issued = [];
+
+    private sealed class Issuance(MatchSeedTablesRequested request)
+    {
+        internal MatchSeedTablesRequested Request { get; } = request;
+        internal TaskCompletionSource Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal (double Primary, double Sidearm)? LastChances { get; set; }
+        internal CriticalRevision? Revision { get; set; }
+    }
 
     /// <inheritdoc />
     public string Protocol => protocol;
 
-    /// <summary>Sends the critical, defence and cancellation tables (relay S2C 4, 5 and 6) for one seat.</summary>
+    private CriticalHitChances Chances =>
+        chances ?? throw new InvalidOperationException("This relay is issued no critical seed tables.");
+
+    private ushort CriticalOpcode =>
+        criticalOpcode ?? throw new InvalidOperationException("This relay is issued no critical seed tables.");
+
+    /// <summary>Identifies modes whose critical tables require authoritative equipment and accepted weapon transitions.</summary>
+    public bool RequiresFixedEquipment(int modeId) => weapons?.AppliesTo(modeId) == true;
+
+    /// <summary>Resolves optional weapon inputs without drawing bits or reserving an installation.</summary>
+    public void Validate(MatchSeedTablesRequested request)
+    {
+        if (weapons is not null) _ = weapons.Contributions(request.Equipment);
+        var occupants = DefenceSeedRoster.Occupants(request);
+        if (defences is not null)
+            foreach (var occupant in occupants) _ = defences.Range(occupant.Equipment);
+    }
+
+    /// <summary>
+    /// Queues one round's critical, defence and cancellation tables in order. Duplicate requests share the original
+    /// outcome without reinstalling tables; a failed or canceled attempt cannot be retried within that round.
+    /// </summary>
     public async ValueTask SendAsync(ISession session, MatchSeedTablesRequested message, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         if (session.Profile.Id != build)
             throw new InvalidOperationException("Native seed tables belong to another client profile.");
+        Validate(message);
+        Issuance issuance;
+        var ownsIssuance = false;
         lock (_gate)
         {
-            if (!_issued.ContainsKey(session.Id) && _issued.Count >= maxSessions)
-                throw new InvalidOperationException($"Native seed authority reached its {maxSessions} session limit.");
-            _issued[session.Id] = (message.Generation, message.EntityId);
+            if (_issued.TryGetValue(session.Id, out var previous))
+            {
+                if (previous.Request.RoomId == message.RoomId && previous.Request.Generation == message.Generation)
+                {
+                    if (previous.Request != message)
+                        throw new InvalidOperationException("Native seed inputs changed within the same room generation.");
+                    issuance = previous;
+                }
+                else
+                {
+                    if (!previous.Completion.Task.IsCompleted || previous.Revision?.Completion.Task.IsCompleted == false)
+                        throw new InvalidOperationException("Native seed installation is still in progress for this relay session.");
+                    if (previous.Request.RoomId == message.RoomId && message.Generation < previous.Request.Generation)
+                        throw new InvalidOperationException("Native seed request belongs to an older room generation.");
+                    issuance = new(message);
+                    _issued[session.Id] = issuance;
+                    ownsIssuance = true;
+                }
+            }
+            else
+            {
+                if (_issued.Count >= maxSessions)
+                    throw new InvalidOperationException($"Native seed authority reached its {maxSessions} session limit.");
+                issuance = new(message);
+                _issued.Add(session.Id, issuance);
+                ownsIssuance = true;
+            }
         }
-        var chance = chances.RoundStartChance(message.PreviousRound);
-        await session.SendAsync(criticalOpcode, Critical(message.EntityId, chance), ct).ConfigureAwait(false);
-        await session.SendAsync(defenceOpcode, Defence(message.EntityId), ct).ConfigureAwait(false);
-        await session.SendAsync(cancelOpcode, Cancellation(message.EntityId), ct).ConfigureAwait(false);
+        if (ownsIssuance)
+        {
+            try
+            {
+                (double Primary, double Sidearm)? probabilities = null;
+                byte[]? critical = null;
+                if (_critical)
+                {
+                    var baseline = Chances.RoundStartChance(message.PreviousRound);
+                    var contribution = weapons?.Contributions(message.Equipment) ?? (Primary: 0.0, Sidearm: 0.0);
+                    var chance = (Primary: Math.Clamp(baseline + contribution.Primary, 0, 1),
+                        Sidearm: Math.Clamp(baseline + contribution.Sidearm, 0, 1));
+                    critical = Critical(message.EntityId, chance.Primary, chance.Sidearm);
+                    probabilities = chance;
+                }
+                // Every client rolls each victim's reduction from that victim's own table (kr-812 sub_51D000 runs for
+                // relayed hits too, and kr-812 sub_5063A0 installs a table for any seat), so each seat receives every
+                // occupant's table; the bytes depend only on the round and the occupant, never on the recipient.
+                var defence = defences is null ? [Defence(message.EntityId)]
+                    : DefenceSeedRoster.Occupants(message).Select(occupant => Defence(occupant.EntityId,
+                        defences.Table(message.RoomId, message.Generation, occupant.EntityId, occupant.Equipment))).ToArray();
+                var cancellation = _critical ? Cancellation(message.EntityId) : null;
+                if (critical is not null)
+                    await SendTableAsync(CriticalOpcode, critical).ConfigureAwait(false);
+                foreach (var table in defence)
+                    await SendTableAsync(defenceOpcode, table).ConfigureAwait(false);
+                if (cancellation is not null)
+                    await SendTableAsync(cancelOpcode!.Value, cancellation).ConfigureAwait(false);
+                lock (_gate) issuance.LastChances = probabilities;
+                issuance.Completion.TrySetResult();
+            }
+            catch (OperationCanceledException failure)
+            {
+                issuance.Completion.TrySetCanceled(failure.CancellationToken);
+            }
+            catch (Exception failure)
+            {
+                issuance.Completion.TrySetException(failure);
+            }
+        }
+        // cn-324 sub_4A91A0 / cn-406 sub_4728A0 reset every critical cursor on installation, even for identical
+        // words. Retain failures as well as success: a partial send cannot safely restart from the first table.
+        await issuance.Completion.Task.WaitAsync(ct).ConfigureAwait(false);
+
+        ValueTask SendTableAsync(ushort opcode, byte[] payload)
+        {
+            ct.ThrowIfCancellationRequested();
+            lock (_gate)
+            {
+                if (!_issued.TryGetValue(session.Id, out var current) || !ReferenceEquals(current, issuance))
+                    throw new InvalidOperationException($"Native seed issuance was removed for relay session {session.Id}.");
+            }
+            return session.SendAsync(opcode, payload, ct);
+        }
     }
 
-    /// <summary>Returns whether a client-reported table names the entity issued to that relay session this round.</summary>
-    internal bool Issued(long sessionId, int entityId, out int generation)
+    /// <summary>
+    /// Correlates a client-reported table with this session's attempted round issuance, including reports arriving
+    /// while later tables are being queued. A defence table may name any occupant the seat was sent. The association
+    /// is not proof of delivery or client installation.
+    /// </summary>
+    internal bool Issued(long sessionId, NativeSceneSeedKind kind, int entityId, out int generation)
     {
         lock (_gate)
         {
-            var found = _issued.TryGetValue(sessionId, out var issued) && issued.EntityId == entityId;
-            generation = found ? issued.Generation : 0;
-            return found;
+            if (_issued.TryGetValue(sessionId, out var issued) && (issued.Request.EntityId == entityId
+                || (defences is not null && kind == NativeSceneSeedKind.Defence
+                    && issued.Request.Roster?.Occupants.Any(occupant => occupant.EntityId == entityId) == true)))
+            {
+                generation = issued.Request.Generation;
+                return true;
+            }
+            generation = 0;
+            return false;
         }
     }
 
@@ -159,13 +286,17 @@ internal sealed class SceneSeedAuthority(string protocol, string build, PacketTa
 
     /// <summary>Encodes a critical table with each of the first two weapon-slot tables drawn at <paramref name="chance"/>.</summary>
     internal byte[] Critical(int entityId, double chance) =>
-        SceneSeedSender.Encode(tables, build, NativeSceneSeedTable.WithWordVectors(NativeSceneSeedKind.Critical, entityId,
-            [Draw(chance), Draw(chance)]), "RelayCriticalSeedTable");
+        Critical(entityId, chance, chance);
 
-    // The shipped defence column is zero for every category (checked on load), so every defence byte is zero.
-    internal byte[] Defence(int entityId) =>
+    /// <summary>Encodes independent primary and sidearm probabilities without changing native vector sizes.</summary>
+    internal byte[] Critical(int entityId, double primaryChance, double sidearmChance) =>
+        SceneSeedSender.Encode(tables, build, NativeSceneSeedTable.WithWordVectors(NativeSceneSeedKind.Critical, entityId,
+            [Draw(primaryChance), Draw(sidearmChance)]), "RelayCriticalSeedTable");
+
+    // Without a defence catalog every byte is zero: the table branch then reduces no damage.
+    internal byte[] Defence(int entityId, byte[]? values = null) =>
         SceneSeedSender.Encode(tables, build, NativeSceneSeedTable.Bytes(NativeSceneSeedKind.Defence, entityId,
-            new byte[BitsPerTable]), "RelayDefenceSeedTable");
+            values ?? new byte[BitsPerTable]), "RelayDefenceSeedTable");
 
     // A player's cancellation chance is a character attribute (cn-324 sub_4A9A00's non-player branch reads it from
     // the attribute block); the server keeps no such attribute, so no hit is cancelled.

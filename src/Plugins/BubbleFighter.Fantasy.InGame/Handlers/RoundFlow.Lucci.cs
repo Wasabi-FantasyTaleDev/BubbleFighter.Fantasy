@@ -28,7 +28,7 @@ internal sealed partial class RoundFlow
 
     private async ValueTask CreateLucciAsync(ISession session, RoundLucciPoint point, int kind, int tag, CancellationToken ct)
     {
-        var (room, _) = _registry.RequireGame(session);
+        if (FindGameReportRoom(session) is not { } room) return;
         await room.Executor.ExecuteAsync(async operationCt =>
         {
             RoomSeat[] members = [];
@@ -63,11 +63,12 @@ internal sealed partial class RoundFlow
 
     internal async ValueTask HandleLucciPickupAsync(ISession session, RoundLucciPickupRequested request, CancellationToken ct)
     {
-        var (room, _) = _registry.RequireGame(session);
+        if (FindGameReportRoom(session) is not { } room) return;
         await room.Executor.ExecuteAsync(async operationCt =>
         {
             RoomSeat[] members;
             RoundLucciPicked picked;
+            RoundScoreUpdated update;
             lock (room.Gate)
             {
                 // Every client touches the same item independently; the first report wins and the rest find it gone.
@@ -77,10 +78,14 @@ internal sealed partial class RoundFlow
                     return;
                 room.Scoring.AddLucci(seat.Slot, _options.LucciKindValues[kind - 1], _options.MaxRoundLucci);
                 picked = new RoundLucciPicked(request.CharacterObjectId, request.ObjectId);
+                // kr-812 sub_7527C0 renders row +128; kr-812 sub_804850 replaces it from live stat 13.
+                update = new(room.Id, 0, [.. room.Scoring.TeamTotals], [room.Scoring.Stats(seat.Slot)], LiveScoreboard(room))
+                    { CollectedLucciOnly = true };
                 members = [.. room.Seats];
             }
             foreach (var member in members)
                 await _lucciPicked!.SendAsync(member.Game, picked, operationCt).ConfigureAwait(false);
+            await SendScoreAsync(room, update, operationCt).ConfigureAwait(false);
         }, ct).ConfigureAwait(false);
     }
 }

@@ -4,6 +4,8 @@
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../../src/BubbleFighter.Fantasy.Archives/BubbleFighter.Fantasy.Archives.csproj" />
+    <ProjectReference Include="../../src/Plugins/BubbleFighter.Fantasy.Cluster/BubbleFighter.Fantasy.Cluster.csproj" />
     <ProjectReference Include="../../src/Plugins/BubbleFighter.Fantasy.Commands/BubbleFighter.Fantasy.Commands.csproj" />
     <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Localization\BubbleFighter.Fantasy.Localization.csproj" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
@@ -28,6 +30,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\Shared\TestPlayerSessions.cs" Link="TestPlayerSessions.cs" />
+    <Compile Include="..\Shared\LocalClientData.cs" Link="LocalClientData.cs" />
+    <Compile Include="..\Shared\WorldBlockFixture.cs" Link="WorldBlockFixture.cs" />
+    <Compile Include="..\Shared\TestTempDirectories.cs" Link="TestTempDirectories.cs" />
     <None Include="..\..\profiles\kr-1256\opcodes.yaml" Link="opcodes.yaml" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\data\level-experience.csv" Link="data\level-experience.csv" CopyToOutputDirectory="PreserveNewest" />
     <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Protocol\BubbleFighter.Fantasy.Protocol.csproj" />

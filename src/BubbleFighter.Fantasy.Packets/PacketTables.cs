@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 using BubbleFighter.Fantasy.Abstractions;
 using YamlDotNet.Serialization;
@@ -31,6 +32,12 @@ public sealed class PacketTables
 
     private const string BuildsFile = "builds.yaml";
 
+    // A module may have many build-scoped rows. Reuse their live snapshot without owning its lifetime.
+    private static readonly object SnapshotLock = new();
+    private static WeakReference<PacketTables>? _lastSnapshot;
+    private static string? _lastDirectory;
+    private static byte[]? _lastDigest;
+
     private static readonly HashSet<string> Scalars = new(StringComparer.Ordinal)
     {
         "u8", "u16", "u32", "u64", "bool", "f32", "f64", "wstr", "empty_list",
@@ -47,17 +54,24 @@ public sealed class PacketTables
     private readonly Dictionary<(string Build, string Struct), IReadOnlyList<PacketField>> _resolved = new();
     private readonly List<string> _buildOrder = [];
     private readonly List<string> _structOrder = [];
+    private readonly IReadOnlyList<string> _buildView;
+    private readonly IReadOnlyList<string> _structView;
 
-    private PacketTables(string directory) => Directory = directory;
+    private PacketTables(string directory)
+    {
+        Directory = directory;
+        _buildView = _buildOrder.AsReadOnly();
+        _structView = _structOrder.AsReadOnly();
+    }
 
     /// <summary>Gets the directory the tables were read from.</summary>
     public string Directory { get; }
 
     /// <summary>Gets the builds of <c>builds.yaml</c>, each after its base.</summary>
-    public IReadOnlyList<string> Builds => _buildOrder;
+    public IReadOnlyList<string> Builds => _buildView;
 
     /// <summary>Gets the structure names, in file order.</summary>
-    public IReadOnlyList<string> Structs => _structOrder;
+    public IReadOnlyList<string> Structs => _structView;
 
     private sealed record BuildEntry(string? Base, IDictionary<object, object> Values, string File);
 
@@ -67,7 +81,7 @@ public sealed class PacketTables
 
     private sealed record Table(string Owner, List<Row> Rows, string Where);
 
-    /// <summary>Reads and checks every table of a directory.</summary>
+    /// <summary>Reads and checks every table, reusing a live snapshot only when all source bytes still match.</summary>
     /// <param name="directory">The packets directory.</param>
     /// <returns>The tables, with every build's every structure already resolved once.</returns>
     /// <exception cref="ConfigException">
@@ -77,13 +91,53 @@ public sealed class PacketTables
     /// </exception>
     public static PacketTables Load(string directory)
     {
+        directory = Path.GetFullPath(directory);
+        lock (SnapshotLock)
+        {
+            var files = ReadSources(directory);
+            using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+            foreach (var file in files)
+            {
+                // Fixed-size component hashes distinguish filenames and file boundaries without ambiguity.
+                hash.AppendData(SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetFileName(file.Path))));
+                hash.AppendData(SHA256.HashData(file.Bytes));
+            }
+            var digest = hash.GetHashAndReset();
+            if (string.Equals(directory, _lastDirectory, OperatingSystem.IsWindows()
+                    ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)
+                && _lastDigest is not null && digest.AsSpan().SequenceEqual(_lastDigest)
+                && _lastSnapshot is not null && _lastSnapshot.TryGetTarget(out var existing))
+                return existing;
+
+            var tables = LoadSnapshot(directory, files);
+            _lastDirectory = directory;
+            _lastDigest = digest;
+            _lastSnapshot = new WeakReference<PacketTables>(tables);
+            return tables;
+        }
+    }
+
+    private sealed record SourceFile(string Path, byte[] Bytes);
+
+    private static SourceFile[] ReadSources(string directory)
+    {
         if (!System.IO.Directory.Exists(directory))
             throw new ConfigException($"The packets directory '{directory}' does not exist.");
-        var tables = new PacketTables(directory);
         var buildsPath = Path.Combine(directory, BuildsFile);
         if (!File.Exists(buildsPath))
             throw new ConfigException($"'{buildsPath}' is missing: it names the client builds the tables are written for.");
-        tables.ReadBuilds(buildsPath, ReadFile(buildsPath));
+        return [new(buildsPath, File.ReadAllBytes(buildsPath)),
+            .. System.IO.Directory.EnumerateFiles(directory, "*.yaml").Order(StringComparer.Ordinal)
+                .Where(path => !string.Equals(Path.GetFileName(path), BuildsFile, StringComparison.Ordinal))
+                .Select(path => new SourceFile(path, File.ReadAllBytes(path)))];
+    }
+
+    private static PacketTables LoadSnapshot(string directory, SourceFile[] files)
+    {
+        var tables = new PacketTables(directory);
+        var deserializer = new DeserializerBuilder().Build();
+        var buildsPath = files[0].Path;
+        tables.ReadBuilds(buildsPath, ReadFile(files[0], deserializer));
         foreach (var build in tables.Builds)
         {
             if (tables.ValuesOf(build).TryGetValue("capabilities", out var rawCapabilities))
@@ -94,11 +148,8 @@ public sealed class PacketTables
                     tables.CapabilityOf(build, capability);
             }
         }
-        foreach (var file in System.IO.Directory.EnumerateFiles(directory, "*.yaml").Order(StringComparer.Ordinal))
-        {
-            if (!string.Equals(Path.GetFileName(file), BuildsFile, StringComparison.Ordinal))
-                tables.ReadStructs(file, ReadFile(file));
-        }
+        foreach (var file in files.Skip(1))
+            tables.ReadStructs(file.Path, ReadFile(file, deserializer));
         foreach (var name in tables._structOrder)
         {
             if (!tables._structs[name].ContainsKey(tables._buildOrder[0]))
@@ -176,7 +227,7 @@ public sealed class PacketTables
             if (char.IsAsciiLetterUpper(inner[0]) && !_structs.ContainsKey(inner))
                 throw new ConfigException($"{table.Where}: build '{build}' field '{field.Name}' names unknown structure '{inner}'.");
         }
-        return _resolved[(build, structure)] = fields;
+        return _resolved[(build, structure)] = fields.AsReadOnly();
     }
 
     /// <summary>Gets a build's own values of <c>builds.yaml</c> laid over its base's, as nested maps of text.</summary>
@@ -300,13 +351,14 @@ public sealed class PacketTables
             ? entry
             : throw new ConfigException($"'{Path.Combine(Directory, BuildsFile)}' does not name the build '{build}'.");
 
-    private static IDictionary<object, object> ReadFile(string path)
+    private static IDictionary<object, object> ReadFile(SourceFile file, IDeserializer deserializer)
     {
+        var path = file.Path;
         object? graph;
         try
         {
-            using var reader = File.OpenText(path);
-            graph = new DeserializerBuilder().Build().Deserialize(reader);
+            using var reader = new StreamReader(new MemoryStream(file.Bytes, writable: false));
+            graph = deserializer.Deserialize(reader);
         }
         catch (YamlDotNet.Core.YamlException ex)
         {

@@ -8,6 +8,7 @@ structs:
   # kr-1256 sub_10D9410 consumes this same wire sequence inside room appearance profiles;
   # cn-774 sub_449C80 and tw-454 sub_44A090 consume the same five fields in modern equipped-object vectors.
   # All three modern objects omit the leading vtable; their member offsets are four bytes lower.
+  # cn-735 sub_58D6B0, cn-738 sub_420490 and cn-742 sub_61C980 retain the legacy offsets and fields.
   ItemAttr:
     - unknown_4: u32
       offset: 4
@@ -23,6 +24,7 @@ structs:
   # cn-406 sub_41CE80, id-400 sub_47E8B0, id-1809 sub_4D4780 and cn-706 sub_4B8290.
   # Writers transfer four bytes at +4 and eight bytes at +8; no inferred lifetime units.
   # CN2011/CN2012 EquippedItemList has no ItemExpiredTime vector.
+  # cn-735 sub_692430, cn-738 sub_6C1000 and cn-742 sub_61CEC0 also read a word and eight bytes.
   ItemExpiredTime:
     - unknown_4: u32
       offset: 4

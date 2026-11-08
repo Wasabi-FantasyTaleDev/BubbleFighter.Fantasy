@@ -30,7 +30,7 @@ internal static class PlazaRecords
         ISession? recipient = null, IGameText? texts = null)
     {
         if (!HasEquippedObjects(tables, build))
-            return RoomRecords.Seat(member, recipient, texts);
+            return RoomRecords.Seat(tables, build, member, recipient, texts);
         if (member.CharacterItemId is < 300001 or > 301999)
             throw new ArgumentException("A plaza seat requires a resolved native character item.", nameof(member));
         // cn-774 sub_493E20 / tw-454 sub_48BD60 carry the character type at +40; the account identifies the local seat.
@@ -38,7 +38,7 @@ internal static class PlazaRecords
         {
             ["occupied"] = true, ["user_number"] = member.UserNum,
             ["nickname"] = RoomNames.Resolve(member.Nickname, member.Ai?.NicknameKey ?? "", recipient, texts),
-            ["character_type"] = member.CharacterItemId - 300000, ["level"] = Math.Max(1, member.Level),
+            ["character_type"] = member.CharacterItemId - 300000, ["level"] = NativeDisplayLevel.Project(tables, build, member.Level),
             // cn-774 sub_8DB6B0 / tw-454 sub_A5B220 install the team and the ready/shop/inventory state.
             ["slot"] = checked((byte)member.Slot), ["team"] = checked((byte)member.Team),
             ["ready"] = member.Ready, ["in_shop"] = member.InShop, ["in_inventory"] = member.InInventory,
@@ -56,23 +56,30 @@ internal static class PlazaRecords
             values["ai_difficulty"] = ai.Difficulty;
             values["ai_preset"] = ai.Preset;
         }
+        NativePlazaRecruitment.Project(tables, build, values, member.Recruitment);
         return values;
     }
 
     internal static byte[] Install(PacketTables tables, string build, IReadOnlyList<RoomMemberView> seats,
-        int localSlot, int kind, bool partyTransition)
+        int localSlot, int kind, bool partyTransition, ISession? recipient = null)
     {
         RequireLayouts(tables, build);
         if (!HasEquippedObjects(tables, build))
-            return RoomRecords.Install(tables, build, new Dictionary<string, object?> { ["kind"] = kind }, seats, 0, localSlot, partyTransition);
+            return RoomRecords.Install(tables, build, new Dictionary<string, object?> { ["kind"] = kind }, seats, 0, localSlot, partyTransition, recipient);
         if (seats.Count == 0 || !seats.Any(seat => seat.Slot == localSlot)
             || seats.Any(seat => seat.Slot is < 0 or >= 36)
             || seats.Select(seat => seat.Slot).Distinct().Count() != seats.Count)
             throw new ArgumentException("A plaza install requires unique native seats and its local member.", nameof(seats));
         var bySlot = seats.ToDictionary(seat => seat.Slot);
         var rows = Enumerable.Range(0, seats.Max(seat => seat.Slot) + 1)
-            .Select(slot => bySlot.TryGetValue(slot, out var member) ? Seat(tables, build, member)
+            .Select(slot => bySlot.TryGetValue(slot, out var member) ? Seat(tables, build, member, recipient)
                 : new Dictionary<string, object?> { ["occupied"] = false }).ToArray();
+        if (kind == 3)
+            foreach (var seat in seats)
+            {
+                NativePlazaRecruitment.Project(tables, build, rows[seat.Slot], NativePlazaRecruitment.Allowed(recipient, seat.UserNum));
+                NativePlazaRecruitment.Project(tables, build, rows[seat.Slot], seat.Recruitment);
+            }
         // cn-774 sub_8D6590 / tw-454 sub_A560E0 install the local slot before the unkeyed appearance vector.
         return PacketCodec.Write(tables, build, "gspGotoRoom", new Dictionary<string, object?>
         {

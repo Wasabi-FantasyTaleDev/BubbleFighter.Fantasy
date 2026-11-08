@@ -18,7 +18,7 @@ using Xunit;
 
 namespace BubbleFighter.Fantasy.Launcher.Http.Tests;
 
-public sealed class LauncherPresentationTests
+public sealed partial class LauncherPresentationTests
 {
     private const string Password = "Local-presentation-123";
 
@@ -115,7 +115,8 @@ public sealed class LauncherPresentationTests
         Assert.True(roster.GetProperty("enabled").GetBoolean());
         Assert.True(roster.GetProperty("truncated").GetBoolean());
         var player = Assert.Single(roster.GetProperty("players").EnumerateArray());
-        Assert.Equal(2, player.EnumerateObject().Count());
+        Assert.Equal(3, player.EnumerateObject().Count());
+        Assert.Equal("kr-812", player.GetProperty("buildId").GetString());
         Assert.Equal("Alpha", player.GetProperty("name").GetString());
         Assert.Equal(3, player.GetProperty("level").GetInt32());
         Assert.DoesNotContain("private-login", roster.GetRawText());
@@ -322,8 +323,8 @@ public sealed class LauncherPresentationTests
         Instances = [new() { Id = "kr-812", Build = "kr-812", Port = 7110, Name = [new() { Language = "en", Text = "KR 2015" }] }],
     };
 
-    private static Task<LauncherServer> Start(LauncherOptions options, ISessionRegistry? players = null, IMatchConnectionTracker? matches = null, ILauncherAccountRepository? accounts = null) =>
-        LauncherServer.StartAsync(options, accounts ?? new MemoryLauncherAccounts(10), new LauncherSessions(options, new MemoryLauncherSessions(10)), players: players, matchConnections: matches);
+    private static Task<LauncherServer> Start(LauncherOptions options, ISessionRegistry? players = null, IMatchConnectionTracker? matches = null, ILauncherAccountRepository? accounts = null, ILauncherPresenceDirectory? presenceDirectory = null) =>
+        LauncherServer.StartAsync(options, accounts ?? new MemoryLauncherAccounts(10), new LauncherSessions(options, new MemoryLauncherSessions(10)), players: players, matchConnections: matches, presenceDirectory: presenceDirectory);
 
     private static HttpClient Client(LauncherServer server) => new() { BaseAddress = new Uri(server.Addresses.Single()) };
 
@@ -367,7 +368,7 @@ public sealed class LauncherPresentationTests
         internal bool Closed { get; set; } = closed;
         public long Id => id;
         public IConnection Connection => this;
-        public ClientProfile Profile { get; } = new("kr-812", "kr", 812, 0, 0, "test");
+        public ClientProfile Profile { get; init; } = new("kr-812", "kr", 812, 0, 0, "test");
         public ConcurrentDictionary<string, object> Items { get; } = new();
         public ISessionFeatures Features => this;
         public int Capacity => 1;

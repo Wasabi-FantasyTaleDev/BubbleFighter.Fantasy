@@ -20,7 +20,7 @@ namespace BubbleFighter.Fantasy.InGame.Sessions;
 /// consults that classification to leave the reconnect-shaped C2S 3 alone.
 ///
 /// </summary>
-public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabilityDirectory, IRoomAdminDirectory
+public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabilityDirectory, IRoomAdminDirectory, IRoomPeerRoster, IPublishedRoomDirectory
 {
     private readonly ConcurrentDictionary<int, PlayRoom> _rooms = new();
     private readonly ConcurrentDictionary<long, int> _sessionToRoom = new();
@@ -35,6 +35,8 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
     private readonly ConcurrentDictionary<int, Task> _retiring = new();
     private readonly InGameOptions _options;
     private readonly ILogger _logger;
+    private readonly TimeProvider _admissionClock;
+    private int _admissionsStopped;
 
     /// <inheritdoc />
     public string ClientBuild => _options.GameProtocol.Split('/')[0];
@@ -47,10 +49,12 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
     /// <summary>Creates the registry.</summary>
     /// <param name="options">Bound row options.</param>
     /// <param name="logger">Receives failures of background executor shutdowns for deleted rooms.</param>
-    public RoomRegistry(InGameOptions options, ILogger? logger = null)
+    /// <param name="admissionClock">Monotonic clock for destination seat expiry; defaults to the system clock.</param>
+    public RoomRegistry(InGameOptions options, ILogger? logger = null, TimeProvider? admissionClock = null)
     {
         _options = options;
         _logger = logger ?? NullLogger.Instance;
+        _admissionClock = admissionClock ?? TimeProvider.System;
     }
 
     /// <summary>Creates a room from a parsed C2S 402 session blob and seats the host.</summary>
@@ -202,6 +206,7 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
                 CreateRules = rules,
                 Listed = listed,
             };
+            room.SetAdmissionClock(_admissionClock);
             if (_rooms.TryAdd(id, room))
                 break;
             // Lost a race for the id: this executor never ran an operation, so its stop is immediate.
@@ -332,8 +337,9 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
     /// <param name="nickname">Joiner nickname.</param>
     /// <param name="characterId">Resolved equipped character, or zero for callers that initialize the seat separately before publishing.</param>
     /// <param name="equippedItemIds">Resolved worn items installed before the seat becomes visible to publishers.</param>
+    /// <param name="reservation">An exact pending seat hold, consumed only after destination game authentication.</param>
     public (PlayRoom Room, RoomSeat Seat) Join(ISession game, int roomId, int userNum, string nickname,
-        int characterId = 0, IReadOnlyList<int>? equippedItemIds = null)
+        int characterId = 0, IReadOnlyList<int>? equippedItemIds = null, RoomAdmissionReservation? reservation = null)
     {
         if (characterId != 0 && characterId is < 300000 or > 301999)
             throw new ArgumentOutOfRangeException(nameof(characterId));
@@ -346,7 +352,8 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
         {
             if (!room.Listed)
                 throw new InvalidOperationException($"Room {roomId} is not open to joins.");
-            var seat = room.Add(game, NewKey(), userNum, nickname);
+            var seat = reservation is null ? room.Add(game, NewKey(), userNum, nickname)
+                : room.AddAdmission(game, NewKey(), userNum, nickname, reservation);
             seat.CharacterId = characterId;
             seat.EquippedItemIds = equippedItemIds;
             seat.Level = SessionPlayer.ResolveLevel(game);
@@ -668,20 +675,56 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
     /// <returns>A task that completes when every executor has finished its running operation.</returns>
     public Task StopAllAsync()
     {
+        Interlocked.Exchange(ref _admissionsStopped, 1);
         var stops = new List<Task>(_retiring.Values);
         foreach (var room in _rooms.Values)
         {
             lock (room.Gate)
             {
+                room.ClearAdmissions();
                 room.AutoStartCancellation?.Cancel();
                 room.TutorialCancellation?.Cancel();
+                room.CancelLoadTimeout();
+                room.CancelResultSequence();
             }
             if (room.AutoStartTask is { } pending)
                 stops.Add(pending);
             if (room.Tutorial is not null) stops.Add(room.CountdownTask);
-            stops.Add(room.Executor.DisposeAsync().AsTask());
+            stops.Add(room.LoadTimeoutTask);
+            stops.Add(StopRoomAsync(room));
         }
         return Task.WhenAll(stops);
+    }
+
+    private static async Task StopRoomAsync(PlayRoom room)
+    {
+        lock (room.Gate)
+        {
+            room.IsStopping = true;
+            room.CancelBattleSettlement();
+            room.ExtremeRacingClock?.Cancel();
+            room.FinalZoneWaterClock?.Cancel();
+            room.FinalZoneDroneClock?.Cancel();
+            room.CancelResultSequence();
+        }
+        await room.Executor.DisposeAsync().ConfigureAwait(false);
+        Task result, extremeRacing, finalZoneWater, finalZoneDrones;
+        lock (room.Gate)
+        {
+            // A running executor operation may have started its result after shutdown began.
+            room.CancelResultSequence();
+            result = room.ResultTask;
+            room.ExtremeRacingClock?.Cancel();
+            extremeRacing = room.ExtremeRacingClock?.Completion ?? Task.CompletedTask;
+            room.FinalZoneWaterClock?.Cancel();
+            finalZoneWater = room.FinalZoneWaterClock?.Completion ?? Task.CompletedTask;
+            room.FinalZoneDroneClock?.Cancel();
+            finalZoneDrones = room.FinalZoneDroneClock?.Completion ?? Task.CompletedTask;
+        }
+        await result.ConfigureAwait(false);
+        await extremeRacing.ConfigureAwait(false);
+        await finalZoneWater.ConfigureAwait(false);
+        await finalZoneDrones.ConfigureAwait(false);
     }
 
     // A room is usually deleted by the operation running on its own executor, which may not stop itself
@@ -693,16 +736,17 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
         {
             room.AutoStartCancellation?.Cancel();
             room.TutorialCancellation?.Cancel();
+            room.CancelLoadTimeout();
         }
         Task stop;
         if (ExecutionContext.IsFlowSuppressed())
-            stop = Task.Run(() => room.Executor.DisposeAsync().AsTask());
+            stop = Task.Run(() => StopRoomAsync(room));
         else
         {
             using (ExecutionContext.SuppressFlow())
-                stop = Task.Run(() => room.Executor.DisposeAsync().AsTask());
+                stop = Task.Run(() => StopRoomAsync(room));
         }
-        stop = Task.WhenAll(stop, room.AutoStartTask ?? Task.CompletedTask);
+        stop = Task.WhenAll(stop, room.AutoStartTask ?? Task.CompletedTask, room.LoadTimeoutTask);
         if (room.Tutorial is not null) stop = Task.WhenAll(stop, room.CountdownTask);
         _retiring[room.Id] = stop;
         _ = stop.ContinueWith(completed =>

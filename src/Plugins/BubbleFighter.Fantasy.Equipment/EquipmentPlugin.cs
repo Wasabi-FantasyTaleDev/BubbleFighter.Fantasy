@@ -4,6 +4,7 @@ using BubbleFighter.Fantasy.Abstractions.Net;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.ClientData;
 using BubbleFighter.Fantasy.Contracts.Sessions;
+using BubbleFighter.Fantasy.Packets;
 using BubbleFighter.Fantasy.Equipment.Data;
 using BubbleFighter.Fantasy.Equipment.Handlers;
 using BubbleFighter.Fantasy.Equipment.Selection;
@@ -64,6 +65,11 @@ public sealed class EquipmentPlugin : IPlugin
             throw new InvalidOperationException("persist_worn_state requires IEquipmentSelection and IEquippedViewPush; enable the inventory-view provider so equipment changes cannot remain flag-only.");
         if (options.PetSharedSlot)
         {
+            var tables = PacketTables.Load(options.PacketsDirectory);
+            var build = tables.NearestBuild(context.Row.LineageOrBuild())
+                ?? throw new ConfigException("pet_shared_slot requires a client build declared in the packet tables.");
+            if (!tables.CapabilityOf(build, "pet_equipment"))
+                throw new ConfigException($"pet_shared_slot is unavailable: the native pet equipment path is not established for '{build}'.");
             // The rule is a default-off capability of this row: the pet identities come from
             // the build's own workbook, and a missing store or unreadable workbook fails the
             // row instead of arming a rule with no pets in it.
@@ -75,6 +81,21 @@ public sealed class EquipmentPlugin : IPlugin
                 WorkbookFile.FromBytes(options.PetCatalogClientPath, clientData.Read(options.PetCatalogClientPath)),
                 options.MaxPetCatalogBytes, "equipment.max_pet_catalog_bytes");
             var petPolicy = new PetSharedSlotPolicy(pets, inventory, options.Protocol, context.Logger);
+            var petItems = Array.AsReadOnly(pets.Order().ToArray());
+            var petGroup = new InventoryWearGroup(petItems[0], petItems[^1], petItems[0])
+            {
+                ItemIds = petItems,
+                RejectWhenOccupied = true,
+            };
+            context.Effect(context.Events.Intercept<EquipmentWearGroupsRequested, IReadOnlyList<InventoryWearGroup>>(
+                async (request, next, ct) =>
+                {
+                    var groups = await next(ct).ConfigureAwait(false);
+                    if (request.Protocol != options.Protocol) return groups;
+                    if (groups is null || groups.Count >= InventoryLimits.MaxWearGroups)
+                        throw new ConfigException("The shared pet slot exceeds the equipment position limit.");
+                    return Array.AsReadOnly(groups.Append(petGroup).ToArray());
+                }));
             // One middleware of the shared EquipmentSelectionApplying waterfall: the denial
             // rides the selection's existing refusal path, and any other selection policy
             // (a character mask, for instance) stays in the chain untouched.

@@ -21,6 +21,10 @@
   <ItemGroup>
     <Compile Include="..\Shared\TestPlayerSessions.cs" Link="TestPlayerSessions.cs" />
     <Compile Include="..\..\src\Plugins\BubbleFighter.Fantasy.InventoryView\EquipmentSelection.cs" Link="Production\EquipmentSelection.cs" />
+    <Compile Include="..\..\src\Plugins\BubbleFighter.Fantasy.InventoryView\EquipmentWearGroups.cs" Link="Production\EquipmentWearGroups.cs" />
     <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Persistence.Sqlite\BubbleFighter.Fantasy.Persistence.Sqlite.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Plugins\BubbleFighter.Fantasy.Cluster\BubbleFighter.Fantasy.Cluster.csproj" />
   </ItemGroup>
 </Project>

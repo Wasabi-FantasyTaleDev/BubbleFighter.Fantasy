@@ -27,7 +27,8 @@ structs:
       offset: 4
   # Own readers: kr-812 sub_6DB1B0, cn-717 sub_538B70, cn-324 sub_408DF0,
   # cn-279 sub_47E650, id-400 sub_782DD0, id-1809 sub_4D7F70, cn-706 sub_733050.
-  # kr-812 sub_827550 consumes the shop key followed by result 1 for success.
+  # kr-812 sub_827550 consumes the shop key followed by result 1 for success; the result word of each
+  # refusal is the build's shop.refusal_codes in packets/builds.yaml.
   ShopPurchaseReply:
     - key: u32
       offset: 4

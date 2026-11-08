@@ -129,13 +129,13 @@ internal sealed class PlazaRoomHandler
 
     /// <summary>
     /// Handles <c>gcpRoomReqReadyStatus</c>: replies with <c>gspRoomSetSlot</c> for seat 0 with
-    /// UserSlot +125 ready set when any of the three request flags is true.
+    /// UserSlot +125 ready set from the request's ready flag; the shop and inventory flags are not a ready mark.
     /// </summary>
     public async ValueTask HandleReadyStatusAsync(ISession session, InboundPacket packet, CancellationToken ct)
     {
-        var (unknown0, unknown1, unknown2) = PlazaRoomWire.ReadReadyStatus(_packetTables, _build, packet.Payload.Span);
+        var request = RoomRequests.ReadReady(_packetTables, _build, packet.Payload.Span);
         var player = RequirePlayer(session);
-        var ready = unknown0 || unknown1 || unknown2;
+        var ready = request.Ready;
         PlazaSeat seat;
         lock (_gate)
         {
@@ -147,8 +147,8 @@ internal sealed class PlazaRoomHandler
         var body = PlazaRoomWire.WriteSetSlot(seat.Room, _packetTables, _build, _room, slot: 0, ready);
         await session.SendAsync(table.S2C("gspRoomSetSlot"), body, ct).ConfigureAwait(false);
         _logger.LogInformation(
-            "Session {Id} plaza ready: S2C gspRoomSetSlot ready={Ready} ({Bytes} bytes, flags={F0}/{F1}/{F2}).",
-            session.Id, ready, body.Length, unknown0, unknown1, unknown2);
+            "Session {Id} plaza ready: S2C gspRoomSetSlot ready={Ready} ({Bytes} bytes, shop={Shop}, inventory={Inventory}).",
+            session.Id, ready, body.Length, request.InShop, request.InInventory);
     }
 
     /// <summary>

@@ -43,6 +43,12 @@ public sealed record RoundFinishingBlowReported(int ReporterSlot) : IMessage
 
     /// <summary>Gets whether an explicit scorer reference requires an authenticated reporting-seat check.</summary>
     public bool RequiresReporterOwnership { get; init; }
+
+    /// <summary>
+    /// Gets whether the report is a Captain kill: the victim must have been the opposing team's Captain, and
+    /// each Captain's fall is credited once whichever member reports it.
+    /// </summary>
+    public bool CaptainKill { get; init; }
 }
 
 /// <summary>What one seat did in the round so far; every counter is the absolute value, never a delta.</summary>
@@ -58,6 +64,9 @@ public sealed record RoundSeatStats(int Slot, int Kills, int Knockdowns, int Sco
 
     /// <summary>Gets the stars the seat holds in a star round; null in a round that counts no stars.</summary>
     public int? Stars { get; init; }
+
+    /// <summary>Gets the absolute value of accepted coin pickups this round; null before the first pickup.</summary>
+    public int? CollectedLucci { get; init; }
 }
 
 /// <summary>
@@ -70,7 +79,11 @@ public sealed record RoundSeatStats(int Slot, int Kills, int Knockdowns, int Sco
 /// <param name="Seats">The seats this event updated, with their absolute counters. The first is the scorer; a second is the victim.</param>
 /// <param name="Scoreboard">The whole table as it stands after the event, for a build that has no packet for a single change.</param>
 public sealed record RoundScoreUpdated(int RoomId, int ScoringTeam, IReadOnlyList<int> TeamTotals, IReadOnlyList<RoundSeatStats> Seats,
-    RoundScoreboard? Scoreboard = null) : IMessage;
+    RoundScoreboard? Scoreboard = null) : IMessage
+{
+    /// <summary>Gets whether this event changes only accepted coin pickup counters, leaving combat and team counters untouched.</summary>
+    public bool CollectedLucciOnly { get; init; }
+}
 
 /// <summary>How a round finished for one player.</summary>
 public enum RoundOutcome
@@ -132,6 +145,9 @@ public sealed record RoundScoreboardRow(int Slot, string Nickname, int Team, int
 public sealed record RoundScoreboard(int RoomId, int WinnerTeam, IReadOnlyList<int> TeamTotals, IReadOnlyList<RoundScoreboardRow> Rows,
     bool WithRewards = false, bool TimeOver = false) : IMessage
 {
+    /// <summary>Gets cumulative round wins by team, independently of kill totals; null means no multi-round projection.</summary>
+    public IReadOnlyList<int>? RoundWins { get; init; }
+
     /// <summary>Gets the round's mode, so the dialect can apply the build's per-mode result presentation.</summary>
     public int ModeId { get; init; }
 }

@@ -1,6 +1,34 @@
 profile: cn-279
 # Numeric spaces are separate. Only packets traced in this build are listed.
 opcodes:
+  - value: 32836
+    direction: c2s
+    connection: both
+    name: gppDead
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_81D680 constructs Packet_gppDead, stamps 32836 and sends one actor word through cn-279 sub_404F00; cn-279 sub_81B310 consumes it"
+  - value: 13
+    direction: c2s
+    connection: game
+    name: gcpReqMoveInto
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_6F9CE0 constructs Packet_gcpReqMoveInto after gcpStartGPK, fills the retained user and stage words, and calls cn-279 sub_453D00, which stamps 13"
+  - value: 32885
+    direction: c2s
+    connection: both
+    name: gppWanderLean
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_702370 stamps32885 for the native movement record; cn-279 sub_4045F0 reads its 21-byte body"
+  - value: 32885
+    direction: s2c
+    connection: both
+    name: gppWanderLean
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_703430 consumes the native movement record using cn-279 sub_4045F0"
   - value: 507
     direction: c2s
     connection: game
@@ -78,6 +106,13 @@ opcodes:
     evidence: verified
     source: "cn-279 sub_7A7300 constructs Packet_gcpReqJoinSession through sub_41EB00 and passes the same object to sub_41F4F0, which stamps 403; vtable 0x9C1C6C reader sub_41EAC0"
     notes: "Three words and a counted UTF-16 password, no tail. Distinct from native matching request 111."
+  - value: 501
+    direction: c2s
+    name: gcpRoomSendChatMsg
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_453F00 stamps 501 on Packet_gcpRoomSendChatMsg; reader cn-279 sub_425D90"
+    notes: "Waiting-room chat box line: bool32 team-only flag, then the text. The client draws nothing until S2C gspRoomReceiveChatMsg answers."
   - value: 502
     direction: c2s
     name: gcpRoomSendChatModuleMsg
@@ -133,6 +168,13 @@ opcodes:
     name_source: label@cn-279
     evidence: verified
     source: "cn-279 dispatcher sub_70A0F0 case 504 calls sub_706B50, which constructs Packet_gspRoomChangeTeam vtable 0x9DD95C; reader sub_47E650 consumes seat and team words"
+  - value: 508
+    direction: s2c
+    name: gspRoomReceiveChatMsg
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 dispatcher sub_70A0F0 case 508: Packet_gspRoomReceiveChatMsg; reader cn-279 sub_449D40"
+    notes: "Answer to C2S gcpRoomSendChatMsg: u16 slot, bool32 team-only, two strings, colour word, bool32."
   - value: 509
     direction: s2c
     name: gspRoomReceiveChatModuleMsg
@@ -203,6 +245,22 @@ opcodes:
     evidence: verified
     source: "cn-279 sub_7A7AF0 case 117 dispatches cn-279 sub_7A6420, which reads Packet_gspNotifyMatch through cn-279 sub_44C1A0"
     notes: "u32 result; 0 opens searching UI, 1 refuses"
+  - value: 101
+    direction: s2c
+    connection: game
+    name: gspRepListSession
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 session-list dispatcher sub_7A7AF0 case 101 ('e') runs the deserializer cn-279 sub_41EBB0 (vtable 0x9C1C90) and the handler cn-279 sub_7A5410"
+    notes: "u32 page, bool32 more, u32 count, then count SessionSetting (128-byte client objects) - the RoomListReply shape kr-812 declares, byte for byte; the handler sorts rows by the stage filter pair"
+  - value: 102
+    direction: s2c
+    connection: game
+    name: gspRepCreateSession
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_7A7AF0 case 102 ('f') runs the deserializer cn-279 sub_44C1A0 (vtable 0x9C1C9C) and the handler cn-774-analog cn-279 sub_7A6D60"
+    notes: "u32 result; the handler builds a result lambda per value. No kr-812 row exists to mirror (kr-812's own S2C 102 is a different login-space packet)"
   - value: 805
     direction: c2s
     name: gcpReqInventoryUseItem
@@ -461,6 +519,26 @@ opcodes:
     name_source: mirrored
     evidence: unverified
     source: "Mirrored from the family; cn-279 dispatcher case 0x389 -> sub_644860"
+  - value: 906
+    direction: s2c
+    name: gspHordeStageCleared_
+    name_source: coined
+    evidence: verified
+    connection: game
+    source: "cn-279 sub_645040 case 0x38A sets HordeModeMgr+5312 to 1 without reading a payload; cn-279 sub_624CD0 and sub_62DE70 select the clear result from that state"
+  - value: 907
+    direction: s2c
+    name: gspHordeStageFailed_
+    name_source: coined
+    evidence: verified
+    connection: game
+    source: "cn-279 sub_645040 case 0x38B sets HordeModeMgr+5312 to 2 without reading a payload; cn-279 sub_624CD0 and sub_62DE70 select the failure result from that state"
+  - value: 908
+    direction: s2c
+    name: Unknown908
+    name_source: none
+    evidence: verified
+    source: "cn-279 sub_645040 case 0x38C calls cn-279 sub_638720(actor manager, 1) without reading a body before case 0x38D installs the wave table"
   - value: 909
     direction: s2c
     name: gspRepWaveAllSpawnMobs
@@ -600,10 +678,11 @@ opcodes:
     source: "cn-279 dispatcher sub_6FFDE0 case 7: Packet_gspRepGPKCSAuth"
   - value: 8
     direction: s2c
+    connection: game
     name: gspRepMoveChannel
     name_source: label@cn-279
-    evidence: inferred
-    source: "cn-279 dispatcher sub_6FFDE0 case 8: Packet_gspRepMoveChannel"
+    evidence: verified
+    source: "cn-279 sub_6FFDE0 case 8 calls cn-279 sub_6FBE60; cn-279 reader sub_44A060"
   - value: 10
     direction: s2c
     name: gspRepMoveInto
@@ -636,10 +715,11 @@ opcodes:
     source: "cn-279 dispatcher sub_6FFDE0 case 14: Packet_gspQueryBadProgram"
   - value: 17
     direction: s2c
+    connection: game
     name: gspRepUniquenessCheck
     name_source: label@cn-279
-    evidence: inferred
-    source: "cn-279 dispatcher sub_6FFDE0 case 17: Packet_gspRepUniquenessCheck"
+    evidence: verified
+    source: "cn-279 sub_6FFDE0 case 17 calls cn-279 sub_6F1C10; cn-279 reader sub_44FC80"
   - value: 104
     direction: s2c
     name: gspReqUserPoll
@@ -664,6 +744,12 @@ opcodes:
     name_source: label@cn-279
     evidence: inferred
     source: "cn-279 dispatcher sub_6FFDE0 case 111: Packet_gspRepInvite"
+  - value: 112
+    direction: c2s
+    name: gcpReqFighterInfo
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_777F30 builds Packet_gcpReqFighterInfo (vtable 0x9AEC84, deserializer cn-279 sub_44C1A0: one word) and calls cn-279 sub_426E90, which stamps 112 through cn-279 sub_56E6E0; layout in packets/fighter-info.yaml"
   - value: 112
     direction: s2c
     name: gspNotifyInvite
@@ -698,8 +784,8 @@ opcodes:
     direction: s2c
     name: gspRepFighterInfo
     name_source: label@cn-279
-    evidence: inferred
-    source: "cn-279 dispatcher sub_6FFDE0 case 121: Packet_gspRepFighterInfo"
+    evidence: verified
+    source: "cn-279 dispatcher cn-279 sub_6FFDE0 case 121: Packet_gspRepFighterInfo; reader cn-279 sub_44EFC0 (vtable 0x9E1014), handler cn-279 sub_6FA910 - the layout is FighterInfoReply@cn-279 of packets/fighter-info.yaml"
   - value: 122
     direction: s2c
     name: gspRepAwardInfo
@@ -948,22 +1034,25 @@ opcodes:
     source: "cn-279 dispatcher sub_6FFDE0 case 832: Packet_gspRepPickup"
   - value: 15
     direction: s2c
+    connection: game
     name: gspRepCenterUserCnt
     name_source: label@cn-279
     evidence: verified
-    source: "cn-279 sub_6FFDE0 case 15 -> sub_6F05D0; reader sub_405360"
+    source: "cn-279 sub_6FFDE0 case 15 calls cn-279 sub_6F05D0; cn-279 reader sub_405360"
   - value: 22
     direction: c2s
+    connection: game
     name: gcpReqCenterUserCnt
     name_source: label@cn-279
     evidence: verified
-    source: "cn-279 center connector constructs Packet_gcpReqCenterUserCnt; sub_453C80 stamps 22"
+    source: "cn-279 sub_453C80 selects Packet_gcpReqCenterUserCnt and stamps 22; the native writer has no body"
   - value: 23
     direction: c2s
+    connection: game
     name: gcpReqUniquenessCheck
     name_source: label@cn-279
-    evidence: inferred
-    source: "cn-279 Packet_gcpReqUniquenessCheck reader sub_44EA60; matched center connect chain"
+    evidence: verified
+    source: "cn-279 sub_454200 selects Packet_gcpReqUniquenessCheck and stamps 23; the native writer carries one user-number word"
   - value: 2
     direction: c2s
     name: gcpStartGPK
@@ -1005,6 +1094,13 @@ opcodes:
     name_source: label@cn-279
     evidence: verified
     source: "cn-279 room dispatcher sub_70A0F0 case 0x202 -> handler sub_707790 builds Packet_gspReceiveSessionChrPos (cn-279)"
+  - value: 304
+    direction: c2s
+    name: gcpSendPartyChatMsg
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_480BD0 stamps 304 on Packet_gcpSendPartyChatMsg; reader cn-279 sub_481C90"
+    notes: "Chat box line outside a room: one string. The client draws nothing until S2C gspReceivePartyChatMsg answers."
   - value: 401
     direction: c2s
     name: gcpReqListSession
@@ -1119,7 +1215,7 @@ opcodes:
     name: gcpEatItem
     name_source: label@cn-279
     evidence: verified
-    source: "cn-279 sender sub_8190C0 stamps 707 through sub_56E6E0 and writes the box's object id and the item kind; its caller is the item box's collision handler sub_89DD80"
+    source: "cn-279 sub_8190C0 stamps 707 through cn-279 sub_56E6E0 and writes object id and item kind; cn-279 sub_89DD80 reports box collisions. Zombie event 54 handler cn-279 sub_732F00 sends object -1 and kind 104 at cn-279 0x732F1A..0x732F21 when its gauge is ready."
   - value: 708
     direction: c2s
     connection: game
@@ -1161,7 +1257,7 @@ opcodes:
     name: gspItemUsed
     name_source: label@cn-279
     evidence: verified
-    source: "cn-279 dispatcher sub_82AB20 case 0x2CA -> sub_81BB50 reads the seat and the item kind (Packet_gspItemUsed) and runs the item for that player"
+    source: "cn-279 sub_82AB20 case 0x2CA -> cn-279 sub_81BB50 reads seat and kind with cn-279 sub_47E650 and runs the item's vtable+12. Kind 104 uses cn-279 sub_884050, which sends the controlled character's attribute through cn-279 sub_818940."
   - value: 811
     direction: c2s
     name: gcpReqPresentNewReceive
@@ -1210,3 +1306,1086 @@ opcodes:
     name_source: label@cn-279
     evidence: inferred
     source: "Packet_gcpReqPresentDeleteReceive is constructed before the stamping call of cn-279 sub_4834C0: removing a gift from the received list (id); layout in packets/present.yaml"
+
+  - value: 607
+    direction: s2c
+    connection: game
+    name: gspTryHolePunching
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_70A0F0 case607 -> cn-279 sub_7047A0: u16 port, u32 probe identity, u8 unknown"
+
+  - value: 608
+    direction: s2c
+    connection: game
+    name: gspStopUdpDiscovery_
+    name_source: coined
+    evidence: verified
+    source: "cn-279 sub_70A0F0 case608 clears the UDP discovery pending flag without reading a body"
+
+  - value: 610
+    direction: s2c
+    connection: game
+    name: gspTableSetHolePunching
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_70A0F0 case610 -> cn-279 sub_7032E0: native peer table row"
+
+  - value: 611
+    direction: s2c
+    connection: game
+    name: gspUdpPeerTableEnd_
+    name_source: coined
+    evidence: verified
+    source: "cn-279 sub_70A0F0 case611: cn-279 sub_7018A0 sends empty C2S607"
+
+  - value: 612
+    direction: s2c
+    connection: game
+    name: gspUdpPeerPunchStart_
+    name_source: coined
+    evidence: verified
+    source: "cn-279 sub_70A0F0 case612 starts native peer hole punching"
+
+  - value: 613
+    direction: s2c
+    connection: game
+    name: gspUdpPeerPunchFinish_
+    name_source: coined
+    evidence: verified
+    source: "cn-279 sub_70A0F0 case613 -> cn-279 sub_701E00 finalizes peer attempts"
+
+  - value: 607
+    direction: c2s
+    connection: game
+    name: gcpReportTableSetHolePunchingEnd
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_7018A0 constructs the empty native table-end acknowledgment607"
+
+  - value: 603
+    direction: c2s
+    connection: game
+    name: gcpReportHolePunchingEnd
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_701E00 emits603 with occupied-seat and successful-peer counts"
+
+  - value: 2
+    direction: c2s
+    connection: udp
+    name: upTrySendUdpToServer
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_701A40 sends native UDP2 with probe identity, local IPv4 and local port"
+
+  - value: 8
+    direction: c2s
+    connection: relay
+    name: rcpReqRegisterPeer
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_702370 requests relay delivery when direct movement fails"
+
+  - value: 9
+    direction: c2s
+    connection: relay
+    name: rcpReqUnRegisterPeer
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_701E00 unregisters successfully punched peers from the relay"
+  - value: 9
+    direction: s2c
+    connection: game
+    name: gspDisconnectMovedUser
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_6FFDE0 case 9 calls cn-279 sub_6F1A70; empty-body pending promotion closes the previous source"
+
+  - value: 707
+    direction: s2c
+    connection: game
+    name: gspRespawn
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 in-round dispatcher sub_82AB20 case 0x2C3 runs the deserializer cn-279 sub_47E650 (vtable 0x9AED2C) and the handler cn-279 sub_81B470"
+    notes: "[u32 actor][u32 spawn index]; matches the tabled RoundSpawnConfirmation@cn-279 exception (no revive flag, no fourth word)"
+
+  - value: 708
+    direction: s2c
+    connection: game
+    name: gspRequestRespawnIdx
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_82AB20 case 0x2C4 runs cn-279 sub_4051F0 (vtable 0x9AED38) and the handler cn-279 sub_81FAB0, which echoes Packet_gcpRespawn on the flag or picks the native spawn"
+    notes: "[u32 actor][u32 spawn index][bool32 request_respawn]; matches RoundSpawnOffer byte for byte"
+
+  - value: 723
+    direction: s2c
+    connection: game
+    name: gspGameRespawnCharacter
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_82AB20 case 0x2D3 runs cn-279 sub_44C1A0 (vtable 0x9AEE58) and the handler cn-279 sub_81FBB0"
+    notes: "u32 actor; the RoundRespawnPrompt one-word shape"
+
+  - value: 730
+    direction: s2c
+    connection: game
+    name: gspGamePreCountDown
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_82AB20 case 0x2DA runs cn-279 sub_44C1A0 (vtable 0x9AEE4C) and the handler cn-279 sub_824C80"
+    notes: "u32 milliseconds; the RoundCountdown one-word shape"
+
+  - value: 714
+    direction: c2s
+    connection: game
+    name: gcpGameReqExtendRespawn
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_6317D0 stamps 714 through the sender cn-279 sub_818E20 and the writer cn-279 sub_4040E0 (vtable 0x9AEE34)"
+    notes: "[u32 actor][u32 wait_delta]; the RespawnExtendRequest shape with cn-279's own 0.43 scale constant (dbl 0x9FF610), not kr-812's 0.429296875"
+
+  - value: 711
+    direction: c2s
+    connection: game
+    name: gcpGameUpdateDamagePoint
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_7345A0 flushes two float accumulators (kind 1 and 2, each at 100.0) through the writer cn-279 sub_43FA00 (vtable 0x9D5E8C) and the sender cn-279 sub_730CA0"
+    notes: "[u32 kind][u32 actor][f32 amount]; the accumulator identities (dealt vs taken) are unproven, so the kinds stay unnamed. No kr-812 C2S structure exists"
+
+  - value: 727
+    direction: s2c
+    connection: game
+    name: gspGameAwardDialog
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_70A0F0 case 0x2D7 runs the nullsub deserializer cn-279 sub_481D60 (vtable 0x9DDA28) and the handler cn-279 sub_7041F0, which fires UI event 175"
+    notes: "Empty body"
+
+  - value: 734
+    direction: s2c
+    connection: game
+    name: gspGamePrepareHordeZHEvent
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_70A0F0 case 0x2DE runs cn-279 sub_44A550 forwarding to the embedded HordeZHEventModePrepare deserializer cn-279 sub_4490E0 (RTTI 0xAABBE4) and the handler cn-279 sub_704C10"
+    notes: "[u32 unknown][list<u32>]; refreshes a dialog in modes 101/102/103"
+
+  - value: 736
+    direction: s2c
+    connection: game
+    name: gspRepAwardSelectFail
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_70A0F0 case 0x2E0 runs the nullsub deserializer cn-279 sub_481D60 (vtable 0x9DDAA0) and the handler cn-279 sub_704180"
+    notes: "Empty body"
+
+  - value: 719
+    direction: s2c
+    connection: game
+    name: gspGameCreateChocolate
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_82AB20 case 0x2CF runs cn-279 sub_4039D0 (vtable 0x9AED14, the same reader lucci-drops.yaml cites for cn-279's LucciCreate) and the handler cn-279 sub_8233E0"
+    notes: "The LucciCreate shape byte for byte; the client spawns only kind 1"
+
+  - value: 720
+    direction: s2c
+    connection: game
+    name: gspChocolateEaten
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_82AB20 case 0x2D0 runs cn-279 sub_47E650 (vtable 0x9AED20) and the handler cn-279 sub_823A80"
+    notes: "The LucciPicked shape (character first, object second)"
+
+  - value: 737
+    direction: s2c
+    connection: game
+    name: gspGameCreateWeaponObject
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_82AB20 case 0x2E1 runs cn-279 sub_403940 (vtable 0x9AECCC) and the handler cn-279 sub_81B6E0, which feeds the WeaponObject constructor cn-279 sub_756E00"
+    notes: "44 bytes: four u32, five u32 words, one f32 (the handler casts +24) and one bool32 tail; no kr-812 row exists to mirror and kr-1256's twelve-word body differs"
+
+  - value: 738
+    direction: s2c
+    connection: game
+    name: gspPickUpWeapon
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_82AB20 case 0x2E2 runs cn-279 sub_47E650 (vtable 0x9AECD8) and the handler cn-279 sub_823710"
+    notes: "[u32 weapon object][u32 actor] - the field order is the reverse of kr-1256's pickup notice"
+
+  - value: 517
+    direction: s2c
+    connection: game
+    name: gspReqPingUser
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_70A0F0 case 0x205 runs cn-279 sub_44C1A0 (vtable 0x9DD9A4) and the handler cn-279 sub_704120, which answers C2S 516 immediately"
+    notes: "u32 token; the same one-word shape kr-1256's row states"
+
+  - value: 518
+    direction: s2c
+    connection: game
+    name: gspRepPingUser
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_70A0F0 case 0x206 runs cn-279 sub_44C1A0 (vtable 0x9DD9B0) and the handler cn-279 sub_704670"
+    notes: "u32 slot; ONE word - kr-1256's three-word body does not apply, and kr-812's own body was never read"
+
+  - value: 515
+    direction: c2s
+    connection: game
+    name: gcpReqPingUser
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_4073B0 sends the one-word ping request (class vtable 0x9AEC84)"
+    notes: "u32 token"
+
+  - value: 516
+    direction: c2s
+    connection: game
+    name: gcpRepPingUser
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_704120 answers S2C 517 through the writer cn-279 sub_4040E0"
+    notes: "[u32 room word][u32 token]"
+
+
+  - value: 32774
+    direction: s2c
+    connection: relay
+    name: gppDeleteObject
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81B500 via sub_44C1A0 (vtable D-class); despawn via object vtable+32; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d; relay round feed"
+
+  - value: 32782
+    direction: s2c
+    connection: relay
+    name: gppAim
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81A9E0 via sub_44C1A0; Character cast, aim state; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d; relay round feed"
+
+  - value: 32789
+    direction: s2c
+    connection: relay
+    name: gppShocked
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81B110 via sub_44C1A0; Character cast; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d; relay round feed"
+
+  - value: 32790
+    direction: s2c
+    connection: relay
+    name: gppEndStunned
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81B0A0 via sub_44C1A0; Character cast; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d; relay round feed"
+
+  - value: 32792
+    direction: s2c
+    connection: relay
+    name: gppKickFail
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81B2A0 via sub_44C1A0; Character, sub_7E8C10; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d; relay round feed"
+
+  - value: 32801
+    direction: s2c
+    connection: relay
+    name: gppLockInto
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81ADC0 via sub_44C1A0; Character, sub_7E8DF0; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d; relay round feed"
+
+  - value: 32805
+    direction: s2c
+    connection: relay
+    name: gppDying
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81B3F0 via sub_44C1A0; Character cast; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d; relay round feed"
+
+  - value: 32811
+    direction: s2c
+    connection: relay
+    name: gppReload
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_821F60 via sub_44C1A0; Character, sub_7F69D0; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d; relay round feed"
+
+  - value: 32813
+    direction: s2c
+    connection: relay
+    name: gppReturnToNormal
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81A650 via sub_44C1A0; GameObject resolve; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d; relay round feed"
+
+  - value: 32814
+    direction: s2c
+    connection: relay
+    name: gppToNormalShootWeapon
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_81A5E0 via sub_44C1A0; Character, sub_7E6090; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d; cn-279-only, no kr-812 row"
+
+  - value: 32835
+    direction: s2c
+    connection: relay
+    name: gppGotKicked
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81F8D0 via sub_44C1A0; Character, sub_7EB7B0; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d; relay round feed"
+
+  - value: 32836
+    direction: s2c
+    connection: relay
+    name: gppDead
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81B310 via sub_44C1A0; Character, sub_421340+sub_7E8D00; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d; relay round feed"
+
+  - value: 32837
+    direction: s2c
+    connection: relay
+    name: gppKickEnd
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81FEF0 via sub_44C1A0; Character, sub_7F32D0; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d; relay round feed"
+
+  - value: 32831
+    direction: s2c
+    connection: relay
+    name: gppEndFreezeCannon
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81B8B0 via sub_44C1A0; Character cast; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d; relay round feed"
+
+  - value: 32822
+    direction: s2c
+    connection: relay
+    name: gppCreateNPC
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_82A700 via nullsub sub_481D60; spawns from the pending spawn-list; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Empty body (nullsub deserializer)"
+
+  - value: 32773
+    direction: s2c
+    connection: both
+    name: gppNearDamager
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_8263D0 via sub_47E650; Character cast, near-damage apply; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d,d; relay round feed"
+
+  - value: 32778
+    direction: s2c
+    connection: relay
+    name: gppKillObject
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81A560 via sub_47E650; resolve both ids, victim kill; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d,d; relay round feed"
+
+  - value: 32783
+    direction: s2c
+    connection: relay
+    name: gppSetTargettingObj
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81A880 via sub_47E650; MobLua cast, sub_7B52B0; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d,d; relay round feed"
+
+  - value: 32806
+    direction: s2c
+    connection: relay
+    name: gppPopOut
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81B180 via sub_47E650; Character, sub_817E90/sub_70C600; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d,d; relay round feed"
+
+  - value: 32809
+    direction: s2c
+    connection: relay
+    name: gppClimbWall
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_821FD0 via sub_47E650; Character, sub_7F3620; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d,d; relay round feed"
+
+  - value: 32812
+    direction: s2c
+    connection: relay
+    name: gppResetChrAttr
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81F840 via sub_47E650; Character, sub_43A790/sub_7EF420; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d,d; relay round feed"
+
+  - value: 32815
+    direction: s2c
+    connection: relay
+    name: gppHumiliationStart
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81FE80 via sub_47E650; Character, sub_7F36A0; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d,d; relay round feed"
+
+  - value: 32816
+    direction: s2c
+    connection: both
+    name: gppHumiliationEnd
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_826270 via sub_47E650; re-invokes the C2S 32772 sender; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d,d; relay round feed"
+
+  - value: 32817
+    direction: s2c
+    connection: relay
+    name: gppDamageByMap
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_819470 via sub_47E650; hazard code 10001 = map hazard; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d,d; cn-279-only, no kr-812 row"
+
+  - value: 32829
+    direction: s2c
+    connection: relay
+    name: gppHitByItem
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81B9A0 via sub_47E650; Character, sub_7E9A20; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d,d; relay round feed"
+
+  - value: 32830
+    direction: s2c
+    connection: relay
+    name: gppEndMagnet
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81B920 via sub_47E650; Character cast; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d,d; relay round feed"
+
+  - value: 32833
+    direction: s2c
+    connection: relay
+    name: gppStepOnBanana
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81B810 via sub_4051F0; Character, sub_7E8AB0; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d,d,B; relay round feed"
+
+  - value: 32834
+    direction: s2c
+    connection: relay
+    name: gppWallState
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81A980 via sub_47E650 (no cast); in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d,d; relay round feed"
+
+  - value: 32793
+    direction: s2c
+    connection: relay
+    name: gppTryRescued
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81AF80 via sub_47E650; Character, gate sub_811110; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d,d; relay round feed"
+
+  - value: 32794
+    direction: s2c
+    connection: relay
+    name: gppTryKicked
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81B010 via sub_47E650; Character, gate; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d,d; relay round feed"
+
+  - value: 32838
+    direction: s2c
+    connection: relay
+    name: gppResultState
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_81A910 via sub_47E650; Character cast; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d,d; cn-279-only, no kr-812 row"
+
+  - value: 32839
+    direction: s2c
+    connection: relay
+    name: gppLuaEventCharacterState
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_81B7B0 via sub_47E650; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d,d; cn-279-only, no kr-812 row"
+
+  - value: 32884
+    direction: s2c
+    connection: relay
+    name: gppWatchingOnMe
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81B550 via sub_4051F0; Character, gate, sub_40E7A0; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d,d,B; relay round feed"
+
+  - value: 32791
+    direction: s2c
+    connection: relay
+    name: gppKickStart
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_822060 via sub_405360; Character/MobBase, sub_7FA420; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body 3×d; relay round feed"
+
+  - value: 32800
+    direction: s2c
+    connection: relay
+    name: gppChangeState
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81AE30 via sub_405360; Character cast; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body 3×d; relay round feed"
+
+  - value: 32810
+    direction: s2c
+    connection: relay
+    name: gppUpdateWeaponInfo
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81F960 via sub_405360; Character, sub_87F750/sub_7E7F70; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body 3×d; relay round feed"
+
+  - value: 32824
+    direction: s2c
+    connection: relay
+    name: gppItemUseResult
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_8198F0 via sub_404F80; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body 3×d,B; relay round feed"
+
+  - value: 32828
+    direction: c2s
+    connection: game
+    name: gppSetAttribute
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_818940 constructs Packet_gppSetAttribute, stamps 32828 and sends on the game connection; cn-279 sub_4046D0 writes its three words. cn-279 sub_884050 uses it for the controlled character's confirmed item effect."
+  - value: 32828
+    direction: s2c
+    connection: relay
+    name: gppSetAttribute
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_81BA10 via sub_405360; Character, sub_8990A0/sub_403640/sub_899140; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body 3×d; cn-279-only, no kr-812 row"
+
+  - value: 32888
+    direction: s2c
+    connection: relay
+    name: gppSyncUseItemSimply
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81A430 via sub_405360; Character + item-manager map; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body 3×d; relay round feed"
+
+  - value: 32772
+    direction: s2c
+    connection: both
+    name: gppSplashDamager
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_8229F0 via sub_404650; resolve damager, apply splash; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d,d,b,6×d; relay round feed"
+
+  - value: 32777
+    direction: s2c
+    connection: relay
+    name: gppDamageObject
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_822280 via sub_404900; GoDamager+Character, sub_7EB450; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body 9×d; relay round feed"
+
+  - value: 32787
+    direction: s2c
+    connection: relay
+    name: gppKnocked
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_827A30 via sub_404CB0; also stamps game 710 score; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body 6×d,B,B; relay round feed"
+
+  - value: 32788
+    direction: s2c
+    connection: relay
+    name: gppStunned
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81FD50 via sub_404D80; Character/MobBase, sub_7F37D0; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body 6×d; relay round feed"
+
+  - value: 32795
+    direction: s2c
+    connection: relay
+    name: gppKicked
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_8268D0 via sub_404E50; Character/MobBase, sub_7F76A0 + game 710; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body B,5×d,B; relay round feed"
+
+  - value: 32796
+    direction: s2c
+    connection: relay
+    name: gppKickedNoPang
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_822130 via sub_4052E0; Character/MobBase, sub_7F76A0; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body 5×d; relay round feed"
+
+  - value: 32798
+    direction: s2c
+    connection: relay
+    name: gppMeleeReady
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81AEB0 via sub_404F10; Character, sub_7EB700; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d,d,b; relay round feed"
+
+  - value: 32818
+    direction: s2c
+    connection: relay
+    name: gppStickGrenadeTo
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_81A4F0 via sub_4052E0; GoGrenade cast, sub_80A170; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body 5×d; relay round feed"
+
+  - value: 32832
+    direction: s2c
+    connection: relay
+    name: gppCreateMapItem
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_8239A0 via sub_405180; Character, sub_885830; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body 8×d; relay round feed"
+
+  - value: 32877
+    direction: s2c
+    connection: both
+    name: gppMobDropBombOnDead
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_8260C0 via sub_404650; item id from +4288, drop spawn; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d,d,b,6×d; relay round feed"
+
+  - value: 32775
+    direction: s2c
+    connection: relay
+    name: gppFireBullet
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_8294F0 via GameContext virtual slot 11; fire-echo lag sample + bullet spawn; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d,d,d,b,6×d,d,d,B,B; cn-279-only, no kr-812 row"
+
+  - value: 32776
+    direction: s2c
+    connection: relay
+    name: gppExplodeBullet
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_822DB0 via sub_4052E0; GoDamager+Character, sub_7EB450; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body 5×d; cn-279-only, no kr-812 row"
+
+  - value: 32820
+    direction: s2c
+    connection: relay
+    name: gppFireItemBullet
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_829470 via sub_403BF0; Character, sub_806AC0+sub_824F70; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body 4×d; cn-279-only, no kr-812 row"
+
+  - value: 32825
+    direction: s2c
+    connection: relay
+    name: gppTargetLocked
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_8198B0 via sub_404F80; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body 3×d,B; cn-279-only, no kr-812 row"
+
+  - value: 32826
+    direction: s2c
+    connection: relay
+    name: gppCreateItemBullet
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_819840 via sub_405010; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body 4×d,B; cn-279-only, no kr-812 row"
+
+  - value: 32827
+    direction: s2c
+    connection: relay
+    name: gppLockableUsed
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_81BAB0 via sub_4050B0; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body 5×d,B; cn-279-only, no kr-812 row"
+
+  - value: 32878
+    direction: s2c
+    connection: relay
+    name: gppSoccerModeGoal
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_819300 via sub_404540; marks team round state, fires Lua event; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body b; cn-279-only, no kr-812 row"
+
+  - value: 32879
+    direction: s2c
+    connection: relay
+    name: gppSoccerModeCountDown
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_821DD0 via nullsub; 4000 ms timer, per-team sends gcpRespawn; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Empty body (nullsub deserializer)"
+
+  - value: 32880
+    direction: s2c
+    connection: relay
+    name: gppSoccerModeContinueGame
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_819210 via nullsub; timer + Lua event; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Empty body (nullsub deserializer)"
+
+  - value: 32874
+    direction: s2c
+    connection: relay
+    name: gppSetNoDamaged
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_819630 via sub_425AA0; sets byte +17588; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d,B; cn-279-only, no kr-812 row"
+
+  - value: 32875
+    direction: s2c
+    connection: relay
+    name: gppSetForcedInvincible
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_819530 via sub_425AA0; sub_4ED110; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d,B; cn-279-only, no kr-812 row"
+
+  - value: 32881
+    direction: s2c
+    connection: both
+    name: gppDropHumilPrevItem
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_825E20 via sub_44C1A0; drops humiliation item with orientation math; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d; cn-279-only, no kr-812 row"
+
+  - value: 32882
+    direction: s2c
+    connection: relay
+    name: gppGhost
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_821EF0 via sub_425AA0; sub_7F4F20 ghost flag; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d,B; relay round feed"
+
+  - value: 32840
+    direction: s2c
+    connection: relay
+    name: gppPing
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_819710 via raw sub_4EC030×2; RTT sample; in-round dispatcher cn-279 sub_82AB20"
+    notes: "Body d,d; relay round feed"
+
+  - value: 32841
+    direction: s2c
+    connection: relay
+    name: gppIniPacket
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_776310 via sub_481C90; Lambda::Stream blob; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)"
+    notes: "Body s; relay round feed"
+
+  - value: 32842
+    direction: s2c
+    connection: relay
+    name: gppCreateMob
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_776270 via sub_42C2B0; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)"
+    notes: "Body s,5×d,s; relay round feed"
+
+  - value: 32843
+    direction: s2c
+    connection: relay
+    name: gppMobFireBullet
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_773180 via sub_42C410; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)"
+    notes: "Body 2×d,b,6×d,d,d; relay round feed"
+
+  - value: 32844
+    direction: s2c
+    connection: relay
+    name: gppMobFireMelee
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_773050 via sub_47E650; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)"
+    notes: "Body d,d; relay round feed"
+
+  - value: 32845
+    direction: s2c
+    connection: relay
+    name: gppMobKnocked
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_772F00 via sub_42C510; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)"
+    notes: "Body 6×d,B; relay round feed"
+
+  - value: 32846
+    direction: s2c
+    connection: relay
+    name: gppMobDie
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_772D00 via sub_42C570; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)"
+    notes: "Body d,3×d; relay round feed"
+
+  - value: 32847
+    direction: s2c
+    connection: relay
+    name: gppMobPush
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_772C80 via sub_42C570; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)"
+    notes: "Body d,3×d; relay round feed"
+
+  - value: 32848
+    direction: s2c
+    connection: relay
+    name: gppMobTryKicked
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_772B50 via sub_47E650; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)"
+    notes: "Body d,d; relay round feed"
+
+  - value: 32849
+    direction: s2c
+    connection: relay
+    name: gppMobKicked
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_773950 via sub_42C660; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)"
+    notes: "Body d,B,4×d; relay round feed"
+
+  - value: 32850
+    direction: s2c
+    connection: relay
+    name: gppMobPopOut
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_772A10 via sub_44C1A0; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)"
+    notes: "Body d; cn-279-only, no kr-812 row"
+
+  - value: 32851
+    direction: s2c
+    connection: relay
+    name: gppMobHelp
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_772990 via sub_47E650; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)"
+    notes: "Body d,d; cn-279-only, no kr-812 row"
+
+  - value: 32852
+    direction: s2c
+    connection: relay
+    name: gppMobTryRescued
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_772860 via sub_47E650; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)"
+    notes: "Body d,d; relay round feed"
+
+  - value: 32853
+    direction: s2c
+    connection: relay
+    name: gppMobRescue
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_772730 via sub_47E650; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)"
+    notes: "Body d,d; relay round feed"
+
+  - value: 32854
+    direction: s2c
+    connection: relay
+    name: gppMobPang
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_7726B0 via sub_47E650; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)"
+    notes: "Body d,d; cn-279-only, no kr-812 row"
+
+  - value: 32855
+    direction: s2c
+    connection: relay
+    name: gppMobKickStart
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_772630 via sub_47E650; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)"
+    notes: "Body d,d; cn-279-only, no kr-812 row"
+
+  - value: 32856
+    direction: s2c
+    connection: relay
+    name: gppMobKickFail
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_7725C0 via sub_44C1A0; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)"
+    notes: "Body d; cn-279-only, no kr-812 row"
+
+  - value: 32859
+    direction: s2c
+    connection: relay
+    name: gppSpawnMobsByTrigger
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_7738F0 via sub_44C1A0; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)"
+    notes: "Body d; relay round feed"
+
+  - value: 32860
+    direction: s2c
+    connection: relay
+    name: gppCreateNpcBreakableModel
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_774480 via sub_42C710; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)"
+    notes: "Body s,5×d; relay round feed"
+
+  - value: 32861
+    direction: s2c
+    connection: relay
+    name: gppRemoveAddableObject
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_7756D0 via sub_481C90; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)"
+    notes: "Body s; relay round feed"
+
+  - value: 32863
+    direction: s2c
+    connection: relay
+    name: gppActivateSpawnObjByTrigger
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_771F50 via sub_44C1A0; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)"
+    notes: "Body d; relay round feed"
+
+  - value: 32864
+    direction: s2c
+    connection: relay
+    name: gppTriggerLuaEvent
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_774400 via sub_481C90; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)"
+    notes: "Body s; relay round feed"
+
+  - value: 32865
+    direction: s2c
+    connection: relay
+    name: gppMobLuaMessage
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-279 sub_772190 via sub_480550; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)"
+    notes: "Body d,s; relay round feed"
+
+
+  - value: 511
+    name: gcpRoomChangeInventory
+    direction: c2s
+    connection: game
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_881D40 constructs Packet_gcpRoomChangeInventory through cn-279 sub_422470; cn-279 sub_422720 stamps 511; cn-279 sub_448840 reads two words and a counted word vector. The UI writes four signed UserSlot shorts at +24..+30."
+
+  - value: 517
+    direction: c2s
+    connection: game
+    name: gcpReqSelectAward
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_886D20 / cn-279 sub_48EEA0 sends card and local seat; cn-279 sub_47E650 reads two u32"
+
+  - value: 729
+    direction: s2c
+    connection: game
+    name: gspGameReturnAfterAward_
+    name_source: coined
+    evidence: verified
+    source: "cn-279 sub_70A0F0 case 729 calls cn-279 sub_708F60 without a body, closes the award UI and restores the room stage"
+
+  - value: 735
+    direction: s2c
+    connection: game
+    name: gspRepAwardSelectSuccess
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_70A0F0 case 735 calls cn-279 sub_704370; cn-279 sub_47E650 reads card and seat"
+
+  - value: 519
+    direction: s2c
+    connection: game
+    name: gspHordeModeRewardList
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-279 sub_70A0F0 case 519 calls cn-279 sub_704500; cn-279 sub_48E8E0 reads a counted u32 vector"
+  - value: 305
+    direction: c2s
+    connection: game
+    name: gcpReqPartyRecruiting
+    name_source: label@cn-279
+    evidence: verified
+    source: cn-279 sub_46E850 stamps 305 for Packet_gcpReqPartyRecruiting; cn-279 sub_44FC80 reads its four-byte boolean
+  - value: 514
+    direction: c2s
+    connection: game
+    name: gcpRoomSendRecMsg
+    name_source: label@cn-279
+    evidence: verified
+    source: cn-279 sub_454080 stamps the native recruitment-text request; cn-279 sub_481C90 reads one counted UTF-16 message
+  - value: 516
+    direction: s2c
+    connection: game
+    name: gspRoomReceiveRecruitMsg
+    name_source: label@cn-279
+    evidence: verified
+    source: cn-279 sub_70A0F0 case 516 reaches cn-279 sub_704E00; cn-279 sub_449F50 reads a u16 plaza seat then one counted UTF-16 message

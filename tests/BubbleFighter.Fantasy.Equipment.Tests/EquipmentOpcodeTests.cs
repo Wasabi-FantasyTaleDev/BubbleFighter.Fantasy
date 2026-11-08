@@ -44,6 +44,9 @@ public sealed class EquipmentOpcodeTests
 
         var equipmentCodecContext = h.Context("dialect.messages");
         await new BubbleFighter.Fantasy.Dialect.Messages.MessagesPlugin().ActivateAsync(equipmentCodecContext, default);
+        // The kr-1256 row now mounts the preset switch on its capability; the harness needs the
+        // persistence face the real mysql row publishes.
+        h.Services.Register<IPlayerInventoryState>(new ZeroPresetState());
         var equipmentContext = h.Context("equipment", new() { ["persist_worn_state"] = false });
         await new EquipmentPlugin().ActivateAsync(equipmentContext, default);
         await h.Router.DispatchAsync("kr-1256/game", h.Session, new(3804, BitConverter.GetBytes(201003L)), default);
@@ -365,4 +368,14 @@ public sealed class EquipmentOpcodeTests
             for (var i = _contexts.Count - 1; i >= 0; i--) _contexts[i].Unwind();
         }
     }
+}
+
+/// <summary>A persistence face the kr-1256 preset switch can mount against in harnesses: zero reads, no writes.</summary>
+internal sealed class ZeroPresetState : IPlayerInventoryState
+{
+    public ValueTask<byte> GetActiveWeaponPresetSlotAsync(long userNum, CancellationToken ct) => ValueTask.FromResult((byte)0);
+    public ValueTask SetActiveWeaponPresetSlotAsync(long userNum, byte slot, CancellationToken ct) => ValueTask.CompletedTask;
+    public ValueTask<WeaponPresetPage[]?> GetWeaponPresetPagesAsync(long userNum, CancellationToken ct) => ValueTask.FromResult<WeaponPresetPage[]?>(null);
+    public ValueTask SetWeaponPresetPagesAsync(long userNum, WeaponPresetPage[] pages, CancellationToken ct) => ValueTask.CompletedTask;
+    public ValueTask<WeaponPresetPage[]> GetOrCreateWeaponPresetPagesAsync(long userNum, WeaponPresetPage[] initialPages, CancellationToken ct) => ValueTask.FromResult(initialPages);
 }

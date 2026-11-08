@@ -5,6 +5,9 @@ structs:
   # +14/+15/+16 and a 2-byte word at +18 (kr-812 sub_A56C10 reads 4 bytes, sub_A56BF0 2 and sub_A56BB0 1). kr-812
   # sub_80DBB0 is its sender. The kr-812 fields' meanings are not read here, so they keep their offsets; the
   # kr-1256 record below names them from its own writer.
+  # cn-717 sub_537AC0 and id-1809 sub_4D6E10 read the same scalar widths and order.
+  # cn-406 sub_41FEC0 and id-400 sub_481B70 independently read this same 15-byte record.
+  # cn-404 sub_4AFF50, cn-408 sub_4AF880, cn-705 sub_4BA9C0 and cn-706 sub_4BAA90 match it.
   MovementReport:
     - unknown_4: u32
       offset: 4
@@ -35,15 +38,72 @@ structs:
     - state: u8
     - tick: u16
 
-  # Partial movement, C2S gppWanderLeanOptimize. kr-812 Packet_gppWanderLeanOptimize (vtable 0xD1E8CC) is read by
-  # kr-812 sub_5040D0: a 4-byte word at +4, a 2-byte word at +8, then a member object at +12 that reads itself
-  # through its own vtable. That member's layout is not read, so kr-812's table stops before it and the
-  # structure is not used for kr-812.
+  # cn-279 sub_4045F0 reads u32, eight opaque bytes, three u16, one byte and u16.
+  # cn-279 sub_703430 consumes this same 21-byte record on the direct UDP path.
+  # cn-324 sub_6F7760 instead reads the baseline 15-byte packed record.
+  MovementReport@cn-279:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u64
+      offset: 8
+    - unknown_16: u16
+      offset: 16
+    - unknown_18: u16
+      offset: 18
+    - unknown_20: u16
+      offset: 20
+    - unknown_22: u8
+      offset: 22
+    - unknown_24: u16
+      offset: 24
+
+  # cn-735 sub_684E10, cn-738 sub_6BF160 and cn-742 sub_61A8F0 read four words,
+  # three bytes and a u16. cn-735 sub_A10450 and cn-742 sub_97C850 write floating-point members.
+  # cn-735 sub_6DDA20 takes the actor, position vector, angles, state and sample clock from Character;
+  # cn-735 sub_A0FE80 packs them and cn-735 sub_67AE70 resolves the actor before applying the unpacked record.
+  # cn-738 sub_A396F0 and cn-742 sub_97C000 independently preserve this packing and member order.
+  MovementReport@cn-735:
+    - object_id: u32
+      offset: 4
+    - x: f32
+      offset: 8
+    - y: f32
+      offset: 12
+    - z: f32
+      offset: 16
+    - yaw: u8
+      offset: 20
+    - pitch: u8
+      offset: 21
+    - state: u8
+      offset: 22
+    - tick: u16
+      offset: 24
+
+  # kr-812 sub_5040D0 reads u32 + u16, then OptimizeWanderInfo. Its reader sub_504020
+  # and writer sub_503F90 select three u16 values and three bytes using a one-byte mask.
+  # cn-717 sub_894980/cn-717 sub_539250 and id-1809 sub_7B8B80/id-1809 sub_4D8520 use the same prefix and mask.
+  # cn-404 sub_4B15B0/cn-404 sub_4B1500 and cn-408 sub_4B0F20/cn-408 sub_4B0E70 match these widths.
+  # cn-705 sub_4BC0E0/cn-705 sub_4BC030 and cn-706 sub_4BC2C0/cn-706 sub_4BC210 match too.
   MovementSample:
     - unknown_4: u32
       offset: 4
     - unknown_8: u16
       offset: 8
+    - mask: u8
+      offset: 16
+    - unknown_18: 'when<mask&0x01,u16>'
+      offset: 18
+    - unknown_20: 'when<mask&0x02,u16>'
+      offset: 20
+    - unknown_22: 'when<mask&0x04,u16>'
+      offset: 22
+    - unknown_24: 'when<mask&0x08,u8>'
+      offset: 24
+    - unknown_25: 'when<mask&0x10,u8>'
+      offset: 25
+    - unknown_26: 'when<mask&0x20,u8>'
+      offset: 26
   # The modern delta: kr-1256 sub_10F4A10 reads it and kr-1256 sub_10F4930 writes it; kr-1256 sub_95F490 builds
   # the mask from what changed since the last full record. Each field after the mask is present only when its bit
   # is set: three four-byte floats for bits 0x01/0x02/0x04, then three bytes for 0x08/0x10/0x20. The full
@@ -59,3 +119,122 @@ structs:
     - yaw: 'when<mask&0x08,u8>'
     - pitch: 'when<mask&0x10,u8>'
     - state: 'when<mask&0x20,u8>'
+
+  # cn-735 sub_684D90, cn-738 sub_6BF0E0 and cn-742 sub_61A850 read the six gated members.
+  # cn-735 sub_A10EC0, cn-738 sub_A3A050 and cn-742 sub_97CD30 read u32/u16 before the mask.
+  # cn-735 sub_72DE20, cn-738 sub_75E7E0 and cn-742 sub_6BDD80 select changed full-record members,
+  # then copy its actor and sample clock into the delta prefix without conversion.
+  MovementSample@cn-735:
+    - actor: u32
+      offset: 4
+    - tick: u16
+      offset: 8
+    - mask: u8
+      offset: 16
+    - x: 'when<mask&0x01,f32>'
+      offset: 20
+    - y: 'when<mask&0x02,f32>'
+      offset: 24
+    - z: 'when<mask&0x04,f32>'
+      offset: 28
+    - yaw: 'when<mask&0x08,u8>'
+      offset: 32
+    - pitch: 'when<mask&0x10,u8>'
+      offset: 33
+    - state: 'when<mask&0x20,u8>'
+      offset: 34
+
+  # kr-812 sub_B28BB0 reserves six bytes; sub_B28B90 writes the opcode at offset0.
+  # kr-812 sub_80FA60 skips six bytes for the body but reads the opcode from the original buffer.
+  # cn-717 sub_BF6B60/cn-717 sub_BF6B40 and id-1809 sub_ABD530/id-1809 sub_ABD510 have the same header.
+  # cn-406 sub_A05D10/cn-406 sub_A05CF0 and id-400 sub_A9F020/id-400 sub_A9F000 also reserve six bytes with opcode0.
+  # Modern constructors kr-1256 sub_10BBB50, cn-774 sub_1048110, tw-454 sub_FD49A0
+  # reserve six bytes too; kr-1256 sub_95E410, cn-774 sub_92F740 and tw-454 sub_A77DA0 read opcode0.
+  # cn-404 sub_AD6F60, cn-408 sub_ADFFB0, cn-705 sub_AA5D70 and cn-706 sub_AA7F20 reserve6.
+  # cn-735 sub_DD1DE0, cn-738 sub_DFFE30 and cn-742 sub_E50A40 also reserve six bytes.
+  UdpRelayDatagramPrefix:
+    - opcode: u16
+      offset: 0
+    - unknown_2: u32
+      offset: 2
+
+  # cn-279 sub_56FBA0 clears eight bytes; cn-279 sub_56FB80 writes opcode0 and
+  # cn-279 sub_56FB90 writes the sending peer identity at4. cn-279 sub_7037B0 skips8.
+  # cn-324 sub_91C4E0 instead reserves the baseline six bytes; do not inherit this header.
+  UdpRelayDatagramPrefix@cn-279:
+    - opcode: u16
+      offset: 0
+    - unknown_2: u16
+      offset: 2
+    - peer_identity: u32
+      offset: 4
+
+  # kr-812 sub_8117F0 reads u16 port + u32 cookie and echoes only the cookie in UDP20001.
+  # kr-812 sub_810830 and kr-1256 sub_95AD40 send relay TCP20005 without a body.
+  UdpRelayDisable: []
+
+  # cn-717 sub_896CE0 and id-1809 sub_7BAC80 likewise read u16 port then u32 cookie.
+  # cn-735 sub_A11EF0, cn-738 sub_A3B080 and cn-742 sub_97DD90 retain the four-byte cookie.
+  UdpRelayProbeReply:
+    - unknown_0: u32
+  UdpRelayOffer:
+    - unknown_0: u16
+    - unknown_2: u32
+
+  # Modern offers contain an eight-byte cookie: kr-1256 sub_9601E0, cn-774 sub_B593D0,
+  # tw-454 sub_A79210. The same bytes prefix20003/20004 and answer UDP19 as20002.
+  UdpRelayProbeReply@kr-1256:
+    - unknown_0: u64
+  UdpRelayOffer@kr-1256:
+    - unknown_0: u16
+    - unknown_2: u64
+
+  # UDP relay movement envelopes: kr-1256 sub_95FAE0, cn-774 sub_B58DB0 and tw-454 sub_A78CC0.
+  # After the six-byte datagram header comes an eight-byte identity prefix
+  # copied from the relay connection, then the same full movement record or masked sample.
+  # The prefix values are preserved but their individual meanings are not established here.
+  UdpRelayMovement:
+    - unknown_0: u32
+      only: [kr-1256]
+    - unknown_4: u32
+      only: [kr-1256]
+    - object_id: u32
+      only: [kr-1256]
+    - x: f32
+      only: [kr-1256]
+    - y: f32
+      only: [kr-1256]
+    - z: f32
+      only: [kr-1256]
+    - yaw: u8
+      only: [kr-1256]
+    - pitch: u8
+      only: [kr-1256]
+    - state: u8
+      only: [kr-1256]
+    - tick: u16
+      only: [kr-1256]
+
+  UdpRelayMovementOptimize:
+    - unknown_0: u32
+      only: [kr-1256]
+    - unknown_4: u32
+      only: [kr-1256]
+    - actor: u32
+      only: [kr-1256]
+    - tick: u16
+      only: [kr-1256]
+    - mask: u8
+      only: [kr-1256]
+    - x: 'when<mask&0x01,f32>'
+      only: [kr-1256]
+    - y: 'when<mask&0x02,f32>'
+      only: [kr-1256]
+    - z: 'when<mask&0x04,f32>'
+      only: [kr-1256]
+    - yaw: 'when<mask&0x08,u8>'
+      only: [kr-1256]
+    - pitch: 'when<mask&0x10,u8>'
+      only: [kr-1256]
+    - state: 'when<mask&0x20,u8>'
+      only: [kr-1256]

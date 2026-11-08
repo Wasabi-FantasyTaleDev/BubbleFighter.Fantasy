@@ -17,7 +17,8 @@ internal sealed class RoomNotices(IMessageSender<ServerNotice>? notices, IGameTe
     internal ValueTask SendCommandResultAsync(ISession session, CommandResult result, CancellationToken ct)
     {
         if (result.Message.Length == 0 || notices is null) return ValueTask.CompletedTask;
-        return result.Status == CommandStatus.Success
+        return result.Status == CommandStatus.Success || result.Status == CommandStatus.InvalidArguments
+            && result.Message.StartsWith("Usage: ", StringComparison.Ordinal)
             ? notices.SendAsync(session, new ServerNotice(result.Message), ct)
             : SendAsync(session, "command.result." + result.Status.ToString().ToLowerInvariant(), null, ct);
     }

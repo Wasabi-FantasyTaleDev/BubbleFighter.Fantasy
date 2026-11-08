@@ -7,6 +7,7 @@
 # Lobby login send list.
 - id: fighters
   plugin: fighters
+  parent_id: inventoryview
   config:
     fighter_config_client_path: "Config/FighterConfig.xml"
     max_fighter_config_bytes: 134217728

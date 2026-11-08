@@ -115,6 +115,45 @@ public sealed class ProfileComposerTests : IDisposable
         Assert.Equal(ClientBuild.Parse("cn:324:0"), rows[3].ClientBuild);
     }
 
+    [Fact]
+    public void Cn324OfficialAndLocalCenterRespondersComposeIndependently()
+    {
+        var profiles = Path.Combine(RepositoryRoot(), "profiles");
+        var composer = new ProfileComposer(profiles, key => key is "BFF_MYSQL_PASSWORD" or "BFF_ADMIN_TOKEN"
+            ? "isolated-test-placeholder" : null);
+        var defaultRows = composer.Compose("cn-324", []);
+        var defaultProtocol = Assert.Single(defaultRows, row => row.Id == "protocol");
+        Assert.DoesNotContain("alternate_handshake_sequence", defaultProtocol.Config!.Keys);
+        Assert.DoesNotContain("answer_center_status", defaultProtocol.Config!.Keys);
+        Assert.DoesNotContain(defaultRows, row => row.Plugin == "centers");
+
+        var responder = Path.Combine(profiles, "bundles", "cn-324-center-responder.yaml");
+        var official = composer.Compose("cn-324", [responder]);
+        var protocol = Assert.Single(official, row => row.Id == "protocol");
+        // The responder switches the derived sequence on; the build data supplies its GPK prefix.
+        Assert.Equal("true", protocol.Config!["answer_center_status"]);
+        Assert.Equal(new object?[] { "gcpStartGPK" },
+            Assert.IsAssignableFrom<IReadOnlyList<object?>>(protocol.Config!["auxiliary_prefix"]));
+        Assert.DoesNotContain("require_patch_handshake_first", protocol.Config!.Keys);
+        Assert.Equal("true", Assert.Single(official, row => row.Id == "dialect.messages").Config!["center_directory"]);
+
+        var centers = Assert.Single(official, row => row.Plugin == "centers");
+        var entries = Assert.IsAssignableFrom<IReadOnlyList<object?>>(centers.Config!["entries"]);
+        var entry = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(Assert.Single(entries));
+        Assert.Equal("正式服", entry["name"]);
+        Assert.Equal("game-listener", entry["listener_id"]);
+
+        var localTest = composer.Compose("cn-324", [responder,
+            Path.Combine(profiles, "bundles", "cn-324-center-test.yaml")]);
+        var localProtocol = Assert.Single(localTest, row => row.Id == "protocol");
+        Assert.Equal("true", localProtocol.Config!["answer_center_status"]);
+        var localCenters = Assert.Single(localTest, row => row.Plugin == "centers");
+        var localEntries = Assert.IsAssignableFrom<IReadOnlyList<object?>>(localCenters.Config!["entries"]);
+        var localEntry = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(Assert.Single(localEntries));
+        Assert.Equal("测试服", localEntry["name"]);
+        Assert.Equal("game-listener", localEntry["listener_id"]);
+    }
+
     /// <summary>One bundle serves two builds: each profile's id, build and vars fill it, and set changes one key.</summary>
     [Fact]
     public void ProfileVariablesFillASharedBundleAndSetChangesSingleKeys()
@@ -1000,5 +1039,12 @@ public sealed class ProfileComposerTests : IDisposable
         var row = Assert.Single(new ProfileComposer(_root).Compose("demo", []));
         Assert.Equal("<2", row.Version);
         Assert.Equal(new Abstractions.Protocol.ClientBuild("kr", 1256, 1304), row.ClientBuild);
+    }
+
+    private static string RepositoryRoot()
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
+            if (File.Exists(Path.Combine(directory.FullName, "packets", "builds.yaml"))) return directory.FullName;
+        throw new InvalidOperationException("Repository packet tables were not found.");
     }
 }

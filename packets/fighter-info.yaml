@@ -2,10 +2,12 @@ version: 1
 structs:
   # C2S gcpReqFighterInfo, the player menu's "view info" item. Deserializers: kr-812 sub_6DB1B0 (vtable 0xD490C8),
   # cn-717 sub_538B70, cn-324 sub_408DF0, id-400 sub_782DD0, id-1809 sub_4D7F70, cn-706 sub_733050, cn-406 sub_420FC0,
-  # cn-404 sub_4AF1B0, cn-408 sub_4AF4C0; each is two four-byte reads at +4 and +8. cn-279 sub_44C1A0 reads only +4.
+  # cn-404 sub_4AF1B0, cn-408 sub_4AF4C0; each is two four-byte reads at +4 and +8. cn-279 sub_44C1A0 reads only +4
+  # (writer cn-279 sub_404F00 at vtable 0x9AEC84; the callers cn-279 sub_777F30 and cn-279 sub_790750 build the packet inline
+  # and cn-279 sub_426E90 stamps 112).
   # The sender kr-812 sub_6C2EB0 stores its argument at +4; the three callers get that argument from the clicked row's
   # account id (the room slot or plaza list entry, 288 bytes per entry, number at +7440 in kr-812 sub_806DB0).
-  # kr-1256 sub_9319E0 and cn-774 sub_B277C0 write the same two words; kr-1256's room menu passes the account id
+  # kr-1256 sub_9319E0, cn-774 sub_B277C0 and tw-454 sub_8D91C0 write the same two words; kr-1256's room menu passes the account id
   # that kr-1256 sub_944C50 copies out of the clicked UserSlot (user_number, +8 of the 320-byte slot).
   FighterInfoRequest:
     - target_user_number: u32 # the clicked player's account id
@@ -22,8 +24,8 @@ structs:
   # Readers: kr-812 sub_83DD00 (vtable 0xD6F174), cn-717 sub_8C6D90, cn-324 sub_6FCD50, id-400 sub_797D00,
   # id-1809 sub_7BD940, cn-706 sub_7A0050, cn-406 sub_714200, cn-404 sub_7C54C0, cn-408 sub_7C8A40: a u32, two nested
   # FighterInfo, two strings. Offsets are the kr-812 object's; the builds whose objects differ say so beside each field.
-  # cn-279 sub_44EFC0 reads a u32, one FighterInfo and then a counted vector; it is not tabled.
-  # The modern family reads four words after the second string and is restated below as FighterInfoReply@kr-1256.
+  # The modern family reads four words after the second string and is restated below as FighterInfoReply@kr-1256;
+  # cn-279 is restated after it as FighterInfoReply@cn-279.
   FighterInfoReply:
     - result: u32 # 1 shows the dialog; anything else is the failure notice
       offset: 4
@@ -102,11 +104,8 @@ structs:
   # through tw-454 sub_AEBF20 and the second through tw-454 sub_AEFDC0.
   # cn-774 and tw-454 follow this table (builds.yaml bases them on kr-1256); only kr-1256 keeps a reply object, so
   # the offsets below are its own and the two stack-local readers state no object offset. Their FighterInfo blocks are
-  # their own rows of packets/user-stat.yaml. tw-454's fighter_info capability stays false: its pre-move reply was a
-  # 36-byte compact body (result, two wstrings, four words), while the reader tw-454 sub_A97DD0 consumes the full
-  # two-block sequence this table states (for the same sample cn-774 resolves 970 bytes found / 954 failure, and
-  # tw-454 resolves the same wire sequence). OPEN ITEM: enabling tw-454 replaces that 36-byte body with the full one;
-  # the change is visible to the owner's client and waits for a real-client test.
+  # their own rows of packets/user-stat.yaml. tw-454's full two-block reply is enabled through the bundle's
+  # BFF_TW_454_FIGHTER_INFO opt-in; its layout coverage does not establish native-client acceptance.
   FighterInfoReply@kr-1256:
     - result: u32 # 1 shows the dialog; anything else is the failure notice
       offset: 0
@@ -126,3 +125,34 @@ structs:
       offset: 1216
     - unknown_1220: u32
       offset: 1220
+
+  # S2C gspRepFighterInfo of cn-279. The handler cn-279 sub_6FA910 (dispatcher cn-279 sub_6FFDE0 case 121)
+  # constructs the reply with cn-279 sub_44F000 and reads it through the deserializer cn-279 sub_44EFC0
+  # (Packet_gspRepFighterInfo vtable 0x9E1014, writer cn-279 sub_44EF60, RTTI 0x9E100C): a u32, one
+  # FighterInfo (read through its own vtable entry, cn-279 sub_44E0D0), then a counted vector of AwardInfo
+  # (counted reader cn-279 sub_453420: a u32 count, then each element read through its vtable+4, cn-279
+  # sub_405360; element vtable 0x9E0F20). Result 1 constructs the 588-byte DlgFighterInfo (constructor
+  # cn-279 sub_838F40) and fills it through cn-279 sub_83B330 (FighterInfo as this, the dialog, the vector;
+  # call site 0x6FA9C6): the nickname into four labels, the level with "%d", the stat words as counted and
+  # percentage strings, FighterInfo+12 passed to the model preview cn-279 sub_82DFA0, and each record into
+  # the list control at dialog+544. Every other result opens the notice cn-279 sub_8A2F10 builds from the
+  # two string-table captions dword_9DFD80/dword_9DF08C, so a failure still carries a whole body.
+  FighterInfoReply@cn-279:
+    - result: u32 # 1 shows the dialog; anything else is the failure notice
+      offset: 4
+    - fighter: FighterInfo # FighterInfo@cn-279 of packets/user-stat.yaml
+      offset: 8
+    - awards: "list<AwardInfo>" # sent empty; the record meanings are not proven
+      offset: 152
+
+  # One award row of the fighter dialog's list, cn-279 sub_405360 (writer cn-279 sub_4046D0, vtable
+  # 0x9E0F20, RTTI 0x9E0F1C). The dialog fill cn-279 sub_83B330 picks the row's caption from a 19x6
+  # string-table grid at record+8 + 19*(record+4) and shows record+12 as its value; which ids the client
+  # expects is not proven, so the server sends the vector empty.
+  AwardInfo:
+    - unknown_4: u32 # the grid's row selector in the fill cn-279 sub_83B330
+      offset: 4
+    - unknown_8: u32 # the grid's column selector
+      offset: 8
+    - unknown_12: u32 # the value shown beside the caption
+      offset: 12

@@ -290,7 +290,8 @@ public sealed class Cn279LoginScenarioTests
         Assert.Equal((uint)identity, slot.ReadUInt32());
         Assert.Equal(nickname ?? client.Name, slot.ReadWideStringPrefixed());
         slot.ReadBytes(5);
-        Assert.Equal(characterType, slot.ReadInt32());
+        // cn-279 sub_685920 reads the new player's level here; appearance comes from the equipped character below.
+        Assert.Equal(1, slot.ReadInt32());
         var equipped = new PacketReader(room.Payload.AsSpan(300));
         Assert.Equal(1, equipped.ReadInt32());
         Assert.Equal(identity, equipped.ReadInt32());

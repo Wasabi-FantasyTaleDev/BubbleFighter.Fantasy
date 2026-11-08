@@ -70,7 +70,7 @@ public sealed class PlayRoundResultWireTests
     [Fact]
     public void EmptyLiveScoreKeepsBothMissingSeatSentinelsAndEmptyVectors()
     {
-        var body = PlayRoomCodec.WriteScoreUpdate(TestBuilds.Packets, "kr-812",
+        var body = RoundResultWire.WriteScoreUpdate(TestBuilds.Packets, "kr-812",
             new RoundScoreUpdated(0, 1, [0, 0], []));
         Assert.Equal("010000FFFF0000000000000000", Convert.ToHexString(body));
         Assert.Equal(13, body.Length);
@@ -81,9 +81,9 @@ public sealed class PlayRoundResultWireTests
     {
         var message = new RoundScoreUpdated(0, 1, [ushort.MaxValue, 0],
             [new RoundSeatStats(0, Kills: int.MaxValue, Knockdowns: -1, Score: int.MaxValue, Deaths: -1)]);
-        var body = PlayRoomCodec.WriteScoreUpdate(TestBuilds.Packets, "kr-812", message);
+        var body = RoundResultWire.WriteScoreUpdate(TestBuilds.Packets, "kr-812", message);
         Assert.Equal("01FFFF00FF040000001DFFFF00000018FFFF0A000000000000", Convert.ToHexString(body));
-        Assert.Throws<OverflowException>(() => PlayRoomCodec.WriteScoreUpdate(TestBuilds.Packets, "kr-812",
+        Assert.Throws<OverflowException>(() => RoundResultWire.WriteScoreUpdate(TestBuilds.Packets, "kr-812",
             new RoundScoreUpdated(0, 1, [ushort.MaxValue + 1, 0], [])));
     }
 
@@ -97,7 +97,7 @@ public sealed class PlayRoundResultWireTests
         var message = new RoundScoreUpdated(0, 2, [0, 18],
             [new RoundSeatStats(0, Kills: 18, Knockdowns: 21, Score: 57, Deaths: 0)]);
 
-        var body = PlayRoomCodec.WriteScoreUpdate(TestBuilds.Packets, build, message);
+        var body = RoundResultWire.WriteScoreUpdate(TestBuilds.Packets, build, message);
 
         Assert.Equal(25, body.Length);
         Assert.Equal(LiveScoreBody, Convert.ToHexString(body));
@@ -109,7 +109,7 @@ public sealed class PlayRoundResultWireTests
         var message = new RoundScoreUpdated(0, 2, [0, 20],
             [new RoundSeatStats(0, Kills: 20, Knockdowns: 22, Score: 62, Deaths: 0)]);
 
-        var body = PlayRoomCodec.WriteScoreUpdate(TestBuilds.Packets, "kr-812", message);
+        var body = RoundResultWire.WriteScoreUpdate(TestBuilds.Packets, "kr-812", message);
 
         Assert.Equal(0xFF, body[4]);
         Assert.Equal(0u, BitConverter.ToUInt32(body, 21));
@@ -122,7 +122,7 @@ public sealed class PlayRoundResultWireTests
             [new RoundSeatStats(2, Kills: 3, Knockdowns: 1, Score: 7, Deaths: 4),
              new RoundSeatStats(3, Kills: 0, Knockdowns: 0, Score: 0, Deaths: 2)]);
 
-        var body = PlayRoomCodec.WriteScoreUpdate(TestBuilds.Packets, "kr-812", message);
+        var body = RoundResultWire.WriteScoreUpdate(TestBuilds.Packets, "kr-812", message);
 
         Assert.Equal(37, body.Length);
         Assert.Equal(1, body[0]);
@@ -142,14 +142,14 @@ public sealed class PlayRoundResultWireTests
     [Fact]
     public void TheEndBodyCarriesTheOutcomeWord()
     {
-        Assert.Equal(8, PlayRoomCodec.WriteGameEnd(TestBuilds.Packets, "kr-812", RoundOutcome.Won).Length);
-        Assert.Equal(GameEndBody, Convert.ToHexString(PlayRoomCodec.WriteGameEnd(TestBuilds.Packets, "kr-812", RoundOutcome.Won)));
+        Assert.Equal(8, RoundResultWire.WriteGameEnd(TestBuilds.Packets, "kr-812", RoundOutcome.Won).Length);
+        Assert.Equal(GameEndBody, Convert.ToHexString(RoundResultWire.WriteGameEnd(TestBuilds.Packets, "kr-812", RoundOutcome.Won)));
         // 3 sets the client's win flag, 1 and 2 clear it; 0 would leave the result stage inert.
-        Assert.Equal(3, PlayRoomCodec.OutcomeWord(RoundOutcome.Won));
-        Assert.Equal(2, PlayRoomCodec.OutcomeWord(RoundOutcome.Lost));
-        Assert.Equal(1, PlayRoomCodec.OutcomeWord(RoundOutcome.Draw));
-        Assert.Equal("0000000002000000", Convert.ToHexString(PlayRoomCodec.WriteGameEnd(TestBuilds.Packets, "kr-812", RoundOutcome.Lost)));
-        Assert.Equal("0000000001000000", Convert.ToHexString(PlayRoomCodec.WriteGameEnd(TestBuilds.Packets, "kr-812", RoundOutcome.Draw)));
+        Assert.Equal(3, RoundResultWire.OutcomeWord(RoundOutcome.Won));
+        Assert.Equal(2, RoundResultWire.OutcomeWord(RoundOutcome.Lost));
+        Assert.Equal(1, RoundResultWire.OutcomeWord(RoundOutcome.Draw));
+        Assert.Equal("0000000002000000", Convert.ToHexString(RoundResultWire.WriteGameEnd(TestBuilds.Packets, "kr-812", RoundOutcome.Lost)));
+        Assert.Equal("0000000001000000", Convert.ToHexString(RoundResultWire.WriteGameEnd(TestBuilds.Packets, "kr-812", RoundOutcome.Draw)));
     }
 
     // SHA-256 of the two recorded scoreboards: part02 s2c#213 (4524 bytes, before the rewards) and
@@ -163,7 +163,7 @@ public sealed class PlayRoundResultWireTests
     [Fact]
     public void TheScoreboardBeforeTheRewardsIsTheRecordedBodyByteForByte()
     {
-        var body = PlayRoomCodec.WriteScoreboard(TestBuilds.Packets, "kr-812",
+        var body = RoundResultWire.WriteScoreboard(TestBuilds.Packets, "kr-812",
             new RoundScoreboard(0, 2, [0, 20], [RecordedRow(expTotal: 1763, expGained: 0, lucciGained: 0, badges: [])]));
 
         Assert.Equal(4524, body.Length);
@@ -173,7 +173,7 @@ public sealed class PlayRoundResultWireTests
     [Fact]
     public void TheScoreboardWithTheRewardsIsTheRecordedBodyByteForByte()
     {
-        var body = PlayRoomCodec.WriteScoreboard(TestBuilds.Packets, "kr-812",
+        var body = RoundResultWire.WriteScoreboard(TestBuilds.Packets, "kr-812",
             new RoundScoreboard(0, 2, [0, 20], [RecordedRow(expTotal: 1879, expGained: 116, lucciGained: 588, RecordedBadges)]));
 
         Assert.Equal(4710, body.Length);
@@ -183,7 +183,7 @@ public sealed class PlayRoundResultWireTests
     [Fact]
     public void ASeatNobodySitsInIsWrittenWithTheVacantValues()
     {
-        var body = PlayRoomCodec.WriteScoreboard(TestBuilds.Packets, "kr-812", new RoundScoreboard(0, 0, [0, 0], []));
+        var body = RoundResultWire.WriteScoreboard(TestBuilds.Packets, "kr-812", new RoundScoreboard(0, 0, [0, 0], []));
 
         // The header, seventeen team rows, sixteen vacant rows of 255 bytes and the sixteen tail pairs.
         Assert.Equal(20 + 17 * 16 + 16 * 255 + 128, body.Length);
@@ -195,8 +195,8 @@ public sealed class PlayRoundResultWireTests
     [Fact]
     public void Cn324ScoreboardIsItsOwnBlockOfEightRows()
     {
-        var vacant = PlayRoomCodec.WriteScoreboard(TestBuilds.Packets, "cn-324", new RoundScoreboard(0, 0, [0, 0], []));
-        var seated = PlayRoomCodec.WriteScoreboard(TestBuilds.Packets, "cn-324",
+        var vacant = RoundResultWire.WriteScoreboard(TestBuilds.Packets, "cn-324", new RoundScoreboard(0, 0, [0, 0], []));
+        var seated = RoundResultWire.WriteScoreboard(TestBuilds.Packets, "cn-324",
             new RoundScoreboard(0, 1, [3, 0], [RecordedRow(expTotal: 1763, expGained: 0, lucciGained: 0, badges: [])]));
 
         // u32 team count, 16 x 3 u32, eight rows of 221 bytes when vacant, eight u32 (reader cn-324 sub_6E9EF0).
@@ -228,7 +228,7 @@ public sealed class PlayRoundResultWireTests
         var won = fields.Single(field => field.Name == (build == "cn-324" ? "unknown_116" : "unknown_140"));
         var minimal = new[] { won };
         var row = new RoundScoreboardRow(0, "player", 2, 1, new RoundSeatStats(0, 0, 0, 0, 0), null) { Outcome = outcome };
-        var body = PlayRoomCodec.WriteScoreRowBody(TestBuilds.Packets, build, minimal, row);
+        var body = RoundResultWire.WriteScoreRowBody(TestBuilds.Packets, build, minimal, row);
         Assert.Equal(4, body.Length);
         Assert.Equal(expected, BitConverter.ToInt32(body));
     }
@@ -237,7 +237,7 @@ public sealed class PlayRoundResultWireTests
     [InlineData(false, "0000000003000000")]
     [InlineData(true, "0300000000000000")]
     public void TheOutcomeWordSitsWhereTheBuildReadsIt(bool outcomeFirst, string body) =>
-        Assert.Equal(body, Convert.ToHexString(PlayRoomCodec.WriteGameEnd(TestBuilds.Packets, "kr-812", RoundOutcome.Won, outcomeFirst)));
+        Assert.Equal(body, Convert.ToHexString(RoundResultWire.WriteGameEnd(TestBuilds.Packets, "kr-812", RoundOutcome.Won, outcomeFirst)));
 
     /// <summary>CN2012 horde mode 101 and Boss use the direct outcome; the native mode-10 branch is distinct.</summary>
     [Theory]
@@ -252,7 +252,7 @@ public sealed class PlayRoundResultWireTests
     {
         var shape = TestBuilds.Of("cn-324").Play.Score!;
         Assert.False(shape.NpcTeamOutcome);
-        var body = PlayRoomCodec.WriteGameEndForRecipient(TestBuilds.Packets, "cn-324", shape,
+        var body = RoundResultWire.WriteGameEndForRecipient(TestBuilds.Packets, "cn-324", shape,
             new RoundEnded(1, outcome) { ModeId = mode, RecipientTeam = team });
         Assert.Equal(8, body.Length);
         Assert.Equal(0, BitConverter.ToInt32(body));
@@ -266,7 +266,7 @@ public sealed class PlayRoundResultWireTests
         var shape = TestBuilds.Of("cn-324").Play.Score!;
         Assert.False(shape.OutcomeFirst);
         Assert.Equal("0000000003000000", Convert.ToHexString(
-            PlayRoomCodec.WriteGameEnd(TestBuilds.Packets, "kr-812", RoundOutcome.Won, shape.OutcomeFirst)));
+            RoundResultWire.WriteGameEnd(TestBuilds.Packets, "kr-812", RoundOutcome.Won, shape.OutcomeFirst)));
     }
 
     [Theory]

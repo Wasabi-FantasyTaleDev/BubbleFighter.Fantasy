@@ -255,3 +255,6 @@
 - id: companion.notices
   plugin: companion.notices
   disabled: true
+- id: companion.commands
+  plugin: companion.commands
+  disabled: true

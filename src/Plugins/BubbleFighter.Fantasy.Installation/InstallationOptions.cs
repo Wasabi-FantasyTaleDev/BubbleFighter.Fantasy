@@ -36,6 +36,12 @@ public sealed class InstallationOptions : IValidatableOptions
     /// <summary>Gets or sets the maximum time spent receiving and validating an import.</summary>
     [Range(10, 3600)]
     public int ClientDataImportSeconds { get; set; } = 1200;
+    /// <summary>Gets or sets the maximum directory publication attempts for Windows access or sharing conflicts; one disables retries.</summary>
+    [Range(1, 100)]
+    public int ClientDataPublishAttempts { get; set; } = 20;
+    /// <summary>Gets or sets the delay between directory publication attempts, within the overall import deadline.</summary>
+    [Range(1, 1000)]
+    public int ClientDataPublishRetryMs { get; set; } = 50;
     /// <summary>Gets or sets the maximum concurrent live administration sessions.</summary>
     [Range(1, 256)]
     public int SessionCapacity { get; set; } = 32;

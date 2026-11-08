@@ -152,6 +152,7 @@ public sealed class CreationBindingPinsBeforeMove
     [Theory]
     [InlineData("kr-1256", 31)]
     [InlineData("kr-812", 15)]
+    [InlineData("cn-406", 14)]
     public void NameRequestReaderIsOnePrefixedString(string build, int request)
     {
         var binding = Binding(build, out var table);
@@ -238,7 +239,7 @@ public sealed class CreationBindingPinsBeforeMove
     [Fact]
     public void CreationCapabilityIsStatedPerBuild()
     {
-        foreach (var build in new[] { "kr-812", "cn-717", "id-400", "id-1809", "cn-324", "cn-279", "kr-1256" })
+        foreach (var build in new[] { "kr-812", "cn-717", "id-400", "id-1809", "cn-324", "cn-279", "kr-1256", "cn-406" })
             Assert.True(TestBuilds.Packets.CapabilityOf(build, "character_creation"), build);
         Assert.False(TestBuilds.Packets.CapabilityOf("cn-774", "character_creation"));
         Assert.False(TestBuilds.Packets.CapabilityOf("tw-454", "character_creation"));

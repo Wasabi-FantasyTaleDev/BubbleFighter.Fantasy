@@ -111,6 +111,23 @@ public sealed class SqliteSaveTests : IDisposable
     }
 
     [Fact]
+    public async Task ConcurrentWalletInitializationKeepsTheFirstCommittedSnapshot()
+    {
+        using var database = new SqliteDatabase(Options());
+        var stores = new SqliteRepositories(database);
+        var user = (await stores.CreateAsync("wallet-seed", "wallet-seed", default)).UserNum;
+
+        var wallets = await Task.WhenAll(Enumerable.Range(0, 16).Select(index => Task.Run(async () =>
+            await stores.GetOrCreateAsync(new(user, 100 + index, 200 + index), default))));
+        var persisted = await stores.FindByUserNumAsync(user, default);
+
+        Assert.NotNull(persisted);
+        Assert.All(wallets, wallet => Assert.Equal(persisted, wallet));
+        Assert.Contains((persisted.Lucci, persisted.Cash), Enumerable.Range(0, wallets.Length)
+            .Select(index => (100 + index, 200 + index)));
+    }
+
+    [Fact]
     public async Task FailedAndConflictingPurchasesDoNotChangeWalletBagOrAudit()
     {
         using var database = new SqliteDatabase(Options());

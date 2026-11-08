@@ -1,0 +1,59 @@
+version: 1
+structs:
+  # kr-812 sub_50EB50 / kr-812 sub_80A910 write/read the object word.
+  # kr-1256 sub_6DD200 writes it; kr-1256 sub_6D55D0 case 32774 resolves it through kr-1256 sub_6CF510.
+  # cn-774 sub_89EC50 / cn-774 sub_897E80 and tw-454 sub_711A70 / tw-454 sub_70B3F0 retain this field order.
+  NpcObjectDelete:
+    - actor: u32
+      offset: 4
+
+  # kr-812 sub_6DEE10 / kr-812 sub_5C8FD0 carry a counted UTF-16 document.
+  # kr-1256 sub_8F9E20 writes the same document; kr-1256 sub_8F9240 hands it to kr-1256 sub_8FA4F0.
+  # cn-774 sub_AEC7C0 / cn-774 sub_AECD50 and tw-454 sub_8F9D10 / tw-454 sub_8FA2A0 retain this field order.
+  NpcIni:
+    - unknown_4: wstr
+      offset: 4
+
+  # kr-812 sub_6E0B70 / kr-812 sub_844570 write/read one word and a counted UTF-16 document.
+  # kr-1256 sub_8FB840 / kr-1256 sub_8FC040 agree; zero names all mobs, nonzero resolves a MobBase.
+  # cn-774 sub_AEE060 / cn-774 sub_AEE730 and tw-454 sub_8FB3C0 / tw-454 sub_8FBA90 retain this field order.
+  NpcLuaMessage:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: wstr
+      offset: 8
+
+  # kr-812 sub_524F90 / kr-812 sub_503BF0 write/read word, counted UTF-16 string, word.
+  # kr-1256 sub_6FE410 / kr-1256 sub_6FE110 agree; only non-master clients apply the named ChrAgent motion.
+  # cn-774 sub_8BE4A0 / cn-774 sub_8BE390 and tw-454 sub_7320E0 / tw-454 sub_731FD0 retain this field order.
+  NpcDummyMotion:
+    - actor: u32
+      offset: 4
+    - unknown_8: wstr
+      offset: 8
+    - unknown_32: u32
+      offset: 32
+
+  # kr-812 sub_5285E0 / kr-812 sub_52FBA0 write/read five words.
+  # kr-1256 sub_702030 writes actor, slot and position; kr-1256 sub_6D55D0 case 32893 checks both identities.
+  # cn-774 sub_8C1D10 / cn-774 sub_8C1E80 and tw-454 sub_735710 / tw-454 sub_735880 retain this field order.
+  NpcAgentMove:
+    - actor: u32
+      offset: 4
+    - slot: u32
+      offset: 8
+    - position_x: f32
+      offset: 12
+    - position_y: f32
+      offset: 16
+    - position_z: f32
+      offset: 20
+
+  # kr-812 sub_525670 / kr-812 sub_6DB1B0 write/read two words.
+  # kr-1256 sub_6FE730 / kr-1256 sub_6FE850 resolve a ChrLogic then its direct-use item; actor -1 resolves null.
+  # cn-774 sub_8BEC00 / cn-774 sub_8BF200 and tw-454 sub_7327F0 / tw-454 sub_732DB0 retain this field order.
+  NpcDirectItem:
+    - actor: u32
+      offset: 4
+    - item: u32
+      offset: 8

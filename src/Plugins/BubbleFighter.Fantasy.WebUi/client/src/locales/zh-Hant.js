@@ -1,6 +1,7 @@
 // Traditional Chinese (Taiwan). Same keys and {placeholders} as en.js, one entry per line.
 export default {
   'plugins.policy.sourcesButton': '推薦插件源',
+  'plugins.policy.defaultSelected': '初始勾選',
   'plugins.policy.type.require': '必需',
   'plugins.policy.type.disable': '停用',
   'plugins.policy.type.recommend': '推薦',

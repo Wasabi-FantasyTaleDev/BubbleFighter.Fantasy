@@ -10,7 +10,7 @@ internal enum PurchaseGrantKind
     Count,
     /// <summary>Extends or starts a finite deadline from the later of now and the stored expiry, whole remaining days rounded at half a second.</summary>
     Days,
-    /// <summary>One unbounded, unstackable grant: only acquirable while the item is not owned.</summary>
+    /// <summary>One unbounded, unstackable grant: acquirable while the item is not owned, or over a timed copy it makes permanent.</summary>
     Permanent,
     /// <summary>Uses charges: re-acquirable only while the owned item's life is exhausted.</summary>
     Life,
@@ -35,8 +35,9 @@ internal static class ItemPurchasePlanner
     /// count items stack only unexpired permanent rows, timed items renew from the stored deadline
     /// (whole remaining days, half-second rounding, per <c>kr-812 sub_978350</c> and
     /// <c>kr-812 sub_4C75D0</c>), life items only while the stored charges are used up (same
-    /// <c>kr-812 sub_978350</c> rule), and permanent items only while unowned. Rejections are
-    /// purchase-level user outcomes, not store faults.
+    /// <c>kr-812 sub_978350</c> rule), and permanent items while unowned or over a timed copy, whose
+    /// row then loses its deadline. Rejections are purchase-level user outcomes, not store faults,
+    /// and each names the reason the client can show.
     /// </summary>
     /// <exception cref="ArgumentException">Thrown for unbounded inputs or a foreign bag.</exception>
     /// <exception cref="PurchaseRejectedException">Thrown for incompatible terms, invalid amounts, cap overruns, owned-item rules or unreconciled duplicates.</exception>
@@ -65,7 +66,8 @@ internal static class ItemPurchasePlanner
                 throw new PurchaseRejectedException($"Item {term.ItemId} has multiple stored instances and requires reconciliation.");
             var existing = found.SingleOrDefault();
             if (existing is not null && term.RejectOwned)
-                throw new PurchaseRejectedException($"Item {term.ItemId} cannot be acquired again while owned.");
+                throw new PurchaseRejectedException($"Item {term.ItemId} cannot be acquired again while owned.",
+                    ShopPurchaseRefusal.AlreadyOwned);
 
             int quantity;
             InventoryLifetime lifetime;
@@ -76,13 +78,16 @@ internal static class ItemPurchasePlanner
                         throw new PurchaseRejectedException("The stored count item has incompatible quantity or expiry metadata.");
                     var total = (existing?.Quantity ?? 0) + amount;
                     if (total > term.Maximum)
-                        throw new PurchaseRejectedException($"Item {term.ItemId} would exceed its catalog count limit.");
+                        throw new PurchaseRejectedException($"Item {term.ItemId} would exceed its catalog count limit.",
+                            ShopPurchaseRefusal.LimitReached);
                     quantity = checked((int)total);
                     lifetime = InventoryLifetime.Permanent;
                     break;
                 case PurchaseGrantKind.Days:
                     if (existing is not null && existing.Lifetime.Kind != InventoryLifetimeKind.ExpiresAt)
-                        throw new PurchaseRejectedException("Timed renewal requires an established finite deadline.");
+                        throw new PurchaseRejectedException("Timed renewal requires an established finite deadline.",
+                            existing.Lifetime.Kind == InventoryLifetimeKind.Permanent
+                                ? ShopPurchaseRefusal.AlreadyOwned : ShopPurchaseRefusal.Unspecified);
                     var start = existing is null ? now
                         : DateTimeOffset.FromUnixTimeMilliseconds(existing.Lifetime.ExpiresAtUnixMilliseconds!.Value);
                     if (start < now)
@@ -90,22 +95,27 @@ internal static class ItemPurchasePlanner
                     // kr-812 sub_978350 / sub_4C75D0 limit whole remaining days, rounded at half a second.
                     var wholeDays = (long)Math.Truncate((start - now).TotalDays + 0.5 / 86400);
                     if (wholeDays + amount > term.Maximum)
-                        throw new PurchaseRejectedException($"Item {term.ItemId} would exceed its catalog day limit.");
+                        throw new PurchaseRejectedException($"Item {term.ItemId} would exceed its catalog day limit.",
+                            ShopPurchaseRefusal.LimitReached);
                     lifetime = InventoryLifetime.Until(start.AddDays(amount));
                     quantity = 1;
                     break;
                 case PurchaseGrantKind.Life:
                     // kr-812 sub_978350: an owned kind 3 item may be acquired again only while its life is 0 or less.
                     if (existing is not null && (existing.Lifetime.Kind != InventoryLifetimeKind.Life || existing.Quantity > 0))
-                        throw new PurchaseRejectedException($"Item {term.ItemId} cannot be acquired again while it still has life.");
+                        throw new PurchaseRejectedException($"Item {term.ItemId} cannot be acquired again while it still has life.",
+                            ShopPurchaseRefusal.NoMoreAllowed);
                     if (amount > term.Maximum)
-                        throw new PurchaseRejectedException($"Item {term.ItemId} would exceed its catalog life limit.");
+                        throw new PurchaseRejectedException($"Item {term.ItemId} would exceed its catalog life limit.",
+                            ShopPurchaseRefusal.LimitReached);
                     lifetime = InventoryLifetime.Life;
                     quantity = checked((int)amount);
                     break;
                 case PurchaseGrantKind.Permanent:
-                    if (existing is not null)
-                        throw new PurchaseRejectedException("The unlimited stock cannot be acquired while the item is already owned.");
+                    // A timed copy is upgraded in place: the same row keeps its slot and loses its deadline.
+                    if (existing is not null && existing.Lifetime.Kind != InventoryLifetimeKind.ExpiresAt)
+                        throw new PurchaseRejectedException("The unlimited stock cannot be acquired while the item is already owned.",
+                            ShopPurchaseRefusal.AlreadyOwned);
                     lifetime = InventoryLifetime.Permanent;
                     quantity = 1;
                     break;
@@ -124,4 +134,11 @@ internal static class ItemPurchasePlanner
 }
 
 /// <summary>A purchase-level rejection: the user's request is refused, not a store or transport fault.</summary>
-internal sealed class PurchaseRejectedException(string message) : InvalidOperationException(message);
+/// <param name="message">The logged reason.</param>
+/// <param name="refusal">The reason the client is told.</param>
+internal sealed class PurchaseRejectedException(string message,
+    ShopPurchaseRefusal refusal = ShopPurchaseRefusal.Unspecified) : InvalidOperationException(message)
+{
+    /// <summary>Gets the reason the client is told.</summary>
+    internal ShopPurchaseRefusal Refusal { get; } = refusal;
+}

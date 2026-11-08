@@ -116,13 +116,10 @@ public sealed class PlayRoomWireId400Tests
         w.WriteUInt16(0);
         Assert.Equal(18, buffer.WrittenCount);
 
-        var request = PlazaRoomWire.ReadJoinSession(TestBuilds.Packets, "id-400", buffer.WrittenSpan);
-
-        Assert.Equal((404, 1200, 1971401584, "", 0),
-            (request.RoomId, request.Unknown1, request.Unknown2, request.Password, request.Unknown4));
-        Assert.Throws<PacketFormatException>(() => PlazaRoomWire.ReadJoinSession(TestBuilds.Packets, "id-400", buffer.WrittenSpan[..17]));
+        Assert.Equal(new RoomJoinRequested(404, ""), RoomRequests.ReadJoin(TestBuilds.Packets, "id-400", buffer.WrittenSpan));
+        Assert.Throws<PacketFormatException>(() => RoomRequests.ReadJoin(TestBuilds.Packets, "id-400", buffer.WrittenSpan[..17]));
         // The kr-812 u32 tail leaves two trailing bytes under this build's shape.
-        Assert.Throws<PacketFormatException>(() => PlazaRoomWire.ReadJoinSession(TestBuilds.Packets, "id-400", [.. buffer.WrittenSpan, 0, 0]));
+        Assert.Throws<PacketFormatException>(() => RoomRequests.ReadJoin(TestBuilds.Packets, "id-400", [.. buffer.WrittenSpan, 0, 0]));
     }
 
     [Fact]

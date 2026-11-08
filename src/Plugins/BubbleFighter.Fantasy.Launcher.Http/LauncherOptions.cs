@@ -13,6 +13,8 @@ public sealed class LauncherOptions : IValidatableOptions
     public string Listen { get; set; } = "127.0.0.1:8090";
     /// <summary>Gets or sets the public server display name.</summary>
     [Required] public string Name { get; set; } = "Bubble Fighter Fantasy";
+    /// <summary>Gets or sets server-authorized Center selection; ordinary servers leave it disabled.</summary>
+    public LauncherCenterOptions Center { get; set; } = new();
     /// <summary>Gets or sets auto, ip or domain; explicit routing requirements override all launcher preferences.</summary>
     public string HostPolicy { get; set; } = "auto";
     /// <summary>Gets or sets the deployment region, or empty when unspecified.</summary>
@@ -35,6 +37,10 @@ public sealed class LauncherOptions : IValidatableOptions
     [Range(1, int.MaxValue)] public int MaxRosterPlayers { get; set; } = 1000;
     /// <summary>Gets or sets whether the catalog exposes the current authenticated-player count.</summary>
     public bool ShowOnlinePlayers { get; set; } = true;
+    /// <summary>Gets or sets an explicit aggregate population group; empty keeps local presence and admission unchanged.</summary>
+    public string PresenceGroup { get; set; } = "";
+    /// <summary>Gets or sets the bounded number of local account observations captured for public and private presence.</summary>
+    [Range(1, 65536)] public int MaxPresencePlayers { get; set; } = 4096;
     /// <summary>Gets or sets the launcher admission limit; null allows any number of players.</summary>
     [Range(1, int.MaxValue)] public int? PlayerLimit { get; set; }
     /// <summary>Gets or sets whether launcher sign-ins and new launch tickets are refused for maintenance.</summary>
@@ -68,6 +74,8 @@ public sealed class LauncherOptions : IValidatableOptions
     [Range(6, int.MaxValue)] public int MinimumPasswordLength { get; set; } = 6;
     /// <summary>Gets or sets the maximum simultaneously retained sessions and launch tickets, each.</summary>
     [Range(1, int.MaxValue)] public int MaxSessions { get; set; } = 1024;
+    /// <summary>Gets or sets the total endpoint bindings retained by one selection grant, counting appearances in separate native selectors.</summary>
+    [Range(1, 4096)] public int MaxSelectionTargets { get; set; } = 128;
     /// <summary>Gets or sets live durable sign-ins per account; a new sign-in revokes the oldest. Defaults to 8.</summary>
     [Range(1, int.MaxValue)] public int MaxSessionsPerAccount { get; set; } = 8;
     /// <summary>Gets or sets the access bearer lifetime in seconds; the launcher renews it from its refresh credential.</summary>
@@ -103,6 +111,8 @@ public sealed class LauncherOptions : IValidatableOptions
     /// <inheritdoc />
     public IEnumerable<ValidationResult> Validate()
     {
+        if (PresenceGroup is null || PresenceGroup.Length > 64 || PresenceGroup.Any(c => !char.IsAsciiLetterOrDigit(c) && c is not ('-' or '_' or '.')))
+            yield return new("presence_group must be empty or a bounded group identity.", [nameof(PresenceGroup)]);
         if (SecureUrl.Length > 0 && (!Uri.TryCreate(SecureUrl, UriKind.Absolute, out var secure) || secure.Scheme != Uri.UriSchemeHttps
             || secure.Query.Length > 0 || secure.Fragment.Length > 0))
             yield return new("secure_url must be an absolute https URL without query or fragment.", [nameof(SecureUrl)]);
@@ -137,6 +147,8 @@ public sealed class LauncherOptions : IValidatableOptions
         if (Instances is null) { yield return new("instances must be a list.", [nameof(Instances)]); yield break; }
         if (Instances.Any(i => i is null)) { yield return new("instances must not contain null entries.", [nameof(Instances)]); yield break; }
         if (Instances.Select(i => i.Id).Distinct(StringComparer.Ordinal).Count() != Instances.Length) yield return new("instance ids must be unique.", [nameof(Instances)]);
+        if (Center is null || Center.Mode is not ("native" or "gateway"))
+            yield return new("center requires enabled and a native or gateway mode.", [nameof(Center)]);
         foreach (var instance in Instances)
         {
             if (!ValidId(instance.Id) || !ValidId(instance.Build) || instance.Name is null || instance.Name.Length == 0 || !instance.Name.Any(n => n is not null && n.Language == "en") || instance.Name.Any(n => n is null || string.IsNullOrWhiteSpace(n.Text) || string.IsNullOrWhiteSpace(n.Language)) || instance.Name.Select(n => n.Language).Distinct(StringComparer.Ordinal).Count() != instance.Name.Length ||
@@ -177,7 +189,8 @@ public sealed class LauncherClientPolicyOptions
             new ClientPolicySource(source.Name, source.Kind, source.BaseUrl, source.CatalogPath)).ToArray(),
         (Plugins ?? throw new ClientPolicyException("client_policy_invalid")).Select(plugin => plugin is null ? null! :
             new ClientPluginRules(plugin.Id, plugin.Name, plugin.Description, (plugin.Rules ?? throw new ClientPolicyException("client_policy_invalid", plugin.Id))
-                .Select(rule => rule is null ? null! : new ClientPolicyRule(rule.Id, rule.Type, rule.Builds, rule.Version, rule.Sources)).ToArray())).ToArray());
+                .Select(rule => rule is null ? null! : new ClientPolicyRule(rule.Id, rule.Type, rule.Builds, rule.Version, rule.Sources)
+                    { DefaultSelected = rule.DefaultSelected }).ToArray())).ToArray());
 }
 
 /// <summary>A configured store source, referred to by name from recommendation rules.</summary>
@@ -219,6 +232,8 @@ public sealed class LauncherPolicyRuleOptions
     public string? Version { get; set; }
     /// <summary>Gets or sets the source names a recommendation installs from.</summary>
     public string[]? Sources { get; set; }
+    /// <summary>Gets or sets a recommendation's initial check state; omission means unchecked and other rule types must omit it.</summary>
+    public bool? DefaultSelected { get; set; }
 }
 
 /// <summary>A deployer's advertised client preset and its connection destination.</summary>
@@ -249,6 +264,15 @@ public sealed class LauncherInstanceOptions
     public string LauncherLogin { get; set; } = "required";
     /// <summary>Gets or sets an optional public store recommendation for this build's client package.</summary>
     public LauncherDownloadSourceOptions? DownloadSource { get; set; }
+}
+
+/// <summary>Explicit server authorization for native Center selection or its local Gateway transport.</summary>
+public sealed class LauncherCenterOptions
+{
+    /// <summary>Gets or sets whether this server enables the game's Center selector; absence leaves selection disabled.</summary>
+    public bool Enabled { get; set; }
+    /// <summary>Gets or sets native for server-owned Center selection or gateway for a local native-protocol selector.</summary>
+    public string Mode { get; set; } = "gateway";
 }
 
 /// <summary>A public store location advertised for explicit client installation by the launcher.</summary>

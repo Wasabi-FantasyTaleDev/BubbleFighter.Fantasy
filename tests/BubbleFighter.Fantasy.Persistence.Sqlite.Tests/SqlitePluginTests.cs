@@ -27,6 +27,10 @@ public sealed class SqlitePluginTests
             var user = await players.CreateAsync("one", "nickname", default);
             Assert.Equal(user.UserNum, (await registry.Get<ILauncherAccountRepository>().FindAsync("one", default))!.UserNumber);
             Assert.NotNull(registry.Get<IInventoryRepository>());
+            var progress = registry.Get<BubbleFighter.Fantasy.Contracts.Progress.IPlayerProgressRepository>();
+            var records = registry.Get<BubbleFighter.Fantasy.Contracts.Progress.IPlayerBattleRecordsRepository>();
+            Assert.Same(progress, records);
+            Assert.True(records.IsDurable);
             var movement = registry.Get<IPlayerMovementState>();
             Assert.Null(await movement.MergeAsync(1, 1, 0, 0, 0, 0, 0, 0, default));
             Assert.NotNull(await movement.MergeAsync(1, PlayerMovementState.FullMask, 1, 2, 3, 4, 5, 6, default));

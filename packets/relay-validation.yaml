@@ -53,9 +53,39 @@ structs:
   # cn-279 sub_701270 reports game-side relay success directly on inbound relay 1.
   # Its native connection path sends no later validation report; the codec rejects this structure there.
   RelayValidationReport@cn-279: []
+
+  # cn-735 sub_A128F0, cn-738 sub_A3BAA0 and cn-742 sub_97E930 write this complete tree.
+  # cn-738 sub_A3A470 and cn-742 sub_97D120 copy local actor+416 into the leading identity.
+  RelayValidationReport@cn-735:
+    - entity_id: u32
+      offset: 4
+    - nickname: wstr
+      offset: 8
+    - unknown_36: u32
+      offset: 36
+    - equipment: EquippedItemList
+      offset: 40
+    - presets: WeaponPresetList
+      offset: 120
+    - unknown_160: wstr
+      offset: 160
+    - unknown_192: u8
+      offset: 192
+    - unknown_196: u16
+      offset: 196
+    - unknown_198: u16
+      offset: 198
+    - unknown_200: u16
+      offset: 200
+    - signature: SessionSignatureData
+      offset: 204
+    - unknown_236: bool
+      offset: 236
   # Native readers: kr-812 sub_80C2E0, cn-717 sub_891180, cn-406 sub_6FFC00,
   # id-400 sub_781E00, id-1809 sub_7A52F0 and cn-706 sub_787A80; each writer agrees.
   # CN2011/CN2012 have no signature in their relay validation path.
+  # kr-812 gspSetSessionSigData (S2C 522, handler kr-812 sub_8071A0) stores unknown_4 at GameInfo+21064; after the
+  # relay join kr-812 sub_810C20 quits through kr-812 sub_8E51A0 unless it equals the round mode at GameInfo+96.
   SessionSignatureData:
     - unknown_4: u16
       offset: 4
@@ -66,3 +96,13 @@ structs:
     - unknown_8: "list<u8>"
       offset: 8
       except: [cn-324]
+
+  # cn-735 sub_A0BB20, cn-738 sub_A35AA0 and cn-742 sub_977E60 transfer 2, 1 and counted bytes.
+  # The one-byte enum occupies a native word at +12; the byte vector begins at +16.
+  SessionSignatureData@cn-735:
+    - unknown_4: u16
+      offset: 4
+    - unknown_12: u8
+      offset: 12
+    - unknown_16: "list<u8>"
+      offset: 16

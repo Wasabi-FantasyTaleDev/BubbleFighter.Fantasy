@@ -1,6 +1,7 @@
 // Korean. Same keys and {placeholders} as en.js, one entry per line.
 export default {
   'plugins.policy.sourcesButton': '권장 플러그인 소스',
+  'plugins.policy.defaultSelected': '처음에 선택',
   'plugins.policy.type.require': '필수',
   'plugins.policy.type.disable': '비활성화',
   'plugins.policy.type.recommend': '추천',

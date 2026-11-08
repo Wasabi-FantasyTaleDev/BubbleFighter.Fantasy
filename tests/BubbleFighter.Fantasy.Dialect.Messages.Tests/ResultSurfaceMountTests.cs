@@ -15,10 +15,57 @@ namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
 /// <summary>Checks native result output independently of admission of inbound kill-credit packets.</summary>
 public sealed class ResultSurfaceMountTests
 {
+    /// <summary>Exercises the CN2014 full knock-down and compact finishing-blow routes with their distinct native widths.</summary>
+    [Theory]
+    [InlineData("cn-705", true)]
+    [InlineData("cn-706", true)]
+    public async Task MixedWidthScoresDispatchThroughTheNativeFullAndOptimizedRoutes(string build, bool tutorialScores)
+    {
+        var profile = new ClientProfile(build, build[..2], int.Parse(build[3..]), 0, 0, build);
+        var path = Path.Combine(Directory.GetParent(TestBuilds.PacketsDirectory())!.FullName, "profiles", build, "opcodes.yaml");
+        var table = OpcodeTableLoader.Load(path, profile);
+        var services = new ServiceRegistry();
+        var routes = new Routes();
+        var messages = new Messages();
+        using var packets = services.Register<IPacketRouter>(routes);
+        using var typed = services.Register<IMessageRouter>(messages);
+        var context = new PluginContext(new PluginRow { Id = "mixed-scores", Plugin = "test", Source = "test" },
+            services, new EventBus(NullLogger.Instance), NullLogger.Instance);
+        var (schema, play) = TestBuilds.Of(build);
+        var codec = new PlayRoomCodec(build + "/game", build, schema, play,
+            new Tables(table), NullLogger.Instance, TestBuilds.Packets);
+        var session = new Session(profile);
+        try
+        {
+            codec.Mount(context);
+            var full = table.C2S("gcpGameUpdateScore");
+            var optimized = table.C2S("gcpGameUpdateScoreOptimze");
+            var fullBody = Convert.FromHexString("0160E31600804F120000020007000000");
+            var shortBody = Convert.FromHexString("02804F120002");
+            await routes.Handlers[(build + "/game", full)](session, new(full, fullBody), default);
+            await routes.Handlers[(build + "/game", optimized)](session, new(optimized, shortBody), default);
+            var credit = Assert.Single(messages.Received.OfType<RoundKillCreditReported>());
+            Assert.Equal(2, credit.ReporterSlot);
+            Assert.Equal(5, credit.Victim);
+            Assert.Equal(7, credit.ComboCount);
+            Assert.Equal(2, Assert.Single(messages.Received.OfType<RoundFinishingBlowReported>()).ReporterSlot);
+            Assert.Equal(tutorialScores
+                ? new[] { new TutorialScoreReported(2, TutorialScoreEvent.Bubble), new TutorialScoreReported(2, TutorialScoreEvent.Pang) }
+                : [], messages.Received.OfType<TutorialScoreReported>());
+            await routes.Handlers[(build + "/game", full)](session, new(full, fullBody[..^1]), default);
+            await routes.Handlers[(build + "/game", optimized)](session, new(optimized, new byte[] { 2, 128, 79, 18, 0, 2, 0 }), default);
+            Assert.Equal(tutorialScores ? 4 : 2, messages.Received.Count);
+        }
+        finally { await context.UnwindAsync(); }
+        Assert.Empty(routes.Handlers);
+    }
+
     /// <summary>Checks wide reference-based ordinary reports independently of side fields and unsupported event kinds.</summary>
     [Theory]
     [InlineData("id-400", 32, true)]
     [InlineData("cn-406", 32, true)]
+    [InlineData("cn-404", 32, true)]
+    [InlineData("cn-408", 32, true)]
     [InlineData("cn-279", 20, false)]
     public async Task WideOrdinaryReportsUseExplicitScorerAndVictimReferences(string build, int length, bool directKills)
     {
@@ -51,20 +98,22 @@ public sealed class ResultSurfaceMountTests
                 await handler(session, new(opcode, body), default);
             }
             var expectedCount = directKills ? 3 : 2;
-            Assert.Equal(expectedCount, messages.Received.Count);
-            var credit = Assert.IsType<RoundKillCreditReported>(messages.Received[0]);
+            var ordinary = messages.Received.Where(message => message is not TutorialScoreReported).ToArray();
+            Assert.Equal(expectedCount, ordinary.Length);
+            Assert.Equal(build is "cn-406" or "cn-404" or "cn-408" ? 4 : 0, messages.Received.OfType<TutorialScoreReported>().Count());
+            var credit = Assert.IsType<RoundKillCreditReported>(ordinary[0]);
             Assert.Equal(2, credit.ReporterSlot);
             Assert.Equal(5, credit.Victim);
             Assert.Equal(0, credit.ComboCount);
             Assert.True(credit.RequiresReporterOwnership);
-            var finishing = Assert.IsType<RoundFinishingBlowReported>(messages.Received[1]);
+            var finishing = Assert.IsType<RoundFinishingBlowReported>(ordinary[1]);
             Assert.Equal(2, finishing.ReporterSlot);
             Assert.Equal(5, finishing.Victim);
             Assert.True(finishing.HasVictimReference);
             Assert.True(finishing.RequiresReporterOwnership);
             Assert.False(finishing.RequiresDirectKillMode);
             if (directKills)
-                Assert.True(Assert.IsType<RoundFinishingBlowReported>(messages.Received[2]).RequiresDirectKillMode);
+                Assert.True(Assert.IsType<RoundFinishingBlowReported>(ordinary[2]).RequiresDirectKillMode);
             for (var kind = 1; kind <= 2; kind++)
             {
                 BinaryPrimitives.WriteInt32LittleEndian(body, kind);
@@ -81,7 +130,7 @@ public sealed class ResultSurfaceMountTests
                 await handler(session, new(opcode, body), default);
                 await handler(session, new(opcode, body[..^1]), default);
                 await handler(session, new(opcode, new byte[length + 1]), default);
-                Assert.Equal(expectedCount + kind, messages.Received.Count);
+                Assert.Equal(expectedCount + kind, messages.Received.Count(message => message is not TutorialScoreReported));
             }
         }
         finally { await context.UnwindAsync(); }
@@ -188,7 +237,8 @@ public sealed class ResultSurfaceMountTests
             {
                 var opcode = table.C2S(name);
                 var handler = routes.Handlers[(build + "/game", opcode)];
-                var before = messages.Received.Count;
+                var before = messages.Received.Count(message => message is not TutorialScoreReported);
+                var tutorialBefore = messages.Received.OfType<TutorialScoreReported>().Count();
                 for (var kind = 0; kind <= byte.MaxValue; kind++)
                 {
                     var body = new byte[length];
@@ -196,14 +246,18 @@ public sealed class ResultSurfaceMountTests
                     body[length == 16 ? 10 : 5] = 2;
                     await handler(session, new(opcode, body), default);
                 }
-                Assert.Equal(before + 1, messages.Received.Count);
+                Assert.Equal(before + 1, messages.Received.Count(message => message is not TutorialScoreReported));
+                Assert.Equal(tutorialBefore + ((build is "kr-812" or "cn-717") && name == "gcpGameUpdateScoreOptimze" ? 1 : 0),
+                    messages.Received.OfType<TutorialScoreReported>().Count());
                 if (supported == 1)
                     Assert.Equal(2, Assert.IsType<RoundKillCreditReported>(messages.Received[^1]).ReporterSlot);
                 else
                     Assert.Equal(2, Assert.IsType<RoundFinishingBlowReported>(messages.Received[^1]).ReporterSlot);
                 await handler(session, new(opcode, new byte[length - 1]), default);
                 await handler(session, new(opcode, new byte[length + 1]), default);
-                Assert.Equal(before + 1, messages.Received.Count);
+                Assert.Equal(before + 1, messages.Received.Count(message => message is not TutorialScoreReported));
+                Assert.Equal(tutorialBefore + ((build is "kr-812" or "cn-717") && name == "gcpGameUpdateScoreOptimze" ? 1 : 0),
+                    messages.Received.OfType<TutorialScoreReported>().Count());
             }
             var fullOpcode = table.C2S("gcpGameUpdateScore");
             var full = new byte[16];
@@ -234,7 +288,8 @@ public sealed class ResultSurfaceMountTests
     [InlineData("id-1809", true, true)]
     [InlineData("cn-279", true, false)]
     [InlineData("cn-406", true, false)]
-    [InlineData("cn-706", false, false)]
+    [InlineData("cn-705", true, true)]
+    [InlineData("cn-706", true, true)]
     public async Task ResultsMountAndSendWithoutEnablingUnauditedReports(string build, bool resultOutput, bool reports)
     {
         var profile = new ClientProfile(build, build[..2], int.Parse(build[3..]), 0, 0, build);
@@ -274,7 +329,7 @@ public sealed class ResultSurfaceMountTests
                 await sender.SendAsync(session, board, default);
                 var nested = play.Score.TimeOverEnd == PlayValues.TimeOverEndBody.Scoreboard;
                 Assert.Equal(table.S2C(nested ? "gspGameTimeOverEnd" : "gspGameBroadcastPlayerScoreData"), session.Sent[0].Opcode);
-                Assert.Equal(PlayRoomCodec.WriteScoreboard(TestBuilds.Packets, build, board), session.Sent[0].Body);
+                Assert.Equal(RoundResultWire.WriteScoreboard(TestBuilds.Packets, build, board), session.Sent[0].Body);
                 await sender.SendAsync(session, board with { WithRewards = true }, default);
                 Assert.Equal(table.S2C("gspGameBroadcastPlayerScoreData"), session.Sent[1].Opcode);
                 Assert.Equal(session.Sent[0].Body, session.Sent[1].Body);

@@ -116,9 +116,9 @@ opcodes:
   - value: 3
     direction: c2s
     name: gcpReqLogin
-    name_source: mirrored
-    evidence: captured
-    source: "mirrored from the cn-279 and kr-812 rows"
+    name_source: label@id-400
+    evidence: verified
+    source: "id-400 sub_5E9850 constructs Packet_gcpReqLogin; id-400 sub_5EA410 stamps3; id-400 sub_5E8B10 writes three strings and a counted u32 adapter vector without a trailer"
     notes: "the lobby's typed login resolves this name; body is the id-400 login shape from dialect.messages"
   - value: 3
     direction: s2c
@@ -443,8 +443,9 @@ opcodes:
     direction: c2s
     name: gcpReqIDPCRoomAuth
     name_source: label@id-400
-    evidence: inferred
-    source: "Packet_gcpReqIDPCRoomAuth class and opcode setter sub_A9DDA0 in sender sub_5EA3A0 (id-400)"
+    evidence: verified
+    connection: game
+    source: "id-400 sub_5E9050 constructs Packet_gcpReqIDPCRoomAuth and calls id-400 sub_5EA3A0, which stamps 9; id-400 sub_798AB0 writes two counted UTF-16 strings at object offsets 4 and 32"
   - value: 12
     direction: c2s
     name: gcpReqMoveChannel
@@ -583,6 +584,13 @@ opcodes:
     name_source: label@id-400
     evidence: inferred
     source: "Packet_gcpReqChangePartyLeader class and opcode setter sub_A9DDA0 in sender sub_8A1EA0 (id-400)"
+  - value: 304
+    direction: c2s
+    name: gcpSendPartyChatMsg
+    name_source: label@id-400
+    evidence: verified
+    source: "id-400 sub_8A2300 stamps 304 on Packet_gcpSendPartyChatMsg; reader id-400 sub_89DD10"
+    notes: "Chat box line outside a room: one string. The client draws nothing until S2C gspReceivePartyChatMsg answers."
   - value: 305
     direction: c2s
     name: gcpReqPartyRecruiting
@@ -615,10 +623,12 @@ opcodes:
     source: "Packet_gcpReqSelectAward class and opcode setter sub_A9DDA0 in sender sub_9801D0 (id-400)"
   - value: 607
     direction: c2s
+    connection: game
     name: gcpReportTableSetHolePunchingEnd
     name_source: label@id-400
-    evidence: inferred
-    source: "Packet_gcpReportTableSetHolePunchingEnd class and opcode setter sub_A9DDA0 in sender sub_7928B0 (id-400)"
+    evidence: verified
+    source: "id-400 sub_7928B0 stamps607 with empty body"
+
   - value: 704
     direction: c2s
     name: gcpRespawn
@@ -653,8 +663,8 @@ opcodes:
     direction: c2s
     name: gcpGameUpdateScore
     name_source: label@id-400
-    evidence: inferred
-    source: "Packet_gcpGameUpdateScore class and opcode setter sub_A9DDA0 in sender sub_4891A0 (id-400)"
+    evidence: verified
+    source: "sender wrapper id-400 sub_48D2F0 stamps 710 through setter sub_A9DDA0 and maps its arguments to the eight wire words (kind at +4, two character references at +8/+12); writer sub_480790 and reader sub_480800 move eight 4-byte fields; the kind-17 self-report is a direct construction in id-400 sub_4891A0 (throttled to 4000 ms)"
   - value: 711
     direction: c2s
     name: gcpGameUpdateDamagePoint
@@ -1095,16 +1105,18 @@ opcodes:
     source: "Packet_gcpReqNotifyChangeLevelIcon class and opcode setter sub_A9DDA0 in sender sub_655EA0 (id-400)"
   - value: 2010
     direction: c2s
+    connection: game
     name: gcpBombMissionOver
     name_source: label@id-400
-    evidence: inferred
-    source: "Packet_gcpBombMissionOver class and opcode setter sub_A9DDA0 in sender sub_4A8E80 (id-400)"
+    evidence: verified
+    source: "id-400 sub_4A8E80 stamps 2010 and serializes the winner and two operator user numbers."
   - value: 2011
     direction: c2s
+    connection: game
     name: gcpBombState
     name_source: label@id-400
-    evidence: inferred
-    source: "Packet_gcpBombState class and opcode setter sub_A9DDA0 in sender sub_4A8960 (id-400)"
+    evidence: verified
+    source: "id-400 sub_4A8960 stamps 2011 and serializes the operator, state and three coordinates."
   - value: 2012
     direction: c2s
     name: gcpUserUpdateCustomizedKeyList
@@ -1125,10 +1137,11 @@ opcodes:
     source: "Packet_gcpGoMapItemSync class and opcode setter sub_A9DDA0 in sender sub_789930 (id-400)"
   - value: 2017
     direction: c2s
+    connection: game
     name: gcpDropCaptain
     name_source: label@id-400
-    evidence: inferred
-    source: "Packet_gcpDropCaptain class and opcode setter sub_A9DDA0 in sender sub_42BC60 (id-400)"
+    evidence: verified
+    source: "id-400 sub_41E150 reports the local Captain death through the one-seat gcpDropCaptain builder."
   - value: 2018
     direction: c2s
     name: gcpReqClanInfo
@@ -1145,8 +1158,8 @@ opcodes:
     direction: s2c
     name: gspRepMoveChannel
     name_source: label@id-400
-    evidence: inferred
-    source: "id-400 dispatcher sub_7BF2E0 case 9: Packet_gspRepMoveChannel"
+    evidence: verified
+    source: "id-400 sub_7BF2E0 case9 invokes id-400 sub_7A3BF0; id-400 sub_7828E0 reads result and NetAddress; result0 opens pending through id-400 sub_7A4560"
   - value: 11
     direction: s2c
     name: gspRepMoveInto
@@ -1175,8 +1188,8 @@ opcodes:
     direction: s2c
     name: gspRepUniquenessCheck
     name_source: label@id-400
-    evidence: inferred
-    source: "id-400 dispatcher sub_7BF2E0 case 18: Packet_gspRepUniquenessCheck"
+    evidence: verified
+    source: "id-400 sub_7BF2E0 case18 invokes id-400 sub_7A15D0; id-400 sub_63B780 reads bool32; true retires the unselected connection"
   - value: 19
     direction: s2c
     name: gspDisconnectOpenWeb
@@ -1535,8 +1548,8 @@ opcodes:
     direction: s2c
     name: gspMergeCountOrDayItemList
     name_source: label@id-400
-    evidence: inferred
-    source: "id-400 dispatcher sub_7BF2E0 case 910: Packet_gspMergeCountOrDayItemList"
+    evidence: verified
+    source: "id-400 main dispatcher sub_7BF2E0 case 0x38E runs id-400 sub_7AA550 into the reader id-400 sub_799520 (vtable 0xCB5C24)"
   - value: 913
     direction: s2c
     name: gspManufactureRecipeInfo
@@ -1695,10 +1708,11 @@ opcodes:
     source: "id-400 dispatcher sub_7BF2E0 case 957: Packet_gspNexonGuard"
   - value: 958
     direction: s2c
+    connection: game
     name: gspPortalMove
     name_source: label@id-400
-    evidence: inferred
-    source: "id-400 dispatcher sub_7BF2E0 case 958: Packet_gspPortalMove"
+    evidence: verified
+    source: "id-400 sub_79A030 reads word, region u16 and seat word; id-400 sub_7BD5D0 authorizes native map-region motion and clears local pending contact; packets/portal.yaml"
   - value: 959
     direction: s2c
     name: gspNotifyMsg
@@ -1877,6 +1891,13 @@ opcodes:
     name_source: label@id-400
     evidence: inferred
     source: "Packet_gcpReqOnlineMatchTeamInfoLoad is the only class constructed before the calls of the stamping helper sub_5E7A40 (id-400)"
+  - value: 501
+    direction: c2s
+    name: gcpRoomSendChatMsg
+    name_source: label@id-400
+    evidence: verified
+    source: "id-400 sub_7C2DF0 stamps 501 on Packet_gcpRoomSendChatMsg; reader id-400 sub_89DC20"
+    notes: "Waiting-room chat box line: bool32 team-only flag, then the text. The client draws nothing until S2C gspRoomReceiveChatMsg answers."
   - value: 502
     direction: c2s
     name: gcpRoomSendChatModuleMsg
@@ -1910,10 +1931,12 @@ opcodes:
     source: "Packet_gcpRoomSendAmpMsg is the only class constructed before the calls of the stamping helper sub_7C2E60 (id-400)"
   - value: 603
     direction: c2s
+    connection: game
     name: gcpReportHolePunchingEnd
     name_source: label@id-400
-    evidence: inferred
-    source: "Packet_gcpReportHolePunchingEnd is the only class constructed before the calls of the stamping helper sub_792360 (id-400)"
+    evidence: verified
+    source: "id-400 sub_792360 stamps603 with occupied-seat and successful-peer counts"
+
   - value: 807
     direction: c2s
     name: gcpReqInventoryThrowItem
@@ -1994,10 +2017,11 @@ opcodes:
     source: "Packet_gcpReqIgnoreMissionSet is the only class constructed before the calls of the stamping helper sub_732060 (id-400)"
   - value: 948
     direction: c2s
+    connection: game
     name: gcpPortalMove
     name_source: label@id-400
-    evidence: inferred
-    source: "Packet_gcpPortalMove is the only class constructed before the calls of the stamping helper sub_4A8270 (id-400)"
+    evidence: verified
+    source: "id-400 sub_4A8270 stamps game 948 and relay 26 separately; id-400 sub_4812A0 reads position xyz and region u16; packets/portal.yaml"
   - value: 951
     direction: c2s
     name: gcpReqAddGiftTest
@@ -2032,9 +2056,9 @@ opcodes:
   - value: 14
     direction: c2s
     name: gcpReqMoveInto
-    name_source: mirrored
-    evidence: inferred
-    source: "Packet_gcpReqMoveInto class exists in id-400; kr-812 assigns it 14, and the named neighbours 13 and 15 match kr-812"
+    name_source: label@id-400
+    evidence: verified
+    source: "id-400 sub_79C450 sends Packet_gcpReqMoveInto when migration flag2381 is set; id-400 sub_7C2D80 stamps14; id-400 sub_7990F0 writes two u32 words"
   - value: 601
     direction: c2s
     connection: game
@@ -2712,7 +2736,7 @@ opcodes:
     connection: both
     name: gppShocked2
     name_source: label@id-400
-    evidence: inferred
+    evidence: verified
     source: "Packet_gppShocked2 class and opcode setter sub_A9DDA0 in sender sub_490A50 (id-400)"
   - value: 32913
     direction: c2s
@@ -3253,6 +3277,31 @@ opcodes:
     name_source: label@id-400
     evidence: inferred
     source: "Packet_gppSetNoTargetByMob class, stamped 32876 in sender sub_942770 (id-400); read back under the same number"
+  - value: 32883
+    direction: s2c
+    connection: relay
+    name: gppFireBullet2
+    name_source: label@cn-324
+    evidence: verified
+    source: "id-400 wave dispatcher sub_9AEEC0 case 0x8073 reads inline through id-400 sub_610D40"
+    notes: "[u32 character id][u32 bool flag]; the handler stores the flag at Character+39548. S2C only; id-1809 dropped this number"
+  - value: 906
+    direction: s2c
+    connection: game
+    name: gspHordeStageCleared_
+    name_source: coined
+    evidence: verified
+    source: "id-400 game dispatcher sub_48A090 case 906 writes mgr+5460 = 1 (id-400 sub_9B0220's analog)"
+    notes: "Empty body; mirrors cn-324's coined name — the horde-mode stage flag = 1"
+  - value: 907
+    direction: s2c
+    connection: game
+    name: gspHordeStageFailed_
+    name_source: coined
+    evidence: verified
+    source: "id-400 sub_48A090 case 907 writes mgr+5460 = 2 (id-400 sub_9B0220's analog)"
+    notes: "Empty body; mirrors cn-324's coined name — the horde-mode stage flag = 2"
+
   - value: 32877
     direction: s2c
     connection: both
@@ -3499,8 +3548,8 @@ opcodes:
     direction: s2c
     name: gspRoomChangeInventory
     name_source: mirrored
-    evidence: inferred
-    source: "Packet_gspRoomChangeInventory class exists in id-400; kr-812 assigns it 506, and the named neighbours 505 and 509 match kr-812"
+    evidence: verified
+    source: "id-400 session dispatcher sub_7833E0 runs id-400 sub_782670 (vtable 0xCAB5C5) and the handler id-400 sub_785760; the class row supersedes the earlier existence note"
   - value: 507
     direction: s2c
     name: gspRoomRepChangeMaster
@@ -3521,10 +3570,12 @@ opcodes:
     source: "id-400 session dispatcher sub_7833E0 case 519 builds Packet_gspHordeModeRewardList"
   - value: 607
     direction: s2c
+    connection: game
     name: gspTryHolePunching
     name_source: mirrored
-    evidence: inferred
-    source: "Packet_gspTryHolePunching class exists in id-400; kr-812 assigns it 607, and the named neighbours 603 and 701 match kr-812"
+    evidence: verified
+    source: "id-400 sub_7833E0 case607 -> id-400 sub_78CFE0: u16 port, u32 identity, u8 unknown"
+
   - value: 609
     direction: s2c
     name: gspNotifyUdpToServerReceived
@@ -3533,10 +3584,12 @@ opcodes:
     source: "Packet_gspNotifyUdpToServerReceived class exists in id-400; kr-812 assigns it 609, and the named neighbours 603 and 701 match kr-812"
   - value: 610
     direction: s2c
+    connection: game
     name: gspTableSetHolePunching
-    name_source: mirrored
-    evidence: inferred
-    source: "Packet_gspTableSetHolePunching class exists in id-400; kr-812 assigns it 610, and the named neighbours 603 and 701 match kr-812"
+    name_source: label@id-400
+    evidence: verified
+    source: "id-400 sub_7833E0 case610 -> id-400 sub_792B70/id-400 sub_791070: slot, identity, counted local addresses, local port, outer IPv4 and port"
+
   - value: 711
     direction: s2c
     name: gspGameCreateGameItem
@@ -3779,3 +3832,361 @@ opcodes:
     name_source: label@id-400
     evidence: inferred
     source: "Packet_gcpReqPresentDeleteReceive is constructed before the stamping call of id-400 sub_8D48E0 / sub_8D5EE0: removing a gift from the received list (id); layout in packets/present.yaml"
+  - value: 608
+    direction: s2c
+    connection: game
+    name: gspStopUdpDiscovery_
+    name_source: coined
+    evidence: verified
+    source: "id-400 sub_7833E0 case608 stops discovery"
+
+  - value: 611
+    direction: s2c
+    connection: game
+    name: gspUdpPeerTableEnd_
+    name_source: coined
+    evidence: verified
+    source: "id-400 sub_7833E0 case611 -> id-400 sub_7928B0 sends empty C2S607"
+
+  - value: 612
+    direction: s2c
+    connection: game
+    name: gspUdpPeerPunchStart_
+    name_source: coined
+    evidence: verified
+    source: "id-400 sub_7833E0 case612 -> id-400 sub_792940 sends native UDP6/8"
+
+  - value: 613
+    direction: s2c
+    connection: game
+    name: gspUdpPeerPunchFinish_
+    name_source: coined
+    evidence: verified
+    source: "id-400 sub_7833E0 case613 -> id-400 sub_792360 finalizes peer attempts"
+
+  - value: 2
+    direction: c2s
+    connection: udp
+    name: upTrySendUdpToServer
+    name_source: label@id-400
+    evidence: verified
+    source: "id-400 sub_791510 stamps UDP2 with identity, local IPv4 and local port"
+
+  - value: 8
+    direction: c2s
+    connection: relay
+    name: rcpReqRegisterPeer
+    name_source: label@id-400
+    evidence: verified
+    source: "id-400 sub_791F30 stamps relay8 with peer identity after failed movement acknowledgments"
+
+  - value: 9
+    direction: c2s
+    connection: relay
+    name: rcpReqUnRegisterPeer
+    name_source: label@id-400
+    evidence: verified
+    source: "id-400 sub_792360 stamps relay9 with successfully punched peer identity"
+
+  - value: 32885
+    direction: c2s
+    connection: both
+    name: gppWanderLean
+    name_source: mirrored
+    evidence: verified
+    source: "id-400 sub_791F30 stamps32885; id-400 sub_481B70 reads its15-byte body"
+
+  - value: 32885
+    direction: s2c
+    connection: both
+    name: gppWanderLean
+    name_source: mirrored
+    evidence: verified
+    source: "id-400 sub_793200 consumes32885 using id-400 sub_481B70"
+
+  - value: 23
+    direction: c2s
+    connection: game
+    name: gcpReqCenterUserCnt
+    name_source: label@id-400
+    evidence: verified
+    source: "id-400 sub_79C450 selects the empty Packet_gcpReqCenterUserCnt at vtable0xCB58AC; id-400 sub_7C2D10 stamps23"
+
+  - value: 24
+    direction: c2s
+    connection: game
+    name: gcpReqUniquenessCheck
+    name_source: label@id-400
+    evidence: verified
+    source: "id-400 sub_7A17A0 constructs Packet_gcpReqUniquenessCheck; id-400 sub_7C3090 stamps24; id-400 sub_8F2850 writes one retained user-number word"
+
+  - value: 16
+    direction: s2c
+    connection: game
+    name: gspRepCenterUserCnt
+    name_source: label@id-400
+    evidence: verified
+    source: "id-400 sub_7BF2E0 case16 invokes id-400 sub_7A0DA0; id-400 sub_798560 reads center identity, name and two occupancy words"
+
+  - value: 10
+    direction: s2c
+    connection: game
+    name: gspDisconnectMovedUser
+    name_source: label@id-400
+    evidence: verified
+    source: "id-400 sub_7BF2E0 case10 invokes id-400 sub_7A50D0 without reading a body; pending replaces current and the old source closes without acknowledgement"
+
+  - value: 102
+    direction: s2c
+    connection: game
+    name: gspRepCreateSession
+    name_source: label@id-400
+    evidence: verified
+    source: "id-400 session dispatcher sub_5E0BB0 case 'f' runs Packet_gspRepCreateSession (vtable 0xC84D6C) through id-400 sub_93D120 and the handler id-400 sub_5E3760"
+    notes: "u32 result; identical to cn-324's frame"
+  - value: 722
+    direction: s2c
+    connection: game
+    name: gspGameCreateChocolate
+    name_source: label@id-400
+    evidence: verified
+    source: "id-400 game dispatcher sub_48A090 case 722 runs id-400 sub_4804E0 (vtable 0xC67798) — the same reader as its lucci create"
+    notes: "The LucciCreate shape byte for byte"
+  - value: 723
+    direction: s2c
+    connection: game
+    name: gspChocolateEaten
+    name_source: label@id-400
+    evidence: verified
+    source: "id-400 sub_48A090 case 723 runs the shared two-word reader id-400 sub_782DD0"
+    notes: "The LucciPicked shape"
+  - value: 724
+    direction: s2c
+    connection: game
+    name: gspGameCreateSpawner
+    name_source: label@id-400
+    evidence: verified
+    source: "id-400 sub_48A090 case 724 runs id-400 sub_480670"
+    notes: "Eight u32 words; SpawnerCreateNoticeLegacy@id-400"
+  - value: 725
+    direction: s2c
+    connection: game
+    name: gspSpawnerEaten
+    name_source: label@id-400
+    evidence: verified
+    source: "id-400 sub_48A090 case 725 runs the shared two-word reader"
+    notes: "The LucciPicked shape"
+  - value: 726
+    direction: s2c
+    connection: game
+    name: gspGameCreateHeart
+    name_source: label@id-400
+    evidence: verified
+    source: "id-400 sub_48A090 case 726 runs id-400 sub_4804E0 — the same LucciCreate reader"
+    notes: "The LucciCreate shape byte for byte"
+  - value: 727
+    direction: s2c
+    connection: game
+    name: gspHeartEaten
+    name_source: label@id-400
+    evidence: verified
+    source: "id-400 sub_48A090 case 727 runs the shared two-word reader"
+    notes: "The LucciPicked shape"
+  - value: 745
+    direction: s2c
+    connection: game
+    name: gspGameCreateWeaponObject
+    name_source: label@id-400
+    evidence: verified
+    source: "id-400 sub_48A090 case 745 runs id-400 sub_4803B0 (vtable 0xC67738)"
+    notes: "Ten u32 words plus a bool32 tail; this build has no 744 weapon create (its S2C 744 is gspRepAwardSelectFail)"
+  - value: 746
+    direction: s2c
+    connection: game
+    name: gspPickUpWeapon
+    name_source: label@id-400
+    evidence: verified
+    source: "id-400 sub_48A090 case 746 runs id-400 sub_782DD0 (vtable 0xC67744); the handler id-400 sub_497CA0 resolves the character"
+    notes: "[u32 weapon object][u32 actor] — object first, the reverse of kr-1256's pickup"
+  - value: 512
+    direction: s2c
+    connection: game
+    name: gspRoomOpenCloseSlot
+    name_source: label@cn-324
+    evidence: verified
+    source: "id-400 sub_7833E0 runs id-400 sub_610D40 (vtable 0xCAFBD4)"
+    notes: "u32 plus bool32 — matches the kr-812-mirrored shape cn-324 carries at this number"
+  - value: 513
+    direction: s2c
+    connection: game
+    name: gspRepKickFromSession
+    name_source: label@cn-324
+    evidence: verified
+    source: "id-400 sub_7833E0 runs id-400 sub_782430 (vtable 0xCAFAC0)"
+    notes: "Two counted strings and a result word — matches cn-324's row"
+  - value: 516
+    direction: s2c
+    connection: game
+    name: gspRoomReceiveRecruitMsg
+    name_source: label@cn-324
+    evidence: verified
+    source: "id-400 sub_7833E0 runs id-400 sub_782870"
+    notes: "u16 plus counted string — RoomRecruitReply@kr-812 exactly"
+  - value: 517
+    direction: s2c
+    connection: game
+    name: gspReqPingUser
+    name_source: label@cn-324
+    evidence: verified
+    source: "id-400 sub_7833E0 runs id-400 sub_93D120 (vtable 0xCAF8BC)"
+    notes: "u32 token"
+  - value: 518
+    direction: s2c
+    connection: game
+    name: gspRepPingUser
+    name_source: label@cn-324
+    evidence: verified
+    source: "id-400 sub_7833E0 runs id-400 sub_72E4D0"
+    notes: "Three u32 words — kr-1256's body applies here, unlike cn-279's one-word reply"
+  - value: 521
+    direction: s2c
+    connection: game
+    name: gspSetSessionSigData
+    name_source: label@cn-324
+    evidence: verified
+    source: "id-400 sub_7833E0 runs id-400 sub_7828E0 (vtable 0xCAF8...); the nested SessionSignatureData reader is id-400 sub_781E00"
+    notes: "A leading u32 of unproven purpose followed by the tabled SessionSignatureData — id-1809 reads the nested object only"
+  - value: 522
+    direction: s2c
+    connection: game
+    name: gspResClientDamageSyncData
+    name_source: label@cn-324
+    evidence: verified
+    source: "id-400 sub_7833E0 runs id-400 sub_782D30; the sDAMAGEINFO reader is id-400 sub_47FEF0"
+    notes: "The DamageInfoBody, uncompressed and identical to id-1809's"
+  - value: 900
+    direction: s2c
+    connection: game
+    name: gspRepGuildLineBoard
+    name_source: label@cn-324
+    evidence: verified
+    source: "id-400 main dispatcher sub_7BF2E0 compares 900 (gated on state 11) and runs id-400 sub_7B75C0 into the reader id-400 sub_799A50 (vtable 0xCB5D74)"
+    notes: "u32 plus counted GuildLineBoardRecord — the guild-board.yaml shapes"
+  - value: 911
+    direction: s2c
+    connection: game
+    name: gspCreateUnit
+    name_source: label@cn-324
+    evidence: verified
+    source: "id-400 game dispatcher sub_48A090 case 0x38F runs id-400 sub_497D80 into the reader id-400 sub_480FD0 (vtable 0xC67768)"
+    notes: "Seven u32 words, a counted string, a u64 and a u32; the purposes are unproven"
+  - value: 949
+    direction: s2c
+    connection: game
+    name: gspNotifyRankInfo2
+    name_source: label@cn-324
+    evidence: verified
+    source: "id-400 session dispatcher sub_7833E0 case 0x3B5 runs id-400 sub_7861F0 into the reader id-400 sub_782CB0 (vtable 0xCAFC4C); the element reader id-400 sub_781D60 walks sGAMERESULTRANKINFO (vtable 0xCAFA90)"
+    notes: "u32 count then counted {u32, wstr, u32} entries (40-byte stride); the id builds number this frame 949 where cn-324 uses 950"
+
+  - value: 32912
+    direction: s2c
+    connection: relay
+    name: gppZombieStoneActive
+    name_source: label@cn-324
+    evidence: verified
+    source: "id-400 wave dispatcher case 0x8090 runs the deserializer and the handler walks 64 entity slots RT-casting to ChrZombieStone"
+    notes: "[bool32 active][u8 variant]; the variant selects one of two stone attachment effects"
+  - value: 32872
+    direction: s2c
+    connection: relay
+    name: gppWaveKeyMobGroupData
+    name_source: label@cn-324
+    evidence: verified
+    source: "id-400 wave dispatcher case 0x8068 runs the deserializer and the handler re-keys the fields into the wave-key to mob-group registry"
+    notes: "Five u32 words and a counted string; no C2S sender exists in any build"
+  - value: 32873
+    direction: s2c
+    connection: relay
+    name: gppWaveSetMobSpawnGroup
+    name_source: label@cn-324
+    evidence: verified
+    source: "id-400 wave dispatcher case 0x8069 runs the deserializer; the two bytes match a wave-node key and the u32 is stored at the node"
+    notes: "[u8][u8][u32]"
+  - value: 11
+    direction: c2s
+    connection: relay
+    name: rcpSetDamageAffectingAttribute
+    name_source: label@id-400
+    evidence: inferred
+    source: "id-400 senders sub_48EB20, id-400 sub_4ACAE0, id-400 sub_4ACB50 stamp relay 11; layout packets/relay-hp.yaml RelayDamageAttributeReport"
+  - value: 13
+    direction: c2s
+    connection: relay
+    name: rcpReqDamageCalcAndBroadcast
+    name_source: label@id-400
+    evidence: inferred
+    source: "id-400 senders sub_4ACD40 stamp relay 13; layout packets/relay-hp.yaml RelayDamageRequest"
+  - value: 14
+    direction: c2s
+    connection: relay
+    name: rcpCharacterRespawn
+    name_source: label@id-400
+    evidence: inferred
+    source: "id-400 senders sub_4ACEB0 stamp relay 14; layout packets/relay-hp.yaml RelayCharacterRespawnReport"
+  - value: 15
+    direction: c2s
+    connection: relay
+    name: rcpChangeChrType
+    name_source: label@id-400
+    evidence: inferred
+    source: "id-400 senders sub_4ACF30, id-400 sub_4ACFA0 stamp relay 15; layout packets/relay-hp.yaml RelayCharacterTypeReport"
+  - value: 16
+    direction: c2s
+    connection: relay
+    name: rcpHpRecover
+    name_source: label@id-400
+    evidence: inferred
+    source: "id-400 senders sub_4ACDC0, id-400 sub_4ACE30 stamp relay 16; layout packets/relay-hp.yaml RelayHpRecoverReport"
+  - value: 22
+    direction: c2s
+    connection: relay
+    name: rcpSetChrState
+    name_source: label@id-400
+    evidence: inferred
+    source: "id-400 senders sub_48EC70, id-400 sub_4ACBD0, id-400 sub_4ACC40 stamp relay 22; layout packets/relay-hp.yaml RelayCharacterStateReport"
+  - value: 7
+    direction: s2c
+    connection: relay
+    name: rspHpDeltaBroadcast
+    name_source: label@id-400
+    evidence: inferred
+    source: "id-400 dispatcher sub_794200 route relay 7; layout packets/relay-hp.yaml RelayHpDelta"
+  - value: 972
+    direction: s2c
+    connection: game
+    name: gspBombState
+    name_source: label@kr-812
+    evidence: verified
+    source: "id-400 sub_48A090 case 972 reads Packet_gspBombState and applies its state, timer, position and trailing flag."
+  - value: 973
+    direction: s2c
+    connection: game
+    name: gspObserver
+    name_source: label@kr-812
+    evidence: verified
+    source: "id-400 sub_48A090 case 973 calls id-400 sub_4A8A10, which resolves the scene-object word for mode 19."
+  - value: 981
+    direction: s2c
+    connection: game
+    name: gspCreateCaptain
+    name_source: label@kr-812
+    evidence: verified
+    source: "id-400 sub_7833E0 case 981 calls id-400 sub_784DE0, which reads one seat word and dispatches Captain event 309."
+  - value: 516
+    direction: c2s
+    connection: game
+    name: gcpRoomSendRecMsg
+    name_source: label@id-400
+    evidence: verified
+    source: id-400 sub_7C2F40 stamps the native recruitment-text request; id-400 sub_89DD10 reads one counted UTF-16 message

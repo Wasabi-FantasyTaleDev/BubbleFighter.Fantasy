@@ -3,7 +3,8 @@ using BubbleFighter.Fantasy.Contracts.Inventory;
 namespace BubbleFighter.Fantasy.InventoryView;
 
 /// <summary>Resolves the native character and weapon positions independently of UI category selection.</summary>
-internal sealed class EquipmentSelection(IInventoryRepository inventory, IReadOnlyList<InventoryWearGroup>? wearableLocations = null) : IEquipmentSelection
+internal sealed class EquipmentSelection(IInventoryRepository inventory,
+    IReadOnlyList<InventoryWearGroup>? wearableLocations = null, EquipmentWearGroups? contributions = null) : IEquipmentSelection
 {
     // 0x808F10 / 0x81B9C0: primary and special preset positions; ShopItem2 identifies
     // 202/203/204 as rifle/sniper/shotgun, 201 as sidearm, 205 as special, 207 as melee.
@@ -19,9 +20,14 @@ internal sealed class EquipmentSelection(IInventoryRepository inventory, IReadOn
     private readonly InventoryWearGroup[] _groups = [.. Groups, .. wearableLocations ?? []];
 
     public async ValueTask<IReadOnlyList<InventorySlotRecord>> ReadAsync(long userNum, CancellationToken ct) =>
-        await inventory.UpdateWornSelectionAsync(userNum, _groups, null, false, ct).ConfigureAwait(false)
+        await inventory.UpdateWornSelectionAsync(userNum, await GroupsAsync(ct).ConfigureAwait(false),
+            null, false, ct).ConfigureAwait(false)
         ?? throw new InvalidOperationException("Equipment normalization returned no inventory.");
 
-    public ValueTask<IReadOnlyList<InventorySlotRecord>?> ApplyAsync(long userNum, int itemId, bool worn, CancellationToken ct) =>
-        inventory.UpdateWornSelectionAsync(userNum, _groups, itemId, worn, ct);
+    public async ValueTask<IReadOnlyList<InventorySlotRecord>?> ApplyAsync(long userNum, int itemId, bool worn, CancellationToken ct) =>
+        await inventory.UpdateWornSelectionAsync(userNum, await GroupsAsync(ct).ConfigureAwait(false),
+            itemId, worn, ct).ConfigureAwait(false);
+
+    private ValueTask<IReadOnlyList<InventoryWearGroup>> GroupsAsync(CancellationToken ct) =>
+        contributions?.ResolveAsync(_groups, ct) ?? ValueTask.FromResult<IReadOnlyList<InventoryWearGroup>>(_groups);
 }

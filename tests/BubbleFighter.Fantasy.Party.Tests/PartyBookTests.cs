@@ -11,6 +11,55 @@ public sealed class PartyBookTests
     private static readonly PartyMember Cy = new(3, "Cy");
 
     [Fact]
+    public void SoloReservationInvalidatesInvitesAndExcludesBothJoinDirections()
+    {
+        var book = Book();
+        book.Invite(Al, Bo);
+        book.Invite(Cy, Al);
+        using var reservation = book.TryReserveSolo(1);
+        Assert.NotNull(reservation);
+        Assert.Null(book.TryReserveSolo(1));
+        Assert.False(book.TakeInvite(1, 2));
+        Assert.False(book.TakeInvite(3, 1));
+        Assert.Equal(PartyInviteResult.Refused, book.Invite(Al, Bo));
+        Assert.Equal(PartyInviteResult.Refused, book.Invite(Cy, Al));
+        Assert.Equal(PartyInviteResult.Refused, book.Join(Al, Bo, []));
+        Assert.Equal(PartyInviteResult.Refused, book.Join(Cy, Al, []));
+        reservation.Dispose();
+        using var next = book.TryReserveSolo(1);
+        reservation.Dispose();
+        Assert.NotNull(next);
+        Assert.Equal(PartyInviteResult.Refused, book.Join(Al, Bo, []));
+        next.Dispose();
+        Assert.Equal(PartyInviteResult.Sent, book.Join(Al, Bo, []));
+        Assert.Null(book.TryReserveSolo(1));
+        Assert.Null(book.TryReserveSolo(2));
+    }
+
+    [Fact]
+    public void SoloReservationsRespectTheConfiguredPendingCapacity()
+    {
+        var book = Book(maxPending: 1);
+        using var first = book.TryReserveSolo(1);
+        Assert.Null(book.TryReserveSolo(2));
+        first!.Dispose();
+        using var second = book.TryReserveSolo(2);
+        Assert.NotNull(second);
+    }
+
+    [Fact]
+    public async Task ConcurrentPartyJoinAndSoloReservationHaveOnlyOneWinner()
+    {
+        var book = Book();
+        using var start = new Barrier(2);
+        var reserve = Task.Run(() => { start.SignalAndWait(); return book.TryReserveSolo(1); });
+        var join = Task.Run(() => { start.SignalAndWait(); return book.Join(Al, Bo, []); });
+        using var held = await reserve;
+        Assert.Equal(held is null ? PartyInviteResult.Sent : PartyInviteResult.Refused, await join);
+        Assert.Equal(held is null, book.PartyOf(1) is not null);
+    }
+
+    [Fact]
     public void AnAcceptedInvitationMakesTheInviterTheLeader()
     {
         var book = Book();

@@ -1,0 +1,11 @@
+# Explicit opt-in to the audited Zombie Escape mode on kr-1256, cn-774 and tw-454.
+# Native-client acceptance is pending; apply to one supported build or its ignored local patch.
+- set:
+    id: dialect.rooms
+    config:
+      zombie_escape: true
+      result_scoreboard_modes: [1, 8, 19, 20, 23, 24, 25, 28, 30, 32, 45]
+- set:
+    id: ingame
+    config:
+      zombie_escape: true

@@ -77,14 +77,28 @@ class Reports(unittest.TestCase):
                     file.touch()
                 self.assertEqual([], GATES.missing_local_data())
 
+    def test_discovery_includes_new_untracked_projects_once(self):
+        """A fresh plugin test project cannot disappear from a pre-commit gate."""
+        files = '\n'.join([
+            "tests/Example.Tests/Example.Tests.csproj",
+            "tests/New.Tests/New.Tests.csproj",
+            "tests/New.Tests/New.Tests.csproj",
+        ])
+        with patch.object(GATES.subprocess, "check_output", return_value=files) as discover:
+            self.assertEqual(["Example.Tests", "New.Tests"], [path.parent.name for path in GATES.projects()])
+            command = discover.call_args.args[0]
+            self.assertIn("--cached", command)
+            self.assertIn("--others", command)
+            self.assertIn("--exclude-standard", command)
+
 
 class Ordering(unittest.TestCase):
     """Independent projects run together and timing-sensitive projects run afterwards, alone."""
 
     @staticmethod
     def _projects() -> list[Path]:
-        names = ("Archives", "Scenario", "Kernel", "Net.Tcp", "Lobby", "Architecture",
-                 "Loader.Remote", "Shop")
+        names = ("Archives", "Scenario", "Kernel", "Net.Tcp", "Net.Udp", "Lobby", "Architecture",
+                 "Loader.Remote", "Shop", "WebUi", "Cluster")
         return [Path(f"tests/BubbleFighter.Fantasy.{name}.Tests/BubbleFighter.Fantasy.{name}.Tests.csproj")
                 for name in names]
 
@@ -103,7 +117,7 @@ class Ordering(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             with patch.object(GATES, "run_project", side_effect=self._fake(calls)):
                 reports = GATES.run_tests(self._projects(), Path(directory), False, 4, {})
-        self.assertEqual(8, len(reports))
+        self.assertEqual(11, len(reports))
         self.assertEqual(set(GATES.SERIAL_PROJECTS), {name for name, _ in calls[4:]})
         self.assertTrue(all(name not in GATES.SERIAL_PROJECTS for name, _ in calls[:4]))
 

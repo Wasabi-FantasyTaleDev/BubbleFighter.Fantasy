@@ -38,7 +38,20 @@ public sealed record RoomSeatView(int Slot, byte Team, int UserNumber, ISession 
 /// and 106), so in-round actions may name NPC entities that belong to no seat.
 /// </param>
 public sealed record RoomRosterView(int RoomId, RoomStage Stage, int Generation, ushort ModeId, IReadOnlyList<RoomSeatView> Seats,
-    bool ClientRunsNpcs);
+    bool ClientRunsNpcs)
+{
+    /// <summary>Gets whether this is a published gameplay room rather than an automatic or training scene.</summary>
+    public bool IsMatchRoom { get; init; }
+
+    /// <summary>Gets the room owner's forced UDP choice, or null for the multiplayer-only default.</summary>
+    public bool? UdpOverride { get; init; }
+
+    /// <summary>Gets the revision of full room installations; a new installation invalidates prepared peer tables.</summary>
+    public long InstallationVersion { get; init; }
+
+    /// <summary>Gets whether this room requests UDP; the deployment switch still takes precedence.</summary>
+    public bool UsesUdp => IsMatchRoom && (UdpOverride ?? Seats.Count(seat => !seat.Game.Connection.IsClosed) > 1);
+}
 
 /// <summary>
 /// Read access to the rooms for rows that act on in-round traffic but do not own the rooms.
@@ -54,4 +67,21 @@ public interface IRoomRoster
     /// <summary>Returns a room by id, or <see langword="null"/> when it no longer exists.</summary>
     /// <param name="roomId">The room id.</param>
     RoomRosterView? Find(int roomId);
+}
+
+/// <summary>A protocol-scoped room roster for peer setup plugins serving more than one build.</summary>
+public interface IRoomPeerRoster : IRoomRoster
+{
+    /// <summary>Gets the owning game protocol; snapshots never cross this scope.</summary>
+    string Protocol { get; }
+
+    /// <summary>Returns immutable views of the protocol's bounded room registry, including rooms still waiting.</summary>
+    IReadOnlyList<RoomRosterView> Snapshot();
+
+    /// <summary>Runs native peer control publication on the room's bounded serial queue, after pending scene installations.</summary>
+    /// <param name="roomId">The room whose current view is passed to the operation.</param>
+    /// <param name="operation">A control publication that completes before later room transitions can run.</param>
+    /// <param name="ct">Cancels queued work or cooperatively cancels the running publication.</param>
+    /// <returns>Whether the room still existed when the operation began.</returns>
+    ValueTask<bool> ExecuteAsync(int roomId, Func<RoomRosterView, CancellationToken, ValueTask> operation, CancellationToken ct);
 }

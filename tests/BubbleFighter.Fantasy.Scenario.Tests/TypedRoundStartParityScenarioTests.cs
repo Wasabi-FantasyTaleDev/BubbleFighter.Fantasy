@@ -165,8 +165,8 @@ public sealed class RoundStartParityRun : IAsyncLifetime
         await using var server = await ParityRun.StartAsync(rounds: true);
         var a = await server.ConnectAsync("scenRoundA");
         var b = await server.ConnectAsync("scenRoundB");
-        await a.Login();
-        await b.Login();
+        await a.Login(pollConfiguration: false);
+        await b.Login(pollConfiguration: false);
         await a.Send(106, []);
         await b.Send(106, []);
         await ParityRun.Settle(server.Ct, a, b);
@@ -181,7 +181,7 @@ public sealed class RoundStartParityRun : IAsyncLifetime
         await b.Send(403, ParityRun.Body("RoomJoinRequest", new() { ["room_id"] = roomId, ["password"] = "" }));
         var seatB = Seat(await b.WaitFor(503, from));
         await ParityRun.Settle(server.Ct, a, b);
-        await b.Send(505, ParityRun.Body("RoomReadyRequest", new() { ["ready"] = true, ["unknown_5"] = false, ["unknown_6"] = false }));
+        await b.Send(505, ParityRun.Body("RoomReadyRequest", new() { ["ready"] = true, ["in_shop"] = false, ["in_inventory"] = false }));
         await ParityRun.Settle(server.Ct, a, b);
 
         var relays = new Dictionary<string, SimActor>();

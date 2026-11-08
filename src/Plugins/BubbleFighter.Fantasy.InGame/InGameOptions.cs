@@ -13,6 +13,24 @@ namespace BubbleFighter.Fantasy.InGame;
 /// </summary>
 public sealed partial class InGameOptions : IValidatableOptions
 {
+    /// <summary>Gets or sets native Zombie Escape selection, infection and stage completion; disabled by default.</summary>
+    public bool ZombieEscape { get; set; }
+
+    /// <summary>Gets or sets the enabled Zombie Escape stage deadline in milliseconds; the native script uses ten minutes.</summary>
+    [Range(1, 3_600_000)]
+    public int ZombieEscapeRoundTimeLimitMs { get; set; } = 600_000;
+
+    /// <summary>Gets or sets whether remote visitors return home or stay after a completed room or plaza exit.</summary>
+    [Required, RegularExpression("^(home|stay)$")]
+    public string ReturnOnLeave { get; set; } = "home";
+
+    /// <summary>Gets or sets the idle delay before returning home; a changed scene cancels that return.</summary>
+    [Range(0, 60000)]
+    public int ReturnDelayMs { get; set; } = 1500;
+
+    /// <summary>Gets or sets whether the deployment installs UDP transports for this gameplay scope.</summary>
+    public bool UdpEnabled { get; set; }
+
     /// <summary>Gets or sets whether room, plaza and command chat share a per-connection rate budget.</summary>
     public bool ChatRateLimitEnabled { get; set; } = true;
 
@@ -50,6 +68,14 @@ public sealed partial class InGameOptions : IValidatableOptions
     [MaxLength(32)]
     public int[] NativeLifeModeIds { get; set; } = [];
 
+    /// <summary>
+    /// Gets or sets whether every mode follows the rules of <see cref="NativeLifeModeIds"/>: lives follow the native
+    /// reports, a dead player comes back after its death presentation unless its mode explicitly disables respawn, a death's stage report
+    /// never ends the round, and the clock does (or a host's cleared waves).
+    /// YAML key <c>native_life_every_mode</c>.
+    /// </summary>
+    public bool NativeLifeEveryMode { get; set; }
+
     /// <summary>Gets or sets the mode with counted cooperative item slots; zero disables them.</summary>
     [Range(0, ushort.MaxValue)]
     public int CountedItemModeId { get; set; }
@@ -79,12 +105,24 @@ public sealed partial class InGameOptions : IValidatableOptions
 
     /// <summary>
     /// Gets or sets the zombie battle modes (humans against a zombie king and the zombinis it makes); empty
-    /// disables them. The client keeps no rules of its own for them: the server picks the king, converts the
-    /// dead and decides the winner.
+    /// disables them. The server picks the king, confirms native conversion requests and decides the winner
+    /// from admitted life and team evidence; character health and effects remain client-side.
     ///
     /// </summary>
     [MaxLength(16)]
     public int[] ZombiePvpModeIds { get; set; } = [];
+
+    /// <summary>Gets or sets whether modern mode 8 uses its native master script and team-34 conversion exchange.</summary>
+    public bool ScriptZombies { get; set; }
+
+    /// <summary>Gets or sets whether audited ghost mode 28 uses its native single-king script and conversion exchange.</summary>
+    public bool GhostZombies { get; set; }
+
+    internal bool UsesScriptZombieMode(int mode) => mode == 8 && ScriptZombies || mode == 28 && GhostZombies;
+
+    /// <summary>Gets or sets the duration of an ordinary or ghost zombie round; both native scripts request three minutes.</summary>
+    [Range(1, 3600000)]
+    public int ScriptZombieRoundTimeLimitMs { get; set; } = 180000;
 
     /// <summary>
     /// Gets or sets the item kind the zombie king's ultra asks for, or 0 when the build's king has none. Once the
@@ -95,6 +133,16 @@ public sealed partial class InGameOptions : IValidatableOptions
     /// </summary>
     [Range(0, 65535)]
     public int ZombieKingUltraItemKind { get; set; }
+
+    /// <summary>
+    /// Gets or sets the item kind the Captain's ULTRA asks for in mode 20, or 0 when the round leaves it unanswered.
+    /// With the client's own gauge ready, SHIFT raises the Captain manager's event 55 and its handler sends the item
+    /// request with no object and this kind (cn-706 sub_57CB50 -> cn-706 sub_428D10, kr-812 sub_430DB0: ecx 0x68,
+    /// object -1). The round answers only the current Captain, and only that player, with the direct item effect;
+    /// the client then sends its own direct effect to the other players. YAML key <c>captain_ultra_item_kind</c>.
+    /// </summary>
+    [Range(0, 65535)]
+    public int CaptainUltraItemKind { get; set; }
 
     /// <summary>Gets or sets how long after a zombie battle starts the server turns a random human into the zombie king.</summary>
     [Range(0, 600000)]
@@ -182,8 +230,8 @@ public sealed partial class InGameOptions : IValidatableOptions
     /// <summary>
     /// Gets or sets the modes that are item modes (client mode 3, <c>GameModeId.Item</c>), where the box kinds the server
     /// accepts are limited to <see cref="ItemModeKinds"/> and a box a team owns is eaten only by that team; empty disables
-    /// the policy. The clients keep the rules of the mode (kr-812 builds a plain ModeMgr for it, sub_53AB30), so this does not
-    /// schedule boxes: the host client reports the points and the server relays them.
+    /// the policy. The host reports native points; <see cref="ItemModeFallbackPointCount"/> separately enables
+    /// server-scheduled neutral boxes when that report contains no random-box point.
     ///
     /// </summary>
     [MaxLength(16)]
@@ -199,9 +247,33 @@ public sealed partial class InGameOptions : IValidatableOptions
     [MaxLength(64)]
     public int[] ItemModeKinds { get; set; } = [];
 
+    /// <summary>
+    /// Gets or sets the maximum neutral random-box points supplied when an item-mode map reports no random boxes.
+    /// Zero disables this server policy; positive values reuse track.wb helper positions with the default supply interval.
+    /// </summary>
+    [Range(0, 32)]
+    public int ItemModeFallbackPointCount { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether an eligible random box with an unresolved or unoffered pickup kind is resolved uniformly
+    /// from the intersection of random supply kinds and item-mode kinds. Valid client rolls remain unchanged.
+    /// </summary>
+    public bool ItemModeResolveInvalidRandomPickups { get; set; }
+
+    /// <summary>Gets or sets the largest map resource accepted by the optional item-mode helper reader, in bytes.</summary>
+    [Range(1024, 67108864)]
+    public int ItemModeFallbackMaximumFileBytes { get; set; } = 8388608;
+
+    /// <summary>Gets or sets the maximum number of map helpers read before selecting item-mode fallback points.</summary>
+    [Range(1, 65536)]
+    public int ItemModeFallbackMaximumCandidates { get; set; } = 4096;
+
     /// <summary>Gets or sets the number of native held-item slots supported by the dialect.</summary>
     [Range(1, 2)]
     public int NativeItemSlotCount { get; set; } = 1;
+
+    /// <summary>Gets or sets whether boxes refused for full held slots are recreated once space becomes available.</summary>
+    public bool RenewFullSlotSupplies { get; set; }
 
     /// <summary>Gets or sets confirmed pickup kinds that run a native effect immediately instead of occupying an item slot.</summary>
     [MaxLength(64)]
@@ -283,6 +355,37 @@ public sealed partial class InGameOptions : IValidatableOptions
     /// </summary>
     public bool AssignSpawnTeamsOnStart { get; set; }
 
+    /// <summary>
+    /// Gets or sets the fewest players, seats and bots together, a master's start needs; 0 or 1 lets anyone start
+    /// alone. A refused start is logged and the room keeps waiting, since the client has no refusal reason for it.
+    /// A native automatic start is not checked. YAML key <c>start_min_players</c>.
+    /// </summary>
+    [Range(0, 32)]
+    public int StartMinPlayers { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether a master's start in a red-or-blue team mode needs the two teams, seats and bots
+    /// together, to differ by at most one player once <see cref="AssignSpawnTeamsOnStart"/> has placed the players
+    /// without a team. A refused start is logged and the room keeps waiting. A native automatic start is not
+    /// checked. YAML key <c>start_requires_team_balance</c>.
+    /// </summary>
+    public bool StartRequiresTeamBalance { get; set; }
+
+    /// <summary>
+    /// Gets or sets how long, in milliseconds, a round may load before it is cancelled and every player is sent
+    /// to the plaza; 0 lets loading run without a limit. It runs from the start packets to the countdown, so it
+    /// has to cover the slowest client's map load and the native match setup. YAML key <c>load_timeout_ms</c>.
+    /// </summary>
+    [Range(0, 600_000)]
+    public int LoadTimeoutMs { get; set; } = 60_000;
+
+    /// <summary>
+    /// Gets or sets whether a dropped connection during a loading or playing round cancels the round: it ends with
+    /// no result and every remaining player is sent to the plaza. A player who leaves the room themselves never
+    /// cancels it; the others play on. YAML key <c>cancel_round_on_disconnect</c>.
+    /// </summary>
+    public bool CancelRoundOnDisconnect { get; set; } = true;
+
     /// <summary>Gets or sets the maximum supply points retained for one map.</summary>
     [Range(32, 1024)]
     public int MaxSupplyPoints { get; set; } = 128;
@@ -311,6 +414,14 @@ public sealed partial class InGameOptions : IValidatableOptions
     /// <summary>Gets or sets the supply reference range's first reserved value; generated objects use the next values.</summary>
     [Range(1, int.MaxValue - 1024)]
     public int SupplyObjectIdBase { get; set; } = 0x62000000;
+
+    /// <summary>Gets or sets the first reserved dropped-weapon id; each round allocates subsequent identities.</summary>
+    [Range(1, int.MaxValue - 65536)]
+    public int WeaponObjectIdBase { get; set; } = 0x64000000;
+
+    /// <summary>Gets or sets the maximum total weapon objects created in one round, including already picked objects.</summary>
+    [Range(1, 65536)]
+    public int MaxWeaponObjectsPerRound { get; set; } = 256;
 
     /// <summary>
     /// Gets or sets the object id range reserved for NPC-kill Lucci items; created items use the
@@ -403,6 +514,16 @@ public sealed partial class InGameOptions : IValidatableOptions
     [Range(1, 4096)]
     public int RoomQueueCapacity { get; set; } = 64;
 
+    /// <summary>Publishes destination seat preparation for an authenticated cluster transfer coordinator; disabled by default.</summary>
+    public bool RoomAdmissionReservations { get; set; }
+
+    /// <summary>Publishes retained home arrivals through the normal main-menu scene encoder; disabled by default.</summary>
+    public bool HomeMigrationAdmission { get; set; }
+
+    /// <summary>Bounds how long an unused destination seat remains held, measured with the monotonic room clock.</summary>
+    [Range(100, 60000)]
+    public int RoomAdmissionLifetimeMs { get; set; } = 10000;
+
     /// <summary>
     /// Gets or sets how many players the plaza shows at once; the next entrant is refused loudly
     /// instead of silently dropped from everyone's view. The recorded client's own plaza seat array
@@ -411,6 +532,13 @@ public sealed partial class InGameOptions : IValidatableOptions
     /// </summary>
     [Range(1, 255)]
     public int PlazaCapacity { get; set; } = 36;
+
+    /// <summary>Gets or sets whether native plaza recruitment signs and party admission are served.</summary>
+    public bool PlazaRecruitment { get; set; }
+
+    /// <summary>Gets or sets the maximum UTF-16 length retained for one plaza recruitment message.</summary>
+    [Range(1, 1024)]
+    public int PlazaRecruitmentTextLength { get; set; } = 128;
 
     /// <summary>
     /// Gets or sets whether a plaza enter that arrives before the login burst has finished is ignored. The
@@ -537,6 +665,16 @@ public sealed partial class InGameOptions : IValidatableOptions
     /// </summary>
     [Range(0, 600_000)]
     public int RespawnDelayMaxMs { get; set; } = 30_000;
+
+    /// <summary>
+    /// Gets or sets modes that explicitly prohibit respawn for the current round. Empty allows every mode;
+    /// mounting an observation sender does not change this policy. Denied modes require an audited observation
+    /// sender that supports every listed mode. YAML key <c>respawn_disabled_mode_ids</c>.
+    /// </summary>
+    [Required, MaxLength(64)]
+    public int[] RespawnDisabledModeIds { get; set; } = [];
+
+    internal bool AllowsRespawn(int modeId) => !RespawnDisabledModeIds.Contains(modeId);
 
     /// <summary>Gets or sets the inventory entitlement consumed by instant respawn; zero disables consumable revival.</summary>
     [Range(0, int.MaxValue)]
@@ -866,6 +1004,9 @@ public sealed partial class InGameOptions : IValidatableOptions
         if (PveRevivalModes.Any(mode => mode is <= 0 or > ushort.MaxValue)
             || PveRevivalModes.Distinct().Count() != PveRevivalModes.Length)
             yield return new ValidationResult("pve_revival_modes must contain distinct positive mode identifiers.");
+        if (RespawnDisabledModeIds is null || RespawnDisabledModeIds.Any(mode => mode is <= 0 or > ushort.MaxValue)
+            || RespawnDisabledModeIds.Distinct().Count() != RespawnDisabledModeIds.Length)
+            yield return new ValidationResult("respawn_disabled_mode_ids must contain distinct mode ids from 1 to 65535.", [nameof(RespawnDisabledModeIds)]);
         if ((CountedItemModeId > 0) != (CountedItemKinds.Length > 0)
             || (CountedItemModeId > 0 && CountedItemKinds.Length != CountedItemSlotCount)
             || CountedItemKinds.Any(kind => kind <= 0 || !RandomSupplyItemKinds.Contains(kind))
@@ -897,11 +1038,28 @@ public sealed partial class InGameOptions : IValidatableOptions
         if (ItemModeKinds.Any(kind => kind <= 0 || !(RandomSupplyItemKinds.Contains(kind) || ImmediateSupplyItemKinds.Contains(kind)))
             || ItemModeKinds.Distinct().Count() != ItemModeKinds.Length)
             yield return new ValidationResult("item_mode_kinds must contain distinct kinds present in random_supply_item_kinds or immediate_supply_item_kinds.");
+        if (ItemModeFallbackPointCount > 0 && (ItemModeIds.Length == 0 || ItemModeKinds.Length == 0
+                || ItemModeFallbackPointCount > MaxSupplyPoints || ItemModeFallbackPointCount > ItemModeFallbackMaximumCandidates))
+            yield return new ValidationResult("item_mode_fallback_point_count requires item_mode_ids and item_mode_kinds and cannot exceed max_supply_points or item_mode_fallback_maximum_candidates.");
+        if (ItemModeResolveInvalidRandomPickups && (ItemModeIds.Length == 0 || !ItemModeKinds.Intersect(RandomSupplyItemKinds).Any()))
+            yield return new ValidationResult("item_mode_resolve_invalid_random_pickups requires item_mode_ids and at least one shared random_supply_item_kinds/item_mode_kinds entry.");
         if (ZombieKingUltraItemKind > 0 && ZombiePvpModeIds.Length == 0)
             yield return new ValidationResult("zombie_king_ultra_item_kind requires zombie_pvp_mode_ids.");
         if (ZombiePvpModeIds.Any(mode => mode is <= 0 or > ushort.MaxValue || mode == ZombieConversionModeId)
             || ZombiePvpModeIds.Distinct().Count() != ZombiePvpModeIds.Length)
             yield return new ValidationResult("zombie_pvp_mode_ids must contain distinct positive mode ids other than zombie_conversion_mode_id.");
+        if (ScriptZombies && (ZombiePvpModeIds.Contains(8) || ZombieConversionModeId == 8
+            || ItemModeIds.Contains(8) || CountedItemModeId == 8 || StarModeIds.Contains(8) || StarTeamModeIds.Contains(8)
+            || !NativeLifeEveryMode && !NativeLifeModeIds.Contains(8) || !AllowsRespawn(8)))
+            yield return new ValidationResult("script_zombies requires native life and respawn for mode 8, without another mode-8 policy.");
+        if (ZombieEscape && (ZombiePvpModeIds.Contains(32) || ZombieConversionModeId == 32
+            || ItemModeIds.Contains(32) || CountedItemModeId == 32 || StarModeIds.Contains(32) || StarTeamModeIds.Contains(32)
+            || !AllowsRespawn(32)))
+            yield return new ValidationResult("zombie_escape requires respawn for mode 32 without another mode-32 policy.");
+        if (GhostZombies && (ZombiePvpModeIds.Contains(28) || ZombieConversionModeId == 28
+            || ItemModeIds.Contains(28) || CountedItemModeId == 28 || StarModeIds.Contains(28) || StarTeamModeIds.Contains(28)
+            || !NativeLifeEveryMode && !NativeLifeModeIds.Contains(28) || !AllowsRespawn(28)))
+            yield return new ValidationResult("ghost_zombies requires native life and respawn for mode 28, without another mode-28 policy.");
         var starModes = StarModeIds.Concat(StarTeamModeIds).ToArray();
         if (starModes.Any(mode => mode is <= 0 or > ushort.MaxValue || mode == ZombieConversionModeId || ZombiePvpModeIds.Contains(mode))
             || starModes.Distinct().Count() != starModes.Length)

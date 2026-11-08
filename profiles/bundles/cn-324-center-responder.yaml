@@ -1,0 +1,23 @@
+# Optional responder for CN2012 auxiliary connections opened against this server's game listener.
+# This does not advertise additional gates; Gateway supplies the chooser directory separately.
+# Ordinary connections still require the patch handshake; only the exact auxiliary prefix is an alternative.
+- set:
+    id: protocol
+    config:
+      # cn-324 sub_7001F0 sends the build's auxiliary_prefix, then cn-324 sub_4823F0 sends gcpReqCenterUserCnt.
+      answer_center_status: true
+- set:
+    id: dialect.messages
+    config:
+      center_directory: true
+- insert:
+    - id: centers
+      plugin: centers
+      config:
+        protocol: "${BFF_PROFILE_ID}/game"
+        entries:
+          - id: 1
+            name: "正式服"
+            listener_id: game-listener
+            users: 0
+            capacity: 512

@@ -15,7 +15,7 @@ using Xunit;
 namespace BubbleFighter.Fantasy.Party.Tests;
 
 /// <summary>Exercises concurrent requests and connection lifetimes through the mounted party row.</summary>
-public sealed class PartyPluginTests
+public sealed partial class PartyPluginTests
 {
     /// <summary>Committed membership requests a scene move once, and a replayed accept cannot move again.</summary>
     [Fact]
@@ -29,6 +29,72 @@ public sealed class PartyPluginTests
         Assert.Equal(1, follow.Request.LeaderUserNum);
         await rig.AcceptAsync();
         Assert.Single(rig.SceneFollows);
+    }
+
+    /// <summary>A party chat line reaches every member, the speaker included, because the client draws nothing locally.</summary>
+    [Fact]
+    public async Task PartyChatReachesEveryMemberAndTheSpeaker()
+    {
+        await using var rig = await Rig.StartAsync();
+        await rig.InviteAsync();
+        await rig.AcceptAsync();
+        await rig.SendAsync(rig.B, new PartyChatSent("hi"));
+        var lines = rig.Sent.Where(sent => sent.Message is PartyChatReceived).ToArray();
+        Assert.Equal(new[] { rig.A, rig.B }.OrderBy(session => session.Id), lines.Select(line => line.Session).OrderBy(session => session.Id));
+        Assert.All(lines, line => Assert.Equal(new PartyChatReceived(2, "hi"), line.Message));
+    }
+
+    /// <summary>
+    /// The quick-start answer fans the leader's kind out to every member (each client runs its stage start per
+    /// kr-812 sub_68EF10, and the leader's client then sends the ordinary room-create); a member's mode request
+    /// and any other kind are refused with 0, the stage-local cancel form kr-812 sub_6875C0 exits on, and the
+    /// wait-dialog kind 4 is answered to its requester as-is (kr-812 sub_68F010).
+    /// </summary>
+    [Fact]
+    public async Task QuickStartFansOutFromTheLeaderAndRefusesEveryoneElse()
+    {
+        await using var rig = await Rig.StartAsync();
+        await rig.InviteAsync();
+        await rig.AcceptAsync();
+        rig.Sent.Clear();
+        await rig.SendAsync(rig.A, new PartyQuickStartRequested(1));
+        Assert.Equal(
+            new[] { rig.A, rig.B }.OrderBy(session => session.Id),
+            rig.Sent.Select(sent => sent.Session).OrderBy(session => session.Id));
+        Assert.All(rig.Sent, sent => Assert.Equal(new PartyQuickStartAnswered(1), sent.Message));
+
+        // A member's mode request never starts the party's match: the requester alone is told to cancel.
+        rig.Sent.Clear();
+        await rig.SendAsync(rig.B, new PartyQuickStartRequested(2));
+        var refusal = Assert.Single(rig.Sent);
+        Assert.Same(rig.B, refusal.Session);
+        Assert.Equal(new PartyQuickStartAnswered(0), refusal.Message);
+
+        // The wait-dialog request belongs to its requester and is answered as-is.
+        rig.Sent.Clear();
+        await rig.SendAsync(rig.B, new PartyQuickStartRequested(4));
+        var wait = Assert.Single(rig.Sent);
+        Assert.Same(rig.B, wait.Session);
+        Assert.Equal(new PartyQuickStartAnswered(4), wait.Message);
+
+        // Outside any party there is nobody to start: the request is refused.
+        await rig.SendAsync(rig.A, new PartyLeaveRequested());
+        rig.Sent.Clear();
+        await rig.SendAsync(rig.A, new PartyQuickStartRequested(1));
+        var solo = Assert.Single(rig.Sent);
+        Assert.Same(rig.A, solo.Session);
+        Assert.Equal(new PartyQuickStartAnswered(0), solo.Message);
+    }
+
+    /// <summary>A player outside a party is a party of one: only they hear their line.</summary>
+    [Fact]
+    public async Task PartyChatOutsideAPartyEchoesOnlyToTheSpeaker()
+    {
+        await using var rig = await Rig.StartAsync();
+        await rig.SendAsync(rig.A, new PartyChatSent("solo"));
+        var line = Assert.Single(rig.Sent, sent => sent.Message is PartyChatReceived);
+        Assert.Same(rig.A, line.Session);
+        Assert.Equal(new PartyChatReceived(1, "solo"), line.Message);
     }
 
     /// <summary>A build without a visit-answer packet joins and follows directly instead of sending an unusable prompt.</summary>
@@ -163,6 +229,36 @@ public sealed class PartyPluginTests
         rig.Online.Players[2] = replacement;
         await rig.SendAsync(replacement, new PartyInviteAccepted(true, "Al"));
         Assert.Null(rig.Parties.PartyOf(2));
+    }
+
+    /// <summary>A party that crossed nodes is rebuilt without an invitation or a scene move, and every member is told.</summary>
+    [Fact]
+    public async Task ARejoinRebuildsAnArrivedPartyWithoutAnInvitation()
+    {
+        await using var rig = await Rig.StartAsync();
+        Assert.True(await rig.Parties.RejoinAsync(rig.A, rig.B, default));
+        Assert.Equal(new[] { 1, 2 }, rig.Parties.PartyOf(2)!.Members.Select(member => member.UserNum));
+        Assert.Empty(rig.SceneFollows);
+        Assert.Contains(rig.Sent, sent => sent.Session == rig.A && sent.Message is PartyUpdated { Party.Members.Count: 2 });
+        Assert.Contains(rig.Sent, sent => sent.Session == rig.B && sent.Message is PartyUpdated { Party.Members.Count: 2 });
+        Assert.False(await rig.Parties.RejoinAsync(rig.A, rig.B, default));
+    }
+
+    /// <summary>A traveller whose connection was replaced or whose leader now follows someone else arrives alone.</summary>
+    [Fact]
+    public async Task ARejoinNeedsCurrentConnectionsAndALeaderThatStillLeads()
+    {
+        await using var rig = await Rig.StartAsync();
+        rig.Online.Players[2] = new Session(2, "Bo", 10);
+        Assert.False(await rig.Parties.RejoinAsync(rig.A, rig.B, default));
+        Assert.Null(rig.Parties.PartyOf(1));
+        rig.Online.Players[2] = rig.B;
+        await rig.SendAsync(rig.B, new PartyInviteRequested(true, "Al"));
+        await rig.SendAsync(rig.A, new PartyInviteAccepted(true, "Bo"));
+        var carol = new Session(3, "Cy", 3);
+        rig.Online.Players[3] = carol;
+        Assert.False(await rig.Parties.RejoinAsync(rig.A, carol, default));
+        Assert.Null(rig.Parties.PartyOf(3));
     }
 
     [Fact]
@@ -367,6 +463,7 @@ public sealed class PartyPluginTests
             Register<PartyMemberJoined>(); Register<PartyKickReplied>(); Register<PartyKicked>();
             Register<PartyMemberKicked>(); Register<PartyLeaderChanged>();
             Register<PartyVisitAsked>(); Register<PartyVisitFailed>(); Register<PartyVisitGranted>();
+            Register<PartyChatReceived>(); Register<PartyQuickStartAnswered>();
         }
         internal static async Task<Rig> StartAsync(int inviteTimeoutMs = 30000)
         {

@@ -67,7 +67,7 @@ internal sealed class CatalogOpcodeFallback(IOpcodeTable runtime, ILogger logger
                 if (document.Profile == "kr-1256" && (ushort.Parse(row.Value) >= 2000 || row.Name.StartsWith("gpp", StringComparison.Ordinal))) continue;
                 connection = "game";
             }
-            var scopes = connection switch { "game" => new[] { OpcodeConnection.Game }, "relay" => [OpcodeConnection.Relay],
+            var scopes = connection switch { "game" => new[] { OpcodeConnection.Game }, "relay" => [OpcodeConnection.Relay], "udp" => [OpcodeConnection.Udp],
                 "both" => [OpcodeConnection.Game, OpcodeConnection.Relay], _ => throw new ConfigException($"Invalid catalog connection in '{path}': {connection}") };
             foreach (var scope in scopes)
             {

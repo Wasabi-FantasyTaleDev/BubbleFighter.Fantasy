@@ -53,7 +53,7 @@ internal static class LoginPartySnapshot
         {
             ["user_number"] = userNumber,
             ["nickname"] = nickname,
-            ["level"] = level,
+            ["level"] = NativeDisplayLevel.Project(tables, build, level),
         };
         // kr-1256 reads user_number as the profile map's key and character_id as its payload head; cn-774
         // and tw-454 read the same two words as the record's own identity and equipped character.

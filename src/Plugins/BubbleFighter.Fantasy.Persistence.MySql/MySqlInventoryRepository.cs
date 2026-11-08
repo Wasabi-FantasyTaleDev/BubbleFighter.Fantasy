@@ -1,3 +1,4 @@
+using BubbleFighter.Fantasy.Contracts.Cluster;
 using BubbleFighter.Fantasy.Contracts.Inventory;
 using BubbleFighter.Fantasy.Abstractions.Persistence;
 using System.Linq.Expressions;
@@ -5,8 +6,9 @@ using SqlSugar;
 
 namespace BubbleFighter.Fantasy.Persistence.MySql;
 
-/// <summary>MySQL store for <c>inventory_slots</c> (migrations 0005, 0016, 0021, 0022, 0027).</summary>
-public sealed class MySqlInventoryRepository(IDbConnectionFactory connections) : IInventoryRepository
+/// <summary>MySQL store for shared <c>inventory_slots</c> and independently keyed <c>player_loadouts</c>.</summary>
+public sealed partial class MySqlInventoryRepository(IDbConnectionFactory connections, IAccountMutationFence? authority = null,
+    int maxLoadoutsPerPlayer = 32) : IInventoryLoadoutStore
 {
     /// <inheritdoc />
     public async ValueTask<IReadOnlyList<InventorySlotRecord>?> RemoveExpiredItemAsync(long userNum, int itemId,
@@ -16,7 +18,7 @@ public sealed class MySqlInventoryRepository(IDbConnectionFactory connections) :
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(itemId);
         await using var session = await SugarSession.OpenAsync(connections, ct).ConfigureAwait(false);
         var db = session.Db;
-        await using var tx = await session.BeginAsync().ConfigureAwait(false);
+        await using var tx = await session.BeginWriteAsync(userNum, authority, ct).ConfigureAwait(false);
         await MySqlPlayerLock.AcquireAsync(db, userNum, ct).ConfigureAwait(false);
         var owned = await db.Queryable<InventorySlotRow>()
             .Where(row => row.UserNum == userNum && row.ItemId == itemId && (row.Bag == 0 || row.Bag == 1))
@@ -49,7 +51,7 @@ public sealed class MySqlInventoryRepository(IDbConnectionFactory connections) :
         if (itemId <= 0) throw new ArgumentOutOfRangeException(nameof(itemId));
         await using var session = await SugarSession.OpenAsync(connections, ct).ConfigureAwait(false);
         var db = session.Db;
-        await using var tx = await session.BeginAsync().ConfigureAwait(false);
+        await using var tx = await session.BeginWriteAsync(userNum, authority, ct).ConfigureAwait(false);
         await MySqlPlayerLock.AcquireAsync(db, userNum, ct).ConfigureAwait(false);
         var owned = await db.Queryable<InventorySlotRow>()
             .Where(row => row.UserNum == userNum && row.Bag == 0 && row.ItemId == itemId)
@@ -83,7 +85,7 @@ public sealed class MySqlInventoryRepository(IDbConnectionFactory connections) :
         RequireUserNum(userNum);
         await using var session = await SugarSession.OpenAsync(connections, ct).ConfigureAwait(false);
         var db = session.Db;
-        await using var tx = await session.BeginAsync().ConfigureAwait(false);
+        await using var tx = await session.BeginWriteAsync(userNum, authority, ct).ConfigureAwait(false);
         await MySqlPlayerLock.AcquireAsync(db, userNum, ct).ConfigureAwait(false);
         var stored = await db.Queryable<PlayerRow>().Where(p => p.UserNum == userNum)
             .Select(p => p.LastLoginDay).Take(1).ToListAsync(ct).ConfigureAwait(false);
@@ -142,7 +144,7 @@ public sealed class MySqlInventoryRepository(IDbConnectionFactory connections) :
         var ended = EndedRows(userNum, now.ToUnixTimeMilliseconds());
         await using var session = await SugarSession.OpenAsync(connections, ct).ConfigureAwait(false);
         var db = session.Db;
-        await using var tx = await session.BeginAsync().ConfigureAwait(false);
+        await using var tx = await session.BeginWriteAsync(userNum, authority, ct).ConfigureAwait(false);
         await MySqlPlayerLock.AcquireAsync(db, userNum, ct).ConfigureAwait(false);
         var expired = await db.Queryable<InventorySlotRow>()
             .Where(ended)
@@ -167,7 +169,7 @@ public sealed class MySqlInventoryRepository(IDbConnectionFactory connections) :
         RequireUserNum(userNum);
         await using var session = await SugarSession.OpenAsync(connections, ct).ConfigureAwait(false);
         var db = session.Db;
-        await using var tx = await session.BeginAsync().ConfigureAwait(false);
+        await using var tx = await session.BeginWriteAsync(userNum, authority, ct).ConfigureAwait(false);
         await MySqlPlayerLock.AcquireAsync(db, userNum, ct).ConfigureAwait(false);
         var stored = await db.Queryable<InventorySlotRow>()
             .Where(s => s.UserNum == userNum && (s.Bag == 0 || s.Bag == 1))
@@ -255,7 +257,7 @@ public sealed class MySqlInventoryRepository(IDbConnectionFactory connections) :
 
         await using var session = await SugarSession.OpenAsync(connections, ct).ConfigureAwait(false);
         var db = session.Db;
-        await using var tx = await session.BeginAsync().ConfigureAwait(false);
+        await using var tx = await session.BeginWriteAsync(userNum, authority, ct).ConfigureAwait(false);
         await MySqlPlayerLock.AcquireAsync(db, userNum, ct).ConfigureAwait(false);
         var bagId = (int)bag;
         var rows = await db.Queryable<InventorySlotRow>()
@@ -300,7 +302,7 @@ public sealed class MySqlInventoryRepository(IDbConnectionFactory connections) :
 
         await using var session = await SugarSession.OpenAsync(connections, ct).ConfigureAwait(false);
         var db = session.Db;
-        await using var tx = await session.BeginAsync().ConfigureAwait(false);
+        await using var tx = await session.BeginWriteAsync(userNum, authority, ct).ConfigureAwait(false);
         var bagId = (int)bag;
         await db.Deleteable<InventorySlotRow>()
             .Where(s => s.UserNum == userNum && s.Bag == bagId)
@@ -325,7 +327,7 @@ public sealed class MySqlInventoryRepository(IDbConnectionFactory connections) :
 
         await using var session = await SugarSession.OpenAsync(connections, ct).ConfigureAwait(false);
         var db = session.Db;
-        await using var tx = await session.BeginAsync().ConfigureAwait(false);
+        await using var tx = await session.BeginWriteAsync(userNum, authority, ct).ConfigureAwait(false);
         var bagId = (int)InventoryBag.CharacterBag;
         // Existence is decided by the read, never by the UPDATE row count: a
         // repeated wear writes the same flags byte, which MySQL reports as zero

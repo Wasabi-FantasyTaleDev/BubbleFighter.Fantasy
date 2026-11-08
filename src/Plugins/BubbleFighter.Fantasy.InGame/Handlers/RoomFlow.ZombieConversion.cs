@@ -29,14 +29,13 @@ internal sealed partial class RoomFlow
                 // cn-324 sub_68AE20 / kr-812 sub_78BCC0 request conversion after death; cn-324 sub_68C290 and
                 // kr-812 sub_78D340 use human 2 and zombie 15. A build whose client times its own respawn
                 // (server_revives false) is dead from its death report until its spawn is accepted.
-                if (room.Phase != RoomPhase.Playing || room.ModeId != _options?.ZombieConversionModeId
+                if (room.Phase != RoomPhase.Playing || _options is not { } options
+                    || room.ModeId != options.ZombieConversionModeId || !options.AllowsRespawn(room.ModeId)
                     || room.FindByGame(session.Id) is not { Team: 2 or 15 } seat
-                    || (!seat.AwaitingRespawn && seat.LastDeathActor is null && !(pveRevival && seat.Team == 15)))
+                    || (!seat.Life.ServerTimedWait && seat.Life.DeathActor is null && !(pveRevival && seat.Team == 15)))
                     return;
                 seat.Team = 15;
-                seat.AwaitingRespawn = false;
-                seat.InstantRevivalPending = false;
-                seat.LastDeathActor = null;
+                seat.Life.EndDeathByConversion();
                 change = new(seat.Slot, 15);
                 members = [.. room.Seats];
             }

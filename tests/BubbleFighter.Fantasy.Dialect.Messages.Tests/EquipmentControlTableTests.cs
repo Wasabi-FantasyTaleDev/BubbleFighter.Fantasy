@@ -38,6 +38,7 @@ public sealed class EquipmentControlTableTests
     [InlineData("id-400")]
     [InlineData("id-1809")]
     [InlineData("cn-706")]
+    [InlineData("cn-406")]
     public void PresetRequestKeepsSignedContextAndTheUnfilteredNativeByte(string build)
     {
         Assert.Equal(new WeaponPresetChangeRequested(-1, 4),

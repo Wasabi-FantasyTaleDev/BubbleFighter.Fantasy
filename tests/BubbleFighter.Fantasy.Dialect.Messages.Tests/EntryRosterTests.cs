@@ -46,6 +46,24 @@ public sealed class EntryRosterTests
         }
     }
 
+    /// <summary>
+    /// kr-812 sub_810C20 quits through sub_8E51A0 after the relay join unless the signature word stored by sub_8071A0
+    /// equals the round mode, so the start burst carries the room mode before the stage enter.
+    /// </summary>
+    [Fact]
+    public async Task Kr812StartSendsTheRoomModeSignatureBeforeTheStageEnter()
+    {
+        const string build = "kr-812";
+        var session = new RecordingSession(build);
+        var (schema, play) = TestBuilds.Of(build);
+        var codec = new PlayRoomCodec(build + "/game", build, schema, play,
+            new Tables(signature: true), NullLogger.Instance, TestBuilds.Packets);
+        await codec.SendAsync(session, new RoomMatchStarting(Room([Member(0, "AB", 1, 17), Member(1, "CD", 2, 23)]), "ab"), default);
+        Assert.Equal(new ushort[] { 503, 503, 522, 510 }, session.Sent.Select(packet => packet.Opcode));
+        // u16 mode, u8 zero, u32 empty byte-vector count (reader kr-812 sub_80C2E0).
+        Assert.Equal("01000000000000", Convert.ToHexString(session.Sent[2].Payload));
+    }
+
     [Theory]
     [InlineData("cn-279", 184, 149, 1408, 0, 4)]
     [InlineData("cn-324", 196, 221, 1996, 0, 8)]
@@ -178,16 +196,16 @@ public sealed class EntryRosterTests
         }
     }
 
-    private sealed class Tables : IOpcodeTableRegistry
+    private sealed class Tables(bool signature = false) : IOpcodeTableRegistry
     {
-        private readonly IOpcodeTable _table = new EntryTable();
+        private readonly IOpcodeTable _table = new EntryTable(signature);
         public IReadOnlyList<IOpcodeTable> All => [_table];
         public IDisposable Register(IOpcodeTable table) => throw new NotSupportedException();
         public IOpcodeTable Get(string profileId) => _table;
         public bool TryGet(string profileId, out IOpcodeTable? table) { table = _table; return true; }
     }
 
-    private sealed class EntryTable : IOpcodeTable
+    private sealed class EntryTable(bool signature) : IOpcodeTable
     {
         public ClientProfile Profile => throw new NotSupportedException();
         public OpcodeConnection Connection => OpcodeConnection.Game;
@@ -195,6 +213,7 @@ public sealed class EntryRosterTests
         [
             new(503, PacketDirection.ServerToClient, "gspRoomSetSlot", Evidence.Verified, null, null),
             new(510, PacketDirection.ServerToClient, "gspRoomEnterGame", Evidence.Verified, null, null),
+            .. signature ? [new OpcodeEntry(522, PacketDirection.ServerToClient, "gspSetSessionSigData", Evidence.Inferred, null, null)] : Array.Empty<OpcodeEntry>(),
         ];
         public IOpcodeTable ForConnection(OpcodeConnection connection) => this;
         public bool TryGet(PacketDirection direction, ushort value, out OpcodeEntry? entry) => throw new NotSupportedException();

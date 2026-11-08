@@ -3,13 +3,18 @@ structs:
   # Own readers: kr-812 sub_80A910, cn-717 sub_8C4210, id-400 sub_93D120,
   # id-1809 sub_4D60C0, cn-406 sub_700770 and cn-324 sub_410910.
   # The NPC property selects a server score unit, not a character or player identity.
+  # cn-705 sub_4C5A00 / cn-705 sub_4BAA30, kr-1256 sub_6DC720, cn-774 sub_89E020
+  # and tw-454 sub_710EB0 independently send the same unit word.
   PvePangUnit:
     - unit_index: u32
       offset: 4
   # Readers kr-812 sub_9D95D0, cn-717 sub_7F4370, id-400 sub_72E4D0,
-  # id-1809 sub_4D8130, cn-406 sub_715B70 and cn-324 sub_6EB8B0 read three words.
+  # id-1809 sub_4D8130, cn-406 sub_715B70, cn-706 sub_7A23F0 and cn-324 sub_6EB8B0 read three words.
   # Delta consumers: kr-812 sub_7FED80, cn-717 sub_882530, id-400 sub_785FC0,
-  # id-1809 sub_7A9650, cn-406 sub_703930 and cn-324 sub_6EE7A0.
+  # id-1809 sub_7A9650, cn-406 sub_703930, cn-706 sub_78BBD0 and cn-324 sub_6EE7A0.
+  # cn-705 sub_80C530 reads three words; cn-705 sub_78A740 applies the delta.
+  # Modern consumers kr-1256 sub_9E1EB0, cn-774 sub_8D7D20 and tw-454 sub_A578B0
+  # case 925 read three words and update the live seat, independently of the result-rank vector.
   PveGamePoint:
     - seat: u32
       offset: 4
@@ -18,6 +23,9 @@ structs:
     - amount: u32
       offset: 12
   # kr-812 sub_80BD70 / cn-324 sub_6EA940 read five words; native 24-byte stride includes the vtable.
+  # cn-406 sub_6FFB10 reads the same five words; cn-706 sub_78BC80 consumes PveRankInfo
+  # through cn-706 sub_7887A0 (u32, counted u32 vector, nested 24-byte rows) and sums the
+  # unknown_8, unknown_12 and unknown_16 words into the seat's score while storing rank separately.
   PveRankRow:
     - seat: u32
       offset: 4
@@ -35,7 +43,7 @@ structs:
   PveRankInfo:
     - unknown_4: u32 # Native result-state field; zero is provisional until a consumer is found.
       offset: 4
-    - unknown_8: empty_list # Native u32 vector, consumed separately by presentation code.
+    - unknown_8: empty_list # Native u32 vector, consumed separately by presentation code. cn-406 sub_700810 reads the same counted vector; the server always sends it empty.
       offset: 8
     - rows: list<PveRankRow>
       offset: 20

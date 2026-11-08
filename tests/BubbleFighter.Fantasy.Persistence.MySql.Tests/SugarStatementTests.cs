@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using System.Reflection;
 using BubbleFighter.Fantasy.Contracts.Clans;
 using BubbleFighter.Fantasy.Contracts.Inventory;
@@ -74,6 +74,21 @@ public sealed class SugarStatementTests
         sql = Normalize(sql);
         Assert.Contains("(`user_num`,`lucci`,`cash`) VALUES", sql, StringComparison.Ordinal);
         Assert.EndsWith("ON DUPLICATE KEY UPDATE `user_num` = VALUES(`user_num`)", sql, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FirstWalletInsertConflictCannotReplaceExistingBalances()
+    {
+        var row = new WalletRow { UserNum = 7, Lucci = 100, Cash = 50 };
+        var (sql, _) = SugarSql.BuildUpsert(Client(), row, [nameof(WalletRow.UpdatedAt)],
+            [nameof(WalletRow.UserNum)], []);
+        sql = Normalize(sql);
+
+        Assert.StartsWith("INSERT INTO `player_wallets` (`user_num`,`lucci`,`cash`) VALUES", sql, StringComparison.Ordinal);
+        Assert.EndsWith("ON DUPLICATE KEY UPDATE `user_num` = VALUES(`user_num`)", sql, StringComparison.Ordinal);
+        Assert.DoesNotContain("`lucci` =", sql, StringComparison.Ordinal);
+        Assert.DoesNotContain("`cash` =", sql, StringComparison.Ordinal);
+        Assert.DoesNotContain("`updated_at` =", sql, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -297,7 +312,7 @@ public sealed class SugarStatementTests
             }));
         var db = Client();
         var entities = assembly.GetTypes().Where(t => t.GetCustomAttribute<SugarTable>() is not null).ToArray();
-        Assert.Equal(24, entities.Length);
+        Assert.Equal(26, entities.Length);
         foreach (var entity in entities)
         {
             var info = db.EntityMaintenance.GetEntityInfo(entity);

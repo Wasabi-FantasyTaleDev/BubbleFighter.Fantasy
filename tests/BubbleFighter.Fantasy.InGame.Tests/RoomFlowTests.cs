@@ -45,11 +45,14 @@ public sealed class RoomFlowTests
         public Sink<RoomMasterChangeReplied> MasterReplies { get; } = new();
         public Sink<RoomJoinRefused> Refused { get; } = new();
         public Sink<RoomLeft> Left { get; } = new();
+        public Sink<MainMenuRoomOpened> MainMenu { get; } = new();
+        public Sink<PlazaEntered> Plaza { get; } = new();
         public Sink<RoomMatchStarting> Starting { get; } = new();
         public Sink<RoomSettingsChanged> SettingsChanged { get; } = new();
         public Sink<RoomUiChanged> UiChanged { get; } = new();
         public Sink<RoomProbeAcknowledged> ProbeAcknowledged { get; } = new();
         public Sink<RoomChatReceived> Chat { get; } = new();
+        public Sink<RoomSessionChatReceived> SessionChat { get; } = new();
         public Sink<RoomSeatLockChanged> SeatLock { get; } = new();
         public Sink<RoomMemberKicked> Kicked { get; } = new();
         public Sink<RoomAutoStartNotified> AutoStart { get; } = new();
@@ -62,14 +65,19 @@ public sealed class RoomFlowTests
 
         public Rig(int seats = 16, InGameOptions? options = null, bool stageProbes = false,
             Func<long>? autoStartNow = null, Func<TimeSpan, CancellationToken, ValueTask>? autoStartDelay = null,
-            Func<TimeSpan, CancellationToken, ValueTask>? zombieKingDelay = null, IGameText? texts = null)
+            Func<TimeSpan, CancellationToken, ValueTask>? zombieKingDelay = null, IGameText? texts = null,
+            TimeProvider? admissionClock = null, bool migrationHome = false, bool plaza = false)
         {
-            Registry = new RoomRegistry(options ?? new InGameOptions { MaxPlayersPerMatch = seats });
+            Registry = new RoomRegistry(options ?? new InGameOptions { MaxPlayersPerMatch = seats }, admissionClock: admissionClock);
             Flow = new RoomFlow(Registry, new RoomSenders(Entered, SeatUpdated, SeatVacated, MasterChanged, Refused, Left, Starting,
-                Chat: Chat, SeatLock: SeatLock, Kicked: Kicked, AutoStart: AutoStart, Notices: Notices,
+                Chat: Chat, SessionChat: SessionChat, SeatLock: SeatLock, Kicked: Kicked, AutoStart: AutoStart, Notices: Notices,
                 RescuePrepared: RescuePrepared, SettingsChanged: SettingsChanged,
                 UiChanged: stageProbes ? UiChanged : null, ProbeAcknowledged: stageProbes ? ProbeAcknowledged : null,
-                MasterChangeReply: MasterReplies),
+                MasterChangeReply: MasterReplies, MainMenu: migrationHome ? MainMenu : null,
+                PlazaEntered: plaza ? Plaza : null,
+                PlazaMemberEntered: plaza ? new Sink<PlazaMemberEntered>() : null,
+                PlazaMemberLeft: plaza ? new Sink<PlazaMemberLeft>() : null,
+                PlazaPositionReceived: plaza ? new Sink<PlazaPositionReceived>() : null),
                 NullLogger.Instance, null, null, 36, options, default, texts ?? new TestTexts(), null, null,
                 autoStartNow ?? (() => Environment.TickCount64),
                 autoStartDelay ?? ((delay, ct) => new(Task.Delay(delay, ct))),

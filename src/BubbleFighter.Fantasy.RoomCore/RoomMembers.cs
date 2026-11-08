@@ -47,7 +47,7 @@ public sealed class RoomMembers<TMember> where TMember : IRoomMember
     /// <summary>Gets whether no open seat remains.</summary>
     public bool IsFull => _members.Count + _closedSlots.Count + _reservedSlots.Count >= _capacity;
 
-    /// <summary>Reserves an open seat for a non-connection occupant without making it a closed seat.</summary>
+    /// <summary>Reserves an open seat for an occupant or pending admission without making it a closed seat.</summary>
     /// <param name="slot">The seat to reserve.</param>
     /// <returns>Whether the seat was open and is now reserved.</returns>
     public bool Reserve(int slot)
@@ -96,6 +96,23 @@ public sealed class RoomMembers<TMember> where TMember : IRoomMember
         if (member.Slot != slot)
             throw new InvalidOperationException($"Member occupies seat {member.Slot}, expected {slot}.");
         _members.Add(member);
+        return member;
+    }
+
+    /// <summary>Atomically replaces one caller-owned reservation with a member, retaining the hold if creation fails.</summary>
+    /// <param name="slot">The seat reserved by the caller.</param>
+    /// <param name="create">Creates the member for that exact seat.</param>
+    /// <returns>The newly occupied member.</returns>
+    public TMember AddReserved(int slot, Func<int, TMember> create)
+    {
+        ArgumentNullException.ThrowIfNull(create);
+        if (!_reservedSlots.Contains(slot))
+            throw new InvalidOperationException($"Room seat {slot} is not reserved.");
+        var member = create(slot);
+        if (member.Slot != slot)
+            throw new InvalidOperationException($"Member occupies seat {member.Slot}, expected {slot}.");
+        _members.Add(member);
+        _reservedSlots.Remove(slot);
         return member;
     }
 

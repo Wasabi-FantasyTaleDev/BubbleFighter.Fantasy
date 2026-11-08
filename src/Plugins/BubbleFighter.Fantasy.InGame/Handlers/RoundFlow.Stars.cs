@@ -26,7 +26,7 @@ internal sealed partial class RoundFlow
     {
         if (request.Kind is not (SmallStarKind or BigStarKind))
             throw new InvalidOperationException($"Star kind {request.Kind} is not a small or big star.");
-        var (room, _) = _registry.RequireGame(session);
+        if (FindGameReportRoom(session) is not { } room) return;
         await room.Executor.ExecuteAsync(async operationCt =>
         {
             RoomSeat[] members = [];
@@ -63,7 +63,7 @@ internal sealed partial class RoundFlow
     // sends gcpEatStar and then the score report), and gspStarEaten changes no counter (kr-812 sub_5153D0).
     internal async ValueTask HandleStarPickupAsync(ISession session, RoundStarPickupRequested request, CancellationToken ct)
     {
-        var (room, _) = _registry.RequireGame(session);
+        if (FindGameReportRoom(session) is not { } room) return;
         await room.Executor.ExecuteAsync(async operationCt =>
         {
             RoomSeat[] members;

@@ -6,8 +6,8 @@ using Microsoft.Extensions.Logging;
 namespace BubbleFighter.Fantasy.InGame.Handlers;
 
 /// <summary>
-/// The zombie battle: humans against a zombie king and the zombinis it makes. The client keeps no rules of its
-/// own (kr-812 ZombieModeMgr): every member's client treats the first seat the server moves to the zombie team
+/// The zombie battle: humans against a zombie king and the zombinis it makes. Every member's client treats
+/// the first seat the server moves to the zombie team
 /// as the zombie king and every later one as a zombini (kr-812 sub_776870 counts the zombie team in
 /// sub_776770 and plays the king's transformation when it holds one player), and a seat already on the zombie
 /// team that is moved there again revives as a zombie.
@@ -33,6 +33,8 @@ internal sealed partial class RoomFlow
     {
         if (!IsZombiePvp(room))
             return;
+        lock (room.Gate)
+            room.ZombieBattleParticipants = room.Seats.Count;
         room.ZombieKingTask = BackgroundWork.Detached(() => PickZombieKingAsync(room, generation));
     }
 
@@ -50,7 +52,8 @@ internal sealed partial class RoomFlow
                     // A player who died before the opening ended already became the king.
                     if (room.Phase != RoomPhase.Playing || room.StartGeneration != generation || room.ZombieKingSlot is not null)
                         return;
-                    var humans = room.Seats.Where(seat => seat.Team == ZombiePvpHumanTeam && !seat.Game.Connection.IsClosed).ToArray();
+                    var humans = room.Seats.Where(seat => seat.Team == ZombiePvpHumanTeam && !seat.Game.Connection.IsClosed
+                        && (_options!.AllowsRespawn(room.ModeId) || seat.Life.State is SeatLife.Alive or SeatLife.Bubble)).ToArray();
                     if (humans.Length == 0)
                         return;
                     var king = humans[Random.Shared.Next(humans.Length)];
@@ -77,9 +80,9 @@ internal sealed partial class RoomFlow
     }
 
     /// <summary>
-    /// Answers the death report of a zombie battle: kr-812 sub_76C090 sends gcpRoomChangeTeam on every death of
-    /// the local player. A dead human becomes a zombini (or the king, when it is the first), a dead zombini comes
-    /// back without limit, and a dead king gives the humans the round.
+    /// Answers the native conversion request: kr-812 sub_76C090 sends gcpRoomChangeTeam for the local player.
+    /// Humans become zombinis (or the first king), and zombinis return without limit. The king is excluded from
+    /// conversion waits (kr-812 sub_76F710); its final-death notification, not this request, decides its defeat.
     /// </summary>
     private Task HandleZombiePvpDeathAsync(PlayRoom room, ISession session, CancellationToken ct) =>
         room.Executor.ExecuteAsync(async operationCt =>
@@ -93,11 +96,11 @@ internal sealed partial class RoomFlow
                     return;
                 if (seat.Team == ZombiePvpZombieTeam && seat.Slot == room.ZombieKingSlot)
                 {
-                    room.DecidedWinnerTeam = ZombiePvpHumanTeam;
-                    _logger.LogInformation("Room {Room}: the zombie king (seat {Seat}) was defeated.", room.Id, seat.Slot);
+                    return;
                 }
                 else if (seat.Team is ZombiePvpHumanTeam or ZombiePvpZombieTeam)
                 {
+                    if (!_options!.AllowsRespawn(room.ModeId)) return;
                     // The report names no killer (kr-812 sub_76C090 sends an empty body). Humans share one team,
                     // so only a zombie can finish one off; a human who falls to the map turns as well.
                     if (seat.Team == ZombiePvpHumanTeam && room.ZombieKingSlot is null)
@@ -107,9 +110,7 @@ internal sealed partial class RoomFlow
                 }
                 else
                     return;
-                seat.AwaitingRespawn = false;
-                seat.InstantRevivalPending = false;
-                seat.LastDeathActor = null;
+                if (change is not null && _options!.AllowsRespawn(room.ModeId)) seat.Life.EndDeathByConversion();
                 members = [.. room.Seats];
             }
             if (change is { } converted)

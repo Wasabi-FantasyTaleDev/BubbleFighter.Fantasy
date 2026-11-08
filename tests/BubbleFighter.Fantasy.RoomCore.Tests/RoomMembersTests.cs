@@ -62,6 +62,23 @@ public sealed class RoomMembersTests
         Assert.Empty(members.Members);
     }
 
+    [Fact]
+    public void ReservedAdmissionKeepsItsSeatWhenCreationFailsAndConsumesItExactlyOnce()
+    {
+        var members = new RoomMembers<Member>(2);
+        var host = members.Add(slot => new Member(slot));
+        Assert.True(members.Reserve(1));
+        Assert.True(members.IsFull);
+        Assert.Throws<InvalidOperationException>(() => members.AddReserved(1, _ => throw new InvalidOperationException("creation failed")));
+        Assert.Throws<InvalidOperationException>(() => members.AddReserved(1, _ => new Member(0)));
+        Assert.True(members.IsFull);
+        Assert.Single(members.Members);
+        var guest = members.AddReserved(1, slot => new Member(slot));
+        Assert.Equal(new[] { host, guest }, members.Members);
+        Assert.False(members.Release(1));
+        Assert.Throws<InvalidOperationException>(() => members.AddReserved(1, slot => new Member(slot)));
+    }
+
     private sealed class Member(int slot) : IRoomMember
     {
         public int Slot { get; } = slot;

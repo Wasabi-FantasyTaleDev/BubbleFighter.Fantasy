@@ -1,0 +1,6 @@
+# Explicit opt-in to the build-audited captain exchange; native-client acceptance remains required.
+- set:
+    id: dialect.rooms
+    config:
+      captain_mode: true
+      result_scoreboard_modes: [1, 8, 19, 20, 32]

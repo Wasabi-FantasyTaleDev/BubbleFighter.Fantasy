@@ -39,10 +39,11 @@ internal sealed class CharacterCreationPreview(int capacity, IPlayerRepository p
         lock (_gate)
         {
             account = RequirePending(session).Account;
-            result = IsAvailable(request.Nickname) ? 0 : 1;
+            result = NameResult(request.Nickname);
         }
-        if (persistent && result == 0 && await players.NicknameExistsAsync(request.Nickname, ct, account).ConfigureAwait(false))
-            result = 1;
+        if (persistent && result == CharacterCreationResult.Accepted
+            && await players.NicknameExistsAsync(request.Nickname, ct, account).ConfigureAwait(false))
+            result = CharacterCreationResult.NameTaken;
         await sender.SendAsync(session, new(result, request.Nickname), ct).ConfigureAwait(false);
     }
 
@@ -50,30 +51,34 @@ internal sealed class CharacterCreationPreview(int capacity, IPlayerRepository p
         IMessageSender<CharacterCreateReplied> sender, CancellationToken ct)
     {
         string account;
-        var accepted = false;
+        int result;
         lock (_gate)
         {
             var pending = RequirePending(session);
             account = pending.Account;
-            if (!pending.Created && _characterTypes.Contains(request.CharacterType) && IsAvailable(request.Nickname)
-                && !_created.ContainsKey(account) && _created.Count < capacity)
-            {
+            result = NameResult(request.Nickname);
+            if (result == CharacterCreationResult.Accepted && !_characterTypes.Contains(request.CharacterType))
+                result = CharacterCreationResult.CharacterUnusable;
+            // A repeated submission or a full preview cannot create the record now.
+            if (result == CharacterCreationResult.Accepted
+                && (pending.Created || _created.ContainsKey(account) || _created.Count >= capacity))
+                result = CharacterCreationResult.CreationFailed;
+            if (result == CharacterCreationResult.Accepted)
                 _created.Add(account, (request.Nickname, 300000 + request.CharacterType));
-                accepted = true;
-            }
         }
-        if (!accepted)
+        if (result != CharacterCreationResult.Accepted)
         {
-            await sender.SendAsync(session, new(1), ct).ConfigureAwait(false);
+            await sender.SendAsync(session, new(result), ct).ConfigureAwait(false);
             return;
         }
         var player = persistent
             ? await players.CreateCharacterAsync(account, request.Nickname, KitFor(account), ct).ConfigureAwait(false)
             : await players.CreateAsync(account, request.Nickname, ct).ConfigureAwait(false);
+        // The store refuses a name or account that another creation took first.
         if (player is null)
         {
             lock (_gate) _created.Remove(account);
-            await sender.SendAsync(session, new(1), ct).ConfigureAwait(false);
+            await sender.SendAsync(session, new(CharacterCreationResult.NameTaken), ct).ConfigureAwait(false);
             return;
         }
         if (!atomicInventory && inventory is not null)
@@ -83,7 +88,7 @@ internal sealed class CharacterCreationPreview(int capacity, IPlayerRepository p
             if (_pending.TryGetValue(session.Id, out var pending))
                 _pending[session.Id] = pending with { Created = true };
         }
-        await sender.SendAsync(session, new(0), ct).ConfigureAwait(false);
+        await sender.SendAsync(session, new(CharacterCreationResult.Accepted), ct).ConfigureAwait(false);
     }
 
     internal string Finish(ISession session)
@@ -126,8 +131,13 @@ internal sealed class CharacterCreationPreview(int capacity, IPlayerRepository p
     private Pending RequirePending(ISession session) => _pending.TryGetValue(session.Id, out var pending)
         ? pending : throw new InvalidOperationException("No character creation is open for this session.");
 
-    // cn-279 sub_6E9850 limits the native name edit control to twelve UTF-16 units.
-    private bool IsAvailable(string nickname) => !string.IsNullOrWhiteSpace(nickname)
-        && nickname.Length <= 12 && !nickname.Any(char.IsControl)
-        && !_created.Values.Any(choice => string.Equals(choice.Nickname, nickname, StringComparison.OrdinalIgnoreCase));
+    // cn-279 sub_6E9850 limits the native name edit control to twelve UTF-16 units. Each refusal gets the code
+    // whose dialog explains it.
+    private int NameResult(string nickname) =>
+        string.IsNullOrWhiteSpace(nickname) || nickname.Any(char.IsControl) ? CharacterCreationResult.NameUnusable
+        : nickname.Length > 12 ? CharacterCreationResult.NameLength
+        // TODO: a configurable profanity filter answers CharacterCreationResult.NameProfane here.
+        : _created.Values.Any(choice => string.Equals(choice.Nickname, nickname, StringComparison.OrdinalIgnoreCase))
+            ? CharacterCreationResult.NameTaken
+        : CharacterCreationResult.Accepted;
 }

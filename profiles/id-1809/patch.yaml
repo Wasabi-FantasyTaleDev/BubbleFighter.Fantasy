@@ -25,7 +25,7 @@
       # Pirate (horde) rooms have no start button: once every seat is taken or closed, the clients run the
       # native five-second countdown (id-1809 gspRepAutoStart gate sub_63ED50) and the master's client enters.
       # The tutorial (mode 103) is not a room of this kind and keeps its own start.
-      auto_start_mode_ids: [101, 102]
+      auto_start_mode_ids: [101, 102, 16]
       lottery_items:
       - group: crew
         item_id: 100207
@@ -391,3 +391,11 @@
     id: dialect.messages
     config:
       customized_keys: false
+- set:
+    id: dialect.rooms
+    config:
+      plaza_recruitment: true
+- set:
+    id: ingame
+    config:
+      plaza_recruitment: true

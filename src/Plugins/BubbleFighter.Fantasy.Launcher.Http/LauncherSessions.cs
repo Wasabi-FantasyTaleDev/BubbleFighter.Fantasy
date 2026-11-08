@@ -18,7 +18,8 @@ public sealed record LauncherGrant(string AccessToken, DateTimeOffset AccessExpi
 /// build-bound single-use launch tickets derived from them. A server restart drops bearers and tickets only; the
 /// launcher renews its bearer from the stored session.
 /// </summary>
-public sealed class LauncherSessions(LauncherOptions options, ILauncherSessionStore store, TimeProvider? clock = null) : ILauncherTicketService
+public sealed class LauncherSessions(LauncherOptions options, ILauncherSessionStore store, TimeProvider? clock = null)
+    : ILauncherTicketService, ILauncherNodeTicketService
 {
     private const int TokenBytes = 32;
     private readonly TimeProvider _clock = clock ?? TimeProvider.System;
@@ -26,7 +27,8 @@ public sealed class LauncherSessions(LauncherOptions options, ILauncherSessionSt
     private readonly SemaphoreSlim _mutations = new(1, 1);
     private DateTimeOffset? _lastRefreshPrune;
     private readonly Dictionary<string, Entry> _access = new(StringComparer.Ordinal), _tickets = new(StringComparer.Ordinal);
-    private sealed record Entry(string Username, string SessionId, string? Build, DateTimeOffset ExpiresAt, string? LauncherLanguage = null, string? LaunchId = null);
+    private sealed record Entry(string Username, string SessionId, string? Build, DateTimeOffset ExpiresAt,
+        string? LauncherLanguage = null, string? LaunchId = null, LauncherServerSelectionGrant? Selection = null, string? LocalNodeId = null);
 
     /// <summary>Starts a new durable session for <paramref name="username"/> and returns its first credentials.</summary>
     public ValueTask<LauncherGrant> SignInAsync(string username, CancellationToken ct) =>
@@ -130,6 +132,36 @@ public sealed class LauncherSessions(LauncherOptions options, ILauncherSessionSt
 
     /// <summary>Issues a one-use ticket carrying the user's optional Launcher UI language and the launch it belongs to.</summary>
     public (string Token, DateTimeOffset ExpiresAt) Issue(string accessToken, string build, string? launcherLanguage, string? launchId = null)
+        => IssueCore(accessToken, build, launcherLanguage, launchId, null, null, null);
+
+    /// <summary>Issues a ticket whose original node membership and issuer policy remain fixed for its full lifetime, independently of short health observations.</summary>
+    public (string Token, DateTimeOffset ExpiresAt) IssueForServers(string accessToken, string build,
+        LauncherServerSelectionSnapshot snapshot, string localNodeId, string policyRevision,
+        string? launcherLanguage = null, string? launchId = null)
+    {
+        static bool Id(string? value) => value is { Length: > 0 and <= 128 } && value.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or '.');
+        var issuerOrigins = snapshot.Servers.Where(server => server.Automatic).SelectMany(server => server.Targets)
+            .Select(target => target.Authentication?.ApiUrl).Distinct(StringComparer.Ordinal).ToArray();
+        if (!Id(localNodeId) || !Id(policyRevision) || !Id(snapshot.AuthorityId) || !Id(snapshot.DataScope)
+            || snapshot.Servers.Count < 1
+            || snapshot.Servers.Sum(server => server.Targets.Count) > options.MaxSelectionTargets
+            || !snapshot.Servers.Any(server => server.Automatic && server.Targets.Count > 0)
+            || issuerOrigins.Length != 1 || string.IsNullOrEmpty(issuerOrigins[0])
+            || snapshot.Servers.Any(server => server.Targets.Any(target => !Id(target.NodeId)
+                || server.Automatic && target.DataScope != snapshot.DataScope
+                || target.Authentication is not { Mode: "master-issued", PolicyMode: "authority" } auth
+                || auth.AuthorityId != snapshot.AuthorityId || auth.ApiUrl != issuerOrigins[0])))
+            throw new ArgumentException("The launch requires a bounded, authority-owned endpoint snapshot.", nameof(snapshot));
+        var frozen = snapshot with
+        {
+            Servers = Array.AsReadOnly(snapshot.Servers.Select(server => server with
+            { Targets = Array.AsReadOnly(server.Targets.Select(target => target with { }).ToArray()) }).ToArray()),
+        };
+        return IssueCore(accessToken, build, launcherLanguage, launchId, frozen, localNodeId, policyRevision);
+    }
+
+    private (string Token, DateTimeOffset ExpiresAt) IssueCore(string accessToken, string build, string? launcherLanguage,
+        string? launchId, LauncherServerSelectionSnapshot? snapshot, string? localNodeId, string? policyRevision)
     {
         if (launcherLanguage is not (null or "zh-CN" or "zh-TW" or "ko" or "en" or "id" or "vi"))
             throw new ArgumentException("Unsupported Launcher UI language.", nameof(launcherLanguage));
@@ -138,7 +170,36 @@ public sealed class LauncherSessions(LauncherOptions options, ILauncherSessionSt
             Prune();
             var bearer = _access.GetValueOrDefault(Key(accessToken)) ?? throw new UnauthorizedAccessException();
             var expiry = _clock.GetUtcNow().AddSeconds(options.TicketSeconds);
-            return Add(_tickets, bearer with { Build = build, ExpiresAt = expiry < bearer.ExpiresAt ? expiry : bearer.ExpiresAt, LauncherLanguage = launcherLanguage, LaunchId = launchId });
+            if (expiry > bearer.ExpiresAt) expiry = bearer.ExpiresAt;
+            var selection = snapshot is null ? null : new LauncherServerSelectionGrant(NewToken(), build,
+                snapshot.AuthorityId, policyRevision!, snapshot.DataScope, expiry, snapshot);
+            return Add(_tickets, bearer with { Build = build, ExpiresAt = expiry, LauncherLanguage = launcherLanguage,
+                LaunchId = launchId, Selection = selection, LocalNodeId = localNodeId });
+        }
+    }
+
+    /// <summary>Reads an unconsumed grant only for its authorizing session and exact build and grant identity, without renewing or consuming the ticket.</summary>
+    public LauncherServerSelectionGrant? Selection(string accessToken, string ticket, string build, string grantId)
+    {
+        lock (_gate)
+        {
+            Prune();
+            var bearer = _access.GetValueOrDefault(Key(accessToken));
+            var entry = _tickets.GetValueOrDefault(Key(ticket));
+            return bearer is not null && entry is not null && entry.SessionId == bearer.SessionId && entry.Build == build
+                && entry.Selection?.GrantId == grantId ? entry.Selection : null;
+        }
+    }
+
+    /// <summary>Returns the just-issued grant for its authorizing session; only the issuer uses this overload before publishing the ticket response.</summary>
+    internal LauncherServerSelectionGrant? Selection(string accessToken, string ticket, string build)
+    {
+        lock (_gate)
+        {
+            Prune();
+            var bearer = _access.GetValueOrDefault(Key(accessToken));
+            var entry = _tickets.GetValueOrDefault(Key(ticket));
+            return bearer is not null && entry is not null && entry.SessionId == bearer.SessionId && entry.Build == build ? entry.Selection : null;
         }
     }
 
@@ -147,11 +208,24 @@ public sealed class LauncherSessions(LauncherOptions options, ILauncherSessionSt
 
     /// <inheritdoc />
     public LauncherTicketIdentity? RedeemIdentity(string ticket, string build)
+        => RedeemCore(ticket, build, null);
+
+    /// <inheritdoc />
+    public ValueTask<LauncherTicketIdentity?> RedeemForNodeAsync(string ticket, string build, string nodeId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ArgumentException.ThrowIfNullOrWhiteSpace(nodeId);
+        return ValueTask.FromResult(RedeemCore(ticket, build, nodeId));
+    }
+
+    private LauncherTicketIdentity? RedeemCore(string ticket, string build, string? nodeId)
     {
         lock (_gate)
         {
             Prune(); var key = Key(ticket); var entry = _tickets.GetValueOrDefault(key);
             if (entry is null || entry.Build != build) return null;
+            if (entry.Selection is { } selection && !selection.Snapshot.Servers.SelectMany(server => server.Targets)
+                .Any(target => target.NodeId == (nodeId ?? entry.LocalNodeId))) return null;
             _tickets.Remove(key); return new(entry.Username, entry.LauncherLanguage, entry.LaunchId);
         }
     }

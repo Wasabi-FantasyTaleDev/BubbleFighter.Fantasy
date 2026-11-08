@@ -46,6 +46,9 @@ internal enum LifeCheck
 
     /// <summary>A pop between characters of the same team, or of a seat without a team.</summary>
     PopWithoutOpposingTeams,
+
+    /// <summary>A reset confirmation for a mode whose explicit rule prohibits revival.</summary>
+    ResetConfirmedWhileRespawnDisabled,
 }
 
 /// <summary>Per-round counts of <see cref="LifeCheck"/> results; a fixed array, so it is bounded. Guarded by the room gate.</summary>

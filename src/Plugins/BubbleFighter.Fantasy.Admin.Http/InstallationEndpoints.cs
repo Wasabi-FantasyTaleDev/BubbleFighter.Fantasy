@@ -8,6 +8,8 @@ using BubbleFighter.Fantasy.Contracts.Admin;
 using BubbleFighter.Fantasy.Contracts.Installation;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace BubbleFighter.Fantasy.Admin.Http;
 
@@ -64,6 +66,10 @@ public sealed partial class AdminHttpPlugin
                  path?.StartsWith("/api/auth/", StringComparison.Ordinal) == true))
             {
                 if (http.Response.HasStarted) throw;
+                // A failure the mapper does not recognize must not vanish behind a bare 409: the
+                // administrator sees only "operation_failed", so the server keeps the cause.
+                http.RequestServices.GetRequiredService<ILoggerFactory>()
+                    .CreateLogger("admin.http").LogError(error, "Setup endpoint {Path} failed", path);
                 var code = error switch
                 {
                     BadHttpRequestException e when e.StatusCode == 413 => "client_data_limit",

@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Runtime.CompilerServices;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Party;
 using BubbleFighter.Fantasy.Contracts.Rooms;
@@ -7,13 +8,39 @@ using BubbleFighter.Fantasy.Packets;
 
 namespace BubbleFighter.Fantasy.Dialect.Rooms;
 
-/// <summary>Supplies typed identity and equipment values to the modern family's audited room tables.</summary>
+/// <summary>Supplies typed identity and equipment values to the audited native room containers.</summary>
 internal static class RoomRecords
 {
+    private static readonly ConditionalWeakTable<PacketTables, RoomTables> EquippedListTables = new();
+
+    private static bool UsesEquippedLists(PacketTables tables, string build) =>
+        tables.Resolve(build, "gspGotoRoom").Any(field => field is { Name: "equipped_item_lists", Type: "list<EquippedItemList>" });
+
+    private static RoomSchema EquippedListSchema(PacketTables tables, string build) =>
+        EquippedListTables.GetValue(tables, static snapshot => RoomTables.Load(snapshot)).Of(build).Schema;
+
+    private static RoomSlotValues EquippedListSeat(RoomMemberView seat, ISession? recipient, IGameText? texts)
+    {
+        if (seat.Ai is not null)
+            throw new ArgumentException("Separate equipment-list room projections require an audited human seat.", nameof(seat));
+        RequireSeatIndex(seat.Slot);
+        return new(true, false, seat.UserNum, RoomNames.Resolve(seat.Nickname, "", recipient, texts),
+            seat.CharacterItemId, seat.EquippedItemIds, seat.Ready)
+        {
+            ColorIndex = seat.ColorIndex, Team = seat.Team, Level = Math.Max(1, seat.Level), ControllerSlot = seat.Slot,
+        };
+    }
+
+    private static void RequireSeatIndex(int slot)
+    {
+        if (slot is < 0 or >= 36)
+            throw new ArgumentOutOfRangeException(nameof(slot), "Room seat indexes must be between 0 and 35.");
+    }
+
     internal static bool UsesEquippedObjects(PacketTables tables, string build) =>
         tables.Resolve(build, "gspGotoRoom").Any(field => field.Name == "equipped_objects");
 
-    internal static Dictionary<string, object?> Seat(RoomMemberView seat, ISession? recipient = null, IGameText? texts = null)
+    internal static Dictionary<string, object?> Seat(PacketTables tables, string build, RoomMemberView seat, ISession? recipient = null, IGameText? texts = null)
     {
         var values = new Dictionary<string, object?>
         {
@@ -28,7 +55,7 @@ internal static class RoomRecords
         ["unknown_97"] = seat.InShop,
         ["unknown_98"] = seat.InInventory,
         // kr-1256 sub_EE9550 uses level - 1; zero makes the level icon disappear.
-        ["level"] = Math.Max(1, seat.Level),
+        ["level"] = NativeDisplayLevel.Project(tables, build, seat.Level),
         };
         if (seat.Ai is { } ai)
         {
@@ -48,6 +75,7 @@ internal static class RoomRecords
                 },
             };
         }
+        NativePlazaRecruitment.Project(tables, build, values, seat.Recruitment);
         return values;
     }
 
@@ -129,10 +157,30 @@ internal static class RoomRecords
             throw new ArgumentException("Room installs require unique seat indexes below 36.", nameof(seats));
         var count = seats.Count == 0 ? 0 : seats.Max(seat => seat.Slot) + 1;
         var ordered = seats.ToDictionary(seat => seat.Slot);
+        if (UsesEquippedLists(tables, build))
+        {
+            var schema = EquippedListSchema(tables, build);
+            var slots = Enumerable.Range(0, count).Select(slot => ordered.TryGetValue(slot, out var seat)
+                ? EquippedListSeat(seat, recipient, texts) : RoomSlotValues.Empty(false)).ToArray();
+            // cn-735 sub_A4D6F0, cn-738 sub_A76920 and cn-742 sub_9BD720 read separate seat and equipment vectors.
+            return PacketCodec.Write(tables, build, "gspGotoRoom", new Dictionary<string, object?>
+            {
+                ["session_setting"] = setting, ["master_slot"] = masterSlot, ["local_slot"] = localSlot,
+                ["user_slots"] = slots.Select(slot => RoomCodec.PlaySeatValues(schema, slot, equipment: false)).ToArray(),
+                ["equipped_item_lists"] = slots.Select(slot => RoomCodec.PlaySeatValues(schema, slot, equipment: true)).ToArray(),
+                ["party_transition"] = partyTransition,
+            });
+        }
         var native = UsesEquippedObjects(tables, build);
         var rows = Enumerable.Range(0, count).Select(slot => ordered.TryGetValue(slot, out var seat)
-            ? native ? PlazaRecords.Seat(tables, build, seat, recipient, texts) : Seat(seat, recipient, texts)
+            ? native ? PlazaRecords.Seat(tables, build, seat, recipient, texts) : Seat(tables, build, seat, recipient, texts)
             : native ? new Dictionary<string, object?> { ["occupied"] = false } : Gap(slot)).ToArray();
+        if (setting.TryGetValue("kind", out var kind) && Convert.ToInt32(kind) == 3)
+            foreach (var seat in seats)
+            {
+                NativePlazaRecruitment.Project(tables, build, rows[seat.Slot], NativePlazaRecruitment.Allowed(recipient, seat.UserNum));
+                NativePlazaRecruitment.Project(tables, build, rows[seat.Slot], seat.Recruitment);
+            }
         return PacketCodec.Write(tables, build, "gspGotoRoom", new Dictionary<string, object?>
         {
             ["session_setting"] = setting,
@@ -150,10 +198,13 @@ internal static class RoomRecords
         ISession? recipient = null, IGameText? texts = null)
     {
         ValidateLayouts(tables, build);
+        if (UsesEquippedLists(tables, build))
+            return RoomCodec.WriteSeatEnvelope(tables, build, EquippedListSchema(tables, build), seat.Slot,
+                EquippedListSeat(seat, recipient, texts));
         return PacketCodec.Write(tables, build, "RoomSeatUpdate", new Dictionary<string, object?>
         {
             ["slot"] = seat.Slot,
-            ["user"] = UsesEquippedObjects(tables, build) ? PlazaRecords.Seat(tables, build, seat, recipient, texts) : Seat(seat, recipient, texts),
+            ["user"] = UsesEquippedObjects(tables, build) ? PlazaRecords.Seat(tables, build, seat, recipient, texts) : Seat(tables, build, seat, recipient, texts),
             ["equipment"] = UsesEquippedObjects(tables, build) ? EquippedObject(seat) : null,
             ["profile_entries"] = SlotProfiles(seats),
             ["unknown_n3"] = HumanProfiles(seats),
@@ -163,12 +214,30 @@ internal static class RoomRecords
     internal static byte[] SeatLeave(PacketTables tables, string build, int slot, bool closed = false)
     {
         ValidateLayouts(tables, build);
+        if (UsesEquippedLists(tables, build))
+        {
+            RequireSeatIndex(slot);
+            return RoomCodec.WriteSeatEnvelope(tables, build, EquippedListSchema(tables, build), slot,
+                RoomSlotValues.Empty(closed), leaving: true);
+        }
         return PacketCodec.Write(tables, build, "RoomSeatLeave", new Dictionary<string, object?>
         {
             ["slot"] = slot,
             ["user"] = UsesEquippedObjects(tables, build)
                 ? new Dictionary<string, object?> { ["occupied"] = false, ["closed"] = closed }
                 : Vacated(closed),
+        });
+    }
+
+    internal static byte[] PlazaRecruitmentUpdate(PacketTables tables, string build, RoomMemberView seat)
+    {
+        RequireSeatIndex(seat.Slot);
+        if (UsesEquippedLists(tables, build))
+            return RoomCodec.WriteSeatEnvelope(tables, build, EquippedListSchema(tables, build), seat.Slot,
+                EquippedListSeat(seat, null, null), leaving: true, recruitment: seat.Recruitment);
+        return PacketCodec.Write(tables, build, "RoomSeatLeave", new Dictionary<string, object?>
+        {
+            ["slot"] = seat.Slot, ["user"] = PlazaRecords.Seat(tables, build, seat),
         });
     }
 
@@ -191,6 +260,15 @@ internal static class RoomRecords
     /// <param name="build">The audited client build.</param>
     internal static void ValidateLayouts(PacketTables tables, string build)
     {
+        if (UsesEquippedLists(tables, build))
+        {
+            RoomCodec.ValidateLayouts(tables, build);
+            PacketLayoutContract.RequireFields(tables, build, "gspGotoRoom", "Room records",
+                ("session_setting", "SessionSetting"), ("master_slot", "u32"), ("local_slot", "u32"),
+                ("user_slots", "list<UserSlot>"), ("equipped_item_lists", "list<EquippedItemList>"), ("party_transition", "bool"));
+            _ = EquippedListSchema(tables, build);
+            return;
+        }
         if (UsesEquippedObjects(tables, build))
         {
             PlazaRecords.RequireLayouts(tables, build);

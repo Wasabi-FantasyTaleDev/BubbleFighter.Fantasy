@@ -9,9 +9,8 @@ namespace BubbleFighter.Fantasy.Dialect.Rooms;
 /// <summary>
 /// The legacy plaza as typed messages. The plaza is the same session structure as a room (the
 /// client keeps one session context for both, with members in seats), so the packets reuse the
-/// seat-record writers: an entrant is announced with <c>gspRoomSetSlot</c>, a leaver with
-/// <c>gspRoomLeaveSlot</c>. The burst order and the entry position walk follow
-/// the kr-812 readers.
+/// seat-record writers. A complete install replaces the previous scene, while occupied and
+/// vacant <c>gspRoomLeaveSlot</c> records reconcile the actors of players already present.
 /// </summary>
 internal sealed partial class PlayRoomCodec
     : IInboundMessageBinding<PlazaEnterRequested>, IInboundMessageBinding<PlazaPositionReported>,
@@ -26,11 +25,10 @@ internal sealed partial class PlayRoomCodec
     private static readonly string[] PlazaPacketNames =
     [
         "gcpReqGotoLobby", "gspGotoLobby", "gspRepMoveInto", "gspRoomSetSlot", "gspRoomLeaveSlot",
-        "gspReceiveSessionChrPos",
+        "gspReceiveSessionChrPos", "gspGotoRoom",
     ];
 
-    // Sends a packet of the burst only on a build that has it: cn-324 has neither the seat-record
-    // refresh (gspRepNotifyChangeLevelIcon) nor gspReceiveSessionInit class.
+    // Optional room frames are emitted only when the build's own table names them.
     private ValueTask SendWhereNamedAsync(ISession session, string name, Func<byte[]> body, CancellationToken ct) =>
         tables.Get(session.Profile.Id).Find(PacketDirection.ServerToClient, name) is { } code
             ? session.SendAsync(code, body(), ct)
@@ -123,85 +121,79 @@ internal sealed partial class PlayRoomCodec
         return new PlazaPositionReported(body.ToArray());
     }
 
-    /// <summary>
-    /// The entrant's burst, as recorded at s2c#1770-1800 after the leaving player's own packets:
-    /// <c>gspGotoLobby</c>, their seat record twice, the scene move <c>gspRepMoveInto</c> twice,
-    /// their own seat slot, their place at the plaza spawn, their session init, then one seat
-    /// record per player already present. The positions streamed after that are the
-    /// entrant's own reports coming back, so they are not produced here.
-    /// </summary>
+    /// <summary>Installs the complete plaza session before the native stage creates its actors and entry movement.</summary>
     public async ValueTask SendAsync(ISession session, PlazaEntered message, CancellationToken ct)
     {
-        await session.SendAsync(S2C(session, "gspGotoLobby"), RoomCodec.WriteSceneTransition(packetTables, lineage, message.PartyTransition), ct).ConfigureAwait(false);
-        // Delay the plaza burst until the pending lobby-stage switch has been consumed; the client constructs
-        // plaza avatars while entering that stage.
-        if (play.Wire.PlazaEntrySettleMs > 0)
-            await Task.Delay(play.Wire.PlazaEntrySettleMs, ct).ConfigureAwait(false);
-        await SendWhereNamedAsync(session, "gspRepNotifyChangeLevelIcon", () => WritePlazaSeatRecord(packetTables, lineage, schema, message.You), ct)
+        // cn-279 sub_6FF6C0 and kr-812 sub_820060 replace the local slot and clear the previous scene's actors.
+        await session.SendAsync(S2C(session, "gspGotoRoom"), WritePlazaInstall(packetTables, lineage, schema, message, session), ct)
             .ConfigureAwait(false);
-        await session.SendAsync(S2C(session, "gspRepMoveInto"), WritePlazaMoveInto(packetTables, lineage), ct).ConfigureAwait(false);
-        await session.SendAsync(S2C(session, "gspRoomSetSlot"), WritePlazaSeatSlot(packetTables, lineage, schema, message.You), ct).ConfigureAwait(false);
-        await session.SendAsync(S2C(session, "gspReceiveSessionChrPos"), WritePlazaWalkStep(packetTables, lineage, message.You.UserNumber, 1, message.You.EntrySeed), ct)
-            .ConfigureAwait(false);
-        await SendWhereNamedAsync(session, "gspReceiveSessionInit", () => WritePlazaSessionInit(packetTables, lineage, message.You.UserNumber), ct)
-            .ConfigureAwait(false);
-        await session.SendAsync(S2C(session, "gspRepMoveInto"), WritePlazaMoveInto(packetTables, lineage), ct).ConfigureAwait(false);
-        await SendWhereNamedAsync(session, "gspRepNotifyChangeLevelIcon", () => WritePlazaSeatRecord(packetTables, lineage, schema, message.You), ct)
-            .ConfigureAwait(false);
-        foreach (var member in message.Members)
-            await session.SendAsync(S2C(session, "gspRoomSetSlot"), WritePlazaSeatSlot(packetTables, lineage, schema, member), ct).ConfigureAwait(false);
+        await session.SendAsync(S2C(session, "gspGotoLobby"), RoomCodec.WriteSceneTransition(packetTables, lineage), ct).ConfigureAwait(false);
+        await session.SendAsync(S2C(session, "gspRepMoveInto"), WritePlazaMoveInto(packetTables, lineage, PlayerChannel), ct).ConfigureAwait(false);
     }
 
-    /// <summary>
-    /// An entrant as the players already present see them: their seat record, then their place at the plaza spawn so the avatar
-    /// stands somewhere until the entrant's own reports arrive.
-    /// </summary>
+    /// <summary>Installs an entrant's equipment before reconciling its occupied seat into the existing plaza scene.</summary>
     public async ValueTask SendAsync(ISession session, PlazaMemberEntered message, CancellationToken ct)
     {
-        await session.SendAsync(S2C(session, "gspRoomSetSlot"), WritePlazaSeatSlot(packetTables, lineage, schema, message.Member), ct).ConfigureAwait(false);
-        await session.SendAsync(S2C(session, "gspReceiveSessionChrPos"), WritePlazaWalkStep(packetTables, lineage, message.Member.UserNumber, 1, message.Member.EntrySeed), ct)
+        // cn-279 sub_708960 caches equipment but only updates existing actors; cn-279 sub_708040 creates missing actors.
+        var allowed = NativePlazaRecruitment.Allowed(session, message.Member.UserNumber);
+        await session.SendAsync(S2C(session, "gspRoomSetSlot"), WritePlazaSeatSlot(packetTables, lineage, schema, message.Member, allowed), ct)
+            .ConfigureAwait(false);
+        await session.SendAsync(S2C(session, "gspRoomLeaveSlot"), WritePlazaPresence(packetTables, lineage, schema, message.Member, allowed), ct)
             .ConfigureAwait(false);
     }
 
-    /// <summary><c>gspRoomLeaveSlot</c> (reader <c>sub_8104E0</c>): the leaver's seat with the cleared record.</summary>
+    /// <summary>Clears the departed account from the native seat so the plaza removes its actor.</summary>
     public ValueTask SendAsync(ISession session, PlazaMemberLeft message, CancellationToken ct) =>
         session.SendAsync(S2C(session, "gspRoomLeaveSlot"), WritePlazaLeaveSeat(packetTables, lineage, schema, message.Member), ct);
 
-    /// <summary>
-    /// <c>gspReceiveSessionChrPos</c> (reader <c>sub_92AC50</c>, handler <c>sub_806C40</c>): the
-    /// sender's user number, their per-entry position sequence, then the reported position's
-    /// 18-byte tail verbatim. The client skips its own user number, so echoing the sender back is
-    /// safe and keeps the broadcast one shape for every recipient.
-    /// </summary>
+    /// <summary>Forwards actual client movement; the native scene owns the entry transform and movement.</summary>
     public ValueTask SendAsync(ISession session, PlazaPositionReceived message, CancellationToken ct) =>
-        session.SendAsync(S2C(session, "gspReceiveSessionChrPos"),
-            // A member who has not reported yet stands at the plaza spawn.
-            message.Body.IsEmpty
-                ? WritePlazaWalkStep(packetTables, lineage, message.UserNumber, 1, message.EntrySeed)
-                : WritePlazaPositionLine(packetTables, lineage, message.UserNumber, message.Sequence, message.Body.Span), ct);
+        message.Body.IsEmpty ? ValueTask.CompletedTask
+            : session.SendAsync(S2C(session, "gspReceiveSessionChrPos"),
+                WritePlazaPositionLine(packetTables, lineage, message.UserNumber, message.Sequence, message.Body.Span), ct);
 
-    /// <summary>
-    /// <c>gspGotoMenu</c> (kr-812 sub_81FDA0): the party notice flag followed by a switch of the
-    /// stage to the main menu and needs no other packet. The session the login install built stays.
-    /// </summary>
-    public ValueTask SendAsync(ISession session, PlazaMenuReturnRequested message, CancellationToken ct) =>
-        session.SendAsync(S2C(session, "gspGotoMenu"), RoomCodec.WriteSceneTransition(packetTables, lineage, message.PartyTransition), ct);
+    /// <summary>Replaces the plaza or tutorial session with the local player's one-seat menu before switching stages.</summary>
+    public ValueTask SendAsync(ISession session, PlazaMenuReturnRequested message, CancellationToken ct)
+    {
+        var member = message.You ?? throw new InvalidOperationException("Menu return requires the committed own appearance.");
+        return session.SendAsync(S2C(session, "gspGotoRoom"), RoomCodec.WriteRoomEnvelope(packetTables, lineage, schema,
+            new RoomValues(RoomCodec.MainMenuKind, [PlazaSlot(member)]) { PartyTransition = message.PartyTransition }), ct);
+    }
 
-    // The plaza spawn every entrant's first position line carries: the spawn column and height with the movement-state bytes (0x01,0x7F). The 20
-    // lines after it (y sinking by 0.25 more each step, state 0x00 then 0x02) are the
-    // client's own fall being reported and echoed. The start differs on every entry,
-    // always inside x 697..743, z 512..551, so the column is picked per entry from that box.
-    private const int PlazaWalkSteps = 21;
-    private const int PlazaSpawnMinX = 697;
-    private const int PlazaSpawnMaxX = 743;
-    private const float PlazaWalkStartY = 179.6107177734375f;
-    private const float PlazaWalkStepY = 0.25f;
-    private const int PlazaSpawnMinZ = 512;
-    private const int PlazaSpawnMaxZ = 551;
-    private const byte PlazaWalkStateMoving = 0x01;
-    private const byte PlazaWalkStateIdle = 0x00;
-    private const byte PlazaWalkStateArrived = 0x02;
-    private const byte PlazaWalkStateUnknown = 0x7F;
+    /// <summary>Writes a complete plaza session with indexed vacant gaps and an explicit local seat.</summary>
+    internal static byte[] WritePlazaInstall(PacketTables tables, string build, RoomSchema schema, PlazaEntered message,
+        ISession? recipient = null)
+    {
+        var members = message.Members.Append(message.You).ToArray();
+        if (members.Any(member => member.Slot is < 0 or >= 36)
+            || members.Select(member => member.Slot).Distinct().Count() != members.Length)
+            throw new ArgumentException("A plaza install requires unique native seats below 36.", nameof(message));
+        var bySlot = members.ToDictionary(member => member.Slot);
+        var slots = Enumerable.Range(0, members.Max(member => member.Slot) + 1)
+            .Select(slot => bySlot.TryGetValue(slot, out var member) ? PlazaSlot(member) : RoomSlotValues.Empty(false)).ToArray();
+        var users = slots.Select(slot => RoomCodec.PlaySeatValues(schema, slot, equipment: false)).ToArray();
+        foreach (var member in members)
+        {
+            NativePlazaRecruitment.Project(tables, build, users[member.Slot], NativePlazaRecruitment.Allowed(recipient, member.UserNumber));
+            NativePlazaRecruitment.Project(tables, build, users[member.Slot], member.Recruitment);
+        }
+        var setting = RoomCodec.PlaySessionValues(schema, new RoomValues(3, slots) { Play = true });
+        // cn-279 sub_6FF6C0 and kr-812 sub_820060 install both indexed vectors before selecting kind 3's plaza stage.
+        return PacketCodec.Write(tables, build, "gspGotoRoom", new Dictionary<string, object?>
+        {
+            ["session_setting"] = setting,
+            ["game_setting"] = setting["game_setting"],
+            ["local_slot"] = message.You.Slot, ["master_slot"] = message.You.Slot,
+            ["user_slots"] = users,
+            ["equipped_item_lists"] = slots.Select(slot => RoomCodec.PlaySeatValues(schema, slot, equipment: true)).ToArray(),
+            ["party_transition"] = message.PartyTransition,
+        });
+    }
+
+    /// <summary>Writes an occupied seat through the native actor reconciliation envelope.</summary>
+    internal static byte[] WritePlazaPresence(PacketTables tables, string build, RoomSchema schema, PlazaMember member, bool canRecruit = true) =>
+        RoomCodec.WriteSeatEnvelope(tables, build, schema, member.Slot, PlazaSlot(member), leaving: true,
+            canRecruit: canRecruit, recruitment: member.Recruitment);
 
     /// <summary>Writes <c>gspReceiveSessionChrPos</c>: u32 user number, u32 sequence, the reported 18-byte tail verbatim.</summary>
     internal static byte[] WritePlazaPositionLine(PacketTables tables, string build, int userNumber, int sequence, ReadOnlySpan<byte> reported)
@@ -217,49 +209,19 @@ internal sealed partial class PlayRoomCodec
     }
 
     /// <summary>
-    /// Picks an entry's spawn column inside the recorded box. Deterministic in its inputs, so the
-    /// entrant and every other receiver of the same entry place the member at the same spot.
+    /// Writes the scene move through the build's audited table. Its <c>scene</c> word is the player's channel:
+    /// kr-812 <c>sub_81C6F0</c> stores it at <c>ServerConnection+2432</c>, the slot the round start reads its
+    /// <c>FighterConfigChannel</c> column from (kr-812 <c>sub_587690</c>, <c>sub_584320</c>).
     /// </summary>
-    /// <param name="userNumber">The entrant's user number.</param>
-    /// <param name="entrySeed">The value fixed for this entry.</param>
-    internal static (float X, float Z) PlazaSpawnColumn(int userNumber, int entrySeed)
-    {
-        // A 64-bit finalizer-style mix of both inputs; x and z read independent bit ranges.
-        var h = unchecked((ulong)(uint)userNumber * 0x9E3779B97F4A7C15UL + (ulong)(uint)entrySeed * 0xC2B2AE3D27D4EB4FUL);
-        h ^= h >> 33;
-        h = unchecked(h * 0xFF51AFD7ED558CCDUL);
-        h ^= h >> 33;
-        h = unchecked(h * 0xC4CEB9FE1A85EC53UL);
-        h ^= h >> 33;
-        var x = PlazaSpawnMinX + (int)((uint)h % (uint)(PlazaSpawnMaxX - PlazaSpawnMinX + 1));
-        var z = PlazaSpawnMinZ + (int)((uint)(h >> 32) % (uint)(PlazaSpawnMaxZ - PlazaSpawnMinZ + 1));
-        return (x, z);
-    }
-
-    /// <summary>Writes the recorded entry progression through the native broadcast table, retaining unresolved scalar defaults.</summary>
-    /// <param name="tables">The audited packet tables.</param>
-    /// <param name="build">The client build whose movement layout is written.</param>
-    /// <param name="userNumber">The walking member's user number.</param>
-    /// <param name="step">The 1-based step in the entry walk.</param>
-    /// <param name="entrySeed">The member's per-entry value, which fixes the column every step shares.</param>
-    internal static byte[] WritePlazaWalkStep(PacketTables tables, string build, int userNumber, int step, int entrySeed)
-    {
-        var (x, z) = PlazaSpawnColumn(userNumber, entrySeed);
-        return PacketCodec.Write(tables, build, "PlazaPositionBroadcast", new Dictionary<string, object?>
-        {
-            ["user_number"] = userNumber, ["sequence"] = step,
-            ["x"] = x, ["y"] = PlazaWalkStartY - PlazaWalkStepY * (step - 1) * (step - 1), ["z"] = z,
-            ["unknown_24"] = step == 1 ? PlazaWalkStateMoving : step == PlazaWalkSteps ? PlazaWalkStateArrived : PlazaWalkStateIdle,
-            ["unknown_25"] = PlazaWalkStateUnknown, ["unknown_28"] = 0f,
-        });
-    }
-
-    /// <summary>Writes the scene move through the build's audited table.</summary>
-    internal static byte[] WritePlazaMoveInto(PacketTables tables, string build) =>
+    /// <param name="tables">The row's packet tables.</param>
+    /// <param name="build">The build whose table is written.</param>
+    /// <param name="channel">The row's player channel (<see cref="RoomsOptions.PlayerChannel"/>).</param>
+    /// <returns>The body.</returns>
+    internal static byte[] WritePlazaMoveInto(PacketTables tables, string build, int channel = RoomsOptions.FreeChannel) =>
         PacketCodec.Write(tables, build, "RoomMoveInto", new Dictionary<string, object?>
         {
             ["moved"] = true,
-            ["scene"] = 60,
+            ["scene"] = channel,
             ["unknown_12"] = 1,
         });
 
@@ -277,11 +239,13 @@ internal sealed partial class PlayRoomCodec
     /// (closed, seated and the three flags after ready set),
     /// with the member's own level where the menu record holds a constant.
     /// </summary>
-    internal static byte[] WritePlazaSeatRecord(PacketTables tables, string build, RoomSchema schema, PlazaMember member)
+    internal static byte[] WritePlazaSeatRecord(PacketTables tables, string build, RoomSchema schema, PlazaMember member, bool canRecruit = true)
     {
         var slot = PlazaSlot(member);
         var values = RoomCodec.MenuSeatValues(schema, slot);
         values["level"] = RoomCodec.PlaySeatValues(schema, slot, equipment: false)["level"];
+        NativePlazaRecruitment.Project(tables, build, values, canRecruit);
+        NativePlazaRecruitment.Project(tables, build, values, member.Recruitment);
         return PacketCodec.Write(tables, build, "UserSlot", values);
     }
 
@@ -289,15 +253,14 @@ internal sealed partial class PlayRoomCodec
     /// Writes <c>gspRoomSetSlot</c> (reader <c>sub_80C1B0</c>): the seat index, the member's
     /// <c>UserSlot</c> and <c>EquippedItemList</c> — the plaza record is one of the room's.
     /// </summary>
-    internal static byte[] WritePlazaSeatSlot(PacketTables tables, string build, RoomSchema schema, PlazaMember member) =>
-        RoomCodec.WriteSeatEnvelope(tables, build, schema, member.Slot, PlazaSlot(member));
+    internal static byte[] WritePlazaSeatSlot(PacketTables tables, string build, RoomSchema schema, PlazaMember member, bool canRecruit = true) =>
+        RoomCodec.WriteSeatEnvelope(tables, build, schema, member.Slot, PlazaSlot(member),
+            canRecruit: canRecruit, recruitment: member.Recruitment);
 
-    /// <summary>Writes the native leave envelope while retaining the departed player's identity.</summary>
+    /// <summary>Clears the account identity as well as occupancy so native plaza actor lookup no longer finds the departed player.</summary>
     internal static byte[] WritePlazaLeaveSeat(PacketTables tables, string build, RoomSchema schema, PlazaMember member) =>
-        RoomCodec.WriteSeatEnvelope(tables, build, schema, member.Slot, PlazaSlot(member) with
-        {
-            Occupied = false, Departed = true, EquippedItemIds = [], Ready = false,
-        }, leaving: true);
+        // cn-279 sub_703FF0 and kr-812 sub_6CC6F0 scan account numbers without checking occupancy.
+        RoomCodec.WriteSeatEnvelope(tables, build, schema, member.Slot, RoomSlotValues.Empty(false), leaving: true);
 
     private static RoomSlotValues PlazaSlot(PlazaMember member) =>
         new(true, false, member.UserNumber, member.Nickname, member.CharacterItemId,

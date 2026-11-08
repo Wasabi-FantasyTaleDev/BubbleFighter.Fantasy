@@ -1,0 +1,88 @@
+version: 1
+structs:
+  # kr-1256 sub_9A6BA0 stamps C2S 55 after promotion and writes no payload.
+  # The empty structure alone does not enable a release opcode on another build.
+  PendingPromotionAcknowledgement: []
+  # kr-1256 sub_9D2FF0 case 10 reads no body, closes the old source and releases its reference.
+  # cn-735 sub_A1E6E0, cn-774 sub_BA6F60 and tw-454 sub_A84880 close retained source.
+  CompletePendingPromotion: []
+  # kr-1256 sub_10C6A00 writes three strings, a counted word vector, two words and a final string.
+  # kr-1256 sub_10C74A0 writes the adapter vector count followed by one u32 per entry.
+  # cn-774 sub_105C310 and tw-454 sub_ECB950 independently serialize the same field sequence.
+  PreloginRedirectRequest@kr-1256:
+    - credential: wstr # kr-1256 sub_85EDB0 copies current ServerConnection +2516 here.
+      offset: 0
+    - unknown_24: wstr
+      offset: 24
+    - unknown_48: wstr
+      offset: 48
+    - adapters: list<PreloginRedirectAdapter>
+      offset: 72
+    - unknown_84: u32
+      offset: 84
+    - unknown_88: u32
+      offset: 88
+    - unknown_92: wstr
+      offset: 92
+  # kr-812 sub_837170 case 10 invokes kr-812 sub_81C550 without reading a body, promoting pending to current.
+  # kr-1256 sub_9D2FF0 case 9 calls kr-1256 sub_9A6BA0 without reading a body.
+  # It promotes pending, retains the old source and acknowledges on the connection receiving promotion.
+  # cn-774 sub_BA6D70 and tw-454 sub_A84660 perform the same source acknowledgement.
+  # cn-735 sub_A1E5A0 consumes no body, promotes pending, retains source and sends C2S55.
+  # cn-717 sub_8C0080 case 10 -> cn-717 sub_8A2830 and id-1809 sub_7E3180 case 10
+  # -> id-1809 sub_7C9700 promote pending and close the old source without an acknowledgement.
+  # cn-324 sub_714540 case 9 (native label gspDisconnectMovedUser) invokes cn-324 sub_705980
+  # without reading a body; it promotes pending to current and closes the old source.
+  # cn-279 sub_6FFDE0 case 9 -> cn-279 sub_6F1A70 follows the same empty-body promotion.
+  # id-400 sub_7BF2E0 case 10 invokes id-400 sub_7A50D0 without reading a body;
+  # pending becomes current and the previous source closes without an acknowledgement packet.
+  # cn-406 sub_738290 case 9 -> cn-406 sub_7205B0; cn-404 sub_7EC320 case 10 -> cn-404 sub_7D2A40;
+  # cn-408 sub_7EF9A0 case 10 -> cn-408 sub_7D6000; cn-706 sub_7C8720 case 10 -> cn-706 sub_7ADED0.
+  # Every build's promotion has this empty body; whether a build acknowledges it is not a layout difference.
+  PromotePendingConnection@kr-812: []
+  # kr-812 sub_682370 writes three strings, an adapter-word vector and two trailing words.
+  # cn-735 sub_835270 independently writes these three strings, vector and two trailing words.
+  PreloginRedirectRequest@kr-812:
+    - credential: wstr # kr-812 sub_681500 copies current ServerConnection +2440 here.
+      offset: 4
+    - unknown_32: wstr
+      offset: 32
+    - unknown_60: wstr
+      offset: 60
+    - adapters: list<PreloginRedirectAdapter> # kr-812 sub_B28910 collects adapter IPv4 words from GetAdaptersInfo.
+      offset: 88
+    - unknown_104: u32
+      offset: 104
+    - unknown_108: u32
+      offset: 108
+      except: [id-1809] # id-1809 sub_632220 ends after the adapter vector and the word at object +104.
+  # cn-324 sub_583D70 writes three strings and a counted u32 vector; cn-324 sub_583DD0 reads
+  # that exact sequence through cn-324 sub_5856B0, with no trailing words.
+  PreloginRedirectRequest@cn-324:
+    - credential: wstr # cn-324 sub_5852D0 puts the provider ticket in this field before native serialization.
+      offset: 4
+    - unknown_8: wstr
+      offset: 8
+    - unknown_12: wstr
+      offset: 12
+    - adapters: list<PreloginRedirectAdapter> # cn-324 sub_91C3C0 collects inet_addr IPv4 words.
+      offset: 16
+  # id-400 sub_5E8B10 writes three inline strings and the adapter vector, then returns.
+  # id-400 sub_7A4560 copies the retained credential into pending before native promotion.
+  PreloginRedirectRequest@id-400:
+    - credential: wstr
+      offset: 4
+    - unknown_32: wstr
+      offset: 32
+    - unknown_60: wstr
+      offset: 60
+    - adapters: list<PreloginRedirectAdapter>
+      offset: 88
+    - unknown_104: u32 # cn-706 sub_611A60 writes this word after the vector; earlier writers return before it.
+      offset: 104
+      only: [cn-706]
+  # kr-812 sub_B28910 and cn-324 sub_91C3C0 collect inet_addr IPv4 words;
+  # kr-812 sub_682370 and cn-324 sub_583D70 write each as four bytes.
+  PreloginRedirectAdapter:
+    - ipv4_word: u32
+      offset: 0

@@ -1,0 +1,72 @@
+version: 1
+# Extreme Racing (round mode 24, widget wgtExtremeRacing, kr-1256 sub_1134B50 case 24): the race frames.
+#
+# kr-812 has no Extreme Racing stage, so the baseline structures are empty and kr-1256 restates them. Mode 24
+# builds GameExtremeRacingStrategy (kr-1256 sub_9E1710 case 24) and ExtremeRacingGameStage (kr-1256 sub_67A510).
+# The game dispatcher hands S2C 600..764 without an explicit case to the strategy's slot 28 (kr-1256 sub_9E1EB0
+# default branch, vtable +112); that slot is kr-1256 sub_CE55F0 -> sub_CE5600, which reads S2C 711..718 except 715
+# and applies them only when the current stage casts to ExtremeRacingGameStage. The client stores no packet name
+# for any of these frames; the opcode rows carry coined names. Every bool is a four-byte word read as nonzero.
+structs:
+
+  ExtremeRacingTimer: []
+
+  # S2C 711: kr-1256 sub_CE5600 case 0x2C7 reads three words; the third is kept as `!= 0`.
+  # kr-1256 sub_67E8B0 switches on the code (2500, 20000, 210000) and uses the duration as milliseconds.
+  ExtremeRacingTimer@kr-1256:
+    - code: u32
+      offset: 0
+    - duration_ms: u32
+      offset: 4
+    - active: bool
+      offset: 8
+
+  ExtremeRacingRound: []
+
+  # S2C 712: kr-1256 sub_CE5600 case 0x2C8 reads two words into the same local; only the second reaches
+  # kr-1256 sub_67E4A0, which stores it at stage +3160.
+  ExtremeRacingRound@kr-1256:
+    - unknown_0: u32
+      offset: 0
+    - round: u32
+      offset: 4
+
+  ExtremeRacingRecordValue: []
+
+  # One record field: kr-1256 sub_CE71F0 reads a byte, then a word; kr-1256 sub_1155410 stores the word by the
+  # byte's case 0..6.
+  ExtremeRacingRecordValue@kr-1256:
+    - field: u8
+      offset: 0
+    - value: u32
+      offset: 4
+
+  ExtremeRacingRecord: []
+
+  # ExtremeRacing::UpdatePlayRecord: kr-1256 sub_CE4330 reads a two-byte key at +4, then the counted field
+  # list (kr-1256 sub_CE71F0). kr-1256 sub_D18140 matches the key to the record kr-1256 sub_D189F0 created for
+  # that seat index.
+  ExtremeRacingRecord@kr-1256:
+    - seat: u16
+      offset: 4
+    - values: "list<ExtremeRacingRecordValue>"
+      offset: 8
+
+  ExtremeRacingRecords: []
+
+  # S2C 714: kr-1256 sub_CE5600 case 0x2CA reads the scope word, then kr-1256 sub_10C1850 reads the counted
+  # UpdatePlayRecord list. kr-1256 sub_CE6BA0: scope 0 updates the local seat's record only, scope 1 every record
+  # plus the ranking board and the team round totals, scope 2 every record plus the ranking board.
+  ExtremeRacingRecords@kr-1256:
+    - scope: u32
+      offset: 0
+    - records: "list<ExtremeRacingRecord>"
+      offset: 4
+
+  ExtremeRacingGoal: []
+
+  # C2S 711: kr-1256 sub_B0D760 kind 5 stamps 711 and writes one word, the touched goal's round, which must equal
+  # stage +3160; it is sent on the game connection (dword_18E7F48) once per round (character +14024).
+  ExtremeRacingGoal@kr-1256:
+    - round: u32
+      offset: 0

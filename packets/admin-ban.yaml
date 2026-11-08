@@ -65,8 +65,6 @@ structs:
   # session flags and calls the client's disconnect path. Modern descendants inherit this baseline.
   DisconnectMovedUser: []
 
-  DisconnectMovedUser@kr-1256: []
-
   # kr-1256 sub_9BE7C0 stores the counted string in a local aggregate.
   OveruseAlarmMsg@kr-1256:
     - unknown_4: wstr

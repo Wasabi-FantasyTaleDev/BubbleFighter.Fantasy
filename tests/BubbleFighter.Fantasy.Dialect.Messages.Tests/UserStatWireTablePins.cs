@@ -29,7 +29,7 @@ public sealed class UserStatWireTablePins
         Pin("cn-774", "nick", 10, 1234, 5678, 3, 1001, 521, Cn774Body);
     }
 
-    /// <summary>tw-454 follows cn-774's UserStat and FighterInfo tables; its body is the same 521 bytes.</summary>
+    /// <summary>tw-454 sub_48DBE0 omits two social boolean words, so the named UserStat body is 513 bytes.</summary>
     [Fact]
     public void Tw454BodyIsUnchanged()
     {

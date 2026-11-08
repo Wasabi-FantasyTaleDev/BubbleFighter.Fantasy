@@ -14,6 +14,7 @@ public sealed class ShopLayoutTests
     [InlineData("kr", 812, 380, 44, true, 44)]
     [InlineData("cn", 717, 380, 44, true, 44)]
     [InlineData("id", 400, 340, 44, true, 44)]
+    [InlineData("cn", 406, 268, 44, true, 44)]
     [InlineData("id", 1809, 344, 44, true, 44)]
     [InlineData("cn", 324, 256, 36, true, 44)]
     [InlineData("cn", 279, 168, 36, true, 32)]
@@ -60,7 +61,7 @@ public sealed class ShopLayoutTests
     [InlineData("id-400", true, false)]
     [InlineData("id-1809", true, false)]
     [InlineData("cn-706", true, false)]
-    [InlineData("cn-406", false, false)]
+    [InlineData("cn-406", true, false)]
     public void PinsShopCapabilitiesPerBuild(string build, bool cashCheckRequest, bool equipResultReply)
     {
         Assert.Equal(cashCheckRequest, Tables.CapabilityOf(build, "cash_check_request"));

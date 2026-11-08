@@ -1,0 +1,18 @@
+# Loopback-only responder for an isolated local CN2012 chooser test.
+- set:
+    id: protocol
+    config:
+      answer_center_status: true
+- set:
+    id: dialect.messages
+    config:
+      center_directory: true
+- set:
+    id: centers
+    config:
+      entries:
+        - id: 1
+          name: "测试服"
+          listener_id: game-listener
+          users: 0
+          capacity: 512

@@ -1,3 +1,4 @@
+using System.Numerics;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Match;
@@ -41,9 +42,16 @@ internal sealed class SupplyBinding(string protocol, IOpcodeTable table, PacketT
         PacketLayoutContract.RequireFields(tables, build, "SupplyPicked", "Map supplies",
             ("seat", "u32"), ("object_id", "u32"));
         PacketLayoutContract.RequireFields(tables, build, "SupplyCreate", "Map supplies",
-            ("object_id", "u32"), ("unknown_8", "u32"), ("x", "f32"), ("y", "f32"), ("z", "f32"), ("kind", "u32"));
+            ("object_id", "u32"), ("x", "f32"), ("y", "f32"), ("z", "f32"), ("kind", "u32"));
+        var creationClass = tables.Resolve(build, "SupplyCreate").Any(field => field.Name == "creation_class")
+            ? "creation_class" : "unknown_8";
+        PacketLayoutContract.RequireFields(tables, build, "SupplyCreate", "Map supplies", (creationClass, "u32"));
+        if (tables.Resolve(build, "SupplyCreate").Any(field => field.Name is "velocity_x" or "velocity_y" or "velocity_z"))
+            PacketLayoutContract.RequireFields(tables, build, "SupplyCreate", "Map supplies",
+                ("velocity_x", "f32"), ("velocity_y", "f32"), ("velocity_z", "f32"));
         PacketLayoutContract.RequireFields(tables, build, "SupplyDropRequest", "Map supplies",
-            ("x", "f32"), ("y", "f32"), ("z", "f32"), ("kind", "u32"));
+            ("x", "f32"), ("y", "f32"), ("z", "f32"), ("kind", "u32"),
+            ("velocity_x", "f32"), ("velocity_y", "f32"), ("velocity_z", "f32"));
         context.Effect(context.Services.RegisterMany<IInboundMessageBinding<RoundSuppliesReported>>(this));
         context.Effect(context.Services.RegisterMany<IInboundMessageBinding<RoundSupplyPickupRequested>>(this));
         context.Effect(context.Services.RegisterMany<IInboundMessageBinding<RoundSupplyDropRequested>>(this));
@@ -74,7 +82,10 @@ internal sealed class SupplyBinding(string protocol, IOpcodeTable table, PacketT
         if (table.Find(PacketDirection.ServerToClient, "gspSwitchItemSlot") is not null)
         {
             PacketLayoutContract.RequireFields(tables, build, "SupplyItemSlotChanged", "Map supplies",
-                ("seat", "u32"), ("item_slot", "u32"), ("kind", "u32"), ("result", "u32"));
+                ("seat", "u32"), ("item_slot", "u32"), ("kind", "u32"));
+            // kr-1256 sub_6D55D0 case 658 installs three words; cn-774 sub_897E80 case 647 also checks a result.
+            if (tables.Resolve(build, "SupplyItemSlotChanged").Any(field => field.Name == "result"))
+                PacketLayoutContract.RequireFields(tables, build, "SupplyItemSlotChanged", "Map supplies", ("result", "u32"));
             context.Effect(context.Services.RegisterMany<IInboundMessageBinding<RoundItemSlotSwitchRequested>>(this));
             context.Effect(context.Services.RegisterMany<IMessageSender<RoundItemSlotChanged>>(this));
             context.Effect(router.Register(protocol, table.C2S("gcpSwitchItemSlot"), async (session, packet, ct) =>
@@ -123,12 +134,18 @@ internal sealed class SupplyBinding(string protocol, IOpcodeTable table, PacketT
         var x = (float)values["x"];
         var y = (float)values["y"];
         var z = (float)values["z"];
-        if (!float.IsFinite(x) || !float.IsFinite(y) || !float.IsFinite(z))
-            throw new PacketFormatException("Dropped item coordinates are not finite.", 0);
+        var velocity = new Vector3((float)values["velocity_x"], (float)values["velocity_y"], (float)values["velocity_z"]);
+        if (!float.IsFinite(x) || !float.IsFinite(y) || !float.IsFinite(z) || !Finite(velocity))
+            throw new PacketFormatException("Dropped item position or velocity is not finite.", 0);
         // A request without the classification word (cn-279 sub_404180 reads six floats and the kind) gets the value the
         // other builds send for an ordinary throw (kr-812 sub_5145F0); cn-279 sub_81FF70 only tests the word against 14.
-        var classified = values.TryGetValue("unknown_36", out var creationClass);
-        return new(new(x, y, z, (int)values["kind"], 0, 0), classified ? (int)creationClass! : OrdinaryCreationClass);
+        var classified = values.TryGetValue("creation_class", out var creationClass)
+            || values.TryGetValue("unknown_36", out creationClass);
+        var team = values.TryGetValue("team", out var nativeTeam) ? (int)nativeTeam : 0;
+        if (team is < 0 or > 2)
+            throw new PacketFormatException("Dropped item team is not 0, 1 or 2.", body.Length);
+        return new(new(x, y, z, (int)values["kind"], 0, 0, team), classified ? (int)creationClass! : OrdinaryCreationClass)
+            { Velocity = velocity };
     }
 
     internal static RoundSuppliesReported ReadReport(PacketTables tables, string build, ReadOnlySpan<byte> body, int limit)
@@ -150,7 +167,7 @@ internal sealed class SupplyBinding(string protocol, IOpcodeTable table, PacketT
         var stated = values.ContainsKey("regeneration_min_ms");
         var minimum = stated ? (object?[])values["regeneration_min_ms"]! : new object?[positions.Length];
         var maximum = stated ? (object?[])values["regeneration_max_ms"]! : new object?[positions.Length];
-        // A build with team boxes reports one team word per point; one without has no such vector.
+        // Modern serializers use byte team elements (kr-1256 sub_10D14C0); legacy serializers use words.
         var teams = values.TryGetValue("team", out var teamVector) ? (object?[])teamVector! : null;
         if (kinds.Length != positions.Length || minimum.Length != positions.Length || maximum.Length != positions.Length
             || (teams is not null && teams.Length != positions.Length))
@@ -158,7 +175,12 @@ internal sealed class SupplyBinding(string protocol, IOpcodeTable table, PacketT
         return new RoundSuppliesReported(positions.Select((entry, i) =>
         {
             var point = (Dictionary<string, object?>)entry!;
-            var team = teams is null ? 0 : (int)teams[i]!;
+            var team = teams is null ? 0 : teams[i] switch
+            {
+                int word => word,
+                byte octet => octet,
+                _ => throw new PacketFormatException("Supply team element is neither a word nor a byte.", bodyLength),
+            };
             // The host's map classification yields only 0, 1 and 2 (kr-812 sub_50C840).
             if (team is < 0 or > 2)
                 throw new PacketFormatException("Supply point team is not 0, 1 or 2.", bodyLength);
@@ -169,15 +191,29 @@ internal sealed class SupplyBinding(string protocol, IOpcodeTable table, PacketT
 
     public ValueTask SendAsync(ISession session, RoundSupplyCreated message, CancellationToken ct)
     {
+        if (!float.IsFinite(message.Point.X) || !float.IsFinite(message.Point.Y) || !float.IsFinite(message.Point.Z))
+            throw new InvalidOperationException("Created item position is not finite.");
         var fields = new Dictionary<string, object?> { ["object_id"] = message.ObjectId, ["kind"] = message.Point.Kind,
-            ["unknown_8"] = message.CreationClass, ["x"] = message.Point.X, ["y"] = message.Point.Y, ["z"] = message.Point.Z };
+            ["unknown_8"] = message.CreationClass, ["creation_class"] = message.CreationClass,
+            ["x"] = message.Point.X, ["y"] = message.Point.Y, ["z"] = message.Point.Z };
+        var layout = tables.Resolve(build, "SupplyCreate");
+        // cn-279 sub_81FF70 applies this vector after construction; other layouts retain their unnamed words.
+        if (layout.Any(field => field.Name == "velocity_x"))
+        {
+            if (!Finite(message.Velocity)) throw new InvalidOperationException("Created item velocity is not finite.");
+            fields["velocity_x"] = message.Velocity.X;
+            fields["velocity_y"] = message.Velocity.Y;
+            fields["velocity_z"] = message.Velocity.Z;
+        }
         // The envelope of a build with team boxes ends in the box's team (kr-812 sub_636F20); the other builds have no such word.
-        if (tables.Resolve(build, "SupplyCreate").Any(field => field.Name == "team"))
+        if (layout.Any(field => field.Name == "team"))
             fields["team"] = message.Point.Team;
         else if (message.Point.Team != 0)
             throw new InvalidOperationException("A team box was created for a build whose creation envelope has no team word.");
         return session.SendAsync(table.S2C("gspGameCreateGameItem"), PacketCodec.Write(tables, build, "SupplyCreate", fields), ct);
     }
+
+    private static bool Finite(Vector3 value) => float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
 
     public async ValueTask SendAsync(ISession session, RoundSupplyPicked message, CancellationToken ct)
     {

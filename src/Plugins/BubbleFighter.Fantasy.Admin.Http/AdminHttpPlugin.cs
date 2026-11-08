@@ -126,7 +126,7 @@ public sealed partial class AdminHttpPlugin : IPlugin
                 ? Results.Ok(tables.All.Where(t => profile is null || t.Profile.Id == profile).Select(t => new
                 {
                     profile = t.Profile.Id,
-                    opcodes = t.All.Concat(t.ForConnection(OpcodeConnection.Relay).All.Where(o => o.Connection == OpcodeConnection.Relay))
+                    opcodes = t.All.Concat(t.ForConnection(OpcodeConnection.Relay).All.Where(o => o.Connection == OpcodeConnection.Relay)).Concat(t.ForConnection(OpcodeConnection.Udp).All)
                         .Select(o => new { o.Value, direction = o.Direction.ToString(), connection = o.Connection.ToString(), o.Name, evidence = o.Evidence.ToString(), o.Source, o.Notes }),
                 }))
                 : Results.Problem("IOpcodeTableRegistry is not available.", statusCode: StatusCodes.Status503ServiceUnavailable));

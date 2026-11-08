@@ -1,0 +1,11 @@
+# Explicit opt-in to the audited ghost mode-28 script; native-client acceptance remains required.
+# Keep scoreboards for the other audited optional modes without enabling their gameplay.
+- set:
+    id: dialect.rooms
+    config:
+      ghost_zombies: true
+      result_scoreboard_modes: [1, 8, 19, 20, 23, 24, 25, 28, 30, 32, 45]
+- set:
+    id: ingame
+    config:
+      ghost_zombies: true

@@ -2,10 +2,72 @@ version: 1
 structs:
   # kr-812 sub_50E8A0 sends the actor reference; reader kr-812 sub_80A910 reads one word.
   # cn-717 sub_8C4210, id-400 sub_93D120, id-1809 sub_4D60C0,
-  # cn-706 sub_4BBB70 and cn-324 sub_410910 read the same +4 field.
+  # cn-706 sub_4BBB70 and cn-324 sub_410910 read the same +4 field. cn-406 sub_42A960 sends it
+  # (writer cn-406 sub_420D90 / reader cn-406 sub_700770) from the rightRespawn death-screen action
+  # cn-406 sub_4E4D80, which checks the bag count of item 100443 first.
   InstantRevivalRequest:
     - actor: u32
       offset: 4
       except: [cn-279]
   # cn-324 sub_53CEC0 sends an empty packet in PvE modes; identity comes from the connection.
+  # cn-406 sub_523AA0 sends it empty (nullsub_1 cn-406 sub_5129E0) from the ChrPlayer death slot
+  # +0x4C in modes 16 and 101.
   PveRevivalRequest: []
+  # The modern respawn requests share the numbering and most shapes across kr-1256, cn-774 and
+  # tw-454. The 603 index request is identical in all three: cn-774 sub_8A47C0, tw-454 sub_717BB0
+  # and kr-1256 sub_6E3940 each write the actor word and the client-chosen spawn index (the chooser
+  # is kr-1256 sub_98DB80 over the spawn-point table). cn-774 and tw-454 follow the kr-1256 table
+  # through builds.yaml.
+  RespawnIndexRequest@kr-812: []
+  RespawnIndexRequest@kr-1256:
+    - actor: u32
+      offset: 4
+    - spawn_index: u32
+      offset: 8
+  # C2S 602 carries the respawn decision. cn-774 (cn-774 sub_8A4650) and tw-454 (tw-454 sub_717A20) write three
+  # plain words - the actor, the spawn index and the itemResetOnRespawn setting byte widened to u32
+  # (the same settings keys in all three builds). tw-454 follows the cn-774 table.
+  RespawnRequest@kr-812: []
+  RespawnRequest@cn-774:
+    - actor: u32
+      offset: 4
+    - spawn_index: u32
+      offset: 8
+    - item_reset: u32
+      offset: 12
+  # kr-1256 wraps the spawn index in its own optional-field framing (writer kr-1256 sub_10C0430):
+  # the actor always, then the 0x3A tag plus the index when the dispatcher's spawn decision carries
+  # one, else the bare 0xBA byte, then the same trailing item-reset u32. The dispatcher's per-player
+  # path (kr-1256 0x6D7775) shows the second 0x3A-tagged slot; its content was never observed
+  # present, so it stays an unknown word. 10/14/18 bytes total.
+  RespawnRequest@kr-1256:
+    - actor: u32
+      offset: 4
+    - spawn_index: 'optional<0x3A,RespawnOfferTail>'
+      offset: 8
+      default: 186
+    - unknown_9: 'optional<0x3A,RespawnStateTail>'
+      offset: 9
+      default: 186
+    - item_reset: u32
+      offset: 10
+  # The two optional records of the kr-1256 respawn request: the value lands at buffer +9 and +10
+  # when the 0x3A tag is present.
+  RespawnOfferTail:
+    - spawn_index: u32
+      offset: 9
+      only: [kr-1256]
+  RespawnStateTail:
+    - unknown_10: u32
+      offset: 10
+      only: [kr-1256]
+  # C2S 613 extends another player's respawn wait. All three builders write the same two words with
+  # the same 0.429296875 scale constant (kr-1256 0x1641514, cn-774 0x14E4AD4, tw-454 0x13EF348):
+  # kr-1256 sub_7D0BB0, cn-774 sub_96F3D0 (UI event 175) and tw-454 sub_C9D9A0 (UI event 176).
+  # cn-774 and tw-454 follow the kr-1256 table through builds.yaml.
+  RespawnExtendRequest@kr-812: []
+  RespawnExtendRequest@kr-1256:
+    - actor: u32
+      offset: 4
+    - wait_delta: u32
+      offset: 8

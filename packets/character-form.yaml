@@ -1,0 +1,20 @@
+version: 1
+structs:
+  # Rhea's game request: kr-1256 sub_6E3A60 (2072), cn-774 sub_8A48A0 (2071), tw-454 sub_717CC0 (2067).
+  # Each writes the local character's scene handle and a canonical bool32. No seat or item identifier is sent.
+  # These stream fields have no common packet-object offsets. Only the independently audited modern family is present.
+  CharacterFormRequest:
+    - actor: u32
+      only: [kr-1256]
+    - active: bool
+      only: [kr-1256]
+
+  # kr-1256 sub_6D55D0 -> kr-1256 sub_7055D0 (1540); cn-774 sub_897E80 -> cn-774 sub_8C5800 (1539);
+  # tw-454 sub_70B3F0 -> tw-454 sub_7397F0 (1538). Each reads actor u32 then bool32, finds the scene object,
+  # applies normal/transformed Rhea (29/2000), preserves the HP ratio and clears its local pending request.
+  # The consumer applies the form directly; it does not send a second peer effect. The owner needs this reply too.
+  CharacterFormReply:
+    - actor: u32
+      only: [kr-1256]
+    - active: bool
+      only: [kr-1256]

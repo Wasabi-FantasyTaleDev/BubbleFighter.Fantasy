@@ -16,19 +16,28 @@ internal sealed partial class RoundFlow
     {
         if (_registry.TryGet(session.Id) is not { } room)
             return;
+        int? finalZoneGeneration = IsFinalZoneMode(room) ? room.StartGeneration : null;
+        int? scriptZombieGeneration;
+        lock (room.Gate) scriptZombieGeneration = (_options.ScriptZombies || _options.GhostZombies || ZombieEscapeEnabled) ? room.StartGeneration : null;
         await room.Executor.ExecuteAsync(async operationCt =>
         {
             RoundScoreUpdated? update = null;
             lock (room.Gate)
             {
-                if (room.Phase != RoomPhase.Playing || !UsesNativeLife(room))
+                if (room.Phase != RoomPhase.Playing || (!UsesNativeLife(room) && !_options.ZombiePvpModeIds.Contains(room.ModeId)))
                     return;
+                if (finalZoneGeneration is { } generation && !FinalZoneReportIsCurrent(room, session, generation)) return;
+                if (IsScriptZombieMode(room) && (scriptZombieGeneration is not { } zombieGeneration
+                    || !ScriptZombieReportIsCurrent(room, session, zombieGeneration))) return;
+                if (IsZombieEscapeMode(room) && (scriptZombieGeneration is not { } escapeGeneration
+                    || !ZombieEscapeReportIsCurrent(room, session, escapeGeneration))) return;
                 var sender = room.Seats.FirstOrDefault(seat => seat.Game.Id == session.Id || seat.Relay?.Id == session.Id);
                 if (sender is null)
                     return;
                 var own = room.ControlsActor(sender, report.Actor);
                 var target = LifeActor(room, report.Actor);
                 var actor = own ? target! : new LifeParticipant(sender, null);
+                var initiator = report.Initiator is { } handle ? LifeActor(room, handle) : null;
                 LifeCheck? ignored = null;
                 switch (report.Event)
                 {
@@ -36,80 +45,68 @@ internal sealed partial class RoundFlow
                         or RoundLifeEvent.DeathCleaned or RoundLifeEvent.ResetConfirmed when !own:
                         ignored = LifeCheck.OwnEventForeignActor;
                         break;
-                    case RoundLifeEvent.Bubbled when actor.Life == SeatLife.Alive:
-                        actor.Life = SeatLife.Bubble;
-                        break;
                     case RoundLifeEvent.Bubbled:
-                        ignored = LifeCheck.BubbledWhileNotAlive;
-                        break;
-                    case RoundLifeEvent.Died when actor.Life == SeatLife.Alive:
-                    case RoundLifeEvent.BubbleExpired when actor.Life == SeatLife.Bubble:
-                        actor.Life = SeatLife.Dead;
-                        actor.DeathCleaned = false;
+                        if (!actor.Life.Bubble()) ignored = LifeCheck.BubbledWhileNotAlive;
+                        update = CreditAction(room, initiator?.Slot, actor.Slot, rescue: false, lifeEvidence: true);
                         break;
                     case RoundLifeEvent.Died:
-                        ignored = LifeCheck.DiedWhileNotAlive;
+                        if (!actor.Life.Die() && !actor.Life.Burst()) ignored = LifeCheck.DiedWhileNotAlive;
+                        (update, _, _) = CreditKill(room, new(initiator?.Slot, actor.Slot, KillEvidence.DirectDeath,
+                            InitiatorNamed: report.Initiator is not null));
                         break;
                     case RoundLifeEvent.BubbleExpired:
-                        ignored = LifeCheck.ExpiredWhileNotBubbled;
+                        if (!actor.Life.Burst()) ignored = LifeCheck.ExpiredWhileNotBubbled;
                         break;
-                    case RoundLifeEvent.Released when target is { Life: SeatLife.Bubble }:
-                        target.Life = SeatLife.Alive;
+                    case RoundLifeEvent.Released or RoundLifeEvent.Finished when !own
+                        && !(report.Initiator is { } contact && (room.ControlsActor(sender, contact)
+                            || report.Event == RoundLifeEvent.Finished && contact >= 0 && !room.IsMemberCharacter(contact)
+                                && sender.Slot == room.MasterSlot)):
+                        ignored = LifeCheck.OwnEventForeignActor;
                         break;
                     case RoundLifeEvent.Released:
-                        ignored = LifeCheck.ReleasedNotBubbled;
-                        break;
-                    case RoundLifeEvent.DeathCleaned when actor.Life == SeatLife.Dead:
-                        actor.DeathCleaned = true;
+                        if (target?.Life.Release() != true) ignored = LifeCheck.ReleasedNotBubbled;
+                        update = CreditAction(room, initiator?.Slot, target?.Slot, rescue: true, lifeEvidence: true);
                         break;
                     case RoundLifeEvent.DeathCleaned:
-                        ignored = LifeCheck.CleanedWhileNotDead;
+                        // cn-324 sub_4757B0 / kr-812 sub_51E920 finalize the named actor even without an earlier score.
+                        // This establishes no attacker or reward and does not alter ordinary reset admission.
+                        // The ghost king cleanup itself ends the native round (kr-1256 sub_AC5110 /
+                        // cn-774 sub_CA7D50); it need not follow a separate server-observed death frame.
+                        if (_options.ZombiePvpModeIds.Contains(room.ModeId)
+                            || IsScriptZombieMode(room) && room.ScriptZombies?.KingSlot == actor.Slot)
+                        {
+                            actor.Life.Die();
+                            actor.Life.Burst();
+                        }
+                        if (!actor.Life.CleanDeath()) ignored = LifeCheck.CleanedWhileNotDead;
+                        break;
+                    case RoundLifeEvent.ResetConfirmed when RespawnIsDisabled(room):
+                        ignored = LifeCheck.ResetConfirmedWhileRespawnDisabled;
                         break;
                     // The confirmation must come on the match link the reset was granted on.
-                    case RoundLifeEvent.ResetConfirmed when actor.Life == SeatLife.ResetPending
-                        && ReferenceEquals(actor.ResetRelay, session):
-                        actor.Life = SeatLife.Alive;
-                        actor.DeathCleaned = false;
-                        actor.ResetRelay = null;
+                    case RoundLifeEvent.ResetConfirmed when actor.Life.ConfirmsGrant(session):
+                        actor.Life.Revive();
                         actor.ClearMovement();
                         break;
                     case RoundLifeEvent.ResetConfirmed:
-                        ignored = actor.Life == SeatLife.ResetPending ? LifeCheck.ResetConfirmedOnOtherLink : LifeCheck.ResetConfirmedWithoutGrant;
+                        ignored = actor.Life.State == SeatLife.ResetPending ? LifeCheck.ResetConfirmedOnOtherLink : LifeCheck.ResetConfirmedWithoutGrant;
                         break;
                     case RoundLifeEvent.Finished:
-                        (update, ignored) = Finish(room, target, report.Initiator);
+                        (update, ignored, _) = CreditKill(room, new(initiator?.Slot, target?.Slot,
+                            KillEvidence.BubbleContact, InitiatorNamed: report.Initiator is not null));
                         break;
                 }
                 if (ignored is { } check)
                     Observe(room, sender, report, check);
             }
+            await ReplaceDepartedCaptainsAsync(room, operationCt).ConfigureAwait(false);
             if (update is not null)
                 await SendScoreAsync(room, update, operationCt).ConfigureAwait(false);
+            if (_options.ZombiePvpModeIds.Contains(room.ModeId))
+                await ZombiePvpOutcomeAsync(room, operationCt).ConfigureAwait(false);
+            await SynchronizeFinalZoneAsync(room, operationCt).ConfigureAwait(false);
+            await ScriptZombieOutcomeAsync(room, operationCt).ConfigureAwait(false);
         }, ct).ConfigureAwait(false);
-    }
-
-    // A pop kills a bubbled enemy: the victim dies and the popper scores. Called under the room gate. A pop that does
-    // not fit returns why, for the observation counts.
-    private (RoundScoreUpdated? Update, LifeCheck? Ignored) Finish(PlayRoom room, LifeParticipant? victim, int? initiatorActor)
-    {
-        var initiator = initiatorActor is { } actor ? LifeActor(room, actor) : null;
-        LifeCheck? ignored = victim is null ? LifeCheck.PopWithoutVictim
-            : initiator is null ? LifeCheck.PopWithoutInitiator
-            : initiator.Slot == victim.Slot ? LifeCheck.PopOfSelf
-            : victim.Life != SeatLife.Bubble ? LifeCheck.PopOfUnbubbled
-            : initiator.Team is not (1 or 2) || victim.Team is not (1 or 2) || initiator.Team == victim.Team
-                ? LifeCheck.PopWithoutOpposingTeams
-            : null;
-        if (ignored is not null)
-            return (null, ignored);
-        victim!.Life = SeatLife.Dead;
-        victim.DeathCleaned = false;
-        if (room.Scoring.AddKill(initiator!.Slot, initiator.Team, victim.Slot) is not { } stats)
-            return (null, null);
-        _logger.LogInformation("Room {Room} slot {Slot} popped slot {Victim}; team totals {Totals}.",
-            room.Id, initiator.Slot, victim.Slot, string.Join(':', room.Scoring.TeamTotals));
-        return (new RoundScoreUpdated(room.Id, initiator.Team, [.. room.Scoring.TeamTotals],
-            [stats, room.Scoring.Stats(victim.Slot)], LiveScoreboard(room)), null);
     }
 
     // Counts an ignored life report; the round's first of each kind is logged at information level, the rest at
@@ -118,57 +115,6 @@ internal sealed partial class RoundFlow
     {
         var level = room.LifeChecks.Note(check) ? LogLevel.Information : LogLevel.Debug;
         _logger.Log(level, "Room {Room} slot {Slot}: life report {Event} for actor {Actor} ignored ({Check}); the seat is {Life}.",
-            room.Id, sender.Slot, report.Event, report.Actor, check, sender.Life);
-    }
-
-    /// <summary>
-    /// Grants a dead player's reset once its death presentation is over: the grant goes to the requester, and its
-    /// relay's confirmation then brings the character back. A request naming another seat's character is refused
-    /// loudly; one outside a native-life round, or too early, is dropped.
-    /// </summary>
-    public async ValueTask HandleResetRequestedAsync(ISession session, RoundResetRequested request,
-        IMessageSender<RoundResetGranted> sender, CancellationToken ct)
-    {
-        if (_registry.TryGet(session.Id) is not { } room)
-            return;
-        await room.Executor.ExecuteAsync(async operationCt =>
-        {
-            LifeParticipant seat;
-            lock (room.Gate)
-            {
-                if (room.Phase != RoomPhase.Playing || room.FindByGame(session.Id) is not { } found)
-                    return;
-                if (!room.ControlsActor(found, request.Actor))
-                {
-                    if (LifeActor(room, request.Actor) is not null)
-                        throw new InvalidOperationException($"Slot {found.Slot} asked to reset another seat's character.");
-                    _logger.LogWarning("Session {Id} reset of actor {Actor}, which belongs to no seat; dropped.", session.Id, request.Actor);
-                    return;
-                }
-                seat = LifeActor(room, request.Actor)!;
-                if (!UsesNativeLife(room) || MatchLink(room, found) is not { } relay)
-                    return;
-                if (seat.Life == SeatLife.ResetPending && !ReferenceEquals(seat.ResetRelay, relay))
-                    seat.Life = SeatLife.Dead;
-                if (seat.Life != SeatLife.Dead || !seat.DeathCleaned)
-                {
-                    _logger.LogInformation("Session {Id} reset refused while its character is {Life}.", session.Id, seat.Life);
-                    return;
-                }
-                seat.Life = SeatLife.ResetPending;
-                seat.ResetRelay = relay;
-            }
-            try
-            {
-                await sender.SendAsync(session, new RoundResetGranted(request.Request), operationCt).ConfigureAwait(false);
-            }
-            catch
-            {
-                lock (room.Gate)
-                    if (seat.Life == SeatLife.ResetPending)
-                        seat.Life = SeatLife.Dead;
-                throw;
-            }
-        }, ct).ConfigureAwait(false);
+            room.Id, sender.Slot, report.Event, report.Actor, check, sender.Life.State);
     }
 }

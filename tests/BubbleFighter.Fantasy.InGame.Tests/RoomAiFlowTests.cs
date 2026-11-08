@@ -89,9 +89,9 @@ public sealed class RoomAiFlowTests
         var rig = new RoomFlowTests.Rig(options: options);
         var host = RoomFlowTests.Rig.Player(11, "host");
         var guest = RoomFlowTests.Rig.Player(22, "guest");
-        var grants = new RoomFlowTests.Sink<RoundResetGranted>();
+        var grants = new RoomFlowTests.Sink<RoundPlayerRespawned>();
         var round = new RoundFlow(rig.Registry, options, new(null, new RoomFlowTests.Sink<RoundCountdownStarted>(),
-            new RoomFlowTests.Sink<RoundStarted>()), NullLogger.Instance, default, rig.Flow.ReturnToRoomAsync);
+            new RoomFlowTests.Sink<RoundStarted>(), Respawned: grants), NullLogger.Instance, default, rig.Flow.ReturnToRoomAsync);
         try
         {
             await rig.Flow.HandleCreateAsync(host, new("AI", "", 38, "map"), default);
@@ -105,23 +105,27 @@ public sealed class RoomAiFlowTests
             var bot = Assert.Single(room.Bots);
             var actor = RoomRegistry.SceneEntity(1);
             await round.HandleLifeReportedAsync(guest, new(RoundLifeEvent.Died, actor), default);
-            Assert.Equal(SeatLife.Alive, bot.Life);
+            Assert.Equal(SeatLife.Alive, bot.Life.State);
             await round.HandleLifeReportedAsync(host, new(RoundLifeEvent.Died, actor), default);
             await round.HandleLifeReportedAsync(host, new(RoundLifeEvent.DeathCleaned, actor), default);
-            Assert.Equal(SeatLife.Dead, bot.Life);
-            Assert.True(bot.DeathCleaned);
-            Assert.Equal(SeatLife.Alive, controller.Life);
-            var reset = new RoundResetRequested(actor, new byte[10]);
+            Assert.Equal(SeatLife.Dead, bot.Life.State);
+            Assert.True(bot.Life.DeathCleaned);
+            Assert.Equal(SeatLife.Alive, controller.Life.State);
+            var reset = new RoundSpawnAccepted(actor, 0)
+            {
+                Request = new byte[10],
+                Rules = new(RoundRespawnAudience.Requester, RoundRespawnCompletion.MatchConfirmation, RoundRespawnAdmission.CleanedDeath),
+            };
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                round.HandleResetRequestedAsync(guest, reset, grants, default).AsTask());
-            await round.HandleResetRequestedAsync(host, reset, grants, default);
+                round.HandleSpawnAcceptedAsync(guest, reset, default).AsTask());
+            await round.HandleSpawnAcceptedAsync(host, reset, default);
             Assert.Single(grants.To(host));
-            Assert.Equal(SeatLife.ResetPending, bot.Life);
+            Assert.Equal(SeatLife.ResetPending, bot.Life.State);
             await round.HandleLifeReportedAsync(host, new(RoundLifeEvent.ResetConfirmed, actor), default);
-            Assert.Equal(SeatLife.Alive, bot.Life);
-            Assert.False(bot.DeathCleaned);
-            Assert.Null(bot.ResetRelay);
-            Assert.Equal(SeatLife.Alive, controller.Life);
+            Assert.Equal(SeatLife.Alive, bot.Life.State);
+            Assert.False(bot.Life.DeathCleaned);
+            Assert.Null(bot.Life.GrantLink);
+            Assert.Equal(SeatLife.Alive, controller.Life.State);
         }
         finally { await rig.Registry.StopAllAsync(); }
     }

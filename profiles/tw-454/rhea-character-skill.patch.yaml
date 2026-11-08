@@ -1,0 +1,5 @@
+# Opt in to the audited Rhea form exchange; native-client acceptance remains outstanding.
+- set:
+    id: dialect.rooms
+    config:
+      rhea_character_skill: true

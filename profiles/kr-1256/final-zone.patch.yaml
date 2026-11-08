@@ -1,0 +1,7 @@
+# Explicit opt-in to the audited survival round exchanges (modes 23, 25, 30 and 45). Native-client acceptance remains required.
+# Import the matching client resources; optional starting packs and AutoItem terrain maps are rejected before countdown.
+- set:
+    id: dialect.rooms
+    config:
+      final_zone: true
+      result_scoreboard_modes: [1, 8, 19, 20, 23, 24, 25, 28, 30, 32, 45]

@@ -55,9 +55,6 @@ internal static class ShopWire
     /// <summary>Far-future sale bound; see <see cref="LegacySaleFrom"/>.</summary>
     public const double LegacySaleTo = ShopCatalogWire.LegacySaleTo;
 
-    /// <summary>Default deployment card-count limit of the legacy catalog selection.</summary>
-    public const int LegacyEnterShopCardCap = ShopCatalogWire.LegacyEnterShopCardCap;
-
     /// <summary>Main category the kr-812 / cn-717 dialog opens on.</summary>
     public const int LegacyEnterShopMainCategory = ShopCatalogWire.LegacyEnterShopMainCategory;
 
@@ -240,7 +237,7 @@ internal static class ShopWire
     /// <returns>The selected prefix and the dropped count.</returns>
     public static (IReadOnlyList<ShopCardRow> Selected, int Dropped) SelectBoundedCards(
         IReadOnlyList<ShopCardRow> cards, int budget, bool wideStockType = false, bool vectorOnlyStocks = false,
-        int maxCards = LegacyEnterShopCardCap) =>
+        int maxCards = 0) =>
         ShopCatalogWire.SelectBoundedCards(cards, budget, wideStockType, vectorOnlyStocks, maxCards);
 
     /// <summary>Orders shop-visible mains for the legacy enter-shop reply.</summary>

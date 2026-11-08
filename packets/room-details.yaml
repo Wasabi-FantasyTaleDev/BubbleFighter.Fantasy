@@ -49,9 +49,27 @@ structs:
         - result: u32
           offset: 8
 
+  # C2S gcpRoomChangeInventory: cn-279 sub_881D40 -> cn-279 sub_422720
+  # stamps 511; cn-279 sub_448840 reads two words and a counted word vector.
+  # cn-324 sub_598700 -> cn-324 sub_598F40 stamps 511 with the same envelope
+  # (cn-324 sub_597A30). The first word comes from DlgInventoryTemp+356;
+  # the second word has no proven assignment. The vectors contain the four
+  # signed UserSlot shorts at +24..+30, plus +32 in cn-324.
+  RoomInventoryChangeRequest:
+    - character_selection: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - weapon_selections: "list<u32>"
+      offset: 12
+
   # S2C gspRoomChangeInventory (506): kr-812 sub_7FE650 uses reader
   # kr-812 sub_80C100: three words, then a counted word vector. Their meanings
-  # are unresolved. The modern consumers use their first word as the room seat.
+  # are unresolved in the baseline. cn-279 sub_708720 and cn-324 sub_6EDF70
+  # prove the early first word is the seat, the second the character selector,
+  # and the vector the signed native weapon selectors. The early runtime keeps
+  # these aliases separate from the other builds' unreviewed semantics.
+  # The modern consumers use their first word as the room seat.
   # The same read order is in cn-717 sub_890EC0, cn-324 sub_6EB2E0 and
   # cn-279 sub_449C30 (cn-279 dispatcher sub_70A0F0 case 506), each with its
   # own three four-byte primitives and its own counted word vector; cn-279's

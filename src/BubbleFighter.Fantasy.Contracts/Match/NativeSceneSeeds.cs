@@ -76,7 +76,17 @@ public enum MatchPreviousRound
 /// <param name="Generation">The room start generation the tables belong to.</param>
 /// <param name="EntityId">The seat's native scene actor identifier.</param>
 /// <param name="PreviousRound">The seat's result in the previous round of the same room.</param>
-public sealed record MatchSeedTablesRequested(int RoomId, int Generation, int EntityId, MatchPreviousRound PreviousRound) : IMessage;
+public sealed record MatchSeedTablesRequested(int RoomId, int Generation, int EntityId, MatchPreviousRound PreviousRound) : IMessage
+{
+    /// <summary>Gets the frozen accepted loadout, or null when the room has no authoritative equipment service.</summary>
+    public MatchSeedEquipment? Equipment { get; init; }
+
+    /// <summary>
+    /// Gets every occupant of the round, this seat included, whose defence table the seat must receive; null when
+    /// the seat receives only its own tables.
+    /// </summary>
+    public MatchSeedRoster? Roster { get; init; }
+}
 
 /// <summary>
 /// The game connection of the seat a match connection is bound to, published on the match session while the binding

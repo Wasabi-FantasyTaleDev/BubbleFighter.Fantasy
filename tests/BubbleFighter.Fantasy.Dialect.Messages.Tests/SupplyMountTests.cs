@@ -15,6 +15,8 @@ public sealed class SupplyMountTests
     [InlineData("kr-812", false)]
     [InlineData("cn-324", false)]
     [InlineData("cn-406", false)]
+    [InlineData("cn-705", false)]
+    [InlineData("cn-706", false)]
     [InlineData("cn-717", false)]
     [InlineData("id-400", false)]
     [InlineData("id-1809", false)]
@@ -145,7 +147,7 @@ public sealed class SupplyMountTests
 
     /// <summary>Unavailable native supply families fail before publishing any service or packet route.</summary>
     [Theory]
-    [InlineData("cn-706")]
+    [InlineData("cn-735")]
     public async Task UnreviewedSupplySurfaceCannotInstallRoutes(string build)
     {
         var profile = new ClientProfile(build, build[..2], int.Parse(build[3..]), 0, 0, build);

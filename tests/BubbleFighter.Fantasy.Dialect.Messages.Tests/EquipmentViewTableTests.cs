@@ -86,6 +86,7 @@ public sealed class EquipmentViewTableTests
 
     [Theory]
     [InlineData("kr-812", "EquippedItemList", new[] { "view", "preset_update" })]
+    [InlineData("cn-406", "EquippedItemList", new[] { "view", "preset_update" })]
     [InlineData("kr-1256", "RoomProfileEntry", new[] { "preset_reply", "preset_update", "view" })]
     [InlineData("cn-774", "SoloPartyEquippedItem", new[] { "view" })]
     [InlineData("tw-454", "SoloPartyEquippedItem", new[] { "view" })]

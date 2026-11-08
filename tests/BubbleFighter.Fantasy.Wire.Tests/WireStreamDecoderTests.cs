@@ -55,6 +55,89 @@ public sealed class WireStreamDecoderTests
     }
 
     [Fact]
+    public void ConsumedPlaintextIsErasedWithoutChangingReturnedPayload()
+    {
+        using var decoder = new WireStreamDecoder(Dialect, PacketDirection.ClientToServer, 4096);
+        var payload = Enumerable.Repeat((byte)0x5A, 96).ToArray();
+        var frame = Assert.IsType<WireStreamItem.Frame>(Assert.Single(decoder.Feed(
+            Encrypt(PacketDirection.ClientToServer, Dialect.EncodeFrame(1, payload)))));
+        Assert.Equal(payload, frame.Value.Payload);
+        Assert.All(Storage(decoder), value => Assert.Equal(0, value));
+    }
+
+    [Fact]
+    public void CompactionErasesConsumedTailAndPreservesPartialFrame()
+    {
+        using var decoder = new WireStreamDecoder(Dialect, PacketDirection.ClientToServer, 4096);
+        var bytes = Encrypt(PacketDirection.ClientToServer,
+            Dialect.EncodeFrame(1, Enumerable.Repeat((byte)0x5A, 96).ToArray()),
+            Dialect.EncodeFrame(2, Enumerable.Repeat((byte)0xA5, 32).ToArray()));
+        Assert.Single(decoder.Feed(bytes.AsSpan(0, bytes.Length - 10)));
+        Assert.True(decoder.PendingBytes > 0);
+        Assert.All(Storage(decoder).Skip(decoder.PendingBytes), value => Assert.Equal(0, value));
+        var last = Assert.IsType<WireStreamItem.Frame>(Assert.Single(decoder.Feed(bytes.AsSpan(bytes.Length - 10))));
+        Assert.Equal(Enumerable.Repeat((byte)0xA5, 32), last.Value.Payload);
+        Assert.All(Storage(decoder), value => Assert.Equal(0, value));
+    }
+
+    [Fact]
+    public void ResizeAndDisposalEraseEveryOwnedPartialPlaintextArray()
+    {
+        var decoder = new WireStreamDecoder(Dialect, PacketDirection.ClientToServer, 6000);
+        var bytes = Encrypt(PacketDirection.ClientToServer, Dialect.EncodeFrame(1, Enumerable.Repeat((byte)0x5A, 5000).ToArray()));
+        Assert.Empty(decoder.Feed(bytes.AsSpan(0, 4000)));
+        var original = Storage(decoder);
+        Assert.Contains((byte)0x5A, original);
+        Assert.Empty(decoder.Feed(bytes.AsSpan(4000, 500)));
+        var grown = Storage(decoder);
+        Assert.NotSame(original, grown);
+        Assert.All(original, value => Assert.Equal(0, value));
+        Assert.Contains((byte)0x5A, grown);
+        decoder.Dispose();
+        decoder.Dispose();
+        Assert.All(grown, value => Assert.Equal(0, value));
+        Assert.Equal(0, decoder.PendingBytes);
+        Assert.Throws<ObjectDisposedException>(() => decoder.Feed([]));
+    }
+
+    [Fact]
+    public void DecodeFailureErasesStorageAndFramesThatCouldNotBeReturned()
+    {
+        var recording = new RecordingBuild();
+        using var decoder = new WireStreamDecoder(recording, PacketDirection.ClientToServer, 4096);
+        var invalid = Dialect.EncodeFrame(2, [1, 2, 3]);
+        invalid[5] ^= 0xFF;
+        var bytes = Encrypt(PacketDirection.ClientToServer,
+            Dialect.EncodeFrame(1, Enumerable.Repeat((byte)0x5A, 96).ToArray()), invalid);
+        Assert.Throws<PacketFormatException>(() => decoder.Feed(bytes));
+        Assert.All(Storage(decoder), value => Assert.Equal(0, value));
+        var payload = Assert.Single(recording.Payloads);
+        Assert.All(payload, value => Assert.Equal(0, value));
+        Assert.Throws<ObjectDisposedException>(() => decoder.Feed([]));
+    }
+
+    private static byte[] Storage(WireStreamDecoder decoder) => (byte[])typeof(WireStreamDecoder)
+        .GetField("_buffer", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(decoder)!;
+
+    private sealed class RecordingBuild : WireDialect
+    {
+        internal List<byte[]> Payloads { get; } = [];
+        public override ClientProfile Profile => Dialect.Profile;
+        public override int MaxFrameOverheadBytes => Dialect.MaxFrameOverheadBytes;
+        public override byte[] BuildServerPreamble(ushort status, string commandLine) => Dialect.BuildServerPreamble(status, commandLine);
+        public override int PreambleLength(PacketDirection direction) => Dialect.PreambleLength(direction);
+        public override IStreamTransform CreateDecryptor(PacketDirection direction) => Dialect.CreateDecryptor(direction);
+        public override IStreamTransform CreateEncryptor(PacketDirection direction) => Dialect.CreateEncryptor(direction);
+        public override byte[] EncodeFrame(ushort opcode, ReadOnlySpan<byte> payload) => Dialect.EncodeFrame(opcode, payload);
+        public override bool TryReadFrame(ref System.Buffers.ReadOnlySequence<byte> plaintext, int maxPayloadBytes, out DecodedFrame frame)
+        {
+            var success = Dialect.TryReadFrame(ref plaintext, maxPayloadBytes, out frame);
+            if (success) Payloads.Add(frame.Payload);
+            return success;
+        }
+    }
+
+    [Fact]
     public void CorruptedHeaderFailsLoud()
     {
         var bytes = Encrypt(PacketDirection.ClientToServer, Dialect.EncodeFrame(9, new byte[4]));

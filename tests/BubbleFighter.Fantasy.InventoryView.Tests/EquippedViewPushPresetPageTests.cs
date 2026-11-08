@@ -1,6 +1,7 @@
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Inventory;
 using BubbleFighter.Fantasy.InventoryView;
+using BubbleFighter.Fantasy.Kernel;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -43,8 +44,8 @@ public sealed class EquippedViewPushPresetPageTests
 
         Assert.Equal(1, state.PageReads);
         Assert.Equal(1, state.PageWrites);
-        var seeded = Assert.IsType<WeaponPresetPage[]>(Assert.Single(local.Sent).WeaponPresetPages);
-        Assert.Equal(WeaponPresetSlots.Count, seeded.Length);
+        var seeded = Assert.IsAssignableFrom<IReadOnlyList<WeaponPresetPage>>(Assert.Single(local.Sent).WeaponPresetPages);
+        Assert.Equal(WeaponPresetSlots.Count, seeded.Count);
         // The seed is the derived page the shipped bar carries: worn primary, worn special, zero word.
         Assert.All(seeded, page => Assert.Equal(new WeaponPresetPage(202001, 205001, 0), page));
     }
@@ -66,7 +67,7 @@ public sealed class EquippedViewPushPresetPageTests
         Assert.Equal(0, state.PageWrites);
         // The publication still carries the current worn snapshot for the view; only the pages stay put.
         Assert.Equal(202001, Assert.Single(local.Sent).PrimaryWeaponId);
-        Assert.Equal(state.Pages, Assert.IsType<WeaponPresetPage[]>(Assert.Single(local.Sent).WeaponPresetPages));
+        Assert.Equal(state.Pages, Assert.IsAssignableFrom<IReadOnlyList<WeaponPresetPage>>(Assert.Single(local.Sent).WeaponPresetPages));
     }
 
     [Fact]
@@ -81,6 +82,97 @@ public sealed class EquippedViewPushPresetPageTests
         await push.SendSelectionAsync(new RecordingSession(4), 42, 300001, StarterWorn, default);
 
         Assert.Null(Assert.Single(local.Sent).WeaponPresetPages);
+    }
+
+    /// <summary>A completed-view event retains the sent snapshot and cannot precede the dialect's final frame.</summary>
+    [Fact]
+    public async Task CompletedViewEventFollowsSuccessfulSendAndOwnsItsSnapshot()
+    {
+        var events = new EventBus(NullLogger.Instance);
+        var published = new List<EquipmentViewPublished>();
+        using var subscription = events.OnAsync<EquipmentViewPublished>((message, _) =>
+        {
+            published.Add(message);
+            return ValueTask.CompletedTask;
+        });
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var local = new RecordingSender
+        {
+            BeforeSend = async ct =>
+            {
+                entered.SetResult();
+                await release.Task.WaitAsync(ct);
+            },
+        };
+        var push = new EquippedViewPush(NullLogger.Instance, local, new RecordingSender(), events: events);
+        var session = new RecordingSession(8);
+        var worn = StarterWorn.ToArray();
+        var send = push.SendSelectionAsync(session, 42, 300001, worn, default).AsTask();
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Empty(published);
+            worn[1] = 204099;
+        }
+        finally
+        {
+            release.TrySetResult();
+            await send;
+        }
+        var result = Assert.Single(published);
+        Assert.Same(session, result.Session);
+        Assert.Equal(local.Protocol, result.Protocol);
+        Assert.True(result.SelectionChange);
+        Assert.Same(Assert.Single(local.Sent), result.View);
+        Assert.Equal(StarterWorn, result.View.EquippedItemIds);
+        Assert.Throws<NotSupportedException>(() => ((IList<int>)result.View.EquippedItemIds)[1] = 204099);
+    }
+
+    /// <summary>A failed local view has no completed publication event for scene owners to consume.</summary>
+    [Fact]
+    public async Task FailedViewDoesNotPublishACompletion()
+    {
+        var events = new EventBus(NullLogger.Instance);
+        var notifications = 0;
+        using var subscription = events.OnAsync<EquipmentViewPublished>((_, _) =>
+        {
+            notifications++;
+            return ValueTask.CompletedTask;
+        });
+        var local = new RecordingSender { BeforeSend = _ => ValueTask.FromException(new IOException("View send failed.")) };
+        var push = new EquippedViewPush(NullLogger.Instance, local, new RecordingSender(), events: events);
+        await Assert.ThrowsAsync<IOException>(() =>
+            push.SendSelectionAsync(new RecordingSession(9), 42, 300001, StarterWorn, default).AsTask());
+        Assert.Equal(0, notifications);
+    }
+
+    /// <summary>The completed snapshot owns the preset table as well as the worn list, even while its sender is suspended.</summary>
+    [Fact]
+    public async Task CompletedViewOwnsThePersistedPresetTable()
+    {
+        var events = new EventBus(NullLogger.Instance);
+        EquipmentViewPublished? published = null;
+        using var subscription = events.OnAsync<EquipmentViewPublished>((message, _) =>
+        {
+            published = message;
+            return ValueTask.CompletedTask;
+        });
+        var state = new RecordingPresetState { Pages = WeaponPresetPages.SeedFromWorn(202001, 205001) };
+        var local = new RecordingSender
+        {
+            BeforeSend = _ =>
+            {
+                state.Pages![0] = new(204099, 0, 0);
+                return ValueTask.CompletedTask;
+            },
+        };
+        var push = new EquippedViewPush(NullLogger.Instance, local, new RecordingSender(), state,
+            persistPresetPages: true, events: events);
+        await push.SendSelectionAsync(new RecordingSession(10), 42, 300001, StarterWorn, default);
+        var pages = Assert.IsAssignableFrom<IReadOnlyList<WeaponPresetPage>>(published!.View.WeaponPresetPages);
+        Assert.All(pages, page => Assert.Equal(new WeaponPresetPage(202001, 205001, 0), page));
+        Assert.Throws<NotSupportedException>(() => ((IList<WeaponPresetPage>)pages)[0] = new(204099, 0, 0));
     }
 
     private sealed class RecordingPresetState : IPlayerInventoryState
@@ -117,11 +209,12 @@ public sealed class EquippedViewPushPresetPageTests
     private sealed class RecordingSender : IMessageSender<LocalEquipmentViewUpdated>, IMessageSender<RemoteEquipmentViewUpdated>
     {
         internal List<LocalEquipmentViewUpdated> Sent { get; } = [];
+        internal Func<CancellationToken, ValueTask>? BeforeSend { get; init; }
         public string Protocol => "test/game";
-        public ValueTask SendAsync(ISession session, LocalEquipmentViewUpdated message, CancellationToken ct)
+        public async ValueTask SendAsync(ISession session, LocalEquipmentViewUpdated message, CancellationToken ct)
         {
+            if (BeforeSend is not null) await BeforeSend(ct);
             Sent.Add(message);
-            return ValueTask.CompletedTask;
         }
         public ValueTask SendAsync(ISession session, RemoteEquipmentViewUpdated message, CancellationToken ct) =>
             throw new InvalidOperationException("These publications are local-only.");

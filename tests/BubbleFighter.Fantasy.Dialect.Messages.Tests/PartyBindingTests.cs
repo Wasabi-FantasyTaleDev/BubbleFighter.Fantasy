@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Text;
@@ -15,9 +16,20 @@ using Xunit;
 namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
 
 /// <summary>Pins the legacy party packet bodies and the routes each build mounts.</summary>
-public sealed class PartyBindingTests
+public sealed partial class PartyBindingTests
 {
     public static readonly TheoryData<string> PartyBuilds = new() { "kr-812", "cn-717", "cn-324", "cn-279", "id-400", "id-1809", "cn-706", "cn-404", "cn-408" };
+
+    /// <summary>The kernel can publish every party binding and sender during actual activation.</summary>
+    [Fact]
+    public void EveryPartyServiceIsDeclaredByThePlugin()
+    {
+        var declared = typeof(MessagesPlugin).GetCustomAttribute<PluginAttribute>()!.ConditionalProvidesMany;
+        var published = typeof(PartyBinding).GetInterfaces().Where(type => type.IsGenericType
+            && (type.GetGenericTypeDefinition() == typeof(IInboundMessageBinding<>)
+                || type.GetGenericTypeDefinition() == typeof(IMessageSender<>)));
+        Assert.Empty(published.Except(declared));
+    }
 
     /// <summary>The party list is the state word, the counted members (user, nickname, two unknown words and level) and an empty equipped list.</summary>
     [Fact]
@@ -105,7 +117,17 @@ public sealed class PartyBindingTests
             // cn-324 and cn-279 visit directly; their C2S 111 belongs to matching, not a visit-answer packet.
             var visit = table.Find(PacketDirection.ClientToServer, "gcpReqMoveToFriend");
             Assert.NotNull(visit);
-            Assert.Equal(PartyBinding.Requests.Length + 1 + (answer is null ? 0 : 1), routes.Handlers.Count);
+            var chat = table.Find(PacketDirection.ClientToServer, "gcpSendPartyChatMsg");
+            Assert.NotNull(chat);
+            var quickStartRequest = table.Find(PacketDirection.ClientToServer, "gcpReqPartyQuickStart");
+            var quickStartMounted = quickStartRequest is not null
+                && table.Find(PacketDirection.ServerToClient, "gspRepPartyQuickStart") is not null
+                && TestBuilds.Packets.Resolve(build, "PartyQuickStartRequest") is { Count: > 0 };
+            if (quickStartMounted)
+                Assert.True(routes.Handlers.ContainsKey((build + "/game", table.C2S("gcpReqPartyQuickStart"))),
+                    "gcpReqPartyQuickStart");
+            Assert.Equal(PartyBinding.Requests.Length + 2 + (answer is null ? 0 : 1) + (quickStartMounted ? 1 : 0),
+                routes.Handlers.Count);
             Assert.Equal(answer is null ? 0 : 1, services.GetAll<IInboundMessageBinding<PartyVisitAnswered>>().Count);
             Assert.Equal(answer is null ? 0 : 1, services.GetAll<IMessageSender<PartyVisitAsked>>().Count);
             foreach (var name in PartyBinding.Replies)
@@ -115,6 +137,36 @@ public sealed class PartyBindingTests
         finally { await context.UnwindAsync(); }
         Assert.Empty(routes.Handlers);
         Assert.Empty(services.GetAll<IMessageSender<PartyUpdated>>());
+    }
+
+    /// <summary>The native request reaches typed dispatch, rejects truncated bodies, and releases its registration.</summary>
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(4)]
+    public async Task QuickStartTraversesThePacketRoute(int kind)
+    {
+        var binding = Binding("kr-812", out var table);
+        var services = new ServiceRegistry();
+        var routes = new Routes();
+        var messages = new Messages();
+        using var router = services.Register<IPacketRouter>(routes);
+        var context = new PluginContext(new PluginRow { Id = "party-binding", Plugin = "test", Source = "test" },
+            services, new EventBus(NullLogger.Instance), NullLogger.Instance);
+        try
+        {
+            binding.Bind(context, messages);
+            var opcode = table.C2S("gcpReqPartyQuickStart");
+            var handler = routes.Handlers[("kr-812/game", opcode)];
+            await handler(new Session(), new InboundPacket(opcode, W(kind)), default);
+            Assert.Equal(new PartyQuickStartRequested(kind), Assert.Single(messages.Received));
+            await Assert.ThrowsAsync<PacketFormatException>(() =>
+                handler(new Session(), new InboundPacket(opcode, new byte[3]), default).AsTask());
+            Assert.Single(messages.Received);
+        }
+        finally { await context.UnwindAsync(); }
+        Assert.Empty(routes.Handlers);
+        Assert.Empty(services.GetAll<IMessageSender<PartyQuickStartAnswered>>());
     }
 
     /// <summary>Direct Find completion has its own native success result and trailing word.</summary>
@@ -347,12 +399,18 @@ public sealed class PartyBindingTests
                 table.C2S("gcpReqAcceptVisitation_"), table.C2S("gcpReqRefuseVisitation_"),
             };
             if (hasInvite) expected.Add(table.C2S("gcpReqInvite"));
+            // All three modern builds state the audited leave, kick and leader trio
+            // (kr-1256 sub_90B630/kr-1256 sub_90A770/kr-1256 sub_90A950; cn-774 sub_B04F30/cn-774 sub_B04310/cn-774 sub_B04790;
+            // tw-454 sub_AB1C50/tw-454 sub_B9FD40/tw-454 sub_B9FEA0).
+            expected.Add(table.C2S("gcpReqLeaveParty"));
+            expected.Add(table.C2S("gcpReqKickFromParty"));
+            expected.Add(table.C2S("gcpReqChangePartyLeader"));
             Assert.Equal(expected.Order(), routes.Handlers.Keys.Select(key => key.Item2).Order());
             Assert.Single(services.GetAll<IMessageSender<PartyInviteNotified>>());
             Assert.Single(services.GetAll<IMessageSender<PartyInviteReplied>>());
             Assert.Single(services.GetAll<IMessageSender<PartyUpdated>>());
-            Assert.Empty(services.GetAll<IMessageSender<PartyKickReplied>>());
-            Assert.Empty(services.GetAll<IMessageSender<PartyLeaderChanged>>());
+            Assert.Single(services.GetAll<IMessageSender<PartyKickReplied>>());
+            Assert.Single(services.GetAll<IMessageSender<PartyLeaderChanged>>());
             Assert.Equal(build == "tw-454" ? 1 : 0, services.GetAll<IInboundMessageBinding<PartyInviteAnswered>>().Count);
             Assert.Equal(build == "tw-454" ? 0 : 1, services.GetAll<IInboundMessageBinding<PartyInviteTokenRefused>>().Count);
 
@@ -365,9 +423,23 @@ public sealed class PartyBindingTests
             Assert.Equal(new PartyInviteAccepted(true, "Al"), Assert.Single(messages.Received));
             messages.Received.Clear();
             if (build == "tw-454") return; // tw-454's accept carries no kind byte.
-            var wrongKind = Bytes(b => { Text(b, "Al"); Word(b, 0x7F000001); b.Add(0x39); b.Add(0x30); b.Add(2); });
+            var wrongKind = Bytes(b => { Text(b, "Al"); Word(b, 0x7F000001); b.Add(0x39); b.Add(0x30); b.Add(3); });
             await accept(new Session(), new InboundPacket(0, wrongKind), default);
             Assert.Empty(messages.Received);
+            // The audited trio: an empty leave, a one-name kick and a one-name handover.
+            var leave = routes.Handlers[(build + "/game", table.C2S("gcpReqLeaveParty"))];
+            await leave(new Session(), new InboundPacket(0, new byte[0]), default);
+            Assert.Equal(new PartyLeaveRequested(), Assert.Single(messages.Received));
+            messages.Received.Clear();
+            await Assert.ThrowsAsync<PacketFormatException>(async () =>
+                await leave(new Session(), new InboundPacket(0, new byte[1]), default));
+            var kick = routes.Handlers[(build + "/game", table.C2S("gcpReqKickFromParty"))];
+            await kick(new Session(), new InboundPacket(0, Bytes(b => Text(b, "Bob"))), default);
+            Assert.Equal(new PartyKickRequested("Bob"), Assert.Single(messages.Received));
+            messages.Received.Clear();
+            var handover = routes.Handlers[(build + "/game", table.C2S("gcpReqChangePartyLeader"))];
+            await handover(new Session(), new InboundPacket(0, Bytes(b => Text(b, "Bob"))), default);
+            Assert.Equal(new PartyLeaderChangeRequested("Bob"), Assert.Single(messages.Received));
         }
         finally { await context.UnwindAsync(); }
     }
@@ -453,7 +525,7 @@ public sealed class PartyBindingTests
         Assert.Equal(Bytes(b => { Word(b, 0x01020304); Text(b, "Al"); Word(b, 0); }), session.Sent[0].Body);
         await binding.SendAsync(session, new PartyVisitFailed(PartyVisitFailure.Declined, "Bob"), default);
         Assert.Equal(table.S2C("gspVisitationFailed"), session.Sent[1].Opcode);
-        Assert.Equal(Bytes(b => { Text(b, "Bob"); Word(b, 28); }), session.Sent[1].Body);
+        Assert.Equal(Bytes(b => { Text(b, "Bob"); Word(b, build == "tw-454" ? 5 : 28); }), session.Sent[1].Body);
         await binding.SendAsync(session, new PartyVisitGranted("Bob"), default);
         if (build == "tw-454")
         {

@@ -7,8 +7,9 @@ namespace BubbleFighter.Fantasy.InGame.Handlers;
 
 internal sealed partial class RoundFlow
 {
-    // The ultra's item request names no scene object (cn-324 sub_667CC0 passes -1 to cn-324 sub_4672B0).
-    private const int ZombieKingUltraObject = -1;
+    // An ultra's item request names no scene object (cn-324 sub_667CC0 passes -1 to cn-324 sub_4672B0; the Captain
+    // manager's cn-706 sub_428D10 and kr-812 sub_430DB0 push -1 the same way).
+    private const int UltraRequestObject = -1;
 
     /// <summary>
     /// Answers the zombie king's ultra: the client checks its own gauge before it sends the request, so the round

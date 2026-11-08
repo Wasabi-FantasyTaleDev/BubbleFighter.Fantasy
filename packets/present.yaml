@@ -71,12 +71,16 @@ structs:
       offset: 4
     - pending_count: u32
       offset: 8
-      except: [id-400, id-1809, cn-324]
+      # cn-406 sub_700770 reads one word and stores `word == 1` as the task-bar byte, as cn-324 does.
+      except: [id-400, id-1809, cn-324, cn-406]
 
-  # S2C gspRepPresentReceiveSubList (kr-812 818, cn-324 819): one page of the receiver's list. Reader kr-812 sub_83F640
-  # with the 88-byte record loop kr-812 sub_8403A0 (cn-717 sub_8C8B30; cn-324 sub_6FE200 and the other one-pair builds
-  # read two words). kr-812 sub_828E00 acts only when the status is 1; the second word is stored at box +804 and
-  # kr-812 sub_960BE0 turns it into the page count (total - 1) / 4 + 1, the third is the task-bar count.
+  # S2C gspRepPresentReceiveSubList (kr-812 818, cn-324 819, kr-1256 822): one page of the receiver's list. Reader
+  # kr-812 sub_83F640 with the 88-byte record loop kr-812 sub_8403A0 (cn-717 sub_8C8B30; cn-324 sub_6FE200 and the
+  # other one-pair builds read two words). kr-812 sub_828E00 acts only when the status is 1; the second word is
+  # stored at box +804 and kr-812 sub_960BE0 turns it into the page count (total - 1) / 4 + 1, the third is the
+  # task-bar count. The modern handler kr-1256 sub_9B8240 (dispatch case 822 of kr-1256 sub_9D2FF0) reads the same
+  # three words through kr-1256 sub_99B410: the total goes to box +1692 and the third word to the session's gift
+  # count (+904), and the record vector walks an 88-byte stride, the restated modern record below.
   PresentReceiveSubList:
     - status: u32
       offset: 4
@@ -84,12 +88,17 @@ structs:
       offset: 8
     - pending_count: u32
       offset: 12
-      except: [id-400, id-1809, cn-324]
+      # cn-406 sub_715940 (dispatch case 818 -> handler cn-406 sub_72C250) reads status, total, then the record
+      # count and walks the records - a pending_count word here would be misread as the count and run the
+      # loop off the packet whenever it differed.
+      except: [id-400, id-1809, cn-324, cn-406]
     - presents: "list<PresentReceive>"
       offset: 16
 
-  # S2C gspRepPresentSendSubList (kr-812 819, cn-324 820): one page of the sender's list. Reader kr-812 sub_83F590 with
-  # the 120-byte record loop kr-812 sub_83FC70; handler kr-812 sub_828F40 stores the total at box +804 the same way.
+  # S2C gspRepPresentSendSubList (kr-812 819, cn-324 820, kr-1256 823): one page of the sender's list. Reader
+  # kr-812 sub_83F590 with the 120-byte record loop kr-812 sub_83FC70; handler kr-812 sub_828F40 stores the total
+  # at box +804 the same way. The modern handler kr-1256 sub_9B8400 (dispatch case 823 of kr-1256 sub_9D2FF0)
+  # reads two words and the record vector (element reader kr-1256 sub_114DCE0) with no third word.
   PresentSendSubList:
     - status: u32
       offset: 4
@@ -119,7 +128,8 @@ structs:
       offset: 12
     - pending_count: u32
       offset: 16
-      except: [id-400, id-1809, cn-324]
+      # cn-406 sub_715B70 reads three words: result, id and item_key (dispatch case 822 -> handler cn-406 sub_72DD90).
+      except: [id-400, id-1809, cn-324, cn-406]
 
   # S2C gspRepPresentThrow (kr-812 823, cn-324 824): the result of throwing a gift away. Reader kr-812 sub_6DB1B0,
   # handler kr-812 sub_82AD40: status 1 shows "discarded" and then sends the delete request for the id.
@@ -150,7 +160,9 @@ structs:
       offset: 8
     - pending_count: u32
       offset: 12
-      except: [id-400, id-1809, cn-324]
+      # cn-406 sub_420FC0 reads two words (dispatch case 828 -> handler cn-406 sub_72F3C0); success re-requests
+      # the received list.
+      except: [id-400, id-1809, cn-324, cn-406]
 
   # C2S gcpReqPresentSend (kr-812 816, cn-324 817): buy a shop item as a gift. Writer kr-812 sub_95C1C0 (cn-717, id-400,
   # id-1809, cn-324, cn-279 write the same four fields). The caller kr-812 sub_96F350 fills the recipient from the
@@ -176,8 +188,11 @@ structs:
     - count: u32
       offset: 8
 
-  # C2S gcpReqPresentReceive (817), gcpReqPresentThrow (818), gcpReqPresentDeleteSend (822) and
-  # gcpReqPresentDeleteReceive (823): one gift. Writer kr-812 sub_844A30.
+  # C2S gcpReqPresentReceive (kr-812 817, kr-1256 819), gcpReqPresentThrow (kr-812 818, kr-1256 820),
+  # gcpReqPresentDeleteSend (kr-812 822, kr-1256 824) and gcpReqPresentDeleteReceive (kr-812 823, kr-1256 825):
+  # one gift. Writer kr-812 sub_844A30. The modern take and throw stamps are kr-1256 0xE2C2EF and kr-1256 0xE2C630
+  # in the receive dialog's notify handler, written with the same call as the dialog module's stamped 822/824
+  # senders; cn-774 sub_6AEEE0 and tw-454 sub_BBC770 send the same pair from the same dialog's buttons.
   PresentIdRequest:
     - id: u32
       offset: 4
@@ -265,21 +280,37 @@ structs:
       offset: 84
 
   # S2C gspRepPresentSend (kr-1256 825). Its handler kr-1256 sub_9B9A40 reads the shop purchase reply struct through
-  # kr-1256 sub_99B580, not one result word as the legacy builds do: a string, the result word (the switch on it names
-  # -77, -76, -51, -18, -17, -15, -11, -3, -2, -1, 2, 4, 8, 9, 27, 30, 301, 302, 303, 501 and 502 and has no -21, -22
-  # or -23), a word, and two more strings. The meaning of the other fields is not proven. The cn-774 and tw-454
-  # handlers are not read yet.
+  # kr-1256 sub_99B580, not one result word as the legacy builds do: a string, a word, the result word, and two more
+  # strings (the reader walks string, dword, dword, string, string). The switch that names the failure texts
+  # (-77, -76, -51, -18, -17, -15, -11, -3, -2, -1, 2, 4, 8, 9, 27, 30, 301, 302, 303, 501 and 502 and has no -21,
+  # -22 or -23) runs on the SECOND dword: the handler's switch variable sits at struct +28 (kr-1256 sub_9B9A40's
+  # v53 lives 28 bytes above the struct base). The first dword is the shop purchase context the reply carries; the
+  # server sends 0 and its meaning for a gift reply is unproven. cn-774 sub_BB7130 reads the same five fields:
+  # cn-774 sub_1093FE0 reads the leading string and both trailing strings, including their length prefixes.
   PresentSendReply@kr-1256:
     - unknown_0: wstr
       offset: 0
-    - result: u32
+    - unknown_24: u32 # The purchase context the client carries into its dialog; the server has no value and writes 0.
       offset: 24
-    - unknown_28: u32
+    - result: u32 # kr-1256 sub_9B9A40 switches the failure texts on this word.
       offset: 28
     - unknown_32: wstr
       offset: 32
     - unknown_56: wstr
       offset: 56
+
+  # S2C gspRepPresentSend (tw-454 825): tw-454 sub_A94910 calls tw-454 sub_E91B70 for the leading string,
+  # reads the context and result words, then calls the same counted-string reader once more. Unlike KR/CN,
+  # there is only one trailing string. The result is the second word, stored at the native object's +28.
+  PresentSendReply@tw-454:
+    - unknown_0: wstr
+      offset: 0
+    - unknown_24: u32
+      offset: 24
+    - result: u32
+      offset: 28
+    - unknown_32: wstr
+      offset: 32
 
   # S2C gspRepPresentSendThankMsg (kr-812 824, kr-1256 828): the result of storing the receiver's thank-you.
   # The legacy class reader kr-812 sub_80A910 reads one word at +4; the kr-1256 handler kr-1256 sub_9BB8B0 reads one

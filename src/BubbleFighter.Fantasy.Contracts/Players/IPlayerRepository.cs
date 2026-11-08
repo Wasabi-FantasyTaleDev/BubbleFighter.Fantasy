@@ -14,6 +14,9 @@ public interface IPlayerRepository
     /// <summary>Gets whether the store commits paint consumption and player color in one operation.</summary>
     bool SupportsAtomicPaintApplication => false;
 
+    /// <summary>Gets whether migration can read existing identities by account number without provisioning them.</summary>
+    bool SupportsRetainedAccountLookup => false;
+
     /// <summary>Atomically changes a player's nickname and consumes one owned rename card; returns the native result code.</summary>
     ValueTask<int> RenameWithItemAsync(long userNum, string nickname, int itemId, CancellationToken ct) =>
         throw new NotSupportedException("This player repository does not support atomic consumable name changes.");
@@ -27,6 +30,10 @@ public interface IPlayerRepository
     /// <param name="username">The login name.</param>
     /// <param name="ct">Cancellation token.</param>
     ValueTask<PlayerRecord?> FindByUsernameAsync(string username, CancellationToken ct);
+
+    /// <summary>Reads an existing player by positive retained account identity without creating an account or granting authentication.</summary>
+    ValueTask<PlayerRecord?> FindByUserNumAsync(long userNum, CancellationToken ct) =>
+        throw new NotSupportedException("This player repository does not support retained account lookup.");
 
     /// <summary>Checks whether the player completed native character creation rather than automatic account provisioning.</summary>
     /// <param name="userNum">The existing player identity.</param>

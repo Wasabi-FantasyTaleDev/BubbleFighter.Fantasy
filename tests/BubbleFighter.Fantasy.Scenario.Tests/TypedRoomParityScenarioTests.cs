@@ -237,7 +237,7 @@ public sealed class ParityRun : IAsyncLifetime
             };
         }
 
-        await Step("login", async () => { await a.Login(); await b.Login(); });
+        await Step("login", async () => { await a.Login(pollConfiguration: false); await b.Login(pollConfiguration: false); });
         await Step("A 106", () => a.Send(106, []));
         await Step("B 106", () => b.Send(106, []));
         await Step("A 401", () => a.SendReference(401));
@@ -251,10 +251,10 @@ public sealed class ParityRun : IAsyncLifetime
         });
         await Step("B 403 join", () => b.Send(403, Body("RoomJoinRequest", new() { ["room_id"] = roomId, ["password"] = "" })));
         await Step("B 517 probe", () => b.Send(517, Body("RoomPingRequest", new() { ["unknown_n0"] = 0 })));
-        await Step("B 505 ready", () => b.Send(505, Body("RoomReadyRequest", new() { ["ready"] = true, ["unknown_5"] = false, ["unknown_6"] = false })));
-        await Step("B 505 shop", () => b.Send(505, Body("RoomReadyRequest", new() { ["ready"] = false, ["unknown_5"] = true, ["unknown_6"] = false })));
-        await Step("B 505 inventory", () => b.Send(505, Body("RoomReadyRequest", new() { ["ready"] = false, ["unknown_5"] = false, ["unknown_6"] = true })));
-        await Step("B 505 clear", () => b.Send(505, Body("RoomReadyRequest", new() { ["ready"] = false, ["unknown_5"] = false, ["unknown_6"] = false })));
+        await Step("B 505 ready", () => b.Send(505, Body("RoomReadyRequest", new() { ["ready"] = true, ["in_shop"] = false, ["in_inventory"] = false })));
+        await Step("B 505 shop", () => b.Send(505, Body("RoomReadyRequest", new() { ["ready"] = false, ["in_shop"] = true, ["in_inventory"] = false })));
+        await Step("B 505 inventory", () => b.Send(505, Body("RoomReadyRequest", new() { ["ready"] = false, ["in_shop"] = false, ["in_inventory"] = true })));
+        await Step("B 505 clear", () => b.Send(505, Body("RoomReadyRequest", new() { ["ready"] = false, ["in_shop"] = false, ["in_inventory"] = false })));
         await Step("B 515 team", () => b.Send(515, [0xBA, 0xBA]));
         await Step("A 502 chat", () => a.Send(502, Body("RoomChatRequest", new() { ["channel"] = 0, ["text"] = "hello", ["unknown_n2"] = "" })));
         await Step("A 509 lock", () => a.Send(509, Body("RoomSeatLock", new() { ["slot"] = 3, ["closed"] = true })));

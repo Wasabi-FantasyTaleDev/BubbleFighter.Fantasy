@@ -337,6 +337,8 @@ WebUI: http://127.0.0.1:8080/
 
 기본 제한은 업로드 8 GiB, 가져오기당 압축 해제 데이터 16 GiB, 가져오기당 파일 32,768개, 보관 사본 64개, 전체 가져오기 저장 공간 64 GiB, 가져오기당 20분입니다. `installation` 행에서 `client_data_upload_bytes`, `client_data_extracted_bytes`, `client_data_file_limit`, `client_data_copy_limit`, `client_data_storage_bytes`, `client_data_import_seconds`로 조정할 수 있습니다. 다시 가져와도 이전에 성공한 사본은 삭제되지 않습니다.
 
+Windows에서는 파일 쓰기가 끝난 뒤 검사 프로그램이나 다른 프로세스가 최종 디렉터리 이름 변경을 일시적으로 막을 수 있습니다. 이 게시 단계에서만 Windows 액세스, 공유 또는 잠금 충돌을 재시도합니다. `client_data_publish_attempts`는 기본 20회(범위 1–100), `client_data_publish_retry_ms`는 기본 50밀리초(범위 1–1000)입니다. 횟수를 1로 설정하면 재시도하지 않습니다. 전체 가져오기 제한 시간과 취소는 계속 적용됩니다. 업로드를 다시 실행하거나 기존 대상을 덮어쓰지 않으며, 영구 오류와 다른 오류는 그대로 보고합니다.
+
 **확인:** 도우미가 설치 완료를 보고하고 WebUI가 관리 인터페이스로 전환됩니다. 관리자가 아직 없어도 아래 `/health` 검사는 도우미가 실행되는 동안 정상 응답합니다.
 
 ## 설치 확인

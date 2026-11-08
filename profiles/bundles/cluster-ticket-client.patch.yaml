@@ -1,0 +1,9 @@
+# Mount on a worker instead of a local launcher.http ticket provider.
+- insert:
+    - id: cluster-ticket-client
+      plugin: cluster.ticket-client
+      config:
+        authority_url: "${BFF_CLUSTER_TICKET_URL}"
+        node_id: "${BFF_CLUSTER_NODE_ID}"
+        key: "${BFF_CLUSTER_REDEMPTION_KEY}"
+        builds: [kr-1256]

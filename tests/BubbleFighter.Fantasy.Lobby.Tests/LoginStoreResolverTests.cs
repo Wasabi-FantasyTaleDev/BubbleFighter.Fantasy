@@ -22,6 +22,44 @@ public sealed class LoginStoreResolverTests
         await store.ListSlotsAsync(User, bag, InventoryLimits.MaxInventorySlotsPerBag, default);
 
     [Fact]
+    public async Task EmptyLoginSnapshotCannotEraseAnItemCommittedBeforeSeeding()
+    {
+        var stored = NewStore();
+        var interleaved = new InterleavedInventory(stored);
+        var snapshot = await new LoginInventoryResolver(interleaved, true).ResolveAsync(User, default);
+        Assert.Contains(snapshot.CharacterBag, row => row.ItemId == 987654 && row.Quantity == 17);
+        Assert.Contains(snapshot.EquippedBag, row => row.ItemId == 987654 && row.Quantity == 17);
+        Assert.All(StarterKit.Default.ItemIds, id => Assert.Contains(snapshot.CharacterBag, row => row.ItemId == id));
+        Assert.Equal(snapshot.CharacterBag, await Bag(stored, InventoryBag.CharacterBag));
+    }
+
+    private sealed class InterleavedInventory(IInventoryRepository stored) : IInventoryRepository
+    {
+        private bool _committed;
+        private async ValueTask CommitOtherNodeAsync(CancellationToken ct)
+        {
+            if (_committed) return;
+            _committed = true;
+            foreach (var bag in new[] { InventoryBag.CharacterBag, InventoryBag.EquippedBag })
+                await stored.AppendMissingItemsAsync(User, bag, [new(User, bag, StoredKey, 987654, 17, 0)], ct);
+        }
+        public ValueTask<IReadOnlyList<InventorySlotRecord>> ListSlotsAsync(long userNum, InventoryBag bag, int maxCount, CancellationToken ct) =>
+            stored.ListSlotsAsync(userNum, bag, maxCount, ct);
+        public async ValueTask ReplaceSlotsAsync(long userNum, InventoryBag bag, IReadOnlyList<InventorySlotRecord> slots, CancellationToken ct)
+        {
+            await CommitOtherNodeAsync(ct);
+            await stored.ReplaceSlotsAsync(userNum, bag, slots, ct);
+        }
+        public async ValueTask<IReadOnlyList<InventorySlotRecord>> AppendMissingItemsAsync(long userNum, InventoryBag bag, IReadOnlyList<InventorySlotRecord> candidates, CancellationToken ct)
+        {
+            await CommitOtherNodeAsync(ct);
+            return await stored.AppendMissingItemsAsync(userNum, bag, candidates, ct);
+        }
+        public ValueTask<InventorySlotRecord?> SetSlotWornAsync(long userNum, int itemId, bool worn, CancellationToken ct) =>
+            stored.SetSlotWornAsync(userNum, itemId, worn, ct);
+    }
+
+    [Fact]
     public async Task FirstLoginSeedsTheStarterBagIntoBothBagsAndReplaysIt()
     {
         var store = NewStore();
@@ -112,6 +150,24 @@ public sealed class LoginStoreResolverTests
     }
 
     [Fact]
+    public async Task ConcurrentFirstLoginsKeepTheSingleAtomicallyCreatedWallet()
+    {
+        var repository = new MemoryPlayerWalletRepository(new MemoryPlayerTable(8));
+        var resolvers = Enumerable.Range(0, 32)
+            .Select(index => new LoginMoneyResolver(repository, 100 + index, 200 + index))
+            .ToArray();
+
+        var wallets = await Task.WhenAll(resolvers.Select(resolver => Task.Run(
+            async () => await resolver.ResolveAsync(User, default))));
+        var stored = await repository.FindByUserNumAsync(User, default);
+
+        Assert.NotNull(stored);
+        Assert.All(wallets, wallet => Assert.Equal(stored, wallet));
+        Assert.Contains((stored.Lucci, stored.Cash), Enumerable.Range(0, resolvers.Length)
+            .Select(index => (100 + index, 200 + index)));
+    }
+
+    [Fact]
     public void SourceOptionsDefaultToReferenceAndRejectUnknownValues()
     {
         var options = new LobbyOptions();
@@ -159,6 +215,12 @@ public sealed class LoginStoreResolverTests
 
         public ValueTask<PlayerWallet?> FindByUserNumAsync(long userNum, CancellationToken ct) =>
             ValueTask.FromResult(_stored?.UserNum == userNum ? _stored : null);
+
+        public ValueTask<PlayerWallet> GetOrCreateAsync(PlayerWallet initialWallet, CancellationToken ct)
+        {
+            _stored ??= initialWallet;
+            return ValueTask.FromResult(_stored);
+        }
 
         public ValueTask UpsertAsync(PlayerWallet wallet, CancellationToken ct)
         {

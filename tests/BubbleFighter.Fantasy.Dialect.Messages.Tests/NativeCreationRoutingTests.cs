@@ -47,8 +47,10 @@ public sealed class NativeCreationRoutingTests
     [InlineData("id-1809", 12, 20)]
     [InlineData("cn-324", 11, 20)]
     [InlineData("cn-279", 11, 20)]
+    [InlineData("cn-406", 11, 20)]
     [InlineData("kr-812", 12, 24, true)]
     [InlineData("cn-324", 11, 20, true)]
+    [InlineData("cn-406", 11, 20, true)]
     public async Task NativeRequestsReachSharedMessagesAndUnloadCleanly(string build, ushort notice, int createLength, bool remap = false)
     {
         var root = Directory.GetParent(TestBuilds.PacketsDirectory())!.FullName;
@@ -141,8 +143,10 @@ public sealed class NativeCreationRoutingTests
             Assert.Empty(services.GetAll<IMessageSender<CharacterCreationOpened>>());
         }
         finally { context.Unwind(); }
-        foreach (var build in new[] { "cn-406", "cn-706", "cn-735" })
+        foreach (var build in new[] { "cn-706", "cn-735" })
             Assert.False(TestBuilds.Packets.CapabilityOf(build, "character_creation"));
+        // cn-406's creation surface is audited and stated (its own numbers, the Dao/Dizni pair).
+        Assert.True(TestBuilds.Packets.CapabilityOf("cn-406", "character_creation"));
     }
 
     private sealed class RecordingMessages : IMessageRouter

@@ -166,6 +166,7 @@ public sealed class FighterInfoScenarioTests
             (115, "c2s", "gcpReqFighterInfo"), (124, "s2c", "gspRepFighterInfo"),
             // The shared login row publishes the bag on the login burst; the row's inventory: true states it.
             (801, "s2c", "gspInventoryUpdateAllInventorySlot"), (803, "s2c", "gspInventoryUpdateInventorySlots"),
+            (805, "s2c", "gspInventoryViewUpdateView"),
         };
         await File.WriteAllTextAsync(tablePath, "profile: kr-812\nopcodes:\n" + string.Concat(entries.Select(e =>
             $"  - value: {e.Value}\n    direction: {e.Direction}\n    name: {e.Name}\n    name_source: label@kr-812\n    evidence: verified\n")), ct);
@@ -185,6 +186,7 @@ public sealed class FighterInfoScenarioTests
             Row("lobby", new()
             {
                 ["protocol"] = "kr-812/game", ["auto_create_players"] = true, ["online_players"] = true, ["fighter_info"] = true,
+                ["inventory_source"] = "mysql", ["seed_starter_inventory"] = true,
             }),
             // Bind once; a released free-port probe can be claimed before activation.
             Row("net.tcp", new() { ["listen"] = "127.0.0.1:0", ["protocol"] = "kr-812/game" }),
@@ -208,6 +210,9 @@ public sealed class FighterInfoScenarioTests
             var cb = b.Cursor;
             await a.SendAsync(115, [.. Word(targetNumber), .. Word(0)], ct, 0);
             var found = await a.WaitAsync(ca, 124, TimeSpan.FromSeconds(10), ct);
+            // kr-812 sub_87DD90 consumes the target's cached equipment when opening its fighter dialog.
+            Assert.Equal(new ushort[] { 805, 124 }, a.Since(ca)
+                .Where(frame => frame.Opcode is 805 or 124).Select(frame => frame.Opcode));
             var fields = PacketCodec.Read(tables, "kr-812", "FighterInfoReply", found.Payload);
             Assert.Equal(1, Convert.ToInt32(fields["result"]));
             var fighter = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(fields["fighter"]);
@@ -229,6 +234,7 @@ public sealed class FighterInfoScenarioTests
             // The target is never involved.
             await Task.Delay(300, ct);
             Assert.DoesNotContain(b.Since(cb), frame => frame.Opcode == 124);
+            Assert.DoesNotContain(b.Since(cb), frame => frame.Opcode == 805);
         }
         finally
         {

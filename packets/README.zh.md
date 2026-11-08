@@ -4,6 +4,15 @@
 
 英文原文：[README.md](README.md)。
 
+`tutorial_score_builds` 显式列出已核对的选关教程客户端，未列出的派生版本不继承启用状态。
+`tutorial_score_help_field` 指定该版本 `ScoreRow` 中救援目标对应的原生四字节字段；
+字段必须存在，且不能与泡封、击破字段相同。这些值仅影响已认证单人教程的计分更新，
+不改变普通对局的计分或奖励。
+`tutorial_score_npc_finish_fields` 将 `victim`、`scorer`、`auxiliary` 映射到已核对的八个四字节字段 NPC 爆破报告中的不同字段；
+仅在角色引用均为零、受击席位为负值标记且其余辅助字均为零时使用该席位，
+共享教程处理器仍核验当前单人玩家。未指定时只按角色引用归属。
+继承的映射仅在 `tutorial_score_builds` 明确列出当前版本时生效。
+
 | 檔案 | 內容 |
 |---|---|
 | `builds.yaml` | 有哪些客戶端版本、各自以誰為基底、各版本自己的設定值。 |
@@ -13,7 +22,9 @@
 | `cash-inventory.yaml` | 帶數量的現金收件箱清單與領取封包，包含 modern 的展示尾段；結構表不會啟用道具領取。 |
 | `damagers.yaml` | 伺服器原樣轉發的回合內傷害體封包，例如 `SplashDamagerByDamager`（32900）以及 `packets/damagers.yaml` 中的七个生成封包。 |
 | `recruit.yaml` | 共享擴音器請求與傳統招募訊息；排除尚未核實的現代招募格式。 |
+| `plaza-recruitment.yaml` | 原生廣場招募開關與文字、現代版本的招募發布及分頁清單；入隊由共享隊伍邏輯處理。 |
 | `round-feed-native.yaml` | 已核对字段顺序差异的原生战斗消息；封包表不会自行注册中继路由或启用对局。 |
+| `map-scripts.yaml` | 三个现代版本的原生对象名字节串、显隐、可破坏物体生命值与不透明脚本序号；共享特效布局保留在 `final-zone.yaml`。 |
 | `score.yaml` | 計分板：`ScoreRow`，`gspGameBroadcastPlayerScoreData` 裡的一個座位。 |
 | `score-reports.yaml` | 原生入站積分上報布局；表中有布局不代表啟用尚未審核的事件類型或 opcode 路由。 |
 | `inventory.yaml` | `InventoryUpdate` 和 `InventorySlot`：S2C 801/802 的背包。 |
@@ -23,6 +34,8 @@
 | `user-stat.yaml` | `UserStat`（S2C `gspUserStat`，錢包和 FighterInfo），以及其中的 `FighterInfo`、`EloRating`。 |
 | `fighter-info.yaml` | `FighterInfoRequest`、`FighterInfoReply`：legacy 版本與 kr-1256 家族（`FighterInfoReply@kr-1256`）玩家菜單的「查看資訊」（C2S `gcpReqFighterInfo`，S2C `gspRepFighterInfo`）。 |
 | `clan.yaml` | 氏族（clan）game 連線的封包體：`ClanPassport`、`ClanMarkInfo`、`ClanGuildInfo`、`ClanAttendanceState`，以及空的氏族請求；以 kr-1256 的結構為主，並列 kr-812 的基底結構。 |
+| `udp-peers.yaml` | 原生 peer 发现、端点表、打洞控制及 relay 成员消息；布局不会启用监听或直接移动。 |
+| `round-movement.yaml` | 原生完整及掩码移动、UDP 中继探测、身份、控制和头部布局，包含各版本身份宽度差异。 |
 | `relay-connection.yaml` | 已核對的原生中繼地址、key、連接通知、加入請求和連接報告；存在封包表不代表已啟用中繼監聽或握手。 |
 | `relay-validation.yaml` | 加入中繼後的原生校驗報告與簽名資料；CN2011 改用直接報告連接成功的順序。 |
 | `relay-success.yaml` | 原生加入／場景成功的空消息體；不初始化場景種子表，也不啟用監聽器。 |
@@ -100,6 +113,10 @@ structs:
 原生包體的 65,535 位元組上限始終有效。調用方可為已核對的消息指定更嚴格的限制與規範布林值。
 能讀取結構不代表註冊了 opcode、啟用了能力或通過連線認證。
 
+`PacketCodec.ReadPrefix` 從 `PacketReader` 當前位置讀取一個結構，保留外層剩餘資料。
+調用前後的位置可用於取得原始位元組範圍，無需重新編碼。每次調用套用相同的結構樹限制；
+外層完整封包仍須另外驗證，以限制整包的總量並拒絕尾隨位元組。
+
 ## 一個欄位
 
 ```yaml
@@ -175,6 +192,19 @@ bff packets json id-400                 # 一個版本的全部內容，JSON 格
 
 結構是資料，含義是程式。
 
+`weapon_critical_seed_builds` 显式列出已审核种子消费路径、可在 `dialect.scene-seeds` 中
+启用 `weapon_critical_bonuses` 的客户端；后继版本不会自动启用。
+`weapon_critical_mode_fields` 将已审核模式映射到该模式的武器规格替换字段。
+`weapon_critical_view_refresh` 说明局内装备视图是否重建已安装武器：CN324 保留已安装的规格，
+其余四个已审核版本在各自原生功能开关下，以发布的穿戴集合和已接纳的房间覆盖值重建武器。
+此选项默认关闭，已审核的 cn-324、cn-406、cn-404、cn-408 和 id-400 配置启用它。
+所有正数模式保留普通武器及装备贡献；七条已映射的原生模式路径执行一次资源替换。
+原生武器报告只修订报告者自己的主武器或副武器槽；已审核的效果触发会刷新原生持续时间，
+到期后移除限时贡献。概率相同时只推进输入修订，不重装种子表或重置读取位置。
+资源或开局装备缺失会在发布倒计时前报错。本地视图及预设发布完成后，当前房间执行器会用
+实际发送的同一份不可变装备快照协调状态；预设页索引和未解释的页字段不作为已安装武器规格。
+完成表示发送器成功，不代表客户端已经接收或应用。客户端自行计算这些贡献的版本被排除。
+
 原生功能支援寫在 `builds.yaml` 的 `capabilities` 下。基準版本宣告已核對的能力，後繼版本
 繼承並只覆寫差異。方言在啟用功能前呼叫 `PacketTables.CapabilityOf(build, name)`；未知或
 格式錯誤的值會報配置錯誤。能力開啟表示原生支援已有證據，不表示客戶端已實測通過。
@@ -204,6 +234,8 @@ IReadOnlyList<PacketField> fields = tables.Resolve("id-400", "MyStructure");
 
 `builds.yaml` 中的 `play` 描述各构建的教程房与游戏房在仍由代码写出形状的封包上的差异。其子块为 `tutorial`（`old_map_key`、`select_kind`、`skip_enter`、`old_mode`、`wave_map_key`、`master_slot_packet`）、`wire`（`server_revives`、`pre_count_down_first`、`unchosen_map_key`、`unchosen_map_theme`、`spawn_group_applies_locally`、`unchosen_difficulty_mode`、`unchosen_difficulty_map_key`、`restate_left_room`、`plaza_entry_settle_ms`）与 `score`（`wide_report`、`live_score_packet`、`outcome_first`、`time_over_end`、`npc_team_outcome`、`rescue_credit`、`horde_stage_outcome`、`star_report` 及 `star_small_gained`、`star_big_gained`、`star_small_lost`、`star_big_lost` 四个星星上报种类），另有平铺键 `match_start`、`host_start`、`one_seat_waves`、`npc_waves`、`score_reports` 与 `tutorial_skip_start`。旧版房间方言通过 `PlayValues.Of` 读取，启动时拒绝未知键、不属于该键名称的取值，以及缺失的 `match_start` 或 `host_start`。
 
+`play.score.zombie_result_cause` 让已核对的僵尸结果横幅使用全体接收者共享的终局原因值，而不是各接收者的奖励胜负值。默认关闭；CN2012 启用，尚未核对消费路径的派生构建显式关闭。此选项不改变奖励、血量或结算时序。
+
 `room_projection_fields` 描述 modern 类型化等待房间的模式字段、按顺序使用的地图候选及普通房间 UI 门控覆盖规则。`clear_mask` 只从 `flags` 清除已核对的阻断位，保留分轮地图选择位及其他无关位；`clear_words` 和 `clear_booleans` 指定其余已核对的门控字段。绑定挂载前校验全部别名及类型。较晚构建若不存在继承映射中的字段，会报告错误，不会借用基线偏移。
 
 `room_unchosen_map` 内的空值条目用于取消继承的字段，适用于后代版本重新定义 `GameSetting` 的情况；其余条目仍按后代版本的布局校验。
@@ -218,7 +250,12 @@ IReadOnlyList<PacketField> fields = tables.Resolve("id-400", "MyStructure");
 缺失名称、重复编号、与既有动作族冲突或身份字段不是完整整数字时，在发布服务之前报错。
 
 可选的 `life_event` 和 `life_actor` 将已验证的原生消息转换为共享生命处理器的事件。
-`finished` 还必须提供 `life_initiator`；`life_success` 控制报告是否成功，
+可选的 `builds` 列表将路由限制在明确审核的版本内，后代版本继承配置时也必须列名。
+未列出的版本继续使用其余路由或既有透传策略。列表必须非空，并且只包含互不重复的已知版本名称。
+`finished` 还必须提供 `life_initiator`。对于 `bubbled` 或 `died`，可选的
+`life_initiator` 指定攻击角色；对于 `released`，则指定救援者。基础通知省略此字段，
+不产生归属计分。共享对局逻辑对每次原生泡泡、完成救援和死亡仅计分一次。
+`life_success` 控制报告是否成功，
 `life_death_flag` 区分直接死亡与进入泡泡。这些配置必须指向所选结构中类型正确的字段。
 `nested: true` 使用完整封包表读取器，并校验原生复活确认的缺省标签。
 基线动作的结构和报告者证据记录在 `round-feed.yaml`；伤害体创建消息和仅有写入证据的中继移动消息

@@ -3,6 +3,9 @@ using BubbleFighter.Fantasy.Contracts.Rooms;
 
 namespace BubbleFighter.Fantasy.Contracts.Match;
 
+/// <summary>Releases a player's previous social scene before the tutorial selection installs its own session.</summary>
+public sealed record TutorialSelectionOpening : IMessage;
+
 /// <summary>Seats one player in an unlisted tutorial round before its dialect sends the native scene burst.</summary>
 /// <param name="ModeId">Native tutorial actor mode.</param>
 /// <param name="MapKey">Resolved tutorial map.</param>

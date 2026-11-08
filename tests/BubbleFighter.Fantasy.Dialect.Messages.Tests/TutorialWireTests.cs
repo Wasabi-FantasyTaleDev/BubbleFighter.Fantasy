@@ -9,21 +9,35 @@ namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
 /// <summary>Byte-length pins for the legacy tutorial select list and start packets.</summary>
 public sealed class TutorialWireTests
 {
+    /// <summary>
+    /// The tutorial move-in places every legacy build on the Free channel (60) by default and on the row's
+    /// player channel when one is set; channel 50 has no FighterConfigChannel column to play a round on.
+    /// </summary>
     [Theory]
-    [InlineData("kr-812", 50)]
-    [InlineData("cn-717", 50)]
-    [InlineData("id-400", 50)]
-    [InlineData("id-1809", 50)]
-    [InlineData("cn-706", 50)]
-    [InlineData("cn-324", 50)]
-    [InlineData("cn-279", 0)]
-    public void TutorialMoveIntoPreservesNativeDefaultsAcrossLegacyBuilds(string build, int channel)
+    [InlineData("kr-812")]
+    [InlineData("cn-717")]
+    [InlineData("id-400")]
+    [InlineData("id-1809")]
+    [InlineData("cn-706")]
+    [InlineData("cn-324")]
+    [InlineData("cn-279")]
+    public void TutorialMoveIntoPlacesThePlayerOnThePlayerChannel(string build)
     {
         var body = RoomBinding.WriteMoveInto(TestBuilds.Packets, build);
         Assert.Equal(12, body.Length);
         Assert.Equal(1, BitConverter.ToInt32(body));
-        Assert.Equal(channel, BitConverter.ToInt32(body, 4));
+        Assert.Equal(RoomsOptions.FreeChannel, BitConverter.ToInt32(body, 4));
         Assert.Equal(0, BitConverter.ToInt32(body, 8));
+        Assert.Equal(10, BitConverter.ToInt32(RoomBinding.WriteMoveInto(TestBuilds.Packets, build, 10), 4));
+    }
+
+    /// <summary>The plaza's scene move carries the same player channel in its second word.</summary>
+    [Fact]
+    public void PlazaMoveIntoCarriesThePlayerChannel()
+    {
+        Assert.Equal("01000000" + "3C000000" + "01000000",
+            Convert.ToHexString(PlayRoomCodec.WritePlazaMoveInto(TestBuilds.Packets, "kr-812")));
+        Assert.Equal(20, BitConverter.ToInt32(PlayRoomCodec.WritePlazaMoveInto(TestBuilds.Packets, "kr-812", 20), 4));
     }
 
     [Theory]
@@ -402,33 +416,33 @@ public sealed class TutorialWireTests
     [Fact]
     public void CreateMobsFromSpawnGroupPinsFourByteGroup()
     {
-        var body = TutorialWire.WriteCreateMobsFromSpawnGroup(TestBuilds.Packets, "kr-812", 1);
+        var body = NpcWire.WriteCreateMobsFromSpawnGroup(TestBuilds.Packets, "kr-812", 1);
         Assert.Equal(4, body.Length);
         Assert.Equal(1, BitConverter.ToInt32(body, 0));
-        Assert.Equal(1, TutorialWire.ReadCreateMobsFromSpawnGroup(TestBuilds.Packets, "kr-812", body));
+        Assert.Equal(1, NpcWire.ReadCreateMobsFromSpawnGroup(TestBuilds.Packets, "kr-812", body));
     }
 
     [Fact]
     public void CreateMobsFromSpawnGroupRejectsTrailingBytes()
     {
         Assert.Throws<PacketFormatException>(() =>
-            TutorialWire.ReadCreateMobsFromSpawnGroup(TestBuilds.Packets, "kr-812", new byte[5]));
+            NpcWire.ReadCreateMobsFromSpawnGroup(TestBuilds.Packets, "kr-812", new byte[5]));
     }
 
     [Fact]
     public void StartNewWavePinsFourByteWave()
     {
-        var body = TutorialWire.WriteStartNewWave(TestBuilds.Packets, "cn-717", 1);
+        var body = NpcWire.WriteStartNewWave(TestBuilds.Packets, "cn-717", 1);
         Assert.Equal(4, body.Length);
         Assert.Equal(1, BitConverter.ToInt32(body, 0));
-        Assert.Equal(1, TutorialWire.ReadStartNewWave(TestBuilds.Packets, "kr-812", body));
+        Assert.Equal(1, NpcWire.ReadStartNewWave(TestBuilds.Packets, "kr-812", body));
     }
 
     [Fact]
     public void StartNewWaveRejectsTrailingBytes()
     {
         Assert.Throws<PacketFormatException>(() =>
-            TutorialWire.ReadStartNewWave(TestBuilds.Packets, "kr-812", new byte[5]));
+            NpcWire.ReadStartNewWave(TestBuilds.Packets, "kr-812", new byte[5]));
     }
 
     [Fact]

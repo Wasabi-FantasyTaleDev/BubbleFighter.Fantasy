@@ -102,7 +102,7 @@ internal sealed class CommandService(IPluginContext context, IPermissionService 
             ObjectDisposedException.ThrowIf(_disposed, this);
             _names.TryGetValue(command, out entry);
             if (entry is null) rejected = new(CommandStatus.NotFound, "Unknown command.");
-            else if (!ValidArguments(entry.Definition, input)) rejected = new(CommandStatus.InvalidArguments, "Arguments do not match the command schema.");
+            else if (!ValidArguments(entry.Definition, input)) rejected = new(CommandStatus.InvalidArguments, CommandText.Usage(caller, entry.Definition));
             else if (!permissions.IsAllowed(caller.Subject, entry.Definition.Permission)) rejected = new(CommandStatus.Denied, "Permission denied.");
             else if (entry.Owner.Lifetime.IsCancellationRequested || cancellationToken.IsCancellationRequested) rejected = new(CommandStatus.Cancelled, "Command cancelled.");
             else if (_active >= options.MaxConcurrent) rejected = new(CommandStatus.Busy, "Command execution capacity is occupied.");
@@ -153,15 +153,16 @@ internal sealed class CommandService(IPluginContext context, IPermissionService 
     }
 
     /// <summary>
-    /// Parses and executes one text line. When required, the line must start with <c>/</c>,
+    /// Parses and executes one text line. Game chat requires a trigger unless already normalized: <c>/</c>,
     /// <c>!</c> or the full-width <c>！</c> (U+FF01); tokens split on unquoted whitespace with
     /// double-quote grouping, and a trailing remaining-text argument receives the rest of the line
-    /// joined back with single spaces.
+    /// joined back with single spaces. Non-game entry points also admit bare command names.
     /// </summary>
     public ValueTask<CommandResult> ExecuteTextAsync(CommandCaller caller, string text, bool requirePrefix = true, CancellationToken cancellationToken = default)
     {
         ValidateCaller(caller);
-        if (text is null || text.Length > options.MaxInputCharacters || text.Any(char.IsControl) || !TryTokens(text, requirePrefix, out var tokens))
+        if (text is null || text.Length > options.MaxInputCharacters || text.Any(char.IsControl) ||
+            !TryTokens(text, requirePrefix && caller.Actor.Kind == PrincipalKind.Game, out var tokens))
             return ValueTask.FromResult(Complete(caller, "", "", new(CommandStatus.InvalidArguments, "Invalid command text or missing prefix.")));
         string[] arguments = tokens.Skip(1).ToArray();
         lock (_gate)
@@ -217,10 +218,8 @@ internal sealed class CommandService(IPluginContext context, IPermissionService 
     private bool TryTokens(string text, bool requirePrefix, out List<string> tokens)
     {
         tokens = [];
-        var span = text.AsSpan().Trim();
-        if (span.IsEmpty) return false;
-        if (span[0] is '/' or '!' or '\uFF01') span = span[1..];
-        else if (requirePrefix) return false;
+        if (!CommandText.TryNormalize(text, requirePrefix, out var content)) return false;
+        var span = content.AsSpan();
         var token = new StringBuilder();
         var quoted = false;
         var started = false;

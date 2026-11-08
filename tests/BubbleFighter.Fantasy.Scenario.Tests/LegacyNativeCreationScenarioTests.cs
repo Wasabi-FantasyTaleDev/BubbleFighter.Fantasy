@@ -74,7 +74,7 @@ public sealed class LegacyNativeCreationScenarioTests
         var move = await client.WaitAsync(cursor, 11, TimeSpan.FromSeconds(5), ct);
         Assert.True(login.Index < stat.Index && stat.Index < inventory.Index && inventory.Index < room.Index);
         Assert.True(room.Index < menu.Index && menu.Index < move.Index);
-        Assert.Equal(Convert.FromHexString("010000003200000000000000"), move.Payload);
+        Assert.Equal(Convert.FromHexString("010000003C00000000000000"), move.Payload);
         var reader = new PacketReader(login.Payload);
         Assert.Equal(0, reader.ReadInt32());
         Assert.Equal("creation-account", reader.ReadWideStringPrefixed());

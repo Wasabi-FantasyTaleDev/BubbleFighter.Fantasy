@@ -12,7 +12,7 @@
 - set:
     id: protocol
     config:
-      pre_handshake_opcodes: [19]
+      pre_handshake_opcodes: [gcpReportLastCrash]
       bootstrap_command_line: "http://bf.dn.nexoncdn.co.kr/PatchData"
 - set:
     id: shop
@@ -688,3 +688,11 @@
     id: dialect.messages
     config:
       customized_keys: false
+- set:
+    id: dialect.rooms
+    config:
+      plaza_recruitment: true
+- set:
+    id: ingame
+    config:
+      plaza_recruitment: true

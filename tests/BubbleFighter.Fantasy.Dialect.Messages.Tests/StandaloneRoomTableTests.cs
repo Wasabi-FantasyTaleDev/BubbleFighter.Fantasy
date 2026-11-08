@@ -34,15 +34,15 @@ public sealed class StandaloneRoomTableTests
     }
 
     [Theory]
-    [InlineData("kr-812")]
-    [InlineData("cn-717")]
-    [InlineData("cn-324")]
-    [InlineData("cn-279")]
-    [InlineData("id-400")]
-    [InlineData("id-1809")]
-    [InlineData("cn-706")]
-    [InlineData("cn-735")]
-    public void StandalonePlazaRecordPreservesIdentityLevelAndNativeDefaults(string build)
+    [InlineData("kr-812", 200)]
+    [InlineData("cn-717", 200)]
+    [InlineData("cn-324", 180)]
+    [InlineData("cn-279", 180)]
+    [InlineData("id-400", 180)]
+    [InlineData("id-1809", 180)]
+    [InlineData("cn-706", 200)]
+    [InlineData("cn-735", 200)]
+    public void StandalonePlazaRecordPreservesIdentityLevelAndNativeDefaults(string build, int maximum)
     {
         var schema = TestBuilds.Of(build).Schema;
         foreach (var level in new[] { 0, 1, 42, 240 })
@@ -55,13 +55,16 @@ public sealed class StandaloneRoomTableTests
             };
             // The plaza record is the member's main-menu record: the table's menu values with their identity and level.
             var values = RoomCodec.MenuSeatValues(schema, slot);
-            values["level"] = Math.Max(1, level);
+            values["level"] = Math.Clamp(level, 1, maximum);
+            var gate = (string)TestBuilds.Packets.ValuesOf(build)["plaza_recruitment_field"]!;
+            values[gate] = true;
             var expected = PacketCodec.Write(TestBuilds.Packets, build, "UserSlot", values);
             var actual = PlayRoomCodec.WritePlazaSeatRecord(TestBuilds.Packets, build, schema, member);
             Assert.Equal(expected, actual);
             var read = PacketCodec.Read(TestBuilds.Packets, build, "UserSlot", actual, new PacketReadLimits());
             Assert.Equal(282, Convert.ToInt32(read["user_number"]));
-            Assert.Equal(Math.Max(1, level), Convert.ToInt32(read["level"]));
+            Assert.Equal(Math.Clamp(level, 1, maximum), Convert.ToInt32(read["level"]));
+            Assert.True(Assert.IsType<bool>(read[gate]));
             Assert.Equal(true, read["occupied"]);
         }
     }

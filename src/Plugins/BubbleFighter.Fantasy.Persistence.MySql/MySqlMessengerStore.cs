@@ -192,16 +192,19 @@ public sealed class MySqlMessengerStore(IDbConnectionFactory connections) : IMes
         ArgumentNullException.ThrowIfNull(limits);
         await using var session = await SugarSession.OpenAsync(connections, cancellationToken).ConfigureAwait(false);
         var db = session.Db;
-        await using var tx = await session.BeginAsync().ConfigureAwait(false);
         var found = await db.Queryable<MessengerRequestRow>().Where(r => r.Handle == handle && r.Recipient == recipient.Value)
             .Take(1).ToListAsync(cancellationToken).ConfigureAwait(false);
         if (found.Count == 0) return new MessengerRequestOutcome(MessengerResult.NotFound, null);
         var row = found[0];
+        // Locate the participants before opening the transaction, so no stale snapshot predates their locks.
+        await using var tx = await session.BeginAsync().ConfigureAwait(false);
         await LockUsersAsync(db, cancellationToken, row.Sender, row.Recipient).ConfigureAwait(false);
-        // Re-read under the locks: a concurrent resolve of the same request removes it first.
-        if (await db.Queryable<MessengerRequestRow>().Where(r => r.Handle == handle).CountAsync(cancellationToken).ConfigureAwait(false) == 0)
+        // A locking read sees a concurrent resolver's commit instead of the initial REPEATABLE READ snapshot.
+        var retained = await db.Queryable<MessengerRequestRow>().Where(r => r.Handle == handle && r.Recipient == recipient.Value)
+            .TranLock(DbLockType.Wait).Take(1).ToListAsync(cancellationToken).ConfigureAwait(false);
+        if (retained.Count == 0)
             return new MessengerRequestOutcome(MessengerResult.NotFound, null);
-        var request = ToRequest(row);
+        var request = ToRequest(retained[0]);
         if (accept)
         {
             if (await FriendCountAsync(db, row.Sender, cancellationToken).ConfigureAwait(false) >= limits.MaxFriends ||
@@ -223,10 +226,13 @@ public sealed class MySqlMessengerStore(IDbConnectionFactory connections) : IMes
     public async ValueTask<bool> DeleteFriendshipAsync(MessengerUserId owner, MessengerUserId friend, CancellationToken cancellationToken)
     {
         await using var session = await SugarSession.OpenAsync(connections, cancellationToken).ConfigureAwait(false);
-        // One statement removes both directions atomically.
-        return await session.Db.Deleteable<MessengerRelationRow>()
+        await using var tx = await session.BeginAsync().ConfigureAwait(false);
+        await LockUsersAsync(session.Db, cancellationToken, owner.Value, friend.Value).ConfigureAwait(false);
+        var removed = await session.Db.Deleteable<MessengerRelationRow>()
             .Where(r => r.Owner == owner.Value && r.Friend == friend.Value || r.Owner == friend.Value && r.Friend == owner.Value)
             .ExecuteCommandAsync(cancellationToken).ConfigureAwait(false) > 0;
+        await tx.CommitAsync().ConfigureAwait(false);
+        return removed;
     }
 
     /// <inheritdoc />
@@ -234,12 +240,15 @@ public sealed class MySqlMessengerStore(IDbConnectionFactory connections) : IMes
     {
         var flag = (byte)(blocked ? 1 : 0);
         await using var session = await SugarSession.OpenAsync(connections, cancellationToken).ConfigureAwait(false);
+        await using var tx = await session.BeginAsync().ConfigureAwait(false);
+        await LockUsersAsync(session.Db, cancellationToken, owner.Value).ConfigureAwait(false);
         // A matched row whose flag already has the value reports zero affected rows, so existence is checked first.
         var exists = await session.Db.Queryable<MessengerRelationRow>().Where(r => r.Owner == owner.Value && r.Friend == friend.Value)
             .CountAsync(cancellationToken).ConfigureAwait(false) == 1;
         if (!exists) return false;
         await session.Db.Updateable<MessengerRelationRow>().SetColumns(r => new MessengerRelationRow { Blocked = flag })
             .Where(r => r.Owner == owner.Value && r.Friend == friend.Value).ExecuteCommandAsync(cancellationToken).ConfigureAwait(false);
+        await tx.CommitAsync().ConfigureAwait(false);
         return true;
     }
 
@@ -288,11 +297,14 @@ public sealed class MySqlMessengerStore(IDbConnectionFactory connections) : IMes
     {
         ArgumentNullException.ThrowIfNull(name);
         await using var session = await SugarSession.OpenAsync(connections, cancellationToken).ConfigureAwait(false);
+        await using var tx = await session.BeginAsync().ConfigureAwait(false);
+        await LockUsersAsync(session.Db, cancellationToken, owner.Value).ConfigureAwait(false);
         var exists = await session.Db.Queryable<MessengerCategoryRow>().Where(c => c.Owner == owner.Value && c.Id == categoryId)
             .CountAsync(cancellationToken).ConfigureAwait(false) == 1;
         if (!exists) return MessengerResult.NotFound;
         await session.Db.Updateable<MessengerCategoryRow>().SetColumns(c => new MessengerCategoryRow { Name = name })
             .Where(c => c.Owner == owner.Value && c.Id == categoryId).ExecuteCommandAsync(cancellationToken).ConfigureAwait(false);
+        await tx.CommitAsync().ConfigureAwait(false);
         return MessengerResult.Ok;
     }
 

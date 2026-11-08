@@ -18,10 +18,8 @@ internal sealed partial class PlayRoomCodec
             _ = packetTables.Resolve(lineage, structure);
         foreach (var name in new[] { "gspRepListSession", "gspGotoRoom", "gspRoomSetSlot", "gspRoomLeaveSlot", "gspRoomSetMasterSlotIdx", "gspRoomSetSession", "gspRepJoinSession", "gspRoomChangeGameSetting", "gspRoomReceiveChatModuleMsg", "gspRoomOpenCloseSlot", "gspRepKickFromSession" })
             _ = table.S2C(name);
-        context.Effect(services.RegisterMany<IInboundMessageBinding<RoomListRequested>>(this));
         context.Effect(services.RegisterMany<IInboundMessageBinding<RoomCreateRequested>>(this));
         context.Effect(services.RegisterMany<IInboundMessageBinding<RoomLeaveRequested>>(this));
-        context.Effect(services.RegisterMany<IMessageSender<RoomListSnapshot>>(this));
         context.Effect(services.RegisterMany<IMessageSender<RoomEntered>>(this));
         context.Effect(services.RegisterMany<IMessageSender<RoomSeatUpdated>>(this));
         context.Effect(services.RegisterMany<IMessageSender<RoomSeatVacated>>(this));
@@ -38,12 +36,6 @@ internal sealed partial class PlayRoomCodec
             }));
         }
 
-        Bind("gcpReqListSession", (session, body) =>
-        {
-            var (page, pageSize) = PlazaRoomWire.ReadListSession(packetTables, lineage, body.Span);
-            session.Items[PageSizeItem] = (int)pageSize;
-            return new RoomListRequested(page);
-        });
         Bind("gcpReqCreateSession", (_, body) =>
         {
             var request = PlazaRoomWire.ReadCreateRoom(body.Span, schema);
@@ -56,6 +48,9 @@ internal sealed partial class PlayRoomCodec
                 throw new PacketFormatException($"gcpReqLeaveSession must be empty; got {body.Length} byte(s).", 0);
             return new RoomLeaveRequested();
         });
+        // The room list is the shared codec's; a legacy row shows the room's native game setting.
+        new RoomListCodec(protocol, table.C2S("gcpReqListSession"), table.S2C("gspRepListSession"), packetTables, lineage, logger,
+            room => GameSetting(room.BuildSettings)).Mount(context);
         MountPlaza(context);
     }
 }

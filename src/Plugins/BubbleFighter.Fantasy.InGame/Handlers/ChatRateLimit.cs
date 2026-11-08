@@ -21,7 +21,7 @@ internal sealed class ChatRateLimit(InGameOptions options, ILogger logger, TimeP
     internal ValueTask Filter<T>(ISession session, T message, MessageHandler<T> next, CancellationToken ct) where T : IMessage =>
         Admit(session, ct) ? next(session, message, ct) : ValueTask.CompletedTask;
 
-    private bool Admit(ISession session, CancellationToken ct)
+    internal bool Admit(ISession session, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         var warn = false;

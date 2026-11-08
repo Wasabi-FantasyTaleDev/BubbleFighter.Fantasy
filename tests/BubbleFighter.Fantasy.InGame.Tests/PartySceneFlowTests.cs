@@ -1,4 +1,6 @@
 using BubbleFighter.Fantasy.Abstractions.Protocol;
+using BubbleFighter.Fantasy.Contracts.Cluster;
+using BubbleFighter.Fantasy.Contracts.Inventory;
 using BubbleFighter.Fantasy.Contracts.Lobby;
 using BubbleFighter.Fantasy.Contracts.Party;
 using BubbleFighter.Fantasy.Contracts.Players;
@@ -16,6 +18,69 @@ namespace BubbleFighter.Fantasy.InGame.Tests;
 /// <summary>Party moves reuse the shared room and plaza owners with individual seats and live membership checks.</summary>
 public sealed class PartySceneFlowTests
 {
+    /// <summary>Following normalizes each member's bag under its own authority and restores the triggering caller.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PartyEquipmentNormalizationUsesEachMembersAuthority(bool joinAfterCreation)
+    {
+        var scopes = new EquipmentScopes();
+        var selection = new AuthorizedEquipment(scopes);
+        await using var rig = new Rig(selection: selection, mutations: scopes);
+        var leader = rig.Player(11);
+        var member = rig.Player(22);
+        if (!joinAfterCreation) rig.Party = new([new(11, "player11"), new(22, "player22")]);
+        using (scopes.Enter(leader))
+        {
+            await rig.Flow.HandleCreateAsync(leader, new("party", "", 1, "map"), default);
+            Assert.Same(leader, scopes.Current);
+        }
+        if (joinAfterCreation)
+        {
+            rig.Party = new([new(11, "player11"), new(22, "player22")]);
+            // The party worker has no incoming packet scope to inherit.
+            await rig.Flow.HandlePartySceneFollowAsync(member, new(11), default);
+        }
+        Assert.Null(scopes.Current);
+        Assert.Equal(new long[] { 11, 22 }, selection.Reads);
+        Assert.Same(rig.Registry.TryGet(leader.Id), rig.Registry.TryGet(member.Id));
+        Assert.False(leader.Connection.IsClosed);
+        Assert.False(member.Connection.IsClosed);
+    }
+
+    private sealed class EquipmentScopes : IAccountMutationScopes
+    {
+        private readonly AsyncLocal<ISession?> _current = new();
+        internal ISession? Current => _current.Value;
+        public IDisposable Bind(ISession session, IAccountOwnership ownership) => throw new NotSupportedException();
+        public IDisposable Enter(ISession session)
+        {
+            var previous = _current.Value;
+            _current.Value = session;
+            return new Scope(() => _current.Value = previous);
+        }
+        private sealed class Scope(Action remove) : IDisposable
+        {
+            public void Dispose() => remove();
+        }
+    }
+
+    private sealed class AuthorizedEquipment(EquipmentScopes scopes) : IEquipmentSelection
+    {
+        internal List<long> Reads { get; } = [];
+        public async ValueTask<IReadOnlyList<InventorySlotRecord>> ReadAsync(long userNum, CancellationToken ct)
+        {
+            await Task.Yield();
+            Assert.NotNull(scopes.Current);
+            Assert.True(scopes.Current.TryFeature<IPlayerSession>(out var player));
+            Assert.Equal(userNum, player.Identity.UserNum);
+            Reads.Add(userNum);
+            return [new(userNum, InventoryBag.CharacterBag, 1, 300001, 1, InventorySlotRecord.WornFlagBit)];
+        }
+        public ValueTask<IReadOnlyList<InventorySlotRecord>?> ApplyAsync(long userNum, int itemId, bool worn, CancellationToken ct) =>
+            throw new NotSupportedException();
+    }
+
     /// <summary>An invitation accepted after the leader has already arrived follows that scene immediately.</summary>
     [Theory]
     [InlineData(false)]
@@ -402,6 +467,38 @@ public sealed class PartySceneFlowTests
         internal T[] To(ISession session) { lock (Sent) return Sent.Where(row => row.Session == session).Select(row => row.Message).ToArray(); }
     }
 
+    /// <summary>A visiting party member waits for its leader to go home; the leader's own return carries the party.</summary>
+    [Fact]
+    public async Task OnlyTheLeaderOfAVisitingPartyStartsTheReturnHome()
+    {
+        await using var rig = new Rig(returnDelayMs: 0);
+        var (leader, member) = (rig.Player(11, visiting: true), rig.Player(22, visiting: true));
+        rig.Party = new([new(11, "player11"), new(22, "player22")]);
+        var migration = new HomeReturns();
+        rig.Flow.Migration = migration;
+        var recovery = (IMigrationRoomRecovery)rig.Flow;
+        await recovery.ReturnHomeAsync(member, member.Feature<IPlayerSession>().Generation, default);
+        Assert.Empty(migration.Returns);
+        await recovery.ReturnHomeAsync(leader, leader.Feature<IPlayerSession>().Generation, default);
+        Assert.Equal(new[] { leader.Id }, migration.Returns);
+        rig.Party = null;
+        await recovery.ReturnHomeAsync(member, member.Feature<IPlayerSession>().Generation, default);
+        Assert.Equal(new[] { leader.Id, member.Id }, migration.Returns);
+    }
+
+    private sealed class HomeReturns : BubbleFighter.Fantasy.Contracts.Cluster.IRemoteRoomMigration
+    {
+        internal readonly List<long> Returns = [];
+        public string ClientBuild => "test";
+        public ValueTask ReturnHomeAsync(ISession session, CancellationToken cancellationToken)
+        {
+            Returns.Add(session.Id);
+            return ValueTask.CompletedTask;
+        }
+        public ValueTask<RoomJoinRefusal?> BeginAsync(ISession session, RoomBrowserSelection selection, string password,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
     private sealed class Rig : IPartyDirectory, IOnlinePlayers, IAsyncDisposable
     {
         private readonly Dictionary<int, ISession> _online = [];
@@ -417,20 +514,27 @@ public sealed class PartySceneFlowTests
         internal Sink<PlazaMemberLeft> PlazaDepartures { get; } = new();
         internal Sink<PlazaPositionReceived> Positions { get; } = new();
         internal Sink<PlazaMenuReturnRequested> Menu { get; } = new();
-        internal Rig(int seats = 4, int plazaCapacity = 36)
+        internal Rig(int seats = 4, int plazaCapacity = 36, int returnDelayMs = 1500,
+            IEquipmentSelection? selection = null, IAccountMutationScopes? mutations = null)
         {
-            var options = new InGameOptions { MaxPlayersPerMatch = seats, PlazaCapacity = plazaCapacity };
+            var options = new InGameOptions { MaxPlayersPerMatch = seats, PlazaCapacity = plazaCapacity, ReturnDelayMs = returnDelayMs };
             Registry = new RoomRegistry(options);
             Flow = new RoomFlow(Registry, new RoomSenders(Entered, Seats, new Sink<RoomSeatVacated>(),
                 new Sink<RoomMasterChanged>(), Refused, Left, PlazaEntered: Plaza,
                 PlazaMemberEntered: PlazaArrivals, PlazaMemberLeft: PlazaDepartures,
                 PlazaPositionReceived: Positions, MenuReturn: Menu), NullLogger.Instance,
-                plazaCapacity: plazaCapacity, options: options, parties: this, online: this);
+                plazaCapacity: plazaCapacity, options: options, parties: this, online: this, selection: selection, mutations: mutations);
         }
-        internal RecordingSession Player(int user, long? sessionId = null)
+        internal RecordingSession Player(int user, long? sessionId = null, bool visiting = false)
         {
             var session = new RecordingSession(sessionId ?? user);
-            session.SetLobbyPlayer(user, "player" + user);
+            var player = session.SetLobbyPlayer(user, "player" + user, pastLoginBurst: !visiting);
+            if (visiting)
+            {
+                // A visitor's home is installed before its first scene on this node.
+                player.SetMigrationHome(new("home", 50));
+                player.MoveTo(SessionPhase.MainMenu);
+            }
             _online[user] = session;
             return session;
         }

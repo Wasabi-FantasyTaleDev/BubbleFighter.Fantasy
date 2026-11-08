@@ -1,0 +1,76 @@
+version: 1
+structs:
+  # The legacy relay's HP reports. Every legacy client builds its game manager with the server-damage byte set
+  # (cn-324 sub_460042 writes +3088 = 1; kr-812 tests +4728) and then sends these on the match relay for each
+  # Character whose vfunc +700 holds. Only relay 13 has a reply.
+
+  # Native relay 11 rcpSetDamageAffectingAttribute: kr-812 sub_502400, cn-324 sub_45DA20 (u32, u8, u16, u32).
+  # cn-324 sub_469180 fills +4 with the id it looked up in the game object map and cast to Character, so the
+  # field is that character's object id; the host also reports for the NPC characters it runs.
+  RelayDamageAttributeReport:
+    - character_id: u32
+      offset: 4
+    - unknown_8: u8
+      offset: 8
+    - unknown_9: u16
+      offset: 9
+    - unknown_11: u32
+      offset: 11
+
+  # Native relay 13 rcpReqDamageCalcAndBroadcast: kr-812 sub_5024A0, cn-324 sub_45DAC0, cn-406 sub_41F9C0
+  # (u32, u32, u16, u32, u16, u16). cn-324 sub_473D50 and cn-406 sub_448870 send it; the reply is relay 7.
+  RelayDamageRequest:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u16
+      offset: 12
+    - unknown_14: u32
+      offset: 14
+    - unknown_18: u16
+      offset: 18
+    - unknown_20: u16
+      offset: 20
+
+  # Native relay 14 rcpCharacterRespawn: kr-812 sub_6DB1B0, cn-324 sub_408DF0 (two u32).
+  RelayCharacterRespawnReport:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+
+  # Native relay 15 rcpChangeChrType: kr-812 sub_502520, cn-324 sub_45DB40 (u32, u16, u32).
+  RelayCharacterTypeReport:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u16
+      offset: 8
+    - unknown_10: u32
+      offset: 10
+
+  # Native relay 16 rcpHpRecover: kr-812 sub_502580, cn-324 sub_45DBA0 (u32, u8, u32).
+  RelayHpRecoverReport:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u8
+      offset: 8
+    - unknown_9: u32
+      offset: 9
+
+  # Native relay 22 rcpSetChrState: kr-812 sub_97F4F0, cn-324 sub_45DD60 (u32, u8). cn-324 sub_4692C0 fills +4
+  # with the Character it looked up in the game object map, as relay 11 does.
+  RelayCharacterStateReport:
+    - character_id: u32
+      offset: 4
+    - unknown_8: u8
+      offset: 8
+
+  # Native relay 7 rspHpDeltaBroadcast: kr-812 sub_810C20 case 7 -> sub_506540, cn-324 sub_6FA120 case 7 ->
+  # sub_460C20; readers kr-812 sub_6DB1B0, cn-324 sub_408DF0 (two words). Both consumers store the second word as a
+  # float (kr-812 +4752, cn-324 +3104) only while the server-damage byte is set, and nothing else reads it.
+  RelayHpDelta:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: f32
+      offset: 8

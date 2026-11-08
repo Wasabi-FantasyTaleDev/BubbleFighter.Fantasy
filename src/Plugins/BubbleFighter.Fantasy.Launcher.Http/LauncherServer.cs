@@ -6,6 +6,7 @@ using System.Text.Json;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Companion;
+using BubbleFighter.Fantasy.Contracts.Cluster;
 using BubbleFighter.Fantasy.Contracts.Launcher;
 using BubbleFighter.Fantasy.Contracts.Match;
 using BubbleFighter.Fantasy.Contracts.Messenger;
@@ -24,7 +25,9 @@ public sealed class LauncherServer : IAsyncDisposable
     private readonly WebApplication _app;
     private readonly SemaphoreSlim _workers;
     private readonly LauncherOptions _options;
-    private LauncherServer(WebApplication app, SemaphoreSlim workers, LauncherOptions options) { _app = app; _workers = workers; _options = options; }
+    /// <summary>Gets the local authenticated owner source used by optional private cluster reports.</summary>
+    public ILocalLauncherPresence LocalPresence { get; }
+    private LauncherServer(WebApplication app, SemaphoreSlim workers, LauncherOptions options, ILocalLauncherPresence presence) { _app = app; _workers = workers; _options = options; LocalPresence = presence; }
 
     /// <summary>Gets the actual bound addresses, including the port chosen when listen uses zero.</summary>
     public IReadOnlyCollection<string> Addresses => _app.Urls.ToArray();
@@ -41,12 +44,24 @@ public sealed class LauncherServer : IAsyncDisposable
         LauncherSessions sessions, ISessionRegistry? players, IMatchConnectionTracker? matchConnections = null,
         IPlayerWalletRepository? wallets = null, IPlayerProgressRepository? progress = null, CancellationToken ct = default,
         ILogger? logger = null, IMessengerTicketIssuer? messenger = null, IHostReadiness? readiness = null,
-        ICompanionTicketIssuer? companion = null)
+        ICompanionTicketIssuer? companion = null, IServerDirectory? directory = null, ILauncherServerSelection? serverSelection = null, ILauncherPresenceDirectory? presenceDirectory = null)
     {
         Validator.ValidateObject(options, new ValidationContext(options), true);
         var errors = options.Validate().ToArray(); if (errors.Length > 0) throw new ValidationException(string.Join("; ", errors.Select(e => e.ErrorMessage)));
+        var center = new { enabled = options.Center.Enabled, mode = options.Center.Mode };
         var policy = new LauncherClientPolicy(options);
         var presence = new LauncherPresence(options, players, matchConnections);
+        if (options.PresenceGroup.Length > 0 && (presenceDirectory is null
+            || !presenceDirectory.Groups.Contains(options.PresenceGroup, StringComparer.Ordinal)))
+            throw new ValidationException("presence_group requires a configured ILauncherPresenceDirectory group.");
+        async ValueTask<LauncherPresenceSnapshot?> Aggregate(bool includeRoster, CancellationToken token)
+        {
+            if (options.PresenceGroup.Length == 0) return null;
+            try { return await presenceDirectory!.ReadAsync(options.PresenceGroup, includeRoster, token).ConfigureAwait(false); }
+            catch (Exception error) when (error is HttpRequestException or IOException or KeyNotFoundException
+                || error is OperationCanceledException && !token.IsCancellationRequested)
+            { throw new LauncherApiFailure(503, "player_state_unavailable"); }
+        }
         if (options.PlayerLimit is not null && players is null)
             throw new ValidationException("player_limit requires ISessionRegistry to enforce launcher admission.");
         await sessions.InitializeAsync(ct).ConfigureAwait(false);
@@ -86,26 +101,35 @@ public sealed class LauncherServer : IAsyncDisposable
             finally { workers.Release(); }
         });
 
-        app.MapGet("/v1/catalog", (HttpContext context) => Results.Json(new
+        // Select the result-producing route overload; a Task-only request delegate discards the JSON result.
+        app.MapGet("/v1/catalog", (Delegate)(async (HttpContext context) => Results.Json(new
         {
-            schema = 1, game = "bubblefighter", name = options.Name, registrationEnabled = options.RegistrationEnabled,
+            schema = 1, game = "bubblefighter", name = options.Name, center, registrationEnabled = options.RegistrationEnabled,
             secureUrl = options.SecureUrl.Length == 0 ? null : options.SecureUrl,
             registrationFields = Array.Empty<object>(),
             options.HostPolicy, region = options.Region.Length == 0 ? null : options.Region, options.SupportsInstances, options.SupportsPlugins, options.LevelIcon,
             profileFields = new[] { "level", "lucci", "cash" },
-            presentation = presence.Presentation(),
+            presentation = presence.Presentation(options.ShowOnlinePlayers ? await Aggregate(false, context.RequestAborted).ConfigureAwait(false) : null),
             policy.MinimumLauncherVersion, clientPolicy = policy.ClientPolicy,
             instances = options.Instances.Select(instance => CatalogInstance(instance, context.Request.Host.Host)),
-        }));
-        app.MapGet("/v1/players", () =>
+        })));
+        if (directory is not null)
+            app.MapGet("/v1/servers/{build}", (string build) =>
+                build.Length > 64 || !options.Instances.Any(instance => instance.Build == build)
+                    ? Results.NotFound()
+                    : Results.Json(new { schema = 1, build, center, generated_at_utc = DateTimeOffset.UtcNow, servers = directory.ListServers(build) }));
+        app.MapGet("/v1/players", (Delegate)(async (HttpContext context) =>
         {
             // Disabling disclosure must not even consult the session registry.
             if (!options.RosterEnabled) return Results.Json(new { schema = 1, enabled = false, players = Array.Empty<object>(), truncated = false });
-            var online = presence.Snapshot();
+            var aggregate = await Aggregate(true, context.RequestAborted).ConfigureAwait(false);
+            var online = aggregate?.Players ?? presence.LocalRoster()
+                .Select(p => new LauncherRosterPlayer(p.Name!, p.Level!.Value, p.BuildId)).ToArray();
             return Results.Json(new { schema = 1, enabled = true,
-                players = online.Take(options.MaxRosterPlayers).Select(p => new { name = p.Nickname, level = p.Level }),
-                truncated = online.Length > options.MaxRosterPlayers });
-        });
+                players = online.Take(options.MaxRosterPlayers),
+                truncated = online.Count > options.MaxRosterPlayers,
+                complete = aggregate?.RosterComplete ?? true });
+        }));
         app.MapGet("/v1/instances/{id}/instance.toml", (string id) =>
         {
             var preset = options.Instances.SingleOrDefault(i => i.Id == id); if (preset is null) return Results.NotFound();
@@ -199,6 +223,25 @@ public sealed class LauncherServer : IAsyncDisposable
             if (preset is null) return Results.BadRequest(new { error = "unsupported_build" });
             var metadata = LauncherLaunchMetadata.Read(body);
             RequireReady(readiness);
+            bool? selectionRequested = body.TryGetProperty("serverSelection", out var selectionValue) ? selectionValue.ValueKind switch
+            {
+                JsonValueKind.True => true,
+                JsonValueKind.False => false,
+                _ => throw new InvalidDataException(),
+            } : null;
+            LauncherServerSelectionSnapshot? selectionSnapshot = null;
+            var automatic = center.enabled && center.mode == "gateway"
+                && directory?.ListServers(build!).Any(server => server.Automatic) == true;
+            if (selectionRequested == true && !automatic) return Error(409, "server_selection_unavailable");
+            if (automatic && (selectionRequested == true || account is not null))
+            {
+                if (account is null) throw new UnauthorizedAccessException();
+                if (serverSelection is null) return Error(409, "server_selection_unavailable");
+                if (selectionRequested == false) return Error(409, "server_selection_required");
+                selectionSnapshot = serverSelection.Capture(build!);
+                if (!selectionSnapshot.Servers.Any(server => server.Automatic && server.Targets.Count > 0))
+                    return Error(503, "server_selection_unavailable");
+            }
             if (account is null)
             {
                 if (preset.LauncherLogin != "game") throw new UnauthorizedAccessException();
@@ -221,18 +264,46 @@ public sealed class LauncherServer : IAsyncDisposable
                 try { companionGrant = companion.Open(account.Username, build!); }
                 catch (InvalidOperationException e) { logger?.LogWarning("Companion launch not opened: {Reason}", e.Message); }
             }
-            var ticket = sessions.Issue(Bearer(context), build!, metadata.LauncherLanguage, companionGrant?.LaunchId);
+            var ticket = selectionSnapshot is null
+                ? sessions.Issue(Bearer(context), build!, metadata.LauncherLanguage, companionGrant?.LaunchId)
+                : sessions.IssueForServers(Bearer(context), build!, selectionSnapshot, serverSelection!.LocalNodeId,
+                    SelectionPolicyRevision(preset, policy, options.Center), metadata.LauncherLanguage, companionGrant?.LaunchId);
             logger?.LogInformation("Launcher ticket issued for build {Build}, release {ReleaseVersion}, patch {PatchVersion}, languages {LauncherLanguage}/{NativeLanguage}/{ClientLanguage}.",
                 build, metadata.ReleaseVersion, metadata.PatchVersion, metadata.LauncherLanguage, metadata.NativeLanguage, metadata.ClientLanguage);
             // The messenger ticket is separate from the single-use game ticket, so the game login cannot consume it.
             var messengerTicket = messenger?.Issue(account.Username, account.Nickname ?? account.Username, build!);
             var reply = new Dictionary<string, object?> { ["account"] = account.Username, ["ticket"] = ticket.Token, ["expiresAt"] = ticket.ExpiresAt };
+            if (selectionSnapshot is not null)
+            {
+                var grant = sessions.Selection(Bearer(context), ticket.Token, build!) ?? throw new UnauthorizedAccessException();
+                reply["serverSelection"] = SelectionReply(grant, selectionSnapshot);
+            }
             if (messengerTicket is not null)
                 reply["messenger"] = new { url = messenger!.PublicUrl.Replace("{host}", context.Request.Host.Host, StringComparison.Ordinal), ticket = messengerTicket.Value, expiresAt = messengerTicket.ExpiresAt };
             if (companionGrant is not null) reply["companion"] = CompanionReply(companionGrant, context.Request.Host.Host);
             // The launcher that opened an in-game sign-in launch fetches this grant with the launch key.
             if (boundLaunch is not null && companionGrant is not null) gameLogins.Attach(boundLaunch, companionGrant);
             return Results.Json(reply);
+        });
+        app.MapPost("/v1/launch/servers", async (HttpContext context) =>
+        {
+            await Authorized(context, accounts, sessions).ConfigureAwait(false);
+            var body = await Body(context).ConfigureAwait(false);
+            policy.Check(context, body);
+            string Text(string name) => body.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
+                && value.GetString() is { Length: > 0 and <= 128 } text ? text : throw new InvalidDataException();
+            var build = Text("build");
+            var ticket = Text("ticket");
+            var grantId = Text("grantId");
+            var grant = sessions.Selection(Bearer(context), ticket, build, grantId);
+            var preset = options.Instances.FirstOrDefault(instance => instance.Build == build);
+            if (grant is null || preset is null || !center.enabled || center.mode != "gateway" || serverSelection is null
+                || directory?.ListServers(build).Any(server => server.Automatic) != true
+                || grant.PolicyRevision != SelectionPolicyRevision(preset, policy, options.Center))
+                return Error(409, "admission_closed");
+            RequireReady(readiness);
+            var snapshot = serverSelection.Refresh(build, grant.Snapshot);
+            return Results.Json(new { serverSelection = SelectionReply(grant, snapshot) });
         });
         // The launcher of an in-game sign-in launch holds no bearer: its launch key fetches the companion grant once the
         // game has signed in (404 launch_not_bound until then), and a fresh one on every later call.
@@ -243,9 +314,9 @@ public sealed class LauncherServer : IAsyncDisposable
             var launchId = Text("launchId");
             var found = gameLogins.Companion(launchId, Text("launchKey"));
             if (found is null) return Error(404, gameLogins.Known(launchId) ? "launch_not_bound" : "launch_not_found");
-            var (owner, grant, fresh) = found.Value;
+            var (owner, grant, _) = found.Value;
             if (companion is null || grant is null) return Error(404, "companion_unavailable");
-            var current = fresh ? grant : companion.Renew(owner, grant.LaunchId);
+            var current = await companion.RenewAsync(owner, grant.LaunchId, context.RequestAborted).ConfigureAwait(false);
             return current is null ? Error(404, "launch_not_found") : Results.Json(CompanionReply(current, context.Request.Host.Host));
         });
         // A reconnecting launcher needs a fresh one-time companion ticket for the launch it already holds.
@@ -255,10 +326,10 @@ public sealed class LauncherServer : IAsyncDisposable
             var body = await Body(context).ConfigureAwait(false);
             var launchId = body.TryGetProperty("launchId", out var value) && value.ValueKind == JsonValueKind.String ? value.GetString()! : throw new InvalidDataException();
             if (companion is null) return Error(404, "companion_unavailable");
-            var grant = companion.Renew(account.Username, launchId);
+            var grant = await companion.RenewAsync(account.Username, launchId, context.RequestAborted).ConfigureAwait(false);
             return grant is null ? Error(404, "launch_not_found") : Results.Json(CompanionReply(grant, context.Request.Host.Host));
         });
-        try { await app.StartAsync(ct).ConfigureAwait(false); return new LauncherServer(app, workers, options); }
+        try { await app.StartAsync(ct).ConfigureAwait(false); return new LauncherServer(app, workers, options, presence); }
         catch { await app.DisposeAsync().ConfigureAwait(false); workers.Dispose(); throw; }
     }
 
@@ -291,6 +362,17 @@ public sealed class LauncherServer : IAsyncDisposable
     {
         if (readiness is { IsReady: false }) throw new LauncherApiFailure(503, "server_not_ready");
     }
+
+    private static string SelectionPolicyRevision(LauncherInstanceOptions preset, LauncherClientPolicy policy, LauncherCenterOptions center) =>
+        Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new
+        { preset, center, policy.MinimumLauncherVersion, policy.ClientPolicy })));
+
+    private static object SelectionReply(LauncherServerSelectionGrant grant, LauncherServerSelectionSnapshot snapshot) => new
+    {
+        schema = 1, grantId = grant.GrantId, build = grant.Build, authorityId = grant.AuthorityId,
+        policyRevision = grant.PolicyRevision, dataScope = grant.DataScope, expiresAtUtc = grant.ExpiresAtUtc,
+        generated_at_utc = snapshot.GeneratedAtUtc, servers = snapshot.Servers,
+    };
 
     private static async Task<object> Profile(LauncherAccount account, LauncherOptions options, IPlayerWalletRepository? wallets, IPlayerProgressRepository? progress, CancellationToken ct)
     {

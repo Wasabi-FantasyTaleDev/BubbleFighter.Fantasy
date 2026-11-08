@@ -2,19 +2,34 @@
 # The dialect chooses containers through packet data; the gameplay row is the same one rooms use.
 - id: dialect.rooms
   plugin: dialect.rooms
+  parent_id: inventory.loadouts
   config:
     protocol: "${BFF_PROFILE_ID}/game"
+    # The plaza and tutorial move replies place the player on the same channel as the login (see
+    # dialect.messages login_channel); a channel must be a FighterConfigChannel column, which 50 is not.
+    player_channel: ${BFF_PLAYER_CHANNEL:-60}
     relay_protocol: "${BFF_PROFILE_ID}/relay"
     modern_rooms: true
     # Both native dialects pass two-client loading, relay, combat, results and
     # return through a second round; keep their shared gameplay admission open.
     waiting_rooms_only: false
     packets_directory: packets
+- id: inventory.loadouts
+  plugin: inventory.loadouts
+  parent_id: clientdata
+  isolated_services:
+    - BubbleFighter.Fantasy.Contracts.Inventory.IInventoryRepository
+    - BubbleFighter.Fantasy.Contracts.Inventory.IPlayerInventoryState
+    - BubbleFighter.Fantasy.Contracts.Fighters.IFighterRoster
+    - BubbleFighter.Fantasy.Contracts.Fighters.ISeatCharacterResolver
+  config:
+    build_key: "${BFF_PROFILE_ID}"
 - id: inventoryview
   plugin: inventoryview
-  parent_id: clientdata
+  parent_id: inventory.loadouts
   # Every build keeps its appearance, publication and online-player services in its own subtree.
   isolated_services:
+    - BubbleFighter.Fantasy.Contracts.Lobby.IRetainedPlayerAdmission
     - BubbleFighter.Fantasy.Contracts.Inventory.IInventoryPushService
     - BubbleFighter.Fantasy.Contracts.Inventory.IEquipmentSelection
     - BubbleFighter.Fantasy.Contracts.Inventory.IInventoryExpiry
@@ -23,12 +38,23 @@
     - BubbleFighter.Fantasy.Contracts.Inventory.IWeaponPresetPageSource
     - BubbleFighter.Fantasy.Contracts.Shop.IShopGiftService
     - BubbleFighter.Fantasy.Contracts.Players.IOnlinePlayers
+    - BubbleFighter.Fantasy.Contracts.Party.IPartyDirectory
   config:
     protocol: "${BFF_PROFILE_ID}/game"
     client_profile: "${BFF_PROFILE_ID}"
     version_major: ${BFF_BUILD_MAJOR}
     enabled: true
     publish_equipped_view_push: true
+# cn-774 sub_503990 and tw-454 sub_7684C0 consume per-player ordinary-defence tables from relay 5.
+# The optional defence patch activates this authority after each native actor exists at round start.
+- id: dialect.scene-seeds
+  plugin: dialect.scene-seeds
+  parent_id: clientdata
+  disabled: true
+  config:
+    protocol: "${BFF_PROFILE_ID}/relay"
+    packets_directory: packets
+    defence_seeds: true
 - id: ingame
   plugin: ingame
   parent_id: inventoryview
@@ -70,6 +96,8 @@
     server_map_draw: true
     assign_spawn_teams_on_start: true
     native_life_mode_ids: [1]
+    # Every mode revives without limit after the death presentation; only mode 1 ends on the clock.
+    native_life_every_mode: true
     plaza_enter_requires_finished_login: true
     plaza_replay_positions_on_enter: false
     plaza_echo_positions: false

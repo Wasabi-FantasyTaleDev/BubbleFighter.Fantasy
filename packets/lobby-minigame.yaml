@@ -1,0 +1,82 @@
+version: 1
+# The lobby-minigame sub-packet channel of the modern CN and TW builds. The stage gates read a
+# subcommand and dispatch into a per-key handler registry: cn-774 builds it in cn-774 sub_9D8810
+# (the LobbyMinigameContext constructor, RTTI SubPacketDispatchEntry1Impl entries) and dispatches
+# through cn-774 sub_9E52D0; tw-454 builds the same eight keys in its LobbyMinigameContext ctor and
+# dispatches the same way. The keys pair with the RTTI handler names Reply*@LmgProtocol and
+# *@LmgSync, so the request names below take their nouns from those handlers. The field meanings
+# inside each body are unknown; the layouts are pinned by the byte-length tests.
+structs:
+  # C2S 551 subcommand 1 pairs with the ReplyShootBasketball@LmgProtocol key. cn-774 sub_E32F70
+  # re-sends it periodically while the minigame runs; tw-454 sub_DC2290 does the same.
+  LmgBasketballRequest@kr-812: []
+  LmgBasketballRequest@cn-774:
+    - subcmd: u16
+      offset: 4
+    - unknown_6: u16
+      offset: 6
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+  # C2S 551 subcommand 10 pairs with the ReplyStartFishing@LmgProtocol key. cn-774 sub_9DCAA0
+  # (packed writer cn-774 sub_47AE10) and tw-454 sub_637390 write the same 12-byte options block:
+  # tw-454 sub_46C330 widens two bytes to u32, then writes two u16 values in that order.
+  LmgFishingStartRequest@kr-812: []
+  LmgFishingStartRequest@cn-774:
+    - subcmd: u16
+      offset: 4
+    - unknown_6: u32
+      offset: 6
+    - unknown_10: u32
+      offset: 10
+    - unknown_14: u16
+      offset: 14
+    - unknown_16: u16
+      offset: 16
+  # C2S 551 subcommand 11 pairs with the ReplyLiftFishingRod@LmgProtocol key. cn-774 sub_E34210
+  # and tw-454 sub_DC3380 write that options block, followed by one byte widened to u32.
+  LmgRodLiftRequest@kr-812: []
+  LmgRodLiftRequest@cn-774:
+    - subcmd: u16
+      offset: 4
+    - unknown_6: u32
+      offset: 6
+    - unknown_10: u32
+      offset: 10
+    - unknown_14: u16
+      offset: 14
+    - unknown_16: u16
+      offset: 16
+    - unknown_18: u32
+      offset: 18
+  # C2S 551 subcommand 12 pairs with the ReplyFortune@LmgProtocol key. cn-774 sub_E34770 and
+  # tw-454 sub_DC3A70: the 64-bit pair is the client-state value the senders resolve.
+  LmgFortuneRequest@kr-812: []
+  LmgFortuneRequest@cn-774:
+    - subcmd: u16
+      offset: 4
+    - unknown_6: u16
+      offset: 6
+    - unknown_8: u64
+      offset: 8
+    - unknown_16: u32
+      offset: 16
+  # The C2S 552 state actions, subcommands 100, 101, 200 and 201 (ShootFire, ChangeState,
+  # CastFishing and LiftFishing@LmgSync): cn-774 sub_9E3240 / cn-774 sub_E34EC0 / cn-774 sub_9E3BF0 / cn-774 sub_9E3E80
+  # and tw-454 sub_63D7E0 / tw-454 sub_DC41B0 / tw-454 sub_63E1A0 / tw-454 sub_63E430, each the u16 subcommand and one
+  # u32 argument. The 552 senders are themselves the registered minigame handlers.
+  LmgSyncAction@kr-812: []
+  LmgSyncAction@cn-774:
+    - subcmd: u16
+      offset: 4
+    - unknown_6: u32
+      offset: 6
+  # The S2C 552 state body: the gates read a u32 and a u16 into cn-774 sub_9F24C0 and
+  # tw-454 sub_8A0CB0 before the per-key dispatch.
+  LmgSyncState@kr-812: []
+  LmgSyncState@cn-774:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u16
+      offset: 8

@@ -20,7 +20,9 @@ public sealed class PortalMoveTablePins
     {
         var body = PacketCodec.Write(Tables.Value, build, "PortalMoveRequest", new Dictionary<string, object?>
         {
-            ["unknown_4"] = 0x11, ["unknown_8"] = 0x22, ["unknown_12"] = 0x33, ["unknown_16"] = 0x44,
+            ["position_x"] = BitConverter.Int32BitsToSingle(0x11),
+            ["position_y"] = BitConverter.Int32BitsToSingle(0x22),
+            ["position_z"] = BitConverter.Int32BitsToSingle(0x33), ["portal_id"] = 0x44,
         });
         Assert.Equal(14, body.Length);
         Assert.Equal(new byte[]
@@ -37,7 +39,7 @@ public sealed class PortalMoveTablePins
     {
         var body = PacketCodec.Write(Tables.Value, build, "PortalMoveReply", new Dictionary<string, object?>
         {
-            ["unknown_4"] = 0x11, ["unknown_8"] = 0x22, ["unknown_12"] = 0x33,
+            ["unknown_4"] = 0x11, ["portal_id"] = 0x22, ["seat"] = 0x33,
         });
         Assert.Equal(10, body.Length);
         Assert.Equal(new byte[]

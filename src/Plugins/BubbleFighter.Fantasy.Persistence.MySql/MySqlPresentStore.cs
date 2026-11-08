@@ -1,3 +1,4 @@
+using BubbleFighter.Fantasy.Contracts.Cluster;
 using BubbleFighter.Fantasy.Abstractions.Persistence;
 using BubbleFighter.Fantasy.Contracts.Presents;
 using BubbleFighter.Fantasy.Contracts.Shop;
@@ -12,7 +13,7 @@ namespace BubbleFighter.Fantasy.Persistence.MySql;
 /// and inserts the gift; a delivery marks the gift taken inside the purchase transaction
 /// (<see cref="MySqlShopPurchaseStore"/>).
 /// </summary>
-public sealed class MySqlPresentStore(IDbConnectionFactory connections) : IPresentStore
+public sealed class MySqlPresentStore(IDbConnectionFactory connections, IAccountMutationFence? authority = null) : IPresentStore
 {
     private const byte Pending = (byte)PresentState.Pending;
 
@@ -35,7 +36,7 @@ public sealed class MySqlPresentStore(IDbConnectionFactory connections) : IPrese
         var receiver = command.Receiver.UserNum;
         await using var session = await SugarSession.OpenAsync(connections, ct).ConfigureAwait(false);
         var db = session.Db;
-        await using var tx = await session.BeginAsync().ConfigureAwait(false);
+        await using var tx = await session.BeginWriteAsync(sender, authority, ct).ConfigureAwait(false);
         foreach (var user in sender < receiver ? new[] { sender, receiver } : new[] { receiver, sender })
         {
             if ((await MySqlPlayerLock.LockQuery(db, user).ToListAsync(ct).ConfigureAwait(false)).Count != 0)
@@ -93,7 +94,7 @@ public sealed class MySqlPresentStore(IDbConnectionFactory connections) : IPrese
         var receiver = command.ReceiverUserNum;
         await using var session = await SugarSession.OpenAsync(connections, ct).ConfigureAwait(false);
         var db = session.Db;
-        await using var tx = await session.BeginAsync().ConfigureAwait(false);
+        await using var tx = await session.BeginWriteAsync(receiver, authority, ct).ConfigureAwait(false);
         // The receiver's row lock serializes two grants for one player, so the claim lookup below cannot race an insert
         // (the primary key is the backstop, not the mechanism).
         if ((await MySqlPlayerLock.LockQuery(db, receiver).ToListAsync(ct).ConfigureAwait(false)).Count == 0)
@@ -182,21 +183,21 @@ public sealed class MySqlPresentStore(IDbConnectionFactory connections) : IPrese
 
     /// <inheritdoc />
     public ValueTask<bool> DiscardAsync(string profileId, long userNum, long id, CancellationToken ct) =>
-        ChangeAsync(profileId, id, db => DiscardUpdate(db, profileId, userNum, id), ct);
+        ChangeAsync(profileId, userNum, id, db => DiscardUpdate(db, profileId, userNum, id), ct);
 
     /// <inheritdoc />
     public ValueTask<bool> DeleteReceivedAsync(string profileId, long userNum, long id, CancellationToken ct) =>
-        ChangeAsync(profileId, id, db => HideUpdate(db, profileId, userNum, id, PresentBox.Received), ct);
+        ChangeAsync(profileId, userNum, id, db => HideUpdate(db, profileId, userNum, id, PresentBox.Received), ct);
 
     /// <inheritdoc />
     public ValueTask<bool> DeleteSentAsync(string profileId, long userNum, long id, CancellationToken ct) =>
-        ChangeAsync(profileId, id, db => HideUpdate(db, profileId, userNum, id, PresentBox.Sent), ct);
+        ChangeAsync(profileId, userNum, id, db => HideUpdate(db, profileId, userNum, id, PresentBox.Sent), ct);
 
-    private async ValueTask<bool> ChangeAsync(string profileId, long id, Func<SqlSugarClient, IUpdateable<PresentRow>> update, CancellationToken ct)
+    private async ValueTask<bool> ChangeAsync(string profileId, long userNum, long id, Func<SqlSugarClient, IUpdateable<PresentRow>> update, CancellationToken ct)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(profileId);
         await using var session = await SugarSession.OpenAsync(connections, ct).ConfigureAwait(false);
-        await using var tx = await session.BeginAsync().ConfigureAwait(false);
+        await using var tx = await session.BeginWriteAsync(userNum, authority, ct).ConfigureAwait(false);
         var changed = await update(session.Db).ExecuteCommandAsync(ct).ConfigureAwait(false) == 1;
         if (changed)
             await PurgeDelete(session.Db, id).ExecuteCommandAsync(ct).ConfigureAwait(false);

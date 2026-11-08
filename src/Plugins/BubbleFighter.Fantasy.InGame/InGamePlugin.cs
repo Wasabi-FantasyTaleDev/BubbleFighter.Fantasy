@@ -27,9 +27,10 @@ namespace BubbleFighter.Fantasy.InGame;
 [Plugin("ingame",
     Description = "Plaza enter, room create/join/ready, and combat over the typed room and round messages.",
     Requires = [typeof(IPacketRouter), typeof(IMessageRouter)],
-    OptionalMany = [typeof(IMatchCapabilityOfferSender), typeof(IMessageSender<MatchSeedTablesRequested>), typeof(IInboundMessageBinding<MatchConnectionReported>), typeof(IMessageSender<RoomTeamConverted>), typeof(IInboundMessageBinding<RoomMatchRequested>), typeof(IMessageSender<RoomMatchNotified>), typeof(IMessageSender<RoomAutoStartNotified>), typeof(IMessageSender<ServerNotice>), typeof(IMessageSender<MatchSessionSignature>),
+    OptionalMany = [typeof(IRoomBrowser), typeof(IMatchCapabilityOfferSender), typeof(IMatchSeedInputValidator), typeof(IMatchCriticalSeedAuthority), typeof(IMessageSender<MatchSeedTablesRequested>), typeof(IInboundMessageBinding<MatchConnectionReported>), typeof(IMessageSender<RoomTeamConverted>), typeof(IInboundMessageBinding<RoomMatchRequested>), typeof(IMessageSender<RoomMatchNotified>), typeof(IMessageSender<RoomAutoStartNotified>), typeof(IMessageSender<ServerNotice>), typeof(IMessageSender<MatchSessionSignature>),
         typeof(IInboundMessageBinding<RoomListRequested>), typeof(IMessageSender<RoomListSnapshot>), typeof(IMessageSender<PartyUpdated>), typeof(IMessageSender<PartyVisitSucceeded>), typeof(IMessageSender<PartyInvitationMoveSucceeded>), typeof(IMessageSender<PartyVisitFailed>),
         typeof(IInboundMessageBinding<RoomCreateRequested>), typeof(IInboundMessageBinding<RoomJoinRequested>),
+        typeof(IInboundMessageBinding<RoomInventoryChangeRequested>), typeof(IMessageSender<RoomInventoryChanged>),
         typeof(IInboundMessageBinding<RoomLeaveRequested>), typeof(IInboundMessageBinding<RoomReadyRequested>),
         typeof(IInboundMessageBinding<RoomUiRefreshRequested>), typeof(IMessageSender<RoomUiChanged>), typeof(IMessageSender<RoomProbeAcknowledged>),
         typeof(IMessageSender<RoomEntered>), typeof(IMessageSender<RoomSeatUpdated>), typeof(IMessageSender<RoomSeatVacated>),
@@ -45,20 +46,48 @@ namespace BubbleFighter.Fantasy.InGame;
         typeof(IMessageSender<RoundStarted>), typeof(IMessageSender<RoundFeedReceived>),
         typeof(IInboundMessageBinding<RoundObjectAddRequested>), typeof(IMessageSender<RoundObjectAddAcknowledged>),
         typeof(IInboundMessageBinding<RoundMovementReported>), typeof(IMessageSender<RoundMovementRelayed>),
-        typeof(IInboundMessageBinding<RoundLifeReported>), typeof(IInboundMessageBinding<RoundResetRequested>),
-        typeof(IMessageSender<RoundResetGranted>),
+        typeof(IInboundMessageBinding<RoundLifeReported>),
         typeof(IInboundMessageBinding<RoundLotteryRequested>), typeof(IMessageSender<RoundLotteryOpened>), typeof(IMessageSender<RoundLotteryClosed>), typeof(IMessageSender<RoundLotterySelected>), typeof(IMessageSender<RoundLotteryRevealed>), typeof(IInboundMessageBinding<RoundEndRequested>), typeof(IMessageSender<RoundEnded>),
         typeof(IInboundMessageBinding<RoundRespawnRequested>), typeof(IInboundMessageBinding<RoundSpawnAccepted>), typeof(IInboundMessageBinding<RoundDeathReported>),
         typeof(IMessageSender<RoundSpawnOffered>),
         typeof(IMessageSender<RoundPlayerRespawned>),
         typeof(IInboundMessageBinding<RoundTauntReported>), typeof(IMessageSender<RoundRespawnWaitChanged>),
-        typeof(IInboundMessageBinding<RoomChatSent>), typeof(IMessageSender<RoomChatReceived>), typeof(IInboundMessageBinding<RoomSeatLockRequested>), typeof(IInboundMessageBinding<RoomAiAddRequested>), typeof(IInboundMessageBinding<RoomAiRemoveRequested>),
+        typeof(IInboundMessageBinding<RoomChatSent>), typeof(IMessageSender<RoomChatReceived>), typeof(IInboundMessageBinding<RoomSessionChatSent>), typeof(IMessageSender<RoomSessionChatReceived>), typeof(IInboundMessageBinding<RoomSeatLockRequested>), typeof(IInboundMessageBinding<RoomAiAddRequested>), typeof(IInboundMessageBinding<RoomAiRemoveRequested>),
         typeof(IMessageSender<RoomSeatLockChanged>), typeof(IInboundMessageBinding<RoomKickRequested>), typeof(IMessageSender<RoomMemberKicked>),
         typeof(IInboundMessageBinding<PlazaEnterRequested>), typeof(IInboundMessageBinding<PlazaPositionReported>),
         typeof(IInboundMessageBinding<PlazaMenuReturnRequested>),
+        typeof(IInboundMessageBinding<PlazaRecruitmentRequested>), typeof(IInboundMessageBinding<PlazaRecruitmentTextRequested>),
+        typeof(IMessageSender<PlazaRecruitmentChanged>), typeof(IMessageSender<PlazaRecruitmentTextReceived>),
+        typeof(IInboundMessageBinding<PlazaRecruitmentListRequested>), typeof(IMessageSender<PlazaRecruitmentListReceived>),
+        typeof(IMessageSender<PlazaRecruitmentRejected>),
         typeof(IInboundMessageBinding<InitialTutorialRequested>), typeof(IMessageSender<InitialTutorialEntered>),
         typeof(IInboundMessageBinding<InitialTutorialExitRequested>),
         typeof(IInboundMessageBinding<InitialTutorialNpcReported>), typeof(IMessageSender<InitialTutorialNpcAcknowledged>),
+        typeof(IInboundMessageBinding<RoundNpcReported>), typeof(IMessageSender<RoundNpcAcknowledged>),
+        typeof(IInboundMessageBinding<TutorialScoreReported>), typeof(IMessageSender<TutorialScoreUpdated>),
+        typeof(IInboundMessageBinding<RoundStageResultReported>), typeof(IScriptZombieModes),
+        typeof(IInboundMessageBinding<RoundBombStateReported>), typeof(IInboundMessageBinding<RoundBombMissionOverReported>),
+        typeof(IMessageSender<RoundBombStateChanged>), typeof(IRoundObservationSender),
+        typeof(IInboundMessageBinding<RoundPortalMoveRequested>), typeof(IMessageSender<RoundPortalMoved>),
+        typeof(IInboundMessageBinding<RoundCharacterFormRequested>), typeof(IMessageSender<RoundCharacterFormChanged>),
+        typeof(IInboundMessageBinding<RoundCaptainDropped>), typeof(IMessageSender<RoundCaptainAppointed>),
+        typeof(IInboundMessageBinding<RoundScriptZombieConversionReported>), typeof(IMessageSender<RoundScriptZombieConversionReported>),
+        typeof(IMessageSender<RoundScriptZombieTeamChanged>),
+        typeof(IInboundMessageBinding<RoundExtremeRacingGoalReported>), typeof(IMessageSender<RoundExtremeRacingTimerChanged>),
+        typeof(IMessageSender<RoundExtremeRacingRoundChanged>), typeof(IMessageSender<RoundExtremeRacingRecordsUpdated>),
+        typeof(IInboundMessageBinding<RoundFinalZoneItemPickupRequested>), typeof(IInboundMessageBinding<RoundFinalZoneItemsDropped>),
+        typeof(IInboundMessageBinding<RoundFinalZoneBackpackDropped>), typeof(IInboundMessageBinding<RoundFinalZoneBackpackPickupRequested>),
+        typeof(IInboundMessageBinding<RoundFinalZoneMapEffectChanged>), typeof(IMessageSender<RoundFinalZoneMapEffectChanged>),
+        typeof(IInboundMessageBinding<RoundMapObjectVisibilityChanged>), typeof(IMessageSender<RoundMapObjectVisibilityChanged>),
+        typeof(IInboundMessageBinding<RoundBreakableMapObjectCreated>), typeof(IMessageSender<RoundBreakableMapObjectCreated>),
+        typeof(IMessageSender<RoundFinalZoneItemsSpawned>), typeof(IMessageSender<RoundFinalZoneItemPicked>),
+        typeof(IMessageSender<RoundFinalZoneBackpackSpawned>), typeof(IMessageSender<RoundFinalZoneBackpackPicked>),
+        typeof(IMessageSender<RoundFinalZonePlayerEliminated>), typeof(IMessageSender<RoundFinalZoneWaterTimerChanged>),
+        typeof(IInboundMessageBinding<RoundFinalZoneDroneDestroyed>), typeof(IInboundMessageBinding<RoundFinalZoneGoldenSupplyRequested>),
+        typeof(IMessageSender<RoundFinalZoneDroneSpawned>), typeof(IMessageSender<RoundFinalZoneDroneBoxSpawned>),
+        typeof(IMessageSender<RoundFinalZoneGoldenSupplySpawned>),
+        typeof(IInboundMessageBinding<RoundFinalZoneTrapRequested>), typeof(IInboundMessageBinding<RoundFinalZoneTrapLinked>),
+        typeof(IMessageSender<RoundFinalZoneTrapSpawned>), typeof(IMessageSender<RoundFinalZoneTrapLinked>),
         typeof(IMessageSender<PlazaEntered>), typeof(IMessageSender<PlazaMemberEntered>), typeof(IMessageSender<PlazaMemberLeft>),
         typeof(IMessageSender<PlazaPositionReceived>), typeof(IMessageSender<PlazaMenuReturnRequested>),
         typeof(IInboundMessageBinding<RoundKillCreditReported>), typeof(IInboundMessageBinding<RoundFinishingBlowReported>),
@@ -66,6 +95,8 @@ namespace BubbleFighter.Fantasy.InGame;
         typeof(IMessageSender<RoundPlayerWalletChanged>), typeof(IMessageSender<RoundWaveChanged>),
         typeof(IInboundMessageBinding<RoundSuppliesReported>), typeof(IInboundMessageBinding<RoundSupplyPickupRequested>), typeof(IInboundMessageBinding<RoundSupplyDropRequested>),
         typeof(IMessageSender<RoundSupplyCreated>), typeof(IMessageSender<RoundSupplyPicked>),
+        typeof(IInboundMessageBinding<RoundWeaponDropRequested>), typeof(IInboundMessageBinding<RoundWeaponPickupRequested>),
+        typeof(IMessageSender<RoundWeaponCreated>), typeof(IMessageSender<RoundWeaponPicked>),
         typeof(IInboundMessageBinding<RoundLucciDropRequested>), typeof(IInboundMessageBinding<RoundHordeAwardRequested>),
         typeof(IInboundMessageBinding<RoundLucciPickupRequested>), typeof(IMessageSender<RoundLucciCreated>), typeof(IMessageSender<RoundLucciPicked>),
         typeof(IInboundMessageBinding<RoundStarDropRequested>), typeof(IInboundMessageBinding<RoundStarPickupRequested>),
@@ -78,10 +109,10 @@ namespace BubbleFighter.Fantasy.InGame;
         typeof(IMessageSender<RoundRescueMissionsPrepared>), typeof(IMessageSender<RoundRescueMissionStarted>),
         typeof(IMessageSender<RoundRescueMissionFailed>), typeof(IMessageSender<RoundRescueMissionSucceeded>),
         typeof(IInboundMessageBinding<RoundPvePangReported>), typeof(IMessageSender<RoundPvePointsChanged>)],
-    Optional = [typeof(ICommandExecutor), typeof(IGameCommandEndpoints), typeof(IPartyDirectory), typeof(IOnlinePlayers), typeof(BubbleFighter.Fantasy.Contracts.Shop.IShopPurchaseStore), typeof(IInventoryRepository), typeof(IInventoryPushService), typeof(IGameText), typeof(ISeatCharacterResolver), typeof(IEquippedViewPush), typeof(IEquipmentSelection), typeof(BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore), typeof(BubbleFighter.Fantasy.Contracts.Progress.IPlayerProgressRepository), typeof(BubbleFighter.Fantasy.Contracts.Wallet.IPlayerWalletRepository), typeof(BubbleFighter.Fantasy.Contracts.Progress.ITutorialStageStore), typeof(BubbleFighter.Fantasy.Contracts.Shop.IShopGiftService), typeof(IOpcodeTableRegistry)],
-    ProvidesMany = [typeof(IMatchCapabilityDirectory), typeof(IRoomAdminDirectory)],
-    ConditionalProvides = [])]
-public sealed class InGamePlugin : IPlugin
+    Optional = [typeof(BubbleFighter.Fantasy.Contracts.Cluster.IAccountMutationScopes), typeof(ICommandExecutor), typeof(IGameCommandEndpoints), typeof(IPartyDirectory), typeof(IOnlinePlayers), typeof(BubbleFighter.Fantasy.Contracts.Shop.IShopPurchaseStore), typeof(IInventoryRepository), typeof(IInventoryPushService), typeof(IGameText), typeof(ISeatCharacterResolver), typeof(IEquippedViewPush), typeof(IEquipmentSelection), typeof(BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore), typeof(BubbleFighter.Fantasy.Contracts.Progress.IPlayerProgressRepository), typeof(BubbleFighter.Fantasy.Contracts.Wallet.IPlayerWalletRepository), typeof(BubbleFighter.Fantasy.Contracts.Progress.ITutorialStageStore), typeof(BubbleFighter.Fantasy.Contracts.Shop.IShopGiftService), typeof(IOpcodeTableRegistry)],
+    ProvidesMany = [typeof(IGameSessionStateReader), typeof(BubbleFighter.Fantasy.Contracts.Cluster.IRemoteRoomMigrationEndpoint), typeof(IUdpTransportStatusRegistry), typeof(IPlazaFederationEndpoint), typeof(IMatchCapabilityDirectory), typeof(IRoomAdminDirectory), typeof(IRoomPeerRoster), typeof(IPublishedRoomDirectory)],
+    ConditionalProvides = [], ConditionalProvidesMany = [typeof(IRoomAdmissionDirectory), typeof(IMigrationHomeAdmission), typeof(IMigrationRoomRecovery), typeof(IGameCommandInput)])]
+public sealed partial class InGamePlugin : IPlugin
 {
     /// <inheritdoc />
     public ValueTask ActivateAsync(IPluginContext context, CancellationToken cancellationToken)
@@ -100,6 +131,8 @@ public sealed class InGamePlugin : IPlugin
         });
         context.Effect(context.Services.RegisterMany<IMatchCapabilityDirectory>(registry));
         context.Effect(context.Services.RegisterMany<IRoomAdminDirectory>(registry));
+        context.Effect(context.Services.RegisterMany<IRoomPeerRoster>(registry));
+        context.Effect(context.Services.RegisterMany<IPublishedRoomDirectory>(registry));
         var chatRateLimit = new ChatRateLimit(options, context.Logger);
         context.Effect(chatRateLimit);
         context.Effect(context.Events.On<ConnectionClosedEvent>(chatRateLimit.OnConnectionClosed));
@@ -144,20 +177,59 @@ public sealed class InGamePlugin : IPlugin
             _ = PlaySenders.Required<PlazaPositionReceived>(context, game);
             _ = PlaySenders.Required<PlazaMenuReturnRequested>(context, game);
         }
+        if ((options.ScriptZombies || options.GhostZombies || options.ZombieEscape) && !Bound<RoundLoadReported>())
+            throw new ConfigException("Script zombie rules require native round loading bindings.");
         if (options.NativeMatchRelay && !Bound<RoundLoadReported>())
             throw new ConfigException("Native match relay requires a map-load binding and shared round handlers.");
+        if (options.RespawnDisabledModeIds.Length > 0)
+        {
+            if (!Bound<RoundLoadReported>())
+                throw new ConfigException("respawn_disabled_mode_ids requires a map-load binding and shared round handlers.");
+            if (!Bound<RoundSpawnAccepted>())
+                throw new ConfigException("respawn_disabled_mode_ids requires a native respawn request binding.");
+        }
         if (options.AiModeIds.Length > 0 && !(Bound<RoomAiAddRequested>() && Bound<RoomAiRemoveRequested>()))
             throw new ConfigException("ai_mode_ids requires the native AI add and remove bindings on the game protocol.");
         foreach (var key in options.AiPresets.Select(preset => preset.NicknameKey).Where(key => key.Length > 0).Distinct(StringComparer.Ordinal))
             if (!context.Services.TryGet<IGameText>(out var names) || names is null || !names.TryFormat("", key, out _))
                 throw new ConfigException($"ai_presets nickname_key '{key}' requires localization with a deployment-default translation.");
-        var rooms = new RoomFlow(registry, RoomSenders.Resolve(context, game), context.Logger, selection, characters,
+        var roomSenders = RoomSenders.Resolve(context, game);
+        var rooms = new RoomFlow(registry, roomSenders, context.Logger, selection, characters,
             options.PlazaCapacity, options, context.Lifetime,
             context.Services.TryGet<IGameText>(out var texts) ? texts : null,
             context.Services.TryGet<IPartyDirectory>(out var parties) ? parties : null,
-            context.Services.TryGet<IOnlinePlayers>(out var online) ? online : null);
+            context.Services.TryGet<IOnlinePlayers>(out var online) ? online : null,
+            context.Services.TryGet<BubbleFighter.Fantasy.Contracts.Cluster.IAccountMutationScopes>(out var mutations) ? mutations : null);
+        if (options.RoomAdmissionReservations)
+        {
+            if (!Bound<RoomJoinRequested>() || roomSenders.Entered is null || roomSenders.SeatUpdated is null || roomSenders.JoinRefused is null)
+                throw new ConfigException("room_admission_reservations requires native room join, entry, peer and refusal bindings.");
+            context.Effect(context.Services.RegisterMany<IRoomAdmissionDirectory>(rooms));
+        }
+        if (options.HomeMigrationAdmission)
+        {
+            if (!options.RoomAdmissionReservations || PlaySenders.Optional<MainMenuRoomOpened>(context, game) is null)
+                throw new ConfigException("home_migration_admission requires room_admission_reservations and a main-menu scene sender.");
+            context.Effect(context.Services.RegisterMany<IMigrationHomeAdmission>(rooms));
+            context.Effect(context.Services.RegisterMany<IMigrationRoomRecovery>(rooms));
+        }
+        var browsers = context.Services.GetAll<IRoomBrowser>().Where(browser => browser.ClientBuild == game.Split('/')[0]).ToArray();
+        if (browsers.Length > 1) throw new ConfigException("InGame requires at most one native room browser per build.");
+        rooms.Browser = browsers.SingleOrDefault();
+        var migration = new RoomMigrationEndpoint(game.Split('/')[0]);
+        context.Effect(migration);
+        context.Effect(context.Services.RegisterMany<BubbleFighter.Fantasy.Contracts.Cluster.IRemoteRoomMigrationEndpoint>(migration));
+        rooms.Migration = migration;
+        // The cluster row that shares the plaza starts after this one and binds the endpoint itself.
+        context.Effect(context.Services.RegisterMany<IPlazaFederationEndpoint>(new PlazaFederationEndpoint(game.Split('/')[0], rooms)));
         rooms.Modes = modes;
+        rooms.CommandAdmission = chatRateLimit.Admit;
         rooms.BindCommands(context, game, options.SharedChatCommands);
+        rooms.BindSessionState(context);
+        // The UDP rows read this row's room roster, so they start later and register their reporters here.
+        var udpStatus = new UdpTransportStatusRegistry(game);
+        context.Effect(context.Services.RegisterMany<IUdpTransportStatusRegistry>(udpStatus));
+        rooms.UdpStatus = udpStatus.Snapshot;
         context.Effect(() =>
         {
             if (!rooms.StopScenesAsync().Wait(TimeSpan.FromMilliseconds(options.RoomStopTimeoutMs)))
@@ -216,6 +288,7 @@ public sealed class InGamePlugin : IPlugin
             });
             context.Effect(context.Events.On<ConnectionClosedEvent>(matching.OnConnectionClosed));
             context.Effect(messages.On<RoomMatchRequested>(game, gate.Expect<RoomMatchRequested>(matching.HandleAsync, Menu, Plaza)));
+            context.Effect(messages.On<RoomMatchCancelled>(game, gate.Expect<RoomMatchCancelled>(matching.HandleCancelAsync, Menu, Plaza)));
         }
         if (Bound<RoomJoinRequested>())
             context.Effect(messages.On<RoomJoinRequested>(game, gate.Expect<RoomJoinRequested>(rooms.HandleJoinAsync, Menu, Plaza)));
@@ -227,6 +300,32 @@ public sealed class InGamePlugin : IPlugin
             context.Effect(messages.On<PlazaPositionReported>(game, gate.Expect<PlazaPositionReported>(rooms.HandlePlazaPositionAsync, Plaza)));
         if (Bound<PlazaMenuReturnRequested>())
             context.Effect(messages.On<PlazaMenuReturnRequested>(game, gate.Expect<PlazaMenuReturnRequested>(rooms.HandlePlazaMenuReturnAsync, Plaza, Room, SessionPhase.Match)));
+        if (options.PlazaRecruitment)
+        {
+            if (!Bound<PlazaRecruitmentRequested>())
+                throw new ConfigException("plaza_recruitment requires the build's native recruitment binding.");
+            rooms.ConfigurePlazaRecruitment(PlaySenders.Required<PlazaRecruitmentChanged>(context, game),
+                PlaySenders.Optional<PlazaRecruitmentTextReceived>(context, game),
+                PlaySenders.Optional<PlazaRecruitmentListReceived>(context, game),
+                PlaySenders.Optional<PlazaRecruitmentRejected>(context, game));
+            context.Effect(messages.On<PlazaRecruitmentRequested>(game, gate.Expect<PlazaRecruitmentRequested>(
+                (session, request, ct) => !request.Active || chatRateLimit.Admit(session, ct)
+                    ? rooms.HandlePlazaRecruitmentAsync(session, request, ct) : ValueTask.CompletedTask, Plaza)));
+            if (Bound<PlazaRecruitmentTextRequested>())
+                context.Effect(messages.On<PlazaRecruitmentTextRequested>(game, gate.Expect<PlazaRecruitmentTextRequested>(
+                    chatRateLimit.Wrap<PlazaRecruitmentTextRequested>(rooms.HandlePlazaRecruitmentTextAsync), Plaza)));
+            if (Bound<PlazaRecruitmentListRequested>())
+                context.Effect(messages.On<PlazaRecruitmentListRequested>(game, gate.Expect<PlazaRecruitmentListRequested>(
+                    chatRateLimit.Wrap<PlazaRecruitmentListRequested>(rooms.HandlePlazaRecruitmentListAsync), Menu, Plaza)));
+            context.Effect(context.Events.OnAsync<PartyPlazaMembershipChanged>((change, ct) =>
+                change.Protocol == game ? rooms.RefreshPlazaPartyMembershipAsync(change, ct) : ValueTask.CompletedTask));
+        }
+        if (Bound<RoomInventoryChangeRequested>())
+        {
+            rooms.InventoryChanged = PlaySenders.Required<RoomInventoryChanged>(context, game);
+            context.Effect(messages.On<RoomInventoryChangeRequested>(game,
+                gate.Expect<RoomInventoryChangeRequested>(rooms.HandleInventoryChangeAsync, Room)));
+        }
         if (Bound<RoomReadyRequested>())
             context.Effect(messages.On<RoomReadyRequested>(game, gate.Expect<RoomReadyRequested>(rooms.HandleReadyAsync, Room)));
         if (Bound<RoomUiRefreshRequested>())
@@ -236,7 +335,7 @@ public sealed class InGamePlugin : IPlugin
             context.Effect(messages.On<RoomUiRefreshRequested>(game, gate.Expect<RoomUiRefreshRequested>(rooms.HandleRoomUiRefreshAsync, Room)));
         }
         if (Bound<RoomTeamChangeRequested>())
-            context.Effect(messages.On<RoomTeamChangeRequested>(game, gate.Expect<RoomTeamChangeRequested>(rooms.HandleTeamChangeAsync, Room)));
+            context.Effect(messages.On<RoomTeamChangeRequested>(game, gate.Expect<RoomTeamChangeRequested>(rooms.HandleTeamChangeAsync, Room, SessionPhase.Match)));
         if (Bound<RoomSettingsChangeRequested>())
             context.Effect(messages.On<RoomSettingsChangeRequested>(game, gate.Expect<RoomSettingsChangeRequested>(rooms.HandleSettingsChangeAsync, Room)));
         if (Bound<RoomRoundSettingsChangeRequested>())
@@ -253,6 +352,12 @@ public sealed class InGamePlugin : IPlugin
         {
             context.Effect(messages.On<RoomChatSent>(game, rooms.HandleChatAsync));
             context.Effect(messages.Use<RoomChatSent>(game, chatRateLimit.Filter<RoomChatSent>));
+        }
+        if (Bound<RoomSessionChatSent>())
+        {
+            _ = PlaySenders.Required<RoomSessionChatReceived>(context, game);
+            context.Effect(messages.On<RoomSessionChatSent>(game, rooms.HandleSessionChatAsync));
+            context.Effect(messages.Use<RoomSessionChatSent>(game, chatRateLimit.Filter<RoomSessionChatSent>));
         }
         if (Bound<RoomAiAddRequested>())
             context.Effect(messages.On<RoomAiAddRequested>(game, gate.Expect<RoomAiAddRequested>(rooms.HandleAiAddAsync, Room)));
@@ -272,11 +377,18 @@ public sealed class InGamePlugin : IPlugin
         {
             if (options.NativeMatchRelay && !Bound<MatchConnectionReported>())
                 throw new ConfigException("Native match relay requires a game-side connection-report binding.");
+            if (options.BombRoundSeries && (!Bound<RoundBombStateReported>() || !Bound<RoundBombMissionOverReported>()))
+                throw new ConfigException("bomb_round_series requires the bomb state and mission-result bindings.");
             // The round follows the start: loading barrier, countdown, start, and the gameplay feed.
             // The result surface resolves inside the flow from the same dialect's encoders, so a
             // build without one keeps the plain end path.
             var round = new RoundFlow(registry, options, RoundSenders.Resolve(context, game), context.Logger, context.Lifetime,
-                rooms.ReturnToRoomAsync, context);
+                rooms.ReturnToRoomAsync, context, continueSeries: rooms.ContinueSeriesAsync);
+            context.Effect(context.Events.OnAsync<EquipmentViewPublished>(async (publication, ct) =>
+            {
+                using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, context.Lifetime);
+                await round.OnEquipmentViewPublishedAsync(publication, linked.Token).ConfigureAwait(false);
+            }));
             context.Services.TryGet<BubbleFighter.Fantasy.Contracts.Progress.ITutorialStageStore>(out var tutorialStages);
             // Tutorial stage clears are listed by MapMeta stageNum; without client data no clear is recorded.
             var stageTable = context.Services.TryGet<BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore>(out var tutorialData) && tutorialData is not null
@@ -304,18 +416,96 @@ public sealed class InGamePlugin : IPlugin
                 var entered = PlaySenders.Required<InitialTutorialEntered>(context, game);
                 context.Effect(messages.On<InitialTutorialRequested>(game,
                     gate.Expect<InitialTutorialRequested>((session, request, ct) => rooms.HandleInitialTutorialAsync(session, request, entered, ct), Menu)));
-                context.Effect(messages.On<InitialTutorialExitRequested>(game,
-                    gate.Expect<InitialTutorialExitRequested>(rooms.HandleInitialTutorialExitAsync, Room, SessionPhase.Match)));
             }
+            if (Bound<RoundStageResultReported>())
+                context.Effect(messages.On<RoundStageResultReported>(game,
+                    gate.Expect<RoundStageResultReported>((session, request, ct) => rooms.PlaysSoloTutorial(session)
+                        ? rooms.HandleInitialTutorialExitAsync(session, new InitialTutorialExitRequested(), ct)
+                        : round.HandleStageResultAsync(session, request, ct), Room, SessionPhase.Match)));
             if (Bound<InitialTutorialNpcReported>())
             {
                 var npc = PlaySenders.Required<InitialTutorialNpcAcknowledged>(context, game);
                 context.Effect(messages.On<InitialTutorialNpcReported>(game,
                     (session, request, ct) => rooms.HandleInitialTutorialNpcAsync(session, request, npc, ct)));
             }
+            if (Bound<RoundNpcReported>())
+            {
+                // The solo tutorial answers only its host; any other round answers through the shared horde flow.
+                var npc = PlaySenders.Required<RoundNpcAcknowledged>(context, game);
+                context.Effect(messages.On<RoundNpcReported>(game, (session, request, ct) => rooms.PlaysSoloTutorial(session)
+                    ? rooms.HandleTutorialNpcAsync(session, request, npc, ct)
+                    : round.HandleNpcAsync(session, request, npc, ct)));
+            }
+            if (Bound<RoundBombStateReported>())
+            {
+                // The bomb-mission round relays the acting client's own state change to every member.
+                var bomb = PlaySenders.Required<RoundBombStateChanged>(context, game);
+                context.Effect(messages.On<RoundBombStateReported>(game,
+                    (session, request, ct) => round.HandleBombStateAsync(session, request, bomb, ct)));
+            }
+            if (Bound<RoundBombMissionOverReported>())
+                context.Effect(messages.On<RoundBombMissionOverReported>(game, round.HandleBombMissionOverAsync));
+            if (Bound<RoundPortalMoveRequested>())
+            {
+                var portal = PlaySenders.Required<RoundPortalMoved>(context, game);
+                context.Effect(messages.On<RoundPortalMoveRequested>(game,
+                    (session, request, ct) => round.HandlePortalMoveAsync(session, request, portal, ct)));
+            }
+            if (Bound<RoundCharacterFormRequested>())
+            {
+                var form = PlaySenders.Required<RoundCharacterFormChanged>(context, game);
+                context.Effect(messages.On<RoundCharacterFormRequested>(game,
+                    (session, request, ct) => round.HandleCharacterFormAsync(session, request, form, ct)));
+            }
+            if (Bound<RoundCaptainDropped>())
+            {
+                // Mode 20 chooses and replaces Captains only where the build's exchange is mounted.
+                round.CaptainAppointed = PlaySenders.Required<RoundCaptainAppointed>(context, game);
+                context.Effect(messages.On<RoundCaptainDropped>(game, round.HandleCaptainDroppedAsync));
+            }
+            if (Bound<RoundExtremeRacingGoalReported>())
+            {
+                // Mode 24 runs its race rounds only where the build's exchange is mounted.
+                round.ExtremeRacing = new(PlaySenders.Required<RoundExtremeRacingTimerChanged>(context, game),
+                    PlaySenders.Required<RoundExtremeRacingRoundChanged>(context, game),
+                    PlaySenders.Required<RoundExtremeRacingRecordsUpdated>(context, game));
+                context.Effect(messages.On<RoundExtremeRacingGoalReported>(game, round.HandleExtremeRacingGoalAsync));
+            }
+            if ((options.ScriptZombies || options.GhostZombies || options.ZombieEscape) != Bound<RoundScriptZombieConversionReported>())
+                throw new ConfigException("Script zombie conversion must be enabled on both the in-game and room dialect rows.");
+            var zombieModes = context.Services.GetAll<IScriptZombieModes>().Where(binding => binding.Protocol == game).ToArray();
+            var expectedZombieModes = new HashSet<GameModeId>();
+            if (options.ScriptZombies) expectedZombieModes.Add(GameModeId.Zombie);
+            if (options.GhostZombies) expectedZombieModes.Add(GameModeId.ZombieGhost);
+            if (options.ZombieEscape) expectedZombieModes.Add(GameModeId.ZombieEscape);
+            if (zombieModes.Length != (expectedZombieModes.Count == 0 ? 0 : 1)
+                || zombieModes.Length == 1 && !zombieModes[0].Modes.SetEquals(expectedZombieModes))
+                throw new ConfigException("Script zombie mode options must agree between the in-game and room dialect rows.");
+            if (options.ScriptZombies || options.GhostZombies || options.ZombieEscape)
+            {
+                round.ScriptZombieTeams = PlaySenders.Required<RoundScriptZombieTeamChanged>(context, game);
+                round.ScriptZombieConversions = PlaySenders.Required<RoundScriptZombieConversionReported>(context, game);
+                rooms.ScriptZombiesStarting = round.InitializeScriptZombies;
+                round.ZombieEscapeEnabled = options.ZombieEscape;
+                if (options.ZombieEscape) rooms.ZombieEscapeStarting = round.InitializeZombieEscape;
+                rooms.ScriptZombieConversionRequested = round.HandleScriptZombieConversionAsync;
+                context.Effect(messages.On<RoundScriptZombieConversionReported>(game, round.HandleScriptZombiePeerAsync));
+                if (context.Services.GetAll<IInboundMessageBinding<RoundScriptZombieConversionReported>>()
+                    .Any(binding => binding.Protocol == options.RelayProtocol))
+                    context.Effect(messages.On<RoundScriptZombieConversionReported>(options.RelayProtocol, round.HandleScriptZombiePeerAsync));
+            }
+            MountFinalZone(context, options, round);
+            MountMapScripts(context, options, round);
+            context.Effect(messages.On<TutorialSelectionOpening>(game, rooms.HandleTutorialSelectionOpeningAsync));
             context.Effect(messages.On<TutorialRoundOpened>(game, tutorials.OpenAsync));
             context.Effect(messages.On<TutorialRoundClosed>(game, tutorials.CloseAsync));
             context.Effect(messages.On<TutorialStageCleared>(game, tutorials.ClearedAsync));
+            if (Bound<TutorialScoreReported>())
+            {
+                var score = PlaySenders.Required<TutorialScoreUpdated>(context, game);
+                context.Effect(messages.On<TutorialScoreReported>(game,
+                    (session, report, ct) => tutorials.ScoreAsync(session, report, score, ct)));
+            }
             if (options.CountedItemModeId > 0 && !Bound<RoundCountedItemUseRequested>())
                 throw new ConfigException("Counted cooperative items require a native use binding.");
             if (Bound<RoundCountedItemUseRequested>())
@@ -339,14 +529,14 @@ public sealed class InGamePlugin : IPlugin
             if (Bound<RoundRescueProgressReported>())
                 context.Effect(messages.On<RoundRescueProgressReported>(game, round.HandleRescueProgressAsync));
             rooms.SeatLeftDuringRound = round.OnSeatLeftAsync;
+            rooms.BeforeSeatLeaves = round.RecordDepartureAsync;
             rooms.TeamConvertedDuringRound = round.OnTeamConvertedAsync;
             round.RoundPlaying = rooms.ScheduleZombieKing;
             if (options.RandomSupplyItemKinds.Length > 0 && !Bound<RoundItemUseRequested>())
                 throw new ConfigException("Configured random supply kinds require a native item-use binding.");
-            // An immediate kind runs its effect through the direct item-effect sender (gspPveItemUsed); a build without
-            // that packet (cn-279) cannot offer one.
+            // The dialect confirms an immediate kind through the build's own native item-effect consumer.
             if (options.ImmediateSupplyItemKinds.Length > 0 && PlaySenders.Optional<RoundCountedItemUsed>(context, game) is null)
-                throw new ConfigException("immediate_supply_item_kinds require the build's direct item-effect sender (gspPveItemUsed).");
+                throw new ConfigException("immediate_supply_item_kinds require the build's direct item-effect sender.");
             if (Bound<RoundSuppliesReported>())
             {
                 _ = PlaySenders.Required<RoundSupplyCreated>(context, game);
@@ -354,6 +544,23 @@ public sealed class InGamePlugin : IPlugin
                 context.Effect(messages.On<RoundSuppliesReported>(game, round.HandleSuppliesReportedAsync));
                 context.Effect(messages.On<RoundSupplyPickupRequested>(game, round.HandleSupplyPickupAsync));
                 context.Effect(messages.On<RoundSupplyDropRequested>(game, round.HandleSupplyDropAsync));
+            }
+            if (options.ItemModeFallbackPointCount > 0)
+            {
+                if (!Bound<RoundSuppliesReported>() || !Bound<RoundSupplyPickupRequested>() || !Bound<RoundItemUseRequested>()
+                    || !context.Services.TryGet<BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore>(out var itemMapData)
+                    || itemMapData is null)
+                    throw new ConfigException("item_mode_fallback_point_count requires supply/item bindings and client map data.");
+                round.ConfigureItemModeFallback(itemMapData);
+            }
+            if (Bound<RoundWeaponDropRequested>())
+            {
+                _ = PlaySenders.Required<RoundWeaponCreated>(context, game);
+                _ = PlaySenders.Required<RoundWeaponPicked>(context, game);
+                if (!Bound<RoundWeaponPickupRequested>())
+                    throw new ConfigException("Weapon drops require a native pickup binding.");
+                context.Effect(messages.On<RoundWeaponDropRequested>(game, round.HandleWeaponDropAsync));
+                context.Effect(messages.On<RoundWeaponPickupRequested>(game, round.HandleWeaponPickupAsync));
             }
             if (Bound<RoundLucciDropRequested>())
             {
@@ -387,6 +594,8 @@ public sealed class InGamePlugin : IPlugin
             }
             if (options.NativeItemSlotCount > 1 && !Bound<RoundItemSlotSwitchRequested>())
                 throw new ConfigException("Multiple native item slots require a slot-switch binding.");
+            if (options.RenewFullSlotSupplies && (!Bound<RoundSupplyPickupRequested>() || !Bound<RoundItemUseRequested>()))
+                throw new ConfigException("Full-slot supply renewal requires pickup and item-use bindings.");
             if (options.LotteryModes.Length > 0 && !Bound<RoundLotteryRequested>())
                 throw new ConfigException("Reward cards require a native selection binding.");
             if (Bound<RoundLotteryRequested>())
@@ -409,16 +618,11 @@ public sealed class InGamePlugin : IPlugin
                 context.Effect(messages.On<RoundFinishingBlowReported>(game, round.HandleFinishingBlowReportedAsync));
             if (Bound<RoundFeedSent>())
                 context.Effect(messages.On<RoundFeedSent>(game, round.HandleFeedAsync));
-            if (options.NativeLifeModeIds.Length > 0 && !(Bound<RoundLifeReported>() && Bound<RoundResetRequested>()))
-                throw new ConfigException("native_life_mode_ids requires a dialect that publishes the life reports and the reset request.");
+            if ((options.NativeLifeModeIds.Length > 0 || options.NativeLifeEveryMode) && !(Bound<RoundLifeReported>() && Bound<RoundSpawnAccepted>()
+                && PlaySenders.Optional<RoundPlayerRespawned>(context, game) is not null))
+                throw new ConfigException("native_life_mode_ids and native_life_every_mode require a dialect that publishes the life reports, the respawn request and its grant.");
             if (Bound<RoundLifeReported>())
                 context.Effect(messages.On<RoundLifeReported>(game, round.HandleLifeReportedAsync));
-            if (Bound<RoundResetRequested>())
-            {
-                var resetGranted = PlaySenders.Required<RoundResetGranted>(context, game);
-                context.Effect(messages.On<RoundResetRequested>(game,
-                    (session, request, ct) => round.HandleResetRequestedAsync(session, request, resetGranted, ct)));
-            }
             if (Bound<RoundMovementReported>())
             {
                 var movementSender = PlaySenders.Required<RoundMovementRelayed>(context, game);

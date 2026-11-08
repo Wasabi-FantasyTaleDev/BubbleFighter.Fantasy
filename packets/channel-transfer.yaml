@@ -1,0 +1,34 @@
+version: 1
+structs:
+  # kr-812 sub_840500 and kr-812 sub_8104E0 write/read one word then NetAddress;
+  # kr-812 sub_5026C0 and kr-812 sub_5026F0 write/read its IPv4 word and port without padding.
+  # kr-812 sub_81AB20 accepts result zero and passes this endpoint to kr-812 sub_81B680,
+  # which opens a pending game connection while retaining the current connection.
+  # This records the baseline body only; it does not enable transfer or prove another build's consumer.
+  ChannelMoveOffer:
+    - result: u32
+      offset: 4
+    - ipv4_word: u32
+      offset: 12
+    - port: u16
+      offset: 16
+
+  # kr-1256 sub_9A6440 reads these four scalars directly into locals, accepts result zero,
+  # and opens pending with migration flag set; the last word has no proven object offset or purpose.
+  # cn-774 sub_BA61D0 and tw-454 sub_A83A50 consume the same fourteen-byte move offer.
+  ChannelMoveOffer@kr-1256:
+    - result: u32
+    - ipv4_word: u32
+    - port: u16
+    - unknown_10: u32 # Wire offset 10; no stable destination object offset is established.
+
+  # kr-812 sub_840530 and kr-812 sub_6DB1B0 write/read two words; kr-812 sub_8399F0 stamps gcpReqMoveInto.
+  # kr-812 sub_813060 fills the first from the retained security store and the second
+  # from a stage condition. Neither word is evidence of a fresh authentication credential.
+  # kr-1256 sub_99DD00 writes the retained user number and a boolean stage condition on C2S 54.
+  # kr-1256 sub_99D1A0 sets migration mode independently of whether the retained number is zero.
+  ChannelMoveIntoRequest:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8

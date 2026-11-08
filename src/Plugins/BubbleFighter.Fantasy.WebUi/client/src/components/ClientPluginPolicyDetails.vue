@@ -45,7 +45,7 @@ const unsaved = computed(() => drafts.value.filter(draft => draft.original === n
 function addDraft() { drafts.value.push({ key: 'new-' + nextDraft++, original: null, type: '', version: '', sources: [], builds: [], added: [] }) }
 function editRule(rule) {
   if (draftFor(rule.id)) return
-  drafts.value.push({ key: rule.id, original: rule.id, type: rule.type, version: rule.version || '', sources: [...(rule.sources || [])], builds: [...rule.builds], added: [] })
+  drafts.value.push({ key: rule.id, original: rule.id, type: rule.type, version: rule.version || '', sources: [...(rule.sources || [])], builds: [...rule.builds], defaultSelected: rule.defaultSelected, added: [] })
 }
 function dropDraft(draft) { drafts.value = drafts.value.filter(item => item !== draft); delete errors[draft.key] }
 
@@ -163,6 +163,7 @@ const ruleTone = rule => rule.type === 'require' ? 'success' : ['recommend', 'la
                   <NoahSelect v-model="item.draft.type" class="policy-type-select" :options="ruleTypes" :aria-label="t('plugins.policy.ruleNumber', { number: index + 1 })" />
                   <NoahInput v-if="field(item.draft) === 'version'" v-model="item.draft.version" class="policy-version-input" :aria-label="typeLabel(item.draft.type)" :aria-invalid="!!errors[item.draft.key]" placeholder="0.2.0" required />
                   <NoahButton v-if="field(item.draft) === 'sources'" class="policy-source-button" variant="primary" @click="openSources(item.draft)">{{ t('plugins.policy.sourcesButton') }}<span v-if="item.draft.sources.length"> ({{ item.draft.sources.length }})</span></NoahButton>
+                  <label v-if="item.draft.type === 'recommend'"><input v-model="item.draft.defaultSelected" type="checkbox" :disabled="busy"> {{ t('plugins.policy.defaultSelected') }}</label>
                 </div>
                 <button type="button" class="policy-build-scope" @click="openBuilds(item.draft)"><span>{{ t('plugins.policy.builds') }}</span><strong>{{ buildSummary(item.draft.builds) }}</strong></button>
                 <p v-if="errors[item.draft.key]" class="policy-form-error" role="alert">{{ errors[item.draft.key] }}</p>

@@ -93,7 +93,24 @@ internal static class LoginMessageCodec
             PacketLayoutContract.RequireFields(tables, build, "LoginReply", "Login message", ("unknown_96", "wstr"));
         if (reply.Any(field => field.Name == "unknown_48"))
             PacketLayoutContract.RequireFields(tables, build, "LoginReply", "Login message", ("unknown_48", "wstr"));
+        if (reply.Any(field => field.Name == "channel_id"))
+            PacketLayoutContract.RequireFields(tables, build, "LoginReply", "Login message", ("channel_id", "u32"));
     }
+
+    /// <summary>
+    /// Tells whether this build's accepted login reply carries the player's channel word. The modern table
+    /// reply always does (kr-1256 <c>sub_9A2770</c>, <c>ServerConnection+2508</c>); the legacy table reply does
+    /// where the build's <c>LoginReply</c> names <c>channel_id</c> (kr-812 <c>sub_818680</c>,
+    /// <c>ServerConnection+2432</c>). The cn-324/cn-279 reply and the response pair have no such word, so those
+    /// clients take their channel only from a move reply.
+    /// </summary>
+    /// <param name="tables">The row's packet tables.</param>
+    /// <param name="build">The build whose reply is checked.</param>
+    /// <param name="values">The build's login values, which select the reply family.</param>
+    /// <returns>True when a configured login channel reaches the client in the reply.</returns>
+    internal static bool CarriesChannel(PacketTables tables, string build, LoginValues values) =>
+        values.Reply == LoginValues.ModernReply
+        || (!values.Shape.LoginResponse && tables.Resolve(build, "LoginReply").Any(field => field.Name == "channel_id"));
 
     /// <summary>
     /// Reads <c>gcpReqLogin</c>: <c>wstr account, wstr unknown1, wstr unknown2, u32 count,
@@ -149,11 +166,17 @@ internal static class LoginMessageCodec
     /// <param name="shape">The build's login layout.</param>
     /// <param name="tables">The packet structures loaded for this row.</param>
     /// <param name="build">The nearest build named in the packet tables.</param>
+    /// <param name="channel">
+    /// The channel written to the reply's <c>channel_id</c> word where the build's table has one (kr-812
+    /// <c>sub_818680</c> stores it at <c>ServerConnection+2432</c>); zero leaves the client on its own default.
+    /// A table without the word ignores it.
+    /// </param>
     /// <returns>The S2C 3 body.</returns>
-    public static byte[] WriteAccepted(LoginAccepted accepted, LoginShape shape, PacketTables tables, string build) => shape.LoginResponse
+    public static byte[] WriteAccepted(LoginAccepted accepted, LoginShape shape, PacketTables tables, string build,
+        int channel = 0) => shape.LoginResponse
         ? WriteModernAccepted(accepted)
         : Write(tables, build, 0, accepted.Account, accepted.UserNumber, accepted.Nickname, accepted.CharacterItemId - CharacterItemBase,
-            accepted.ServerTime.ToOADate(), "LOCAL");
+            accepted.ServerTime.ToOADate(), "LOCAL", channel);
 
     /// <summary>
     /// Writes an accepted <c>LoginResponse</c> + <c>LoginNational</c> reply: <c>i32 result 0,
@@ -194,7 +217,7 @@ internal static class LoginMessageCodec
     {
         if (shape.LoginResponse)
             return WriteModernRejected(rejected);
-        return Write(tables, build, RejectionResult(rejected), "", 0, "", 0, 0, "");
+        return Write(tables, build, RejectionResult(rejected), "", 0, "", 0, 0, "", 0);
     }
 
     /// <summary>
@@ -261,7 +284,7 @@ internal static class LoginMessageCodec
     };
 
     private static byte[] Write(PacketTables tables, string build, int result, string account, int userNumber,
-        string nickname, int characterType, double serverTime, string unknownString) =>
+        string nickname, int characterType, double serverTime, string unknownString, int channel) =>
         PacketCodec.Write(tables, build, "LoginReply", new Dictionary<string, object?>
         {
             ["result"] = result,
@@ -269,6 +292,7 @@ internal static class LoginMessageCodec
             ["user_number"] = userNumber,
             ["nickname"] = nickname,
             ["character_type"] = characterType,
+            ["channel_id"] = channel,
             ["server_time"] = serverTime,
             ["unknown_96"] = unknownString,
             ["unknown_48"] = unknownString,

@@ -15,7 +15,7 @@ namespace BubbleFighter.Fantasy.Dialect.Rooms;
 /// names a result hands the waiting room.
 /// </summary>
 internal sealed class RoomCommandsBinding(string protocol, IOpcodeTable table, PacketTables packets, string build, ILogger logger,
-    bool roundsBound = false)
+    bool roundsBound = false, bool roomKicking = false, bool scriptZombies = false)
     : IInboundMessageBinding<RoomCreateRequested>, IInboundMessageBinding<RoomJoinRequested>,
       IInboundMessageBinding<RoomLeaveRequested>, IInboundMessageBinding<RoomReadyRequested>,
       IInboundMessageBinding<RoomTeamChangeRequested>, IInboundMessageBinding<RoomStartUnavailableRequested>,
@@ -26,7 +26,8 @@ internal sealed class RoomCommandsBinding(string protocol, IOpcodeTable table, P
       IInboundMessageBinding<RoomMasterChangeRequested>, IMessageSender<RoomMasterChangeReplied>,
       IMessageSender<RoomSettingsChanged>, IInboundMessageBinding<RoomRoundSettingsChangeRequested>,
       IMessageSender<RoomSeatLockChanged>, IMessageSender<RoomUiChanged>, IMessageSender<RoomProbeAcknowledged>,
-      IInboundMessageBinding<RoomSettingsChangeRequested>
+      IInboundMessageBinding<RoomSettingsChangeRequested>, IInboundMessageBinding<RoomKickRequested>,
+      IMessageSender<RoomMemberKicked>
 {
     private static readonly string[] Structures =
     [
@@ -66,7 +67,15 @@ internal sealed class RoomCommandsBinding(string protocol, IOpcodeTable table, P
             PacketLayoutContract.RequireEmpty(packets, build, "RoundStageReset", "Round return");
         }
         _s2c = RoomRoutes.Preflight(table, packets, build, Structures,
-            roundsBound ? [.. ServerNames, .. _roundReturnNames] : ServerNames);
+            [.. ServerNames, .. _roundReturnNames, .. (roomKicking ? new[] { "gspRepKickFromSession" } : [])]);
+        if (roomKicking)
+        {
+            if (table.Find(PacketDirection.ClientToServer, "gcpReqKickFromSession") is null)
+                throw new ConfigException("Room kicking requires C2S gcpReqKickFromSession.");
+            PacketLayoutContract.RequireFields(packets, build, "RoomKickRequest", "Room kicking", ("nickname", "wstr"));
+            PacketLayoutContract.RequireFields(packets, build, "RoomMemberKicked", "Room kicking",
+                ("by_nickname", "wstr"), ("nickname", "wstr"), ("result", "u32"));
+        }
         // The waiting-room requests and the session projection state their own contracts; the structures this
         // binding writes directly are checked here, field by field with the exact types their writers size:
         // the waiting dialog's state word (kr-1256 sub_858250 opens the wall on 0), the team label's seat and
@@ -144,12 +153,19 @@ internal sealed class RoomCommandsBinding(string protocol, IOpcodeTable table, P
         context.Effect(context.Services.RegisterMany<IMessageSender<RoomProbeAcknowledged>>(this));
         context.Effect(context.Services.RegisterMany<IInboundMessageBinding<RoomMasterChangeRequested>>(this));
         context.Effect(context.Services.RegisterMany<IMessageSender<RoomMasterChangeReplied>>(this));
+        if (roomKicking)
+        {
+            context.Effect(context.Services.RegisterMany<IInboundMessageBinding<RoomKickRequested>>(this));
+            context.Effect(context.Services.RegisterMany<IMessageSender<RoomMemberKicked>>(this));
+            Bind(context, "gcpReqKickFromSession", body => new RoomKickRequested(
+                (string)PacketCodec.ReadScalars(packets, build, "RoomKickRequest", body)["nickname"]));
+        }
 
         Bind(context, "gcpReqCreateSession", body => RoomProjection.Create(packets, build, body));
         Bind(context, "gcpReqJoinSession", body => RoomRequests.ReadJoin(packets, build, body));
         Bind(context, "gcpReqLeaveSession", body => { RoomRoutes.RequireEmpty(body, "C2S gcpReqLeaveSession"); return new RoomLeaveRequested(); });
         Bind(context, "gcpRoomReqReadyStatus", body => RoomRequests.ReadReady(packets, build, body));
-        Bind(context, "gcpRoomChangeTeam", body => RoomRequests.ReadTeamChange(packets, build, body));
+        Bind(context, "gcpRoomChangeTeam", body => RoomRequests.ReadTeamChange(packets, build, body, scriptZombies));
         Bind(context, "gcpRoomSendChatModuleMsg", body => RoomRequests.ReadChat(packets, build, body));
         Bind(context, "gcpRoomReqOpenCloseSlot", body => RoomRequests.ReadSeatLock(packets, build, body));
         Bind(context, "gcpRoomReqChangeMaster", body => new RoomMasterChangeRequested(
@@ -184,8 +200,8 @@ internal sealed class RoomCommandsBinding(string protocol, IOpcodeTable table, P
         var self = room.Seats.Single(seat => seat.Slot == message.YourSlot);
         var profiles = RoomProjection.Members(room);
         var setting = RoomProjection.Session(packets, build, room);
-        if (message.Reason == RoomEntryReason.Joined && (table.Find(PacketDirection.ServerToClient, "gspRoomWaitingDialog_")
-            ?? table.Find(PacketDirection.ServerToClient, "Unknown128")) is { } waitingDialog)
+        if (message.Reason == RoomEntryReason.Joined
+            && table.Find(PacketDirection.ServerToClient, "gspNotifyMatch") is { } waitingDialog)
             await session.SendAsync(waitingDialog, PacketCodec.Write(packets, build, "RoomWaitingDialog", new Dictionary<string, object?> { ["state"] = 0 }), ct).ConfigureAwait(false);
         await session.SendAsync(S2C("gspGotoRoom"), RoomRecords.Install(packets, build, setting,
             profiles, room.MasterSlot, message.YourSlot, message.PartyTransition, session, _texts), ct).ConfigureAwait(false);
@@ -240,6 +256,10 @@ internal sealed class RoomCommandsBinding(string protocol, IOpcodeTable table, P
         Send(session, "gspRoomRepChangeMaster", "RoomMasterChangeReply",
             new() { ["nickname"] = message.Nickname, ["result"] = message.Result }, ct);
 
+    public ValueTask SendAsync(ISession session, RoomMemberKicked message, CancellationToken ct) =>
+        Send(session, "gspRepKickFromSession", "RoomMemberKicked",
+            new() { ["by_nickname"] = message.ByNickname, ["nickname"] = message.Nickname, ["result"] = 0 }, ct);
+
     public ValueTask SendAsync(ISession session, RoomSettingsChanged message, CancellationToken ct)
     {
         var opcode = _settingsReply
@@ -279,7 +299,7 @@ internal sealed class RoomCommandsBinding(string protocol, IOpcodeTable table, P
         ["users"] = room.Seats.Select(seat => new Dictionary<string, object?>
         {
             ["nickname"] = RoomNames.Resolve(seat.Nickname, seat.Ai?.NicknameKey ?? "", recipient, _texts),
-            ["level"] = seat.Level,
+            ["level"] = NativeDisplayLevel.Project(packets, build, seat.Level),
         }).ToArray(),
     });
     private async ValueTask PublishViewAsync(ISession session, int userNum, int characterId,

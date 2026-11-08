@@ -16,6 +16,7 @@ public sealed partial class MySqlPlayerRepository
         ArgumentOutOfRangeException.ThrowIfZero(colorIndex);
         await using var db = await connections.OpenAsync(ct).ConfigureAwait(false);
         await using var tx = await db.BeginTransactionAsync(ct).ConfigureAwait(false);
+        if (authority is not null) await authority.VerifyAsync(db, tx, userNum, ct).ConfigureAwait(false);
         var current = await db.QuerySingleOrDefaultAsync<int?>(new CommandDefinition(
             "SELECT color_index FROM players WHERE user_num=@userNum FOR UPDATE",
             new { userNum }, tx, cancellationToken: ct)).ConfigureAwait(false)

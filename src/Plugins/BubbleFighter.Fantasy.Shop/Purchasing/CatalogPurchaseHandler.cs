@@ -75,6 +75,7 @@ internal sealed class CatalogPurchaseHandler(ShopOptions options, ShopCatalog ca
         }
 
         ShopPurchaseResult? result;
+        var refusal = ShopPurchaseRefusal.Unspecified;
         try
         {
             result = await purchaser.CommitOfferAsync(session, player.Identity.UserNum, offer, ct).ConfigureAwait(false);
@@ -84,12 +85,13 @@ internal sealed class CatalogPurchaseHandler(ShopOptions options, ShopCatalog ca
             logger.LogWarning("Purchase {Key} refused for player {Player}: {Reason}",
                 request.Key, player.Identity.UserNum, ex.Message);
             result = null;
+            refusal = ex.Refusal;
         }
 
         if (result is not null)
             await state.SendAsync(session, new(player.Identity, result.Wallet, result.Grants, false), ct)
                 .ConfigureAwait(false);
         // A send failure after commit propagates and closes the connection; it never retries the charge.
-        await reply.SendAsync(session, new(request.Key, result is not null), ct).ConfigureAwait(false);
+        await reply.SendAsync(session, new(request.Key, result is not null) { Refusal = refusal }, ct).ConfigureAwait(false);
     }
 }

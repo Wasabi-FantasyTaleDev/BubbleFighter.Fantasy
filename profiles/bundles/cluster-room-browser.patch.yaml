@@ -1,0 +1,8 @@
+# Optional native browsing; directory visibility does not grant remote room admission.
+# Mount one browser per build after configuring cluster.room-directory for that build.
+- insert:
+    - id: cluster-room-browser
+      plugin: cluster.room-browser
+      config:
+        node_id: "${BFF_CLUSTER_NODE_ID}"
+        client_build: kr-1256

@@ -9,6 +9,13 @@ public interface ILauncherTicketService
     /// <summary>Consumes a valid build-bound ticket with its user-selected UI language; older providers return an unspecified language.</summary>
     LauncherTicketIdentity? RedeemIdentity(string ticket, string build) =>
         Redeem(ticket, build) is { } username ? new(username) : null;
+
+    /// <summary>Consumes a build-bound ticket through the configured authority without blocking a network reader thread.</summary>
+    ValueTask<LauncherTicketIdentity?> RedeemIdentityAsync(string ticket, string build, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(RedeemIdentity(ticket, build));
+    }
 }
 
 /// <summary>The account, optional user UI language and optional launch authenticated by one launch ticket.</summary>

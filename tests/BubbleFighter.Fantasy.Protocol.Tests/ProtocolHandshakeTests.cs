@@ -9,6 +9,9 @@ using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Net;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Kernel;
+using BubbleFighter.Fantasy.Contracts.Launcher;
+using BubbleFighter.Fantasy.Contracts.Lobby;
+using BubbleFighter.Fantasy.Contracts.Sessions;
 using BubbleFighter.Fantasy.Protocol;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -24,6 +27,9 @@ public sealed class ProtocolHandshakeTests
     /// <summary>Shared sink filled by <see cref="HarnessPlugin"/> during activation.</summary>
     internal sealed class HarnessSink
     {
+        public readonly Tickets Tickets = new();
+        public readonly ConcurrentQueue<MoveIntoRequested> Moves = new();
+        public IPacketRouter? Packets;
         public ISessionRegistry? Sessions;
         public IConnectionProtocolRegistry? Protocols;
         public readonly List<int> MismatchReported = [];
@@ -32,7 +38,8 @@ public sealed class ProtocolHandshakeTests
     }
 
     /// <summary>Captures registries and handshake events for one host start.</summary>
-    [Plugin("test.protocol-harness", Requires = [typeof(ISessionRegistry), typeof(IConnectionProtocolRegistry)])]
+    [Plugin("test.protocol-harness", Requires = [typeof(ISessionRegistry), typeof(IConnectionProtocolRegistry), typeof(IPacketRouter)],
+        Provides = [typeof(ILauncherTicketService)])]
     public sealed class HarnessPlugin : IPlugin
     {
         /// <summary>The sink the next activation writes into.</summary>
@@ -43,6 +50,8 @@ public sealed class ProtocolHandshakeTests
         {
             var sink = Current ?? throw new InvalidOperationException("HarnessPlugin.Current is unset.");
             sink.Sessions = context.Services.Get<ISessionRegistry>();
+            sink.Packets = context.Services.Get<IPacketRouter>();
+            context.Effect(context.Services.Register<ILauncherTicketService>(sink.Tickets));
             sink.Protocols = context.Services.Get<IConnectionProtocolRegistry>();
             context.Effect(context.Events.On<ClientVersionMismatchEvent>(e =>
             {
@@ -141,22 +150,49 @@ public sealed class ProtocolHandshakeTests
         }
     }
 
+    /// <summary>Accepts a typed migration message without authorizing a connection, to exercise the real strict gate.</summary>
+    [Plugin("test.migration-dispatch", Requires = [typeof(IMessageRouter)])]
+    public sealed class MigrationDispatchPlugin : IPlugin
+    {
+        /// <inheritdoc />
+        public ValueTask ActivateAsync(IPluginContext context, CancellationToken cancellationToken)
+        {
+            var sink = HarnessPlugin.Current ?? throw new InvalidOperationException("Migration test sink is unset.");
+            context.Effect(context.Services.Get<IMessageRouter>().For(context).On<MoveIntoRequested>("kr-1256/game",
+                (session, message, ct) =>
+                {
+                    sink.Moves.Enqueue(message);
+                    return ValueTask.CompletedTask;
+                }));
+            return ValueTask.CompletedTask;
+        }
+    }
+
     private sealed class ProtocolHarness : IAsyncDisposable
     {
         private readonly PluginHost _host;
         private readonly HarnessSink _sink;
 
-        private ProtocolHarness(PluginHost host, HarnessSink sink)
+        private ProtocolHarness(PluginHost host, HarnessSink sink, string build)
         {
             _host = host;
             _sink = sink;
+            _build = build;
         }
 
-        public IConnectionProtocol Game => _sink.Protocols!.Resolve(ProtocolPlugin.GameProtocolName);
+        private readonly string _build;
 
-        public IConnectionProtocol Relay => _sink.Protocols!.Resolve(ProtocolPlugin.RelayProtocolName);
+        public IConnectionProtocol Game => _sink.Protocols!.Resolve(_build + "/game");
+
+        public IConnectionProtocol Relay => _sink.Protocols!.Resolve(_build + "/relay");
 
         public ISessionRegistry Sessions => _sink.Sessions!;
+
+        public IPacketRouter Packets => _sink.Packets!;
+
+        public Tickets Tickets => _sink.Tickets;
+
+        public ConcurrentQueue<MoveIntoRequested> Moves => _sink.Moves;
 
         public List<int> MismatchReported => _sink.MismatchReported;
 
@@ -164,12 +200,17 @@ public sealed class ProtocolHandshakeTests
 
         public List<PacketSentEvent> Sent => _sink.Sent;
 
-        public static async Task<ProtocolHarness> StartAsync(Dictionary<string, object?>? protocolExtras = null)
+        public static async Task<ProtocolHarness> StartAsync(Dictionary<string, object?>? protocolExtras = null, bool centerPrelogin = false, bool nativeMigration = false, string build = "kr-1256")
         {
             var sink = new HarnessSink();
             HarnessPlugin.Current = sink;
-            var opcodeTable = Path.Combine(AppContext.BaseDirectory, "opcodes.yaml");
-            var protocolConfig = new Dictionary<string, object?> { ["opcode_table_path"] = opcodeTable };
+            var root = Directory.GetParent((string)TestWireDialects.MessagesConfig()["packets_directory"]!)!.FullName;
+            var opcodeTable = Path.Combine(root, "profiles", build, "opcodes.yaml");
+            var protocolConfig = new Dictionary<string, object?>
+            {
+                ["opcode_table_path"] = opcodeTable,
+                ["patch_request_name"] = build == "kr-1256" ? "gcpReqGamePatch" : "gcpFirstConnect",
+            };
             if (protocolExtras is not null)
             {
                 foreach (var (key, value) in protocolExtras)
@@ -177,7 +218,7 @@ public sealed class ProtocolHandshakeTests
             }
 
             PluginRow Row(string id, string plugin, Dictionary<string, object?>? config = null) =>
-                new() { Id = id, Plugin = plugin, Source = "test", ClientBuild = new("kr", 1256, 1304), Family = "modern", Config = config };
+                new() { Id = id, Plugin = plugin, Source = "test", ClientBuild = ClientBuild.Parse($"{TestWireDialects.Get(build).Profile.Region}:{TestWireDialects.Get(build).Profile.ClientVersionMajor}:{TestWireDialects.Get(build).Profile.ResourceVersion}"), Family = build == "kr-1256" ? "modern" : "legacy", Config = config };
 
             var host = new PluginHost(
                 [
@@ -187,12 +228,26 @@ public sealed class ProtocolHandshakeTests
                     Row("core.client-profiles", "core.client-profiles"),
                     Row("core.opcode-tables", "core.opcode-tables"),
                     Row("core.wire-dialects", "core.wire-dialects"),
-                    Row("dialect", "dialect", TestWireDialects.RowConfig("kr-1256")),
+                    Row("dialect", "dialect", TestWireDialects.RowConfig(build)),
                     Row("protocol", "protocol", protocolConfig),
                     Row("harness", "test.protocol-harness"),
+                    .. centerPrelogin || nativeMigration ? new[]
+                    {
+                        Row("core.message-router", "core.message-router"),
+                        Row("messages", "dialect.messages", TestWireDialects.MessagesConfig(new()
+                        {
+                            ["protocol"] = "kr-1256/game", ["login"] = true,
+                            ["center_migration_prelogin"] = centerPrelogin, ["native_migration"] = nativeMigration, ["character_creation_preview"] = true, ["inventory"] = true,
+                        })),
+                        Row("lobby", "lobby", new()
+                        {
+                            ["protocol"] = "kr-1256/game", ["authentication"] = "ticket", ["character_creation_preview"] = true,
+                        }),
+                    } : [],
+                    .. nativeMigration ? new[] { Row("migration-dispatch", "test.migration-dispatch") } : [],
                 ],
                 PluginCatalog.ScanAssemblies(
-                    [typeof(Dialect.DialectPlugin).Assembly, typeof(ProtocolPlugin).Assembly, typeof(PluginHost).Assembly, typeof(ProtocolHandshakeTests).Assembly]),
+                    [typeof(Dialect.DialectPlugin).Assembly, typeof(ProtocolPlugin).Assembly, typeof(PluginHost).Assembly, typeof(ProtocolHandshakeTests).Assembly, typeof(Dialect.Messages.MessagesPlugin).Assembly, typeof(Lobby.LobbyPlugin).Assembly]),
                 NullLoggerFactory.Instance);
 
             try
@@ -206,7 +261,7 @@ public sealed class ProtocolHandshakeTests
                 throw;
             }
 
-            return new ProtocolHarness(host, sink);
+            return new ProtocolHarness(host, sink, build);
         }
 
         public async ValueTask DisposeAsync()
@@ -215,6 +270,202 @@ public sealed class ProtocolHandshakeTests
             if (ReferenceEquals(HarnessPlugin.Current, _sink))
                 HarnessPlugin.Current = null;
         }
+    }
+
+    internal sealed class Tickets : ILauncherTicketService
+    {
+        private int _redeemed;
+        internal int Calls;
+        public string? Redeem(string ticket, string build) => RedeemIdentity(ticket, build)?.Username;
+        public LauncherTicketIdentity? RedeemIdentity(string ticket, string build)
+        {
+            Interlocked.Increment(ref Calls);
+            return ticket == new string('a', 64) && build == "kr-1256" && Interlocked.Exchange(ref _redeemed, 1) == 0
+                ? new("fresh-account", "zh-CN", "launch-prelogin") : null;
+        }
+    }
+
+    private static byte[] CredentialLogin(string credential)
+    {
+        var buffer = new ArrayBufferWriter<byte>();
+        var writer = new PacketWriter(buffer);
+        writer.WriteWideStringPrefixed(credential);
+        writer.WriteWideStringPrefixed("");
+        writer.WriteWideStringPrefixed("");
+        writer.WriteUInt32(0);
+        writer.WriteUInt32(0);
+        writer.WriteUInt32(0);
+        writer.WriteWideStringPrefixed("");
+        return buffer.WrittenSpan.ToArray();
+    }
+
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(1, false)]
+    [InlineData(0, true)]
+    [InlineData(1, true)]
+    public async Task FreshCenterMoveContinuesToOneUseTicketLoginThroughTheStrictWireGate(int stage, bool nativeMigration)
+    {
+        await using var harness = await ProtocolHarness.StartAsync(new()
+        {
+            ["pre_handshake_opcodes"] = new List<object?> { "gcpReqMoveInto" },
+        }, centerPrelogin: true, nativeMigration: nativeMigration);
+        await WithProtocolAsync(harness.Game, async (connection, ct) =>
+        {
+            _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
+            var cipher = SimpleCipher.ClientToServer();
+            var body = new byte[8];
+            body[4] = (byte)stage;
+            await connection.SendAsync(EncryptFrame(cipher, 54, body), ct);
+            var reply = await connection.ReceiveExactlyAsync(WirePins.RepGamePatchFrameSize, ct);
+            Assert.Equal(WirePins.RepGamePatchS2CFrameCipherHex, Convert.ToHexString(reply));
+            var session = Assert.Single(harness.Sessions.All);
+            Assert.False(session.TryFeature<IPlayerSession>(out _));
+            Assert.Equal(0, Volatile.Read(ref harness.Tickets.Calls));
+            await connection.SendAsync(EncryptFrame(cipher, 3, CredentialLogin(new string('a', 64))), ct);
+            Assert.True(await WaitForAsync(() =>
+            {
+                lock (harness.Sent) return harness.Sent.Any(e => e.Opcode == 12);
+            }), "valid ticket did not reach native character creation after the continuation");
+            Assert.Equal(1, Volatile.Read(ref harness.Tickets.Calls));
+            Assert.Equal("zh-CN", session.Feature<ISessionLanguage>().LauncherLanguage);
+            Assert.False(session.TryFeature<IInitialHandshakeContinuation>(out _));
+            Assert.False(connection.IsClosed);
+        });
+        await WithProtocolAsync(harness.Game, async (connection, ct) =>
+        {
+            _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
+            var cipher = SimpleCipher.ClientToServer();
+            await connection.SendAsync(EncryptFrame(cipher, 54, new byte[8]), ct);
+            _ = await connection.ReceiveExactlyAsync(WirePins.RepGamePatchFrameSize, ct);
+            await connection.SendAsync(EncryptFrame(cipher, 3, CredentialLogin(new string('a', 64))), ct);
+            Assert.True(await WaitForAsync(() => connection.IsClosed));
+            Assert.Equal(2, Volatile.Read(ref harness.Tickets.Calls));
+        });
+    }
+
+    [Theory]
+    [InlineData(1u)]
+    [InlineData(2147483648u)]
+    [InlineData(4294967295u)]
+    public async Task SuccessfulRetainedIdentityDispatchCannotOpenTheStrictWireGate(uint identity)
+    {
+        await using var harness = await ProtocolHarness.StartAsync(new()
+        {
+            ["pre_handshake_opcodes"] = new List<object?> { "gcpReqMoveInto" },
+        }, centerPrelogin: true, nativeMigration: true);
+        await WithProtocolAsync(harness.Game, async (connection, ct) =>
+        {
+            _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
+            var cipher = SimpleCipher.ClientToServer();
+            var body = new byte[8];
+            BinaryPrimitives.WriteUInt32LittleEndian(body, identity);
+            // Coalescing the requests also catches a gate cleared merely by successful typed dispatch.
+            var move = EncryptFrame(cipher, 54, body);
+            var login = EncryptFrame(cipher, 3, CredentialLogin(new string('a', 64)));
+            await connection.SendAsync(move.Concat(login).ToArray(), ct);
+            Assert.True(await WaitForAsync(() => connection.IsClosed));
+            lock (harness.Received)
+            {
+                Assert.Contains(harness.Received, e => e.Packet.Opcode == 54);
+                Assert.DoesNotContain(harness.Received, e => e.Packet.Opcode == 3);
+            }
+            Assert.Equal(new MoveIntoRequested(identity, 0), Assert.Single(harness.Moves));
+            Assert.Equal(0, Volatile.Read(ref harness.Tickets.Calls));
+            lock (harness.Sent) Assert.Empty(harness.Sent);
+        });
+    }
+
+    [Fact]
+    public async Task FreshCenterMoveCannotAuthenticateWithAnOrdinaryAccountName()
+    {
+        await using var harness = await ProtocolHarness.StartAsync(new()
+        {
+            ["pre_handshake_opcodes"] = new List<object?> { "gcpReqMoveInto" },
+        }, centerPrelogin: true);
+        await WithProtocolAsync(harness.Game, async (connection, ct) =>
+        {
+            _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
+            var cipher = SimpleCipher.ClientToServer();
+            await connection.SendAsync(EncryptFrame(cipher, 54, new byte[8]), ct);
+            _ = await connection.ReceiveExactlyAsync(WirePins.RepGamePatchFrameSize, ct);
+            var session = Assert.Single(harness.Sessions.All);
+            await connection.SendAsync(EncryptFrame(cipher, 3, CredentialLogin("ordinary-account")), ct);
+            Assert.True(await WaitForAsync(() => connection.IsClosed));
+            Assert.False(session.TryFeature<IPlayerSession>(out _));
+            Assert.Equal(0, Volatile.Read(ref harness.Tickets.Calls));
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OnlyThePatchHandshakeMarksTheConnectionVersionVerified(bool ordinaryPatch)
+    {
+        await using var harness = await ProtocolHarness.StartAsync(centerPrelogin: true);
+        var dialect = TestWireDialects.Get("kr-1256");
+        var root = Path.GetDirectoryName((string)TestWireDialects.MessagesConfig()["packets_directory"]!)!;
+        var table = OpcodeTableLoader.Load(Path.Combine(root, "profiles", "kr-1256", "opcodes.yaml"), dialect.Profile);
+        using var verified = new VersionVerifiedScope(1);
+        var options = new ProtocolOptions { PreHandshakeOpcodes = ["gcpReqMoveInto"] };
+        var protocol = new WireProtocol("kr-1256/game", dialect, dialect.BuildServerPreamble(0, ""),
+            options, harness.Packets, table, new EventBus(NullLogger.Instance), harness.Sessions,
+            verified, NullLogger.Instance, CancellationToken.None, requiresPatchHandshake: true);
+        var dispatched = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var handler = harness.Packets.Register("kr-1256/game", 521, (session, _, _) =>
+        {
+            Assert.False(session.TryFeature<IInitialHandshakeContinuation>(out _));
+            dispatched.SetResult();
+            return ValueTask.CompletedTask;
+        });
+        await WithProtocolAsync(protocol, async (connection, ct) =>
+        {
+            _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
+            var cipher = SimpleCipher.ClientToServer();
+            await connection.SendAsync(EncryptFrame(cipher, ordinaryPatch ? (ushort)1 : (ushort)54,
+                ordinaryPatch ? WirePins.GamePatchPayload() : new byte[8]), ct);
+            _ = await connection.ReceiveExactlyAsync(WirePins.RepGamePatchFrameSize, ct);
+            await connection.SendAsync(EncryptFrame(cipher, 521, [1]), ct);
+            await dispatched.Task.WaitAsync(ct);
+            Assert.Equal(ordinaryPatch, verified.IsVerified(connection.Id));
+            Assert.Equal(ordinaryPatch ? 1 : 0, verified.Count);
+            Assert.False(Assert.Single(harness.Sessions.All).TryFeature<IPlayerSession>(out _));
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ContinuationMustBeRequestedDuringSuccessfulPermittedDispatch(bool failAfterRequest)
+    {
+        await using var harness = await ProtocolHarness.StartAsync(new()
+        {
+            ["pre_handshake_opcodes"] = new List<object?> { "Unknown521" },
+        });
+        IInitialHandshakeContinuation? retained = null;
+        using var handler = harness.Packets.Register("kr-1256/game", 521, (session, _, _) =>
+        {
+            retained = session.Feature<IInitialHandshakeContinuation>();
+            if (failAfterRequest)
+            {
+                retained.ContinueWithoutVersionVerification();
+                throw new InvalidOperationException("intentional handler failure after admission request");
+            }
+            return ValueTask.CompletedTask;
+        });
+        await WithProtocolAsync(harness.Game, async (connection, ct) =>
+        {
+            _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
+            var cipher = SimpleCipher.ClientToServer();
+            await connection.SendAsync(EncryptFrame(cipher, 521, [1]), ct);
+            Assert.True(await WaitForAsync(() => retained is not null &&
+                (connection.IsClosed || !Assert.Single(harness.Sessions.All).TryFeature<IInitialHandshakeContinuation>(out _))));
+            Assert.Throws<InvalidOperationException>(() => retained!.ContinueWithoutVersionVerification());
+            if (!failAfterRequest)
+                await connection.SendAsync(EncryptFrame(cipher, 3, [1]), ct);
+            Assert.True(await WaitForAsync(() => connection.IsClosed));
+            lock (harness.Received) Assert.DoesNotContain(harness.Received, e => e.Packet.Opcode == 3);
+        });
     }
 
     private static async Task<bool> WaitForAsync(Func<bool> condition)
@@ -227,6 +478,13 @@ public sealed class ProtocolHandshakeTests
             await Task.Delay(15);
         }
         return false;
+    }
+
+    private static byte[] EncryptLegacyFrame(IStreamTransform cipher, ushort opcode, byte[] payload)
+    {
+        var frame = TestWireDialects.Get("cn-324").EncodeFrame(opcode, payload);
+        cipher.Apply(frame);
+        return frame;
     }
 
     private static byte[] EncryptFrame(SimpleCipher cipher, ushort opcode, byte[] payload)
@@ -613,7 +871,7 @@ public sealed class ProtocolHandshakeTests
     [Fact]
     public async Task PreHandshakeOpcodePassesButTheHandshakeIsStillRequired()
     {
-        await using var harness = await ProtocolHarness.StartAsync(new() { ["pre_handshake_opcodes"] = new List<object?> { "521" } });
+        await using var harness = await ProtocolHarness.StartAsync(new() { ["pre_handshake_opcodes"] = new List<object?> { "Unknown521" } });
         await WithProtocolAsync(harness.Game, async (connection, ct) =>
         {
             _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
@@ -668,6 +926,271 @@ public sealed class ProtocolHandshakeTests
             lock (harness.MismatchReported)
                 Assert.DoesNotContain(-1, harness.MismatchReported);
         });
+    }
+
+    [Fact]
+    public async Task Cn324AuxiliaryCenterSequencePassesWhenResponderIsEnabled()
+    {
+        await using var harness = await ProtocolHarness.StartAsync(new()
+        {
+            ["alternate_handshake_sequence"] = new List<object?> { "gcpStartGPK", "gcpReqCenterUserCnt" },
+        }, build: "cn-324");
+        await WithProtocolAsync(harness.Game, async (connection, ct) =>
+        {
+            _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
+            var cipher = TestWireDialects.Get("cn-324").CreateEncryptor(PacketDirection.ClientToServer);
+            await connection.SendAsync(EncryptLegacyFrame(cipher, 2, []), ct);
+            await connection.SendAsync(EncryptLegacyFrame(cipher, 22, []), ct);
+            await connection.SendAsync(EncryptLegacyFrame(cipher, 23, [1, 0, 0, 0]), ct);
+            await connection.SendAsync(EncryptLegacyFrame(cipher, 3, [1]), ct);
+
+            Assert.True(await WaitForAsync(() =>
+            {
+                lock (harness.Received)
+                    return new ushort[] { 2, 22, 23, 3 }.All(opcode =>
+                        harness.Received.Any(e => e.Packet.Opcode == opcode));
+            }), "the auxiliary Center requests and following login did not reach packet dispatch");
+            Assert.False(connection.IsClosed, "the accepted auxiliary sequence closed the connection");
+            lock (harness.MismatchReported)
+                Assert.DoesNotContain(-1, harness.MismatchReported);
+        });
+    }
+
+    [Fact]
+    public async Task AlternateHandshakeDoesNotAcceptAnOrdinaryLoginAsTheFirstPacket()
+    {
+        await using var harness = await ProtocolHarness.StartAsync(new()
+        {
+            ["alternate_handshake_sequence"] = new List<object?> { "gcpStartGPK", "gcpReqCenterUserCnt" },
+        }, build: "cn-324");
+        await WithProtocolAsync(harness.Game, async (connection, ct) =>
+        {
+            _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
+            await connection.SendAsync(EncryptLegacyFrame(TestWireDialects.Get("cn-324").CreateEncryptor(PacketDirection.ClientToServer), 3, [1]), ct);
+            Assert.True(await WaitForAsync(() => connection.IsClosed));
+            Assert.Contains("configured alternate sequence", connection.CloseReason);
+        });
+    }
+
+    /// <summary>A configured one-frame auxiliary query admits subsequent requests on its original socket.</summary>
+    [Fact]
+    public async Task SingleFrameAuxiliaryHandshakeAdmitsFollowingRequests()
+    {
+        // kr-1256 sub_99DD00 calls kr-1256 sub_885D00 to send an empty C2S 22 on an auxiliary connection.
+        await using var harness = await ProtocolHarness.StartAsync(new()
+        {
+            ["alternate_handshake_sequence"] = new List<object?> { "gcpReqCenterUserCnt" },
+        });
+        await WithProtocolAsync(harness.Game, async (connection, ct) =>
+        {
+            _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
+            var cipher = SimpleCipher.ClientToServer();
+            await connection.SendAsync(EncryptFrame(cipher, 22, []), ct);
+            await connection.SendAsync(EncryptFrame(cipher, 23, [1, 0, 0, 0]), ct);
+            await connection.SendAsync(EncryptFrame(cipher, 3, [1]), ct);
+
+            Assert.True(await WaitForAsync(() =>
+            {
+                lock (harness.Received)
+                    return new ushort[] { 22, 23, 3 }.All(opcode =>
+                        harness.Received.Any(e => e.Packet.Opcode == opcode));
+            }));
+            Assert.False(connection.IsClosed);
+        });
+    }
+
+    /// <summary>A one-frame alternative still rejects an unrelated first opcode or a query with a body.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SingleFrameAuxiliaryHandshakeRejectsInvalidFirstFrame(bool nonEmptyQuery)
+    {
+        await using var harness = await ProtocolHarness.StartAsync(new()
+        {
+            ["alternate_handshake_sequence"] = new List<object?> { "gcpReqCenterUserCnt" },
+        });
+        await WithProtocolAsync(harness.Game, async (connection, ct) =>
+        {
+            _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
+            var opcode = nonEmptyQuery ? (ushort)22 : (ushort)3;
+            await connection.SendAsync(EncryptFrame(SimpleCipher.ClientToServer(), opcode, [1]), ct);
+            Assert.True(await WaitForAsync(() => connection.IsClosed));
+            Assert.Contains(nonEmptyQuery ? "empty payloads" : "configured alternate sequence", connection.CloseReason);
+            lock (harness.Received)
+                Assert.DoesNotContain(harness.Received, e => e.Packet.Opcode == opcode);
+        });
+    }
+
+    /// <summary>A retained move following the native GPK marker reaches authorization without admitting an ordinary login.</summary>
+    /// <param name="authorize">Whether the application accepts the retained-player handshake.</param>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PermittedMoveAfterGpkMarkerRequiresApplicationContinuation(bool authorize)
+    {
+        // The switches the shipped bundles set, not hand-written lists: the build's prefix and the move are resolved by name.
+        await using var harness = await ProtocolHarness.StartAsync(new()
+        {
+            ["auxiliary_prefix"] = new List<object?> { "gcpStartGPK" },
+            ["accept_retained_moves"] = true,
+        }, build: "cn-324");
+        var dispatched = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var handler = harness.Packets.Register("cn-324/game", 13, (session, packet, _) =>
+        {
+            Assert.Equal(8, packet.Payload.Length);
+            var continuation = session.Feature<IInitialHandshakeContinuation>();
+            if (authorize) continuation.ContinueWithoutVersionVerification();
+            dispatched.SetResult();
+            return ValueTask.CompletedTask;
+        });
+        await WithProtocolAsync(harness.Game, async (connection, ct) =>
+        {
+            _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
+            var cipher = TestWireDialects.Get("cn-324").CreateEncryptor(PacketDirection.ClientToServer);
+            await connection.SendAsync(EncryptLegacyFrame(cipher, 2, []), ct);
+            await connection.SendAsync(EncryptLegacyFrame(cipher, 13, new byte[8]), ct);
+            await dispatched.Task.WaitAsync(ct);
+            await connection.SendAsync(EncryptLegacyFrame(cipher, 3, [1]), ct);
+            if (authorize)
+            {
+                Assert.True(await WaitForAsync(() =>
+                {
+                    lock (harness.Received) return harness.Received.Any(e => e.Packet.Opcode == 3);
+                }));
+                Assert.False(connection.IsClosed);
+            }
+            else
+            {
+                Assert.True(await WaitForAsync(() => connection.IsClosed));
+                Assert.Equal("alternate handshake sequence was interrupted", connection.CloseReason);
+                lock (harness.Received) Assert.DoesNotContain(harness.Received, e => e.Packet.Opcode == 3);
+            }
+        });
+    }
+
+    [Fact]
+    public async Task AlternateHandshakeRequiresTheCenterRequestImmediatelyAfterGpkMarker()
+    {
+        await using var harness = await ProtocolHarness.StartAsync(new()
+        {
+            ["alternate_handshake_sequence"] = new List<object?> { "gcpStartGPK", "gcpReqCenterUserCnt" },
+        }, build: "cn-324");
+        await WithProtocolAsync(harness.Game, async (connection, ct) =>
+        {
+            _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
+            var cipher = TestWireDialects.Get("cn-324").CreateEncryptor(PacketDirection.ClientToServer);
+            await connection.SendAsync(EncryptLegacyFrame(cipher, 2, []), ct);
+            await connection.SendAsync(EncryptLegacyFrame(cipher, 3, [1]), ct);
+            Assert.True(await WaitForAsync(() => connection.IsClosed));
+            Assert.Equal("alternate handshake sequence was interrupted", connection.CloseReason);
+        });
+    }
+
+    [Fact]
+    public async Task AlternateHandshakeRejectsRepeatedGpkMarker()
+    {
+        await using var harness = await ProtocolHarness.StartAsync(new()
+        {
+            ["alternate_handshake_sequence"] = new List<object?> { "gcpStartGPK", "gcpReqCenterUserCnt" },
+        }, build: "cn-324");
+        await WithProtocolAsync(harness.Game, async (connection, ct) =>
+        {
+            _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
+            var cipher = TestWireDialects.Get("cn-324").CreateEncryptor(PacketDirection.ClientToServer);
+            await connection.SendAsync(EncryptLegacyFrame(cipher, 2, []), ct);
+            await connection.SendAsync(EncryptLegacyFrame(cipher, 2, []), ct);
+            Assert.True(await WaitForAsync(() => connection.IsClosed));
+            Assert.Equal("alternate handshake sequence was interrupted", connection.CloseReason);
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AlternateHandshakeRejectsNonEmptyGpkOrCenterStatusPayload(bool statusPacket)
+    {
+        await using var harness = await ProtocolHarness.StartAsync(new()
+        {
+            ["alternate_handshake_sequence"] = new List<object?> { "gcpStartGPK", "gcpReqCenterUserCnt" },
+        }, build: "cn-324");
+        await WithProtocolAsync(harness.Game, async (connection, ct) =>
+        {
+            _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
+            var cipher = TestWireDialects.Get("cn-324").CreateEncryptor(PacketDirection.ClientToServer);
+            if (statusPacket)
+                await connection.SendAsync(EncryptLegacyFrame(cipher, 2, []), ct);
+            var opcode = statusPacket ? (ushort)22 : (ushort)2;
+            await connection.SendAsync(EncryptLegacyFrame(cipher, opcode, [1]), ct);
+            Assert.True(await WaitForAsync(() => connection.IsClosed));
+            Assert.Equal("alternate handshake sequence packets must have empty payloads", connection.CloseReason);
+            lock (harness.Received)
+                Assert.DoesNotContain(harness.Received, e => e.Packet.Opcode == opcode);
+        });
+    }
+
+    [Fact]
+    public async Task AlternateHandshakeCannotOverlapPreHandshakeOpcodes()
+    {
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => ProtocolHarness.StartAsync(new()
+        {
+            ["alternate_handshake_sequence"] = new List<object?> { "gcpStartGPK", "gcpReqCenterUserCnt" },
+            ["pre_handshake_opcodes"] = new List<object?> { "gcpStartGPK" },
+        }));
+        Assert.Contains("not overlap pre_handshake_opcodes", error.Message);
+    }
+
+    /// <summary>
+    /// A build without an auxiliary prefix (kr-812) sends its retained move first; the switch alone admits it and
+    /// still leaves center status queries closed, because only answer_center_status derives that sequence.
+    /// </summary>
+    [Fact]
+    public async Task RetainedMovesWithoutAPrefixAdmitTheMoveButNotACenterQuery()
+    {
+        await using var harness = await ProtocolHarness.StartAsync(new() { ["accept_retained_moves"] = true }, build: "kr-812");
+        var dispatched = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var handler = harness.Packets.Register("kr-812/game", 14, (session, _, _) =>
+        {
+            session.Feature<IInitialHandshakeContinuation>().ContinueWithoutVersionVerification();
+            dispatched.SetResult();
+            return ValueTask.CompletedTask;
+        });
+        await WithProtocolAsync(harness.Game, async (connection, ct) =>
+        {
+            _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
+            var cipher = TestWireDialects.Get("kr-812").CreateEncryptor(PacketDirection.ClientToServer);
+            await connection.SendAsync(EncryptLegacyFrame(cipher, 14, new byte[8]), ct);
+            await dispatched.Task.WaitAsync(ct);
+            Assert.False(connection.IsClosed);
+        });
+        await WithProtocolAsync(harness.Game, async (connection, ct) =>
+        {
+            _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
+            var cipher = TestWireDialects.Get("kr-812").CreateEncryptor(PacketDirection.ClientToServer);
+            await connection.SendAsync(EncryptLegacyFrame(cipher, 22, []), ct);
+            Assert.True(await WaitForAsync(() => connection.IsClosed));
+        });
+    }
+
+    /// <summary>
+    /// Bootstrap lists name packets so one profile line serves every build; a number, an unknown name, a
+    /// server-to-client name and a relay-only name each fail at activation instead of admitting nothing.
+    /// </summary>
+    [Theory]
+    [InlineData("pre_handshake_opcodes", "54", "a number")]
+    [InlineData("pre_handshake_opcodes", "gcpNoSuchPacket", "no game-connection C2S row")]
+    [InlineData("pre_handshake_opcodes", "gspRoomRepChangeMaster", "no game-connection C2S row")]
+    [InlineData("pre_handshake_opcodes", "rcpReqJoinRelaySession", "no game-connection C2S row")]
+    [InlineData("alternate_handshake_sequence", "22", "a number")]
+    [InlineData("alternate_handshake_sequence", "rcpReqJoinRelaySession", "no game-connection C2S row")]
+    public async Task BootstrapListsRejectEntriesThatAreNotGameC2SNames(string key, string entry, string reason)
+    {
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        {
+            await using var harness = await ProtocolHarness.StartAsync(new() { [key] = new List<object?> { entry } });
+        });
+        var config = Assert.IsType<ConfigException>(error.InnerException);
+        Assert.Contains(key, config.Message);
+        Assert.Contains(reason, config.Message);
     }
 
     [Fact]

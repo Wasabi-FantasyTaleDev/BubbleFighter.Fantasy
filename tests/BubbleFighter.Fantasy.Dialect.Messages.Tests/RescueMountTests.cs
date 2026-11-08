@@ -20,6 +20,9 @@ public sealed class RescueMountTests
     [InlineData("cn-324", false)]
     [InlineData("id-400", false)]
     [InlineData("id-1809", false)]
+    [InlineData("cn-406", false)]
+    [InlineData("cn-705", false)]
+    [InlineData("cn-706", false)]
     [InlineData("kr-812", true)]
     public async Task NativeRescueMountDispatchesAndUnloads(string build, bool remap)
     {
@@ -76,8 +79,6 @@ public sealed class RescueMountTests
     /// <summary>A configuration flag cannot enable an unreviewed mission surface or publish partial effects.</summary>
     [Theory]
     [InlineData("cn-279")]
-    [InlineData("cn-406")]
-    [InlineData("cn-706")]
     public void UnreviewedMissionResourcesFailBeforeEffects(string build)
     {
         var profile = new ClientProfile(build, build[..2], int.Parse(build[3..]), 0, 0, build);

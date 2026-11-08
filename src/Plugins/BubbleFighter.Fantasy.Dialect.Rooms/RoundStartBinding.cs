@@ -19,7 +19,7 @@ internal sealed class RoundStartBinding(string protocol, IOpcodeTable table, Pac
     IReadOnlyList<int> loadingFlags, ILogger logger)
     : IInboundMessageBinding<RoomStartRequested>, IInboundMessageBinding<RoundObjectAddRequested>,
       IInboundMessageBinding<RoundLoadReported>,
-      IMessageSender<RoomMatchStarting>, IMessageSender<RoundCountdownStarted>, IMessageSender<RoundStarted>,
+      IRoundSeriesEntrySender, IMessageSender<RoundCountdownStarted>, IMessageSender<RoundStarted>,
       IMessageSender<RoundObjectAddAcknowledged>
 {
     private static readonly string[] Structures =
@@ -35,16 +35,19 @@ internal sealed class RoundStartBinding(string protocol, IOpcodeTable table, Pac
         "gspGameEverybodyLoadingComplete", "gspGameCountDown", "gspGameStartGame", "gspGameClockUnbounded_",
     ];
 
-    // The no-limit round length: kr-1256 sub_9E1EB0 case 0x261 (S2C 609) hands it to the round-duration setter
-    // kr-1256 sub_6FEFC0, which writes the same value as its second timer's ceiling.
-    private const int NoTimeLimitMs = 0x3FFFFFFF;
-
     // The S2C 510 stage record's room state for an ordinary map (kr-1256 sub_9D9930 case 0x1FE copies it to
     // session+12); a mission names its mode there instead.
     private const int MapRoomState = 3;
 
     private IReadOnlyDictionary<string, ushort> _s2c = new Dictionary<string, ushort>();
     private IGameText? _texts;
+    private readonly RoundSeriesFields? _seriesFields = RoundSeriesFields.Load(packets, build);
+
+    public int RoundsToWin => _seriesFields?.RoundsToWin ?? 2;
+
+    public bool SupportsMode(int modeId) => modeId == (int)GameModeId.Bomb && _seriesFields is not null;
+
+    internal bool SuppliesBound { get; init; }
 
     public string Protocol => protocol;
 
@@ -93,8 +96,9 @@ internal sealed class RoundStartBinding(string protocol, IOpcodeTable table, Pac
             return new RoundLoadReported();
         });
         // The game-side relay report (C2S 571 gcpReportRelayConnected) belongs to dialect.match-offers now.
-        // Neither the map-data report nor the map recheck has an audited layout or a reply; neither advances loading.
-        RoomRoutes.LogOnly(context, protocol, table, logger, "gcpGameReportMapData");
+        // The supply binding owns the audited map report when enabled; neither report advances loading.
+        if (!SuppliesBound)
+            RoomRoutes.LogOnly(context, protocol, table, logger, "gcpGameReportMapData");
         RoomRoutes.LogOnly(context, protocol, table, logger, "gcpReqRecheckMap");
     }
 
@@ -122,17 +126,29 @@ internal sealed class RoundStartBinding(string protocol, IOpcodeTable table, Pac
     public async ValueTask SendAsync(ISession session, RoomMatchStarting message, CancellationToken ct)
     {
         var room = message.Room;
+        if (message.Series is { } series)
+        {
+            if (!SupportsMode(room.ModeId))
+                throw new ConfigException("Round-series entry is not supported for this room's mode.");
+            _seriesFields!.Validate(series);
+            if (series.RoundIndex == 0)
+            {
+                // kr-1256 sub_9E5E70, cn-774 sub_8DD8D0 and tw-454 sub_A5D750 gate the entry index on bit 1.
+                var setting = RoomProjection.Map(RoomProjection.Session(packets, build, room)["game_setting"]);
+                setting[_seriesFields.SettingsFlags] = Convert.ToInt32(setting[_seriesFields.SettingsFlags]) | 1;
+                await session.SendAsync(table.S2C("gspRoomChangeGameSetting"),
+                    PacketCodec.Write(packets, build, "GameSetting", setting), ct).ConfigureAwait(false);
+            }
+        }
         var profiles = RoomProjection.Members(room);
         foreach (var seat in profiles)
             await session.SendAsync(S2C("gspRoomSetSlot"), RoomRecords.SeatUpdate(packets, build, seat, profiles, session, _texts), ct).ConfigureAwait(false);
-        await session.SendAsync(S2C("gspSessionSignatureData"), PacketCodec.Write(packets, build,
-            "SessionSignatureData", new Dictionary<string, object?> { ["unknown_4"] = checked((ushort)room.ModeId) }), ct).ConfigureAwait(false);
+        await session.SendAsync(S2C("gspSessionSignatureData"),
+            RoundEntryWire.WriteSignature(packets, build, room.ModeId), ct).ConfigureAwait(false);
         var stage = message.StageKey.Length > 0 ? message.StageKey : message.MapKey;
-        await Send(session, "gspRoomEnterGame", "RoomEnterGame", new()
-        {
-            ["map_key"] = message.MapKey, ["stage_key"] = stage,
-            ["map_selection"] = message.MapKey, ["room_state"] = message.IsMission ? room.ModeId : MapRoomState,
-        }, ct).ConfigureAwait(false);
+        await session.SendAsync(S2C("gspRoomEnterGame"), RoundEntryWire.Write(packets, build,
+            unknown0: 0, mapKey: message.MapKey, roomState: message.IsMission ? room.ModeId : MapRoomState,
+            stageKey: stage, mapSelection: message.MapKey, series: message.Series), ct).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -141,30 +157,15 @@ internal sealed class RoundStartBinding(string protocol, IOpcodeTable table, Pac
     /// optimizer switch the debug overlay prints as "Optimize Packet" (kr-1256 sub_7B5A00). A seat playing over its
     /// game connection gets both selections cleared, so kr-1256 sub_95B910 sends its round packets there.
     /// </summary>
-    public async ValueTask SendAsync(ISession session, RoundCountdownStarted message, CancellationToken ct)
-    {
-        await Send(session, "gspGameEverybodyLoadingComplete", "RoundEverybodyLoadingComplete", new()
-        {
-            ["unknown_4"] = !message.MatchOverGame && loadingFlags[0] != 0,
-            ["unknown_5"] = !message.MatchOverGame && loadingFlags[1] != 0,
-            ["unknown_6"] = loadingFlags[2] != 0,
-        }, ct).ConfigureAwait(false);
-        await Send(session, "gspGameCountDown", "RoundCountdown", new() { ["milliseconds"] = message.Milliseconds }, ct).ConfigureAwait(false);
-    }
+    public ValueTask SendAsync(ISession session, RoundCountdownStarted message, CancellationToken ct) =>
+        RoundStartSender.SendCountdownAsync(packets, build, table, loadingFlags, session, message, ct);
 
     /// <summary>
     /// Sends the round start (kr-1256 sub_9E7570 reads two words, the first the round length); a round without a
     /// limit carries the client's own no-limit length and then its empty unlimited-clock notification.
     /// </summary>
-    public async ValueTask SendAsync(ISession session, RoundStarted message, CancellationToken ct)
-    {
-        await Send(session, "gspGameStartGame", "RoundStartGame", new()
-        {
-            ["unknown_4"] = message.Unlimited ? NoTimeLimitMs : message.TimeLimitMs, ["unknown_8"] = 0,
-        }, ct).ConfigureAwait(false);
-        if (message.Unlimited)
-            await session.SendAsync(S2C("gspGameClockUnbounded_"), ReadOnlyMemory<byte>.Empty, ct).ConfigureAwait(false);
-    }
+    public ValueTask SendAsync(ISession session, RoundStarted message, CancellationToken ct) =>
+        RoundStartSender.SendStartedWithClockNotificationAsync(packets, build, table, session, message, ct);
 
     /// <summary>Acknowledges the requester's own character add with a zero countdown (kr-1256 sub_9E7080).</summary>
     public ValueTask SendAsync(ISession session, RoundObjectAddAcknowledged message, CancellationToken ct) =>

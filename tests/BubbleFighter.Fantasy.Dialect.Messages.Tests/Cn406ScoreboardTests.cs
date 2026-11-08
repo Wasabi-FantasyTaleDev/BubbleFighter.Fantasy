@@ -22,7 +22,7 @@ public sealed class Cn406ScoreboardTests
             BitConverter.GetBytes(-1).CopyTo(expected, 276 + row * 221);
             BitConverter.GetBytes(-1).CopyTo(expected, 276 + row * 221 + 193);
         }
-        var body = PlayRoomCodec.WriteScoreboard(TestBuilds.Packets, "cn-406",
+        var body = RoundResultWire.WriteScoreboard(TestBuilds.Packets, "cn-406",
             new RoundScoreboard(0, 0, [0, 0], []));
         Assert.Equal(expected, body);
         Assert.Equal(expected, TutorialWire.WriteRoomEnterGame(TestBuilds.Packets, "cn-406", 0, "")[8..^4]);
@@ -37,7 +37,7 @@ public sealed class Cn406ScoreboardTests
         var row = new RoundScoreboardRow(0, nickname, 2, 12,
             new RoundSeatStats(0, Kills: 7, Knockdowns: 13, Score: 29, Deaths: 0),
             new RoundRewardRow(12, 100, 123, 200, 21, 43, false, badges));
-        var body = PlayRoomCodec.WriteScoreboard(TestBuilds.Packets, "cn-406",
+        var body = RoundResultWire.WriteScoreboard(TestBuilds.Packets, "cn-406",
             new RoundScoreboard(0, 2, [11, 1], [row]));
 
         var expected = new ArrayBufferWriter<byte>();

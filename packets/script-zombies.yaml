@@ -1,0 +1,40 @@
+version: 1
+structs:
+  # kr-1256 sub_9DAE50 consumes the full ServerTeamInfo after the optional character/weapon pair,
+  # then dispatches event 16 to the selected mode manager. Mode 8 selects it through kr-1256 sub_AD0450.
+  ScriptZombieTeamChange:
+    - seat: u32
+      only: [kr-1256]
+    - team: u8
+      only: [kr-1256]
+    - conversion: "optional<0x3A,ScriptZombieConversion>"
+      only: [kr-1256]
+      # cn-774 sub_8DBEA0 / tw-454 sub_A5BA70 consume both words without a presence tag.
+      cn-774:
+        - conversion: ScriptZombieConversion
+    - team_info: ServerTeamInfo
+      only: [kr-1256]
+  ScriptZombieConversion:
+    - zombie_kind: u32
+      only: [kr-1256]
+    - weapon_item_id: u32
+      only: [kr-1256]
+  # kr-1256 sub_AD2060 writes this operation; kr-1256 sub_6E0DA0 invokes kr-1256 sub_ACD450,
+  # clears the pending latch and emits OnPlayerToZombie. The producer also needs the echo.
+  ScriptZombiePeerConversion:
+    - team: u8
+      only: [kr-1256]
+    - seat: u32
+      only: [kr-1256]
+    - operation: u32
+      only: [kr-1256]
+    - kind: "optional<0x3A,ScriptZombieKind>"
+      only: [kr-1256]
+      # cn-774 sub_CC51C0 / tw-454 sub_9AE730 write a mandatory kind word, for a 17-byte body.
+      cn-774:
+        - kind: ScriptZombieKind
+    - weapon_item_id: u32
+      only: [kr-1256]
+  ScriptZombieKind:
+    - zombie_kind: u32
+      only: [kr-1256]

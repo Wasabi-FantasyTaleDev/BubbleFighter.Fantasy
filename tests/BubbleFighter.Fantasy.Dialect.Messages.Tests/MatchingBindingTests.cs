@@ -1,7 +1,10 @@
+using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Contracts.Rooms;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Dialect.Rooms;
 using BubbleFighter.Fantasy.Packets;
+using BubbleFighter.Fantasy.Protocol;
+using System.Reflection;
 using Xunit;
 
 namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
@@ -122,5 +125,90 @@ public sealed class MatchingBindingTests
         Assert.Throws<PacketFormatException>(() => MatchingBinding.Read(tables, "cn-279", body.Concat(new byte[1]).ToArray()));
         Assert.Equal(new byte[4], MatchingBinding.Write(tables, "cn-279", new(true)));
         Assert.Equal("01000000", Convert.ToHexString(MatchingBinding.Write(tables, "cn-279", new(false))));
+    }
+
+    /// <summary>The modern family passes the audited selector check, pins the base body and answers
+    /// with the shared notification body.</summary>
+    [Fact]
+    public void ModernRequestFamilyPassesValidationAndPinsTheBaseBody()
+    {
+        var tables = Tables();
+        Assert.True(tables.CapabilityOf("kr-1256", "quick_matching"));
+        TypedMatchingBinding.Validate(tables.Resolve("kr-1256", "RoomMatchRequest"));
+        // The legacy selector layout is not the audited modern family.
+        Assert.Throws<ConfigException>(() => TypedMatchingBinding.Validate(tables.Resolve("kr-812", "RoomMatchRequest")));
+        var start = Convert.FromHexString("0100000000");
+        var values = PacketCodec.ReadScalars(tables, "kr-1256", "RoomMatchRequest", start);
+        Assert.Equal(1, Convert.ToInt32(values["type"]));
+        Assert.Throws<PacketFormatException>(() =>
+            PacketCodec.ReadScalars(tables, "kr-1256", "RoomMatchRequest", start[..^1]));
+        Assert.Throws<PacketFormatException>(() =>
+            PacketCodec.ReadScalars(tables, "kr-1256", "RoomMatchRequest", start.Concat(new byte[1]).ToArray()));
+        Assert.Equal(new byte[12], TypedMatchingBinding.Write(tables, "kr-1256", new RoomMatchNotified(true)));
+        var refused = TypedMatchingBinding.Write(tables, "kr-1256", new RoomMatchNotified(false));
+        Assert.Equal(12, refused.Length);
+        Assert.Equal(1, BitConverter.ToInt32(refused));
+        Assert.All(refused[4..], value => Assert.Equal(0, value));
+    }
+
+    /// <summary>The route reader consumes the complete native body for every typed request.</summary>
+    [Theory]
+    [InlineData("0100000000", 1)]
+    [InlineData("02000000007800", 2)]
+    [InlineData("03000000000400", 3)]
+    [InlineData("04000000002A0000001000", 4)]
+    public void ModernRouteReaderAcceptsEachNativeTail(string hex, int type)
+    {
+        var body = Convert.FromHexString(hex);
+        Assert.Equal(type, TypedMatchingBinding.ReadType(Tables(), "kr-1256", body));
+        Assert.Throws<PacketFormatException>(() => TypedMatchingBinding.ReadType(Tables(), "kr-1256", body[..^1]));
+        Assert.Throws<PacketFormatException>(() => TypedMatchingBinding.ReadType(Tables(), "kr-1256", [.. body, 0]));
+    }
+
+    /// <summary>Missing and unknown discriminators cannot be treated as ordinary match starts.</summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData("0000000000")]
+    [InlineData("0500000000")]
+    public void ModernRouteReaderRejectsUnknownRequestTypes(string hex)
+    {
+        Assert.Throws<PacketFormatException>(() =>
+            TypedMatchingBinding.ReadType(Tables(), "kr-1256", Convert.FromHexString(hex)));
+    }
+
+    /// <summary>Native keepalives reach the mounted matcher; unsupported flows return a complete refusal.</summary>
+    [Fact]
+    public async Task ModernMountedRouteDispatchesKeepaliveAndRefusesUnimplementedFlows()
+    {
+        var profile = new ClientProfile("kr-1256", "kr", 1256, 0, 0, "kr-1256");
+        var root = Directory.GetParent(TestBuilds.PacketsDirectory())!.FullName;
+        var table = OpcodeTableLoader.Load(Path.Combine(root, "profiles", "kr-1256", "opcodes.yaml"), profile)
+            .ForConnection(OpcodeConnection.Game);
+        using var fixture = new MatchMessagesMountTests.Fixture(table);
+        var context = fixture.Context("kr-1256", "kr-1256/game", "dialect.rooms");
+        context.BindServices(typeof(RoomsPlugin).GetCustomAttribute<PluginAttribute>()!);
+        var session = new MatchMessagesMountTests.Session(profile);
+        try
+        {
+            new TypedMatchingBinding("kr-1256/game", table, Tables(), "kr-1256", 16).Mount(context, fixture.Messages);
+            await Request("0100000000");
+            await Request("02000000007800");
+            Assert.Equal(2, fixture.Messages.Received.Count);
+            Assert.All(fixture.Messages.Received, message => Assert.Equal(new RoomMatchRequested(16, false), message));
+            await Request("03000000000400");
+            await Request("04000000002A0000001000");
+            Assert.Equal(2, fixture.Messages.Received.Count);
+            Assert.Equal(2, session.Sent.Count);
+            Assert.All(session.Sent, opcode => Assert.Equal(table.S2C("gspNotifyMatch"), opcode));
+            Assert.All(session.Bodies, body => Assert.Equal("010000000000000000000000", Convert.ToHexString(body)));
+            await Assert.ThrowsAsync<PacketFormatException>(() => Request("0200000000"));
+        }
+        finally { await context.UnwindAsync(); }
+        Assert.Empty(fixture.Packets.Handlers);
+        Assert.Empty(fixture.Services.GetAll<IInboundMessageBinding<RoomMatchRequested>>());
+        Assert.Empty(fixture.Services.GetAll<IMessageSender<RoomMatchNotified>>());
+
+        Task Request(string hex) => fixture.Packets.DispatchAsync("kr-1256/game", session,
+            new(table.C2S("gcpReqMatch"), Convert.FromHexString(hex)), default).AsTask();
     }
 }

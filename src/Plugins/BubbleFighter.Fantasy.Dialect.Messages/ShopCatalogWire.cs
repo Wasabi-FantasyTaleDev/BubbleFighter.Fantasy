@@ -19,6 +19,9 @@ public enum LegacyCategoryTree
 
     /// <summary>As <see cref="Landing"/>, plus each main's default subcategory rows.</summary>
     LandingDefaults,
+
+    /// <summary>Includes landing and default rows while keeping tabs in workbook display order.</summary>
+    OrderedDefaults,
 }
 
 /// <summary>What a legacy <c>gspRepEnterShop</c> carries after its category tree.</summary>
@@ -64,15 +67,6 @@ internal static class ShopCatalogWire
 
     /// <summary>The kr-812 far-future sale bound; see <see cref="LegacySaleFrom"/>.</summary>
     public const double LegacySaleTo = 58441.0;
-
-    /// <summary>
-    /// Default deployment card-count limit for legacy <c>gspRepEnterShop</c> selection.
-    /// A 221-card catalog fits a 35256-byte frame.
-    /// It is configurable independently of the 16-bit frame limit; that
-    /// card count does not establish a client limit.
-    ///
-    /// </summary>
-    public const int LegacyEnterShopCardCap = 221;
 
     /// <summary>
     /// Main category the kr-812 / cn-717 dialog opens on for a normal shop click.
@@ -122,6 +116,7 @@ internal static class ShopCatalogWire
                 "ordered" => LegacyCategoryTree.Ordered,
                 "landing" => LegacyCategoryTree.Landing,
                 "landing_defaults" => LegacyCategoryTree.LandingDefaults,
+                "ordered_defaults" => LegacyCategoryTree.OrderedDefaults,
                 var other => throw Unknown(build, "tree", other),
             },
             MainPageType: Text(catalog, "page_type", "shop.catalog.page_type") switch
@@ -186,7 +181,8 @@ internal static class ShopCatalogWire
         else
             WriteCards(w, cards, from, to);
         w.WriteInt64(0);
-        WriteCategories(w, layout.Tree == LegacyCategoryTree.Ordered ? OrderEnterShopCategories(categories) : categories,
+        WriteCategories(w, layout.Tree is LegacyCategoryTree.Ordered or LegacyCategoryTree.OrderedDefaults
+                ? OrderEnterShopCategories(categories) : categories,
             layout.MainPageType ? 2 : null);
         if (layout.Trailer != LegacyCatalogTrailer.None)
             w.WriteUInt32(0);
@@ -277,15 +273,14 @@ internal static class ShopCatalogWire
     }
 
     /// <summary>
-    /// Greedily selects cards that fit both the wire budget and
-    /// <see cref="LegacyEnterShopCardCap"/>. Order is deterministic: landing main
+    /// Selects cards within their actual encoded byte budget. Order is deterministic: landing main
     /// <see cref="LegacyEnterShopMainCategory"/>, its default sub
     /// <see cref="LegacyEnterShopDefaultSubCategory"/>, then the rest of that main,
     /// then main 500, then remaining mains ascending, and within a group by
     /// subcategory, display order, then card id. kr-812 <c>sub_9720E0</c> appends matching
     /// cards to the grid in vector order, so the open tab must lead the vector.
-    /// Selection stops at the first card that does not fit (no skipping). Returns
-    /// the selected prefix and how many cards did not fit.
+    /// With no optional count limit, reserves category coverage before filling the remaining bytes.
+    /// Returns the selected cards and how many cards did not fit.
     /// <paramref name="wideStockType"/> selects the cn-279 stock width (28 wire bytes)
     /// for the size measurement.
     ///
@@ -300,7 +295,7 @@ internal static class ShopCatalogWire
     /// <param name="maxCards">Maximum selected cards, or zero to use only the byte budget.</param>
     public static (IReadOnlyList<ShopCardRow> Selected, int Dropped) SelectBoundedCards(
         IReadOnlyList<ShopCardRow> cards, int budget, bool wideStockType = false, bool vectorOnlyStocks = false,
-        int maxCards = LegacyEnterShopCardCap)
+        int maxCards = 0)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(budget);
         ArgumentOutOfRangeException.ThrowIfNegative(maxCards);
@@ -588,7 +583,8 @@ internal static class ShopCatalogWire
     /// <c>shopDefaultSubCategory</c> (or, when that cell is empty, the main id itself
     /// - <c>All_Clothes</c> 100 under Clothes 100). Missing that row leaves pageType
     /// at dialog init (0) and mode 0 compares card+48 to the default sub id, so every
-    /// filter misses. kr-812 / cn-717 keep their card-linked trees unchanged.
+    /// filter misses. cn-717 <c>sub_A1B3A0</c> also resolves the workbook default before
+    /// selecting its page type; its ordered-default tree retains these rows.
     ///
     /// </summary>
     /// <param name="categories">Card-linked shop-visible mains.</param>

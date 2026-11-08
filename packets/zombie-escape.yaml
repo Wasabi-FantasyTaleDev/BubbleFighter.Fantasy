@@ -1,0 +1,11 @@
+version: 1
+structs:
+  # The stage result has mode-specific meaning. kr-1256 sub_AD1F50 passes humanWon xor 1
+  # through kr-1256 sub_6E5840 to kr-1256 sub_708B60, which writes one word and false bool32.
+  ScriptStageResult:
+    - outcome: u32
+      only: [kr-1256]
+    # cn-774 sub_CC50D0 -> cn-774 sub_8A5EE0 and tw-454 sub_9AE640 -> tw-454 sub_7192C0 write only the outcome word.
+    - unknown_4: bool
+      only: [kr-1256]
+      except: [cn-774]

@@ -3,11 +3,8 @@ using BubbleFighter.Fantasy.Contracts.Wallet;
 namespace BubbleFighter.Fantasy.Persistence.Memory;
 
 /// <summary>
-/// In-process store for the six S2C 106 money integers, mirroring the guard
-/// behaviour of the MySQL store: the same argument checks run before any state
-/// is touched, a first-seen player reads as <see langword="null"/>, and an
-/// upsert inserts or replaces the whole snapshot. Callers seed and spend by
-/// reading a snapshot, producing the adjusted record and upserting it.
+/// Stores wallet snapshots under each player's lock. Initialization preserves an existing wallet;
+/// explicit upserts replace it. Purchases use their separate transactional store.
 /// </summary>
 public sealed class MemoryPlayerWalletRepository(MemoryPlayerTable table) : IPlayerWalletRepository
 {
@@ -22,6 +19,24 @@ public sealed class MemoryPlayerWalletRepository(MemoryPlayerTable table) : IPla
             return ValueTask.FromResult<PlayerWallet?>(null);
         lock (entry.Gate)
             return ValueTask.FromResult(entry.Money);
+    }
+
+    /// <inheritdoc />
+    public ValueTask<PlayerWallet> GetOrCreateAsync(PlayerWallet initialWallet, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(initialWallet);
+        if (initialWallet.UserNum <= 0)
+            throw new ArgumentOutOfRangeException(nameof(initialWallet), initialWallet.UserNum, "user_num must be a positive login id.");
+        if (initialWallet.Lucci < 0 || initialWallet.Cash < 0)
+            throw new ArgumentOutOfRangeException(nameof(initialWallet), "A wallet balance cannot be negative.");
+
+        var entry = table.GetOrAdd(initialWallet.UserNum);
+        lock (entry.Gate)
+        {
+            entry.Money ??= initialWallet;
+            entry.Progress ??= new BubbleFighter.Fantasy.Contracts.Progress.PlayerProgress(initialWallet.UserNum, 1, 0);
+            return ValueTask.FromResult(entry.Money);
+        }
     }
 
     /// <inheritdoc />

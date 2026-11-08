@@ -4,6 +4,90 @@
 # plaza packets, so those numbers are carried over by matching the builder or handler to the
 # id-400 one, not by the opcode value.
 opcodes:
+  - value: 20005
+    direction: c2s
+    connection: relay
+    name: rcpReqUdpBypassDisable
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 sub_7B9DC0 sends an empty relay TCP20005 after the UDP liveness check fails"
+  - value: 32885
+    direction: c2s
+    connection: both
+    name: gppWanderLean
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 sub_7B6FA0 writes32885; sub_7B8E40 dispatches its UDP copy to sub_7B8920"
+  - value: 32885
+    direction: s2c
+    connection: both
+    name: gppWanderLean
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 sub_7B6FA0 writes32885; sub_7B8E40 dispatches its UDP copy to sub_7B8920"
+  - value: 32922
+    direction: c2s
+    connection: both
+    name: gppWanderLeanOptimize
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 sub_7B6FA0 writes32922; sub_7B8E40 dispatches its UDP copy to sub_7B8B80"
+  - value: 32922
+    direction: s2c
+    connection: both
+    name: gppWanderLeanOptimize
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 sub_7B6FA0 writes32922; sub_7B8E40 dispatches its UDP copy to sub_7B8B80"
+  - value: 18
+    direction: s2c
+    connection: relay
+    name: rspUdpBypassInfo
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 sub_7BA1A0 case18 calls sub_7BAC80, reading u16 port + u32 cookie"
+  - value: 19
+    direction: s2c
+    connection: udp
+    name: rspUdpBypassVerify_
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_7B8E40 receives UDP19; sub_7B8E00 checks relay source and calls sub_7B9D10"
+  - value: 20
+    direction: s2c
+    connection: relay
+    name: rspUdpBypassReady_
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_7BA1A0 case20 sets the relay UDP-ready byte at2416 without a body"
+  - value: 20001
+    direction: c2s
+    connection: udp
+    name: rcpUdpBypassAck
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 sub_7BAC80 sends Packet_rcpUdpBypassAck containing the four-byte offered cookie"
+  - value: 20002
+    direction: c2s
+    connection: udp
+    name: rcpUdpBypassVerifyAck
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 sub_7B9D10 sends the four-byte relay cookie in response to UDP19"
+  - value: 20003
+    direction: c2s
+    connection: udp
+    name: rcpUdpBypassWanderLean
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 sub_7B9E50 wraps32885 with the four-byte relay cookie as20003"
+  - value: 20004
+    direction: c2s
+    connection: udp
+    name: rcpUdpBypassWanderLeanOptimize
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 sub_7B9E50 wraps32922 with the four-byte relay cookie as20004"
   - value: 508
     direction: c2s
     connection: game
@@ -217,7 +301,8 @@ opcodes:
     name: gcpReqIDPCRoomAuth
     name_source: label@id-1809
     evidence: verified
-    source: "builder sub_632750 (Packet_gcpReqIDPCRoomAuth, vtable 0xC76F00, serializer sub_8C2550) via send helper sub_633E30, opcode setter sub_ABB1C0(9); id-400 serializer sub_798AB0"
+    connection: game
+    source: "id-1809 sub_632750 constructs Packet_gcpReqIDPCRoomAuth and calls id-1809 sub_633E30, which stamps 9 through id-1809 sub_ABB1C0; id-1809 sub_8C2550 writes two counted UTF-16 strings at object offsets 4 and 32"
     notes: "wstr, wstr; same field list as id-400. The relay connection reuses value 9 for rcpReqUnRegisterPeer (senders in sub_7B7410); that is a separate numeric space"
   - value: 22
     direction: c2s
@@ -507,6 +592,13 @@ opcodes:
     name_source: label@id-1809
     evidence: inferred
     source: "Packet_gcpReqChangePartyLeader class and opcode setter sub_ABB1C0 in sender sub_8C65E0 (id-1809)"
+  - value: 304
+    direction: c2s
+    name: gcpSendPartyChatMsg
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 sub_8C6B00 stamps 304 on Packet_gcpSendPartyChatMsg; reader id-1809 sub_68D480"
+    notes: "Chat box line outside a room: one string. The client draws nothing until S2C gspReceivePartyChatMsg answers."
   - value: 305
     direction: c2s
     name: gcpReqPartyRecruiting
@@ -1091,16 +1183,18 @@ opcodes:
     source: "Packet_gcpReqNotifyChangeLevelIcon class and opcode setter sub_ABB1C0 in sender sub_6848F0 (id-1809)"
   - value: 2010
     direction: c2s
+    connection: game
     name: gcpBombMissionOver
     name_source: label@id-1809
-    evidence: inferred
-    source: "Packet_gcpBombMissionOver class and opcode setter sub_ABB1C0 in sender sub_4FDC40 (id-1809)"
+    evidence: verified
+    source: "id-1809 sub_4FDC40 stamps 2010 and serializes the winner and two operator user numbers."
   - value: 2011
     direction: c2s
+    connection: game
     name: gcpBombState
     name_source: label@id-1809
-    evidence: inferred
-    source: "Packet_gcpBombState class and opcode setter sub_ABB1C0 in sender sub_4FD6F0 (id-1809)"
+    evidence: verified
+    source: "id-1809 sub_4FD6F0 stamps 2011 and serializes the operator, state and three coordinates."
   - value: 2012
     direction: c2s
     name: gcpUserUpdateCustomizedKeyList
@@ -1127,10 +1221,11 @@ opcodes:
     source: "Packet_gcpGoMapItemSync class and opcode setter sub_ABB1C0 in sender sub_7AD430 (id-1809)"
   - value: 2017
     direction: c2s
+    connection: game
     name: gcpDropCaptain
     name_source: label@id-1809
-    evidence: inferred
-    source: "Packet_gcpDropCaptain class and opcode setter sub_ABB1C0 in sender sub_4376A0 (id-1809)"
+    evidence: verified
+    source: "id-1809 sub_429650 reports the local Captain death through the one-seat gcpDropCaptain builder."
   - value: 2018
     direction: c2s
     name: gcpReqClanInfo
@@ -1163,10 +1258,11 @@ opcodes:
     source: "id-1809 dispatcher sub_7E3180 case 5: Packet_gspReqHackShieldCheck"
   - value: 9
     direction: s2c
+    connection: game
     name: gspRepMoveChannel
     name_source: label@id-1809
-    evidence: inferred
-    source: "id-1809 dispatcher sub_7E3180 case 9: Packet_gspRepMoveChannel"
+    evidence: verified
+    source: "id-1809 sub_7E3180 case 9 calls id-1809 sub_7C7D30; id-1809 reader sub_7A5E00"
   - value: 11
     direction: s2c
     name: gspRepMoveInto
@@ -1193,10 +1289,11 @@ opcodes:
     source: "id-1809 dispatcher sub_7E3180 case 15: Packet_gspQueryBadProgram"
   - value: 18
     direction: s2c
+    connection: game
     name: gspRepUniquenessCheck
     name_source: label@id-1809
-    evidence: inferred
-    source: "id-1809 dispatcher sub_7E3180 case 18: Packet_gspRepUniquenessCheck"
+    evidence: verified
+    source: "id-1809 sub_7E3180 case 18 calls id-1809 sub_7C55C0; id-1809 reader sub_7BEBE0"
   - value: 20
     direction: s2c
     name: gspDisconnectFromRestriction
@@ -1531,8 +1628,8 @@ opcodes:
     direction: s2c
     name: gspMergeCountOrDayItemList
     name_source: label@id-1809
-    evidence: inferred
-    source: "id-1809 dispatcher sub_7E3180 case 910: Packet_gspMergeCountOrDayItemList"
+    evidence: verified
+    source: "id-1809 main dispatcher sub_7E3180 case 0x38E runs id-1809 sub_7CEEB0 into the reader id-1809 sub_7BF2A0 (vtable 0xCA4F84)"
   - value: 913
     direction: s2c
     name: gspManufactureRecipeInfo
@@ -1685,10 +1782,11 @@ opcodes:
     source: "id-1809 dispatcher sub_7E3180 case 956: Packet_gspGMConsole"
   - value: 958
     direction: s2c
+    connection: game
     name: gspPortalMove
     name_source: label@id-1809
-    evidence: inferred
-    source: "id-1809 dispatcher sub_7E3180 case 958: Packet_gspPortalMove"
+    evidence: verified
+    source: "id-1809 sub_7BFDC0 reads word, region u16 and seat word; id-1809 sub_7E0C60 authorizes native map-region motion and clears local pending contact; packets/portal.yaml"
   - value: 959
     direction: s2c
     name: gspNotifyMsg
@@ -1993,6 +2091,13 @@ opcodes:
     name_source: label@id-1809
     evidence: inferred
     source: "Packet_gcpReqLeaveSession is the only class constructed before the calls of the stamping helper sub_659CF0 (id-1809)"
+  - value: 501
+    direction: c2s
+    name: gcpRoomSendChatMsg
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 sub_7E6300 stamps 501 on Packet_gcpRoomSendChatMsg; reader id-1809 sub_7BE6C0"
+    notes: "Waiting-room chat box line: bool32 team-only flag, then the text. The client draws nothing until S2C gspRoomReceiveChatMsg answers."
   - value: 502
     direction: c2s
     name: gcpRoomSendChatModuleMsg
@@ -2122,10 +2227,11 @@ opcodes:
     source: "Packet_gcpReqIgnoreMissionSet is the only class constructed before the calls of the stamping helper sub_755310 (id-1809)"
   - value: 948
     direction: c2s
+    connection: game
     name: gcpPortalMove
     name_source: label@id-1809
-    evidence: inferred
-    source: "Packet_gcpPortalMove is the only class constructed before the calls of the stamping helper sub_4FCFE0 (id-1809)"
+    evidence: verified
+    source: "id-1809 sub_4FCFE0 stamps game 948 and relay 26 separately; id-1809 sub_4D6510 reads position xyz and region u16; packets/portal.yaml"
   - value: 951
     direction: c2s
     name: gcpReqAddGiftTest
@@ -2866,7 +2972,7 @@ opcodes:
     connection: both
     name: gppZombieBossState
     name_source: label@id-1809
-    evidence: inferred
+    evidence: verified
     source: "Packet_gppZombieBossState class and opcode setter sub_ABB1C0 in sender sub_4FC540 (id-1809)"
   - value: 32913
     direction: c2s
@@ -3435,6 +3541,23 @@ opcodes:
     name_source: label@id-1809
     evidence: inferred
     source: "Packet_gppWaveSetMobSpawnGroup class, stamped 32873 in sender sub_9C1B70 (id-1809); read back under the same number"
+  - value: 906
+    direction: s2c
+    connection: game
+    name: gspHordeStageCleared_
+    name_source: coined
+    evidence: verified
+    source: "id-1809 game dispatcher sub_4DF530 case 906 writes mgr+5520 = 1 (id-1809 sub_9CD510's analog)"
+    notes: "Empty body; mirrors cn-324's coined name — the horde-mode stage flag = 1"
+  - value: 907
+    direction: s2c
+    connection: game
+    name: gspHordeStageFailed_
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4DF530 case 907 writes mgr+5520 = 2 (id-1809 sub_9CD510's analog)"
+    notes: "Empty body; mirrors cn-324's coined name — the horde-mode stage flag = 2"
+
   - value: 32876
     direction: s2c
     connection: both
@@ -3972,3 +4095,333 @@ opcodes:
     name_source: label@id-1809
     evidence: inferred
     source: "Packet_gcpReqPresentDeleteReceive is constructed before the stamping call of id-1809 sub_8FD000 / sub_8FE580: removing a gift from the received list (id); layout in packets/present.yaml"
+
+  - value: 32885
+    direction: s2c
+    connection: udp
+    name: gppWanderLean
+    name_source: mirrored
+    evidence: verified
+    source: "id-1809 sub_7B8E40 dispatches the native UDP movement body after the datagram header"
+
+  - value: 32922
+    direction: s2c
+    connection: udp
+    name: gppWanderLeanOptimize
+    name_source: mirrored
+    evidence: verified
+    source: "id-1809 sub_7B8E40 dispatches the native UDP movement body after the datagram header"
+  - value: 16
+    direction: s2c
+    connection: game
+    name: gspRepCenterUserCnt
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 sub_7E3180 case 16 calls id-1809 sub_7C4B10; id-1809 reader sub_66BE50"
+  - value: 10
+    direction: s2c
+    connection: game
+    name: gspDisconnectMovedUser
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 sub_7E3180 case 10 calls id-1809 sub_7C9700; empty-body pending promotion closes the previous source"
+  - value: 23
+    direction: c2s
+    connection: game
+    name: gcpReqCenterUserCnt
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 sub_7E6220 selects Packet_gcpReqCenterUserCnt and stamps 23; the native writer has no body"
+  - value: 24
+    direction: c2s
+    connection: game
+    name: gcpReqUniquenessCheck
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 sub_7C5790 selects Packet_gcpReqUniquenessCheck and stamps 24; the native writer carries one user-number word"
+
+  - value: 102
+    direction: s2c
+    connection: game
+    name: gspRepCreateSession
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 session dispatcher sub_628FA0 case 'f' runs Packet_gspRepCreateSession (vtable 0xC76C58) through id-1809 sub_4D60C0 and the handler id-1809 sub_62C7D0"
+    notes: "u32 result; identical to cn-324's and id-400's frame"
+  - value: 722
+    direction: s2c
+    connection: game
+    name: gspGameCreateChocolate
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 game dispatcher sub_4DF530 case 722 runs id-1809 sub_4D5680 (vtable 0xC548E0) — the same reader as its lucci create"
+    notes: "The LucciCreate shape byte for byte"
+  - value: 723
+    direction: s2c
+    connection: game
+    name: gspChocolateEaten
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 sub_4DF530 case 723 runs the shared two-word reader id-1809 sub_4D7F70"
+    notes: "The LucciPicked shape"
+  - value: 724
+    direction: s2c
+    connection: game
+    name: gspGameCreateSpawner
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 sub_4DF530 case 724 runs id-1809 sub_4D7FE0"
+    notes: "Eight u32 words; SpawnerCreateNoticeLegacy@id-1809"
+  - value: 725
+    direction: s2c
+    connection: game
+    name: gspSpawnerEaten
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 sub_4DF530 case 725 runs the shared two-word reader"
+    notes: "The LucciPicked shape"
+  - value: 726
+    direction: s2c
+    connection: game
+    name: gspGameCreateHeart
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 sub_4DF530 case 726 runs id-1809 sub_4D5680 — the same LucciCreate reader"
+    notes: "The LucciCreate shape byte for byte"
+  - value: 727
+    direction: s2c
+    connection: game
+    name: gspHeartEaten
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 sub_4DF530 case 727 runs the shared two-word reader"
+    notes: "The LucciPicked shape"
+  - value: 745
+    direction: s2c
+    connection: game
+    name: gspGameCreateWeaponObject
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 sub_4DF530 case 745 runs id-1809 sub_4D55F0 (vtable 0xC54880)"
+    notes: "Ten u32 words plus a bool32 tail; this build has no 744 weapon create"
+  - value: 746
+    direction: s2c
+    connection: game
+    name: gspPickUpWeapon
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 sub_4DF530 case 746 runs id-1809 sub_4D7F70 (vtable 0xC5488C); the handler id-1809 sub_4ECE90 resolves the character"
+    notes: "[u32 weapon object][u32 actor] — object first"
+  - value: 506
+    direction: s2c
+    connection: game
+    name: gspRoomChangeInventory
+    name_source: label@cn-279
+    evidence: verified
+    source: "id-1809 session dispatcher sub_7A6A40 runs id-1809 sub_7A5BB0 (vtable 0xC9F170) and the handler id-1809 sub_785760's analog"
+    notes: "Three u32 words plus a counted u32 list — the same shape id-400 reads at 506"
+  - value: 508
+    direction: s2c
+    connection: game
+    name: gspRoomReceiveChatMsg
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 sub_7A6A40 runs id-1809 sub_7A5C70; the handler id-1809 sub_788FF0's analog consumes it"
+    notes: "u16, bool32, two counted strings, a u32 and a bool32 — the legacy room chat frame"
+  - value: 509
+    direction: s2c
+    connection: game
+    name: gspRoomReceiveChatModuleMsg
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 sub_7A6A40 runs id-1809 sub_7A5D30"
+    notes: "u16, wstr, u32, wstr, wstr, then TWO u32 words and a bool32 — id-1809 carries one extra u32 over cn-324's seven-field frame"
+  - value: 517
+    direction: s2c
+    connection: game
+    name: gspReqPingUser
+    name_source: label@cn-324
+    evidence: verified
+    source: "id-1809 sub_7A6A40 runs id-1809 sub_4D60C0"
+    notes: "u32 token"
+  - value: 518
+    direction: s2c
+    connection: game
+    name: gspRepPingUser
+    name_source: label@cn-324
+    evidence: verified
+    source: "id-1809 sub_7A6A40 runs id-1809 sub_4D8130"
+    notes: "Three u32 words — kr-1256's body applies here"
+  - value: 522
+    direction: s2c
+    connection: game
+    name: gspResClientDamageSyncData
+    name_source: label@cn-324
+    evidence: verified
+    source: "id-1809 sub_7A6A40 runs id-1809 sub_7A6320; the sDAMAGEINFO reader is id-1809 sub_4D5130"
+    notes: "The DamageInfoBody, uncompressed and identical to id-400's"
+  - value: 523
+    direction: s2c
+    connection: game
+    name: gspReceiveSessionInit
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 sub_7A6A40 case 0x20B runs id-1809 sub_4D60C0 and the handler id-1809 sub_7B15C0 compares the word against a session value"
+    notes: "u32; this build's own addition (kr-812 has the class at 524 per the cn-404 row note)"
+  - value: 750
+    direction: s2c
+    connection: game
+    name: gspBFRunnerOver
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 game dispatcher sub_4DF530 case 0x2EE runs id-1809 sub_4FC6E0; Packet_gspBFRunnerOver vtable 0xC54940 reads through id-1809 sub_4D60C0"
+    notes: "u32; the BFRunner mode's over notice, id-1809 only"
+  - value: 751
+    direction: s2c
+    connection: game
+    name: gspBFRunnerCheckPointValue
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 sub_4DF530 case 0x2EF runs id-1809 sub_4FC720; Packet_gspBFRunnerCheckPointValue vtable 0xC5494C reads through id-1809 sub_4D7F70"
+    notes: "Two u32 words; id-1809 only"
+  - value: 900
+    direction: s2c
+    connection: game
+    name: gspRepGuildLineBoard
+    name_source: label@cn-324
+    evidence: verified
+    source: "id-1809 main dispatcher sub_7E3180 compares 900 and runs id-1809 sub_7DA920 into the reader id-1809 sub_7BF800 (vtable 0xCA50E0)"
+    notes: "u32 plus counted GuildLineBoardRecord — the guild-board.yaml shapes"
+  - value: 911
+    direction: s2c
+    connection: game
+    name: gspCreateUnit
+    name_source: label@cn-324
+    evidence: verified
+    source: "id-1809 game dispatcher sub_4DF530 case 0x38F runs id-1809 sub_4ECF80 into the reader id-1809 sub_4D5700 (vtable 0xC548B0)"
+    notes: "Seven u32 words, a counted string, a u64 and a u32"
+  - value: 949
+    direction: s2c
+    connection: game
+    name: gspNotifyRankInfo2
+    name_source: label@cn-324
+    evidence: verified
+    source: "id-1809 room dispatcher sub_7A6A40 case 0x3B5 runs id-1809 sub_7A9880 into the reader id-1809 sub_7A6130; the element reader id-1809 sub_7A5270 walks the rank rows (vtable 0xC9F098)"
+    notes: "u32 count then counted {u32, wstr, u32} entries (40-byte stride)"
+  - value: 950
+    direction: s2c
+    connection: game
+    name: gspResClientDamageSyncData_
+    name_source: coined
+    evidence: verified
+    source: "id-1809 main dispatcher sub_7E3180 case 0x3B6 runs id-1809 sub_7DBAD0, which reads sDAMAGEINFO directly off the stream (id-1809 sub_4D5130)"
+    notes: "The DamageInfoBody; no packet class — a direct stream read, so the coined name"
+  - value: 988
+    direction: s2c
+    connection: game
+    name: gspGameScoreData
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 room dispatcher sub_7A6A40 case 0x3DC runs id-1809 sub_7A9B10 into the reader id-1809 sub_7A6300 (vtable 0xC9F2FC); the element reader id-1809 sub_414920 walks PlayerGameScoreData (vtable 0xC3F0C0)"
+    notes: "u32 count then counted {u8, u16, u16, u16, u16} entries (9 wire bytes, 16-byte stride) — exactly kr-812's GameScoreData shape, which kr-812 numbers 989"
+
+  - value: 32911
+    direction: s2c
+    connection: relay
+    name: gppZombieStoneActive
+    name_source: label@cn-324
+    evidence: verified
+    source: "id-1809 wave dispatcher case 0x808F runs the deserializer and the handler walks 64 entity slots RT-casting to ChrZombieStone"
+    notes: "[bool32 active][u8 variant]; the variant selects one of two stone attachment effects"
+  - value: 32872
+    direction: s2c
+    connection: relay
+    name: gppWaveKeyMobGroupData
+    name_source: label@cn-324
+    evidence: verified
+    source: "id-1809 wave dispatcher case 0x8068 runs the deserializer and the handler re-keys the fields into the wave-key to mob-group registry"
+    notes: "Five u32 words and a counted string; no C2S sender exists in any build"
+  - value: 11
+    direction: c2s
+    connection: relay
+    name: rcpSetDamageAffectingAttribute
+    name_source: label@id-1809
+    evidence: inferred
+    source: "id-1809 senders sub_4E43D0, id-1809 sub_501970, id-1809 sub_5019E0 stamp relay 11; layout packets/relay-hp.yaml RelayDamageAttributeReport"
+  - value: 13
+    direction: c2s
+    connection: relay
+    name: rcpReqDamageCalcAndBroadcast
+    name_source: label@id-1809
+    evidence: inferred
+    source: "id-1809 senders sub_501C40 stamp relay 13; layout packets/relay-hp.yaml RelayDamageRequest"
+  - value: 14
+    direction: c2s
+    connection: relay
+    name: rcpCharacterRespawn
+    name_source: label@id-1809
+    evidence: inferred
+    source: "id-1809 senders sub_501DB0 stamp relay 14; layout packets/relay-hp.yaml RelayCharacterRespawnReport"
+  - value: 15
+    direction: c2s
+    connection: relay
+    name: rcpChangeChrType
+    name_source: label@id-1809
+    evidence: inferred
+    source: "id-1809 senders sub_501E30, id-1809 sub_501EA0 stamp relay 15; layout packets/relay-hp.yaml RelayCharacterTypeReport"
+  - value: 16
+    direction: c2s
+    connection: relay
+    name: rcpHpRecover
+    name_source: label@id-1809
+    evidence: inferred
+    source: "id-1809 senders sub_501CC0, id-1809 sub_501D30 stamp relay 16; layout packets/relay-hp.yaml RelayHpRecoverReport"
+  - value: 22
+    direction: c2s
+    connection: relay
+    name: rcpSetChrState
+    name_source: label@id-1809
+    evidence: inferred
+    source: "id-1809 senders sub_4E4520, id-1809 sub_501A60, id-1809 sub_501AD0 stamp relay 22; layout packets/relay-hp.yaml RelayCharacterStateReport"
+  - value: 7
+    direction: s2c
+    connection: relay
+    name: rspHpDeltaBroadcast
+    name_source: label@id-1809
+    evidence: inferred
+    source: "id-1809 dispatcher sub_7BA1A0 route relay 7; layout packets/relay-hp.yaml RelayHpDelta"
+  - value: 972
+    direction: s2c
+    connection: game
+    name: gspBombState
+    name_source: label@kr-812
+    evidence: verified
+    source: "id-1809 sub_4DF530 case 972 reads Packet_gspBombState and applies its state, timer, position and trailing flag."
+  - value: 973
+    direction: s2c
+    connection: game
+    name: gspObserver
+    name_source: label@kr-812
+    evidence: verified
+    source: "id-1809 sub_4DF530 case 973 calls id-1809 sub_4FD7A0, which resolves the scene-object word for mode 19."
+  - value: 981
+    direction: s2c
+    connection: game
+    name: gspCreateCaptain
+    name_source: label@kr-812
+    evidence: verified
+    source: "id-1809 sub_7A6A40 case 981 calls id-1809 sub_7A8410, which reads one seat word and dispatches Captain event 309."
+  - value: 516
+    direction: c2s
+    connection: game
+    name: gcpRoomSendRecMsg
+    name_source: label@id-1809
+    evidence: verified
+    source: id-1809 sub_7E6450 stamps the native recruitment-text request; id-1809 sub_68D480 reads one counted UTF-16 message
+  - value: 516
+    direction: s2c
+    connection: game
+    name: gspRoomReceiveRecruitMsg
+    name_source: label@id-1809
+    evidence: verified
+    source: id-1809 sub_7A6A40 case 516 reaches id-1809 sub_7AD240; id-1809 sub_7A5DD0 reads a u16 plaza seat then one counted UTF-16 message

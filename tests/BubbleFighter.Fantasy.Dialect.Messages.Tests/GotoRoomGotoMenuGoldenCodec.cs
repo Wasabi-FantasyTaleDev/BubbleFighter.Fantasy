@@ -27,8 +27,9 @@ internal static class GotoRoomGotoMenuGoldenCodec
 
     /// <summary>Retains the cn-735 sub_A4D6F0 envelope and nested readers as the independent byte oracle.</summary>
     /// <param name="room">The main-menu player data.</param>
+    /// <param name="additionalArenaWord">Whether the native nested ArenaLevel consumes its second word.</param>
     /// <returns>The previous positional menu payload.</returns>
-    public static byte[] WriteMainMenu(MainMenuRoomOpened room)
+    public static byte[] WriteMainMenu(MainMenuRoomOpened room, bool additionalArenaWord = false)
     {
         var buffer = new ArrayBufferWriter<byte>(512);
         var w = new PacketWriter(buffer);
@@ -36,7 +37,7 @@ internal static class GotoRoomGotoMenuGoldenCodec
         w.WriteInt32(0);
         w.WriteInt32(0);
         w.WriteInt32(1);
-        WriteUserSlot(w, room);
+        WriteUserSlot(w, room, additionalArenaWord);
         w.WriteInt32(1);
         WriteEquippedItemList(w, room);
         w.WriteBool32(false);
@@ -107,7 +108,7 @@ internal static class GotoRoomGotoMenuGoldenCodec
         w.WriteInt32(0);
     }
 
-    private static void WriteUserSlot(PacketWriter w, MainMenuRoomOpened room)
+    private static void WriteUserSlot(PacketWriter w, MainMenuRoomOpened room, bool additionalArenaWord)
     {
         var characterType = room.CharacterItemId - CharacterItemBase;
         w.WriteBool32(true);
@@ -150,6 +151,9 @@ internal static class GotoRoomGotoMenuGoldenCodec
         // Plain u32 at +220 (vtable off_10B35AC deserialize cn-735 sub_4013A0), then
         // SocialSystemInfo cn-735 sub_426E90 (u32 x7, bool, f64), then three trailing u32.
         w.WriteInt32(0);
+        // cn-742 sub_4014C0 reads a second ArenaLevel word; cn-735 and cn-738 read only the first.
+        if (additionalArenaWord)
+            w.WriteInt32(0);
         for (var i = 0; i < 7; i++)
             w.WriteInt32(0);
         w.WriteBool32(false);

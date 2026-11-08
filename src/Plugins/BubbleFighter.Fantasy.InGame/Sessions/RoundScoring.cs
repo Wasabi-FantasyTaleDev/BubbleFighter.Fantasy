@@ -43,7 +43,8 @@ internal sealed class RoundScoring
     /// <param name="slot">The seat index.</param>
     internal RoundSeatStats Stats(int slot) => slot >= 0 && slot < _kills.Length
         ? new RoundSeatStats(slot, _kills[slot], _knockdowns[slot], Score(slot), _deaths[slot])
-            { Rescues = _rescues[slot], Stars = _countsStars ? _stars[slot] : null }
+            { Rescues = _rescues[slot], Stars = _countsStars ? _stars[slot] : null,
+                CollectedLucci = _lucci[slot] > 0 ? _lucci[slot] : null }
         : new RoundSeatStats(slot, 0, 0, 0, 0);
 
     /// <summary>Reads every seat's counters.</summary>
@@ -69,6 +70,9 @@ internal sealed class RoundScoring
         _pendingVictims[reporterSlot] = null;
         return victim;
     }
+
+    /// <summary>Discards unresolved targets when a new round starts within a match, retaining every earned counter.</summary>
+    internal void ClearPendingVictims() => Array.Clear(_pendingVictims);
 
     /// <summary>
     /// Counts one knock-down report. The victim's side does not move here: which counter a

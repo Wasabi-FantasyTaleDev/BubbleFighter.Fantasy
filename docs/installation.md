@@ -337,6 +337,8 @@ Prepared data imports copy files into the installation state; their required tab
 
 The default bounds are 8 GiB per upload, 16 GiB of extracted data per import, 32,768 files per import, 64 retained copies, 64 GiB of total import storage and 20 minutes per import. Adjust them on the `installation` row with `client_data_upload_bytes`, `client_data_extracted_bytes`, `client_data_file_limit`, `client_data_copy_limit`, `client_data_storage_bytes` and `client_data_import_seconds`. Importing again does not delete earlier successful copies.
 
+On Windows, a scanner or another process can briefly block the final directory rename after the files have been written. Only this publication step retries Windows access, sharing or lock conflicts, up to `client_data_publish_attempts` (default 20, range 1–100), waiting `client_data_publish_retry_ms` (default 50 ms, range 1–1000) between attempts. Set attempts to 1 to disable retries. The overall import deadline and cancellation still apply; uploads are not replayed, existing destinations are never replaced, and permanent or unrelated failures are reported.
+
 **Check it worked:** the assistant reports the installation complete and the WebUI switches to the administration interface. The `/health` check below answers while the assistant is running, even before an administrator exists.
 
 ## Check the installation

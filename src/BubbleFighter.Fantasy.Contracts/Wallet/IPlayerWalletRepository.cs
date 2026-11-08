@@ -9,6 +9,16 @@ public interface IPlayerWalletRepository
     ValueTask<PlayerWallet?> FindByUserNumAsync(long userNum, CancellationToken ct);
 
     /// <summary>
+    /// Returns the player's existing wallet or creates it from the supplied starting balances atomically.
+    /// Concurrent callers must all receive the single stored wallet; a losing caller must never overwrite it.
+    /// </summary>
+    /// <param name="initialWallet">The balances to store only when the player has no wallet.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The existing or newly created wallet.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown for a non-positive user number or a negative balance.</exception>
+    ValueTask<PlayerWallet> GetOrCreateAsync(PlayerWallet initialWallet, CancellationToken ct);
+
+    /// <summary>
     /// Stores the given absolute balances, creating the wallet when absent. The store does not merge:
     /// this write wins over any balance read earlier. Changes that must survive a concurrent purchase
     /// go through the purchase store's serialized operation, which reads the wallet under the wallet

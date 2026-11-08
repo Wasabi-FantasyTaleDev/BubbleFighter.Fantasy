@@ -30,7 +30,7 @@ public sealed class ActivationLifetimeTests
     /// <summary>Unload must signal the activation before its admitted callback drains, without cancelling another row in the same process.</summary>
     [Theory]
     [InlineData("python")]
-    [InlineData("typescript")]
+    [SdkData("typescript")]
     [InlineData("go")]
     [InlineData("rust")]
     public async Task CancellationPrecedesCallbackDrainAndIsIsolatedByActivation(string language)
@@ -59,7 +59,7 @@ public sealed class ActivationLifetimeTests
     /// <summary>SDK rollback cancels its lifetime before running effects, including single-threaded modules.</summary>
     [Theory]
     [InlineData("python", false)]
-    [InlineData("typescript", false)]
+    [SdkData("typescript", false)]
     [InlineData("go", false)]
     [InlineData("rust", false)]
     [InlineData("go", true)]
@@ -97,7 +97,7 @@ public sealed class ActivationLifetimeTests
     /// <summary>SDK resource scopes and release callbacks remain owned by the native activation scope.</summary>
     [Theory]
     [InlineData("python", false)]
-    [InlineData("typescript", false)]
+    [SdkData("typescript", false)]
     [InlineData("go", false)]
     [InlineData("rust", false)]
     [InlineData("go", true)]

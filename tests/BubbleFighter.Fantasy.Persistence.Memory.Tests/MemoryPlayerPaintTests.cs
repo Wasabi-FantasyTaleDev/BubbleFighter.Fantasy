@@ -25,6 +25,7 @@ public sealed class MemoryPlayerPaintTests
 
         Assert.True(await players.ApplyPaintWithItemAsync(player.UserNum, 100180, 14, default));
         Assert.Equal(player with { ColorIndex = 14 }, await players.FindByUsernameAsync("paint", default));
+        Assert.Equal(player with { ColorIndex = 14 }, await players.FindByUserNumAsync(player.UserNum, default));
         Assert.Equal(new[] { original, selected with { Quantity = 1 }, other },
             await inventory.ListSlotsAsync(player.UserNum, InventoryBag.CharacterBag, 32, default));
         Assert.Equal(selected with { Bag = InventoryBag.EquippedBag, Quantity = 1 },
