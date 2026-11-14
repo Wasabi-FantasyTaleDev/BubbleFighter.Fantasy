@@ -449,6 +449,7 @@ structs:
           menu: 1
     - unknown_12: u32
       offset: 12
+      except: [kr-186] # kr-186 sub_4170D0 reads the mode, then the four map strings
     # The four map strings are the ones the map dialog writes for the entry it was given (cn-324 sub_59E1C0): the
     # display name, the map's directory (or the key itself for the all-random entry), the theme tab and the key.
     # The create request fills only the first two, from the startup configuration (cn-324 sub_582C00), and the room
@@ -520,6 +521,9 @@ structs:
       offset: 60
     - unknown_64: u32
       offset: 64
+    # The mission difficulty (kr-812 GameSetting+164): RoomGameSettingChangeRequest@cn-324 difficulty carries
+    # the room master's choice here (builds.yaml room_setting_change_fields.difficulty_target). It keeps its
+    # offset name because the shared room writer gives the name difficulty to the tutorial's own value.
     - unknown_68: u32
       offset: 68
       default: 1
@@ -529,6 +533,7 @@ structs:
     - unknown_72: u32
       offset: 72
       default: -1
+      except: [kr-186] # kr-186 sub_4170D0 ends after four words (+48..+60) where cn-279 reads five
       cn-279:
         - unknown_72: u32
           offset: 68
@@ -1493,6 +1498,7 @@ structs:
     # set together with occupied for a seated player; cleared in the record gspRoomLeaveSlot carries
     - seated: bool
       offset: 6
+      except: [kr-186] # kr-186 sub_43A9A0 reads +4, +5, then the u8 at +96; it has no seated flag
     # start position: the position table is indexed with (12 - value); 0xFF until the round is set up
     - spawn_index: u8
       offset: 96

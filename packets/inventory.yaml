@@ -46,6 +46,7 @@ structs:
       offset: 27
     - unknown_28: bool
       offset: 28
+      except: [kr-186] # kr-186 sub_43D1D0 reads +4, +8, the f64 at +16 and four flags at +24..+27
     - unknown_48: wstr
       offset: 48
       except: [cn-324] # cn-324 sub_6FA8E0 and cn-279 sub_44CD50 stop after +28

@@ -9,15 +9,15 @@ namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
 public sealed class SettingChangeAliasTests
 {
     [Theory]
-    [InlineData("kr-812", "unknown_60", "unknown_116", "unknown_117")]
-    [InlineData("cn-717", "unknown_60", "unknown_116", "unknown_117")]
-    [InlineData("cn-324", "unknown_12", "unknown_20", "unknown_21")]
-    [InlineData("cn-279", "unknown_12", "unknown_20", "unknown_21")]
-    [InlineData("id-400", "unknown_60", "unknown_116", "unknown_117")]
-    [InlineData("id-1809", "unknown_60", "unknown_116", "unknown_117")]
-    [InlineData("cn-706", "unknown_60", "unknown_116", "unknown_117")]
-    public void BuildAliasesMatchNativeOffsetNames(string build, string third, string first, string second) =>
-        Assert.Equal(new SettingChangeFields(third, first, second),
+    [InlineData("kr-812", "unknown_60", "unknown_116", "unknown_117", "difficulty")]
+    [InlineData("cn-717", "unknown_60", "unknown_116", "unknown_117", "difficulty")]
+    [InlineData("cn-324", "unknown_12", "unknown_20", "unknown_21", "unknown_68")]
+    [InlineData("cn-279", "unknown_12", "unknown_20", "unknown_21", "unknown_68")]
+    [InlineData("id-400", "unknown_60", "unknown_116", "unknown_117", "difficulty")]
+    [InlineData("id-1809", "unknown_60", "unknown_116", "unknown_117", "difficulty")]
+    [InlineData("cn-706", "unknown_60", "unknown_116", "unknown_117", "difficulty")]
+    public void BuildAliasesMatchNativeOffsetNames(string build, string third, string first, string second, string difficulty) =>
+        Assert.Equal(new SettingChangeFields(third, first, second, difficulty),
             SettingChangeFields.Require(TestBuilds.Packets, build));
 
     [Fact]

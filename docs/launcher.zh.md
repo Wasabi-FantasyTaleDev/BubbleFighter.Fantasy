@@ -1,7 +1,7 @@
 ---
 title: "启动器"
 description: "Bubble Fighter Fantasy 的配套启动器：客户端版本、会话、登录票据与服务端启动器 API。"
-updated: 2026-10-23
+updated: 2026-11-13
 ---
 
 Bubble Fighter Fantasy 的配套桌面应用 **Fantasy Tale Launcher** 正在开发中，目标是安装并启动游戏客户端，并把它们连接到玩家选择的服务器。它是一个独立项目：[FantasyTale.Launcher](https://github.com/Wasabi-FantasyTaleDev/FantasyTale.Launcher)，以 MIT 许可证分发。本服务器仓库不包含它，两个项目都不分发游戏客户端或其数据。
@@ -41,8 +41,10 @@ Bubble Fighter Fantasy 的配套桌面应用 **Fantasy Tale Launcher** 正在开
 | --- | --- | --- | --- | --- | --- |
 | `kr-1256` | 韩国 | KR 2026 | 2026-05-08 | 1256 | 实验性 |
 | `kr-812` | 韩国 | KR 2015 | 2015-04-22 | 812 | 已支持 |
+| `kr-186` | 韩国 | KR 2009 | 2009-12-20 | 186 | 实验性 |
 | `cn-279` | 中国 | CN 2011 | 2011-04-08 | 279 | 已支持 |
 | `cn-324` | 中国 | CN 2012 | 2012-09-23 | 324 | 已支持 |
+| `tw-410` | 台湾 | TW 2013 | 2013-01-22 | 410 | 实验性 |
 | `cn-406` | 中国 | CN 2013 | 2013-06-28 | 406 | 开发中的早期阶段 |
 | `id-400` | 印尼 | ID 2014 | 2014-01-23 | 400 | 已支持 |
 | `cn-706` | 中国 | CN 2014 | 2014-09-23 | 706 | 已支持 |

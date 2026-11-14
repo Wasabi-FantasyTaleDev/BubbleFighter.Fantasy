@@ -228,12 +228,13 @@ public sealed class RoomsPlugin : IPlugin
                 context.Effect(router.Register(options.Protocol, endStage, tutorial.HandleEndStageAsync));
             // A build whose tutorial requests are not named yet gets its rooms without the tutorial.
             if (table.Find(PacketDirection.ClientToServer, "gcpReqCreateTutorialSession") is { } createTutorial
-                && table.Find(PacketDirection.ClientToServer, "gcpReqSingleStageInfo") is { } stageInfo
                 && table.Find(PacketDirection.ClientToServer, "gcpReqPlayTutorial") is { } playTutorial)
             {
                 context.Effect(router.Register(options.Protocol, createTutorial, tutorial.HandleCreateTutorialAsync));
-                context.Effect(router.Register(options.Protocol, stageInfo, tutorial.HandleSingleStageInfoAsync));
                 context.Effect(router.Register(options.Protocol, playTutorial, tutorial.HandlePlayTutorialAsync));
+                // The cleared-stage list came later: kr-186 has no Packet_gcpReqSingleStageInfo class.
+                if (table.Find(PacketDirection.ClientToServer, "gcpReqSingleStageInfo") is { } stageInfo)
+                    context.Effect(router.Register(options.Protocol, stageInfo, tutorial.HandleSingleStageInfoAsync));
             }
             else
                 context.Logger.LogInformation("dialect.rooms: {Protocol} names no tutorial requests; the tutorial is not bound.", options.Protocol);

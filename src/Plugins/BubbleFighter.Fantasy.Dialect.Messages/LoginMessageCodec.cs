@@ -28,11 +28,16 @@ namespace BubbleFighter.Fantasy.Dialect.Messages;
 /// from a four-byte key it XORs with a byte of a client table; id-400 <c>sub_5E8B10</c> has no
 /// such field). The value is read and ignored.
 /// </param>
+/// <param name="RequestStrings">
+/// How many <c>wstr</c> open <c>gcpReqLogin</c> before the adapter count: three from cn-279 on (account and two
+/// unknown strings), one in kr-186, whose writer <c>sub_418DC0</c> sends only the account.
+/// </param>
 internal sealed record LoginShape(
     bool RequestTrailer,
     bool LoginResponse = false,
     bool RequestExtraWstr = false,
-    bool RequestToken = false)
+    bool RequestToken = false,
+    int RequestStrings = 3)
 {
     /// <summary>Reads the layout from a build's merged <c>login</c> values in <c>packets/builds.yaml</c>.</summary>
     /// <param name="build">The packet-table build, for messages.</param>
@@ -43,7 +48,12 @@ internal sealed record LoginShape(
     {
         if (!values.TryGetValue("login", out var raw) || raw is not IReadOnlyDictionary<string, object?> login)
             throw new ConfigException($"Build '{build}' must define login values in packets/builds.yaml.");
-        return new(Flag("request_trailer"), Flag("login_response"), Flag("request_extra_wstr"), Flag("request_token"));
+        return new(Flag("request_trailer"), Flag("login_response"), Flag("request_extra_wstr"), Flag("request_token"), Strings());
+
+        int Strings() => login.TryGetValue("request_strings", out var value) && value is string text
+            && int.TryParse(text, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var count)
+            && count is 1 or 3
+            ? count : throw new ConfigException($"Build '{build}' must define login.request_strings (1 or 3) in packets/builds.yaml.");
 
         bool Flag(string key) => login.TryGetValue(key, out var value) && value is string text && bool.TryParse(text, out var flag)
             ? flag : throw new ConfigException($"Build '{build}' must define boolean login.{key} in packets/builds.yaml.");
@@ -113,7 +123,7 @@ internal static class LoginMessageCodec
         || (!values.Shape.LoginResponse && tables.Resolve(build, "LoginReply").Any(field => field.Name == "channel_id"));
 
     /// <summary>
-    /// Reads <c>gcpReqLogin</c>: <c>wstr account, wstr unknown1, wstr unknown2, u32 count,
+    /// Reads <c>gcpReqLogin</c>: <c>wstr account, wstr unknown1, wstr unknown2</c> (kr-186: the account alone), <c>u32 count,
     /// count x u32 adapter IPv4</c>, then <c>u32 unknown3, u32 unknown4</c> when the shape has
     /// the request trailer, or one <c>u32</c> token when it has the request token. Each wstr is a <c>u32</c> character count plus UTF-16LE; the
     /// account is padded with NULs to the buffer length.
@@ -126,8 +136,8 @@ internal static class LoginMessageCodec
     {
         var reader = new PacketReader(payload);
         var account = ReadString(ref reader);
-        ReadString(ref reader);
-        ReadString(ref reader);
+        for (var i = 1; i < shape.RequestStrings; i++)
+            ReadString(ref reader);
         var count = reader.ReadUInt32();
         if (count > MaxAddresses)
             throw new PacketFormatException($"gcpReqLogin lists {count} adapter addresses; the client sends at most {MaxAddresses}", reader.Offset);

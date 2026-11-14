@@ -33,7 +33,9 @@ structs:
       offset: 140
     - unknown_144: u32
       offset: 144
-    - unknown_148: u32
+    # The room's mission difficulty: kr-812 sub_6A0E10 copies GameSetting+164 here and kr-812 sub_6A1160
+    # replaces it with the picked pirate map's difficulty; the round reads it back from GameSetting+164.
+    - difficulty: u32
       offset: 148
     - mode: u32
       offset: 152
@@ -72,12 +74,20 @@ structs:
       offset: 44
     - unknown_48: u32
       offset: 48
+    # The mission difficulty, copied from GameSetting+68 by cn-324 sub_59DEA0, cn-279 sub_79B090 and
+    # tw-410 sub_59D420. kr-186 has no pirate mode, so its word stays unknown.
+    - difficulty: u32
+      offset: 52
+      except: [kr-186]
     - unknown_52: u32
       offset: 52
+      only: [kr-186]
     - mode: u32
       offset: 56
+      except: [kr-186] # kr-186 sub_419210 writes four strings, two flags and eight words, then stops
     - sub_mode: u32
       offset: 60
+      except: [kr-186]
 
   # kr-1256 sub_5E1490 stamps C2S 513 and delegates to kr-1256 sub_10D3F80:
   # three counted UTF-16 strings and thirteen four-byte words. Four words are
@@ -262,8 +272,10 @@ structs:
       offset: 12
     - unknown_16: wstr
       offset: 16
+      except: [kr-186] # kr-186 sub_41DE00 writes a flag, two strings, then MapMetaData (thirteen words, one flag)
     - unknown_20: u32
       offset: 20
+      except: [kr-186]
     # As above, the thirteen MapMetaData words are the map's rule record: kr-1256 sub_AADD50 fills the same record
     # from the map keys EndGameTimeOverTick, EndGameNotifyWinOrLoseTickTeam, EndGameNotifyWinOrLoseTickStar,
     # EndGameNotifyResultTick, FeverTimeDuration, StarDropTimeDuration, DeathMatchKillLimit, then
@@ -299,7 +311,10 @@ structs:
       offset: 80
     - unknown_81: bool
       offset: 81
+      except: [kr-186]
     - unknown_82: bool
       offset: 82
+      except: [kr-186]
     - unknown_83: bool
       offset: 83
+      except: [kr-186]

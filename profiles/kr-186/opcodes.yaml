@@ -1,0 +1,2416 @@
+# Opcode assignments for the Korean 2009 client (ClientVersion_Major 186). C2S and S2C are separate numeric spaces.
+# Rows come from this build's own class labels: senders that stamp them and dispatcher cases that read them.
+profile: kr-186
+opcodes:
+- value: 1
+  direction: c2s
+  connection: game
+  name: gcpFirstConnect
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_676C80 builds Packet_gcpFirstConnect with version 186; kr-186 sub_4428F0 stamps 1
+- value: 1
+  direction: c2s
+  connection: relay
+  name: rcpReqJoinRelaySession
+  name_source: label@kr-186
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_453E00 stamps relay 1; native Packet_rcpReqJoinRelaySession writer cn-279 sub_44C610 and reader cn-279 sub_44C640; field sequence is recorded in packets/relay-connection.yaml
+- value: 2
+  direction: c2s
+  connection: game
+  name: gcpReqLogin
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_418FC0 stamps 2 for Packet_gcpReqLogin (sibling-init)
+  notes: cn-279 numbers this class 3.
+- value: 5
+  direction: c2s
+  connection: game
+  name: gcpRepPing
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_442CF0 stamps 5 for Packet_gcpRepPing (caller-nearest)
+- value: 8
+  direction: c2s
+  connection: game
+  name: gcpReqMoveChannel
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_462F80 stamps 8 for Packet_gcpReqMoveChannel (caller-nearest)
+- value: 8
+  direction: c2s
+  connection: relay
+  name: rcpReqRegisterPeer
+  name_source: label@kr-186
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_702370 requests relay delivery when direct movement fails
+- value: 9
+  direction: c2s
+  connection: game
+  name: gcpReqMoveChannelByType
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_418300 stamps 9 for Packet_gcpReqMoveChannelByType (caller-construct)
+- value: 9
+  direction: c2s
+  connection: relay
+  name: rcpReqUnRegisterPeer
+  name_source: label@kr-186
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_701E00 unregisters successfully punched peers from the relay
+- value: 10
+  direction: c2s
+  connection: game
+  name: gcpReqMoveInto
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_442870 stamps 10 for Packet_gcpReqMoveInto (caller-nearest)
+  notes: cn-279 numbers this class 13.
+- value: 11
+  direction: c2s
+  connection: game
+  name: gcpReqCheckCreateUserName
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_4507E0 stamps 11 for Packet_gcpReqCheckCreateUserName (caller-construct)
+- value: 12
+  direction: c2s
+  connection: game
+  name: gcpReqCreateUserInfo
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_66B760 constructs Packet_gcpReqCreateUserInfo and passes it to sub_450860, which stamps 12
+  notes: cn-279 numbers this class 15.
+- value: 13
+  direction: c2s
+  connection: game
+  name: gcpLoginAfterCreateUserInfo
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_4508E0 stamps 13 for Packet_gcpLoginAfterCreateUserInfo (caller-nearest)
+  notes: cn-279 numbers this class 16.
+- value: 14
+  direction: c2s
+  connection: game
+  name: gcpNotifyCloseProgram
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_65D2A0 stamps 14 for Packet_gcpNotifyCloseProgram (sender-inline)
+- value: 15
+  direction: c2s
+  connection: game
+  name: gcpReportLastCrash
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_442B70 stamps 15 for Packet_gcpReportLastCrash (caller-construct)
+- value: 16
+  direction: c2s
+  connection: game
+  name: gcpCustomLog
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_41A560 stamps 16 for Packet_gcpCustomLog (caller-construct)
+- value: 17
+  direction: c2s
+  connection: game
+  name: gcpReportBadProgram
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_442D70 stamps 17 for Packet_gcpReportBadProgram (caller-construct)
+- value: 101
+  direction: c2s
+  connection: game
+  name: gcpRepUserPoll
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_453890 stamps 101 for Packet_gcpRepUserPoll (caller-construct)
+- value: 103
+  direction: c2s
+  connection: game
+  name: gcpReportUserTracking
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_43C030 stamps 103 for Packet_gcpReportUserTracking (caller-nearest)
+- value: 105
+  direction: c2s
+  connection: game
+  name: gcpReqGotoMenu
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_454560 stamps 105 for Packet_gcpReqGotoMenu (caller-nearest)
+- value: 106
+  direction: c2s
+  connection: game
+  name: gcpReqGotoLobby
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_419960 stamps 106 for Packet_gcpReqGotoLobby (caller-nearest)
+- value: 107
+  direction: c2s
+  connection: game
+  name: gcpReqPlayTutorial
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_442AF0 stamps 107 for Packet_gcpReqPlayTutorial (caller-construct)
+- value: 108
+  direction: c2s
+  connection: game
+  name: gcpReqInvite
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_41EF60 stamps 108 for Packet_gcpReqInvite (sibling-init)
+- value: 109
+  direction: c2s
+  connection: game
+  name: gcpReqMoveToInviter
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_674A50 constructs Packet_gcpReqMoveToInviter and passes it to sub_442C70, which stamps 109
+- value: 110
+  direction: c2s
+  connection: game
+  name: gcpReqMoveToFriend
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_658C90 constructs Packet_gcpReqMoveToFriend and passes it to sub_45BD00, which stamps 110
+- value: 111
+  direction: c2s
+  connection: game
+  name: gcpReqMatch
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_418200 stamps 111 for Packet_gcpReqMatch (caller-nearest)
+- value: 112
+  direction: c2s
+  connection: game
+  name: gcpReqFighterInfo
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_41EE60 stamps 112 for Packet_gcpReqFighterInfo (caller-nearest)
+- value: 114
+  direction: c2s
+  connection: game
+  name: gcpReqEvent
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_617DA0 stamps 114 for Packet_gcpReqEvent (caller-construct)
+- value: 115
+  direction: c2s
+  connection: game
+  name: gcpReqGotoGuild
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_4233A0 stamps 115 for Packet_gcpReqGotoGuild (caller-nearest)
+- value: 202
+  direction: c2s
+  connection: game
+  name: gcpReqLeaveParty
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_4427F0 stamps 202 for Packet_gcpReqLeaveParty (caller-nearest)
+- value: 302
+  direction: c2s
+  connection: game
+  name: gcpReqKickFromParty
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_7B8540 constructs Packet_gcpReqKickFromParty and passes it to sub_41EEE0, which stamps 302
+- value: 303
+  direction: c2s
+  connection: game
+  name: gcpReqChangePartyLeader
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_7B5B30 constructs Packet_gcpReqChangePartyLeader and passes it to sub_41EDE0, which stamps 303
+- value: 304
+  direction: c2s
+  connection: game
+  name: gcpSendPartyChatMsg
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_464AF0 stamps 304 for Packet_gcpSendPartyChatMsg (caller-nearest)
+- value: 305
+  direction: c2s
+  connection: game
+  name: gcpReqPartyRecruiting
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_457530 stamps 305 for Packet_gcpReqPartyRecruiting (caller-nearest)
+- value: 401
+  direction: c2s
+  connection: game
+  name: gcpReqListSession
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_418400 stamps 401 for Packet_gcpReqListSession (caller-nearest)
+- value: 402
+  direction: c2s
+  connection: game
+  name: gcpReqCreateSession
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_418380 stamps 402 for Packet_gcpReqCreateSession (caller-construct)
+- value: 403
+  direction: c2s
+  connection: game
+  name: gcpReqJoinSession
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_418280 stamps 403 for Packet_gcpReqJoinSession (sibling-init)
+- value: 404
+  direction: c2s
+  connection: game
+  name: gcpReqLeaveSession
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_41EBE0 stamps 404 for Packet_gcpReqLeaveSession (caller-nearest)
+- value: 406
+  direction: c2s
+  connection: game
+  name: gcpReqCreateTutorialSession
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_4199E0 stamps 406 for Packet_gcpReqCreateTutorialSession (caller-nearest)
+- value: 501
+  direction: c2s
+  connection: game
+  name: gcpRoomSendChatMsg
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_4429F0 stamps 501 for Packet_gcpRoomSendChatMsg (caller-nearest)
+- value: 502
+  direction: c2s
+  connection: game
+  name: gcpRoomReqEnterGame
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_6166E0 constructs Packet_gcpRoomReqEnterGame and passes it to sub_41DF50, which stamps 502
+  notes: cn-279 numbers this class 503.
+- value: 503
+  direction: c2s
+  connection: game
+  name: gcpRoomReqReadyStatus
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_41EC60 stamps 503 for Packet_gcpRoomReqReadyStatus (caller-nearest)
+  notes: cn-279 numbers this class 504.
+- value: 504
+  direction: c2s
+  connection: game
+  name: gcpRoomReqLeaveGame
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_405E70 stamps 504 for Packet_gcpRoomReqLeaveGame (caller-nearest)
+  notes: cn-279 numbers this class 505.
+- value: 505
+  direction: c2s
+  connection: game
+  name: gcpRoomReqAddDummy
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_41ECE0 stamps 505 for Packet_gcpRoomReqAddDummy (caller-nearest)
+- value: 506
+  direction: c2s
+  connection: game
+  name: gcpRoomReqChangeMaster
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_7B8540 constructs Packet_gcpRoomReqChangeMaster and passes it to sub_41ED60, which stamps 506
+  notes: cn-279 numbers this class 507.
+- value: 507
+  direction: c2s
+  connection: game
+  name: gcpRoomReqOpenCloseSlot
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_41E050 stamps 507 for Packet_gcpRoomReqOpenCloseSlot (caller-nearest)
+  notes: cn-279 numbers this class 508.
+- value: 508
+  direction: c2s
+  connection: game
+  name: gcpReqKickFromSession
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_7B8540 constructs Packet_gcpReqKickFromSession and passes it to sub_41EFE0, which stamps 508
+  notes: cn-279 numbers this class 509.
+- value: 510
+  direction: c2s
+  connection: game
+  name: gcpRoomChangeInventory
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_41AF50 stamps 510 for Packet_gcpRoomChangeInventory (caller-construct)
+  notes: cn-279 numbers this class 511.
+- value: 511
+  direction: c2s
+  connection: game
+  name: gcpRoomChangeGameSetting
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_70C970 constructs Packet_gcpRoomChangeGameSetting and passes it to sub_4198E0, which stamps 511
+  notes: cn-279 numbers this class 512.
+- value: 512
+  direction: c2s
+  connection: game
+  name: gcpRoomChangeTeam
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_41EB60 stamps 512 for Packet_gcpRoomChangeTeam (caller-nearest)
+  notes: cn-279 numbers this class 513.
+- value: 513
+  direction: c2s
+  connection: game
+  name: gcpRoomSendRecMsg
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_442A70 stamps 513 for Packet_gcpRoomSendRecMsg (caller-nearest)
+  notes: cn-279 numbers this class 514.
+- value: 601
+  direction: c2s
+  connection: game
+  name: gcpReportRelayConnected
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_43CE40 stamps 601 for Packet_gcpReportRelayConnected (caller-nearest)
+- value: 602
+  direction: c2s
+  connection: game
+  name: gcpReportSuperPeerConnected
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_43CEC0 stamps 602 for Packet_gcpReportSuperPeerConnected (caller-nearest)
+- value: 604
+  direction: c2s
+  connection: game
+  name: gcpReportSuperPeerPingFail
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_416570 stamps 604 for Packet_gcpReportSuperPeerPingFail (caller-nearest)
+- value: 607
+  direction: c2s
+  connection: game
+  name: gcpReportTableSetHolePunchingEnd
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_67F5B0 stamps 607 for Packet_gcpReportTableSetHolePunchingEnd (sender-inline)
+- value: 701
+  direction: c2s
+  connection: game
+  name: gcpGameReportMapLoadingComplete
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_783600 stamps 701 for Packet_gcpGameReportMapLoadingComplete (sender-inline)
+- value: 702
+  direction: c2s
+  connection: game
+  name: gcpGameReportMapData
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_77FEC0 stamps 702 for Packet_gcpGameReportMapData (caller-construct)
+- value: 704
+  direction: c2s
+  connection: game
+  name: gcpRespawn
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_406070 stamps 704 for Packet_gcpRespawn (caller-nearest)
+- value: 705
+  direction: c2s
+  connection: game
+  name: gcpRequestRespawnIdx
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_4060F0 stamps 705 for Packet_gcpRequestRespawnIdx (caller-nearest)
+- value: 707
+  direction: c2s
+  connection: game
+  name: gcpEatItem
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_77D270 stamps 707 for Packet_gcpEatItem (sender-inline)
+- value: 708
+  direction: c2s
+  connection: game
+  name: gcpUseItem
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_77D0A0 stamps 708 for Packet_gcpUseItem (sender-inline)
+- value: 709
+  direction: c2s
+  connection: game
+  name: gcpReqAddObject
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_405FF0 stamps 709 for Packet_gcpReqAddObject (caller-nearest)
+- value: 710
+  direction: c2s
+  connection: game
+  name: gcpGameUpdateScore
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_405F70 stamps 710 for Packet_gcpGameUpdateScore (caller-nearest)
+- value: 711
+  direction: c2s
+  connection: game
+  name: gcpGameUpdateDamagePoint
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_434510 stamps 711 for Packet_gcpGameUpdateDamagePoint (caller-nearest)
+- value: 713
+  direction: c2s
+  connection: game
+  name: gcpGameReqRespawn
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_405EF0 stamps 713 for Packet_gcpGameReqRespawn (caller-nearest)
+- value: 715
+  direction: c2s
+  connection: game
+  name: gcpGameDebugPassCountDown
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_416370 stamps 715 for Packet_gcpGameDebugPassCountDown (caller-nearest)
+- value: 716
+  direction: c2s
+  connection: game
+  name: gcpGameDebugPassGameOver
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_4163F0 stamps 716 for Packet_gcpGameDebugPassGameOver (caller-nearest)
+- value: 717
+  direction: c2s
+  connection: game
+  name: gcpGameDebugPassResult
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_416470 stamps 717 for Packet_gcpGameDebugPassResult (caller-nearest)
+- value: 718
+  direction: c2s
+  connection: game
+  name: gcpGameDebugPassLevelUp
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_4164F0 stamps 718 for Packet_gcpGameDebugPassLevelUp (caller-nearest)
+- value: 719
+  direction: c2s
+  connection: game
+  name: gcpGameReportPerfLog
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_43C1C0 stamps 719 for Packet_gcpGameReportPerfLog (caller-construct)
+- value: 720
+  direction: c2s
+  connection: game
+  name: gcpGameAwardResult
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_5D9B10 stamps 720 for Packet_gcpGameAwardResult (sender-inline)
+- value: 721
+  direction: c2s
+  connection: game
+  name: gcpReqEndStage
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_77AF60 stamps 721 for Packet_gcpReqEndStage (sender-inline)
+  notes: cn-279 numbers this class 723.
+- value: 722
+  direction: c2s
+  connection: game
+  name: gcpReqEndStageRoundOverReady
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_77B000 stamps 722 for Packet_gcpReqEndStageRoundOverReady (sender-inline)
+- value: 723
+  direction: c2s
+  connection: game
+  name: gcpReportHackDetectAfterGame
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_5DA090 stamps 723 for Packet_gcpReportHackDetectAfterGame (sender-inline)
+- value: 724
+  direction: c2s
+  connection: game
+  name: gcpReportHackDetectLucciCount
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_77A9B0 stamps 724 for Packet_gcpReportHackDetectLucciCount (sender-inline)
+- value: 725
+  direction: c2s
+  connection: game
+  name: gcpReqCreateItem
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_72E5E0 stamps 725 for Packet_gcpReqCreateItem (sender-inline)
+  notes: cn-279 numbers this class 727.
+- value: 726
+  direction: c2s
+  connection: game
+  name: gcpEatStar
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_77D1D0 stamps 726 for Packet_gcpEatStar (sender-inline)
+  notes: cn-279 numbers this class 730.
+- value: 727
+  direction: c2s
+  connection: game
+  name: gcpReqCreateStar
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_77ADA0 stamps 727 for Packet_gcpReqCreateStar (sender-inline)
+  notes: cn-279 numbers this class 731.
+- value: 728
+  direction: c2s
+  connection: game
+  name: gcpEatLucci
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_77D130 stamps 728 for Packet_gcpEatLucci (sender-inline)
+  notes: cn-279 numbers this class 732.
+- value: 729
+  direction: c2s
+  connection: game
+  name: gcpReqCreateLucci
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_77ACC0 stamps 729 for Packet_gcpReqCreateLucci (sender-inline)
+  notes: cn-279 numbers this class 733.
+- value: 801
+  direction: c2s
+  connection: game
+  name: gcpEnterShop
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_701030 stamps 801 for Packet_gcpEnterShop (sender-inline)
+- value: 802
+  direction: c2s
+  connection: game
+  name: gcpEnterInventory
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_701330 stamps 802 for Packet_gcpEnterInventory (sender-inline)
+- value: 803
+  direction: c2s
+  connection: game
+  name: gcpReqInventoryEquip
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_5EFCF0 stamps 803 for Packet_gcpReqInventoryEquip (sender-inline)
+- value: 804
+  direction: c2s
+  connection: game
+  name: gcpReqInventoryUnequip
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_5EFC50 stamps 804 for Packet_gcpReqInventoryUnequip (sender-inline)
+- value: 805
+  direction: c2s
+  connection: game
+  name: gcpReqInventoryUseItem
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_5F0420 stamps 805 for Packet_gcpReqInventoryUseItem (sender-inline)
+- value: 807
+  direction: c2s
+  connection: game
+  name: gcpReqInventoryThrowItem
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_46A110 stamps 807 for Packet_gcpReqInventoryThrowItem (caller-nearest)
+- value: 808
+  direction: c2s
+  connection: game
+  name: gcpReqShopBuy
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_4654C0 stamps 808 for Packet_gcpReqShopBuy (caller-nearest)
+- value: 809
+  direction: c2s
+  connection: game
+  name: gcpReqShopItemCardInfo
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_46A090 stamps 809 for Packet_gcpReqShopItemCardInfo (caller-nearest)
+- value: 810
+  direction: c2s
+  connection: game
+  name: gcpReqShopItemCardInfos
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_615A90 stamps 810 for Packet_gcpReqShopItemCardInfos (sender-inline)
+- value: 811
+  direction: c2s
+  connection: game
+  name: gcpReqPresentNewReceive
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_467190 stamps 811 for Packet_gcpReqPresentNewReceive (caller-nearest)
+- value: 812
+  direction: c2s
+  connection: game
+  name: gcpReqPresentReceiveList
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_467110 stamps 812 for Packet_gcpReqPresentReceiveList (caller-nearest)
+- value: 813
+  direction: c2s
+  connection: game
+  name: gcpReqPresentSendList
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_467210 stamps 813 for Packet_gcpReqPresentSendList (caller-nearest)
+- value: 814
+  direction: c2s
+  connection: game
+  name: gcpReqPresentSend
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_600C60 constructs Packet_gcpReqPresentSend and passes it to sub_466BD0, which stamps 814
+  notes: cn-279 numbers this class 817.
+- value: 815
+  direction: c2s
+  connection: game
+  name: gcpReqPresentReceive
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_465860 stamps 815 for Packet_gcpReqPresentReceive (caller-nearest)
+  notes: cn-279 numbers this class 818.
+- value: 816
+  direction: c2s
+  connection: game
+  name: gcpReqPresentThrow
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_4658E0 stamps 816 for Packet_gcpReqPresentThrow (caller-nearest)
+  notes: cn-279 numbers this class 819.
+- value: 817
+  direction: c2s
+  connection: game
+  name: gcpReqPresentSendThankMsg
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_468190 stamps 817 for Packet_gcpReqPresentSendThankMsg (caller-construct)
+- value: 818
+  direction: c2s
+  connection: game
+  name: gcpReqPresentViewThankMsg
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_467090 stamps 818 for Packet_gcpReqPresentViewThankMsg (caller-nearest)
+- value: 820
+  direction: c2s
+  connection: game
+  name: gcpReqPresentDeleteSend
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_467010 stamps 820 for Packet_gcpReqPresentDeleteSend (caller-nearest)
+  notes: cn-279 numbers this class 823.
+- value: 821
+  direction: c2s
+  connection: game
+  name: gcpReqPresentDeleteReceive
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_466F90 stamps 821 for Packet_gcpReqPresentDeleteReceive (caller-nearest)
+  notes: cn-279 numbers this class 824.
+- value: 822
+  direction: c2s
+  connection: game
+  name: gcpReqRealCouponUse
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_465C20 stamps 822 for Packet_gcpReqRealCouponUse (caller-nearest)
+- value: 823
+  direction: c2s
+  connection: game
+  name: gcpReqCheckCash
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_465E70 stamps 823 for Packet_gcpReqCheckCash (caller-nearest)
+  notes: cn-279 numbers this class 826.
+- value: 881
+  direction: c2s
+  connection: game
+  name: gcpReqDebugBegItem
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_615CA0 stamps 881 for Packet_gcpReqDebugBegItem (sender-inline)
+- value: 882
+  direction: c2s
+  connection: game
+  name: gcpReqDebugSetItemExpireTime
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_615C00 stamps 882 for Packet_gcpReqDebugSetItemExpireTime (sender-inline)
+- value: 900
+  direction: c2s
+  connection: game
+  name: gcpReqGuildLineBoard
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_423220 stamps 900 for Packet_gcpReqGuildLineBoard (caller-nearest)
+- value: 901
+  direction: c2s
+  connection: game
+  name: gcpReqGuildLineBoardWrite
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_4232A0 stamps 901 for Packet_gcpReqGuildLineBoardWrite (caller-nearest)
+- value: 902
+  direction: c2s
+  connection: game
+  name: gcpReqGuildLineBoardDelete
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 sub_423320 stamps 902 for Packet_gcpReqGuildLineBoardDelete (caller-nearest)
+- value: 32816
+  direction: c2s
+  connection: both
+  name: gppHumiliationEnd
+  name_source: label@kr-186
+  evidence: inferred
+  source: kept from cn-279; cn-279 sender sub_81CAA0 builds Packet_gppHumiliationEnd and stamps 32816 (cn-279)
+- value: 32827
+  direction: c2s
+  connection: game
+  name: gppSetAttribute
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 places Packet_gppSetAttribute at 32827; cn-279 sub_818940 constructs Packet_gppSetAttribute, stamps 32828 and sends on the game connection; cn-279 sub_4046D0 writes its three words. cn-279
+    sub_884050 uses it for the controlled character's confirmed item effect.
+  notes: cn-279 numbers this class 32828.
+- value: 32835
+  direction: c2s
+  connection: both
+  name: gppDead
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 places Packet_gppDead at 32835; cn-279 sub_81D680 constructs Packet_gppDead, stamps 32836 and sends one actor word through cn-279 sub_404F00; cn-279 sub_81B310 consumes it
+  notes: cn-279 numbers this class 32836.
+- value: 32856
+  direction: c2s
+  connection: both
+  name: gppCreateMobsFromSpawnGroup
+  name_source: mirrored
+  evidence: inferred
+  source: kr-186 places Packet_gppCreateMobsFromSpawnGroup at 32856; Mirrored from cn-324 (0x8059); the cn-279 gpp dispatcher carries a 0x8059 case (sub_773920)
+  notes: cn-279 numbers this class 32857.
+- value: 32860
+  direction: c2s
+  connection: both
+  name: gppCreateSpawnGroupMemberMob
+  name_source: mirrored
+  evidence: inferred
+  source: kr-186 places Packet_gppCreateSpawnGroupMemberMob at 32860; Mirrored from cn-324 (0x805E); the cn-279 gpp dispatcher carries a 0x805E case (sub_776140)
+  notes: cn-279 numbers this class 32862.
+- value: 32885
+  direction: c2s
+  connection: both
+  name: gppWanderLean
+  name_source: label@cn-279
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_702370 stamps32885 for the native movement record; cn-279 sub_4045F0 reads its 21-byte body
+- value: 32892
+  direction: c2s
+  connection: both
+  name: gppCreateAIObject
+  name_source: mirrored
+  evidence: unverified
+  source: kept from cn-279; Mirrored from cn-324 (0x807C)
+- value: 1
+  direction: s2c
+  connection: relay
+  name: rspRelayJoinAccepted_
+  name_source: coined
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_701270 native relay 1 inspects only opcode and connection, with no body read; direct game-side success via cn-279 sub_44C8F0; empty signal recorded in packets/relay-success.yaml
+- value: 2
+  direction: s2c
+  connection: game
+  name: gspRepGamePatch
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 2 labels the packet gspRepGamePatch before calling its handler
+- value: 3
+  direction: s2c
+  connection: game
+  name: gspRepLogin
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 3 labels the packet gspRepLogin before calling its handler
+- value: 4
+  direction: s2c
+  connection: game
+  name: gspReqPing
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 4 labels the packet gspReqPing before calling its handler
+- value: 5
+  direction: s2c
+  connection: game
+  name: gspRepMoveChannel
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 5 labels the packet gspRepMoveChannel before calling its handler
+  notes: cn-279 numbers this class 8.
+- value: 6
+  direction: s2c
+  connection: game
+  name: gspDisconnectMovedUser
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 6 labels the packet gspDisconnectMovedUser before calling its handler
+  notes: cn-279 numbers this class 9.
+- value: 7
+  direction: s2c
+  connection: game
+  name: gspRepMoveInto
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 7 labels the packet gspRepMoveInto before calling its handler
+  notes: cn-279 numbers this class 10.
+- value: 8
+  direction: s2c
+  connection: game
+  name: gspNotifyAutoTutorial_
+  name_source: coined
+  evidence: verified
+  source: kr-186 sub_67E140 case 8 only sets byte_9B415D, as cn-279 sub_6FFDE0 case 11 sets byte_ABB3DF; neither reads a field
+  notes: cn-279 numbers this 11.
+- value: 9
+  direction: s2c
+  connection: game
+  name: gspRepCheckCreateUserName
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 9 labels the packet gspRepCheckCreateUserName before calling its handler
+  notes: cn-279 numbers this class 12.
+- value: 10
+  direction: s2c
+  connection: game
+  name: gspRepCreateUserInfo
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 10 labels the packet gspRepCreateUserInfo before calling its handler
+  notes: cn-279 numbers this class 13.
+- value: 11
+  direction: s2c
+  connection: game
+  name: gspQueryBadProgram
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 11 labels the packet gspQueryBadProgram before calling its handler
+  notes: cn-279 numbers this class 14.
+- value: 101
+  direction: s2c
+  connection: game
+  name: gspRepListSession
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_715B60 case 101 reads Packet_gspRepListSession
+- value: 102
+  direction: s2c
+  connection: game
+  name: gspRepCreateSession
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_715B60 case 102 reads Packet_gspRepCreateSession
+- value: 103
+  direction: s2c
+  connection: game
+  name: gspRepJoinSession
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_715B60 case 103 reads Packet_gspRepJoinSession
+- value: 104
+  direction: s2c
+  connection: game
+  name: gspReqUserPoll
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_67E140 case 104 reads Packet_gspReqUserPoll
+- value: 105
+  direction: s2c
+  connection: game
+  name: gspUserStat
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 105 labels the packet gspUserStat before calling its handler
+- value: 106
+  direction: s2c
+  connection: game
+  name: gspReceiveServerNoticeMsg
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_67E140 case 106 reads Packet_gspReceiveServerNoticeMsg
+  notes: cn-279 numbers this class 107.
+- value: 107
+  direction: s2c
+  connection: game
+  name: gspGotoMenu
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 107 labels the packet gspGotoMenu before calling its handler
+  notes: cn-279 numbers this class 108.
+- value: 108
+  direction: s2c
+  connection: game
+  name: gspGotoLobby
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 108 labels the packet gspGotoLobby before calling its handler
+  notes: cn-279 numbers this class 109.
+- value: 109
+  direction: s2c
+  connection: game
+  name: gspGotoRoom
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 109 labels the packet gspGotoRoom before calling its handler
+  notes: cn-279 numbers this class 110.
+- value: 110
+  direction: s2c
+  connection: game
+  name: gspRepInvite
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 110 labels the packet gspRepInvite before calling its handler
+  notes: cn-279 numbers this class 111.
+- value: 111
+  direction: s2c
+  connection: game
+  name: gspNotifyInvite
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 111 labels the packet gspNotifyInvite before calling its handler
+  notes: cn-279 numbers this class 112.
+- value: 112
+  direction: s2c
+  connection: game
+  name: gspRepMoveToInviter
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 112 labels the packet gspRepMoveToInviter before calling its handler
+  notes: cn-279 numbers this class 113.
+- value: 113
+  direction: s2c
+  connection: game
+  name: gspRepMoveToFriend
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 113 labels the packet gspRepMoveToFriend before calling its handler
+  notes: cn-279 numbers this class 114.
+- value: 116
+  direction: s2c
+  connection: game
+  name: gspNotifyMatch
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_715B60 case 116 reads Packet_gspNotifyMatch
+  notes: cn-279 numbers this class 117.
+- value: 117
+  direction: s2c
+  connection: game
+  name: gspEventNotice
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 117 labels the packet gspEventNotice before calling its handler
+  notes: cn-279 numbers this class 118.
+- value: 119
+  direction: s2c
+  connection: game
+  name: gspEvent2GuildRanking
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 119 labels the packet gspEvent2GuildRanking before calling its handler
+  notes: cn-279 numbers this class 120.
+- value: 120
+  direction: s2c
+  connection: game
+  name: gspRepFighterInfo
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 120 labels the packet gspRepFighterInfo before calling its handler
+  notes: cn-279 numbers this class 121.
+- value: 121
+  direction: s2c
+  connection: game
+  name: gspRepAwardInfo
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 121 labels the packet gspRepAwardInfo before calling its handler
+  notes: cn-279 numbers this class 122.
+- value: 122
+  direction: s2c
+  connection: game
+  name: gspRepEvent
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 122 labels the packet gspRepEvent before calling its handler
+  notes: cn-279 numbers this class 123.
+- value: 124
+  direction: s2c
+  connection: game
+  name: gspNotifyPromotion
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 124 labels the packet gspNotifyPromotion before calling its handler
+  notes: cn-279 numbers this class 125.
+- value: 125
+  direction: s2c
+  connection: game
+  name: gspChangedUserName
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 125 labels the packet gspChangedUserName before calling its handler
+  notes: cn-279 numbers this class 126.
+- value: 201
+  direction: s2c
+  connection: game
+  name: gspUpdateParty
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 201 labels the packet gspUpdateParty before calling its handler
+- value: 202
+  direction: s2c
+  connection: game
+  name: gspRepJoinParty
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 202 labels the packet gspRepJoinParty before calling its handler
+- value: 203
+  direction: s2c
+  connection: game
+  name: gspUpdatePartyLeader
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 203 labels the packet gspUpdatePartyLeader before calling its handler
+- value: 204
+  direction: s2c
+  connection: game
+  name: gspNotifyPartyLeaveSuccess
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 204 labels the packet gspNotifyPartyLeaveSuccess before calling its handler
+- value: 205
+  direction: s2c
+  connection: game
+  name: gspNotifyMemberLeave
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 205 labels the packet gspNotifyMemberLeave before calling its handler
+- value: 206
+  direction: s2c
+  connection: game
+  name: gspNotifyNewMemberJoin
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 206 labels the packet gspNotifyNewMemberJoin before calling its handler
+- value: 301
+  direction: s2c
+  connection: game
+  name: gspReceivePartyChrPos
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 301 labels the packet gspReceivePartyChrPos before calling its handler
+- value: 302
+  direction: s2c
+  connection: game
+  name: gspRepKickFromParty
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 302 labels the packet gspRepKickFromParty before calling its handler
+- value: 303
+  direction: s2c
+  connection: game
+  name: gspRepChangePartyLeader
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 303 labels the packet gspRepChangePartyLeader before calling its handler
+- value: 304
+  direction: s2c
+  connection: game
+  name: gspNotifyKickFromParty
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 304 labels the packet gspNotifyKickFromParty before calling its handler
+- value: 305
+  direction: s2c
+  connection: game
+  name: gspReceivePartyChatMsg
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 305 labels the packet gspReceivePartyChatMsg before calling its handler
+- value: 306
+  direction: s2c
+  connection: game
+  name: gspRepPartyRecruiting
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 306 labels the packet gspRepPartyRecruiting before calling its handler
+- value: 307
+  direction: s2c
+  connection: game
+  name: gspNotifyKickMember
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 307 labels the packet gspNotifyKickMember before calling its handler
+- value: 501
+  direction: s2c
+  connection: game
+  name: gspRoomSetSession
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_686740 case 501 calls sub_6865E0, which builds Packet_gspRoomSetSession
+- value: 502
+  direction: s2c
+  connection: game
+  name: gspRoomSetMasterSlotIdx
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_686740 case 502 reads Packet_gspRoomSetMasterSlotIdx
+- value: 503
+  direction: s2c
+  connection: game
+  name: gspRoomSetSlot
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_686740 case 503 reads Packet_gspRoomSetSlot
+- value: 504
+  direction: s2c
+  connection: game
+  name: gspRoomChangeTeam
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_686740 case 504 reads Packet_gspRoomChangeTeam
+- value: 505
+  direction: s2c
+  connection: game
+  name: gspRoomChangeGameSetting
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_686740 case 505 reads Packet_gspRoomChangeGameSetting
+- value: 506
+  direction: s2c
+  connection: game
+  name: gspRoomChangeInventory
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_686740 case 506 reads Packet_gspRoomChangeInventory
+- value: 507
+  direction: s2c
+  connection: game
+  name: gspRoomRepChangeMaster
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_686740 case 507 reads Packet_gspRoomRepChangeMaster
+- value: 508
+  direction: s2c
+  connection: game
+  name: gspRoomReceiveChatMsg
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_686740 case 508 reads Packet_gspRoomReceiveChatMsg
+- value: 509
+  direction: s2c
+  connection: game
+  name: gspRoomEnterGame
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_686740 case 509 reads Packet_gspRoomEnterGame
+  notes: cn-279 numbers this class 510.
+- value: 510
+  direction: s2c
+  connection: game
+  name: gspRoomLeaveSlot
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_686740 case 510 reads Packet_gspRoomLeaveSlot
+  notes: cn-279 numbers this class 511.
+- value: 511
+  direction: s2c
+  connection: game
+  name: gspRoomOpenCloseSlot
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_686740 case 511 reads Packet_gspRoomOpenCloseSlot
+  notes: cn-279 numbers this class 512.
+- value: 512
+  direction: s2c
+  connection: game
+  name: gspRepKickFromSession
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_686740 case 512 reads Packet_gspRepKickFromSession
+  notes: cn-279 numbers this class 513.
+- value: 513
+  direction: s2c
+  connection: game
+  name: gspReceiveSessionChrPos
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_686740 case 513 reads Packet_gspReceiveSessionChrPos
+  notes: cn-279 numbers this class 514.
+- value: 515
+  direction: s2c
+  connection: game
+  name: gspRoomReceiveRecruitMsg
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_686740 case 515 reads Packet_gspRoomReceiveRecruitMsg
+  notes: cn-279 numbers this class 516.
+- value: 601
+  direction: s2c
+  connection: game
+  name: gspConnectToRelayServer
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 601 labels the packet gspConnectToRelayServer before calling its handler
+- value: 603
+  direction: s2c
+  connection: game
+  name: gspConnectToSuperPeer
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 603 labels the packet gspConnectToSuperPeer before calling its handler
+- value: 606
+  direction: s2c
+  connection: game
+  name: gspUdpStop
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 606 labels the packet gspUdpStop before calling its handler
+- value: 607
+  direction: s2c
+  connection: game
+  name: gspTryHolePunching
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_686740 case 607 reads Packet_gspTryHolePunching
+- value: 608
+  direction: s2c
+  connection: game
+  name: gspStopUdpDiscovery_
+  name_source: coined
+  evidence: inferred
+  source: kr-186 sub_686740 handles case 608 as cn-279 does; cn-279 sub_70A0F0 case608 clears the UDP discovery pending flag without reading a body
+- value: 609
+  direction: s2c
+  connection: game
+  name: gspNotifyUdpToServerReceived
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_686740 case 609 reads Packet_gspNotifyUdpToServerReceived
+- value: 610
+  direction: s2c
+  connection: game
+  name: gspTableSetHolePunching
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_686740 case 610 reads Packet_gspTableSetHolePunching
+- value: 611
+  direction: s2c
+  connection: game
+  name: gspUdpPeerTableEnd_
+  name_source: coined
+  evidence: inferred
+  source: 'kr-186 sub_686740 handles case 611 as cn-279 does; cn-279 sub_70A0F0 case611: cn-279 sub_7018A0 sends empty C2S607'
+- value: 612
+  direction: s2c
+  connection: game
+  name: gspUdpPeerPunchStart_
+  name_source: coined
+  evidence: inferred
+  source: kr-186 sub_686740 handles case 612 as cn-279 does; cn-279 sub_70A0F0 case612 starts native peer hole punching
+- value: 613
+  direction: s2c
+  connection: game
+  name: gspUdpPeerPunchFinish_
+  name_source: coined
+  evidence: inferred
+  source: kr-186 sub_686740 handles case 613 as cn-279 does; cn-279 sub_70A0F0 case613 -> cn-279 sub_701E00 finalizes peer attempts
+- value: 701
+  direction: s2c
+  connection: game
+  name: gspGameMapLoadingComplete
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_686740 case 701 reads Packet_gspGameMapLoadingComplete
+- value: 702
+  direction: s2c
+  connection: game
+  name: gspGameEverybodyLoadingComplete
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_686740 case 702 reads Packet_gspGameEverybodyLoadingComplete
+- value: 703
+  direction: s2c
+  connection: game
+  name: gspGameCountDown
+  name_source: label@cn-279
+  evidence: verified
+  source: kr-186 sub_686740 case 0x2BF calls sub_684760 under the same guard as cn-279 sub_70A0F0 case 703 (sub_708270)
+- value: 704
+  direction: s2c
+  connection: game
+  name: gspGameStartGame
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_686740 case 704 reads Packet_gspGameStartGame
+- value: 705
+  direction: s2c
+  connection: game
+  name: gspGameEndGame
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_686740 case 705 reads Packet_gspGameEndGame
+- value: 707
+  direction: s2c
+  connection: game
+  name: gspRespawn
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_7881C0 case 707 reads Packet_gspRespawn
+- value: 708
+  direction: s2c
+  connection: game
+  name: gspRequestRespawnIdx
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_7881C0 case 708 reads Packet_gspRequestRespawnIdx
+- value: 711
+  direction: s2c
+  connection: game
+  name: gspGameCreateGameItem
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_686740/sub_7881C0 case 711 reads Packet_gspGameCreateGameItem
+- value: 712
+  direction: s2c
+  connection: game
+  name: gspItemEaten
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_7881C0 case 712 reads Packet_gspItemEaten
+- value: 713
+  direction: s2c
+  connection: game
+  name: gspAddItemToSlot
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_7881C0 case 713 reads Packet_gspAddItemToSlot
+- value: 714
+  direction: s2c
+  connection: game
+  name: gspItemUsed
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_7881C0 case 714 reads Packet_gspItemUsed
+- value: 715
+  direction: s2c
+  connection: game
+  name: gspGameCreateStar
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_7881C0 case 715 reads Packet_gspGameCreateStar
+- value: 716
+  direction: s2c
+  connection: game
+  name: gspStarEaten
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_7881C0 case 716 reads Packet_gspStarEaten
+- value: 717
+  direction: s2c
+  connection: game
+  name: gspGameCreateLucci
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_7881C0 case 717 reads Packet_gspGameCreateLucci
+- value: 718
+  direction: s2c
+  connection: game
+  name: gspLucciEaten
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_7881C0 case 718 reads Packet_gspLucciEaten
+- value: 720
+  direction: s2c
+  connection: game
+  name: gspGameBroadcastPlayerScoreData
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_686740 case 720 reads Packet_gspGameBroadcastPlayerScoreData
+  notes: cn-279 numbers this class 722.
+- value: 721
+  direction: s2c
+  connection: game
+  name: gspGameRespawnCharacter
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_7881C0 case 721 reads Packet_gspGameRespawnCharacter
+  notes: cn-279 numbers this class 723.
+- value: 722
+  direction: s2c
+  connection: game
+  name: gspGameTimeOverEnd
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_686740 case 722 reads Packet_gspGameTimeOverEnd
+  notes: cn-279 numbers this class 725.
+- value: 723
+  direction: s2c
+  connection: game
+  name: gspGameShowResult_
+  name_source: coined
+  evidence: verified
+  source: kr-186 sub_686740 case 0x2D3 calls sub_685A40 under dword_9B40DC as cn-279 sub_70A0F0 case 726 calls sub_708BF0
+  notes: cn-279 numbers this 726.
+- value: 725
+  direction: s2c
+  connection: game
+  name: gspGameReturnAfterAward_
+  name_source: coined
+  evidence: verified
+  source: kr-186 sub_686740 case 0x2D5 passes the packet to sub_685890 as cn-279 sub_70A0F0 case 729 does to sub_708F60
+  notes: cn-279 numbers this 729; kr-186 has no award dialog (cn-279 727).
+- value: 726
+  direction: s2c
+  connection: game
+  name: gspGamePreCountDown
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_7881C0 case 726 reads Packet_gspGamePreCountDown
+  notes: cn-279 numbers this class 730.
+- value: 728
+  direction: s2c
+  connection: game
+  name: gspGamePrepareLucciEvent
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_686740 case 728 reads Packet_gspGamePrepareLucciEvent
+- value: 800
+  direction: s2c
+  connection: game
+  name: gspRepEnterShop
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 800 labels the packet gspRepEnterShop before calling its handler
+- value: 801
+  direction: s2c
+  connection: game
+  name: gspInventoryUpdateAllInventorySlot
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 801 labels the packet gspInventoryUpdateAllInventorySlot before calling its handler
+- value: 802
+  direction: s2c
+  connection: game
+  name: gspInventoryUpdateInventorySlots
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 802 labels the packet gspInventoryUpdateInventorySlots before calling its handler
+- value: 803
+  direction: s2c
+  connection: game
+  name: gspInventoryUpdateInventorySlot
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 803 labels the packet gspInventoryUpdateInventorySlot before calling its handler
+- value: 805
+  direction: s2c
+  connection: game
+  name: gspInventoryViewUpdateView
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 805 labels the packet gspInventoryViewUpdateView before calling its handler
+- value: 806
+  direction: s2c
+  connection: game
+  name: gspCheckExpiredTimeResult
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 806 labels the packet gspCheckExpiredTimeResult before calling its handler
+- value: 807
+  direction: s2c
+  connection: game
+  name: gspRepInventoryEquip
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 807 labels the packet gspRepInventoryEquip before calling its handler
+  notes: cn-279 numbers this class 808.
+- value: 808
+  direction: s2c
+  connection: game
+  name: gspRepInventoryUnequip
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 808 labels the packet gspRepInventoryUnequip before calling its handler
+  notes: cn-279 numbers this class 809.
+- value: 809
+  direction: s2c
+  connection: game
+  name: gspRepInventoryUseItem
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 809 labels the packet gspRepInventoryUseItem before calling its handler
+  notes: cn-279 numbers this class 810.
+- value: 810
+  direction: s2c
+  connection: game
+  name: gspRepInventoryDeleteItem
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 810 labels the packet gspRepInventoryDeleteItem before calling its handler
+  notes: cn-279 numbers this class 811.
+- value: 811
+  direction: s2c
+  connection: game
+  name: gspRepInventoryThrowItem
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 811 labels the packet gspRepInventoryThrowItem before calling its handler
+  notes: cn-279 numbers this class 812.
+- value: 812
+  direction: s2c
+  connection: game
+  name: gspRepShopBuy
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 812 labels the packet gspRepShopBuy before calling its handler
+  notes: cn-279 numbers this class 813.
+- value: 813
+  direction: s2c
+  connection: game
+  name: gspRepShopItemCardInfo
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 813 labels the packet gspRepShopItemCardInfo before calling its handler
+  notes: cn-279 numbers this class 814.
+- value: 814
+  direction: s2c
+  connection: game
+  name: gspRepShopItemCardInfos
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 814 labels the packet gspRepShopItemCardInfos before calling its handler
+- value: 815
+  direction: s2c
+  connection: game
+  name: gspRepPresentNewReceive
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 815 labels the packet gspRepPresentNewReceive before calling its handler
+  notes: cn-279 numbers this class 816.
+- value: 816
+  direction: s2c
+  connection: game
+  name: gspRepPresentReceiveList
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 816 labels the packet gspRepPresentReceiveList before calling its handler
+  notes: cn-279 numbers this class 817.
+- value: 817
+  direction: s2c
+  connection: game
+  name: gspRepPresentSendList
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 817 labels the packet gspRepPresentSendList before calling its handler
+  notes: cn-279 numbers this class 818.
+- value: 818
+  direction: s2c
+  connection: game
+  name: gspRepPresentSend
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 818 labels the packet gspRepPresentSend before calling its handler
+  notes: cn-279 numbers this class 822.
+- value: 819
+  direction: s2c
+  connection: game
+  name: gspRepPresentReceive
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 819 labels the packet gspRepPresentReceive before calling its handler
+  notes: cn-279 numbers this class 823.
+- value: 820
+  direction: s2c
+  connection: game
+  name: gspRepPresentThrow
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 820 labels the packet gspRepPresentThrow before calling its handler
+  notes: cn-279 numbers this class 824.
+- value: 821
+  direction: s2c
+  connection: game
+  name: gspRepPresentSendThankMsg
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 821 labels the packet gspRepPresentSendThankMsg before calling its handler
+  notes: cn-279 numbers this class 825.
+- value: 822
+  direction: s2c
+  connection: game
+  name: gspRepPresentViewThankMsg
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 822 labels the packet gspRepPresentViewThankMsg before calling its handler
+  notes: cn-279 numbers this class 826.
+- value: 823
+  direction: s2c
+  connection: game
+  name: gspRepPresentConfirm
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 823 labels the packet gspRepPresentConfirm before calling its handler
+  notes: cn-279 numbers this class 827.
+- value: 824
+  direction: s2c
+  connection: game
+  name: gspRepPresentDeleteSend
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 824 labels the packet gspRepPresentDeleteSend before calling its handler
+  notes: cn-279 numbers this class 828.
+- value: 825
+  direction: s2c
+  connection: game
+  name: gspRepPresentDeleteReceive
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 825 labels the packet gspRepPresentDeleteReceive before calling its handler
+  notes: cn-279 numbers this class 829.
+- value: 826
+  direction: s2c
+  connection: game
+  name: gspRepRealCouponUse
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 826 labels the packet gspRepRealCouponUse before calling its handler
+  notes: cn-279 numbers this class 830.
+- value: 900
+  direction: s2c
+  connection: game
+  name: gspRepGuildLineBoard
+  name_source: label@kr-186
+  evidence: verified
+  source: kr-186 sub_67E140 case 900 labels the packet gspRepGuildLineBoard before calling its handler
+- value: 903
+  direction: s2c
+  connection: game
+  name: gspRepGuildLineBoardWrite
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 dispatcher sub_67E140 case 903 reads Packet_gspRepGuildLineBoardWrite
+- value: 32772
+  direction: s2c
+  connection: both
+  name: gppSplashDamager
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_8229F0 via sub_404650; resolve damager, apply splash; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d,d,b,6×d; relay round feed
+- value: 32773
+  direction: s2c
+  connection: both
+  name: gppNearDamager
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_8263D0 via sub_47E650; Character cast, near-damage apply; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d,d; relay round feed
+- value: 32774
+  direction: s2c
+  connection: relay
+  name: gppDeleteObject
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_81B500 via sub_44C1A0 (vtable D-class); despawn via object vtable+32; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d; relay round feed
+- value: 32775
+  direction: s2c
+  connection: relay
+  name: gppFireBullet
+  name_source: label@cn-279
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_8294F0 via GameContext virtual slot 11; fire-echo lag sample + bullet spawn; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d,d,d,b,6×d,d,d,B,B; cn-279-only, no kr-812 row
+- value: 32776
+  direction: s2c
+  connection: relay
+  name: gppExplodeBullet
+  name_source: label@kr-186
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_822DB0 via sub_4052E0; GoDamager+Character, sub_7EB450; in-round dispatcher cn-279 sub_82AB20
+  notes: Body 5×d; cn-279-only, no kr-812 row
+- value: 32777
+  direction: s2c
+  connection: relay
+  name: gppDamageObject
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_822280 via sub_404900; GoDamager+Character, sub_7EB450; in-round dispatcher cn-279 sub_82AB20
+  notes: Body 9×d; relay round feed
+- value: 32778
+  direction: s2c
+  connection: relay
+  name: gppKillObject
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_81A560 via sub_47E650; resolve both ids, victim kill; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d,d; relay round feed
+- value: 32782
+  direction: s2c
+  connection: relay
+  name: gppAim
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_81A9E0 via sub_44C1A0; Character cast, aim state; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d; relay round feed
+- value: 32783
+  direction: s2c
+  connection: relay
+  name: gppSetTargettingObj
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_81A880 via sub_47E650; MobLua cast, sub_7B52B0; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d,d; relay round feed
+- value: 32787
+  direction: s2c
+  connection: relay
+  name: gppKnocked
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_827A30 via sub_404CB0; also stamps game 710 score; in-round dispatcher cn-279 sub_82AB20
+  notes: Body 6×d,B,B; relay round feed
+- value: 32788
+  direction: s2c
+  connection: relay
+  name: gppStunned
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_81FD50 via sub_404D80; Character/MobBase, sub_7F37D0; in-round dispatcher cn-279 sub_82AB20
+  notes: Body 6×d; relay round feed
+- value: 32789
+  direction: s2c
+  connection: relay
+  name: gppShocked
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_81B110 via sub_44C1A0; Character cast; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d; relay round feed
+- value: 32790
+  direction: s2c
+  connection: relay
+  name: gppEndStunned
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_81B0A0 via sub_44C1A0; Character cast; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d; relay round feed
+- value: 32791
+  direction: s2c
+  connection: relay
+  name: gppKickStart
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_822060 via sub_405360; Character/MobBase, sub_7FA420; in-round dispatcher cn-279 sub_82AB20
+  notes: Body 3×d; relay round feed
+- value: 32792
+  direction: s2c
+  connection: relay
+  name: gppKickFail
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_81B2A0 via sub_44C1A0; Character, sub_7E8C10; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d; relay round feed
+- value: 32793
+  direction: s2c
+  connection: relay
+  name: gppTryRescued
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_81AF80 via sub_47E650; Character, gate sub_811110; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d,d; relay round feed
+- value: 32794
+  direction: s2c
+  connection: relay
+  name: gppTryKicked
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_81B010 via sub_47E650; Character, gate; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d,d; relay round feed
+- value: 32795
+  direction: s2c
+  connection: relay
+  name: gppKicked
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_8268D0 via sub_404E50; Character/MobBase, sub_7F76A0 + game 710; in-round dispatcher cn-279 sub_82AB20
+  notes: Body B,5×d,B; relay round feed
+- value: 32796
+  direction: s2c
+  connection: relay
+  name: gppKickedNoPang
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_822130 via sub_4052E0; Character/MobBase, sub_7F76A0; in-round dispatcher cn-279 sub_82AB20
+  notes: Body 5×d; relay round feed
+- value: 32798
+  direction: s2c
+  connection: relay
+  name: gppMeleeReady
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_81AEB0 via sub_404F10; Character, sub_7EB700; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d,d,b; relay round feed
+- value: 32800
+  direction: s2c
+  connection: relay
+  name: gppChangeState
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_81AE30 via sub_405360; Character cast; in-round dispatcher cn-279 sub_82AB20
+  notes: Body 3×d; relay round feed
+- value: 32801
+  direction: s2c
+  connection: relay
+  name: gppLockInto
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_81ADC0 via sub_44C1A0; Character, sub_7E8DF0; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d; relay round feed
+- value: 32805
+  direction: s2c
+  connection: relay
+  name: gppDying
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_81B3F0 via sub_44C1A0; Character cast; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d; relay round feed
+- value: 32806
+  direction: s2c
+  connection: relay
+  name: gppPopOut
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_81B180 via sub_47E650; Character, sub_817E90/sub_70C600; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d,d; relay round feed
+- value: 32809
+  direction: s2c
+  connection: relay
+  name: gppClimbWall
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_821FD0 via sub_47E650; Character, sub_7F3620; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d,d; relay round feed
+- value: 32810
+  direction: s2c
+  connection: relay
+  name: gppUpdateWeaponInfo
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_81F960 via sub_405360; Character, sub_87F750/sub_7E7F70; in-round dispatcher cn-279 sub_82AB20
+  notes: Body 3×d; relay round feed
+- value: 32811
+  direction: s2c
+  connection: relay
+  name: gppReload
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_821F60 via sub_44C1A0; Character, sub_7F69D0; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d; relay round feed
+- value: 32812
+  direction: s2c
+  connection: relay
+  name: gppResetChrAttr
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_81F840 via sub_47E650; Character, sub_43A790/sub_7EF420; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d,d; relay round feed
+- value: 32813
+  direction: s2c
+  connection: relay
+  name: gppReturnToNormal
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_81A650 via sub_44C1A0; GameObject resolve; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d; relay round feed
+- value: 32814
+  direction: s2c
+  connection: relay
+  name: gppToNormalShootWeapon
+  name_source: label@kr-186
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_81A5E0 via sub_44C1A0; Character, sub_7E6090; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d; cn-279-only, no kr-812 row
+- value: 32815
+  direction: s2c
+  connection: relay
+  name: gppHumiliationStart
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_81FE80 via sub_47E650; Character, sub_7F36A0; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d,d; relay round feed
+- value: 32816
+  direction: s2c
+  connection: both
+  name: gppHumiliationEnd
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_826270 via sub_47E650; re-invokes the C2S 32772 sender; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d,d; relay round feed
+- value: 32817
+  direction: s2c
+  connection: relay
+  name: gppDamageByMap
+  name_source: label@kr-186
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_819470 via sub_47E650; hazard code 10001 = map hazard; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d,d; cn-279-only, no kr-812 row
+- value: 32818
+  direction: s2c
+  connection: relay
+  name: gppStickGrenadeTo
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_81A4F0 via sub_4052E0; GoGrenade cast, sub_80A170; in-round dispatcher cn-279 sub_82AB20
+  notes: Body 5×d; relay round feed
+- value: 32819
+  direction: s2c
+  connection: relay
+  name: gppFireItemBullet
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 places Packet_gppFireItemBullet at 32819; cn-279 sub_829470 via sub_403BF0; Character, sub_806AC0+sub_824F70; in-round dispatcher cn-279 sub_82AB20
+  notes: cn-279 numbers this class 32820.
+- value: 32821
+  direction: s2c
+  connection: relay
+  name: gppCreateNPC
+  name_source: label@kr-812
+  evidence: inferred
+  source: kr-186 places Packet_gppCreateNPC at 32821; cn-279 sub_82A700 via nullsub sub_481D60; spawns from the pending spawn-list; in-round dispatcher cn-279 sub_82AB20
+  notes: cn-279 numbers this class 32822.
+- value: 32823
+  direction: s2c
+  connection: relay
+  name: gppItemUseResult
+  name_source: label@kr-812
+  evidence: inferred
+  source: kr-186 places Packet_gppItemUseResult at 32823; cn-279 sub_8198F0 via sub_404F80; in-round dispatcher cn-279 sub_82AB20
+  notes: cn-279 numbers this class 32824.
+- value: 32824
+  direction: s2c
+  connection: relay
+  name: gppTargetLocked
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 places Packet_gppTargetLocked at 32824; cn-279 sub_8198B0 via sub_404F80; in-round dispatcher cn-279 sub_82AB20
+  notes: cn-279 numbers this class 32825.
+- value: 32825
+  direction: s2c
+  connection: relay
+  name: gppCreateItemBullet
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 places Packet_gppCreateItemBullet at 32825; cn-279 sub_819840 via sub_405010; in-round dispatcher cn-279 sub_82AB20
+  notes: cn-279 numbers this class 32826.
+- value: 32826
+  direction: s2c
+  connection: relay
+  name: gppLockableUsed
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 places Packet_gppLockableUsed at 32826; cn-279 sub_81BAB0 via sub_4050B0; in-round dispatcher cn-279 sub_82AB20
+  notes: cn-279 numbers this class 32827.
+- value: 32827
+  direction: s2c
+  connection: relay
+  name: gppSetAttribute
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 places Packet_gppSetAttribute at 32827; cn-279 sub_81BA10 via sub_405360; Character, sub_8990A0/sub_403640/sub_899140; in-round dispatcher cn-279 sub_82AB20
+  notes: cn-279 numbers this class 32828.
+- value: 32828
+  direction: s2c
+  connection: relay
+  name: gppHitByItem
+  name_source: label@kr-812
+  evidence: inferred
+  source: kr-186 places Packet_gppHitByItem at 32828; cn-279 sub_81B9A0 via sub_47E650; Character, sub_7E9A20; in-round dispatcher cn-279 sub_82AB20
+  notes: cn-279 numbers this class 32829.
+- value: 32829
+  direction: s2c
+  connection: relay
+  name: gppEndMagnet
+  name_source: label@kr-812
+  evidence: inferred
+  source: kr-186 places Packet_gppEndMagnet at 32829; cn-279 sub_81B920 via sub_47E650; Character cast; in-round dispatcher cn-279 sub_82AB20
+  notes: cn-279 numbers this class 32830.
+- value: 32830
+  direction: s2c
+  connection: relay
+  name: gppEndFreezeCannon
+  name_source: label@kr-812
+  evidence: inferred
+  source: kr-186 places Packet_gppEndFreezeCannon at 32830; cn-279 sub_81B8B0 via sub_44C1A0; Character cast; in-round dispatcher cn-279 sub_82AB20
+  notes: cn-279 numbers this class 32831.
+- value: 32831
+  direction: s2c
+  connection: relay
+  name: gppCreateMapItem
+  name_source: label@kr-812
+  evidence: inferred
+  source: kr-186 places Packet_gppCreateMapItem at 32831; cn-279 sub_8239A0 via sub_405180; Character, sub_885830; in-round dispatcher cn-279 sub_82AB20
+  notes: cn-279 numbers this class 32832.
+- value: 32832
+  direction: s2c
+  connection: relay
+  name: gppStepOnBanana
+  name_source: label@kr-812
+  evidence: inferred
+  source: kr-186 places Packet_gppStepOnBanana at 32832; cn-279 sub_81B810 via sub_4051F0; Character, sub_7E8AB0; in-round dispatcher cn-279 sub_82AB20
+  notes: cn-279 numbers this class 32833.
+- value: 32833
+  direction: s2c
+  connection: relay
+  name: gppWallState
+  name_source: label@kr-812
+  evidence: inferred
+  source: kr-186 places Packet_gppWallState at 32833; cn-279 sub_81A980 via sub_47E650 (no cast); in-round dispatcher cn-279 sub_82AB20
+  notes: cn-279 numbers this class 32834.
+- value: 32834
+  direction: s2c
+  connection: relay
+  name: gppGotKicked
+  name_source: label@kr-812
+  evidence: inferred
+  source: kr-186 places Packet_gppGotKicked at 32834; cn-279 sub_81F8D0 via sub_44C1A0; Character, sub_7EB7B0; in-round dispatcher cn-279 sub_82AB20
+  notes: cn-279 numbers this class 32835.
+- value: 32835
+  direction: s2c
+  connection: relay
+  name: gppDead
+  name_source: label@kr-812
+  evidence: inferred
+  source: kr-186 places Packet_gppDead at 32835; cn-279 sub_81B310 via sub_44C1A0; Character, sub_421340+sub_7E8D00; in-round dispatcher cn-279 sub_82AB20
+  notes: cn-279 numbers this class 32836.
+- value: 32836
+  direction: s2c
+  connection: relay
+  name: gppKickEnd
+  name_source: label@kr-812
+  evidence: inferred
+  source: kr-186 places Packet_gppKickEnd at 32836; cn-279 sub_81FEF0 via sub_44C1A0; Character, sub_7F32D0; in-round dispatcher cn-279 sub_82AB20
+  notes: cn-279 numbers this class 32837.
+- value: 32837
+  direction: s2c
+  connection: relay
+  name: gppResultState
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 places Packet_gppResultState at 32837; cn-279 sub_81A910 via sub_47E650; Character cast; in-round dispatcher cn-279 sub_82AB20
+  notes: cn-279 numbers this class 32838.
+- value: 32838
+  direction: s2c
+  connection: relay
+  name: gppLuaEventCharacterState
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 places Packet_gppLuaEventCharacterState at 32838; cn-279 sub_81B7B0 via sub_47E650; in-round dispatcher cn-279 sub_82AB20
+  notes: cn-279 numbers this class 32839.
+- value: 32839
+  direction: s2c
+  connection: relay
+  name: gppPing
+  name_source: label@kr-812
+  evidence: inferred
+  source: kr-186 places Packet_gppPing at 32839; cn-279 sub_819710 via raw sub_4EC030×2; RTT sample; in-round dispatcher cn-279 sub_82AB20
+  notes: cn-279 numbers this class 32840.
+- value: 32840
+  direction: s2c
+  connection: relay
+  name: gppIniPacket
+  name_source: label@kr-812
+  evidence: inferred
+  source: kr-186 places Packet_gppIniPacket at 32840; cn-279 sub_776310 via sub_481C90; Lambda::Stream blob; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)
+  notes: cn-279 numbers this class 32841.
+- value: 32841
+  direction: s2c
+  connection: relay
+  name: gppCreateMob
+  name_source: label@kr-812
+  evidence: inferred
+  source: kr-186 places Packet_gppCreateMob at 32841; cn-279 sub_776270 via sub_42C2B0; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)
+  notes: cn-279 numbers this class 32842.
+- value: 32842
+  direction: s2c
+  connection: relay
+  name: gppMobFireBullet
+  name_source: label@kr-812
+  evidence: inferred
+  source: kr-186 places Packet_gppMobFireBullet at 32842; cn-279 sub_773180 via sub_42C410; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)
+  notes: cn-279 numbers this class 32843.
+- value: 32843
+  direction: s2c
+  connection: relay
+  name: gppMobFireMelee
+  name_source: label@kr-812
+  evidence: inferred
+  source: kr-186 places Packet_gppMobFireMelee at 32843; cn-279 sub_773050 via sub_47E650; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)
+  notes: cn-279 numbers this class 32844.
+- value: 32844
+  direction: s2c
+  connection: relay
+  name: gppMobKnocked
+  name_source: label@kr-812
+  evidence: inferred
+  source: kr-186 places Packet_gppMobKnocked at 32844; cn-279 sub_772F00 via sub_42C510; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)
+  notes: cn-279 numbers this class 32845.
+- value: 32845
+  direction: s2c
+  connection: relay
+  name: gppMobDie
+  name_source: label@kr-812
+  evidence: inferred
+  source: kr-186 places Packet_gppMobDie at 32845; cn-279 sub_772D00 via sub_42C570; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)
+  notes: cn-279 numbers this class 32846.
+- value: 32846
+  direction: s2c
+  connection: relay
+  name: gppMobPush
+  name_source: label@kr-812
+  evidence: inferred
+  source: kr-186 places Packet_gppMobPush at 32846; cn-279 sub_772C80 via sub_42C570; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)
+  notes: cn-279 numbers this class 32847.
+- value: 32847
+  direction: s2c
+  connection: relay
+  name: gppMobTryKicked
+  name_source: label@kr-812
+  evidence: inferred
+  source: kr-186 places Packet_gppMobTryKicked at 32847; cn-279 sub_772B50 via sub_47E650; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)
+  notes: cn-279 numbers this class 32848.
+- value: 32848
+  direction: s2c
+  connection: relay
+  name: gppMobKicked
+  name_source: label@kr-812
+  evidence: inferred
+  source: kr-186 places Packet_gppMobKicked at 32848; cn-279 sub_773950 via sub_42C660; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)
+  notes: cn-279 numbers this class 32849.
+- value: 32849
+  direction: s2c
+  connection: relay
+  name: gppMobPopOut
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 places Packet_gppMobPopOut at 32849; cn-279 sub_772A10 via sub_44C1A0; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)
+  notes: cn-279 numbers this class 32850.
+- value: 32850
+  direction: s2c
+  connection: relay
+  name: gppMobHelp
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 places Packet_gppMobHelp at 32850; cn-279 sub_772990 via sub_47E650; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)
+  notes: cn-279 numbers this class 32851.
+- value: 32851
+  direction: s2c
+  connection: relay
+  name: gppMobTryRescued
+  name_source: label@kr-812
+  evidence: inferred
+  source: kr-186 places Packet_gppMobTryRescued at 32851; cn-279 sub_772860 via sub_47E650; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)
+  notes: cn-279 numbers this class 32852.
+- value: 32852
+  direction: s2c
+  connection: relay
+  name: gppMobRescue
+  name_source: label@kr-812
+  evidence: inferred
+  source: kr-186 places Packet_gppMobRescue at 32852; cn-279 sub_772730 via sub_47E650; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)
+  notes: cn-279 numbers this class 32853.
+- value: 32853
+  direction: s2c
+  connection: relay
+  name: gppMobPang
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 places Packet_gppMobPang at 32853; cn-279 sub_7726B0 via sub_47E650; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)
+  notes: cn-279 numbers this class 32854.
+- value: 32854
+  direction: s2c
+  connection: relay
+  name: gppMobKickStart
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 places Packet_gppMobKickStart at 32854; cn-279 sub_772630 via sub_47E650; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)
+  notes: cn-279 numbers this class 32855.
+- value: 32855
+  direction: s2c
+  connection: relay
+  name: gppMobKickFail
+  name_source: label@kr-186
+  evidence: inferred
+  source: kr-186 places Packet_gppMobKickFail at 32855; cn-279 sub_7725C0 via sub_44C1A0; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)
+  notes: cn-279 numbers this class 32856.
+- value: 32856
+  direction: s2c
+  connection: both
+  name: gppCreateMobsFromSpawnGroup
+  name_source: mirrored
+  evidence: inferred
+  source: kr-186 places Packet_gppCreateMobsFromSpawnGroup at 32856; Mirrored from cn-324; cn-279 gpp dispatcher case 0x8059 -> sub_773920
+  notes: cn-279 numbers this class 32857.
+- value: 32857
+  direction: s2c
+  connection: relay
+  name: gppSpawnMobsByTrigger
+  name_source: label@kr-812
+  evidence: inferred
+  source: kr-186 places Packet_gppSpawnMobsByTrigger at 32857; cn-279 sub_7738F0 via sub_44C1A0; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)
+  notes: cn-279 numbers this class 32859.
+- value: 32858
+  direction: s2c
+  connection: relay
+  name: gppCreateNpcBreakableModel
+  name_source: label@kr-812
+  evidence: inferred
+  source: kr-186 places Packet_gppCreateNpcBreakableModel at 32858; cn-279 sub_774480 via sub_42C710; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)
+  notes: cn-279 numbers this class 32860.
+- value: 32859
+  direction: s2c
+  connection: relay
+  name: gppRemoveAddableObject
+  name_source: label@kr-812
+  evidence: inferred
+  source: kr-186 places Packet_gppRemoveAddableObject at 32859; cn-279 sub_7756D0 via sub_481C90; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)
+  notes: cn-279 numbers this class 32861.
+- value: 32860
+  direction: s2c
+  connection: both
+  name: gppCreateSpawnGroupMemberMob
+  name_source: mirrored
+  evidence: inferred
+  source: kr-186 places Packet_gppCreateSpawnGroupMemberMob at 32860; Mirrored from cn-324; cn-279 gpp dispatcher case 0x805E -> sub_776140
+  notes: cn-279 numbers this class 32862.
+- value: 32861
+  direction: s2c
+  connection: relay
+  name: gppActivateSpawnObjByTrigger
+  name_source: label@kr-812
+  evidence: inferred
+  source: kr-186 places Packet_gppActivateSpawnObjByTrigger at 32861; cn-279 sub_771F50 via sub_44C1A0; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)
+  notes: cn-279 numbers this class 32863.
+- value: 32862
+  direction: s2c
+  connection: relay
+  name: gppMobLuaMessage
+  name_source: label@kr-812
+  evidence: inferred
+  source: kr-186 places Packet_gppMobLuaMessage at 32862; cn-279 sub_772190 via sub_480550; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)
+  notes: cn-279 numbers this class 32865.
+- value: 32864
+  direction: s2c
+  connection: relay
+  name: gppTriggerLuaEvent
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_774400 via sub_481C90; relay round-feed dispatcher cn-279 sub_776820 (after its call to cn-279 sub_82AB20)
+  notes: Body s; relay round feed
+- value: 32874
+  direction: s2c
+  connection: relay
+  name: gppSetNoDamaged
+  name_source: label@cn-279
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_819630 via sub_425AA0; sets byte +17588; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d,B; cn-279-only, no kr-812 row
+- value: 32875
+  direction: s2c
+  connection: relay
+  name: gppSetForcedInvincible
+  name_source: label@cn-279
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_819530 via sub_425AA0; sub_4ED110; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d,B; cn-279-only, no kr-812 row
+- value: 32877
+  direction: s2c
+  connection: both
+  name: gppMobDropBombOnDead
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_8260C0 via sub_404650; item id from +4288, drop spawn; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d,d,b,6×d; relay round feed
+- value: 32878
+  direction: s2c
+  connection: relay
+  name: gppSoccerModeGoal
+  name_source: label@cn-279
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_819300 via sub_404540; marks team round state, fires Lua event; in-round dispatcher cn-279 sub_82AB20
+  notes: Body b; cn-279-only, no kr-812 row
+- value: 32879
+  direction: s2c
+  connection: relay
+  name: gppSoccerModeCountDown
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_821DD0 via nullsub; 4000 ms timer, per-team sends gcpRespawn; in-round dispatcher cn-279 sub_82AB20
+  notes: Empty body (nullsub deserializer)
+- value: 32880
+  direction: s2c
+  connection: relay
+  name: gppSoccerModeContinueGame
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_819210 via nullsub; timer + Lua event; in-round dispatcher cn-279 sub_82AB20
+  notes: Empty body (nullsub deserializer)
+- value: 32881
+  direction: s2c
+  connection: both
+  name: gppDropHumilPrevItem
+  name_source: label@cn-279
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_825E20 via sub_44C1A0; drops humiliation item with orientation math; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d; cn-279-only, no kr-812 row
+- value: 32882
+  direction: s2c
+  connection: relay
+  name: gppGhost
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_821EF0 via sub_425AA0; sub_7F4F20 ghost flag; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d,B; relay round feed
+- value: 32884
+  direction: s2c
+  connection: relay
+  name: gppWatchingOnMe
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_81B550 via sub_4051F0; Character, gate, sub_40E7A0; in-round dispatcher cn-279 sub_82AB20
+  notes: Body d,d,B; relay round feed
+- value: 32885
+  direction: s2c
+  connection: both
+  name: gppWanderLean
+  name_source: label@cn-279
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_703430 consumes the native movement record using cn-279 sub_4045F0
+- value: 32888
+  direction: s2c
+  connection: relay
+  name: gppSyncUseItemSimply
+  name_source: label@kr-812
+  evidence: inferred
+  source: kept from cn-279; cn-279 sub_81A430 via sub_405360; Character + item-manager map; in-round dispatcher cn-279 sub_82AB20
+  notes: Body 3×d; relay round feed
+- value: 32892
+  direction: s2c
+  connection: both
+  name: gppCreateAIObject
+  name_source: mirrored
+  evidence: unverified
+  source: kept from cn-279; Mirrored from cn-324

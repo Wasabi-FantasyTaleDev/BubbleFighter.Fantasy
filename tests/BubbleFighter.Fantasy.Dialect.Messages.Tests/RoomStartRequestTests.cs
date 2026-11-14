@@ -37,8 +37,9 @@ public sealed class RoomStartRequestTests
         var body = buffer.WrittenSpan.ToArray();
         Assert.Equal(64 + (trailingFlag ? 4 : 0) + 2 * (9 + 22 + 3 + 6), body.Length);
 
+        // The eighth word is the mission difficulty (kr-812 sub_6A1160, cn-324 sub_59DEA0).
         Assert.Equal(new GameSettingChange("Map label", "rel_zombie02_Twobridge", "All", "Random",
-            true, false, 16, 3), PlazaRoomWire.ReadChangeGameSetting(TestBuilds.Packets, build, body));
+            true, false, 16, 3) { Difficulty = 1007 }, PlazaRoomWire.ReadChangeGameSetting(TestBuilds.Packets, build, body));
         var typed = PlayRoomCodec.ReadSettingsChange(TestBuilds.Packets, build, body);
         Assert.Equal(16, typed.ModeId);
         Assert.Equal("Random", typed.MapKey);

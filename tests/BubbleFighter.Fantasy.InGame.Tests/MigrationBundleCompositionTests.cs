@@ -123,7 +123,12 @@ public sealed class MigrationBundleCompositionTests
             var composer = Composer(profiles);
             var builds = composer.Compose("all", []).Where(row => row.Id.EndsWith(".lobby", StringComparison.Ordinal))
                 .Select(row => row.Id[..^".lobby".Length]).ToArray();
-            Assert.Equal(13, builds.Length);
+            Assert.Equal(15, builds.Length);
+            // Builds whose native move is not audited stay out of the node-wide migration rows; kr-186 has no
+            // server list at all, and tw-410's move reply is not yet checked against its own channel table.
+            string[] unaudited = ["kr-186", "tw-410"];
+            Assert.All(unaudited, build => Assert.Contains(build, builds));
+            builds = [.. builds.Except(unaudited)];
             Assert.DoesNotContain(composer.Compose("all", []), row => row.Plugin.StartsWith("cluster.migration-", StringComparison.Ordinal));
             var channel = ChannelPatch(60, [60]);
             try

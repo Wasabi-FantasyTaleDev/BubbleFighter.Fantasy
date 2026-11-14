@@ -25,10 +25,13 @@ public sealed class RoomSettingChangeMap
     private readonly IReadOnlyDictionary<string, string> _targets;
     private readonly string _missionPrefix;
     private readonly IReadOnlyDictionary<string, string> _copies;
+    private readonly IReadOnlyDictionary<string, string> _wordCopies;
 
     private RoomSettingChangeMap(PacketTables tables, string build, IReadOnlyDictionary<string, string> request,
-        IReadOnlyDictionary<string, string> targets, string missionPrefix, IReadOnlyDictionary<string, string> copies) =>
-        (_tables, _build, _request, _targets, _missionPrefix, _copies) = (tables, build, request, targets, missionPrefix, copies);
+        IReadOnlyDictionary<string, string> targets, string missionPrefix, IReadOnlyDictionary<string, string> copies,
+        IReadOnlyDictionary<string, string> wordCopies) =>
+        (_tables, _build, _request, _targets, _missionPrefix, _copies, _wordCopies) =
+            (tables, build, request, targets, missionPrefix, copies, wordCopies);
 
     /// <summary>Loads a build's value, or returns null when the build states none.</summary>
     /// <param name="tables">The packet tables the build is named in.</param>
@@ -45,33 +48,40 @@ public sealed class RoomSettingChangeMap
             return null;
         var where = $"{build} room_setting_change_map";
         if (raw is not Dictionary<string, object?> map
-            || map.Keys.Any(key => key is not ("request" or "targets" or "mission_prefix" or "string_copies"))
+            || map.Keys.Any(key => key is not ("request" or "targets" or "mission_prefix" or "string_copies" or "word_copies"))
             || map.GetValueOrDefault("request") is not Dictionary<string, object?> request
             || map.GetValueOrDefault("targets") is not Dictionary<string, object?> targets
             || map.GetValueOrDefault("mission_prefix") is not string { Length: > 0 } prefix)
             throw new ConfigException($"{where} must state request, targets and mission_prefix.");
         var requestFields = tables.Resolve(build, "RoomGameSettingChangeRequest");
         var settingFields = tables.Resolve(build, "GameSetting");
-        var copies = new Dictionary<string, string>(StringComparer.Ordinal);
-        if (map.TryGetValue("string_copies", out var rawCopies))
-        {
-            if (rawCopies is not Dictionary<string, object?> copyMap || copyMap.Count != 2
-                || copyMap.GetValueOrDefault("targets") is not string[] { Length: > 0 } copyTargets
-                || copyMap.GetValueOrDefault("sources") is not string[] copySources || copySources.Length != copyTargets.Length
-                || copyTargets.Distinct(StringComparer.Ordinal).Count() != copyTargets.Length)
-                throw new ConfigException($"{where}.string_copies requires equally sized targets and sources, with distinct targets.");
-            foreach (var (target, name) in copyTargets.Zip(copySources))
-            {
-                if (!settingFields.Any(field => field.Name == target && field.Type == "wstr")
-                    || !requestFields.Any(field => field.Name == name && field.Type == "wstr"))
-                    throw new ConfigException($"{where}.string_copies requires existing GameSetting and request strings.");
-                copies.Add(target, name);
-            }
-        }
         return new(tables, build,
             Names(request, RequestKeys, requestFields, key => key == "mode" ? "u32" : "wstr", $"{where}.request"),
             Names(targets, TargetKeys, settingFields, _ => "wstr", $"{where}.targets"),
-            prefix, copies);
+            prefix, Copies(map, "string_copies", "wstr", requestFields, settingFields, where),
+            Copies(map, "word_copies", "u32", requestFields, settingFields, where));
+    }
+
+    // Pairs of GameSetting targets and request sources of one wire type, each target named once.
+    private static Dictionary<string, string> Copies(Dictionary<string, object?> map, string key, string type,
+        IReadOnlyList<PacketField> requestFields, IReadOnlyList<PacketField> settingFields, string where)
+    {
+        var copies = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (!map.TryGetValue(key, out var raw))
+            return copies;
+        if (raw is not Dictionary<string, object?> copyMap || copyMap.Count != 2
+            || copyMap.GetValueOrDefault("targets") is not string[] { Length: > 0 } targets
+            || copyMap.GetValueOrDefault("sources") is not string[] sources || sources.Length != targets.Length
+            || targets.Distinct(StringComparer.Ordinal).Count() != targets.Length)
+            throw new ConfigException($"{where}.{key} requires equally sized targets and sources, with distinct targets.");
+        foreach (var (target, name) in targets.Zip(sources))
+        {
+            if (!settingFields.Any(field => field.Name == target && field.Type == type)
+                || !requestFields.Any(field => field.Name == name && field.Type == type))
+                throw new ConfigException($"{where}.{key} requires existing GameSetting and request {type} fields.");
+            copies.Add(target, name);
+        }
+        return copies;
     }
 
     /// <summary>Reads one change request.</summary>
@@ -85,6 +95,9 @@ public sealed class RoomSettingChangeMap
         {
             CopiedStrings = _copies.Count == 0 ? System.Collections.Immutable.ImmutableDictionary<string, string>.Empty
                 : _copies.ToDictionary(pair => pair.Key, pair => (string)fields[pair.Value], StringComparer.Ordinal),
+            CopiedWords = _wordCopies.Count == 0 ? System.Collections.Immutable.ImmutableDictionary<string, int>.Empty
+                : _wordCopies.ToDictionary(pair => pair.Key,
+                    pair => Convert.ToInt32(fields[pair.Value], System.Globalization.CultureInfo.InvariantCulture), StringComparer.Ordinal),
         };
     }
 
@@ -112,6 +125,11 @@ public sealed class RoomSettingChangeMap
         // Native map panels can retain more text fields than the shared key/name/selection operation needs.
         foreach (var (name, value) in change.CopiedStrings)
             setting[name] = value;
+        // The picked map's mission difficulty, which the round reads back through Lua GetDifficulty. kr-1256
+        // sub_96CF30 fills it only from a map row; levels start at 1, so an empty word keeps the room's own.
+        foreach (var (name, value) in change.CopiedWords)
+            if (value > 0)
+                setting[name] = value;
     }
 
     private bool IsMission(RoomSettingChange change) =>
@@ -141,4 +159,6 @@ public sealed class RoomSettingChangeMap
 public sealed record RoomSettingChange(int Mode, string Name, string Key, string Scene)
 {
     internal IReadOnlyDictionary<string, string> CopiedStrings { get; init; } = System.Collections.Immutable.ImmutableDictionary<string, string>.Empty;
+
+    internal IReadOnlyDictionary<string, int> CopiedWords { get; init; } = System.Collections.Immutable.ImmutableDictionary<string, int>.Empty;
 }

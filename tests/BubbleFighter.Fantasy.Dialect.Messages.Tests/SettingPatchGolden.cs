@@ -50,8 +50,16 @@ internal static class SettingPatchGolden
             }
             if (i < 2 && field.Type == RoomFieldType.U32)
             {
-                r.ReadInt32();
-                w.WriteInt32(i == 0 ? applied.Mode : applied.SubMode);
+                // A change without a mode (kr-186) keeps the setting's own words.
+                var kept = r.ReadInt32();
+                w.WriteInt32((i == 0 ? applied.Mode : applied.SubMode) ?? kept);
+                continue;
+            }
+            if (field.Type == RoomFieldType.U32 && field.Name == SettingChangeFields.Require(tables, build).DifficultyTarget)
+            {
+                // The request's difficulty replaces the room's mission difficulty word.
+                var kept = r.ReadInt32();
+                w.WriteInt32(applied.Difficulty is > 0 and var level ? level : kept);
                 continue;
             }
             ConsumeField(ref r, field);

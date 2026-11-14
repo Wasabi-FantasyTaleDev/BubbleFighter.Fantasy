@@ -13,8 +13,8 @@
   # Each row costs 1 + its effect capacity (4096 by default); the reserves cover every selectable build's optional rows
   # while a reconfiguration holds the old and new installations at once. SetupRuntimeBudgetTests checks both totals.
   lifecycle:
-    entry_reserve: 820
-    service_metadata_reserve: 3400000
+    entry_reserve: 900
+    service_metadata_reserve: 3800000
   config:
     state_directory: "${BFF_STATE_DIR}"
     bootstrap_token: "${BFF_SETUP_TOKEN:-}"

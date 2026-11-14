@@ -74,6 +74,8 @@ public sealed class SettingPatchTests
             WriteDefault(writer, f);
         var body = PlazaRoomWire.ApplyGameSettingChange(schema, TestBuilds.Packets, build,
             buffer.WrittenSpan, Request(build));
+        // The request's difficulty (77 here) lands in the build's mission difficulty word.
+        var difficulty = SettingChangeFields.Require(TestBuilds.Packets, build).DifficultyTarget;
         var reader = new PacketReader(body);
         foreach (var f in fields)
         {
@@ -95,7 +97,7 @@ public sealed class SettingPatchTests
             else if (f.Type == RoomFieldType.Bool)
                 Assert.Equal(f.Name is "unknown_4" or "unknown_5", reader.ReadBool32());
             else if (f.Type == RoomFieldType.U32)
-                Assert.Equal(f.Name == "mode" ? 101 : f.Name == "unknown_12" ? -7 : 0, reader.ReadInt32());
+                Assert.Equal(f.Name == "mode" ? 101 : f.Name == "unknown_12" ? -7 : f.Name == difficulty ? 77 : 0, reader.ReadInt32());
             else
                 Skip(ref reader, f);
         }

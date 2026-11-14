@@ -196,6 +196,8 @@ public sealed class RoomLeaveRoutingTests
                 ["unknown_60"] = chosen["npc_table_key"], ["map_key"] = chosen["map_name"],
                 ["unknown_116"] = chosen["unknown_4"], ["unknown_117"] = chosen["unknown_5"],
                 ["mode"] = chosen["mode"], ["sub_mode"] = chosen["unknown_12"],
+                // kr-812 sub_6A0E10 fills the request's difficulty from the setting's own.
+                ["difficulty"] = chosen["difficulty"],
             });
             held = new RoomBuildSettings(build, settings, change);
         }

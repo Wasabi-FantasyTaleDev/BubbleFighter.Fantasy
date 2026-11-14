@@ -61,26 +61,29 @@ public sealed class RoomUnchosenMapTests
     {
         var map = Assert.IsType<RoomSettingChangeMap>(RoomSettingChangeMap.Load(TestBuilds.Packets, "kr-1256"));
         var change = map.Read(PacketCodec.Write(TestBuilds.Packets, "kr-1256", "RoomGameSettingChangeRequest",
-            new Dictionary<string, object?> { ["unknown_0"] = "name", ["unknown_24"] = "rel_Map", ["unknown_48"] = "", ["mode"] = 1 }));
-        Assert.Equal(new RoomSettingChange(1, "name", "rel_Map", ""), change);
+            new Dictionary<string, object?> { ["unknown_0"] = "name", ["unknown_24"] = "rel_Map", ["unknown_48"] = "", ["mode"] = 1, ["unknown_100"] = 3 }));
+        Assert.Equal((1, "name", "rel_Map", ""), (change.Mode, change.Name, change.Key, change.Scene));
         Assert.Equal("rel_Map", map.RoomKey(change));
         var setting = new Dictionary<string, object?>();
         map.Apply(setting, change);
         Assert.Equal(("rel_Map", "rel_Map", "rel_Map", "name"), ((string)setting["unknown_44"]!, (string)setting["unknown_68"]!,
             (string)setting["unknown_92"]!, (string)setting["unknown_116"]!));
+        // kr-1256 sub_96CF30 puts the map's Difficulty at request +100; sub_7EEB80 reads GameSetting +140.
+        Assert.Equal(3, setting["unknown_140"]);
     }
 
     /// <summary>The native CN and TW map panels use their own strings without inheriting KR AI-seat flags.</summary>
     [Theory]
-    [InlineData("cn-774", "unknown_52", "unknown_76", "unknown_100", "unknown_124", "unknown_148")]
-    [InlineData("tw-454", "unknown_36", "unknown_60", "unknown_84", "unknown_108", "unknown_132")]
-    public void NativeMapPanelsRetainAllFourStrings(string build, string selection, string key, string name, string first, string third)
+    [InlineData("cn-774", "unknown_52", "unknown_76", "unknown_100", "unknown_124", "unknown_148", "unknown_172")]
+    [InlineData("tw-454", "unknown_36", "unknown_60", "unknown_84", "unknown_108", "unknown_132", "unknown_156")]
+    public void NativeMapPanelsRetainAllFourStrings(string build, string selection, string key, string name, string first, string third,
+        string difficulty)
     {
         var map = Assert.IsType<RoomSettingChangeMap>(RoomSettingChangeMap.Load(TestBuilds.Packets, build));
         var body = PacketCodec.Write(TestBuilds.Packets, build, "RoomGameSettingChangeRequest", new Dictionary<string, object?>
         {
             ["unknown_0"] = "native-first", ["unknown_24"] = "map name", ["unknown_48"] = "native-third",
-            ["unknown_72"] = "rel_Village01", ["unknown_128"] = 1,
+            ["unknown_72"] = "rel_Village01", ["unknown_128"] = 1, ["unknown_124"] = 2,
         });
         var change = map.Read(body);
         Assert.Equal(1, change.Mode);
@@ -93,6 +96,8 @@ public sealed class RoomUnchosenMapTests
         Assert.Equal("native-first", setting[first]);
         Assert.Equal("native-third", setting[third]);
         Assert.Equal(42, setting["unknown_16"]);
+        // The map's Difficulty (request +124) becomes the word Lua GetDifficulty reads.
+        Assert.Equal(2, setting[difficulty]);
         Assert.Throws<BubbleFighter.Fantasy.Abstractions.Protocol.PacketFormatException>(() => map.Read(body[..^1]));
         Assert.Null(RoomAiSeatFlag.Load(TestBuilds.Packets, build));
     }

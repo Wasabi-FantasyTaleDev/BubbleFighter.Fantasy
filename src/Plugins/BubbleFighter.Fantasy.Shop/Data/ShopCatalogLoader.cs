@@ -366,7 +366,7 @@ public static class ShopCatalogLoader
         RequireHeader(
             header,
             "stockSetId", "stockSetName", "isOnSale", "showPrice", "sellPrice",
-            "moneyType", "refundable", "mainCategory", "subCategory", "stockId01", "displayOrder");
+            "moneyType", "mainCategory", "subCategory", "stockId01", "displayOrder");
         if (secondaryCashColumns)
             RequireHeader(header, "sellPriceCash");
         var list = new List<ShopCardRow>();
@@ -449,7 +449,7 @@ public static class ShopCatalogLoader
                 name,
                 money,
                 true,
-                IntCell(row, header, "refundable") != 0,
+                Refundable(row, header),
                 showPrice,
                 sellPrice,
                 cashPrice,
@@ -477,7 +477,7 @@ public static class ShopCatalogLoader
         if (rows.Count < 2)
             return [];
         var header = HeaderMap(rows[0]);
-        RequireHeader(header, "itemId", "itemName", "isOnSale", "moneyType", "refundable",
+        RequireHeader(header, "itemId", "itemName", "isOnSale", "moneyType",
             "mainCategory", "subCategory", "displayOrder");
         var byItem = stocks.Where(s => s.IsOnSale).GroupBy(s => s.ItemId).ToDictionary(g => g.Key, g => g.ToArray());
         var cards = new List<ShopCardRow>();
@@ -506,7 +506,7 @@ public static class ShopCatalogLoader
                 // itemId 100001 once with inline stock 1000001 (1 day) and the vector
                 // [1000001 (1d), 1000002 (7d), 1000003 (30d)] - the vector repeats the
                 // inline first and then the other terms. Per-term cards would duplicate the item across tabs.
-                cards.Add(new ShopCardRow(0, name, money, true, IntCell(row, header, "refundable") != 0,
+                cards.Add(new ShopCardRow(0, name, money, true, Refundable(row, header),
                     first.ShowPrice, first.SellPrice, first.SellPriceCash, main, sub, id, terms,
                     ResolveCategory(mainIds, main, "MainCategory", id, schema, reportMissing),
                     ResolveCategory(subIds, sub, "SubCategory", id, schema, reportMissing),
@@ -516,7 +516,7 @@ public static class ShopCatalogLoader
             {
                 // Each offer gets its own inline stock and matching choice.
                 foreach (var term in terms)
-                    cards.Add(new ShopCardRow(0, name, money, true, IntCell(row, header, "refundable") != 0,
+                    cards.Add(new ShopCardRow(0, name, money, true, Refundable(row, header),
                         term.ShowPrice, term.SellPrice, term.SellPriceCash, main, sub, id, [term],
                         ResolveCategory(mainIds, main, "MainCategory", id, schema, reportMissing),
                         ResolveCategory(subIds, sub, "SubCategory", id, schema, reportMissing),
@@ -676,4 +676,11 @@ public static class ShopCatalogLoader
         throw new InvalidOperationException(
             $"Shop catalog StockSet {rowKey} references missing {sheet} '{key}'.");
     }
+    /// <summary>
+    /// Whether a ShopItem or StockSet row can be refunded. The 2009 workbook (kr-186 Config/ShopItem2.xml) has no
+    /// refundable column on either sheet, so a missing column means no row of that build is refundable.
+    /// </summary>
+    private static bool Refundable(IReadOnlyList<string> row, Dictionary<string, int> header) =>
+        header.ContainsKey("refundable") && IntCell(row, header, "refundable") != 0;
+
 }

@@ -81,7 +81,7 @@ internal sealed record LoginValues(LoginShape Shape, string Reply, string MainMe
     {
         if (!values.TryGetValue("login", out var raw) || raw is not Dictionary<string, object?> login)
             throw new ConfigException($"Build '{build}' must define login values in packets/builds.yaml.");
-        if (login.Keys.FirstOrDefault(key => key is not ("request_trailer" or "request_token" or "request_extra_wstr"
+        if (login.Keys.FirstOrDefault(key => key is not ("request_trailer" or "request_token" or "request_extra_wstr" or "request_strings"
                 or "login_response" or "reply" or "main_menu" or "channel_id" or "burst")) is { } unknown)
             throw new ConfigException($"Build '{build}' login has the unknown value '{unknown}'.");
         return login;

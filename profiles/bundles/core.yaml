@@ -116,10 +116,14 @@
         release: "ID2014"
       - build: id-1809
         release: "ID2015"
+      - build: kr-186
+        release: "KR2009"
       - build: cn-279
         release: "CN2011 0.1.5.005"
       - build: cn-324
         release: "CN2012"
+      - build: tw-410
+        release: "TW2013"
       - build: cn-706
         release: "CN2014 0.2.51.002"
       - build: cn-717

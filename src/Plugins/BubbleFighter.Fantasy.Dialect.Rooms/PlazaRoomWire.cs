@@ -174,8 +174,8 @@ internal static class PlazaRoomWire
     /// <summary>
     /// C2S <c>gcpRoomChangeGameSetting</c> (kr-812 serialize <c>sub_5C8DE0</c> / reader <c>sub_5C8ED0</c>):
     /// wstr x4, bool32 x2, u32 x10, bool32. The strings are <c>GameSetting</c> +16, +44, +72 and
-    /// +100, the bools +4 and +5, and the ninth and tenth u32 the mode and sub-mode; the other
-    /// values have no proven target.
+    /// +100, the bools +4 and +5, the eighth u32 the mission difficulty (+164), and the ninth and tenth
+    /// u32 the mode and sub-mode; the other values have no proven target.
     /// </summary>
     /// <param name="tables">The native packet layouts.</param>
     /// <param name="build">The selected client build.</param>
@@ -184,18 +184,29 @@ internal static class PlazaRoomWire
     public static GameSettingChange ReadChangeGameSetting(PacketTables tables, string build, ReadOnlySpan<byte> payload)
     {
         PacketLayoutContract.RequireFields(tables, build, "RoomGameSettingChangeRequest", "Plaza room wire",
-            ("map_directory", "wstr"), ("current_map", "wstr"), ("map_key", "wstr"),
-            ("mode", "u32"), ("sub_mode", "u32"));
+            ("map_directory", "wstr"), ("current_map", "wstr"), ("map_key", "wstr"));
+        // kr-186 sub_419210 ends the request after eight words: that client sends no mode or sub-mode, so the
+        // room keeps the ones it was created with.
+        var carriesMode = tables.Resolve(build, "RoomGameSettingChangeRequest").Any(field => field.Name == "mode");
+        if (carriesMode)
+            PacketLayoutContract.RequireFields(tables, build, "RoomGameSettingChangeRequest", "Plaza room wire",
+                ("mode", "u32"), ("sub_mode", "u32"));
         var values = PacketCodec.ReadScalars(tables, build, "RoomGameSettingChangeRequest", payload);
         var aliases = SettingChangeFields.Require(tables, build);
         return new GameSettingChange((string)values["map_directory"], (string)values["current_map"],
             (string)values[aliases.ThirdString], (string)values["map_key"], (bool)values[aliases.FirstFlag],
-            (bool)values[aliases.SecondFlag], (int)values["mode"], (int)values["sub_mode"]);
+            (bool)values[aliases.SecondFlag], carriesMode ? (int)values["mode"] : null,
+            carriesMode ? (int)values["sub_mode"] : null)
+        {
+            // kr-812 sub_6A1160 puts the picked pirate map's difficulty here; a build whose request does not
+            // name the word keeps the room's own difficulty.
+            Difficulty = values.TryGetValue("difficulty", out var difficulty) ? (int)difficulty! : null,
+        };
     }
 
     /// <summary>
     /// Returns <paramref name="gameSetting"/> with a recorded settings change applied: the four
-    /// strings, the two bools and the mode and sub-mode. An empty block starts from the build's
+    /// strings, the two bools, the mission difficulty and the mode and sub-mode. An empty block starts from the build's
     /// table. Every other byte is kept as it was.
     /// </summary>
     /// <param name="schema">The build's named room fields used to locate each changed value.</param>
@@ -213,9 +224,9 @@ internal static class PlazaRoomWire
         if (change.IsEmpty)
             return gameSetting.ToArray();
 
-        foreach (var name in new[] { "mode", "unknown_12", "unknown_4", "unknown_5" })
+        foreach (var name in new[] { "mode", "unknown_4", "unknown_5" })
             if (!schema.GameSetting.Any(field => field.Name == name &&
-                field.Type == (name is "mode" or "unknown_12" ? RoomFieldType.U32 : RoomFieldType.Bool)))
+                field.Type == (name is "mode" ? RoomFieldType.U32 : RoomFieldType.Bool)))
                 throw new ConfigException($"GameSetting patch requires the audited '{name}' field.");
         foreach (var role in new[] { RoomFieldValue.MapDirectory, RoomFieldValue.CurrentMap, RoomFieldValue.MapName })
             if (!schema.GameSetting.Any(field => field.Value == role && field.Type == RoomFieldType.WStr))
@@ -224,6 +235,7 @@ internal static class PlazaRoomWire
             field.Value is RoomFieldValue.NpcTableKey or RoomFieldValue.MapTheme))
             throw new ConfigException("GameSetting patch requires an audited NPC-key or theme mapping.");
         var applied = ReadChangeGameSetting(tables, build, change);
+        var difficultyTarget = SettingChangeFields.Require(tables, build).DifficultyTarget;
         var r = new PacketReader(gameSetting);
         var buffer = new ArrayBufferWriter<byte>(gameSetting.Length + 128);
         var w = new PacketWriter(buffer);
@@ -256,10 +268,20 @@ internal static class PlazaRoomWire
                 });
                 continue;
             }
-            if (field.Type == RoomFieldType.U32 && field.Name is "mode" or "unknown_12")
+            // A change without a mode (kr-186) keeps the block's own mode and sub-mode words.
+            if (field.Type == RoomFieldType.U32 && field.Name is "mode" or "unknown_12"
+                && (field.Name == "mode" ? applied.Mode : applied.SubMode) is { } word)
             {
                 r.ReadInt32();
-                w.WriteInt32(field.Name == "mode" ? applied.Mode : applied.SubMode);
+                w.WriteInt32(word);
+                continue;
+            }
+            // The round reads its difficulty back from this word (kr-812 sub_A31410, Lua GetDifficulty). Levels
+            // start at 1; changes kr-812 sub_6845B0 builds leave the word empty, and those keep the room's own.
+            if (field.Type == RoomFieldType.U32 && field.Name == difficultyTarget && applied.Difficulty is > 0 and var level)
+            {
+                r.ReadInt32();
+                w.WriteInt32(level);
                 continue;
             }
             ConsumeField(ref r, field);
@@ -573,7 +595,11 @@ internal readonly record struct PlaySessionSetting(string Title, int Mode, strin
 /// <param name="MapKey">The player-chosen map key, <c>GameSetting</c> +100.</param>
 /// <param name="Flag4">The bool at <c>GameSetting</c> +4.</param>
 /// <param name="Flag5">The bool at <c>GameSetting</c> +5.</param>
-/// <param name="Mode">The mode, <c>GameSetting</c> +8.</param>
-/// <param name="SubMode">The sub-mode, <c>GameSetting</c> +12.</param>
+/// <param name="Mode">The mode, <c>GameSetting</c> +8, or null when the build's request carries none.</param>
+/// <param name="SubMode">The sub-mode, <c>GameSetting</c> +12, or null when the build's request carries none.</param>
 internal sealed record GameSettingChange(string DisplayName, string CurrentMap, string Unknown72, string MapKey,
-    bool Flag4, bool Flag5, int Mode, int SubMode);
+    bool Flag4, bool Flag5, int? Mode, int? SubMode)
+{
+    /// <summary>Gets the mission difficulty for <c>GameSetting</c>'s <c>difficulty</c> word, or null when the build's request carries none.</summary>
+    public int? Difficulty { get; init; }
+}

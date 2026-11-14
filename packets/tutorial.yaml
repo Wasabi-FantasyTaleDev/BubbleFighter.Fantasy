@@ -193,15 +193,22 @@ structs:
       offset: 60
     - unknown_61: bool
       offset: 61
+      except: [kr-186] # kr-186 MapMetaData (kr-186 sub_41DCA0) is the thirteen words and one flag
     - unknown_62: bool
       offset: 62
+      except: [kr-186]
     - unknown_63: bool
       offset: 63
+      except: [kr-186]
     - unknown_64: wstr
       offset: 64
+      except: [kr-186]
     - unknown_68: wstr
       offset: 68
+      except: [kr-186]
     - map_key: wstr
       offset: 72
+      except: [kr-186]
     - difficulty: u32
       offset: 76
+      except: [kr-186]

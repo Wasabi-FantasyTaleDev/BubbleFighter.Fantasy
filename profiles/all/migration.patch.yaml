@@ -1,6 +1,7 @@
 # Node-wide migration rows for the shipped all-builds profile. Mount the account ownership,
 # sessions, fencing and room-directory bundles first. Each build also needs the per-build
 # migration patch in its local override, with channel and admission channels explicitly set.
+# kr-186 and tw-410 are not listed: their native move is not audited (kr-186 has no server list).
 - insert:
     - id: cluster-migration-broker
       plugin: cluster.migration-broker

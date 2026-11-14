@@ -308,9 +308,11 @@ builds:
     #   request_trailer     true: two u32 follow the adapter list (kr-812 sub_682370); false stops there
     #   request_token       true: one more u32 follows the adapter list (read and ignored)
     #   request_extra_wstr  true: one more wstr ends the request
+    #   request_strings     how many wstr open the request: 3 (account and two unknown strings) or 1 (kr-186)
     #   login_response      true: the reply is LoginResponse then LoginNational instead of the legacy reply
     login:
       request_trailer: true
+      request_strings: 3
       request_token: false
       request_extra_wstr: false
       login_response: false
@@ -693,6 +695,9 @@ builds:
     room_setting_change_map:
       request: { name: unknown_0, key: unknown_24, scene: unknown_48, mode: mode }
       targets: { selection: unknown_44, key: unknown_68, current: unknown_92, name: unknown_116 }
+      # The picked map's Difficulty column (kr-1256 sub_96CF30 parses it into request +100) becomes the
+      # room's mission difficulty, GameSetting +140, which kr-1256 sub_7EEB80 hands to Lua GetDifficulty.
+      word_copies: { targets: [unknown_140], sources: [unknown_100] }
       mission_prefix: npc_
     # The custom AI-war rooms (modes 38 and 39, wgtNoItemCustomAiWar and wgtTeamSurvivalCustomAiWar) let the master
     # add computer players: kr-1256 sub_9681C0 builds the add panel only while the room's session byte +72 is set,
@@ -984,6 +989,9 @@ builds:
       request: { name: unknown_24, key: unknown_72, scene: unknown_72, mode: unknown_128 }
       targets: { selection: unknown_52, key: unknown_76, current: unknown_124, name: unknown_100 }
       string_copies: { targets: [unknown_124, unknown_148], sources: [unknown_0, unknown_48] }
+      # Mission difficulty: cn-774 sub_B6F7C0 parses the map's Difficulty column into request +124, and
+      # cn-774 sub_98CB90 hands GameSetting +172 to Lua GetDifficulty.
+      word_copies: { targets: [unknown_172], sources: [unknown_124] }
       mission_prefix: npc_
     room_ai_seat: ~
     base: kr-1256
@@ -1170,6 +1178,9 @@ builds:
       request: { name: unknown_24, key: unknown_72, scene: unknown_72, mode: unknown_128 }
       targets: { selection: unknown_36, key: unknown_60, current: unknown_108, name: unknown_84 }
       string_copies: { targets: [unknown_108, unknown_132], sources: [unknown_0, unknown_48] }
+      # Mission difficulty: tw-454 sub_7D62F0 parses the map's Difficulty column into request +124, and tw-454 0xCBAAD5 copies
+      # GameSetting +156 into the field Lua GetDifficulty returns.
+      word_copies: { targets: [unknown_156], sources: [unknown_124] }
       mission_prefix: npc_
     base: cn-774
     inventory:
@@ -1764,6 +1775,8 @@ builds:
       third_string: unknown_12
       first_flag: unknown_20
       second_flag: unknown_21
+      # cn-324 sub_59DEA0 (cn-279 sub_79B090, tw-410 sub_59D420) fills the request's difficulty from GameSetting+68.
+      difficulty_target: unknown_68
     capabilities:
       # Native title request and reply consumers are audited only for the two Korean baselines.
       title_operations: false
@@ -1930,6 +1943,32 @@ builds:
         # (TutorialRoomStage, cn-279 sub_6DA4E0 case 8) exits the client at stage entry with both
         # an empty and a rel_Tutorial_01 room body; its own GotoRoom reader needs pinning before
         # another attempt. The stage's UI (Ui/TutorialRoomStage.ui) exists in Ui0000.pkn.
+
+  # Korea 2009 (linked 2009-12-20, ClientVersion_Major 186), older than cn-279. It shares cn-279's ten-byte frame
+  # and cipher tables; its numbering is cn-279's with a few blocks shifted down (kr-186 has no GPK or
+  # uniqueness check, so gcpReqLogin is 2). Login goes through nmcogame NMCO_CallNMFunc and login.ini
+  # (kr-186 sub_65B370), as on kr-812.
+  kr-186:
+    base: cn-279
+    login:
+      # kr-186 sub_418DC0 (Packet_gcpReqLogin slot 0) writes the account wstr, the adapter count and the
+      # addresses; cn-279 adds two more strings after the account.
+      request_strings: 1
+    play:
+      # No wave exchange: kr-186 has no wave packet classes (no Packet_gcpReqStartNewWave or its replies).
+      npc_waves: false
+      score:
+        # No horde mode: kr-186 has no horde classes or strings, so no stage-cleared or stage-failed result.
+        horde_stage_outcome: false
+        # kr-186 sub_683110 stores Packet_gspGameEndGame's first word at dword_9B40DC+384, and the result
+        # opener kr-186 sub_6CCC40 (S2C 723) shows nothing while that word is 0; cn-279 reads the second word.
+        outcome_first: true
+
+  # Taiwan 2013 (resource VERSION 227, ClientVersion_Major 410). Its classes carry cn-324's numbers: 494 of the
+  # reviewed cn-324 rows sit at the same number in tw-410's tables and 8 move; tw-410 sub_78ACF0 reads cn-324's
+  # cipher tables. Login goes through nmcogame NMCO_CallNMFunc2 and login.ini (tw-410 sub_790010), as on kr-812.
+  tw-410:
+    base: cn-324
 
   # China 2014 (0.2.51.002). Uses id-400's layout base with audited differences below.
   cn-706:

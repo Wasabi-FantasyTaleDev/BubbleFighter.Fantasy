@@ -483,21 +483,27 @@ structs:
       offset: 113
     - unknown_114: bool
       offset: 114
+      except: [kr-186] # kr-186 sub_43A250 ends a row with the flags at +112, +113, +120 and the word at +116
     - unknown_115: bool
       offset: 115
+      except: [kr-186]
     - unknown_120: bool
       offset: 120
     - unknown_121: bool
       offset: 121
+      except: [kr-186]
     - unknown_122: u8
       offset: 122
+      except: [kr-186]
     - unknown_116: u32
       offset: 116
     - unknown_132: u32
       offset: 132
+      except: [kr-186]
     # cn-279 sub_888D80 reads row +124 for the selected card's Stock/StockSet identity.
     - award_display_id: u32
       offset: 124
+      except: [kr-186]
 
   # ScoreRow of cn-324: the same fields in the same order as kr-812's, without one of the five u32 after
   # the second string and without everything after the last bool. The row object is 280 bytes.

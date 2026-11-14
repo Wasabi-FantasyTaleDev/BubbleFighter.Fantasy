@@ -93,6 +93,7 @@ structs:
       offset: 4
     - unknown_8: u32
       offset: 8
+      except: [kr-186] # kr-186 sub_423A80 writes the mode word alone
   # kr-1256 sends the quick-match request through one request-object serializer, kr-1256 sub_114E2E0
   # (vftable kr-1256 0x163BDD8 slot 0, RTTI RequestUserMysteryStore): a u8 type, then a u32, then a
   # type-specific tail. kr-1256 sub_E651C0 stamps C2S 128 on the packet and the serializer writes the

@@ -176,6 +176,45 @@ public sealed class PlayRoomWireTests
         Assert.Throws<PacketFormatException>(() => PlazaRoomWire.ReadChangeGameSetting(TestBuilds.Packets, "kr-812", change.AsSpan(0, 171)));
     }
 
+    /// <summary>
+    /// The picked pirate map's difficulty reaches the room: kr-812 sub_6A1160 writes it as the request's eighth
+    /// word, and the round reads GameSetting+164 back (kr-812 sub_A31410). cn-324 sub_59DEA0 uses its +68 word.
+    /// </summary>
+    [Theory]
+    [InlineData("kr-812")]
+    [InlineData("cn-324")]
+    [InlineData("tw-410")]
+    public void ASettingsChangeCarriesTheMissionDifficulty(string build)
+    {
+        var schema = TestBuilds.Of(build).Schema;
+        byte[] Change(int difficulty)
+        {
+            var values = new Dictionary<string, object?>
+            {
+                ["map_directory"] = "display", ["current_map"] = "rel_Village07_Hard01", ["map_key"] = "npc_Village07_Hard01",
+                ["mode"] = 101, ["sub_mode"] = 0, ["difficulty"] = difficulty,
+            };
+            return BubbleFighter.Fantasy.Packets.PacketCodec.Write(TestBuilds.Packets, build, "RoomGameSettingChangeRequest", values);
+        }
+        Assert.Equal(3, PlazaRoomWire.ReadChangeGameSetting(TestBuilds.Packets, build, Change(3)).Difficulty);
+        var blank = PlazaRoomWire.ApplyGameSettingChange(schema, TestBuilds.Packets, build, default, default);
+        var easy = PlazaRoomWire.ApplyGameSettingChange(schema, TestBuilds.Packets, build, blank, Change(1));
+        var hard = PlazaRoomWire.ApplyGameSettingChange(schema, TestBuilds.Packets, build, easy, Change(3));
+        // Exactly one word differs: the difficulty, 1 before and 3 after.
+        var differing = Enumerable.Range(0, easy.Length).Where(i => easy[i] != hard[i]).ToArray();
+        var at = Assert.Single(differing);
+        Assert.Equal((1, 3), (BitConverter.ToInt32(easy, at), BitConverter.ToInt32(hard, at)));
+    }
+
+    /// <summary>kr-186 has no pirate mode and no proven difficulty word, so a change keeps the room's own.</summary>
+    [Fact]
+    public void Kr186SettingsChangeCarriesNoDifficulty()
+    {
+        var body = BubbleFighter.Fantasy.Packets.PacketCodec.Write(TestBuilds.Packets, "kr-186", "RoomGameSettingChangeRequest",
+            new Dictionary<string, object?> { ["map_directory"] = "d", ["current_map"] = "c", ["map_key"] = "k" });
+        Assert.Null(PlazaRoomWire.ReadChangeGameSetting(TestBuilds.Packets, "kr-186", body).Difficulty);
+    }
+
     [Theory]
     [InlineData(RoomJoinRefusal.Started, 1)]
     [InlineData(RoomJoinRefusal.Full, 3)]

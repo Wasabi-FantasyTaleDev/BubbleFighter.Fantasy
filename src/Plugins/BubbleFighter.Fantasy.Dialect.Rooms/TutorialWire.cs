@@ -265,8 +265,14 @@ internal static class TutorialWire
         var fields = PacketCodec.ReadScalars(tables, build, "TutorialPlayRequest", payload,
             maxStringCharacters: (ushort.MaxValue - 4) / 2);
         var strings = tables.Resolve(build, "TutorialPlayRequest").Where(field => field.Type == "wstr").ToArray();
-        return new PlayTutorialRequest((string)fields[strings[0].Name], (string)fields[strings[1].Name],
-            (string)fields["map_key"], (int)fields["difficulty"], (int)fields["time_attack_time_limit_ms"]);
+        // kr-186 sends MapMetaData alone (kr-186 sub_41DCA0: thirteen words and a flag): no strings, map key or
+        // difficulty, so the server names the old tutorial map. A field the layout states is always read.
+        return new PlayTutorialRequest(Text(0), Text(1),
+            fields.TryGetValue("map_key", out var map) ? (string)map! : "",
+            fields.TryGetValue("difficulty", out var difficulty) ? (int)difficulty! : 0,
+            (int)fields["time_attack_time_limit_ms"]);
+
+        string Text(int index) => index < strings.Length ? (string)fields[strings[index].Name] : "";
     }
 
     /// <summary>
@@ -370,8 +376,11 @@ internal static class TutorialWire
         // table states it, the same conditional shape the inventory extension uses.
         if (tables.Resolve(build, "TutorialHostStart").Any(field => field.Name == "unknown_4"))
             PacketLayoutContract.RequireFields(tables, build, "TutorialHostStart", "Tutorial", ("unknown_4", "u32"));
-        PacketLayoutContract.RequireFields(tables, build, "TutorialPlayRequest", "Tutorial",
-            ("map_key", "wstr"), ("difficulty", "u32"), ("time_attack_time_limit_ms", "u32"));
+        PacketLayoutContract.RequireFields(tables, build, "TutorialPlayRequest", "Tutorial", ("time_attack_time_limit_ms", "u32"));
+        // kr-186's request is MapMetaData alone; a layout that states the map key states the difficulty with it.
+        if (tables.Resolve(build, "TutorialPlayRequest").Any(field => field.Name == "map_key"))
+            PacketLayoutContract.RequireFields(tables, build, "TutorialPlayRequest", "Tutorial",
+                ("map_key", "wstr"), ("difficulty", "u32"));
     }
 
 }

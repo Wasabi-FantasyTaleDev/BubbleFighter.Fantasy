@@ -57,9 +57,12 @@ public sealed class PknArchiveV1 : IArchiveReader
             var path = root.Length == 0 ? relative : root + "/" + relative;
             // One normalized string serves the lookup key and the entry.
             var key = Archive.NormalizeMemberPath(path);
-            if (path.Length == 0 || !_members.TryAdd(key, new PknEntry(path, flags, block, size, stored, md5)))
-                throw new InvalidDataException($"'{uri}' contains an empty or duplicate legacy member path.");
-            _entries.Add(new ArchiveEntry(key, size));
+            if (path.Length == 0)
+                throw new InvalidDataException($"'{uri}' legacy entry {i} has an empty member path.");
+            // A repeated path keeps its first entry: kr-186 sub_471AE0 finds the existing node by a
+            // case-insensitive compare and returns it without inserting (kr-186 BazziMode0000.pkn lists one twice).
+            if (_members.TryAdd(key, new PknEntry(path, flags, block, size, stored, md5)))
+                _entries.Add(new ArchiveEntry(key, size));
         }
         DataOffset = checked((index.Position + 1023) / 1024 * 1024);
         foreach (var member in _members.Values)

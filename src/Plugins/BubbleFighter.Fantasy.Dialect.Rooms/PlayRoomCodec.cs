@@ -259,7 +259,7 @@ internal sealed partial class PlayRoomCodec(
     {
         var change = PlazaRoomWire.ReadChangeGameSetting(tables, build, body);
         // kr-812 sub_5C2B80 copies session+188 separately from the stage Directory at session+132.
-        return new RoomSettingsChangeRequested(change.Mode, change.MapKey,
+        return new RoomSettingsChangeRequested(change.Mode ?? RoomSettingsChangeRequested.KeepMode, change.MapKey,
             new RoomBuildSettings(build, default, body.ToArray()));
     }
 

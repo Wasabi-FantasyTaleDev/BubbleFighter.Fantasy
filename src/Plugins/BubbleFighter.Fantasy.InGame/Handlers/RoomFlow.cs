@@ -743,11 +743,12 @@ internal sealed partial class RoomFlow
                         session.Id, room.Id);
                     return;
                 }
-                removedBots = _options?.AiModeIds.Contains(request.ModeId) == true ? [] : room.RemoveBots();
-                var modeChanged = room.ModeId != request.ModeId;
+                var requestedMode = request.ModeId == RoomSettingsChangeRequested.KeepMode ? room.ModeId : request.ModeId;
+                removedBots = _options?.AiModeIds.Contains(requestedMode) == true ? [] : room.RemoveBots();
+                var modeChanged = room.ModeId != requestedMode;
                 var customRulesNeedDefaults = room.BuildSettings is null
                     || request.BuildSettings is { } incoming && incoming.Lineage != room.BuildSettings.Lineage;
-                room.ModeId = checked((ushort)request.ModeId);
+                room.ModeId = checked((ushort)requestedMode);
                 if (request.MapKey.Length > 0)
                     room.MapKey = request.MapKey;
                 if (request.BuildSettings is { } change)

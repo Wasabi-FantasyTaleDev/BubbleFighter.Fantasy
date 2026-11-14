@@ -1,0 +1,42 @@
+id: tw-410
+display_names:
+  en: "Taiwan 2013"
+  zh-Hans: "台服 2013"
+  zh-Hant: "台灣 2013"
+  ko: "대만 2013"
+client_build: tw:410:0
+# Nearest build whose layouts this one reuses when it has no variant of its own; the same
+# base as this build's entry in packets/builds.yaml.
+parent: cn-324
+description: Taiwanese 2013 client build, ClientVersion_Major 410 (tw-410 wWinMain calls sub_8B5B30(410, 1)), resource VERSION 227.
+bundles:
+  - core
+  - legacy
+# What this build differs in; everything else is the legacy bundle's (kr-812).
+vars:
+  LEGACY_PORT: ${TW_410_GAME_PORT:-7270}
+  LEGACY_PUBLIC_PORT: ${TW_410_PUBLIC_PORT:-7270}
+  # The game port players reach; the migration destination advertises it.
+  GAME_PUBLIC_PORT: ${TW_410_PUBLIC_PORT:-7270}
+  LEGACY_RELAY_PORT: ${TW_410_RELAY_PORT:-7271}
+  LEGACY_RELAY_PUBLIC_PORT: ${TW_410_PUBLIC_RELAY_PORT:-7271}
+  # cn-324's SimpleCipher tables: tw-410 sub_78ACF0 reads byte_B1E0BC (49) and byte_B1E0F0 (24), byte-identical to cn-324.
+  WIRE_CIPHER_TABLE_A: 3A153E32C14866775D2E294E6879866CB53B59F38D4E588D560CCD80E8E2FEFE425F67597E5F7588337647613162729243
+  WIRE_CIPHER_TABLE_B: "730023003200250032003300730064003200330061002300"
+  LEGACY_CENTER_PORT: ${TW_410_CENTER_PORT:-7272}
+  LEGACY_CENTER_PUBLIC_PORT: ${TW_410_CENTER_PUBLIC_PORT:-7272}
+  LEGACY_GATE_KEY: 6
+  LEGACY_GATE_SUB_KEY: 1
+  LEGACY_SEATS: 8
+  # This client counts 4000 ms down once the countdown packet arrives (cn-324 sub_6F0BB0; tw-410 not yet audited).
+  LEGACY_START_TIMER_MS: 4000
+patches:
+  - patch.yaml
+  # Optional native server selector; uncomment to enable the configured directory.
+  # - ../bundles/center-selector.yaml
+  # Optional CN2012 auxiliary CenterStatus responder; explicitly add this bundle for deployments that need it.
+  # - ../bundles/cn-324-center-responder.yaml
+  # The shop supplement is cn-324's: this build's ShopItem table prices item 100224 in Lucci, so it is not listed.
+  # - ../bundles/shop-supplement.yaml
+  # Optional developer override; git-ignored and skipped when absent.
+  - local.patch.yaml

@@ -1,7 +1,7 @@
 ---
 title: "Launcher"
 description: "The companion launcher for Bubble Fighter Fantasy: client builds, sessions, login tickets and the server launcher API."
-updated: 2026-10-23
+updated: 2026-11-13
 ---
 
 Bubble Fighter Fantasy has a companion desktop application, **Fantasy Tale Launcher**, being developed
@@ -55,8 +55,10 @@ server profiles and client records currently documented here are:
 | --- | --- | --- | --- | --- | --- |
 | `kr-1256` | Korea | KR 2026 | 2026-05-08 | 1256 | Experimental |
 | `kr-812` | Korea | KR 2015 | 2015-04-22 | 812 | Supported |
+| `kr-186` | Korea | KR 2009 | 2009-12-20 | 186 | Experimental |
 | `cn-279` | China | CN 2011 | 2011-04-08 | 279 | Supported |
 | `cn-324` | China | CN 2012 | 2012-09-23 | 324 | Supported |
+| `tw-410` | Taiwan | TW 2013 | 2013-01-22 | 410 | Experimental |
 | `cn-406` | China | CN 2013 | 2013-06-28 | 406 | Early development |
 | `id-400` | Indonesia | ID 2014 | 2014-01-23 | 400 | Supported |
 | `cn-706` | China | CN 2014 | 2014-09-23 | 706 | Supported |

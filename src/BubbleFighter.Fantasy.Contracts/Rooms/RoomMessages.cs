@@ -48,10 +48,17 @@ public sealed record RoomBuildSettings(string Lineage, ReadOnlyMemory<byte> Byte
 }
 
 /// <summary>The room master changes the room's settings.</summary>
-/// <param name="ModeId">The game mode id now selected.</param>
+/// <param name="ModeId">The game mode id now selected, or <see cref="KeepMode"/> when the client's request carries no mode.</param>
 /// <param name="MapKey">The map key now selected, or empty to keep the room's.</param>
 /// <param name="BuildSettings">The change as the master's client encoded it, in <see cref="RoomBuildSettings.Change"/>.</param>
-public sealed record RoomSettingsChangeRequested(int ModeId, string MapKey, RoomBuildSettings? BuildSettings = null) : IMessage;
+public sealed record RoomSettingsChangeRequested(int ModeId, string MapKey, RoomBuildSettings? BuildSettings = null) : IMessage
+{
+    /// <summary>
+    /// The mode id of a change that names no mode: no mode is numbered 0, and a client whose settings request has no
+    /// mode word (kr-186) keeps the mode the room was created with.
+    /// </summary>
+    public const int KeepMode = 0;
+}
 
 /// <summary>Sent to every member after the master changed the room's settings.</summary>
 /// <param name="Room">The room with the new settings.</param>
