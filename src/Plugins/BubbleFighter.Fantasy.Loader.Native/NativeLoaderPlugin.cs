@@ -5,7 +5,7 @@ using BubbleFighter.Fantasy.Native;
 namespace BubbleFighter.Fantasy.Loader.Native;
 
 /// <summary>Publishes a bounded native module source as an ordinary activation-owned plugin effect.</summary>
-[Plugin("loader.native", Description = "Publishes native module definitions from configured roots.", Requires = [typeof(IPluginHost)])]
+[Plugin("loader.native", Category = "core", Names = ["en=.NET plugin loader", "zh-Hans=.NET 插件加载器", "zh-Hant=.NET 模組載入器", "ko=.NET 플러그인 로더"], Description = "Publishes native module definitions from configured roots.", Requires = [typeof(IPluginHost)])]
 public sealed class NativeLoaderPlugin : IPlugin
 {
     /// <inheritdoc />

@@ -147,7 +147,7 @@ public sealed class SharedRoundEntryBurstTests
             services, new EventBus(NullLogger.Instance), NullLogger.Instance);
         var binding = new RoundStartBinding(build + "/game", table, TestBuilds.Packets, build, [1, 0, 0], NullLogger.Instance)
         {
-            SuppliesBound = true,
+            MapReportBound = true,
         };
         try
         {

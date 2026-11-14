@@ -1,4 +1,5 @@
 using System.Text.Json;
+using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 
 namespace BubbleFighter.Fantasy.Contracts.Companion;
@@ -44,6 +45,14 @@ public interface ICompanionFederation
     /// <summary>Trusts one configured ticket authority to prepare and renew launches for the allowed builds; dispose to revoke.</summary>
     IDisposable TrustAuthority(string key, IReadOnlyList<string> builds);
 }
+
+/// <summary>
+/// Raised when a launcher connection becomes the bound connection of a game session: when the game login binds a launch
+/// that is already connected, and on every reconnect of a bound launch. Features that keep the launcher in step with
+/// server state send their current snapshot then; messages queued now follow the connection's welcome.
+/// </summary>
+/// <param name="Session">The bound game session.</param>
+public sealed record CompanionSessionConnected(ISession Session) : IEvent;
 
 /// <summary>The launcher account and game session a companion message came from.</summary>
 /// <param name="Account">Launcher account that opened the launch.</param>

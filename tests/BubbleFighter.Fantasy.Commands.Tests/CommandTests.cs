@@ -13,7 +13,10 @@ public sealed class CommandTests
     private static readonly TimeSpan Limit = TimeSpan.FromSeconds(10);
     private static readonly ConcurrentDictionary<string, Action<IPluginContext>> Plans = new();
     private static TaskCompletionSource Signal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private static CommandCaller Caller(PrincipalKind kind = PrincipalKind.Game, string id = "17") => new(new(kind, id), new(kind, id));
+    private static CommandCaller Caller(PrincipalKind kind = PrincipalKind.Game, string id = "17") => new(new(kind, id), new(kind, id))
+    {
+        Source = kind switch { PrincipalKind.Console => CommandSource.Terminal, PrincipalKind.WebUi => CommandSource.WebUi, _ => CommandSource.InGameChat },
+    };
 
     [Plugin("test.commands", Requires = [typeof(ICommandRegistry), typeof(ICommandExecutor), typeof(IPermissionRegistry), typeof(IPermissionService)])]
     public sealed class Consumer : IPlugin
@@ -47,10 +50,11 @@ public sealed class CommandTests
             try { await h.Host.StartAsync(default).AsTask().WaitAsync(Limit); return h; }
             catch { await h.DisposeAsync(); throw; }
         }
-        internal IDisposable Add(CommandHandler? handler = null, IReadOnlyList<CommandArgument>? args = null, string name = "echo", bool allowed = true)
+        internal IDisposable Add(CommandHandler? handler = null, IReadOnlyList<CommandArgument>? args = null, string name = "echo", bool allowed = true,
+            IReadOnlyList<CommandSource>? sources = null)
         {
             Context.Effect(Nodes.Register(new("test." + name, "Test operation.", allowed)));
-            return Context.Effect(Registry.Register(Context, new(name, ["alias-" + name], "test." + name, "Test command.", args ?? []),
+            return Context.Effect(Registry.Register(Context, new(name, ["alias-" + name], "test." + name, "Test command.", args ?? []) { Sources = sources },
                 handler ?? ((invocation, _) => ValueTask.FromResult(new CommandResult(CommandStatus.Success, string.Join('|', invocation.Arguments))))));
         }
         public async ValueTask DisposeAsync()
@@ -119,6 +123,35 @@ public sealed class CommandTests
         var delegated = Caller(PrincipalKind.Game) with { Actor = new(PrincipalKind.WebUi, "admin") };
         Assert.Equal("Usage: /echo <number> [reason]",
             (await h.Executor.ExecuteTextAsync(delegated, "echo wrong")).Message);
+    }
+
+    [Fact]
+    public async Task ACommandLimitedToSomeSourcesDeniesTheOthersBeforeItsHandler()
+    {
+        await using var h = await Harness.Start();
+        var runs = 0;
+        h.Add((_, _) => { runs++; return ValueTask.FromResult(new CommandResult(CommandStatus.Success, "")); },
+            sources: [CommandSource.Nirinsou, CommandSource.Terminal]);
+        var chat = await h.Executor.ExecuteTextAsync(Caller(), "/echo");
+        Assert.Equal((CommandStatus.Denied, "This command is not available from InGameChat."), (chat.Status, chat.Message));
+        Assert.Equal(0, runs);
+        Assert.Equal(CommandStatus.Success, (await h.Executor.ExecuteTextAsync(Caller() with { Source = CommandSource.Nirinsou }, "/echo")).Status);
+        Assert.Equal(1, runs);
+    }
+
+    [Theory]
+    [InlineData(CommandSource.InGameChat)]
+    [InlineData(CommandSource.Nirinsou)]
+    [InlineData(CommandSource.WebUi)]
+    [InlineData(CommandSource.Terminal)]
+    public async Task EveryCompletedCommandRecordsWhereItCameFrom(CommandSource source)
+    {
+        await using var h = await Harness.Start();
+        h.Add();
+        await h.Executor.ExecuteTextAsync(Caller(PrincipalKind.Console) with { Source = source }, "echo");
+        await h.Executor.ExecuteTextAsync(Caller(PrincipalKind.Console) with { Source = source }, "missing");
+        Assert.All(h.Audit, completed => Assert.Equal(source, completed.Source));
+        Assert.Equal(2, h.Audit.Count);
     }
 
     [Fact]
@@ -256,7 +289,7 @@ public sealed class CommandTests
     {
         await using var h = await Harness.Start();
         h.Add(args: [new("secret")]);
-        var caller = new CommandCaller(new(PrincipalKind.Game, "target"), new(PrincipalKind.Console, "local"));
+        var caller = new CommandCaller(new(PrincipalKind.Game, "target"), new(PrincipalKind.Console, "local")) { Source = CommandSource.Terminal };
         await h.Executor.ExecuteAsync(caller, "echo", ["secret-value"]);
         var audit = Assert.Single(h.Audit);
         Assert.Equal(caller.Actor, audit.Actor);

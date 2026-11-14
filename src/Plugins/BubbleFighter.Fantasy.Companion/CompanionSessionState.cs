@@ -15,13 +15,20 @@ internal sealed class CompanionSessionState(IPluginContext context)
         ct.ThrowIfCancellationRequested();
         if (payload.ValueKind != JsonValueKind.Object || payload.EnumerateObject().Any())
             throw new InvalidDataException("Session state requires an empty object payload.");
-        if (context.Lifetime.IsCancellationRequested || caller.Session.Connection.IsClosed
-            || !caller.Session.TryFeature<IPlayerSession>(out var player)
+        if (!caller.Session.TryFeature<IPlayerSession>(out var player)
             || !string.Equals(player.Identity.Username, caller.Account, StringComparison.OrdinalIgnoreCase))
             return ValueTask.FromResult<object?>(GameSessionState.Unavailable);
+        return ValueTask.FromResult<object?>(Describe(caller.Session));
+    }
+
+    /// <summary>The session's current scene: a room owner's snapshot, otherwise the lobby phase.</summary>
+    internal GameSessionState Describe(ISession session)
+    {
+        if (context.Lifetime.IsCancellationRequested || session.Connection.IsClosed || !session.TryFeature<IPlayerSession>(out var player))
+            return GameSessionState.Unavailable;
         var generation = player.Generation;
         var snapshots = context.Services.GetAll<IGameSessionStateReader>()
-            .Select(reader => reader.Describe(caller.Session)).OfType<GameSessionState>().ToArray();
+            .Select(reader => reader.Describe(session)).OfType<GameSessionState>().ToArray();
         if (snapshots.Length > 1) throw new InvalidOperationException("Multiple gameplay owners hold the queried session.");
         var result = snapshots.SingleOrDefault() ?? (player.Phase switch
         {
@@ -31,7 +38,6 @@ internal sealed class CompanionSessionState(IPluginContext context)
             SessionPhase.Migrating => new("migrating", false, false, false, null),
             _ => GameSessionState.Unavailable,
         });
-        return ValueTask.FromResult<object?>(generation == player.Generation && !caller.Session.Connection.IsClosed
-            ? result : GameSessionState.Unavailable);
+        return generation == player.Generation && !session.Connection.IsClosed ? result : GameSessionState.Unavailable;
     }
 }

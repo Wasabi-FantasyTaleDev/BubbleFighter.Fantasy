@@ -37,7 +37,7 @@ public sealed class BuildLoadoutTests : IDisposable
             command.Parameters.AddWithValue("$user", user);
             var json = JsonNode.Parse((string)command.ExecuteScalar()!)!.AsObject();
             json.Remove("Loadouts");
-            command.CommandText = "UPDATE players SET state=$state WHERE user_num=$user; PRAGMA user_version=7;";
+            command.CommandText = "UPDATE players SET state=$state WHERE user_num=$user; DROP TABLE IF EXISTS pet_identity_allocator; PRAGMA user_version=7;";
             command.Parameters.AddWithValue("$state", json.ToJsonString());
             command.ExecuteNonQuery();
         }

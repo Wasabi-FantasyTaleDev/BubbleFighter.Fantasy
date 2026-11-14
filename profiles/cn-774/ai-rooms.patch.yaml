@@ -1,4 +1,4 @@
-# Optional operator patch; not enabled by the default profile.
+# AI rooms, included by the build profile.
 # cn-774 sub_E4C8C0 defines difficulties 0..3; cn-774 sub_B7DFA0 selects the matching native popup preset.
 # Configured loadouts use items present in this build's catalog, not equipment introduced by later builds.
 # Nickname keys follow the shared translated tier/character names and are resolved per recipient's launcher_language.

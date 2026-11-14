@@ -223,7 +223,7 @@ public sealed class SharedGameCommandTests
         });
         await h.Start();
         var principal = new CommandPrincipal(PrincipalKind.Game, "33");
-        var caller = new CommandCaller(principal, principal, SessionId: "33");
+        var caller = new CommandCaller(principal, principal, SessionId: "33") { Source = CommandSource.InGameChat };
 
         var result = await h.Executor.ExecuteTextAsync(caller, "/start");
 
@@ -391,7 +391,7 @@ public sealed class SharedGameCommandTests
             await rig.Flow.HandleCreateAsync(player, new("room", "", 4, ""), default);
             var principal = new CommandPrincipal(PrincipalKind.Game, "33");
 
-            var result = await h.Executor.ExecuteTextAsync(new(principal, principal, SessionId: "33"), "/start");
+            var result = await h.Executor.ExecuteTextAsync(new(principal, principal, SessionId: "33") { Source = CommandSource.InGameChat }, "/start");
 
             Assert.Equal(CommandStatus.InvalidState, result.Status);
             Assert.Equal(RoomPhase.Waiting, rig.Registry.TryGet(player.Id)!.Phase);
@@ -466,7 +466,7 @@ public sealed class SharedGameCommandTests
                 new WaitingEndpoint(player, entered, stopped))));
         await h.Start();
         var principal = new CommandPrincipal(PrincipalKind.Game, "11");
-        var invocation = h.Executor.ExecuteTextAsync(new(principal, principal, SessionId: "11"), "/start").AsTask();
+        var invocation = h.Executor.ExecuteTextAsync(new(principal, principal, SessionId: "11") { Source = CommandSource.InGameChat }, "/start").AsTask();
         await entered.Task.WaitAsync(Limit);
 
         await h.Host.UnloadAsync(h.Owner, default).AsTask().WaitAsync(Limit);
@@ -496,14 +496,14 @@ public sealed class SharedGameCommandTests
         var player = RoomFlowTests.Rig.Player(11, "player");
         var roomId = await h.Rig.CreateAsync(player);
         var wrong = new CommandPrincipal(PrincipalKind.Game, "22");
-        var result = await h.Executor.ExecuteTextAsync(new(wrong, wrong, SessionId: "11"), "/mode 8");
+        var result = await h.Executor.ExecuteTextAsync(new(wrong, wrong, SessionId: "11") { Source = CommandSource.InGameChat }, "/mode 8");
         Assert.Equal(CommandStatus.InvalidState, result.Status);
         Assert.Equal(4, h.Rig.Registry.Find(roomId)!.ModeId);
 
         var executor = h.Executor;
         await h.Host.UnloadAsync(h.Owner, default).AsTask().WaitAsync(Limit);
         var actual = new CommandPrincipal(PrincipalKind.Game, "11");
-        result = await executor.ExecuteTextAsync(new(actual, actual, SessionId: "11"), "/mode 8");
+        result = await executor.ExecuteTextAsync(new(actual, actual, SessionId: "11") { Source = CommandSource.InGameChat }, "/mode 8");
         Assert.Equal(CommandStatus.InvalidState, result.Status);
         Assert.Equal(4, h.Rig.Registry.Find(roomId)!.ModeId);
     }
@@ -582,8 +582,8 @@ public sealed class SharedGameCommandTests
         Assert.True(input.OwnsSession(player));
         var impostor = RoomFlowTests.Rig.Player(22, "guest");
         Assert.False(input.OwnsSession(impostor));
-        Assert.Equal(CommandStatus.InvalidState, (await input.ExecuteTextAsync(impostor, "mode 8", default)).Status);
-        Assert.Equal(CommandStatus.Denied, (await input.ExecuteTextAsync(player, "mode 8", default)).Status);
+        Assert.Equal(CommandStatus.InvalidState, (await input.ExecuteTextAsync(impostor, "mode 8", CommandSource.Nirinsou, default)).Status);
+        Assert.Equal(CommandStatus.Denied, (await input.ExecuteTextAsync(player, "mode 8", CommandSource.Nirinsou, default)).Status);
         Assert.Equal(4, h.Rig.Registry.Find(id)!.ModeId);
         Assert.Empty(h.Rig.SettingsChanged.Sent);
     }
@@ -602,8 +602,8 @@ public sealed class SharedGameCommandTests
         await h.Rig.CreateAsync(player);
         await limit.Wrap<RoomChatSent>(h.Rig.Flow.HandleChatAsync)(player, new(0, "!udp status"), default);
         var input = Assert.Single(h.Context.Services.GetAll<IGameCommandInput>());
-        Assert.Equal(CommandStatus.Success, (await input.ExecuteTextAsync(player, "udp status", default)).Status);
-        Assert.Equal(CommandStatus.Busy, (await input.ExecuteTextAsync(player, "plaza", default)).Status);
+        Assert.Equal(CommandStatus.Success, (await input.ExecuteTextAsync(player, "udp status", CommandSource.Nirinsou, default)).Status);
+        Assert.Equal(CommandStatus.Busy, (await input.ExecuteTextAsync(player, "plaza", CommandSource.Nirinsou, default)).Status);
         Assert.NotNull(h.Rig.Registry.TryGet(player.Id));
     }
 
@@ -618,18 +618,18 @@ public sealed class SharedGameCommandTests
         await h.Rig.CreateAsync(player);
         await h.Rig.Flow.HandleStartAsync(player, new("rel_Village07_Easy02"), default);
         Assert.Equal(CommandStatus.InvalidState, (await Assert.Single(h.Context.Services.GetAll<IGameCommandInput>())
-            .ExecuteTextAsync(player, "plaza", default)).Status);
+            .ExecuteTextAsync(player, "plaza", CommandSource.Nirinsou, default)).Status);
         lock (h.Rig.Registry.TryGet(player.Id)!.Gate) h.Rig.Registry.TryGet(player.Id)!.MarkPlaying();
         var input = Assert.Single(h.Context.Services.GetAll<IGameCommandInput>());
-        Assert.Equal(CommandStatus.Success, (await input.ExecuteTextAsync(player, "plaza", default)).Status);
+        Assert.Equal(CommandStatus.Success, (await input.ExecuteTextAsync(player, "plaza", CommandSource.Nirinsou, default)).Status);
         Assert.Null(h.Rig.Registry.TryGet(player.Id));
         Assert.Single(h.Rig.Left.To(player));
         Assert.False(input.OwnsSession(player));
-        Assert.Equal(CommandStatus.InvalidState, (await input.ExecuteTextAsync(player, "plaza", default)).Status);
+        Assert.Equal(CommandStatus.InvalidState, (await input.ExecuteTextAsync(player, "plaza", CommandSource.Nirinsou, default)).Status);
         await h.Rig.CreateAsync(player);
         await h.Host.ShutdownAsync(default).AsTask().WaitAsync(Limit);
         Assert.False(input.OwnsSession(player));
-        Assert.Equal(CommandStatus.InvalidState, (await input.ExecuteTextAsync(player, "plaza", default)).Status);
+        Assert.Equal(CommandStatus.InvalidState, (await input.ExecuteTextAsync(player, "plaza", CommandSource.Nirinsou, default)).Status);
     }
 
     [Theory]
@@ -660,7 +660,7 @@ public sealed class SharedGameCommandTests
         try
         {
             var invocation = await caller.RunTaskAsync("external-command", async token =>
-                result = await input.ExecuteTextAsync(player, "start", token), stop.Token);
+                result = await input.ExecuteTextAsync(player, "start", CommandSource.Nirinsou, token), stop.Token);
             await entered.Task.WaitAsync(Limit);
 
             if (cancellation == "caller") stop.Cancel();
@@ -674,7 +674,7 @@ public sealed class SharedGameCommandTests
             {
                 var principal = new CommandPrincipal(PrincipalKind.Game, "11");
                 Assert.Equal(CommandStatus.InvalidState, (await h.Executor.ExecuteTextAsync(
-                    new(principal, principal, SessionId: "99"), "/start")).Status);
+                    new(principal, principal, SessionId: "99") { Source = CommandSource.InGameChat }, "/start")).Status);
                 var healthy = await caller.RunTaskAsync("after-cancellation", _ => ValueTask.CompletedTask);
                 await healthy.Completion.WaitAsync(Limit);
                 healthy = await h.Context.RunTaskAsync("after-cancellation", _ => ValueTask.CompletedTask);
@@ -711,14 +711,14 @@ public sealed class SharedGameCommandTests
         try
         {
             var invocation = await caller.RunTaskAsync("external-command", async token =>
-                result = await input.ExecuteTextAsync(player, "udp status", token), stop.Token);
+                result = await input.ExecuteTextAsync(player, "udp status", CommandSource.Nirinsou, token), stop.Token);
             await entered.Task.WaitAsync(Limit);
             stop.Cancel();
             await invocation.Completion.WaitAsync(Limit);
             Assert.Equal(CommandStatus.Cancelled, result!.Status);
 
             admission.Set();
-            Assert.Equal(CommandStatus.Success, (await input.ExecuteTextAsync(player, "udp status", default)).Status);
+            Assert.Equal(CommandStatus.Success, (await input.ExecuteTextAsync(player, "udp status", CommandSource.Nirinsou, default)).Status);
             var healthy = await caller.RunTaskAsync("after-cancellation", _ => ValueTask.CompletedTask);
             await healthy.Completion.WaitAsync(Limit);
         }

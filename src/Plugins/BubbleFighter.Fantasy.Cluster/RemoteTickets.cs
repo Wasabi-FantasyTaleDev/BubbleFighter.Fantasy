@@ -42,7 +42,7 @@ internal sealed class RemoteTickets(TicketClientOptions options, HttpClient http
 }
 
 /// <summary>Publishes asynchronous ticket redemption for a worker with an explicitly configured authority.</summary>
-[Plugin("cluster.ticket-client", Description = "Redeems trusted authority tickets without sharing account credentials.",
+[Plugin("cluster.ticket-client", Category = "cluster", Names = ["en=Cluster ticket client", "zh-Hans=集群票据客户端", "zh-Hant=叢集票證用戶端", "ko=클러스터 티켓 클라이언트"], Description = "Redeems trusted authority tickets without sharing account credentials.",
     Provides = [typeof(ILauncherTicketService)], Optional = [typeof(ICompanionFederation)])]
 public sealed class TicketClientPlugin : IPlugin
 {

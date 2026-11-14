@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Text;
 using Xunit;
 
@@ -67,6 +68,49 @@ public sealed class WebContentFilesTests
         Assert.Equal("text/html; charset=utf-8", type);
         Assert.Contains("id=\"app\"", Encoding.UTF8.GetString(content.Span));
         Assert.True(files.Count >= 3);
+    }
+
+    [Fact]
+    public void EmbeddedFilesAreServedInPlaceWithoutAManagedCopy()
+    {
+        var assembly = typeof(WebUiPlugin).Assembly;
+        var files = WebContentFiles.FromAssembly(assembly);
+        var checkedFiles = 0;
+        foreach (var name in assembly.GetManifestResourceNames())
+        {
+            var normalized = name.Replace('\\', '/');
+            if (!normalized.StartsWith("wwwroot/", StringComparison.Ordinal))
+                continue;
+            using var stream = assembly.GetManifestResourceStream(name)!;
+            var expected = new byte[stream.Length];
+            stream.ReadExactly(expected);
+
+            Assert.True(files.TryGetFile(normalized["wwwroot/".Length..], out var content, out _));
+            Assert.False(MemoryMarshal.TryGetArray(content, out _), $"{name} was copied to a managed array.");
+            Assert.True(content.Span.SequenceEqual(expected), $"{name} differs from the embedded resource.");
+            checkedFiles++;
+        }
+        Assert.Equal(files.Count, checkedFiles);
+    }
+
+    [Fact]
+    public unsafe void EmbeddedFileMemoryCanBePinnedAtAnyOffset()
+    {
+        var files = WebContentFiles.FromAssembly(typeof(WebUiPlugin).Assembly);
+        Assert.True(files.TryGetFile("index.html", out var content, out _));
+        Assert.True(content.Length > 16);
+
+        using (var start = content.Pin())
+        using (var middle = content[7..].Pin())
+        {
+            Assert.Equal((nint)start.Pointer + 7, (nint)middle.Pointer);
+            Assert.Equal(content.Span[7], *(byte*)middle.Pointer);
+        }
+
+        // A slice of a few bytes in the middle is what a partial write hands to the socket.
+        Assert.True(content.Slice(7, 9).Span.SequenceEqual(content.ToArray().AsSpan(7, 9)));
+        using var end = content[content.Length..].Pin();
+        Assert.Equal(0, content[content.Length..].Length);
     }
 
     [Fact]

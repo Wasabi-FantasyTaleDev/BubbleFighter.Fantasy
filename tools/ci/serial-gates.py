@@ -8,12 +8,21 @@ gate. Test counters are cross-checked against unique populated TRX result rows.
 Independent test projects run at the same time, at most --jobs of them; the
 timing-sensitive projects run one at a time afterwards. --jobs 1 runs every
 project one at a time in the old serial way.
+
+--affected REF runs only the test projects that can observe a change since REF
+(the merge base with it, plus uncommitted and untracked files): a project whose
+own files changed, or that references a changed project directly, transitively
+or through a wildcard reference. A change outside every project that is not
+documentation (profiles, packets, build files, tools) selects every project. It
+is for day-to-day branches; a deployment batch or release still runs the full
+gate.
 """
 
 from __future__ import annotations
 
 import argparse
 import concurrent.futures
+import fnmatch
 import json
 import os
 from pathlib import Path
@@ -39,8 +48,22 @@ SERIAL_PROJECTS = (
     "BubbleFighter.Fantasy.Cluster.Tests",
 )
 
+# Quiet projects whose own fixtures tolerate a few test collections at once: still alone on the
+# machine, but not one test at a time. Scenario boots a complete server per test and needs no
+# shared port or deadline between its collections.
+QUIET_THREADS: dict[str, int] = {
+    "BubbleFighter.Fantasy.Scenario.Tests": 4,
+}
+
+# Changes that no test, build or gate reads.
+DOCUMENTATION_ONLY = ("docs/*", "docs-site/*", "*.md", "LICENSE*")
+
 # These fixtures are required by specific LocalClientData cases, never an entire project.
 LOCAL_DATA_PREREQUISITES: dict[str, tuple[str, str]] = {
+    "BubbleFighter.Fantasy.InGame.Tests (KR1256 BnB map)": (
+        "client-data/kr-1256/data/Packs/Maps_00023.pkn",
+        "BnBMapDataTests reads rel_bnb01_village06 CustomMap.json and BnBItemLayout.json to pin the native item layout",
+    ),
     "BubbleFighter.Fantasy.InGame.Tests (CN2011 desert WB)": (
         "client-data/cn-279/dataraw/Maps/rel_Desert04_Pharaoh/track.wb",
         "ItemModeNativeResourceTests traverses the native CN2011 map records and selects their helper positions",
@@ -80,13 +103,25 @@ LOCAL_DATA_PREREQUISITES: dict[str, tuple[str, str]] = {
 }
 
 
+LOCAL_DATA_ENV_PREREQUISITES = {
+    f"BFF_{build}_CONFIG_ARCHIVE": "WeaponCriticalCatalogTests loads this build's Config.bfz"
+    for build in ("CN324", "CN404", "CN406", "CN408", "ID400")
+}
+
+
 def missing_local_data() -> list[dict[str, str]]:
     """Check every locally provisioned client-data and fixture path the LocalClientData cases read."""
-    return [
+    missing = [
         {"test": project, "missing": relative, "reason": reason}
         for project, (relative, reason) in LOCAL_DATA_PREREQUISITES.items()
         if not (ROOT / relative).is_file()
     ]
+    for variable, reason in LOCAL_DATA_ENV_PREREQUISITES.items():
+        value = os.environ.get(variable)
+        if not value or not (ROOT / value).is_file():
+            missing.append({"test": "BubbleFighter.Fantasy.Dialect.Messages.Tests",
+                            "missing": variable, "reason": reason})
+    return missing
 
 
 def run(command: list[str], log: Path, environment: dict[str, str]) -> None:
@@ -150,9 +185,59 @@ def test_command(project: Path, directory: Path, public: bool, no_build: bool = 
     if public:
         command += ["--filter", "Category!=LocalClientData"]
     if is_serial(project):
-        # The quiet phase must also serialize fixture classes inside each test host.
-        command += ["--", "xUnit.ParallelizeTestCollections=false", "xUnit.MaxParallelThreads=1"]
+        threads = next((count for name, count in QUIET_THREADS.items() if project.parent.name.endswith(name)), 1)
+        if threads == 1:
+            # The quiet phase must also serialize fixture classes inside each test host.
+            command += ["--", "xUnit.ParallelizeTestCollections=false", "xUnit.MaxParallelThreads=1"]
+        else:
+            command += ["--", f"xUnit.MaxParallelThreads={threads}"]
     return command
+
+
+def changed_files(base: str) -> list[str]:
+    """Files changed since the merge base with base, including uncommitted and untracked files."""
+    merge_base = subprocess.check_output(["git", "merge-base", base, "HEAD"], cwd=ROOT, text=True).strip()
+    lines = subprocess.check_output(["git", "diff", "--name-only", merge_base], cwd=ROOT, text=True).splitlines()
+    lines += subprocess.check_output(["git", "ls-files", "--others", "--exclude-standard"], cwd=ROOT, text=True).splitlines()
+    return sorted({line.strip().replace("\\", "/") for line in lines if line.strip()})
+
+
+def references(project: Path) -> set[Path]:
+    """The project files a csproj references, with wildcard includes expanded."""
+    root = ET.parse(project).getroot()
+    result: set[Path] = set()
+    for node in root.iter():
+        if node.tag.split("}")[-1] != "ProjectReference" or not node.get("Include"):
+            continue
+        pattern = node.get("Include", "").replace("\\", "/")
+        if any(mark in pattern for mark in "*?"):
+            result.update(path.resolve() for path in project.parent.glob(pattern))
+        else:
+            result.add((project.parent / pattern).resolve())
+    return result
+
+
+def affected_projects(all_projects: list[Path], changed: list[str]) -> list[Path] | None:
+    """The test projects that can observe the changes, or None when every project must run."""
+    sources = [ROOT / path for path in subprocess.check_output(
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "*.csproj"], cwd=ROOT, text=True).splitlines()]
+    graph = {project.resolve(): references(project) for project in sources if project.is_file()}
+    directories = {project.parent: project for project in graph}
+    touched: set[Path] = set()
+    for name in changed:
+        if any(fnmatch.fnmatch(name, pattern) for pattern in DOCUMENTATION_ONLY):
+            continue
+        owner = next((directories[parent] for parent in (ROOT / name).resolve().parents if parent in directories), None)
+        if owner is None:
+            return None
+        touched.add(owner)
+    closure = set(touched)
+    while True:
+        grown = {project for project, refs in graph.items() if refs & closure} - closure
+        if not grown:
+            break
+        closure |= grown
+    return [project for project in all_projects if project.resolve() in closure]
 
 
 def run_project(project: Path, output: Path, public: bool, no_build: bool,
@@ -196,7 +281,8 @@ def run_tests(all_projects: list[Path], output: Path, public: bool, jobs: int,
     if failures:
         raise RuntimeError("Parallel test projects failed: " + "; ".join(failures))
     for project in serial:
-        record(run_project(project, output, public, False, environment))
+        # The single Release build already compiled these too; a rebuild check only delays them.
+        record(run_project(project, output, public, True, environment))
     return reports
 
 
@@ -210,6 +296,9 @@ def main() -> int:
     parser.add_argument("--jobs", type=int, default=None,
                         help="Maximum independent test projects to run at once "
                              "(default: max(1, cpu_count // 2)).")
+    parser.add_argument("--affected", metavar="REF", default=None,
+                        help="Run only the test projects that can observe the changes since the merge "
+                             "base with REF; not a deployment or release gate.")
     args = parser.parse_args()
     if args.jobs is not None and args.jobs < 1:
         parser.error("--jobs must be at least 1")
@@ -230,6 +319,15 @@ def main() -> int:
         raise RuntimeError("Missing validation toolchains: " + ", ".join(missing))
 
     all_projects = projects()
+    every_project = len(all_projects)
+    changed: list[str] | None = None
+    if args.affected is not None:
+        changed = changed_files(args.affected)
+        selected = affected_projects(all_projects, changed)
+        if selected is not None:
+            all_projects = selected
+        print(f"AFFECTED since {args.affected}: {len(changed)} changed files, "
+              f"{'every' if selected is None else len(all_projects)} test projects", flush=True)
     missing_data = missing_local_data()
     if missing_data:
         print("LOCAL PREREQUISITES ABSENT (projects still run in public mode):", flush=True)
@@ -250,25 +348,34 @@ def main() -> int:
         "release_gate": not args.public,
         "jobs": jobs,
         "serial_projects": list(SERIAL_PROJECTS),
+        "affected_since": args.affected,
+        "test_projects": [project.parent.name for project in all_projects],
     }, indent=2), encoding="utf-8")
 
-    run(["dotnet", "build", "BubbleFighter.Fantasy.sln", "-c", "Release", "-m:1",
+    # One parallel build: nothing else runs yet, -nr:false leaves no build node behind and shared
+    # compilation stays off, so the build still leaves no process running after it.
+    run(["dotnet", "build", "BubbleFighter.Fantasy.sln", "-c", "Release", "-m",
          "-nr:false", "-p:UseSharedCompilation=false"], output / "release.log", environment)
-    run([sys.executable, "sdk/run-conformance.py"], output / "sdk-conformance.log", environment)
-    if any(line.startswith("SKIP ") for line in (output / "sdk-conformance.log").read_text(encoding="utf-8").splitlines()):
-        raise RuntimeError("An SDK conformance gate was skipped.")
+    sdk_inputs = ("sdk/", "src/Plugins/BubbleFighter.Fantasy.Loader.Remote/",
+                  "src/BubbleFighter.Fantasy.Abstractions/", "src/BubbleFighter.Fantasy.Contracts/")
+    if changed is None or len(all_projects) == every_project or any(name.startswith(sdk_inputs) for name in changed):
+        run([sys.executable, "sdk/run-conformance.py"], output / "sdk-conformance.log", environment)
+        if any(line.startswith("SKIP ") for line in (output / "sdk-conformance.log").read_text(encoding="utf-8").splitlines()):
+            raise RuntimeError("An SDK conformance gate was skipped.")
 
-    reports = run_tests(all_projects, output, args.public, jobs, environment)
+    reports = run_tests(all_projects, output, args.public, jobs, environment) if all_projects else []
 
     host = ROOT / "src/BubbleFighter.Fantasy.Host/bin/Release/net10.0/BubbleFighter.Fantasy.Host.dll"
     run(["dotnet", str(host), "packets", "check"], output / "packets.log", environment)
     run(["dotnet", str(host), "run", "--profile", "kr-1256", "--patch",
          "tools/local-checks/isolated-memory.patch.yaml", "--dump-config"], output / "dump-config.log", environment)
     total = sum(int(report["counters"]["passed"]) for report in reports)  # type: ignore[index]
-    mode = "public" if args.public else "complete"
+    mode = ("affected " if args.affected is not None else "") + ("public" if args.public else "complete")
     print(f"PASS {mode} gates: {len(reports)} populated test reports, {total} tests, no skips", flush=True)
     if args.public:
         print("EXCLUDED: Category=LocalClientData; complete release validation remains required", flush=True)
+    if args.affected is not None:
+        print("SCOPE: affected projects only; run the full gate before a deployment batch or release", flush=True)
     return 0
 
 

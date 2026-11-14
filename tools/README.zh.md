@@ -6,6 +6,7 @@
 
 - `ci/serial-gates.py` 执行 Release 构建、SDK 检查、逐项目串行测试以及包表和配置检查。完整模式需要指南列出的本地数据；`--public` 只排除需要本地数据的用例。
 - `legacy-audit/audit.py` 检查已声明功能的覆盖范围。它读取源码和隔离配置，不能证明实际玩法通过验收。
+- `perf/` 测量一次隔离 Host 启动的内存和 CPU 并与预算比较，也可只读 `/proc` 报告 Linux 上运行中的进程而不做任何改动。见 [perf/README.md](perf/README.md)。
 - `TrxSummary/` 在输入大小限制内汇总测试结果记录。
 - `ReloadLeakProbe/` 测量合成程序集上下文样本，不测量 Host 重载。
 - `publish-windows-x64.ps1`、`publish-linux.ps1` 和 `prepare-linux-deployment.py` 准备依赖运行时的发布产物。使用前检查参数，凭证和客户端数据不应进入发布归档。

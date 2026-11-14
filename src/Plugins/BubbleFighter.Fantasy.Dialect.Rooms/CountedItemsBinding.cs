@@ -50,6 +50,9 @@ internal sealed class CountedItemsBinding(string protocol, IOpcodeTable table, P
             throw new ConfigException("Direct supply effects require an audited native effect consumer.");
         // The used seat and kind this sender writes; the supply row alone reaches this check without Mount.
         PacketLayoutContract.RequireFields(tables, build, EffectStructure, "Direct item effects", ("seat", "u32"), ("kind", "u32"));
+        if (_usesItemUsed)
+            PacketLayoutContract.RequireFields(tables, build, "SupplyItemGranted", "Direct item effect restoration",
+                ("seat", "u32"), ("kind", "u32"));
         _ = table.S2C(EffectOpcode);
         context.Effect(context.Services.RegisterMany<IMessageSender<RoundCountedItemUsed>>(this));
     }
@@ -57,9 +60,19 @@ internal sealed class CountedItemsBinding(string protocol, IOpcodeTable table, P
     public ValueTask SendAsync(ISession session, RoundCountedItemsPrepared message, CancellationToken ct) =>
         session.SendAsync(table.S2C("gspPveItemInfo"), EncodePrepared(tables, build, message.Kinds), ct);
 
-    public ValueTask SendAsync(ISession session, RoundCountedItemUsed message, CancellationToken ct) =>
-        session.SendAsync(table.S2C(EffectOpcode), PacketCodec.Write(tables, build, EffectStructure,
-            new Dictionary<string, object?> { ["seat"] = message.Seat, ["kind"] = message.Kind }), ct);
+    public async ValueTask SendAsync(ISession session, RoundCountedItemUsed message, CancellationToken ct)
+    {
+        if ((message.RetainedItemSlot is null) != (message.RetainedItemKind is null))
+            throw new InvalidOperationException("A retained item restoration requires both slot and kind.");
+        if (message.RetainedItemSlot is < 0 || message.RetainedItemKind is <= 0)
+            throw new InvalidOperationException("A retained item restoration has an invalid slot or kind.");
+        await session.SendAsync(table.S2C(EffectOpcode), PacketCodec.Write(tables, build, EffectStructure,
+            new Dictionary<string, object?> { ["seat"] = message.Seat, ["kind"] = message.Kind }), ct).ConfigureAwait(false);
+        if (!_usesItemUsed || message.RetainedItemSlot is not { } slot || message.RetainedItemKind is not { } kind)
+            return;
+        await session.SendAsync(table.S2C("gspAddItemToSlot"), PacketCodec.Write(tables, build, "SupplyItemGranted",
+            new Dictionary<string, object?> { ["seat"] = message.Seat, ["kind"] = kind, ["item_slot"] = slot }), ct).ConfigureAwait(false);
+    }
 
     internal static byte[] EncodePrepared(PacketTables tables, string build, IReadOnlyList<int> kinds)
     {

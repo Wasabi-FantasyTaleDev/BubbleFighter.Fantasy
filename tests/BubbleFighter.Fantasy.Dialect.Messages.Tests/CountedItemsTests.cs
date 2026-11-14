@@ -36,11 +36,25 @@ public sealed class CountedItemsTests
             await fixture.Packets.DispatchAsync(protocol, session,
                 new(table.C2S("gcpEatItem"), Convert.FromHexString("FFFFFFFF68000000")), default);
             Assert.Equal(new RoundSupplyPickupRequested(-1, 104), fixture.Messages.Received[^1]);
-            await Assert.Single(fixture.Services.GetAll<IMessageSender<RoundCountedItemUsed>>())
-                .SendAsync(session, new(2, 104), default);
-            Assert.Equal(table.S2C("gspItemUsed"), Assert.Single(session.Sent));
-            Assert.Equal("0200000068000000", Convert.ToHexString(Assert.Single(session.Bodies)));
+            var sender = Assert.Single(fixture.Services.GetAll<IMessageSender<RoundCountedItemUsed>>());
+            await sender.SendAsync(session, new(2, 104) { RetainedItemSlot = 0, RetainedItemKind = 121 }, default);
+            Assert.Equal([table.S2C("gspItemUsed"), table.S2C("gspAddItemToSlot")], session.Sent);
+            Assert.Equal("0200000068000000", Convert.ToHexString(session.Bodies[0]));
+            Assert.Equal("0200000079000000", Convert.ToHexString(session.Bodies[1]));
             Assert.Equal(8, session.Bodies[0].Length);
+            Assert.Equal(8, session.Bodies[1].Length);
+            foreach (var invalid in new RoundCountedItemUsed[]
+            {
+                new(2, 121) { RetainedItemSlot = 0 },
+                new(2, 121) { RetainedItemSlot = -1, RetainedItemKind = 101 },
+                new(2, 121) { RetainedItemSlot = 0, RetainedItemKind = 0 },
+            })
+                await Assert.ThrowsAsync<InvalidOperationException>(() => sender.SendAsync(session, invalid, default).AsTask());
+            Assert.Equal(2, session.Sent.Count);
+            await sender.SendAsync(session, new(2, 121), default);
+            Assert.Equal(3, session.Sent.Count);
+            Assert.Equal(table.S2C("gspItemUsed"), session.Sent[2]);
+            Assert.Equal("0200000079000000", Convert.ToHexString(session.Bodies[2]));
         }
         finally { await context.UnwindAsync(); }
         Assert.Empty(fixture.Packets.Handlers);

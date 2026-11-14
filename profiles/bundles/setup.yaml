@@ -10,11 +10,11 @@
 - id: installation
   plugin: installation
   # The kernel fixes its budget from these startup rows, and every installation is admitted inside it later.
-  # Each row costs 1 + its effect capacity (4096 by default); all selectable builds compose about 300 rows,
-  # and a reconfiguration holds the old and new rows at once. SetupRuntimeBudgetTests checks the sum.
+  # Each row costs 1 + its effect capacity (4096 by default); the reserves cover every selectable build's optional rows
+  # while a reconfiguration holds the old and new installations at once. SetupRuntimeBudgetTests checks both totals.
   lifecycle:
-    entry_reserve: 700
-    service_metadata_reserve: 2900000
+    entry_reserve: 820
+    service_metadata_reserve: 3400000
   config:
     state_directory: "${BFF_STATE_DIR}"
     bootstrap_token: "${BFF_SETUP_TOKEN:-}"
@@ -30,7 +30,8 @@
 - id: admin.http
   plugin: admin.http
   config:
-    listen: "${BFF_ADMIN_HOST:-127.0.0.1}:${BFF_ADMIN_PORT:-8080}"
+    # Reachable from other machines by default; the administrator account signs in. BFF_ADMIN_HOST=127.0.0.1 keeps it local.
+    listen: "${BFF_ADMIN_HOST:-0.0.0.0}:${BFF_ADMIN_PORT:-7300}"
     allowed_hosts: "${BFF_ADMIN_ALLOWED_HOSTS:-}"
     # The host sets this when the executable was started without arguments from an interactive Windows console.
     open_browser: ${BFF_OPEN_BROWSER:-false}

@@ -1,8 +1,16 @@
 ---
 title: "Troubleshooting"
 description: "Diagnose build, configuration, startup, network, persistence and SDK failures in order."
-updated: 2026-10-20
+updated: 2026-11-09
 ---
+
+## Host file logs are missing or incomplete {#host-file-logs}
+
+Check whether `BFF_LOG_FILE` or `--log-file` is set in the actual process environment or command line. File logging defaults off, and the file threshold defaults to `Warning`. Set `BFF_LOG_FILE_LEVEL=Information` or `--log-file-level Information` when information records are required; category filters still apply. This does not change the console threshold.
+
+A startup path, permissions or lock error means the file writer did not start. Use a writable persistent destination and give each running Host its own file path. An existing active file larger than `BFF_LOG_FILE_MAX_BYTES` rotates at startup; older backups remain subject to the fixed count. The default five slots limit new writes to 16 MiB per file; historical backups may be larger after a size reduction.
+
+`dropped_entries=N` counts records lost to queue or byte limits, oversized entries, formatting failures or unavailable I/O. A runtime I/O failure produces one bounded stderr line with the exception type. The writer closes its stream and retries opening with exponential delay, by default one second up to 60 seconds; it counts outage records as dropped and writes the pending count before new records after recovery. On Windows, a viewer opened without delete sharing can block rotation: close it or reopen it with delete sharing, then allow the retry to finish. Check disk access, latency and the limits in [configuration](configuration.md). A failed bounded shutdown reports that the log did not drain cleanly. I/O errors can leave partial records and forced stops can lose queued records. Complete exception records include the message, inner exceptions and stack. A log entry alone does not prove a storage transaction committed; verify persisted state and corresponding audit evidence.
 
 ## First-run setup rejects a proxy {#setup-proxy-refused}
 
@@ -19,7 +27,7 @@ This page turns "the server does not work" into an ordered investigation: what t
 **Before you start.**
 
 - Work from the repository root for a source checkout, or from the release directory for a published build.
-- For local checks, copy `.env.example` to the git-ignored `.env` and set `BFF_MYSQL_PASSWORD` to a nonempty disposable value. Profile interpolation requires it even when MySQL is disabled.
+- A local check with the isolated-memory patch needs no `.env` or database settings. Copy `.env.example` to the git-ignored `.env` only for a deliberate deployment that enables MySQL.
 - Every local Host command on this page includes `--patch tools/local-checks/isolated-memory.patch.yaml`. The patch disables `persistence.mysql` and enables `persistence.memory`, so a developer `.env` or local patch cannot point the server at a live database.
 - Read the first error, change one thing per attempt, and keep the failing output.
 
@@ -64,11 +72,11 @@ One restore error has a different cause. `NU1900` (`Error occurred while getting
 
 ### An environment variable has no value
 
-**Symptom.** `error: File '<file>', row '<row id>': environment variable '<NAME>' is not set and has no default.` **Check.** Look for `${NAME}` without a `:-default` in the profile, bundle or patch named in the error, then inspect `.env` and the process environment. A repository-root `.env` is applied to unset process variables before profile composition for every command except `start`; existing environment variables win. **Likely cause.** The variable is neither exported nor in `.env`, and `BFF_MYSQL_PASSWORD` has no default, so any game or management profile fails to compose without it. **Fix.** Set the variable for the command or add it to the git-ignored `.env`; never commit real credentials. **Confirm recovery.** Composition succeeds and `--dump-config` prints the effective rows.
+**Symptom.** `error: File '<file>', row '<row id>': environment variable '<NAME>' is not set and has no default.` **Check.** Look for `${NAME}` without a `:-default` in the profile, bundle or patch named in the error, then inspect `.env` and the process environment. A repository-root `.env` is applied to unset process variables before profile composition for every command except `start`; existing environment variables win. **Likely cause.** The variable is neither exported nor in `.env`, and an enabled row reads it without a default; for example `persistence.mysql` reads `BFF_MYSQL_PASSWORD`. A row disabled by the profile or a `--patch` needs none of its variables. **Fix.** Set the variable for the command or add it to the git-ignored `.env`; never commit real credentials. **Confirm recovery.** Composition succeeds and `--dump-config` prints the effective rows.
 
 ### The MySQL password is empty
 
-**Symptom.** `error: Activation of row 'persistence.mysql' (plugin 'persistence.mysql') failed: Invalid configuration for row 'persistence.mysql': connection_string is missing Password (BFF_MYSQL_PASSWORD is required and must not be empty).` **Check.** A copied `.env.example` contains `BFF_MYSQL_PASSWORD=`, so interpolation succeeds with an empty string and the failure appears only when the row activates. **Likely cause.** An empty placeholder left in `.env`. **Fix.** Set a disposable nonempty value for local checks and add the isolated patch so no database is contacted; use real credentials only for a deliberate persistent deployment. **Confirm recovery.** With the isolated patch, `persistence.memory` activates and the log reports in-memory persistence active.
+**Symptom.** `error: Activation of row 'persistence.mysql' (plugin 'persistence.mysql') failed: Invalid configuration for row 'persistence.mysql': connection_string is missing Password (BFF_MYSQL_PASSWORD is required and must not be empty).` **Check.** A copied `.env.example` contains `BFF_MYSQL_PASSWORD=`, so interpolation succeeds with an empty string and the failure appears only when the row activates. **Likely cause.** An empty placeholder left in `.env`. **Fix.** For a real MySQL database, set its password. For a local check, add the isolated patch instead: it disables the MySQL row, which then needs no password. **Confirm recovery.** With the isolated patch, `persistence.memory` activates and the log reports in-memory persistence active.
 
 ### A profile, patch or option name is wrong
 
@@ -93,11 +101,11 @@ dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile 
 Every row publishes a state after a start attempt. Read it from the console log or the admin API:
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:8080/api/plugins | Select-Object rowId, plugin, state, error
+Invoke-RestMethod http://127.0.0.1:7300/api/plugins | Select-Object rowId, plugin, state, error
 ```
 
 ```sh
-curl -s http://127.0.0.1:8080/api/plugins
+curl -s http://127.0.0.1:7300/api/plugins
 ```
 
 `/api/plugins` returns one object per runtime instance with `rowId`, `plugin`, `source`, `state`, `error`, `codeRefreshPolicy`, `codeLifetime`, `restartRequiredForReclamation`, `isRetiring`, `overrides`, `version`, `contractVersions` and `supportedBuilds`. Only `Active` is a healthy running state.
@@ -153,7 +161,7 @@ curl -s http://127.0.0.1:8080/api/plugins
 
 ### The admin API or WebUI is unreachable or unauthorized
 
-**Symptom.** The browser cannot reach the WebUI, or `/api/...` answers 401 with `{"error":"unauthorized"}`. **Check.** The admin row binds `${BFF_ADMIN_HOST:-127.0.0.1}:${BFF_ADMIN_PORT:-8080}`, loopback by default. A server started with `start` needs a signed-in administrator session for every protected `/api` request; `/health` and the WebUI files stay open. During first-run setup, `/api/plugins` answers 401 until an administrator account exists — that is the authentication model, not a server failure; `/health` and `/api/setup/status` stay reachable. **Likely cause.** The listener is on loopback and the browser is elsewhere, the session expired, a `run --profile` server was given a non-loopback address (it has no accounts and refuses one), or a non-loopback installation listener was configured without a bootstrap token. **Fix.** Sign in again; on a server started with `start`, set `BFF_ADMIN_HOST` to the interface you need and set `bootstrap_token` (`BFF_SETUP_TOKEN`) to at least 32 characters for a non-loopback installation listener. The row otherwise fails with `A non-loopback installation listener requires an explicit bootstrap_token of at least 32 characters.` **Confirm recovery.** `/health` returns `{"status":"ok", ...}` and the signed-in WebUI lists the plugins.
+**Symptom.** The browser cannot reach the WebUI, or `/api/...` answers 401 with `{"error":"unauthorized"}`. **Check.** A server started with `start` binds `${BFF_ADMIN_HOST:-0.0.0.0}:${BFF_ADMIN_PORT:-7300}` and needs a signed-in administrator session for every protected `/api` request; `/health` and the WebUI files stay open. During first-run setup, `/api/plugins` answers 401 until an administrator account exists — that is the authentication model, not a server failure; `/health` and `/api/setup/status` stay reachable. A `run --profile` server binds loopback. **Likely cause.** The session expired, `BFF_ADMIN_HOST` keeps the listener on loopback while the browser is elsewhere, a `run --profile` server was given a non-loopback address (it has no accounts and refuses one), or `BFF_ADMIN_ALLOWED_HOSTS` does not list the name the browser used (an empty list on a reachable address accepts any name). A remote setup answers 403 `bootstrap_token_required` only when `BFF_SETUP_TOKEN` is set. **Fix.** Sign in again; use the server's address, or set `BFF_ADMIN_HOST` and `BFF_ADMIN_ALLOWED_HOSTS` to match it; send the configured setup token or clear `BFF_SETUP_TOKEN`. **Confirm recovery.** `/health` returns `{"status":"ok", ...}` and the signed-in WebUI lists the plugins.
 
 ## Persistence and migrations
 

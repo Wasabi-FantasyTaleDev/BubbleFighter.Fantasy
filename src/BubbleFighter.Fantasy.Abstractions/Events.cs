@@ -50,6 +50,16 @@ public interface IEventBus
     /// <param name="e">The event payload.</param>
     void Emit<TEvent>(TEvent e) where TEvent : IEvent;
 
+    /// <summary>
+    /// Reports whether any <see cref="On{TEvent}"/> or <see cref="OnAsync{TEvent}"/> handler is subscribed, so a hot
+    /// path can skip building an event nobody receives. A subscription made after the answer is not seen by it, which
+    /// is the same as subscribing after the event was raised. An implementation that cannot tell returns
+    /// <see langword="true"/>.
+    /// </summary>
+    /// <typeparam name="TEvent">The event payload type.</typeparam>
+    /// <returns><see langword="false"/> only when no handler for the event is subscribed.</returns>
+    bool HasHandlers<TEvent>() where TEvent : IEvent => true;
+
     /// <summary>Awaits every async handler one by one, in priority order.</summary>
     /// <typeparam name="TEvent">The event payload type.</typeparam>
     /// <param name="e">The event payload.</param>

@@ -584,6 +584,157 @@ public sealed class ProtocolHandshakeTests
         });
     }
 
+    /// <summary>
+    /// The pump stops reading once the inbound buffer is full, so a frame that is still incomplete at that point
+    /// can never complete. The connection must end there instead of waiting forever with the buffer held.
+    /// </summary>
+    [Fact]
+    public async Task AFrameThatCannotFitTheInboundBufferClosesTheConnection()
+    {
+        await using var harness = await ProtocolHarness.StartAsync();
+        var dialect = TestWireDialects.Get("kr-1256");
+        var root = Path.GetDirectoryName((string)TestWireDialects.MessagesConfig()["packets_directory"]!)!;
+        var table = OpcodeTableLoader.Load(Path.Combine(root, "profiles", "kr-1256", "opcodes.yaml"), dialect.Profile);
+        using var verified = new VersionVerifiedScope(1);
+        // The row refuses this pair when it loads; a protocol that is given it anyway must still not hang.
+        var options = new ProtocolOptions { MaxPayloadBytes = 3 * 1024 * 1024, InboundBufferBytes = 1024 * 1024 };
+        var protocol = new WireProtocol("kr-1256/game", dialect, dialect.BuildServerPreamble(0, ""),
+            options, harness.Packets, table, new EventBus(NullLogger.Instance), harness.Sessions,
+            verified, NullLogger.Instance, CancellationToken.None, requiresPatchHandshake: true);
+        await WithProtocolAsync(protocol, async (connection, ct) =>
+        {
+            _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
+            var wire = FrameHeaderDeclaring(3 * 1024 * 1024, followedBy: 2 * 1024 * 1024);
+            SimpleCipher.ClientToServer().EncryptInPlace(wire);
+            using var sending = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var send = connection.SendAsync(wire, sending.Token);
+            Assert.True(await WaitForAsync(() => connection.IsClosed), "the connection stayed open with its buffer full");
+            Assert.Contains("inbound_buffer_bytes", connection.CloseReason);
+            // The server stopped reading, so the rest of the junk is never taken.
+            sending.Cancel();
+            try { await send; }
+            catch (OperationCanceledException) { }
+            catch (InvalidOperationException) { }
+        });
+    }
+
+    /// <summary>With the shipped limits a header that declares more than a client ever sends is refused on sight.</summary>
+    [Fact]
+    public async Task AnOversizedFrameHeaderIsRefusedBeforeItsPayloadArrives()
+    {
+        await using var harness = await ProtocolHarness.StartAsync();
+        await WithProtocolAsync(harness.Game, async (connection, ct) =>
+        {
+            _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
+            var wire = FrameHeaderDeclaring(3 * 1024 * 1024, followedBy: 0);
+            SimpleCipher.ClientToServer().EncryptInPlace(wire);
+            await connection.SendAsync(wire, ct);
+            Assert.True(await WaitForAsync(() => connection.IsClosed));
+            Assert.Contains("max_payload_bytes", connection.CloseReason);
+        });
+    }
+
+    /// <summary>A connection that never completes a frame is closed at the deadline, silent or mid-header.</summary>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(3)]
+    public async Task AConnectionThatSendsNoCompleteFrameIsClosedAtTheDeadline(int headerBytesSent)
+    {
+        await using var harness = await ProtocolHarness.StartAsync(new() { ["first_frame_seconds"] = 1 });
+        await WithProtocolAsync(harness.Game, async (connection, ct) =>
+        {
+            _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
+            if (headerBytesSent > 0)
+            {
+                var wire = FrameHeaderDeclaring(16, followedBy: 0).AsSpan(0, headerBytesSent).ToArray();
+                SimpleCipher.ClientToServer().EncryptInPlace(wire);
+                await connection.SendAsync(wire, ct);
+            }
+            Assert.False(connection.IsClosed);
+            Assert.True(await WaitForAsync(() => connection.IsClosed));
+            Assert.Contains("first_frame_seconds", connection.CloseReason);
+        });
+    }
+
+    /// <summary>The deadline ends with the first frame: a client that then stays quiet is not closed by it.</summary>
+    [Fact]
+    public async Task TheFirstFrameEndsTheDeadline()
+    {
+        await using var harness = await ProtocolHarness.StartAsync(new()
+        {
+            ["first_frame_seconds"] = 1, ["pre_handshake_opcodes"] = new List<object?> { "Unknown521" },
+        });
+        var received = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var handler = harness.Packets.Register("kr-1256/game", 521, (_, _, _) =>
+        {
+            received.TrySetResult();
+            return ValueTask.CompletedTask;
+        });
+        await WithProtocolAsync(harness.Game, async (connection, ct) =>
+        {
+            _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
+            await connection.SendAsync(EncryptFrame(SimpleCipher.ClientToServer(), 521, new byte[4]), ct);
+            await received.Task.WaitAsync(TimeSpan.FromSeconds(10), ct);
+            await Task.Delay(1800, ct);
+            Assert.False(connection.IsClosed);
+        });
+    }
+
+    /// <summary>The largest frame the limits allow is received when the buffer is exactly one such frame.</summary>
+    [Fact]
+    public async Task TheLargestAllowedFrameFitsABufferOfExactlyItsSize()
+    {
+        const int buffer = 4096;
+        var payload = new byte[buffer - PacketFrame_8Bytes.HeaderSize];
+        Random.Shared.NextBytes(payload);
+        await using var harness = await ProtocolHarness.StartAsync(new()
+        {
+            ["max_payload_bytes"] = payload.Length, ["inbound_buffer_bytes"] = buffer,
+            ["pre_handshake_opcodes"] = new List<object?> { "Unknown521" },
+        });
+        var received = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var handler = harness.Packets.Register("kr-1256/game", 521, (_, packet, _) =>
+        {
+            received.TrySetResult(packet.Payload.ToArray());
+            return ValueTask.CompletedTask;
+        });
+        await WithProtocolAsync(harness.Game, async (connection, ct) =>
+        {
+            _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
+            await connection.SendAsync(EncryptFrame(SimpleCipher.ClientToServer(), 521, payload), ct);
+            Assert.Equal(payload, await received.Task.WaitAsync(ct));
+        });
+    }
+
+    /// <summary>A payload limit that does not fit the inbound buffer with its frame header fails the row.</summary>
+    [Fact]
+    public async Task APayloadLimitThatDoesNotFitTheInboundBufferIsRejectedAtActivation()
+    {
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        {
+            await using var harness = await ProtocolHarness.StartAsync(new()
+            {
+                ["max_payload_bytes"] = 4096 - PacketFrame_8Bytes.HeaderSize + 1, ["inbound_buffer_bytes"] = 4096,
+            });
+        });
+        Assert.IsType<ConfigException>(error.InnerException);
+        Assert.Contains("inbound_buffer_bytes", error.InnerException!.Message);
+        Assert.Contains("max_payload_bytes", error.InnerException.Message);
+    }
+
+    /// <summary>Builds an 8-byte frame header with valid integrity bytes for a payload of the declared length, then junk.</summary>
+    private static byte[] FrameHeaderDeclaring(int payloadLength, int followedBy)
+    {
+        var wire = new byte[PacketFrame_8Bytes.HeaderSize + followedBy];
+        BinaryPrimitives.WriteUInt32LittleEndian(wire, (uint)payloadLength);
+        BinaryPrimitives.WriteUInt16LittleEndian(wire.AsSpan(4), WirePins.PatchRequestOpcode);
+        byte check = 0;
+        foreach (var value in wire.AsSpan(0, 7))
+            check ^= value;
+        wire[7] = check;
+        return wire;
+    }
+
     [Fact]
     public async Task MalformedFrameClosesFeatureAdmission()
     {

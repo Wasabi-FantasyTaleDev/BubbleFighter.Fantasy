@@ -9,7 +9,7 @@ using BubbleFighter.Fantasy.Contracts.Sessions;
 namespace BubbleFighter.Fantasy.Commands;
 
 /// <summary>Publishes one player-directory-backed management scope with its configured notice encoder.</summary>
-[Plugin("commands.players", Requires = [typeof(IOnlineCommandScopes), typeof(IOnlinePlayers), typeof(ISessionRegistry)],
+[Plugin("commands.players", Category = "admin", Names = ["en=Player commands", "zh-Hans=玩家命令", "zh-Hant=玩家指令", "ko=플레이어 명령"], Requires = [typeof(IOnlineCommandScopes), typeof(IOnlinePlayers), typeof(ISessionRegistry)],
     RequiresMany = [typeof(IMessageSender<ServerNotice>)])]
 public sealed class OnlinePlayersPlugin : IPlugin
 {

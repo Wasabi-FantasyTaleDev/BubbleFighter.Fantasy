@@ -16,7 +16,17 @@ public sealed record EquipmentSelectionReadRequested(string Protocol, long UserN
 /// <param name="EquippedItemIds">The committed worn item identities.</param>
 /// <param name="Remote">Whether the appearance belongs to another player rather than the recipient.</param>
 public sealed record EquipmentViewRequested(string Protocol, ISession Session, int UserNum, int CharacterItemId,
-    IReadOnlyList<int> EquippedItemIds, bool Remote) : IEvent;
+    IReadOnlyList<int> EquippedItemIds, bool Remote) : IEvent
+{
+    private IReadOnlyList<Rooms.RoomItemAttribute>? _itemAttributes;
+
+    /// <summary>Gets copied committed modifiers; null requests legacy resolution, while an empty vector clears modifiers.</summary>
+    public IReadOnlyList<Rooms.RoomItemAttribute>? ItemAttributes
+    {
+        get => _itemAttributes;
+        init => _itemAttributes = value is null ? null : new Progress.RoundEquipmentSnapshot(EquippedItemIds, value).ItemAttributes;
+    }
+}
 
 /// <summary>Requests a worn-state change with an opaque client reference and a codec-resolved inventory target.</summary>
 /// <param name="Reference">The original client reference retained for correlation; it is not a persistence slot key.</param>

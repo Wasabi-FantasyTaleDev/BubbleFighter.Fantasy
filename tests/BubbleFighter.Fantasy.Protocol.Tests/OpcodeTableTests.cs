@@ -181,6 +181,85 @@ public sealed class OpcodeTableTests
         Assert.False(registry.TryForProtocol("kr-1256/match", out _));
     }
 
+    /// <summary>Resolves native match and report names without changing another connection or direction's rows.</summary>
+    [Theory]
+    [InlineData("kr-1256", "gspClanPassport(21)", "gspRepJoinSession(103)")]
+    [InlineData("cn-738", "Unknown(21)", "Unknown(103)")]
+    [InlineData("cn-742", "Unknown(21)", "Unknown(103)")]
+    [InlineData("cn-774", "gspDisconnectOpenWeb(21)", "gspRepJoinSession(103)")]
+    [InlineData("tw-454", "gspDisconnectOpenWeb(21)", "gspRepJoinSession(103)")]
+    public void NativeMatchNamesStayInTheirConnectionAndDirection(string build, string game21, string game103)
+    {
+        var table = OpcodeTableLoader.Load(ProfileTablePath(build), TestWireDialects.Get(build).Profile);
+        var registry = new Registry(table);
+        var game = registry.ForProtocol($"{build}/game");
+        var relay = registry.ForProtocol($"{build}/relay");
+        var udp = registry.ForProtocol($"{build}/udp");
+        (string Protocol, PacketDirection Direction, ushort Value, string Name)[] names =
+        [
+            ($"{build}/relay", PacketDirection.ClientToServer, 17, "rcpGameStart"),
+            ($"{build}/relay", PacketDirection.ClientToServer, 24, "rcpCriticalBuffData"),
+            ($"{build}/relay", PacketDirection.ClientToServer, 29, "rcpReqHackDataRandomCheck"),
+            ($"{build}/relay", PacketDirection.ClientToServer, 20006, "rcpReqLagDisPing"),
+            ($"{build}/relay", PacketDirection.ServerToClient, 21, "rspRepLagDisPing"),
+            ($"{build}/game", PacketDirection.ClientToServer, 103, "gcpReportUserTracking"),
+            ($"{build}/relay", PacketDirection.ClientToServer, 32889, "gppCharactersPlayData"),
+        ];
+        foreach (var (protocol, direction, value, name) in names)
+        {
+            var expected = registry.ForProtocol(protocol);
+            Assert.Equal((ushort?)value, expected.Find(direction, name));
+            var opposite = direction == PacketDirection.ClientToServer
+                ? PacketDirection.ServerToClient : PacketDirection.ClientToServer;
+            Assert.Null(expected.Find(opposite, name));
+            foreach (var other in new[] { game, relay, udp }.Where(view => view.Connection != expected.Connection))
+                Assert.Null(other.Find(direction, name));
+        }
+        Assert.Equal(game21, game.Describe(PacketDirection.ServerToClient, 21));
+        Assert.Equal("rspRepLagDisPing(21)", relay.Describe(PacketDirection.ServerToClient, 21));
+        Assert.Equal(game103, game.Describe(PacketDirection.ServerToClient, 103));
+        Assert.Null(relay.Find(PacketDirection.ServerToClient, "gppCharactersPlayData"));
+    }
+
+    /// <summary>Resolves the native pre-countdown only in game S2C while retaining the separate countdown.</summary>
+    [Theory]
+    [InlineData("kr-812", 737, 703)]
+    [InlineData("kr-1256", 606, 607)]
+    [InlineData("cn-738", 739, 703)]
+    [InlineData("cn-742", 739, 703)]
+    [InlineData("cn-774", 637, 601)]
+    [InlineData("tw-454", 637, 601)]
+    public void NativePreCountdownNamesStayInGameServerToClient(string build, ushort preCountdown, ushort countdown)
+    {
+        const string name = "gspGamePreCountDown";
+        var registry = new Registry(OpcodeTableLoader.Load(ProfileTablePath(build), TestWireDialects.Get(build).Profile));
+        var game = registry.ForProtocol($"{build}/game");
+        Assert.Equal(preCountdown, game.S2C(name));
+        Assert.Equal(countdown, game.S2C("gspGameCountDown"));
+        Assert.True(game.TryGet(PacketDirection.ServerToClient, preCountdown, out var entry));
+        Assert.Equal(name, entry!.Name);
+        Assert.Equal(OpcodeConnection.Game, entry.Connection);
+        Assert.Equal(Evidence.Verified, entry.Evidence);
+        Assert.Equal("label@kr-812", entry.NameSource);
+        Assert.Null(game.Find(PacketDirection.ClientToServer, name));
+        foreach (var connection in new[] { "relay", "udp" })
+        {
+            var other = registry.ForProtocol($"{build}/{connection}");
+            Assert.Null(other.Find(PacketDirection.ServerToClient, name));
+            Assert.Null(other.Find(PacketDirection.ClientToServer, name));
+        }
+    }
+
+    private static string ProfileTablePath(string build)
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
+        {
+            var candidate = Path.Combine(directory.FullName, "profiles", build, "opcodes.yaml");
+            if (File.Exists(candidate)) return candidate;
+        }
+        throw new InvalidOperationException($"The opcode table for {build} was not found above the test output.");
+    }
+
     [Theory]
     [InlineData("connection: relay", "connection: relay")]
     [InlineData("connection: both", "connection: game")]

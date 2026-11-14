@@ -10,7 +10,7 @@ namespace BubbleFighter.Fantasy.Kernel;
 /// Kernel built-in plugin providing the default <see cref="IConnectionProtocolRegistry"/>.
 /// Appears as row <c>core.protocol-registry</c> so profiles can replace it.
 /// </summary>
-[Plugin("core.protocol-registry", Description = "Named connection protocol registry.", Provides = [typeof(IConnectionProtocolRegistry)])]
+[Plugin("core.protocol-registry", Category = "core", Names = ["en=Protocol registry", "zh-Hans=协议注册表", "zh-Hant=協定登錄表", "ko=프로토콜 등록부"], Description = "Named connection protocol registry.", Provides = [typeof(IConnectionProtocolRegistry)])]
 public sealed class ConnectionProtocolRegistryPlugin : IPlugin
 {
     /// <inheritdoc />
@@ -69,7 +69,7 @@ public sealed class PacketRouterOptions
 /// registers its handlers after the services they use, and unload releases effects in reverse,
 /// so a handler has finished before anything it depends on is released.
 /// </remarks>
-[Plugin("core.packet-router", Description = "Packet handler router keyed by protocol name and opcode.", Provides = [typeof(IPacketRouter)])]
+[Plugin("core.packet-router", Category = "core", Names = ["en=Packet router", "zh-Hans=封包路由", "zh-Hant=封包路由", "ko=패킷 라우터"], Description = "Packet handler router keyed by protocol name and opcode.", Provides = [typeof(IPacketRouter)])]
 public sealed class PacketRouterPlugin : IPlugin
 {
     /// <inheritdoc />
@@ -111,7 +111,8 @@ public sealed class PacketRouterPlugin : IPlugin
             {
                 // Await plugin observers before accepting the next frame, so asynchronous forwarding
                 // preserves connection order and cannot outlive a reused transport buffer.
-                await events.SerialAsync(new PacketReceivedEvent(session, protocolName, packet, found), ct).ConfigureAwait(false);
+                if (events.HasHandlers<PacketReceivedEvent>())
+                    await events.SerialAsync(new PacketReceivedEvent(session, protocolName, packet, found), ct).ConfigureAwait(false);
                 if (!found)
                     return;
                 using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, registration!.Stopping);
@@ -195,7 +196,7 @@ public sealed class PacketRouterPlugin : IPlugin
 /// Kernel built-in plugin providing the default <see cref="ISessionRegistry"/>. Appears as
 /// row <c>core.session-registry</c> so profiles can replace it.
 /// </summary>
-[Plugin("core.session-registry", Description = "Registry of live protocol sessions.", Provides = [typeof(ISessionRegistry)])]
+[Plugin("core.session-registry", Category = "core", Names = ["en=Session registry", "zh-Hans=会话注册表", "zh-Hant=工作階段登錄表", "ko=세션 등록부"], Description = "Registry of live protocol sessions.", Provides = [typeof(ISessionRegistry)])]
 public sealed class SessionRegistryPlugin : IPlugin
 {
     /// <inheritdoc />
@@ -221,7 +222,7 @@ public sealed class SessionRegistryPlugin : IPlugin
 /// Kernel built-in plugin providing the default <see cref="IClientProfileRegistry"/>.
 /// Appears as row <c>core.client-profiles</c> so profiles can replace it.
 /// </summary>
-[Plugin("core.client-profiles", Description = "Registry of client profiles served by this deployment.", Provides = [typeof(IClientProfileRegistry)])]
+[Plugin("core.client-profiles", Category = "core", Names = ["en=Client profiles", "zh-Hans=客户端配置", "zh-Hant=用戶端設定檔", "ko=클라이언트 프로필"], Description = "Registry of client profiles served by this deployment.", Provides = [typeof(IClientProfileRegistry)])]
 public sealed class ClientProfileRegistryPlugin : IPlugin
 {
     /// <inheritdoc />
@@ -261,7 +262,7 @@ public sealed class ClientProfileRegistryPlugin : IPlugin
 /// Kernel built-in plugin providing the default <see cref="IOpcodeTableRegistry"/>.
 /// Appears as row <c>core.opcode-tables</c> so profiles can replace it.
 /// </summary>
-[Plugin("core.opcode-tables", Description = "Registry of opcode tables keyed by client profile id.", Provides = [typeof(IOpcodeTableRegistry)])]
+[Plugin("core.opcode-tables", Category = "core", Names = ["en=Opcode tables", "zh-Hans=Opcode 表", "zh-Hant=Opcode 表", "ko=Opcode 표"], Description = "Registry of opcode tables keyed by client profile id.", Provides = [typeof(IOpcodeTableRegistry)])]
 public sealed class OpcodeTableRegistryPlugin : IPlugin
 {
     /// <inheritdoc />

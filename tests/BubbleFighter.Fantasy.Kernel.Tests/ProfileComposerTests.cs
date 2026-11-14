@@ -115,6 +115,25 @@ public sealed class ProfileComposerTests : IDisposable
         Assert.Equal(ClientBuild.Parse("cn:324:0"), rows[3].ClientBuild);
     }
 
+    /// <summary>
+    /// A row the server profile shares with its builds is composed once, by the server profile: a patch that disables
+    /// it there means no build needs its variables either.
+    /// </summary>
+    [Fact]
+    public void SharedRowDisabledOnTheServerNeedsNoVariablesInItsBuilds()
+    {
+        Write("bundles/core.yaml", "- id: db\n  plugin: p.db\n  config: {password: \"${BFF_TEST_UNSET_SHARED}\"}\n");
+        Write("bundles/one.yaml", "- id: listener\n  plugin: p.listener\n  config: {port: 1}\n");
+        Write("one/profile.yaml", "client_build: kr:812:0\nbundles: [core, one]\n");
+        Write("off.yaml", "- replace:\n    id: db\n    disabled: true\n");
+        WriteProfile("bundles: [core]\nbuilds: [one]\n");
+
+        var rows = new ProfileComposer(_root).Compose("demo", [Path.Combine(_root, "off.yaml")]);
+
+        Assert.Equal(["db", "one.listener"], rows.Select(row => row.Id));
+        Assert.True(rows[0].Disabled);
+    }
+
     [Fact]
     public void Cn324OfficialAndLocalCenterRespondersComposeIndependently()
     {
@@ -225,6 +244,56 @@ public sealed class ProfileComposerTests : IDisposable
         WriteProfile("builds: [inner]\n");
         var error = Assert.Throws<ConfigException>(() => new ProfileComposer(_root).Compose("demo", []));
         Assert.Contains("itself lists builds", error.Message);
+    }
+
+    /// <summary>
+    /// An on-demand server profile leaves a build's rows asleep and its listeners bound: a row that states
+    /// <c>activation: always</c> keeps it, every other row of the build follows the profile, shared rows are untouched,
+    /// and every row of a build names the build as its group.
+    /// </summary>
+    [Fact]
+    public void OnDemandBuildsKeepStatedListenersAndGroupTheirRows()
+    {
+        Write("bundles/core.yaml", "- id: shared\n  plugin: p.shared\n");
+        Write("bundles/client.yaml", """
+            - id: listener
+              plugin: p.listener
+              activation: always
+            - id: rooms
+              plugin: p.rooms
+            - id: child
+              plugin: p.child
+              parent_id: rooms
+            """);
+        Write("one/profile.yaml", "client_build: kr:812:0\nbundles: [core, client]\npatches: [patch.yaml]\n");
+        // A replace that states no activation keeps the row's own.
+        Write("one/patch.yaml", "- replace: {id: listener, config: {port: 1}}");
+        Write("two/profile.yaml", "client_build: cn:324:0\nbundles: [core, client]\n");
+        WriteProfile("bundles: [core]\nbuild_activation: ${ACTIVATION_UNDER_TEST:-on_demand}\nbuilds: [one, two]\n");
+        var composer = new ProfileComposer(_root);
+        var rows = composer.Compose("demo", []).ToDictionary(row => row.Id);
+        Assert.Equal((PluginActivation.Default, null), (rows["shared"].Activation, rows["shared"].ActivationGroup));
+        Assert.Equal((PluginActivation.Always, "one"), (rows["one.listener"].Activation, rows["one.listener"].ActivationGroup));
+        Assert.Equal((PluginActivation.OnDemand, "one"), (rows["one.rooms"].Activation, rows["one.rooms"].ActivationGroup));
+        Assert.Equal((PluginActivation.OnDemand, "two"), (rows["two.child"].Activation, rows["two.child"].ActivationGroup));
+
+        WriteProfile("bundles: [core]\nbuilds: [one, two]\n");
+        var always = composer.Compose("demo", []).ToDictionary(row => row.Id);
+        Assert.Equal((PluginActivation.Default, "one"), (always["one.rooms"].Activation, always["one.rooms"].ActivationGroup));
+        Assert.Equal(PluginActivation.Always, always["one.listener"].Activation);
+
+        var selected = composer.ComposeBuilds("one", [], []);
+        Assert.All(selected, row => Assert.Null(row.ActivationGroup));
+        WriteProfile("bundles: [core]\n");
+        var picked = composer.ComposeBuilds("demo", ["two"], [], buildActivation: PluginActivation.OnDemand).ToDictionary(row => row.Id);
+        Assert.Equal(PluginActivation.OnDemand, picked["two.rooms"].Activation);
+        Assert.Equal(PluginActivation.Always, picked["two.listener"].Activation);
+
+        WriteProfile("bundles: [core]\nbuild_activation: sometimes\nbuilds: [one]\n");
+        Assert.Contains("build_activation", Assert.Throws<ConfigException>(() => composer.Compose("demo", [])).Message);
+        Write("bundles/client.yaml", "- id: listener\n  plugin: p.listener\n  activation: later\n");
+        WriteProfile("bundles: [core]\nbuilds: [one]\n");
+        Assert.Contains("activation", Assert.Throws<ConfigException>(() => composer.Compose("demo", [])).Message);
     }
 
     /// <summary>Preserves runtime parents and isolation across patches and emits their effective configuration.</summary>
@@ -840,6 +909,38 @@ public sealed class ProfileComposerTests : IDisposable
         WriteProfile("id: demo\nbundles: [a]\n");
         var rows = new ProfileComposer(_root).Compose("demo", []);
         Assert.Equal("fallback:1", rows[0].Config!["listen"]);
+    }
+
+    /// <summary>A row a later patch disables never activates, so its unset variables are not an error.</summary>
+    [Fact]
+    public void RowDisabledByALaterPatchNeedsNoVariables()
+    {
+        Write("bundles/a.yaml", "- id: db\n  plugin: p.db\n  config:\n    password: \"${BFF_TEST_UNSET_PASSWORD}\"\n");
+        Write("demo/set.yaml", "- set:\n    id: db\n    config: {host: \"${BFF_TEST_UNSET_HOST}\"}\n");
+        Write("off.yaml", "- replace:\n    id: db\n    disabled: true\n");
+        WriteProfile("id: demo\nbundles: [a]\npatches: [set.yaml]\n");
+
+        var rows = new ProfileComposer(_root).Compose("demo", [Path.Combine(_root, "off.yaml")]);
+
+        Assert.True(Assert.Single(rows).Disabled);
+    }
+
+    /// <summary>An enabled row still fails loud, naming the file that wrote the placeholder.</summary>
+    [Fact]
+    public void EnabledRowReportsAnUnsetVariableWithItsFile()
+    {
+        Write("bundles/a.yaml", "- id: db\n  plugin: p.db\n  config:\n    password: \"${BFF_TEST_UNSET_PASSWORD}\"\n");
+        Write("demo/set.yaml", "- set:\n    id: db\n    config: {host: \"${BFF_TEST_UNSET_HOST}\"}\n");
+        WriteProfile("id: demo\nbundles: [a]\n");
+        var bundle = Assert.Throws<ConfigException>(() => new ProfileComposer(_root).Compose("demo", []));
+        Assert.Contains("BFF_TEST_UNSET_PASSWORD", bundle.Message);
+        Assert.Contains("a.yaml", bundle.Message);
+
+        Write("bundles/a.yaml", "- id: db\n  plugin: p.db\n  config:\n    password: fixed\n");
+        WriteProfile("id: demo\nbundles: [a]\npatches: [set.yaml]\n");
+        var patch = Assert.Throws<ConfigException>(() => new ProfileComposer(_root).Compose("demo", []));
+        Assert.Contains("BFF_TEST_UNSET_HOST", patch.Message);
+        Assert.Contains("set.yaml", patch.Message);
     }
 
     [Fact]

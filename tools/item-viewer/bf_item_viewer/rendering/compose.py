@@ -5,11 +5,11 @@ Rules and their grades (details and evidence in research/composition.md):
   kr-812 inventory grid: it matches every rifle, sniper, shotgun and hammer within 1% and also places the
   pistols whose ``Gun.mtn`` biped carries a large root offset (Pistol27, Pistol16), which the posed
   skin drops off the canvas. For the other weapons both rules give the same geometry.
-* slot item: the item's own meshes posed by its own ``.mtn`` frame 0 (same reasoning, *inferred*).
+* slot item: compose the item meshes here and let the preview session resolve their motions and sockets.
 * costume part / character: the wearer's ``Default`` parts restricted to the PartLocation sheet's
   part names (ShopItem2.xml; ``Body`` is not among them), with the item's parts replacing the slot of
-  the same name, posed by a standing motion of the wearer (*inferred*; the client's preview motion
-  is still being traced).
+  the same name, posed at frame zero of the wearer's CommonAni basic/stop motion. The profile names
+  the native selector; missing resources retain an explicitly reported idle/bind fallback.
 """
 
 from __future__ import annotations
@@ -20,15 +20,13 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from ..catalog.model import CatalogItem, Kind
+from ..catalog.spreadsheet import read_sheets
 from .scene import Part, Scene, load_motion, load_part
 
 DEFAULT_PART_NAMES = ("Head", "Face", "ArmL", "ArmR", "HandL", "HandR", "BodyU", "BodyD", "Legs", "Feet",
                       "Eyebrow")
-# The basic/stand row of Models/Characters/AniList.xml sets EyePitchFollowBone=Bip01_Neck and
-# IsEyeFollowCharacter=1: the client turns the head to the character's own facing, so the motion's
-# head yaw (up to 65 degrees in some stand motions) never shows. Giving the head the upper spine's
-# orientation reproduces that for Dao, Dizni, Bazzi, Uni, Mos, Kephi and Ethi (measured against kr-812
-# inventory screenshots); Marid's head still tips forward, so the exact rule is open.
+# Preserve the previous inferred head adjustment only for the missing-preview-motion idle fallback.
+# The native basic/stop row has EyePitchFollowBone=NONE and keeps the authored static pose.
 FACE_FORWARD = ("Bip01_Head", "Bip01_Spine2")
 STAND_MOTIONS = ("pis-basic-stand.mtn", "lobby-stand.mtn", "basic-stand.mtn", "stand.mtn")
 
@@ -50,9 +48,11 @@ class Composition:
 
 
 class Composer:
-    def __init__(self, index, part_names: tuple = DEFAULT_PART_NAMES):
+    def __init__(self, index, part_names: tuple = DEFAULT_PART_NAMES, preview_motion: dict | None = None):
         self.index = index
         self.part_names = {n.lower() for n in part_names}
+        self.preview_motion = preview_motion or {}
+        self._preview_animation: dict | None = None
 
     def wearer_options(self, item: CatalogItem) -> list[str]:
         if item.model is None:
@@ -69,6 +69,34 @@ class Composer:
         if stands:
             return stands[0], f"first '*stand*' motion in {folder} (fallback)"
         return None, f"no motion in {folder}; bind pose"
+
+    def _preview_pose(self, character: str) -> tuple[str | None, str, bool]:
+        """Resolve the native preview's animation row before using the existing missing-motion fallback."""
+        cfg = self.preview_motion
+        workbook = cfg.get("workbook")
+        if workbook and self.index.exists(workbook):
+            if self._preview_animation is None:
+                rows = read_sheets(self.index.read(workbook), {cfg["sheet"]}, cfg["header_row"])
+                matches = [row for row in rows.get(cfg["sheet"], [])
+                           if row.get("[Weapon]") == cfg["weapon"]
+                           and row.get("[Category]") == cfg["category"]
+                           and row.get("[Motion]") == cfg["motion"]]
+                if len(matches) != 1:
+                    raise ValueError(f"{workbook}: expected one {cfg['category']}/{cfg['motion']} preview row")
+                self._preview_animation = matches[0]
+            row = self._preview_animation
+            upper, lower = row.get("[FileUpper]", ""), row.get("[FileLower]", "")
+            if not upper or upper != lower:
+                raise ValueError(f"{workbook}: preview upper/lower motions must identify the same file")
+            if row.get("[EyePitchFollowBone]") != "NONE":
+                raise ValueError(f"{workbook}: preview pitch-follow bone must be NONE")
+            motion = f"Models/Characters/{character}/common/{upper}.mtn"
+            if self.index.exists(motion):
+                # kr-812 sub_9B1630 and cn-717 sub_A61840 select CommonAni basic/stop, not idle stand.
+                # Its EyePitchFollowBone=NONE keeps the authored head orientation at frame zero.
+                return motion, f"{cfg['sheet']} {cfg['category']}/{cfg['motion']} at frame 0", False
+        motion, rule = self._stand_motion(character)
+        return motion, f"preview motion unavailable; {rule}", True
 
     def _default_parts(self, character: str) -> list[str]:
         folder = f"Models/Characters/{character}/Default"
@@ -88,10 +116,20 @@ class Composer:
                 part.rigid = True
             return Scene(parts, None, None), comp
         if item.kind == Kind.SLOT_ITEM:
-            comp = Composition("slot item", item_parts=list(model.meshes), motion=model.motion,
-                               motion_rule="the item's own .mtn, frame 0 (inferred)")
-            parts = [load_part(self.index, p, "item") for p in model.meshes]
-            return Scene(parts, model.motion, load_motion(self.index, model.motion) if model.motion else None), comp
+            sockets = {name.casefold() for name in item.raw.get("slotSocket", "").split()}
+            meshes = list(model.meshes)
+            if sockets:
+                # kr-812 sub_58F0D0 -> kr-812 sub_AF1210 loads the registered socket mesh,
+                # not every alternate socket model retained in the item's resource folder.
+                meshes = [path for path in meshes
+                          if posixpath.splitext(posixpath.basename(path))[0].casefold() in sockets]
+                found = {posixpath.splitext(posixpath.basename(path))[0].casefold() for path in meshes}
+                if found != sockets:
+                    raise ValueError(f"item {item.item_id}: missing socket meshes {sorted(sockets - found)}")
+            comp = Composition("slot item", item_parts=meshes,
+                               motion_rule="mesh-named item motion at frame 0, or rigid")
+            parts = [load_part(self.index, p, "item") for p in meshes]
+            return Scene(parts, None, None), comp
         if item.kind in (Kind.COSTUME_PART, Kind.CHARACTER):
             choices = model.wearers or []
             chosen = wearer if wearer in choices else (choices[0] if choices else None)
@@ -118,13 +156,14 @@ class Composer:
             comp.item_parts = item_meshes
             comp.default_parts = kept if item.kind != Kind.CHARACTER else []
             comp.replaced_slots = sorted(replaced) if item.kind != Kind.CHARACTER else []
-            motion, rule = self._stand_motion(chosen)
+            motion, rule, idle_fallback = self._preview_pose(chosen)
             comp.motion, comp.motion_rule = motion, rule
             comp.tint = tuple(tint)
             parts = ([load_part(self.index, p, "default", tint) for p in comp.default_parts]
                      + [load_part(self.index, p, "item", tint) for p in item_meshes])
             scene = Scene(parts, motion, load_motion(self.index, motion) if motion else None)
-            scene.face_forward = (*FACE_FORWARD, np.eye(3))
-            comp.notes.append(f"{FACE_FORWARD[0]} takes {FACE_FORWARD[1]}'s orientation (eye follows the character)")
+            if idle_fallback:
+                scene.face_forward = (*FACE_FORWARD, np.eye(3))
+                comp.notes.append(f"{FACE_FORWARD[0]} takes {FACE_FORWARD[1]}'s orientation (idle fallback)")
             return scene, comp
         raise ValueError(f"item {item.item_id}: no composition rule for kind {item.kind.value}")

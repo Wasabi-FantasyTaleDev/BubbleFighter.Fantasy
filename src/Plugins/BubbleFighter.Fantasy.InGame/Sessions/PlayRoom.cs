@@ -1,5 +1,6 @@
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Match;
+using BubbleFighter.Fantasy.Contracts.Progress;
 using BubbleFighter.Fantasy.RoomCore;
 
 namespace BubbleFighter.Fantasy.InGame.Sessions;
@@ -21,9 +22,12 @@ public sealed partial class PlayRoom
     internal ushort RedScore { get; set; }
     internal BubbleFighter.Fantasy.InGame.Handlers.RoundSupplyState? Supplies { get; set; }
     internal BubbleFighter.Fantasy.InGame.Handlers.RoundWeaponState? Weapons { get; set; }
+
+    /// <summary>Gets or sets this round's WeaponMaster levels and weapons; null in any other round.</summary>
+    internal WeaponMasterRoundState? WeaponMaster { get; set; }
     internal BubbleFighter.Fantasy.InGame.Handlers.RoundLucciState? Lucci { get; set; }
     // The star modes' unconsumed stars; the same id-to-kind bookkeeping as the Lucci items.
-    internal BubbleFighter.Fantasy.InGame.Handlers.RoundLucciState? Stars { get; set; }
+    internal BubbleFighter.Fantasy.InGame.Handlers.RoundStarState? Stars { get; set; }
 
     /// <summary>
     /// Gets the current round's per-seat counters and team totals. A new object per round, so a
@@ -78,7 +82,22 @@ public sealed partial class PlayRoom
     internal long PeerInstallationVersion { get; set; }
 
     /// <summary>Gets the current phase.</summary>
-    public RoomPhase Phase { get; private set; } = RoomPhase.Waiting;
+    public RoomPhase Phase
+    {
+        get;
+        private set
+        {
+            if (field == value) return;
+            field = value;
+            SceneChanged?.Invoke(this);
+        }
+    } = RoomPhase.Waiting;
+
+    /// <summary>
+    /// Gets or sets what runs, under <see cref="Gate"/>, after the phase, countdown, mode or cancellation that the members'
+    /// scene snapshots report changed; it only schedules work.
+    /// </summary>
+    internal Action<PlayRoom>? SceneChanged { get; set; }
 
     /// <summary>
     /// Gets the create-time session blob echoed on later S2C 117. Map changes
@@ -130,7 +149,16 @@ public sealed partial class PlayRoom
     /// into the nested MapMeta's <c>u16</c> slot, and the row label reads it.
     ///
     /// </summary>
-    public ushort ModeId { get; set; }
+    public ushort ModeId
+    {
+        get;
+        set
+        {
+            if (field == value) return;
+            field = value;
+            SceneChanged?.Invoke(this);
+        }
+    }
 
     /// <summary>Gets a snapshot of seats. Callers must hold <see cref="Gate"/>.</summary>
     public IReadOnlyList<RoomSeat> Seats => _members.Members;
@@ -333,10 +361,13 @@ public sealed partial class PlayRoom
     {
         if (Phase != RoomPhase.Waiting)
             throw new InvalidOperationException($"Room {Id} cannot start from phase {Phase}.");
+        var equipment = Seats.Select(seat => (Seat: seat,
+            Snapshot: new RoundEquipmentSnapshot(seat.EquippedItemIds ?? [], seat.ItemAttributes))).ToArray();
         ClearAdmissions();
         CancelResultSequence();
         MatchId = Guid.NewGuid().ToString("N");
         BattleSettlements = null;
+        foreach (var entry in equipment) entry.Seat.FreezeRewardEquipment(MatchId, entry.Snapshot);
         BlueScore = RedScore = 0;
         HordeDropSerial = 0;
         Scoring = new RoundScoring(maxSeats: _maxSeats);
@@ -344,6 +375,17 @@ public sealed partial class PlayRoom
         ZombieKingSlot = null;
         BombSeries = null;
         ResetRoundParticipants();
+    }
+
+    /// <summary>Freezes an admitted seat's equipment once for this match, including a late join during play.</summary>
+    internal void FreezeRewardEquipment(RoomSeat seat)
+    {
+        lock (Gate)
+        {
+            if (Phase is not (RoomPhase.Starting or RoomPhase.Playing) || !Seats.Contains(seat))
+                throw new InvalidOperationException($"Room {Id} cannot freeze reward equipment for a seat outside its active match.");
+            seat.FreezeRewardEquipment(MatchId);
+        }
     }
 
     /// <summary>Starts a new bomb series after the ordinary match start has established its settlement identity.</summary>
@@ -379,6 +421,8 @@ public sealed partial class PlayRoom
         Captains = new CaptainRoster();
         CancelModeClocks();
         ExtremeRacing = new ExtremeRacingRoundState();
+        RacingInitialization = null;
+        BnBRound = null;
         FinalZone = null;
         ScriptZombies = null;
         ZombieEscape = null;
@@ -387,6 +431,7 @@ public sealed partial class PlayRoom
         Phase = RoomPhase.Starting;
         StartGeneration++;
         Weapons = null;
+        WeaponMaster = null;
         RoundEndsAtUtc = null;
         ResultOpenSent = ResultCloseSent = false;
         DecidedWinnerTeam = null;
@@ -445,8 +490,10 @@ public sealed partial class PlayRoom
         get;
         set
         {
+            var changed = field != value;
             field = value;
             if (value) CancelModeClocks();
+            if (changed) SceneChanged?.Invoke(this);
         }
     }
 
@@ -512,14 +559,23 @@ public sealed partial class PlayRoom
     /// </summary>
     public string MatchId { get; private set; } = "";
 
-    // Terminal account identities and counters survive result-screen departures until the next match starts.
+    // Prepared terminal rewards, account identities and optional counters survive departures until the next match.
     internal IReadOnlyList<BattleSettlementPlan>? BattleSettlements { get; set; }
 
     /// <summary>The current round's ignored life reports (observation only). Guarded by <see cref="Gate"/>.</summary>
     internal LifeObservations LifeChecks { get; private set; } = new();
 
     /// <summary>Gets or sets the start generation whose countdown was already announced; 0 for none.</summary>
-    internal int CountdownGeneration { get; set; }
+    internal int CountdownGeneration
+    {
+        get;
+        set
+        {
+            if (field == value) return;
+            field = value;
+            SceneChanged?.Invoke(this);
+        }
+    }
 
     /// <summary>Gets or sets the single countdown task retained for this bounded room.</summary>
     public Task CountdownTask { get; set; } = Task.CompletedTask;
@@ -664,10 +720,13 @@ public sealed partial class PlayRoom
             ScriptZombies = null;
             Supplies = null;
             Weapons = null;
+            WeaponMaster = null;
             Lucci = null;
             Stars = null;
             RoundMapKey = string.Empty;
             RoundStageKey = string.Empty;
+            RacingInitialization = null;
+            BnBRound = null;
             RoundEndsAtUtc = null;
             ResultOpenSent = false;
             ResultCloseSent = false;

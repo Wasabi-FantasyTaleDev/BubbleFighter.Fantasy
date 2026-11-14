@@ -48,7 +48,15 @@ public sealed class PresentLoginEventTests
         var (raised, frames) = Assert.Single(seen);
         Assert.Equal("kr-812/game", raised.Protocol);
         Assert.Same(session, raised.Session);
-        Assert.Same(login, raised.Login);
+        Assert.Equal((login.UserNumber, login.Account, login.Nickname, login.Level, login.ServerTime, login.CharacterItemId,
+                login.Wallet, login.InventoryIsComplete, login.OfferTutorial, login.ColorIndex),
+            (raised.Login.UserNumber, raised.Login.Account, raised.Login.Nickname, raised.Login.Level, raised.Login.ServerTime,
+                raised.Login.CharacterItemId, raised.Login.Wallet, raised.Login.InventoryIsComplete,
+                raised.Login.OfferTutorial, raised.Login.ColorIndex));
+        Assert.Equal(login.EquippedItemIds, raised.Login.EquippedItemIds);
+        Assert.Equal(login.CharacterBag, raised.Login.CharacterBag);
+        Assert.Equal(login.EquippedBag, raised.Login.EquippedBag);
+        Assert.Equal(login.ExpiredItemIds, raised.Login.ExpiredItemIds);
         // The menu frame (100) is the last login frame; the event follows it, so the gift icon is never lost to a
         // client that has not built its task bar yet.
         Assert.Equal(session.Sent.Count, frames);

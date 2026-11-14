@@ -11,6 +11,9 @@
 # frame), WIRE_CIPHER_TABLE_A and WIRE_CIPHER_TABLE_B (hexadecimal; empty for the shared pair).
 - id: dialect
   plugin: dialect
+  # Stays loaded while the build sleeps: the shared dialect table is built from these rows, and a row that came or
+  # went would restart that table and every build that frames packets through it.
+  activation: always
   config:
     profile_id: "${BFF_PROFILE_ID}"
     frame: "${WIRE_FRAME:-legacy_5}"
@@ -34,6 +37,8 @@
         port: ${LEGACY_PUBLIC_PORT}
 - id: game-listener
   plugin: net.tcp
+  # Bound while the build sleeps: a client that connects is what wakes it.
+  activation: always
   config:
     listen: "${BFF_BIND_HOST:-0.0.0.0}:${LEGACY_PORT}"
     protocol: "${BFF_PROFILE_ID}/game"
@@ -45,6 +50,8 @@
 # patch.yaml. Profile vars: LEGACY_RELAY_PORT (required), LEGACY_RELAY_PUBLIC_PORT.
 - id: relay-listener
   plugin: net.tcp
+  # Bound while the build sleeps: a client that connects is what wakes it.
+  activation: always
   config:
     listen: "${BFF_BIND_HOST:-0.0.0.0}:${LEGACY_RELAY_PORT}"
     protocol: "${BFF_PROFILE_ID}/relay"
@@ -84,6 +91,7 @@
     login_channel: ${BFF_PLAYER_CHANNEL:-60}
     enable_purchases: true
     max_shop_sessions: 512
+    max_inventory_publications_per_connection: 8
     packets_directory: packets
     server_notices: true
     # kr-812 sub_837170 case 0x326 -> sub_6D5890 shows one notice per expired item id; a build without the
@@ -151,6 +159,8 @@
   config:
     data_directory: "${BFF_CLIENT_DATA:-client-data}/${BFF_PROFILE_ID}/data"
     raw_directory: "${BFF_CLIENT_DATA:-client-data}/${BFF_PROFILE_ID}/dataraw"
+    # The catalogs rows build from this client data, kept for the next start. A cache: delete it at any time.
+    compiled_file: "${BFF_COMPILED_DATA:-state/compiled-data}/${BFF_PROFILE_ID}.bffdata"
 # The relay's seed authority: each seat's critical, defence and cancellation tables when its round starts, the critical
 # chance taken from this build's Config/CriticalHitTable.xml. The seeded-critical builds read their critical hits only
 # from these tables (cn-324 sub_4A94C0); a build without the seed capability turns this row off in its patch.yaml.
@@ -169,6 +179,7 @@
   parent_id: clientdata
   isolated_services:
     - BubbleFighter.Fantasy.Contracts.Inventory.IInventoryRepository
+    - BubbleFighter.Fantasy.Contracts.Inventory.IInventoryBuildScope
     - BubbleFighter.Fantasy.Contracts.Inventory.IPlayerInventoryState
     - BubbleFighter.Fantasy.Contracts.Inventory.IWeaponPresetPageSource
     - BubbleFighter.Fantasy.Contracts.Fighters.IFighterRoster
@@ -187,6 +198,7 @@
     - BubbleFighter.Fantasy.Contracts.Inventory.IInventoryExpiry
     - BubbleFighter.Fantasy.Contracts.Inventory.IInventoryItemRemoval
     - BubbleFighter.Fantasy.Contracts.Inventory.IEquippedViewPush
+    - BubbleFighter.Fantasy.Contracts.Inventory.IWeaponPresetPageSource
     - BubbleFighter.Fantasy.Contracts.Shop.IShopGiftService
     - BubbleFighter.Fantasy.Contracts.Inventory.IPaintItemCatalog
     - BubbleFighter.Fantasy.Contracts.Players.IOnlinePlayers
@@ -197,6 +209,9 @@
     version_major: ${BFF_BUILD_MAJOR}
     enabled: true
     publish_equipped_view_push: true
+    # Each preset page keeps the weapon worn while it was active, per build (kr-812 sub_987BA0 installs five pages).
+    # A build without preset packets materializes pages it never publishes.
+    persist_preset_pages: true
     # Clothing parts and accessory slots come from the build's own shop workbook.
     item_locations_client_path: "Config/ShopItem2.xml"
     # No legacy client emits a proven inventory-view request packet.
@@ -287,6 +302,7 @@
   plugin: ingame
   parent_id: inventoryview
   config:
+    mode_name_table_path: data/room-modes.json
     game_protocol: "${BFF_PROFILE_ID}/game"
     relay_protocol: "${BFF_PROFILE_ID}/relay"
     # Loaded seats get the relay offer and the countdown waits for each relay to join, register and be confirmed
@@ -952,6 +968,14 @@
     lottery_crew_count_weights: [70, 25, 5]
     lottery_coin_count_weights: [45, 30, 18, 7]
     lottery_group_weights: [{ group: common, weight: 800 }, { group: small_parts, weight: 100 }, { group: mid_parts, weight: 40 }, { group: crew_set, weight: 40 }, { group: small_set, weight: 15 }, { group: mid_set, weight: 5 }]
+# Applies the server-wide ban-pick policies and room host bans to this build's rooms (see the banpick row). A child of
+# the room row, so it sees this build's client data and room policy host.
+- id: banpick.room
+  plugin: banpick.room
+  parent_id: ingame
+  config:
+    protocol: "${BFF_PROFILE_ID}/game"
+    shop_item_client_path: "Config/ShopItem2.xml"
 - id: shop
   plugin: shop
   parent_id: inventoryview

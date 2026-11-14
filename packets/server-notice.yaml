@@ -23,6 +23,16 @@ structs:
     - unknown_29: bool
       offset: 29
 
+  # cn-774 sub_BBC600 (behind cn-774 sub_BCF090 case 114) and tw-454 sub_A99620 (behind tw-454 sub_AACF80 case 112)
+  # read u8 then wstr from the stream (vtable +44 with length 1, then cn-774 sub_1093FE0 / tw-454 sub_E91B70) and pass
+  # both to the chat log (cn-774 sub_56FBD0, tw-454 sub_A0CCF0) unless the stage word +76 is 4. They read no flags, so
+  # kr-1256's trailing words are not sent. tw-454 is based on cn-774 and uses this layout.
+  ServerNotice@cn-774:
+    - unknown_0: u8
+      offset: 0
+    - text: wstr
+      offset: 4
+
   # kr-812 sub_845500; id-400 sub_798E60, id-1809 sub_7BEBA0, cn-717 sub_8CFA00,
   # cn-706 sub_7A13A0 and cn-324 sub_6FDDB0 read the same widths and object offsets.
   ServerNotice:

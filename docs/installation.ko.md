@@ -80,8 +80,9 @@ curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash
 | `state/` | 설치 도우미가 저장한 설치 상태, 업그레이드해도 유지 |
 | `dotnet/` | 런타임, 설치 스크립트가 설치해야 했을 때만 존재 |
 | `bff` | 실행기, 인수 없이 실행하면 설치 도우미 시작 |
+| `settings.env` | 설치 스크립트가 고른 WebUI 접근, 설치 토큰, 포트. 업그레이드해도 유지 |
 
-`~/bubblefighter-fantasy/bff`로 서버를 시작하고 `http://127.0.0.1:8080/`을 여세요. 도우미는 루프백 주소에서만 대기합니다. 원격 서버라면 먼저 자신의 컴퓨터에서 `ssh -L 8080:127.0.0.1:8080 <user>@<server>`로 포트를 전달하세요.
+`~/bubblefighter-fantasy/bff`로 서버를 시작하고 서버 자체에서 `http://127.0.0.1:7300/`을 여세요. 설치 스크립트는 두 가지를 묻고, 기본 답은 모두 아니요입니다. 다른 컴퓨터에서 WebUI를 열 수 있게 할지(`--remote-admin`), 첫 실행 마법사에 설치 토큰이 필요한지(`--setup-token`)입니다. WebUI를 로컬로만 둔 경우 내 컴퓨터에서 터널로 여세요: `ssh -L 7300:127.0.0.1:7300 <user>@<server>` 후 `http://127.0.0.1:7300/`. 원격 접근을 켠 경우 `http://<server>:7300/`을 열고 방화벽이나 클라우드 보안 그룹에서 TCP 7300 포트를 허용하세요. 답은 설치 디렉터리의 `settings.env`에 저장되고 업그레이드해도 유지됩니다. 환경 변수에 설정한 값이 우선합니다.
 
 옵션은 `bash -s --` 뒤에 씁니다. 예: `curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash -s -- --service`
 
@@ -89,7 +90,11 @@ curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash
 | --- | --- |
 | `--version <tag>` | 최신 대신 해당 릴리스를 설치 |
 | `--dir <path>` | 설치 디렉터리 |
-| `--admin-port <n>` | 설치 도우미와 WebUI 포트(기본값 8080) |
+| `--admin-port <n>` | 설치 도우미와 WebUI 포트(기본값 7300) |
+| `--remote-admin` | 다른 컴퓨터에서 WebUI를 열 수 있게 합니다. 없으면 서버 자체에서만 접근합니다 |
+| `--setup-token` | 첫 실행 마법사가 요구하는 토큰을 생성하고 출력합니다 |
+| `--local-admin`, `--no-setup-token` | 기본값을 명시합니다 |
+| `--no-prompt` | 묻지 않고 지정한 옵션과 기본값을 사용합니다(터미널이 없을 때도 동일) |
 | `--service` | root로 실행 시 `bubblefighter-fantasy` systemd 서비스를 만들고 `bff` 시스템 사용자로 시작 |
 | `--start` | 설치가 끝나면 서버 시작 |
 | `--no-runtime` | 런타임을 설치하지 않고 실패 |
@@ -105,7 +110,7 @@ curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash -s -- --doc
 
 Docker Engine과 Compose 플러그인이 필요합니다. 설치 스크립트는 Linux 패키지를 `~/bubblefighter-fantasy/docker`에 풀고, 이를 바탕으로 로컬 이미지를 빌드한 뒤 Docker Compose로 서버 컨테이너를 시작합니다. 컨테이너는 호스트 네트워크를 사용하므로 선택한 클라이언트의 게임 포트에 접속할 수 있습니다. 기본적으로 데이터베이스 컨테이너는 시작하지 않습니다. 설치 도우미에서 `bff-state` 볼륨에 파일을 저장하는 SQLite를 선택하거나, 기존 MySQL 서버를 입력하세요.
 
-내장 MySQL 8.4도 함께 실행하려면 `--with-mysql`을 추가하세요.
+내장 데이터베이스도 함께 실행하려면 `--with-mysql`을 추가하세요. 새 스택은 MariaDB 11.4를 사용하며 서버는 이를 MySQL로 사용합니다. MySQL 8.4로 만든 기존 스택은 MariaDB가 그 데이터를 열 수 없으므로 업그레이드 후에도 MySQL을 유지합니다.
 
 ```bash
 curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash -s -- --docker --with-mysql
@@ -242,12 +247,12 @@ docker compose -f deploy/docker/compose.yaml --env-file .env up --build
 
 compose 파일은 두 서비스를 시작합니다.
 
-- `bff`는 `deploy/docker/Dockerfile`로 빌드하며 빌드 컨텍스트는 저장소 루트입니다. Dockerfile은 런타임을 포함하지 않은 Host를 게시한 뒤 ASP.NET Core Runtime 10 이미지에서 비 root 시스템 사용자로 실행하며, 진입점은 `dotnet BubbleFighter.Fantasy.Host.dll run --profile kr-1256`입니다. 이미지는 7100, 7101, 8080 포트를 노출합니다.
-- `mysql`은 `mysql:8.4` 이미지를 사용하며 데이터베이스 이름은 `bf_game_db`, 사용자는 `bff`, 문자 집합은 utf8mb4입니다. 데이터는 `mysql-data` 볼륨에 저장되고 서버가 시작되기 전에 상태 검사를 통과합니다.
+- `bff`는 `deploy/docker/Dockerfile`로 빌드하며 빌드 컨텍스트는 저장소 루트입니다. Dockerfile은 런타임을 포함하지 않은 Host를 게시한 뒤 ASP.NET Core Runtime 10 이미지에서 비 root 시스템 사용자로 실행하며, 진입점은 `dotnet BubbleFighter.Fantasy.Host.dll run --profile kr-1256`입니다. 이미지는 7100, 7101, 7300 포트를 노출합니다.
+- `mysql`은 `BFF_DB_IMAGE`가 지정한 이미지를 사용합니다. `.env.example`에서는 `mariadb:11.4`이고, 이 줄이 없는 이전 `.env`는 `mysql-data` 볼륨을 MySQL이 만들었으므로 `mysql:8.4`를 사용합니다. 데이터베이스 이름은 `bf_game_db`, 사용자는 `bff`, 문자 집합은 utf8mb4입니다. 데이터는 `mysql-data` 볼륨에 저장되고 서버가 시작되기 전에 상태 검사를 통과합니다.
 
-게시되는 포트는 서버의 7100, 7101, 8080과 MySQL의 `${BFF_MYSQL_PORT:-3306}`입니다. 서버는 `${BFF_CLIENT_DATA_HOST:-../../client-data}`(저장소의 `client-data` 디렉터리)를 `/app/client-data`에 읽기 전용으로 마운트합니다. 컨테이너에는 `client-data/kr-1256/data` 또는 `client-data/kr-1256/dataraw`가 필요하며, 없으면 clientdata 행이 실패합니다. 두 서비스 모두 `restart: unless-stopped`를 사용합니다.
+게시되는 포트는 서버의 7100, 7101, 7300과 MySQL의 `${BFF_MYSQL_PORT:-3306}`입니다. 서버는 `${BFF_CLIENT_DATA_HOST:-../../client-data}`(저장소의 `client-data` 디렉터리)를 `/app/client-data`에 읽기 전용으로 마운트합니다. 컨테이너에는 `client-data/kr-1256/data` 또는 `client-data/kr-1256/dataraw`가 필요하며, 없으면 clientdata 행이 실패합니다. 두 서비스 모두 `restart: unless-stopped`를 사용합니다.
 
-컨테이너 방식은 의도적으로 MySQL을 시작합니다. 격리된 로컬 검사가 아니며 로컬 검사 패치를 사용하지 않습니다. 관리 리스너는 컨테이너 안에서 `127.0.0.1:8080`에 바인딩되므로, 게시된 8080 포트로 WebUI에 접근하려면 `.env`에 `BFF_ADMIN_HOST=0.0.0.0`을 추가하세요.
+컨테이너 방식은 의도적으로 MySQL을 시작합니다. 격리된 로컬 검사가 아니며 로컬 검사 패치를 사용하지 않습니다. 관리 리스너는 컨테이너 안에서 `127.0.0.1:7300`에 바인딩되므로, 게시된 7300 포트로 WebUI에 접근하려면 `.env`에 `BFF_ADMIN_HOST=0.0.0.0`을 추가하세요.
 
 ### 3. 로그 확인
 
@@ -273,7 +278,7 @@ compose 조합 대신 컨테이너 하나를 직접 실행하려면 저장소 �
 
 ```sh
 docker build -f deploy/docker/Dockerfile -t bff-fantasy .
-docker run --rm --env-file .env -e BFF_MYSQL_HOST=<mysql-host> -e BFF_ADMIN_HOST=0.0.0.0 -p 7100:7100 -p 7101:7101 -p 8080:8080 -v "<client-data-directory>:/app/client-data:ro" bff-fantasy
+docker run --rm --env-file .env -e BFF_MYSQL_HOST=<mysql-host> -e BFF_ADMIN_HOST=0.0.0.0 -p 7100:7100 -p 7101:7101 -p 7300:7300 -v "<client-data-directory>:/app/client-data:ro" bff-fantasy
 ```
 
 이미지는 게시된 Host와 `profiles` 디렉터리만 복사하며 데이터베이스와 클라이언트 데이터는 포함하지 않습니다. `BFF_MYSQL_HOST`는 컨테이너가 접근할 수 있는 주소로 지정하세요.
@@ -301,21 +306,21 @@ Windows에서는 빌드 출력 디렉터리에서 터미널을 열고 실행 파
 콘솔에 관리 리스너와 WebUI 주소가 출력됩니다.
 
 ```text
-Row 'admin.http' admin API listening on 127.0.0.1:8080.
-WebUI: http://127.0.0.1:8080/
+Row 'admin.http' admin API listening on 127.0.0.1:7300.
+WebUI: http://127.0.0.1:7300/
 ```
 
-브라우저에서 `http://127.0.0.1:8080/`을 여세요. 관리 리스너는 기본적으로 `127.0.0.1:8080`이며, 변경하려면 프로세스 환경에서 `BFF_ADMIN_HOST` 또는 `BFF_ADMIN_PORT`를 설정하세요(`start`는 `.env`를 읽지 않습니다).
+브라우저에서 `http://127.0.0.1:7300/`을 열거나 다른 컴퓨터에서 서버 주소를 여세요. `start`로 시작한 서버의 관리 리스너는 기본적으로 `0.0.0.0:7300`이며, 변경하려면 프로세스 환경에서 `BFF_ADMIN_HOST` 또는 `BFF_ADMIN_PORT`를 설정하세요(`start`는 `.env`를 읽지 않습니다). 첫 설치에는 토큰이 필요 없으며, `BFF_SETUP_TOKEN`(32자 이상)을 설정하면 원격 설치 시 이를 요구합니다.
 
 ### 3. 도우미 완료
 
 1. 인터페이스 언어를 선택합니다. 영어, 중국어 간체, 중국어 번체, 한국어 중 하나입니다.
 2. 서버 이름을 지정합니다(1~80자).
 3. 활성화할 클라이언트 버전을 하나 이상 선택합니다. 선택한 버전마다 클라이언트 데이터 선택이 따로 있으며, 지금 데이터를 넣지 않고 나중에 서버 설정에서 가져올 수도 있습니다.
-4. 선택 사항: 지금 클라이언트 데이터를 가져옵니다. 로컬 폴더나 준비된 ZIP 패키지를 선택하고 필터링된 파일 수와 크기를 확인한 뒤 "가져오기 시작"을 누르세요. 브라우저 자체의 폴더 확인은 폴더의 모든 파일을 셀 수 있지만, 도우미는 선택 항목을 클라이언트 아카이브와 `data`/`dataraw` 파일로 먼저 필터링한 뒤 요약을 표시합니다. 가져오기는 상태 디렉터리에 사본을 만들며, 실패하거나 취소된 가져오기는 자신의 임시 파일만 정리합니다.
-5. 데이터베이스를 선택합니다. 기본값은 MySQL이며 호스트 `127.0.0.1`, 포트 `3306`, 데이터베이스 `bf_game_db`, 사용자 `bff`입니다. SQLite는 기본적으로 상태 디렉터리에 데이터베이스를 저장합니다. "연결 테스트"를 실행하세요. 테스트가 성공하기 전에는 도우미가 다음으로 진행하지 않습니다.
-6. 관리자 계정을 만듭니다. 사용자 이름은 3~64자, 비밀번호는 12자 이상입니다. 이 계정은 서버 관리용이며 설치 정보와 함께 저장되고 게임 계정과는 별개입니다.
-7. 설정을 검토하고 적용합니다. Host가 선택한 프로필 행을 시작하며, 활성화에 실패하면 재시도할 수 있는 오류 코드를 표시합니다.
+4. 선택 사항: 지금 클라이언트 데이터를 가져옵니다. 로컬 폴더나 준비된 ZIP 패키지를 선택하고 필터링된 파일 수와 크기를 확인한 뒤 "가져오기 시작"을 누르세요. 브라우저 자체의 폴더 확인은 폴더의 모든 파일을 셀 수 있지만, 도우미는 선택 항목을 클라이언트 아카이브와 `data`/`dataraw` 파일로 먼저 필터링한 뒤 요약을 표시합니다. 가져오기는 상태 디렉터리에 사본을 만들며, 실패하거나 취소된 가져오기는 자신의 임시 파일만 정리합니다. 데이터가 이미 서버에 있으면 서버에서 폴더 선택을 눌러 `<build>/data`가 있는 폴더를 고르거나 가져오기를 건너뛰세요. 건너뛴 빌드도 데이터가 서버의 client-data 폴더에 있으면 그 데이터로 시작합니다.
+5. 데이터베이스를 선택합니다. 기본값은 MySQL이며 호스트 `localhost`, 포트 `3306`, 데이터베이스 `bf_game_db`, 사용자 `root`입니다. 테스트가 실패하면 메시지 끝에 접근 거부나 알 수 없는 데이터베이스처럼 데이터베이스가 알려 준 원인이 붙습니다. SQLite는 기본적으로 상태 디렉터리에 데이터베이스를 저장합니다. "연결 테스트"를 실행하세요. 테스트가 성공하기 전에는 도우미가 다음으로 진행하지 않습니다. 데이터베이스가 아직 없으면 테스트가 이를 알려 주고 적용할 때 생성합니다. 이미 테이블이 있으면 테이블과 게임 계정 수를 보여 주는 팝업이 처리 방법을 묻습니다. 기존 데이터 사용(기본값, 계정·캐릭터·아이템이 유지되고 없는 업그레이드만 적용) 또는 빈 데이터베이스로 교체입니다. 교체는 두 번째 확인 창에서 다시 묻고, 모든 테이블을 한 번만 삭제한 뒤 유지로 저장되므로 재시작해도 다시 삭제되지 않습니다. 테스트 결과 아래 링크로 선택을 바꿀 수 있습니다.
+6. 관리자 계정을 만듭니다. 사용자 이름은 3~64자, 비밀번호는 6자 이상입니다. 이 계정은 서버 관리용이며 설치 정보와 함께 저장되고 게임 계정과는 별개입니다.
+7. 설정을 검토하고 적용합니다. Host가 선택한 프로필 행을 시작하며, 활성화에 실패하면 재시도할 수 있는 오류 코드를 표시합니다. 활성화에 실패하면 오류 코드 아래에 이유가 표시됩니다.
 
 ### 4. 적용 성공 후 디스크에 남는 항목
 
@@ -335,7 +340,7 @@ WebUI: http://127.0.0.1:8080/
 
 가져오기는 파일을 설치 상태로 복사할 뿐이며, 필요한 데이터 표와 아카이브 내용은 게임 서비스가 시작될 때 검사됩니다. 가져오기 성공은 게임 플레이나 클라이언트 호환성이 검증되었다는 뜻이 아닙니다.
 
-기본 제한은 업로드 8 GiB, 가져오기당 압축 해제 데이터 16 GiB, 가져오기당 파일 32,768개, 보관 사본 64개, 전체 가져오기 저장 공간 64 GiB, 가져오기당 20분입니다. `installation` 행에서 `client_data_upload_bytes`, `client_data_extracted_bytes`, `client_data_file_limit`, `client_data_copy_limit`, `client_data_storage_bytes`, `client_data_import_seconds`로 조정할 수 있습니다. 다시 가져와도 이전에 성공한 사본은 삭제되지 않습니다.
+기본 제한은 업로드 8 GiB, 가져오기당 압축 해제 데이터 16 GiB, 가져오기당 업로드 파일 32,768개(업로드한 게임 아카이브 안의 항목은 세지 않음), 보관 사본 64개, 전체 가져오기 저장 공간 64 GiB, 가져오기당 20분입니다. `installation` 행에서 `client_data_upload_bytes`, `client_data_extracted_bytes`, `client_data_file_limit`, `client_data_copy_limit`, `client_data_storage_bytes`, `client_data_import_seconds`로 조정할 수 있습니다. 다시 가져와도 이전에 성공한 사본은 삭제되지 않습니다.
 
 Windows에서는 파일 쓰기가 끝난 뒤 검사 프로그램이나 다른 프로세스가 최종 디렉터리 이름 변경을 일시적으로 막을 수 있습니다. 이 게시 단계에서만 Windows 액세스, 공유 또는 잠금 충돌을 재시도합니다. `client_data_publish_attempts`는 기본 20회(범위 1–100), `client_data_publish_retry_ms`는 기본 50밀리초(범위 1–1000)입니다. 횟수를 1로 설정하면 재시도하지 않습니다. 전체 가져오기 제한 시간과 취소는 계속 적용됩니다. 업로드를 다시 실행하거나 기존 대상을 덮어쓰지 않으며, 영구 오류와 다른 오류는 그대로 보고합니다.
 
@@ -367,7 +372,7 @@ dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- plugins list
 dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile kr-812 --patch tools/local-checks/isolated-memory.patch.yaml --dump-config
 ```
 
-이 명령은 `BFF_MYSQL_PASSWORD`가 설정되어 있어야 합니다. MySQL 행을 구성할 때 `${BFF_MYSQL_PASSWORD}`를 치환하며, 마지막 패치가 그 행을 이후에 비활성화하기 때문입니다. 아직 준비하지 않았다면 [빠른 시작](quickstart.md)에 따라 `.env`를 만드세요.
+이 명령에는 데이터베이스 설정이 필요하지 않습니다. 격리 메모리 패치가 MySQL 행을 비활성화하며, 비활성화된 행은 `${BFF_MYSQL_PASSWORD}`를 읽지 않습니다.
 
 명령은 적용되는 행 목록을 YAML로 출력하며 각 행은 `- id:`로 시작하는 블록이고, 종료 코드 0으로 끝납니다. 출력에서 다음을 확인하세요.
 
@@ -387,10 +392,10 @@ dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile 
 
 | 검사 | 명령 | 표시되어야 하는 내용 |
 | --- | --- | --- |
-| 상태 확인 | `Invoke-RestMethod http://127.0.0.1:8080/health` | `status` = `ok`와 UTC 타임스탬프 |
-| 설치 상태 | `Invoke-RestMethod http://127.0.0.1:8080/api/setup/status` | `phase`, `installed`, `profiles`와 가져오기 제한이 담긴 JSON |
+| 상태 확인 | `Invoke-RestMethod http://127.0.0.1:7300/health` | `status` = `ok`와 UTC 타임스탬프 |
+| 설치 상태 | `Invoke-RestMethod http://127.0.0.1:7300/api/setup/status` | `phase`, `installed`, `profiles`와 가져오기 제한이 담긴 JSON |
 
-Linux에서는 `curl -s http://127.0.0.1:8080/health`와 `curl -s http://127.0.0.1:8080/api/setup/status`를 사용하세요. `/health`와 WebUI 파일은 항상 열려 있으며, 관리자가 아직 없으면 `/api/plugins`는 설계상 401을 반환하므로 먼저 도우미에서 관리자를 만드세요.
+Linux에서는 `curl -s http://127.0.0.1:7300/health`와 `curl -s http://127.0.0.1:7300/api/setup/status`를 사용하세요. `/health`와 WebUI 파일은 항상 열려 있으며, 관리자가 아직 없으면 `/api/plugins`는 설계상 401을 반환하므로 먼저 도우미에서 관리자를 만드세요.
 
 **확인:** 세 소스 빌드 명령이 모두 성공적으로 종료되고 브라우저 검사가 위에 설명한 JSON을 반환합니다.
 
@@ -422,7 +427,7 @@ Linux에서는 `curl -s http://127.0.0.1:8080/health`와 `curl -s http://127.0.0
 
 - **빌드 실패:** 이 저장소는 경고를 오류로 처리합니다. 첫 번째 `error` 줄이 프로젝트와 원인을 알려 줍니다. 수정한 뒤 다시 빌드하세요. [문제 해결](troubleshooting.md)을 참고하세요.
 - **프레임워크 종속 빌드가 시작되지 않음:** ASP.NET Core Runtime 10이 없습니다. `dotnet --list-runtimes`로 확인한 뒤 같은 아키텍처의 런타임을 설치하세요.
-- **포트가 이미 사용 중:** 도우미는 8080 포트를 사용하고 게임 프로필은 자체 게임 포트(예: `kr-812`의 7110)를 사용합니다. `.env`에서 `BFF_ADMIN_PORT` 또는 해당 빌드의 포트 변수를 설정하거나 포트를 점유한 프로세스를 중지하세요.
+- **포트가 이미 사용 중:** 도우미는 7300 포트를 사용하고 게임 프로필은 자체 게임 포트(예: `kr-812`의 7110)를 사용합니다. `.env`에서 `BFF_ADMIN_PORT` 또는 해당 빌드의 포트 변수를 설정하거나 포트를 점유한 프로세스를 중지하세요.
 - **게임 프로필이 클라이언트 데이터 때문에 실패:** `clientdata` 행이 `data_directory`와 `raw_directory`가 모두 없다고 보고합니다. 일치하는 클라이언트 데이터를 제공하거나 설치 도우미로 가져온 뒤 프로필을 다시 시작하세요. [문제 해결](troubleshooting.md)을 참고하세요.
 
 ## 다음 단계

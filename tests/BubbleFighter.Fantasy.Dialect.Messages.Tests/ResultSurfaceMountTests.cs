@@ -6,6 +6,7 @@ using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Match;
 using BubbleFighter.Fantasy.Dialect.Rooms;
 using BubbleFighter.Fantasy.Kernel;
+using BubbleFighter.Fantasy.Packets;
 using BubbleFighter.Fantasy.Protocol;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -15,6 +16,60 @@ namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
 /// <summary>Checks native result output independently of admission of inbound kill-credit packets.</summary>
 public sealed class ResultSurfaceMountTests
 {
+    /// <summary>Admits the CN2011 NPC finishing producer only with its zero references, negative marker and native scorer seat.</summary>
+    [Theory]
+    [InlineData(2, 0, 0, -1, 2, true)]
+    [InlineData(2, 0, 0, -1, 0, true)]
+    [InlineData(1, 0, 0, -1, 2, false)]
+    [InlineData(2, 0, 0, 0, 2, false)]
+    [InlineData(2, 0, 31, -1, 2, false)]
+    [InlineData(2, 31, 0, -1, 2, false)]
+    [InlineData(2, 0, 0, -1, -1, false)]
+    [InlineData(2, 0, 0, -1, 64, false)]
+    public async Task Cn2011NpcFinishingReportRequiresTheNativeEnvelope(
+        int kind, int victimReference, int scorerReference, int marker, int scorerSlot, bool accepted)
+    {
+        const string build = "cn-279";
+        var table = TestBuilds.Opcodes(build);
+        var services = new ServiceRegistry();
+        var routes = new Routes();
+        var messages = new Messages();
+        using var packets = services.Register<IPacketRouter>(routes);
+        using var typed = services.Register<IMessageRouter>(messages);
+        var context = new PluginContext(new PluginRow { Id = "npc-score", Plugin = "test", Source = "test" },
+            services, new EventBus(NullLogger.Instance), NullLogger.Instance);
+        var (schema, play) = TestBuilds.Of(build);
+        var codec = new PlayRoomCodec(build + "/game", build, schema, play,
+            new Tables(table), NullLogger.Instance, TestBuilds.Packets);
+        var session = new Session(table.Profile);
+        // cn-279 sub_773950 -> cn-279 sub_818DE0 sends two zero references, -1 and the computed scorer seat.
+        var body = PacketCodec.Write(TestBuilds.Packets, build, "RoundScoreReport", new Dictionary<string, object?>
+        {
+            ["kind"] = kind, ["unknown_8"] = victimReference, ["unknown_12"] = scorerReference,
+            ["unknown_16"] = marker, ["npc_scorer_slot"] = scorerSlot,
+        });
+        Assert.Equal(20, body.Length);
+        try
+        {
+            codec.Mount(context);
+            var opcode = table.C2S("gcpGameUpdateScore");
+            await routes.Handlers[(build + "/game", opcode)](session, new(opcode, body), default);
+            if (accepted)
+            {
+                var report = Assert.IsType<RoundFinishingBlowReported>(Assert.Single(messages.Received));
+                Assert.Equal(scorerSlot, report.ReporterSlot);
+                Assert.Null(report.Victim);
+                Assert.True(report.HasVictimReference);
+                Assert.True(report.RequiresReporterOwnership);
+                Assert.False(report.RequiresDirectKillMode);
+            }
+            else
+                Assert.Empty(messages.Received);
+        }
+        finally { await context.UnwindAsync(); }
+        Assert.Empty(routes.Handlers);
+    }
+
     /// <summary>Exercises the CN2014 full knock-down and compact finishing-blow routes with their distinct native widths.</summary>
     [Theory]
     [InlineData("cn-705", true)]

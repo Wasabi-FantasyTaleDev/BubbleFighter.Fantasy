@@ -51,23 +51,57 @@ public sealed class EquippedViewPushPresetPageTests
     }
 
     [Fact]
-    public async Task MaterializedPagesWinOverALaterWornChange()
+    public async Task ACommittedSelectionRewritesOnlyTheActivePage()
     {
-        var state = new RecordingPresetState
-        {
-            Pages = [new(204001, 0, 0), new(203001, 0, 0), new(202001, 0, 0), new(202003, 0, 0), new(204003, 0, 0)],
-        };
+        WeaponPresetPage[] before = [new(204001, 0, 0), new(203001, 0, 7), new(202001, 0, 0), new(202003, 0, 0), new(204003, 0, 0)];
+        var state = new RecordingPresetState { Pages = [.. before], ActiveSlot = 1 };
         var (local, remote) = (new RecordingSender(), new RecordingSender());
         var push = new EquippedViewPush(NullLogger.Instance, local, remote, state, selection: null,
             persistPresetPages: true);
 
         await push.SendSelectionAsync(new RecordingSession(3), 42, 300001, StarterWorn, default);
 
-        Assert.Equal(1, state.PageReads);
+        Assert.Equal(1, state.PageWrites);
+        // Page 1 now holds the committed worn primary and special and keeps its third word; every other page keeps its weapon.
+        WeaponPresetPage[] expected = [before[0], new(202001, 205001, 7), before[2], before[3], before[4]];
+        Assert.Equal(expected, state.Pages);
+        Assert.Equal(expected, Assert.IsAssignableFrom<IReadOnlyList<WeaponPresetPage>>(Assert.Single(local.Sent).WeaponPresetPages));
+    }
+
+    [Fact]
+    public async Task ARemovedPrimaryKeepsThePageWeaponAndALoginReplayNeverWrites()
+    {
+        WeaponPresetPage[] before = [new(204001, 0, 0), new(203001, 0, 0), new(202001, 0, 0), new(202003, 0, 0), new(204003, 0, 0)];
+        var state = new RecordingPresetState { Pages = [.. before] };
+        var (local, remote) = (new RecordingSender(), new RecordingSender());
+        var push = new EquippedViewPush(NullLogger.Instance, local, remote, state, selection: null,
+            persistPresetPages: true);
+
+        // No worn primary: recording a zero would unbind the page, so nothing is written.
+        await push.SendSelectionAsync(new RecordingSession(3), 42, 300001, [300001, 205001], default);
+        // A plain (non-selection) publication such as a login replay reads pages but never records them.
+        await push.SendAsync(new RecordingSession(3), 42, 300001, StarterWorn, default);
+
         Assert.Equal(0, state.PageWrites);
-        // The publication still carries the current worn snapshot for the view; only the pages stay put.
-        Assert.Equal(202001, Assert.Single(local.Sent).PrimaryWeaponId);
-        Assert.Equal(state.Pages, Assert.IsAssignableFrom<IReadOnlyList<WeaponPresetPage>>(Assert.Single(local.Sent).WeaponPresetPages));
+        Assert.Equal(before, state.Pages);
+    }
+
+    [Fact]
+    public async Task APresetSwitchPublicationNeverRecordsTheWornWeaponIntoTheNewPage()
+    {
+        // Page 1 names a weapon the switch could not wear; republishing the previous page's weapon must not overwrite it.
+        WeaponPresetPage[] before = [new(202001, 205001, 0), new(203001, 0, 0), new(202001, 0, 0), new(202003, 0, 0), new(204003, 0, 0)];
+        var state = new RecordingPresetState { Pages = [.. before], ActiveSlot = 1 };
+        var (local, remote) = (new RecordingSender(), new RecordingSender());
+        var push = new EquippedViewPush(NullLogger.Instance, local, remote, state, selection: null,
+            persistPresetPages: true);
+        InventorySlotRecord[] bag = [.. StarterWorn.Select((id, index) =>
+            new InventorySlotRecord(42, InventoryBag.CharacterBag, index + 1, id, 1, InventorySlotRecord.WornFlagBit))];
+
+        await push.SendPresetSwitchAsync(new RecordingSession(5), 42, 300001, bag, default);
+
+        Assert.Equal(0, state.PageWrites);
+        Assert.Equal(before, Assert.IsAssignableFrom<IReadOnlyList<WeaponPresetPage>>(Assert.Single(local.Sent).WeaponPresetPages));
     }
 
     [Fact]
@@ -124,6 +158,7 @@ public sealed class EquippedViewPushPresetPageTests
         Assert.Same(session, result.Session);
         Assert.Equal(local.Protocol, result.Protocol);
         Assert.True(result.SelectionChange);
+        Assert.False(result.IsSceneReplay);
         Assert.Same(Assert.Single(local.Sent), result.View);
         Assert.Equal(StarterWorn, result.View.EquippedItemIds);
         Assert.Throws<NotSupportedException>(() => ((IList<int>)result.View.EquippedItemIds)[1] = 204099);
@@ -180,8 +215,9 @@ public sealed class EquippedViewPushPresetPageTests
         internal int PageReads { get; private set; }
         internal int PageWrites { get; private set; }
         internal WeaponPresetPage[]? Pages { get; set; }
+        internal byte ActiveSlot { get; init; }
         public ValueTask<byte> GetActiveWeaponPresetSlotAsync(long userNum, CancellationToken ct) =>
-            ValueTask.FromResult((byte)0);
+            ValueTask.FromResult(ActiveSlot);
         public ValueTask SetActiveWeaponPresetSlotAsync(long userNum, byte slot, CancellationToken ct) =>
             throw new InvalidOperationException("View publications never change the active slot.");
         public ValueTask<WeaponPresetPage[]?> GetWeaponPresetPagesAsync(long userNum, CancellationToken ct)
@@ -202,6 +238,7 @@ public sealed class EquippedViewPushPresetPageTests
         public ValueTask SetWeaponPresetPagesAsync(long userNum, WeaponPresetPage[] pages, CancellationToken ct)
         {
             PageWrites++;
+            Pages = WeaponPresetPages.CopyTable(pages);
             return ValueTask.CompletedTask;
         }
     }

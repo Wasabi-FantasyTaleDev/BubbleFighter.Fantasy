@@ -1,4 +1,5 @@
 using BubbleFighter.Fantasy.Abstractions.Protocol;
+using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Contracts.Fighters;
 using BubbleFighter.Fantasy.Contracts.Inventory;
 
@@ -15,7 +16,8 @@ internal static class SeatCharacter
         (await ResolveEquipmentAsync(session, userNum, selection, characters, ct).ConfigureAwait(false)).CharacterId;
 
     internal static async ValueTask<SeatEquipment> ResolveEquipmentAsync(ISession session, int userNum,
-        IEquipmentSelection? selection, ISeatCharacterResolver? characters, CancellationToken ct)
+        IEquipmentSelection? selection, ISeatCharacterResolver? characters, CancellationToken ct,
+        IEventBus? events = null, string? protocol = null)
     {
         // kr-1256 sub_81D060 / sub_81CCE0 overwrite the same character field for 117/201/503/806.
         // A login snapshot or optional fighter roster must not override the current worn bag.
@@ -26,9 +28,14 @@ internal static class SeatCharacter
                 && row.ItemId is >= 300001 and <= 300031).Select(row => row.ItemId).Distinct().ToArray();
             if (selected.Length != 1)
                 throw new InvalidOperationException($"Player {userNum} must have exactly one equipped character; found {selected.Length}.");
-            return new SeatEquipment(selected[0], Array.AsReadOnly(bag
+            var worn = Array.AsReadOnly(bag
                 .Where(row => (row.Flags & InventorySlotRecord.WornFlagBit) != 0)
-                .Select(row => row.ItemId).Distinct().ToArray()));
+                .Select(row => row.ItemId).Distinct().ToArray());
+            return new SeatEquipment(selected[0], worn)
+            {
+                ItemAttributes = events is null || protocol is null ? []
+                    : await InventoryPresentations.EquippedAsync(events, protocol, bag, worn, ct).ConfigureAwait(false),
+            };
         }
 
         if (characters is not null)
@@ -49,10 +56,13 @@ internal static class SeatCharacter
 /// <summary>One resolved scene appearance; null items preserve the legacy profile without inventory services.</summary>
 internal sealed record SeatEquipment(int CharacterId, IReadOnlyList<int>? ItemIds)
 {
+    internal IReadOnlyList<BubbleFighter.Fantasy.Contracts.Rooms.RoomItemAttribute>? ItemAttributes { get; init; }
+
     internal void Apply(RoomSeat seat)
     {
         seat.InventorySelection = null;
         seat.CharacterId = CharacterId;
         seat.EquippedItemIds = ItemIds;
+        seat.ItemAttributes = ItemAttributes ?? seat.ItemAttributes.Where(attribute => ItemIds?.Contains(attribute.ItemId) == true).ToArray();
     }
 }

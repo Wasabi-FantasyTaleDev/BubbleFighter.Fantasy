@@ -1,7 +1,7 @@
 ---
 title: "服务器配置"
 description: "组合插件 profile、设置环境变量、端口与持久化。"
-updated: 2026-11-07
+updated: 2026-11-12
 ---
 
 Bubble Fighter Fantasy 没有固定的一组服务器组件。`profiles/` 下的一个 **profile** 决定运行哪些插件行、服务哪个客户端构建、打开哪些监听端口以及使用哪种存储。本页说明 profile 如何变成运行中的服务器、配置文件的位置、环境变量与端口的工作方式，以及如何切换持久化与客户端数据。
@@ -12,7 +12,7 @@ Bubble Fighter Fantasy 没有固定的一组服务器组件。`profiles/` 下的
 
 - 先构建一次服务器：`dotnet build BubbleFighter.Fantasy.sln -c Release` 必须以零警告完成。参见[安装](installation.md)。
 - 在仓库根目录打开终端。本页使用 `dotnet run` 的命令都假定当前目录是仓库根目录，因为 profile、packets 和客户端数据都相对于工作目录解析。
-- 将 `.env.example` 复制为 `.env`，并设置非空的 `BFF_MYSQL_PASSWORD`。即使某次检查会禁用 MySQL，profile 插值也要求该变量有值。不要把真实凭证写入准备提交的文件。
+- 真实部署时将 `.env.example` 复制为 `.env`。禁用 MySQL 或使用内存或 SQLite 的检查不需要任何 `BFF_MYSQL_*` 变量。不要把真实凭证写入准备提交的文件。
 - 如果打算启动游戏构建，请准备好客户端数据。仓库不包含客户端数据；客户端数据见本页“客户端数据”一节。
 
 ## 配置的工作方式
@@ -43,7 +43,7 @@ profile 按层组合，后一层修改前一层的组合结果：
 - id: admin.http
   plugin: admin.http
   config:
-    listen: "${BFF_ADMIN_HOST:-127.0.0.1}:${BFF_ADMIN_PORT:-8080}"
+    listen: "${BFF_ADMIN_HOST:-127.0.0.1}:${BFF_ADMIN_PORT:-7300}"
 ```
 
 | 键 | 必需 | 含义 |
@@ -84,6 +84,12 @@ profile 按层组合，后一层修改前一层的组合结果：
 `${VAR}` 插入变量值，`${VAR:-default}` 提供默认值。如果 profile 的 `vars` 与进程环境都没有定义该变量且没有默认值，组合会失败并指出文件、行和变量。profile 自己的 `vars` 优先于同名环境变量，禁用行不参与插值。
 
 配置绑定将 `snake_case` 键映射到插件的类型化选项。未知键、错误类型、越界数字和选项校验失败会合并报告为一条 `Invalid configuration for row '<id>': ...` 错误。
+
+### 背包发布限制
+
+`dialect.messages` 插件行会按连接串行发布背包、商店状态和旧版实验室完成结果。`max_inventory_publications_per_connection` 限制正在运行的发布与排队调用者的总数（默认 `8`，范围 `1..256`）。`max_shop_sessions` 限制保留时基或已获准发布的连接数（默认 `512`，范围 `1..65536`）；已失效但尚未结束的工作仍计入限制。不同连接可以独立发布。超过任一上限时立即失败，不再增加排队调用者。
+
+连接关闭或插件行卸载会取消等待者并使正在准备的发布失效，延迟恢复的调用不能重新安装旧时基。确定性的编码错误保留原有时基。发送序列开始后的失败会使该连接的发布状态失效并请求关闭连接；已经提交的背包保留，清理过程不会再次扣费或发放物品。提高排队上限不会使发布变成客户端确认或数据库事务。
 
 ## 文件位置
 
@@ -136,9 +142,20 @@ dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile 
 | --- | --- | --- |
 | `BFF_BIND_HOST` | 游戏与中继监听器绑定的地址。 | `0.0.0.0` |
 | `BFF_PUBLIC_HOST` | 告知客户端用于连接和中继的地址。 | `127.0.0.1` |
-| `BFF_ADMIN_HOST` / `BFF_ADMIN_PORT` | 管理 HTTP 绑定地址。 | `127.0.0.1` / `8080` |
+| `BFF_ADMIN_HOST` / `BFF_ADMIN_PORT` | 管理 HTTP 绑定地址。 | `127.0.0.1` / `7300` |
 | `BFF_LOG_LEVEL` | 控制台日志级别：Trace、Debug、Information、Warning、Error、Critical、None。 | `Information` |
+| `BFF_LOG_FILE` | 可选 Host 日志文件；`--log-file` 优先。未设置时关闭文件日志。 | 未设置 |
+| `BFF_LOG_FILE_LEVEL` | 文件日志阈值；`--log-file-level` 优先。使用与控制台相同的级别名称。 | `Warning` |
+| `BFF_LOG_FILE_MAX_BYTES` | 每个保留文件的 UTF-8 字节上限；1024–1073741824。 | `16777216`（16 MiB） |
+| `BFF_LOG_FILE_COUNT` | 保留文件数，包含当前文件；1–32。 | `5` |
+| `BFF_LOG_FILE_QUEUE_CAPACITY` | 等待写入的记录槽数；1–65536。 | `256` |
+| `BFF_LOG_FILE_MAX_QUEUED_BYTES` | UTF-8 正文字节预算，包含正在写入的记录；1024–268435456。 | `16777216`（16 MiB） |
+| `BFF_LOG_FILE_SHUTDOWN_TIMEOUT_MS` | 关闭时排空等待上限，单位毫秒；100–30000。 | `5000` |
+| `BFF_LOG_FILE_RETRY_INITIAL_MS` | 重新打开文件的初始重试延迟，单位毫秒；100–60000。 | `1000` |
+| `BFF_LOG_FILE_RETRY_MAX_MS` | 指数重试延迟上限，单位毫秒；100–60000，且不得小于初始延迟。 | `60000` |
 | `BFF_CLIENT_DATA` | 各构建客户端数据的根目录。 | `client-data` |
+| `BFF_COMPILED_DATA` | 各构建编译后客户端数据文件所在的目录；它是服务器会自行重建的缓存，见部署指南的小型服务器一节。 | `state/compiled-data` |
+| `BFF_PACKET_LOG` | 将每个封包写为封包日志文件中的一行，用于调试。 | `false` |
 | `BFF_PACKET_CAPTURE` | 启用可选的完整数据包记录器。 | `false` |
 | `BFF_STATE_DIR` | 首次安装流程（`start`）的状态目录。 | 可执行文件旁的 `state` |
 | `BFF_SQLITE_DATABASE_PATH` | 补丁启用 SQLite 提供程序时使用的绝对存档路径。 | 无 |
@@ -151,7 +168,7 @@ dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile 
 | `BFF_MYSQL_HOST` | 数据库主机。Docker Compose 会把它改为其 `mysql` 服务。 | `127.0.0.1` |
 | `BFF_MYSQL_PORT` | 数据库端口。 | `3306` |
 | `BFF_MYSQL_USER` | 数据库账号。 | `bff` |
-| `BFF_MYSQL_PASSWORD` | 密码。插值发生在禁用补丁之前，因此必须非空。 | 空，必须设置 |
+| `BFF_MYSQL_PASSWORD` | 密码。启用 MySQL 行时必须非空；禁用的行不会读取它。 | 空，启用 MySQL 时必须设置 |
 | `BFF_MYSQL_DATABASE` | 数据库名。可以使用任何已有的数据库。 | `bf_game_db` |
 
 端口和游戏数值在下面的章节说明。`.env.example` 是带注释的完整列表；请复制它，不要自行发明变量名。
@@ -166,7 +183,7 @@ dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile 
 | --- | --- | --- |
 | 游戏 TCP | `7100`（`KR_1256_GAME_PORT`） | `7110`（`KR_812_GAME_PORT`） |
 | 中继 TCP | `7101`（`KR_1256_RELAY_PORT`） | `7111`（`KR_812_RELAY_PORT`） |
-| 管理 HTTP | `8080`（`BFF_ADMIN_PORT`） | `8081`，由 profile 补丁移动 |
+| 管理 HTTP | `7300`（`BFF_ADMIN_PORT`） | `7300`（`BFF_ADMIN_PORT`），同一个 WebUI |
 | 可选原生选择器 | 不使用 | 挂载 `center-selector.yaml` 时为 `7112` |
 
 `all` profile 把已接入的客户端构建组合进一个进程，每个构建使用自己的游戏监听器。其默认游戏端口从 `7100` 开始以十递增（`kr-1256` 7100、`kr-812` 7110、`id-400` 7120，直到 `cn-408` 7250），每个构建的中继监听在游戏端口加一（`<BUILD>_RELAY_PORT`，对客户端公布 `<BUILD>_PUBLIC_RELAY_PORT`）。旧版构建在中继连上时通过中继进行回合，中继失败时回退到游戏连接；`cn-706` 和 `cn-705` 的中继封包未经审计，回合仍走游戏连接。开放防火墙规则前，请用 `--dump-config` 读取所选 profile 的实际 `listen` 字符串。
@@ -290,11 +307,11 @@ CN279 保留年级权重表中的十七种道具和一个原生持有槽。碰�
 
 ```sh
 cp .env.example .env
-# 编辑 .env，将 BFF_MYSQL_PASSWORD 设为一次性的非空值。
+# 不需要数据库设置：隔离内存补丁会禁用 MySQL。
 dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile management --patch tools/local-checks/isolated-memory.patch.yaml
 ```
 
-控制台会报告已激活的行，Host 就绪后输出 `Server started with <n> active row(s).`。访问 `http://127.0.0.1:8080/` 的 `GET /health`：它返回含 `status` 字段的 JSON。用 `Ctrl+C` 停止。
+控制台会报告已激活的行，Host 就绪后输出 `Server started with <n> active row(s).`。访问 `http://127.0.0.1:7300/` 的 `GET /health`：它返回含 `status` 字段的 JSON。用 `Ctrl+C` 停止。
 
 ### SQLite 服务器
 
@@ -382,13 +399,30 @@ BFF_PUBLIC_HOST=<public-address-clients-use>
 
 已列出的 profile 意味着：仓库能组合这些行，并带有该构建的封包数据和能力记录。它不意味着：所有游戏功能都已实现，或真实客户端已验证。自动化检查通过、能力启用或 profile 出现在列表中，都不构成真实客户端兼容性证明；能力记录描述的是已审计的原生支持，原生验收仍需单独进行。
 
+## 默认启用的功能
+
+发布的 profile 默认启用所有已实现的功能，新服务器可以直接测试全部内容。下表中的每个玩法开关默认均为 `true`；在 `.env` 中设为 `false` 即可关闭对应功能。客户端没有给出的数值（成功率、扣除数量、武器池），profile 中已填好可用的服务器策略，可用本地补丁替换。下文各节说明的字段均已由 profile 填写。
+
+| 变量 | 功能 |
+| --- | --- |
+| `BFF_TITLES_ENABLED` | 称号、勋章兑换与自动回合勋章（`kr-812`、`kr-1256`） |
+| `BFF_FAVORITE_WEAPON_ENABLED` | Favorite 武器点数与等级提示（`kr-1256`） |
+| `BFF_FAVORITE_TITLES_ENABLED` | Favorite 挑战称号及其进度（`kr-1256`） |
+| `BFF_ITEM_ENHANCEMENT_ENABLED` | 研究所的强化、永久转换与升级（`kr-1256`） |
+| `BFF_ITEM_MODIFICATION_ENABLED` | 武器改造（`kr-1256`） |
+| `BFF_SCIENCE_LAB_ENABLED` | 旧版合成（`kr-812`） |
+| `BFF_PET_COMBAT_ENABLED`, `BFF_PET_REWARDS_ENABLED`, `BFF_PET_CANCELLATION_SEEDS` | 宠物战斗效果、回合奖励与抵消种子，适用于所有普通模式 |
+| `BFF_CUSTOM_ROOM_RULES_ENABLED` | 自定义房间选项（`kr-1256`） |
+
+各版本 profile 也列出了所有已审计的模式补丁：`kr-1256` 的炸弹、队长、BnB、Extreme Racing、Final Zone、OneKill、星星、幽灵与脚本僵尸、Rhea、AI 房间、Zombie Escape、等待室踢人、防御种子与 WeaponMaster；`cn-774` 和 `tw-454` 为其已审计的子集；旧版为炸弹与队长。每个版本的 `modes.patch.yaml` 放在最后，统一给出结果计分板模式的并集。启动器票据、UDP 传输、集群行与封包日志保持关闭：它们改变的是客户端的连接方式，而不是游戏内容。所有时区设置在任何主机上都同时接受 IANA 名称（`Asia/Seoul`）与 Windows 名称（`Korea Standard Time`）。
+
 ## 可选功能 bundle
 
 少数 bundle 需要显式启用，且只被客户端审计支持的 profile 列出。
 
 **`player-settings`** 挂载 `player.settings`，即玩家自定义按键的类型化存储。封包本身由 `dialect.messages` 行的 `customized_keys` 选项绑定，由 `kr-812`、`kr-1256`、`cn-774` 和 `tw-454` 声明；其他 profile 需先审计其原生控制名称和封包路径。每个 `player.settings` 行都需要 `protocol`，并使用按 profile 的 `scope`，避免混淆不同构建的名称。持久化提供程序按账号保存映射；MySQL 通过迁移 `0032_customized_keys.sql` 存储。每个提供程序用 `customized_keys` 配置每账号预算（`max_scopes` 1–64、`max_mappings` 1–512、`max_name_characters` 1–1024，三者组合必须能放入封包体）。超出预算会直接失败，而不会驱逐其他已保存映射。
 
-`dialect.messages.config.science_lab` 默认 `false`。`kr-1256`、`cn-774` 和 `tw-454` 已验证的操作行允许此选项对八种实验室操作统一返回客户端的实验室关闭结果（KR 为 5，CN/TW 为 4）。激活要求每组请求与回复均已验证且布局齐全，表不完整会直接失败。这不是完整实验室：尚无配方、费用、成功概率、奖励或物品变更，也尚未建立可信的实验室状态开启请求链。启用此选项不会发布实验室状态或开启界面。KR 状态的 34 字节、CN 状态的 36 字节和 KR 空物品列表的 26 字节固定测试仅代表数据覆盖。
+`dialect.messages.config.science_lab` 默认 `false`，用于路由 `kr-1256`、`cn-774` 和 `tw-454` 已验证的实验室操作。没有对应处理器的操作返回客户端的实验室关闭结果（KR 为 5，CN/TW 为 4）。激活要求每组请求与回复均已验证且布局齐全，表不完整会直接失败。此选项本身不提供配方、经济策略、物品变更或实验室配置。[可选物品强化](#可选物品强化) bundle 为 `kr-1256` 将其与 `science_lab_configuration` 和强化处理器一同启用，并为该构建提供单独启用的可选改造（Modification）策略。旧版 `kr-812` 的合成与分解使用独立的[可选旧版科学室](#可选旧版科学室)配置。原生实验室界面验收尚未完成。
 
 过期物品丢弃也以同样方式声明：`dialect.messages` 行的 `inventory_actions` 选项绑定 `gcpReqInventoryThrowItem`/`gspRepInventoryThrowItem`（每个 legacy 构建和 `kr-1256` 均开启），构建自己的 bundle 内的 `inventory.throw` 行通过存储装备服务移除该物品。行为被有意限制得很窄：只移除一个已认证玩家两个背包中的该过期物品；若有匹配权益仍有效，整个移除会被拒绝；构建的类别 6 排除规则会被遵守。比赛中的请求会被拒绝。真实客户端验收仍待进行；仅凭封包表覆盖不足以在另一个构建上声明该选项。
 
@@ -405,6 +439,25 @@ BFF_PUBLIC_HOST=<public-address-clients-use>
 
 撤销旧会话时也会清除它在本进程中的访问凭据和待用游戏票据。监听器启动前删除过期刷新会话，之后在登录时最多每小时清理一次。账号会话上限由存储层执行，因此服务端重启后仍然有效。
 
+## 被动中继延迟回复
+
+`relay-latency` bundle 仅在 `kr-1256`、`cn-738`、`cn-742`、`cn-774` 和 `tw-454` 中加入默认禁用的 `dialect.relay-latency`、`match-latency` 行。进行原生客户端验收测试时，可通过部署补丁同时启用两行：
+
+```yaml
+- set:
+    id: dialect.relay-latency
+    disabled: false
+- set:
+    id: match-latency
+    disabled: false
+    config:
+      reply_word: 0
+```
+
+两行的 `protocol` 都必须指向所属版本的中继协议，例如 `kr-1256/relay`；bundle 已提供此值。dialect 的 `packets_directory` 默认为 `packets`。逻辑行的 `reply_word` 范围为 `0..4294967295`，默认 `0`；它是原生回复处理器读取后丢弃的四字节未知值，不是请求时间戳的回显。
+
+每个完整请求仅在发起请求、已通过认证且租约仍有效的中继连接上收到一次回复。回复与握手发送共用连接所有者的串行门，无须等待场景初始化完成。正文格式错误、租约失效及发送失败仍按连接错误处理，资源受现有连接与发送队列预算约束。握手顺序和客户端采样设置保持原样：启用这两行不会启动客户端探测。两行默认保持禁用，等待原生客户端验收。在 `all` profile 的补丁中使用带版本前缀的行 ID。
+
 ## 可选 UDP 传输
 
 UDP 由 `net.udp` 插件提供。游戏登录、房间准入和对局身份认证继续使用 TCP；UDP 承载已审计的原生移动与发现流量。所有现有配置默认都不会挂载 UDP 监听器。
@@ -419,9 +472,6 @@ UDP 由 `net.udp` 插件提供。游戏登录、房间准入和对局身份认�
 例如，先将普通 TCP/管理端口改到本地空闲端口并准备该版本客户端数据，再执行：
 
 ```powershell
-$env:BFF_MYSQL_PASSWORD = "isolated-unused"
-$env:BFF_MYSQL_HOST = "127.0.0.1"
-$env:BFF_MYSQL_PORT = "1"
 $env:BFF_LOGIN_AUTHENTICATION = "open"
 $env:BFF_BIND_HOST = "127.0.0.1"
 $env:BFF_UDP_PORT = "7603"
@@ -483,6 +533,8 @@ schema-1 服务器目录新增响应字段 `generated_at_utc` 和目标字段 `o
 手动入口允许空 `nodes` 列表，用于保留不可选项而不猜测目标地址；自动入口仍须配置候选。启动器接口保留空入口，读取方必须保持其不可选，不解析或连接虚构地址。
 
 入口支持可选的 `short_name`：长度为 1..128 个 UTF-16 代码单元，不能全为空白、不能含控制字符，代理项必须成对。目录和启动授权均以 `short_name` 返回；未配置时仍回退到完整 `name`。健康刷新保留授权时的两个名称。简短地区名称须明确配置，不从完整名称推导；名称不会改变端点或认证绑定。
+
+入口可分组为 `sections`（例如 Main、Test Server、Oversea Server），第一个分区为默认分区。每个分区有 `id`、`name` 和可选的 `api_url`。没有 `api_url` 的分区与发布目录的启动器 API 共用登录，一次登录即可经游戏内列表进入其服务器；设置了 `api_url` 的分区经该 API 登录并签发自己的票据，启动器分开保存其账号。分组要么全有要么全无：配置了分区时每个入口都必须在 `section` 中指定一个分区，未配置时都不得指定。`GET /v1/servers/{build}` 增加 `sections` 和每个入口的 `section`。节点还可声明 `maintenance`，包含 `start` 与 `end`（含秒与时区偏移的 ISO 8601，均可省略）和 Markdown 格式的 `description`；维护生效期间其目标会携带维护时段，自动分配不再选择该节点，启动器把该服务器显示为维护中，并从游戏内列表中移除。启动器保留最后读取的目录，因此发布目录的 API 无法连接时仍会列出所有分区，经各独立分区自己的 API 查询状态，并把其余服务器显示为离线。
 
 `selectors[].nodes` 决定可见节点，手动选项有零个或一个节点。`selectors[].automatic` 仅返回租约有效、已就绪、未排空且未满员的候选，并要求成员属于同一非空 `data_scope`。`nodes[].data_scope` 和 `nodes[].join_scope` 是不透明的关系声明：空值不授予共享或加入权限，同名也不自动实现这些能力。`nodes[].room_directories` 独立控制房间摘要共享，允许友好服务器仅共享房间目录而保持账号隔离。
 
@@ -626,13 +678,56 @@ InGame 的 `return_on_leave` 默认 `home`，设为 `stay` 则留在访问节点
 
 `dialect.rooms.config.bomb_mission` 启用已审核的原生炸弹操作与结果绑定。`ingame.config.bomb_round_series` 进一步启用连续回合，逐局交换攻守，将胜局数与击杀总分分别记录。legacy 格式为三局两胜；kr-1256、cn-774 和 tw-454 为五局三胜。两项默认均为 `false`，完整系列支持 kr-812、cn-717、id-400、id-1809、cn-404、cn-408、cn-706、kr-1256、cn-774 和 tw-454，需要共用结果接口及已审核的连续回合入场发送器。应用对应的 `profiles/<build>/bomb.patch.yaml` 可启用两项并从普通复活流程中排除模式 19，要求具备观察模式支持。modern 显式启用补丁同时将模式 19、20 加入记分板选择。CN2013 cn-406 的模式工厂没有这两个专用分支，因此保持排除；该结论不代表其他 CN2013 修订。
 
-`dialect.rooms.config.extreme_racing` 默认 `false`，需要已审核的 `extreme_racing` 版本能力（目前仅 kr-1256），并需要 `modern_rooms` 及其对局绑定；cn-774 和 tw-454 已有经过审核的计时、回合、记录、终点、金币与检查点表行，但竞速能力仍关闭并拒绝此选项，等待完整对局审核。应用 `profiles/kr-1256/extreme-racing.patch.yaml` 即可启用。模式 24 随后进行 `ingame.config.extreme_racing_rounds` 个竞速回合（1 至 5，默认 3）。每回合开始时启动竞速计时（`extreme_racing_round_ms`，默认 180000）。首位到达终点后启动终点倒计时（`extreme_racing_finish_countdown_ms`，默认 10000）；倒计时或竞速计时结束，或所有在线玩家都完成时，该回合结束。完成者按名次获得 `extreme_racing_place_points` 分数（默认 10、8、6、5、4、3、2、1），竞速记录板显示本回合与累计分数，回合之间暂停 `extreme_racing_intermission_ms`（默认 5000，须大于 1000）。最后一回合后执行一次共用结算：分数较高的队伍获胜；房间不是两队时，分数最高的玩家获胜。共用对局时限不会结束竞速。检查点触发会被转发，使每名玩家的进度标记前进；标记和复活点由客户端自行布置。需要服务器对象列表的地图对象（炮台、金币和石块）不会生成。回合数、计时与分数属于服务器规则，原生客户端验收尚未完成。
+`dialect.rooms.config.extreme_racing` 默认 `false`，需要已审核的 `extreme_racing` 版本能力（目前仅 kr-1256），并需要 `modern_rooms` 及其对局绑定；cn-774 和 tw-454 已有经过审核的计时、回合、记录、终点、金币与检查点表行，但竞速能力仍关闭并拒绝此选项，等待完整对局审核。应用 `profiles/kr-1256/extreme-racing.patch.yaml` 即可启用。模式 24 随后进行 `ingame.config.extreme_racing_rounds` 个竞速回合（1 至 5，默认 3）。每回合开始时启动竞速计时（`extreme_racing_round_ms`，默认 180000）。首位到达终点后启动终点倒计时（`extreme_racing_finish_countdown_ms`，默认 10000）；倒计时或竞速计时结束，或所有在线玩家都完成时，该回合结束。完成者按名次获得 `extreme_racing_place_points` 分数（默认 10、8、6、5、4、3、2、1），竞速记录板显示本回合与累计分数，回合之间暂停 `extreme_racing_intermission_ms`（默认 5000，须大于 1000）。最后一回合后执行一次共用结算：分数较高的队伍获胜；房间不是两队时，分数最高的玩家获胜。共用对局时限不会结束竞速。检查点触发会被转发，使每名玩家的进度标记前进；标记和复活点由客户端自行布置。需要服务器对象列表的地图对象须通过下述独立初始化选项建立。回合数、计时与分数属于服务器规则，原生客户端验收尚未完成。
 
 服务端依据具体操作人、队伍与当前回合校验安装、取消和拆除。原生房主客户端上报爆炸与目标结果；普通回合时间到期后，已安装炸弹保留自身倒计时。各局沿用共用加载、角色生命与取消流程，整场只结算一次奖励，并保留同一场次标识。一整队主动退出会判该队整场弃权，不增加未进行的胜局；现有掉线取消策略保持生效。此选项不启用未经审核的版本，也不代表已通过原生客户端验收。
 
+### 竞速地图初始化
+
+`dialect.rooms.config` 和 `ingame.config` 的 `extreme_racing_initialization` 均默认 `false`，须与已有竞速交换一起在两处启用。运行时能力目前仅支持 kr-1256。包表还描述 cn-738、cn-742、cn-774 和 tw-454，包括早期没有石块清除器字段的双映射初始化；存在表项并不代表这些版本已启用玩法。
+
+在 `ingame.config.extreme_racing_stages` 中明确配置地图策略。每项必须指定 `stage_directory`、正数 `first_cannon_identity`、`first_coin_identity`、`first_stone_disposer_identity`、`coin_variant: 0`，以及 `coin_rounds`：按原生金币 helper 的数字后缀顺序，为每枚金币指定从 1 开始的回合数。地图的 `SavePoint/StageCount` 必须等于 `extreme_racing_rounds`。炮台与清除器、金币、石块的身份区间不能重叠，并须低于玩家 actor 身份空间。导入对应的 `Maps/<stage_directory>/option.ini` 和 `track.wb`；缺失 helper、身份重叠或金币回合配置不完整会导致激活失败。
+
+资源上限为 `extreme_racing_maximum_file_bytes`（默认 8388608，范围 8..67108864）、`extreme_racing_maximum_helpers`（4096，1..65536）和 `extreme_racing_maximum_objects`（1024，1..4096），最多接受 128 项不同地图策略。每次进入地图时，初始化在开局倒计时结束前向每名已加载参与者发送一次相同的对象身份。部分发送失败或成员变化会取消该回合并关闭其连接。此功能建立初始对象列表；移动碰撞车辆、炮台调度及真实客户端验收尚未完成。
+
+### 竞速炮台中继
+
+`extreme_racing_cannon` 在 `dialect.rooms.config` 和 `ingame.config` 中均默认 `false`，须与 `extreme_racing_initialization` 一起在两处启用，并要求版本具备 `extreme_racing_cannon` 能力（目前仅 kr-1256）。启用后，房间会在每个已配置地图的 `option.ini` 旁读取 `Maps/<stage_directory>/cannon.ini`：声明的炮台数必须等于该地图的 `Cannon/PairCount`，或者为 0；每门炮台需要 `WEAPONCOUNT`、正数 `INTERVAL` 和该地图拥有的 `STAGE`，每件武器需要含 `WEAPONID`（50000 至 50008）、`COUNT` 与有限正数 `SCALE` 的 `[CannonN_WeaponM]` 小节。其他任何不一致或格式错误都会使激活失败。声明 0 门炮的地图（例如初始化了 9 对的 rel_Racing01_Extreme）不安排任何炮击：这些炮台保持空闲，不放行任何射击。房间仅在中继炮台射击帧（中继 32902）的行为者等于发送者自己的座位、向量为有限数、炮台标识已在本局初始化、武器属于该炮台的资源列表，并且它恰好对应一条尚未应答的服务器命令时才接受它，然后把原始字节向其他已初始化的参与者转发一次，不回送给发送者，不重试，也不改写序号。每个炮台对最多挂起一条命令，账本大小即地图的炮台数。此选项本身不发送任何炮台命令：在下面的调度发出命令之前不会放行任何射击。原生客户端验收尚未完成。
+
+### 竞速炮台调度
+
+`extreme_racing_cannon_fire` 在 `ingame.config` 中默认 `false`，并要求 `extreme_racing_cannon`。客户端没有任何计时器会开炮，因此不启用此选项就不会有炮击。启用后，每个竞速回合在发送比赛时钟（S2C 711）之后立即启动炮台，命令（S2C 718）只发给一个座位，即源座位；其客户端开炮并中继射击（中继 32902），由房间路由转发。源座位的选择、节奏和武器顺序均为服务器策略而非原生行为，且尚未找到读取 `INTERVAL` 的客户端代码：
+
+- 源座位是已收到初始化且游戏连接仍然开启的最小座位号。命令从不发给多个座位，因为每个接收者都会各自发射一枚子弹。
+- 每门炮台在比赛时钟启动后经过一个 `INTERVAL` 到期，此后每次到期再经过一个间隔。炮台对仍有未应答命令时会被跳过而不是排队，时钟停顿也不会补发错过的射击。不使用 `STAGE`。拥有多件武器的炮台按文件顺序循环使用。
+- 命令携带分组 0（任意炮台分组）、该炮台对的第一个标识和缩放 1.0：中继的射击不含缩放，其他值只会改变源座位的炮台。
+- 竞速回合结束、对局被取消或结束、房间停止或局代更换时，节奏停止，其未应答命令作废；下一个竞速回合会重新启动。
+- 源座位离开或断线时，其未应答命令作废且不会重发；剩余已初始化座位中座位号最小者仅为之后的命令成为新的源座位。未收到初始化的座位不会被选中，也不会收到命令历史。
+- 发送失败会结束该局的调度：命令作废、不重试，比赛继续但没有炮台流量。
+
+原生客户端验收尚未完成。
+
+### WeaponMaster 对局
+
+`dialect.rooms.config.weapon_master` 默认 `false`，要求版本具备 `weapon_master` 能力（目前仅 kr-1256；cn-774 与 tw-454 不继承），并同时启用 `modern_rooms`、在 `result_scoreboard_modes` 中包含模式 26。它挂载为座位分配武器的装备封包，以及客户端在多次死亡后请求新武器的封包。
+
+在同一协议的游戏内行上同时设置 `ingame.config.weapon_master_levels`，缺少任一项都会使激活失败。该选项没有默认值：空列表时模式 26 只是普通的计时对局。列表每一项按顺序代表一个等级，包含其 `experience` 门槛（第一级为 `0`，之后每级更高，且小于 65535）以及可选的 `weapons` 列表（`item` 为正的物品 ID，同级内不重复；`weight` 为正数）。没有列出武器的等级从共享的 `weapon_master_weapons` 武器池抽取，因此与等级无关的武器只需写一次。`weapon_master_experience` 以 `{ event, points }` 列出每种被接受的事件给予的经验，事件取自 `kill`、`knockdown` 与 `rescue` 且互不重复，点数为正；未列出的事件不给经验。模式 26 还必须通过 `native_life_every_mode` 或包含 26 的 `native_life_mode_ids` 使用原生生命判定。帧以武器目录 ID 指定武器，由 `kr-1256 sub_4ADD70` 解析；主武器的商店物品 ID 为 200000 加上该 ID。`kr-1256` 配置的补丁使用十个等级、每级相差 200 经验、每次击杀 100 经验，以及由旧版 L1、L2、L3、S1、S2、R3 主武器组成的单一随机武器池。
+
+每个座位在对局开始时获得一把武器。被接受的事件累加其经验；当经验达到后续等级的门槛时，座位升到该等级并获得该等级的一把武器，一次事件跨越多个门槛也只发一把。实时比分以种类 31 到 34 传送每个座位的等级、经验、当前等级的起始经验和下一等级的经验（`kr-1256 sub_9E9160` 将其存放在座位记录 +204 到 +216）；在最后一级时，下一等级的值为其起始值加一。最先到达最后一级的座位获胜，对局立即结束。当客户端报告其玩家自上次换武器后已死亡规定次数时，服务器发给它同一等级的新武器。服务器从客户端的 `Config/GameOption.xml` 读取该次数 `WeaponMasterNoPangDeadCount`，因此必须导入该文件；数值缺失、重复或不为正都会使激活失败。过早的请求会被记录并忽略。复活遵循通用规则。若时间结束时仍无人到达最后一级，等级最高的座位获胜；所有座位等级相同则为平局。结果画面的等级栏仍显示账号等级。原生客户端验收尚未完成。
+
+### BnB 对局
+
+`dialect.rooms.config` 和 `ingame.config` 的 `bnb` 均默认 `false`。启用已审核的 kr-1256 模式 41 交换时，两处均须开启，并要求 `modern_rooms`、`result_scoreboard_modes` 包含 41、`native_match_relay: true`，以及通过 `native_life_every_mode` 或包含 41 的 `native_life_mode_ids` 启用原生命状态接纳。其他版本在完整交换审核前拒绝此选项；该路径不接纳机器人。应用 `profiles/kr-1256/bnb.patch.yaml` 可按已核实的场景边界为 `rel_bnb01_village06` 启用交换。
+
+导入 `Config/GameSpec/BnBSpec.yaml`，以及所选地图的 `Maps/<stage_directory>/CustomMap.json` 和 `BnBItemLayout.json`。`ingame.config.bnb_stages` 最多包含 128 项不同地图，每项必须指定 `stage_directory`、`tile_layer_minimum_x` 和 `tile_layer_maximum_z`。两个坐标是应用 JSON 偏移前的原生 TileLayer 边界，必须明确提供有限值，并从所选地图的场景数据取得。猜测原点可能导致格子定位错误，即使物品生成结果一致。
+
+`bnb_maximum_file_bytes` 默认 1048576（1..16777216），`bnb_maximum_cells` 默认 1024（1..4096），`bnb_maximum_position_cell_distance` 默认 1（距离最近已接纳移动位置的曼哈顿格数，0..4），`bnb_explosion_report_grace_ms` 默认 1000（0..10000）。引信、火焰、方块销毁时间及能力上限取自原生资源。加载前同步地图种子，每个回合保留一份按序处理的放置、爆炸和拾取状态。重复放置到已占格子不会发送通知或推进序号；对已被领取物品的拾取仍发送确认，使原生输入状态能够释放，同时避免重复奖励。错误归属、旧生命和旧回合不能修改当前状态。同步失败或必要参与者连接丢失会取消对应回合。真实客户端验收仍待完成。
+
+同一角色生命代次中紧随泡泡报告的拾取仍可通过相同的位置和归属校验；死亡或已移除的角色不能拾取。死亡清理完成后只回复一次角色移除，不授予复活，后续重置确认也不能让该角色复活。新回合会创建新的角色生命代次。
+
 ### FinalZone
 
-`dialect.rooms.config.final_zone` 默认 `false`。应用 `profiles/kr-1256/final-zone.patch.yaml` 可启用模式 23、25、30、45 共用的 Area32 交互，需要 modern 对局绑定、`final_zone` 版本能力和记分板模式 30，目前仅审核 kr-1256。补丁同时保留记分板模式 1、19、20、24，可以在其他模式补丁之后应用，但不会自行开启这些模式。
+`dialect.rooms.config.final_zone` 默认 `false`。应用 `profiles/kr-1256/final-zone.patch.yaml` 可启用模式 23、25、30、45 共用的 Area32 交互，需要 modern 对局绑定、`final_zone` 版本能力和记分板模式 30，目前仅审核 kr-1256。补丁同时保留记分板模式 1、5、6、19、20、24，可以在其他模式补丁之后应用，但不会自行开启这些模式。
 
 通过 `client-data` 导入对应客户端的 `Config/GameSpec/GenItemSetting.yaml`、`Config/GenDroneSpec.csv`、`Config/SurvivalMode.xml`、`ServerShared/MapMeta.xml`，以及所选地图的 `GenClusterTable.csv`、`GenSpawnTable.csv`、`GenSpotList.csv`。使用无人机或金色补给的地图还需要 `GenDroneRewardTable.csv`。公寓地图关闭了无人机，原始资源也没有这张表。资源缺失或格式错误会在倒计时前报错。当前显式物品生成路径支持普通生成物，包括 `rel_Sudden08_Finalzone` 地图；使用独立 `AutoItem` 地形物件类别的地图（包括 `rel_space04_64room`）会被拒绝。可选开局包的原生消耗与发放交互尚未接入，因此装备开局包也会在倒计时前被拒绝。
 
@@ -654,6 +749,29 @@ InGame 的 `return_on_leave` 默认 `home`，设为 `stay` 则留在访问节点
 | `final_zone_maximum_bonus_items` | 64 | 单次生成选择附带的物件数。 |
 
 此功能仍是受开关保护的增量。台账限制已发放数量，但尚未完整复现原生背包槽位、武器变体与实时弹药消耗。模式 30 的同盟与背刺行为尚未得到证实。自动检查和资源导入不代表原生客户端验收，也不代表地图机制全部覆盖。
+
+### 夺星模式
+
+`ingame.config.star_mode_ids` 和 `star_team_mode_ids` 指定个人和团队夺星模式（原生客户端为模式 5 和 6），需要启用 `dialect.rooms.config.star_items`。夺星对局时长为 `star_round_time_limit_ms`（默认 240000），使用地图自身的星星点：位置、种类和刷新时间来自房主的地图报告；房主没有报告星星点时，服务器改为读取地图 `track.wb` 中的 `#sp_star_` 和 `#sp_bigStar_` helper（`star_map_fallback`，默认 `true`）。每个点按自身延迟出现第一颗星，这颗星被拿走后才会补充。夺星对局按各座位持有的星数决定胜负，实时比分和结算以每队的星数作为队伍总分。现代版房间启用 `star_items` 时，`result_scoreboard_modes` 还必须包含模式 5 和 6，因为结算表只对列出的模式发送。`star_fever_lead_ms`（默认 0，关闭）在时间结束前这么多毫秒启动该版本的终局星星 Fever，目前只有 kr-1256 的 Fever 包经过审核。应用 `profiles/kr-1256/stars.patch.yaml` 可在 kr-1256 启用这两个模式，并在最后 45 秒启动 Fever。补丁重述完整的记分板模式列表，可以在其他模式补丁之后应用。原生客户端验收仍待完成。
+
+## 禁选（Ban-pick）
+
+禁选是原生客户端没有的服务器功能。它默认安装并启用，但在有人设置规则之前不禁用任何东西。`core` 中的 `banpick` 行保存全服文档，每个版本的 `banpick.room` 行（该版本 `ingame` 行的子行）把它应用到该版本的房间。停用这两行即可移除此功能。
+
+禁用分两种：
+
+- **房间禁用**由房主设置，只在房间存在期间有效。`!banpick`（别名 `!bp`）支持 `add <物品编号、名称或分组>`、`remove <...>`、`set <编号或分组...>`（一次替换整个列表，浮层即用此方式）、`clear` 和 `list [页码]`。所有人都能查看列表；只有房主能修改，且只能在游戏开始前修改。
+- **全服策略**由管理员用 `gbanpick`（别名 `gbp`，权限 `game.management.banpick`）设置，保存到 `state_path`（默认 `data/banpick-policy.json`），每次保存都要写明所修改的版本号。`state_path` 为空时，配置里的 `policy` 只读。
+
+文档结构与客户端策略相同。`policy.groups` 按 `ShopItem2` 的 `MainCategory`/`SubCategory` 表编号（各版本共用）或 `function` 列定义物品分组；自带的分组包括 `weapon`、`sniper`、`rifle`、`shotgun`、`clothes`、`hat`、`character` 和 `pet`。`policy.policies` 可以列出任意多个策略，每个策略有作用范围（`builds`、`modes`、`rooms: all|public|password`）和带类型的规则：
+
+| 规则类型 | 效果 |
+|---|---|
+| `block` | 在策略生效的地方拒绝装备该物品，穿着它的对局无法开始。 |
+| `confirm` | 与房间禁用同等强度：提醒房主，房主仍可开始。 |
+| `warn` | 允许使用，但会告诉房间里的人谁在用；新进房间的人会收到所有正在使用者的提醒。 |
+
+房主点击开始时，如果有人穿着房间禁用或 `confirm` 物品，所有成员都会收到谁穿着什么的提醒。装有 Nirinsou Link 浮层的房主会看到确认对话框；其他房主在 `reclick_window_ms`（默认 10000）内再次点击开始或输入 `!bp start` 即可开始。超过 `announcement_items`（默认 25）项的列表只公告数量。浮层接收 `game.ban.list.changed`、`game.ban.start.confirm`、`game.ban.warn`，并用 `game.ban.list.get`、`game.ban.catalog.search` 请求读取列表。浮层做出的每个修改（包括对话框里的确定）都是通过启动绑定的命令通道（`game.command.execute`）执行的 `bp` 命令，因此与手动输入的命令接受同样的检查；这需要启用 `companion.commands` 行（`core` 中默认停用）。消息行不发送服务器公告的版本会以系统聊天消息收到同样的文字。原生客户端验收尚未完成。
 
 ## 原生广场招募
 
@@ -703,4 +821,136 @@ CN2011（`cn-279`）在原生伤害路径中本地计算普通装备防御，不
 
 首次使用时，系统从旧记录继承兼容的选择，并通过既有穿戴规则补齐必需装备位置。后续修改只影响当前版本。预设初始化不会覆盖已经保存的预设页。该行位于 `clientdata` 下，隔离 `IInventoryRepository` 与 `IPlayerInventoryState`，通过共享存储提供的 `IInventoryLoadoutStore` 操作数据。自定义配置应让大厅、装备视图、装备、商店、房间协议和游戏逻辑消费者位于此子树中。
 
+`inventoryview` 行的 `persist_preset_pages` 开关把武器预设页作为服务器所有的状态保存。legacy 配置包和 kr-1256 配置包已开启；cn-774 和 tw-454 的页记录结构不同，保持关闭。客户端没有保存预设页的封包，因此由服务器记录：每次装备变更提交时，把已穿戴的主武器和特殊武器写入当时处于激活状态的页，其他页保留各自的武器，使每个标签页拥有独立的配置。卸下主武器不会清空该页的武器，登录重放也不会写入。切换到另一页时，若本版本自己的背包持有该页武器，会通过普通的装备提交穿上它；无法穿戴的页武器仍保留在该页，已穿戴组合保持不变。预设页归属于该版本的 `inventory.loadouts` 范围。新版本中同时包含水晶或宠物的预设页尚未覆盖。
+
 Memory、MySQL 和 SQLite 提供者均有 `max_loadouts_per_player`，默认 `32`，范围 `1..256`。达到上限后拒绝新增版本方案，不驱逐已有方案。MySQL 迁移 `0038` 新增 `player_loadouts`；SQLite 模式 `8` 增加方案快照并保留旧账号状态。升级前备份持久存储。回退 MySQL 程序时保留新增表；旧 SQLite 读取器会拒绝模式 `8`，回退需要兼容读取器。不要用旧存档覆盖玩家的新进度。
+
+## 可选物品强化
+
+`kr-1256` 配置已包含 `profiles/bundles/item-enhancement.patch.yaml`。`BFF_ITEM_ENHANCEMENT_ENABLED` 默认 `true`，控制普通物品的新 Article 分配、强化变更及实验室操作与配置绑定。`item-enhancement.articles` 元数据行保持启用；其经校验的 `initialize_articles` 字段默认 `false`，随同一开关变化。关闭开关后，已有持久化身份仍可解析、穿戴和卸下，并继续显示已保存的强化与改造属性；尚无 Article 身份的普通背包物品不会因此获得新身份。启用强化时必须显式填写下列五项配方数值，缺失或超出范围都会导致激活失败。
+
+配置用 `-1` 表示尚未填写的配方值。强化行将其视为未配置，只有五项数值都满足下列范围才允许启用；`-1` 不会作为成功率或材料数量使用。
+
+强化仅接受主菜单中一件符合条件的永久、未穿戴武器或服装 Article，已强化的物品不能再次强化。此补丁的强化与武器改造（Modification）准入已针对 `kr-1256` 审查；这不代表其他客户端版本已受支持，也不会启用其他实验室操作。
+
+| 环境变量 | 强化行字段 | 必填整数值 |
+| --- | --- | --- |
+| `BFF_ENHANCEMENT_SUCCESS_BASIS_POINTS` | `success_basis_points` | `0..10000`；`5000` 表示 50% 成功率。 |
+| `BFF_ENHANCEMENT_ADDITIVE_SUCCESS_BASIS_POINTS` | `additive_success_basis_points` | `0..10000`；玩家选择添加剂时的成功率（`10000` 表示必定成功）。 |
+| `BFF_ENHANCEMENT_CARD_QUANTITY` | `card_quantity` | 每次获准尝试消耗卡片 `190111` 的数量，范围 `1..1000000`。 |
+| `BFF_ENHANCEMENT_KIT_QUANTITY` | `kit_quantity` | 每次获准尝试消耗四种工具 `190106`、`190107`、`190108`、`190109` 中每一种的数量，范围 `2..1000000`。 |
+| `BFF_ENHANCEMENT_ADDITIVE_QUANTITY` | `additive_quantity` | 玩家选择添加剂时消耗添加剂 `101745` 的数量，范围 `1..1000000`。 |
+
+这些数值定义服务器的配方策略。`.env.example` 中注释的数字仅为示例，不是默认经济数值，也不代表历史价格。每次获准尝试都会扣除配置数量的卡片及每一种工具，强化失败也会扣除。选择添加剂还会扣除其配置数量，并使用 `additive_success_basis_points` 代替 `success_basis_points`。材料不足或材料身份有歧义时，在提交任何变更前拒绝请求。
+
+武器改造由 `BFF_ITEM_MODIFICATION_ENABLED` 单独控制，默认 `true`。启用时需要同时设置 `BFF_ITEM_ENHANCEMENT_ENABLED=true`，填齐上述五项强化数值，并在部署补丁的 `item-enhancement` 行提供完整的嵌套 `modification` 策略。开关本身不提供材料数量、价格、效果幅度或概率策略。
+
+| 改造字段 | 必填策略 |
+| --- | --- |
+| `part_quantity` | 每个所选零件的消耗数量，范围 `1..715827882`；固定选择三个零件，重复选择时的总扣除量必须适合 Int32。 |
+| `apply_lucci_cost`、`delete_lucci_cost` | 添加或删除一组改造的显式 Lucci 费用，各为 `0..2147483647`；免费也必须明确填 `0`。 |
+| `parts` | 一至 24 项，`item_id` 和 `(numeric_tag, effect_category)` 组合均不得重复；每件物品必须是原生按数量计的改造零件。 |
+| `parts[].numeric_tag`、`parts[].effect_category` | 原生分类分别为 `0..2` 与 `1..8`；已配置的标签与效果分类的每种组合都必须有零件条目。 |
+| `parts[].attribute_ids` | 恰好七个互不相同的已审查原生 ItemAttr 编号，范围 `101..156`。同一数字标签内，每个编号只能属于一个配置项；不同标签可以复用编号。 |
+| `parts[].value0` | 正向有符号效果单位，范围 `1..2147483647`；`160` 显示为 `1.60%`。 |
+| `parts[].negative_values` | 恰好七项 `{ attribute_id, value }`，与上述编号一一对应；值为 `-2147483648..0`，`-40` 显示为 `-0.40%`。 |
+| `tag_weights`、`effect_weights` | 每项包含 `key` 与三个 `weights`，依次用于已安装零、一、两组改造的状态；键必须匹配零件分类。每个权重为 `1..715827882`，保证重复选择三个零件后的权重和适合 Int32。 |
+
+改造接受主菜单中符合条件的永久、未穿戴武器 Article。玩家必须选择三个已拥有的零件，重复选择会合并扣除数量。算法分别累加所选零件的标签与效果分类权重，再从所得分类组合的七个属性编号中等概率选择一个。同一策略用于原生实验室预览。预览幅度采用浮点百分比，已安装 Article 属性保留有符号整数单位、组号与数字标签。这些值属于明确配置的部署策略。
+
+每件武器最多保存三组改造，组号为 `0..2`，与强化状态独立。添加时使用第一个空组，删除时必须指定已安装组。每次成功添加或删除都会推进该武器在当前目录范围内的版本号，删除最后一组后仍保留空状态和版本号。完全相同的过期持久化计划不能再次扣款；之后重新解析的新添加请求可以正常安装另一组改造。
+
+材料扣除与成功强化在同一事务中提交。改造将 Lucci 费用、全部所选材料、组变更及所需 Article/宠物元数据一并提交，并在操作结果之前发送已提交余额与完整背包，使原生处理器能找到变更后的 Article。关闭消耗开关后，已有属性继续显示。原生客户端验收和真实 MySQL 环境验证仍待完成。
+
+永久转换（实验室的 ChangeUnlimited 标签页，仅 `kr-1256`）单独默认关闭。在部署补丁中为已启用的 `item-enhancement` 行添加嵌套的 `conversion` 策略即可启用：
+
+| 转换字段 | 必需策略 |
+| --- | --- |
+| `enabled` | `true` 显示该标签页并接受请求；默认的 `false` 使其隐藏并拒绝请求。 |
+| `card_item_id` | 每次转换消耗的计数卡片，例如原生的 `190151`。它必须是该版本目录中的计数材料，且不能是转换目标。 |
+| `minimum_days` | 目标至少还需剩余的整天数，`1..10000`。客户端在发送请求前会检查同一个值。 |
+| `set_card_quantity` | 可选。一次原生套装转换消耗的卡片数，至少为 1。留空则套装仍被拒绝；客户端只为该标签页指定一张卡片，没有按套装的数量，因此由部署方给出。 |
+
+转换在主菜单中接受一个按物品 ID 选择的单件限时物品。该物品必须带有客户端自身的转换标记，是武器或服装，尚无装备身份，未穿戴也不带其他排除标记，并且剩余时间不少于 `minimum_days`（含客户端的半秒容差）。服务器消耗一张卡片，并把同一行变为永久，保留其格位、标记与已装备副本；即使强化和改造都不覆盖该物品，它也会获得装备身份。服务器在存储层持有账号时再次判定计时，因此等待期间到期的计时、过期的请求或物品变为永久后的重复请求都不会消耗任何东西。完整背包会先于结果发布。配置 `set_card_quantity` 后，指定原生套装的请求会在一个事务中转换套装行列出的每个成员（前 `setCnt` 个编号）：每个成员都必须通过与单件物品相同的检查，卡片只消耗一次，任何一个成员不合格都会让整套保持不变。回复包含套装编号和第一个成员的 Article 键。kr-1256 客户端只有在每个成员的部位位置都已设置时才会发送套装请求，而其工作簿对全部仅由可转换物品组成的套装都把它留空，因此原生客户端在该数据下无法发出此类请求。原生客户端验收仍待完成。
+
+实验室升级（MakeItemAdvanced 标签页，仅 `kr-1256`）单独默认关闭。在部署补丁中为已启用的 `item-enhancement` 行添加嵌套的 `advancement` 策略即可启用：`enabled`、`tab_card_item_id`（客户端为该标签页列出的卡片；它必须是某条规则的卡片，客户端还会拿所选卡片与它比较，以决定普通 HC 套装的确认文字）以及 `rules`，每张升级卡一条，包含 `card_item_id`（目录中的计数材料，例如原生的 `190247`）、`source_tier`（客户端的阶数：`3` 为 HC 升级为进阶 HC，`4` 为进阶 HC 升级为进阶 L4HC，`5` 为 L4HC 升级为进阶 L4HC）、`card_quantity`（一次升级消耗的卡片数）和可选的 `set_ids`（把该卡片限定在指定的原生套装）。客户端没有给出卡片、价格或几率，因此不作任何假设，且各卡片必须互不相同。服务器在实验室配置中按客户端自身规则引擎读取的形式发布这些规则，并用同样的规则判断每个请求：请求指明一个原生服装套装以及完整套装中每个成员的 Article（不完整的套装会被拒绝），所有成员必须是永久且未穿戴的，卡片必须匹配套装当前升级状态所允许的规则，并且卡片在同一事务中扣除。结果是原生升级属性（HC 升级为进阶 HC 为 ItemAttr `100`，进阶 HC 升级为进阶 L4HC 为 `157`，L4HC 升级为进阶 L4HC 为 `158`），存放在套装行顺序中的第一个成员上，携带工作簿中固定的效果数值；之后的升级会替换它，强化尝试则保留它。它存放在 Article 已有的强化元数据中，无需迁移。升级是确定性的，因为客户端没有该标签页的失败显示；被拒绝的请求回复关闭结果且不扣除任何东西。完整库存先于回复发布，回复指明套装和携带属性的成员。客户端会合并所有成员的效果，并未说明由哪个成员携带该属性；选择第一个成员属于服务器策略。原生客户端验收仍在等待中。
+
+## 本命武器
+
+`BFF_FAVORITE_WEAPON_ENABLED` 默认为 `true`。启用后，`item-enhancement.articles` 与 `item-enhancement` 两行都会读取客户端 `Config/FavoriteWeaponSystem.xml`（`favorite.workbook_path`）的 `Base` 与 `Upgrade` 工作表。武器强化成功时，会在与版本号和材料扣除相同的事务中为该武器增加工作簿的 `IncreasePointEnchant` 点数；失败的尝试不增加点数。点数按武器和目录范围保存为非负整数；等级（Normal、Expert、Special、Master）始终由 `Upgrade` 阈值从点数推导，不会保存。随后武器的物品展示带有携带等级和点数的 ItemAttr 164。没有进度的武器没有该条目，外部背包写入不能创建或修改点数。MySQL 需要迁移 `0047`；SQLite 保持 schema `13`。改造成功安装一个属性时，也会在与所装属性组相同的事务中，按其等级（S、A 或 B，即所装属性的第一类别 0、1 或 2）为该武器增加工作簿的 `IncreasePointModification` 点数；删除改造不增加点数。当强化或改造的点数使武器越过等级阈值时，玩家会在背包刷新后收到客户端的等级聊天提示（S2C 1548，标志为零）；`dialect.messages` 的 `favorite_weapon_grade_notices` 选项跟随同一变量。对局点数、衰减、升级奖励与降级提示尚未实现。原生客户端验收仍待完成。
+
+## 可选称号与勋章
+
+`kr-812` 和 `kr-1256` 配置已包含 `profiles/bundles/titles.patch.yaml`。`BFF_TITLES_ENABLED` 默认 `true`；设为 `true` 会同时启用称号行及其消息绑定。插件按版本声明的称号目录格式加载 `Config/BF_title.xml` 和 `Config/ShopItem2.xml`。
+
+此功能支持查询勋章、用勋章兑换称号，以及穿戴或卸下已拥有且符合条件的称号。称号所有权来自现有背包，称号选择遵循当前版本的穿戴方案。兑换时，勋章扣除与称号发放在同一事务提交；背包同步保留普通 Article 与宠物元数据。SQLite 和 MySQL 持久保存勋章余额，Memory 提供者支持相同操作供本地使用。
+
+对局自动勋章默认单独关闭。在 `titles` 行设置 `round_medals_enabled: true`，并提供非空的 `round_medal_rules`。每条规则指定原生 `medal_id`、精确的 `mode_ids`、`metric`、包含边界的 `minimum` 与可选 `maximum`、发放 `count`（默认 `1`），以及 `minimum_participants`（默认 `2`，只统计真人参与者）。可用指标为 `Completed`、`Wins`、`Kills`、`Knockdowns`、`Rescues`、`Score`、`Deaths` 和 `Stars`。每个勋章只能出现在一条规则中。`max_round_medal_rules`（默认 `256`）和 `max_modes_per_round_medal_rule`（默认 `128`）限制保留的策略规模。阈值与允许模式必须作为部署策略明确配置；单独启用称号不会自动选定历史发奖规则。
+
+对局策略使用服务器接受的最终统计。勋章、对局进度、钱包奖励和对局回执由声明支持原子对局勋章结算的提供者在同一事务中提交。Memory、MySQL 和 SQLite 均实现此能力。完全相同的对局重放不会重复发放勋章。发奖不会弹出称号窗口；下次查询勋章时返回当前余额。例如，以下补丁为有效击倒数为五至九次、至少两名真人参与的道具模式对局发放一枚原生勋章。这些阈值仅为策略示例：
+
+```yaml
+- set:
+    id: titles
+    config:
+      round_medals_enabled: true
+      round_medal_rules:
+        - medal_id: 30007
+          mode_ids: [3]
+          metric: Knockdowns
+          minimum: 5
+          maximum: 9
+          count: 1
+          minimum_participants: 2
+```
+
+限时获取需要显式配置服务器已安装的 `acquisition_time_zone`，例如 `Asia/Shanghai`。空值会保持限时获取不可用。原生获取区间按月、日、时、分比较，包含起止边界且忽略年份（`kr-812 sub_4FE3D0`、`kr-1256 sub_EAE090`）；这是按当地时间每年重复的区间，不会自动处理跨年环绕。此限制不影响穿戴已拥有的称号。
+
+原生 stock 与 stock-set 附加奖励通过同一商城工作簿解析，与称号及其勋章消耗一并提交。Memory 和 MySQL 保留独立回执，删除或过期的称号不会再次获得附加奖励；MySQL 需要迁移 `0046`。SQLite schema `13` 不具备附加奖励回执能力，因此只拒绝带附加奖励的称号获取，普通兑换、勋章查询和对局勋章仍可使用。目前已审计的 stock 奖励使用永久或按天发放；包含 Lucci 奖励的 stock-set 不可用。原生勋章附加奖励引用没有数量列：`bonus_medal_quantity` 用于显式指定正整数发放量，不设置时此类获取保持不可用。
+
+情侣及挑战称号获取仍不可用。单纯存在情侣关系不能证明钻石戒指条件；Luxury、Gallery 和 Honor 条件需要各自的权威玩法状态及自动发放路径。Favorite 称号是 kr-1256 上的例外：设置 `BFF_FAVORITE_TITLES_ENABLED=true`（需同时启用 `BFF_TITLES_ENABLED` 与 `BFF_FAVORITE_WEAPON_ENABLED`；默认开启，仅 kr-1256）后，当账号有 1、2 或 3 把武器 Article 达到 Favorite 大师等级时，称号 400312、400313、400314 会被永久发放，不消耗勋章，并在登录时和每次 Favorite 点数发放后检查。发放会发布背包，随后发送称号窗口的进度（S2C 933，条件 6，当前值不超过要求值）。检查时若账号正忙于其他写入，本次检查会跳过，称号在下次登录或下次 Favorite 点数发放时发放。用勋章换取这些称号仍被拒绝。原生客户端验收和真实 MySQL 环境验证仍待完成。
+
+## 可选自定义房间规则
+
+`kr-1256` 配置已包含 `profiles/bundles/custom-room-rules.patch.yaml`。`BFF_CUSTOM_ROOM_RULES_ENABLED` 默认 `true`；设为 `true` 会同时启用 `dialect.rooms` 与 `ingame` 的 `custom_room_rules`，使用客户端数据中的 `Config/CustomGameMode.xml`。此补丁不会为其他版本启用该功能。
+
+只有等待中房间的当前房主可以修改选项。原生目录提供模式 `1`、`3`、`8`、`11`、`13`、`28`、`30`、`32`、`37`、`38` 和 `39` 允许的控件及数值。这些是已有模式的选项，各模式的独立玩法仍遵循各自的启用条件。完整房间设置会先于修改反馈同步。新成员收到当前设置，转移房主时保留设置，切换模式或重置时恢复原生模式默认值。自定义规则随房间存续，不是服务器重启后仍由数据库保留的配置。
+
+`ingame` 行通过以下字段限制工作簿解析资源：`custom_room_rules_max_bytes`（默认 `8388608`）、`custom_room_rules_max_rows`（所选工作表合计 `4096` 行，包含稀疏行填充）、`custom_room_rules_max_columns`（`64`）和 `custom_room_rules_max_cell_characters`（`8192`）。缺少客户端数据、绑定不受支持或配置无效时激活失败。原生客户端验收仍待完成。
+
+
+## 可选旧版科学室
+
+`kr-812` 配置已包含 `profiles/bundles/science-lab.patch.yaml`。`BFF_SCIENCE_LAB_ENABLED` 默认 `true`，同时控制 `science-lab` 行和 `dialect.messages.config.legacy_science_lab`。该行需要共享背包绑定、与客户端目录一致的背包作用域 `build_key`，以及原生 `Config/ShopItem2.xml` 和 `Config/SynthesisSystem.ini`。目前只接受已审计的 `kr-812`；其他版本必须先核对自己的请求读取器、结果消费路径和材料资格，再修改准入数据。该行处理合成与拆解，现有 item-enhancement 行仍独占其科学室配置请求处理器。
+
+合成消耗三个互不重复、符合条件、未穿戴且未过期的期限物品，或三套完整原生套装，再返回按配置选择的保留物品。原生套装使用 `stockSetId` 和按顺序排列的 `setCnt` 个成员，编号可能不同于 `setId`；拒绝混合套装与普通物品的请求。同一套装的所有成员必须具有相同有效期。拆解消耗一个符合条件的永久物品或一套完整永久套装。两种操作都扣除配置的计数卡片，选中的添加剂另按明确配置扣除。请求必须来自主菜单；缺失、陈旧、有歧义、已穿戴、已过期或不支持的所有权会使整项操作拒绝提交。
+
+下面的 `profiles/kr-812/local.patch.yaml` 示例仅定义合成策略。数字属于部署示例，并非恢复的原版经济规则；安装资源中 `SYNTHESISINFO` 的数值不能证明服务端配方价格或概率。启用前应确定实际采用的策略。
+
+```yaml
+- set:
+    id: science-lab
+    config:
+      enabled: true
+      synthesis_card_item_id: 100622
+      card_quantity: 1
+      synthesis_survivor: first
+      synthesis_maximum_days: 729
+      synthesis_permanent_at_days: 730
+- set:
+    id: dialect.messages
+    config:
+      legacy_science_lab: true
+```
+
+`card_quantity` 是各配置配方共用的正整数卡片扣除量。`synthesis_survivor` 必须为 `first` 或 `uniform`。合成累加精确的剩余天数小数，以低于原生 730 天永久显示阈值的 `synthesis_maximum_days` 封顶，并在总和达到更高的 `synthesis_permanent_at_days` 时转为永久。输入包含永久物品时也生成永久所有权。没有通过隐含经济默认值启用的合成卡或拆解配方。
+
+可选 `decomposition` 条目包含 `card_item_id`（此原生目录为 `100623` 或 `100656`）、`category`（`0` 饰品、`1` 服装/套装、`2` 武器）及非空 `rewards` 数组。每项奖励包含原生 `stock_id`、唯一 `item_id`、`kind`（`Count` 或 `Days`）、正整数 `amount`、`maximum` 和正整数 `weight`。`Stock` 行必须指向同一物品，且 `duration` 必须精确等于本次发放数量或天数。客户端显示该库存商品规格，不显示累加后的背包所有权。未上架的 Stock 行仍可表示奖励。拒绝小数天数的 Stock 奖励，合成主物品有效期仍保留小数。永久拆解和添加剂奖励尚不可用：原生结果格式化器不会将 `Stock.duration: -1` 视为永久，此目录也没有已经审计、可显示永久所有权的 Stock 规格。合成主物品的永久化使用另一条已支持路径。配置必须符合原生目录，总权重必须位于有符号 32 位抽样范围内。每次拆解选择一项奖励。
+
+`permanent_additive_item_id`（`100624`）需要 `permanent_additive_quantity` 和 `permanent_additive_basis_points`（`0..10000`）；概率低于 10000 时还需要采用上述奖励格式的 `permanent_failure_reward`。它仅适用于尚未转为永久的合成。`bonus_additive_item_id`（`100655`）需要 `bonus_additive_quantity` 与 `bonus_reward`。添加剂编号和操作/效果会与原生 `ASSISTINFO` 核对；编号为零表示禁用。被接受配方中的奖励编号不能冲突。
+
+资源预算都是经验证的部署字段：`max_workbook_bytes` 默认每份原生资源 `134217728` 字节，`max_catalog_rows` 为 `65536`，`max_catalog_columns` 为 `256`，`max_cell_characters` 为 `16384`，`max_in_flight_accounts` 为 `128`，`max_decomposition_recipes` 为 `64`，`max_rewards_per_recipe` 为 `128`。这些值必须为正整数，可按部署需要提高。列数上限约束非空值；原生表格尾部只有样式的空单元格不会分配稀疏填充空间，但其索引仍须递增。背包容量及原生选择/帧长度限制仍独立执行。
+
+Memory、SQLite 和 MySQL 使用同一消耗与发放事务，保留无关所有权、保留物品的元数据、一致的背包镜像和槽位分配水位。普通 Article 与宠物准备在新奖励存在后执行，并随事务一起提交。完整背包先于结果发布。小数有效期按绝对时间戳保存；合成主结果天数采用客户端同一次完整背包同步的会话基准，而不是发送结果时重新计算的倒计时。拆解和附加奖励结果携带配置的 Stock 编号，数量和期限由客户端 `Stock` 表读取。提交后的传输失败不会撤销所有权，也不会在背包未发布时宣告成功。
+
+原生开头字符串是二级密码（`kr-812 sub_9E29F0` 和 `kr-812 sub_4F8A20`）。当前没有经验证的密码校验服务，因此拒绝非空密码，也拒绝非零诊断请求路径。独立武器进化尚不可用：`gspEvolveResult` 属于宠物，尚未建立独立武器请求/结果流程。原生玩法与界面验收、真实 MySQL 科学室验证仍待完成；自动协议和持久化检查不能证明这两项验收。

@@ -10,19 +10,19 @@
          every plugin directory. -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
-  <!-- Abstractions and Contracts are loaded once by the host and shared with every plugin
-       load context (PluginLoadContext never reads a plugin's own copy), so a copy in a plugin
+  <!-- Abstractions, Contracts and the binary serializer Contracts depends on are loaded once by the
+       host and shared with every plugin load context (it never reads a plugin's own copy), so a copy in a plugin
        directory is dead weight that can also drift from the deployed contract version. -->
   <Target Name="DropHostSharedAssemblies" AfterTargets="ResolveAssemblyReferences">
     <ItemGroup>
       <ReferenceCopyLocalPaths Remove="@(ReferenceCopyLocalPaths)"
-                               Condition="'%(Filename)' == 'BubbleFighter.Fantasy.Abstractions' Or '%(Filename)' == 'BubbleFighter.Fantasy.Contracts'" />
+                               Condition="'%(Filename)' == 'BubbleFighter.Fantasy.Abstractions' Or '%(Filename)' == 'BubbleFighter.Fantasy.Contracts' Or '%(Filename)' == 'MemoryPack.Core'" />
     </ItemGroup>
   </Target>
   <Target Name="DropHostSharedAssembliesFromPublish" AfterTargets="ComputeResolvedFilesToPublishList">
     <ItemGroup>
       <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
-                             Condition="'%(Filename)' == 'BubbleFighter.Fantasy.Abstractions' Or '%(Filename)' == 'BubbleFighter.Fantasy.Contracts'" />
+                             Condition="'%(Filename)' == 'BubbleFighter.Fantasy.Abstractions' Or '%(Filename)' == 'BubbleFighter.Fantasy.Contracts' Or '%(Filename)' == 'MemoryPack.Core'" />
     </ItemGroup>
   </Target>
   <!-- Every plugin's build output is mirrored to artifacts/plugins/<AssemblyName>/ so the
@@ -30,7 +30,7 @@
        the current output, so a dependency the plugin dropped does not linger there. -->
   <Target Name="CopyPluginToArtifacts" AfterTargets="Build">
     <ItemGroup>
-      <_PluginOutput Include="$(TargetDir)**\*.*" Exclude="$(TargetDir)BubbleFighter.Fantasy.Abstractions.*;$(TargetDir)BubbleFighter.Fantasy.Contracts.*" />
+      <_PluginOutput Include="$(TargetDir)**\*.*" Exclude="$(TargetDir)BubbleFighter.Fantasy.Abstractions.*;$(TargetDir)BubbleFighter.Fantasy.Contracts.*;$(TargetDir)MemoryPack.Core.*" />
     </ItemGroup>
     <RemoveDir Directories="$(RepoRoot)artifacts\plugins\$(AssemblyName)" />
     <Copy SourceFiles="@(_PluginOutput)"

@@ -1,5 +1,8 @@
 version: 1
 structs:
+  # kr-812 sub_897850, cn-717 sub_926590 and id-1809 sub_83C130 send rcpReqLeaveGame.
+  # Their serializers kr-812 sub_5C8FC0, cn-717 sub_BD9960 and id-1809 sub_8BA8E0 write no body.
+  RelayLeaveGameRequest: []
   # Native memory stream kr-812 sub_A5FA60/sub_A5FAC0 copies bytes without conversion.
   # NetAddress kr-812 sub_5026C0/sub_5026F0; cn-717 sub_537870/sub_5378A0;
   # cn-324 sub_44CA50/sub_44CA80; cn-279 sub_41DF40/sub_41DF70;

@@ -11,7 +11,7 @@ namespace BubbleFighter.Fantasy.Messenger;
 /// or implicitly when a <c>messenger.tickets</c> row runs in the same process, so the core works both inside a game
 /// server and as a standalone deployment shared by several servers.
 /// </summary>
-[Plugin("messenger", Description = "Game-neutral friends, categories, presence and change events for native messenger clients.",
+[Plugin("messenger", Category = "social", Names = ["en=Messenger", "zh-Hans=好友聊天", "zh-Hant=好友聊天", "ko=메신저"], Description = "Game-neutral friends, categories, presence and change events for native messenger clients.",
     Requires = [typeof(IMessengerStore)], Optional = [typeof(IMessengerTicketIssuer), typeof(IPlayerRepository)], Provides = [typeof(IMessengerService)])]
 public sealed class MessengerPlugin : IPlugin
 {

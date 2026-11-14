@@ -127,11 +127,16 @@ internal sealed class ZipCrypto
         return table;
     }
 
-    public static uint Crc32(ReadOnlySpan<byte> data)
+    public static uint Crc32(ReadOnlySpan<byte> data) => ~Crc32Append(Crc32Seed, data);
+
+    /// <summary>The running state a CRC-32 starts from; the checksum is the complement of the final state.</summary>
+    public const uint Crc32Seed = 0xFFFFFFFFu;
+
+    /// <summary>Continues a CRC-32 over the next bytes and returns the new running state.</summary>
+    public static uint Crc32Append(uint state, ReadOnlySpan<byte> data)
     {
-        var crc = 0xFFFFFFFFu;
         foreach (var b in data)
-            crc = Crc(crc, b);
-        return ~crc;
+            state = Crc(state, b);
+        return state;
     }
 }

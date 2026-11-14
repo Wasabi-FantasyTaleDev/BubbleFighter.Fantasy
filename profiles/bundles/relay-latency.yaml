@@ -1,0 +1,13 @@
+# Passive relay replies require explicit opt-in and native-client acceptance.
+- id: dialect.relay-latency
+  plugin: dialect.relay-latency
+  disabled: true
+  config:
+    protocol: "${BFF_PROFILE_ID}/relay"
+    packets_directory: packets
+- id: match-latency
+  plugin: match-latency
+  disabled: true
+  config:
+    protocol: "${BFF_PROFILE_ID}/relay"
+    reply_word: 0

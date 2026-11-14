@@ -7,19 +7,21 @@ using BubbleFighter.Fantasy.Abstractions.Net;
 namespace BubbleFighter.Fantasy.Net.Tcp;
 
 /// <summary>
-/// An accepted TCP connection exposed through <see cref="System.IO.Pipelines"/>. The
-/// inbound side is a bounded <see cref="Pipe"/>: a pump copies the stream into it and the
-/// pause/resume thresholds stop the producer when the consumer falls behind, so a slow
-/// protocol cannot grow memory without limit.
+/// An accepted TCP connection exposed through <see cref="System.IO.Pipelines"/>. The inbound side reads from the
+/// socket only when the protocol asks for more: bytes the protocol has not asked for stay in the operating
+/// system's socket buffer, where the peer's send window bounds them, and the connection holds no buffer of its own
+/// while it waits. The protocol's own buffer is therefore the only inbound memory a connection can pin.
 /// </summary>
 public sealed class TcpConnection : IConnection
 {
-    private const long PauseWriterThreshold = 1 << 20;
-    private const long ResumeWriterThreshold = 512 << 10;
+    /// <summary>
+    /// The size of one socket read. It only shapes how many reads a burst takes; what a connection may hold is
+    /// decided by the protocol that consumes <see cref="Input"/>.
+    /// </summary>
+    private const int ReadBufferBytes = 4096;
 
     private readonly Socket _socket;
     private readonly Stream _stream;
-    private readonly Pipe _inbound;
     private int _closed;
     private long _lastActivityUtcTicks;
 
@@ -43,14 +45,11 @@ public sealed class TcpConnection : IConnection
         ConfigureSocket(socket, options);
         RemoteEndPoint = socket.RemoteEndPoint ?? new IPEndPoint(IPAddress.None, 0);
         _stream = new ActivityStream(new NetworkStream(socket, ownsSocket: true), Touch);
-        _inbound = new Pipe(new PipeOptions(
-            pauseWriterThreshold: PauseWriterThreshold,
-            resumeWriterThreshold: ResumeWriterThreshold,
-            useSynchronizationContext: false));
-        Input = _inbound.Reader;
+        // A zero-byte read waits for data without a buffer, so an idle connection rents nothing.
+        Input = PipeReader.Create(_stream, new StreamPipeReaderOptions(
+            bufferSize: ReadBufferBytes, minimumReadSize: ReadBufferBytes / 4, leaveOpen: true, useZeroByteReads: true));
         Output = PipeWriter.Create(_stream, new StreamPipeWriterOptions(leaveOpen: true));
         Touch();
-        _ = Task.Run(PumpAsync);
     }
 
     internal static void ConfigureSocket(Socket socket, TcpListenerOptions options)
@@ -106,30 +105,6 @@ public sealed class TcpConnection : IConnection
         catch (ObjectDisposedException) { }
         _stream.Dispose();
         await ValueTask.CompletedTask.ConfigureAwait(false);
-    }
-
-    private async Task PumpAsync()
-    {
-        var writer = _inbound.Writer;
-        try
-        {
-            while (true)
-            {
-                var memory = writer.GetMemory(8192);
-                var read = await _stream.ReadAsync(memory).ConfigureAwait(false);
-                if (read == 0)
-                    break;
-                writer.Advance(read);
-                var flush = await writer.FlushAsync().ConfigureAwait(false);
-                if (flush.IsCompleted || flush.IsCanceled)
-                    break;
-            }
-            await writer.CompleteAsync().ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            await writer.CompleteAsync(ex).ConfigureAwait(false);
-        }
     }
 
     private void Touch() => Interlocked.Exchange(ref _lastActivityUtcTicks, DateTime.UtcNow.Ticks);

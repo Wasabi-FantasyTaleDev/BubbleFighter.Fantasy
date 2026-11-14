@@ -1,4 +1,6 @@
+using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Packets;
+using BubbleFighter.Fantasy.Protocol;
 using Xunit;
 
 namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
@@ -6,19 +8,18 @@ namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
 /// <summary>
 /// Pins the title and medal bodies from <c>packets/titles-medals.yaml</c>. The kr-812 shapes come from the
 /// request senders and the reply readers; the kr-1256 title-sync list is pinned from its own reader chain.
-/// Field meanings stay unknown, so only widths, order and the read/write round trip are asserted.
+/// Audited catalogue identities and concealment semantics remain distinct from installed ownership.
 /// </summary>
 public sealed class TitlesMedalsTableTests
 {
     /// <summary>Legacy-only requests and replies do not imply a body for an unverified modern reader.</summary>
     [Theory]
-    [InlineData("kr-1256")]
     [InlineData("cn-774")]
     [InlineData("tw-454")]
     public void UnverifiedModernShapesAreExcluded(string build)
     {
-        foreach (var name in new[] { "MakeTitleRequest", "SetTitleRequest", "MakeTitleReply", "SetTitleReply",
-                     "ProvideMedal", "ClanMarkChangeRequest", "PartyRecruitingRequest", "PartyQuickStartRequest",
+        foreach (var name in new[] { "MakeTitleRequest", "SetTitleRequest", "MakeTitleReply", "MakeTitleRewardReply", "SetTitleReply",
+                     "ProvideMedal", "MedalInfoRequest", "MedalInfoReply", "ClanMarkChangeRequest", "PartyRecruitingRequest", "PartyQuickStartRequest",
                      "PartyChatRequest", "PartyChatMessage", "PartyJoinReply" })
         {
             Assert.Empty(TestBuilds.Packets.Resolve(build, name));
@@ -33,8 +34,8 @@ public sealed class TitlesMedalsTableTests
     {
         var expected = Convert.FromHexString("0100000002000000");
         var fields = PacketCodec.Read(TestBuilds.Packets, "kr-812", "MakeTitleRequest", expected);
-        Assert.Equal(1, Convert.ToInt32(fields["unknown_4"]));
-        Assert.Equal(2, Convert.ToInt32(fields["unknown_8"]));
+        Assert.Equal(1, Convert.ToInt32(fields["user_number"]));
+        Assert.Equal(2, Convert.ToInt32(fields["title_id"]));
         Assert.Equal(8, expected.Length);
         Assert.Equal(expected, PacketCodec.Write(TestBuilds.Packets, "kr-812", "MakeTitleRequest", fields));
     }
@@ -45,7 +46,9 @@ public sealed class TitlesMedalsTableTests
     {
         var expected = Convert.FromHexString("010000000200000003000000");
         var fields = PacketCodec.Read(TestBuilds.Packets, "kr-812", "SetTitleRequest", expected);
-        Assert.Equal(3, Convert.ToInt32(fields["unknown_12"]));
+        Assert.Equal(1, Convert.ToInt32(fields["user_number"]));
+        Assert.Equal(2, Convert.ToInt32(fields["action"]));
+        Assert.Equal(3, Convert.ToInt32(fields["title_id"]));
         Assert.Equal(12, expected.Length);
         Assert.Equal(expected, PacketCodec.Write(TestBuilds.Packets, "kr-812", "SetTitleRequest", fields));
     }
@@ -56,8 +59,8 @@ public sealed class TitlesMedalsTableTests
     {
         var expected = Convert.FromHexString("0100000002000000020000004100A903");
         var fields = PacketCodec.Read(TestBuilds.Packets, "kr-812", "MakeTitleReply", expected);
-        Assert.Equal(1, Convert.ToInt32(fields["unknown_4"]));
-        Assert.Equal(2, Convert.ToInt32(fields["unknown_8"]));
+        Assert.Equal(1, Convert.ToInt32(fields["result"]));
+        Assert.Equal(2, Convert.ToInt32(fields["stock_id"]));
         Assert.Equal("A\u03A9", fields["unknown_12"]);
         Assert.Equal(16, expected.Length);
         Assert.Equal(expected, PacketCodec.Write(TestBuilds.Packets, "kr-812", "MakeTitleReply", fields));
@@ -86,7 +89,7 @@ public sealed class TitlesMedalsTableTests
     {
         var expected = Convert.FromHexString("020000000700000009000000");
         var fields = PacketCodec.Read(TestBuilds.Packets, build, "TitleSyncInfo", expected);
-        var words = Assert.IsAssignableFrom<IEnumerable<object?>>(fields["unknown_4"]);
+        var words = Assert.IsAssignableFrom<IEnumerable<object?>>(fields["concealed_title_ids"]);
         Assert.Equal([7, 9], words.Select(value => Convert.ToInt32(value)));
         Assert.Equal(12, expected.Length);
         Assert.Equal(expected, PacketCodec.Write(TestBuilds.Packets, build, "TitleSyncInfo", fields));
@@ -101,5 +104,31 @@ public sealed class TitlesMedalsTableTests
         Assert.Equal(2, Convert.ToInt32(fields["unknown_8"]));
         Assert.Equal(8, expected.Length);
         Assert.Equal(expected, PacketCodec.Write(TestBuilds.Packets, "kr-812", "ProvideMedal", fields));
+    }
+
+    /// <summary>The separate medal snapshot installs key/count pairs, not title identifiers or reward popups.</summary>
+    [Theory]
+    [InlineData("kr-812")]
+    [InlineData("kr-1256")]
+    public void MedalInfoPinsHeaderAndCountedPairs(string build)
+    {
+        var expected = Convert.FromHexString("0100000007000000020000003775000014000000387500001E000000");
+        var fields = PacketCodec.Read(TestBuilds.Packets, build, "MedalInfoReply", expected);
+        Assert.Equal(1, fields["result"]);
+        Assert.Equal(7, fields["unknown_8"]);
+        var rows = Assert.IsAssignableFrom<IEnumerable<object?>>(fields["medals"]).ToArray();
+        Assert.Equal(2, rows.Length);
+        var first = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(rows[0]);
+        Assert.Equal(30007, first["medal_id"]);
+        Assert.Equal(20, first["count"]);
+        Assert.Equal(28, expected.Length);
+        Assert.Equal(expected, PacketCodec.Write(TestBuilds.Packets, build, "MedalInfoReply", fields));
+        for (var length = 0; length < expected.Length; length++)
+            Assert.Throws<PacketFormatException>(() =>
+                PacketCodec.Read(TestBuilds.Packets, build, "MedalInfoReply", expected[..length]));
+        Assert.Throws<PacketFormatException>(() =>
+            PacketCodec.Read(TestBuilds.Packets, build, "MedalInfoReply", [.. expected, 0]));
+        Assert.Throws<PacketFormatException>(() => PacketCodec.Read(TestBuilds.Packets, build, "MedalInfoReply",
+            Convert.FromHexString("0100000000000000FFFFFFFF")));
     }
 }

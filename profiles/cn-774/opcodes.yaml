@@ -4,6 +4,55 @@ profile: cn-774
 # case's packet name string (jumptable 00BCF218, the case number is the opcode); S2C names
 # below come from there. See profiles/opcode-policy.md.
 opcodes:
+  - value: 17
+    direction: c2s
+    connection: relay
+    name: rcpGameStart
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8E1F90 selects the relay session during native game-start processing; cn-774 sub_8EB350 stamps 17 before the session send; matched to kr-812 sub_803590 constructing Packet_rcpGameStart and kr-812 sub_809DA0 stamping 17"
+  - value: 24
+    direction: c2s
+    connection: relay
+    name: rcpCriticalBuffData
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8A44B0 constructs CriticalBuffData and selects the relay session; cn-774 sub_8C80A0 stamps 24 and writes the actor followed by that component; matched to kr-812 sub_5117C0 constructing Packet_rcpCriticalBuffData and kr-812 sub_52DC30 stamping 24"
+  - value: 20006
+    direction: c2s
+    connection: relay
+    name: rcpReqLagDisPing
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_B5ADF0 stamps 20006 and writes the current native tick after marking a pending latency probe; matched to kr-812 sub_8118D0 constructing Packet_rcpReqLagDisPing and kr-812 sub_811EA0 stamping 20006"
+  - value: 21
+    direction: s2c
+    connection: relay
+    name: rspRepLagDisPing
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_B593D0 case 21 reads one u32 and passes local arrival time to cn-774 sub_9D0310, which clears the pending delay probe; matched to kr-812 sub_810C20 case 0x15 constructing Packet_rspRepLagDisPing and calling kr-812 sub_463300"
+  - value: 103
+    direction: c2s
+    connection: game
+    name: gcpReportUserTracking
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8E2990 stamps 103 and sends the tracking aggregate through cn-774 sub_4AD240, which writes thirty u32 words; matched to kr-812 sub_803DF0 constructing Packet_gcpReportUserTracking and stamping 103"
+  - value: 29
+    direction: c2s
+    connection: relay
+    name: rcpReqHackDataRandomCheck
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_B593D0 builds a random report with HackDataRandomCheckData, stamps 29 and sends through the relay session; cn-774 sub_48B080 installs its SessionSignatureData component; matched to kr-812 sub_810C20 constructing Packet_rcpReqHackDataRandomCheck and kr-812 sub_811E30 stamping 29"
+  - value: 32889
+    direction: c2s
+    connection: relay
+    name: gppCharactersPlayData
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_8B66E0 reduces a 16-byte character/play digest, stamps 32889 and writes one u32; cn-774 sub_953C90 routes it through cn-774 sub_B54910, whose session selector includes relay; matched to kr-812 sub_51EA10 constructing Packet_gppCharactersPlayData, reducing the character/play digest and stamping 32889"
   - value: 510
     direction: c2s
     connection: game
@@ -686,10 +735,11 @@ opcodes:
     source: "dispatcher sub_BCF090 jumptable case 156 stores \"gspRepMakeItemAdvanced\""
   - value: 157
     direction: s2c
+    connection: game
     name: gspRepChangeUnlimited
     name_source: label@cn-774
     evidence: verified
-    source: "dispatcher sub_BCF090 jumptable case 157 stores \"gspRepChangeUnlimited\""
+    source: "cn-774 sub_BCF090 case 157 stores gspRepChangeUnlimited at 0x148CCE8 and calls cn-774 sub_BC3D30, which passes the third ReplyScienceLab reference list to cn-774 sub_E9ADB0"
   - value: 158
     direction: s2c
     name: gspRepModification
@@ -734,16 +784,20 @@ opcodes:
     source: "dispatcher sub_BCF090 jumptable case 165 stores \"gspJackpotReward\""
   - value: 166
     direction: s2c
+    connection: game
     name: gspRepFollowerLevelup
     name_source: label@cn-774
     evidence: verified
-    source: "dispatcher sub_BCF090 jumptable case 166 stores \"gspRepFollowerLevelup\""
+    source: "cn-774 sub_BC3820 reads u64 target and u32 result; zero selects the success presentation"
+    notes: "Twelve-byte reply; publish changed pet state before success. Full layout in packets/pet.yaml."
   - value: 167
     direction: s2c
+    connection: game
     name: gspRepFollowerAbilityChange
     name_source: label@cn-774
     evidence: verified
-    source: "dispatcher sub_BCF090 jumptable case 167 stores \"gspRepFollowerAbilityChange\""
+    source: "cn-774 sub_BC3870 -> cn-774 sub_E596A0 reads u64 target and four u32 words; result is at offset 8 and the displayed ItemAttr selector at offset 16"
+    notes: "Twenty-four-byte reply. Words at offsets 12 and 20 have unestablished purpose; KR result 22 is ignored, while CN treats any nonzero result as failure."
   - value: 168
     direction: s2c
     name: gspGachaponNotice
@@ -931,7 +985,7 @@ opcodes:
     name_source: coined
     evidence: verified
     source: "the racing hub cn-774 sub_D8A460 case 0x2C7 reads three 4-byte words (code, duration, flag) and applies them through cn-774 sub_D8B880, mirroring kr-1256's timer frame; matched to kr-1256 gspExtremeRacingTimer_ by the reader chain"
-    notes: "packets/extreme-racing.yaml ExtremeRacingTimer@kr-1256 states the body; the cn-774 reader behavior is verified identical (codes 2500, 20000, 210000)."
+    notes: "packets/extreme-racing.yaml ExtremeRacingTimer states the body; the cn-774 reader behavior is verified identical (codes 2500, 20000, 210000)."
   - value: 712
     direction: s2c
     connection: game
@@ -939,7 +993,7 @@ opcodes:
     name_source: coined
     evidence: verified
     source: "the racing hub cn-774 sub_D8A460 case 0x2C8 reads two words, resolves the stage through the ExtremeRacingGameStage cast and passes the second word to cn-774 sub_84B0A0; matched to kr-1256 gspExtremeRacingRound_"
-    notes: "packets/extreme-racing.yaml ExtremeRacingRound@kr-1256 states the body."
+    notes: "packets/extreme-racing.yaml ExtremeRacingRound states the body."
   - value: 714
     direction: s2c
     connection: game
@@ -947,7 +1001,7 @@ opcodes:
     name_source: coined
     evidence: verified
     source: "the racing hub cn-774 sub_D8A460 case 0x2CA reads the scope word then the counted record list (the wire reader cn-774 sub_D8C480 reads seat u16 plus counted {u8 field, u32 value} pairs - the same shape kr-1256 states); matched to kr-1256 gspExtremeRacingUpdatePlayRecord_"
-    notes: "packets/extreme-racing.yaml ExtremeRacingRecords@kr-1256 states the body; the cn-774 applier chain (cn-774 sub_D8C550/sub_D8BC70/sub_10568A0) mirrors kr-1256's scope handling."
+    notes: "packets/extreme-racing.yaml ExtremeRacingRecords states the body; the cn-774 applier chain (cn-774 sub_D8C550/sub_D8BC70/sub_10568A0) mirrors kr-1256's scope handling."
   - value: 32934
     direction: c2s
     connection: both
@@ -979,7 +1033,7 @@ opcodes:
     name_source: coined
     evidence: verified
     source: "cn-774 sub_5BE4A0 word-writes 711 at TcpPacket+2 with one word (the goal's round), mirroring kr-1256 sub_B0D760's goal report"
-    notes: "packets/extreme-racing.yaml ExtremeRacingGoal@kr-1256 states the body; once per round per local player."
+    notes: "packets/extreme-racing.yaml ExtremeRacingGoal states the body; once per round per local player."
   - value: 750
     direction: s2c
     name: gspChangePirateAssaultAbilityLevel
@@ -1386,10 +1440,12 @@ opcodes:
     source: "dispatcher sub_BCF090 jumptable case 946 stores \"gspUpdateCoupleList\""
   - value: 949
     direction: s2c
+    connection: game
     name: gspEvolveResult
     name_source: label@cn-774
     evidence: verified
-    source: "dispatcher sub_BCF090 jumptable case 949 stores \"gspEvolveResult\""
+    source: "cn-774 sub_BC1330 -> cn-774 sub_1068B70 / cn-774 sub_1050030 reads u32 outcome, u64 target, tagged optional u32, counted u32 reward item ids"
+    notes: "Growth/regression presentation uses installed inventory state. The recipient layout is in packets/pet.yaml."
   - value: 950
     direction: s2c
     name: gspGMConsole
@@ -1900,10 +1956,19 @@ opcodes:
     source: "dispatcher sub_BCF090 jumptable case 1554 stores \"gspRepOption\""
   - value: 1555
     direction: s2c
+    connection: game
     name: gspCustomGameModeSetting
     name_source: label@cn-774
     evidence: verified
-    source: "dispatcher sub_BCF090 jumptable case 1555 stores \"gspCustomGameModeSetting\""
+    source: "cn-774 sub_BCF090 case 1555 labels gspCustomGameModeSetting; cn-774 sub_BCEAF0 reads u16 result, u16 unknown and counted UTF-16, then displays master/non-master feedback behind native feature 61"
+  - value: 2084
+    direction: c2s
+    connection: game
+    name: gcpCustomGameModeSetting_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_B6A610 checks native feature 61 and room authority, opens DlgCustomGameModeSetting, then stamps 2084 and writes bool32 followed by cn-774 sub_4944D0 counted u16 keys and cn-774 sub_456CD0 counted u32 parameters"
+    notes: "Native feature 61 is absent from cn-774 sub_106CE80 initialization and Config/CustomGameMode.xml is not shipped in the audited configuration archives; this verified codec does not establish an enabled lifecycle."
   # C2S names aligned from cn-717 packet classes; the rows claim the opcode and name, not a layout.
   - value: 31
     direction: c2s
@@ -1964,10 +2029,10 @@ opcodes:
     notes: "Reply S2C 152 (kind 7)."
   - value: 133
     direction: c2s
-    name: gcpReqScienceLabEnchant_
-    name_source: coined
+    name: gcpReqEnchant
+    name_source: label@cn-735
     evidence: verified
-    source: "DlgEnchant slot-4 wrapper cn-774 sub_E78BA0 -> cn-774 sub_E79680 -> sender cn-774 sub_E78C30 stamps 133; the shared class carries the selected content key (or the card key plus attachments) and the 0/1 flag"
+    source: "DlgEnchant slot-4 wrapper cn-774 sub_E78BA0 -> cn-774 sub_E79680 -> sender cn-774 sub_E78C30 stamps 133; the shared class carries the selected content key (or the card key plus attachments) and the 0/1 flag; matched to cn-735 sub_593AB0, which registers native label gcpReqEnchant for the same DlgEnchant request"
     notes: "Reply S2C 154 (kind 2)."
   - value: 134
     direction: c2s
@@ -1985,17 +2050,18 @@ opcodes:
     notes: "Reply S2C 156 (kind 6)."
   - value: 136
     direction: c2s
-    name: gcpReqScienceLabChangeUnlimited_
-    name_source: coined
+    connection: game
+    name: gcpReqChangeUnlimited
+    name_source: label@cn-738
     evidence: verified
-    source: "DlgChangeUnlimited slot-4 wrapper cn-774 sub_E6DD80 -> cn-774 sub_E6E2B0 -> sender cn-774 sub_E6DE10 stamps 136; the shared class carries the single selected key and u64 zero"
-    notes: "Reply S2C 157 (kind 4)."
+    source: "cn-774 sub_E6E2B0 calls cn-774 sub_E6DE10, which stamps 136 and writes one base item or SetItem ID from content+48 plus a zero u64 argument; matched to cn-738 sub_5623D0 and cn-738 sub_562BC0, which registers gcpReqChangeUnlimited at 134"
+    notes: "cn-774 sub_48CE60 writes the counted u64 list and u64 argument. Reply S2C 157 enters cn-774 sub_BC3D30."
   - value: 137
     direction: c2s
     name: gcpReqScienceLabModification_
     name_source: coined
     evidence: verified
-    source: "DlgScienceLabModification slot-4 wrapper cn-774 sub_E8ACC0 -> cn-774 sub_E8AF90 -> sender cn-774 sub_E8B410 stamps 137; the shared class carries one key per selected-parts node and u64 zero"
+    source: "DlgScienceLabModification slot-4 wrapper cn-774 sub_E8ACC0 -> cn-774 sub_E8AF90 -> sender cn-774 sub_E8B410 stamps 137; the shared class carries the target key first, then one key per selected-parts node (each content key is u64 at +40), and u64 zero"
     notes: "Reply S2C 158 (kind 8)."
   - value: 138
     direction: c2s
@@ -3070,6 +3136,14 @@ opcodes:
     name_source: label@kr-812
     evidence: verified
     source: "cn-774 sub_8E1F90 reads the round-start words and enters state 4; matched to kr-812 Packet_gspGameStartGame"
+  - value: 637
+    direction: s2c
+    connection: game
+    name: gspGamePreCountDown
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_897E80 case 637 at 0x898483-0x898543 reads and discards one u32 before resetting scene timer storage, sampling the clock and setting a state flag; matched to kr-812 sub_515190 (Packet_gspGamePreCountDown)"
+    notes: "Payload meaning and sender ordering are unknown"
   - value: 638
     direction: s2c
     connection: game
@@ -3136,6 +3210,22 @@ opcodes:
     source: "cn-774 sub_8A5E30 stamps 625 with no payload writes; the completion and elimination paths invoke it once their stage is over"
 
   # Native action feed; layouts and reporting identities are selected by inherited packet data.
+  - value: 32778
+    direction: c2s
+    connection: both
+    name: gppKillObject
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_8D2850 writes; cn-774 sub_897E80 case 32778 -> cn-774 sub_8BCB90 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "Object word and one word; the reader resolves the object and only destroys an NpcTurret, GoBreakableModel or GoBreakableObject. cn-774 sub_953C90 queues the sender's local copy."
+  - value: 32778
+    direction: s2c
+    connection: both
+    name: gppKillObject
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_8D2850 writes; cn-774 sub_897E80 case 32778 -> cn-774 sub_8BCB90 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "Object word and one word; the reader resolves the object and only destroys an NpcTurret, GoBreakableModel or GoBreakableObject. cn-774 sub_953C90 queues the sender's local copy."
   - value: 32779
     direction: c2s
     connection: both
@@ -4144,11 +4234,12 @@ opcodes:
     notes: "Empty request; no appends between the stamp and the send."
   - value: 143
     direction: c2s
-    name: Unknown143
-    name_source: none
+    connection: game
+    name: gcpReqFollowerLevelup_
+    name_source: coined
     evidence: verified
-    source: "cn-774 sub_E58A60 stamps 143 after the modal wait cn-774 sub_F54E60 returns 257 and sends through the game connection global"
-    notes: "Body is written entirely by the helper cn-774 sub_108BCE0; no inline appends, so the field list is the helper's."
+    source: "cn-774 sub_E58A60 checks the pet grade and experience, then stamps 143 and writes the selected u64 pet reference after confirmation"
+    notes: "Complete eight-byte target body in packets/pet.yaml; requires the pet_level_up capability."
   - value: 146
     direction: c2s
     name: Unknown146
@@ -4360,3 +4451,76 @@ opcodes:
     evidence: verified
     source: "cn-774 sub_8BEC00 writes; cn-774 sub_8BF200 consumes; matched kr-812 and kr-1256 native operation."
     notes: "Two words; direct-use item consumer cn-774 sub_8BED00."
+  - value: 32895
+    direction: c2s
+    connection: both
+    name: gppChangeTurretState
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_8BF250 writes; cn-774 sub_897E80 case 32895 -> cn-774 sub_8BF350 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "Turret word and state word; the reader resolves an NpcTurret and applies a state of at most 5 when it changes. cn-774 sub_953C90 queues the sender's local copy."
+  - value: 32895
+    direction: s2c
+    connection: both
+    name: gppChangeTurretState
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_8BF250 writes; cn-774 sub_897E80 case 32895 -> cn-774 sub_8BF350 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "Turret word and state word; the reader resolves an NpcTurret and applies a state of at most 5 when it changes. cn-774 sub_953C90 queues the sender's local copy."
+  - value: 144
+    direction: c2s
+    connection: game
+    name: gcpReqFollowerAbilityChange_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_7B68F0 stamps 144 and writes u64 pet reference, u32 old ItemAttr selector, u32 new selector and u32 function-38 consumable item id"
+    notes: "Complete twenty-byte body in packets/pet.yaml; requires the pet_ability_change capability."
+
+  - value: 713
+    direction: s2c
+    connection: game
+    name: gspExtremeRacingInitGameData_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_D8A460 case 713 uses cn-774 sub_46E3F0 to read four u32 words and two independently counted u32-key/u32-value maps followed by two stone-disposer u32 words"
+    notes: "packets/extreme-racing.yaml ExtremeRacingInitialization; 32+8*(N+M) bytes; native construction requires delivery once per loaded stage."
+  - value: 716
+    direction: s2c
+    connection: game
+    name: gspExtremeRacingMapState_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_D8A460 case 716 reads three u32 words and a counted u32 vector, applied through cn-774 sub_D8BAF0"
+    notes: "packets/extreme-racing.yaml ExtremeRacingMapState; 16+4*N bytes; selector words and the third word retain unknown names."
+  - value: 717
+    direction: s2c
+    connection: game
+    name: gspExtremeRacingTotalTime_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_D8A460 case 717 reads one unused u32 and invokes HUD action 35; cn-774 sub_86ECA0 selects comboMsgGetTotalTime"
+    notes: "packets/extreme-racing.yaml ExtremeRacingTotalTime; 4 bytes; this notification does not carry a time value."
+  - value: 718
+    direction: s2c
+    connection: game
+    name: gspExtremeRacingCannon_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_D8A460 case 718 reads group u32, cannon identity u32 and weapon u32 plus scale f32; cn-774 sub_848570 checks the full identity and accepts group zero"
+    notes: "packets/extreme-racing.yaml ExtremeRacingCannon; 16 bytes. Eligible clients can generate relay 32902; the command does not select a unique sender."
+  - value: 32902
+    direction: c2s
+    connection: relay
+    name: gppExtremeRacingCannon_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_8A31A0 writes actor u32, weapon u16, origin f32[3], direction f32[3], cannon identity u32 and serial u32; cn-774 sub_8A31A0 stamps 0x8086"
+    notes: "packets/extreme-racing.yaml ExtremeRacingCannonShot; 38 bytes; table coverage does not register an echo or traffic schedule."
+  - value: 32902
+    direction: s2c
+    connection: relay
+    name: gppExtremeRacingCannon_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_897E80 case 32902 dispatches to cn-774 sub_8B0090, which read actor u32, weapon u16, six f32 values and two u32 words"
+    notes: "packets/extreme-racing.yaml ExtremeRacingCannonShot; 38 bytes; table coverage does not register an echo or traffic schedule."

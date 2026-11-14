@@ -56,6 +56,8 @@ internal static class RoomProjection
                 projection.Apply(game, selection.Index, decoded.First, decoded.Second);
             }
         }
+        if (source.CustomRules is { } customRules)
+            RoomCustomRuleFields.Load(tables, build).Apply(game, customRules);
         RoomProjectionFields.Load(tables, build).Apply(game, room.ModeId);
         // kr-1256 sub_970590 requires waiting state 2; sub_9AC490 selects the room stage for kind 2.
         setting["room_id"] = checked((ushort)room.RoomId);

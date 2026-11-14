@@ -27,6 +27,7 @@ public sealed class PluginDefinitionContractTests
     {
         Description = "definition description", SupportedBuilds = ["kr:1256"], Overrides = ["provider:example.Message"],
         Requires = [typeof(IValue)], RequiresMany = [typeof(IValue)], Optional = [typeof(IValue)], OptionalMany = [typeof(IValue)],
+        LiveMany = [typeof(IValue)],
         Provides = [typeof(IValue)], ProvidesMany = [typeof(IValue)], ConditionalProvides = [typeof(IValue)],
         ConditionalProvidesMany = [typeof(IValue)], Observes = [typeof(IValue)], Decorates = [typeof(IValue)],
     };

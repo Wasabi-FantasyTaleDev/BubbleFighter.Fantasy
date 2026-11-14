@@ -52,6 +52,8 @@ internal sealed partial class RoomFlow
             var changed = new RoomMasterChanged(room.Id, nextMaster) { PreviousAiControllerUserNum = previousAiController };
             foreach (var member in members)
                 await NotifyScenePeerAsync(member.Game, _masterChanged, changed, token).ConfigureAwait(false);
+            if (PolicyHost is { } policies)
+                await policies.HostChangedAsync(room, token).ConfigureAwait(false);
         }, ct).ConfigureAwait(false);
     }
 }

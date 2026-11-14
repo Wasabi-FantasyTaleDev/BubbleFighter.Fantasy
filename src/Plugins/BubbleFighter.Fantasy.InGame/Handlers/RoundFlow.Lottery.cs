@@ -40,7 +40,7 @@ internal sealed partial class RoundFlow
         if (_options.LotteryWorkbookClientPath.Length == 0)
             LotteryCatalog.Validate(_options.LotteryWorkbookPath, _options.LotteryItems);
         else if (context.Services.TryGet<BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore>(out var data) && data is not null)
-            LotteryCatalog.Validate(data.Read(_options.LotteryWorkbookClientPath), _options.LotteryItems);
+            LotteryCatalog.Validate(data, _options.LotteryWorkbookClientPath, _options.LotteryItems);
         else
             throw new ConfigException("lottery_workbook_client_path requires a clientdata row for this build.");
     }

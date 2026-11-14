@@ -26,7 +26,7 @@ public sealed class ClientDataGeneratorTests : IDisposable
     {
         Pack("Packs/Config_00000.pkn", [("Config/ShopItem2.xml", "shop"), ("Config/Other.xml", "other")]);
         Pack("Packs/Maps_00000.pkn", [("Maps/Example.xml", "map"), ("Maps/Area/Nested/track.wb", "world-block"), ("Maps/Example.dds", "texture")]);
-        new ClientDataGenerator().Generate("kr-812", Client, Output, 100, 1048576, default);
+        new ClientDataGenerator().Generate("kr-812", Client, Output, 1048576, default);
         Assert.True(File.Exists(Path.Combine(Output, "data/Packs/Config_00000.pkn")));
         Assert.Equal("map", File.ReadAllText(Path.Combine(Output, "dataraw/Maps/Example.xml")));
         Assert.Equal("world-block", File.ReadAllText(Path.Combine(Output, "dataraw/Maps/Area/Nested/track.wb")));
@@ -41,7 +41,7 @@ public sealed class ClientDataGeneratorTests : IDisposable
     public void RequiredFilesInMixedArchivesAreExtractedWithoutTheirTextures()
     {
         Pack("Packs/Mixed_00000.pkn", [("Config/ShopItem2.xml", "shop"), ("Texture/T.dds", "texture")]);
-        new ClientDataGenerator().Generate("kr-812", Client, Output, 100, 1048576, default);
+        new ClientDataGenerator().Generate("kr-812", Client, Output, 1048576, default);
         Assert.Equal("shop", File.ReadAllText(Path.Combine(Output, "dataraw/Config/ShopItem2.xml")));
         Assert.False(Directory.Exists(Path.Combine(Output, "data")));
     }
@@ -51,7 +51,7 @@ public sealed class ClientDataGeneratorTests : IDisposable
     {
         Pack("Packs/Other_00000.pkn", [("Config/Other.xml", "other")]);
         var error = Assert.Throws<InvalidDataException>(() =>
-            new ClientDataGenerator().Generate("kr-812", Client, Output, 100, 1048576, default));
+            new ClientDataGenerator().Generate("kr-812", Client, Output, 1048576, default));
         Assert.Contains("Config/ShopItem2.xml", error.Message, StringComparison.Ordinal);
         Assert.False(Directory.Exists(Output));
     }
@@ -62,7 +62,7 @@ public sealed class ClientDataGeneratorTests : IDisposable
         Pack("Packs/Config_00000.pkn", [("Config/ShopItem2.xml", "shop")]);
         Directory.CreateDirectory(Output);
         File.WriteAllText(Path.Combine(Output, "keep"), "original");
-        Assert.Throws<IOException>(() => new ClientDataGenerator().Generate("kr-812", Client, Output, 100, 1048576, default));
+        Assert.Throws<IOException>(() => new ClientDataGenerator().Generate("kr-812", Client, Output, 1048576, default));
         Assert.Equal("original", File.ReadAllText(Path.Combine(Output, "keep")));
     }
 
@@ -71,9 +71,9 @@ public sealed class ClientDataGeneratorTests : IDisposable
     {
         Pack("Packs/Config_00000.pkn", [("Config/ShopItem2.xml", "shop")]);
         Assert.ThrowsAny<OperationCanceledException>(() =>
-            new ClientDataGenerator().Generate("kr-812", Client, Output, 100, 1048576, new CancellationToken(true)));
+            new ClientDataGenerator().Generate("kr-812", Client, Output, 1048576, new CancellationToken(true)));
         Assert.Throws<InvalidDataException>(() =>
-            new ClientDataGenerator().Generate("kr-812", Client, Output, 100, 1, default));
+            new ClientDataGenerator().Generate("kr-812", Client, Output, 1, default));
         Assert.False(Directory.Exists(Output));
     }
 
@@ -83,7 +83,7 @@ public sealed class ClientDataGeneratorTests : IDisposable
         Pack("Packs/Config_00000.pkn", [("Config/ShopItem2.xml", "shop")]);
         var packLength = new FileInfo(Path.Combine(Client, "Packs/Config_00000.pkn")).Length;
         Assert.Throws<InvalidDataException>(() =>
-            new ClientDataGenerator().Generate("kr-812", Client, Output, 100, packLength, default));
+            new ClientDataGenerator().Generate("kr-812", Client, Output, packLength, default));
         Assert.Empty(Directory.EnumerateFiles(Output, "*", SearchOption.AllDirectories));
     }
 
@@ -91,7 +91,7 @@ public sealed class ClientDataGeneratorTests : IDisposable
     public void CustomBuildUsesTheManifestDefaultsAndCannotBypassRequiredFiles()
     {
         Pack("Packs/Config_00000.pkn", [("Config/ShopItem2.xml", "shop")]);
-        new ClientDataGenerator().Generate("custom-build", Client, Output, 100, 1048576, default);
+        new ClientDataGenerator().Generate("custom-build", Client, Output, 1048576, default);
         Assert.True(File.Exists(Path.Combine(Output, "data/Packs/Config_00000.pkn")));
     }
 
@@ -100,7 +100,7 @@ public sealed class ClientDataGeneratorTests : IDisposable
     {
         Pack("Packs/Config_00000.pkn", [("Config/ShopItem2.xml", "shop"), ("../outside.xml", "bad")]);
         Assert.Throws<InvalidDataException>(() =>
-            new ClientDataGenerator().Generate("kr-812", Client, Output, 100, 1048576, default));
+            new ClientDataGenerator().Generate("kr-812", Client, Output, 1048576, default));
         Assert.False(Directory.Exists(Output));
     }
 
@@ -108,10 +108,31 @@ public sealed class ClientDataGeneratorTests : IDisposable
     public void CommandLineUsesTheSharedGeneratorAndRejectsInvalidLimits()
     {
         Pack("Packs/Config_00000.pkn", [("Config/ShopItem2.xml", "shop")]);
-        Assert.Equal(1, Tool.Program.Main(["generate", "kr-812", Client, Output, "--max-files", "invalid"]));
+        Assert.Equal(1, Tool.Program.Main(["generate", "kr-812", Client, Output, "--max-bytes", "invalid"]));
+        Assert.Equal(1, Tool.Program.Main(["generate", "kr-812", Client, Output, "--max-files", "100"]));
         Assert.False(Directory.Exists(Output));
-        Assert.Equal(0, Tool.Program.Main(["generate", "kr-812", Client, Output, "--max-files", "100", "--max-bytes", "1048576"]));
+        Assert.Equal(0, Tool.Program.Main(["generate", "kr-812", Client, Output, "--max-bytes", "1048576"]));
         Assert.True(File.Exists(Path.Combine(Output, "data/Packs/Config_00000.pkn")));
+    }
+
+    [Fact]
+    public void CommandLineWithoutLimitsGeneratesIntoTheDrivesFreeSpace()
+    {
+        Pack("Packs/Config_00000.pkn", [("Config/ShopItem2.xml", "shop")]);
+        Assert.Equal(0, Tool.Program.Main(["generate", "kr-812", Client, Output]));
+        Assert.True(File.Exists(Path.Combine(Output, "data/Packs/Config_00000.pkn")));
+    }
+
+    [Fact]
+    public void ArchivesWithMoreMembersThanTheFormerCapStillGenerate()
+    {
+        // Real client archives hold far more than 32768 members; only bytes bound generation.
+        var members = Enumerable.Range(0, 40000).Select(i => ($"Texture/T{i}.dds", "t"))
+            .Prepend(("Config/ShopItem2.xml", "shop")).ToArray();
+        Pack("Packs/Mixed_00000.pkn", members);
+        new ClientDataGenerator().Generate("kr-812", Client, Output, 1048576, default);
+        Assert.Equal("shop", File.ReadAllText(Path.Combine(Output, "dataraw/Config/ShopItem2.xml")));
+        Assert.Equal(2, File.ReadAllLines(Path.Combine(Output, "sources.tsv")).Length);
     }
 
     private void Pack(string relative, (string Path, string Text)[] entries)

@@ -1,0 +1,5 @@
+# Opt in to supplementary practice completion while native-client acceptance is pending.
+# cn-279 sub_787290 consumes event 23; this patch does not configure a practice reward.
+- replace:
+    id: tutorial-practice
+    disabled: false

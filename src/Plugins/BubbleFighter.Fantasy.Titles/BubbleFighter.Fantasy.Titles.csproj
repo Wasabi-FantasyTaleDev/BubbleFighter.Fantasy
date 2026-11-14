@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><Description>Native title medal exchange and persistent equipment selection.</Description></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\BubbleFighter.Fantasy.Abstractions\BubbleFighter.Fantasy.Abstractions.csproj" />
+    <ProjectReference Include="..\..\BubbleFighter.Fantasy.Contracts\BubbleFighter.Fantasy.Contracts.csproj" />
+    <InternalsVisibleTo Include="BubbleFighter.Fantasy.Titles.Tests" />
+  </ItemGroup>
+</Project>

@@ -11,6 +11,8 @@ public sealed partial class RoomRegistry
     IReadOnlyList<RoomRosterView> IRoomPeerRoster.Snapshot() =>
         _rooms.Values.Select(PeerSnapshot).OfType<RoomRosterView>().ToArray();
 
+    Task IRoomPeerRoster.WhenAnyRoom() => _anyRoom.WhenPresent;
+
     async ValueTask<bool> IRoomPeerRoster.ExecuteAsync(int roomId,
         Func<RoomRosterView, CancellationToken, ValueTask> operation, CancellationToken ct)
     {

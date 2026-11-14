@@ -1,5 +1,6 @@
 using BubbleFighter.Fantasy.Contracts.Fighters;
 using BubbleFighter.Fantasy.Contracts.Progress;
+using BubbleFighter.Fantasy.Contracts.Titles;
 using BubbleFighter.Fantasy.Contracts.Wallet;
 
 namespace BubbleFighter.Fantasy.Persistence.Sqlite;
@@ -9,7 +10,8 @@ namespace BubbleFighter.Fantasy.Persistence.Sqlite;
 /// writes mutate the whole snapshot under one transaction, keeping wallet changes serialized with
 /// purchases by construction.
 /// </summary>
-internal sealed partial class SqliteRepositories : IFighterRepository, IPlayerWalletRepository, IPlayerBattleRecordsRepository
+internal sealed partial class SqliteRepositories : IFighterRepository, IPlayerWalletRepository, IPlayerBattleRecordsRepository,
+    IRoundTitleMedalSettlementRepository
 {
     public ValueTask<IReadOnlyList<FighterRecord>> ListByUserNumAsync(long userNum, CancellationToken ct) =>
         new(database.Read<IReadOnlyList<FighterRecord>>(db => db.State(userNum)?.Fighters.OrderBy(row => row.Slot).ToArray() ?? [], ct));
@@ -73,7 +75,7 @@ internal sealed partial class SqliteRepositories : IFighterRepository, IPlayerWa
     {
         ArgumentNullException.ThrowIfNull(command);
         command.Validate();
-        return new(database.Write((db, _) =>
+        return new(database.Write((db, transaction) =>
         {
             var state = db.RequireState(command.UserNum);
             var wallet = state.Wallet ?? throw new InvalidOperationException("Round credit requires an initialized wallet.");
@@ -81,11 +83,17 @@ internal sealed partial class SqliteRepositories : IFighterRepository, IPlayerWa
             var receipt = db.Orm.Queryable<RoundSettlementRow>()
                 .Where(row => row.MatchId == command.MatchId && row.UserNum == command.UserNum).ToList().FirstOrDefault();
             if (receipt is not null)
+            {
+                if (command.TitleMedals is { } repeatedMedals)
+                    ApplyTitleGrant(db, transaction, state, repeatedMedals, requireExisting: true);
                 return new RoundSettlementResult(RoundSettlementOutcome.AlreadySettled,
                     new(command.UserNum, receipt.BeforeLevel, receipt.BeforeExp),
                     new(command.UserNum, receipt.AfterLevel, receipt.AfterExp), receipt.LucciEarned, wallet.Lucci);
+            }
             var before = state.Progress ?? new PlayerProgress(command.UserNum, state.Level, 0);
             var after = command.AdvanceChecked(before);
+            if (command.TitleMedals is { } medals && !ApplyTitleGrant(db, transaction, state, medals).Applied)
+                throw new InvalidDataException("The round receipt and its medal receipt disagree.");
             if (command.BattleRecord is { } battle)
             {
                 var previous = state.BattleRecords.SingleOrDefault(row => row.ModeId == battle.ModeId);

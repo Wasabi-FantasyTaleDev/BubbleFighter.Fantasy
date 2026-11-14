@@ -66,7 +66,7 @@ internal sealed class GameCommandHandler(RoomRegistry registry,
         && !session.Connection.IsClosed && ReferenceEquals(FindSession(session.Id), session);
 
     /// <inheritdoc />
-    public async ValueTask<CommandResult> ExecuteTextAsync(ISession session, string command, CancellationToken cancellationToken)
+    public async ValueTask<CommandResult> ExecuteTextAsync(ISession session, string command, CommandSource source, CancellationToken cancellationToken)
     {
         if (!OwnsSession(session) || _dispatcher is null || AdmitInput is null
             || !session.TryFeature<IPlayerSession>(out _))
@@ -80,7 +80,7 @@ internal sealed class GameCommandHandler(RoomRegistry registry,
             if (!AdmitInput(session, lifetime.Token))
                 return new(CommandStatus.Busy, "The shared chat and command rate limit is occupied.");
             // The dispatcher and gameplay endpoint supervise execution; admission adds no enclosing task on that same owner.
-            return await DispatchTextAsync(session, command, lifetime.Token, requireMatchDeparture: true).ConfigureAwait(false);
+            return await DispatchTextAsync(session, command, source, lifetime.Token, requireMatchDeparture: true).ConfigureAwait(false);
         }
         catch (OperationCanceledException error) when (lifetime.IsCancellationRequested && error.CancellationToken == lifetime.Token)
         {
@@ -92,13 +92,13 @@ internal sealed class GameCommandHandler(RoomRegistry registry,
         }
     }
 
-    private ValueTask<CommandResult> DispatchTextAsync(ISession session, string command, CancellationToken ct, bool requireMatchDeparture = false)
+    private ValueTask<CommandResult> DispatchTextAsync(ISession session, string command, CommandSource source, CancellationToken ct, bool requireMatchDeparture = false)
     {
         var identity = session.Feature<IPlayerSession>().Identity;
         var principal = new CommandPrincipal(PrincipalKind.Game, identity.UserNum.ToString(CultureInfo.InvariantCulture));
         var language = session.TryFeature<ISessionLanguage>(out var supplied) ? supplied.LauncherLanguage : "";
         return _dispatcher!.ExecuteTextAsync(new CommandCaller(principal, principal, language,
-            session.Id.ToString(CultureInfo.InvariantCulture)) { RequireMatchDeparture = requireMatchDeparture },
+            session.Id.ToString(CultureInfo.InvariantCulture)) { Source = source, RequireMatchDeparture = requireMatchDeparture },
             command, requirePrefix: false, cancellationToken: ct);
     }
 
@@ -225,7 +225,7 @@ internal sealed class GameCommandHandler(RoomRegistry registry,
         if (!CommandText.TryNormalize(text, requirePrefix: true, out var content)) return false;
         if (_dispatcher is not null)
         {
-            var result = await DispatchTextAsync(session, content, ct).ConfigureAwait(false);
+            var result = await DispatchTextAsync(session, content, CommandSource.InGameChat, ct).ConfigureAwait(false);
             if (notices is not null)
                 await notices.SendCommandResultAsync(session, result, ct).ConfigureAwait(false);
             return true;

@@ -7,6 +7,24 @@ structs:
     - actor: u32
       offset: 4
 
+  # kr-1256 sub_713640 writes the object's id and one word; kr-1256 sub_6D55D0 case 32778 hands them to
+  # kr-1256 sub_6FCD30, which ignores -1 and only destroys an NpcTurret, GoBreakableModel or GoBreakableObject.
+  # cn-774 sub_8D2850 / cn-774 sub_8BCB90 and tw-454 sub_749A80 / tw-454 sub_730AA0 retain this field order.
+  NpcObjectKill:
+    - actor: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+
+  # kr-1256 sub_6FEDA0 writes the turret word and its state; kr-1256 sub_6D55D0 case 32895 resolves an NpcTurret and
+  # applies a state of at most 5 when it changes. cn-774 sub_8BF250 / cn-774 sub_8BF350 and tw-454 sub_732E00 /
+  # tw-454 sub_732F00 retain this field order.
+  NpcTurretState:
+    - actor: u32
+      offset: 4
+    - state: u32
+      offset: 8
+
   # kr-812 sub_6DEE10 / kr-812 sub_5C8FD0 carry a counted UTF-16 document.
   # kr-1256 sub_8F9E20 writes the same document; kr-1256 sub_8F9240 hands it to kr-1256 sub_8FA4F0.
   # cn-774 sub_AEC7C0 / cn-774 sub_AECD50 and tw-454 sub_8F9D10 / tw-454 sub_8FA2A0 retain this field order.

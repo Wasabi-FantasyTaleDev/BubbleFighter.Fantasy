@@ -17,7 +17,7 @@ namespace BubbleFighter.Fantasy.Clan;
 /// <c>0x3F4</c> / <c>0x3F6</c>, not by this dialect. Join and leave have no proven game-port C2S builder; the
 /// store therefore stays empty until a later dialect adds those writers.
 /// </summary>
-[Plugin("clan",
+[Plugin("clan", Category = "social", Names = ["en=Clans", "zh-Hans=公会", "zh-Hant=公會", "ko=클랜"], 
     Description = "Clan passport, mark list, guild info, and attendance. Search and roster rows are not invented.",
     Requires = [typeof(IMessageRouter), typeof(IClanStore)],
     OptionalMany =

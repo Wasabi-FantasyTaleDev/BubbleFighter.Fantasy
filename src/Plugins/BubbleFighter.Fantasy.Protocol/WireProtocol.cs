@@ -27,6 +27,8 @@ internal sealed class WireProtocol : IConnectionProtocol
     private readonly IOpcodeTable _opcodes;
     private readonly IEventBus _events;
     private readonly ISessionRegistry? _sessions;
+    // One per protocol row: the ceiling on what all of the row's sessions hold queued together.
+    private readonly OutboundBudget _budget;
     private readonly VersionVerifiedScope _versionVerified;
     private readonly ILogger _logger;
     private readonly bool _requiresPatchHandshake;
@@ -60,6 +62,7 @@ internal sealed class WireProtocol : IConnectionProtocol
         _sessions = sessions;
         _versionVerified = versionVerified;
         _logger = logger;
+        _budget = new OutboundBudget(_options.TotalSendQueueBytes, _logger);
         _requiresPatchHandshake = requiresPatchHandshake;
         _patchRequestOpcode = requiresPatchHandshake ? opcodes.C2S(options.PatchRequestName) : default(ushort);
         _preHandshakeOpcodes = requiresPatchHandshake ? ResolveNames(opcodes, options.PreHandshakeOpcodes, "pre_handshake_opcodes") : [];
@@ -104,7 +107,7 @@ internal sealed class WireProtocol : IConnectionProtocol
         // Keep one outbound cipher for the entire framed stream after the plaintext preamble.
         var outbound = _dialect.CreateEncryptor(PacketDirection.ServerToClient);
         using var session = new WireSession(connection, _profile, Name, _dialect, outbound, _events,
-            _options.MaxSessionFeatures, _options.SendQueueCapacity, _options.SendQueueBytes, _logger);
+            _options.MaxSessionFeatures, _options.SendQueueCapacity, _options.SendQueueBytes, _budget, _logger);
         _sessions?.Add(session);
         var frames = new Pipe(new PipeOptions(
             pauseWriterThreshold: _options.InboundBufferBytes,
@@ -191,6 +194,15 @@ internal sealed class WireProtocol : IConnectionProtocol
         var handshakePending = _requiresPatchHandshake && _options.EnforceClientVersion;
         var alternateHandshakeIndex = 0;
         var firstFrame = true;
+        // Closing is what ends the pending read below. The timer is released by the first frame; disposing it again
+        // when the method leaves is harmless.
+        using var firstFrameDeadline = new Timer(
+            static state =>
+            {
+                var (pending, seconds) = ((IConnection, int))state!;
+                _ = pending.CloseAsync($"no complete frame within first_frame_seconds ({seconds})").AsTask();
+            },
+            (connection, _options.FirstFrameSeconds), TimeSpan.FromSeconds(_options.FirstFrameSeconds), Timeout.InfiniteTimeSpan);
         while (!ct.IsCancellationRequested && !connection.IsClosed)
         {
             ReadResult result;
@@ -230,6 +242,7 @@ internal sealed class WireProtocol : IConnectionProtocol
                 if (firstFrame)
                 {
                     firstFrame = false;
+                    firstFrameDeadline.Dispose();
                     _events.Emit(new FirstInboundFrameEvent(connection.Id, _profile.Id, Name,
                         packet.Opcode, packet.Payload.Length));
                 }
@@ -292,6 +305,15 @@ internal sealed class WireProtocol : IConnectionProtocol
                     if (!connection.IsClosed)
                         _versionVerified.Mark(connection.Id);
                 }
+            }
+            // The pump stops reading once this much is buffered, so a frame that is still incomplete here can never
+            // complete. The row refuses limits that allow it; ending the connection keeps a wrong pair from
+            // parking it forever with the buffer held.
+            if (buffer.Length >= _options.InboundBufferBytes)
+            {
+                await connection.CloseAsync(
+                    $"an incomplete frame filled inbound_buffer_bytes ({buffer.Length} buffered bytes)").ConfigureAwait(false);
+                return;
             }
             reader.AdvanceTo(buffer.Start, buffer.End);
             if (result.IsCompleted)

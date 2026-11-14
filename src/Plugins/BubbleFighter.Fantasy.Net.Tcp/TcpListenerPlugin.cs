@@ -14,7 +14,7 @@ namespace BubbleFighter.Fantasy.Net.Tcp;
 /// connection protocol named by the row's <c>protocol</c> option. Several rows can mount
 /// the same plugin to listen on several ports.
 /// </summary>
-[Plugin("net.tcp", Description = "TCP listener.", Requires = [typeof(IConnectionProtocolRegistry), typeof(IEventBus)],
+[Plugin("net.tcp", Category = "network", Names = ["en=TCP listener", "zh-Hans=TCP 监听", "zh-Hant=TCP 監聽", "ko=TCP 리스너"], Description = "TCP listener.", Requires = [typeof(IConnectionProtocolRegistry), typeof(IEventBus)],
     ProvidesMany = [typeof(IListenerEndpoint)])]
 public sealed class TcpListenerPlugin : IPlugin
 {

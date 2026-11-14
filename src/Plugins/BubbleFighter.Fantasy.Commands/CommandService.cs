@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Contracts.Administration;
+using Microsoft.Extensions.Logging;
 
 namespace BubbleFighter.Fantasy.Commands;
 
@@ -102,6 +103,8 @@ internal sealed class CommandService(IPluginContext context, IPermissionService 
             ObjectDisposedException.ThrowIf(_disposed, this);
             _names.TryGetValue(command, out entry);
             if (entry is null) rejected = new(CommandStatus.NotFound, "Unknown command.");
+            else if (entry.Definition.Sources is { } sources && !sources.Contains(caller.Source))
+                rejected = new(CommandStatus.Denied, "This command is not available from " + caller.Source + ".");
             else if (!ValidArguments(entry.Definition, input)) rejected = new(CommandStatus.InvalidArguments, CommandText.Usage(caller, entry.Definition));
             else if (!permissions.IsAllowed(caller.Subject, entry.Definition.Permission)) rejected = new(CommandStatus.Denied, "Permission denied.");
             else if (entry.Owner.Lifetime.IsCancellationRequested || cancellationToken.IsCancellationRequested) rejected = new(CommandStatus.Cancelled, "Command cancelled.");
@@ -148,7 +151,7 @@ internal sealed class CommandService(IPluginContext context, IPermissionService 
                 admitted.Active--;
                 if (admitted.Closed && admitted.CancellationComplete && admitted.Active == 0) admitted.Stopping.Dispose();
             }
-            context.Events.Emit(new CommandCompleted(admitted.Definition.Name, admitted.Owner.Row.Id, caller.Actor, caller.Subject, status));
+            Report(admitted.Definition.Name, admitted.Owner.Row.Id, caller, status);
         }
     }
 
@@ -177,9 +180,17 @@ internal sealed class CommandService(IPluginContext context, IPermissionService 
         return ExecuteAsync(caller, tokens[0], arguments, cancellationToken);
     }
 
+    // One record per command: who ran it as whom, from which entry point, and how it ended.
+    private void Report(string name, string owner, CommandCaller caller, CommandStatus status)
+    {
+        context.Events.Emit(new CommandCompleted(name, owner, caller.Actor, caller.Subject, status) { Source = caller.Source });
+        context.Logger.LogInformation("Command {Command} from {Source} by {ActorKind}:{Actor} as {SubjectKind}:{Subject}: {Status}.",
+            name.Length == 0 ? "(unparsed)" : name, caller.Source, caller.Actor.Kind, caller.Actor.Id, caller.Subject.Kind, caller.Subject.Id, status);
+    }
+
     private CommandResult Complete(CommandCaller caller, string name, string owner, CommandResult result)
     {
-        context.Events.Emit(new CommandCompleted(name, owner, caller.Actor, caller.Subject, result.Status));
+        Report(name, owner, caller, result.Status);
         return result;
     }
 

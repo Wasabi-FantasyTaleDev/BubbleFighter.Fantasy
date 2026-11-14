@@ -1,4 +1,5 @@
 using BubbleFighter.Fantasy.Contracts.Inventory;
+using BubbleFighter.Fantasy.Contracts.Pets;
 using BubbleFighter.Fantasy.Contracts.Shop;
 using BubbleFighter.Fantasy.Contracts.Wallet;
 using System.Buffers;
@@ -269,6 +270,51 @@ public sealed class EquipHoldTests
         Assert.Equal(EquipHoldStore.MaxRecordsPerPlayer, hold.Count(SampleUserNum));
     }
 
+    /// <summary>A pet purchase publishes committed inventory without allocating a provisional Article, even when the ordinary equip-hold cache is full.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PetPurchasePublishesInventoryWithoutReservingAProvisionalArticle(bool full)
+    {
+        const int petId = 301001;
+        var hold = new EquipHoldStore();
+        var heldCount = full ? EquipHoldStore.MaxRecordsPerPlayer : 0;
+        for (var index = 0; index < heldCount; index++)
+            hold.Remember(SampleUserNum, new(SampleUserNum, index, 200001, 1, false));
+        var card = LucciCard with
+        {
+            Name = "Pet",
+            PrimaryItemId = petId,
+            Stocks = [LucciCard.Stocks[0] with { ItemId = petId }],
+        };
+        var catalog = new ShopCatalog("test.xml", [card], []);
+        var money = new FakeMoneyRepository(new(SampleUserNum, 100_000, 0));
+        var inventory = new FakeInventoryRepository();
+        var push = new FakeInventoryPushService();
+        var purchases = new FakeShopPurchaseStore().Configure(money, inventory);
+        var purchaser = new ShopPurchaser(HoldOptions(), catalog, purchases, push, NullLogger.Instance, hold)
+        {
+            PetEntitlements = new ClassificationOnlyPetEntitlements(petId),
+            ReplySender = new RecordingBuyReplySender(ShopTablePackets.BuyReply),
+            BalanceSender = new RecordingBalanceSender(ShopTablePackets.UserMoneyStat),
+        };
+        var session = Session(19);
+
+        await purchaser.PurchaseAsync(session, card.StockSetId, default);
+
+        Assert.Equal(95_500, (await money.FindByUserNumAsync(SampleUserNum, default))!.Lucci);
+        Assert.Equal(petId, Assert.Single(await inventory.ListSlotsAsync(SampleUserNum,
+            InventoryBag.CharacterBag, InventoryLimits.MaxInventorySlotsPerBag, default)).ItemId);
+        Assert.Single(purchases.Rows);
+        Assert.Equal(1, push.PushCount);
+        Assert.Equal(heldCount, hold.Count(SampleUserNum));
+        Assert.DoesNotContain(session.Sent, frame => frame.Opcode == ShopTablePackets.InventorySlotsUpdate);
+        var reply = Assert.Single(session.Sent, frame => frame.Opcode == ShopTablePackets.BuyReply);
+        Assert.Equal(1, reply.Payload[4]);
+        if (hold.TryTake(SampleUserNum, out var records))
+            Assert.DoesNotContain(records, record => record.Unknown11 == petId);
+    }
+
     [Fact]
     public void HeldSetIsCappedAndFailsLoudAboveTheCap()
     {
@@ -409,6 +455,31 @@ public sealed class EquipHoldTests
             _stored = record;
             return ValueTask.CompletedTask;
         }
+    }
+
+    private sealed class ClassificationOnlyPetEntitlements(int petId) : IPetEntitlements
+    {
+        /// <summary>Gets the modern Korean build whose pet classification the purchase fixture exposes.</summary>
+        public string BuildKey => "kr-1256";
+        /// <summary>Recognizes the configured pet item so purchase skips provisional equipment allocation.</summary>
+        public bool IsPetItem(int itemId) => itemId == petId;
+        /// <summary>Rejects purchase-time initialization commands because inventory publication owns pet initialization.</summary>
+        public PetInitializationCommand CreateInitialization(long userNum, DateTimeOffset now) =>
+            throw new InvalidOperationException("Inventory publication owns pet initialization.");
+        /// <summary>Rejects purchase-time pet preparation because inventory publication owns initialization.</summary>
+        public ValueTask<PetInventorySnapshot> PrepareAsync(long userNum, CancellationToken ct) =>
+            throw new InvalidOperationException("Inventory publication owns pet initialization.");
+        /// <summary>Rejects Article resolution because purchasing must not select a pet.</summary>
+        public ValueTask<PetEquipmentTarget?> ResolveAsync(long userNum, ulong articleKey, CancellationToken ct) =>
+            throw new InvalidOperationException("Purchasing must not select a pet.");
+        /// <summary>Rejects pet selection commits during purchasing.</summary>
+        public ValueTask<PetInventorySnapshot?> SelectAsync(long userNum, PetEquipmentTarget target,
+            IReadOnlyList<InventoryWearGroup> groups, bool worn, CancellationToken ct) =>
+            throw new InvalidOperationException("Purchasing must not select a pet.");
+        /// <summary>Rejects ordinary item selection commits during purchasing.</summary>
+        public ValueTask<PetInventorySnapshot?> SelectItemAsync(long userNum, int itemId,
+            IReadOnlyList<InventoryWearGroup> groups, bool worn, CancellationToken ct) =>
+            throw new InvalidOperationException("Purchasing must not select a pet.");
     }
 
     private sealed class FakeInventoryRepository : IInventoryRepository

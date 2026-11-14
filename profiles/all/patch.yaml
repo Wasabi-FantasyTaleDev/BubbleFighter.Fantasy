@@ -46,6 +46,7 @@
 - replace:
     id: diagnostics.packet-log
     config:
+      packets_enabled: ${BFF_PACKET_LOG:-false}
       file: logs/{date}/packets-all_{timestamp}.log
       capture_enabled: ${BFF_PACKET_CAPTURE:-false}
       preview_bytes: 96
@@ -70,4 +71,10 @@
     disabled: false
 - replace:
     id: companion.commands
+    disabled: false
+- replace:
+    id: companion.scene
+    disabled: false
+- replace:
+    id: companion.room_create
     disabled: false

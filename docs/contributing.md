@@ -88,19 +88,25 @@ These tests guard the gate runner itself against false success from empty, missi
 python tools/ci/serial-gates.py --public --results-directory artifacts/validation/public-01
 ```
 
-Use a new, non-existent results directory for every attempt; the runner refuses an existing one. It builds Release, runs SDK conformance, runs each test project serially, checks the packet tables and dumps the isolated `kr-1256` configuration. It ends with `PASS public gates: <n> populated test reports, <n> tests, no skips` and records the exclusion in `scope.json`. Public mode runs every tracked test project but excludes only `Category=LocalClientData` cases; it is not the complete release gate. If `CI=true` is set, the runner also refuses a checkout that contains `.env` or `profiles/*/local.patch.yaml`.
+Use a new, non-existent results directory for every attempt; the runner refuses an existing one. It builds Release, runs SDK conformance, runs independent test projects in parallel and the timing-sensitive ones alone afterwards, checks the packet tables and dumps the isolated `kr-1256` configuration. It ends with `PASS public gates: <n> populated test reports, <n> tests, no skips` and records the exclusion in `scope.json`. Public mode runs every tracked test project but excludes only `Category=LocalClientData` cases; it is not the complete release gate. If `CI=true` is set, the runner also refuses a checkout that contains `.env` or `profiles/*/local.patch.yaml`.
+
+For day-to-day work, add `--affected <ref>` to run only the test projects that can observe your changes since the merge base with that ref, including uncommitted files: a project whose own files changed or that references a changed project, directly or through a wildcard. Documentation-only changes run no tests; a change outside every project, such as `profiles/`, `packets/` or build files, runs every project. Run the full gate before a deployment batch or release.
+
+```sh
+python tools/ci/serial-gates.py --public --affected origin/main --results-directory artifacts/validation/affected-01
+```
 
 **Check it worked.** The exit code is 0 and the final line is the `PASS` line above. A nonzero exit prints `FAIL <reason>`; the log of the failing step is in the results directory.
 
 ### Run a local Host check
 
-Follow [Quickstart](quickstart.md): copy `.env.example` to `.env`, set `BFF_MYSQL_PASSWORD` to a nonempty disposable value, and always add the isolated patch — including for `--dump-config`:
+Follow [Quickstart](quickstart.md). A local check needs no database settings or `.env`; always add the isolated patch, including for `--dump-config`:
 
 ```sh
 dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile management --patch tools/local-checks/isolated-memory.patch.yaml
 ```
 
-The patch disables `persistence.mysql` and enables in-memory persistence so a developer `.env` or local override cannot contact a live database. Never point tests or local checks at a production database. **Check it worked:** another terminal gets `{"status":"ok", ...}` from `http://127.0.0.1:8080/health`; stop with Ctrl+C.
+The patch disables `persistence.mysql` and enables in-memory persistence so a developer `.env` or local override cannot contact a live database. Never point tests or local checks at a production database. **Check it worked:** another terminal gets `{"status":"ok", ...}` from `http://127.0.0.1:7300/health`; stop with Ctrl+C.
 
 ## Repository map
 
@@ -188,8 +194,9 @@ The complete gate needs these locally obtained client files; they are not distri
 | Setting or path | Required file |
 | --- | --- |
 | `client-data/cn-324/` | `Config/ShopItem2.xml` |
-| `client-data/kr-1256/data/` | `Packs/Config_00000.pkn` (the shop and fighter workbooks) and `Packs/ConfigSh_00000.pkn` (the pet overlay) |
-| `artifacts/shop-tables-survey/id400/xml/` | `Config/ShopItem2.xml` |
+| `BFF_CN324_CONFIG_ARCHIVE`, `BFF_CN404_CONFIG_ARCHIVE`, `BFF_CN406_CONFIG_ARCHIVE`, `BFF_CN408_CONFIG_ARCHIVE`, `BFF_ID400_CONFIG_ARCHIVE` | Set each environment variable to its own build's `Config.bfz` file. The complete gate checks these paths before building. |
+| `client-data/kr-1256/data/` | `Packs/Config_00000.pkn` (the shop and fighter workbooks and BnB rules), `Packs/ConfigSh_00000.pkn` (the pet overlay), and `Packs/Maps_00023.pkn` (the BnB village map and item layout) |
+| `artifacts/shop-tables-survey/id400/xml/` | `Config/ShopItem2.xml`, extracted from the id-400 client's `Config/Config.bfz` with `bffarchive extract <id-400>/Config/Config.bfz artifacts/shop-tables-survey/id400/xml --path Config/Config.bfz --filter ShopItem2.xml` |
 
 If the files are absent, the complete gate prints the missing prerequisites and stops with `Local game data is missing for <tests>; provision it or pass --public to run the publicly reproducible gates only.`
 

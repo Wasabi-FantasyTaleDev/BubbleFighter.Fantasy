@@ -90,7 +90,7 @@ internal sealed class CompanionCommands(IPluginContext context, CompanionCommand
                 if (inputs.Length > 1) throw new InvalidOperationException("Multiple gameplay owners hold the command session.");
                 result = inputs.Length == 0
                     ? new CommandResult(CommandStatus.InvalidState, "The player's room is no longer available.")
-                    : await inputs[0].ExecuteTextAsync(entry.Session, entry.Command, token).ConfigureAwait(false);
+                    : await inputs[0].ExecuteTextAsync(entry.Session, entry.Command, CommandSource.Nirinsou, token).ConfigureAwait(false);
             }, context.Lifetime).ConfigureAwait(false);
             await task.Completion.ConfigureAwait(false);
             reply = FromResult(operationId, result ?? throw new InvalidOperationException("The command returned no result."));

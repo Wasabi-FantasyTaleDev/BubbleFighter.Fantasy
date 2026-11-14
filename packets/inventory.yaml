@@ -5,24 +5,24 @@ structs:
   # id-400 sub_7993D0, cn-324 sub_6FE0C0, cn-279 sub_450230.
   # The builds whose bag record is the modern one read the same counted list. kr-1256 sub_9AE4A0
   # unwraps the compressed envelope (kr-1256 sub_FA5520) and reads this counted list through
-  # kr-1256 sub_10D7C50 -> sub_10D8550; cn-774 sub_BAD820 -> sub_1063790 reads the count straight
-  # off the stream, and tw-454 writes the cn-774 plain body.
+  # kr-1256 sub_10D7C50 -> kr-1256 sub_10D8550; cn-774 sub_BAD820 -> cn-774 sub_1063790 reads the count straight
+  # off the stream, as does tw-454 sub_A8AEE0 before tw-454 sub_C02AF0 installs the ordinary list.
   InventoryUpdate:
     - slots: "list<InventorySlot>"
 
   # One modern bag slot, read by kr-1256 sub_10D8550: item id, count, eight bytes stored at record
   # +8, the text emptied at +36, an empty attribute vector at +24, and the packed flag byte whose bits
-  # fill +16..+23 (worn is bit 0). cn-774 sub_1063790 and tw-454 sub_4440C0 read the same record.
+  # fill +16..+23 (worn is bit 0). cn-774 sub_496960 and tw-454 sub_4A00D0 read the same wire record.
   InventorySlot@kr-1256:
     - item_id: u32
       offset: 0
     - quantity: u32
       offset: 4
-    - unknown_8: u64 # the stored slot's identity is written here; the client's use of record +8 is not read
+    - unknown_8: u64 # Day-double bits: kr-1256 sub_804160, cn-774 sub_9A44B0 and tw-454 sub_C09140 subtract elapsed inventory time.
       offset: 8
     - unknown_36: wstr
       offset: 36
-    - attributes: empty_list
+    - attributes: "list<ItemAttr>" # kr-1256 sub_10D8550 reads the vector; kr-1256 sub_A0DED0 consumes all four value positions.
       offset: 24
     - flags: u8 # worn is bit 0; the client expands the byte into the record's +16..+23 booleans
       offset: 16
@@ -49,7 +49,7 @@ structs:
     - unknown_48: wstr
       offset: 48
       except: [cn-324] # cn-324 sub_6FA8E0 and cn-279 sub_44CD50 stop after +28
-    - unknown_32: empty_list # a nested vector (kr-812 sub_532610); the server always sends it empty
+    - unknown_32: "list<ItemAttr>" # kr-812 sub_532610 / kr-812 sub_5325A0; cn-717 sub_A480E0 consumes all four value positions.
       offset: 32
       except: [cn-324]
 
@@ -139,22 +139,41 @@ structs:
   InventorySlots:
     - slots: "list<InventorySlot>"
 
-  # The modern three containers read by kr-1256 sub_9AEB10: sub_10D7C50 reads the bag slots,
-  # sub_10D7CE0 the equipped-article slots and sub_10D7E90 a counted word list that
-  # kr-1256 sub_933190 uses to remove bag nodes. The server sends the last two empty, so their
-  # element records are not stated. cn-774 sub_BADC50 -> sub_1063790 reads only the first
-  # container (the reader stops after it), so the cn-774 body is restated below.
+  # kr-1256 sub_9AEB10 reads bag deltas, article deltas and removed ordinary item ids.
+  # Article state 1 inserts or replaces; other states remove the key. cn-774 sub_BADC50
+  # reads only the ordinary slot list, so that build's delta body is restated below.
   InventorySlots@kr-1256:
     - slots: "list<InventorySlot>"
-    - articles: empty_list # kr-1256 sub_10D7CE0; the server always sends it empty
-    - removed_item_ids: "list<u32>" # kr-1256 sub_10D7E90; the server always sends it empty
+    - articles: "list<ArticleSlot>" # kr-1256 sub_10D7CE0 -> kr-1256 sub_10D8370
+    - removed_item_ids: "list<u32>" # kr-1256 sub_10D7E90 -> kr-1256 sub_933190
 
   InventorySlots@cn-774:
     - slots: "list<InventorySlot>"
 
-  # S2C gspUpdateAllArticleSlot: the equipped-article table, a counted list the server always
-  # sends empty. kr-1256 dispatch case 808 and its reader kr-1256 sub_10D7CE0 -> sub_10D8370;
-  # the kr-1256 body is inside the compressed envelope (kr-1256 sub_FA5520), while cn-774
-  # sub_BAE150 -> sub_1063970 reads the count directly and tw-454 writes the cn-774 body.
+  # Full article replacement: kr-1256 sub_9D2FF0 case 808 -> kr-1256 sub_804FC0 clears then installs.
+  # kr-1256 sub_FA5520 and cn-774 sub_BAE150 -> cn-774 sub_F3CD00 unwrap a counted zlib body;
+  # tw-454 sub_A8B870 -> tw-454 sub_EBFE20 reads the counted list directly.
   ArticleSlots:
     - articles: empty_list
+      kr-1256:
+        - articles: "list<ArticleSlot>"
+
+  # kr-1256 sub_10D8370, cn-774 sub_496AD0 and tw-454 sub_4A0240 independently read this row.
+  # The state word is 1 for a live article; kr-1256 sub_9AEB10 removes other states.
+  # The equipped flag occupies four wire bytes despite occupying one byte in the native object.
+  ArticleSlot:
+    - article_key: u64
+      offset: 0
+      only: [kr-1256]
+    - item_id: u32
+      offset: 8
+      only: [kr-1256]
+    - state: u32
+      offset: 12
+      only: [kr-1256]
+    - equipped: bool
+      offset: 16
+      only: [kr-1256]
+    - attributes: "list<ItemAttr>"
+      offset: 20
+      only: [kr-1256]

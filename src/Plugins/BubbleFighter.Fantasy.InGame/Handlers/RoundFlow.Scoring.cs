@@ -69,7 +69,9 @@ internal sealed partial class RoundFlow
         var seatedVictim = victim is { } slot && slot != reporter.Slot && ScoreMember(room, slot) is not null ? victim : null;
         if (room.Scoring.AddKill(reporter.Slot, reporter.Team, seatedVictim) is not { } stats)
             return (null, null, victim);
-        return (new RoundScoreUpdated(room.Id, reporter.Team, [.. room.Scoring.TeamTotals],
+        NoteWeaponMasterScore(room, reporter.Slot, WeaponMasterEvent.Kill);
+        if (seatedVictim is { } fallen) NoteWeaponMasterDeath(room, fallen);
+        return (new RoundScoreUpdated(room.Id, reporter.Team, LiveTeamTotals(room),
             seatedVictim is { } died ? [stats, room.Scoring.Stats(died)] : [stats], LiveScoreboard(room)), null, victim);
     }
 
@@ -100,6 +102,7 @@ internal sealed partial class RoundFlow
         if (!rescue && victimSlot is { } pending)
             room.Scoring.RememberVictim(slot, pending);
         var stats = rescue ? room.Scoring.AddRescue(slot) : room.Scoring.AddKnockdown(slot);
-        return stats is null ? null : new RoundScoreUpdated(room.Id, reporter.Team, [.. room.Scoring.TeamTotals], [stats], LiveScoreboard(room));
+        if (stats is not null) NoteWeaponMasterScore(room, slot, rescue ? WeaponMasterEvent.Rescue : WeaponMasterEvent.Knockdown);
+        return stats is null ? null : new RoundScoreUpdated(room.Id, reporter.Team, LiveTeamTotals(room), [stats], LiveScoreboard(room));
     }
 }

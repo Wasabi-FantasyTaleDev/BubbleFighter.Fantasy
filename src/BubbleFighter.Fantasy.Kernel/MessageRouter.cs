@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 namespace BubbleFighter.Fantasy.Kernel;
 
 /// <summary>Provides the replaceable typed message pipeline as an ordinary profile row.</summary>
-[Plugin("core.message-router", Description = "Typed message handlers and middleware.", Provides = [typeof(IMessageRouter)])]
+[Plugin("core.message-router", Category = "core", Names = ["en=Message router", "zh-Hans=消息路由", "zh-Hant=訊息路由", "ko=메시지 라우터"], Description = "Typed message handlers and middleware.", Provides = [typeof(IMessageRouter)])]
 public sealed class MessageRouterPlugin : IPlugin
 {
     /// <inheritdoc />

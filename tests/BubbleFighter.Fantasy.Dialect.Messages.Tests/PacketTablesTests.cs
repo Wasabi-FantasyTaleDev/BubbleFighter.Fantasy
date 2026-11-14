@@ -145,6 +145,34 @@ public sealed class PacketTablesTests : IDisposable
         Assert.True(TestBuilds.Packets.CapabilityOf("cn-406", "character_creation"));
     }
 
+    /// <summary>
+    /// Each build's values are merged once at load: every call returns its own equal copy, and a sibling build or the
+    /// base keeps its own values rather than one build's merge leaking into another's.
+    /// </summary>
+    [Fact]
+    public void BuildValuesAreMergedOncePerBuild()
+    {
+        var tables = Load(builds: """
+            version: 1
+            builds:
+              base: {play: {wire: {a: 1, b: 2}}, capabilities: {x: true}}
+              older: {base: base, play: {wire: {b: 3}}}
+              later: {base: older, capabilities: {x: false}}
+              other: {base: base, play: {wire: {a: 9}}}
+            """, structs: "version: 1\nstructs: {Seat: [{user_number: u32}]}\n");
+
+        Assert.NotSame(tables.ValuesOf("later"), tables.ValuesOf("later"));
+        string Wire(string build, string key) =>
+            (string)((Dictionary<string, object?>)((Dictionary<string, object?>)tables.ValuesOf(build)["play"]!)["wire"]!)[key]!;
+        Assert.Equal(("1", "2"), (Wire("base", "a"), Wire("base", "b")));
+        Assert.Equal(("1", "3"), (Wire("older", "a"), Wire("older", "b")));
+        Assert.Equal(("1", "3"), (Wire("later", "a"), Wire("later", "b")));
+        Assert.Equal(("9", "2"), (Wire("other", "a"), Wire("other", "b")));
+        Assert.True(tables.CapabilityOf("older", "x"));
+        Assert.False(tables.CapabilityOf("later", "x"));
+        Assert.Throws<ConfigException>(() => tables.ValuesOf("missing"));
+    }
+
     [Fact]
     public void BuildValuesLieOverTheBases()
     {

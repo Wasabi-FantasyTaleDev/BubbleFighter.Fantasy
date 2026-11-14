@@ -8,4 +8,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\BubbleFighter.Fantasy.Contracts\BubbleFighter.Fantasy.Contracts.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>BubbleFighter.Fantasy.Persistence.Memory.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
 </Project>

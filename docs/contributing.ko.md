@@ -88,19 +88,25 @@ python -m unittest discover -s tools/ci -p "test_*.py"
 python tools/ci/serial-gates.py --public --results-directory artifacts/validation/public-01
 ```
 
-시도마다 새롭고 존재하지 않는 결과 디렉터리를 사용합니다. 실행기는 이미 있는 디렉터리를 거부합니다. 게이트는 Release를 빌드하고 SDK 적합성을 실행하며 테스트 프로젝트를 순차 실행하고 packet 테이블을 검사하며 격리 패치를 적용한 `kr-1256` 설정을 덤프합니다. 마지막에 `PASS public gates: <n> populated test reports, <n> tests, no skips`를 출력하고 제외 범위를 `scope.json`에 기록합니다. 공개 모드는 모든 추적 테스트 프로젝트를 실행하되 `Category=LocalClientData` 케이스만 제외하며, 완전한 릴리스 게이트가 아닙니다. `CI=true`이면 실행기는 `.env` 또는 `profiles/*/local.patch.yaml`이 있는 체크아웃도 거부합니다.
+시도마다 새롭고 존재하지 않는 결과 디렉터리를 사용합니다. 실행기는 이미 있는 디렉터리를 거부합니다. 게이트는 Release를 빌드하고 SDK 적합성을 실행하며 서로 독립적인 테스트 프로젝트를 병렬로 실행한 뒤 시간에 민감한 프로젝트를 단독으로 실행하고 packet 테이블을 검사하며 격리 패치를 적용한 `kr-1256` 설정을 덤프합니다. 마지막에 `PASS public gates: <n> populated test reports, <n> tests, no skips`를 출력하고 제외 범위를 `scope.json`에 기록합니다. 공개 모드는 모든 추적 테스트 프로젝트를 실행하되 `Category=LocalClientData` 케이스만 제외하며, 완전한 릴리스 게이트가 아닙니다. `CI=true`이면 실행기는 `.env` 또는 `profiles/*/local.patch.yaml`이 있는 체크아웃도 거부합니다.
+
+일상 작업에서는 `--affected <ref>`를 더해 해당 ref와의 병합 기준 이후 변경(커밋하지 않은 파일 포함)을 관찰할 수 있는 테스트 프로젝트만 실행할 수 있습니다. 자기 파일이 바뀌었거나 바뀐 프로젝트를 직접 또는 와일드카드로 참조하는 프로젝트가 해당합니다. 문서만 바꾸면 테스트를 실행하지 않고, `profiles/`, `packets/`, 빌드 파일처럼 어느 프로젝트에도 속하지 않는 변경은 모든 프로젝트를 실행합니다. 배포 묶음이나 릴리스 전에는 전체 게이트를 실행합니다.
+
+```sh
+python tools/ci/serial-gates.py --public --affected origin/main --results-directory artifacts/validation/affected-01
+```
 
 **확인.** 종료 코드가 0이고 마지막 줄이 위의 `PASS` 줄입니다. 0이 아닌 종료는 `FAIL <reason>`을 출력하며, 실패 단계의 로그는 결과 디렉터리에 있습니다.
 
 ### 로컬 Host 확인 실행
 
-[빠른 시작](quickstart.md)을 따릅니다. `.env.example`을 `.env`로 복사하고 `BFF_MYSQL_PASSWORD`를 비어 있지 않은 임시 값으로 설정하며, `--dump-config`를 포함해 항상 격리 패치를 추가합니다:
+[빠른 시작](quickstart.md)을 따릅니다. 로컬 점검에는 데이터베이스 설정이나 `.env`가 필요하지 않으며, `--dump-config`를 포함해 항상 격리 패치를 추가합니다:
 
 ```sh
 dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile management --patch tools/local-checks/isolated-memory.patch.yaml
 ```
 
-이 패치는 `persistence.mysql`을 비활성화하고 메모리 영속성을 활성화하므로, 개발자의 `.env`나 로컬 재정의가 실제 데이터베이스에 접속하지 않습니다. 테스트나 로컬 확인을 실제 데이터베이스로 향하게 하지 마세요. **확인:** 다른 터미널에서 `http://127.0.0.1:8080/health`가 `{"status":"ok", ...}`를 반환합니다. Ctrl+C로 중지합니다.
+이 패치는 `persistence.mysql`을 비활성화하고 메모리 영속성을 활성화하므로, 개발자의 `.env`나 로컬 재정의가 실제 데이터베이스에 접속하지 않습니다. 테스트나 로컬 확인을 실제 데이터베이스로 향하게 하지 마세요. **확인:** 다른 터미널에서 `http://127.0.0.1:7300/health`가 `{"status":"ok", ...}`를 반환합니다. Ctrl+C로 중지합니다.
 
 ## 저장소 구조
 
@@ -188,8 +194,9 @@ npm run build
 | 설정 또는 경로 | 필요한 파일 |
 | --- | --- |
 | `client-data/cn-324/` | `Config/ShopItem2.xml` |
-| `client-data/kr-1256/data/` | `Packs/Config_00000.pkn`(상점 및 캐릭터 통합 문서)과 `Packs/ConfigSh_00000.pkn`(펫 오버레이) |
-| `artifacts/shop-tables-survey/id400/xml/` | `Config/ShopItem2.xml` |
+| `BFF_CN324_CONFIG_ARCHIVE`, `BFF_CN404_CONFIG_ARCHIVE`, `BFF_CN406_CONFIG_ARCHIVE`, `BFF_CN408_CONFIG_ARCHIVE`, `BFF_ID400_CONFIG_ARCHIVE` | 각 환경 변수는 해당 빌드의 `Config.bfz` 파일을 가리켜야 합니다. 전체 게이트는 빌드 전에 이 경로들을 확인합니다. |
+| `client-data/kr-1256/data/` | `Packs/Config_00000.pkn`(상점 및 캐릭터 통합 문서와 BnB 규칙), `Packs/ConfigSh_00000.pkn`(펫 오버레이), `Packs/Maps_00023.pkn`(BnB 마을 맵과 아이템 배치) |
+| `artifacts/shop-tables-survey/id400/xml/` | `Config/ShopItem2.xml`, id-400 클라이언트의 `Config/Config.bfz`에서 `bffarchive extract <id-400>/Config/Config.bfz artifacts/shop-tables-survey/id400/xml --path Config/Config.bfz --filter ShopItem2.xml`로 추출 |
 
 파일이 없으면 전체 게이트는 누락된 전제를 출력하고 `Local game data is missing for <tests>; provision it or pass --public to run the publicly reproducible gates only.`로 멈춥니다.
 

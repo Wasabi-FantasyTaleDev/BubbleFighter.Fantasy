@@ -265,7 +265,7 @@ public sealed class DefenceSeedTests
         ("100072", "criticalCancelRatio", "0.5", "0"),
     ];
 
-    private static string Workbook(params (string Item, string Name, string Value, string Channel)[] rows)
+    internal static string Workbook(params (string Item, string Name, string Value, string Channel)[] rows)
     {
         static string Cell(string text) => $"<Cell><Data ss:Type=\"String\">{text}</Data></Cell>";
         var body = new StringBuilder();

@@ -5,7 +5,7 @@ using BubbleFighter.Fantasy.Abstractions;
 namespace BubbleFighter.Fantasy.Loader.Remote;
 
 /// <summary>Exports the SDK contract inventory as a normal row, without starting a game or an SDK runtime.</summary>
-[Plugin("sdk.contracts.export", Description = "Exports shared messages, events, service signatures and SDK representation gaps.")]
+[Plugin("sdk.contracts.export", Category = "admin", Names = ["en=Plugin SDK contracts", "zh-Hans=插件 SDK 契约", "zh-Hant=模組 SDK 合約", "ko=플러그인 SDK 계약"], Description = "Exports shared messages, events, service signatures and SDK representation gaps.")]
 public sealed class ContractSchemaExportPlugin : IPlugin
 {
     /// <summary>Validates the output destination and writes a deterministic schema of the loaded shared assemblies.</summary>

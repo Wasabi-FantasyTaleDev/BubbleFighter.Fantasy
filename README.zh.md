@@ -30,7 +30,7 @@ Bubble Fighter Fantasy 是由 **Fantasy Tale Studio** 维护的「泡泡战士�
 运行这些程序包的机器需要 ASP.NET Core Runtime 10。
 
 - **Windows：**从[最新版本](https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest)下载 `bubblefighter-fantasy-win-x64.zip` 或 `bubblefighter-fantasy-win-arm64.zip`，解压到较短的文件夹（例如 `C:\BubbleFighterFantasy`），然后双击 `BubbleFighter.Fantasy.Host.exe`。安装向导会在浏览器中打开。
-- **Linux：**运行 `curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash`，然后运行 `~/bubblefighter-fantasy/bff` 并打开 `http://127.0.0.1:8080/`。缺少运行时时，脚本会自行安装。
+- **Linux：**运行 `curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash`，然后运行 `~/bubblefighter-fantasy/bff` 并打开 `http://127.0.0.1:7300/`。缺少运行时时，脚本会自行安装。
 - **Docker：**`curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash -s -- --docker` 会在容器中运行服务器；加上 `--with-mysql` 可附带 MySQL 8.4。
 
 全部选项见[安装指南](docs/installation.zh.md#安装预编译包)。
@@ -45,7 +45,7 @@ dotnet build BubbleFighter.Fantasy.sln -c Release
 Copy-Item .env.example .env
 ```
 
-构建必须以**零警告、零错误**完成。编辑被忽略的 `.env`，把 `BFF_MYSQL_PASSWORD` 设为非空的临时值；即使本次检查不使用 MySQL，配置插值仍需要这个变量。
+构建必须以**零警告、零错误**完成。使用下面隔离内存补丁的本地检查不需要任何数据库设置；只有启用 MySQL 行时才需要 `BFF_MYSQL_PASSWORD`。
 
 启动一个使用内存存储、不需要游戏数据的本地服务器，然后验证：
 
@@ -56,13 +56,13 @@ dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile 
 在另一个终端：
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:8080/health
+Invoke-RestMethod http://127.0.0.1:7300/health
 ```
 
 返回 `{"status":"ok", ...}` 表示服务器已启动。按 `Ctrl+C` 停止；内存中的数据会丢失。`management` profile 只运行管理与存储，不开放游戏或中继端口。若要运行游戏 profile，请先准备客户端数据并选择匹配的 profile，参见[安装](docs/installation.zh.md)、[快速开始](docs/quickstart.zh.md)与[配置](docs/configuration.zh.md)。
 
 构建输出目录本身就是一个可运行的发布目录：直接启动
-`src/BubbleFighter.Fantasy.Host/bin/Release/net10.0/BubbleFighter.Fantasy.Host.exe`（不带参数）会打开首次运行设置向导，并打印网页界面地址（`WebUI: http://127.0.0.1:8080/`）。
+`src/BubbleFighter.Fantasy.Host/bin/Release/net10.0/BubbleFighter.Fantasy.Host.exe`（不带参数）会打开首次运行设置向导，并打印网页界面地址（`WebUI: http://127.0.0.1:7300/`）。
 
 ## 从源码快速开始（Linux）
 
@@ -74,14 +74,14 @@ dotnet build BubbleFighter.Fantasy.sln -c Release
 cp .env.example .env
 ```
 
-在 `.env` 中把 `BFF_MYSQL_PASSWORD` 设为非空的临时值，然后执行同一本地检查：
+本地检查不需要任何数据库设置，使用隔离内存补丁执行：
 
 ```sh
 dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile management --patch tools/local-checks/isolated-memory.patch.yaml
 ```
 
 ```sh
-curl http://127.0.0.1:8080/health
+curl http://127.0.0.1:7300/health
 ```
 
 按 `Ctrl+C` 停止。
@@ -91,11 +91,11 @@ curl http://127.0.0.1:8080/health
 仓库提供同时运行服务器与 MySQL 的 Compose 配置。默认容器使用游戏 profile，因此请先准备客户端数据（见下文），否则容器会在启动时因缺少数据而退出。
 
 ```sh
-cp .env.example .env      # 设置 BFF_MYSQL_PASSWORD 并检查其他值
+cp .env.example .env      # 设置 BFF_MYSQL_PASSWORD（Compose 要求）并检查其他值
 docker compose -f deploy/docker/compose.yaml up --build
 ```
 
-服务器开放 7100（游戏）、7101（中继）与 8080（管理 API 与网页界面）；MySQL 监听 `${BFF_MYSQL_PORT:-3306}`。客户端数据目录以只读方式挂载到 `/app/client-data`，数据库状态保存在 `mysql-data` 卷中。管理监听器在容器内默认绑定 `127.0.0.1`，如需通过已发布的 8080 端口访问，请在 `.env` 中设置 `BFF_ADMIN_HOST=0.0.0.0`。外部数据库模板、备份、升级与回退见[部署](docs/deployment.zh.md)。
+服务器开放 7100（游戏）、7101（中继）与 7300（管理 API 与网页界面）；MySQL 监听 `${BFF_MYSQL_PORT:-3306}`。客户端数据目录以只读方式挂载到 `/app/client-data`，数据库状态保存在 `mysql-data` 卷中。管理监听器在容器内默认绑定 `127.0.0.1`，如需通过已发布的 7300 端口访问，请在 `.env` 中设置 `BFF_ADMIN_HOST=0.0.0.0`。外部数据库模板、备份、升级与回退见[部署](docs/deployment.zh.md)。
 
 ## 客户端数据
 
@@ -144,6 +144,10 @@ python tools/ci/serial-gates.py --public --results-directory artifacts/validatio
 ```
 
 公开门禁只排除 `Category=LocalClientData` 的用例，不等于完整发布门禁；完整门禁需要的本地客户端工作簿见 CONTRIBUTING.zh.md。自动化检查不能替代真实客户端测试。
+
+## 实现参考
+
+感谢 kanomahoro 的开源项目 [bf-cn0261-go-server](https://github.com/kanomahoro/bf-cn0261-go-server)：我们参考它实现了部分功能并修复了一些 bug。协议细节仍以客户端原生证据和本仓库自己的封包表为准。
 
 ## 许可证
 

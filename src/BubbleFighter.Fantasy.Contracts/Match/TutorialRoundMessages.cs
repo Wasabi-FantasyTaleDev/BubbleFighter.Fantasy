@@ -1,5 +1,6 @@
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Rooms;
+using BubbleFighter.Fantasy.Contracts.Progress;
 
 namespace BubbleFighter.Fantasy.Contracts.Match;
 
@@ -18,6 +19,23 @@ public sealed record TutorialSelectionOpening : IMessage;
 public sealed record TutorialRoundOpened(int ModeId, string MapKey, int CharacterItemId,
     IReadOnlyList<int> EquippedItemIds, byte Team, int CountdownMs, int TimeLimitMs, bool NativeSupplies) : IMessage
 {
+    private IReadOnlyList<RoomItemAttribute> _itemAttributes = [];
+    private IReadOnlyList<int> _equippedItemIds = new RoundEquipmentSnapshot(EquippedItemIds, []).WornItemIds;
+
+    /// <summary>Gets copied worn identities frozen for the tutorial scene admission.</summary>
+    public IReadOnlyList<int> EquippedItemIds
+    {
+        get => _equippedItemIds;
+        init => _equippedItemIds = new RoundEquipmentSnapshot(value, []).WornItemIds;
+    }
+
+    /// <summary>Gets bounded, copied modifiers from that admission; an empty vector clears previous scene modifiers.</summary>
+    public IReadOnlyList<RoomItemAttribute> ItemAttributes
+    {
+        get => _itemAttributes;
+        init => _itemAttributes = new RoundEquipmentSnapshot(EquippedItemIds, value).ItemAttributes;
+    }
+
     /// <summary>Gets whether this solo scene uses its authenticated game connection without a match relay.</summary>
     public bool GameConnectionOnly { get; init; }
 }

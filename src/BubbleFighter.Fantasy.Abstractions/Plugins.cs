@@ -20,6 +20,18 @@ public sealed class PluginAttribute : Attribute
     /// <summary>Gets an optional human-readable description.</summary>
     public string? Description { get; init; }
 
+    /// <summary>
+    /// Gets the plugin's optional display names for administration interfaces, one <c>language=name</c> entry per
+    /// language (<c>en</c>, <c>zh-Hans</c>, <c>zh-Hant</c>, <c>ko</c>). A language without a name shows the plugin id.
+    /// </summary>
+    public string[] Names { get; init; } = [];
+
+    /// <summary>
+    /// Gets the optional group administration interfaces show the plugin under, such as <c>gameplay</c>, <c>items</c>,
+    /// <c>network</c> or <c>storage</c>.
+    /// </summary>
+    public string? Category { get; init; }
+
     /// <summary>Gets inclusive client ranges such as kr:1256 or kr:1100-1256.
     /// Empty means the plugin is independent of the client build.</summary>
     public string[] SupportedBuilds { get; init; } = [];
@@ -42,6 +54,14 @@ public sealed class PluginAttribute : Attribute
 
     /// <summary>Gets extension interfaces whose committed provider list may be empty.</summary>
     public Type[] OptionalMany { get; init; } = [];
+
+    /// <summary>
+    /// Gets extension interfaces read as they stand at each <see cref="IServiceRegistry.GetAll{TService}"/> call rather
+    /// than as a list committed at activation. Their providers are not activation dependencies: the row neither waits
+    /// for them nor restarts when one loads or unloads. A member may stop serving between the call that returned it and
+    /// its use, so the reader asks again for each operation and keeps none. Native plugins only.
+    /// </summary>
+    public Type[] LiveMany { get; init; } = [];
 
     /// <summary>Gets ordered extension interfaces this row must publish during activation.</summary>
     public Type[] ProvidesMany { get; init; } = [];
@@ -133,6 +153,21 @@ public enum PluginState
     Pending,
 }
 
+/// <summary>When the host activates an enabled row.</summary>
+public enum PluginActivation
+{
+    /// <summary>The row states nothing: it is activated with its configuration, unless the composition unit
+    /// that contains it (a client build of a server that serves several) is on demand.</summary>
+    Default,
+
+    /// <summary>The row is activated with the configuration that contains it, whatever its composition unit says.
+    /// A build's listeners are, so the port is bound while the build sleeps.</summary>
+    Always,
+
+    /// <summary>The row stays unloaded until it is requested, and may be unloaded again while nothing uses it.</summary>
+    OnDemand,
+}
+
 /// <summary>Snapshot information about a single instantiated plugin row.</summary>
 /// <param name="RowId">The row id from the composed profile.</param>
 /// <param name="Plugin">The plugin id.</param>
@@ -152,6 +187,18 @@ public sealed record PluginInstanceInfo(string RowId, string Plugin, string Sour
 
     /// <summary>Gets whether configuration removed this entry while its prior identity or resources remain owned.</summary>
     public bool IsRetiring { get; init; }
+
+    /// <summary>Gets when the host activates the row; an on-demand row that is unloaded without an error is asleep, not stopped.</summary>
+    public PluginActivation Activation { get; init; }
+
+    /// <summary>Gets the name of the rows that wake and sleep together with this one, when it belongs to such a unit.</summary>
+    public string? ActivationGroup { get; init; }
+
+    /// <summary>Gets whether the row's configuration switches it off; such a row is neither started with its group nor asleep.</summary>
+    public bool IsDisabled { get; init; }
+
+    /// <summary>Gets whether the row is an on-demand row waiting to be requested.</summary>
+    public bool IsSleeping => Activation == PluginActivation.OnDemand && !IsDisabled && State == PluginState.Unloaded && Error is null && !IsRetiring;
     /// <summary>Gets this plugin's declared handler replacement targets.</summary>
     public IReadOnlyList<string> Overrides { get; init; } = [];
     /// <summary>Gets the plugin assembly's informational release version, including build metadata.</summary>
@@ -165,6 +212,10 @@ public sealed record PluginInstanceInfo(string RowId, string Plugin, string Sour
 
     /// <summary>Gets supported executable build ranges; empty means build-independent.</summary>
     public IReadOnlyList<string> SupportedBuilds { get; init; } = [];
+    /// <summary>Gets the plugin's optional display names keyed by language; an interface shows the plugin id without one.</summary>
+    public IReadOnlyDictionary<string, string> DisplayNames { get; init; } = new Dictionary<string, string>();
+    /// <summary>Gets the optional group the plugin declares for administration interfaces.</summary>
+    public string? Category { get; init; }
 }
 
 /// <summary>
@@ -218,6 +269,15 @@ public sealed record PluginRow
 
     /// <summary>Gets whether the row is disabled. Disabled rows are listed but never activated.</summary>
     public bool Disabled { get; init; }
+
+    /// <summary>Gets when the host activates the row. An on-demand row is composed and validated like any
+    /// enabled row but stays unloaded until something asks for it with <see cref="IPluginHost.RequestState"/>.</summary>
+    public PluginActivation Activation { get; init; }
+
+    /// <summary>Gets the name of the rows that wake and sleep together with this one, when the row belongs to
+    /// such a unit: the client build of a server that serves several. Listeners carry it too, so an accepted
+    /// connection names the unit it needs.</summary>
+    public string? ActivationGroup { get; init; }
 
     /// <summary>Gets a label identifying the configuration layer that produced the row.</summary>
     public required string Source { get; init; }
@@ -416,6 +476,18 @@ public interface IPluginHost
     /// <returns>A receipt that distinguishes convergence, missing dependencies and supersession.</returns>
     /// <exception cref="ArgumentException">Thrown when restart is requested with enabled set to false.</exception>
     IPluginTransition RequestState(string rowId, bool enabled, bool restart = false);
+
+    /// <summary>Sets the desired state of several rows as one request, without waiting. The rows start in the order
+    /// their services require, as at server start, and stop in the reverse order, so each member starts once. A row
+    /// outside the set that is already active and reads what the set provides is restarted with its dependents, as
+    /// for <see cref="RequestState"/>, before the members that require it start. Alternate hosts may reject this
+    /// capability.</summary>
+    /// <param name="rowIds">The configured row identities; duplicates count once.</param>
+    /// <param name="enabled">Whether the rows should be active when their dependencies permit.</param>
+    /// <returns>A receipt for the whole set; it reports waiting when any enabled row could not start yet.</returns>
+    /// <exception cref="ArgumentException">Thrown when the set is empty.</exception>
+    IPluginTransition RequestStates(IReadOnlyCollection<string> rowIds, bool enabled) =>
+        throw new NotSupportedException("This host does not support state requests for a set of rows.");
 
     /// <summary>Gets a copied diagnostic snapshot of known row instances. Entries may retain
     /// incomplete or failed cleanup; an entry's presence does not imply that it is active.</summary>

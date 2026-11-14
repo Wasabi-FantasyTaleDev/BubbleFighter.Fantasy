@@ -13,6 +13,27 @@ namespace BubbleFighter.Fantasy.Contracts.Inventory;
 /// </summary>
 public interface IEquippedViewPush
 {
+    /// <summary>Publishes worn identities and feature attributes from the same committed bag, placing its selected character first when present.</summary>
+    ValueTask SendSnapshotAsync(ISession session, int userNum, int characterId,
+        IReadOnlyList<InventorySlotRecord> characterBag, CancellationToken ct) =>
+        SendSelectionAsync(session, userNum, characterId, characterBag
+            .Where(row => (row.Flags & InventorySlotRecord.WornFlagBit) != 0).Select(row => row.ItemId).Distinct()
+            .OrderBy(id => characterId > 0 && id == characterId ? 0 : 1).ToArray(), ct);
+
+    /// <summary>
+    /// Publishes the committed bag after a granted weapon preset switch. Unlike <see cref="SendSnapshotAsync"/>, the
+    /// worn weapons are not recorded into the switched-to page: that page is what the player chose for it, and a page
+    /// weapon that could not be worn must not be overwritten by the previous page's weapon.
+    /// </summary>
+    /// <param name="session">The switching session.</param>
+    /// <param name="userNum">The switching player's profile identity.</param>
+    /// <param name="characterId">The selected character, placed first.</param>
+    /// <param name="characterBag">The committed character bag.</param>
+    /// <param name="ct">Cancellation of this delivery.</param>
+    ValueTask SendPresetSwitchAsync(ISession session, int userNum, int characterId,
+        IReadOnlyList<InventorySlotRecord> characterBag, CancellationToken ct) =>
+        SendSnapshotAsync(session, userNum, characterId, characterBag, ct);
+
     /// <summary>Updates another player's visible equipment without changing the recipient's local preset index or contents.</summary>
     /// <param name="recipient">Game session observing the player.</param>
     /// <param name="userNum">Observed player's profile identity.</param>

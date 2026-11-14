@@ -1,16 +1,37 @@
 using BubbleFighter.Fantasy.Contracts.Inventory;
+using BubbleFighter.Fantasy.Abstractions;
 
 namespace BubbleFighter.Fantasy.InventoryView;
 
 /// <summary>Publishes shared entitlements with a build-specific equipment projection and preset store.</summary>
-internal sealed class BuildInventory(IInventoryLoadoutStore store, InventoryLoadoutScope scope) : IInventoryRepository, IPlayerInventoryState
+internal sealed class BuildInventory(IInventoryLoadoutStore store, InventoryLoadoutScope scope,
+    IEventBus? events = null) : IInventoryRepository, IPlayerInventoryState, IInventoryBuildScope
 {
-    public ValueTask<IReadOnlyList<InventorySlotRecord>> ListSlotsAsync(long userNum, InventoryBag bag, int maxCount, CancellationToken ct) =>
-        store.ListLoadoutSlotsAsync(userNum, scope, bag, maxCount, ct);
+    /// <summary>Gets the canonical build loadout scope used to select this inventory's persisted bags.</summary>
+    public InventoryLoadoutScope Scope => scope;
 
-    public ValueTask<IReadOnlyList<InventorySlotRecord>?> UpdateWornSelectionAsync(long userNum,
-        IReadOnlyList<InventoryWearGroup> groups, int? itemId, bool worn, CancellationToken ct) =>
-        store.UpdateLoadoutSelectionAsync(userNum, scope, groups, itemId, worn, ct);
+    /// <summary>Reads the requested bounded bag from prepared metadata, or from the canonical build loadout when no preparation provider responds.</summary>
+    public async ValueTask<IReadOnlyList<InventorySlotRecord>> ListSlotsAsync(long userNum, InventoryBag bag, int maxCount, CancellationToken ct)
+    {
+        if (maxCount is < 1 or > InventoryLimits.MaxInventorySlotsPerBag) throw new ArgumentOutOfRangeException(nameof(maxCount));
+        if (bag is not (InventoryBag.CharacterBag or InventoryBag.EquippedBag)) throw new ArgumentOutOfRangeException(nameof(bag));
+        var snapshot = await PrepareAsync(userNum, ct).ConfigureAwait(false);
+        if (snapshot is null) return await store.ListLoadoutSlotsAsync(userNum, scope, bag, maxCount, ct).ConfigureAwait(false);
+        return (bag == InventoryBag.CharacterBag ? snapshot.CharacterBag : snapshot.EquippedBag).Take(maxCount).ToArray();
+    }
+
+    /// <summary>Prepares feature metadata before normalizing or changing this build's persisted worn selection.</summary>
+    public async ValueTask<IReadOnlyList<InventorySlotRecord>?> UpdateWornSelectionAsync(long userNum,
+        IReadOnlyList<InventoryWearGroup> groups, int? itemId, bool worn, CancellationToken ct)
+    {
+        await PrepareAsync(userNum, ct).ConfigureAwait(false);
+        return await store.UpdateLoadoutSelectionAsync(userNum, scope, groups, itemId, worn, ct).ConfigureAwait(false);
+    }
+
+    private ValueTask<PetInventorySnapshot?> PrepareAsync(long userNum, CancellationToken ct) => events is null
+        ? ValueTask.FromResult<PetInventorySnapshot?>(null)
+        : events.WaterfallAsync<InventoryMetadataPreparing, PetInventorySnapshot?>(new(scope.Key, userNum),
+            static _ => ValueTask.FromResult<PetInventorySnapshot?>(null), ct);
 
     public async ValueTask<InventorySlotRecord?> SetSlotWornAsync(long userNum, int itemId, bool worn, CancellationToken ct)
     {

@@ -11,11 +11,11 @@ services:
       BFF_MYSQL_HOST: mysql
       # Port mapping reaches the container from outside its loopback, so first-run setup asks for this token.
       BFF_ADMIN_HOST: 0.0.0.0
-      BFF_SETUP_TOKEN: ${BFF_SETUP_TOKEN:?set BFF_SETUP_TOKEN in .env to at least 32 random characters}
+      BFF_SETUP_TOKEN: ${BFF_SETUP_TOKEN:-}
     ports:
       - "7100:7100"
       - "7101:7101"
-      - "8080:8080"
+      - "7300:7300"
     volumes:
       # Client data is provisioned separately on the host.
       - ${BFF_CLIENT_DATA_HOST:-../../client-data}:/app/client-data:ro
@@ -27,7 +27,9 @@ services:
     restart: unless-stopped
 
   mysql:
-    image: mysql:8.4
+    # New .env files from .env.example choose MariaDB; an older .env has no BFF_DB_IMAGE and keeps the MySQL
+    # its volume was created with.
+    image: ${BFF_DB_IMAGE:-mysql:8.4}
     environment:
       MYSQL_ROOT_PASSWORD: ${BFF_MYSQL_PASSWORD:?set BFF_MYSQL_PASSWORD in .env}
       MYSQL_DATABASE: ${BFF_MYSQL_DATABASE:-bf_game_db}
@@ -39,7 +41,8 @@ services:
     volumes:
       - mysql-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
+      # MariaDB 11 images name the tool mariadb-admin; MySQL images name it mysqladmin.
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 || mysqladmin ping -h 127.0.0.1"]
       interval: 5s
       timeout: 3s
       retries: 20

@@ -31,12 +31,27 @@ public static class PacketFrame_8Bytes
     public static byte[] Encode(ushort opcode, ReadOnlySpan<byte> payload)
     {
         var frame = new byte[HeaderSize + payload.Length];
-        BinaryPrimitives.WriteUInt32LittleEndian(frame.AsSpan(0), (uint)payload.Length);
-        BinaryPrimitives.WriteUInt16LittleEndian(frame.AsSpan(4), opcode);
-        frame[6] = Xor(payload);
-        frame[7] = Xor(frame.AsSpan(0, 7));
-        payload.CopyTo(frame.AsSpan(HeaderSize));
+        Encode(opcode, payload, frame);
         return frame;
+    }
+
+    /// <summary>Encodes the frame into a caller buffer, so a send path can write straight into its output.</summary>
+    /// <param name="opcode">The wire opcode.</param>
+    /// <param name="payload">The payload bytes.</param>
+    /// <param name="destination">At least <see cref="HeaderSize"/> plus the payload length bytes.</param>
+    /// <returns>The number of bytes written.</returns>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="destination"/> is too short.</exception>
+    public static int Encode(ushort opcode, ReadOnlySpan<byte> payload, Span<byte> destination)
+    {
+        var length = HeaderSize + payload.Length;
+        if (destination.Length < length)
+            throw new ArgumentException($"The frame needs {length} bytes.", nameof(destination));
+        BinaryPrimitives.WriteUInt32LittleEndian(destination, (uint)payload.Length);
+        BinaryPrimitives.WriteUInt16LittleEndian(destination[4..], opcode);
+        destination[6] = Xor(payload);
+        destination[7] = Xor(destination[..7]);
+        payload.CopyTo(destination[HeaderSize..]);
+        return length;
     }
 
     /// <summary>Decodes and validates a frame header.</summary>

@@ -9,7 +9,7 @@ using BubbleFighter.Fantasy.Packets;
 namespace BubbleFighter.Fantasy.Dialect.Messages;
 
 /// <summary>Adapts audited native peer discovery and hole-punch controls without enabling a listener.</summary>
-[Plugin("dialect.udp-peers", Description = "Native UDP peer setup messages.",
+[Plugin("dialect.udp-peers", Category = "network", Names = ["en=UDP peer messages", "zh-Hans=UDP 对等消息", "zh-Hant=UDP 對等訊息", "ko=UDP 피어 메시지"], Description = "Native UDP peer setup messages.",
     Requires = [typeof(IOpcodeTableRegistry), typeof(IPacketRouter), typeof(IMessageRouter)],
     OptionalMany = [typeof(IOpcodeTable)],
     ProvidesMany = [typeof(IUdpPeerDialect), typeof(IInboundMessageBinding<UdpPeerTableAcknowledged>),

@@ -1655,10 +1655,11 @@ opcodes:
     source: "cn-408 dispatcher sub_7EF9A0 case 952 (Packet_gspResRandomMissionInfo); Packet_gspResRandomMissionInfo reader and writer bodies match cn-404's"
   - value: 955
     direction: s2c
+    connection: game
     name: gspEvolveResult
     name_source: label@cn-408
-    evidence: inferred
-    source: "cn-408 dispatcher sub_7EF9A0 case 955 (Packet_gspEvolveResult); Packet_gspEvolveResult reader and writer bodies match cn-404's"
+    evidence: verified
+    source: "cn-408 dispatcher sub_7EF9A0 case 955; cn-408 sub_4B0680 reads u32 outcome, u32 pet item id and one unused u32; cn-408 sub_7ED4B0 consumes the installed pet state"
   - value: 958
     direction: s2c
     connection: game

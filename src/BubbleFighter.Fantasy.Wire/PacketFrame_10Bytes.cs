@@ -31,11 +31,32 @@ public static class PacketFrame_10Bytes
             throw new ArgumentOutOfRangeException(nameof(payload), payload.Length,
                 $"A cn-279 frame payload is limited to {MaxPayloadBytes} bytes.");
         var frame = new byte[HeaderSize + payload.Length];
-        frame[0] = 0xFF;
-        BinaryPrimitives.WriteUInt16LittleEndian(frame.AsSpan(2), (ushort)payload.Length);
-        BinaryPrimitives.WriteUInt16LittleEndian(frame.AsSpan(8), opcode);
-        payload.CopyTo(frame.AsSpan(HeaderSize));
+        Encode(opcode, payload, frame);
         return frame;
+    }
+
+    /// <summary>Encodes the frame into a caller buffer, so a send path can write straight into its output.</summary>
+    /// <param name="opcode">The wire opcode.</param>
+    /// <param name="payload">The payload bytes.</param>
+    /// <param name="destination">At least <see cref="HeaderSize"/> plus the payload length bytes.</param>
+    /// <returns>The number of bytes written.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">The payload exceeds the wire length field.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="destination"/> is too short.</exception>
+    public static int Encode(ushort opcode, ReadOnlySpan<byte> payload, Span<byte> destination)
+    {
+        if (payload.Length > MaxPayloadBytes)
+            throw new ArgumentOutOfRangeException(nameof(payload), payload.Length,
+                $"A cn-279 frame payload is limited to {MaxPayloadBytes} bytes.");
+        var length = HeaderSize + payload.Length;
+        if (destination.Length < length)
+            throw new ArgumentException($"The frame needs {length} bytes.", nameof(destination));
+        // The unknown header bytes are zero on the wire; a pipe's span is not cleared.
+        destination[..HeaderSize].Clear();
+        destination[0] = 0xFF;
+        BinaryPrimitives.WriteUInt16LittleEndian(destination[2..], (ushort)payload.Length);
+        BinaryPrimitives.WriteUInt16LittleEndian(destination[8..], opcode);
+        payload.CopyTo(destination[HeaderSize..]);
+        return length;
     }
 
     /// <summary>Consumes one complete frame without advancing an incomplete input.</summary>

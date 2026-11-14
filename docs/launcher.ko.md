@@ -230,7 +230,8 @@ Bubble Fighter 클라이언트 패치는 훅 플러그인으로 제공됩니다.
 | `supports_instances` / `supports_plugins` | 서버가 인스턴스 선택과 클라이언트 플러그인을 허용하는지 광고합니다. | `true` / `true` |
 | `registration_enabled` | 런처 계정 등록을 허용하는지 여부입니다. | `true` |
 | `create_account_on_login` | 알 수 없는 이름으로 로그인하면 입력한 비밀번호로 그 계정을 만들어, 플레이어가 따로 가입하지 않아도 되게 할지 여부입니다. 이름을 잘못 입력하면 새 계정이 만들어집니다. | `false` |
-| `minimum_launcher_version` | 등록, 로그인, 갱신, 티켓 발급에 필요한 최소 런처 SemVer입니다. 비우면 게이트를 비활성화합니다. | 비어 있음 |
+| `minimum_launcher_version` | 등록, 로그인, 갱신, 티켓 발급에 필요한 최소 런처 SemVer입니다. 이보다 낮은 모든 버전은 HTTP 426으로 거부되며, 최소 버전 자체의 사전 릴리스도 포함됩니다(`0.2.0-rc.1`은 `0.2.0`보다 낮음). 비워 두면 검사하지 않습니다. 기본 제공 core 번들은 `${BFF_LAUNCHER_MINIMUM_VERSION:-0.2.0}`으로 설정합니다. | 코드 기본값은 비어 있음, core 번들은 `0.2.0` |
+| `notices` | `GET /v1/notices?section=`으로 제공되는 운영 공지입니다. 각 공지에는 `id`, `title`, Markdown 형식의 `body`(원시 HTML은 표시하지 않음), `level`(`info`, `warning`, `important`), `published_at`(초와 시간대 오프셋을 포함한 ISO 8601, 그 전에는 표시하지 않음), 선택적 `sections`가 있습니다. 최신순으로 제공됩니다. 런처는 플레이어가 게임을 시작할 때 읽지 않은 공지를 한 번씩 보여 주고, 모두 보기에서 전체 공지를 나열합니다. | 비어 있음 |
 | `client_policy` | 런처에 보내는 스토어 소스와 플러그인별 유형 규칙입니다. [클라이언트 정책](#client-policy)을 참조하세요. | 비어 있음 |
 | `session_seconds` / `refresh_session_seconds` | 액세스 토큰과 갱신 가능한 세션의 수명(초)입니다. | 1800 / 2592000 |
 | `ticket_seconds` | 실행 티켓 수명(초)입니다. | 600 |
@@ -399,6 +400,7 @@ WebSocket 채널입니다. 게임 위에 뜨는 런처 팝업처럼 원래 게�
 | --- | --- |
 | `companion` | 리스너와 실행 표. 켜면 모든 `/v1/launch` 응답에 `companion` 객체(`url`, 일회용 `ticket`, `launchId`, `expiresAt`)가 들어갑니다. |
 | `companion.notices` | 런처 팝업(`ui.notification.show`)과 `popup <텍스트>` 관리 명령, 권한 `game.management.popup`. |
+| `companion.native_ui` | 게임 자체의 메시지 상자, 알림, 배너 공지, 로컬 채팅 줄(`ui.native.invoke`/`ui.native.result`). 서버 플러그인은 `IClientNativeUi.ShowAsync`를 호출해 플레이어의 선택을 받습니다. 런처는 클라이언트의 네이티브 컨트롤을 먼저 쓰고 오버레이를 대체 수단으로 씁니다. 개발 테스트 명령 `clientui <닉네임> <box|notice|banner|chat> <텍스트>`(권한 `game.management.clientui`)는 한 플레이어에게 표시하고 결과를 출력합니다. |
 | `companion.commands` | 공유 플레이어 권한과 채팅 제한을 사용하는 인증된 게임 명령 요청. |
 
 세 행은 core 번들에서 꺼져 있고 `all` 프로필이 켭니다. `companion` 옵션:
@@ -484,6 +486,31 @@ payload에는 다음 두 문자열만 허용되며 작업 식별자는 payload �
 읽거나 게임 상태를 바꾸지 않습니다. 알 수 없거나 누락, 불일치, 시간 초과인 결과로 퇴장을 허용하면 안 됩니다.
 이 스냅샷은 퇴장을 예약하지 않으며 실행 시 방 참여와 단계를 다시 확인합니다.
 
+### 장면 변화
+
+`companion.scene` 행은 플레이어의 장면이 바뀔 때마다 `game.session.state`와 같은 payload의 `game.session.changed` v1
+이벤트를 보냅니다. 메인 메뉴, 광장, 방 입장과 퇴장, 방의 대기, 카운트다운, 로딩, 경기, 결과 단계, 모드 변경, 튜토리얼과
+훈련이 모두 해당합니다. Launcher 연결이 바인딩될 때마다(재연결 포함) 한 번 더 보내므로 오버레이는 폴링 없이 플레이어의
+위치를 알 수 있습니다. 같은 장면은 다시 보내지 않습니다.
+
+`companion.room_create` 행은 플레이어가 지금 방을 만들 수 있는지 Launcher에 알려 줍니다. 변화가 있을 때와 연결이
+바인딩될 때마다 `game.room.create.context` v1을 보내고, `game.room.create.context.get` v1 요청(payload `{}`)에
+같은 객체로 응답합니다.
+
+```json
+{"context_id":"6f1c0d2e9b8a4c7d8e5f4a3b2c1d0e9f","revision":2,"active":true}
+```
+
+`active`는 서버가 방 생성을 받는 두 장면인 메인 메뉴와 광장에서만 true입니다. 방 생성이나 입장에 성공한 뒤, 경기 중,
+경기가 끝나 같은 방으로 돌아온 경우는 inactive이며 거부된 생성이나 입장은 상태를 바꾸지 않습니다. `context_id`는
+불투명한 값으로 한 번의 게임 로그인에 속하며 Launcher가 다시 연결해도 바뀌지 않습니다. `revision`은 1에서 시작해
+`active`가 바뀔 때마다 1씩 늘어나므로 중복 전달은 같은 revision을 유지하고 더 낮은 값은 무시할 수 있습니다. 서버는
+클라이언트 자체의 방 만들기 창이 언제 열리는지 알지 못하며 광장 입장 후 시간 제한은 없습니다.
+
+두 행 모두 장면이 바뀐 뒤 게임 잠금 밖에서 장면을 읽고, 바인딩된 게임 연결마다 최신 상태만 보관하며 연결이 닫히면
+버립니다. Launcher 대기열이 가득 차 보내지 못한 상태는 `retry_milliseconds`(기본 250) 뒤에 다시 보내므로 최신 상태
+(inactive 포함)를 잃지 않습니다. 이 유형을 협상하지 않은 Launcher는 아무것도 받지 않습니다.
+
 ### 다른 노드에서 최초 로그인
 
 작업 노드의 `cluster.ticket-client.companion`을 켜고 발급 노드의 해당 peer에 `companion_url`을 명시적인
@@ -536,6 +563,10 @@ Launcher에서 접근할 수 있어야 하고 `{host}`는 설정한 작업 노�
 - 런처 API 뒤의 프로필 행과 환경 변수는 [서버 설정](configuration.md)을 참고하십시오.
 - 서버 실행, 지속성, 백업, 네트워크 보안은 [배포](deployment.md)를 참고하십시오.
 - 런처에 국한되지 않는 서버 측 실패는 [문제 해결](troubleshooting.md)을 참고하십시오.
+
+## 클러스터 클라이언트 버전 {#cluster-client-builds}
+
+클러스터를 사용하면 서버가 지원하는 클라이언트 버전은 모든 노드 버전의 합집합입니다. 이때 `GET /v1/catalog`는 `clusterBuilds`(하나 이상의 노드가 지원하는 버전)를 반환하고 각 프리셋에 `clusterServed`를 표시합니다. 클러스터가 없으면 둘 다 반환하지 않습니다. 지원하는 노드가 없는 버전은 런처의 버전 목록에 남지만 실행 버튼이 비활성화되며, `POST /v1/launch`는 409 `build_not_served`로 거부합니다. 버전별 서버 목록(`/v1/servers/{build}`)은 해당 버전을 지원하는 노드가 있는 서버만 제공하고, 각 노드 대상에는 `client_builds`가 포함되므로 게이트웨이의 서버 센터는 클라이언트 버전을 지원하는 노드만 표시합니다.
 
 ## 서버 공개 정보와 접속 허용 정책 {#server-presentation-and-admission}
 

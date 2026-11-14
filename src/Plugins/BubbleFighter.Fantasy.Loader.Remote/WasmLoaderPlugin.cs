@@ -7,7 +7,7 @@ namespace BubbleFighter.Fantasy.Loader.Remote;
 /// as owned definition sources. A module speaks the same SDK plugin protocol as a <c>loader.process</c> child, so a
 /// plugin built with an SDK can run either way; <see cref="WasmChannel"/> lists the imports a module uses.
 /// </summary>
-[Plugin("loader.wasm", Description = "Publishes plugin definitions served by sandboxed WebAssembly modules inside the host.",
+[Plugin("loader.wasm", Category = "core", Names = ["en=WebAssembly plugin loader", "zh-Hans=WebAssembly 插件加载器", "zh-Hant=WebAssembly 模組載入器", "ko=WebAssembly 플러그인 로더"], Description = "Publishes plugin definitions served by sandboxed WebAssembly modules inside the host.",
     Requires = [typeof(IPluginHost)])]
 public sealed class WasmLoaderPlugin : IPlugin
 {

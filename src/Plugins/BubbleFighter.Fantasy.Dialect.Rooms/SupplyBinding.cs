@@ -26,6 +26,9 @@ internal sealed class SupplyBinding(string protocol, IOpcodeTable table, PacketT
 
     internal Func<ISession, RoundSuppliesReported, CancellationToken, ValueTask<bool>>? MapReportFirst { get; init; }
 
+    // Set when the star modes are mounted: the same report lists the map's star points.
+    internal bool ReportsStars { get; init; }
+
     internal void Mount(IPluginContext context, IMessageRouter messages)
     {
         if (!tables.CapabilityOf(build, "map_supplies"))
@@ -111,7 +114,11 @@ internal sealed class SupplyBinding(string protocol, IOpcodeTable table, PacketT
         }));
         context.Effect(router.Register(protocol, table.C2S("gcpGameReportMapData"), async (session, packet, ct) =>
         {
-            var report = ReadReport(tables, build, packet.Payload.Span, limit);
+            var values = ReadReportValues(tables, build, packet.Payload.Span, limit);
+            var report = Supplies(values, packet.Payload.Length);
+            if (ReportsStars && StarBinding.ReadStarPoints(values, packet.Payload.Length) is { Points.Count: > 0 } stars
+                && !await messages.DispatchAsync(protocol, session, stars, ct).ConfigureAwait(false))
+                throw new InvalidOperationException("Map stars have no typed handler.");
             if (MapReportFirst is not null && await MapReportFirst(session, report, ct).ConfigureAwait(false))
                 return;
             if (!await messages.DispatchAsync(protocol, session, report, ct).ConfigureAwait(false))
@@ -148,7 +155,10 @@ internal sealed class SupplyBinding(string protocol, IOpcodeTable table, PacketT
             { Velocity = velocity };
     }
 
-    internal static RoundSuppliesReported ReadReport(PacketTables tables, string build, ReadOnlySpan<byte> body, int limit)
+    internal static RoundSuppliesReported ReadReport(PacketTables tables, string build, ReadOnlySpan<byte> body, int limit) =>
+        Supplies(ReadReportValues(tables, build, body, limit), body.Length);
+
+    internal static Dictionary<string, object?> ReadReportValues(PacketTables tables, string build, ReadOnlySpan<byte> body, int limit)
     {
         var values = PacketCodec.Read(tables, build, "SupplyMapReport", body,
             new PacketReadLimits(MaxCollectionElements: limit, MaxValues: checked(16 + 24 * limit), MaxDepth: 3));
@@ -160,7 +170,11 @@ internal sealed class SupplyBinding(string protocol, IOpcodeTable table, PacketT
                 if (((Dictionary<string, object?>)entry!).Values.Any(value => value is not float axis || !float.IsFinite(axis)))
                     throw new PacketFormatException("Supply position is not finite.", 0);
         }
-        var bodyLength = body.Length;
+        return values;
+    }
+
+    private static RoundSuppliesReported Supplies(Dictionary<string, object?> values, int bodyLength)
+    {
         var positions = (object?[])values["positions"]!;
         var kinds = (object?[])values["kinds"]!;
         // A build whose report states no interval vectors reports zero bounds; the round applies its default.
@@ -171,7 +185,7 @@ internal sealed class SupplyBinding(string protocol, IOpcodeTable table, PacketT
         var teams = values.TryGetValue("team", out var teamVector) ? (object?[])teamVector! : null;
         if (kinds.Length != positions.Length || minimum.Length != positions.Length || maximum.Length != positions.Length
             || (teams is not null && teams.Length != positions.Length))
-            throw new PacketFormatException("Supply point vectors have different lengths.", body.Length);
+            throw new PacketFormatException("Supply point vectors have different lengths.", bodyLength);
         return new RoundSuppliesReported(positions.Select((entry, i) =>
         {
             var point = (Dictionary<string, object?>)entry!;

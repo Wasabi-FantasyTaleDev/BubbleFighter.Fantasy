@@ -10,4 +10,11 @@ namespace BubbleFighter.Fantasy.Contracts.Inventory;
 /// <param name="SelectionChange">Whether the caller published an accepted selection or preset change.</param>
 /// <remarks>Completion means the sender accepted every frame; it does not establish client receipt or application.</remarks>
 public sealed record EquipmentViewPublished(string Protocol, ISession Session, LocalEquipmentViewUpdated View,
-    bool SelectionChange) : IEvent;
+    bool SelectionChange) : IEvent
+{
+    /// <summary>
+    /// Gets whether this publication replays a supplied room, plaza or login snapshot already applied by its owner,
+    /// so completion does not request another equipment-state reconciliation.
+    /// </summary>
+    public bool IsSceneReplay { get; init; }
+}

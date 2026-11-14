@@ -1,3 +1,4 @@
+using BubbleFighter.Fantasy.Contracts.Titles;
 using BubbleFighter.Fantasy.Contracts.Clans;
 using BubbleFighter.Fantasy.Contracts.Couples;
 using BubbleFighter.Fantasy.Contracts.Fighters;
@@ -21,6 +22,26 @@ namespace BubbleFighter.Fantasy.Persistence.Memory.Tests;
 /// </summary>
 public sealed class MemoryPersistencePluginTests
 {
+    /// <summary>Pet transactions share inventory state and unload with the inventory provider.</summary>
+    [Fact]
+    public async Task PetMutationsUseTheRegisteredInventoryAndUnload()
+    {
+        var registry = new FakeRegistry();
+        var context = new FakeContext(registry, new MemoryPersistenceOptions());
+        await new MemoryPersistencePlugin().ActivateAsync(context, default);
+        Assert.Same(registry.Get<IInventoryRepository>(), registry.Get<IPetMutationStore>());
+        Assert.Same(registry.Get<IInventoryRepository>(), registry.Get<IPetEntitlementStore>());
+        Assert.Same(registry.Get<IInventoryRepository>(), registry.Get<IItemEnhancementStore>());
+        Assert.Same(registry.Get<IInventoryRepository>(), registry.Get<IInventoryMetadataStore>());
+        Assert.Same(registry.Get<IInventoryRepository>(), registry.Get<ITitleMedalStore>());
+        foreach (var effect in registry.Disposables.AsEnumerable().Reverse()) effect.Dispose();
+        Assert.False(registry.TryGet<IPetMutationStore>(out _));
+        Assert.False(registry.TryGet<IPetEntitlementStore>(out _));
+        Assert.False(registry.TryGet<IItemEnhancementStore>(out _));
+        Assert.False(registry.TryGet<IInventoryMetadataStore>(out _));
+        Assert.False(registry.TryGet<ITitleMedalStore>(out _));
+    }
+
     /// <summary>The relationship provider uses the row's capacity limits and unregisters with its owned effects.</summary>
     [Fact]
     public async Task CoupleProviderUsesConfiguredLimitsAndUnloads()

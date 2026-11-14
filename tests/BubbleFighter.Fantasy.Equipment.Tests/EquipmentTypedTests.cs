@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Inventory;
+using BubbleFighter.Fantasy.Contracts.Rooms;
 using BubbleFighter.Fantasy.Equipment.Handlers;
 using BubbleFighter.Fantasy.Equipment.Sessions;
 using BubbleFighter.Fantasy.Kernel;
@@ -139,6 +140,38 @@ public sealed class EquipmentTypedTests
         Assert.True(Assert.IsAssignableFrom<ICollection<int>>(eventItems).IsReadOnly);
     }
 
+    /// <summary>The first commit event already contains copied modifiers from the returned bag, before any subscriber changes storage.</summary>
+    [Fact]
+    public async Task CommittedEventCarriesFrozenAttributesBeforeItsFirstSubscriber()
+    {
+        using var scope = new EquippedItemScope(4, 4);
+        var state = new TraceState();
+        var events = new EventBus(NullLogger.Instance);
+        uint[] words = [1, 2, 3, 4];
+        using var presentation = events.Intercept<InventoryPresentationRequested, InventoryItemPresentation>((request, _, _) =>
+        {
+            Assert.Equal(state.Protocol, request.Protocol);
+            return ValueTask.FromResult(request.Slot.ItemId == 203073
+                ? new InventoryItemPresentation([new(203073, 7, words, 0, "")], null)
+                : InventoryItemPresentation.Empty);
+        });
+        EquipmentSelectionCommitted? committed = null;
+        using var subscription = events.OnAsync<EquipmentSelectionCommitted>((message, _) =>
+        {
+            committed = message;
+            words[0] = 99;
+            state.Bag![1] = state.Bag[1] with { Quantity = 9 };
+            return state.StepAsync("event");
+        });
+        var handler = new EquipmentHandlers(scope, new ForbiddenStore(), state, NullLogger.Instance, state, state, state, events);
+        await handler.HandleAsync(new RecordingSession(1, 42), new(203073, 203073, true), default);
+        var attribute = Assert.Single(committed!.ItemAttributes!);
+        Assert.Equal(new uint[] { 1, 2, 3, 4 }, attribute.Values);
+        Assert.Throws<NotSupportedException>(() => ((IList<uint>)attribute.Values)[0] = 2);
+        Assert.Equal(1, state.Pushed!.Single(row => row.ItemId == 203073).Quantity);
+        Assert.Equal(new[] { "commit", "event", "ack", "inventory", "view" }, state.Calls);
+    }
+
     [Theory]
     [InlineData("commit")]
     [InlineData("event")]
@@ -196,6 +229,82 @@ public sealed class EquipmentTypedTests
         await handler.HandleAsync(new RecordingSession(1, 42), new(203073, 203073, true), default);
         Assert.Equal(new[] { "commit", "ack" }, state.Calls);
         Assert.False(Assert.Single(state.Replies).Succeeded);
+    }
+
+    /// <summary>
+    /// A granted switch to a page whose weapon is owned but not worn wears it through the ordinary commit and inventory
+    /// publication, sends no equip result (the client sent no equip request), then republishes the view and replies.
+    /// </summary>
+    [Fact]
+    public async Task APresetSwitchWearsItsPageWeaponQuietly()
+    {
+        using var scope = new EquippedItemScope(4, 4);
+        var trace = new TraceState { Bag = [new(42, InventoryBag.CharacterBag, 1, 300001, 1, 1), new(42, InventoryBag.CharacterBag, 2, 204001, 1, 1),
+            new(42, InventoryBag.CharacterBag, 3, 202001, 1, 0)] };
+        var equipment = new EquipmentHandlers(scope, new ForbiddenStore(), trace, NullLogger.Instance, trace, trace, trace);
+        // Before the switch the player wears 202001; page 1 holds 204001, which the player owns.
+        var before = new ReadOnlySelection([new(42, InventoryBag.CharacterBag, 1, 300001, 1, 1), new(42, InventoryBag.CharacterBag, 2, 204001, 1, 0),
+            new(42, InventoryBag.CharacterBag, 3, 202001, 1, 1)]);
+        var state = new PageState([new(202001, 0, 0), new(204001, 0, 0), new(0, 0, 0), new(0, 0, 0), new(0, 0, 0)]);
+        var replies = new PresetReplies(trace.Calls);
+        var presets = new WeaponPresetChangeHandler(state, before, trace, replies, NullLogger.Instance, state, equipment);
+
+        await presets.HandleAsync(new RecordingSession(1, 42), new WeaponPresetChangeRequested(-1, 1), default);
+
+        Assert.Equal(204001, trace.AppliedItem);
+        Assert.Equal(new[] { "commit", "inventory", "view", "reply" }, trace.Calls);
+        Assert.Empty(trace.Replies);
+        Assert.Equal(0, Assert.Single(replies.Sent).Status);
+        Assert.Equal((byte)1, state.Active);
+    }
+
+    /// <summary>A page weapon this build's bag does not hold is never worn: the switch keeps the worn set.</summary>
+    [Fact]
+    public async Task APresetSwitchNeverWearsAWeaponThisBuildDoesNotOwn()
+    {
+        using var scope = new EquippedItemScope(4, 4);
+        var trace = new TraceState();
+        var equipment = new EquipmentHandlers(scope, new ForbiddenStore(), trace, NullLogger.Instance, trace, trace, trace);
+        var before = new ReadOnlySelection([new(42, InventoryBag.CharacterBag, 1, 300001, 1, 1), new(42, InventoryBag.CharacterBag, 3, 202001, 1, 1)]);
+        var state = new PageState([new(202001, 0, 0), new(204999, 0, 0), new(0, 0, 0), new(0, 0, 0), new(0, 0, 0)]);
+        var replies = new PresetReplies(trace.Calls);
+        var presets = new WeaponPresetChangeHandler(state, before, trace, replies, NullLogger.Instance, state, equipment);
+
+        await presets.HandleAsync(new RecordingSession(1, 42), new WeaponPresetChangeRequested(-1, 1), default);
+
+        Assert.Equal(0, trace.AppliedItem);
+        Assert.Equal(new[] { "view", "reply" }, trace.Calls);
+        Assert.Equal(0, Assert.Single(replies.Sent).Status);
+    }
+
+    private sealed class ReadOnlySelection(IReadOnlyList<InventorySlotRecord> bag) : IEquipmentSelection
+    {
+        public ValueTask<IReadOnlyList<InventorySlotRecord>> ReadAsync(long userNum, CancellationToken ct) => ValueTask.FromResult(bag);
+        public ValueTask<IReadOnlyList<InventorySlotRecord>?> ApplyAsync(long userNum, int itemId, bool worn, CancellationToken ct) =>
+            throw new InvalidOperationException("The switch commits through the equipment handlers.");
+    }
+
+    private sealed class PageState(WeaponPresetPage[] pages) : IPlayerInventoryState, IWeaponPresetPageSource
+    {
+        internal byte Active { get; private set; }
+        public ValueTask<WeaponPresetPage[]?> ReadAsync(long userNum, CancellationToken ct) => ValueTask.FromResult<WeaponPresetPage[]?>(pages.ToArray());
+        public ValueTask<byte> GetActiveWeaponPresetSlotAsync(long userNum, CancellationToken ct) => ValueTask.FromResult(Active);
+        public ValueTask SetActiveWeaponPresetSlotAsync(long userNum, byte slot, CancellationToken ct) { Active = slot; return ValueTask.CompletedTask; }
+        public ValueTask<WeaponPresetPage[]?> GetWeaponPresetPagesAsync(long userNum, CancellationToken ct) => ValueTask.FromResult<WeaponPresetPage[]?>(pages.ToArray());
+        public ValueTask<WeaponPresetPage[]> GetOrCreateWeaponPresetPagesAsync(long userNum, WeaponPresetPage[] initialPages, CancellationToken ct) => ValueTask.FromResult(pages.ToArray());
+        public ValueTask SetWeaponPresetPagesAsync(long userNum, WeaponPresetPage[] updated, CancellationToken ct) => ValueTask.CompletedTask;
+    }
+
+    private sealed class PresetReplies(List<string> calls) : IMessageSender<WeaponPresetChangeReplied>
+    {
+        internal List<WeaponPresetChangeReplied> Sent { get; } = [];
+        public string Protocol => "kr-812/game";
+        public ValueTask SendAsync(ISession session, WeaponPresetChangeReplied message, CancellationToken ct)
+        {
+            calls.Add("reply");
+            Sent.Add(message);
+            return ValueTask.CompletedTask;
+        }
     }
 
     private sealed class ForbiddenStore : IInventoryRepository

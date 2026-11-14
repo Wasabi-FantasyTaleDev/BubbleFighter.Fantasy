@@ -772,8 +772,8 @@ opcodes:
     direction: s2c
     name: gspEventNotice
     name_source: label@cn-279
-    evidence: inferred
-    source: "cn-279 dispatcher sub_6FFDE0 case 118: Packet_gspEventNotice"
+    evidence: verified
+    source: "cn-279 dispatcher sub_6FFDE0 case 118 -> cn-279 sub_6FB0C0; packet reader cn-279 sub_44EEE0 -> cn-279 sub_453380, EventNoticeItem reader cn-279 sub_44DD40; cn-279 sub_787290 reads event 23 progress 1 for the supplementary practice marker"
   - value: 120
     direction: s2c
     name: gspEvent2GuildRanking

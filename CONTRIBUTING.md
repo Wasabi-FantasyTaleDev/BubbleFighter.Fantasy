@@ -12,7 +12,7 @@ python -m unittest discover -s tools/ci -p "test_*.py"
 python tools/ci/serial-gates.py --public --results-directory artifacts/validation/public-01
 ```
 
-The gate additionally needs Python, Node.js/npm, Go and Rust/cargo/rustup with `wasm32-wasip1` on PATH. Public mode runs every tracked test project, excluding only `Category=LocalClientData` cases. It records that exclusion and is not the complete release gate. Every attempt needs a new results directory; populated TRX results must match passing counters with no skips.
+The gate additionally needs Python, Node.js/npm, Go and Rust/cargo/rustup with `wasm32-wasip1` on PATH. Public mode runs every tracked test project, excluding only `Category=LocalClientData` cases. It records that exclusion and is not the complete release gate. Every attempt needs a new results directory; populated TRX results must match passing counters with no skips. For day-to-day branches, `--affected origin/main` runs only the test projects that can observe your changes; run the full gate before a deployment batch or release.
 
 ## Complete validation
 
@@ -21,8 +21,9 @@ Omit `--public` to require all tests. Provision the following locally obtained c
 | Setting or path | Required file |
 | --- | --- |
 | `client-data/cn-324/` | `Config/ShopItem2.xml` |
-| `client-data/kr-1256/data/` | `Packs/Config_00000.pkn` (the shop and fighter workbooks) and `Packs/ConfigSh_00000.pkn` (the pet overlay) |
-| `artifacts/shop-tables-survey/id400/xml/` | `Config/ShopItem2.xml` |
+| `BFF_CN324_CONFIG_ARCHIVE`, `BFF_CN404_CONFIG_ARCHIVE`, `BFF_CN406_CONFIG_ARCHIVE`, `BFF_CN408_CONFIG_ARCHIVE`, `BFF_ID400_CONFIG_ARCHIVE` | Set each environment variable to its own build's `Config.bfz` file. The complete gate checks these paths before building. |
+| `client-data/kr-1256/data/` | `Packs/Config_00000.pkn` (the shop and fighter workbooks and BnB rules), `Packs/ConfigSh_00000.pkn` (the pet overlay), and `Packs/Maps_00023.pkn` (the BnB village map and item layout) |
+| `artifacts/shop-tables-survey/id400/xml/` | `Config/ShopItem2.xml`, extracted from the id-400 client's `Config/Config.bfz` with `bffarchive extract <id-400>/Config/Config.bfz artifacts/shop-tables-survey/id400/xml --path Config/Config.bfz --filter ShopItem2.xml` |
 
 The complete gate builds Release, checks all four SDKs, runs test projects serially, validates packet tables and dumps isolated configuration. Release review additionally requires isolated startup and affected real-client flows. Automated checks do not replace client acceptance.
 
@@ -30,7 +31,7 @@ Self-hosted CI uses `BFF_CI_FIXTURE_ROOT` for the two fixture trees and the kr-1
 
 ## Local Host checks
 
-Follow [Quickstart](docs/quickstart.md), including the nonempty local `BFF_MYSQL_PASSWORD`. Every local `run`, including `--dump-config`, must include `--patch tools/local-checks/isolated-memory.patch.yaml`. Do not assume a developer environment points at a disposable database.
+Follow [Quickstart](docs/quickstart.md). A local check needs no database settings; `BFF_MYSQL_PASSWORD` is required only when the MySQL row is enabled. Every local `run`, including `--dump-config`, must include `--patch tools/local-checks/isolated-memory.patch.yaml`. Do not assume a developer environment points at a disposable database.
 
 ## Protocol and documentation changes
 

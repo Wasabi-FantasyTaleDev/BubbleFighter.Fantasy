@@ -120,17 +120,21 @@ structs:
   # cn-735 sub_51B4E0 returns on a zero u16 mask without replacing native configuration.
   DynamicConfigReply@cn-735:
     - mask: u16
-  # cn-774 sub_8115F0 and tw-454 sub_A9E440 likewise accept a zero u16 mask.
-  # Nonzero category bodies are not established by these zero-mask bootstrap replies.
+  # cn-774 sub_8115F0 walks sixteen bits; cn-774 sub_811660 reads each counted zlib blob.
+  # cn-774 sub_5F6B40 registers category 14. No other CN category is admitted here.
   DynamicConfigReply@cn-774:
     - mask: u16
+    - slot_14: 'when<mask&0x4000,DynamicConfigBlob>'
+      except: [tw-454] # tw-454 sub_A9E440 has only been admitted for the zero-mask reply.
 
-  # kr-1256 sub_65F370 reads one compressed byte count and wraps those bytes in a zlib stream.
+  # kr-1256 sub_65F370 and cn-774 sub_811660 read a byte count and wrap those bytes in a zlib stream.
   DynamicConfigBlob:
     - compressed: list<u8>
 
   CreationContent: []
   # kr-1256 sub_53D0E0 registers category 14. kr-1256 sub_53CDF0 -> kr-1256 sub_40DC40 reads this inflated body.
+  # cn-774 sub_5F6B40 registers the same ID; cn-774 sub_5F67F0 reads this complete sequence independently.
+  # cn-774 sub_454CA0 reads its one map; native +36 is cleared without consuming another wire field.
   CreationContent@kr-1256:
     - ui_path: wstr
       offset: 0
@@ -140,6 +144,7 @@ structs:
       offset: 44
     - unknown_52: u32
       offset: 52
+      # kr-1256 sub_EE1F10 and cn-774 sub_E5B7F0 consume these bits as a float cooldown in OA days.
     - unknown_56: u32
       offset: 56
       default: 100 # kr-1256 sub_5E6C30 uses this word as a divisor in a separate counter display.

@@ -249,8 +249,8 @@ public sealed class RoundStartParityRun : IAsyncLifetime
         await Step("B move partial first", () => b.Send(32923, PartialMovement(actorB, 1)));
         // The life cycle of the timed score mode: A bubbles B (victim, source, then +24 zero = bubbled), pops it
         // (success, victim, popper) for a team point, B's death is cleaned, and B asks for and confirms its reset.
-        await Step("B bubbled", () => relays["B"].Send(38282, Life(40, (0, actorB), (4, actorA))));
-        await Step("A pops B", () => relays["A"].Send(38277, Life(32, (0, 1), (4, actorB), (8, actorA))));
+        await Step("B bubbled", () => relays["B"].Send(38282, Life(40, (0, actorB), (4, actorA))), waitFor: 985);
+        await Step("A pops B", () => relays["A"].Send(38277, Life(32, (0, 1), (4, actorB), (8, actorA))), waitFor: 985);
         await Step("B death cleaned", () => relays["B"].Send(32836, Words(actorB)));
         await Step("B reset", () => b.Send(602, [.. Words(actorB), 0xBA, 0xBA, .. Words(0)]));
         await Step("B reset confirm", () => relays["B"].Send(32926, [.. Words(actorB), 0xBA, 0xBA, .. new byte[5]]));

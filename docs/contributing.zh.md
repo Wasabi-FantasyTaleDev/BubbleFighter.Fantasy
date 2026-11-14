@@ -88,19 +88,25 @@ python -m unittest discover -s tools/ci -p "test_*.py"
 python tools/ci/serial-gates.py --public --results-directory artifacts/validation/public-01
 ```
 
-每次尝试都使用新的、不存在的结果目录——运行器拒绝已存在的目录。它会构建 Release、运行 SDK 一致性检查、逐个串行运行测试项目、检查 packet 表，并转储带隔离补丁的 `kr-1256` 配置。最后输出 `PASS public gates: <n> populated test reports, <n> tests, no skips`，并把排除范围记录到 `scope.json`。公开模式运行每个被跟踪的测试项目，只排除 `Category=LocalClientData` 用例；它不是完整发布门禁。如果设置了 `CI=true`，运行器还会拒绝含有 `.env` 或 `profiles/*/local.patch.yaml` 的检出。
+每次尝试都使用新的、不存在的结果目录——运行器拒绝已存在的目录。它会构建 Release、运行 SDK 一致性检查、并行运行相互独立的测试项目、随后单独运行对时序敏感的项目、检查 packet 表，并转储带隔离补丁的 `kr-1256` 配置。最后输出 `PASS public gates: <n> populated test reports, <n> tests, no skips`，并把排除范围记录到 `scope.json`。公开模式运行每个被跟踪的测试项目，只排除 `Category=LocalClientData` 用例；它不是完整发布门禁。如果设置了 `CI=true`，运行器还会拒绝含有 `.env` 或 `profiles/*/local.patch.yaml` 的检出。
+
+日常开发可加上 `--affected <ref>`，只运行能观察到自该 ref 合并基点以来改动（包括未提交文件）的测试项目：自身文件有改动，或直接或通过通配符引用了改动项目的项目。只改文档时不运行测试；改动不属于任何项目（例如 `profiles/`、`packets/` 或构建文件）时运行全部项目。部署批次或发布前仍需运行完整门禁。
+
+```sh
+python tools/ci/serial-gates.py --public --affected origin/main --results-directory artifacts/validation/affected-01
+```
 
 **确认成功。** 退出码为 0，最后一行是上面的 `PASS` 行。非零退出会打印 `FAIL <reason>`；失败步骤的日志在结果目录中。
 
 ### 运行本地 Host 检查
 
-遵循[快速开始](quickstart.md)：把 `.env.example` 复制为 `.env`，将 `BFF_MYSQL_PASSWORD` 设为非空的临时值，并且始终附加隔离补丁——`--dump-config` 也一样：
+遵循[快速开始](quickstart.md)。本地检查不需要数据库设置或 `.env`，并且始终附加隔离补丁——`--dump-config` 也一样：
 
 ```sh
 dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile management --patch tools/local-checks/isolated-memory.patch.yaml
 ```
 
-该补丁停用 `persistence.mysql` 并启用内存持久化，因此开发者的 `.env` 或本地覆盖不会连接真实数据库。绝不要把测试或本地检查指向生产数据库。**确认成功：** 另一个终端从 `http://127.0.0.1:8080/health` 得到 `{"status":"ok", ...}`；用 Ctrl+C 停止。
+该补丁停用 `persistence.mysql` 并启用内存持久化，因此开发者的 `.env` 或本地覆盖不会连接真实数据库。绝不要把测试或本地检查指向生产数据库。**确认成功：** 另一个终端从 `http://127.0.0.1:7300/health` 得到 `{"status":"ok", ...}`；用 Ctrl+C 停止。
 
 ## 仓库结构
 
@@ -188,8 +194,9 @@ npm run build
 | 设置或路径 | 必需文件 |
 | --- | --- |
 | `client-data/cn-324/` | `Config/ShopItem2.xml` |
-| `client-data/kr-1256/data/` | `Packs/Config_00000.pkn`（商店与角色工作簿）与 `Packs/ConfigSh_00000.pkn`（宠物叠加表） |
-| `artifacts/shop-tables-survey/id400/xml/` | `Config/ShopItem2.xml` |
+| `BFF_CN324_CONFIG_ARCHIVE`, `BFF_CN404_CONFIG_ARCHIVE`, `BFF_CN406_CONFIG_ARCHIVE`, `BFF_CN408_CONFIG_ARCHIVE`, `BFF_ID400_CONFIG_ARCHIVE` | 各环境变量必须指向对应版本自己的 `Config.bfz` 文件。完整门禁会在构建前检查这些路径。 |
+| `client-data/kr-1256/data/` | `Packs/Config_00000.pkn`（商店与角色工作簿及 BnB 规则）、`Packs/ConfigSh_00000.pkn`（宠物叠加表）和 `Packs/Maps_00023.pkn`（BnB 村庄地图与物品布局） |
+| `artifacts/shop-tables-survey/id400/xml/` | `Config/ShopItem2.xml`，用 `bffarchive extract <id-400>/Config/Config.bfz artifacts/shop-tables-survey/id400/xml --path Config/Config.bfz --filter ShopItem2.xml` 从 id-400 客户端的 `Config/Config.bfz` 中提取 |
 
 如果文件缺失，完整门禁会列出缺少的前置条件并停止：`Local game data is missing for <tests>; provision it or pass --public to run the publicly reproducible gates only.`
 

@@ -3,6 +3,7 @@
     <Description>Authoritative equipment selection and typed view publication with a table-driven view request reader. The row activates only when explicitly enabled.</Description>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="MemoryPack.Generator" PrivateAssets="all" />
     <ProjectReference Include="..\..\BubbleFighter.Fantasy.Abstractions\BubbleFighter.Fantasy.Abstractions.csproj" />
   </ItemGroup>
   <ItemGroup>

@@ -127,6 +127,8 @@ internal sealed partial class RoundFlow
             RoundSupplyPicked picked;
             bool immediate;
             int resolvedKind;
+            int? retainedItemSlot = null;
+            int? retainedItemKind = null;
             lock (room.Gate)
             {
                 if (room.Phase != RoomPhase.Playing || !SupplyRequestIsCurrent(room, session, stamp) || room.FindByGame(session.Id) is not { } seat
@@ -151,6 +153,11 @@ internal sealed partial class RoundFlow
                 var counted = countedMode && _options.CountedItemKinds.Contains(resolvedKind);
                 immediate = _options.ImmediateSupplyItemKinds.Contains(resolvedKind)
                     || (countedMode && _options.CountedImmediateItemKinds.Contains(resolvedKind));
+                if (immediate && state.HeldItems.TryGetValue(seat.Slot, out var retained) && retained.SelectedKind > 0)
+                {
+                    retainedItemSlot = retained.SelectedSlot;
+                    retainedItemKind = retained.SelectedKind;
+                }
                 var slotted = !immediate && _options.RandomSupplyItemKinds.Contains(resolvedKind);
                 // kr-1256 sub_C13F30 resolves a random box before reporting the kind; immediate effects have no held slot.
                 bool MatchesKind(int boxKind) => boxKind == resolvedKind || (boxKind == 0
@@ -210,7 +217,9 @@ internal sealed partial class RoundFlow
                 await _supplyPicked!.SendAsync(member.Game, picked, operationCt).ConfigureAwait(false);
             // cn-324 sub_46DBE0 removes the box; sub_46FED0 separately requests its native effect.
             if (immediate)
-                await _countedItemUsed!.SendAsync(session, new(picked.Seat, resolvedKind), operationCt).ConfigureAwait(false);
+                await _countedItemUsed!.SendAsync(session,
+                    new(picked.Seat, resolvedKind) { RetainedItemSlot = retainedItemSlot, RetainedItemKind = retainedItemKind },
+                    operationCt).ConfigureAwait(false);
         }, ct).ConfigureAwait(false);
     }
 
@@ -223,6 +232,8 @@ internal sealed partial class RoundFlow
             int slot;
             int kind;
             int itemSlot;
+            int nextItemSlot;
+            int nextItemKind;
             List<(int PreviousId, RoundSupplyCreated Created)> renewed;
             lock (room.Gate)
             {
@@ -232,11 +243,25 @@ internal sealed partial class RoundFlow
                     || !state.HeldItems.TryGetValue(seat.Slot, out var held) || !held.TryUse(out itemSlot, out kind))
                     return;
                 slot = seat.Slot;
+                if (_options.AutoAdvanceItemSlotAfterUse && held.TrySelectFirstOccupied(out nextItemSlot, out nextItemKind))
+                {
+                    // The native gspSwitchItemSlot consumer installs the selected slot and its kind for every peer.
+                    // Keep this behind the build capability until that consumer has been read for the build.
+                }
+                else
+                {
+                    nextItemSlot = -1;
+                    nextItemKind = -1;
+                }
                 members = [.. room.Seats];
                 renewed = RenewAvailableSupplies(room, state);
             }
             foreach (var member in members)
                 await _itemUsed!.SendAsync(member.Game, new RoundItemUsed(slot) { Kind = kind, ItemSlot = itemSlot }, operationCt).ConfigureAwait(false);
+            if (nextItemSlot >= 0)
+                foreach (var member in members)
+                    await _itemSlotChanged!.SendAsync(member.Game,
+                        new RoundItemSlotChanged(slot, nextItemSlot, nextItemKind), operationCt).ConfigureAwait(false);
             await SendRenewedSuppliesAsync(members, renewed, operationCt).ConfigureAwait(false);
         }, ct).ConfigureAwait(false);
     }
@@ -456,6 +481,19 @@ internal sealed class HeldSupplyItems(int capacity)
         if (kind <= 0) return false;
         // cn-324 sub_4E2160 clears only the specified slot and preserves the selection.
         _kinds[slot] = 0;
+        return true;
+    }
+
+    internal bool TrySelectFirstOccupied(out int slot, out int kind)
+    {
+        slot = Array.FindIndex(_kinds, value => value > 0);
+        if (slot < 0)
+        {
+            kind = -1;
+            return false;
+        }
+        SelectedSlot = slot;
+        kind = _kinds[slot];
         return true;
     }
 

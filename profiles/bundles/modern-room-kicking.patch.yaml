@@ -1,5 +1,5 @@
-# Opt-in native waiting-room kick binding for kr-1256, cn-774 and tw-454.
-# Supply with --patch for a single build, or copy the operation to that build's local.patch.yaml.
+# Native waiting-room kick binding for kr-1256, cn-774 and tw-454, included by those three profiles.
+# A profile without it can still supply it with --patch.
 - set:
     id: dialect.rooms
     config:

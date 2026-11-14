@@ -111,6 +111,78 @@ public sealed class RoomFlowTests
         }
     }
 
+    private sealed class LifecyclePolicy : IRoomPolicy
+    {
+        internal List<(RoomPolicyRoom? Room, ISession Session)> Departures { get; } = [];
+        internal List<RoomPolicyRoom> Transfers { get; } = [];
+
+        public RoomStartDecision EvaluateStart(RoomPolicyRoom room, long requesterSessionId) => RoomStartDecision.Proceed;
+        public ValueTask OnStartHeldAsync(RoomPolicyRoom room, long requesterSessionId, CancellationToken ct) => ValueTask.CompletedTask;
+        public ValueTask OnMemberEnteredAsync(RoomPolicyRoom room, long sessionId, CancellationToken ct) => ValueTask.CompletedTask;
+        public ValueTask OnAppearanceChangedAsync(RoomPolicyRoom room, long sessionId, CancellationToken ct) => ValueTask.CompletedTask;
+        public void OnRoomClosed(Guid instance) { }
+
+        public ValueTask OnMemberLeftAsync(RoomPolicyRoom? room, ISession session, CancellationToken ct)
+        {
+            Departures.Add((room, session));
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask OnHostChangedAsync(RoomPolicyRoom room, CancellationToken ct)
+        {
+            Transfers.Add(room);
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    /// <summary>Registered policies see the committed roster and host, including the last departure.</summary>
+    [Fact]
+    public async Task RegisteredRoomPolicySeesDeparturesAndHostTransfer()
+    {
+        var rig = new Rig();
+        var policies = new RoomPolicyHost(rig.Registry, "test/game", "kr-812");
+        rig.Flow.PolicyHost = policies;
+        var policy = new LifecyclePolicy();
+        using var registration = policies.Register(policy);
+        var host = Rig.Player(931, "host");
+        var successor = Rig.Player(932, "successor");
+        var guest = Rig.Player(933, "guest");
+        try
+        {
+            var id = await rig.CreateAsync(host);
+            await rig.Flow.HandleJoinAsync(successor, new(id, ""), default);
+            await rig.Flow.HandleJoinAsync(guest, new(id, ""), default);
+
+            await rig.Flow.HandleLeaveAsync(guest, new(), default);
+            var departure = Assert.Single(policy.Departures);
+            Assert.Same(guest, departure.Session);
+            var room = Assert.IsType<RoomPolicyRoom>(departure.Room);
+            Assert.Equal(id, room.RoomId);
+            Assert.Equal(new[] { host.Id, successor.Id }, room.Seats.Select(seat => seat.SessionId));
+            Assert.Equal(host.Id, Assert.Single(room.Seats, seat => seat.Host).SessionId);
+            Assert.Null(policies.Find(guest.Id));
+
+            await rig.Flow.HandleMasterChangeAsync(host, new("successor"), default);
+            var transfer = Assert.Single(policy.Transfers);
+            Assert.Equal(room.Instance, transfer.Instance);
+            Assert.Equal(successor.Id, Assert.Single(transfer.Seats, seat => seat.Host).SessionId);
+            Assert.Equal(host.Id, Assert.Single(room.Seats, seat => seat.Host).SessionId);
+
+            await rig.Flow.HandleLeaveAsync(successor, new(), default);
+            Assert.Equal(2, policy.Departures.Count);
+            Assert.Same(successor, policy.Departures[1].Session);
+            var promoted = Assert.Single(Assert.IsType<RoomPolicyRoom>(policy.Departures[1].Room).Seats);
+            Assert.Equal(host.Id, promoted.SessionId);
+            Assert.True(promoted.Host);
+
+            await rig.Flow.HandleLeaveAsync(host, new(), default);
+            Assert.Equal(3, policy.Departures.Count);
+            Assert.Same(host, policy.Departures[2].Session);
+            Assert.Null(policy.Departures[2].Room);
+        }
+        finally { await rig.Registry.StopAllAsync(); }
+    }
+
     /// <summary>Reusing a free low seat must not rewrite the insertion order retained by the shared snapshot.</summary>
     [Fact]
     public async Task SnapshotsKeepMembershipOrderSeparateFromSeatOrder()
@@ -558,6 +630,45 @@ public sealed class RoomFlowTests
         var stored = rig.Registry.Find(roomId)!.FindByGame(host.Id)!;
         Assert.Equal(300002, stored.CharacterId);
         Assert.Equal(items, stored.EquippedItemIds);
+    }
+
+    /// <summary>The first waiting-room update includes new-item modifiers; an explicit empty commit clears them while older callers retain them.</summary>
+    [Fact]
+    public async Task CommittedEquipmentPublishesAttributesTogetherWithItsFirstSeatUpdate()
+    {
+        var rig = new Rig();
+        var host = Rig.Player(11, "host");
+        var guest = Rig.Player(22, "guest");
+        try
+        {
+            var roomId = await rig.CreateAsync(host);
+            await rig.Flow.HandleJoinAsync(guest, new(roomId, ""), default);
+            rig.SeatUpdated.Sent.Clear();
+            uint[] values = [1, 23, 0, 0];
+            var change = new EquipmentSelectionCommitted(host, 11, 300001, [300001, 301001])
+            {
+                ItemAttributes = [new(301001, 7, values, 0, "")],
+            };
+            values[1] = 99;
+            await rig.Flow.OnEquipmentSelectionCommittedAsync(change, default);
+            foreach (var recipient in new[] { host, guest })
+            {
+                var first = Assert.Single(rig.SeatUpdated.To(recipient)).Seat;
+                Assert.Equal(new[] { 300001, 301001 }, first.EquippedItemIds);
+                Assert.Equal(new uint[] { 1, 23, 0, 0 }, Assert.Single(first.ItemAttributes).Values);
+            }
+            var seat = rig.Registry.Find(roomId)!.FindByGame(host.Id)!;
+            await rig.Flow.OnEquipmentSelectionCommittedAsync(new(host, 11, 300001, [300001, 301001]), default);
+            Assert.Single(seat.ItemAttributes);
+            await rig.Flow.OnEquipmentSelectionCommittedAsync(change with { ItemAttributes = [] }, default);
+            Assert.Empty(seat.ItemAttributes);
+            Assert.Empty(rig.SeatUpdated.To(guest)[^1].Seat.ItemAttributes);
+        }
+        finally
+        {
+            await rig.Flow.StopScenesAsync();
+            await rig.Registry.StopAllAsync();
+        }
     }
 
     [Fact]

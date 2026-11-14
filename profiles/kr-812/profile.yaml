@@ -12,6 +12,9 @@ bundles:
   - player-settings
 # What this build differs in; everything else is the legacy bundle's (kr-812).
 vars:
+  TITLE_CATALOG_SCHEMA: Legacy
+  # The client builds native feeding dates in its own region's civil time (UTC+9).
+  PET_CLIENT_UTC_OFFSET_MINUTES: 540
   LEGACY_PORT: ${KR_812_GAME_PORT:-7110}
   LEGACY_PUBLIC_PORT: ${KR_812_PUBLIC_PORT:-7110}
   # The game port players reach; the migration destination advertises it.
@@ -23,8 +26,12 @@ vars:
   LEGACY_SHOP_NAME_COLUMN: nameKr
 patches:
   - patch.yaml
+  - bomb.patch.yaml
   - ../bundles/shop-supplement-lucci.yaml
   # Optional native server selector; uncomment to enable the configured directory.
   # - ../bundles/center-selector.yaml
+  - ../bundles/pets.patch.yaml
+  - ../bundles/science-lab.patch.yaml
+  - ../bundles/titles.patch.yaml
   # Optional developer override; git-ignored and skipped when absent.
   - local.patch.yaml

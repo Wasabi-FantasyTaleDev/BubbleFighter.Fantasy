@@ -1,6 +1,4 @@
 using System.Buffers.Binary;
-using System.IO.Compression;
-using System.Security.Cryptography;
 using System.Text;
 
 namespace BubbleFighter.Fantasy.Archives;
@@ -41,25 +39,33 @@ public sealed class PknArchive : IArchiveReader
 
         var reader = new CipherReader(stream, PknFormat.IndexOffset(uri), PknFormat.IndexKey(uri));
         var members = new List<PknEntry>((int)Math.Min(count, 65536));
+        var name = new byte[MaxPathLength * 2];
         for (var i = 0u; i < count; i++)
         {
             var length = reader.ReadUInt32();
             if (length > MaxPathLength)
                 throw new InvalidDataException($"'{uri}' index entry {i} has a {length}-character path.");
-            var path = Encoding.Unicode.GetString(reader.Read((int)length * 2));
+            var pathBytes = name.AsSpan(0, (int)length * 2);
+            reader.Read(pathBytes);
+            var path = Encoding.Unicode.GetString(pathBytes);
             var sum = reader.ReadUInt32();
             var flags = reader.ReadUInt32();
             var block = reader.ReadUInt32();
             var size = reader.ReadUInt32();
             var stored = reader.ReadUInt32();
-            var md5 = reader.Read(16);
-            var expected = unchecked(flags + block + size + stored + (uint)md5.Sum(b => b));
+            var md5 = new byte[16];
+            reader.Read(md5);
+            var expected = unchecked(flags + block + size + stored);
+            foreach (var value in md5)
+                expected = unchecked(expected + value);
             if (sum != expected)
                 throw new InvalidDataException($"'{uri}' index entry {i} ('{path}') fails its checksum.");
             var entry = new PknEntry(path, flags, block, size, stored, md5);
             members.Add(entry);
-            _byPath[Archive.NormalizeMemberPath(path)] = entry;
-            _entries.Add(new ArchiveEntry(Archive.NormalizeMemberPath(path), size));
+            // One normalized string serves the lookup key and the entry.
+            var key = Archive.NormalizeMemberPath(path);
+            _byPath[key] = entry;
+            _entries.Add(new ArchiveEntry(key, size));
         }
         Members = members;
         DataOffset = (reader.Position + PknFormat.BlockSize - 1) / PknFormat.BlockSize * PknFormat.BlockSize;
@@ -110,44 +116,22 @@ public sealed class PknArchive : IArchiveReader
     public bool Contains(string path) => _byPath.ContainsKey(Archive.NormalizeMemberPath(path));
 
     /// <inheritdoc />
-    public byte[] Read(string path)
-    {
-        if (!_byPath.TryGetValue(Archive.NormalizeMemberPath(path), out var entry))
-            throw new FileNotFoundException($"'{Uri}' has no member '{path}'.", path);
-        return Read(entry);
-    }
+    public byte[] Read(string path) => Read(Find(path));
 
     /// <summary>Reads, decrypts, unpacks and verifies one member.</summary>
     /// <param name="entry">A member of this pack.</param>
-    public byte[] Read(PknEntry entry)
-    {
-        var padded = (int)((entry.StoredSize + 3) & ~3u);
-        var payload = new byte[padded];
-        lock (_stream)
-        {
-            _stream.Position = DataOffset + (long)entry.Block * PknFormat.BlockSize;
-            _stream.ReadExactly(payload);
-        }
-        if ((entry.Flags & PknFormat.FlagHeadEncrypted) != 0)
-            new Snow2Cipher(PknFormat.MemberKey(entry.Path, entry.Md5)).Decrypt(payload.AsSpan(0, Math.Min(PknFormat.BlockSize, padded)));
-        if ((entry.Flags & PknFormat.FlagEncrypted) != 0)
-            new Snow2Cipher(PknFormat.MemberKey(entry.Path, entry.Md5)).Decrypt(payload);
+    public byte[] Read(PknEntry entry) => PknMember.Read(_stream, DataOffset, entry, Uri);
 
-        byte[] data;
-        if ((entry.Flags & PknFormat.FlagZlib) != 0)
-        {
-            using var inflater = new ZLibStream(new MemoryStream(payload, 0, (int)entry.StoredSize), CompressionMode.Decompress);
-            data = new byte[entry.Size];
-            inflater.ReadExactly(data);
-        }
-        else
-        {
-            data = payload.AsSpan(0, (int)entry.Size).ToArray();
-        }
-        if (!MD5.HashData(data).AsSpan().SequenceEqual(entry.Md5))
-            throw new InvalidDataException($"'{Uri}' member '{entry.Path}' fails its MD5 check.");
-        return data;
-    }
+    /// <inheritdoc />
+    public long Length(string path) => Find(path).Size;
+
+    /// <inheritdoc />
+    public Stream OpenRead(string path) => PknMember.Open(_stream, DataOffset, Find(path), Uri);
+
+    private PknEntry Find(string path) =>
+        _byPath.TryGetValue(Archive.NormalizeMemberPath(path), out var entry)
+            ? entry
+            : throw new FileNotFoundException($"'{Uri}' has no member '{path}'.", path);
 
     /// <inheritdoc />
     public void Dispose() => _stream.Dispose();
@@ -161,35 +145,50 @@ public sealed class PknArchive : IArchiveReader
         return buffer;
     }
 
-    // The client's cipher stream reads whole words from the file and decrypts them in order.
+    // The client's cipher stream reads whole words from the file and decrypts them in order. The index is read
+    // once from front to back, so the file is taken a block at a time instead of a seek and a read per word.
     private sealed class CipherReader(Stream stream, long offset, byte[] key)
     {
+        private const int BlockBytes = 64 * 1024;
+
         private readonly Snow2Cipher _cipher = new(key);
-        private readonly byte[] _word = new byte[4];
-        private int _available;
+        private readonly byte[] _block = new byte[BlockBytes];
+        private int _start;
+        private int _end;
         private long _next = offset;
 
         public long Position { get; private set; } = offset;
 
-        public byte[] Read(int count)
+        public void Read(Span<byte> destination)
         {
-            var result = new byte[count];
-            for (var i = 0; i < count; i++)
+            Position += destination.Length;
+            while (!destination.IsEmpty)
             {
-                if (_available == 0)
-                {
-                    stream.Position = _next;
-                    stream.ReadExactly(_word);
-                    _next += 4;
-                    _cipher.Decrypt(_word);
-                    _available = 4;
-                }
-                result[i] = _word[4 - _available--];
+                if (_start == _end)
+                    Fill();
+                var count = Math.Min(destination.Length, _end - _start);
+                _block.AsSpan(_start, count).CopyTo(destination);
+                _start += count;
+                destination = destination[count..];
             }
-            Position += count;
-            return result;
         }
 
-        public uint ReadUInt32() => BinaryPrimitives.ReadUInt32LittleEndian(Read(4));
+        public uint ReadUInt32()
+        {
+            Span<byte> word = stackalloc byte[4];
+            Read(word);
+            return BinaryPrimitives.ReadUInt32LittleEndian(word);
+        }
+
+        // Only whole words decrypt; bytes of a partial word at the end of a block are read again by the next fill.
+        private void Fill()
+        {
+            stream.Position = _next;
+            var whole = stream.ReadAtLeast(_block, 4, throwOnEndOfStream: true) & ~3;
+            _next += whole;
+            _cipher.Decrypt(_block.AsSpan(0, whole));
+            _start = 0;
+            _end = whole;
+        }
     }
 }

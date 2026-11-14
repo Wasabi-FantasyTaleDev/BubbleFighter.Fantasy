@@ -15,7 +15,7 @@ using Xunit;
 namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
 
 /// <summary>Verifies that login publishes loaded state before equipment and menu entry without a shop.</summary>
-public sealed class LoginStateTests
+public sealed partial class LoginStateTests
 {
     [Theory]
     [InlineData("kr-812", 384)]

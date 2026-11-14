@@ -12,12 +12,10 @@
       # cn-406 sub_717FF0 sends the empty gcpStartGPK marker before a retained move on an auxiliary connection.
       auxiliary_prefix: [gcpStartGPK]
 - set:
-    id: admin.http
-    config:
-      listen: ${CN_406_ADMIN_HOST:-127.0.0.1}:${CN_406_ADMIN_PORT:-8094}
-- set:
     id: diagnostics.packet-log
     config:
+      packets_enabled: ${BFF_PACKET_LOG:-false}
+      capture_enabled: ${BFF_PACKET_CAPTURE:-false}
       file: logs/{date}/packets-cn-406_{timestamp}.log
 - set:
     id: dialect.messages

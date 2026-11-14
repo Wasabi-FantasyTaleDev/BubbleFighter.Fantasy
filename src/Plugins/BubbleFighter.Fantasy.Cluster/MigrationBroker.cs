@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 namespace BubbleFighter.Fantasy.Cluster;
 
 /// <summary>Publishes migration RPC through the existing node lease and the authenticated private directory.</summary>
-[Plugin("cluster.migration-broker", Description = "Bounded leased-node migration requests and destination inbox.",
+[Plugin("cluster.migration-broker", Category = "cluster", Names = ["en=Room migration broker", "zh-Hans=房间迁移协调", "zh-Hant=房間遷移協調", "ko=방 이동 중개"], Description = "Bounded leased-node migration requests and destination inbox.",
     Requires = [typeof(INodeLeaseSource)], Provides = [typeof(IMigrationBroker), typeof(IMigrationTargetDirectory)])]
 public sealed class MigrationBrokerPlugin : IPlugin
 {

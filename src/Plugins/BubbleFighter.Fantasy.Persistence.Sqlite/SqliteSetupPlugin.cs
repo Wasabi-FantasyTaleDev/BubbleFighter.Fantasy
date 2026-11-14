@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 namespace BubbleFighter.Fantasy.Persistence.Sqlite;
 
 /// <summary>Offers real SQLite setup without publishing gameplay repositories before installation completes.</summary>
-[Plugin("persistence.sqlite.setup", ProvidesMany = [typeof(IInstallationDatabase)])]
+[Plugin("persistence.sqlite.setup", Category = "storage", Names = ["en=SQLite setup", "zh-Hans=SQLite 设置", "zh-Hant=SQLite 設定", "ko=SQLite 설정"], ProvidesMany = [typeof(IInstallationDatabase)])]
 public sealed class SqliteSetupPlugin : IPlugin
 {
     /// <inheritdoc />
@@ -56,6 +56,42 @@ public sealed class SqliteSetupPlugin : IPlugin
             }
             cancellationToken.ThrowIfCancellationRequested();
             return new Dictionary<string, object?> { ["database_path"] = settings.SqlitePath, ["busy_timeout_ms"] = setup.BusyTimeoutMs };
+        }
+
+        public async ValueTask<InstallationDatabaseContents?> InspectAsync(InstallationSettings settings, CancellationToken cancellationToken)
+        {
+            var path = Path.GetFullPath(settings.SqlitePath);
+            if (!File.Exists(path)) return new(false, 0, null);
+            await using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+            {
+                DataSource = path, Mode = SqliteOpenMode.ReadOnly, DefaultTimeout = (int)Math.Ceiling(setup.BusyTimeoutMs / 1000d), Pooling = false,
+            }.ConnectionString);
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'";
+            var tables = new List<string>();
+            await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) tables.Add(reader.GetString(0));
+            long? accounts = null;
+            if (tables.Contains("accounts", StringComparer.OrdinalIgnoreCase))
+            {
+                command.CommandText = "SELECT COUNT(*) FROM accounts";
+                accounts = (long)(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false))!;
+            }
+            // The connection test creates an empty file, so a save without tables is still a new one.
+            return new(tables.Count > 0, tables.Count, accounts);
+        }
+
+        public ValueTask ClearAsync(InstallationSettings settings, CancellationToken cancellationToken)
+        {
+            var path = Path.GetFullPath(settings.SqlitePath);
+            // A running provider owns this save; deleting it underneath would lose its writes.
+            if (LeaseHeld(path)) throw new InvalidOperationException("sqlite_in_use");
+            cancellationToken.ThrowIfCancellationRequested();
+            var files = new[] { path, path + "-wal", path + "-shm", path + "-journal" }.Where(File.Exists).ToArray();
+            if (files.Length > 0) logger.LogWarning("Setup is replacing the existing save {Path}.", path);
+            foreach (var file in files) File.Delete(file);
+            return ValueTask.CompletedTask;
         }
 
         // The same lease file and sharing mode the provider takes, released at once when nobody holds it.

@@ -31,6 +31,11 @@ internal sealed class DeclaredServiceView
 
     internal ServiceRuntime Runtime { get; }
 
+    /// <summary>Gets the realm keys this view reads; a capture limited to them selects exactly what a full one would.</summary>
+    internal IReadOnlySet<ServiceKey> Keys => _keys ??= _declarations.Select(declaration => declaration.Key).ToHashSet();
+
+    private HashSet<ServiceKey>? _keys;
+
     internal CommittedServiceView Commit(ServiceActivation consumer, ServiceBindingSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(consumer);

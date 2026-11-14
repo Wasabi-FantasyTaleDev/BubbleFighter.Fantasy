@@ -116,16 +116,24 @@ public sealed class WireSessionConcurrencyTests
     /// surface only.
     /// </summary>
     private static ISession NewWireSession(IConnection connection, IStreamTransform cipher, IEventBus events,
-        int sendQueueCapacity = 4096, int sendQueueBytes = 16 * 1024 * 1024)
+        int sendQueueCapacity = 4096, int sendQueueBytes = 16 * 1024 * 1024, object? budget = null)
     {
         var type = typeof(ProtocolPlugin).Assembly.GetType("BubbleFighter.Fantasy.Protocol.WireSession")
             ?? throw new InvalidOperationException("WireSession was not found in the protocol assembly.");
         var profile = new ClientProfile("kr-test", "kr", 1256, 0, 0, "WireSession concurrency pin");
-        return (ISession)(Activator.CreateInstance(type, connection, profile, ProtocolPlugin.GameProtocolName,
-                TestWireDialects.Get("kr-1256"), cipher, events, 64, sendQueueCapacity, sendQueueBytes,
-                (Microsoft.Extensions.Logging.ILogger)NullLogger.Instance)
+        object?[] arguments = budget is null
+            ? [connection, profile, ProtocolPlugin.GameProtocolName, TestWireDialects.Get("kr-1256"), cipher, events, 64,
+                sendQueueCapacity, sendQueueBytes, (Microsoft.Extensions.Logging.ILogger)NullLogger.Instance]
+            : [connection, profile, ProtocolPlugin.GameProtocolName, TestWireDialects.Get("kr-1256"), cipher, events, 64,
+                sendQueueCapacity, sendQueueBytes, budget, (Microsoft.Extensions.Logging.ILogger)NullLogger.Instance];
+        return (ISession)(Activator.CreateInstance(type, arguments)
             ?? throw new InvalidOperationException("WireSession construction returned null."));
     }
+
+    // The row-wide send budget, internal to the protocol assembly like the session.
+    private static object NewBudget(long limitBytes) =>
+        Activator.CreateInstance(typeof(ProtocolPlugin).Assembly.GetType("BubbleFighter.Fantasy.Protocol.OutboundBudget")!,
+            limitBytes, (Microsoft.Extensions.Logging.ILogger)NullLogger.Instance)!;
 
     // Waits until every frame queued so far is written; sends only queue.
     private static Task FlushAsync(ISession session) =>
@@ -199,6 +207,80 @@ public sealed class WireSessionConcurrencyTests
             await Assert.ThrowsAsync<IOException>(() => session.SendAsync(3, new byte[1], default).AsTask());
             Assert.Equal("send queue byte limit", await connection.Closed.Task.WaitAsync(TimeSpan.FromSeconds(5)));
             await Assert.ThrowsAsync<IOException>(() => session.SendAsync(4, ReadOnlyMemory<byte>.Empty, default).AsTask());
+        }
+        finally { await StopAsync(session).WaitAsync(TimeSpan.FromSeconds(5)); }
+    }
+
+    /// <summary>The session remembers the most it held at once, which is what the byte limit is sized from.</summary>
+    [Fact]
+    public async Task ThePeakOfQueuedBytesIsRemembered()
+    {
+        var connection = new StalledConnection();
+        var session = NewWireSession(connection, TestWireDialects.Get("kr-1256").CreateEncryptor(PacketDirection.ServerToClient),
+            new EventBus(NullLogger.Instance), sendQueueBytes: 64);
+        long Peak() => (long)session.GetType().GetProperty("PeakRetainedBytes",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(session)!;
+        try
+        {
+            Assert.Equal(0, Peak());
+            await session.SendAsync(1, new byte[4], default);
+            await connection.WriteStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await session.SendAsync(2, new byte[6], default);
+            Assert.Equal(10, Peak());
+            // A refused frame was never held, so it does not raise the peak.
+            await Assert.ThrowsAsync<IOException>(() => session.SendAsync(3, new byte[60], default).AsTask());
+            Assert.Equal(10, Peak());
+        }
+        finally { await StopAsync(session).WaitAsync(TimeSpan.FromSeconds(5)); }
+    }
+
+    /// <summary>
+    /// When the sessions of one protocol row together reach the row's budget, the session holding the most queued bytes
+    /// is closed and the sender that reached the budget is still admitted: a stalled client cannot make others fail.
+    /// </summary>
+    [Fact]
+    public async Task TheRowBudgetClosesTheLargestHolderAndAdmitsTheSender()
+    {
+        var budget = NewBudget(12);
+        var stalled = new StalledConnection();
+        var other = new StalledConnection();
+        var cipher = TestWireDialects.Get("kr-1256");
+        var holder = NewWireSession(stalled, cipher.CreateEncryptor(PacketDirection.ServerToClient), new EventBus(NullLogger.Instance), budget: budget);
+        var sender = NewWireSession(other, cipher.CreateEncryptor(PacketDirection.ServerToClient), new EventBus(NullLogger.Instance), budget: budget);
+        try
+        {
+            await holder.SendAsync(1, new byte[4], default);
+            await stalled.WriteStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await holder.SendAsync(2, new byte[6], default);
+            Assert.True(sender.SendAsync(3, new byte[4], default).IsCompletedSuccessfully);
+            Assert.Equal("protocol send budget", await stalled.Closed.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+            Assert.False(other.Closed.Task.IsCompleted);
+        }
+        finally
+        {
+            await StopAsync(holder).WaitAsync(TimeSpan.FromSeconds(5));
+            await StopAsync(sender).WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        // Every byte the two sessions reserved is released once they stop.
+        Assert.Equal(0L, (long)budget.GetType().GetProperty("UsedBytes",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(budget)!);
+    }
+
+    /// <summary>A sender that itself holds the most queued bytes when the row budget is reached is the one closed.</summary>
+    [Fact]
+    public async Task TheRowBudgetClosesTheSenderWhenItHoldsTheMost()
+    {
+        var budget = NewBudget(8);
+        var connection = new StalledConnection();
+        var session = NewWireSession(connection, TestWireDialects.Get("kr-1256").CreateEncryptor(PacketDirection.ServerToClient),
+            new EventBus(NullLogger.Instance), budget: budget);
+        try
+        {
+            await session.SendAsync(1, new byte[4], default);
+            await connection.WriteStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await session.SendAsync(2, new byte[4], default);
+            await Assert.ThrowsAsync<IOException>(() => session.SendAsync(3, new byte[1], default).AsTask());
+            Assert.Equal("protocol send budget", await connection.Closed.Task.WaitAsync(TimeSpan.FromSeconds(5)));
         }
         finally { await StopAsync(session).WaitAsync(TimeSpan.FromSeconds(5)); }
     }

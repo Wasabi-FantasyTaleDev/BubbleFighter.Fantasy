@@ -1,3 +1,4 @@
+using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 
 namespace BubbleFighter.Fantasy.Contracts.Sessions;
@@ -20,3 +21,12 @@ public interface IGameSessionStateReader
     /// <summary>Returns a snapshot when this owner holds the exact room session, otherwise null.</summary>
     GameSessionState? Describe(ISession session);
 }
+
+/// <summary>
+/// Raised after something that <see cref="IGameSessionStateReader"/> or the session's phase reports may have changed:
+/// a scene move, joining or leaving a room, a room's phase, countdown or mode. It carries no state, so a listener reads
+/// the current snapshot when it handles the change and a late or repeated signal can never report a stale scene. It is
+/// raised while the owner may hold its own locks, so a handler only schedules work.
+/// </summary>
+/// <param name="Session">The game session whose scene may have changed.</param>
+public sealed record GameSessionStateChanged(ISession Session) : IEvent;

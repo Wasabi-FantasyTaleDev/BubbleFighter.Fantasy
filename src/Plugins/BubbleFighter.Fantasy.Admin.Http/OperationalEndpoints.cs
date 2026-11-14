@@ -172,7 +172,7 @@ public sealed partial class AdminHttpPlugin
                 return Results.BadRequest(new { error = "Command text must contain 1 to 1024 characters." });
             if (!context.Services.TryGet<ICommandExecutor>(out var executor) || executor is null)
                 return Results.Problem("The command executor is unavailable.", statusCode: StatusCodes.Status503ServiceUnavailable);
-            var caller = new CommandCaller(principal!, principal!, "en");
+            var caller = new CommandCaller(principal!, principal!, "en") { Source = CommandSource.WebUi };
             var result = await executor.ExecuteTextAsync(caller, request.Text, requirePrefix: false, ct).ConfigureAwait(false);
             return Results.Ok(result);
         });

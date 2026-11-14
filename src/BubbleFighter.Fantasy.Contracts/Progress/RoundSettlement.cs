@@ -1,3 +1,5 @@
+using BubbleFighter.Fantasy.Contracts.Titles;
+
 namespace BubbleFighter.Fantasy.Contracts.Progress;
 
 /// <summary>
@@ -24,6 +26,9 @@ public sealed record RoundSettlementCommand(string MatchId, long UserNum, int Lu
     /// </summary>
     public RoundBattleRecord? BattleRecord { get; init; }
 
+    /// <summary>Gets medal credits prepared from this round and committed with its progression receipt.</summary>
+    public TitleMedalGrantCommand? TitleMedals { get; init; }
+
     /// <summary>The longest match identity a store accepts.</summary>
     public const int MaxMatchIdLength = 64;
 
@@ -39,6 +44,12 @@ public sealed record RoundSettlementCommand(string MatchId, long UserNum, int Lu
             throw new ArgumentOutOfRangeException(nameof(UserNum), UserNum, "user_num must be a positive login id.");
         if (LucciEarned < 0)
             throw new ArgumentOutOfRangeException(nameof(LucciEarned), LucciEarned, "A round never takes Lucci.");
+        if (TitleMedals is { } medals)
+        {
+            medals.Validate();
+            if (medals.UserNum != UserNum || medals.Source != "round" || medals.GrantKey != "round:" + MatchId)
+                throw new ArgumentException("Round medals must identify the same account and round settlement.", nameof(TitleMedals));
+        }
     }
 
     /// <summary>Applies <see cref="Advance"/> and checks what it returned.</summary>

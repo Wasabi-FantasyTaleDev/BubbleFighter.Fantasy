@@ -22,7 +22,7 @@ updated: 2026-10-18
 
 - 已完成[安裝](installation.md)並建置取出，終端機位於儲存庫根目錄。
 - 所選語言的 SDK 工具鏈：目前的 Python 3 解譯器（一致性測試執行器呼叫 `python`）、Node.js 20 或更新版本與 npm（`sdk/typescript/package.json` 宣告 `node >=20`）、Go 1.22 或更新版本（`sdk/go/go.mod`），或支援 edition 2021 的 Rust 工具鏈與 cargo（`sdk/rust/Cargo.toml`）。只需要一種，不需要四種都裝。WebAssembly 程式模組還需要 Rust 的 `wasm32-wasip1` 或 Go 的 `wasip1` GOOS。
-- 執行步驟需要：一份 `.env` 檔案，其中 `BFF_MYSQL_PASSWORD` 為非空的臨時值；以及本機檢查修補檔 `tools/local-checks/isolated-memory.patch.yaml`，詳見[快速入門](quickstart.md)。
+- 執行步驟需要：本機檢查修補檔 `tools/local-checks/isolated-memory.patch.yaml`，它不需要資料庫設定，詳見[快速入門](quickstart.md)。
 - 已了解[模組](plugins.md)中的模組模型：模組 id、資料列 id、宣告與 effect。
 
 ## 快速入門

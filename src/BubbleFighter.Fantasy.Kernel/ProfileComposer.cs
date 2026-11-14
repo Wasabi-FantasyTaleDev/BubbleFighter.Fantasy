@@ -158,7 +158,12 @@ public sealed partial class ProfileComposer
     /// <returns>The composed rows in activation-layer order.</returns>
     /// <exception cref="ConfigException">Thrown on any malformed or missing file, unresolved
     /// env var, unknown patch operation, or duplicate row id.</exception>
-    public IReadOnlyList<PluginRow> Compose(string profileId, IReadOnlyList<string> extraPatches)
+    public IReadOnlyList<PluginRow> Compose(string profileId, IReadOnlyList<string> extraPatches) =>
+        Compose(profileId, extraPatches, shared: null);
+
+    // A build composed into a server profile leaves out the rows the server profile already composed, before they
+    // resolve: the server profile's patches decide those rows, so a row it disables needs no variables in any build.
+    private IReadOnlyList<PluginRow> Compose(string profileId, IReadOnlyList<string> extraPatches, IReadOnlySet<string>? shared)
     {
         var outer = t_variables;
         var outerEnvironment = t_environment;
@@ -167,7 +172,7 @@ public sealed partial class ProfileComposer
         {
             t_environment = _environment;
             t_unsetReadsEmpty = _unsetReadsEmpty;
-            return ComposeScoped(profileId, extraPatches);
+            return ComposeScoped(profileId, extraPatches, shared);
         }
         finally
         {
@@ -185,9 +190,11 @@ public sealed partial class ProfileComposer
     /// <param name="buildIds">Unique packaged client profile ids to activate.</param>
     /// <param name="extraPatches">Additional patches for the shared profile.</param>
     /// <param name="buildEnvironment">Optional deployment lookup receiving the client profile id and variable name.</param>
+    /// <param name="buildActivation">Whether the selected builds start with the server or wait for their first client.</param>
     /// <returns>Shared rows followed by each selected build's scoped rows.</returns>
     public IReadOnlyList<PluginRow> ComposeBuilds(string sharedProfileId, IReadOnlyList<string> buildIds,
-        IReadOnlyList<string> extraPatches, Func<string, string, string?>? buildEnvironment = null)
+        IReadOnlyList<string> extraPatches, Func<string, string, string?>? buildEnvironment = null,
+        PluginActivation buildActivation = PluginActivation.Default)
     {
         var available = ListProfiles().ToDictionary(p => p.Id, StringComparer.Ordinal);
         if (buildIds.Count > 256 || buildIds.Distinct(StringComparer.Ordinal).Count() != buildIds.Count ||
@@ -205,12 +212,12 @@ public sealed partial class ProfileComposer
         {
             var composer = buildEnvironment is null ? this : new ProfileComposer(_profilesDir,
                 key => buildEnvironment(buildId, key), _unsetReadsEmpty);
-            AddBuildRows(sharedProfileId, buildId, ids, result, composer);
+            AddBuildRows(sharedProfileId, buildId, ids, result, buildActivation, composer);
         }
         return result;
     }
 
-    private IReadOnlyList<PluginRow> ComposeScoped(string profileId, IReadOnlyList<string> extraPatches)
+    private IReadOnlyList<PluginRow> ComposeScoped(string profileId, IReadOnlyList<string> extraPatches, IReadOnlySet<string>? shared)
     {
         t_variables = null;
         var profileDir = Path.Combine(_profilesDir, profileId);
@@ -280,10 +287,13 @@ public sealed partial class ProfileComposer
         {
             if (!ids.Add(row.Id))
                 throw new ConfigException($"Duplicate row id '{row.Id}' in profile '{profileId}'.");
-            result.Add(row.ToPluginRow(profileFile) with { ClientBuild = clientBuild, Lineage = lineage, Family = family });
+            if (shared?.Contains(row.Id) == true)
+                continue;
+            result.Add(row.ToPluginRow() with { ClientBuild = clientBuild, Lineage = lineage, Family = family });
         }
+        var buildActivation = ReadBuildActivation(doc, profileFile, profileId);
         foreach (var buildId in AsStringList(doc, "builds", profileFile))
-            AddBuildRows(profileId, buildId, ids, result);
+            AddBuildRows(profileId, buildId, ids, result, buildActivation);
         return result;
     }
 
@@ -324,7 +334,8 @@ public sealed partial class ProfileComposer
         return variables;
     }
 
-    private void AddBuildRows(string profileId, string buildId, HashSet<string> ids, List<PluginRow> result, ProfileComposer? composer = null)
+    private void AddBuildRows(string profileId, string buildId, HashSet<string> ids, List<PluginRow> result, PluginActivation activation,
+        ProfileComposer? composer = null)
     {
         var buildFile = Path.Combine(_profilesDir, buildId, "profile.yaml");
         if (!File.Exists(buildFile))
@@ -332,7 +343,7 @@ public sealed partial class ProfileComposer
         if (LoadYaml(buildFile) is IReadOnlyDictionary<string, object?> buildDoc && buildDoc.ContainsKey("builds"))
             throw new ConfigException($"Profile '{profileId}' lists build '{buildId}', which itself lists builds.");
         var shared = new HashSet<string>(ids, StringComparer.Ordinal);
-        var own = (composer ?? this).Compose(buildId, []).Where(row => !shared.Contains(row.Id)).ToArray();
+        var own = (composer ?? this).Compose(buildId, [], shared).ToArray();
         var renamed = own.Select(row => row.Id).ToHashSet(StringComparer.Ordinal);
         foreach (var row in own)
         {
@@ -340,8 +351,25 @@ public sealed partial class ProfileComposer
             if (!ids.Add(id))
                 throw new ConfigException($"Duplicate row id '{id}' in profile '{profileId}'.");
             var parent = row.ParentId is { } p && renamed.Contains(p) ? buildId + "." + p : row.ParentId;
-            result.Add(row with { Id = id, ParentId = parent });
+            // The build is the unit that wakes and sleeps together. A row that states its own activation keeps it
+            // (the listeners are 'always', so the ports stay bound); the others follow the build.
+            result.Add(row with
+            {
+                Id = id, ParentId = parent, ActivationGroup = buildId,
+                Activation = row.Activation == PluginActivation.Default ? activation : row.Activation,
+            });
         }
+    }
+
+    /// <summary>
+    /// Reads a server profile's <c>build_activation</c>: <c>always</c> (the default) or <c>on_demand</c>, in which case
+    /// each listed build's rows stay unloaded until a client connects to that build.
+    /// </summary>
+    private static PluginActivation ReadBuildActivation(IReadOnlyDictionary<string, object?> doc, string file, string profileId)
+    {
+        if (!doc.TryGetValue("build_activation", out var value) || value is null) return PluginActivation.Default;
+        return ParseActivation(value is string text ? InterpolateScalar(text, file, profileId) : null)
+            ?? throw new ConfigException($"Profile file '{file}': build_activation must be 'always' or 'on_demand'.");
     }
 
     /// <summary>Follows <c>parent</c> links from a profile to its root.</summary>
@@ -567,17 +595,22 @@ public sealed partial class ProfileComposer
 
     private sealed record Row(string Id, string Plugin, IReadOnlyDictionary<string, object?>? Config, bool Disabled, string Source, string? Version, PluginLifecycleOptions Lifecycle, string? ParentId, IReadOnlyList<string> IsolatedServices)
     {
-        // Disabled rows retain raw configuration until a patch enables them. Track keys rather than re-expanding
-        // the whole row: an already resolved environment value may itself contain literal placeholder text.
-        public IReadOnlySet<string> DeferredConfigKeys { get; init; } = new HashSet<string>(StringComparer.Ordinal);
+        // Configuration stays raw until every patch has applied: a row that ends up disabled never activates and
+        // needs none of its environment variables (a local run that swaps the MySQL row for memory sets no
+        // database password). Each key remembers the file that wrote it, so an unset variable names that file,
+        // and each value is expanded exactly once, because a resolved value may itself contain placeholder text.
+        public IReadOnlyDictionary<string, string> ConfigSources { get; init; } = new Dictionary<string, string>(StringComparer.Ordinal);
 
-        public PluginRow ToPluginRow(string file)
+        /// <summary>What the row file says under <c>activation</c>; a patch that replaces the row keeps it unless it states one.</summary>
+        public PluginActivation Activation { get; init; }
+
+        public PluginRow ToPluginRow()
         {
             var config = Config;
-            if (!Disabled && config is not null && DeferredConfigKeys.Count > 0)
-                config = config.ToDictionary(pair => pair.Key, pair => pair.Value is not null && DeferredConfigKeys.Contains(pair.Key)
+            if (!Disabled && config is not null)
+                config = config.ToDictionary(pair => pair.Key, pair => pair.Value is not null && ConfigSources.TryGetValue(pair.Key, out var file)
                     ? Interpolate(pair.Value, file, Id) : pair.Value, StringComparer.Ordinal);
-            return new() { Id = Id, Plugin = Plugin, Config = config, Disabled = Disabled, Source = Source, Version = Version, Lifecycle = Lifecycle, ParentId = ParentId, IsolatedServices = IsolatedServices };
+            return new() { Id = Id, Plugin = Plugin, Config = config, Disabled = Disabled, Source = Source, Version = Version, Lifecycle = Lifecycle, ParentId = ParentId, IsolatedServices = IsolatedServices, Activation = Activation };
         }
     }
 
@@ -607,15 +640,13 @@ public sealed partial class ProfileComposer
                     var plugin = argMap.ContainsKey("plugin") ? RequiredString(argMap, "plugin", patchFile) : old.Plugin;
                     var disabled = argMap.ContainsKey("disabled") ? ParseBool(argMap["disabled"], patchFile, id, "disabled") : old.Disabled;
                     var config = old.Config;
-                    var deferred = old.DeferredConfigKeys;
+                    var sources = old.ConfigSources;
                     if (argMap.ContainsKey("config"))
                     {
                         if (argMap["config"] is not null and not IReadOnlyDictionary<string, object?>)
                             throw new ConfigException($"Patch '{patchFile}': row '{id}' config must be a mapping.");
-                        var replaced = argMap["config"] as IReadOnlyDictionary<string, object?>;
-                        config = replaced is null || disabled ? replaced : (IReadOnlyDictionary<string, object?>)Interpolate(replaced, patchFile, id);
-                        deferred = disabled && replaced is not null
-                            ? replaced.Keys.ToHashSet(StringComparer.Ordinal) : new HashSet<string>(StringComparer.Ordinal);
+                        config = argMap["config"] as IReadOnlyDictionary<string, object?>;
+                        sources = SourcesOf(config, patchFile);
                     }
                     var lifecycle = argMap.ContainsKey("lifecycle") ? ReadLifecycle(argMap, patchFile, id) : old.Lifecycle;
                     rows[index] = new Row(
@@ -628,7 +659,7 @@ public sealed partial class ProfileComposer
                         lifecycle,
                         argMap.ContainsKey("parent_id") ? ReadParentId(argMap, patchFile, id) : old.ParentId,
                         argMap.ContainsKey("isolated_services") ? ReadIsolatedServices(argMap, patchFile, id, lifecycle) : old.IsolatedServices)
-                        { DeferredConfigKeys = deferred };
+                        { ConfigSources = sources, Activation = argMap.ContainsKey("activation") ? ReadActivation(argMap, patchFile, id) : old.Activation };
                     break;
                 }
                 case "set":
@@ -649,19 +680,21 @@ public sealed partial class ProfileComposer
                     var merged = old.Config is null
                         ? new Dictionary<string, object?>(StringComparer.Ordinal)
                         : new Dictionary<string, object?>(old.Config, StringComparer.Ordinal);
-                    var deferred = new HashSet<string>(old.DeferredConfigKeys, StringComparer.Ordinal);
+                    var sources = new Dictionary<string, string>(old.ConfigSources, StringComparer.Ordinal);
                     foreach (var (key, value) in keys)
                     {
-                        deferred.Remove(key);
                         if (value is null)
+                        {
                             merged.Remove(key);
+                            sources.Remove(key);
+                        }
                         else
                         {
-                            merged[key] = old.Disabled ? value : Interpolate(value, patchFile, id);
-                            if (old.Disabled) deferred.Add(key);
+                            merged[key] = value;
+                            sources[key] = patchFile;
                         }
                     }
-                    rows[index] = old with { Config = merged, Source = source, DeferredConfigKeys = deferred };
+                    rows[index] = old with { Config = merged, Source = source, ConfigSources = sources };
                     break;
                 }
                 case "insert":
@@ -701,14 +734,31 @@ public sealed partial class ProfileComposer
                 throw new ConfigException($"File '{file}': row '{id}' config must be a mapping.");
             config = cMap;
         }
-        // Disabled rows never activate, so they do not need their environment variables.
-        var interpolated = config is null || disabled ? config : (IReadOnlyDictionary<string, object?>)Interpolate(config, file, id);
         var lifecycle = ReadLifecycle(map, file, id);
-        return new Row((string)InterpolateScalar(id, file, id)!, (string)InterpolateScalar(plugin, file, id)!, interpolated, disabled, source, ReadVersion(map, file, id), lifecycle,
+        return new Row((string)InterpolateScalar(id, file, id)!, (string)InterpolateScalar(plugin, file, id)!, config, disabled, source, ReadVersion(map, file, id), lifecycle,
             ReadParentId(map, file, id), ReadIsolatedServices(map, file, id, lifecycle))
-            { DeferredConfigKeys = disabled && config is not null
-                ? config.Keys.ToHashSet(StringComparer.Ordinal) : new HashSet<string>(StringComparer.Ordinal) };
+            { ConfigSources = SourcesOf(config, file), Activation = ReadActivation(map, file, id) };
     }
+
+    /// <summary>Reads a row's optional <c>activation</c>: <c>always</c> or <c>on_demand</c>; absent leaves the composition unit to decide.</summary>
+    private static PluginActivation ReadActivation(IReadOnlyDictionary<string, object?> map, string file, string rowId)
+    {
+        if (!map.TryGetValue("activation", out var value) || value is null) return PluginActivation.Default;
+        return ParseActivation(value is string text ? InterpolateScalar(text, file, rowId) : null)
+            ?? throw new ConfigException($"File '{file}': row '{rowId}' activation must be 'always' or 'on_demand'.");
+    }
+
+    private static PluginActivation? ParseActivation(string? text) => text switch
+    {
+        "always" => PluginActivation.Always,
+        "on_demand" => PluginActivation.OnDemand,
+        _ => null,
+    };
+
+    private static Dictionary<string, string> SourcesOf(IReadOnlyDictionary<string, object?>? config, string file) =>
+        config is null
+            ? new Dictionary<string, string>(StringComparer.Ordinal)
+            : config.Keys.ToDictionary(key => key, _ => file, StringComparer.Ordinal);
 
     private string? ReadParentId(IReadOnlyDictionary<string, object?> map, string file, string rowId)
     {

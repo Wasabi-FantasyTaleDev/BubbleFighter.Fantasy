@@ -204,8 +204,12 @@ public sealed class ExpiredItemsTests
 
     private sealed class RecordingSession : ISession
     {
-        public long Id => 1;
-        public IConnection Connection { get; } = new StubConnection();
+        // Every session is its own connection: the inventory scope refuses a second connection under a live id.
+        private static long _next;
+        private readonly long _id = Interlocked.Increment(ref _next);
+        public RecordingSession() => Connection = new StubConnection(_id);
+        public long Id => _id;
+        public IConnection Connection { get; }
         public ClientProfile Profile { get; } = new("kr-812", "kr", 812, 458, 0, "kr-812");
         public ConcurrentDictionary<string, object> Items { get; } = new();
         public List<(ushort Opcode, byte[] Payload)> Sent { get; } = [];
@@ -216,9 +220,9 @@ public sealed class ExpiredItemsTests
         }
     }
 
-    private sealed class StubConnection : IConnection
+    private sealed class StubConnection(long id) : IConnection
     {
-        public long Id => 1;
+        public long Id => id;
         public EndPoint RemoteEndPoint => new IPEndPoint(IPAddress.Loopback, 1);
         public PipeReader Input => throw new NotSupportedException();
         public PipeWriter Output => throw new NotSupportedException();

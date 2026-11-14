@@ -51,6 +51,9 @@ internal sealed class ParticipantLife
     /// <summary>Gets whether this death already published its terminal observation notice instead of a respawn.</summary>
     internal bool ObservationSent { get; private set; }
 
+    /// <summary>Gets whether this dead actor received its terminal removal reply in the current incarnation.</summary>
+    internal bool ActorRemovalSent { get; private set; }
+
     /// <summary>
     /// Gets the match link the latest reset was granted on, or null when the grant is not tied to a link (a legacy
     /// revival offer completes through the spawn acceptance on the game connection instead). Only meaningful while
@@ -71,7 +74,7 @@ internal sealed class ParticipantLife
     internal bool RevivalOffered => State == SeatLife.ResetPending && GrantLink is null;
 
     /// <summary>Gets whether a reset may be granted now: the character is dead and its death presentation is over.</summary>
-    internal bool CanGrantReset => State == SeatLife.Dead && DeathCleaned;
+    internal bool CanGrantReset => State == SeatLife.Dead && DeathCleaned && !ActorRemovalSent;
 
     /// <summary>Starts a new round alive with nothing pending.</summary>
     internal void Reset()
@@ -82,6 +85,7 @@ internal sealed class ParticipantLife
         State = SeatLife.Alive;
         DeathCleaned = false;
         ObservationSent = false;
+        ActorRemovalSent = false;
         GrantLink = null;
         DeathActor = null;
         ServerTimedWait = false;
@@ -170,7 +174,7 @@ internal sealed class ParticipantLife
     /// <returns>Whether the report was recorded.</returns>
     internal bool RecordDeath(int actor, bool serverTimed)
     {
-        if (RevivalOffered || ObservationSent) return false;
+        if (RevivalOffered || ObservationSent || ActorRemovalSent) return false;
         EnterDeath();
         DeathActor = actor;
         ServerTimedWait = serverTimed;
@@ -182,6 +186,14 @@ internal sealed class ParticipantLife
     {
         if (State != SeatLife.Dead || ObservationSent) return false;
         ObservationSent = true;
+        return true;
+    }
+
+    /// <summary>Records a cleaned actor's terminal removal once while retaining its death and scoring state.</summary>
+    internal bool TryRemoveActor()
+    {
+        if (!CanGrantReset) return false;
+        ActorRemovalSent = true;
         return true;
     }
 

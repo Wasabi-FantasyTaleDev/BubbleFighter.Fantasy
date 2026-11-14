@@ -8,7 +8,7 @@ namespace BubbleFighter.Fantasy.Persistence.MySql;
 
 /// <summary>MySQL store for shared <c>inventory_slots</c> and independently keyed <c>player_loadouts</c>.</summary>
 public sealed partial class MySqlInventoryRepository(IDbConnectionFactory connections, IAccountMutationFence? authority = null,
-    int maxLoadoutsPerPlayer = 32) : IInventoryLoadoutStore
+    int maxLoadoutsPerPlayer = 32, BubbleFighter.Fantasy.Contracts.Titles.TitleMedalLimits? titleMedalLimits = null) : IInventoryLoadoutStore
 {
     /// <inheritdoc />
     public async ValueTask<IReadOnlyList<InventorySlotRecord>?> RemoveExpiredItemAsync(long userNum, int itemId,
@@ -25,7 +25,7 @@ public sealed partial class MySqlInventoryRepository(IDbConnectionFactory connec
             .OrderBy(row => row.Bag).OrderBy(row => row.Ordinal)
             .Take(2 * InventoryLimits.MaxInventorySlotsPerBag + 1)
             .TranLock(DbLockType.Wait).ToListAsync(ct).ConfigureAwait(false);
-        var removed = InventoryItemRemoval.SelectExpired(userNum, itemId, owned.Select(ToRecord).ToArray(), now);
+        var removed = InventoryItemRemoval.SelectExpired(userNum, itemId, owned.Select(ReadRecord).ToArray(), now);
         if (removed is null) return null;
         if (removed.Count > 0)
         {
@@ -159,7 +159,7 @@ public sealed partial class MySqlInventoryRepository(IDbConnectionFactory connec
                 throw new InvalidOperationException($"Expiry removal for user_num {userNum} deleted {removed} rows; expected {expired.Count}.");
         }
         await tx.CommitAsync().ConfigureAwait(false);
-        return expired.Select(ToRecord).ToList();
+        return expired.Select(ReadRecord).ToList();
     }
 
     /// <inheritdoc />
@@ -179,7 +179,7 @@ public sealed partial class MySqlInventoryRepository(IDbConnectionFactory connec
             .Take(2 * InventoryLimits.MaxInventorySlotsPerBag + 1)
             .TranLock(DbLockType.Wait)
             .ToListAsync(ct).ConfigureAwait(false);
-        var rows = stored.Select(ToRecord).ToArray();
+        var rows = stored.Select(ReadRecord).ToArray();
         var changed = InventoryWearSelection.Apply(rows, groups, itemId, worn);
         if (changed is null) return null;
         var updates = Enumerable.Range(0, rows.Length).Where(i => rows[i].Flags != changed[i].Flags).ToArray();
@@ -239,7 +239,7 @@ public sealed partial class MySqlInventoryRepository(IDbConnectionFactory connec
             .OrderBy(s => s.Ordinal)
             .Take(maxCount)
             .ToListAsync(ct).ConfigureAwait(false);
-        return rows.Select(ToRecord).ToList();
+        return rows.Select(ReadRecord).ToList();
     }
 
     /// <inheritdoc />
@@ -266,12 +266,17 @@ public sealed partial class MySqlInventoryRepository(IDbConnectionFactory connec
             .Take(InventoryLimits.MaxInventorySlotsPerBag)
             .TranLock(DbLockType.Wait)
             .ToListAsync(ct).ConfigureAwait(false);
-        var current = rows.Select(ToRecord).ToList();
+        var current = rows.Select(ReadRecord).ToList();
         var merged = InventoryAppend.Merge(userNum, bag, current, candidates);
+        PetEntitlementInventory.ValidateExternalWrite(userNum, await ReadOwnedInventoryRowsAsync(db, userNum, ct).ConfigureAwait(false),
+            merged.Skip(current.Count).ToArray());
         var nextOrdinal = rows.Count == 0 ? 0 : rows.Max(r => r.Ordinal) + 1;
         var added = new List<InventorySlotRow>(merged.Count - current.Count);
         for (var i = current.Count; i < merged.Count; i++)
+        {
+            merged[i].Pet?.Validate(maxLoadoutsPerPlayer);
             added.Add(ToRow(merged[i], nextOrdinal++));
+        }
         if (added.Count > 0)
         {
             var written = await db.Insertable(added).ExecuteCommandAsync(ct).ConfigureAwait(false);
@@ -294,6 +299,7 @@ public sealed partial class MySqlInventoryRepository(IDbConnectionFactory connec
 
         foreach (var slot in slots)
         {
+            slot.Pet?.Validate(maxLoadoutsPerPlayer);
             if (slot.UserNum != userNum)
                 throw new ArgumentException($"inventory slot user_num {slot.UserNum} does not match replace target {userNum}.", nameof(slots));
             if (slot.Bag != bag)
@@ -303,7 +309,9 @@ public sealed partial class MySqlInventoryRepository(IDbConnectionFactory connec
         await using var session = await SugarSession.OpenAsync(connections, ct).ConfigureAwait(false);
         var db = session.Db;
         await using var tx = await session.BeginWriteAsync(userNum, authority, ct).ConfigureAwait(false);
+        await MySqlPlayerLock.AcquireAsync(db, userNum, ct).ConfigureAwait(false);
         var bagId = (int)bag;
+        PetEntitlementInventory.ValidateExternalWrite(userNum, await ReadOwnedInventoryRowsAsync(db, userNum, ct).ConfigureAwait(false), slots);
         await db.Deleteable<InventorySlotRow>()
             .Where(s => s.UserNum == userNum && s.Bag == bagId)
             .ExecuteCommandAsync(ct).ConfigureAwait(false);
@@ -340,7 +348,7 @@ public sealed partial class MySqlInventoryRepository(IDbConnectionFactory connec
         if (found.Count == 0)
             return null;
         var row = found[0];
-        var record = ToRecord(row);
+        var record = ReadRecord(row);
 
         await WornUpdate(db, userNum, itemId, worn).ExecuteCommandAsync(ct).ConfigureAwait(false);
 
@@ -390,11 +398,28 @@ public sealed partial class MySqlInventoryRepository(IDbConnectionFactory connec
             .Where(s => s.UserNum == userNum && s.Bag == bagId && s.ItemId == itemId);
     }
 
+    private InventorySlotRecord ReadRecord(InventorySlotRow row)
+    {
+        var record = ToRecord(row);
+        record.Pet?.Validate(maxLoadoutsPerPlayer);
+        record.Enhancements?.Validate(maxLoadoutsPerPlayer);
+        record.Modifications?.Validate(maxLoadoutsPerPlayer);
+        record.Favorites?.Validate(maxLoadoutsPerPlayer);
+        _ = InventoryArticleIdentityResolver.Of(record);
+        return record;
+    }
+
     /// <summary>Maps a stored row to the contract record; the lifetime constructor rejects corrupt rows.</summary>
     internal static InventorySlotRecord ToRecord(InventorySlotRow row) =>
         new(row.UserNum, (InventoryBag)row.Bag, row.SlotKey, row.ItemId, row.Quantity, row.Flags)
         {
             Lifetime = new((InventoryLifetimeKind)row.LifetimeKind, row.ExpiresAtUnixMilliseconds),
+            Pet = DecodePet(row.PetJson),
+            PetIdentity = DecodePetIdentity(row.PetEntitlementId, row.PetArticleKey),
+            ArticleIdentity = DecodeArticleIdentity(row.ArticleEntitlementId, row.ArticleKey),
+            Enhancements = DecodeEnhancements(row.EnhancementsJson),
+            Modifications = DecodeModifications(row.ModificationsJson),
+            Favorites = DecodeFavorites(row.FavoritesJson),
         };
 
     /// <summary>Maps a contract record to the row written at <paramref name="ordinal"/>.</summary>
@@ -410,5 +435,13 @@ public sealed partial class MySqlInventoryRepository(IDbConnectionFactory connec
         UpdatedAt = DateTime.UtcNow,
         LifetimeKind = (int)slot.Lifetime.Kind,
         ExpiresAtUnixMilliseconds = slot.Lifetime.ExpiresAtUnixMilliseconds,
+        PetJson = EncodePet(slot.Pet),
+        PetEntitlementId = slot.PetIdentity?.EntitlementId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        PetArticleKey = slot.PetIdentity?.ArticleKey.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        ArticleEntitlementId = slot.ArticleIdentity?.EntitlementId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        ArticleKey = slot.ArticleIdentity?.ArticleKey.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        EnhancementsJson = EncodeEnhancements(slot.Enhancements),
+        ModificationsJson = EncodeModifications(slot.Modifications),
+        FavoritesJson = EncodeFavorites(slot.Favorites),
     };
 }

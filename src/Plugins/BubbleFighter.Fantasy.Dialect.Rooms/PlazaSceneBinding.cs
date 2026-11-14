@@ -81,7 +81,7 @@ internal sealed class PlazaSceneBinding(string protocol, IOpcodeTable table, Pac
     public async ValueTask SendAsync(ISession session, PlazaMemberEntered message, CancellationToken ct)
     {
         var member = message.Member;
-        await PublishViewAsync(session, member.UserNumber, member.CharacterItemId, member.EquippedItemIds, true, ct).ConfigureAwait(false);
+        await PublishViewAsync(session, member, true, ct).ConfigureAwait(false);
         // kr-1256 sub_9DB1E0 consumes occupied 511 records without replacing the plaza stage.
         await session.SendAsync(S2C("gspRoomLeaveSlot"), PacketCodec.Write(packets, build, "RoomSeatLeave", new Dictionary<string, object?>
         {
@@ -113,7 +113,7 @@ internal sealed class PlazaSceneBinding(string protocol, IOpcodeTable table, Pac
         var self = Seat(member) with { Slot = 0 };
         await session.SendAsync(S2C("gspGotoRoom"), Install([self], 0, 1, message.PartyTransition), ct).ConfigureAwait(false);
         await session.SendAsync(S2C("gspUpdateParty"), RoomRecords.Party(packets, build, self, session), ct).ConfigureAwait(false);
-        await PublishViewAsync(session, member.UserNumber, member.CharacterItemId, member.EquippedItemIds, false, ct).ConfigureAwait(false);
+        await PublishViewAsync(session, member, false, ct).ConfigureAwait(false);
     }
 
     private byte[] Install(IReadOnlyList<RoomMemberView> seats, int localSlot, int kind, bool partyTransition = false, ISession? recipient = null) =>
@@ -121,14 +121,14 @@ internal sealed class PlazaSceneBinding(string protocol, IOpcodeTable table, Pac
 
     private static RoomMemberView Seat(PlazaMember member) =>
         new(member.Slot, member.UserNumber, member.Nickname, member.Level, 0, false, member.CharacterItemId, member.EquippedItemIds)
-            { ColorIndex = member.ColorIndex, Recruitment = member.Recruitment };
+            { ColorIndex = member.ColorIndex, Recruitment = member.Recruitment, ItemAttributes = member.ItemAttributes };
 
     private ushort S2C(string name) => _s2c[name];
-    private async ValueTask PublishViewAsync(ISession session, int userNum, int characterId,
-        IReadOnlyList<int> equippedIds, bool remote, CancellationToken ct)
+    private async ValueTask PublishViewAsync(ISession session, PlazaMember member, bool remote, CancellationToken ct)
     {
         var context = _context ?? throw new InvalidOperationException("Room binding is not mounted.");
-        await context.Events.WaterfallAsync(new EquipmentViewRequested(protocol, session, userNum, characterId, equippedIds, remote),
+        await context.Events.WaterfallAsync(new EquipmentViewRequested(protocol, session, member.UserNumber,
+                member.CharacterItemId, member.EquippedItemIds, remote) { ItemAttributes = member.ItemAttributes },
             _ => ValueTask.FromResult(false), ct).ConfigureAwait(false);
     }
 

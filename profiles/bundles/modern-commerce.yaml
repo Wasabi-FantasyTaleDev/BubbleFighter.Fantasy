@@ -6,6 +6,8 @@
   config:
     data_directory: "${BFF_CLIENT_DATA:-client-data}/${BFF_PROFILE_ID}/data"
     raw_directory: "${BFF_CLIENT_DATA:-client-data}/${BFF_PROFILE_ID}/dataraw"
+    # The catalogs rows build from this client data, kept for the next start. A cache: delete it at any time.
+    compiled_file: "${BFF_COMPILED_DATA:-state/compiled-data}/${BFF_PROFILE_ID}.bffdata"
 - id: shop
   plugin: shop
   parent_id: inventoryview

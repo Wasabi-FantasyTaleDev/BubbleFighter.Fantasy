@@ -23,15 +23,15 @@ public sealed class DefenceProfileTests
         Assert.True(TestBuilds.Packets.CapabilityOf(build, "native_defence_seed_tables"));
     }
 
-    /// <summary>Modern profiles keep their native transport active while equipment defence still requires opting in.</summary>
+    /// <summary>Modern profiles include the defence patch, so the seed authority is active beside their native transport.</summary>
     [Theory]
     [InlineData("kr-1256")]
     [InlineData("cn-774")]
     [InlineData("tw-454")]
-    public void ModernDefenceRemainsDormantByDefault(string build)
+    public void ModernDefenceIsOnByDefault(string build)
     {
         var rows = Composer().Compose(build, []);
-        Assert.True(Assert.Single(rows, row => row.Id == "dialect.scene-seeds").Disabled);
+        Assert.False(Assert.Single(rows, row => row.Id == "dialect.scene-seeds").Disabled);
         Assert.False(Assert.Single(rows, row => row.Id == "relay-listener").Disabled);
         Assert.False(TestBuilds.Packets.CapabilityOf(build, "native_scene_seed_tables"));
         Assert.True(TestBuilds.Packets.CapabilityOf(build, "native_defence_seed_tables"));

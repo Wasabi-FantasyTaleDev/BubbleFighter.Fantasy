@@ -19,12 +19,21 @@ builds:
 
   # KR 2015. The baseline of every build whose packet classes keep their names.
   kr-812:
+    # kr-812 sub_804850 replaces row +64/+44/+48/+56; retain the legacy combat projection.
+    # kr-812 sub_5521F0 consumes stars at +112; kr-812 sub_7527C0 consumes collected Lucci at +128.
+    live_score_kinds: { score: 29, knockdowns: 0, kills: 24, deaths: 10, stars: 35, collected_lucci: 13 }
+    # kr-1256 sub_961990, cn-774 sub_B5ADF0 and tw-454 sub_A7A930 send one native tick on the relay.
+    # cn-738 sub_A3B960 and cn-742 sub_97E7C0 match; membership does not enable either plugin row.
+    relay_latency_builds: [kr-1256, cn-738, cn-742, cn-774, tw-454]
+    # kr-812 sub_9EA920 sends synthesis; kr-812 sub_830A20 consumes the result after inventory publication.
+    legacy_laboratory_builds: [kr-812]
     # kr-812 sub_462D30 initializes queue mode 1; kr-812 sub_8E1470 restores it on stage changes.
     # kr-812 sub_6E1350 -> kr-812 sub_463080 queues a local copy; kr-812 sub_6DE5B0 expands only on the master.
     # The tutorial's special-local gate bypasses this queue (kr-812 sub_7FF340), so it keeps its reply.
     # cn-717 sub_474460 -> cn-717 sub_472FE0 and id-1809 sub_448A10 -> id-1809 sub_447910 send the same way: their
-    # queues start in mode 1 (cn-717 sub_474130, id-1809 sub_4486D0) and only stages 5 and 6 set the gate
-    # (cn-717 sub_882D40, id-1809 sub_7A9BD0). cn-717 sub_744160 also expands only on the master.
+    # constructors set default mode 1 (cn-717 sub_474130, id-1809 sub_4486D0), which cn-717 sub_4755D0 and
+    # id-1809 sub_4499F0 copy into the current mode, and only stages 5 and 6 set the gate (cn-717 sub_882D40,
+    # id-1809 sub_7A9BD0). cn-717 sub_744160 also expands only on the master.
     npc_local_spawn_group_builds: [kr-812, cn-717, id-1809]
     # kr-1256 sub_87CB30 restores local+transport mode before each scene; kr-1256 sub_7AB190 queues these frames.
     # kr-1256 sub_95B0B0 selects relay/game transport; the master's local copy already applies the concrete spawn.
@@ -134,6 +143,14 @@ builds:
       first_flag: unknown_116
       second_flag: unknown_117
     capabilities:
+      room_custom_rules: false
+      # Native title request and reply consumers are audited only for the two Korean baselines.
+      title_operations: true
+      # kr-812 sub_832EC0 and cn-717 sub_8BB460 consume native growth/regression notices.
+      pet_evolution: true
+      pet_level_up: false
+      pet_ability_change: false
+      tutorial_practice_progress: false
       round_ping: false
       # The Rhea character form exchange is present only in the audited modern clients.
       rhea_character_skill: false
@@ -204,6 +221,8 @@ builds:
       # Own seed-table readers, writers and relay dispatch cases are proven in
       # the six post-CN2011 legacy clients; this does not mount a relay route.
       native_scene_seed_tables: true
+      # cn-324 sub_4A9A00 consumes the victim's cancellation bits independently of its attack tables.
+      native_cancellation_seed_tables: true
       # A player's ordinary-defence roll reads its 1000-byte seed table once the relay context byte is set
       # (kr-812 sub_557230 against dword_E82684+4728, set in kr-812 sub_5041A0), so the server issues every
       # occupant's table with that occupant's own local roll (defence_seed above).
@@ -237,7 +256,14 @@ builds:
       # Extreme Racing (round mode 24): kr-812 has no ExtremeRacingGameStage or race strategy, so no build inherits
       # the race frames of packets/extreme-racing.yaml from this baseline.
       extreme_racing: false
+      extreme_racing_initialization: false
+      extreme_racing_cannon: false
+      # WeaponMaster (round mode 26) assigns weapons with packets/weapon-master.yaml EquipmentApply; kr-812 has no
+      # GameWeaponMasterStrategy.
+      weapon_master: false
+      bnb: false
       final_zone: false
+      native_one_kill: false
       zombie_escape: false
       script_zombies: false
       ghost_zombies: false
@@ -432,8 +458,30 @@ builds:
   # round layouts are restated as `Name@kr-1256` where they differ. Nothing below kr-812's capabilities is
   # audited for it yet, so each is off until its consumer is read in this build.
   kr-1256:
+    # kr-1256 sub_C45700 and kr-1256 sub_C49880 label and render score, Bubble and Pang from +84/+60/+64.
+    # kr-1256 sub_C4B1B0 and kr-1256 sub_C50B50 render lblPangedCount from +236; kr-1256 sub_9E9160 assigns these kinds.
+    # Held stars retain star_live_stat_kind below; collected Lucci has no audited projection for this build.
+    live_score_kinds: { score: 16, kills: 12, deaths: 14, stars: 19, collected_lucci: null }
+    # kr-1256 sub_67E8B0 selects these three logical race clocks.
+    extreme_racing_timers: { RoundOver: 2500, FinishCountdown: 20000, RaceRunning: 210000 }
     # kr-1256 sub_DF5130 selects errorCloseMsg for result 5.
     laboratory_closed_result: 5
+    # kr-1256 sub_DF7CD0 displays success 0 or failure 16 using the third result vector.
+    # Descendants require their own consumer audit before completion is advertised.
+    laboratory_enchant_builds: [kr-1256]
+    laboratory_enchant_success_result: 0
+    laboratory_enchant_failure_result: 16
+    # kr-1256 sub_9C5920 and kr-1256 sub_9C5A70 consume the three modification result references on success.
+    laboratory_modification_builds: [kr-1256]
+    laboratory_modification_success_result: 0
+    # kr-1256 sub_9C6450 forwards the third result vector to sub_DF8FA0 when sub_DF5130 accepts the result for
+    # tab 4 (ChangeUnlimited); result 0 shows no error. An individual target's vector is its one Article key.
+    laboratory_conversion_builds: [kr-1256]
+    laboratory_conversion_success_result: 0
+    # kr-1256 sub_9C6200 forwards the third result vector to sub_DF8910 when sub_DF5130 accepts the result for tab 6
+    # (MakeItemAdvanced); result 0 shows no error. The set reply is the set identity and one member's Article key.
+    laboratory_advancement_builds: [kr-1256]
+    laboratory_advancement_success_result: 0
     # kr-1256 sub_42A4A0 selects decisive index 4; sub_9E5E70 installs entry +76/+80.
     # kr-1256 sub_42A340 reads cumulative wins from ScoreData's third head vector.
     round_series_fields:
@@ -448,6 +496,13 @@ builds:
     play:
       score:
         captain_kill: 75
+        # Star modes: the client reports its own count in gcpGameUpdateScoreOptimze (C2S 2029) with kind 21 for a
+        # small star taken and 24 for a big one; 22 and 25 for a dropped small or big star await native acceptance.
+        star_report: Optimized
+        star_small_gained: 21
+        star_big_gained: 24
+        star_small_lost: 22
+        star_big_lost: 25
     # kr-1256 sub_62C3D0 checks seat +104.
     plaza_recruitment_field: unknown_104
     plaza_recruitment_active_field: unknown_112
@@ -502,6 +557,9 @@ builds:
       NpcMotion: { builds: [kr-1256, cn-774, tw-454], opcode: gppDummyUnitMotion, structure: NpcDummyMotion, actors: [actor], nested: true }
       NpcMove: { builds: [kr-1256, cn-774, tw-454], opcode: gppAgentMoveTo, structure: NpcAgentMove, actors: [actor] }
       NpcDirectItem: { builds: [kr-1256, cn-774, tw-454], opcode: gppUseItemDirect, structure: NpcDirectItem, actors: [actor] }
+      # Turret and breakable-object identities are map objects, never seated characters (packets/npc-feed.yaml).
+      NpcKill: { builds: [kr-1256, cn-774, tw-454], opcode: gppKillObject, structure: NpcObjectKill, actors: [actor] }
+      NpcTurret: { builds: [kr-1256, cn-774, tw-454], opcode: gppChangeTurretState, structure: NpcTurretState, actors: [actor] }
       Dash: { opcode: gppDash, structure: Dash, actors: [actor] }
       Roll: { opcode: gppRoll, structure: Roll, actors: [actor] }
       Jump: { opcode: gppJump, structure: Jump, actors: [actor] }
@@ -530,6 +588,9 @@ builds:
       Unknown32921: { opcode: Unknown32921, structure: Unknown32921, actors: [actor] }
       Unknown32925: { opcode: Unknown32925, structure: Unknown32925, actors: [actor] }
       RoundResetConfirmation: { opcode: Unknown32926, structure: RoundResetConfirmation, actors: [actor], nested: true, life_event: reset_confirmed, life_actor: actor }
+      # kr-1256 sub_50AFC0 requests; kr-1256 sub_50B470 confirms. kr-1256 sub_7AA3D0 queues each sender's own copy.
+      OneKillRequest: { builds: [kr-1256], opcode: gppOneKillRequest_, structure: OneKillRequest, actors: [attacker], echo_sender: false, one_kill: request }
+      OneKillConfirmation: { builds: [kr-1256], opcode: gppOneKillConfirmation_, structure: OneKillConfirmation, actors: [victim], echo_sender: false, one_kill: confirmation }
       Unknown33286: { opcode: Unknown33286, structure: Unknown33286, actors: [actor] }
       Unknown33301: { opcode: Unknown33301, structure: Unknown33301, actors: [actor] }
       Unknown38271: { opcode: Unknown38271, structure: Unknown38271, actors: [actor, victim], echo_sender: true }
@@ -547,8 +608,23 @@ builds:
       # Only the peer reader kr-1256 sub_6D97D0 advances a mark (kr-1256 sub_D134A0 only resets marks to the start),
       # so the sender needs its own copy.
       ExtremeRacingCheckPoint: { builds: [kr-1256], opcode: gppExtremeRacingCheckPoint_, structure: ExtremeRacingCheckPoint, actors: [actor], echo_sender: true, extreme_racing_checkpoint: true }
+      # kr-1256 sub_6E1E90 writes the shot (relay 32902) and kr-1256 sub_6F0650 reads it; kr-1256 sub_7AB190 queues the
+      # sender's own copy locally, so a delivery back to the sender would create a second bullet there. The route is
+      # claimed only when dialect.rooms extreme_racing_cannon is on.
+      ExtremeRacingCannon: { builds: [kr-1256], opcode: gppExtremeRacingCannon_, structure: ExtremeRacingCannonShot, actors: [actor], echo_sender: false, extreme_racing_cannon: true }
     # kr-1256 sub_9E5E70 initializes this row word for a seated player.
     round_score_row_marker: unknown_500
+    # kr-1256 sub_9E9160 writes held stars through kind19; kr-1256 sub_9E8B20 replaces the third-list totals.
+    # kr-1256 sub_9EAEB0 compares those totals in mode6, including full restatements read by kr-1256 sub_429620.
+    star_score_builds: [kr-1256]
+    # kr-1256 sub_9E5210 can report a departing seat's losses from a surviving client.
+    star_report_slot_builds: [kr-1256]
+    star_score_modes: [6]
+    star_score_team_modes: [6]
+    star_live_stat_kind: 19
+    star_live_team_total_field: unknown_32
+    star_scoreboard_count_field: unknown_120
+    star_scoreboard_team_total_field: unknown_160
     # kr-1256 sub_113D030 reads mode +4 and map strings +44/+68/+92/+116.
     # Keep the established complete flag reset; sub_97C610/sub_9201D0/sub_96F3A0 gate the ordinary room.
     room_projection_fields:
@@ -664,19 +740,36 @@ builds:
     # record is InventorySlot@kr-1256 in packets/inventory.yaml.
     inventory:
       envelope: zlib
-      # `mirror` publishes the stored slots in their stored order, with their own identity fields.
+      # `mirror` publishes the modern slot fields in stored order; ordinary timed values require exact-build admission.
       # `ranked` (the legacy baseline) sorts ascending by item id, drops empty rows on a restatement
       # and needs the connection's inventory time origin for the remaining-day counts.
       rows: mirror
+      # kr-1256 sub_8072A0 enumerates ordinary and Article rows separately; ordinary equipment Articles are admitted here.
+      # Descendants retain Item rows for ordinary ownership until their own resolver and presentation are admitted.
+      ordinary_article_builds: [kr-1256]
+      # kr-1256 sub_804160, cn-774 sub_9A44B0 and tw-454 sub_C09140 subtract elapsed days from the ordinary timer.
+      # Their full installers kr-1256 sub_804220, cn-774 sub_9A4550 and tw-454 sub_C02AF0 reset its origin.
+      ordinary_expiry_builds: [kr-1256, cn-774, tw-454]
       # The packets a whole-bag restatement sends, in order: bag = gspInventoryUpdateAllInventorySlot
       # over the character bag, equipped = gspInventoryUpdateInventorySlots over the equipped bag,
-      # articles = gspUpdateAllArticleSlot (empty), cash = gspCashInvenUpdateAllInventorySlot (empty).
+      # articles = gspUpdateAllArticleSlot (complete owned Articles), cash = gspCashInvenUpdateAllInventorySlot (empty).
       replaced: [bag, equipped, articles, cash]
       # After a purchase: the character bag, then the same bag as the slots packet's first container.
       purchase: [bag, slots]
       # A changed-slot publication.
       changed: [changed]
+    # kr-1256 sub_547950 consumes the custom vector retained at GameSetting +328.
+    room_custom_rule_fields:
+      target: unknown_328
+      key: unknown_0
+      values: unknown_4
     capabilities:
+      room_custom_rules: true
+      # Native title request and reply consumers are audited only for the two Korean baselines.
+      title_operations: true
+      # kr-1256 sub_EDFB50 and kr-1256 sub_EC9610 write the dedicated pet requests.
+      pet_level_up: true
+      pet_ability_change: true
       round_ping: true
       # kr-1256 sub_6E3A60 -> kr-1256 sub_7055D0: actor and bool32 form, with local charge/expiry.
       rhea_character_skill: true
@@ -693,8 +786,19 @@ builds:
       # game dispatcher kr-1256 sub_9E1EB0 defaults to; the goal touch is C2S 711 (kr-1256 sub_B0D760 kind 5) and the
       # checkpoint touch the 32934 feed route. Layouts in packets/extreme-racing.yaml; not native-client acceptance.
       extreme_racing: true
+      # kr-1256 sub_CE6F80 initializes native racing objects once the stage has loaded.
+      extreme_racing_initialization: true
+      # kr-1256 sub_67B6E0 consumes S2C 718 and kr-1256 sub_6E1E90 writes the relay shot 32902; opt-in, no scheduler.
+      extreme_racing_cannon: true
+      # kr-1256 sub_6DD900 reads the equipment frame S2C 1001 and kr-1256 sub_4996C0 applies it; the strategy installed for
+      # mode 26 is kr-1256 GameWeaponMasterStrategy (kr-1256 sub_9E1710). Not native-client acceptance.
+      weapon_master: true
+      # kr-1256 sub_6D97D0 dispatches the ordered BnB placement, explosion and pickup operations.
+      bnb: true
       # kr-1256 sub_CD7EE0 consumes the Area32 exchanges in packets/final-zone.yaml; deployment remains opt-in.
       final_zone: true
+      # kr-1256 sub_6D97D0 and kr-1256 sub_6FBA90 consume the two native OneKill stages.
+      native_one_kill: true
       # kr-1256 sub_4A1EB0, sub_9DAE50, sub_AD2060 and sub_6E0DA0 establish the script conversion exchange.
       zombie_escape: true
       udp_peer_setup: false # Peer setup is enabled only after its own control-path audit.
@@ -732,6 +836,9 @@ builds:
       direct_item_effect_echo: false
       relay_validation_report: false
       native_scene_seed_tables: false
+      # kr-1256 sub_6F3200 reads victim cancellation at kr-1256 0x6F4A64..0x6F4B75 when context+3924 is set.
+      # kr-1256 sub_483540 installs the 32 words as 1000 bits; attack criticals remain local.
+      native_cancellation_seed_tables: true
       # kr-1256 sub_483620 reads the actor's table at +10628 for a player once kr-1256 sub_6CB270 sets the context
       # byte 3924 (kr-1256 0x6CC813). The scene accept sends zeros (S2C 5, read by kr-1256 sub_6CD810), so the round
       # start replaces them with every occupant's own roll.
@@ -784,10 +891,15 @@ builds:
     # from the lobby block so the stage and the wire stay one decision.
     dynamic_config:
       content_file: dynamic-config-content.yml
+      # kr-1256 sub_53CDF0 reads both words; descendants require their own consumer audit.
+      pet_configuration_builds: [kr-1256]
 
   # CN 2019 (ClientVersion_Major 774), kr-1256's lineage. Named so a capability can be stated for it; its layouts are
   # kr-1256's unless a table says otherwise.
   cn-774:
+    # cn-774 sub_7086D0 and cn-774 sub_70B180 render score/Bubble/Pang at +80/+60/+64; cn-774 sub_8E3720 assigns these kinds.
+    # cn-774 sub_717AA0 and cn-774 sub_71D800 bind lblPangedCount to +156; optional star and coin projections remain unaudited.
+    live_score_kinds: { score: 30, kills: 25, deaths: 27, stars: null }
     # cn-774 sub_9B6B80 applies the character then ordered distinct items; cn-774 sub_BE6DE0 aggregates their effects.
     defence_seed:
       # cn-774 sub_BE4540 registers all three families; cn-774 sub_9B6450 finalizes the KR/BB owner bonuses.
@@ -810,10 +922,12 @@ builds:
     # Images/Icons/LevelMark.smf contains 240 native rank frames.
     display_level_max: 240
 
-    # The DynamicConfig slot schemas were audited on kr-1254 and kr-1256 only; these builds keep
-    # the inherited content file off until their own decoders are read.
+    # cn-774 sub_5F67F0 independently reads category 14; cn-774 sub_8115F0 uses a u16 mask.
+    # The CN template is published only with explicit pet settings; other inherited slots stay off.
     dynamic_config:
       content_file: null
+      pet_configuration_builds: [cn-774]
+      pet_content_file: dynamic-config-cn-pets.yml
 
     # cn-774 sub_89B780 dispatches the native release/feedback pair; cn-774 sub_8B43B0 reads contact.
     # Unchanged action routes inherit their field selectors, not Korean opcode rows.
@@ -889,11 +1003,17 @@ builds:
       local_view: [view]
     inventory:
       envelope: plain
+      # cn-774 sub_BAE150 -> cn-774 sub_F3CD00 -> cn-774 sub_F3CB90 unwraps S2C 808 as counted zlib.
+      article_envelope: zlib
     capabilities:
+      room_custom_rules: false
+      # Native title request and reply consumers are audited only for the two Korean baselines.
+      title_operations: false
       round_ping: false
       # cn-774 sub_B593D0 case 5 -> cn-774 sub_5034F0 installs the 1000 bytes read by cn-774 sub_503990.
       # Its ordinary-player path uses percentages; cn-774 sub_531290 selects a separate AI range interpolation.
       native_defence_seed_tables: true
+      native_cancellation_seed_tables: false # Its victim cancellation consumer requires an independent audit.
       # cn-774 sub_8A48A0 -> cn-774 sub_8C5800 independently confirms the Rhea form exchange.
       rhea_character_skill: true
       # cn-774 sub_9A6370 selects the first worn function-10001 key and falls back to cn-774 sub_9A6590.
@@ -902,10 +1022,15 @@ builds:
       zombie_escape: true # Own ChangeZombie, team notification, peer conversion and outcome paths are audited.
       ghost_zombies: true # cn-774 sub_CC48A0 loads mode28; cn-774 sub_CA7D50 handles its king cleanup.
       map_portals: true
-      # The race strategy exists in this executable, but its own frame consumers are not audited yet; tw-454
-      # inherits this until its own audit.
+      # Frame layouts are audited; complete racing runtime activation remains unverified for cn-774 and tw-454.
       extreme_racing: false
       final_zone: false
+      extreme_racing_initialization: false
+      extreme_racing_cannon: false
+      # cn-774 and tw-454 carry the strategy class (vtable only); their equipment reader is not audited.
+      weapon_master: false
+      bnb: false
+      native_one_kill: false # The build's own OneKill consumers have not been audited.
       # cn-774 sub_897E80 -> cn-774 sub_8ACC60: own 37-byte item boxes and native slot replies.
       map_supplies: true
       # cn-774 sub_897E80 case613 -> cn-774 sub_5215A0 preserves the held slot for direct effects.
@@ -931,9 +1056,10 @@ builds:
       # cn-774 sender sub_B277C0 (C2S 117), reader sub_BBA7A0 (S2C 133: a result, two FighterInfo, two strings and
       # four words, the kr-1256 shape with cn-774's own FighterInfo).
       fighter_info: true
-      # cn-774 sub_BCF090 case 114 (gspServerChatNoticeMsg) calls cn-774 sub_4BEE30, which only returns 1; tw-454
-      # sub_AACF80 case 112 calls the same empty tw-454 sub_4AE240. The notice is not shown, so none is sent.
-      server_notice: false
+      # cn-774 sub_BCF090 case 114 (gspServerChatNoticeMsg) passes cn-774 sub_4BEE30, a check that always returns 1,
+      # and then shows the notice through cn-774 sub_BBC600; tw-454 sub_AACF80 case 112 does the same through tw-454
+      # sub_4AE240 and tw-454 sub_A99620. Layout ServerNotice@cn-774 in packets/server-notice.yaml.
+      server_notice: true
       # cn-774 sub_9A9700 sends C2S 832 (context word, slot byte); cn-774 sub_BC0F00/cn-774 sub_BC1040 read the
       # tabled reply and list with kr-1256's latch and apply-on-zero; the envelope kr-1256 sub_498040 and
       # entry cn-774 sub_497F70 are the restated WeaponPresetList/WeaponPresetInfo@cn-774 shapes.
@@ -950,6 +1076,8 @@ builds:
 
   # TW 2019 (ClientVersion_Major 454), cn-774's lineage.
   tw-454:
+    # tw-454 sub_6E2140 and tw-454 sub_6E7110 render the inherited +80/+60/+64 score/Bubble/Pang counters.
+    # tw-454 sub_512780 and tw-454 sub_518050 bind lblPangedCount to +156; tw-454 sub_A63CA0 confirms the inherited kinds.
     # tw-454 sub_C15030 and tw-454 sub_C153F0 apply the character then ordered distinct items; tw-454 sub_C28430 sums effects.
     defence_seed:
       # tw-454 sub_C25A40 registers RC/KR/BB; tw-454 sub_C14940 applies both owner-gated set bonuses.
@@ -973,10 +1101,11 @@ builds:
     # Images/Icons/LevelMark.smf contains 220 native rank frames.
     display_level_max: 220
 
-    # The DynamicConfig slot schemas were audited on kr-1254 and kr-1256 only; these builds keep
-    # the inherited content file off until their own decoders are read.
+    # TW category bodies are not admitted; neither the KR generation nor CN pet template is inherited.
     dynamic_config:
       content_file: null
+      pet_configuration_builds: []
+      pet_content_file: null
 
     # tw-454 sub_70B3F0 dispatches the native life actions; sub_70E250 consumes the rescue pair.
     # The shared finish body keeps victim before attacker (tw-454 sub_72EAA0 -> sub_77A000 / sub_77B210).
@@ -1043,9 +1172,15 @@ builds:
       string_copies: { targets: [unknown_108, unknown_132], sources: [unknown_0, unknown_48] }
       mission_prefix: npc_
     base: cn-774
+    inventory:
+      # tw-454 sub_A8B870 -> tw-454 sub_EBFE20 reads the S2C 808 article count directly.
+      article_envelope: plain
     capabilities:
+      # tw-454 sub_DCFEC0 writes level-up; no dedicated ability-change path is established.
+      pet_ability_change: false
       # tw-454 sub_A79210 relay 5 -> tw-454 sub_704180 installs the 1000 bytes consumed by tw-454 sub_7684C0.
       native_defence_seed_tables: true
+      native_cancellation_seed_tables: false # Its victim cancellation consumer requires an independent audit.
       # tw-454 sub_717CC0 -> tw-454 sub_7397F0 independently confirms the Rhea form exchange.
       rhea_character_skill: true
       # tw-454 sub_C04B40 selects the first worn function-10001 key and falls back to tw-454 sub_C04D60.
@@ -1223,6 +1358,8 @@ builds:
       # cn-404's own creation pair, correcting the inherited id-400 [11, 12]: the stage offers
       # Dao and Dizni (sub_8279D0's vector plus the shipped descDao/descDizni art). cn-408 inherits.
       creation_character_types: [1, 2]
+    # The inherited ID2014 local-spawn policy is independently confirmed: cn-404 sub_6946D0 -> sub_4B9350
+    # copies while session+12790 is clear, as id-400 sub_65EC10 -> sub_48B020 does with session+10214.
 
   # China 2014 0.2.48.001 (cn-408 sub_7CDA60 sends ClientVersion_Major 408). Its eight dispatchers have
   # cn-404's case sets, and of 595 packet classes the derived wire shapes differ in three: UserSlot reads
@@ -1253,6 +1390,8 @@ builds:
       udp_relay_movement: false # Requires this build's UDP control and movement audit.
       # cn-408 sub_934B60 adds the category-6 guard through sub_4A5930 before confirmation.
       inventory_throw_excludes_category6: true
+    # The inherited local-spawn policy is independently confirmed: cn-408 sub_698230 -> sub_4B8C90
+    # copies while session+12838 is clear.
 
   # Indonesia 2014.
   id-400:
@@ -1315,6 +1454,8 @@ builds:
       starter_item_ids: [300001, 201003, 202003, 203003, 204003, 207001]
       starter_worn_ids: [300001, 202003, 201003, 207001]
     capabilities:
+      # Native title request and reply consumers are audited only for the two Korean baselines.
+      title_operations: false
       map_portals: true
       udp_peer_setup: true # id-400 sub_7833E0/id-400 sub_791070/id-400 sub_793200: native controls, table and movement.
       bomb_mission: true
@@ -1400,6 +1541,8 @@ builds:
     lobby:
       creation_character_types: [11, 12]
     capabilities:
+      # Native title request and reply consumers are audited only for the two Korean baselines.
+      title_operations: false
       map_portals: true
       udp_peer_setup: false # Peer setup is enabled only after its own control-path audit.
       udp_relay_movement: true
@@ -1461,6 +1604,8 @@ builds:
         npc_team_outcome: false # Pending this build's horde result consumer audit.
 
     capabilities:
+      # Native title request and reply consumers are audited only for the two Korean baselines.
+      title_operations: false
       map_portals: true
       # cn-717 sub_540B30/sub_4295F0 consume bomb states; sub_530290 selects attack roles.
       bomb_mission: true
@@ -1473,12 +1618,16 @@ builds:
 
   # China 2016: four-byte UDP cookies with floating-point movement.
   cn-735:
+    # cn-735 sub_A3D0E0, cn-738 sub_A66060 and cn-742 sub_9AA450 select errorCloseMsg for result 4.
+    laboratory_operations: [Enchant]
+    laboratory_closed_result: 4
     # Images/Icons/LevelMark.smf contains 200 native rank frames.
     display_level_max: 200
     # The room list answers every room on one page, as the modern adapters always have; this client's paging is
     # not read yet. cn-738 and cn-742 inherit it.
     room_list_paging: false
     capabilities:
+      pet_evolution: false
       pet_equipment: false # This unmounted lineage has not had its pet consumer audited.
       map_portals: false
       bomb_mission: false # This family requires its own native mode audit.
@@ -1497,6 +1646,7 @@ builds:
       direct_supply_effects: false
       direct_item_effect_echo: false
       native_scene_seed_tables: false # The modern family has not been audited for native seed exchange.
+      native_cancellation_seed_tables: false
       native_defence_seed_tables: false # Its defence consumer is not audited.
       native_relay_hp_reports: false # The modern family has not been audited for the relay HP reports.
       lucci_drops: false # The modern family's drop packets are outside this legacy audit.
@@ -1533,6 +1683,8 @@ builds:
   # cn-738 sub_A3A470/cn-738 sub_A39500 and cn-742 sub_97D120/cn-742 sub_97BE20
   # independently match the offer/ready and UDP receive paths; their optimized opcode is32923.
   cn-738:
+    # cn-738 sub_50A250 and cn-742 sub_C79590 select 5000 for the round-over clock.
+    extreme_racing_timers: { RoundOver: 5000, FinishCountdown: 20000, RaceRunning: 210000 }
     # Images/Icons/LevelMark.smf contains 200 native rank frames.
     display_level_max: 200
     base: cn-735
@@ -1613,6 +1765,9 @@ builds:
       first_flag: unknown_20
       second_flag: unknown_21
     capabilities:
+      # Native title request and reply consumers are audited only for the two Korean baselines.
+      title_operations: false
+      pet_evolution: false
       pet_equipment: false # No native follower selection path is established for this lineage; cn-279 inherits it.
       map_portals: false
       weapon_objects: true # cn-324 sub_45D090, cn-324 sub_45C8F0, cn-324 sub_471630 and cn-324 sub_4716F0.
@@ -1700,16 +1855,19 @@ builds:
     display_level_max: 180
     # cn-279's request writer cn-279 sub_481D60 sends no body (inherited); its catalog is its own.
     # Its reader cn-279 0x450090 reads cn-324's segments with 28-byte stocks (cn-279 0x44CC70: a u32 type),
-    # needs only the open main (cn-279 sub_66B830), and its page-1 mode cn-279 sub_66AB50 skips the cards.
+    # cn-279 sub_66AE10 selects each main's native default subcategory; it must be in the tree.
+    # cn-279 sub_66AB50 uses mode 0 for the selected subcategory, 2 for its main, and 1 for native sale rows.
     shop:
       catalog:
         stock_type: u32
-        tree: landing
-        page_type: main
+        tree: landing_defaults
+        page_type: sheet
       # cn-279 sub_6F09D0 uses 36 for insufficient cash and has no case for 22 (generic refusal).
       refusal_codes:
         cash_short: 36
     capabilities:
+      # cn-279 sub_6FB0C0 stores event 23; cn-279 sub_787290 draws its completion marker.
+      tutorial_practice_progress: true
       map_portals: false
       # cn-279 sub_702660 queues peer frames locally only for tutorial/replay; ordinary rounds require the echo.
       round_feed_echo_sender: true
@@ -1737,6 +1895,7 @@ builds:
       direct_supply_effect_uses_item_used: true
       direct_item_effect_echo: false
       native_scene_seed_tables: false # CN2011 has no own seed-table vtables or relay cases.
+      native_cancellation_seed_tables: false
       # cn-279 sub_801A40 and cn-279 sub_625EB0 apply ordinary/RC defence through local floating-point draws.
       native_defence_seed_tables: false
       native_relay_hp_reports: false # No own rows for the relay HP reports in this build.
@@ -1838,6 +1997,7 @@ builds:
       # cn-706 sub_4D0B70 reads seat/kind and calls cn-706 sub_4DE040 with that kind for native effect 32894.
       direct_supply_effects: true
       native_scene_seed_tables: false # Critical and cancellation exchange remains unaudited.
+      native_cancellation_seed_tables: false
       # cn-706 sub_79C8B0 case 5 -> cn-706 sub_4BE150 -> cn-706 sub_50C9E0 installs cn-706 sub_50CAF0's 1000 bytes.
       native_defence_seed_tables: true
       native_relay_hp_reports: false # No own rows for the relay HP reports in this build.
@@ -1900,6 +2060,7 @@ builds:
     base: cn-706
 
     capabilities:
+      pet_evolution: false
       pet_equipment: false # This unmounted build has not had its pet consumer audited.
       map_portals: true
       bomb_mission: false

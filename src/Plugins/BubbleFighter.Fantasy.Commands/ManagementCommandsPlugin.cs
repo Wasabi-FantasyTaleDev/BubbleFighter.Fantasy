@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 namespace BubbleFighter.Fantasy.Commands;
 
 /// <summary>Registers online counts, announcements and notified disconnects once across all player scopes.</summary>
-[Plugin("commands.management", Requires = [typeof(ICommandRegistry), typeof(IPermissionRegistry), typeof(IGameText)],
+[Plugin("commands.management", Category = "admin", Names = ["en=Management commands", "zh-Hans=管理命令", "zh-Hant=管理指令", "ko=관리 명령"], Requires = [typeof(ICommandRegistry), typeof(IPermissionRegistry), typeof(IGameText)],
     Provides = [typeof(IOnlineCommandScopes)])]
 public sealed class ManagementCommandsPlugin : IPlugin
 {

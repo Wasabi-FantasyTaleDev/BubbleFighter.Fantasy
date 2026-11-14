@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 namespace BubbleFighter.Fantasy.Messenger;
 
 /// <summary>Signs this server's messenger tickets so a local or remote messenger can authenticate its players.</summary>
-[Plugin("messenger.tickets", Description = "Signs short-lived messenger tickets for this server's accounts.",
+[Plugin("messenger.tickets", Category = "social", Names = ["en=Messenger sign-in", "zh-Hans=好友聊天登录", "zh-Hant=好友聊天登入", "ko=메신저 로그인"], Description = "Signs short-lived messenger tickets for this server's accounts.",
     Provides = [typeof(IMessengerTicketIssuer)])]
 public sealed class MessengerTicketsPlugin : IPlugin
 {

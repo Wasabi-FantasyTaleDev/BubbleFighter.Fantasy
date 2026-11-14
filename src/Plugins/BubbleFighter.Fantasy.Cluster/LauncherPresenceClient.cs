@@ -41,7 +41,7 @@ public sealed class LauncherPresenceClientOptions : IValidatableOptions
 }
 
 /// <summary>Connects a worker's Launcher API to a shared population authority without changing selector eligibility.</summary>
-[Plugin("cluster.launcher-presence", Description = "Authenticated bounded Launcher population snapshots.",
+[Plugin("cluster.launcher-presence", Category = "cluster", Names = ["en=Cluster launcher presence", "zh-Hans=集群启动器在线状态", "zh-Hant=叢集啟動器上線狀態", "ko=클러스터 런처 접속 상태"], Description = "Authenticated bounded Launcher population snapshots.",
     Provides = [typeof(ILauncherPresenceDirectory)])]
 public sealed class LauncherPresenceClientPlugin : IPlugin
 {

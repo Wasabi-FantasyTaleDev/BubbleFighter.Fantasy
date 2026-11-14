@@ -43,11 +43,11 @@ cp .env.example .env
 
 `.env` is git-ignored. Never commit it.
 
-### 2. Set a disposable password
+### 2. Optional: database settings
 
-Open `.env` and set `BFF_MYSQL_PASSWORD` to a nonempty disposable value, for example `isolated-check-only`. The `persistence.mysql` row reads `${BFF_MYSQL_PASSWORD}` with no default, so composition fails when the variable is missing; the isolated-memory patch disables that row only after composition. Keep real database credentials out of local checks and use them only in a deliberately configured deployment.
+A local check with the isolated-memory patch needs no database settings, so you can leave `.env` as copied. `BFF_MYSQL_PASSWORD` is required, and must be nonempty, only when the `persistence.mysql` row is enabled, and then it has no default. Keep real database credentials out of local checks and use them only in a deliberately configured deployment.
 
-**Check it worked:** `.env` exists (`Test-Path .env` prints `True`) and its `BFF_MYSQL_PASSWORD` line is nonempty. Do not paste the file or its values into a chat or an issue.
+**Check it worked:** `.env` exists (`Test-Path .env` prints `True`). Do not paste the file or its values into a chat or an issue.
 
 ## Find a profile
 
@@ -106,12 +106,12 @@ dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile 
 When a repository-root `.env` exists, the first line says `Loaded unset variables from <path>.`. The server then prints its administration listener, the WebUI address and the active row count:
 
 ```text
-Row 'admin.http' admin API listening on 127.0.0.1:8080.
-WebUI: http://127.0.0.1:8080/
+Row 'admin.http' admin API listening on 127.0.0.1:7300.
+WebUI: http://127.0.0.1:7300/
 Server started with <count> active row(s).
 ```
 
-`<count>` is the number of active rows printed by the host; it is not a fixed number. `management` has no game or relay ports. Its admin API base address is `http://127.0.0.1:8080`, which comes from the `admin.http` row in `profiles/bundles/core.yaml` (`${BFF_ADMIN_HOST:-127.0.0.1}:${BFF_ADMIN_PORT:-8080}`). The process stays in the foreground until you stop it.
+`<count>` is the number of active rows printed by the host; it is not a fixed number. `management` has no game or relay ports. Its admin API base address is `http://127.0.0.1:7300`, which comes from the `admin.http` row in `profiles/bundles/core.yaml` (`${BFF_ADMIN_HOST:-127.0.0.1}:${BFF_ADMIN_PORT:-7300}`). The process stays in the foreground until you stop it.
 
 ### 2. Start a game profile instead (needs client data)
 
@@ -125,7 +125,7 @@ A game profile needs the matching client data. Without it, the `clientdata` row 
 clientdata: neither data_directory '<working-directory>/client-data/kr-812/data' nor raw_directory '<working-directory>/client-data/kr-812/dataraw' exists. Provision the configured client-data directories before enabling this row.
 ```
 
-Supply the data, or import it through the setup assistant described in [Installation](installation.md), then start the profile again. With the data in place, `kr-812` binds its game listener on `${BFF_BIND_HOST:-0.0.0.0}:${LEGACY_PORT}`, which is `0.0.0.0:7110` because `profiles/kr-812/profile.yaml` sets `LEGACY_PORT` to `${KR_812_GAME_PORT:-7110}`. Legacy builds have no relay listener. The admin API stays on `127.0.0.1:8080`.
+Supply the data, or import it through the setup assistant described in [Installation](installation.md), then start the profile again. With the data in place, `kr-812` binds its game listener on `${BFF_BIND_HOST:-0.0.0.0}:${LEGACY_PORT}`, which is `0.0.0.0:7110` because `profiles/kr-812/profile.yaml` sets `LEGACY_PORT` to `${KR_812_GAME_PORT:-7110}`. Legacy builds have no relay listener. The admin API stays on `127.0.0.1:7300`.
 
 **Check it worked:** the process stays in the foreground, prints the three startup lines above, and does not exit with an activation error.
 
@@ -136,13 +136,13 @@ Supply the data, or import it through the setup assistant described in [Installa
 PowerShell:
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:8080/health
+Invoke-RestMethod http://127.0.0.1:7300/health
 ```
 
 Linux shell:
 
 ```sh
-curl -s http://127.0.0.1:8080/health
+curl -s http://127.0.0.1:7300/health
 ```
 
 The response contains `status` = `ok` and a UTC timestamp. `/health` never needs a sign-in.
@@ -152,13 +152,13 @@ The response contains `status` = `ok` and a UTC timestamp. `/health` never needs
 PowerShell:
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:8080/api/plugins | Format-Table rowId, state
+Invoke-RestMethod http://127.0.0.1:7300/api/plugins | Format-Table rowId, state
 ```
 
 Linux shell:
 
 ```sh
-curl -s http://127.0.0.1:8080/api/plugins
+curl -s http://127.0.0.1:7300/api/plugins
 ```
 
 `/api/plugins` returns the running plugin rows. Each item has `rowId`, `plugin`, `source`, `state` and `error`. Look for rows with `state` = `Active` and an empty `error`; a `Failed` or `Pending` row carries its diagnostic in `error`.
@@ -167,7 +167,7 @@ A server started with `run --profile` needs no sign-in for `/api` and listens on
 
 ### 3. Open the WebUI
 
-Open `http://127.0.0.1:8080/` in a browser. The management profile serves the administration interface.
+Open `http://127.0.0.1:7300/` in a browser. The management profile serves the administration interface.
 
 **Check it worked:** the health response reports `ok`, the instance list shows active rows, and the WebUI loads. These checks prove that the host and its administration API run; they do not prove that a game client can connect.
 
@@ -185,8 +185,8 @@ To keep data across restarts, switch persistence to SQLite or MySQL as described
 
 ## If something goes wrong
 
-- **`environment variable 'BFF_MYSQL_PASSWORD' is not set and has no default`:** the `.env` file is missing, was not found at the repository root, or does not set the variable. Copy `.env.example` and set a disposable value.
-- **The administration port is in use:** startup fails on the listener row. Set `BFF_ADMIN_PORT` in `.env`, or stop the process that owns port 8080.
+- **`environment variable 'BFF_MYSQL_PASSWORD' is not set and has no default`:** an enabled row reads a variable that is not set, for example MySQL selected without its password. Add the isolated-memory patch for a local check, or set the variable in `.env` at the repository root for a deployment that uses MySQL.
+- **The administration port is in use:** startup fails on the listener row. Set `BFF_ADMIN_PORT` in `.env`, or stop the process that owns port 7300.
 - **The game port is in use:** set `KR_812_GAME_PORT` in `.env`, or stop the process that owns port 7110.
 - **`kr-812` fails on `clientdata`:** see the client-data message above; the build's data must exist before the profile can start.
 - **`Server startup did not converge`:** the message lists each non-active row with its state and diagnostic. Read the first `Failed` or `Pending` row and fix its cause.

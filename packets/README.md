@@ -28,13 +28,16 @@ Chinese: [README.zh.md](README.zh.md).
 | `udp-peers.yaml` | Native peer discovery, endpoint tables, hole-punch controls and relay membership messages; layouts do not enable listeners or direct movement. |
 | `round-movement.yaml` | Native full/masked movement and UDP relay probe, identity, control and header layouts, including build-specific cookie widths. |
 | `relay-connection.yaml` | Audited native relay endpoints, keys, offers, joins and connection reports. Table presence does not enable a relay listener or handshake. |
+| `relay-latency.yaml` | One-word native relay delay requests and opaque replies; table presence does not enable the passive responder or client sampling. |
 | `relay-validation.yaml` | Native post-join validation reports and signature data; CN2011 uses a direct-success sequence instead. |
 | `relay-success.yaml` | Empty native join/scene success signals; does not initialize scene seed tables or enable listeners. |
 | `relay-seeds.yaml` | Audited native relay seed-table structures; table presence does not enable seed handling. |
 | `critical-transitions.yaml` | Native installed-weapon and timed-effect reports for the explicitly audited seeded clients. |
 | `damagers.yaml` | In-round damager bodies the server relays unchanged, such as `SplashDamagerByDamager` (32900) and the seven spawns of `packets/damagers.yaml`. |
+| `weapon-master.yaml` | The kr-1256 equipment frame (S2C 1001, `EquipmentApply`) that assigns a weapon in round mode 26, and the empty revival request (C2S 765, `WeaponMasterRevivalRequest`) the client sends after repeated deaths. Layout only; the capability `weapon_master` gates its use. |
 | any other `*.yaml` | More structures. Every file in this folder is read; a plugin can ship its own. |
 | `dynamic-config-content.yml` | The kr-1256 native DynamicConfig generation's per-slot content rows (not a layout; the `.yml` suffix keeps this reader from reading it as one). The schemas live in `dynamic-config.yaml`; the wire serves the bits the content file names. |
+| `dynamic-config-cn-pets.yml` | The cn-774 category-14 creation template used when an active pet provider supplies cooldown and mileage display settings. It is content rather than a layout; its schema lives in `dynamic-config.yaml`. |
 
 Every file starts with `version: 1`. That is the version of this file format, not of the game: the
 server refuses a file whose version it does not know, so the format can change later without old files
@@ -227,6 +230,9 @@ bff packets json id-400                 # everything about one build as JSON, fo
 
 Structure is data; meaning is code.
 
+`relay_latency_builds` explicitly lists the builds whose native request/reply pair the passive relay
+adapter may bind. Inheriting the one-word layouts does not add membership or enable either plugin row.
+
 `tutorial_score_builds` explicitly lists the audited selected-tutorial consumers. Descendants do not
 inherit activation unless named. `tutorial_score_help_field` selects that build's native `ScoreRow`
 word for the rescue goal; it must exist and differ from the bubble and finishing counters. These
@@ -296,7 +302,24 @@ means on the wire is up to the plugin that writes it. A structure name may appea
 
 `round_score_row_marker` names the native `ScoreRow` leading word that the modern result adapter fills for a seated row. It must identify that row's first `u32` field; it does not assign a recovered meaning to the unknown field. Level and reward values use the shared named fields, while each row's table determines their wire positions. A result tail's conditional strings remain absent through explicit default gate values from its own table.
 
-`inventory` in `builds.yaml` says how a build publishes its bag through the shared inventory binding. `envelope` is `plain` or `zlib` (the modern family wraps the 802/803/808 bodies in a `u32` compressed length and a zlib stream; the cash inventory is never wrapped). `rows` is `ranked` (the legacy baseline: ascending item id, empty rows dropped on a restatement, connection-relative day counts) or `mirror` (the stored slots in stored order with their own identity fields). `replaced`, `purchase` and `changed` are the ordered publication lists, built from these entry names: `bag` (the whole-bag packet over the character bag), `slots` (the slots packet over the character bag), `equipped` (the slots packet over the equipped bag), `changed` (the slots packet over the changed slots), `articles` (the empty article table) and `cash` (the empty cash inventory). The binding resolves every packet by name and refuses a list entry whose packet the build's table lacks.
+`live_score_kinds` maps `score`, `knockdowns`, `kills`, `deaths`, `stars` and `collected_lucci` to
+the native byte identifiers in a live seat vector. All six keys are required; the two optional
+counters may explicitly be `null` when their native projection is unreviewed. An admitted counter
+must have an identifier before it is written. Identifiers must be distinct. The existing collected-Lucci
+build membership and dedicated StarTeam publication rules still control their own paths.
+These mappings do not enable a sender route or change the gameplay scoring rule.
+The existing modern result sender publishes ordinary combat counters for its changed seats in the
+first team-total frame, followed by the second team's total without repeating the seats. KR1256
+WeaponMaster progress follows those combat counters. Held-star updates still use their separately
+admitted build and mode projection; other star values do not enter the ordinary combat vector.
+
+`inventory` in `builds.yaml` says how a build publishes its bag through the shared inventory binding. `envelope` is `plain` or `zlib`; `zlib` means a `u32` compressed byte count followed by one zlib stream. `article_envelope` selects the Article-list wrapper independently and defaults to `envelope` when omitted. kr-1256 wraps both ordinary inventory and Article bodies; cn-774 keeps ordinary bodies plain but wraps Articles; tw-454 keeps both plain. Cash inventory is always plain. The recipient readers and the CN/TW overrides are documented in `inventory.yaml` and `builds.yaml`.
+
+`rows` is `ranked` (the legacy baseline: ascending item id, empty rows dropped on a restatement, connection-relative day counts) or `mirror` (stored order with the modern slot fields). `replaced`, `purchase` and `changed` are ordered publication lists built from these entries: `bag` (the whole-bag packet over the character bag), `slots` (the slots packet over the character bag), `equipped` (the slots packet over the equipped bag), `changed` (the slots packet over changed rows), `articles` (the complete owned Article table, including worn flags and projected attributes), and `cash` (the empty cash inventory). Modern ordinary slot lists exclude rows represented as Articles. The binding resolves every packet by name and refuses a list entry whose packet the build's table lacks.
+
+`inventory.ordinary_expiry_builds` explicitly names the mirrored builds whose ordinary timed ownership is published as relative day-double bits. kr-1256, cn-774 and tw-454 use the durable UTC expiry unless a feature supplies its own display deadline. Every full ordinary bag, including a purchase restatement, establishes a fresh time origin; pure deltas retain the previous one and refuse a timer before any full publication. Inherited settings do not admit an unlisted descendant. Permanent, unspecified and life-counted rows retain their existing representation. Article rows remain separate and do not acquire an ownership timer through this setting. A publication validates its bounded rows and encodes every frame before advancing the origin or sending the first frame.
+
+`dynamic_config.pet_configuration_builds` explicitly lists the builds whose category 14 can publish both pet settings; an inherited list does not admit a descendant unless it names that build. `pet_content_file` optionally supplies a category-14 template when the build has no ordinary `content_file`. The CN template is published only while the active protocol's pet provider supplies the complete cooldown and mileage display pair. TW disables both the pet build list and template and uses its native PetConfig workbook instead.
 
 A null entry inside `room_unchosen_map` cancels that inherited field when a descendant restates `GameSetting`; remaining entries are still validated against the descendant layout.
 
@@ -322,5 +345,20 @@ the selected structure with the expected widths. `nested: true` selects the comp
 including absent-tag validation for native reset confirmations. The baseline action bodies and
 reporting roles are evidenced beside their structures in `round-feed.yaml`; damager-spawn and
 writer-only relay-motion routes retain their separately documented handling.
+
+`one_kill: request|confirmation` attaches typed participants to a route on builds with the audited
+`native_one_kill` capability. The request reports its attacker; the confirmation reports its victim.
+Both use scalar layouts, omit sender echo and carry no separate `life_event`: the room validates the
+current participants and reporting owner before applying a confirmed death. Deployment requires the
+default-off `native_one_kill` option on `ingame` and the FinalZone exchange. The optional KR1256
+`one-kill.patch.yaml` enables both for native-client acceptance.
+
+`star_score_builds` explicitly limits the audited star projection to named builds. `star_score_modes`
+selects its modes, and `star_score_team_modes` selects those that publish separate team-star totals.
+`star_live_stat_kind` and `star_live_team_total_field` describe the live update; `star_scoreboard_count_field`
+and `star_scoreboard_team_total_field` retain the same state when the complete board replaces it.
+The initial mapping covers KR1256 mode 6. Descendants and other modes retain their existing projection.
+`star_report_slot_builds` separately identifies reports whose named seat has been audited, so a client's
+cleanup report for a departed player cannot change the surviving reporter's own count.
 
 `round_series_fields` maps the audited settings flag and optional settings index, entry index, attacker and state, cumulative team-win field, and native `rounds_to_win` (two or three). Legacy entries use their nested suffix and fixed team rows; modern entries use the direct stage body and masked result head. The dialect validates selectors and widths before advertising series support. `captain_score_fields` names victim and killer seat fields in the complete native score report; full-width values must agree with the character references before the shared Captain handler receives a report. Neither mapping enables a deployment option.

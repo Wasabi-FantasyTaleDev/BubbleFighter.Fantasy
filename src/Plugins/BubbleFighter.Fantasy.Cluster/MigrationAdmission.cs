@@ -5,6 +5,7 @@ using BubbleFighter.Fantasy.Contracts.Lobby;
 using BubbleFighter.Fantasy.Contracts.Rooms;
 using BubbleFighter.Fantasy.Contracts.Party;
 using BubbleFighter.Fantasy.Contracts.Sessions;
+using BubbleFighter.Fantasy.Contracts.Signals;
 using Microsoft.Extensions.Logging;
 
 namespace BubbleFighter.Fantasy.Cluster;
@@ -19,7 +20,12 @@ internal sealed class MigrationAdmission(MigrationAdmissionOptions options, IRet
     private readonly Dictionary<long, Pending> _pending = [];
     private readonly Dictionary<int, PartyArrival> _leaders = [];
     private readonly Dictionary<int, List<PartyArrival>> _followers = [];
+    // Present while an arrival or a party waiting for its members is tracked; the clean-up loop sleeps on it.
+    private readonly PresenceSignal _work = new();
     private bool _disposed;
+
+    // Every change to the three tables happens under _gate, so each holder refreshes once, just before it lets go.
+    private void RefreshWork() => _work.Refresh(() => _pending.Count != 0 || _leaders.Count != 0 || _followers.Count != 0);
 
     internal async ValueTask MoveAsync(ISession session, MoveIntoRequested message, CancellationToken ct)
     {
@@ -89,7 +95,7 @@ internal sealed class MigrationAdmission(MigrationAdmissionOptions options, IRet
             await FailAsync(session, pending, failure).ConfigureAwait(false);
             throw;
         }
-        finally { _gate.Release(); }
+        finally { RefreshWork(); _gate.Release(); }
     }
 
     internal async ValueTask AcknowledgeAsync(ISession session, PendingPromotionAcknowledged message, CancellationToken ct)
@@ -126,7 +132,7 @@ internal sealed class MigrationAdmission(MigrationAdmissionOptions options, IRet
             await FailAsync(session, pending, failure).ConfigureAwait(false);
             throw;
         }
-        finally { _gate.Release(); }
+        finally { RefreshWork(); _gate.Release(); }
     }
 
     private bool ValidIntent(MigrationArrival arrival)
@@ -317,7 +323,7 @@ internal sealed class MigrationAdmission(MigrationAdmissionOptions options, IRet
                 }
             }
         }
-        finally { _gate.Release(); }
+        finally { RefreshWork(); _gate.Release(); }
         // Recovery capacity remains in _pending; no scene delay holds the admission gate.
         await Task.WhenAll(recoveries.Select(pending => ReturnAfterRecoveryAsync(pending, ct))).ConfigureAwait(false);
     }
@@ -334,14 +340,13 @@ internal sealed class MigrationAdmission(MigrationAdmissionOptions options, IRet
         {
             await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
             try { _pending.Remove(pending.Session.Connection.Id); }
-            finally { _gate.Release(); }
+            finally { RefreshWork(); _gate.Release(); }
         }
     }
 
     internal async ValueTask RunAsync(CancellationToken ct)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(options.CleanupIntervalMs), clock);
-        try { while (await timer.WaitForNextTickAsync(ct).ConfigureAwait(false)) await SweepAsync(ct).ConfigureAwait(false); }
+        try { await ParkedLoop.RunAsync(TimeSpan.FromMilliseconds(options.CleanupIntervalMs), clock, () => _work.WhenPresent, SweepAsync, ct).ConfigureAwait(false); }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
     }
 
@@ -364,7 +369,7 @@ internal sealed class MigrationAdmission(MigrationAdmissionOptions options, IRet
             }
             if (failures is not null) throw new AggregateException("Native migration unload could not release all pending arrivals.", failures);
         }
-        finally { _gate.Release(); }
+        finally { RefreshWork(); _gate.Release(); }
     }
 
     private sealed record PartyArrival(ISession Session, long Created, TimeSpan Lifetime);

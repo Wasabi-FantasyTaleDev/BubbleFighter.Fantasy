@@ -1,3 +1,4 @@
+using BubbleFighter.Fantasy.Contracts.Signals;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using System.Net;
 
@@ -29,6 +30,9 @@ public sealed record MatchSceneRegistered(int UserNumber, int EntityId, string N
 /// <param name="Nickname">Owner display name.</param>
 /// <param name="Map">Loaded scene key.</param>
 public sealed record MatchMapNamed(int EntityId, string Nickname, string Map) : IMessage;
+
+/// <summary>Requests departure of the game seat authenticated by the current match transport.</summary>
+public sealed record MatchLeaveRequested : IMessage;
 
 /// <summary>Acknowledges authenticated match admission; the dialect determines whether a subsequent scene report is required.</summary>
 public sealed record MatchAuthenticationAccepted : IMessage;
@@ -150,6 +154,15 @@ public interface IMatchUdpRelayDirectory
 
     /// <summary>Gets a bounded snapshot of initialized registrations, including ones without a UDP offer.</summary>
     IReadOnlyList<ISession> RegisteredSessions();
+
+    /// <summary>
+    /// Gets a task that is complete while at least one session is registered and pending while none is, so the
+    /// relay setup loop can sleep while no match connection exists instead of asking on every tick. The task never
+    /// faults and is never cancelled. A directory that cannot tell returns a completed task, which keeps its
+    /// caller checking on every tick.
+    /// </summary>
+    /// <returns>The level-triggered presence of registrations; see <see cref="PresenceSignal.WhenPresent"/>.</returns>
+    Task WhenAnyRegistered() => Task.CompletedTask;
 
     /// <summary>Gets the current handshake state without retaining an endpoint or token snapshot.</summary>
     MatchUdpRelayState StateOf(ISession session);

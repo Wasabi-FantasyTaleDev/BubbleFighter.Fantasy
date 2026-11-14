@@ -21,7 +21,7 @@ public sealed partial class CompanionLoopbackTests
         internal TaskCompletionSource? Release;
         internal bool Fail;
         public bool OwnsSession(ISession target) => ReferenceEquals(session, target);
-        public async ValueTask<CommandResult> ExecuteTextAsync(ISession target, string command, CancellationToken cancellationToken)
+        public async ValueTask<CommandResult> ExecuteTextAsync(ISession target, string command, CommandSource source, CancellationToken cancellationToken)
         {
             Assert.Same(session, target);
             Assert.Equal("plaza", command);

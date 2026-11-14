@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Xml;
-using System.Xml.Linq;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Contracts.ClientData;
 using BubbleFighter.Fantasy.Contracts.Match;
@@ -13,16 +12,16 @@ internal sealed partial class WeaponCriticalCatalog(
     IReadOnlyDictionary<int, WeaponCriticalCatalog.Specification> specifications,
     IReadOnlyDictionary<int, int> itemSlots, IReadOnlyDictionary<int, string> modeFields,
     IReadOnlyDictionary<int, WeaponCriticalCatalog.CatalogEffect[]> catalogEffects,
-    int primaryDefault, int sidearmDefault, int maxWornItems, bool viewRefreshesWeapons)
+    int primaryDefault, int sidearmDefault, int maxWornItems, bool viewRefreshesWeapons, PetSeedEffects? pets = null)
 {
     internal bool ViewRefreshesWeapons => viewRefreshesWeapons;
     internal sealed record Specification(string Family, float CriticalPercent, IReadOnlyDictionary<string, int> Replacements);
     private static readonly string[] Families = ["Pistol", "Rifle", "Shotgun", "SniperRifle"];
     private static readonly string[] ReplacementFields = ["zombiePveModeId", "hordeModeId", "sniperModeId",
         "zombieModeId", "itemModeId", "singlePvpModeId", "teamSurvivalId"];
-    private static readonly XNamespace Ss = "urn:schemas-microsoft-com:office:spreadsheet";
 
-    internal static WeaponCriticalCatalog Load(IClientDataStore data, PacketTables tables, string build, SceneSeedsOptions options)
+    internal static WeaponCriticalCatalog Load(IClientDataStore data, PacketTables tables, string build,
+        SceneSeedsOptions options, PetSeedEffects? pets = null)
     {
         var values = tables.ValuesOf(build);
         if (!values.TryGetValue("weapon_critical_seed_builds", out var membersRaw) || membersRaw is not string[] members
@@ -121,56 +120,138 @@ internal sealed partial class WeaponCriticalCatalog(
             throw new ConfigException("Weapon catalog lacks the native primary or sidearm default.");
         var effects = CriticalEffects(itemSheets["ShopItemSpec"]);
         return new(specifications, slots, modeFields, effects, primaryDefault, sidearmDefault, options.WeaponMaxWornItems,
-            viewRefreshesWeapons);
+            viewRefreshesWeapons, pets);
 
         Dictionary<string, List<Dictionary<int, string>>> Read(string path, string[] wanted)
         {
             try
             {
-                var bytes = data.Read(path);
-                if (bytes.Length == 0 || bytes.Length > options.WeaponWorkbookMaxBytes)
+                // Streamed from the store: reading the workbook whole first put a large array per file on the heap.
+                var length = data.Length(path);
+                if (length == 0 || length > options.WeaponWorkbookMaxBytes)
                     throw new ConfigException($"'{path}' exceeds weapon_workbook_max_bytes or is empty.");
-                using var stream = new MemoryStream(bytes, writable: false);
-                using var reader = XmlReader.Create(stream, new XmlReaderSettings
-                {
-                    DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null,
-                    MaxCharactersInDocument = options.WeaponWorkbookMaxBytes,
-                });
-                var document = XDocument.Load(reader);
-                var result = new Dictionary<string, List<Dictionary<int, string>>>(StringComparer.Ordinal);
-                foreach (var sheet in document.Descendants(Ss + "Worksheet"))
-                {
-                    var name = (string?)sheet.Attribute(Ss + "Name");
-                    if (name is null || !wanted.Contains(name, StringComparer.Ordinal)) continue;
-                    var rows = new List<Dictionary<int, string>>();
-                    foreach (var row in sheet.Elements(Ss + "Table").Elements(Ss + "Row"))
-                    {
-                        if (rows.Count >= options.WeaponCatalogMaxRecords)
-                            throw new ConfigException($"'{path}' exceeds weapon_catalog_max_records.");
-                        var cells = new Dictionary<int, string>();
-                        var next = 0;
-                        foreach (var cell in row.Elements(Ss + "Cell"))
-                        {
-                            var index = cell.Attribute(Ss + "Index") is { } position ? Positive(position.Value, "cell index") - 1 : next;
-                            var merged = cell.Attribute(Ss + "MergeAcross") is { } span ? Selector(span.Value, 0) : 0;
-                            if (index < next || index >= options.WeaponWorkbookMaxColumns
-                                || merged >= options.WeaponWorkbookMaxColumns - index)
-                                throw new ConfigException($"'{path}' has an overlapping or out-of-bound workbook cell.");
-                            cells.Add(index, cell.Element(Ss + "Data")?.Value.Trim() ?? "");
-                            next = index + merged + 1;
-                        }
-                        rows.Add(cells);
-                    }
-                    if (!result.TryAdd(name, rows)) throw new ConfigException($"'{path}' repeats worksheet '{name}'.");
-                }
-                foreach (var name in wanted)
-                    if (!result.ContainsKey(name)) throw new ConfigException($"'{path}' lacks worksheet '{name}'.");
-                return result;
+                using var stream = data.OpenRead(path);
+                return ReadWorkbook(stream, path, wanted, options.WeaponCatalogMaxRecords, options.WeaponWorkbookMaxColumns,
+                    options.WeaponWorkbookMaxBytes);
             }
             catch (Exception failure) when (failure is FileNotFoundException or XmlException or InvalidOperationException)
             {
                 throw new ConfigException($"Weapon critical catalog cannot read '{path}': {failure.Message}");
             }
+        }
+    }
+
+    /// <summary>
+    /// Reads the wanted worksheets as rows of cells by column. Streamed rather than loaded as a document tree, which
+    /// allocated tens of megabytes per build while the server started. A cell's column follows <c>ss:Index</c> and
+    /// the previous cell's <c>ss:MergeAcross</c>; its value is the trimmed text of its first direct <c>ss:Data</c>
+    /// child, every text run included, as the document reader it replaced read it.
+    /// </summary>
+    internal static Dictionary<string, List<Dictionary<int, string>>> ReadWorkbook(byte[] bytes, string path, string[] wanted,
+        int maxRecords, int maxColumns, int maxCharacters)
+    {
+        using var stream = new MemoryStream(bytes, writable: false);
+        return ReadWorkbook(stream, path, wanted, maxRecords, maxColumns, maxCharacters);
+    }
+
+    /// <summary>Reads the wanted worksheets from a workbook stream; see the byte overload for the rules.</summary>
+    internal static Dictionary<string, List<Dictionary<int, string>>> ReadWorkbook(Stream stream, string path, string[] wanted,
+        int maxRecords, int maxColumns, int maxCharacters)
+    {
+        using var reader = XmlReader.Create(stream, new XmlReaderSettings
+        {
+            DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null, MaxCharactersInDocument = maxCharacters,
+        });
+        const string ss = "urn:schemas-microsoft-com:office:spreadsheet";
+        var result = new Dictionary<string, List<Dictionary<int, string>>>(StringComparer.Ordinal);
+        List<Dictionary<int, string>>? rows = null;
+        var sheetDepth = -1;
+        var tableDepth = -1;
+        while (reader.Read())
+        {
+            if (reader.NodeType == XmlNodeType.EndElement)
+            {
+                if (reader.Depth == tableDepth) tableDepth = -1;
+                else if (reader.Depth == sheetDepth) { rows = null; sheetDepth = -1; }
+                continue;
+            }
+            if (reader.NodeType != XmlNodeType.Element || reader.NamespaceURI != ss) continue;
+            if (reader.LocalName == "Worksheet" && rows is null)
+            {
+                var name = reader.GetAttribute("Name", ss);
+                if (name is null || !wanted.Contains(name, StringComparer.Ordinal) || reader.IsEmptyElement)
+                {
+                    if (name is not null && wanted.Contains(name, StringComparer.Ordinal) && !result.TryAdd(name, []))
+                        throw new ConfigException($"'{path}' repeats worksheet '{name}'.");
+                    continue;
+                }
+                rows = [];
+                if (!result.TryAdd(name, rows)) throw new ConfigException($"'{path}' repeats worksheet '{name}'.");
+                sheetDepth = reader.Depth;
+            }
+            else if (rows is not null && tableDepth < 0 && reader.LocalName == "Table" && reader.Depth == sheetDepth + 1)
+            {
+                if (!reader.IsEmptyElement) tableDepth = reader.Depth;
+            }
+            else if (rows is not null && tableDepth >= 0 && reader.LocalName == "Row" && reader.Depth == tableDepth + 1)
+            {
+                if (rows.Count >= maxRecords)
+                    throw new ConfigException($"'{path}' exceeds weapon_catalog_max_records.");
+                rows.Add(ReadRow(reader, path, maxColumns));
+            }
+        }
+        foreach (var name in wanted)
+            if (!result.ContainsKey(name)) throw new ConfigException($"'{path}' lacks worksheet '{name}'.");
+        return result;
+
+        static Dictionary<int, string> ReadRow(XmlReader reader, string path, int maxColumns)
+        {
+            var cells = new Dictionary<int, string>();
+            if (reader.IsEmptyElement) return cells;
+            var rowDepth = reader.Depth;
+            var next = 0;
+            while (reader.Read() && !(reader.NodeType == XmlNodeType.EndElement && reader.Depth == rowDepth))
+            {
+                if (reader.NodeType != XmlNodeType.Element || reader.NamespaceURI != ss || reader.LocalName != "Cell"
+                    || reader.Depth != rowDepth + 1) continue;
+                var index = reader.GetAttribute("Index", ss) is { } position ? Positive(position, "cell index") - 1 : next;
+                var merged = reader.GetAttribute("MergeAcross", ss) is { } span ? Selector(span, 0) : 0;
+                if (index < next || index >= maxColumns || merged >= maxColumns - index)
+                    throw new ConfigException($"'{path}' has an overlapping or out-of-bound workbook cell.");
+                cells.Add(index, ReadCell(reader));
+                next = index + merged + 1;
+            }
+            return cells;
+        }
+
+        static string ReadCell(XmlReader reader)
+        {
+            if (reader.IsEmptyElement) return "";
+            var cellDepth = reader.Depth;
+            string? first = null;
+            System.Text.StringBuilder? text = null;
+            var dataDepth = -1;
+            var read = false;
+            while (reader.Read() && !(reader.NodeType == XmlNodeType.EndElement && reader.Depth == cellDepth))
+            {
+                if (dataDepth < 0)
+                {
+                    if (!read && reader.NodeType == XmlNodeType.Element && reader.NamespaceURI == ss && reader.LocalName == "Data"
+                        && reader.Depth == cellDepth + 1)
+                    {
+                        read = true;
+                        if (!reader.IsEmptyElement) dataDepth = reader.Depth;
+                    }
+                    continue;
+                }
+                if (reader.NodeType == XmlNodeType.EndElement && reader.Depth == dataDepth) { dataDepth = -1; continue; }
+                if (reader.NodeType is XmlNodeType.Text or XmlNodeType.CDATA or XmlNodeType.Whitespace or XmlNodeType.SignificantWhitespace)
+                {
+                    if (first is null) first = reader.Value;
+                    else (text ??= new System.Text.StringBuilder(first)).Append(reader.Value);
+                }
+            }
+            return (text?.ToString() ?? first ?? "").Trim();
         }
     }
 

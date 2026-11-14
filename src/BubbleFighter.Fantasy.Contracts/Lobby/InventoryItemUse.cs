@@ -4,7 +4,11 @@ using BubbleFighter.Fantasy.Abstractions.Protocol;
 namespace BubbleFighter.Fantasy.Contracts.Lobby;
 
 /// <summary>Requests use of an inventory consumable with the client's action parameters.</summary>
-public sealed record InventoryItemUseRequested(int ItemId, int Quantity, string Parameters) : IMessage;
+public sealed record InventoryItemUseRequested(int ItemId, int Quantity, string Parameters) : IMessage
+{
+    /// <summary>Gets the second native parameter, used when selecting a particular pet ability for deletion.</summary>
+    public string? SecondaryParameter { get; init; }
+}
 
 /// <summary>Returns the native use result and action parameters consumed by the inventory dialog.</summary>
 public sealed record InventoryItemUseReplied(int Result, string Parameters) : IMessage

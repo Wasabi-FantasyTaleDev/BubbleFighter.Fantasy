@@ -22,7 +22,7 @@ updated: 2026-10-18
 
 - 已完成[安装](installation.md)并构建了检出，终端位于仓库根目录。
 - 所选语言的 SDK 工具链：当前 Python 3 解释器（一致性测试运行器调用 `python`）、Node.js 20 或更高版本与 npm（`sdk/typescript/package.json` 声明 `node >=20`）、Go 1.22 或更高版本（`sdk/go/go.mod`），或支持 edition 2021 的 Rust 工具链与 cargo（`sdk/rust/Cargo.toml`）。只需要一种，不需要四种都装。WebAssembly 模块还需 Rust 的 `wasm32-wasip1` 或 Go 的 `wasip1` GOOS。
-- 运行步骤需要：一份 `.env` 文件，其中 `BFF_MYSQL_PASSWORD` 为非空的临时值；以及本地检查补丁 `tools/local-checks/isolated-memory.patch.yaml`，详见[快速开始](quickstart.md)。
+- 运行步骤需要：本地检查补丁 `tools/local-checks/isolated-memory.patch.yaml`，它不需要数据库设置，详见[快速开始](quickstart.md)。
 - 已了解[插件](plugins.md)中的插件模型：插件 id、行 id、声明与 effect。
 
 ## 快速开始

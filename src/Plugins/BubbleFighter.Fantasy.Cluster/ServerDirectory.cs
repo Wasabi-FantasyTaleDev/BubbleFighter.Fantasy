@@ -83,6 +83,10 @@ internal sealed partial class ServerDirectory : IServerDirectory, IServerSelecti
         => ListServers(clientBuild, configuredMembership: false);
 
     /// <inheritdoc />
+    public IReadOnlyList<ServerSection> Sections => Array.AsReadOnly(_options.Sections
+        .Select(section => new ServerSection(section.Id, section.Name, section.ApiUrl.Length == 0 ? null : section.ApiUrl)).ToArray());
+
+    /// <inheritdoc />
     public IReadOnlyList<string> ClientBuilds => Array.AsReadOnly(_options.Nodes.SelectMany(node => node.Endpoints)
         .Select(endpoint => endpoint.Build).Distinct(StringComparer.Ordinal).ToArray());
 
@@ -96,12 +100,18 @@ internal sealed partial class ServerDirectory : IServerDirectory, IServerSelecti
         var result = new List<ServerSelectorEntry>(_options.Selectors.Length);
         foreach (var selector in _options.Selectors)
         {
+            // Nodes need not serve every build. A manual server whose nodes serve none of this build is not offered for
+            // it. A server configured without nodes (a reserved entry) is still listed, and the automatic selector stays:
+            // it is the build's routing entry, and without a serving node its targets are simply empty.
+            if (!selector.Automatic && selector.Nodes.Length > 0 && !selector.Nodes.Any(id => _nodes[id].Options.Endpoints.Any(endpoint => endpoint.Build == clientBuild)))
+                continue;
             var targets = selector.Nodes.Select(id => Snapshot(_nodes[id], clientBuild)).OfType<TargetSnapshot>()
                 .Where(snapshot => configuredMembership || !selector.Automatic || snapshot.Target.Online && !snapshot.Target.Draining
-                    && snapshot.Target.Players < snapshot.Target.Capacity
+                    && snapshot.Target.Players < snapshot.Target.Capacity && snapshot.Target.Maintenance is null
                     && string.Equals(snapshot.PersistentDomainId, selector.PersistentDomainId, StringComparison.OrdinalIgnoreCase))
                 .Select(snapshot => snapshot.Target).ToArray();
-            result.Add(new(selector.Id, selector.Name, selector.Automatic, targets) { ShortName = selector.ShortName });
+            result.Add(new(selector.Id, selector.Name, selector.Automatic, targets)
+                { ShortName = selector.ShortName, Section = selector.Section.Length == 0 ? null : selector.Section });
         }
         return result.ToArray();
     }
@@ -146,12 +156,23 @@ internal sealed partial class ServerDirectory : IServerDirectory, IServerSelecti
                 state?.Ready == true && matchesDomain, lease?.Draining ?? false, state?.Players ?? 0, endpoint.Capacity)
             {
                 Authentication = node.Options.Authentication is { } auth ? new(auth.AuthorityId, auth.ApiUrl, auth.Mode, auth.PolicyMode) : null,
+                ClientBuilds = node.ClientBuilds,
                 ObservedAtUtc = node.Observation?.ObservedAtUtc,
                 ExpiresAtUtc = ObservationExpiry(node.Observation),
                 StatusRevision = node.Observation?.Revision,
+                Maintenance = ActiveMaintenance(node.Options.Maintenance),
             };
             return new(target, lease?.PersistentDomainId);
         }
+    }
+
+    // An announced window is in effect between its start and end; before the start it is only planned, after the end over.
+    private ServerMaintenanceWindow? ActiveMaintenance(MaintenanceWindowOptions? window)
+    {
+        if (window is null) return null;
+        var now = _time.GetUtcNow();
+        DateTimeOffset? start = window.StartTime, end = window.EndTime;
+        return start > now || end <= now ? null : new(start, end, window.Description);
     }
 
     private bool Fresh(Lease lease) => _time.GetElapsedTime(lease.ObservedAt) < TimeSpan.FromSeconds(_options.LeaseSeconds);
@@ -204,6 +225,9 @@ internal sealed partial class ServerDirectory : IServerDirectory, IServerSelecti
     {
         internal Lock Gate { get; } = new();
         internal DirectoryNodeOptions Options { get; } = options;
+        // One instance per node, so targets read twice stay equal as records.
+        internal IReadOnlyList<string> ClientBuilds { get; } =
+            Array.AsReadOnly(options.Endpoints.Select(value => value.Build).Distinct(StringComparer.Ordinal).ToArray());
         internal long LastEpoch { get; set; }
         internal Lease? Lease { get; set; }
         internal Observation? Observation { get; set; }

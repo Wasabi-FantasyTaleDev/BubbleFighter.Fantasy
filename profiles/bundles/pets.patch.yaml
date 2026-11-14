@@ -1,0 +1,85 @@
+# Optional pet wiring for builds whose dialect.messages pet capability is audited.
+# Include after the build patch; modern clients also include pets-modern.patch.yaml.
+# Growth, skills, combat and rewards default on; each has its own BFF_PET_* switch, and a local patch can narrow the
+# reward and combat mode lists. Each including profile states its client's civil-clock offset.
+- insert:
+    - id: pets.entitlements
+      plugin: pets.entitlements
+      parent_id: inventory.loadouts
+      isolated_services:
+        - BubbleFighter.Fantasy.Contracts.Pets.IPetEntitlements
+      config:
+        enabled: ${BFF_PETS_ENABLED:-true}
+        protocol: "${BFF_PROFILE_ID}/game"
+        build_key: "${BFF_PROFILE_ID}"
+        initial_fullness: ${BFF_PET_INITIAL_FULLNESS:-0}
+        client_utc_offset_minutes: ${PET_CLIENT_UTC_OFFSET_MINUTES:-null}
+        manual_level_up: false
+        client_configuration_source: None
+        grade_cap_from_pet_parameter: false
+        maximum_grade: 2
+        shared_skill_pool: false
+        allow_duplicate_skills: false
+        carry_growth_experience: false
+        experience_from_food_parameter: false
+        normal_food_experience: 5
+        premium_food_experience: 100
+        normal_food_fullness: 50
+        premium_food_fullness: 100
+    - id: pets.combat-effects
+      plugin: pets.combat-effects
+      parent_id: clientdata
+      config:
+        enabled: ${BFF_PET_COMBAT_ENABLED:-true}
+        protocol: "${BFF_PROFILE_ID}/game"
+        single_precision_input: false
+    - id: pets
+      plugin: pets
+      parent_id: ingame
+      config:
+        enabled: ${BFF_PETS_ENABLED:-true}
+        max_in_flight_sessions: 128
+        max_held_rooms: 128
+        protocol: "${BFF_PROFILE_ID}/game"
+        build_key: "${BFF_PROFILE_ID}"
+        initial_fullness: ${BFF_PET_INITIAL_FULLNESS:-0}
+        client_utc_offset_minutes: ${PET_CLIENT_UTC_OFFSET_MINUTES:-null}
+        manual_level_up: false
+        client_configuration_source: None
+        grade_cap_from_pet_parameter: false
+        maximum_grade: 2
+        shared_skill_pool: false
+        allow_duplicate_skills: false
+        carry_growth_experience: false
+        experience_from_food_parameter: false
+        normal_food_experience: 5
+        premium_food_experience: 100
+        normal_food_fullness: 50
+        premium_food_fullness: 100
+        rewards:
+          enabled: ${BFF_PET_REWARDS_ENABLED:-true}
+          # Every ordinary round mode; a build ignores a mode it does not have.
+          mode_ids: [1, 3, 5, 6, 8, 11, 13, 19, 20, 23, 24, 25, 26, 28, 30, 32, 37, 38, 39, 41, 45]
+          stacking: highest
+          rounding: floor
+          include_collected_lucci: false
+- replace:
+    id: inventoryview
+    parent_id: pets.entitlements
+- replace:
+    id: dialect.scene-seeds
+    parent_id: pets.combat-effects
+- set:
+    id: dialect.messages
+    config:
+      pets: ${BFF_PETS_ENABLED:-true}
+- set:
+    id: equipment
+    config:
+      pet_shared_slot: ${BFF_PETS_ENABLED:-true}
+- set:
+    id: dialect.scene-seeds
+    config:
+      pet_combat_effects: ${BFF_PET_COMBAT_ENABLED:-true}
+      pet_combat_mode_ids: [1, 3, 5, 6, 8, 11, 13, 19, 20, 23, 24, 25, 26, 28, 30, 32, 37, 38, 39, 41, 45]
+      critical_cancellation_seeds: ${BFF_PET_CANCELLATION_SEEDS:-true}

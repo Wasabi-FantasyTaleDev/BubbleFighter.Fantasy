@@ -176,6 +176,14 @@ internal sealed partial class PlayRoomCodec
             // kr-812 sub_51F780 / kr-812 sub_520A20 use victim then scorer references.
             // kr-812 sub_528550 returns side codes, not seats.
             var scorer = PlayerSeatOf(unchecked((int)fields["unknown_12"]));
+            // cn-279 sub_773950's NPC knockdown path emits kind 2 with -1 at unknown_16 and the
+            // already-computed reporter slot at npc_scorer_slot (offset 20), unlike its character-reference path.
+            if (kind == 2 && (int)fields["unknown_8"] == 0 && (int)fields["unknown_12"] == 0
+                && (int)fields["unknown_16"] == -1 && fields.TryGetValue("npc_scorer_slot", out var npcScorer))
+            {
+                var slot = Convert.ToInt32(npcScorer);
+                scorer = slot is >= 0 and < 64 ? slot : -1;
+            }
             var victim = PlayerSeatOf(unchecked((int)fields["unknown_8"]));
             if (scorer < 0 || victim == scorer)
             {

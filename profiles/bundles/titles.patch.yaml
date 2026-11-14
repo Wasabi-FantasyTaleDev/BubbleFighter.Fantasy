@@ -1,0 +1,25 @@
+# Optional title exchange and selection for profiles with audited title catalogues and packet consumers.
+- insert:
+    - id: titles
+      plugin: titles
+      parent_id: ingame
+      config:
+        enabled: ${BFF_TITLES_ENABLED:-true}
+        protocol: "${BFF_PROFILE_ID}/game"
+        build_key: "${BFF_PROFILE_ID}"
+        catalog_schema: "${TITLE_CATALOG_SCHEMA}"
+        title_catalog_path: Config/BF_title.xml
+        item_catalog_path: Config/ShopItem2.xml
+        # Timed acquisitions use the Korean service's local time.
+        acquisition_time_zone: Asia/Seoul
+        # Native medal-bonus references carry no quantity; one medal is server policy.
+        bonus_medal_quantity: 1
+        # Round medals: one native medal for an Item Mode round with five to nine knockdowns. Thresholds are server
+        # policy; add rules for other medals in a local patch.
+        round_medals_enabled: ${BFF_TITLES_ENABLED:-true}
+        round_medal_rules:
+          - { medal_id: 30007, mode_ids: [3], metric: Knockdowns, minimum: 5, maximum: 9, count: 1, minimum_participants: 2 }
+- set:
+    id: dialect.messages
+    config:
+      titles: ${BFF_TITLES_ENABLED:-true}

@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><Description>Native pet feeding, growth and earned abilities with atomic inventory persistence.</Description></PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="MemoryPack.Generator" PrivateAssets="all" />
+    <ProjectReference Include="..\..\BubbleFighter.Fantasy.Abstractions\BubbleFighter.Fantasy.Abstractions.csproj" />
+    <ProjectReference Include="..\..\BubbleFighter.Fantasy.Contracts\BubbleFighter.Fantasy.Contracts.csproj" />
+    <InternalsVisibleTo Include="BubbleFighter.Fantasy.Pets.Tests" />
+    <InternalsVisibleTo Include="BubbleFighter.Fantasy.InGame.Tests" />
+  </ItemGroup>
+</Project>

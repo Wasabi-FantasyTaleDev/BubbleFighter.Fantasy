@@ -23,13 +23,13 @@ public sealed class ModernCooperativePointsOptionsTests
         var rows = composer.Compose(build, []);
         var rooms = new PluginConfig(Assert.Single(rows, row => row.Id == "dialect.rooms")).Bind<RoomsOptions>();
         Assert.True(rooms.ModernRooms);
-        Assert.False(rooms.ScriptZombies);
-        Assert.DoesNotContain(8, rooms.ResultScoreboardModes);
+        Assert.True(rooms.ScriptZombies);
+        Assert.Contains(8, rooms.ResultScoreboardModes);
         Assert.True(rooms.PvePoints);
         Assert.True(rooms.SupplyItems);
         Assert.True(rooms.CountedPveItems);
         var options = new PluginConfig(Assert.Single(rows, row => row.Id == "ingame")).Bind<InGameOptions>();
-        Assert.False(options.ScriptZombies);
+        Assert.True(options.ScriptZombies);
         Assert.Empty(options.ZombiePvpModeIds);
         Assert.Equal(180_000, options.ScriptZombieRoundTimeLimitMs);
         // Native mode-16 hotkeys read 1..3 while ordinary item mode uses an independent two-slot bank.

@@ -142,6 +142,24 @@ class PreviewCamera:
         return (self.world @ self.view)[:3, :3]
 
 
+def fit_accessory_in_view(camera: PreviewCamera, projected: np.ndarray) -> None:
+    """Recover a standalone accessory that would run outside the preview rectangle."""
+    low = projected[:, :2].min(axis=0)
+    high = projected[:, :2].max(axis=0)
+    size = np.array((camera.width, camera.height))
+    if camera.record.source != "default" and np.all(low >= 0) and np.all(high <= size):
+        return
+    # Keep the authored rotation and zoom when they fit. A fallback only shifts
+    # the projection or reduces its scale, with room for the outline.
+    centre = (low + high) / 2
+    extent = high - low
+    factor = min(1.0, *(0.92 * size / np.maximum(extent, 1e-9)))
+    ndc = (2 * centre / size - 1) * np.array((1.0, -1.0))
+    camera.projection[3, :2] -= ndc
+    camera.projection[:, :2] *= factor
+    camera.notes.append("standalone accessory fitted inside the preview rectangle")
+
+
 def look_at_lh(eye, at, up) -> np.ndarray:
     eye, at, up = (np.asarray(v, dtype=np.float64) for v in (eye, at, up))
     z = at - eye
@@ -168,7 +186,8 @@ def ortho_off_center_lh(l: float, r: float, b: float, t: float, zn: float, zf: f
 
 
 def build_camera(profile: PreviewProfile, record: CameraRecord, width: int, height: int,
-                 view_settings: ViewSettings | None = None, canvas_scale: float = 1.0) -> PreviewCamera:
+                 view_settings: ViewSettings | None = None, canvas_scale: float = 1.0,
+                 character: bool = False) -> PreviewCamera:
     """Reproduce the preview control's transforms for an output of ``width`` x ``height`` pixels.
 
     The output rectangle plays the role of the control's viewport: the projection spans
@@ -187,14 +206,25 @@ def build_camera(profile: PreviewProfile, record: CameraRecord, width: int, heig
     view = look_at_lh(p["view"]["eye"], p["view"]["at"], p["view"]["up"])
     user = (view_settings or ViewSettings()).user_quaternion
     centre = p["centre"]
-    world = (quat_matrix(record.quaternion)
-             @ quat_matrix(user)
+    item_rotation, user_rotation = quat_matrix(record.quaternion), quat_matrix(user)
+    notes = []
+    if character and p.get("character_camera", {}).get("rotation") == "yaw_only":
+        # cn-324 sub_831D50 -> cn-324 sub_833690 and kr-812 sub_9B23D0 -> kr-812 sub_9B42B0 orbit by yaw only.
+        # With the orthographic projection, rotating the model gives the same screen coordinates.
+        def yaw(q):
+            x, y, z, w = (float(value) for value in q)
+            return np.arctan2(2 * (x * z + w * y), w * w + z * z - x * x - y * y)
+
+        item_rotation = yaw_pitch_roll(yaw(record.quaternion), 0.0, 0.0)
+        user_rotation = yaw_pitch_roll(yaw(user), 0.0, 0.0)
+        notes.append("character orbit uses item and user yaw; quaternion pitch and roll are ignored")
+    world = (item_rotation
+             @ user_rotation
              @ translation(*record.position)
              @ scaling(record.zoom, record.zoom, record.zoom)
              @ yaw_pitch_roll(float(p["model_yaw"]["radians"]), 0.0, 0.0)
              @ translation(float(centre["x"]) * canvas_scale, float(centre["y_per_aspect"]) * canvas_scale * aspect,
                            float(centre["z"])))
-    notes = []
     if record.source == "default":
         notes.append("item has no camera record; the client's default record is used")
     return PreviewCamera(world, view, proj, width, height, record, notes)

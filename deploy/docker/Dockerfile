@@ -15,11 +15,14 @@ RUN dotnet publish src/BubbleFighter.Fantasy.Host/BubbleFighter.Fantasy.Host.csp
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
+# The web listeners read no appsettings files, so they do not watch for them either: one watcher thread and one
+# inotify instance less per listener.
+ENV DOTNET_hostBuilder__reloadConfigOnChange=false
 RUN useradd --system --uid 1001 bff && mkdir /app/state && chown bff /app/state
 COPY --from=build /out/host ./
 COPY profiles ./profiles
 USER bff
-EXPOSE 7100 7101 8080
+EXPOSE 7100 7101 7300
 # Without arguments the host runs first-run setup, then the installation it saved under /app/state.
 ENTRYPOINT ["dotnet", "BubbleFighter.Fantasy.Host.dll"]
 CMD ["start", "--state-dir", "/app/state"]

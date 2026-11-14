@@ -10,6 +10,7 @@ using BubbleFighter.Fantasy.Contracts.Lobby;
 using BubbleFighter.Fantasy.Contracts.Match;
 using BubbleFighter.Fantasy.Contracts.Players;
 using BubbleFighter.Fantasy.Contracts.Progress;
+using BubbleFighter.Fantasy.Contracts.Titles;
 using BubbleFighter.Fantasy.Contracts.Wallet;
 using BubbleFighter.Fantasy.Kernel;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -109,19 +110,31 @@ public sealed class ContractSchemaTests
         // Companion routes and offers return owned registrations with handler callbacks, and Send takes an untyped payload.
         // Companion federation keeps URI endpoints and revocable trust registrations in the native process.
         // UDP lease registration needs native callback ownership; span/out lookups and IP endpoint records have no RPC adapter.
+        // Authenticated match operations retain the native handshake gate and a cancellation-bound callback.
         // Account acquisition returns an owned native connection handle; the SDK has no adapter for that lifetime.
         // Retained player installation returns native session state, which has no value-only RPC representation.
         // Handoff storage retains the same native handle; migration addresses and owned broker callbacks have no adapter.
         // Room migration binding owns asynchronous source callbacks and their drain lifetime; it stays in-process.
         // Plaza links and UDP status registrations also own native callbacks and IDisposable lifetimes, with no remote adapter.
-        // Battle records inherit the same settlement callback; adding value-only reads does not make that callback transportable.
-        string[] reviewed = ["IAccountHandoffStore.HandOffAsync", "IAccountHandoffStore.TryClaimAsync", "IAccountHandoffStore.TryWithdrawAsync",
+        // Battle records and atomic round medals inherit the same native settlement callback, which is not transportable.
+        // Ban-pick and room policies register native policy callbacks with owned lifetimes; the hub hands out native
+        // service references, and the scope's companion seam takes a native caller and raw JSON.
+        // Pet combat-effect resolution returns its effects through an out parameter, which the RPC adapter cannot transport.
+        // Client data opens as a native stream that unpacks while it is read; a remote plugin reads the same file
+        // through the byte-array reads and asks its size with Length, which are transportable. The workbook cache takes
+        // a parse callback and is reached only through WorkbookFile inside the host; a remote store simply has none.
+        // Compiled client data takes a compile callback and writes through native streams; a store without it (any
+        // remote store) builds the catalog on every load, which CompiledClientData.Load does by itself.
+        string[] reviewed = ["ICompiledCatalog`1.Read", "ICompiledCatalog`1.Write", "ICompiledCatalog`1.get_Name", "ICompiledClientData.Load",
+            "IClientDataStore.OpenRead", "IClientDataStore.OpenRead", "IClientWorkbookCache.Sheets", "IPetCombatEffects.TryResolve", "IBanPickHub.Register", "IBanPickHub.get_Companion", "IBanPickHub.get_Store", "IBanPickScope.CompanionAsync",
+            "IRoomPolicyHost.Register", "IAccountHandoffStore.HandOffAsync", "IAccountHandoffStore.TryClaimAsync", "IAccountHandoffStore.TryWithdrawAsync",
             "IAccountMutationFence.VerifyAsync", "IAccountMutationScopes.Bind", "IAccountMutationScopes.Enter", "IAccountOwnershipStore.TryAcquireAsync", "IAdminWebContent.TryGetFile", "IBuildReleaseLabels.TryGetRelease", "ICommandRegistry.Register",
             "ICompanionFederation.RedirectAsync", "ICompanionFederation.TrustAuthority",
             "ICompanionHub.Offer", "ICompanionHub.Route", "ICompanionHub.Send", "IGameCommandEndpoints.Register", "IGameText.TryFormat", "IGameText.TryFormat", "IGameText.TryFormat",
             "IDistributionTransport.CopyFileAsync", "IDistributionTransport.CopyRepositoryAssetAsync",
             "IInstallationDatabase.PrepareAsync", "IInstallationRuntime.ApplyAsync", "IInstallationService.ImportClientDataAsync",
             "IListenerEndpoint.get_LocalEndPoint", "IMatchCapabilityOfferSender.SendAsync",
+            "IMatchConnectionOperations.RunAuthenticatedAsync",
             "IMatchUdpRelayDirectory.Register", "IMatchUdpRelayDirectory.TryBind", "IMatchUdpRelayDirectory.TryGetEndpoint",
             "IMatchUdpRelayDirectory.TryGetTarget", "IMatchUdpRelayDirectory.TryResolve",
             "IMessengerService.WaitEventsAsync", "INativeSceneSeedStore.TryGet",
@@ -129,8 +142,27 @@ public sealed class ContractSchemaTests
             "IMigrationArrivalCleanup.Collect", "IMigrationArrivalCleanup.Complete", "IMigrationArrivalCleanup.Retire",
             "IMigrationBroker.RequestAsync", "IMigrationBroker.Serve",
             "IOnlineCommandScopes.Register", "IPaintItemCatalog.TryGetColorIndex", "IPartyDirectory.TryReserveSolo", "IPermissionRegistry.Register", "IPlayerBattleRecordsRepository.SettleRoundAsync", "IPlayerProgressRepository.SettleRoundAsync", "IPlazaFederationEndpoint.Bind", "IRemoteRoomMigrationEndpoint.Bind", "IRetainedPlayerAdmission.InstallAsync", "IRoomPeerRoster.ExecuteAsync", "IRoomStartService.ListAsync",
+            "IRoundTitleMedalSettlementRepository.SettleRoundAsync",
             "IUdpPeerDialect.ReadDiscovery", "IUdpPeerDialect.SendCandidateAsync", "IUdpTransportStatusRegistry.Register"];
         Assert.Equal(reviewed.Order(StringComparer.Ordinal), gaps);
+    }
+
+    /// <summary>The match operation callback stays native while its protocol identity remains a serializable value.</summary>
+    [Fact]
+    public void AuthenticatedMatchOperationRequiresAnOwnedNativeCallbackBridge()
+    {
+        var operation = Operation<IMatchConnectionOperations>(nameof(IMatchConnectionOperations.RunAuthenticatedAsync));
+        var protocol = Operation<IMatchConnectionOperations>("get_Protocol");
+        foreach (var prefix in new[] { "", "provider_" })
+        {
+            Assert.Equal("unsupported", operation[prefix + "rpc_shape"]!.GetValue<string>());
+            Assert.Contains("Parameter 'operation'", operation[prefix + "unsupported_reason"]!.GetValue<string>(), StringComparison.Ordinal);
+            Assert.Contains("owned callback bridge", operation[prefix + "unsupported_reason"]!.GetValue<string>(), StringComparison.Ordinal);
+            Assert.Equal("supported", protocol[prefix + "rpc_shape"]!.GetValue<string>());
+        }
+        var error = Assert.Throws<ConfigException>(() => RemoteServiceProvider.Validate(typeof(IMatchConnectionOperations)));
+        Assert.Contains(nameof(IMatchConnectionOperations.RunAuthenticatedAsync), error.Message, StringComparison.Ordinal);
+        Assert.Contains("owned callback bridge", error.Message, StringComparison.Ordinal);
     }
 
     /// <summary>Federation retains native endpoint and trust ownership until those shapes have explicit SDK adapters.</summary>
@@ -322,13 +354,22 @@ public sealed class ContractSchemaTests
         Assert.Equal("null", method["result"]!["any_of"]![1]!["type"]!.GetValue<string>());
     }
 
-    [Fact]
-    public void DelegateInsideSettlementCommandIsNotMistakenForSerializableData()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DelegateInsideSettlementCommandIsNotMistakenForSerializableData(bool includesMedals)
     {
-        var method = Operation<IPlayerProgressRepository>(nameof(IPlayerProgressRepository.SettleRoundAsync));
-        Assert.Equal("unsupported", method["rpc_shape"]!.GetValue<string>());
-        Assert.Contains("advance", method["unsupported_reason"]!.GetValue<string>(), StringComparison.Ordinal);
-        Assert.Contains("callback", method["unsupported_reason"]!.GetValue<string>(), StringComparison.Ordinal);
+        var type = includesMedals ? typeof(IRoundTitleMedalSettlementRepository) : typeof(IPlayerProgressRepository);
+        var service = new ContractSchema().Export()["services"]!.AsArray().Single(item =>
+            item!["full_name"]!.GetValue<string>() == ContractSchema.TypeName(type))!;
+        var method = service["methods"]!.AsArray().Single(item =>
+            item!["name"]!.GetValue<string>() == nameof(IPlayerProgressRepository.SettleRoundAsync))!;
+        foreach (var prefix in new[] { "", "provider_" })
+        {
+            Assert.Equal("unsupported", method[prefix + "rpc_shape"]!.GetValue<string>());
+            Assert.Contains("advance", method[prefix + "unsupported_reason"]!.GetValue<string>(), StringComparison.Ordinal);
+            Assert.Contains("callback", method[prefix + "unsupported_reason"]!.GetValue<string>(), StringComparison.Ordinal);
+        }
     }
 
     /// <summary>Battle history reads remain usable through RPC while inherited settlement callbacks retain native ownership.</summary>

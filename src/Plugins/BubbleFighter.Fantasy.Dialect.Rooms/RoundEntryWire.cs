@@ -15,8 +15,10 @@ internal static class RoundEntryWire
     internal static byte[] Write(PacketTables tables, string build, int unknown0, string mapKey,
         int unknown2 = 0, int unknown3 = 0, int roomState = 0,
         IReadOnlyDictionary<string, object?>? scoreboardValues = null, string stageKey = "", string mapSelection = "",
-        RoundSeriesEntry? series = null)
+        RoundSeriesEntry? series = null, int? mapSeed = null)
     {
+        if (mapSeed is not null)
+            PacketLayoutContract.RequireFields(tables, build, "RoomEnterGame", "Seeded map entry", ("map_seed", "u32"));
         var seriesFields = series is null ? RoundSeriesFields.Load(tables, build) : RoundSeriesFields.Require(tables, build);
         if (series is not null) seriesFields!.Validate(series);
         if (tables.Resolve(build, "RoomEnterGame").Any(field => field.Name == "room_state"))
@@ -30,6 +32,7 @@ internal static class RoundEntryWire
                 ["map_key"] = mapKey, ["stage_key"] = stageKey,
                 ["map_selection"] = mapSelection, ["room_state"] = roomState,
             };
+            if (mapSeed is { } seed) directValues["map_seed"] = seed;
             if (series is not null)
             {
                 directValues[seriesFields!.EntryIndex] = series.RoundIndex;

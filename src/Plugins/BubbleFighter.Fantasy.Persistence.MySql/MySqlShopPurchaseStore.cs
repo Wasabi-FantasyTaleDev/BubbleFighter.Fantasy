@@ -58,12 +58,8 @@ public sealed class MySqlShopPurchaseStore(IDbConnectionFactory connections, IAc
         if (command.PresentId > 0
             && await MySqlPresentStore.AcceptUpdate(db, command.PresentId, user).ExecuteCommandAsync(ct).ConfigureAwait(false) != 1)
             throw new PresentUnavailableException(command.PresentId);
-        var lastKey = (await db.Queryable<PurchaseLogRow>()
-            .Where(p => p.UserNum == user)
-            .Select(p => SqlFunc.IsNull(SqlFunc.AggregateMax(p.LastSlotKey), 0L))
-            .Take(1)
-            .ToListAsync(ct).ConfigureAwait(false)).FirstOrDefault();
-        var highest = Math.Max(lastKey, bag.Count == 0 ? 0 : bag.Max(s => s.SlotKey));
+        var keys = await MySqlInventorySlotKeys.ReadAsync(db, user, ct).ConfigureAwait(false);
+        var highest = keys.Highest;
         var lastOrdinal = bag.Count == 0 ? -1 : bag.Max(s => s.Ordinal);
         var grants = new InventorySlotRecord[command.Grants.Count];
         for (var i = 0; i < grants.Length; i++)
@@ -114,6 +110,8 @@ public sealed class MySqlShopPurchaseStore(IDbConnectionFactory connections, IAc
         var logged = await db.Insertable(audit).ExecuteCommandAsync(ct).ConfigureAwait(false);
         if (logged < 1)
             throw new InvalidOperationException($"purchase_log insert for user_num {user} wrote {logged} row(s).");
+        await MySqlInventorySlotKeys.AdvanceAsync(db, user, keys.Stored, highest, ct).ConfigureAwait(false);
+        ct.ThrowIfCancellationRequested();
         await tx.CommitAsync().ConfigureAwait(false);
         return new(charged, grants);
     }

@@ -12,14 +12,14 @@ namespace BubbleFighter.Fantasy.Dialect.Messages;
 /// Replies, listener framing and room-issued offers are separate services; mounting this row
 /// alone neither grants a room lease nor enables the native relay handshake.
 /// </summary>
-[Plugin("dialect.match", Description = "Native legacy match request adapters.",
+[Plugin("dialect.match", Category = "network", Names = ["en=Match messages", "zh-Hans=对局消息", "zh-Hant=對局訊息", "ko=매치 메시지"], Description = "Native legacy match request adapters.",
     Requires = [typeof(IPacketRouter), typeof(IMessageRouter), typeof(IOpcodeTableRegistry)],
     OptionalMany = [typeof(IOpcodeTable)],
     Provides = [], ProvidesMany = [],
     ConditionalProvidesMany = [typeof(IInboundMessageBinding<MatchCapabilityAuthenticate>),
         typeof(IInboundMessageBinding<MatchSceneIdentityRegistered>),
         typeof(IInboundMessageBinding<MatchAuthenticate>), typeof(IInboundMessageBinding<MatchSceneRegistered>),
-        typeof(IInboundMessageBinding<MatchMapNamed>)])]
+        typeof(IInboundMessageBinding<MatchMapNamed>), typeof(IInboundMessageBinding<MatchLeaveRequested>)])]
 public sealed class MatchMessagesPlugin : IPlugin
 {
     /// <inheritdoc />
@@ -45,6 +45,17 @@ public sealed class MatchMessagesPlugin : IPlugin
         var binding = new Binding(options.Protocol);
         var packets = context.Services.Get<IPacketRouter>();
         var messages = context.Services.Get<IMessageRouter>();
+        var leaveOpcode = opcodes.Find(PacketDirection.ClientToServer, "rcpReqLeaveGame");
+        if (leaveOpcode is { } leave)
+        {
+            PacketLayoutContract.RequireEmpty(tables, ownBuild, "RelayLeaveGameRequest", "Native match leave");
+            context.Effect(context.Services.RegisterMany<IInboundMessageBinding<MatchLeaveRequested>>(binding));
+            Register(leave, "rcpReqLeaveGame", payload =>
+            {
+                _ = PacketCodec.Read(tables, ownBuild, "RelayLeaveGameRequest", payload.Span);
+                return new MatchLeaveRequested();
+            });
+        }
         if (options.NativeHandshake.Length > 0)
         {
             // The kr-1256 family's own handshake: the same relay opcodes, but its join tail, its reconnect map
@@ -118,7 +129,8 @@ public sealed class MatchMessagesPlugin : IPlugin
 
     private sealed class Binding(string protocol) : IInboundMessageBinding<MatchCapabilityAuthenticate>,
         IInboundMessageBinding<MatchSceneIdentityRegistered>, IInboundMessageBinding<MatchAuthenticate>,
-        IInboundMessageBinding<MatchSceneRegistered>, IInboundMessageBinding<MatchMapNamed>
+        IInboundMessageBinding<MatchSceneRegistered>, IInboundMessageBinding<MatchMapNamed>,
+        IInboundMessageBinding<MatchLeaveRequested>
     {
         public string Protocol => protocol;
     }

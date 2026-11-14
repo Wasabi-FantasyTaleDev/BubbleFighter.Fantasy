@@ -58,12 +58,15 @@ public sealed class PluginDefinition
     private static PluginAttribute Snapshot(PluginAttribute declaration) => new(declaration.Id)
     {
         Description = declaration.Description,
+        Names = Copy(declaration, nameof(PluginAttribute.Names), declaration.Names),
+        Category = declaration.Category,
         SupportedBuilds = Copy(declaration, nameof(PluginAttribute.SupportedBuilds), declaration.SupportedBuilds),
         SupportedFamilies = Copy(declaration, nameof(PluginAttribute.SupportedFamilies), declaration.SupportedFamilies),
         Requires = Copy(declaration, nameof(PluginAttribute.Requires), declaration.Requires),
         RequiresMany = Copy(declaration, nameof(PluginAttribute.RequiresMany), declaration.RequiresMany),
         Optional = Copy(declaration, nameof(PluginAttribute.Optional), declaration.Optional),
         OptionalMany = Copy(declaration, nameof(PluginAttribute.OptionalMany), declaration.OptionalMany),
+        LiveMany = Copy(declaration, nameof(PluginAttribute.LiveMany), declaration.LiveMany),
         Provides = Copy(declaration, nameof(PluginAttribute.Provides), declaration.Provides),
         ProvidesMany = Copy(declaration, nameof(PluginAttribute.ProvidesMany), declaration.ProvidesMany),
         ConditionalProvides = Copy(declaration, nameof(PluginAttribute.ConditionalProvides), declaration.ConditionalProvides),

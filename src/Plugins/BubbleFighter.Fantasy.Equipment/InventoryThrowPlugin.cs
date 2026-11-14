@@ -8,7 +8,7 @@ using BubbleFighter.Fantasy.Packets;
 namespace BubbleFighter.Fantasy.Equipment;
 
 /// <summary>Handles authenticated expired-item actions and republishes their resulting equipment selection.</summary>
-[Plugin("inventory.throw", Description = "Owned expired-item removal and equipment synchronization.",
+[Plugin("inventory.throw", Category = "items", Names = ["en=Item discarding", "zh-Hans=丢弃道具", "zh-Hant=丟棄道具", "ko=아이템 버리기"], Description = "Owned expired-item removal and equipment synchronization.",
     Requires = [typeof(IMessageRouter), typeof(IInventoryItemRemoval), typeof(IEquipmentSelection), typeof(IInventoryPushService), typeof(IEquippedViewPush)],
     RequiresMany = [typeof(IInboundMessageBinding<InventoryThrowRequested>), typeof(IMessageSender<InventoryThrowReplied>)])]
 public sealed class InventoryThrowPlugin : IPlugin

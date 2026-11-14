@@ -267,5 +267,6 @@ internal sealed partial class PlayRoomCodec
             member.EquippedItemIds.Count > 0 ? member.EquippedItemIds : [member.CharacterItemId], false)
         {
             Level = Math.Max(1, member.Level), ColorIndex = member.ColorIndex,
+            ItemAttributes = member.ItemAttributes,
         };
 }

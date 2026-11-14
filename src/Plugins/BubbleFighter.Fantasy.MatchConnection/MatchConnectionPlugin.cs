@@ -8,8 +8,9 @@ using Microsoft.Extensions.Logging;
 namespace BubbleFighter.Fantasy.MatchConnection;
 
 /// <summary>Owns authenticated match connections and their bounded handshake lifetime.</summary>
-[Plugin("match-connection", Description = "Authenticated match transport lifecycle.",
+[Plugin("match-connection", Category = "network", Names = ["en=Match connections", "zh-Hans=对局连接", "zh-Hant=對局連線", "ko=매치 연결"], Description = "Authenticated match transport lifecycle.",
     Requires = [typeof(IMessageRouter)], Optional = [typeof(IMatchRoomDirectory)],
+    ProvidesMany = [typeof(IMatchConnectionOperations)],
     OptionalMany = [typeof(IMatchUdpRelayDirectory), typeof(IMatchCapabilityDirectory), typeof(IInboundMessageBinding<MatchAuthenticate>),
         typeof(IInboundMessageBinding<MatchSceneRegistered>), typeof(IInboundMessageBinding<MatchCapabilityAuthenticate>),
         typeof(IInboundMessageBinding<MatchSceneIdentityRegistered>), typeof(IInboundMessageBinding<MatchMapNamed>),
@@ -56,6 +57,7 @@ public sealed class MatchConnectionPlugin : IPlugin
         var lifecycle = new MatchConnectionLifecycle(directory, accepted, initialized, options, context.Logger,
             udpDirectories.SingleOrDefault());
         context.Effect(lifecycle);
+        context.Effect(context.Services.RegisterMany<IMatchConnectionOperations>(lifecycle));
         var routes = context.Services.Get<IMessageRouter>().For(context);
         if (options.CapabilityAuthentication)
         {
@@ -110,7 +112,7 @@ public sealed class MatchConnectionOptions
 }
 
 /// <summary>Serializes each transport's handshake and revokes leases on failure, timeout, or unload.</summary>
-public sealed class MatchConnectionLifecycle : IDisposable
+public sealed class MatchConnectionLifecycle : IMatchConnectionOperations, IDisposable
 {
     private sealed class Entry(ISession session, bool capabilityOnly)
     {
@@ -133,10 +135,22 @@ public sealed class MatchConnectionLifecycle : IDisposable
     private readonly IMessageSender<MatchSceneAccepted>? _initialized;
     private readonly MatchConnectionOptions _options;
     private readonly ILogger _logger;
+    // Armed only while a connection is tracked: with every build loaded, an always-on sweep woke once per handshake
+    // timeout per build on a server nobody played on. Changed only under _gate.
     private readonly Timer _timer;
+    private bool _sweeping;
     private bool _disposed;
 
     private readonly IMatchUdpRelayDirectory? _udp;
+
+    /// <summary>Gets the relay scope owned by this authenticated connection lifecycle.</summary>
+    public string Protocol => _options.Protocol;
+
+    /// <summary>Gets whether the expiry sweep is armed; it runs only while a connection is tracked.</summary>
+    internal bool Sweeping
+    {
+        get { lock (_gate) return _sweeping; }
+    }
 
     /// <summary>Creates a lifecycle whose timer and retained connections end on disposal.</summary>
     public MatchConnectionLifecycle(IMatchRoomDirectory directory,
@@ -152,12 +166,45 @@ public sealed class MatchConnectionLifecycle : IDisposable
         _initialized = initialized;
         _options = options;
         _logger = logger;
-        _timer = new Timer(_ => Sweep(), null, options.HandshakeTimeoutMs, options.HandshakeTimeoutMs);
+        _timer = new Timer(_ => Sweep(), null, Timeout.Infinite, Timeout.Infinite);
     }
 
     /// <summary>Checks the capability before sending any authentication reply; duplicates are rejected.</summary>
     public ValueTask AuthenticateAsync(ISession session, MatchAuthenticate message, CancellationToken ct) =>
         AuthenticateCoreAsync(session, false, token => _directory.BindAsync(session, message, token), ct);
+
+    /// <summary>Executes one callback under the current lease's handshake gate and revokes that transport when work fails.</summary>
+    public async ValueTask RunAuthenticatedAsync(ISession session, Func<CancellationToken, ValueTask> operation,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        var entry = Require(session);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, entry.Stop.Token);
+        var entered = false;
+        try
+        {
+            await entry.Gate.WaitAsync(linked.Token).ConfigureAwait(false);
+            entered = true;
+            ValueTask pending;
+            lock (entry.Sync)
+            {
+                // Stop is marked cancelled before its callbacks run, so an unload that hands this waiter the gate
+                // mid-cancellation still reads as cancellation rather than as a revoked lease.
+                entry.Stop.Token.ThrowIfCancellationRequested();
+                linked.Token.ThrowIfCancellationRequested();
+                RequireBinding(entry);
+                pending = operation(linked.Token);
+            }
+            await pending.ConfigureAwait(false);
+        }
+        catch
+        {
+            Remove(session.Id, entry);
+            await CloseObservedAsync(session, "authenticated match operation failed").ConfigureAwait(false);
+            throw;
+        }
+        finally { if (entered) entry.Gate.Release(); }
+    }
 
     /// <summary>Authenticates an exact native key through the protocol-scoped capability directory, without guessing account fields.</summary>
     public ValueTask AuthenticateCapabilityAsync(ISession session, MatchCapabilityAuthenticate message, CancellationToken ct)
@@ -180,6 +227,12 @@ public sealed class MatchConnectionLifecycle : IDisposable
             if (_entries.Count >= _options.MaxConnections) throw new InvalidOperationException("Match connection capacity reached.");
             entry = new Entry(session, capabilityOnly);
             _entries.Add(session.Id, entry);
+            if (!_sweeping)
+            {
+                // The first sweep comes one period after the first entry, so an entry still expires within two periods.
+                _timer.Change(_options.HandshakeTimeoutMs, _options.HandshakeTimeoutMs);
+                _sweeping = true;
+            }
         }
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, entry.Stop.Token);
         var entered = false;
@@ -339,7 +392,14 @@ public sealed class MatchConnectionLifecycle : IDisposable
         }
         expected.Stop.Cancel();
         lock (_gate)
+        {
             if (_entries.TryGetValue(id, out var current) && current == expected) _entries.Remove(id);
+            if (_entries.Count == 0 && _sweeping && !_disposed)
+            {
+                _timer.Change(Timeout.Infinite, Timeout.Infinite);
+                _sweeping = false;
+            }
+        }
     }
 
     private void Sweep()
@@ -377,6 +437,8 @@ public sealed class MatchConnectionLifecycle : IDisposable
         {
             if (_disposed) return;
             _disposed = true;
+            // The timer is disposed below, so no sweep stays armed; Remove skips this once disposed.
+            _sweeping = false;
             entries = _entries.Values.ToArray();
             _entries.Clear();
         }

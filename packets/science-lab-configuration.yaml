@@ -1,0 +1,174 @@
+version: 1
+# Native science-lab configuration bodies. Runtime admission uses laboratory_enchant_builds explicitly;
+# inheriting this layout does not establish another client's laboratory-open exchange.
+structs:
+  # kr-1256 sub_DF0990 stamps an empty C2S 141 when kr-1256 sub_DF0FC0 returns 2.
+  # cn-735 sub_5A8470, cn-738 sub_5E2A00 and cn-742 sub_CEB1B0 send empty C2S 136.
+  ScienceLabConfigurationRequest: []
+
+  # cn-735 sub_41B930 reads this earlier NotifyScienceLab body. cn-738 sub_41D7A0
+  # and cn-742 sub_421ED0 add one bool32. cn-738 sub_5E2740 takes the first material
+  # as the operation card, copies the remaining kits and installs the additive at system+396.
+  ScienceLabConfiguration@cn-735:
+    - unknown_12: u32
+      offset: 12
+    - unknown_16: u32
+      offset: 16
+    - unknown_20: u32
+      offset: 20
+    - unknown_24: u32
+      offset: 24
+    - enchant_materials: list<u32>
+      offset: 28
+    - additive_item_id: u32
+      offset: 44
+    - unknown_48: u32
+      offset: 48
+    - unknown_52: u32
+      offset: 52
+    - unknown_56: u32
+      offset: 56
+    - unknown_4: bool
+      offset: 4
+      default: 1 # cn-738 sub_5DC7D0 requires the first three installed flags together.
+    - unknown_5: bool
+      offset: 5
+      default: 1
+    - unknown_6: bool
+      offset: 6
+      default: 1
+    - unknown_7: bool
+      offset: 7
+    - unknown_8: bool
+      offset: 8
+    - unknown_9: bool
+      offset: 9
+      only: [cn-738]
+
+  # kr-1256 sub_114B540 reads the complete S2C 162 body; kr-1256 sub_DFA000 installs it.
+  # Unknown field names preserve native object offsets, not variable stream positions.
+  ScienceLabConfiguration:
+    - unknown_16: u32 # Operation card for tab 0; kr-1256 sub_DF99C0 gives an absent card a zero count.
+      offset: 16
+    - unknown_20: u32 # Compared with an item ID by kr-1256 sub_DCE9A0.
+      offset: 20
+    - unknown_24: u32 # Lower bound compared by kr-1256 sub_DCE9F0; no division is performed.
+      offset: 24
+    - unknown_28: u32 # Operation card for tab 7, copied by kr-1256 sub_DFA000.
+      offset: 28
+    - unknown_80: list<u32> # kr-1256 sub_DD1440 accepts an empty copied list.
+      offset: 80
+    - unknown_68: list<u32> # kr-1256 sub_DD1440 accepts an empty copied list.
+      offset: 68
+    - unknown_12: u32 # kr-1256 sub_DE2F50 uses this as a scalar confirmation-text argument.
+      offset: 12
+    - unknown_32: u32 # Operation card for disabled tab 1, copied by kr-1256 sub_DFA000.
+      offset: 32
+    - enchant_materials: list<u32> # kr-1256 sub_DFA000 dereferences the first card, then copies the kits.
+      offset: 36
+    - additive_item_id: u32 # kr-1256 sub_DD6F10 and kr-1256 sub_DD5E70 match system+352 against the selected item ID.
+      offset: 48
+    - unknown_52: u32 # Operation card for disabled tab 3, copied by kr-1256 sub_DFA000.
+      offset: 52
+    - unknown_56: u32 # Operation card for disabled tab 4, copied by kr-1256 sub_DFA000.
+      offset: 56
+    - unknown_60: u32 # kr-1256 sub_DCB180 compares system+356 as a scalar threshold.
+      offset: 60
+    # kr-1256 sub_DF0FC0 requires flags +0, +1 and +3 together. The other operations still
+    # need closed backend replies; flags alone cannot expose only the enchantment tab.
+    - unknown_0: bool # Tab 0 visibility, kr-1256 sub_DF9F70.
+      offset: 0
+      default: 1
+    - unknown_1: bool # Tab 7 visibility, kr-1256 sub_DF9F70.
+      offset: 1
+      default: 1
+    - unknown_2: bool # Tab 1 visibility, kr-1256 sub_DF9F70.
+      offset: 2
+    - enchant_enabled: bool # Tab 2 is kr-1256 sub_DD3730's DlgEnchant, attached by kr-1256 sub_DDFA30.
+      offset: 3
+      default: 1
+    - unknown_4: bool # Tab 3 visibility, kr-1256 sub_DF9F70.
+      offset: 4
+    - unknown_5: bool # Tab 4 visibility, kr-1256 sub_DF9F70.
+      offset: 5
+    - unknown_6: bool # Tab 5 visibility, kr-1256 sub_DF9F70.
+      offset: 6
+    - unknown_64: u32 # Operation card for disabled tab 6, copied by kr-1256 sub_DFA000.
+      offset: 64
+    - unknown_7: bool # Tab 6 visibility, kr-1256 sub_DF9F70.
+      offset: 7
+    - unknown_8: bool # Tab 8 visibility, kr-1256 sub_DF9F70.
+      offset: 8
+    - modification_configurations: list<ScienceLabModificationConfiguration> # kr-1256 sub_114BF10; empty copied safely by kr-1256 sub_DFBB60.
+      offset: 92
+    - modification_random_table: ScienceLabModificationRandomTable # kr-1256 vtable 0x163BE50, reader kr-1256 sub_114B040.
+      offset: 104
+    - unknown_124: list<ScienceLabConfigurationGroup> # kr-1256 sub_114BC70; empty skips kr-1256 sub_DFA000's derived-content loop.
+      offset: 124
+
+  # kr-1256 sub_114AC20 reads each native ModificationConfig element.
+  ScienceLabModificationConfiguration:
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
+    - unknown_16: list<u32>
+      offset: 16
+    - unknown_28: u32
+      offset: 28
+    - unknown_32: list<ScienceLabConfigurationWordPair>
+      offset: 32
+
+  # kr-1256 sub_114AC20 reads two u32 values and inserts them through kr-1256 sub_10C2030.
+  ScienceLabConfigurationWordPair:
+    - key: u32
+    - value: u32
+
+  # kr-1256 sub_114B040 reads two complete maps; an empty table still occupies eight bytes.
+  ScienceLabModificationRandomTable:
+    - unknown_4: list<ScienceLabConfigurationWordList>
+      offset: 4
+    - unknown_12: list<ScienceLabConfigurationWordList>
+      offset: 12
+
+  # kr-1256 sub_114B040 reads the key, then kr-1256 sub_999C00 reads the counted u32 list.
+  ScienceLabConfigurationWordList:
+    - key: u32
+    - values: list<u32>
+
+  # kr-1256 sub_114BC70 reads each key and the vector whose elements use kr-1256 sub_114CA20.
+  ScienceLabConfigurationGroup:
+    - key: u32
+    - values: list<ScienceLabConfigurationEntry>
+
+  # kr-1256 sub_114CA20 reads the 52-byte native element; its two sets are counted u32 sequences.
+  ScienceLabConfigurationEntry:
+    - unknown_0: u32
+      offset: 0
+    - unknown_4: list<ScienceLabConfigurationContent>
+      offset: 4
+    - unknown_16: list<u32>
+      offset: 16
+    - unknown_24: list<u32>
+      offset: 24
+    - unknown_32: u32
+      offset: 32
+    - unknown_36: list<ScienceLabConfigurationContent>
+      offset: 36
+    - unknown_48: u8
+      offset: 48
+
+  # kr-1256 sub_10D9410 reads the 48-byte native content; kr-1256 sub_1126430 reads its UTF-16 string.
+  ScienceLabConfigurationContent:
+    - unknown_0: u32
+      offset: 0
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: list<u32>
+      offset: 8
+    - unknown_20: u32
+      offset: 20
+    - unknown_24: wstr
+      offset: 24

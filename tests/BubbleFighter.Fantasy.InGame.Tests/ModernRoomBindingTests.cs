@@ -767,13 +767,21 @@ public sealed partial class RoomCommandsBindingTests
         }
     }
 
-    private sealed class Views : IEquippedViewPush
+    private sealed class Views : IEquippedViewPush, IMessageSender<LocalEquipmentViewUpdated>, IMessageSender<RemoteEquipmentViewUpdated>
     {
         internal List<(long Recipient, int User, bool Remote)> Sent { get; } = [];
+        /// <summary>Gets or sets the game protocol whose typed equipment messages the fixture records.</summary>
+        public string Protocol { get; set; } = "kr-1256/game";
         public ValueTask SendAsync(ISession session, int userNum, int characterId, IReadOnlyList<int> equippedIds, CancellationToken ct) =>
             Emit(session, userNum, false, ct);
         public ValueTask SendRemoteAsync(ISession recipient, int userNum, int characterId, IReadOnlyList<int> equippedIds, CancellationToken ct) =>
             Emit(recipient, userNum, true, ct);
+        /// <summary>Records a local typed equipment view and emits the fixture's view marker to its recipient.</summary>
+        public ValueTask SendAsync(ISession session, LocalEquipmentViewUpdated message, CancellationToken ct) =>
+            Emit(session, message.UserNum, false, ct);
+        /// <summary>Records a remote typed equipment view and emits the fixture's view marker to its observer.</summary>
+        public ValueTask SendAsync(ISession session, RemoteEquipmentViewUpdated message, CancellationToken ct) =>
+            Emit(session, message.UserNum, true, ct);
         private ValueTask Emit(ISession session, int user, bool remote, CancellationToken ct)
         {
             Sent.Add((session.Id, user, remote));
@@ -787,6 +795,9 @@ public sealed partial class RoomCommandsBindingTests
         private readonly EventBus _events = new(NullLogger.Instance);
         private readonly List<PluginContext> _contexts = [];
         internal Views Views { get; } = new();
+        internal List<EquipmentViewRequested> RequestedViews { get; } = [];
+        internal List<EquipmentViewPublished> CompletedViews { get; } = [];
+        private bool _realViews;
         private string _protocol = "kr-1256/game";
         internal RecordingSession Host { get; private set; } = Player(101, 11, "host");
         internal RecordingSession Guest { get; private set; } = Player(102, 22, "guest");
@@ -818,6 +829,8 @@ public sealed partial class RoomCommandsBindingTests
                 {
                     if (request.Protocol != h._protocol)
                         return await next(ct);
+                    h.RequestedViews.Add(request);
+                    if (h._realViews) return await next(ct);
                     if (request.Remote)
                         await h.Views.SendRemoteAsync(request.Session, request.UserNum, request.CharacterItemId, request.EquippedItemIds, ct);
                     else
@@ -855,6 +868,28 @@ public sealed partial class RoomCommandsBindingTests
             var context = new PluginContext(new PluginRow { Id = id, Plugin = id, Source = "test", Config = config }, _services, _events, NullLogger.Instance);
             _contexts.Add(context);
             return context;
+        }
+
+        internal async Task MountRealViewsAsync()
+        {
+            var context = Context("real-inventory-views");
+            await new OpcodeTableRegistryPlugin().ActivateAsync(context, default);
+            var build = _protocol[..^5];
+            var table = OpcodeTableLoader.Load(Path.Combine(Root, "profiles", build, "opcodes.yaml"), TestWireDialects.Get(build).Profile);
+            context.Effect(_services.Get<IOpcodeTableRegistry>().Register(table));
+            Views.Protocol = _protocol;
+            context.Effect(_services.RegisterMany<IMessageSender<LocalEquipmentViewUpdated>>(Views));
+            context.Effect(_services.RegisterMany<IMessageSender<RemoteEquipmentViewUpdated>>(Views));
+            context.Effect(_events.OnAsync<EquipmentViewPublished>((publication, _) =>
+            {
+                CompletedViews.Add(publication);
+                return ValueTask.CompletedTask;
+            }));
+            await new BubbleFighter.Fantasy.InventoryView.InventoryViewPlugin().ActivateAsync(Context("inventory-views", new()
+            {
+                ["enabled"] = true, ["publish_equipped_view_push"] = true, ["protocol"] = _protocol,
+            }), default);
+            _realViews = true;
         }
 
         internal void MountRoundNames()

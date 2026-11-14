@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 namespace BubbleFighter.Fantasy.Cluster;
 
 /// <summary>Prepares destination room seats and cancels abandoned arrivals without authenticating a game socket.</summary>
-[Plugin("cluster.migration-destination", Description = "Bounded destination preparation and expired arrival cleanup.",
+[Plugin("cluster.migration-destination", Category = "cluster", Names = ["en=Room migration destination", "zh-Hans=房间迁移目标", "zh-Hant=房間遷移目的地", "ko=방 이동 대상"], Description = "Bounded destination preparation and expired arrival cleanup.",
     Requires = [typeof(IMigrationBroker), typeof(IMigrationArrivals), typeof(IMigrationArrivalCleanup), typeof(INodeLeaseSource)],
     Optional = [typeof(IAccountSessionHandoff)], OptionalMany = [typeof(IRoomAdmissionDirectory), typeof(IMigrationHomeAdmission), typeof(IListenerEndpoint)])]
 public sealed class MigrationDestinationPlugin : IPlugin
@@ -154,8 +154,7 @@ internal sealed class MigrationDestination(MigrationDestinationOptions options, 
 
     internal async ValueTask RunAsync(CancellationToken ct)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(options.CleanupIntervalMs));
-        try { while (await timer.WaitForNextTickAsync(ct).ConfigureAwait(false)) await SweepAsync(ct).ConfigureAwait(false); }
+        try { await ParkedLoop.RunAsync(TimeSpan.FromMilliseconds(options.CleanupIntervalMs), TimeProvider.System, cleanup.WhenAnyTracked, SweepAsync, ct).ConfigureAwait(false); }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
     }
 

@@ -16,7 +16,7 @@ namespace BubbleFighter.Fantasy.Protocol;
 /// protocols are named after the profile, <c>&lt;profile&gt;/game</c> and
 /// <c>&lt;profile&gt;/relay</c>.
 /// </summary>
-[Plugin("protocol", Description = "Client wire protocol. Opcode table and version come from the profile row.",
+[Plugin("protocol", Category = "network", Names = ["en=Game protocol", "zh-Hans=游戏协议", "zh-Hant=遊戲協定", "ko=게임 프로토콜"], Description = "Client wire protocol. Opcode table and version come from the profile row.",
     Requires = [typeof(IConnectionProtocolRegistry), typeof(IPacketRouter), typeof(IClientProfileRegistry), typeof(IOpcodeTableRegistry), typeof(IWireDialectRegistry)],
     Optional = [typeof(ISessionRegistry)],
     ProvidesMany = [typeof(IOpcodeTable)])]
@@ -73,6 +73,13 @@ public sealed class ProtocolPlugin : IPlugin
             throw new ConfigException($"Dialect '{dialect.Id}' returned an inconsistent server preamble.");
         if (dialect.PreambleLength(PacketDirection.ClientToServer) != 0)
             throw new ConfigException($"Protocol row does not support dialect '{dialect.Id}' client preambles.");
+        // The socket pump pauses at inbound_buffer_bytes, so a frame that does not fit there could never be received.
+        if (options.TotalSendQueueBytes < options.SendQueueBytes)
+            throw new ConfigException(
+                $"total_send_queue_bytes ({options.TotalSendQueueBytes}) must be at least send_queue_bytes ({options.SendQueueBytes}), or one session could never use its own queue.");
+        if ((long)options.MaxPayloadBytes + dialect.MaxFrameOverheadBytes > options.InboundBufferBytes)
+            throw new ConfigException(
+                $"inbound_buffer_bytes ({options.InboundBufferBytes}) must hold one whole frame: max_payload_bytes ({options.MaxPayloadBytes}) plus the {dialect.MaxFrameOverheadBytes} frame bytes of dialect '{dialect.Id}'. Raise inbound_buffer_bytes or lower max_payload_bytes.");
         var runtime = OpcodeTableLoader.Load(options.OpcodeTablePath, profile);
         var catalog = options.UseCatalogCandidates
             ? CatalogOpcodeFallback.Load(options, runtime, context.Logger) : null;

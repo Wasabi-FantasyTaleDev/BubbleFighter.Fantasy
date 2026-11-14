@@ -4,6 +4,7 @@ using System.Buffers.Binary;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Contracts.ClientData;
 using BubbleFighter.Fantasy.Contracts.Match;
+using BubbleFighter.Fantasy.Contracts.Pets;
 using BubbleFighter.Fantasy.Packets;
 
 namespace BubbleFighter.Fantasy.Dialect.Messages;
@@ -51,10 +52,11 @@ internal sealed class DefenceSeedCatalog
     private readonly int[] _krOwners;
     private readonly int[] _bbOwners;
     private readonly HashSet<int> _skipped;
+    private readonly PetSeedEffects? _pets;
     private readonly byte[] _secret = RandomNumberGenerator.GetBytes(32);
 
     private DefenceSeedCatalog(IReadOnlyDictionary<int, ItemEffect[]> effects, bool singlePrecision, int rcThreshold,
-        int[] krOwners, int[] bbOwners, HashSet<int> skipped)
+        int[] krOwners, int[] bbOwners, HashSet<int> skipped, PetSeedEffects? pets)
     {
         _effects = effects;
         _singlePrecision = singlePrecision;
@@ -62,6 +64,7 @@ internal sealed class DefenceSeedCatalog
         _krOwners = krOwners;
         _bbOwners = bbOwners;
         _skipped = skipped;
+        _pets = pets;
     }
 
     /// <summary>Reads the build's defence rules from <c>packets/builds.yaml</c> and its effect rows from client data.</summary>
@@ -71,11 +74,12 @@ internal sealed class DefenceSeedCatalog
     /// <param name="path">The client path of the item workbook.</param>
     /// <param name="maxBytes">The workbook size cap.</param>
     /// <param name="limitKey">The snake_case option that owns <paramref name="maxBytes"/>.</param>
+    /// <param name="pets">Optional native instance effects for explicitly enabled modes.</param>
     /// <returns>The resolved catalog.</returns>
     /// <exception cref="ConfigException">The build states no audited rules, or a defence row is malformed or bound to a
     /// channel the server cannot know.</exception>
     internal static DefenceSeedCatalog Load(IClientDataStore data, PacketTables tables, string build, string path,
-        long maxBytes, string limitKey)
+        long maxBytes, string limitKey, PetSeedEffects? pets = null)
     {
         var values = tables.ValuesOf(build);
         if (!values.TryGetValue("defence_seed", out var raw) || raw is not Dictionary<string, object?> rules)
@@ -94,7 +98,7 @@ internal sealed class DefenceSeedCatalog
         IReadOnlyList<IReadOnlyList<string>> rows;
         try
         {
-            rows = SpreadsheetWorkbook.Load(WorkbookFile.FromBytes(path, data.Read(path)), maxBytes, limitKey,
+            rows = SpreadsheetWorkbook.Load(WorkbookFile.FromStore(data, path), maxBytes, limitKey,
                 ["ShopItemSpec"])["ShopItemSpec"];
         }
         catch (Exception failure) when (failure is FileNotFoundException or InvalidOperationException or System.Xml.XmlException)
@@ -135,7 +139,7 @@ internal sealed class DefenceSeedCatalog
             list.Add(new(effect.Kind, (float)parsed));
         }
         return new(effects.ToDictionary(pair => pair.Key, pair => pair.Value.ToArray()), precision == "single",
-            rcThreshold, krOwners, bbOwners, skipped);
+            rcThreshold, krOwners, bbOwners, skipped, pets);
 
         string Text(Dictionary<string, object?> map, string key) => map.TryGetValue(key, out var value) && value is string text
             ? text : throw new ConfigException($"Build '{build}' defence_seed.{key} is missing.");
@@ -147,8 +151,8 @@ internal sealed class DefenceSeedCatalog
     }
 
     /// <summary>
-    /// Resolves the local roll of a worn set: the character first, then each distinct item in ascending order, as
-    /// kr-812 sub_986F60 visits them; set bonuses as kr-812 sub_986B80 finalizes them; the RC bonus and the endpoint
+    /// Resolves the actor's roll: the character, then ordered distinct items and supplied attributes as
+    /// kr-812 sub_9871F0 applies them; set bonuses as kr-812 sub_986B80 finalizes them; the RC bonus and the endpoint
     /// truncation as the consumer applies them at roll time (kr-812 sub_557230).
     /// </summary>
     /// <param name="equipment">The accepted worn set, or null when the room carries none.</param>
@@ -161,11 +165,11 @@ internal sealed class DefenceSeedCatalog
         // kr-812 sub_9A5800 resets every sum and threshold to zero except the RC threshold.
         float min = 0, max = 0, rcMin = 0, rcMax = 0, krMin = 0, bbMin = 0, bbMax = 0;
         int rcThreshold = _rcThreshold, rcCount = 0, krCount = 0, krThreshold = 0, bbCount = 0, bbThreshold = 0;
-        foreach (var item in worn.OrderBy(id => id is >= 300000 and < 400000 ? 0 : 1).ThenBy(id => id))
+        // kr-1256 sub_818AA0 excludes only 300000..300999 from the ordered worn set after applying the character.
+        foreach (var item in worn.OrderBy(id => id is >= 300000 and < 301000 ? 0 : 1).ThenBy(id => id))
         {
             // kr-812 sub_99C480 applies no rows for these characters.
-            if (_skipped.Contains(item) || !_effects.TryGetValue(item, out var effects)) continue;
-            foreach (var effect in effects)
+            foreach (var effect in _skipped.Contains(item) ? [] : _effects.GetValueOrDefault(item) ?? [])
             {
                 switch (effect.Kind)
                 {
@@ -186,6 +190,13 @@ internal sealed class DefenceSeedCatalog
                 }
             }
         }
+        // kr-812 sub_9871F0 and kr-1256 sub_818AA0 apply the supplied scene vector before final equipment bonuses.
+        if (_pets is not null)
+            foreach (var effect in _pets.ForEquipment(equipment))
+            {
+                if (effect.Kind == PetCombatEffectKind.AddDefenceMinimumRatio) min += effect.Amount;
+                else if (effect.Kind == PetCombatEffectKind.AddDefenceMaximumRatio) max += effect.Amount;
+            }
         // kr-812 sub_986B80 adds the KR minimum, then the BB pair, once an owner item is worn and the count is met.
         if (_krOwners.Any(worn.Contains) && krCount >= krThreshold) min += krMin;
         if (_bbOwners.Any(worn.Contains) && bbCount >= bbThreshold)

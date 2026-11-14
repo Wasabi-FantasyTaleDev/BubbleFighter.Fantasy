@@ -5,7 +5,7 @@ using BubbleFighter.Fantasy.Contracts.Cluster;
 namespace BubbleFighter.Fantasy.Cluster;
 
 /// <summary>Runs decoded game work under the originating connection's mutation authority without changing protocol handlers.</summary>
-[Plugin("cluster.account-mutations", Description = "Session-bound mutation authority for packet dispatch.",
+[Plugin("cluster.account-mutations", Category = "cluster", Names = ["en=Cluster account changes", "zh-Hans=集群账号变更", "zh-Hant=叢集帳號變更", "ko=클러스터 계정 변경"], Description = "Session-bound mutation authority for packet dispatch.",
     Requires = [typeof(IAccountMutationScopes), typeof(IAccountSessionAdmission)], Decorates = [typeof(IPacketRouter)])]
 public sealed class AccountMutationsPlugin : IPlugin
 {

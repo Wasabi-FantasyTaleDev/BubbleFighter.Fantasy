@@ -62,13 +62,28 @@ internal sealed class UdpMovementTransport(IUdpDatagramEndpoint endpoint, IMatch
         return session.SendAsync(opcode, body, ct);
     }
 
+    // Probes only bound sessions, which are a subset of the registrations, so the loop sleeps on the directory's
+    // registration presence and holds no timer while nothing is registered; with every build loaded the probe used to
+    // wake once per keepalive period per build on an empty server. The period and the probe are unchanged.
     private async ValueTask KeepaliveAsync(CancellationToken lifetime, int milliseconds)
     {
+        PeriodicTimer? timer = null;
         try
         {
-            using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(milliseconds));
             var opcode = relay.ForConnection(OpcodeConnection.Udp).S2C("rspUdpBypassVerify_");
-            while (await timer.WaitForNextTickAsync(lifetime).ConfigureAwait(false))
+            while (true)
+            {
+                var registered = directory.WhenAnyRegistered();
+                if (!registered.IsCompleted)
+                {
+                    // A periodic timer fires whether or not anyone waits on it, so it is released, not just ignored.
+                    timer?.Dispose();
+                    timer = null;
+                    await registered.WaitAsync(lifetime).ConfigureAwait(false);
+                }
+                timer ??= new PeriodicTimer(TimeSpan.FromMilliseconds(milliseconds));
+                if (!await timer.WaitForNextTickAsync(lifetime).ConfigureAwait(false))
+                    return;
                 foreach (var session in directory.BoundSessions())
                     if (directory.TryGetTarget(session, out var remote, out _) && remote is not null)
                     {
@@ -79,8 +94,13 @@ internal sealed class UdpMovementTransport(IUdpDatagramEndpoint endpoint, IMatch
                         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { throw; }
                         catch (Exception ex) { logger.LogWarning(ex, "UDP relay liveness probe failed for session {Session}.", session.Id); }
                     }
+            }
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        finally
+        {
+            timer?.Dispose();
+        }
     }
 
     private void Register(IPluginContext context,

@@ -14,6 +14,28 @@ namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
 /// <summary>Checks native room entry with sparse occupied rosters, repeat entry and unchanged scalar-only builds.</summary>
 public sealed class EntryRosterTests
 {
+    /// <summary>Legacy waiting-room seat projection retains the modifier vector resolved with its worn items.</summary>
+    [Fact]
+    public async Task Kr812RoomSeatPublishesItsCommittedAttributes()
+    {
+        const string build = "kr-812";
+        var (schema, play) = TestBuilds.Of(build);
+        var codec = new PlayRoomCodec(build + "/game", build, schema, play,
+            new Tables(), NullLogger.Instance, TestBuilds.Packets);
+        var session = new RecordingSession(build);
+        var member = new RoomMemberView(0, 42, "member", 1, 0, false, 300001, [300001, 203100])
+        {
+            ItemAttributes = [new(203100, 7, [1, 2, 3, 4], 0, "")],
+        };
+        await codec.SendAsync(session, new RoomSeatUpdated(1, member), default);
+        var fields = PacketCodec.Read(TestBuilds.Packets, build, "RoomSeatUpdate", Assert.Single(session.Sent).Payload);
+        var equipment = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(fields["equipment"]);
+        var attribute = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(
+            Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<object?>>(equipment["unknown_48"])));
+        Assert.Equal(Convert.FromHexString("5C1903000700000004000000010000000200000003000000040000000000000000000000"),
+            PacketCodec.Write(TestBuilds.Packets, build, "ItemAttr", attribute));
+    }
+
     /// <summary>CN2013 must select a controlled actor before its scene binds the local actor pointer.</summary>
     [Theory]
     [InlineData(0, 1)]

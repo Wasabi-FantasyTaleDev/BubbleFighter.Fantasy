@@ -21,7 +21,7 @@ public sealed partial class PluginHost
             execution ??= DescribeExecution(request);
             var live = _live.ToArray();
             var desired = _desiredRows.ToHashSet(StringComparer.Ordinal);
-            if (request.Enabled) desired.Add(request.RowId); else desired.Remove(request.RowId);
+            if (request.Enabled) desired.UnionWith(request.Roots); else desired.ExceptWith(request.Roots);
             var failed = new HashSet<string>(StringComparer.Ordinal);
             lock (_info)
                 foreach (var info in _info.Values)
@@ -48,13 +48,16 @@ public sealed partial class PluginHost
 
             if (includeRequestedOperation)
             {
-                var root = live.FirstOrDefault(item => item.Row.Id == request.RowId);
-                if (root is not null && (!request.Enabled || request.Restart || root.Context.IsClosing || root.Context.WorkFailure is not null))
-                    RemoveWithDependents(root.Row.Id);
-                if (request.Compatibility && request.Enabled && (request.Restart || root is null))
+                foreach (var rootId in request.Roots)
                 {
-                    refresh.Add(request.RowId);
-                    if (request.Restart) refresh.UnionWith(removing);
+                    var root = live.FirstOrDefault(item => item.Row.Id == rootId);
+                    if (root is not null && (!request.Enabled || request.Restart || root.Context.IsClosing || root.Context.WorkFailure is not null))
+                        RemoveWithDependents(root.Row.Id);
+                    if (request.Compatibility && request.Enabled && (request.Restart || root is null))
+                    {
+                        refresh.Add(rootId);
+                        if (request.Restart) refresh.UnionWith(removing);
+                    }
                 }
             }
             foreach (var item in live.Where(item => affected.Contains(item.Row.Id) && !item.Context.IsClosing && HasStaleActivationView(item)))
@@ -75,7 +78,7 @@ public sealed partial class PluginHost
                     .Select(item => item.Row.Id).ToHashSet(StringComparer.Ordinal);
                 var supplied = new HashSet<ServiceKey>();
                 var candidates = snapshot.Rows.Where(row => affected.Contains(row.Id) && desired.Contains(row.Id) &&
-                    !failed.Contains(row.Id) && (row.Id == request.RowId || !_pendingIntents.ContainsKey(row.Id)) &&
+                    !failed.Contains(row.Id) && (request.Roots.Contains(row.Id) || !_pendingIntents.ContainsKey(row.Id)) &&
                     (!live.Any(item => item.Row.Id == row.Id) || removing.Contains(row.Id))).ToList();
                 var progress = true;
                 while (progress)
@@ -122,10 +125,15 @@ public sealed partial class PluginHost
     private void RestoreRejectedDesiredTarget(TransitionRequest request)
     {
         if (!request.OwnsDesiredTarget || request.IsSuperseded || _shutdownInProgress) return;
-        if ((_pendingIntents.TryGetValue(request.RowId, out var pending) && pending.Revision > request.Revision) ||
-            _runningExecutions.Any(execution => execution.Request.RowId == request.RowId && execution.Request.Revision > request.Revision)) return;
+        // A row a newer request has stated a target for keeps that target.
+        var restorable = request.Roots.Where(rowId =>
+            !_pendingIntents.Values.Any(pending => pending.Revision > request.Revision && pending.Roots.Contains(rowId)) &&
+            !_runningExecutions.Any(execution => execution.Request.Revision > request.Revision &&
+                (request.Roots.Count == 1 ? execution.Request.RowId == rowId : execution.Request.Roots.Contains(rowId)))).ToArray();
+        if (restorable.Length == 0) return;
         // A newer same-entry execution cannot finish while this queued/running owner still conflicts.
-        if (request.PreviousDesiredTarget) _desiredRows.Add(request.RowId); else _desiredRows.Remove(request.RowId);
+        foreach (var rowId in restorable)
+            if (request.PreviousDesiredTargets.Contains(rowId)) _desiredRows.Add(rowId); else _desiredRows.Remove(rowId);
         request.OwnsDesiredTarget = false;
     }
 }

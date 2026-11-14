@@ -7,9 +7,9 @@ using Microsoft.Extensions.Logging;
 namespace BubbleFighter.Fantasy.InventoryView;
 
 /// <summary>Mounts a build's inventory and preset projection over the shared account store.</summary>
-[Plugin("inventory.loadouts", Description = "Independent client-build equipment and weapon presets over shared ownership.",
+[Plugin("inventory.loadouts", Category = "items", Names = ["en=Weapon presets", "zh-Hans=武器预设", "zh-Hant=武器預設", "ko=무기 프리셋"], Description = "Independent client-build equipment and weapon presets over shared ownership.",
     Requires = [typeof(IInventoryLoadoutStore), typeof(IClientDataStore)],
-    Provides = [typeof(IInventoryRepository), typeof(IPlayerInventoryState)])]
+    Provides = [typeof(IInventoryRepository), typeof(IPlayerInventoryState), typeof(IInventoryBuildScope)])]
 public sealed class InventoryLoadoutsPlugin : IPlugin
 {
     /// <inheritdoc />
@@ -18,9 +18,10 @@ public sealed class InventoryLoadoutsPlugin : IPlugin
         var options = context.Config.Bind<InventoryLoadoutsOptions>();
         var data = context.Services.Get<IClientDataStore>();
         var scope = LoadScope(options, data);
-        var inventory = new BuildInventory(context.Services.Get<IInventoryLoadoutStore>(), scope);
+        var inventory = new BuildInventory(context.Services.Get<IInventoryLoadoutStore>(), scope, context.Events);
         context.Effect(context.Services.Register<IInventoryRepository>(inventory));
         context.Effect(context.Services.Register<IPlayerInventoryState>(inventory));
+        context.Effect(context.Services.Register<IInventoryBuildScope>(inventory));
         context.Logger.LogInformation("Build loadout {BuildKey} uses {Items} client catalog identities with shared item ownership.",
             scope.Key, scope.SupportedItemIds.Count);
         return ValueTask.CompletedTask;
@@ -28,8 +29,20 @@ public sealed class InventoryLoadoutsPlugin : IPlugin
 
     internal static InventoryLoadoutScope LoadScope(InventoryLoadoutsOptions options, IClientDataStore data)
     {
+        // The identities depend on the two workbooks and the two limits; the storage key is applied afterwards, so
+        // rows of one build that differ only in their key share one compiled catalog.
+        var inputs = new CompiledInputs()
+            .Add("shop_item", options.ShopItemClientPath)
+            .Add("fighter_config", options.FighterConfigClientPath)
+            .Add("max_workbook_bytes", options.MaxWorkbookBytes)
+            .Add("max_catalog_items", options.MaxCatalogItems).ToString();
+        return new(options.BuildKey, CompiledClientData.Load(data, LoadoutItemsCatalog.Instance, inputs, store => SupportedItems(options, store)));
+    }
+
+    private static int[] SupportedItems(InventoryLoadoutsOptions options, IClientDataStore data)
+    {
         IReadOnlyList<IReadOnlyList<string>> Sheet(string path, string name) => SpreadsheetWorkbook.Load(
-            WorkbookFile.FromBytes(path, data.Read(path, checked((int)options.MaxWorkbookBytes))), options.MaxWorkbookBytes,
+            WorkbookFile.FromStore(data, path, options.MaxWorkbookBytes), options.MaxWorkbookBytes,
             "max_workbook_bytes", [name])[name];
         var items = Sheet(options.ShopItemClientPath, "ShopItem");
         if (items.Count is < 2 || items.Count > options.MaxCatalogItems + 1)
@@ -56,7 +69,7 @@ public sealed class InventoryLoadoutsPlugin : IPlugin
                 && column < names.Count && !string.IsNullOrWhiteSpace(names[column])) characters.Add(300000 + field);
         if (characters.Count == 0) throw new ConfigException("The build loadout FighterConfig sheet defines no characters.");
         supported.RemoveWhere(id => id is >= 300001 and <= 300031 && !characters.Contains(id));
-        return new(options.BuildKey, supported.Order().ToArray());
+        return supported.Order().ToArray();
     }
 }
 

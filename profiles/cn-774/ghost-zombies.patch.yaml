@@ -1,4 +1,4 @@
-# Explicit opt-in to the audited ghost mode-28 script; native-client acceptance remains required.
+# Included by the build profile: the audited ghost mode-28 script; native-client acceptance remains required.
 # Keep scoreboards for the other audited optional modes without enabling their gameplay.
 - set:
     id: dialect.rooms

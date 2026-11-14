@@ -103,6 +103,107 @@ public sealed class PlayRoundResultWireTests
         Assert.Equal(LiveScoreBody, Convert.ToHexString(body));
     }
 
+    /// <summary>A WeaponMaster seat's level and experience follow its combat counters as kinds 31 to 34 (kr-1256 sub_9E9160).</summary>
+    [Fact]
+    public void AWeaponMasterSeatCarriesItsLevelAndExperience()
+    {
+        var message = new RoundScoreUpdated(0, 1, [18, 0],
+            [new RoundSeatStats(0, Kills: 18, Knockdowns: 0, Score: 0, Deaths: 7) { WeaponMaster = new(10, 1800, 1800, 1801) }]);
+
+        var body = RoundResultWire.WriteScoreUpdate(TestBuilds.Packets, "kr-1256", message);
+
+        // u8 team, u16 total, two u8 slots, eight u8 kind + u16 value pairs, then two empty counted lists.
+        Assert.Equal(41, body.Length);
+        Assert.Equal(8u, BitConverter.ToUInt32(body, 5));
+        Assert.Equal("1F0A00" + "200807" + "210807" + "220907", Convert.ToHexString(body, 21, 12));
+    }
+
+    /// <summary>Modern seat vectors use each build's named result counters and retain the empty third list.</summary>
+    [Theory]
+    [InlineData("kr-1256", "0278560307040000001034120056340C45230E674504000000107856009A780C89670EFF7F00000000")]
+    [InlineData("cn-774", "0278560307040000001E34120056341945231B6745040000001E7856009A781989671BFF7F00000000")]
+    [InlineData("tw-454", "0278560307040000001E34120056341945231B6745040000001E7856009A781989671BFF7F00000000")]
+    public void ModernLiveScorePinsBothSeatsNativeCounterKinds(string build, string expected)
+    {
+        var message = new RoundScoreUpdated(1, 2, [0, 0x5678],
+            [new(3, Kills: 0x2345, Knockdowns: 0x3456, Score: 0x1234, Deaths: 0x4567),
+             new(7, Kills: 0x6789, Knockdowns: 0x789A, Score: 0x5678, Deaths: 0x7FFF)]);
+
+        var body = RoundResultWire.WriteScoreUpdate(TestBuilds.Packets, build, message);
+
+        Assert.Equal(41, body.Length);
+        Assert.Equal(expected, Convert.ToHexString(body));
+    }
+
+    /// <summary>Absent modern seats leave all three vectors empty and keep both signed-byte sentinels.</summary>
+    [Theory]
+    [InlineData("kr-1256")]
+    [InlineData("cn-774")]
+    [InlineData("tw-454")]
+    public void ModernEmptyLiveScorePinsAllThreeVectors(string build)
+    {
+        var body = RoundResultWire.WriteScoreUpdate(TestBuilds.Packets, build,
+            new RoundScoreUpdated(1, 1, [0, 0], []));
+
+        Assert.Equal(17, body.Length);
+        Assert.Equal("010000FFFF000000000000000000000000", Convert.ToHexString(body));
+    }
+
+    /// <summary>Modern identifiers keep the existing counter saturation and checked team-total boundaries.</summary>
+    [Theory]
+    [InlineData("kr-1256", "01FFFF00FF0400000010FFFF0000000CFFFF0E00000000000000000000")]
+    [InlineData("cn-774", "01FFFF00FF040000001EFFFF00000019FFFF1B00000000000000000000")]
+    [InlineData("tw-454", "01FFFF00FF040000001EFFFF00000019FFFF1B00000000000000000000")]
+    public void ModernLiveScorePinsSaturatedCounters(string build, string expected)
+    {
+        var message = new RoundScoreUpdated(1, 1, [ushort.MaxValue, 0],
+            [new(0, Kills: int.MaxValue, Knockdowns: -1, Score: int.MaxValue, Deaths: -1)]);
+
+        var body = RoundResultWire.WriteScoreUpdate(TestBuilds.Packets, build, message);
+
+        Assert.Equal(29, body.Length);
+        Assert.Equal(expected, Convert.ToHexString(body));
+        Assert.Throws<OverflowException>(() => RoundResultWire.WriteScoreUpdate(TestBuilds.Packets, build,
+            message with { TeamTotals = [ushort.MaxValue + 1, 0] }));
+    }
+
+    /// <summary>The generic KR1256 projection uses the same held-star kind as the dedicated StarTeam path.</summary>
+    [Fact]
+    public void ModernHeldStarsUseTheirAuditedKind()
+    {
+        var body = RoundResultWire.WriteScoreUpdate(TestBuilds.Packets, "kr-1256",
+            new RoundScoreUpdated(1, 1, [0, 0], [new(0, 0, 0, 0, 0) { Stars = 7 }]));
+
+        Assert.Equal(32, body.Length);
+        Assert.Equal("01000000FF050000001000000000000C00000E00001307000000000000000000", Convert.ToHexString(body));
+    }
+
+    /// <summary>Unreviewed modern star counters cannot accidentally reuse another build's kind.</summary>
+    [Theory]
+    [InlineData("cn-774")]
+    [InlineData("tw-454")]
+    public void UnmappedModernStarsFailBeforeWriting(string build)
+    {
+        var error = Assert.Throws<InvalidOperationException>(() => RoundResultWire.WriteScoreUpdate(TestBuilds.Packets, build,
+            new RoundScoreUpdated(1, 1, [0, 0], [new(0, 0, 0, 0, 0) { Stars = 7 }])));
+
+        Assert.Contains("stars", error.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>Later clients in the legacy lineage keep their established two-list counter bytes.</summary>
+    [Theory]
+    [InlineData("cn-735")]
+    [InlineData("cn-738")]
+    [InlineData("cn-742")]
+    public void LegacyLineageKeepsItsExistingCounterKinds(string build)
+    {
+        var body = RoundResultWire.WriteScoreUpdate(TestBuilds.Packets, build,
+            new RoundScoreUpdated(1, 2, [0, 18], [new(0, Kills: 18, Knockdowns: 21, Score: 57, Deaths: 0)]));
+
+        Assert.Equal(25, body.Length);
+        Assert.Equal(LiveScoreBody, Convert.ToHexString(body));
+    }
+
     [Fact]
     public void AnUnpairedTickCarriesMinusOneForTheVictimAndAnEmptySecondVector()
     {

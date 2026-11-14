@@ -11,6 +11,8 @@ internal sealed class FinalZoneRoundState(int generation, IReadOnlyList<RoomSeat
 
     internal int Generation { get; } = generation;
     internal bool Finished { get; private set; }
+    /// <summary>Shares the bounded connection cleanup after a publication failure in this round.</summary>
+    internal Task? CleanupTask { get; set; }
     internal IReadOnlySet<int> WinnerSlots { get; private set; } = new HashSet<int>();
     internal FinalZoneItemLedger? Items { get; set; }
     internal IReadOnlyList<FinalZoneMapItem>? OpeningItems { get; set; }

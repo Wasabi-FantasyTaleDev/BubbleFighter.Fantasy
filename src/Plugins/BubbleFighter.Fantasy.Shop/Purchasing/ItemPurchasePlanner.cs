@@ -25,111 +25,28 @@ internal enum PurchaseGrantKind
 internal sealed record PurchaseGrantTerm(int ItemId, PurchaseGrantKind Kind, int Amount,
     int Maximum, bool RejectOwned);
 
-/// <summary>Plans one item entry per catalog identity; persistence checks the expected state under its player lock.</summary>
+/// <summary>Adapts shared catalog grant planning to the shop's existing refusal outcomes.</summary>
 internal static class ItemPurchasePlanner
 {
-    /// <summary>
-    /// Turns grant terms into expected-state grants the purchase store verifies atomically. Every term
-    /// group for one item id must agree on kind, bound and ownership rule; duplicate stored instances
-    /// of an item require reconciliation before planning; and each kind has its own renewal rule —
-    /// count items stack only unexpired permanent rows, timed items renew from the stored deadline
-    /// (whole remaining days, half-second rounding, per <c>kr-812 sub_978350</c> and
-    /// <c>kr-812 sub_4C75D0</c>), life items only while the stored charges are used up (same
-    /// <c>kr-812 sub_978350</c> rule), and permanent items while unowned or over a timed copy, whose
-    /// row then loses its deadline. Rejections are purchase-level user outcomes, not store faults,
-    /// and each names the reason the client can show.
-    /// </summary>
-    /// <exception cref="ArgumentException">Thrown for unbounded inputs or a foreign bag.</exception>
-    /// <exception cref="PurchaseRejectedException">Thrown for incompatible terms, invalid amounts, cap overruns, owned-item rules or unreconciled duplicates.</exception>
     internal static IReadOnlyList<ShopPurchaseGrant> Plan(long userNum, IReadOnlyList<PurchaseGrantTerm> terms,
         IReadOnlyList<InventorySlotRecord> bag, DateTimeOffset now)
     {
-        if (userNum <= 0 || terms.Count is < 1 or > InventoryLimits.MaxInventorySlotsPerBag
-            || bag.Count > InventoryLimits.MaxInventorySlotsPerBag)
-            throw new ArgumentException("Purchase planning requires a valid player and bounded inventory inputs.");
-        if (bag.Any(s => s.UserNum != userNum || s.Bag != InventoryBag.CharacterBag))
-            throw new ArgumentException("Purchase planning received another player's bag or a non-character bag.");
-
-        var grants = new List<ShopPurchaseGrant>(terms.Count);
-        foreach (var group in terms.GroupBy(t => t.ItemId))
+        ArgumentNullException.ThrowIfNull(terms);
+        if (terms.Count is < 1 or > InventoryLimits.MaxInventorySlotsPerBag)
+            throw new ArgumentException("Purchase planning requires bounded inventory inputs.", nameof(terms));
+        var resolved = terms.Select(term => new InventoryGrantTerm(term.ItemId, term.Kind switch
         {
-            var term = group.First();
-            if (term.ItemId <= 0 || !Enum.IsDefined(term.Kind) || term.Maximum <= 0
-                || group.Any(t => t.Kind != term.Kind || t.Maximum != term.Maximum || t.RejectOwned != term.RejectOwned))
-                throw new PurchaseRejectedException("The purchase contains incompatible or unsupported item terms.");
-            var amount = group.Sum(t => (long)t.Amount);
-            if (group.Any(t => t.Amount <= 0) || amount > int.MaxValue
-                || (term.Kind == PurchaseGrantKind.Permanent && amount != 1))
-                throw new PurchaseRejectedException("The purchase amount is invalid or duplicates permanent ownership.");
-            var found = bag.Where(s => s.ItemId == term.ItemId).Take(2).ToArray();
-            if (found.Length > 1)
-                throw new PurchaseRejectedException($"Item {term.ItemId} has multiple stored instances and requires reconciliation.");
-            var existing = found.SingleOrDefault();
-            if (existing is not null && term.RejectOwned)
-                throw new PurchaseRejectedException($"Item {term.ItemId} cannot be acquired again while owned.",
-                    ShopPurchaseRefusal.AlreadyOwned);
-
-            int quantity;
-            InventoryLifetime lifetime;
-            switch (term.Kind)
-            {
-                case PurchaseGrantKind.Count:
-                    if (existing is { Quantity: < 0 } || existing?.Lifetime.Kind is InventoryLifetimeKind.ExpiresAt or InventoryLifetimeKind.Life)
-                        throw new PurchaseRejectedException("The stored count item has incompatible quantity or expiry metadata.");
-                    var total = (existing?.Quantity ?? 0) + amount;
-                    if (total > term.Maximum)
-                        throw new PurchaseRejectedException($"Item {term.ItemId} would exceed its catalog count limit.",
-                            ShopPurchaseRefusal.LimitReached);
-                    quantity = checked((int)total);
-                    lifetime = InventoryLifetime.Permanent;
-                    break;
-                case PurchaseGrantKind.Days:
-                    if (existing is not null && existing.Lifetime.Kind != InventoryLifetimeKind.ExpiresAt)
-                        throw new PurchaseRejectedException("Timed renewal requires an established finite deadline.",
-                            existing.Lifetime.Kind == InventoryLifetimeKind.Permanent
-                                ? ShopPurchaseRefusal.AlreadyOwned : ShopPurchaseRefusal.Unspecified);
-                    var start = existing is null ? now
-                        : DateTimeOffset.FromUnixTimeMilliseconds(existing.Lifetime.ExpiresAtUnixMilliseconds!.Value);
-                    if (start < now)
-                        start = now;
-                    // kr-812 sub_978350 / sub_4C75D0 limit whole remaining days, rounded at half a second.
-                    var wholeDays = (long)Math.Truncate((start - now).TotalDays + 0.5 / 86400);
-                    if (wholeDays + amount > term.Maximum)
-                        throw new PurchaseRejectedException($"Item {term.ItemId} would exceed its catalog day limit.",
-                            ShopPurchaseRefusal.LimitReached);
-                    lifetime = InventoryLifetime.Until(start.AddDays(amount));
-                    quantity = 1;
-                    break;
-                case PurchaseGrantKind.Life:
-                    // kr-812 sub_978350: an owned kind 3 item may be acquired again only while its life is 0 or less.
-                    if (existing is not null && (existing.Lifetime.Kind != InventoryLifetimeKind.Life || existing.Quantity > 0))
-                        throw new PurchaseRejectedException($"Item {term.ItemId} cannot be acquired again while it still has life.",
-                            ShopPurchaseRefusal.NoMoreAllowed);
-                    if (amount > term.Maximum)
-                        throw new PurchaseRejectedException($"Item {term.ItemId} would exceed its catalog life limit.",
-                            ShopPurchaseRefusal.LimitReached);
-                    lifetime = InventoryLifetime.Life;
-                    quantity = checked((int)amount);
-                    break;
-                case PurchaseGrantKind.Permanent:
-                    // A timed copy is upgraded in place: the same row keeps its slot and loses its deadline.
-                    if (existing is not null && existing.Lifetime.Kind != InventoryLifetimeKind.ExpiresAt)
-                        throw new PurchaseRejectedException("The unlimited stock cannot be acquired while the item is already owned.",
-                            ShopPurchaseRefusal.AlreadyOwned);
-                    lifetime = InventoryLifetime.Permanent;
-                    quantity = 1;
-                    break;
-                default:
-                    throw new PurchaseRejectedException("The item grant kind is unsupported.");
-            }
-            grants.Add(new(term.ItemId, quantity)
-            {
-                Mode = ShopGrantMode.MatchItem,
-                ExpectedSlot = existing,
-                Lifetime = lifetime,
-            });
+            PurchaseGrantKind.Count => InventoryGrantKind.Count,
+            PurchaseGrantKind.Days => InventoryGrantKind.Days,
+            PurchaseGrantKind.Permanent => InventoryGrantKind.Permanent,
+            PurchaseGrantKind.Life => InventoryGrantKind.Life,
+            _ => throw new PurchaseRejectedException("The inventory grant kind is unsupported."),
+        }, term.Amount, term.Maximum, term.RejectOwned)).ToArray();
+        try { return InventoryGrantPlanner.Plan(userNum, resolved, bag, now); }
+        catch (InventoryGrantRejectedException exception)
+        {
+            throw new PurchaseRejectedException(exception.Message, exception.Refusal);
         }
-        return grants;
     }
 }
 

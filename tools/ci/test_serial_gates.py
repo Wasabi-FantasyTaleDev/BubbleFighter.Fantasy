@@ -69,11 +69,20 @@ class Reports(unittest.TestCase):
         """Every LocalClientData prerequisite is checked by its own path, not by a containing directory."""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            with patch.object(GATES, 'ROOT', root):
-                self.assertEqual(len(GATES.LOCAL_DATA_PREREQUISITES), len(GATES.missing_local_data()))
+            with patch.object(GATES, 'ROOT', root), patch.dict(GATES.os.environ, {}, clear=True):
+                self.assertEqual(len(GATES.LOCAL_DATA_PREREQUISITES) + len(GATES.LOCAL_DATA_ENV_PREREQUISITES),
+                                 len(GATES.missing_local_data()))
                 for relative, _ in GATES.LOCAL_DATA_PREREQUISITES.values():
                     file = root / relative
                     file.parent.mkdir(parents=True, exist_ok=True)
+                    file.touch()
+                self.assertEqual(set(GATES.LOCAL_DATA_ENV_PREREQUISITES),
+                                 {item['missing'] for item in GATES.missing_local_data()})
+                for variable in GATES.LOCAL_DATA_ENV_PREREQUISITES:
+                    file = root / variable / 'Config.bfz'
+                    GATES.os.environ[variable] = str(file)
+                    file.parent.mkdir(parents=True)
+                    self.assertIn(variable, {item['missing'] for item in GATES.missing_local_data()})
                     file.touch()
                 self.assertEqual([], GATES.missing_local_data())
 
@@ -121,14 +130,45 @@ class Ordering(unittest.TestCase):
         self.assertEqual(set(GATES.SERIAL_PROJECTS), {name for name, _ in calls[4:]})
         self.assertTrue(all(name not in GATES.SERIAL_PROJECTS for name, _ in calls[:4]))
 
-    def test_parallel_workers_skip_the_build_and_serial_projects_keep_it(self):
-        """Only the parallel batch relies on the single Release build."""
+    def test_every_project_relies_on_the_single_release_build(self):
+        """Neither the parallel nor the serial batch compiles a second time."""
         calls: list[tuple[str, bool]] = []
         with tempfile.TemporaryDirectory() as directory:
             with patch.object(GATES, "run_project", side_effect=self._fake(calls)):
                 GATES.run_tests(self._projects(), Path(directory), False, 2, {})
-        for name, no_build in calls:
-            self.assertEqual(name in GATES.SERIAL_PROJECTS, not no_build)
+        self.assertTrue(all(no_build for _, no_build in calls))
+
+    def test_scenario_runs_alone_with_a_few_collections_and_others_one_at_a_time(self):
+        """Quiet projects stay alone; only their own collections may overlap where allowed."""
+        scenario = GATES.test_command(Path("tests/BubbleFighter.Fantasy.Scenario.Tests/x.csproj"), Path("r"), True, True)
+        self.assertIn("xUnit.MaxParallelThreads=4", scenario)
+        self.assertNotIn("xUnit.ParallelizeTestCollections=false", scenario)
+        cluster = GATES.test_command(Path("tests/BubbleFighter.Fantasy.Cluster.Tests/x.csproj"), Path("r"), True, True)
+        self.assertIn("xUnit.MaxParallelThreads=1", cluster)
+
+    def test_affected_selection_follows_references_and_falls_back_to_everything(self):
+        """A change reaches every project that references it; an unowned change selects all."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            def project(path, refs=()):
+                file = root / path
+                file.parent.mkdir(parents=True, exist_ok=True)
+                items = "".join(f'<ProjectReference Include="{ref}" />' for ref in refs)
+                file.write_text(f"<Project><ItemGroup>{items}</ItemGroup></Project>", encoding="utf-8")
+                return file
+            core = project("src/Core/Core.csproj")
+            plugin = project("src/Plugins/A/A.csproj", ["..\\..\\Core\\Core.csproj"])
+            other = project("src/Plugins/B/B.csproj")
+            uses_plugin = project("tests/A.Tests/A.Tests.csproj", ["..\\..\\src\\Plugins\\A\\A.csproj"])
+            uses_all = project("tests/All.Tests/All.Tests.csproj", ["..\\..\\src\\Plugins\\*\\*.csproj"])
+            uses_other = project("tests/B.Tests/B.Tests.csproj", ["..\\..\\src\\Plugins\\B\\B.csproj"])
+            tests = [uses_plugin, uses_all, uses_other]
+            listing = "\n".join(path.relative_to(root).as_posix() for path in (core, plugin, other, *tests))
+            with patch.object(GATES, "ROOT", root), patch.object(GATES.subprocess, "check_output", return_value=listing):
+                self.assertEqual([uses_plugin, uses_all], GATES.affected_projects(tests, ["src/Core/Thing.cs"]))
+                self.assertEqual([uses_all, uses_other], GATES.affected_projects(tests, ["src/Plugins/B/B.cs"]))
+                self.assertEqual([], GATES.affected_projects(tests, ["docs/guide.md", "CHANGELOG.md"]))
+                self.assertIsNone(GATES.affected_projects(tests, ["profiles/all/patch.yaml"]))
 
     def test_jobs_one_runs_every_project_one_at_a_time_in_the_old_order(self):
         """--jobs 1 is the previous serial behavior, discovery order included."""

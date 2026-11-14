@@ -207,9 +207,9 @@ internal sealed class RoomCommandsBinding(string protocol, IOpcodeTable table, P
             profiles, room.MasterSlot, message.YourSlot, message.PartyTransition, session, _texts), ct).ConfigureAwait(false);
         await Send(session, "gspRoomSetSession", "SessionSetting", setting, ct).ConfigureAwait(false);
         await session.SendAsync(S2C("gspUpdateParty"), RoomRecords.Party(packets, build, self, session), ct).ConfigureAwait(false);
-        await PublishViewAsync(session, self.UserNum, self.CharacterItemId, self.EquippedItemIds, false, ct).ConfigureAwait(false);
+        await PublishViewAsync(session, self, false, ct).ConfigureAwait(false);
         foreach (var peer in profiles.Where(seat => seat.Slot != self.Slot))
-            await PublishViewAsync(session, peer.UserNum, peer.CharacterItemId, peer.EquippedItemIds, true, ct).ConfigureAwait(false);
+            await PublishViewAsync(session, peer, true, ct).ConfigureAwait(false);
         // kr-1256 sub_9DA720 announces seats without the stage teardown of sub_9AC490's kind-2 install.
         if (message.Reason is RoomEntryReason.Created or RoomEntryReason.Refreshed)
             await session.SendAsync(S2C("gspRoomSetSlot"), RoomRecords.SeatUpdate(packets, build, self, profiles, session, _texts), ct).ConfigureAwait(false);
@@ -232,7 +232,7 @@ internal sealed class RoomCommandsBinding(string protocol, IOpcodeTable table, P
         var room = message.Room ?? throw new InvalidOperationException("Modern seat updates require the complete committed appearance snapshot.");
         await session.SendAsync(S2C("gspRoomSetSlot"), RoomRecords.SeatUpdate(packets, build, message.Seat, RoomProjection.Members(room), session, _texts), ct).ConfigureAwait(false);
         if (message.Reason == RoomSeatUpdateReason.Joined)
-            await PublishViewAsync(session, message.Seat.UserNum, message.Seat.CharacterItemId, message.Seat.EquippedItemIds, true, ct).ConfigureAwait(false);
+            await PublishViewAsync(session, message.Seat, true, ct).ConfigureAwait(false);
     }
 
     public ValueTask SendAsync(ISession session, RoomSeatVacated message, CancellationToken ct) =>
@@ -302,11 +302,11 @@ internal sealed class RoomCommandsBinding(string protocol, IOpcodeTable table, P
             ["level"] = NativeDisplayLevel.Project(packets, build, seat.Level),
         }).ToArray(),
     });
-    private async ValueTask PublishViewAsync(ISession session, int userNum, int characterId,
-        IReadOnlyList<int> equippedIds, bool remote, CancellationToken ct)
+    private async ValueTask PublishViewAsync(ISession session, RoomMemberView member, bool remote, CancellationToken ct)
     {
         var context = _context ?? throw new InvalidOperationException("Room binding is not mounted.");
-        await context.Events.WaterfallAsync(new EquipmentViewRequested(protocol, session, userNum, characterId, equippedIds, remote),
+        await context.Events.WaterfallAsync(new EquipmentViewRequested(protocol, session, member.UserNum,
+                member.CharacterItemId, member.EquippedItemIds, remote) { ItemAttributes = member.ItemAttributes },
             _ => ValueTask.FromResult(false), ct).ConfigureAwait(false);
     }
 

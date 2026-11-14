@@ -12,7 +12,7 @@ python -m unittest discover -s tools/ci -p "test_*.py"
 python tools/ci/serial-gates.py --public --results-directory artifacts/validation/public-01
 ```
 
-门禁还需要 PATH 中的 Python、Node.js/npm、Go、Rust/cargo/rustup 及 `wasm32-wasip1` 目标。公开模式运行每个已跟踪测试项目，仅过滤 `Category=LocalClientData` 用例，并明确记录过滤范围，不能当作完整发布门禁。每次使用新的结果目录；非空 TRX 的结果行必须与全部通过、无跳过的计数一致。
+门禁还需要 PATH 中的 Python、Node.js/npm、Go、Rust/cargo/rustup 及 `wasm32-wasip1` 目标。公开模式运行每个已跟踪测试项目，仅过滤 `Category=LocalClientData` 用例，并明确记录过滤范围，不能当作完整发布门禁。每次使用新的结果目录；非空 TRX 的结果行必须与全部通过、无跳过的计数一致。日常分支可用 `--affected origin/main` 只运行能观察到改动的测试项目；部署批次或发布前仍需运行完整门禁。
 
 ## 完整验证
 
@@ -21,8 +21,9 @@ python tools/ci/serial-gates.py --public --results-directory artifacts/validatio
 | 配置或路径 | 所需文件 |
 | --- | --- |
 | `client-data/cn-324/` | `Config/ShopItem2.xml` |
-| `client-data/kr-1256/data/` | `Packs/Config_00000.pkn`（商店与角色工作表）和 `Packs/ConfigSh_00000.pkn`（宠物覆盖表） |
-| `artifacts/shop-tables-survey/id400/xml/` | `Config/ShopItem2.xml` |
+| `BFF_CN324_CONFIG_ARCHIVE`、`BFF_CN404_CONFIG_ARCHIVE`、`BFF_CN406_CONFIG_ARCHIVE`、`BFF_CN408_CONFIG_ARCHIVE`、`BFF_ID400_CONFIG_ARCHIVE` | 各环境变量必须指向对应版本自己的 `Config.bfz` 文件。完整门禁会在构建前检查这些路径。 |
+| `client-data/kr-1256/data/` | `Packs/Config_00000.pkn`（商店与角色工作表及 BnB 规则）、`Packs/ConfigSh_00000.pkn`（宠物覆盖表）和 `Packs/Maps_00023.pkn`（BnB 村庄地图与物品布局） |
+| `artifacts/shop-tables-survey/id400/xml/` | `Config/ShopItem2.xml`，用 `bffarchive extract <id-400>/Config/Config.bfz artifacts/shop-tables-survey/id400/xml --path Config/Config.bfz --filter ShopItem2.xml` 从 id-400 客户端的 `Config/Config.bfz` 中提取 |
 
 完整门禁构建 Release、检查四种 SDK、串行运行测试项目、检查包表并导出隔离配置。发布审查还需要隔离启动及受影响的真实客户端流程验证；自动检查不能代替客户端验收。
 
@@ -30,7 +31,7 @@ python tools/ci/serial-gates.py --public --results-directory artifacts/validatio
 
 ## 本地 Host 检查
 
-按[快速开始](docs/quickstart.zh.md)设置，包括非空的本地 `BFF_MYSQL_PASSWORD`。每次本地执行 `run` 都必须添加 `--patch tools/local-checks/isolated-memory.patch.yaml`，包括 `--dump-config`。不要假定开发环境连接的是临时数据库。
+按[快速开始](docs/quickstart.zh.md)设置。本地检查不需要任何数据库设置；只有启用 MySQL 行时才需要 `BFF_MYSQL_PASSWORD`。每次本地执行 `run` 都必须添加 `--patch tools/local-checks/isolated-memory.patch.yaml`，包括 `--dump-config`。不要假定开发环境连接的是临时数据库。
 
 ## 协议与文档修改
 

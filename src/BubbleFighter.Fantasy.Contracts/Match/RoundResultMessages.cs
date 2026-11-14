@@ -67,7 +67,17 @@ public sealed record RoundSeatStats(int Slot, int Kills, int Knockdowns, int Sco
 
     /// <summary>Gets the absolute value of accepted coin pickups this round; null before the first pickup.</summary>
     public int? CollectedLucci { get; init; }
+
+    /// <summary>Gets the seat's WeaponMaster level and experience; null outside a WeaponMaster round.</summary>
+    public RoundWeaponMasterProgress? WeaponMaster { get; init; }
 }
+
+/// <summary>A seat's WeaponMaster progress as the live score shows it.</summary>
+/// <param name="Level">The one-based level.</param>
+/// <param name="Experience">The experience earned this round.</param>
+/// <param name="LevelExperience">The experience at which the current level starts.</param>
+/// <param name="NextLevelExperience">The experience of the next level; one more than the last level's start at the last level.</param>
+public sealed record RoundWeaponMasterProgress(int Level, int Experience, int LevelExperience, int NextLevelExperience);
 
 /// <summary>
 /// The live score of a running round, sent to every member after each scoring event: the scoring

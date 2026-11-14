@@ -81,7 +81,7 @@ public sealed class WorldBlockFileTests
                 PknWriter.Write(output, "pack/maps0000.pkn",
                     [("Config/ShopItem2.xml", "shop"u8.ToArray()), ("Maps/Area/Nested/track.wb", bytes),
                      ("Maps/Area/Nested/texture.dds", "texture"u8.ToArray())]);
-            new ClientDataGenerator().Generate("cn-279", client, generated, 100, 1048576, default);
+            new ClientDataGenerator().Generate("cn-279", client, generated, 1048576, default);
             using var store = ClientDataStore.Open(Path.Combine(generated, "data"), Path.Combine(generated, "dataraw"), NullLogger.Instance);
             Assert.True(store.Exists("maps/area/nested/TRACK.WB"));
             Assert.Equal(new Vector3(10, 20, 30), Assert.Single(WorldBlockFile.LoadHelpers(store,

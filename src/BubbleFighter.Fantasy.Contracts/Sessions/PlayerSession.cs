@@ -108,6 +108,18 @@ public sealed class PlayerSession : IPlayerSession
     public PlayerSession(PlayerIdentity identity, long loginConnectionId) : this(identity) =>
         LoginConnectionId = loginConnectionId;
 
+    /// <summary>Creates owned player state that reports every phase change after it is made.</summary>
+    /// <param name="identity">The authenticated identity.</param>
+    /// <param name="loginConnectionId">The owning connection id, preserved when a match connection shares this state.</param>
+    /// <param name="phaseChanged">Called outside the state's lock after each move that changed the phase.</param>
+    public PlayerSession(PlayerIdentity identity, long loginConnectionId, Action phaseChanged) : this(identity, loginConnectionId)
+    {
+        ArgumentNullException.ThrowIfNull(phaseChanged);
+        _phaseChanged = phaseChanged;
+    }
+
+    private readonly Action? _phaseChanged;
+
     /// <inheritdoc />
     public long? LoginConnectionId { get; }
 
@@ -161,6 +173,7 @@ public sealed class PlayerSession : IPlayerSession
     /// <inheritdoc />
     public long MoveTo(SessionPhase next)
     {
+        long generation;
         lock (_gate)
         {
             if (next == _phase)
@@ -169,8 +182,10 @@ public sealed class PlayerSession : IPlayerSession
                 throw new InvalidOperationException(
                     $"Player {Identity.UserNum} cannot move from {_phase} to {next}.");
             _phase = next;
-            return ++_generation;
+            generation = ++_generation;
         }
+        _phaseChanged?.Invoke();
+        return generation;
     }
 
     /// <summary>

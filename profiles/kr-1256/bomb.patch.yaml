@@ -1,9 +1,9 @@
-# Explicit opt-in to the build-audited bomb exchange; native-client acceptance remains required.
+# Included by the build profile: the build-audited bomb exchange; native-client acceptance remains required.
 - set:
     id: dialect.rooms
     config:
       bomb_mission: true
-      result_scoreboard_modes: [1, 8, 19, 20, 23, 24, 25, 28, 30, 32, 45]
+      result_scoreboard_modes: [1, 5, 6, 8, 19, 20, 23, 24, 25, 28, 30, 32, 45]
 - set:
     id: ingame
     config:

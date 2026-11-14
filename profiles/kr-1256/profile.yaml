@@ -11,11 +11,15 @@ parent: kr-812
 # Head of the modern family: builds without recoverable packet class names; cn-774 and tw-454 inherit it.
 family: modern
 vars:
+  TITLE_CATALOG_SCHEMA: MedalFlag
+  # The client builds native feeding dates in its own region's civil time (UTC+9).
+  PET_CLIENT_UTC_OFFSET_MINUTES: 540
   # The game port players reach; the migration destination advertises it.
   GAME_PUBLIC_PORT: "${KR_1256_PUBLIC_PORT:-7100}"
 description: Korean client build, ClientVersion_Major 1256, resource patch 1304.
 bundles:
   - core
+  - relay-latency
   - kr-1256
   - ingame
   - shop
@@ -24,5 +28,29 @@ bundles:
 patches:
   - patch.yaml
   - ../bundles/shop-supplement-lucci.yaml
+  - ../bundles/pets.patch.yaml
+  - ../bundles/pets-modern.patch.yaml
+  - ../bundles/pets-kr-1256.patch.yaml
+  - ../bundles/item-enhancement.patch.yaml
+  - ../bundles/titles.patch.yaml
+  - ../bundles/favorite-titles.patch.yaml
+  - ../bundles/custom-room-rules.patch.yaml
+  # Every audited mode is on by default.
+  - bomb.patch.yaml
+  - captain.patch.yaml
+  - bnb.patch.yaml
+  - extreme-racing.patch.yaml
+  - final-zone.patch.yaml
+  - one-kill.patch.yaml
+  - stars.patch.yaml
+  - ghost-zombies.patch.yaml
+  - script-zombies.patch.yaml
+  - rhea-character-skill.patch.yaml
+  - ai-rooms.patch.yaml
+  - ../bundles/zombie-escape.patch.yaml
+  - ../bundles/modern-room-kicking.patch.yaml
+  - ../bundles/defence-seeds.patch.yaml
+  - weapon-master.patch.yaml
+  - modes.patch.yaml
   # Optional developer override; git-ignored and skipped when absent.
   - local.patch.yaml

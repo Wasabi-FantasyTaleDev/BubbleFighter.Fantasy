@@ -69,7 +69,13 @@ internal sealed partial class SqliteRepositories : IInventoryRepository, IPlayer
         if (slots.Count > InventoryLimits.MaxInventorySlotsPerBag || slots.Any(slot => slot.UserNum != userNum || slot.Bag != bag))
             throw new ArgumentException("Inventory snapshot exceeds its bound or targets another player or bag.", nameof(slots));
         var snapshot = slots.ToArray();
-        Mutate(userNum, state => { state.Slots.RemoveAll(slot => slot.Bag == bag); state.Slots.AddRange(snapshot); return true; }, ct);
+        Mutate(userNum, state =>
+        {
+            PetEntitlementInventory.ValidateExternalWrite(userNum, state.Slots, snapshot);
+            state.Slots.RemoveAll(slot => slot.Bag == bag);
+            state.Slots.AddRange(snapshot);
+            return true;
+        }, ct);
         return ValueTask.CompletedTask;
     }
 
@@ -79,7 +85,9 @@ internal sealed partial class SqliteRepositories : IInventoryRepository, IPlayer
         RequireBag(bag);
         return new(Mutate<IReadOnlyList<InventorySlotRecord>>(userNum, state =>
         {
-            var merged = InventoryAppend.Merge(userNum, bag, state.Slots.Where(slot => slot.Bag == bag).ToArray(), candidates);
+            var current = state.Slots.Where(slot => slot.Bag == bag).ToArray();
+            var merged = InventoryAppend.Merge(userNum, bag, current, candidates);
+            PetEntitlementInventory.ValidateExternalWrite(userNum, state.Slots, merged.Skip(current.Length).ToArray());
             state.Slots.RemoveAll(slot => slot.Bag == bag);
             state.Slots.AddRange(merged);
             return merged;

@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 namespace BubbleFighter.Fantasy.MatchConnection;
 
 /// <summary>Offers UDP only after the room starts and updates its transport when the room preference changes.</summary>
-[Plugin("match-udp-relay-setup", Description = "Room-scoped UDP relay admission and transport switching.",
+[Plugin("match-udp-relay-setup", Category = "network", Names = ["en=UDP relay setup", "zh-Hans=UDP 中继设置", "zh-Hant=UDP 中繼設定", "ko=UDP 릴레이 설정"], Description = "Room-scoped UDP relay admission and transport switching.",
     OptionalMany = [typeof(IRoomPeerRoster), typeof(IMatchUdpRelayDirectory), typeof(IMatchUdpRelayControl), typeof(IUdpTransportStatusRegistry)])]
 public sealed class UdpRelaySetupPlugin : IPlugin
 {
@@ -90,9 +90,8 @@ internal sealed class UdpRelayCoordinator(UdpRelaySetupOptions options, IRoomPee
         if (control.IdentityBytes is not (4 or 8)) throw new ConfigException("UDP relay control identity width must be four or eight.");
         try
         {
-            using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(options.TickMs));
-            while (await timer.WaitForNextTickAsync(ct).ConfigureAwait(false))
-                await TickAsync(ct).ConfigureAwait(false);
+            await DemandLoop.RunAsync(TimeSpan.FromMilliseconds(options.TickMs), directory.WhenAnyRegistered, TickAsync, ct)
+                .ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
     }

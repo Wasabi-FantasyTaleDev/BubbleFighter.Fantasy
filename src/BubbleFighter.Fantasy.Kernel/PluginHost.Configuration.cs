@@ -92,7 +92,8 @@ public sealed partial class PluginHost
                 }
                 foreach (var row in added)
                 {
-                    if (!row.Disabled) _desiredRows.Add(row.Id);
+                    // An on-demand row becomes desired only when something requests it.
+                    if (!row.Disabled && row.Activation != PluginActivation.OnDemand) _desiredRows.Add(row.Id);
                     lock (_info) _info[row.Id] = InstanceInfo(row, DefinitionFor(row), PluginState.Unloaded, null);
                 }
                 foreach (var row in prepared.Where(row => baseline.ById.TryGetValue(row.Id, out var old) && old.Disabled != row.Disabled))
@@ -188,7 +189,7 @@ public sealed partial class PluginHost
 
     private static bool EquivalentConfiguration(PluginRow left, PluginRow right) =>
         left.Plugin == right.Plugin && left.Version == right.Version && left.Disabled == right.Disabled &&
-        left.Lifecycle == right.Lifecycle && left.ClientBuild == right.ClientBuild &&
+        left.Activation == right.Activation && left.ActivationGroup == right.ActivationGroup && left.Lifecycle == right.Lifecycle && left.ClientBuild == right.ClientBuild &&
         left.ParentId == right.ParentId && left.Lineage.SequenceEqual(right.Lineage, StringComparer.Ordinal) &&
         left.IsolatedServices.SequenceEqual(right.IsolatedServices, StringComparer.Ordinal) &&
         PluginConfigurationEquality.Equivalent(left.Config, right.Config);

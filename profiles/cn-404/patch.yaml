@@ -1,6 +1,5 @@
 # Profile patch for cn-404: applied after the bundle rows (see profiles/kr-1256/patch.yaml
-# for the supported operations). The admin API moves off 8080 so this profile can run
-# beside the other builds on one machine.
+# for the supported operations).
 - set:
     id: dialect.scene-seeds
     config:
@@ -8,12 +7,10 @@
       weapon_critical_bonuses: true
       weapon_workbook_max_bytes: 33554432
 - replace:
-    id: admin.http
-    config:
-      listen: "${CN_404_ADMIN_HOST:-127.0.0.1}:${CN_404_ADMIN_PORT:-8095}"
-- replace:
     id: diagnostics.packet-log
     config:
+      packets_enabled: ${BFF_PACKET_LOG:-false}
+      capture_enabled: ${BFF_PACKET_CAPTURE:-false}
       file: logs/{date}/packets-cn-404_{timestamp}.log
       preview_bytes: 96
 # The opt-in reward pool uses this build's own Config/ShopItem2.xml: the award dialog, selection, reveal and

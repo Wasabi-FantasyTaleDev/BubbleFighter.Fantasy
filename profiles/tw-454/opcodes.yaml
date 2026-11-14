@@ -4,6 +4,55 @@ profile: tw-454
 # packet name through an address into the image (dispatcher sub_AACF80
 # --exe). See profiles/opcode-policy.md.
 opcodes:
+  - value: 17
+    direction: c2s
+    connection: relay
+    name: rcpGameStart
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A62210 selects the relay session during native game-start processing, stamps 17 and sends the constructed packet; matched to kr-812 sub_803590 constructing Packet_rcpGameStart and kr-812 sub_809DA0 stamping 17"
+  - value: 24
+    direction: c2s
+    connection: relay
+    name: rcpCriticalBuffData
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_717790 constructs CriticalBuffData, stamps 24, writes the actor followed by that component and sends on the selected relay session; matched to kr-812 sub_5117C0 constructing Packet_rcpCriticalBuffData and kr-812 sub_52DC30 stamping 24"
+  - value: 20006
+    direction: c2s
+    connection: relay
+    name: rcpReqLagDisPing
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A7A930 stamps 20006 and writes the current native tick after marking a pending latency probe; matched to kr-812 sub_8118D0 constructing Packet_rcpReqLagDisPing and kr-812 sub_811EA0 stamping 20006"
+  - value: 21
+    direction: s2c
+    connection: relay
+    name: rspRepLagDisPing
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A79210 case 21 reads one u32 and passes local arrival time to tw-454 sub_6324E0, which clears the pending delay probe; matched to kr-812 sub_810C20 case 0x15 constructing Packet_rspRepLagDisPing and calling kr-812 sub_463300"
+  - value: 103
+    direction: c2s
+    connection: game
+    name: gcpReportUserTracking
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A62E70 stamps 103 and sends the tracking aggregate through tw-454 sub_4ACEC0, which writes thirty u32 words; matched to kr-812 sub_803DF0 constructing Packet_gcpReportUserTracking and stamping 103"
+  - value: 29
+    direction: c2s
+    connection: relay
+    name: rcpReqHackDataRandomCheck
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A79210 builds a random report with HackDataRandomCheckData, stamps 29 and sends through the relay session; tw-454 sub_478860 installs its SessionSignatureData component; matched to kr-812 sub_810C20 constructing Packet_rcpReqHackDataRandomCheck and kr-812 sub_811E30 stamping 29"
+  - value: 32889
+    direction: c2s
+    connection: relay
+    name: gppCharactersPlayData
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_72AC20 reduces a 16-byte character/play digest, stamps 32889 and writes one u32; tw-454 sub_6323B0 routes it through tw-454 sub_A74520, whose session selector includes relay; matched to kr-812 sub_51EA10 constructing Packet_gppCharactersPlayData, reducing the character/play digest and stamping 32889"
   - value: 117
     direction: c2s
     connection: game
@@ -733,10 +782,11 @@ opcodes:
     source: "dispatcher sub_AACF80 jumptable case 154 stores \"gspRepMakeItemAdvanced\""
   - value: 155
     direction: s2c
+    connection: game
     name: gspRepChangeUnlimited
     name_source: label@tw-454
     evidence: verified
-    source: "dispatcher sub_AACF80 jumptable case 155 stores \"gspRepChangeUnlimited\""
+    source: "tw-454 sub_AACF80 case 155 stores gspRepChangeUnlimited at 0x1398DC0 and calls tw-454 sub_AA0F60, which passes the third ReplyScienceLab reference list to tw-454 sub_E0CFB0"
   - value: 156
     direction: s2c
     name: gspRepModification
@@ -781,10 +831,12 @@ opcodes:
     source: "dispatcher sub_AACF80 jumptable case 163 stores \"gspJackpotReward\""
   - value: 164
     direction: s2c
+    connection: game
     name: gspRepFollowerLevelup
     name_source: label@tw-454
     evidence: verified
-    source: "dispatcher sub_AACF80 jumptable case 164 stores \"gspRepFollowerLevelup\""
+    source: "tw-454 sub_AA0C40 reads u64 target and u32 result; zero selects the success presentation"
+    notes: "Twelve-byte reply; publish changed pet state before success. Full layout in packets/pet.yaml."
   - value: 165
     direction: s2c
     name: gspGachaponNotice
@@ -918,7 +970,7 @@ opcodes:
     name_source: coined
     evidence: verified
     source: "the racing hub tw-454 sub_D530A0 (reached from the strategy vtable slot 24) case 0x2C7 reads {key, duration, flag} and applies them through tw-454 sub_D54440 with the codes 2500, 20000 and 210000 (tw-454 sub_544A10 arms the stage timer with the second word through tw-454 sub_EDB430); matched to kr-1256 gspExtremeRacingTimer_ by the verified reader chain"
-    notes: "packets/extreme-racing.yaml ExtremeRacingTimer@kr-1256 states the body; the tw-454 hub drives the same three codes plus the HUD text paths."
+    notes: "packets/extreme-racing.yaml ExtremeRacingTimer states the body; the tw-454 hub drives the same three codes plus the HUD text paths."
   - value: 712
     direction: s2c
     connection: game
@@ -926,7 +978,7 @@ opcodes:
     name_source: coined
     evidence: verified
     source: "the racing hub tw-454 sub_D530A0 case 0x2C8 reads two words and passes the second to tw-454 sub_544700, which stores the round and re-arms the 3x5x5 slot grid; matched to kr-1256 gspExtremeRacingRound_"
-    notes: "packets/extreme-racing.yaml ExtremeRacingRound@kr-1256 states the body."
+    notes: "packets/extreme-racing.yaml ExtremeRacingRound states the body."
   - value: 714
     direction: s2c
     connection: game
@@ -934,7 +986,7 @@ opcodes:
     name_source: coined
     evidence: verified
     source: "the racing hub tw-454 sub_D530A0 case 0x2CA reads the mode word then the counted record list (each record deserialized by tw-454 sub_D550E0 through the tw-454 ExtremeRacing::UpdatePlayRecord vtable 0x13C87FC), applied by tw-454 sub_D54830; matched to kr-1256 gspExtremeRacingUpdatePlayRecord_"
-    notes: "packets/extreme-racing.yaml ExtremeRacingRecords@kr-1256 states the record shape (confirmed identical on tw-454: the reader tw-454 sub_D550E0 reads the seat word, the pair count, then count x {u8 tag, u32 value}); the applier dispatches the mode into three consumer sets."
+    notes: "packets/extreme-racing.yaml ExtremeRacingRecords states the record shape (confirmed identical on tw-454: the reader tw-454 sub_D550E0 reads the seat word, the pair count, then count x {u8 tag, u32 value}); the applier dispatches the mode into three consumer sets."
   - value: 711
     direction: c2s
     connection: game
@@ -942,7 +994,7 @@ opcodes:
     name_source: coined
     evidence: verified
     source: "the racing tick tw-454 sub_4CB190 stamps 711 in its type-5 zone branch with one 4-byte zone id (stored into ChrLocalPlayer+22076), sent on the game connection; matched to kr-1256 gcpExtremeRacingGoal_"
-    notes: "packets/extreme-racing.yaml ExtremeRacingGoal@kr-1256 states the body; once per zone per local player with cooldowns."
+    notes: "packets/extreme-racing.yaml ExtremeRacingGoal states the body; once per zone per local player with cooldowns."
   - value: 32934
     direction: c2s
     connection: both
@@ -1399,10 +1451,12 @@ opcodes:
     source: "dispatcher sub_AACF80 jumptable case 946 stores \"gspUpdateCoupleList\""
   - value: 949
     direction: s2c
+    connection: game
     name: gspEvolveResult
     name_source: label@tw-454
     evidence: verified
-    source: "dispatcher sub_AACF80 jumptable case 949 stores \"gspEvolveResult\""
+    source: "tw-454 sub_A9E4A0 -> tw-454 sub_DD0A00 reads u32 outcome, u64 target and one unused trailing u32"
+    notes: "Growth/regression presentation uses installed inventory state. The recipient layout is in packets/pet.yaml."
   - value: 950
     direction: s2c
     name: gspGMConsole
@@ -2074,10 +2128,10 @@ opcodes:
     notes: "Reply S2C 150 (kind 7)."
   - value: 133
     direction: c2s
-    name: gcpReqScienceLabEnchant_
-    name_source: coined
+    name: gcpReqEnchant
+    name_source: label@cn-735
     evidence: verified
-    source: "DlgEnchant slot-5 wrapper tw-454 sub_DFB0C0 -> tw-454 sub_DFBBB0 -> sender tw-454 sub_DFB150 stamps 133; the shared class carries the selected content key (or the card key plus attachments) and the 0/1 flag (1 iff the stored key equals slotHolder+348)"
+    source: "DlgEnchant slot-5 wrapper tw-454 sub_DFB0C0 -> tw-454 sub_DFBBB0 -> sender tw-454 sub_DFB150 stamps 133; the shared class carries the selected content key (or the card key plus attachments) and the 0/1 flag (1 iff the stored key equals slotHolder+348); matched to cn-735 sub_593AB0, which registers native label gcpReqEnchant for the same DlgEnchant request"
     notes: "Reply S2C 152 (kind 2)."
   - value: 134
     direction: c2s
@@ -2095,17 +2149,18 @@ opcodes:
     notes: "Reply S2C 154 (kind 6)."
   - value: 136
     direction: c2s
-    name: gcpReqScienceLabChangeUnlimited_
-    name_source: coined
+    connection: game
+    name: gcpReqChangeUnlimited
+    name_source: label@cn-738
     evidence: verified
-    source: "DlgChangeUnlimited slot-5 wrapper tw-454 sub_DEEC40 -> tw-454 sub_DEF150 -> sender tw-454 sub_DEECD0 stamps 136; the shared class carries the single selected key and u64 zero"
-    notes: "Reply S2C 155 (kind 4)."
+    source: "tw-454 sub_DEF150 calls tw-454 sub_DEECD0, which stamps 136 and writes one base item or SetItem ID from content+48 plus a zero u64 argument; matched to cn-738 sub_5623D0 and cn-738 sub_562BC0, which registers gcpReqChangeUnlimited at 134"
+    notes: "tw-454 sub_479B90 writes the counted u64 list and u64 argument. Reply S2C 155 enters tw-454 sub_AA0F60."
   - value: 137
     direction: c2s
     name: gcpReqScienceLabModification_
     name_source: coined
     evidence: verified
-    source: "DlgScienceLabModification slot-5 wrapper tw-454 sub_DE9A90 -> tw-454 sub_DE9D60 -> sender tw-454 sub_DEA1E0 stamps 137; the shared class carries one key per selected-parts node and u64 zero"
+    source: "DlgScienceLabModification slot-5 wrapper tw-454 sub_DE9A90 -> tw-454 sub_DE9D60 -> sender tw-454 sub_DEA1E0 stamps 137; the shared class carries the target key first, then one key per selected-parts node (each content key is u64 at +40), and u64 zero"
     notes: "Reply S2C 156 (kind 8)."
   - value: 138
     direction: c2s
@@ -2633,6 +2688,14 @@ opcodes:
     name_source: label@kr-812
     evidence: verified
     source: "tw-454 sub_A62210 reads the round-start words and enters state 4; matched to kr-812 Packet_gspGameStartGame"
+  - value: 637
+    direction: s2c
+    connection: game
+    name: gspGamePreCountDown
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_70B3F0 case 637 at 0x70B8B9-0x70B96A reads and discards one u32 before resetting scene timer storage, sampling the clock and setting a state flag; matched to kr-812 sub_515190 (Packet_gspGamePreCountDown)"
+    notes: "Payload meaning and sender ordering are unknown"
   - value: 638
     direction: s2c
     connection: game
@@ -2991,6 +3054,22 @@ opcodes:
     evidence: verified
     source: "tw-454 reads two u32 words; the weapon pickup notice"
     notes: "Weapon pickup notice"
+  - value: 32778
+    direction: c2s
+    connection: both
+    name: gppKillObject
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_749A80 writes; tw-454 sub_70B3F0 case 32778 -> tw-454 sub_730AA0 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "Object word and one word; the reader resolves the object and only destroys an NpcTurret, GoBreakableModel or GoBreakableObject. tw-454 sub_6323B0 queues the sender's local copy."
+  - value: 32778
+    direction: s2c
+    connection: both
+    name: gppKillObject
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_749A80 writes; tw-454 sub_70B3F0 case 32778 -> tw-454 sub_730AA0 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "Object word and one word; the reader resolves the object and only destroys an NpcTurret, GoBreakableModel or GoBreakableObject. tw-454 sub_6323B0 queues the sender's local copy."
   - value: 32779
     direction: c2s
     connection: both
@@ -4193,3 +4272,76 @@ opcodes:
     evidence: verified
     source: "tw-454 sub_7327F0 writes; tw-454 sub_732DB0 consumes; matched kr-812 and kr-1256 native operation."
     notes: "Two words; direct-use item consumer tw-454 sub_7328F0."
+  - value: 32895
+    direction: c2s
+    connection: both
+    name: gppChangeTurretState
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_732E00 writes; tw-454 sub_70B3F0 case 32895 -> tw-454 sub_732F00 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "Turret word and state word; the reader resolves an NpcTurret and applies a state of at most 5 when it changes. tw-454 sub_6323B0 queues the sender's local copy."
+  - value: 32895
+    direction: s2c
+    connection: both
+    name: gppChangeTurretState
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_732E00 writes; tw-454 sub_70B3F0 case 32895 -> tw-454 sub_732F00 consumes; matched kr-812 and kr-1256 native operation."
+    notes: "Turret word and state word; the reader resolves an NpcTurret and applies a state of at most 5 when it changes. tw-454 sub_6323B0 queues the sender's local copy."
+  - value: 143
+    direction: c2s
+    connection: game
+    name: gcpReqFollowerLevelup_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_DCFEC0 checks the pet grade and experience, then stamps 143 and writes the selected u64 pet reference after confirmation"
+    notes: "Complete eight-byte target body in packets/pet.yaml; requires the pet_level_up capability."
+
+  - value: 713
+    direction: s2c
+    connection: game
+    name: gspExtremeRacingInitGameData_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_D530A0 case 713 uses tw-454 sub_4666F0 to read four u32 words and two independently counted u32-key/u32-value maps followed by two stone-disposer u32 words"
+    notes: "packets/extreme-racing.yaml ExtremeRacingInitialization; 32+8*(N+M) bytes; native construction requires delivery once per loaded stage."
+  - value: 716
+    direction: s2c
+    connection: game
+    name: gspExtremeRacingMapState_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_D530A0 case 716 reads three u32 words and a counted u32 vector, applied through tw-454 sub_D546B0"
+    notes: "packets/extreme-racing.yaml ExtremeRacingMapState; 16+4*N bytes; selector words and the third word retain unknown names."
+  - value: 717
+    direction: s2c
+    connection: game
+    name: gspExtremeRacingTotalTime_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_D530A0 case 717 reads one unused u32 and invokes HUD action 35; tw-454 sub_A3E910 selects comboMsgGetTotalTime"
+    notes: "packets/extreme-racing.yaml ExtremeRacingTotalTime; 4 bytes; this notification does not carry a time value."
+  - value: 718
+    direction: s2c
+    connection: game
+    name: gspExtremeRacingCannon_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_D530A0 case 718 reads group u32, cannon identity u32 and weapon u32 plus scale f32; tw-454 sub_541C40 checks the full identity and accepts group zero"
+    notes: "packets/extreme-racing.yaml ExtremeRacingCannon; 16 bytes. Eligible clients can generate relay 32902; the command does not select a unique sender."
+  - value: 32902
+    direction: c2s
+    connection: relay
+    name: gppExtremeRacingCannon_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_7165A0 writes actor u32, weapon u16, origin f32[3], direction f32[3], cannon identity u32 and serial u32; tw-454 sub_7165A0 stamps 0x8086"
+    notes: "packets/extreme-racing.yaml ExtremeRacingCannonShot; 38 bytes; table coverage does not register an echo or traffic schedule."
+  - value: 32902
+    direction: s2c
+    connection: relay
+    name: gppExtremeRacingCannon_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_70B3F0 case 32902 dispatches to tw-454 sub_724810, which read actor u32, weapon u16, six f32 values and two u32 words"
+    notes: "packets/extreme-racing.yaml ExtremeRacingCannonShot; 38 bytes; table coverage does not register an echo or traffic schedule."

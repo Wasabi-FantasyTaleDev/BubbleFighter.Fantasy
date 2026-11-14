@@ -2,10 +2,15 @@
    has no app shell of its own, so the sidebar follows its Sider pattern. Where a NOAH II component
    styles itself in a scoped block, the overrides below use one extra class of specificity. */
 
+/* Each UI font carries ascent and descent overrides that place its capitals (and Han or Hangul glyphs) in the middle of
+   a line-height: 1 box, so button, tag and tab labels sit centred; the sum keeps each font's own normal line height. */
 @font-face {
   font-family: "Bff Display";
   src: url("../assets/fonts/bff-geist-regular.woff2") format("woff2");
   font-display: swap;
+  ascent-override: 92.5%;
+  descent-override: 21.5%;
+  line-gap-override: 0%;
   font-style: normal;
   font-weight: 400;
 }
@@ -14,6 +19,9 @@
   font-family: "Bff Latin UI";
   src: url("../assets/fonts/bff-oppo-en-variable.woff2") format("woff2");
   font-display: swap;
+  ascent-override: 99%;
+  descent-override: 21%;
+  line-gap-override: 0%;
   font-style: normal;
   font-weight: 200 800;
 }
@@ -22,6 +30,9 @@
   font-family: "Bff Simplified Chinese UI";
   src: url("../assets/fonts/bff-oppo-cn-regular.woff2") format("woff2");
   font-display: swap;
+  ascent-override: 99%;
+  descent-override: 21%;
+  line-gap-override: 0%;
   font-style: normal;
   font-weight: 400;
 }
@@ -30,6 +41,9 @@
   font-family: "Bff Simplified Chinese UI";
   src: url("../assets/fonts/bff-oppo-cn-medium.woff2") format("woff2");
   font-display: swap;
+  ascent-override: 99%;
+  descent-override: 21%;
+  line-gap-override: 0%;
   font-style: normal;
   font-weight: 500;
 }
@@ -38,6 +52,9 @@
   font-family: "Bff Simplified Chinese UI";
   src: url("../assets/fonts/bff-oppo-cn-bold.woff2") format("woff2");
   font-display: swap;
+  ascent-override: 99%;
+  descent-override: 21%;
+  line-gap-override: 0%;
   font-style: normal;
   font-weight: 700;
 }
@@ -46,6 +63,9 @@
   font-family: "Bff Traditional Chinese UI";
   src: url("../assets/fonts/bff-oppo-tc-regular.woff2") format("woff2");
   font-display: swap;
+  ascent-override: 99%;
+  descent-override: 21%;
+  line-gap-override: 0%;
   font-style: normal;
   font-weight: 400;
 }
@@ -54,6 +74,9 @@
   font-family: "Bff Traditional Chinese UI";
   src: url("../assets/fonts/bff-oppo-tc-medium.woff2") format("woff2");
   font-display: swap;
+  ascent-override: 99%;
+  descent-override: 21%;
+  line-gap-override: 0%;
   font-style: normal;
   font-weight: 500;
 }
@@ -62,6 +85,9 @@
   font-family: "Bff Traditional Chinese UI";
   src: url("../assets/fonts/bff-oppo-tc-bold.woff2") format("woff2");
   font-display: swap;
+  ascent-override: 99%;
+  descent-override: 21%;
+  line-gap-override: 0%;
   font-style: normal;
   font-weight: 700;
 }
@@ -70,6 +96,9 @@
   font-family: "Bff Korean UI";
   src: url("../assets/fonts/bff-korean-ui-light.otf") format("opentype");
   font-display: swap;
+  ascent-override: 90.5%;
+  descent-override: 22.5%;
+  line-gap-override: 0%;
   font-style: normal;
   font-weight: 300;
 }
@@ -78,6 +107,9 @@
   font-family: "Bff Korean UI";
   src: url("../assets/fonts/bff-korean-ui-regular.otf") format("opentype");
   font-display: swap;
+  ascent-override: 90.5%;
+  descent-override: 22.5%;
+  line-gap-override: 0%;
   font-style: normal;
   font-weight: 400;
 }
@@ -86,6 +118,9 @@
   font-family: "Bff Korean UI";
   src: url("../assets/fonts/bff-korean-ui-medium.otf") format("opentype");
   font-display: swap;
+  ascent-override: 90.5%;
+  descent-override: 22.5%;
+  line-gap-override: 0%;
   font-style: normal;
   font-weight: 500;
 }
@@ -94,6 +129,9 @@
   font-family: "Bff Korean UI";
   src: url("../assets/fonts/bff-korean-ui-bold.otf") format("opentype");
   font-display: swap;
+  ascent-override: 90.5%;
+  descent-override: 22.5%;
+  line-gap-override: 0%;
   font-style: normal;
   font-weight: 700;
 }
@@ -318,10 +356,7 @@ html, body { margin: 0; background: var(--bg); color: var(--text); font-family: 
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 
-/* Administration overlays retain click handling without dimming the workspace. */
-body:has(.shell) .noah-modal-overlay.glass-backdrop,
-body:has(.shell) .plugin-drawer-overlay,
-body:has(.shell) .room-drawer-overlay,
+/* The sidebar's backdrop keeps click handling without dimming the workspace; dialogs and drawers dim and blur it. */
 body:has(.shell) .sider-backdrop {
   background: transparent;
   backdrop-filter: none;
@@ -331,8 +366,6 @@ body:has(.shell) .admin-select-enter-active,
 body:has(.shell) .admin-select-leave-active { transition: opacity 150ms ease, transform 150ms cubic-bezier(.2,.8,.2,1); }
 body:has(.shell) .admin-select-enter-from,
 body:has(.shell) .admin-select-leave-to { opacity: 0; transform: translateY(-5px) scale(.98); }
-body:has(.shell) .noah-modal-fade-leave-active .noah-modal-dialog { transition: transform 160ms ease; }
-body:has(.shell) .noah-modal-fade-leave-to .noah-modal-dialog { transform: scale(.98) translateY(6px); }
 @media (min-width: 861px) {
   .plugins-shell { height: 100dvh; min-height: 640px; }
   .plugins-shell .main, .plugins-shell .route-page { flex: 1; min-height: 0; }

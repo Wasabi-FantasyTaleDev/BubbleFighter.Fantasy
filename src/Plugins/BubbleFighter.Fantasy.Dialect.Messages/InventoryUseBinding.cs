@@ -14,8 +14,8 @@ namespace BubbleFighter.Fantasy.Dialect.Messages;
 /// tw-454 (kr-812 sub_8B9490/sub_8B9660; kr-812 sub_825070 interprets the reply).
 /// </summary>
 /// <remarks>
-/// A list with more than one string is answered with the native failure result and never reaches the item
-/// handler; a spray sends the list empty (kr-1256 sub_D407C0 case 1).
+/// A spray sends no parameters (kr-1256 sub_D407C0 case 1); selective pet ability deletion sends two
+/// (kr-1256 sub_EDEC10). Larger lists have no supported native action and are refused.
 /// </remarks>
 internal sealed class InventoryUseBinding(string protocol, IOpcodeTable opcodes, PacketTables tables, string build)
     : IInboundMessageBinding<InventoryItemUseRequested>, IMessageSender<InventoryItemUseReplied>, IMessageSender<UserStatUpdated>
@@ -47,27 +47,27 @@ internal sealed class InventoryUseBinding(string protocol, IOpcodeTable opcodes,
         context.Effect(packets.Register(protocol,
             requestOpcode, async (session, packet, ct) =>
             {
-                var (itemId, quantity, parameters) = ReadRequest(packet.Payload.Span);
+                var (itemId, quantity, parameters, secondary) = ReadRequest(packet.Payload.Span);
                 if (parameters is null)
                 {
-                    context.Logger.LogInformation("Session {Id} item use {Item} carries more than one parameter; refused unread.",
+                    context.Logger.LogInformation("Session {Id} item use {Item} carries more than two parameters; refused unread.",
                         session.Id, itemId);
                     await SendAsync(session, new InventoryItemUseReplied(Refused, "") { ItemId = itemId }, ct).ConfigureAwait(false);
                     return;
                 }
-                var request = new InventoryItemUseRequested(itemId, quantity, parameters);
+                var request = new InventoryItemUseRequested(itemId, quantity, parameters) { SecondaryParameter = secondary };
                 if (!await messages.DispatchAsync(protocol, session, request, ct).ConfigureAwait(false))
                     throw new InvalidOperationException("Inventory item use has no handler.");
             }));
     }
 
-    // A null parameter string means the request listed more than one and must not reach the item handler.
-    private (int ItemId, int Quantity, string? Parameters) ReadRequest(ReadOnlySpan<byte> payload)
+    // A null primary parameter marks a list outside the supported action shapes.
+    private (int ItemId, int Quantity, string? Parameters, string? Secondary) ReadRequest(ReadOnlySpan<byte> payload)
     {
         if (!_listParameters)
         {
             var scalars = PacketCodec.ReadScalars(tables, build, "InventoryUseRequest", payload);
-            return ((int)scalars["item_id"], (int)scalars["quantity"], (string)scalars["parameters"]);
+            return ((int)scalars["item_id"], (int)scalars["quantity"], (string)scalars["parameters"], null);
         }
         var fields = PacketCodec.Read(tables, build, "InventoryUseRequest", payload);
         var itemId = Convert.ToInt32(fields["item_id"], CultureInfo.InvariantCulture);
@@ -75,9 +75,10 @@ internal sealed class InventoryUseBinding(string protocol, IOpcodeTable opcodes,
         var list = (object?[])fields["parameters"]!;
         return list.Length switch
         {
-            0 => (itemId, quantity, ""),
-            1 => (itemId, quantity, (string)list[0]!),
-            _ => (itemId, quantity, null),
+            0 => (itemId, quantity, "", null),
+            1 => (itemId, quantity, (string)list[0]!, null),
+            2 => (itemId, quantity, (string)list[0]!, (string)list[1]!),
+            _ => (itemId, quantity, null, null),
         };
     }
 

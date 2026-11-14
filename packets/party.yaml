@@ -96,7 +96,7 @@ structs:
     - unknown_44: "list<u8>"            # +44; cn-774 sub_48B350 reads one-byte elements
       offset: 44
       only: [cn-774]
-    - unknown_56: empty_list            # +56; cn-774 sub_449C80 reads a record vector whose element layout is not stated; sent empty
+    - unknown_56: "list<ItemAttr>"       # cn-774 sub_449C80 reads the modifiers applied by cn-774 sub_9B6B80 -> cn-774 sub_BEF9C0.
       offset: 56
       only: [cn-774]
     - unknown_68: "list<ItemExpiredTime>" # +68; cn-774 sub_496F40 reads counted expiry records (equipment-attributes.yaml)
@@ -121,7 +121,7 @@ structs:
       offset: 20
     - unknown_32: "list<u8>"            # +32; tw-454 sub_478B30 reads one-byte elements
       offset: 32
-    - unknown_44: empty_list            # +44; tw-454 sub_44A090 reads a record vector whose element layout is not stated; sent empty
+    - unknown_44: "list<ItemAttr>"       # tw-454 sub_44A090 reads the modifiers applied by tw-454 sub_C153F0 -> tw-454 sub_C31F10.
       offset: 44
     - unknown_56: "list<ItemExpiredTime>" # +56; tw-454 sub_4A0550 reads counted expiry records (equipment-attributes.yaml)
       offset: 56

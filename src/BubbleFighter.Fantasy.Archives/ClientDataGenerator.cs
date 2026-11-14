@@ -46,13 +46,12 @@ public sealed class ClientDataGenerator
     /// <param name="build">Build key in the embedded manifest.</param>
     /// <param name="client">Installed client root.</param>
     /// <param name="output">New directory containing data, dataraw and sources.tsv.</param>
-    /// <param name="fileLimit">Maximum inspected entries and generated files.</param>
-    /// <param name="byteLimit">Maximum total copied or unpacked bytes.</param>
+    /// <param name="byteLimit">Maximum total copied or unpacked bytes, the space the caller can give the output.
+    /// Member and file counts are not limited: the archives' own indexes bound them.</param>
     /// <param name="cancellationToken">Cancels planning and generation between bounded reads.</param>
-    public void Generate(string build, string client, string output, int fileLimit, long byteLimit,
+    public void Generate(string build, string client, string output, long byteLimit,
         CancellationToken cancellationToken)
     {
-        ArgumentOutOfRangeException.ThrowIfLessThan(fileLimit, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(byteLimit, 1);
         var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(client));
         var target = Path.TrimEndingDirectorySeparator(Path.GetFullPath(output));
@@ -76,10 +75,9 @@ public sealed class ClientDataGenerator
         var rawFolders = rules.GetProperty("raw_folders").EnumerateObject().ToDictionary(p => p.Name,
             p => p.Value.EnumerateArray().Select(e => e.GetString()!).ToHashSet(StringComparer.OrdinalIgnoreCase),
             StringComparer.OrdinalIgnoreCase);
-        var mounted = EnumerateMounted(root, fileLimit, cancellationToken);
+        var mounted = EnumerateMounted(root, cancellationToken);
         var members = new Dictionary<string, (string Archive, long Size, bool Copy)>(StringComparer.OrdinalIgnoreCase);
         var copies = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
-        var inspected = 0;
         foreach (var relative in mounted)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -88,7 +86,6 @@ public sealed class ClientDataGenerator
             var allCopy = reader.Entries.Count > 0 && reader.Entries.All(e => copyFolders.Contains(e.Path.Split('/')[0]));
             foreach (var entry in reader.Entries)
             {
-                if (++inspected > fileLimit) throw new InvalidDataException("Client archive entry limit exceeded.");
                 _ = Inside(target, entry.Path);
                 if (entry.Size < 0) throw new InvalidDataException("Negative archive member size.");
                 members.TryAdd(entry.Path, (relative, entry.Size, allCopy));
@@ -107,7 +104,6 @@ public sealed class ClientDataGenerator
             if (size > byteLimit - total) throw new InvalidDataException("Client data byte limit exceeded.");
             total += size;
         }
-        if (copies.Count + raw.Length + 1 > fileLimit) throw new InvalidDataException("Generated file limit exceeded.");
         if (total == 0) throw new InvalidDataException("No server data was selected.");
         Directory.CreateDirectory(target);
         var written = new List<string>();
@@ -169,20 +165,17 @@ public sealed class ClientDataGenerator
     }
 
     /// <summary>Lists mounted archives in client lookup order without following filesystem links.</summary>
-    public static IReadOnlyList<string> EnumerateMounted(string client, int fileLimit, CancellationToken cancellationToken)
+    public static IReadOnlyList<string> EnumerateMounted(string client, CancellationToken cancellationToken)
     {
-        ArgumentOutOfRangeException.ThrowIfLessThan(fileLimit, 1);
         var root = Path.GetFullPath(client);
         RejectAncestorLinks(root);
         var pending = new Stack<(string Path, int Depth)>();
         pending.Push((root, 0));
         var result = new List<string>();
-        var count = 0;
         while (pending.TryPop(out var directory))
             foreach (var entry in Directory.EnumerateFileSystemEntries(directory.Path))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (++count > fileLimit) throw new InvalidDataException("Client directory entry limit exceeded.");
                 RejectLink(entry);
                 if (Directory.Exists(entry))
                 {

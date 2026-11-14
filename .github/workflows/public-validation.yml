@@ -51,6 +51,8 @@ jobs:
         shell: pwsh
         run: |
           python -m unittest discover -s tools/ci -p 'test_*.py'
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          python -m unittest discover -s tools/perf -p 'test_*.py'
           exit $LASTEXITCODE
       - name: Run publicly reproducible gates
         shell: pwsh

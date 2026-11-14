@@ -1,72 +1,176 @@
 version: 1
-# Extreme Racing (round mode 24, widget wgtExtremeRacing, kr-1256 sub_1134B50 case 24): the race frames.
-#
-# kr-812 has no Extreme Racing stage, so the baseline structures are empty and kr-1256 restates them. Mode 24
-# builds GameExtremeRacingStrategy (kr-1256 sub_9E1710 case 24) and ExtremeRacingGameStage (kr-1256 sub_67A510).
-# The game dispatcher hands S2C 600..764 without an explicit case to the strategy's slot 28 (kr-1256 sub_9E1EB0
-# default branch, vtable +112); that slot is kr-1256 sub_CE55F0 -> sub_CE5600, which reads S2C 711..718 except 715
-# and applies them only when the current stage casts to ExtremeRacingGameStage. The client stores no packet name
-# for any of these frames; the opcode rows carry coined names. Every bool is a four-byte word read as nonzero.
+# Extreme Racing is round mode 24 (kr-1256 sub_1134B50); its strategy owns these game frames.
+# kr-1256 sub_CE5600, cn-774 sub_D8A460 and tw-454 sub_D530A0 consume S2C 711..718 except 715.
+# cn-738 sub_5096F0 and cn-742 sub_C78980 instead consume S2C 761..768 except 765.
+# The native class names prove the purpose; no packet label was recovered for these coined names.
+# Layout coverage does not enable the mode, select command recipients or establish relay echo policy.
 structs:
 
-  ExtremeRacingTimer: []
-
-  # S2C 711: kr-1256 sub_CE5600 case 0x2C7 reads three words; the third is kept as `!= 0`.
-  # kr-1256 sub_67E8B0 switches on the code (2500, 20000, 210000) and uses the duration as milliseconds.
-  ExtremeRacingTimer@kr-1256:
+  # kr-1256 sub_67E8B0, cn-774 sub_D8B880 and tw-454 sub_D54440 use codes 2500, 20000 and 210000.
+  # cn-738 sub_50A250 and cn-742 sub_C79590 use 5000 instead of 2500; every activity flag is bool32.
+  ExtremeRacingTimer:
     - code: u32
       offset: 0
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
     - duration_ms: u32
       offset: 4
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
     - active: bool
       offset: 8
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
 
-  ExtremeRacingRound: []
-
-  # S2C 712: kr-1256 sub_CE5600 case 0x2C8 reads two words into the same local; only the second reaches
-  # kr-1256 sub_67E4A0, which stores it at stage +3160.
-  ExtremeRacingRound@kr-1256:
+  # Each strategy reads two words but applies only the second as the round: kr-1256 sub_67E4A0,
+  # cn-774 sub_84B0A0 and tw-454 sub_544700; cn-738 sub_5096F0 and cn-742 sub_C78980 preserve that order.
+  ExtremeRacingRound:
     - unknown_0: u32
       offset: 0
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
     - round: u32
       offset: 4
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
 
-  ExtremeRacingRecordValue: []
+  # kr-1256 sub_1155670 reads each u32 map key/value; kr-1256 sub_67B270 stores variant at coin +584.
+  # The same pair readers are cn-738 sub_4105F0, cn-742 sub_411DD0, cn-774 sub_46EE40 and tw-454 sub_4670F0.
+  ExtremeRacingCoinVariant:
+    - identity: u32
+      offset: 16
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
+    - variant: u32
+      offset: 20
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
 
-  # One record field: kr-1256 sub_CE71F0 reads a byte, then a word; kr-1256 sub_1155410 stores the word by the
-  # byte's case 0..6.
-  ExtremeRacingRecordValue@kr-1256:
+  # kr-1256 sub_67B270 stores the second map's value at coin +592; kr-1256 sub_BF45D0 gates pickup on it.
+  # cn-738 sub_4521C0, cn-742 sub_468B00, cn-774 sub_8481E0 and tw-454 sub_5418D0 apply this second map.
+  ExtremeRacingCoinRound:
+    - identity: u32
+      offset: 16
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
+    - round: u32
+      offset: 20
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
+
+  # kr-1256 sub_1155540, cn-774 sub_46E3F0 and tw-454 sub_4666F0 read four words, two maps and two words.
+  # cn-738 sub_413690 and cn-742 sub_417600 return after the maps; the second map is at native +36, not +28.
+  ExtremeRacingInitialization:
+    - first_cannon_identity: u32
+      offset: 4
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
+    - unknown_8: u32
+      offset: 8
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
+    - first_coin_identity: u32
+      offset: 12
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
+    - coin_count: u32
+      offset: 16
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
+    - coin_variants: "list<ExtremeRacingCoinVariant>"
+      offset: 20
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
+    - coin_rounds: "list<ExtremeRacingCoinRound>"
+      offset: 28
+      only: [kr-1256, cn-774, tw-454]
+      cn-738:
+        - coin_rounds: "list<ExtremeRacingCoinRound>"
+          offset: 36
+    - first_stone_disposer_identity: u32
+      offset: 36
+      only: [kr-1256, cn-774, tw-454]
+    - stone_disposer_count: u32
+      offset: 40
+      only: [kr-1256, cn-774, tw-454]
+
+  # kr-1256 sub_CE71F0 reads u8 then u32; cn-738 sub_50BCF0 and cn-742 sub_C7B150 match the packed pair.
+  # cn-774 sub_D8C480 and tw-454 sub_D550E0 read the same five wire bytes despite eight-byte native elements.
+  ExtremeRacingRecordValue:
     - field: u8
       offset: 0
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
     - value: u32
       offset: 4
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
 
-  ExtremeRacingRecord: []
-
-  # ExtremeRacing::UpdatePlayRecord: kr-1256 sub_CE4330 reads a two-byte key at +4, then the counted field
-  # list (kr-1256 sub_CE71F0). kr-1256 sub_D18140 matches the key to the record kr-1256 sub_D189F0 created for
-  # that seat index.
-  ExtremeRacingRecord@kr-1256:
+  # kr-1256 sub_CE4330, cn-738 sub_50BD90 and cn-742 sub_C7B1F0 read a u16 key and a counted field list.
+  # cn-774 sub_D8C480 and tw-454 sub_D550E0 preserve the u16 width; the key addresses the seat's play record.
+  ExtremeRacingRecord:
     - seat: u16
       offset: 4
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
     - values: "list<ExtremeRacingRecordValue>"
       offset: 8
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
 
-  ExtremeRacingRecords: []
-
-  # S2C 714: kr-1256 sub_CE5600 case 0x2CA reads the scope word, then kr-1256 sub_10C1850 reads the counted
-  # UpdatePlayRecord list. kr-1256 sub_CE6BA0: scope 0 updates the local seat's record only, scope 1 every record
-  # plus the ranking board and the team round totals, scope 2 every record plus the ranking board.
-  ExtremeRacingRecords@kr-1256:
+  # kr-1256 sub_CE6BA0: scope 0 updates the local seat; 1 updates all records, ranking and team totals; 2 omits totals.
+  # cn-738 sub_50B8D0, cn-742 sub_C7ACE0, cn-774 sub_D8C550 and tw-454 sub_EC4680 read the counted list.
+  ExtremeRacingRecords:
     - scope: u32
       offset: 0
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
     - records: "list<ExtremeRacingRecord>"
       offset: 4
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
 
-  ExtremeRacingGoal: []
+  # kr-1256 sub_67F4E0, cn-774 sub_D8BAF0 and tw-454 sub_D546B0 apply three words and a counted vector.
+  # cn-738 sub_5096F0 case 766 and cn-742 sub_C78980 case 766 read only the first two selector words.
+  ExtremeRacingMapState:
+    - unknown_0: u32
+      offset: 0
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
+    - unknown_4: u32
+      offset: 4
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
+    - unknown_8: u32
+      offset: 8
+      only: [kr-1256, cn-774, tw-454]
+    - vanish_selections: "list<u32>"
+      only: [kr-1256, cn-774, tw-454]
 
-  # C2S 711: kr-1256 sub_B0D760 kind 5 stamps 711 and writes one word, the touched goal's round, which must equal
-  # stage +3160; it is sent on the game connection (dword_18E7F48) once per round (character +14024).
-  ExtremeRacingGoal@kr-1256:
+  # The unused word triggers comboMsgGetTotalTime: kr-1256 sub_69EE70, cn-774 sub_86ECA0 and tw-454 sub_A3E910
+  # select action 35; cn-738 sub_A05EF0 and cn-742 sub_944C30 select action 42.
+  ExtremeRacingTotalTime:
+    - unknown_0: u32
+      offset: 0
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
+
+  # kr-1256 sub_67B6E0, cn-774 sub_848570 and tw-454 sub_541C40 read full u32 identities and accept group zero.
+  # cn-738 sub_4523E0 and cn-742 sub_468D60 require the exact group and receive no scale word.
+  ExtremeRacingCannon:
+    - group: u32
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
+    - identity: u32
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
+    - weapon: u32
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
+    - scale: f32
+      only: [kr-1256, cn-774, tw-454]
+
+  # The writers kr-1256 sub_6E1E90, cn-738 sub_6BE000, cn-742 sub_619050, cn-774 sub_8A31A0 and
+  # tw-454 sub_7165A0 write 4,2,4,4,4,4,4,4,4,4 bytes: 38 total, with only the weapon narrowed to u16.
+  ExtremeRacingCannonShot:
+    - actor: u32
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
+    - weapon: u16
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
+    - origin_x: f32
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
+    - origin_y: f32
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
+    - origin_z: f32
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
+    - direction_x: f32
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
+    - direction_y: f32
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
+    - direction_z: f32
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
+    - cannon_identity: u32
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
+    - serial: u32
+      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
+
+  # kr-1256 sub_B0D760, cn-774 sub_5BE4A0 and tw-454 sub_4CB190 stamp C2S 711 with the goal's round.
+  # The earlier clients' corresponding game senders have not been established, so they have no goal layout.
+  ExtremeRacingGoal:
     - round: u32
       offset: 0
+      only: [kr-1256, cn-774, tw-454]

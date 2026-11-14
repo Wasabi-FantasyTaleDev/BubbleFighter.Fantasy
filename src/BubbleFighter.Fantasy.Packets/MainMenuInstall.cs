@@ -86,7 +86,54 @@ public static class MainMenuInstall
     /// <returns>The complete unframed <c>gspGotoRoom</c> body.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="tables"/> is null.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown for a character item id outside 300001..301999.</exception>
-    public static byte[] Write(PacketTables tables, string build, int userNumber, string nickname, int level, int characterItemId)
+    public static byte[] Write(PacketTables tables, string build, int userNumber, string nickname, int level, int characterItemId) =>
+        WriteCore(tables, build, userNumber, nickname, level, characterItemId, null, []);
+
+    /// <summary>Writes the menu from one captured worn set and its native ItemAttr values, including explicit empty modifier vectors.</summary>
+    /// <param name="tables">The resolved native packet layouts.</param>
+    /// <param name="build">The client build receiving the menu.</param>
+    /// <param name="userNumber">The player used as the seat and equipment-map key.</param>
+    /// <param name="nickname">The captured player name.</param>
+    /// <param name="level">The captured display level.</param>
+    /// <param name="characterItemId">The selected character item.</param>
+    /// <param name="equippedItemIds">The complete captured worn set, including the selected character.</param>
+    /// <param name="itemAttributes">ItemAttr dictionaries using the five fields declared by the packet tables.</param>
+    public static byte[] Write(PacketTables tables, string build, int userNumber, string nickname, int level, int characterItemId,
+        IReadOnlyList<int> equippedItemIds, IReadOnlyList<IReadOnlyDictionary<string, object?>> itemAttributes)
+    {
+        ArgumentNullException.ThrowIfNull(equippedItemIds);
+        ArgumentNullException.ThrowIfNull(itemAttributes);
+        if (equippedItemIds.Count > ushort.MaxValue / sizeof(uint) || itemAttributes.Count > ushort.MaxValue / (5 * sizeof(uint)))
+            throw new InvalidDataException("Menu appearance exceeds the native room packet bound.");
+        var ids = equippedItemIds.ToArray();
+        var selected = ids.ToHashSet();
+        if (!selected.Contains(characterItemId) || selected.Count != ids.Length || ids.Any(id => id <= 0))
+            throw new InvalidDataException("Menu appearance requires distinct positive worn identities including its character.");
+        var attributes = new IReadOnlyDictionary<string, object?>[itemAttributes.Count];
+        var bytes = ids.Length * sizeof(uint);
+        for (var index = 0; index < attributes.Length; index++)
+        {
+            var source = itemAttributes[index];
+            if (source is null || !source.TryGetValue("unknown_4", out var item) || item is not int itemId || !selected.Contains(itemId)
+                || !source.TryGetValue("unknown_8", out var selector) || selector is not uint kind
+                || !source.TryGetValue("unknown_12", out var vector) || vector is not IReadOnlyList<uint> words
+                || !source.TryGetValue("unknown_28", out var trailing) || trailing is not uint unknown28
+                || !source.TryGetValue("unknown_32", out var name) || name is not string text
+                || words.Count > ushort.MaxValue / sizeof(uint) || text.Length > ushort.MaxValue / sizeof(char))
+                throw new InvalidDataException("Menu appearance contains an unrelated or malformed ItemAttr.");
+            bytes += 5 * sizeof(uint) + words.Count * sizeof(uint) + text.Length * sizeof(char);
+            if (bytes > ushort.MaxValue) throw new InvalidDataException("Menu modifiers exceed the native room packet bound.");
+            attributes[index] = new Dictionary<string, object?>
+            {
+                ["unknown_4"] = itemId, ["unknown_8"] = kind, ["unknown_12"] = words.ToArray(),
+                ["unknown_28"] = unknown28, ["unknown_32"] = text,
+            };
+        }
+        return WriteCore(tables, build, userNumber, nickname, level, characterItemId, ids, attributes);
+    }
+
+    private static byte[] WriteCore(PacketTables tables, string build, int userNumber, string nickname, int level, int characterItemId,
+        IReadOnlyList<int>? equippedItemIds, IReadOnlyList<IReadOnlyDictionary<string, object?>> itemAttributes)
     {
         ArgumentNullException.ThrowIfNull(tables);
         if (characterItemId is < CharacterItemBase + 1 or > CharacterItemBase + 1999)
@@ -125,13 +172,20 @@ public static class MainMenuInstall
         {
             ["user_number"] = userNumber,
             ["character_id"] = characterItemId,
-            ["equipped_items"] = new[] { characterItemId },
+            ["equipped_items"] = equippedItemIds ?? [characterItemId],
         };
         var equippedObject = new Dictionary<string, object?>
         {
             ["user_number"] = userNumber,
             ["character_id"] = characterItemId,
         };
+        if (equippedItemIds is not null)
+        {
+            equippedObject["equipped_items"] = equippedItemIds;
+            var fields = tables.Resolve(build, "gspGotoRoom");
+            if (fields.Any(field => field.Name == "profile_entries")) ApplyAttributes("RoomProfileEntry", profile);
+            if (fields.Any(field => field.Name == "equipped_objects")) ApplyAttributes("EquippedObjectEntry", equippedObject);
+        }
         var teamInfo = new Dictionary<string, object?>
         {
             // One map entry {team 2, slots [0]}, then the slot vector 1..11 kept as sent today (meaning not
@@ -171,6 +225,16 @@ public static class MainMenuInstall
             ["local_slot"] = 0,
             ["party_transition"] = false,
         });
-        return PacketCodec.Write(tables, build, "gspGotoRoom", values);
+        var body = PacketCodec.Write(tables, build, "gspGotoRoom", values);
+        if (body.Length > ushort.MaxValue) throw new InvalidDataException("Main-menu install exceeds the native room packet bound.");
+        return body;
+
+        void ApplyAttributes(string structure, Dictionary<string, object?> record)
+        {
+            // kr-1256 sub_10D9410, cn-774 sub_449C80 and tw-454 sub_44A090 consume these native ItemAttr records.
+            var fields = tables.Resolve(build, structure).Where(field => field.Type == "list<ItemAttr>").ToArray();
+            if (fields.Length != 1) throw new InvalidDataException($"Menu structure '{structure}' must contain one native ItemAttr vector.");
+            record[fields[0].Name] = itemAttributes;
+        }
     }
 }

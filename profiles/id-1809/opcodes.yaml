@@ -1770,10 +1770,11 @@ opcodes:
     source: "id-1809 dispatcher sub_7E3180 case 952: Packet_gspResRandomMissionInfo"
   - value: 955
     direction: s2c
+    connection: game
     name: gspEvolveResult
     name_source: label@id-1809
-    evidence: inferred
-    source: "id-1809 dispatcher sub_7E3180 case 955: Packet_gspEvolveResult"
+    evidence: verified
+    source: "id-1809 dispatcher sub_7E3180 case 955; id-1809 sub_4D8130 reads u32 outcome, u32 pet item id and one unused u32; id-1809 sub_7E00C0 consumes the installed pet state"
   - value: 956
     direction: s2c
     name: gspGMConsole

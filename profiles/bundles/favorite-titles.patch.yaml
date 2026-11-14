@@ -1,0 +1,10 @@
+# KR1256 only: grants the Favorite challenge titles when enough weapons reach Master and shows their progress.
+# Needs BFF_TITLES_ENABLED and BFF_FAVORITE_WEAPON_ENABLED; other builds do not include this patch.
+- set:
+    id: titles
+    config:
+      favorite_titles: ${BFF_FAVORITE_TITLES_ENABLED:-true}
+- set:
+    id: dialect.messages
+    config:
+      title_progress: ${BFF_FAVORITE_TITLES_ENABLED:-true}

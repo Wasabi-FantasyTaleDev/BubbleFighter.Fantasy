@@ -1,3 +1,4 @@
+using BubbleFighter.Fantasy.Contracts.Titles;
 using BubbleFighter.Fantasy.Contracts.Launcher;
 using BubbleFighter.Fantasy.Contracts.Clans;
 using BubbleFighter.Fantasy.Contracts.Fighters;
@@ -30,7 +31,7 @@ namespace BubbleFighter.Fantasy.Persistence.MySql;
 /// beside <see cref="IDbConnectionFactory"/>; login still consumes
 /// <c>IPlayerRepository</c> from the lobby row.
 /// </summary>
-[Plugin("persistence.mysql", Description = "MySQL persistence via MySqlConnector and SqlSugar.",
+[Plugin("persistence.mysql", Category = "storage", Names = ["en=MySQL storage", "zh-Hans=MySQL 存储", "zh-Hant=MySQL 儲存", "ko=MySQL 저장소"], Description = "MySQL persistence via MySqlConnector and SqlSugar.",
     Optional = [typeof(IAccountMutationFence)],
     Provides = [
         typeof(IDbConnectionFactory),
@@ -38,11 +39,13 @@ namespace BubbleFighter.Fantasy.Persistence.MySql;
         typeof(IClanStore),
         typeof(ILauncherAccountRepository),
         typeof(ILauncherSessionStore),
-        typeof(BubbleFighter.Fantasy.Contracts.Progress.ITutorialStageStore),
+        typeof(BubbleFighter.Fantasy.Contracts.Progress.ITutorialStageStore), typeof(BubbleFighter.Fantasy.Contracts.Progress.ITutorialPracticeStore),
         typeof(IShopSessionStore),
         typeof(IFighterRepository),
         typeof(IInventoryRepository),
-        typeof(IInventoryLoadoutStore),
+        typeof(IInventoryLoadoutStore), typeof(IPetMutationStore), typeof(IPetEntitlementStore), typeof(IItemEnhancementStore),
+        typeof(IItemModificationStore), typeof(ILaboratoryInventoryStore), typeof(IRoundTitleMedalSettlementRepository),
+        typeof(IInventoryMetadataStore), typeof(ITitleMedalStore),
         typeof(IPlayerWalletRepository),
         typeof(BubbleFighter.Fantasy.Contracts.Progress.IPlayerProgressRepository),
         typeof(BubbleFighter.Fantasy.Contracts.Progress.IPlayerBattleRecordsRepository),
@@ -82,14 +85,23 @@ public sealed class MySqlPlugin : IPlugin
         context.Effect(context.Services.Register<ILauncherAccountRepository>(new MySqlLauncherAccounts(factory)));
         context.Effect(context.Services.Register<ILauncherSessionStore>(new MySqlLauncherSessions(factory)));
         context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Progress.ITutorialStageStore>(new MySqlTutorialStages(factory, authority)));
+        context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Progress.ITutorialPracticeStore>(new MySqlTutorialPractice(factory, authority)));
         context.Effect(context.Services.Register<IShopSessionStore>(new MySqlShopSessionStore(factory, authority)));
         context.Effect(context.Services.Register<IClanStore>(new MySqlClanStore(factory, authority)));
         context.Effect(context.Services.Register<IFighterRepository>(new MySqlFighterRepository(factory, authority)));
-        var inventory = new MySqlInventoryRepository(factory, authority, options.MaxLoadoutsPerPlayer);
+        var inventory = new MySqlInventoryRepository(factory, authority, options.MaxLoadoutsPerPlayer, options.TitleMedals);
         context.Effect(context.Services.Register<IInventoryRepository>(inventory));
         context.Effect(context.Services.Register<IInventoryLoadoutStore>(inventory));
+        context.Effect(context.Services.Register<IPetMutationStore>(inventory));
+        context.Effect(context.Services.Register<IPetEntitlementStore>(inventory));
+        context.Effect(context.Services.Register<IItemEnhancementStore>(inventory));
+        context.Effect(context.Services.Register<IItemModificationStore>(inventory));
+        context.Effect(context.Services.Register<ILaboratoryInventoryStore>(inventory));
+        context.Effect(context.Services.Register<IInventoryMetadataStore>(inventory));
+        context.Effect(context.Services.Register<ITitleMedalStore>(inventory));
         context.Effect(context.Services.Register<IPlayerWalletRepository>(new MySqlPlayerWalletRepository(factory, authority)));
-        var progress = new MySqlPlayerProgressRepository(factory, authority, options.MaxBattleModesPerPlayer);
+        var progress = new MySqlPlayerProgressRepository(factory, authority, options.MaxBattleModesPerPlayer, options.TitleMedals);
+        context.Effect(context.Services.Register<IRoundTitleMedalSettlementRepository>(progress));
         context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Progress.IPlayerProgressRepository>(progress));
         context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Progress.IPlayerBattleRecordsRepository>(progress));
         context.Effect(context.Services.Register<IPlayerInventoryState>(new MySqlPlayerInventoryState(factory, authority)));
@@ -109,6 +121,10 @@ public sealed class MySqlPlugin : IPlugin
 /// <summary>Configuration for the <see cref="MySqlPlugin"/> row.</summary>
 public sealed class MySqlOptions : IValidatableOptions
 {
+    /// <summary>Gets or sets catalogue medal balances and credit receipt budgets per account.</summary>
+    [System.ComponentModel.DataAnnotations.Required]
+    public TitleMedalLimits TitleMedals { get; set; } = new();
+
     /// <summary>Gets or sets the maximum number of recorded game modes per player without evicting history.</summary>
     [Range(1, 4096)]
     public int MaxBattleModesPerPlayer { get; set; } = 128;

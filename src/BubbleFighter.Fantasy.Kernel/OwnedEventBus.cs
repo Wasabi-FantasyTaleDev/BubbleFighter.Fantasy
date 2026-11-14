@@ -46,6 +46,7 @@ internal sealed class OwnedEventBus(PluginContext owner, IEventBus inner) : IEve
     }
 
     public void Emit<TEvent>(TEvent value) where TEvent : IEvent => inner.Emit(value);
+    public bool HasHandlers<TEvent>() where TEvent : IEvent => inner.HasHandlers<TEvent>();
     public ValueTask SerialAsync<TEvent>(TEvent value, CancellationToken ct) where TEvent : IEvent => inner.SerialAsync(value, ct);
     public ValueTask ParallelAsync<TEvent>(TEvent value, CancellationToken ct) where TEvent : IEvent => inner.ParallelAsync(value, ct);
     public ValueTask<TResult> WaterfallAsync<TEvent, TResult>(TEvent value, Func<CancellationToken, ValueTask<TResult>> terminal, CancellationToken ct) where TEvent : IEvent => inner.WaterfallAsync(value, terminal, ct);

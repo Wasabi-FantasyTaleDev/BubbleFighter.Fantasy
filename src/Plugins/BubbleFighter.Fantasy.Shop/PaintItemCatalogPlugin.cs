@@ -24,7 +24,7 @@ public sealed class PaintItemCatalogOptions
 }
 
 /// <summary>Publishes fixed spray colors independently of shop opens or purchase persistence.</summary>
-[Plugin("inventory.paint-catalog", Description = "Native fixed-color spray definitions for shared inventory use.",
+[Plugin("inventory.paint-catalog", Category = "items", Names = ["en=Paint catalog", "zh-Hans=涂装目录", "zh-Hant=塗裝目錄", "ko=페인트 목록"], Description = "Native fixed-color spray definitions for shared inventory use.",
     Requires = [typeof(IClientDataStore)], Provides = [typeof(IPaintItemCatalog)])]
 public sealed class PaintItemCatalogPlugin : IPlugin
 {
@@ -34,7 +34,7 @@ public sealed class PaintItemCatalogPlugin : IPlugin
         cancellationToken.ThrowIfCancellationRequested();
         var options = context.Config.Bind<PaintItemCatalogOptions>();
         var data = context.Services.Get<IClientDataStore>();
-        var workbook = WorkbookFile.FromBytes(options.ShopItemClientPath, data.Read(options.ShopItemClientPath));
+        var workbook = WorkbookFile.FromStore(data, options.ShopItemClientPath);
         var rows = SpreadsheetWorkbook.Load(
             workbook, options.MaxShopItemBytes, ShopCatalogLoader.LimitKey, ["ShopItem"])["ShopItem"];
         var catalog = PaintItemCatalog.Parse(rows, options.MaxPaintItems);

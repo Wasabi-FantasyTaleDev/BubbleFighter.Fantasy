@@ -85,6 +85,29 @@ public sealed class PluginTransitionTests
         public async ValueTask ActivateAsync(IPluginContext context, CancellationToken ct)
         { await Begin(context, ct); context.Services.RegisterDecoratable<IA>(new Value(States[context.Row.Id])); }
     }
+    public interface ITable { int Count { get; } }
+    private sealed record Table(int Count) : ITable;
+    [Plugin("transition.table", OptionalMany = [typeof(IA)], Provides = [typeof(ITable)])]
+    public sealed class Tabulator : IPlugin
+    {
+        public async ValueTask ActivateAsync(IPluginContext context, CancellationToken ct)
+        { var count = context.Services.GetAll<IA>().Count; await Begin(context, ct); context.Services.Register<ITable>(new Table(count)); }
+    }
+    [Plugin("transition.table-user", Requires = [typeof(ITable)])]
+    public sealed class TableUser : IPlugin
+    {
+        public ValueTask ActivateAsync(IPluginContext context, CancellationToken ct)
+        { States[context.Row.Id].Observed = context.Services.Get<ITable>().Count; return Begin(context, ct); }
+    }
+    [Plugin("transition.reader", OptionalMany = [typeof(IA)])]
+    public sealed class Reader : IPlugin
+    {
+        public ValueTask ActivateAsync(IPluginContext context, CancellationToken ct)
+        { States[context.Row.Id].Many = context.Services.GetAll<IA>(); return Begin(context, ct); }
+    }
+    [Plugin("transition.live", LiveMany = [typeof(IA)])]
+    public sealed class LiveReader : IPlugin
+    { public ValueTask ActivateAsync(IPluginContext context, CancellationToken ct) => Begin(context, ct); }
     private sealed record Inverted(IA Inner) : IA { public bool Alive => !Inner.Alive; }
     [Plugin("transition.layer", Decorates = [typeof(IA)])]
     public sealed class Decorator : IPlugin
@@ -159,6 +182,151 @@ public sealed class PluginTransitionTests
         Assert.Null(h[0].Seen);
         Assert.Equal(3, h[0].Starts);
         Assert.Equal(1, h[2].Starts);
+    }
+
+    [Fact]
+    public async Task OnDemandRowSleepsUntilItIsAskedForAndSleepsAgainWhenReleased()
+    {
+        await using var h = new Harness(["transition.d"], ("transition.d", false), ("transition.a", false));
+        await h.Host.StartAsync(default);
+        var asleep = h.Host.Instances.Single(info => info.RowId == h.Rows[0].Id);
+        Assert.Equal(0, h[0].Starts);
+        Assert.Equal(PluginState.Unloaded, asleep.State);
+        Assert.True(asleep.IsSleeping);
+        Assert.Equal("group", asleep.ActivationGroup);
+        Assert.False(h.Host.Instances.Single(info => info.RowId == h.Rows[1].Id).IsSleeping);
+        Assert.False((asleep with { IsDisabled = true }).IsSleeping);
+
+        // A configuration pass with the same rows is not a request for the row.
+        await h.Host.ReconcileConfigurationAsync(h.Rows).AsTask().WaitAsync(Limit);
+        Assert.Equal(0, h[0].Starts);
+
+        await h.Request(0, true).WaitAsync().AsTask().WaitAsync(Limit);
+        Assert.Equal(PluginState.Active, h.Status(0));
+        Assert.False(h.Host.Instances.Single(info => info.RowId == h.Rows[0].Id).IsSleeping);
+        Assert.Equal(1, h[0].Starts);
+
+        await h.Request(0, false).WaitAsync().AsTask().WaitAsync(Limit);
+        Assert.True(h.Host.Instances.Single(info => info.RowId == h.Rows[0].Id).IsSleeping);
+        Assert.Equal(1, h[1].Starts);
+    }
+
+    [Fact]
+    public async Task RowsRequestedTogetherStartOnceInProviderOrderAndStopInReverse()
+    {
+        // Listed consumers first, so a request per row would start a consumer before its provider and restart it.
+        string[] group = ["transition.optional", "transition.c", "transition.b", "transition.a"];
+        await using var h = new Harness(group, ("transition.optional", false), ("transition.c", false), ("transition.b", false), ("transition.a", false), ("transition.d", false));
+        var stopped = new ConcurrentQueue<int>();
+        foreach (var index in new[] { 1, 2, 3 })
+            h[index].Stop = _ => { stopped.Enqueue(index); return ValueTask.CompletedTask; };
+        await h.Host.StartAsync(default);
+        var ids = h.Rows.Take(4).Select(row => row.Id).ToArray();
+        Assert.All(Enumerable.Range(0, 4), index => Assert.Equal(0, h[index].Starts));
+
+        var wake = await h.Host.RequestStates(ids, true).WaitAsync().AsTask().WaitAsync(Limit);
+        Assert.Equal(PluginTransitionOutcome.Converged, wake.Outcome);
+        Assert.Equal(ids.Order(), wake.ChangedRowIds.Order());
+        Assert.All(h.Host.Instances, info => Assert.Equal(PluginState.Active, info.State));
+        Assert.All(Enumerable.Range(0, 4), index => Assert.Equal(1, h[index].Starts));
+        Assert.NotNull(h[0].Seen);
+
+        var sleep = await h.Host.RequestStates(ids, false).WaitAsync().AsTask().WaitAsync(Limit);
+        Assert.Equal(PluginTransitionOutcome.Converged, sleep.Outcome);
+        Assert.Equal(new[] { 1, 2, 3 }, stopped.ToArray());
+        Assert.All(h.Host.Instances.Where(info => ids.Contains(info.RowId)), info => Assert.True(info.IsSleeping));
+        Assert.All(Enumerable.Range(0, 5), index => Assert.Equal(1, h[index].Starts));
+        Assert.Equal(0, h.Host.PendingIntentCount);
+        Assert.Throws<ArgumentException>(() => h.Host.RequestStates([], true));
+    }
+
+    [Fact]
+    public async Task RowsRequestedTogetherWaitForALiveRowThatReadsWhatTheSetProvides()
+    {
+        // The table is live and built from the providers it saw. Its user is listed before the new provider and its
+        // requirement is already met, but the table it would get is about to be rebuilt.
+        await using var h = new Harness(["transition.table-user", "transition.many"],
+            ("transition.table", false), ("transition.table-user", false), ("transition.many", false), ("transition.d", false));
+        await h.Host.StartAsync(default);
+        Assert.Equal(1, h[0].Starts);
+
+        var ids = new[] { h.Rows[1].Id, h.Rows[2].Id };
+        var wake = await h.Host.RequestStates(ids, true).WaitAsync().AsTask().WaitAsync(Limit);
+        Assert.Equal(PluginTransitionOutcome.Converged, wake.Outcome);
+        Assert.All(h.Host.Instances, info => Assert.Equal(PluginState.Active, info.State));
+        Assert.Equal(2, h[0].Starts);
+        Assert.Equal(1, h[1].Starts);
+        Assert.Equal(1, h[1].Observed);
+        Assert.Equal(1, h[2].Starts);
+        Assert.Equal(1, h[3].Starts);
+
+        var sleep = await h.Host.RequestStates(ids, false).WaitAsync().AsTask().WaitAsync(Limit);
+        Assert.Equal(PluginTransitionOutcome.Converged, sleep.Outcome);
+        Assert.Equal(3, h[0].Starts);
+        Assert.Equal(1, h[1].Starts);
+        Assert.Equal(1, h[3].Starts);
+    }
+
+    [Fact]
+    public async Task OnDemandGroupsDoNotSeeEachOtherAndARowOfNoGroupSeesBoth()
+    {
+        await using var h = Harness.Grouped(("transition.reader", "one"), ("transition.many", "one"),
+            ("transition.many", "two"), ("transition.reader", "two"), ("transition.reader", null));
+        await h.Host.StartAsync(default);
+        Assert.Empty(h[4].Many);
+        Assert.Equal(1, h[4].Starts);
+
+        var one = new[] { h.Rows[0].Id, h.Rows[1].Id };
+        var two = new[] { h.Rows[2].Id, h.Rows[3].Id };
+        await h.Host.RequestStates(one, true).WaitAsync().AsTask().WaitAsync(Limit);
+        Assert.Single(h[0].Many);
+        Assert.Single(h[4].Many);
+        Assert.Equal(2, h[4].Starts);
+
+        // The second group loads beside the first: the first group's reader keeps its view and is not restarted.
+        await h.Host.RequestStates(two, true).WaitAsync().AsTask().WaitAsync(Limit);
+        Assert.All(h.Host.Instances, info => Assert.Equal(PluginState.Active, info.State));
+        Assert.Equal(1, h[0].Starts);
+        Assert.Single(h[0].Many);
+        Assert.Equal(1, h[3].Starts);
+        Assert.Same(h[2].Context, ((Value)Assert.Single(h[3].Many)).State.Context);
+        Assert.Equal(2, h[4].Many.Count);
+        Assert.Equal(3, h[4].Starts);
+
+        await h.Host.RequestStates(one, false).WaitAsync().AsTask().WaitAsync(Limit);
+        Assert.Equal(1, h[3].Starts);
+        Assert.Equal(1, h[2].Starts);
+        Assert.Single(h[4].Many);
+        Assert.Equal(4, h[4].Starts);
+    }
+
+    [Fact]
+    public async Task ALiveReadFollowsProvidersWithoutRestartingItsReader()
+    {
+        await using var h = Harness.Grouped(("transition.live", null), ("transition.many", "one"), ("transition.many", "two"),
+            ("transition.live", "one"));
+        await h.Host.StartAsync(default);
+        var shared = h[0].Context!.Services;
+        Assert.Empty(shared.GetAll<IA>());
+
+        var one = new[] { h.Rows[1].Id, h.Rows[3].Id };
+        var two = new[] { h.Rows[2].Id };
+        await h.Host.RequestStates(one, true).WaitAsync().AsTask().WaitAsync(Limit);
+        Assert.Same(h[1].Context, ((Value)Assert.Single(shared.GetAll<IA>())).State.Context);
+        await h.Host.RequestStates(two, true).WaitAsync().AsTask().WaitAsync(Limit);
+        Assert.Equal(2, shared.GetAll<IA>().Count);
+        // A live read obeys the rule a committed view does: an on-demand group does not see another one.
+        Assert.Same(h[1].Context, ((Value)Assert.Single(h[3].Context!.Services.GetAll<IA>())).State.Context);
+
+        await h.Host.RequestStates(one, false).WaitAsync().AsTask().WaitAsync(Limit);
+        Assert.Same(h[2].Context, ((Value)Assert.Single(shared.GetAll<IA>())).State.Context);
+        await h.Host.RequestStates(two, false).WaitAsync().AsTask().WaitAsync(Limit);
+        Assert.Empty(shared.GetAll<IA>());
+
+        // Four loads and unloads passed and the reader of no group was activated once, with the registry it began with.
+        Assert.Equal(1, h[0].Starts);
+        Assert.Same(shared, h[0].Context!.Services);
+        Assert.Equal(1, h[3].Starts);
     }
 
     [Fact]
@@ -1177,9 +1345,20 @@ public sealed class PluginTransitionTests
         internal readonly PluginHost Host;
         internal Harness(params (string Plugin, bool Disabled)[] rows) : this(10000, rows) { }
         internal Harness(int timeout, params (string Plugin, bool Disabled)[] rows) : this(timeout, 32, rows) { }
-        internal Harness(int timeout, int attempts, params (string Plugin, bool Disabled)[] rows)
+        internal Harness(int timeout, int attempts, params (string Plugin, bool Disabled)[] rows) : this(timeout, attempts, [], rows) { }
+        /// <summary>Rows whose plugin id is in <paramref name="onDemand"/> start only when asked for.</summary>
+        internal Harness(string[] onDemand, params (string Plugin, bool Disabled)[] rows) : this(10000, 32, onDemand, rows) { }
+        /// <summary>Rows with a group load on demand as members of that group; a row without one starts with the host.</summary>
+        internal static Harness Grouped(params (string Plugin, string? Group)[] rows) => new(rows);
+        private Harness((string Plugin, string? Group)[] rows)
         {
-            Rows = rows.Select(row => new PluginRow { Id = Guid.NewGuid().ToString("N"), Plugin = row.Plugin, Disabled = row.Disabled, Source = "test", Lifecycle = new() { TeardownTimeoutMs = timeout, ReconcileAttemptLimit = attempts } }).ToArray();
+            Rows = rows.Select(row => new PluginRow { Id = Guid.NewGuid().ToString("N"), Plugin = row.Plugin, Source = "test", Activation = row.Group is null ? PluginActivation.Default : PluginActivation.OnDemand, ActivationGroup = row.Group, Lifecycle = new() { TeardownTimeoutMs = 10000, ReconcileAttemptLimit = 32 } }).ToArray();
+            foreach (var row in Rows) States[row.Id] = new();
+            Host = new(Rows, PluginCatalog.ScanAssemblies([typeof(PluginTransitionTests).Assembly]), NullLoggerFactory.Instance);
+        }
+        private Harness(int timeout, int attempts, string[] onDemand, (string Plugin, bool Disabled)[] rows)
+        {
+            Rows = rows.Select(row => new PluginRow { Id = Guid.NewGuid().ToString("N"), Plugin = row.Plugin, Disabled = row.Disabled, Source = "test", Activation = onDemand.Contains(row.Plugin) ? PluginActivation.OnDemand : PluginActivation.Default, ActivationGroup = onDemand.Contains(row.Plugin) ? "group" : null, Lifecycle = new() { TeardownTimeoutMs = timeout, ReconcileAttemptLimit = attempts } }).ToArray();
             foreach (var row in Rows) States[row.Id] = new();
             Host = new(Rows, PluginCatalog.ScanAssemblies([typeof(PluginTransitionTests).Assembly]), NullLoggerFactory.Instance);
         }

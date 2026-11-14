@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Net;
 using System.Net.Sockets;
 using System.ComponentModel.DataAnnotations;
@@ -61,6 +62,133 @@ public sealed class TcpConnectionTests
             KeepAliveIntervalSeconds = interval, KeepAliveRetryCount = retries,
         };
         Assert.False(Validator.TryValidateObject(options, new ValidationContext(options), [], validateAllProperties: true));
+    }
+
+    private static async Task<(Socket Client, Socket Server)> ConnectAsync()
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var accept = listener.AcceptSocketAsync();
+        var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        await client.ConnectAsync((IPEndPoint)listener.LocalEndpoint);
+        return (client, await accept);
+    }
+
+    /// <summary>
+    /// Bytes nobody asked for stay in the operating system's socket buffer, where the peer's own send window
+    /// bounds them. The connection must not pull them into a buffer of its own ahead of the protocol.
+    /// </summary>
+    [Fact]
+    public async Task BytesStayInTheSocketUntilTheProtocolReads()
+    {
+        var (client, server) = await ConnectAsync();
+        using var _ = client;
+        var connection = new TcpConnection(3, server, noDelay: true);
+        try
+        {
+            await client.SendAsync(new byte[] { 1, 2, 3 });
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+            while (server.Available != 3 && DateTime.UtcNow < deadline)
+                await Task.Delay(20);
+            await Task.Delay(100);
+            Assert.Equal(3, server.Available);
+
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var result = await connection.Input.ReadAsync(timeout.Token);
+            Assert.Equal(new byte[] { 1, 2, 3 }, result.Buffer.ToArray());
+            connection.Input.AdvanceTo(result.Buffer.End);
+        }
+        finally { await connection.CloseAsync("test complete"); }
+    }
+
+    /// <summary>A megabyte sent in uneven pieces arrives complete and in order.</summary>
+    [Fact]
+    public async Task ALargeTransferArrivesCompleteAndInOrder()
+    {
+        var (client, server) = await ConnectAsync();
+        using var _ = client;
+        var connection = new TcpConnection(4, server, noDelay: true);
+        try
+        {
+            var sent = new byte[1024 * 1024];
+            new Random(20261111).NextBytes(sent);
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var sending = Task.Run(async () =>
+            {
+                for (var offset = 0; offset < sent.Length;)
+                {
+                    var count = Math.Min(sent.Length - offset, 1 + offset % 7919);
+                    offset += await client.SendAsync(sent.AsMemory(offset, count), timeout.Token);
+                }
+            });
+            var received = new byte[sent.Length];
+            for (var filled = 0; filled < received.Length;)
+            {
+                var result = await connection.Input.ReadAsync(timeout.Token);
+                Assert.False(result.IsCompleted && result.Buffer.IsEmpty, $"the stream ended after {filled} bytes");
+                result.Buffer.CopyTo(received.AsSpan(filled));
+                filled += (int)result.Buffer.Length;
+                connection.Input.AdvanceTo(result.Buffer.End);
+            }
+            await sending;
+            Assert.True(sent.AsSpan().SequenceEqual(received));
+        }
+        finally { await connection.CloseAsync("test complete"); }
+    }
+
+    /// <summary>The peer closing its side completes the input after the bytes it sent.</summary>
+    [Fact]
+    public async Task PeerCloseCompletesTheInputAfterItsLastBytes()
+    {
+        var (client, server) = await ConnectAsync();
+        var connection = new TcpConnection(5, server, noDelay: true);
+        try
+        {
+            await client.SendAsync(new byte[] { 9, 8 });
+            client.Shutdown(SocketShutdown.Send);
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var seen = 0;
+            while (true)
+            {
+                var result = await connection.Input.ReadAsync(timeout.Token);
+                seen += (int)result.Buffer.Length;
+                connection.Input.AdvanceTo(result.Buffer.End);
+                if (result.IsCompleted)
+                    break;
+            }
+            Assert.Equal(2, seen);
+        }
+        finally
+        {
+            await connection.CloseAsync("test complete");
+            client.Dispose();
+        }
+    }
+
+    /// <summary>Closing the connection releases a read that is waiting for the peer.</summary>
+    [Fact]
+    public async Task ClosingReleasesAPendingRead()
+    {
+        var (client, server) = await ConnectAsync();
+        using var _ = client;
+        var connection = new TcpConnection(6, server, noDelay: true);
+        var pending = connection.Input.ReadAsync().AsTask();
+        await Task.Delay(100);
+        Assert.False(pending.IsCompleted);
+
+        await connection.CloseAsync("test close");
+        var finished = await Task.WhenAny(pending, Task.Delay(TimeSpan.FromSeconds(5)));
+        Assert.Same(pending, finished);
+        // Cancelled, completed or failed are all acceptable ends; waiting forever is not.
+        try
+        {
+            var result = await pending;
+            Assert.True(result.IsCanceled || result.IsCompleted);
+        }
+        catch (Exception error) when (error is IOException or ObjectDisposedException or OperationCanceledException)
+        {
+        }
+        Assert.Equal("test close", connection.CloseReason);
     }
 
     [Fact]

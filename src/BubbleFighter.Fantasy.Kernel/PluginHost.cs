@@ -141,6 +141,18 @@ public sealed partial class PluginHost : IPluginHost
         InitializeBindingReconciliation();
     }
 
+    /// <summary>
+    /// Announces that the startup configuration converged with every enabled row active, by raising
+    /// <see cref="StartupConvergedEvent"/> once. The server command calls it before it compacts the heap, so data that
+    /// rows kept only for the start is already released when it does.
+    /// </summary>
+    public void MarkConverged()
+    {
+        if (Interlocked.Exchange(ref _converged, 1) == 0) _events.Emit(new StartupConvergedEvent());
+    }
+
+    private int _converged;
+
     /// <summary>Marks the host ready once its startup configuration converged with every enabled row active.</summary>
     /// <remarks>Called by the server command after startup; rows that admit new players read <see cref="IHostReadiness"/>.</remarks>
     public void MarkReady()
@@ -197,7 +209,7 @@ public sealed partial class PluginHost : IPluginHost
                 catch (Exception ex) { cleanupErrors.Add(ex); }
             }
             lock (_intentGate)
-                _desiredRows.IntersectWith(previous.Concat(_pendingIntents.Values.Where(request => request.Enabled).Select(request => request.RowId)));
+                _desiredRows.IntersectWith(previous.Concat(_pendingIntents.Values.Where(request => request.Enabled).SelectMany(request => request.Roots)));
             if (cleanupErrors.Count > 0)
                 throw new AggregateException("Startup and rollback did not complete cleanly.", new[] { activationError }.Concat(cleanupErrors));
             throw;
@@ -268,7 +280,11 @@ public sealed partial class PluginHost : IPluginHost
     private async ValueTask StartCoreAsync(CancellationToken ct)
     {
         RefuseUnsettledActivations();
-        var pending = _rows.Where(r => !r.Disabled && !_live.Any(live => live.Row.Id == r.Id)).ToList();
+        // An on-demand row starts only once it was requested; until then it is neither pending nor a boot failure.
+        HashSet<string> requested;
+        lock (_intentGate) requested = _desiredRows.ToHashSet(StringComparer.Ordinal);
+        var pending = _rows.Where(r => !r.Disabled && (r.Activation != PluginActivation.OnDemand || requested.Contains(r.Id)) &&
+            !_live.Any(live => live.Row.Id == r.Id)).ToList();
         // A row that reserves definition sources (loader.process, loader.wasm) publishes plugins only once it is active,
         // so at startup a row bound to such a plugin waits as Pending, with its reason, until the source publishes it.
         var sourcesDeclared = pending.Any(r => r.Lifecycle.DefinitionSourceReserve > 0);
@@ -442,12 +458,16 @@ public sealed partial class PluginHost : IPluginHost
         // Instances of one definition are symmetric peers (one per client build in a multi-build
         // server); waiting for a sibling would always deadlock, so optional waits skip them.
         // A row whose definition is not yet published advertises nothing until its source publishes it.
-        return pending.Where(row => row.Id != consumer.Id && row.Plugin != consumer.Plugin && DefinitionFor(row) is { } provider &&
+        return pending.Where(row => row.Id != consumer.Id && row.Plugin != consumer.Plugin && !IsHiddenFrom(row, consumer) && DefinitionFor(row) is { } provider &&
             (AdvertisedServices(provider).Select(ScopeFor(row).Resolve).Any(dependencies.Contains) ||
              Metadata(provider).Decorates.Select(ScopeFor(row).Resolve).Any(projected.Contains))).Select(row => row.Id);
     }
+    // The row form of ServiceActivation.IsHiddenFrom, for rows that are not active yet.
+    private static bool IsHiddenFrom(PluginRow provider, PluginRow consumer) =>
+        ServiceActivation.IsHidden(provider.Activation == PluginActivation.OnDemand, provider.ActivationGroup, consumer.ActivationGroup);
+    // Read-only: scheduling reads declarations in loops over row pairs. Paths that hand the arrays on use Declaration.
     private static PluginAttribute Metadata(PluginDescriptor descriptor) =>
-        descriptor.Declaration;
+        descriptor.ReadOnlyDeclaration;
 
     private static IEnumerable<Type> AdvertisedServices(PluginDescriptor descriptor)
     {
@@ -462,7 +482,7 @@ public sealed partial class PluginHost : IPluginHost
         var scope = context.NativeServices!.Scope;
         var published = AdvertisedServices(descriptor).Select(scope.Resolve).ToHashSet();
         var decorated = attribute.Decorates.Select(scope.Resolve).ToHashSet();
-        var consumers = _live.Where(live => live.Row.Id != row.Id && live.Row.Plugin != row.Plugin && live.Context.NativeServices!.Access is { } access &&
+        var consumers = _live.Where(live => live.Row.Id != row.Id && live.Row.Plugin != row.Plugin && !IsHiddenFrom(row, live.Row) && live.Context.NativeServices!.Access is { } access &&
             access.View.Selections.Values.Any(selection => published.Contains(selection.Key) ||
                 (decorated.Contains(selection.Key) && access.ReadsProjection(selection.Key.Contract))))
             .Select(live => live.Row.Id).ToArray();
@@ -493,7 +513,7 @@ public sealed partial class PluginHost : IPluginHost
         string? reloadKey = reload ? descriptor.CoordinationKey : null;
         bool reloadClaimed = false;
         var logger = _loggerFactory.CreateLogger($"plugin:{row.Id}");
-        var attribute = Metadata(descriptor);
+        var attribute = descriptor.Declaration;
         var context = new PluginContext(row, _registry, _events, logger, attribute.Overrides, captureSnapshot: false, ScopeFor(row));
         _registry.StageOwner(context.NativeServices!.Activation);
         lock (_info) _activationGenerations[row.Id] = context.NativeServices!.Activation.Generation;
@@ -555,7 +575,7 @@ public sealed partial class PluginHost : IPluginHost
                 reloadClaimed = false;
                 _modules.CompleteReload(reloadSlot2, success: true);
             }
-            attribute = Metadata(descriptor);
+            attribute = descriptor.Declaration;
             ValidateReservedDescriptor(row, descriptor);
             ValidateCompatibility(row, descriptor, attribute);
             requiredRows = RequiredEntryRows(row, attribute);
@@ -658,12 +678,17 @@ public sealed partial class PluginHost : IPluginHost
         new(row.Id, row.Plugin, row.Source, state, error)
         {
             CodeRefreshPolicy = row.Lifecycle.CodeRefreshPolicy,
+            Activation = row.Activation,
+            ActivationGroup = row.ActivationGroup,
+            IsDisabled = row.Disabled,
             CodeLifetime = descriptor?.ModuleCode?.Lifetime ?? PluginCodeLifetime.Unknown,
             Version = descriptor?.Version,
             Description = descriptor?.Description,
+            DisplayNames = descriptor?.DisplayNames ?? new Dictionary<string, string>(),
+            Category = descriptor?.Category,
             ContractVersions = descriptor?.ContractVersions ?? new Dictionary<string, string>(),
             SupportedBuilds = descriptor?.SupportedBuilds ?? [],
-            Overrides = descriptor is null ? [] : Metadata(descriptor).Overrides,
+            Overrides = descriptor is null ? [] : descriptor.Declaration.Overrides,
         };
 
     private void EnterTransition(CancellationToken ct)

@@ -16,16 +16,30 @@ internal sealed partial class RoundFlow
     {
         if (_registry.TryGet(session.Id) is not { } room)
             return;
-        int? finalZoneGeneration = IsFinalZoneMode(room) ? room.StartGeneration : null;
+        BnBParticipantStamp? bnbParticipant;
+        lock (room.Gate)
+        {
+            bnbParticipant = IsBnBMode(room) ? CaptureBnBParticipant(room, session, gameOnly: false) : null;
+            if (IsBnBMode(room) && bnbParticipant is null) return;
+        }
+        FinalZoneRoundState? finalZoneState;
+        lock (room.Gate)
+        {
+            finalZoneState = IsFinalZoneMode(room) ? room.FinalZone : null;
+            if (IsFinalZoneMode(room) && finalZoneState is null) return;
+        }
+        int? finalZoneGeneration = finalZoneState?.Generation;
         int? scriptZombieGeneration;
         lock (room.Gate) scriptZombieGeneration = (_options.ScriptZombies || _options.GhostZombies || ZombieEscapeEnabled) ? room.StartGeneration : null;
-        await room.Executor.ExecuteAsync(async operationCt =>
+        await ExecuteFinalZoneGuardedAsync(room, finalZoneState, async operationCt =>
         {
             RoundScoreUpdated? update = null;
             lock (room.Gate)
             {
                 if (room.Phase != RoomPhase.Playing || (!UsesNativeLife(room) && !_options.ZombiePvpModeIds.Contains(room.ModeId)))
                     return;
+                if (bnbParticipant is not null ? !BnBParticipantIsCurrent(room, bnbParticipant) : IsBnBMode(room)) return;
+                if (finalZoneState is not null ? !ReferenceEquals(room.FinalZone, finalZoneState) : IsFinalZoneMode(room)) return;
                 if (finalZoneGeneration is { } generation && !FinalZoneReportIsCurrent(room, session, generation)) return;
                 if (IsScriptZombieMode(room) && (scriptZombieGeneration is not { } zombieGeneration
                     || !ScriptZombieReportIsCurrent(room, session, zombieGeneration))) return;
@@ -83,6 +97,9 @@ internal sealed partial class RoundFlow
                     case RoundLifeEvent.ResetConfirmed when RespawnIsDisabled(room):
                         ignored = LifeCheck.ResetConfirmedWhileRespawnDisabled;
                         break;
+                    case RoundLifeEvent.ResetConfirmed when IsBnBMode(room) || actor.Life.ActorRemovalSent:
+                        ignored = LifeCheck.ResetConfirmedWithoutGrant;
+                        break;
                     // The confirmation must come on the match link the reset was granted on.
                     case RoundLifeEvent.ResetConfirmed when actor.Life.ConfirmsGrant(session):
                         actor.Life.Revive();
@@ -98,10 +115,14 @@ internal sealed partial class RoundFlow
                 }
                 if (ignored is { } check)
                     Observe(room, sender, report, check);
+                // A death no kill credit names (a fall, an expired bubble) still counts for the WeaponMaster re-roll.
+                if (ignored is null) NoteWeaponMasterDeath(room, actor.Slot);
             }
             await ReplaceDepartedCaptainsAsync(room, operationCt).ConfigureAwait(false);
             if (update is not null)
                 await SendScoreAsync(room, update, operationCt).ConfigureAwait(false);
+            else
+                await PublishWeaponMasterAsync(room, operationCt).ConfigureAwait(false);
             if (_options.ZombiePvpModeIds.Contains(room.ModeId))
                 await ZombiePvpOutcomeAsync(room, operationCt).ConfigureAwait(false);
             await SynchronizeFinalZoneAsync(room, operationCt).ConfigureAwait(false);

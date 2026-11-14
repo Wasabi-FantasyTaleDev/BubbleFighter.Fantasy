@@ -143,8 +143,8 @@ onBeforeUnmount(() => { if (trigger?.isConnected) trigger.focus() })
 .room-open { display:grid; place-items:center; width:32px; height:32px; padding:0; border:0; border-radius:var(--radius-xs); background:transparent; color:var(--text-muted); cursor:pointer; transition:background-color 160ms,color 160ms; }
 .room-open:hover { color:var(--text); background:var(--hover); }
 .room-open:focus-visible { outline:2px solid var(--accent-ring); outline-offset:1px; }
-.room-drawer-overlay { position:fixed; inset:0; z-index:1000; display:flex; justify-content:flex-end; background:rgb(0 0 0 / .22); }
-.room-drawer-panel { display:flex; flex-direction:column; width:min(420px,100%); height:100dvh; min-width:0; background:var(--surface); box-shadow:var(--shadow-lg); }
+.room-drawer-overlay { position:fixed; inset:0; z-index:1000; display:flex; justify-content:flex-end; background:rgb(15 23 42 / .28); backdrop-filter:blur(6px); }
+.room-drawer-panel { display:flex; flex-direction:column; width:min(440px,100%); height:100dvh; min-width:0; background:var(--surface); box-shadow:-24px 0 60px rgb(15 23 42 / .18); overflow:hidden; }
 .room-drawer-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding:24px; border-bottom:1px solid var(--border-soft); flex:none; }
 .room-drawer-heading > div { min-width:0; }
 .room-heading-title { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin-top:8px; }
@@ -172,9 +172,9 @@ onBeforeUnmount(() => { if (trigger?.isConnected) trigger.focus() })
 .room-player-tags :deep(.noah-tag) { padding:5px 9px; line-height:1.2; }
 .room-player-empty { font-size:var(--text-control); line-height:1.8; }
 .room-drawer-footer { display:flex; justify-content:flex-end; flex:none; padding:16px 24px; border-top:1px solid var(--border-soft); }
-.room-drawer-enter-active, .room-drawer-leave-active { transition:background-color 240ms; }
-.room-drawer-enter-active .room-drawer-panel, .room-drawer-leave-active .room-drawer-panel { transition:transform 240ms cubic-bezier(.2,.8,.2,1); }
-.room-drawer-enter-from, .room-drawer-leave-to { background:transparent; }
+.room-drawer-enter-active, .room-drawer-leave-active { transition:background-color 260ms, backdrop-filter 260ms; }
+.room-drawer-enter-active .room-drawer-panel, .room-drawer-leave-active .room-drawer-panel { transition:transform 320ms cubic-bezier(.16,1,.3,1); }
+.room-drawer-enter-from, .room-drawer-leave-to { background:transparent; backdrop-filter:blur(0); }
 .room-drawer-enter-from .room-drawer-panel, .room-drawer-leave-to .room-drawer-panel { transform:translateX(100%); }
 @media(min-width:861px) {
   :global(.shell:has(.rooms-page)) { height:100dvh; min-height:640px; }

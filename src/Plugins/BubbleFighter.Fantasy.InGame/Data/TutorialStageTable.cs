@@ -20,7 +20,11 @@ internal static class TutorialStageTable
     /// <summary>Reads the stage numbers and gifts from <paramref name="store"/>.</summary>
     /// <param name="store">The build's client data.</param>
     /// <returns>Stage numbers and gifts by map key, compared without regard to case.</returns>
-    internal static TutorialStages Load(IClientDataStore store)
+    internal static TutorialStages Load(IClientDataStore store) =>
+        // The few numbers come out of the whole map table; a store with compiled client data keeps just them.
+        CompiledClientData.Load(store, CompiledTutorialStages.Instance, "", Build);
+
+    private static TutorialStages Build(IClientDataStore store)
     {
         var meta = MapMetaTable.Parse(store.Read(MapMetaTable.Path));
         var stages = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -35,5 +39,32 @@ internal static class TutorialStageTable
                 gifts[map] = gift;
         }
         return new TutorialStages(stages, gifts);
+    }
+}
+
+/// <summary>
+/// The tutorial stages in the build's compiled client data: the stage numbers, then the gifts, each as a count and
+/// its map keys with their numbers in ordinal key order. Keys keep their letter case and compare without it.
+/// </summary>
+internal static class CompiledTutorialStages
+{
+    internal static readonly ICompiledCatalog<TutorialStages> Instance =
+        new PackedCatalog<TutorialStages, KeyValuePair<string, int>[][]>("tutorial-stages",
+            stages => [Pairs(stages.Numbers), Pairs(stages.Gifts)],
+            packed => packed.Length == 2 ? new TutorialStages(Table(packed[0]), Table(packed[1]))
+                : throw new InvalidDataException("The compiled tutorial stages are not two tables."));
+
+    private static KeyValuePair<string, int>[] Pairs(IReadOnlyDictionary<string, int> table) =>
+        table.OrderBy(pair => pair.Key, StringComparer.Ordinal).ToArray();
+
+    private static Dictionary<string, int> Table(KeyValuePair<string, int>[]? pairs)
+    {
+        if (pairs is null)
+            throw new InvalidDataException("The compiled tutorial stages lack a table.");
+        var table = new Dictionary<string, int>(pairs.Length, StringComparer.OrdinalIgnoreCase);
+        foreach (var (map, number) in pairs)
+            if (map is null || !table.TryAdd(map, number))
+                throw new InvalidDataException($"The compiled tutorial stages repeat or lack a map key ('{map}').");
+        return table;
     }
 }

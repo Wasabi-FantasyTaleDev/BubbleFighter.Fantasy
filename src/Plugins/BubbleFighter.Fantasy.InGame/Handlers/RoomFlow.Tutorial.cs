@@ -36,6 +36,7 @@ internal sealed partial class RoomFlow
             equipment.ItemIds ?? [equipment.CharacterId], request.Team, _options?.StartTimerMs ?? 0, request.TimeLimitMs, true)
         {
             GameConnectionOnly = true,
+            ItemAttributes = equipment.ItemAttributes ?? [],
         };
         await tutorials.OpenAsync(session, admission, ct).ConfigureAwait(false);
         try

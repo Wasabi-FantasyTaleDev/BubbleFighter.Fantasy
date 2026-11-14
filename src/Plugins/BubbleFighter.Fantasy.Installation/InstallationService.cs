@@ -41,6 +41,7 @@ internal sealed class InstallationService : IInstallationService, IAdminAccessCo
     private InstallationDocument? _document;
     private string _phase = "language";
     private string? _error;
+    private string? _errorDetail;
     private bool _running;
     private readonly Dictionary<IPAddress, LoginWindow> _loginWindows = new();
     private sealed record LoginWindow(long Started, int Failures);
@@ -72,7 +73,7 @@ internal sealed class InstallationService : IInstallationService, IAdminAccessCo
                 _document?.Settings.Language ?? "en", _document?.Settings.ServerName ?? "Bubble Fighter Fantasy",
                 _document?.Settings.Profile, _document?.OperationId, _error, _runtime.Profiles, DefaultSqlitePath,
                 _document is { } document && HasDeferredClients(document.Settings))
-            { ImportLimits = new(_options.ClientDataUploadBytes, _options.ClientDataFileLimit) };
+            { ImportLimits = new(_options.ClientDataUploadBytes, _options.ClientDataFileLimit), ErrorDetail = _errorDetail };
         }
     }
 
@@ -135,6 +136,17 @@ internal sealed class InstallationService : IInstallationService, IAdminAccessCo
         finally { _database.Release(); }
     }
 
+    /// <summary>Reports what the selected database already holds, under the same lock and time bound as a probe.</summary>
+    /// <exception cref="InvalidOperationException">Thrown while another database operation runs or the database fails (<c>database_failed</c>).</exception>
+    public async ValueTask<InstallationDatabaseContents?> InspectDatabaseAsync(InstallationSettings settings, CancellationToken cancellationToken)
+    {
+        settings = Normalize(settings);
+        Validate(settings);
+        if (!await _database.WaitAsync(0, cancellationToken).ConfigureAwait(false)) throw new InvalidOperationException("operation_busy");
+        try { return await WithDatabaseAsync(settings, (provider, token) => provider.InspectAsync(settings, token), cancellationToken).ConfigureAwait(false); }
+        finally { _database.Release(); }
+    }
+
     /// <summary>
     /// Claims the administrator identity with its credentials and settings and starts the apply
     /// operation. Repeating the claim's own operation id is idempotent; a different id after a claim
@@ -162,7 +174,7 @@ internal sealed class InstallationService : IInstallationService, IAdminAccessCo
             var username = request.Username?.Trim().Normalize(NormalizationForm.FormC) ?? "";
             if (request.OperationId == Guid.Empty || username.Length is < 3 or > 64 ||
                 username.EnumerateRunes().Any(c => !Rune.IsLetterOrDigit(c) && c.Value is not ('.' or '_' or '-')) ||
-                request.Password is not { Length: >= 12 and <= 256 })
+                request.Password is not { Length: >= 6 and <= 256 })
                 throw new ArgumentException("administrator_invalid");
             var salt = RandomNumberGenerator.GetBytes(16);
             var hash = await Task.Run(() => Hash(request.Password, salt), cancellationToken).ConfigureAwait(false);
@@ -286,7 +298,8 @@ internal sealed class InstallationService : IInstallationService, IAdminAccessCo
 
     private InstallationSettings ResolveUpdate(InstallationUpdate update, InstallationSettings saved)
     {
-        var settings = Normalize(update.Settings);
+        // Corrections and later edits never delete data; replacing is offered only by the first-run assistant.
+        var settings = Normalize(update.Settings) with { ExistingData = "keep" };
         if (!update.RetainDatabasePassword) return settings;
         // A retained credential can only go back to its original host and account, never to a replacement endpoint.
         if (settings.DatabaseKind != "mysql" || saved.DatabaseKind != "mysql" || settings.MySqlHost != saved.MySqlHost ||
@@ -297,7 +310,7 @@ internal sealed class InstallationService : IInstallationService, IAdminAccessCo
 
     private async ValueTask StartApplyAsync()
     {
-        lock (_sync) { _running = true; _phase = "applying"; _error = null; }
+        lock (_sync) { _running = true; _phase = "applying"; _error = null; _errorDetail = null; }
         try { await _context.RunTaskAsync("installation-apply", ApplyAsync).ConfigureAwait(false); }
         catch
         {
@@ -316,7 +329,20 @@ internal sealed class InstallationService : IInstallationService, IAdminAccessCo
             lock (_sync) document = _document ?? throw new InvalidOperationException("installation_missing");
             await _database.WaitAsync(cancellationToken).ConfigureAwait(false);
             IReadOnlyDictionary<string, object?> config;
-            try { config = await PrepareDatabaseAsync(document.Settings, true, cancellationToken).ConfigureAwait(false); }
+            try
+            {
+                if (document.Settings.ExistingData == "replace")
+                {
+                    var settings = document.Settings;
+                    await WithDatabaseAsync(settings, async (provider, token) => { await provider.ClearAsync(settings, token).ConfigureAwait(false); return true; },
+                        cancellationToken).ConfigureAwait(false);
+                    // The replace happened; saving keep first means a retry or a restart never deletes the new data again.
+                    document = document with { Settings = settings with { ExistingData = "keep" } };
+                    _store.Save(document);
+                    lock (_sync) _document = document;
+                }
+                config = await PrepareDatabaseAsync(document.Settings, true, cancellationToken).ConfigureAwait(false);
+            }
             finally { _database.Release(); }
             errorCode = "runtime_failed";
             await _runtime.ApplyAsync(document.Settings, config, document.Username, cancellationToken).ConfigureAwait(false);
@@ -330,24 +356,45 @@ internal sealed class InstallationService : IInstallationService, IAdminAccessCo
         catch (Exception error)
         {
             // Database errors and configuration diagnostics can contain secrets. Only a stable code crosses this boundary.
-            _context.Logger.LogError("Installation operation failed: {Code} ({FailureType}).", errorCode, error.GetType().Name);
-            lock (_sync) { _phase = "failed"; _error = errorCode; }
+            var detail = Reason(error);
+            _context.Logger.LogError("Installation operation failed: {Code} ({FailureType}): {Detail}", errorCode, error.GetType().Name, detail);
+            lock (_sync) { _phase = "failed"; _error = errorCode; _errorDetail = detail; }
         }
         finally { lock (_sync) _running = false; }
     }
 
-    private async ValueTask<IReadOnlyDictionary<string, object?>> PrepareDatabaseAsync(InstallationSettings settings, bool initialize,
-        CancellationToken cancellationToken)
+    private ValueTask<IReadOnlyDictionary<string, object?>> PrepareDatabaseAsync(InstallationSettings settings, bool initialize,
+        CancellationToken cancellationToken) =>
+        WithDatabaseAsync(settings, (provider, token) => provider.PrepareAsync(settings, initialize, token), cancellationToken);
+
+    // The innermost causes of a failed apply, one line, without the database password. Configuration diagnostics can
+    // echo a connection string, so the only secret setup holds is removed before the text reaches the log or the page.
+    private string? Reason(Exception error)
+    {
+        var parts = new List<string>();
+        for (var cause = error.InnerException ?? error; cause is not null && parts.Count < 3; cause = cause.InnerException)
+            if (cause.Message.Length > 0 && !parts.Contains(cause.Message)) parts.Add(cause.Message);
+        var text = string.Join(" <- ", parts).ReplaceLineEndings(" ").Trim();
+        string? password;
+        lock (_sync) password = _document?.Settings.MySqlPassword;
+        if (!string.IsNullOrEmpty(password)) text = text.Replace(password, "***", StringComparison.Ordinal);
+        return text.Length == 0 ? null : text.Length > 400 ? text[..400] : text;
+    }
+
+    private async ValueTask<T> WithDatabaseAsync<T>(InstallationSettings settings,
+        Func<IInstallationDatabase, CancellationToken, ValueTask<T>> operation, CancellationToken cancellationToken)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _context.Lifetime);
         timeout.CancelAfter(TimeSpan.FromSeconds(_options.DatabaseTimeoutSeconds));
         try
         {
             var provider = _databases.Single(d => d.Kind == settings.DatabaseKind);
-            return await provider.PrepareAsync(settings, initialize, timeout.Token).ConfigureAwait(false);
+            return await operation(provider, timeout.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested || _context.Lifetime.IsCancellationRequested) { throw; }
-        catch (Exception) { throw new InvalidOperationException("database_failed"); }
+        // The provider's exception stays the cause, so the log and the setup page can say why (access denied, unknown
+        // database, refused connection); database client messages do not carry the password.
+        catch (Exception error) { throw new InvalidOperationException("database_failed", error); }
     }
 
     private InstallationSettings Normalize(InstallationSettings settings)
@@ -384,6 +431,7 @@ internal sealed class InstallationService : IInstallationService, IAdminAccessCo
             settings.ServerName is not { Length: >= 1 and <= 80 } || settings.ServerName.Any(char.IsControl) ||
             (settings.Clients is null && !IsSelectable(settings.Profile)) ||
             settings.DatabaseKind is not ("sqlite" or "mysql") || _databases.Count(d => d.Kind == settings.DatabaseKind) != 1 ||
+            settings.ExistingData is not ("keep" or "replace") ||
             settings.ClientDataPath is not { Length: <= 2048 } ||
             (settings.Clients is null && settings.Profile != "management" && !settings.DeferClientDataImport && !Path.IsPathFullyQualified(settings.ClientDataPath)) ||
             (settings.Clients is null && settings.DeferClientDataImport && settings.ClientDataPath.Length != 0) ||

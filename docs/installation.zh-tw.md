@@ -80,8 +80,9 @@ curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash
 | `state/` | 安裝助理儲存的安裝狀態，升級時保留 |
 | `dotnet/` | 執行階段，僅在安裝指令碼需要安裝時存在 |
 | `bff` | 啟動器；不帶參數時啟動安裝助理 |
+| `settings.env` | 安裝指令碼選擇的 WebUI 存取方式、安裝權杖與連接埠；升級時保留 |
 
-用 `~/bubblefighter-fantasy/bff` 啟動伺服器，然後開啟 `http://127.0.0.1:8080/`。助理只監聽本機回送位址；在遠端伺服器上，請先在自己的電腦上用 `ssh -L 8080:127.0.0.1:8080 <user>@<server>` 轉送連接埠。
+用 `~/bubblefighter-fantasy/bff` 啟動伺服器，然後在伺服器本機上開啟 `http://127.0.0.1:7300/`。安裝指令碼會問兩個問題，預設都是否：是否允許其他機器開啟 WebUI（`--remote-admin`），以及首次執行助理是否需要安裝權杖（`--setup-token`）。WebUI 只在本機時，從自己的電腦透過通道開啟：`ssh -L 7300:127.0.0.1:7300 <user>@<server>`，然後開啟 `http://127.0.0.1:7300/`。開啟遠端存取時，開啟 `http://<server>:7300/`，並在防火牆或雲端安全群組中開放 TCP 7300 連接埠。這些選擇儲存在安裝目錄的 `settings.env` 中，升級時保留；環境變數中已設定的值優先。
 
 選項寫在 `bash -s --` 之後，例如 `curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash -s -- --service`：
 
@@ -89,7 +90,11 @@ curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash
 | --- | --- |
 | `--version <tag>` | 安裝指定版本而非最新版本 |
 | `--dir <path>` | 安裝目錄 |
-| `--admin-port <n>` | 安裝助理與 WebUI 的連接埠（預設 8080） |
+| `--admin-port <n>` | 安裝助理與 WebUI 的連接埠（預設 7300） |
+| `--remote-admin` | 允許其他機器開啟 WebUI；不加時 WebUI 只接受伺服器本機 |
+| `--setup-token` | 產生首次執行助理要求輸入的權杖，安裝指令碼會列印它 |
+| `--local-admin`、`--no-setup-token` | 明確指定預設值 |
+| `--no-prompt` | 不提問，使用給定的選項與預設值（沒有終端機時也是如此） |
 | `--service` | 以 root 執行時：建立並啟動 `bubblefighter-fantasy` systemd 服務，以 `bff` 系統使用者執行 |
 | `--start` | 安裝完成後啟動伺服器 |
 | `--no-runtime` | 缺少執行階段時直接失敗，而不是安裝它 |
@@ -105,7 +110,7 @@ curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash -s -- --doc
 
 需要 Docker Engine 與 Compose 外掛。安裝指令碼會把 Linux 套件解壓縮到 `~/bubblefighter-fantasy/docker`，用它建置本機映像檔，並透過 Docker Compose 啟動伺服器容器。容器使用主機網路，因此你選擇的用戶端所用的遊戲連接埠都可以連線。預設不啟動資料庫容器：在安裝助理中選擇 SQLite（資料檔儲存在 `bff-state` 磁碟區中），或填寫既有的 MySQL 伺服器。
 
-如需同時執行內建的 MySQL 8.4，請加上 `--with-mysql`：
+如需同時執行內建資料庫，請加上 `--with-mysql`。新建的部署使用 MariaDB 11.4，伺服器把它當作 MySQL 使用；以 MySQL 8.4 建立的舊部署在升級時保留 MySQL，因為 MariaDB 無法開啟它的資料：
 
 ```bash
 curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash -s -- --docker --with-mysql
@@ -242,12 +247,12 @@ docker compose -f deploy/docker/compose.yaml --env-file .env up --build
 
 compose 檔案會啟動兩個服務：
 
-- `bff` 使用 `deploy/docker/Dockerfile` 建置，建置內容為儲存庫根目錄。Dockerfile 先發布不含執行階段的 Host，再於 ASP.NET Core Runtime 10 映像中以非 root 系統使用者執行，進入點命令為 `dotnet BubbleFighter.Fantasy.Host.dll run --profile kr-1256`。映像宣告連接埠 7100、7101 與 8080。
-- `mysql` 使用 `mysql:8.4` 映像，資料庫名稱為 `bf_game_db`、使用者為 `bff`、字元集為 utf8mb4，資料存放在 `mysql-data` 磁碟區中，並在伺服器啟動前通過健康檢查。
+- `bff` 使用 `deploy/docker/Dockerfile` 建置，建置內容為儲存庫根目錄。Dockerfile 先發布不含執行階段的 Host，再於 ASP.NET Core Runtime 10 映像中以非 root 系統使用者執行，進入點命令為 `dotnet BubbleFighter.Fantasy.Host.dll run --profile kr-1256`。映像宣告連接埠 7100、7101 與 7300。
+- `mysql` 使用 `BFF_DB_IMAGE` 指定的映像：`.env.example` 中為 `mariadb:11.4`；沒有這一行的舊 `.env` 使用 `mysql:8.4`，因為它的 `mysql-data` 磁碟區由 MySQL 建立。資料庫名稱為 `bf_game_db`、使用者為 `bff`、字元集為 utf8mb4，資料存放在 `mysql-data` 磁碟區中，並在伺服器啟動前通過健康檢查。
 
-對外發布的連接埠為伺服器的 7100、7101、8080，以及 MySQL 的 `${BFF_MYSQL_PORT:-3306}`。伺服器把 `${BFF_CLIENT_DATA_HOST:-../../client-data}`（即儲存庫中的 `client-data` 目錄）以唯讀方式掛載到 `/app/client-data`；容器需要 `client-data/kr-1256/data` 或 `client-data/kr-1256/dataraw`，否則 clientdata 列會失敗。兩個服務都使用 `restart: unless-stopped`。
+對外發布的連接埠為伺服器的 7100、7101、7300，以及 MySQL 的 `${BFF_MYSQL_PORT:-3306}`。伺服器把 `${BFF_CLIENT_DATA_HOST:-../../client-data}`（即儲存庫中的 `client-data` 目錄）以唯讀方式掛載到 `/app/client-data`；容器需要 `client-data/kr-1256/data` 或 `client-data/kr-1256/dataraw`，否則 clientdata 列會失敗。兩個服務都使用 `restart: unless-stopped`。
 
-容器方式會刻意啟動 MySQL，它不是隔離的本機檢查，也不使用本機檢查修補檔。管理監聽在容器內綁定 `127.0.0.1:8080`，如需透過發布的 8080 連接埠存取 WebUI，請在 `.env` 中加入 `BFF_ADMIN_HOST=0.0.0.0`。
+容器方式會刻意啟動 MySQL，它不是隔離的本機檢查，也不使用本機檢查修補檔。管理監聽在容器內綁定 `127.0.0.1:7300`，如需透過發布的 7300 連接埠存取 WebUI，請在 `.env` 中加入 `BFF_ADMIN_HOST=0.0.0.0`。
 
 ### 3. 追蹤記錄
 
@@ -273,7 +278,7 @@ docker compose -f deploy/docker/compose.yaml down
 
 ```sh
 docker build -f deploy/docker/Dockerfile -t bff-fantasy .
-docker run --rm --env-file .env -e BFF_MYSQL_HOST=<mysql-host> -e BFF_ADMIN_HOST=0.0.0.0 -p 7100:7100 -p 7101:7101 -p 8080:8080 -v "<client-data-directory>:/app/client-data:ro" bff-fantasy
+docker run --rm --env-file .env -e BFF_MYSQL_HOST=<mysql-host> -e BFF_ADMIN_HOST=0.0.0.0 -p 7100:7100 -p 7101:7101 -p 7300:7300 -v "<client-data-directory>:/app/client-data:ro" bff-fantasy
 ```
 
 映像只複製發布後的 Host 與 `profiles` 目錄，不包含資料庫，也不包含用戶端資料。請把 `BFF_MYSQL_HOST` 指向容器能夠存取的位址。
@@ -301,21 +306,21 @@ docker run --rm --env-file .env -e BFF_MYSQL_HOST=<mysql-host> -e BFF_ADMIN_HOST
 主控台會列印管理監聽位址與 WebUI 位址：
 
 ```text
-Row 'admin.http' admin API listening on 127.0.0.1:8080.
-WebUI: http://127.0.0.1:8080/
+Row 'admin.http' admin API listening on 127.0.0.1:7300.
+WebUI: http://127.0.0.1:7300/
 ```
 
-在瀏覽器開啟 `http://127.0.0.1:8080/`。管理監聽預設是 `127.0.0.1:8080`；如需修改，請在處理程序環境中設定 `BFF_ADMIN_HOST` 或 `BFF_ADMIN_PORT`（`start` 不讀取 `.env`）。
+在瀏覽器開啟 `http://127.0.0.1:7300/`，或從其他機器開啟伺服器位址。以 `start` 啟動的伺服器，管理監聽預設為 `0.0.0.0:7300`；如需修改，請在處理程序環境中設定 `BFF_ADMIN_HOST` 或 `BFF_ADMIN_PORT`（`start` 不讀取 `.env`）。首次安裝不需權杖；設定 `BFF_SETUP_TOKEN`（至少 32 個字元）後，遠端安裝會要求輸入該權杖。
 
 ### 3. 完成助理
 
 1. 選擇介面語言：英文、簡體中文、繁體中文或韓文。
 2. 為伺服器命名（1 到 80 個字元）。
 3. 選擇一個或多個要啟用的用戶端版本。每個選取的版本有各自的用戶端資料選擇；你也可以暫時不提供資料，稍後在伺服器設定中匯入。
-4. 選用：現在匯入用戶端資料。選擇本機資料夾或準備好的 ZIP 套件，檢查篩選後的檔案數量與大小，然後按下「開始匯入」。瀏覽器本身的資料夾確認可能會統計資料夾內的全部檔案；助理會先把選擇篩選為用戶端封存檔與 `data`/`dataraw` 檔案，再顯示彙總。匯入會在狀態目錄中產生一份副本；失敗或取消的匯入只清理它自己的暫存檔案。
-5. 選擇資料庫。預設選取 MySQL：主機 `127.0.0.1`、連接埠 `3306`、資料庫 `bf_game_db`、使用者 `bff`。SQLite 預設把資料庫儲存在狀態目錄中。請執行「測試連線」；連線測試成功前助理不會繼續。
-6. 建立管理員帳號。使用者名稱 3 到 64 個字元，密碼至少 12 個字元。此帳號用於管理伺服器，隨安裝資訊一起儲存，與遊戲帳號分開。
-7. 檢查各項設定並套用。Host 會啟動所選 profile 的列；如果啟用失敗，會顯示可重試的錯誤碼。
+4. 選用：現在匯入用戶端資料。選擇本機資料夾或準備好的 ZIP 套件，檢查篩選後的檔案數量與大小，然後按下「開始匯入」。瀏覽器本身的資料夾確認可能會統計資料夾內的全部檔案；助理會先把選擇篩選為用戶端封存檔與 `data`/`dataraw` 檔案，再顯示彙總。匯入會在狀態目錄中產生一份副本；失敗或取消的匯入只清理它自己的暫存檔案。資料已經在伺服器上時，按「在伺服器上選擇資料夾」，選擇包含 `<build>/data` 的資料夾；或者略過匯入：略過的版本只要資料已在伺服器的 client-data 資料夾中，就會直接使用這些資料啟動。
+5. 選擇資料庫。預設選取 MySQL：主機 `localhost`、連接埠 `3306`、資料庫 `bf_game_db`、使用者 `root`。測試失敗時，提示末尾會附上資料庫本身給出的原因，例如拒絕存取或資料庫不存在。SQLite 預設把資料庫儲存在狀態目錄中。請執行「測試連線」；連線測試成功前助理不會繼續。資料庫尚不存在時，測試會說明這一點，套用時自動建立。資料庫裡已有資料表時，會跳出視窗顯示已有的資料表與遊戲帳號數量，並詢問如何處理：使用現有資料（預設；帳號、角色與道具保留，只補上缺少的升級），或替換為空資料庫。替換會再跳出一次確認，只刪除一次所有資料表，之後儲存為保留，因此重新啟動不會再次刪除資料。按測試結果下方的連結可以變更選擇。
+6. 建立管理員帳號。使用者名稱 3 到 64 個字元，密碼至少 6 個字元。此帳號用於管理伺服器，隨安裝資訊一起儲存，與遊戲帳號分開。
+7. 檢查各項設定並套用。Host 會啟動所選 profile 的列；如果啟用失敗，會顯示可重試的錯誤碼。啟用失敗時，錯誤代碼下方會顯示原因。
 
 ### 4. 套用成功後磁碟上的內容
 
@@ -335,7 +340,7 @@ WebUI: http://127.0.0.1:8080/
 
 匯入只是把檔案複製到安裝狀態；所需的資料表與封存檔內容會在遊戲服務啟動時檢查。匯入成功並不代表玩法或用戶端相容性已經驗證。
 
-預設限制為每次上傳 8 GiB、每次匯入解壓資料 16 GiB、每次匯入 32,768 個檔案、保留 64 份副本、匯入儲存總量 64 GiB、每次匯入最長 20 分鐘。可在 `installation` 列中以 `client_data_upload_bytes`、`client_data_extracted_bytes`、`client_data_file_limit`、`client_data_copy_limit`、`client_data_storage_bytes` 與 `client_data_import_seconds` 調整。再次匯入不會刪除先前成功的副本。
+預設限制為每次上傳 8 GiB、每次匯入解壓資料 16 GiB、每次匯入上傳 32,768 個檔案（上傳的遊戲封存檔內部的成員不計入）、保留 64 份副本、匯入儲存總量 64 GiB、每次匯入最長 20 分鐘。可在 `installation` 列中以 `client_data_upload_bytes`、`client_data_extracted_bytes`、`client_data_file_limit`、`client_data_copy_limit`、`client_data_storage_bytes` 與 `client_data_import_seconds` 調整。再次匯入不會刪除先前成功的副本。
 
 在 Windows 上，掃描程式或其他處理程序可能在檔案寫完後短暫阻止最終目錄重新命名。只有這一步發佈操作會對 Windows 存取、共用或鎖定衝突重試：`client_data_publish_attempts` 預設 20 次，範圍 1–100；間隔 `client_data_publish_retry_ms` 預設 50 毫秒，範圍 1–1000。將次數設為 1 可關閉重試。整體匯入期限和取消仍然生效；不會重送上傳、覆寫既有目標，永久錯誤或其他錯誤仍會回報。
 
@@ -367,7 +372,7 @@ dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- plugins list
 dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile kr-812 --patch tools/local-checks/isolated-memory.patch.yaml --dump-config
 ```
 
-這條命令要求已設定 `BFF_MYSQL_PASSWORD`，因為組合 MySQL 列時會插值 `${BFF_MYSQL_PASSWORD}`，之後最後的修補檔才會停用該列。如果還沒有準備，請依[快速入門](quickstart.md)建立 `.env`。
+這條命令不需要任何資料庫設定：隔離記憶體修補檔會停用 MySQL 列，被停用的列不會讀取 `${BFF_MYSQL_PASSWORD}`。
 
 命令以 YAML 輸出生效的列清單，每一列是一個以 `- id:` 開頭的區塊，然後以結束碼 0 結束。請確認以下內容：
 
@@ -387,10 +392,10 @@ dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile 
 
 | 檢查 | 命令 | 應看到的內容 |
 | --- | --- | --- |
-| 健康檢查 | `Invoke-RestMethod http://127.0.0.1:8080/health` | `status` = `ok` 以及 UTC 時間戳 |
-| 安裝狀態 | `Invoke-RestMethod http://127.0.0.1:8080/api/setup/status` | 包含 `phase`、`installed`、`profiles` 與匯入限制的 JSON |
+| 健康檢查 | `Invoke-RestMethod http://127.0.0.1:7300/health` | `status` = `ok` 以及 UTC 時間戳 |
+| 安裝狀態 | `Invoke-RestMethod http://127.0.0.1:7300/api/setup/status` | 包含 `phase`、`installed`、`profiles` 與匯入限制的 JSON |
 
-在 Linux 上使用 `curl -s http://127.0.0.1:8080/health` 與 `curl -s http://127.0.0.1:8080/api/setup/status`。`/health` 與 WebUI 檔案始終開放；在管理員尚未建立時，`/api/plugins` 依設計傳回 401，因此請先透過助理建立管理員。
+在 Linux 上使用 `curl -s http://127.0.0.1:7300/health` 與 `curl -s http://127.0.0.1:7300/api/setup/status`。`/health` 與 WebUI 檔案始終開放；在管理員尚未建立時，`/api/plugins` 依設計傳回 401，因此請先透過助理建立管理員。
 
 **檢查是否成功：** 三條原始碼建置命令都成功結束，瀏覽器檢查傳回上述 JSON。
 
@@ -422,7 +427,7 @@ dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile 
 
 - **建置失敗：** 本儲存庫將警告視為錯誤。第一條 `error` 會指出專案與原因，修正後重新建置。參見[疑難排解](troubleshooting.md)。
 - **相依於框架的建置無法啟動：** 缺少 ASP.NET Core Runtime 10。用 `dotnet --list-runtimes` 確認，然後安裝相同架構的執行階段。
-- **連接埠已被占用：** 助理使用 8080 連接埠，遊戲 profile 使用自己的遊戲連接埠，例如 `kr-812` 的 7110。請在 `.env` 中設定 `BFF_ADMIN_PORT` 或該版本的連接埠變數，或停止占用連接埠的處理程序。
+- **連接埠已被占用：** 助理使用 7300 連接埠，遊戲 profile 使用自己的遊戲連接埠，例如 `kr-812` 的 7110。請在 `.env` 中設定 `BFF_ADMIN_PORT` 或該版本的連接埠變數，或停止占用連接埠的處理程序。
 - **遊戲 profile 因用戶端資料失敗：** `clientdata` 列會報告 `data_directory` 與 `raw_directory` 都不存在。請提供相符的用戶端資料，或透過安裝助理匯入，然後重新啟動該 profile。參見[疑難排解](troubleshooting.md)。
 
 ## 下一步

@@ -190,6 +190,8 @@ internal readonly record struct RoomField(RoomFieldType Type, RoomFieldValue Val
 internal sealed record RoomSlotValues(bool Occupied, bool Closed, int UserNumber, string Nickname, int CharacterItemId,
     IReadOnlyList<int> EquippedItemIds, bool Ready)
 {
+    /// <summary>Gets native modifiers belonging to the worn items in this snapshot.</summary>
+    public IReadOnlyList<BubbleFighter.Fantasy.Contracts.Rooms.RoomItemAttribute> ItemAttributes { get; init; } = [];
     /// <summary>Gets the persisted avatar material color index; zero keeps the native default.</summary>
     public ushort ColorIndex { get; init; }
 
@@ -570,7 +572,7 @@ internal static class RoomCodec
 
     private static RoomSlotValues Seated(MainMenuRoomOpened room, bool ready) =>
         new(true, false, room.UserNumber, room.Nickname, room.CharacterItemId, room.EquippedItemIds, ready)
-        { ColorIndex = room.ColorIndex, Level = room.Level };
+        { ColorIndex = room.ColorIndex, Level = room.Level, ItemAttributes = room.ItemAttributes };
 
     private static RoomValues PlayOf(RoomSlotValues slot) => new(PlayRoomKind, [slot]) { Play = true };
 
@@ -647,6 +649,8 @@ internal static class RoomCodec
         }
         if (slot?.InventorySelection is { } selection)
             RoomInventoryProjection.Apply(schema.Tables, schema.Build, values, selection);
+        if (slot is not null && ReferenceEquals(fields, schema.EquippedItemList) && values.ContainsKey("unknown_48"))
+            values["unknown_48"] = RoomRecords.AttributeValues(slot.ItemAttributes);
         return values;
     }
 

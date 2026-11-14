@@ -7,6 +7,25 @@
     ]
   },
   "preview": {
+    "character_camera": {
+      "rotation": "yaw_only",
+      "status": "inferred",
+      "source": "kr-1256 sub_A29C30 takes the first angle from kr-1256 sub_107A3E0 for both quaternions and orbits through kr-1256 sub_A2B940; equivalent yaw extraction inherited from kr-812 pending native screenshot comparison"
+    },
+    "character_motion": {
+      "workbook": "Models/Characters/AniList.xml",
+      "sheet": "CommonAni",
+      "header_row": 2,
+      "weapon": "Common",
+      "category": "basic",
+      "motion": "stop",
+      "status": "proven",
+      "source": "kr-1256 sub_A29090 passes basic/stop (UTF-16 at 0x15BD9B0) to kr-1256 sub_A28C40, which resolves the animation row; CommonAni FileUpper/FileLower=pis-basic-stop, EyePitchFollowBone=NONE"
+    },
+    "accessories": {
+      "mounted_mesh_roll_degrees": -90,
+      "status": "Own motion root replacement inherited from kr-812 sub_AECA30 and checked against model resources. The measured cn-717 roll is retained only when item motion is absent; later native comparison remains pending."
+    },
     "camera_table": "Config/ShopItemCamera.csv",
     "camera_table_columns": [
       "shopItemId",

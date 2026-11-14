@@ -20,6 +20,7 @@ public sealed class PluginDeclarationShapeTests
     [InlineData(nameof(PluginAttribute.RequiresMany))]
     [InlineData(nameof(PluginAttribute.Optional))]
     [InlineData(nameof(PluginAttribute.OptionalMany))]
+    [InlineData(nameof(PluginAttribute.LiveMany))]
     [InlineData(nameof(PluginAttribute.Provides))]
     [InlineData(nameof(PluginAttribute.ProvidesMany))]
     [InlineData(nameof(PluginAttribute.ConditionalProvides))]
@@ -86,7 +87,7 @@ public sealed class PluginDeclarationShapeTests
     {
         var fields = typeof(PluginAttribute).GetProperties()
             .Where(property => property.PropertyType == typeof(Type[])).OrderBy(property => property.Name, StringComparer.Ordinal).ToArray();
-        Assert.Equal(10, fields.Length);
+        Assert.Equal(11, fields.Length);
         Type[] contracts = [typeof(IDisposable), typeof(IEnumerable<int>)];
 
         foreach (var field in fields)

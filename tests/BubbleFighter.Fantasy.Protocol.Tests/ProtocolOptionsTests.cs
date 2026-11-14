@@ -15,8 +15,10 @@ public sealed class ProtocolOptionsTests
         Assert.Equal(4, options.BootstrapStatus);
         Assert.Equal("", options.BootstrapCommandLine);
         Assert.True(options.EnforceClientVersion);
-        Assert.Equal(4 * 1024 * 1024, options.MaxPayloadBytes);
-        Assert.Equal(1024 * 1024, options.InboundBufferBytes);
+        Assert.Equal(65535, options.MaxPayloadBytes);
+        Assert.Equal(131072, options.InboundBufferBytes);
+        Assert.Equal(4 * 1024 * 1024, options.SendQueueBytes);
+        Assert.Equal(4096, options.SendQueueCapacity);
         Assert.Equal(1024, options.MaxTrackedConnections);
         Assert.Equal("gcpReqGamePatch", options.PatchRequestName);
         Assert.Equal(WirePins.GreetingSize, TestWireDialects.Get("kr-1256").BuildServerPreamble((ushort)options.BootstrapStatus, options.BootstrapCommandLine).Length);

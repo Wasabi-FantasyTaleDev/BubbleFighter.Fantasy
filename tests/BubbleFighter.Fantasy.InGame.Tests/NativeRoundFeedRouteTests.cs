@@ -54,8 +54,9 @@ public sealed class NativeRoundFeedRouteTests
             TestWireDialects.Get(build).Profile);
         var relay = game.ForConnection(OpcodeConnection.Relay);
         var routes = RoundFeedRoute.Load(tables, build, game, relay);
-        Assert.Equal(46, routes.Length);
-        Assert.Equal(new[] { "NpcAgentMove", "NpcDirectItem", "NpcDummyMotion", "NpcIni", "NpcLuaMessage", "NpcObjectDelete" },
+        Assert.Equal(48, routes.Length);
+        Assert.Equal(new[] { "NpcAgentMove", "NpcDirectItem", "NpcDummyMotion", "NpcIni", "NpcLuaMessage", "NpcObjectDelete",
+            "NpcObjectKill", "NpcTurretState" },
             routes.Where(route => route.Structure.StartsWith("Npc", StringComparison.Ordinal)).Select(route => route.Structure).Order());
         Assert.Equal("PortalTeleport", routes.Single(route => route.GameInbound == game.C2S("gppTeleportPortal")).Structure);
         Assert.All(routes, route =>

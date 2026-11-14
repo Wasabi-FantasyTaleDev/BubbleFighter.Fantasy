@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 namespace BubbleFighter.Fantasy.Cluster;
 
 /// <summary>Mounts a bounded native room browser only when explicitly included in a cluster profile.</summary>
-[Plugin("cluster.room-browser", Description = "Connection-local native room aliases over authenticated discovery.",
+[Plugin("cluster.room-browser", Category = "cluster", Names = ["en=Cluster room browser", "zh-Hans=集群房间浏览", "zh-Hant=叢集房間瀏覽", "ko=클러스터 방 탐색"], Description = "Connection-local native room aliases over authenticated discovery.",
     Requires = [typeof(IFederatedRoomDiscovery)], ProvidesMany = [typeof(IRoomBrowser)])]
 public sealed class RoomBrowserPlugin : IPlugin
 {

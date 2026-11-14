@@ -15,6 +15,31 @@ namespace BubbleFighter.Fantasy.InGame.Tests;
 
 public sealed class RoomRegistryTests
 {
+    /// <summary>Peer setup loops sleep on this task, so it must follow the first room in and the last room out.</summary>
+    [Fact]
+    public async Task TheRoomPresenceTaskFollowsTheFirstRoomInAndTheLastRoomOut()
+    {
+        var registry = new RoomRegistry(new InGameOptions());
+        var roster = (IRoomPeerRoster)registry;
+        try
+        {
+            var empty = roster.WhenAnyRoom();
+            Assert.False(empty.IsCompleted);
+            registry.CreateForMode(new RecordingSession(911), 3, "map", "First", 7, "HostA", listed: true);
+            Assert.True(empty.IsCompletedSuccessfully);
+            Assert.True(roster.WhenAnyRoom().IsCompleted);
+            registry.CreateForMode(new RecordingSession(912), 3, "map", "Second", 8, "HostB", listed: true);
+            registry.Detach(911);
+            Assert.True(roster.WhenAnyRoom().IsCompleted);
+            registry.Detach(912);
+            Assert.Empty(roster.Snapshot());
+            Assert.False(roster.WhenAnyRoom().IsCompleted);
+            registry.CreateForMode(new RecordingSession(913), 3, "map", "Third", 9, "HostC", listed: true);
+            Assert.True(roster.WhenAnyRoom().IsCompleted);
+        }
+        finally { await registry.StopAllAsync(); }
+    }
+
     [Fact]
     public async Task PublishedRoomsDetachNativeSettingsAndPreserveCreationIdentity()
     {

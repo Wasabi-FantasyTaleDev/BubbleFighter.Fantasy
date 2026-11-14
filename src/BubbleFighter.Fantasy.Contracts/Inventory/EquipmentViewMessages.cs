@@ -19,7 +19,11 @@ public sealed record LocalEquipmentViewUpdated(
     byte ActiveWeaponPresetSlot,
     int PrimaryWeaponId,
     int SpecialWeaponId,
-    IReadOnlyList<WeaponPresetPage>? WeaponPresetPages = null) : IMessage;
+    IReadOnlyList<WeaponPresetPage>? WeaponPresetPages = null) : IMessage
+{
+    /// <summary>Gets native modifiers belonging to the committed worn items.</summary>
+    public IReadOnlyList<Rooms.RoomItemAttribute> ItemAttributes { get; init; } = [];
+}
 
 /// <summary>Publishes another player's committed appearance without changing the recipient's local weapon presets.</summary>
 /// <param name="UserNum">The observed player's identity.</param>
@@ -28,4 +32,8 @@ public sealed record LocalEquipmentViewUpdated(
 public sealed record RemoteEquipmentViewUpdated(
     int UserNum,
     int CharacterId,
-    IReadOnlyList<int> EquippedItemIds) : IMessage;
+    IReadOnlyList<int> EquippedItemIds) : IMessage
+{
+    /// <summary>Gets native modifiers belonging to the observed player's worn items.</summary>
+    public IReadOnlyList<Rooms.RoomItemAttribute> ItemAttributes { get; init; } = [];
+}

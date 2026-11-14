@@ -575,3 +575,35 @@ opcodes:
     name_source: mirrored
     evidence: verified
     source: "cn-735 sub_A44A20 selects1500; cn-735 sub_51B4E0 reads a u16 mask and leaves configuration unchanged when zero"
+
+  - value: 132
+    direction: c2s
+    connection: game
+    name: gcpReqEnchant
+    name_source: label@cn-735
+    evidence: verified
+    source: "cn-735 sub_592B50 builds the DlgEnchant request and stamps 132; cn-735 sub_41B700 writes a counted u32 list plus one u32 argument; cn-735 sub_593AB0 registers the native label gcpReqEnchant"
+
+  - value: 144
+    direction: s2c
+    connection: game
+    name: gspRepEnchant
+    name_source: label@cn-735
+    evidence: verified
+    source: "cn-735 sub_A3D0E0 reads ReplyScienceLab through cn-735 sub_41B810, maps result 4 to errorCloseMsg and sends results 0 and 16 to the enchantment result UI"
+
+  - value: 136
+    direction: c2s
+    connection: game
+    name: gcpReqSciendLabConfig
+    name_source: label@cn-735
+    evidence: verified
+    source: "cn-735 sub_5A8470 sends an empty request stamped 136; cn-735 sub_5A89A0 registers the native label gcpReqSciendLabConfig"
+
+  - value: 148
+    direction: s2c
+    connection: game
+    name: gspRepSciendLabConfig
+    name_source: label@cn-735
+    evidence: verified
+    source: "cn-735 sub_A3E2F0 reads NotifyScienceLab and installs the laboratory configuration"

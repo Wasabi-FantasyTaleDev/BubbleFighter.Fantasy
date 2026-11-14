@@ -105,7 +105,7 @@ public sealed class BattleRecordCapabilityTests : IDisposable
             await store.UpsertAsync(new PlayerWallet(user, 100, 0), default);
             await store.SettleRoundAsync(new("old", user, 5, before => before with { Exp = 50 }), default);
         }
-        Execute("UPDATE players SET state=json_remove(state, '$.BattleRecords'); PRAGMA user_version=8;");
+        Execute("UPDATE players SET state=json_remove(state, '$.BattleRecords'); DROP TABLE IF EXISTS pet_identity_allocator; PRAGMA user_version=8;");
         using var upgraded = new SqliteDatabase(Options());
         var repository = new SqliteRepositories(upgraded);
         Assert.Null(await repository.ListBattleRecordsAsync(user, default));

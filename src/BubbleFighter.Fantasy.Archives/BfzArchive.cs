@@ -54,8 +54,10 @@ public sealed class BfzArchive : IArchiveReader
             if (path.EndsWith('/'))
                 continue;
             var member = new Member(path, flags, method, crc, compressed, size, localOffset, time);
-            _byPath[Archive.NormalizeMemberPath(path)] = member;
-            _entries.Add(new ArchiveEntry(Archive.NormalizeMemberPath(path), size));
+            // One normalized string serves the lookup key and the entry.
+            var key = Archive.NormalizeMemberPath(path);
+            _byPath[key] = member;
+            _entries.Add(new ArchiveEntry(key, size));
         }
     }
 
@@ -98,10 +100,27 @@ public sealed class BfzArchive : IArchiveReader
     /// <inheritdoc />
     public byte[] Read(string path)
     {
-        if (!_byPath.TryGetValue(Archive.NormalizeMemberPath(path), out var member))
-            throw new FileNotFoundException($"'{RelativePath}' has no member '{path}'.", path);
+        var member = Find(path);
+        var data = new byte[member.Size];
+        using var stream = Open(member);
+        stream.ReadExactly(data);
+        return data;
+    }
 
-        byte[] stored;
+    /// <inheritdoc />
+    public long Length(string path) => Find(path).Size;
+
+    /// <inheritdoc />
+    public Stream OpenRead(string path) => Open(Find(path));
+
+    private Member Find(string path) =>
+        _byPath.TryGetValue(Archive.NormalizeMemberPath(path), out var member)
+            ? member
+            : throw new FileNotFoundException($"'{RelativePath}' has no member '{path}'.", path);
+
+    private Stream Open(Member member)
+    {
+        long dataOffset;
         lock (_stream)
         {
             _stream.Position = member.LocalHeaderOffset;
@@ -109,39 +128,34 @@ public sealed class BfzArchive : IArchiveReader
             _stream.ReadExactly(local);
             if (BinaryPrimitives.ReadUInt32LittleEndian(local) != LocalHeaderSignature)
                 throw new InvalidDataException($"'{RelativePath}' member '{member.Path}' has no local header.");
-            _stream.Position += BinaryPrimitives.ReadUInt16LittleEndian(local[26..]) + BinaryPrimitives.ReadUInt16LittleEndian(local[28..]);
-            stored = new byte[member.CompressedSize];
-            _stream.ReadExactly(stored);
+            dataOffset = _stream.Position + BinaryPrimitives.ReadUInt16LittleEndian(local[26..]) + BinaryPrimitives.ReadUInt16LittleEndian(local[28..]);
         }
 
-        var body = stored.AsSpan();
-        if ((member.Flags & 1) != 0)
+        Stream stored = new ArchiveSliceStream(_stream, dataOffset, member.CompressedSize);
+        try
         {
-            new ZipCrypto(_password).Decrypt(body);
-            // The last header byte repeats the CRC's high byte (or the time's, with bit 3 set).
-            var check = (member.Flags & 8) != 0 ? (byte)(member.Time >> 8) : (byte)(member.Crc >> 24);
-            if (body.Length < 12 || body[11] != check)
-                throw new InvalidDataException($"'{RelativePath}' member '{member.Path}' does not decrypt with this archive's password.");
-            body = body[12..];
+            if ((member.Flags & 1) != 0)
+            {
+                stored = new ZipCryptoStream(stored, new ZipCrypto(_password));
+                Span<byte> header = stackalloc byte[12];
+                // The last header byte repeats the CRC's high byte (or the time's, with bit 3 set).
+                var check = (member.Flags & 8) != 0 ? (byte)(member.Time >> 8) : (byte)(member.Crc >> 24);
+                if (member.CompressedSize < 12 || stored.ReadAtLeast(header, 12, throwOnEndOfStream: false) != 12 || header[11] != check)
+                    throw new InvalidDataException($"'{RelativePath}' member '{member.Path}' does not decrypt with this archive's password.");
+            }
+            stored = member.Method switch
+            {
+                0 => stored,
+                8 => new DeflateStream(stored, CompressionMode.Decompress),
+                _ => throw new NotSupportedException($"'{RelativePath}' member '{member.Path}' uses zip method {member.Method}."),
+            };
+            return new VerifiedMemberStream(stored, member.Size, new Crc32Checksum(member.Crc), $"'{RelativePath}' member '{member.Path}'");
         }
-
-        byte[] data;
-        switch (member.Method)
+        catch
         {
-            case 0:
-                data = body.ToArray();
-                break;
-            case 8:
-                data = new byte[member.Size];
-                using (var inflater = new DeflateStream(new MemoryStream(body.ToArray()), CompressionMode.Decompress))
-                    inflater.ReadExactly(data);
-                break;
-            default:
-                throw new NotSupportedException($"'{RelativePath}' member '{member.Path}' uses zip method {member.Method}.");
+            stored.Dispose();
+            throw;
         }
-        if (ZipCrypto.Crc32(data) != member.Crc)
-            throw new InvalidDataException($"'{RelativePath}' member '{member.Path}' fails its CRC check.");
-        return data;
     }
 
     /// <inheritdoc />

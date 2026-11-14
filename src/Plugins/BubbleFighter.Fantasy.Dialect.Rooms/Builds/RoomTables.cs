@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Packets;
@@ -48,6 +49,8 @@ internal sealed class RoomTables
         ["list<UserSlot>"] = RoomFieldType.UserSlots, ["list<EquippedItemList>"] = RoomFieldType.EquippedItemLists,
     };
 
+    private static readonly ConditionalWeakTable<PacketTables, RoomTables> Resolved = new();
+
     private readonly Dictionary<string, (RoomSchema Schema, PlayValues Play)> _builds = new(StringComparer.Ordinal);
 
     private RoomTables(PacketTables tables) => Tables = tables;
@@ -82,6 +85,11 @@ internal sealed class RoomTables
     /// </exception>
     public static RoomTables Load(string packetsDirectory) => Load(PacketTables.Load(packetsDirectory));
 
+    /// <summary>Gets the room projections of an admitted packet snapshot, resolved once per snapshot.</summary>
+    /// <param name="tables">The admitted packet snapshot; it is never modified after admission.</param>
+    /// <returns>The resolved builds, shared by every writer that uses the same snapshot.</returns>
+    internal static RoomTables For(PacketTables tables) => Resolved.GetValue(tables, static snapshot => Load(snapshot));
+
     /// <summary>Builds room projections from an already admitted packet snapshot without rereading files.</summary>
     internal static RoomTables Load(PacketTables tables)
     {
@@ -94,7 +102,11 @@ internal sealed class RoomTables
             var values = tables.ValuesOf(build);
             // Feature values, including initial_tutorial_routes, are validated by their owning rows.
             if (values.Keys.FirstOrDefault(key => key is not ("weapon_critical_seed_builds" or "weapon_critical_mode_fields" or "weapon_critical_defaults" or "weapon_critical_view_refresh" or "defence_seed"
-                    or "npc_local_spawn_group_builds" or "npc_peer_transport_builds" or "plaza_recruitment_active_field" or "plaza_recruitment_text_field" or "party_invitation_failure_codes" or "party_visit_failure_codes")
+                    or "npc_local_spawn_group_builds" or "npc_peer_transport_builds" or "plaza_recruitment_active_field" or "plaza_recruitment_text_field" or "party_invitation_failure_codes" or "party_visit_failure_codes"
+                    or "room_custom_rule_fields" or "laboratory_operations" or "laboratory_enchant_builds" or "laboratory_enchant_success_result" or "laboratory_enchant_failure_result"
+                    or "live_score_kinds" or "star_score_builds" or "star_score_modes" or "star_score_team_modes" or "star_live_stat_kind"
+                    or "star_live_team_total_field" or "star_scoreboard_count_field" or "star_scoreboard_team_total_field" or "star_report_slot_builds" or "extreme_racing_timers"
+                    or "legacy_laboratory_builds" or "laboratory_modification_builds" or "laboratory_modification_success_result" or "laboratory_conversion_builds" or "laboratory_conversion_success_result" or "laboratory_advancement_builds" or "laboratory_advancement_success_result" or "relay_latency_builds")
                 && key is not ("captain_score_fields" or "round_series_fields" or "room_inventory_selection_count" or "room_inventory_selection_fields" or "plaza_recruitment_field" or "display_level_max" or "needs_idle_party" or "room_chat_colour" or "room_list_paging" or "play" or "capabilities" or "room_setting_change_fields" or "room_round_setting_fields" or "room_projection_fields" or "room_unchosen_map" or "room_unchosen_difficulty" or "room_setting_change_map" or "room_ai_seat" or "round_score_row_marker" or "round_feed" or "round_feed_passthrough" or "respawn" or "shop" or "lobby" or "login" or "inventory" or "equipment" or "family" or "initial_tutorial_routes" or "tutorial_score_builds" or "tutorial_score_help_field" or "tutorial_score_npc_finish_fields" or "collected_lucci_builds" or "collected_lucci_field" or "gateway_center_group" or "gateway_reserved_center" or "dynamic_config" or "laboratory_closed_result")) is { } unknown)
                 throw new ConfigException($"{where} has the unknown value '{unknown}'.");
             if (values.TryGetValue("tutorial_score_builds", out var tutorialScores)
@@ -106,6 +118,10 @@ internal sealed class RoomTables
                 _ = PlayRoomCodec.TutorialHelpField(tables, build);
             _ = PlayRoomCodec.TutorialNpcFinishFields(tables, build);
             _ = RoundResultWire.CollectedLucciField(tables, build);
+            if (values.ContainsKey("live_score_kinds"))
+                _ = LiveScoreKinds.Require(tables, build);
+            _ = StarScoreFields.Load(tables, build);
+            _ = StarBinding.HasNamedStarReporter(tables, build);
             if (tables.CapabilityOf(build, "captain_mode"))
                 _ = new CaptainScoreCodec(tables, build);
             // A build of another family (its own value or its base's) is served by that family's room binding.

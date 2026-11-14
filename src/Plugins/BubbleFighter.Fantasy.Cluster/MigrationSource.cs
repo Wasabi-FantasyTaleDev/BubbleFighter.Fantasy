@@ -8,6 +8,7 @@ using BubbleFighter.Fantasy.Contracts.Party;
 using BubbleFighter.Fantasy.Contracts.Players;
 using BubbleFighter.Fantasy.Contracts.Rooms;
 using BubbleFighter.Fantasy.Contracts.Sessions;
+using BubbleFighter.Fantasy.Contracts.Signals;
 using Microsoft.Extensions.Logging;
 
 namespace BubbleFighter.Fantasy.Cluster;
@@ -18,6 +19,8 @@ internal sealed class MigrationSource(MigrationSourceOptions options, IMigration
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly Dictionary<long, Pending> _pending = [];
+    // Present while a departure is pending; the clean-up loop sleeps on it. Refreshed by whoever holds _gate.
+    private readonly PresenceSignal _departures = new();
     private bool _disposed;
     public string ClientBuild => options.ClientBuild;
 
@@ -135,6 +138,7 @@ internal sealed class MigrationSource(MigrationSourceOptions options, IMigration
                 { SourceChannel = player.MigrationHome?.Channel ?? options.Channel, HomeNode = player.MigrationHome?.NodeId ?? leases.NodeId,
                     HomeScene = kind == MigrationKind.Home ? player.Phase : SessionPhase.MainMenu, PartyLeader = partyLeader }, TimeSpan.FromMilliseconds(options.OperationTimeoutMs));
             _pending.Add(session.Connection.Id, pending);
+            _departures.Refresh(() => _pending.Count != 0);
             pending.Generation = player.MoveTo(SessionPhase.Migrating);
             RequireCurrent(pending, deadline.Token);
             if (!await account.IsHeldAsync(deadline.Token).ConfigureAwait(false))
@@ -211,6 +215,7 @@ internal sealed class MigrationSource(MigrationSourceOptions options, IMigration
         }
         pending.Solo?.Dispose();
         _pending.Remove(pending.Session.Connection.Id);
+        _departures.Refresh(() => _pending.Count != 0);
     }
 
     internal async ValueTask SweepAsync(CancellationToken ct)
@@ -234,8 +239,7 @@ internal sealed class MigrationSource(MigrationSourceOptions options, IMigration
 
     internal async ValueTask RunAsync(CancellationToken ct)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(options.CleanupIntervalMs), clock);
-        try { while (await timer.WaitForNextTickAsync(ct).ConfigureAwait(false)) await SweepAsync(ct).ConfigureAwait(false); }
+        try { await ParkedLoop.RunAsync(TimeSpan.FromMilliseconds(options.CleanupIntervalMs), clock, () => _departures.WhenPresent, SweepAsync, ct).ConfigureAwait(false); }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
     }
 

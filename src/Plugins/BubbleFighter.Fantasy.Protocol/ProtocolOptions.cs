@@ -39,14 +39,34 @@ public sealed class ProtocolOptions
     /// <summary>Gets or sets the command-line string sent in the bootstrap greeting.</summary>
     public string BootstrapCommandLine { get; set; } = "";
 
-    /// <summary>Gets or sets the maximum accepted frame payload in bytes.</summary>
+    /// <summary>
+    /// Gets or sets the largest frame payload accepted from a client, in bytes; a header that declares more closes
+    /// the connection before any of the payload is buffered. The default is the most a frame with a 16-bit length
+    /// can carry, which is every build but the ones with the 8-byte frame; the largest frame a supported client is
+    /// known to send is its login, about 2 KB. The row refuses a value that does not fit
+    /// <see cref="InboundBufferBytes"/> together with the dialect's frame header.
+    /// </summary>
     [Range(1, 64 * 1024 * 1024)]
-    public int MaxPayloadBytes { get; set; } = 4 * 1024 * 1024;
+    public int MaxPayloadBytes { get; set; } = ushort.MaxValue;
 
-    /// <summary>Gets or sets the maximum decrypted-but-unparsed inbound bytes buffered per
-    /// connection; the socket pump pauses when the frame parser falls this far behind.</summary>
+    /// <summary>
+    /// Gets or sets the maximum decrypted-but-unparsed inbound bytes buffered per connection; the socket pump
+    /// pauses when the frame parser falls this far behind. It is also the most memory a client can make the server
+    /// hold before it has sent one complete frame. The default holds one largest frame and as much again that
+    /// arrived behind it.
+    /// </summary>
     [Range(1024, 64 * 1024 * 1024)]
-    public int InboundBufferBytes { get; set; } = 1024 * 1024;
+    public int InboundBufferBytes { get; set; } = 2 * (ushort.MaxValue + 1);
+
+    /// <summary>
+    /// Gets or sets how long a new connection may take to send its first complete frame, in seconds, before it is
+    /// closed. Every supported client sends its first frame as soon as it has the greeting, so only a connection
+    /// that is not a game client waits this long; without the limit such a connection holds its socket, its
+    /// session and its buffer for as long as it likes. The deadline is one timer per connection that has not
+    /// spoken yet and nothing afterwards.
+    /// </summary>
+    [Range(1, 3600)]
+    public int FirstFrameSeconds { get; set; } = 30;
 
     /// <summary>
     /// Gets or sets the maximum frames queued for one session and not yet written. Sends return
@@ -56,9 +76,26 @@ public sealed class ProtocolOptions
     [Range(1, 65536)]
     public int SendQueueCapacity { get; set; } = 4096;
 
-    /// <summary>Gets or sets the retained outbound payload bytes allowed per session, including the frame currently being written. Exhaustion closes the connection.</summary>
+    /// <summary>
+    /// Gets or sets the retained outbound payload bytes allowed per session, including the frame currently being
+    /// written. Exhaustion closes the connection, so this is the most memory a client that stops reading can make
+    /// the server hold. It must exceed the largest frame the build sends, or that frame can never be sent: the
+    /// largest any build sends is the kr-1256 shop catalog at about 112 KB, and a frame with a 16-bit length cannot
+    /// exceed 64 KB. The default is 64 such full frames. With debug logging each session reports the most it queued
+    /// when it ends, which is the number to size this from.
+    /// </summary>
     [Range(1, 1073741824)]
-    public int SendQueueBytes { get; set; } = 16 * 1024 * 1024;
+    public int SendQueueBytes { get; set; } = 64 * (ushort.MaxValue + 1);
+
+    /// <summary>
+    /// Gets or sets the outbound bytes all sessions of this protocol row may hold queued together. Each session stops
+    /// at <see cref="SendQueueBytes"/>, but many clients that stop reading at once could each hold that much; when a
+    /// frame would cross this ceiling the session holding the most queued bytes is closed and no sender waits. It must
+    /// be at least <see cref="SendQueueBytes"/>. Sessions log their peak queue at Debug when they end, which is the
+    /// number to size it from.
+    /// </summary>
+    [Range(1, long.MaxValue)]
+    public long TotalSendQueueBytes { get; set; } = 64L * 1024 * 1024;
 
     /// <summary>Gets or sets the maximum simultaneous typed state associations per connection.</summary>
     [Range(1, 4096)]

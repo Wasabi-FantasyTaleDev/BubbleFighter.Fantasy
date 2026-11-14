@@ -22,13 +22,15 @@ namespace BubbleFighter.Fantasy.Equipment.Handlers;
 /// latched sender re-arms.</param>
 /// <param name="logger">Reports refused and granted switches.</param>
 /// <param name="presetPages">The build-scoped persisted-bar policy, absent when the build uses a derived bar.</param>
+/// <param name="wear">Wears the granted page's weapon through the ordinary equipment commit; absent on an ack-only row.</param>
 public sealed class WeaponPresetChangeHandler(
     IPlayerInventoryState playerState,
     IEquipmentSelection? selection,
     IEquippedViewPush? equippedView,
     IMessageSender<WeaponPresetChangeReplied> replies,
     ILogger logger,
-    IWeaponPresetPageSource? presetPages = null)
+    IWeaponPresetPageSource? presetPages = null,
+    EquipmentHandlers? wear = null)
 {
     /// <summary>Handles one decoded preset request.</summary>
     /// <param name="session">The requesting session and its authenticated player feature.</param>
@@ -47,10 +49,16 @@ public sealed class WeaponPresetChangeHandler(
 
         var current = await playerState.GetActiveWeaponPresetSlotAsync(user, ct).ConfigureAwait(false);
         var worn = Array.Empty<int>();
+        IReadOnlyList<InventorySlotRecord>? snapshot = null;
         if (selection is not null)
         {
             var bag = await selection.ReadAsync(user, ct).ConfigureAwait(false);
-            worn = bag.Where(row => (row.Flags & InventorySlotRecord.WornFlagBit) != 0)
+            if (bag.Count > InventoryLimits.MaxInventorySlotsPerBag)
+                throw new InvalidOperationException("The preset equipment snapshot exceeds the inventory slot limit.");
+            snapshot = Array.AsReadOnly(bag.ToArray());
+            if (snapshot.Any(row => row is null || row.UserNum != user || row.Bag != InventoryBag.CharacterBag || row.ItemId <= 0))
+                throw new InvalidOperationException("The preset equipment snapshot has an invalid owner, bag or item.");
+            worn = snapshot.Where(row => (row.Flags & InventorySlotRecord.WornFlagBit) != 0)
                 .Select(row => row.ItemId).Distinct().ToArray();
         }
         // Materialized pages are the published bar, so they are also the binding: a page with no weapon
@@ -71,13 +79,29 @@ public sealed class WeaponPresetChangeHandler(
         }
 
         await playerState.SetActiveWeaponPresetSlotAsync(user, request.Slot, ct).ConfigureAwait(false);
+        // A persisted page is the weapon the player chose for it: wear it when it is owned and not already worn, so the
+        // equipped view, the room and the round see the page's weapon. kr-812 sub_832BD0 and kr-1256 case 836 rebuild
+        // the fighter from the record in-match; the menu draws the worn view, which only the server can change.
+        if (pages is not null && wear is not null && snapshot is not null && !worn.Contains(slots[request.Slot])
+            && snapshot.Where(row => row.ItemId == slots[request.Slot]).Take(2).ToArray() is [var owned])
+        {
+            var committed = await wear.WearForPresetAsync(session, user, owned, ct).ConfigureAwait(false);
+            if (committed is not null)
+            {
+                snapshot = committed;
+                worn = committed.Where(row => (row.Flags & InventorySlotRecord.WornFlagBit) != 0)
+                    .Select(row => row.ItemId).Distinct().ToArray();
+            }
+            else
+                logger.LogWarning("Session {Session} player {User} preset slot {Slot}: page weapon {Item} could not be worn; the worn set is kept.",
+                    session.Id, user, request.Slot, slots[request.Slot]);
+        }
         // The view republishes the worn set and reads the slot back from the store, so the
         // preset bar's leading byte always reflects the persisted grant.
         var character = worn.FirstOrDefault(id => id is >= 300001 and <= 300031);
-        if (equippedView is not null && character != 0)
+        if (equippedView is not null && character != 0 && snapshot is not null)
         {
-            var ids = worn.Where(id => id != character).Prepend(character).ToArray();
-            await equippedView.SendSelectionAsync(session, checked((int)user), character, ids, ct).ConfigureAwait(false);
+            await equippedView.SendPresetSwitchAsync(session, checked((int)user), character, snapshot, ct).ConfigureAwait(false);
         }
         await ReplyAsync(request.Slot, 0).ConfigureAwait(false);
         logger.LogInformation("Session {Session} player {User} weapon preset slot {Slot} granted and persisted.",

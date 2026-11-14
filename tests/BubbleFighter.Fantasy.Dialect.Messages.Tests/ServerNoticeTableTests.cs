@@ -43,9 +43,13 @@ public sealed class ServerNoticeTableTests
     [Theory]
     [InlineData("cn-774")]
     [InlineData("tw-454")]
-    public void TheModernBuildsWhoseNoticeHandlerIsEmptyHaveNoNotices(string build)
+    public void Cn774AndTw454CarryOnlyTheStyleAndTheText(string build)
     {
-        Assert.False(TestBuilds.Packets.CapabilityOf(build, "server_notice"));
+        Assert.True(TestBuilds.Packets.CapabilityOf(build, "server_notice"));
+        var bytes = PacketCodec.Write(TestBuilds.Packets, build, "ServerNotice",
+            new Dictionary<string, object?> { ["text"] = "ab" });
+        // u8 style, then wstr (cn-774 sub_BBC600, tw-454 sub_A99620); no kr-1256 chat or popup flags follow.
+        Assert.Equal("00" + "02000000" + "61006200", Convert.ToHexString(bytes));
     }
 
     [Fact]

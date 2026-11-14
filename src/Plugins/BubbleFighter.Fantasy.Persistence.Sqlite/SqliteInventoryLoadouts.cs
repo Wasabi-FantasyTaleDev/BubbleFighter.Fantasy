@@ -29,21 +29,37 @@ internal sealed partial class SqliteRepositories : IInventoryLoadoutStore
         }, ct));
     }
 
-    public ValueTask<IReadOnlyList<InventorySlotRecord>?> UpdateLoadoutSelectionAsync(long userNum,
-        InventoryLoadoutScope scope, IReadOnlyList<InventoryWearGroup> groups, int? itemId, bool worn, CancellationToken ct)
+    public async ValueTask<IReadOnlyList<InventorySlotRecord>?> UpdateLoadoutSelectionAsync(long userNum,
+        InventoryLoadoutScope scope, IReadOnlyList<InventoryWearGroup> groups, int? itemId, bool worn, CancellationToken ct) =>
+        (await UpdateLoadoutSelectionSnapshotAsync(userNum, scope, groups, itemId, worn, ct).ConfigureAwait(false))?.CharacterBag;
+
+    public ValueTask<PetInventorySnapshot?> UpdateLoadoutSelectionSnapshotAsync(long userNum, InventoryLoadoutScope scope,
+        IReadOnlyList<InventoryWearGroup> groups, int? itemId, bool worn, CancellationToken ct,
+        PetInitializationCommand? initialization = null) =>
+        UpdateLoadoutSelectionSnapshotAsync(userNum, scope, groups, itemId, worn, ct, initialization, null);
+
+    public ValueTask<PetInventorySnapshot?> UpdateLoadoutSelectionSnapshotAsync(long userNum, InventoryLoadoutScope scope,
+        IReadOnlyList<InventoryWearGroup> groups, int? itemId, bool worn, CancellationToken ct,
+        PetInitializationCommand? initialization, ArticleInitializationCommand? articleInitialization,
+        InventorySelectionTarget? target = null)
     {
         ArgumentNullException.ThrowIfNull(scope);
-        return new(Mutate<IReadOnlyList<InventorySlotRecord>?>(userNum, state =>
+        initialization?.ValidateFor(userNum, scope);
+        articleInitialization?.ValidateFor(userNum, scope);
+        target?.ValidateFor(userNum, scope, itemId);
+        return new(database.Write<PetInventorySnapshot?>((db, transaction) =>
         {
-            var loadout = ReadLoadout(state, scope);
-            var changed = InventoryWearSelection.Apply(InventoryLoadouts.Project(state.Slots, loadout, scope), groups, itemId, worn);
+            var state = db.RequireState(userNum);
+            if (target is not null && !target.Matches(InventoryLoadouts.Project(state.Slots, ReadLoadout(state, scope), scope))) return null;
+            var plan = PreparePetInventory(db, transaction, state, scope, initialization, articleInitialization);
+            var projected = InventoryLoadouts.Project(plan.Rows, plan.Loadout, scope);
+            var changed = InventoryWearSelection.Apply(projected, groups, itemId, worn);
             if (changed is null) return null;
-            state.Loadouts[scope.Key] = loadout with
-            {
-                WornItemIds = changed.Where(row => row.Bag == InventoryBag.CharacterBag
-                    && (row.Flags & InventorySlotRecord.WornFlagBit) != 0).Select(row => row.ItemId).Distinct().ToArray(),
-            };
-            return changed.Where(row => row.Bag == InventoryBag.CharacterBag).ToArray();
+            var loadout = InventoryLoadouts.Selection(plan.Loadout, changed);
+            var result = new PetInventorySnapshot(changed.Where(row => row.Bag == InventoryBag.CharacterBag).ToArray(),
+                changed.Where(row => row.Bag == InventoryBag.EquippedBag).ToArray());
+            CommitPetPreparation(db, transaction, userNum, state, scope, plan, plan.Rows, loadout);
+            return result;
         }, ct));
     }
 

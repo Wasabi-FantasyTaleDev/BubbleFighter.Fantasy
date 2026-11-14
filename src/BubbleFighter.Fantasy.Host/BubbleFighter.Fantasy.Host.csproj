@@ -4,7 +4,19 @@
     <ApplicationIcon>icon_odteam.ico</ApplicationIcon>
     <Description>Console host for the Bubble Fighter Fantasy server.</Description>
     <AssemblyName>BubbleFighter.Fantasy.Host</AssemblyName>
+    <!-- Memory settings travel with the Host in its runtimeconfig.json, so every deployment gets them without
+         environment variables; a DOTNET_GC* variable still overrides each one. The workstation collector keeps one
+         heap however many cores the machine has, and the concurrent collector keeps full collections off the
+         packet path. -->
+    <ServerGarbageCollector>false</ServerGarbageCollector>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
   </PropertyGroup>
+  <ItemGroup>
+    <!-- 0 is off and 9 trades the most collector time for the smallest heap. Startup parses far more than the
+         server keeps, so compacting eagerly lowers the peak a small machine must survive (measured: 567 to 471 MB
+         for one build, 611 to 541 MB for all). -->
+    <RuntimeHostConfigurationOption Include="System.GC.ConserveMemory" Value="9" />
+  </ItemGroup>
   <ItemGroup>
     <!-- The ASP.NET shared framework supplies Microsoft.Extensions.Logging(.Console). -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
@@ -19,8 +31,10 @@
     <Content Include="bootstrap\**\*.yaml" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="$(RepoRoot)profiles\**\*.yaml" Exclude="$(RepoRoot)profiles\**\local.patch.yaml" Link="profiles\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="$(RepoRoot)packets\**\*.yaml" Link="packets\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="$(RepoRoot)packets\**\*.yml" Link="packets\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="$(RepoRoot)data\level-experience.csv" Link="data\level-experience.csv" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="$(RepoRoot)data\github-mirrors.json" Link="data\github-mirrors.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="$(RepoRoot)data\room-modes.json" Link="data\room-modes.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="$(RepoRoot)data\locales\*.json" Link="data\locales\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <!-- Make locally built plugins under artifacts/plugins visible to the default "plugins"

@@ -1,80 +1,102 @@
 version: 1
 structs:
-  # S2C gspEvolveResult at kr-812 955 (the legacy "follower" evolve reply).
-  # kr-812 Packet_gspEvolveResult, vtable kr-812 D6F6F0; deserializer kr-812 sub_9D95D0 reads three
-  # four-byte words through the four-byte primitive kr-812 sub_A56C10 into object +4, +8 and +12.
-  # cn-717 Packet_gspEvolveResult, vtable cn-717 E97D10; reader cn-717 sub_7F4370 reads the same three
-  # words into the same offsets. The values' meanings are unknown: no consumer was read.
-  # The shape is the read order of kr-812 sub_9D95D0 and cn-717 sub_7F4370. kr-1256, cn-774 and
-  # tw-454 resolve it empty because their evolve reply has a different body at another number; the
-  # other legacy builds (id-400, id-1809, cn-404, cn-408, cn-706 and the rest that name a packet at
-  # 955) inherit this shape until their own reader is read.
+  # kr-812 sub_9D95D0 / kr-812 sub_832EC0 and cn-717 sub_7F4370 / cn-717 sub_8BB460:
+  # outcome >0 grows, 0 regresses, negative values report failure; the consumer reads installed state.
+  # Other three-word readers: cn-404 sub_7C7100, cn-408 sub_4B0680, cn-406 sub_715B70,
+  # cn-706 sub_7A23F0, id-400 sub_72E4D0 and id-1809 sub_4D8130.
+  # kr-1256 sub_9C3BE0 and cn-774 sub_BC1330 use a u64 target, optional word and reward item list.
+  # tw-454 sub_A9E4A0 / tw-454 sub_DD0A00 keeps a fixed trailing word after its u64 target.
+  # Modern inline-reader offsets are relative to the first local field, including alignment padding.
   PetEvolveResult:
-    - unknown_4: u32
+    - outcome: u32
       offset: 4
-      except: [kr-1256, cn-774, tw-454]
-    - unknown_8: u32
+      kr-1256:
+        - outcome: u32
+          offset: 0
+    - target: u32
       offset: 8
-      except: [kr-1256, cn-774, tw-454]
+      kr-1256:
+        - target: u64
+          offset: 8
     - unknown_12: u32
       offset: 12
-      except: [kr-1256, cn-774, tw-454]
-
-  # kr-1256 sub_9C3BE0 reads a word, an eight-byte value and an optional 0x3A-tagged word,
-  # then calls kr-1256 sub_10C9110, which reads a u32 count followed by that many u32 values.
-  # The count is present even without the optional word. Names below use offsets relative to
-  # the first stack-local word (EBP-0x48); they do not assign meanings to the returned values.
-  # cn-774 and tw-454 inherit this unbound shape; their own readers are not established here.
-  PetEvolveResultModern:
-    - unknown_0: u32
-      only: [kr-1256]
-    - unknown_8: u64
-      only: [kr-1256]
+      except: [kr-1256]
+      tw-454:
+        - unknown_16: u32
+          offset: 16
     - unknown_16: 'optional<0x3A,PetEvolveTail>'
+      offset: 16
+      default: 186
       only: [kr-1256]
-    - unknown_24: 'list<u32>'
+      except: [tw-454]
+    - rewards: 'list<u32>'
+      offset: 24
       only: [kr-1256]
+      except: [tw-454]
 
-  # The one four-byte word the 0x3A tag announces in the kr-1256 evolve reply (wire offset 13).
+  # kr-1256 sub_9C3BE0 and cn-774 sub_1068B70: tag 0x3A announces one word; 0xBA means absent.
   PetEvolveTail:
     - unknown_0: u32
       offset: 0
       only: [kr-1256]
+      except: [tw-454]
 
-  # S2C gspRepFollowerLevelup at kr-1256 166, stated for the kr-1256 family (kr-1256 and the builds
-  # based on it): cn-774 and tw-454 inherit this table by the build rules and neither was read here.
-  # Dispatcher case 166 stores the class vtable kr-1256 off_15B85C4, reads eight bytes and four bytes, and
-  # calls the level-up handler kr-1256 sub_EE0080 with the four-byte word. The eight-byte value has
-  # the shape the pet helpers take as an item key, but no getter was resolved, so both stay unknown.
-  # Wire offsets, because the inline reader builds no object.
-  PetFollowerLevelUp:
-    - unknown_0: u64
+  # kr-1256 sub_EDFB50, cn-774 sub_E58A60 and tw-454 sub_DCFEC0 write the selected u64 reference.
+  PetLevelUpRequest:
+    - target: u64
       offset: 0
       only: [kr-1256]
-    - unknown_8: u32
-      offset: 8
-      only: [kr-1256]
 
-  # S2C gspRepFollowerAbilityChange at kr-1256 167, stated for the kr-1256 family (kr-1256 and the
-  # builds based on it): cn-774 and tw-454 inherit this table by the build rules and neither was read
-  # here. Dispatcher case 167 stores the class vtable kr-1256 off_15B85F0 and reads eight bytes and four
-  # four-byte words. It branches on the first four-byte word: 0 calls the success handler kr-1256 sub_EE08A0
-  # with the third four-byte word (wire offset 16), 0x16 is dropped, and any other value calls the failure
-  # handler kr-1256 sub_EE0B70. That branching is why the word is named result; the values are a
-  # status set, and the other words are unknown. Wire offsets.
-  PetFollowerAbilityChange:
-    - unknown_0: u64
+  # kr-1256 sub_9D2FF0 case 166, cn-774 sub_BC3820 and tw-454 sub_AA0C40:
+  # the result word reaches the level-up presentation; state is installed by other packets.
+  PetFollowerLevelUp:
+    - target: u64
       offset: 0
       only: [kr-1256]
     - result: u32
       offset: 8
       only: [kr-1256]
+
+  # kr-1256 sub_EC9610 / kr-1256 sub_EC83F0 and cn-774 sub_7B68F0:
+  # selected article key, old and new ItemAttr selectors, then the function-38 consumable item id.
+  PetAbilityChangeRequest:
+    - target: u64
+      offset: 0
+      only: [kr-1256]
+      except: [tw-454]
+    - old_selector: u32
+      offset: 8
+      only: [kr-1256]
+      except: [tw-454]
+    - new_selector: u32
+      offset: 12
+      only: [kr-1256]
+      except: [tw-454]
+    - consumable_item_id: u32
+      offset: 16
+      only: [kr-1256]
+      except: [tw-454]
+
+  # kr-1256 sub_9D2FF0 case 167 / kr-1256 sub_EE08A0 and cn-774 sub_BC3870 / cn-774 sub_E596A0:
+  # zero result displays the selector at wire offset 16. Other words are not consumed here.
+  PetFollowerAbilityChange:
+    - target: u64
+      offset: 0
+      only: [kr-1256]
+      except: [tw-454]
+    - result: u32
+      offset: 8
+      only: [kr-1256]
+      except: [tw-454]
     - unknown_12: u32
       offset: 12
       only: [kr-1256]
-    - unknown_16: u32
+      except: [tw-454]
+    - selector: u32
       offset: 16
       only: [kr-1256]
+      except: [tw-454]
     - unknown_20: u32
       offset: 20
       only: [kr-1256]
+      except: [tw-454]

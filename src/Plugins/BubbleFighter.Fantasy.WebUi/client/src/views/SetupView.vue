@@ -12,6 +12,7 @@ import { LANGUAGE_NAMES } from '../langs'
 import { createBlueField } from '../scenes/blueField'
 import SetupNarrator from '../components/SetupNarrator.vue'
 import SetupClients from '../components/SetupClients.vue'
+import SetupExistingData from '../components/SetupExistingData.vue'
 import { clientName } from '../components/clientNames'
 
 const server = useServerStore()
@@ -25,11 +26,15 @@ const error = ref('')
 const tested = ref(false)
 const editing = ref(false)
 const retainPassword = ref(false)
+// What the connection test found in the database, and the operator's answer when it already holds data.
+const databaseContents = ref(null)
+const existingData = ref('keep')
+const existingDialog = ref(null)
 const administrator = reactive({ username: '', password: '', confirm: '' })
 const settings = reactive({
   language: ui.lang, serverName: 'Bubble Fighter Fantasy', profile: 'management', clientDataPath: '', clients: [],
-  deferClientDataImport: false, databaseKind: 'mysql', sqlitePath: '', mySqlHost: '127.0.0.1', mySqlPort: 3306,
-  mySqlDatabase: 'bf_game_db', mySqlUser: 'bff', mySqlPassword: '', mySqlSslMode: 'None',
+  deferClientDataImport: false, databaseKind: 'mysql', sqlitePath: '', mySqlHost: 'localhost', mySqlPort: 3306,
+  mySqlDatabase: 'bf_game_db', mySqlUser: 'root', mySqlPassword: '', mySqlSslMode: 'None',
   playerLogin: 'launcher', publicHost: '', createAccountOnLogin: false
 })
 const heading = ref(null)
@@ -52,10 +57,17 @@ const introPhrases = [
 ]
 const introPhrase = computed(() => introPhrases[introLanguageIndex.value])
 const status = computed(() => server.setupStatus)
+const connectionText = computed(() => {
+  if (!tested.value) return t('setup.testConnectionRequired')
+  const found = databaseContents.value
+  if (found && !found.exists) return t('setup.connectionCreates', { database: settings.databaseKind === 'sqlite' ? settings.sqlitePath : settings.mySqlDatabase })
+  if (found?.hasData) return t(existingData.value === 'replace' ? 'setup.connectionReplace' : 'setup.connectionKeep')
+  return t('setup.connectionSuccess')
+})
 const validAdmin = computed(() => {
   const username = administrator.username.trim().normalize('NFC')
   return username.length >= 3 && username.length <= 64 && /^[\p{L}\p{Nd}._-]+$/u.test(username) &&
-    administrator.password.length >= 12 && administrator.password.length <= 256 && administrator.password === administrator.confirm
+    administrator.password.length >= 6 && administrator.password.length <= 256 && administrator.password === administrator.confirm
 })
 const canContinue = computed(() => {
   if (importingClients.value) return false
@@ -69,6 +81,7 @@ const canContinue = computed(() => {
 function candidateSettings() {
   // The first-run wizard keeps the initial connection path simple; TLS can be configured later by an operator.
   return { ...settings, mySqlPort: Number(settings.mySqlPort), publicHost: settings.publicHost.trim(),
+    existingData: !editing.value && databaseContents.value?.hasData ? existingData.value : 'keep',
     mySqlSslMode: editing.value ? (settings.mySqlSslMode || 'None') : 'None', clients: settings.clients.map(client => ({
     ...client, clientDataPath: client.clientDataPath.trim(), deferClientDataImport: !client.clientDataPath.trim()
   })) }
@@ -191,13 +204,15 @@ async function probe() {
   busy.value = true; error.value = ''; tested.value = false
   try {
     const candidate = candidateSettings()
-    await api(editing.value ? 'setup/configuration/probe' : 'setup/probe', jsonRequest('POST', editing.value
+    const result = await api(editing.value ? 'setup/configuration/probe' : 'setup/probe', jsonRequest('POST', editing.value
       ? { settings: candidate, retainDatabasePassword: retainPassword.value } : candidate))
+    databaseContents.value = result?.database ?? null; existingData.value = 'keep'
     tested.value = true
-  } catch (e) { error.value = message(e.message) }
+    if (databaseContents.value?.hasData) existingDialog.value?.show(databaseContents.value, existingData.value)
+  } catch (e) { error.value = message(e.message) + (e.body?.detail ? ' (' + e.body.detail + ')' : '') }
   finally { busy.value = false }
 }
-function invalidate() { tested.value = false; error.value = '' }
+function invalidate() { tested.value = false; error.value = ''; databaseContents.value = null }
 watch(settings, invalidate)
 watch(step, showScrollbar)
 function operationId() {
@@ -372,8 +387,8 @@ onBeforeUnmount(() => {
             </template>
             <template v-else-if="step === 4">
               <div class="setup-field"><label for="admin-username">{{ t('setup.username') }}</label><NoahInput id="admin-username" v-model="administrator.username" name="username" autocomplete="username" required minlength="3" maxlength="64" /><p class="setup-hint">{{ t('setup.usernameHelp') }}</p></div>
-              <div class="setup-field"><label for="admin-password">{{ t('setup.password') }}</label><NoahInput id="admin-password" v-model="administrator.password" name="password" type="password" autocomplete="new-password" required minlength="12" maxlength="256" :show-password-label="t('setup.showPassword')" :hide-password-label="t('setup.hidePassword')" /><p class="setup-hint">{{ t('setup.passwordHelp') }}</p></div>
-              <div class="setup-field"><label for="admin-confirm">{{ t('setup.confirmPassword') }}</label><NoahInput id="admin-confirm" v-model="administrator.confirm" type="password" autocomplete="new-password" required minlength="12" maxlength="256" :show-password-label="t('setup.showPassword')" :hide-password-label="t('setup.hidePassword')" /></div>
+              <div class="setup-field"><label for="admin-password">{{ t('setup.password') }}</label><NoahInput id="admin-password" v-model="administrator.password" name="password" type="password" autocomplete="new-password" required minlength="6" maxlength="256" :show-password-label="t('setup.showPassword')" :hide-password-label="t('setup.hidePassword')" /><p class="setup-hint">{{ t('setup.passwordHelp') }}</p></div>
+              <div class="setup-field"><label for="admin-confirm">{{ t('setup.confirmPassword') }}</label><NoahInput id="admin-confirm" v-model="administrator.confirm" type="password" autocomplete="new-password" required minlength="6" maxlength="256" :show-password-label="t('setup.showPassword')" :hide-password-label="t('setup.hidePassword')" /></div>
               <p class="setup-callout">{{ t('setup.separateAdministrator') }}</p>
             </template>
             <template v-else-if="step === 5">
@@ -385,6 +400,7 @@ onBeforeUnmount(() => {
                 <div><dt>{{ t('setup.publicHost') }}</dt><dd>{{ settings.publicHost.trim() || t('setup.publicHostAuto') }}</dd></div>
                 <div v-for="client in settings.clients" :key="client.profile"><dt>{{ clientName(status?.profiles || [], client.profile, ui.lang) }}</dt><dd>{{ client.deferClientDataImport ? t('setup.skipImport') : client.clientDataPath }}</dd></div>
                 <div><dt>{{ t('setup.database') }}</dt><dd>{{ settings.databaseKind === 'sqlite' ? 'SQLite' : 'MySQL' }}</dd></div>
+                <div v-if="databaseContents?.hasData && !editing"><dt>{{ t('setup.existingSummary') }}</dt><dd :class="{ 'setup-summary-danger': existingData === 'replace' }">{{ t(existingData === 'replace' ? 'setup.existingSummaryReplace' : 'setup.existingSummaryKeep') }}</dd></div>
                 <div><dt>{{ t(settings.databaseKind === 'sqlite' ? 'setup.sqlitePath' : 'setup.host') }}</dt><dd>{{ settings.databaseKind === 'sqlite' ? settings.sqlitePath : `${settings.mySqlHost}:${settings.mySqlPort}` }}</dd></div>
                 <div v-if="!editing"><dt>{{ t('setup.username') }}</dt><dd>{{ administrator.username }}</dd></div>
               </dl>
@@ -407,12 +423,15 @@ onBeforeUnmount(() => {
               <NoahIcon v-else name="alert" :size="36"/>
               <h2>{{ t(status?.phase === 'failed' ? 'setup.failed' : 'setup.applying') }}</h2>
               <p>{{ status?.phase === 'failed' ? message(status.errorCode) : t('setup.applyingDescription') }}</p>
+              <p v-if="status?.phase === 'failed' && status.errorDetail" class="setup-failure-detail">{{ status.errorDetail }}</p>
               <div v-if="status?.phase === 'failed'" class="setup-progress-actions"><NoahButton :loading="busy" @click="retry">{{ t('setup.retry') }}</NoahButton><NoahButton variant="primary" :disabled="busy" @click="edit">{{ t('setup.edit') }}</NoahButton></div>
             </div>
               </div>
             </Transition>
           </div>
-            <p v-if="step === 3" id="setup-connection-status" class="setup-connection-status" :class="{ 'is-verified': tested && !error, 'is-error': !!error }" :role="error ? 'alert' : 'status'" :aria-live="error ? 'assertive' : 'polite'" aria-atomic="true">{{ error || t(tested ? 'setup.connectionSuccess' : 'setup.testConnectionRequired') }}</p>
+            <p v-if="step === 3" id="setup-connection-status" :key="error || connectionText" class="setup-connection-status" :class="{ 'is-verified': tested && !error, 'is-error': !!error }" :role="error ? 'alert' : 'status'" :aria-live="error ? 'assertive' : 'polite'" aria-atomic="true">{{ error || connectionText }}</p>
+            <SetupExistingData ref="existingDialog" :database="settings.databaseKind === 'sqlite' ? settings.sqlitePath : settings.mySqlDatabase" @choose="value => existingData = value" />
+            <button v-if="step === 3 && tested && databaseContents?.hasData && !editing" type="button" class="setup-existing-change" @click="existingDialog.show(databaseContents, existingData)">{{ t('setup.existingChange') }}</button>
             <p v-else-if="error" class="setup-error" role="alert">{{ error }}</p>
             <footer v-if="step < 6" class="setup-actions">
               <span v-if="step === 0" class="setup-hint">{{ t('setup.changeLater') }}</span>

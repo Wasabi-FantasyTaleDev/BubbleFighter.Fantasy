@@ -9,13 +9,13 @@ using Microsoft.Extensions.Logging;
 namespace BubbleFighter.Fantasy.Diagnostics;
 
 /// <summary>
-/// Diagnostics plugin that logs one line per packet and per connection event. Packets
-/// without a registered handler are logged at <see cref="LogLevel.Warning"/> with a hex
-/// preview of the payload head. An optional bounded rolling file sink mirrors the lines to
-/// disk (rotating to <c>.1</c> when <see cref="PacketLogOptions.MaxFileBytes"/> is
-/// exceeded).
+/// Diagnostics plugin that logs connection events and, when <see cref="PacketLogOptions.PacketsEnabled"/> is set, one
+/// line per packet. Packets without a registered handler are logged at <see cref="LogLevel.Warning"/> with a hex
+/// preview of the payload head. An optional bounded rolling file sink mirrors the lines to disk (rotating to
+/// <c>.1</c> when <see cref="PacketLogOptions.MaxFileBytes"/> is exceeded). With packet lines and capture both off,
+/// the row subscribes to no packet event, opens no file and loads no name catalog, so packets cost it nothing.
 /// </summary>
-[Plugin("diagnostics.packet-log", Description = "One-line-per-packet diagnostics logging.",
+[Plugin("diagnostics.packet-log", Category = "admin", Names = ["en=Packet log", "zh-Hans=封包日志", "zh-Hant=封包記錄", "ko=패킷 로그"], Description = "One-line-per-packet diagnostics logging.",
     Optional = [typeof(IOpcodeTableRegistry)])]
 public sealed class PacketLogPlugin : IPlugin
 {
@@ -23,17 +23,22 @@ public sealed class PacketLogPlugin : IPlugin
     public async ValueTask ActivateAsync(IPluginContext context, CancellationToken cancellationToken)
     {
         var options = context.Config.Bind<PacketLogOptions>();
-        if (!options.ConsolePackets && string.IsNullOrWhiteSpace(options.File))
+        if (options.PacketsEnabled && !options.ConsolePackets && string.IsNullOrWhiteSpace(options.File))
             throw new ConfigException("Packet logging requires a file sink when console_packets is disabled.");
+        var observePackets = options.PacketsEnabled || options.CaptureEnabled;
         var previewHandled = options.PreviewHandledOpcodes.ToHashSet();
         var tables = context.Services.TryGet<IOpcodeTableRegistry>(out var registry) ? registry : null;
-        var catalog = PacketCatalogNames.Load(options.CatalogDirectory, options.MaxCatalogEntries, options.MaxCatalogFileBytes);
+        // The research catalogs only name packets; nothing reads them while packets are not observed.
+        var catalog = observePackets
+            ? PacketCatalogNames.Load(options.CatalogDirectory, options.MaxCatalogEntries, options.MaxCatalogFileBytes)
+            : null;
         string Describe(string protocol, PacketDirection direction, ushort opcode)
         {
             var table = tables is not null && tables.TryForProtocol(protocol, out var found) ? found : null;
-            return catalog.Describe(protocol, direction, opcode, table);
+            return catalog!.Describe(protocol, direction, opcode, table);
         }
-        var sink = options.File is { Length: > 0 } file
+        // Without packet lines the file would hold only connection lines, which the console already receives.
+        var sink = options.PacketsEnabled && options.File is { Length: > 0 } file
             ? new RollingFileSink(file, options.FileTimeZone, options.MaxFileBytes, options.MaxLogFiles) : null;
         async ValueTask WriteEntry(LogEntry entry)
         {
@@ -68,6 +73,18 @@ public sealed class PacketLogPlugin : IPlugin
         context.Effect(context.Events.On<FirstInboundFrameEvent>(e =>
             Log(LogLevel.Information, ConnectionStageLog.FirstFrame(e))));
 
+        context.Effect(context.Events.On<ConnectionAcceptedEvent>(e =>
+            Log(LogLevel.Information, ConnectionStageLog.Accepted(e))));
+
+        context.Effect(context.Events.On<ConnectionClosedEvent>(e =>
+            Log(LogLevel.Information, ConnectionStageLog.Closed(e))));
+
+        context.Effect(context.Events.On<ClientVersionMismatchEvent>(e =>
+            Log(LogLevel.Warning, $"version-mismatch session={e.Session.Id} reported={e.Reported} expected={e.Expected}")));
+
+        if (!observePackets)
+            return;
+
         context.Effect(context.Events.On<PacketReceivedEvent>(e =>
         {
             if (ConnectionStageLog.CenterFrame(tables, e.Session, e.ProtocolName,
@@ -75,6 +92,8 @@ public sealed class PacketLogPlugin : IPlugin
                 Log(LogLevel.Information, stage);
             var name = Describe(e.ProtocolName, PacketDirection.ClientToServer, e.Packet.Opcode);
             capture?.Record(e.Session, e.ProtocolName, "c2s", e.Packet.Opcode, name, e.Packet.Payload, e.HasHandler);
+            if (!options.PacketsEnabled)
+                return;
             if (e.HasHandler)
             {
                 var preview = previewHandled.Contains(e.Packet.Opcode)
@@ -100,18 +119,9 @@ public sealed class PacketLogPlugin : IPlugin
                     throw new InvalidOperationException("Full packet capture requires the complete sent payload.");
                 capture.Record(e.Session, e.ProtocolName, "s2c", e.Opcode, name, e.Payload, null);
             }
-            Log(LogLevel.Information, $"send {e.ProtocolName} {name} len={e.PayloadLength} session={e.Session.Id}", packet: true);
+            if (options.PacketsEnabled)
+                Log(LogLevel.Information, $"send {e.ProtocolName} {name} len={e.PayloadLength} session={e.Session.Id}", packet: true);
         }));
-
-        context.Effect(context.Events.On<ConnectionAcceptedEvent>(e =>
-            Log(LogLevel.Information, ConnectionStageLog.Accepted(e))));
-
-        context.Effect(context.Events.On<ConnectionClosedEvent>(e =>
-            Log(LogLevel.Information, ConnectionStageLog.Closed(e))));
-
-        context.Effect(context.Events.On<ClientVersionMismatchEvent>(e =>
-            Log(LogLevel.Warning, $"version-mismatch session={e.Session.Id} reported={e.Reported} expected={e.Expected}")));
-
     }
 
     private sealed record LogEntry(DateTime Timestamp, LogLevel Level, string Line, bool Packet);
@@ -126,7 +136,7 @@ public sealed class PacketLogPlugin : IPlugin
 
     private static string ResolveFilePath(string path, string timeZone)
     {
-        var zone = TimeZoneInfo.FindSystemTimeZoneById(timeZone);
+        var zone = TimeZones.Resolve(timeZone);
         var stamp = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, zone).ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
         return path.Replace("{timestamp}", stamp, StringComparison.Ordinal)
             .Replace("{date}", TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, zone).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), StringComparison.Ordinal);
@@ -192,7 +202,7 @@ public sealed class PacketLogPlugin : IPlugin
         }
 
         private string CurrentDate() => TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow,
-            TimeZoneInfo.FindSystemTimeZoneById(_timeZone)).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            TimeZones.Resolve(_timeZone)).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
         public async ValueTask WriteLineAsync(DateTime timestamp, string line)
         {
@@ -249,6 +259,13 @@ public sealed class PacketLogOptions
     /// <summary>Gets or sets the capture file size before rotation to its single backup.</summary>
     [Range(1024, int.MaxValue)]
     public int CaptureMaxFileBytes { get; set; } = 128 * 1024 * 1024;
+
+    /// <summary>
+    /// Gets or sets whether one line per packet is written, to the file sink and, with <see cref="ConsolePackets"/>, to
+    /// the console. Off by default: the lines are a debugging aid, and every frame then costs an event, a formatted
+    /// line and a file write. Connection lines are logged either way.
+    /// </summary>
+    public bool PacketsEnabled { get; set; }
 
     /// <summary>Gets or sets whether packet traffic is also sent to console logging by the background writer.</summary>
     public bool ConsolePackets { get; set; }

@@ -7,19 +7,21 @@ namespace BubbleFighter.Fantasy.Dialect.Messages;
 /// <summary>Reads wear and removal requests and writes their results; the equipped view is the <c>EquippedItemList</c> table.</summary>
 internal static class EquipmentRequestWire
 {
-    /// <summary>Keys from this value up name an article, not a bag item (kr-1256 sub_806CE0 selects the bag below it).</summary>
-    private const long FirstArticleKey = 100000000;
-
     /// <summary>
-    /// Reads the build's <c>InventoryEquipmentRequest</c>: kr-812 sub_977E70 / sub_977F60 send one item id
-    /// (reader kr-812 sub_80A910); kr-1256 sub_659850 / sub_805A60 send one i64 key whose values below
-    /// <see cref="FirstArticleKey"/> are bag item ids. The key is kept as the request's reference.
+    /// Reads one item id or all eight reference bytes. kr-1256 sub_659850 and kr-1256 sub_805A60
+    /// transfer the key intact; kr-1256 sub_9B34D0 consumes its echo. High bits stay opaque here.
     /// </summary>
     internal static EquipmentChangeRequested ReadRequest(PacketTables tables, string build, ReadOnlySpan<byte> body, bool worn)
     {
-        var key = Convert.ToInt64(PacketCodec.ReadScalars(tables, build, "InventoryEquipmentRequest", body)["item_id"],
-            System.Globalization.CultureInfo.InvariantCulture);
-        return new EquipmentChangeRequested(key, key is > 0 and < FirstArticleKey ? (int)key : null, worn);
+        var field = PacketCodec.ReadScalars(tables, build, "InventoryEquipmentRequest", body)["item_id"];
+        var reference = field switch
+        {
+            int word => (long)word,
+            long wide => wide,
+            _ => throw new ConfigException("An equipment reference must be a four-byte or eight-byte integer."),
+        };
+        var key = unchecked((ulong)reference);
+        return new EquipmentChangeRequested(reference, key is > 0 and < PetArticleKeys.First ? (int)key : null, worn);
     }
 
     /// <summary>

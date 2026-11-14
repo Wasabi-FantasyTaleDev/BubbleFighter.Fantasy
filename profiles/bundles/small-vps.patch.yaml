@@ -1,0 +1,23 @@
+# Optional patch for a machine with 512 MB to 1 GB of memory. Mount it after the profile's own patches:
+#   --patch profiles/bundles/small-vps.patch.yaml
+# It turns off what a game server does not need to serve players. The administration API stays on; the web
+# interface page does not, so administer with the API or remove the webui replacement below. Packet logging is
+# already off unless BFF_PACKET_LOG is set. Listener limits are per build and stay in each profile; see the
+# deployment guide for them.
+- replace:
+    id: webui
+    disabled: true
+# Client and plugin downloads published through this server. Without them the administration API answers
+# its distribution routes as unavailable; the game does not use them.
+- replace:
+    id: distribution.sources
+    disabled: true
+- replace:
+    id: distribution.plans
+    disabled: true
+- replace:
+    id: distribution.packages
+    disabled: true
+- replace:
+    id: distribution.jobs
+    disabled: true

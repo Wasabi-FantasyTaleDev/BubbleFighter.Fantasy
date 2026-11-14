@@ -38,8 +38,8 @@ public sealed class PluginContext : IPluginContext
         Row = row;
         NativeServices = services switch
         {
-            ServiceRegistry registry => registry.For(scope ?? registry.Runtime.RootScope, registry.Runtime.NewActivation(row.Id, row.Plugin)),
-            ScopedServiceRegistry scoped => scoped.Registry.For(scoped.Scope, scoped.Registry.Runtime.NewActivation(row.Id, row.Plugin)),
+            ServiceRegistry registry => registry.For(scope ?? registry.Runtime.RootScope, registry.Runtime.NewActivation(row.Id, row.Plugin, row.ActivationGroup, row.Activation == PluginActivation.OnDemand)),
+            ScopedServiceRegistry scoped => scoped.Registry.For(scoped.Scope, scoped.Registry.Runtime.NewActivation(row.Id, row.Plugin, row.ActivationGroup, row.Activation == PluginActivation.OnDemand)),
             _ => null
         };
         services = NativeServices ?? services;

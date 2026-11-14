@@ -1,6 +1,4 @@
 using System.Buffers.Binary;
-using System.IO.Compression;
-using System.Security.Cryptography;
 using System.Text;
 
 namespace BubbleFighter.Fantasy.Archives;
@@ -18,7 +16,6 @@ public sealed class PknArchiveV1 : IArchiveReader
     private const int MaxEntries = 65536;
     private const int MaxIndexBytes = 64 * 1024 * 1024;
     private readonly Stream _stream;
-    private readonly int _maxMemberBytes;
     private readonly Dictionary<string, PknEntry> _members = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<ArchiveEntry> _entries = [];
 
@@ -31,7 +28,6 @@ public sealed class PknArchiveV1 : IArchiveReader
         if (!stream.CanRead || !stream.CanSeek)
             throw new ArgumentException("A readable, seekable stream is required.", nameof(stream));
         _stream = stream;
-        _maxMemberBytes = maxMemberBytes;
         Uri = uri;
         // cn-279 sub_61D390: the sum of the original URI's UTF-16 code units modulo 312, plus 30.
         var headerOffset = PknFormat.HeaderOffset(uri);
@@ -59,10 +55,11 @@ public sealed class PknArchiveV1 : IArchiveReader
                 throw new InvalidDataException($"'{uri}' legacy entry {i} has unsupported flags or exceeds the member byte limit.");
             // cn-279 sub_61D600 joins the root and relative name before deriving member keys.
             var path = root.Length == 0 ? relative : root + "/" + relative;
-            if (path.Length == 0 || !_members.TryAdd(Archive.NormalizeMemberPath(path),
-                    new PknEntry(path, flags, block, size, stored, md5)))
+            // One normalized string serves the lookup key and the entry.
+            var key = Archive.NormalizeMemberPath(path);
+            if (path.Length == 0 || !_members.TryAdd(key, new PknEntry(path, flags, block, size, stored, md5)))
                 throw new InvalidDataException($"'{uri}' contains an empty or duplicate legacy member path.");
-            _entries.Add(new ArchiveEntry(Archive.NormalizeMemberPath(path), size));
+            _entries.Add(new ArchiveEntry(key, size));
         }
         DataOffset = checked((index.Position + 1023) / 1024 * 1024);
         foreach (var member in _members.Values)
@@ -107,37 +104,19 @@ public sealed class PknArchiveV1 : IArchiveReader
     public bool Contains(string path) => _members.ContainsKey(Archive.NormalizeMemberPath(path));
 
     /// <inheritdoc />
-    public byte[] Read(string path)
-    {
-        if (!_members.TryGetValue(Archive.NormalizeMemberPath(path), out var member))
-            throw new FileNotFoundException($"'{Uri}' has no member '{path}'.", path);
-        var padded = checked((int)(((long)member.StoredSize + 3) & ~3L));
-        if (padded > _maxMemberBytes + 3L)
-            throw new InvalidDataException("Legacy member exceeds the configured byte limit.");
-        var bytes = new byte[padded];
-        lock (_stream)
-        {
-            _stream.Position = DataOffset + (long)member.Block * 1024;
-            _stream.ReadExactly(bytes);
-        }
-        if ((member.Flags & PknFormat.FlagHeadEncrypted) != 0)
-            new Snow2Cipher(PknFormat.MemberKey(member.Path, member.Md5)).Decrypt(bytes.AsSpan(0, Math.Min(1024, padded)));
-        if ((member.Flags & PknFormat.FlagEncrypted) != 0)
-            new Snow2Cipher(PknFormat.MemberKey(member.Path, member.Md5)).Decrypt(bytes);
-        byte[] result;
-        if ((member.Flags & PknFormat.FlagZlib) != 0)
-        {
-            using var zlib = new ZLibStream(new MemoryStream(bytes, 0, checked((int)member.StoredSize)), CompressionMode.Decompress);
-            result = new byte[member.Size];
-            zlib.ReadExactly(result);
-            if (zlib.ReadByte() != -1)
-                throw new InvalidDataException($"'{Uri}' member '{member.Path}' expands beyond its declared size.");
-        }
-        else result = bytes.AsSpan(0, checked((int)member.Size)).ToArray();
-        if (!MD5.HashData(result).AsSpan().SequenceEqual(member.Md5))
-            throw new InvalidDataException($"'{Uri}' member '{member.Path}' fails its MD5 check.");
-        return result;
-    }
+    public byte[] Read(string path) => PknMember.Read(_stream, DataOffset, Find(path), Uri);
+
+    /// <inheritdoc />
+    public long Length(string path) => Find(path).Size;
+
+    /// <inheritdoc />
+    public Stream OpenRead(string path) => PknMember.Open(_stream, DataOffset, Find(path), Uri);
+
+    // The index was checked against max_member_bytes when the pack was opened, so every member found here fits.
+    private PknEntry Find(string path) =>
+        _members.TryGetValue(Archive.NormalizeMemberPath(path), out var member)
+            ? member
+            : throw new FileNotFoundException($"'{Uri}' has no member '{path}'.", path);
 
     /// <inheritdoc />
     public void Dispose() => _stream.Dispose();

@@ -60,6 +60,8 @@ internal static class GotoRoomGotoMenuCodec
             ["character_item"] = room.CharacterItemId, ["equipped_items"] = room.EquippedItemIds,
         };
         var game = PacketMenuProjection.Project(tables, build, "GameSetting", new Dictionary<string, object?>());
+        var equipment = new Dictionary<string, object?>(player, StringComparer.Ordinal);
+        ItemAttributeWire.Apply(tables, build, "EquippedItemList", equipment, room.ItemAttributes);
         var session = PacketMenuProjection.Project(tables, build, "SessionSetting", new Dictionary<string, object?>
         {
             ["kind"] = MainMenuKind, ["game_setting"] = game,
@@ -68,7 +70,7 @@ internal static class GotoRoomGotoMenuCodec
         {
             ["session_setting"] = session,
             ["user_slots"] = new[] { PacketMenuProjection.Project(tables, build, "UserSlot", player) },
-            ["equipped_item_lists"] = new[] { PacketMenuProjection.Project(tables, build, "EquippedItemList", player) },
+            ["equipped_item_lists"] = new[] { PacketMenuProjection.Project(tables, build, "EquippedItemList", equipment) },
         });
         return PacketCodec.Write(tables, build, "gspGotoRoom", envelope);
     }

@@ -15,7 +15,7 @@ public static class Program
           bffarchive pack    <input dir> <output archive> [--path <client-relative path>] [--no-compress] [--no-encrypt]
           bffarchive scan    <client root>
           bffarchive index   <client root>
-          bffarchive generate <build> <client root> <build data dir> [--max-files <count>] [--max-bytes <bytes>]
+          bffarchive generate <build> <client root> <build data dir> [--max-bytes <bytes>]
           bffarchive copy    <client root> <build data dir> <client path>... [--from <list file>]
           bffarchive unpack  <client root> <build data dir> <client path>... [--from <list file>]
 
@@ -162,16 +162,14 @@ public static class Program
 
     private static int Generate(List<string> args, Dictionary<string, string?> options)
     {
-        // These CLI limits match the installation defaults and can be overridden explicitly.
-        var fileLimit = 32768;
-        var byteLimit = 17179869184L;
-        if (options.TryGetValue("max-files", out var files) &&
-            (!int.TryParse(files, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out fileLimit) || fileLimit < 1))
-            throw new ArgumentException("--max-files requires a positive integer.");
+        if (options.ContainsKey("max-files"))
+            throw new ArgumentException("--max-files was removed: the archives' own indexes bound the member count.");
+        // Without --max-bytes the output may use what its drive has free; nothing else bounds generated data.
+        var byteLimit = new DriveInfo(Path.GetPathRoot(Path.GetFullPath(args[2]))!).AvailableFreeSpace;
         if (options.TryGetValue("max-bytes", out var bytes) &&
             (!long.TryParse(bytes, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out byteLimit) || byteLimit < 1))
             throw new ArgumentException("--max-bytes requires a positive integer.");
-        new ClientDataGenerator().Generate(args[0], args[1], args[2], fileLimit, byteLimit, CancellationToken.None);
+        new ClientDataGenerator().Generate(args[0], args[1], args[2], byteLimit, CancellationToken.None);
         Console.WriteLine($"Generated client data: {Path.GetFullPath(args[2])}");
         return 0;
     }

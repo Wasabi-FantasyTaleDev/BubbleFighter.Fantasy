@@ -115,7 +115,7 @@ public sealed class InventoryUseMountTests
     }
 
     /// <summary>
-    /// kr-1256 reads the request's counted string list from the table, refuses more than one string unread,
+    /// kr-1256 preserves both native selection parameters and refuses lists outside the supported action shape,
     /// and keeps the modern reply and state refresh bytes pinned by <see cref="InventoryUseKr1256Pins"/>.
     /// </summary>
     [Fact]
@@ -140,7 +140,10 @@ public sealed class InventoryUseMountTests
             Assert.Equal(new InventoryItemUseRequested(200001, 1, ""), Assert.Single(messages.Received));
 
             await handler(session, new(requestOpcode, Convert.FromHexString("410D0300010000000200000002000000610062000200000063006400")), default);
-            Assert.Single(messages.Received);
+            Assert.Equal(new InventoryItemUseRequested(200001, 1, "ab") { SecondaryParameter = "cd" }, messages.Received[1]);
+            Assert.Empty(session.Sent);
+            await handler(session, new(requestOpcode, Convert.FromHexString("410D030001000000030000000200000061006200020000006300640000000000")), default);
+            Assert.Equal(2, messages.Received.Count);
             var refused = Assert.Single(session.Sent);
             Assert.Equal(table.S2C("gspRepInventoryUseItem"), refused.Opcode);
             Assert.Equal("01000000410D030000000000", Convert.ToHexString(refused.Body));

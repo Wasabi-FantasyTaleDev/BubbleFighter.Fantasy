@@ -1,4 +1,4 @@
-# Opt in to the audited Rhea form exchange; native-client acceptance remains outstanding.
+# Included by the build profile: the audited Rhea form exchange; native-client acceptance remains outstanding.
 - set:
     id: dialect.rooms
     config:

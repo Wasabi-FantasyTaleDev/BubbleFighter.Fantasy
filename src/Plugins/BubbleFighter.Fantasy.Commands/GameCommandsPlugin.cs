@@ -8,7 +8,7 @@ using BubbleFighter.Fantasy.Contracts.Sessions;
 namespace BubbleFighter.Fantasy.Commands;
 
 /// <summary>Publishes one set of room commands and routes them to independently owned gameplay scopes.</summary>
-[Plugin("commands.game", Requires = [typeof(ICommandRegistry), typeof(IPermissionRegistry)],
+[Plugin("commands.game", Category = "admin", Names = ["en=Game commands", "zh-Hans=游戏命令", "zh-Hant=遊戲指令", "ko=게임 명령"], Requires = [typeof(ICommandRegistry), typeof(IPermissionRegistry)],
     Provides = [typeof(IGameCommandEndpoints)])]
 public sealed class GameCommandsPlugin : IPlugin
 {

@@ -351,7 +351,8 @@ The row's configuration is validated as one unit; unknown keys fail binding. The
 | `supports_instances` / `supports_plugins` | Advertise whether the server allows choosing instances and client plugins. | `true` / `true` |
 | `registration_enabled` | Whether launcher accounts may register. | `true` |
 | `create_account_on_login` | Whether signing in with an unknown name creates that account with the given password, so players need not register. A mistyped name creates a new account. | `false` |
-| `minimum_launcher_version` | Minimum launcher SemVer for registration, login, refresh and ticket issuance. Empty disables the gate. | empty |
+| `minimum_launcher_version` | Minimum launcher SemVer for registration, login, refresh and ticket issuance. Every earlier version is refused with HTTP 426, including pre-releases of the minimum itself (`0.2.0-rc.1` is below `0.2.0`). Empty disables the gate. The shipped core bundle sets `${BFF_LAUNCHER_MINIMUM_VERSION:-0.2.0}`. | empty in code; `0.2.0` in the core bundle |
+| `notices` | Operator notices served at `GET /v1/notices?section=`: each has `id`, `title`, a Markdown `body` (raw HTML is not rendered), `level` (`info`, `warning`, `important`), `published_at` (ISO 8601 with seconds and an offset; hidden until then) and optional `sections`. Newest first. The Launcher shows each unseen notice once when the player starts the game and lists all of them under Show All. | empty |
 | `client_policy` | Store sources and typed rules per plugin, sent to the Launcher; see [Client policy](#client-policy). | empty |
 | `session_seconds` / `refresh_session_seconds` | Access-token and renewable-session lifetimes in seconds. | 1800 / 2592000 |
 | `ticket_seconds` | Launch-ticket lifetime in seconds. | 600 |
@@ -556,6 +557,7 @@ before.
 | --- | --- |
 | `companion` | The listener and the launch table. With it, every `/v1/launch` reply carries a `companion` object: `url`, a one-time `ticket`, the `launchId` and `expiresAt`. |
 | `companion.notices` | Launcher popups (`ui.notification.show`) and the `popup <text>` management command, permission `game.management.popup`. |
+| `companion.native_ui` | The game's own message boxes, notifications, banners and local chat lines (`ui.native.invoke`/`ui.native.result`). Server plugins call `IClientNativeUi.ShowAsync` and get the player's answer; the launcher uses the client's native control first and its overlay as the fallback. The `clientui <nickname> <box|notice|banner|chat> <text>` developer command, permission `game.management.clientui`, shows one to a player and prints the outcome. |
 | `companion.commands` | Authenticated game command requests using the shared player permissions and chat budget. |
 
 All three rows are disabled in the core bundle and enabled by the `all` profile. Options of `companion`:
@@ -651,6 +653,34 @@ session; it accepts no identity arguments and neither reads client memory nor ch
 An unknown, absent, inconsistent or timed-out result must not authorize departure. This snapshot
 does not reserve a departure: the command rechecks current room membership and phase.
 
+### Scene changes
+
+The `companion.scene` row pushes `game.session.changed` v1, an event with the same payload as
+`game.session.state`, whenever the player's scene changes: main menu, plaza, joining or leaving a room, the room's
+waiting, countdown, loading, match and result phases, its mode, tutorials and training. It is also sent once each time
+a launcher connection becomes bound, including reconnects, so an overlay knows where the player is without polling.
+A repeated scene is not sent again.
+
+The `companion.room_create` row tells the launcher when the player can create a room. It pushes
+`game.room.create.context` v1 on every change and on every bound connection, and answers the
+`game.room.create.context.get` v1 request (payload `{}`) with the same object:
+
+```json
+{"context_id":"6f1c0d2e9b8a4c7d8e5f4a3b2c1d0e9f","revision":2,"active":true}
+```
+
+`active` is true only in the main menu and the plaza, the two scenes the server accepts a room creation from.
+A successful create or join, a round and the return from a round to its room are inactive; a refused create or join
+changes nothing. `context_id` is opaque, belongs to one game login and stays the same across launcher reconnects.
+`revision` starts at 1 and grows by one each time `active` changes, so a repeated delivery keeps its revision and a
+lower one can be ignored. The server does not know when the client's own Create Room form opens; there is no time limit
+after entering the plaza.
+
+Both rows read the scene after it changes and outside game locks, keep only the latest state per bound game connection
+and drop it when the connection closes. A state refused by a full launcher queue is sent again after
+`retry_milliseconds` (default 250), so the latest state, an inactive one included, is never lost. Launchers that do
+not negotiate these types receive nothing.
+
 ### First login on another node
 
 Enable `cluster.ticket-client.companion` on the worker and set its matching authority peer's
@@ -718,6 +748,10 @@ For server-side failures outside the launcher API, see [Troubleshooting](trouble
 - [Deployment](deployment.md) for running the server, persistence, backups and network security.
 - [Troubleshooting](troubleshooting.md) for server-side failures that are not specific to the
   launcher.
+
+## Cluster client builds {#cluster-client-builds}
+
+With a cluster, a server serves the union of its nodes' client builds. `GET /v1/catalog` then returns `clusterBuilds`, the builds some node serves, and marks each preset with `clusterServed`; both are absent without a cluster. The launcher keeps a preset whose build no node serves in the version list but disables Launch, and `POST /v1/launch` refuses it with 409 `build_not_served`. The server list for a build (`/v1/servers/{build}`) offers only servers with a node that serves it, and each node target carries its `client_builds`, so the gateway's server center lists only nodes that serve the client's build.
 
 ## Public server presentation and admission {#server-presentation-and-admission}
 

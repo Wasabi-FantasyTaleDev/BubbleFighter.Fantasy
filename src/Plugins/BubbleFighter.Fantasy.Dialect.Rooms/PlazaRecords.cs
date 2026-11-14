@@ -92,7 +92,7 @@ internal static class PlazaRecords
             ["user_slots"] = rows,
             ["local_slot"] = localSlot,
             ["party_transition"] = partyTransition,
-            ["equipped_objects"] = seats.Select(RoomRecords.EquippedObject).ToArray(),
+            ["equipped_objects"] = seats.Select(seat => RoomRecords.EquippedObject(tables, build, seat)).ToArray(),
         });
     }
 

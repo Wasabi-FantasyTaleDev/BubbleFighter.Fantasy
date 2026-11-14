@@ -1,3 +1,5 @@
+using BubbleFighter.Fantasy.Contracts.Enhancement;
+using BubbleFighter.Fantasy.Contracts.Titles;
 using System.ComponentModel.DataAnnotations;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Net;
@@ -8,6 +10,7 @@ using BubbleFighter.Fantasy.Contracts.Lobby;
 using BubbleFighter.Fantasy.Contracts.Match;
 using BubbleFighter.Fantasy.Contracts.Party;
 using BubbleFighter.Fantasy.Contracts.Players;
+using BubbleFighter.Fantasy.Contracts.Pets;
 using BubbleFighter.Fantasy.Contracts.Presents;
 using BubbleFighter.Fantasy.Contracts.Settings;
 using BubbleFighter.Fantasy.Contracts.Shop;
@@ -23,20 +26,20 @@ namespace BubbleFighter.Fantasy.Dialect.Messages;
 /// names it, and the two-frame main-menu <c>gspGotoRoom</c> / <c>gspGotoMenu</c> sender for
 /// cn-735 and its descendants (no <c>dialect.rooms</c> row on those profiles).
 /// </summary>
-[Plugin("dialect.messages", Description = "Typed message adapters for every build, with per-build layouts from the packet tables.",
+[Plugin("dialect.messages", Category = "network", Names = ["en=Message encoding", "zh-Hans=消息编码", "zh-Hant=訊息編碼", "ko=메시지 인코딩"], Description = "Typed message adapters for every build, with per-build layouts from the packet tables.",
     Requires = [typeof(IPacketRouter), typeof(IMessageRouter), typeof(IOpcodeTableRegistry)],
     // The settings repository backs the customized_keys option only; a profile without a provider keeps
     // the option off, so the read is optional rather than required.
     Optional = [typeof(IPlayerSettingsRepository)],
     OptionalMany = [typeof(IOpcodeTable), typeof(IMessageSender<MainMenuRoomOpened>)],
     Provides = [], ProvidesMany = [],
-    ConditionalProvides = [], ConditionalProvidesMany = [typeof(IMessageSender<ChannelMoveOffered>), typeof(IInboundMessageBinding<MoveIntoRequested>), typeof(IMessageSender<MoveIntoReplied>), typeof(IMessageSender<PendingConnectionPromoted>), typeof(IInboundMessageBinding<PendingPromotionAcknowledged>), typeof(IMessageSender<PendingPromotionCompleted>), typeof(IInboundMessageBinding<LoginRequested>), typeof(IMessageSender<LoginAccepted>), typeof(IMessageSender<LoginRejected>), typeof(IMessageSender<LoginSucceeded>), typeof(IInboundMessageBinding<MainMenuInitRequest>), typeof(IMessageSender<EmptySessionSignature>), typeof(IMessageSender<MatchSessionSignature>), typeof(IInboundMessageBinding<CenterStatusRequested>), typeof(IInboundMessageBinding<CenterAvailabilityRequested>), typeof(IMessageSender<CenterStatusReplied>), typeof(IMessageSender<CenterAvailabilityReplied>), typeof(IMessageSender<ServerNotice>), typeof(IInboundMessageBinding<InventoryItemUseRequested>), typeof(IMessageSender<InventoryItemUseReplied>), typeof(IMessageSender<UserStatUpdated>), typeof(IInboundMessageBinding<CharacterNameRequested>), typeof(IInboundMessageBinding<CharacterCreateRequested>), typeof(IInboundMessageBinding<CharacterLoginRequested>), typeof(IMessageSender<CharacterCreationOpened>), typeof(IMessageSender<CharacterNameReplied>), typeof(IMessageSender<CharacterCreateReplied>), typeof(IMessageSender<ShopStateUpdated>), typeof(IMessageSender<ShopPurchaseReplied>), typeof(IMessageSender<ShopBalanceUpdated>), typeof(IInboundMessageBinding<ShopBalanceRequested>), typeof(IInboundMessageBinding<ShopPurchaseRequested>), typeof(IInboundMessageBinding<ShopInventoryRequested>), typeof(IInboundMessageBinding<ShopCatalogRequested>), typeof(IInboundMessageBinding<ShopCashCatalogRequested>), typeof(IInboundMessageBinding<ShopCardInfoRequested>), typeof(IInboundMessageBinding<ShopCouponUseRequested>), typeof(IInboundMessageBinding<ShopCashCheckRequested>), typeof(IMessageSender<ShopCatalogPublished>), typeof(IMessageSender<ShopCashCatalogPublished>), typeof(IMessageSender<ShopCardInfoReplied>), typeof(IMessageSender<ShopCouponUseReplied>), typeof(IMessageSender<ShopCashCheckReplied>), typeof(IMessageSender<EquippedArticlesFlushed>), typeof(IMessageSender<InventoryReplaced>), typeof(IMessageSender<InventorySlotsUpdated>), typeof(IMessageSender<InventoryPurchaseApplied>), typeof(IMessageSender<ItemsExpired>), typeof(IMessageSender<LocalEquipmentViewUpdated>), typeof(IMessageSender<RemoteEquipmentViewUpdated>), typeof(IInboundMessageBinding<EquipmentChangeRequested>), typeof(IMessageSender<EquipmentChangeReplied>), typeof(IInboundMessageBinding<WeaponPresetChangeRequested>), typeof(IMessageSender<WeaponPresetChangeReplied>), typeof(IInboundMessageBinding<PartyInviteRequested>), typeof(IInboundMessageBinding<PartyInviteAccepted>), typeof(IInboundMessageBinding<PartyRecruitmentJoinRequested>), typeof(IInboundMessageBinding<PartyInviteAnswered>), typeof(IInboundMessageBinding<PartyInviteTokenRefused>), typeof(IInboundMessageBinding<PartyLeaveRequested>), typeof(IInboundMessageBinding<PartyKickRequested>), typeof(IInboundMessageBinding<PartyLeaderChangeRequested>), typeof(IInboundMessageBinding<PartyQuickStartRequested>), typeof(IMessageSender<PartyQuickStartAnswered>), typeof(IMessageSender<PartyInviteReplied>), typeof(IMessageSender<PartyInviteNotified>), typeof(IMessageSender<PartyUpdated>), typeof(IMessageSender<PartyLeaderReplaced>), typeof(IMessageSender<PartyLeft>), typeof(IMessageSender<PartyMemberLeft>), typeof(IMessageSender<PartyMemberJoined>), typeof(IMessageSender<PartyKickReplied>), typeof(IMessageSender<PartyKicked>), typeof(IMessageSender<PartyMemberKicked>), typeof(IMessageSender<PartyLeaderChanged>), typeof(IInboundMessageBinding<PartyVisitRequested>), typeof(IInboundMessageBinding<PartyVisitAnswered>), typeof(IInboundMessageBinding<PartyVisitTokenAnswered>), typeof(IMessageSender<PartyVisitAsked>), typeof(IMessageSender<PartyVisitFailed>), typeof(IMessageSender<PartyVisitGranted>), typeof(IMessageSender<PartyVisitSucceeded>), typeof(IMessageSender<PartyInvitationMoveSucceeded>), typeof(IInboundMessageBinding<PartyChatSent>), typeof(IMessageSender<PartyChatReceived>), typeof(IInboundMessageBinding<ClanServerAckReceived>), typeof(IInboundMessageBinding<ClanMainOpened>), typeof(IInboundMessageBinding<ClanAttendanceCheckedIn>), typeof(IMessageSender<ClanOpened>), typeof(IMessageSender<ClanAttendanceStateUpdated>), typeof(IInboundMessageBinding<FighterInfoRequested>), typeof(IMessageSender<FighterInfoReplied>), typeof(IInboundMessageBinding<PresentSendRequested>), typeof(IInboundMessageBinding<PresentListRequested>), typeof(IInboundMessageBinding<PresentActionRequested>), typeof(IInboundMessageBinding<PresentNoticeRequested>), typeof(IMessageSender<PresentSendReplied>), typeof(IMessageSender<PresentListReplied>), typeof(IMessageSender<PresentActionReplied>), typeof(IMessageSender<PresentNoticeSent>), typeof(IInboundMessageBinding<InventoryThrowRequested>), typeof(IMessageSender<InventoryThrowReplied>), typeof(IInboundMessageBinding<CustomizedKeysUpdated>), typeof(IMessageSender<CustomizedKeysRestored>), typeof(IMessageSender<LabOperationAnswered>)])]
+    ConditionalProvides = [], ConditionalProvidesMany = [typeof(IPetClientConfigurationSink), typeof(IMessageSender<ChannelMoveOffered>), typeof(IInboundMessageBinding<MoveIntoRequested>), typeof(IMessageSender<MoveIntoReplied>), typeof(IMessageSender<PendingConnectionPromoted>), typeof(IInboundMessageBinding<PendingPromotionAcknowledged>), typeof(IMessageSender<PendingPromotionCompleted>), typeof(IInboundMessageBinding<LoginRequested>), typeof(IMessageSender<LoginAccepted>), typeof(IMessageSender<LoginRejected>), typeof(IMessageSender<LoginSucceeded>), typeof(IInboundMessageBinding<MainMenuInitRequest>), typeof(IMessageSender<EmptySessionSignature>), typeof(IMessageSender<MatchSessionSignature>), typeof(IInboundMessageBinding<CenterStatusRequested>), typeof(IInboundMessageBinding<CenterAvailabilityRequested>), typeof(IMessageSender<CenterStatusReplied>), typeof(IMessageSender<CenterAvailabilityReplied>), typeof(IMessageSender<ServerNotice>), typeof(IInboundMessageBinding<InventoryItemUseRequested>), typeof(IMessageSender<InventoryItemUseReplied>), typeof(IMessageSender<UserStatUpdated>), typeof(IInboundMessageBinding<CharacterNameRequested>), typeof(IInboundMessageBinding<CharacterCreateRequested>), typeof(IInboundMessageBinding<CharacterLoginRequested>), typeof(IMessageSender<CharacterCreationOpened>), typeof(IMessageSender<CharacterNameReplied>), typeof(IMessageSender<CharacterCreateReplied>), typeof(IMessageSender<ShopStateUpdated>), typeof(IMessageSender<ShopPurchaseReplied>), typeof(IMessageSender<ShopBalanceUpdated>), typeof(IInboundMessageBinding<ShopBalanceRequested>), typeof(IInboundMessageBinding<ShopPurchaseRequested>), typeof(IInboundMessageBinding<ShopInventoryRequested>), typeof(IInboundMessageBinding<ShopCatalogRequested>), typeof(IInboundMessageBinding<ShopCashCatalogRequested>), typeof(IInboundMessageBinding<ShopCardInfoRequested>), typeof(IInboundMessageBinding<ShopCouponUseRequested>), typeof(IInboundMessageBinding<ShopCashCheckRequested>), typeof(IMessageSender<ShopCatalogPublished>), typeof(IMessageSender<ShopCashCatalogPublished>), typeof(IMessageSender<ShopCardInfoReplied>), typeof(IMessageSender<ShopCouponUseReplied>), typeof(IMessageSender<ShopCashCheckReplied>), typeof(IMessageSender<EquippedArticlesFlushed>), typeof(IMessageSender<InventoryReplaced>), typeof(IMessageSender<InventorySlotsUpdated>), typeof(IMessageSender<InventoryPurchaseApplied>), typeof(IMessageSender<ItemsExpired>), typeof(IMessageSender<LocalEquipmentViewUpdated>), typeof(IMessageSender<RemoteEquipmentViewUpdated>), typeof(IInboundMessageBinding<EquipmentChangeRequested>), typeof(IMessageSender<EquipmentChangeReplied>), typeof(IInboundMessageBinding<WeaponPresetChangeRequested>), typeof(IMessageSender<WeaponPresetChangeReplied>), typeof(IInboundMessageBinding<PartyInviteRequested>), typeof(IInboundMessageBinding<PartyInviteAccepted>), typeof(IInboundMessageBinding<PartyRecruitmentJoinRequested>), typeof(IInboundMessageBinding<PartyInviteAnswered>), typeof(IInboundMessageBinding<PartyInviteTokenRefused>), typeof(IInboundMessageBinding<PartyLeaveRequested>), typeof(IInboundMessageBinding<PartyKickRequested>), typeof(IInboundMessageBinding<PartyLeaderChangeRequested>), typeof(IInboundMessageBinding<PartyQuickStartRequested>), typeof(IMessageSender<PartyQuickStartAnswered>), typeof(IMessageSender<PartyInviteReplied>), typeof(IMessageSender<PartyInviteNotified>), typeof(IMessageSender<PartyUpdated>), typeof(IMessageSender<PartyLeaderReplaced>), typeof(IMessageSender<PartyLeft>), typeof(IMessageSender<PartyMemberLeft>), typeof(IMessageSender<PartyMemberJoined>), typeof(IMessageSender<PartyKickReplied>), typeof(IMessageSender<PartyKicked>), typeof(IMessageSender<PartyMemberKicked>), typeof(IMessageSender<PartyLeaderChanged>), typeof(IInboundMessageBinding<PartyVisitRequested>), typeof(IInboundMessageBinding<PartyVisitAnswered>), typeof(IInboundMessageBinding<PartyVisitTokenAnswered>), typeof(IMessageSender<PartyVisitAsked>), typeof(IMessageSender<PartyVisitFailed>), typeof(IMessageSender<PartyVisitGranted>), typeof(IMessageSender<PartyVisitSucceeded>), typeof(IMessageSender<PartyInvitationMoveSucceeded>), typeof(IInboundMessageBinding<PartyChatSent>), typeof(IMessageSender<PartyChatReceived>), typeof(IInboundMessageBinding<ClanServerAckReceived>), typeof(IInboundMessageBinding<ClanMainOpened>), typeof(IInboundMessageBinding<ClanAttendanceCheckedIn>), typeof(IMessageSender<ClanOpened>), typeof(IMessageSender<ClanAttendanceStateUpdated>), typeof(IInboundMessageBinding<FighterInfoRequested>), typeof(IMessageSender<FighterInfoReplied>), typeof(IInboundMessageBinding<PresentSendRequested>), typeof(IInboundMessageBinding<PresentListRequested>), typeof(IInboundMessageBinding<PresentActionRequested>), typeof(IInboundMessageBinding<PresentNoticeRequested>), typeof(IMessageSender<PresentSendReplied>), typeof(IMessageSender<PresentListReplied>), typeof(IMessageSender<PresentActionReplied>), typeof(IMessageSender<PresentNoticeSent>), typeof(IInboundMessageBinding<InventoryThrowRequested>), typeof(IMessageSender<InventoryThrowReplied>), typeof(IInboundMessageBinding<CustomizedKeysUpdated>), typeof(IMessageSender<CustomizedKeysRestored>), typeof(IInboundMessageBinding<ScienceLabConfigurationRequested>), typeof(IMessageSender<ScienceLabConfigurationPublished>), typeof(IInboundMessageBinding<TitleMakeRequested>), typeof(IInboundMessageBinding<TitleSetRequested>), typeof(IInboundMessageBinding<MedalInfoRequested>), typeof(IMessageSender<TitleMakeReplied>), typeof(IMessageSender<TitleSetReplied>), typeof(IMessageSender<TitleCatalogueConcealed>), typeof(IMessageSender<MedalInfoReplied>), typeof(IMessageSender<TitleMedalPresented>), typeof(IInboundMessageBinding<LabOperationRequested>), typeof(IMessageSender<LabOperationAnswered>), typeof(IMessageSender<LabOperationRefused>), typeof(IMessageSender<LabEnchantCompleted>), typeof(IMessageSender<LabModificationCompleted>), typeof(IMessageSender<LabConversionCompleted>), typeof(IMessageSender<LabAdvancementCompleted>), typeof(IInboundMessageBinding<LaboratoryRequested>), typeof(IMessageSender<LaboratoryRefused>), typeof(IMessageSender<LaboratoryCompleted>), typeof(IInboundMessageBinding<PetLevelUpRequested>), typeof(IInboundMessageBinding<PetAbilityChangeRequested>), typeof(IMessageSender<PetLevelUpReplied>), typeof(IMessageSender<PetAbilityChangeReplied>), typeof(IMessageSender<PetEvolved>), typeof(IMessageSender<FavoriteWeaponGradeChanged>), typeof(IMessageSender<TitleProgressNotified>)])]
 public sealed class MessagesPlugin : IPlugin
 {
     // cn-774 carries the same GotoRoom/GotoMenu pair on a different lineage (kr-1256) and is not yet decoded.
     private static readonly BuildVariants<bool> GotoRoomGotoMenu = new BuildVariants<bool>("two-frame main menu (gspGotoRoom + gspGotoMenu)").Add("cn-735", true);
 
-    /// <inheritdoc />
+    /// <summary>Installs the configured build's typed message bindings and their row-owned inventory publication scope.</summary>
     public ValueTask ActivateAsync(IPluginContext context, CancellationToken cancellationToken)
     {
         var options = context.Config.Bind<MessagesOptions>();
@@ -53,6 +56,7 @@ public sealed class MessagesPlugin : IPlugin
                 ?? throw new ConfigException($"No build of lineage [{string.Join(", ", lineage)}] is named in '{options.PacketsDirectory}'."));
         });
         var (loginTables, loginBuild) = packetTablesOfRow.Value;
+        var configurationOfRow = new Lazy<DynamicConfigWire>(() => new(loginTables, loginBuild, options.Protocol));
         var loginValues = LoginValues.From(loginBuild, loginTables.ValuesOf(loginBuild));
         var shape = loginValues.Shape;
         context.Logger.LogInformation("dialect.messages: login layout of build {Build} ({Shape}, {Reply} reply, {Burst} steps) for lineage [{Lineage}].",
@@ -65,7 +69,8 @@ public sealed class MessagesPlugin : IPlugin
         {
             if (!packetTablesOfRow.Value.Tables.CapabilityOf(packetTablesOfRow.Value.Build, "character_creation"))
                 throw new ConfigException("Native character creation preview requires a build with the character_creation capability.");
-            new CharacterCreationBinding(options.Protocol, table, packetTablesOfRow.Value.Tables, packetTablesOfRow.Value.Build).Bind(context, router);
+            new CharacterCreationBinding(options.Protocol, table, packetTablesOfRow.Value.Tables,
+                packetTablesOfRow.Value.Build, context.Events, configurationOfRow.Value).Bind(context, router);
         }
         if (options.CenterDirectory)
             new CenterDirectoryBinding(options.Protocol, table, packetTablesOfRow.Value.Tables, packetTablesOfRow.Value.Build).Bind(context, router);
@@ -117,6 +122,22 @@ public sealed class MessagesPlugin : IPlugin
             expiredItems = new ExpiredItemsBinding(options.Protocol, table, packetTables, buildName);
             context.Effect(context.Services.RegisterMany<IMessageSender<ItemsExpired>>(expiredItems));
         }
+        if (options.FavoriteWeaponGradeNotices)
+        {
+            var (packetTables, buildName) = packetTablesOfRow.Value;
+            if (packetTables.Resolve(buildName, "FavoriteWeaponGrade").Count == 0)
+                throw new ConfigException("Favorite weapon grade notices require a verified packet layout for this build.");
+            context.Effect(context.Services.RegisterMany<IMessageSender<FavoriteWeaponGradeChanged>>(
+                new FavoriteWeaponGradeBinding(options.Protocol, table, packetTables, buildName)));
+        }
+        if (options.TitleProgress)
+        {
+            var (packetTables, buildName) = packetTablesOfRow.Value;
+            if (packetTables.Resolve(buildName, "TitleInstanceNotice").Count == 0)
+                throw new ConfigException("Title progress requires a verified packet layout for this build.");
+            context.Effect(context.Services.RegisterMany<IMessageSender<TitleProgressNotified>>(
+                new TitleProgressBinding(options.Protocol, table, packetTables, buildName)));
+        }
         if (options.InventoryItemUse)
         {
             var (packetTables, buildName) = packetTablesOfRow.Value;
@@ -124,9 +145,18 @@ public sealed class MessagesPlugin : IPlugin
                 throw new ConfigException("Inventory item use requires a verified packet layout for this build.");
             new InventoryUseBinding(options.Protocol, table, packetTables, buildName).Bind(context, router);
         }
+        if (options.Pets)
+            new PetBinding(options.Protocol, table, packetTablesOfRow.Value.Tables,
+                packetTablesOfRow.Value.Build).Bind(context, router);
         if (options.ScienceLab)
             new LabBinding(options.Protocol, table, packetTablesOfRow.Value.Tables,
                 packetTablesOfRow.Value.Build).Mount(context);
+        if (options.ScienceLabConfiguration)
+            new ScienceLabConfigurationBinding(options.Protocol, table, packetTablesOfRow.Value.Tables,
+                packetTablesOfRow.Value.Build).Bind(context, router);
+        if (options.Titles)
+            new TitleBinding(options.Protocol, table, packetTablesOfRow.Value.Tables,
+                packetTablesOfRow.Value.Build).Bind(context, router);
         if (options.InventoryActions)
             new InventoryActionsBinding(options.Protocol, table, packetTablesOfRow.Value.Tables,
                 packetTablesOfRow.Value.Build).Bind(context, router);
@@ -153,14 +183,22 @@ public sealed class MessagesPlugin : IPlugin
         if (options.EnablePurchases || options.Inventory)
         {
             // One inventory time origin per connection, shared by every bag and shop writer.
-            inventoryScope = new InventoryBaselineScope(options.MaxShopSessions, TimeProvider.System);
+            inventoryScope = new InventoryBaselineScope(options.MaxShopSessions, TimeProvider.System,
+                options.MaxInventoryPublicationsPerConnection);
             context.Effect(inventoryScope);
             context.Effect(context.Events.On<ConnectionClosedEvent>(e => inventoryScope.Remove(e.Connection.Id)));
             inventoryBinding = new InventoryBinding(options.Protocol, table,
-                packetTablesOfRow.Value.Tables, packetTablesOfRow.Value.Build, inventoryScope);
+                packetTablesOfRow.Value.Tables, packetTablesOfRow.Value.Build, inventoryScope, context.Events);
             context.Effect(context.Services.RegisterMany<IMessageSender<InventoryReplaced>>(inventoryBinding));
             context.Effect(context.Services.RegisterMany<IMessageSender<InventorySlotsUpdated>>(inventoryBinding));
             context.Effect(context.Services.RegisterMany<IMessageSender<InventoryPurchaseApplied>>(inventoryBinding));
+        }
+        if (options.LegacyScienceLab)
+        {
+            var scope = inventoryScope
+                ?? throw new ConfigException("legacy_science_lab requires inventory or enable_purchases to establish its time origin.");
+            new LaboratoryBinding(options.Protocol, table, packetTablesOfRow.Value.Tables,
+                packetTablesOfRow.Value.Build, scope).Bind(context, router);
         }
         if (options.EnablePurchases)
         {
@@ -309,17 +347,20 @@ public sealed class MessagesPlugin : IPlugin
                 // S2C 4 frame (kr-1256 sub_9ACF60 consumes it as the cached-configuration
                 // acknowledgement); only stale categories are re-framed.
                 var configAck = table.Find(PacketDirection.ServerToClient, "gspReqPing");
-                var configuration = new DynamicConfigWire(loginTables, loginBuild);
+                var configuration = configurationOfRow.Value;
+                if (configuration.SupportsPetConfiguration)
+                    context.Effect(context.Services.RegisterMany<IPetClientConfigurationSink>(configuration));
                 context.Effect(context.Services.Get<IPacketRouter>().Register(options.Protocol, clientEnvironment,
-                    (session, packet, ct) =>
+                    async (session, packet, ct) =>
                     {
                         context.Logger.LogInformation(
                             "Session {Id}: dynamic configuration request ({Bytes} bytes).",
                             session.Id, packet.Payload.Length);
-                        var reply = configuration.Reply(packet.Payload.Span);
-                        return reply is not null ? session.SendAsync(dynamicConfig, reply, ct)
+                        var settings = await DynamicConfigWire.ResolvePetConfigurationAsync(context.Events, options.Protocol, ct).ConfigureAwait(false);
+                        var reply = configuration.Reply(packet.Payload.Span, settings);
+                        await (reply is not null ? session.SendAsync(dynamicConfig, reply, ct)
                             : configAck is { } ack ? session.SendAsync(ack, ReadOnlyMemory<byte>.Empty, ct)
-                            : session.SendAsync(dynamicConfig, LoginBurstWire.WriteDynamicConfigEmpty(loginTables, loginBuild), ct);
+                            : session.SendAsync(dynamicConfig, LoginBurstWire.WriteDynamicConfigEmpty(loginTables, loginBuild), ct)).ConfigureAwait(false);
                     }));
             }
             if (table.Find(PacketDirection.ClientToServer, "gcpReqUserLaboratoryState") is { } laboratory)
@@ -589,11 +630,19 @@ public sealed class MessagesOptions
     public bool Clan { get; set; }
 
     /// <summary>
-    /// Gets or sets whether the eight audited laboratory requests receive the closed-lab reply.
-    /// Defaults to false and requires every operation's verified request and reply rows. No recipes,
-    /// item mutations or laboratory state opener are implemented. YAML key <c>science_lab</c>.
+    /// Gets or sets whether the audited laboratory requests are routed to shared feature handlers.
+    /// Defaults to false; an absent handler receives the client's closed-laboratory result.
     /// </summary>
     public bool ScienceLab { get; set; }
+
+    /// <summary>Gets or sets whether the audited native laboratory configuration request and reply are bound.</summary>
+    public bool ScienceLabConfiguration { get; set; }
+
+    /// <summary>Gets or sets whether the audited legacy synthesis and decomposition messages share the inventory time origin.</summary>
+    public bool LegacyScienceLab { get; set; }
+
+    /// <summary>Gets or sets whether this build binds its audited title acquisition, equipment and medal messages.</summary>
+    public bool Titles { get; set; }
 
     /// <summary>
     /// Gets or sets whether to bind the player menu's "view info" packets (<c>gcpReqFighterInfo</c> and
@@ -604,6 +653,9 @@ public sealed class MessagesOptions
 
     /// <summary>Gets or sets whether the profile enables verified inventory consumable requests and replies.</summary>
     public bool InventoryItemUse { get; set; }
+
+    /// <summary>Gets or sets whether the build's audited pet requests and evolution notifications are bound.</summary>
+    public bool Pets { get; set; }
 
     /// <summary>
     /// Gets or sets whether this row binds the native expired-item discard (<c>gcpReqInventoryThrowItem</c> in,
@@ -637,6 +689,18 @@ public sealed class MessagesOptions
     /// <c>expired_item_notice</c> capability. YAML key <c>expired_item_notices</c>.
     /// </summary>
     public bool ExpiredItemNotices { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether to write the Favorite weapon grade notice (<c>gspNotifyFavoriteWeaponGrade</c>,
+    /// <c>packets/skill-honor.yaml</c>) for the <c>item-enhancement</c> rows; the build needs the <c>FavoriteWeaponGrade</c> layout.
+    /// </summary>
+    public bool FavoriteWeaponGradeNotices { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether to write the title condition progress (<c>gspNotifyUserTitleInstance</c>, <c>packets/titles-medals.yaml</c>)
+    /// for the <c>titles</c> row's <c>favorite_titles</c>; the build needs the <c>TitleInstanceNotice</c> layout.
+    /// </summary>
+    public bool TitleProgress { get; set; }
     /// <summary>
     /// Gets or sets whether to bind native character creation for a store-backed lobby, on builds whose
     /// <c>character_creation</c> capability in <c>packets/builds.yaml</c> is set; other builds keep it off.
@@ -671,9 +735,13 @@ public sealed class MessagesOptions
     /// </summary>
     public bool TypedPlazaEnter { get; set; } = true;
 
-    /// <summary>Gets or sets the maximum live connections retaining an inventory time origin.</summary>
+    /// <summary>Gets or sets the maximum connections retaining an inventory origin or running/pending publication, including retired work until it drains.</summary>
     [Range(1, 65536)]
     public int MaxShopSessions { get; set; } = 512;
+
+    /// <summary>Gets or sets the maximum running plus pending inventory, shop-state and legacy laboratory publications per connection.</summary>
+    [Range(1, InventoryBaselineScope.MaximumPublicationCapacity)]
+    public int MaxInventoryPublicationsPerConnection { get; set; } = InventoryBaselineScope.DefaultPublicationCapacity;
 
     /// <summary>Gets or sets the legacy game connection protocol, such as <c>kr-812/game</c>.</summary>
     [Required, StringLength(128, MinimumLength = 1)]

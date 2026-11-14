@@ -33,6 +33,7 @@ structs:
       offset: 28
   # Element readers/writers: cn-717 sub_88EC40/sub_88EB20,
   # id-1809 sub_7A6370/sub_7A6340 and cn-706 sub_788A10/sub_7889E0.
+  # Identifiers are selected by live_score_kinds in builds.yaml; a shared envelope does not imply shared stat kinds.
   RoundLiveScoreStat:
     - kind: u8
       offset: 4

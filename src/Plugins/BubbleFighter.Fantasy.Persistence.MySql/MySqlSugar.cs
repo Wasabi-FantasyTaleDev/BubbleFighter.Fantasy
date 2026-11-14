@@ -64,16 +64,20 @@ internal sealed class SugarSession : IAsyncDisposable
     }
 
     /// <summary>
-    /// Starts a transaction at the server's default isolation level (REPEATABLE READ), the level every
-    /// multi-row write in this plugin was designed against.
+    /// Starts a REPEATABLE READ transaction unless an operation explicitly selects another isolation level.
     /// </summary>
     /// <returns>The transaction; disposing it without a commit rolls it back.</returns>
     public ValueTask<SugarTransaction> BeginAsync() => BeginAsync(IsolationLevel.RepeatableRead);
 
     /// <summary>Starts a mutation transaction and, when required, locks and validates its account authority until commit.</summary>
-    public async ValueTask<SugarTransaction> BeginWriteAsync(long userNum, IAccountMutationFence? authority, CancellationToken ct)
+    public ValueTask<SugarTransaction> BeginWriteAsync(long userNum, IAccountMutationFence? authority, CancellationToken ct) =>
+        BeginWriteAsync(userNum, authority, IsolationLevel.RepeatableRead, ct);
+
+    /// <summary>Starts a mutation at the requested isolation level while retaining its account authority fence until completion.</summary>
+    public async ValueTask<SugarTransaction> BeginWriteAsync(long userNum, IAccountMutationFence? authority,
+        IsolationLevel isolation, CancellationToken ct)
     {
-        var transaction = await BeginAsync().ConfigureAwait(false);
+        var transaction = await BeginAsync(isolation).ConfigureAwait(false);
         try
         {
             if (authority is not null) await authority.VerifyAsync(_connection, Db.Ado.Transaction as DbTransaction ?? throw new InvalidOperationException("A mutation requires an active transaction."), userNum, ct).ConfigureAwait(false);

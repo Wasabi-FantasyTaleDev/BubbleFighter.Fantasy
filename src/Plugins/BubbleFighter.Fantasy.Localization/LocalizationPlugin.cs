@@ -8,7 +8,7 @@ using BubbleFighter.Fantasy.Contracts.Sessions;
 namespace BubbleFighter.Fantasy.Localization;
 
 /// <summary>Loads bounded game-language resources and publishes the game text service.</summary>
-[Plugin("localization", Provides = [typeof(IGameText)])]
+[Plugin("localization", Category = "admin", Names = ["en=Localization", "zh-Hans=本地化", "zh-Hant=在地化", "ko=현지화"], Provides = [typeof(IGameText)])]
 public sealed class LocalizationPlugin : IPlugin
 {
     /// <inheritdoc />

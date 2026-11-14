@@ -67,7 +67,8 @@ internal sealed class FighterInfoBinding(string protocol, IOpcodeTable opcodes, 
         message = snapshot.Reply;
         var reply = Encode(message, snapshot.Statistics);
         var view = message.Fighter is { } fighter && message.Appearance is { } appearance
-            ? EquipmentViewBinding.WriteView(tables, build, fighter.UserNum, appearance.CharacterItemId, appearance.EquippedItemIds)
+            ? EquipmentViewBinding.WriteView(tables, build, fighter.UserNum, appearance.CharacterItemId,
+                appearance.EquippedItemIds, appearance.ItemAttributes)
             : null;
         if (view is not null)
             await session.SendAsync(opcodes.S2C("gspInventoryViewUpdateView"), view, ct).ConfigureAwait(false);

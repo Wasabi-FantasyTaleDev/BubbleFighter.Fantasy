@@ -15,7 +15,7 @@ public sealed class LocalPresenceOptions
 }
 
 /// <summary>Reports local login owners without mounting an account API or replacing a node's ticket authority.</summary>
-[Plugin("launcher.presence-local", Description = "Private local presence for nodes without a Launcher API.",
+[Plugin("launcher.presence-local", Category = "launcher", Names = ["en=Launcher presence", "zh-Hans=启动器在线状态", "zh-Hant=啟動器上線狀態", "ko=런처 접속 상태"], Description = "Private local presence for nodes without a Launcher API.",
     Requires = [typeof(ISessionRegistry)], Provides = [typeof(ILocalLauncherPresence)])]
 public sealed class LocalPresencePlugin : IPlugin
 {

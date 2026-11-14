@@ -9,6 +9,9 @@ internal sealed class ActivationServiceAccess
     private readonly Dictionary<Type, ServiceCardinality> _writes = [];
     private readonly HashSet<Type> _decorates = [];
     private readonly HashSet<Type> _observes = [];
+    // Contracts read from the registry at each call. They stay out of the committed view, so a provider that comes or
+    // goes never makes this activation stale.
+    private readonly HashSet<Type> _live = [];
     internal ActivationServiceAccess(ScopedServiceRegistry owner, PluginAttribute declaration)
     {
         _owner = owner;
@@ -16,6 +19,9 @@ internal sealed class ActivationServiceAccess
         AddReads(declaration.Optional, ServiceCardinality.Single, false);
         AddReads(declaration.RequiresMany, ServiceCardinality.Multiple, true);
         AddReads(declaration.OptionalMany, ServiceCardinality.Multiple, false);
+        foreach (var type in Copy(declaration.LiveMany))
+            if (_reads.ContainsKey(type) || !_live.Add(type))
+                throw new InvalidOperationException($"Duplicate read declaration for '{type.FullName}'.");
         foreach (var type in Copy(declaration.Decorates))
         {
             if (!_decorates.Add(type)) throw new InvalidOperationException("Duplicate decoration declaration.");
@@ -34,11 +40,13 @@ internal sealed class ActivationServiceAccess
                 (_writes.TryGetValue(type, out var mode) && mode != ServiceCardinality.Single))
                 throw new InvalidOperationException("Availability observation requires singleton mode.");
         }
-        View = new DeclaredServiceView(owner.Scope, _reads.Values.ToArray()).Commit(owner.Activation,
-            owner.Registry.CaptureBindings(owner.Activation, _decorates));
+        var declared = new DeclaredServiceView(owner.Scope, _reads.Values.ToArray());
+        _keys = declared.Keys;
+        View = declared.Commit(owner.Activation, owner.Registry.CaptureBindings(owner.Activation, _decorates, _keys));
     }
+    private readonly IReadOnlySet<ServiceKey> _keys;
     internal CommittedServiceView View { get; }
-    internal bool MatchesCurrent() => View.Matches(_owner.Registry.CaptureBindings(_owner.Activation, _decorates));
+    internal bool MatchesCurrent() => View.Matches(_owner.Registry.CaptureBindings(_owner.Activation, _decorates, _keys));
     internal bool ReadsProjection(Type contract) => _reads.ContainsKey(contract) && !_decorates.Contains(contract);
     internal void RequirePublish(Type contract, ServiceCardinality cardinality)
     {
@@ -66,6 +74,9 @@ internal sealed class ActivationServiceAccess
     internal IReadOnlyList<TService> GetAll<TService>() where TService : class
     {
         var type = typeof(TService);
+        if (_live.Contains(type))
+            return Array.AsReadOnly(_owner.Registry.LiveBindings(_owner.Scope, _owner.Activation, type)
+                .Select(binding => (TService)binding.Instance).ToArray());
         RequireRead(type, ServiceCardinality.Multiple);
         IReadOnlyList<ServiceBinding> external = View.Selections.TryGetValue(type, out var selection) ? selection.Bindings : [];
         var own = _writes.ContainsKey(type) ? _owner.Registry.OwnBindings(_owner.Scope, _owner.Activation, type) : [];
@@ -97,6 +108,7 @@ internal sealed class ActivationServiceAccess
         foreach (var type in Copy(types))
         {
             if (!_writes.TryAdd(type, cardinality)) throw new InvalidOperationException($"Duplicate publication declaration for '{type.FullName}'.");
+            if (_live.Contains(type)) throw new InvalidOperationException($"A live read of '{type.FullName}' cannot also be published by the same activation.");
             if (_reads.TryGetValue(type, out var read) && read.Cardinality != cardinality)
                 throw new InvalidOperationException($"Read and publication modes differ for '{type.FullName}'.");
         }

@@ -8,6 +8,7 @@
   parent_id: clientdata
   isolated_services:
     - BubbleFighter.Fantasy.Contracts.Inventory.IInventoryRepository
+    - BubbleFighter.Fantasy.Contracts.Inventory.IInventoryBuildScope
     - BubbleFighter.Fantasy.Contracts.Inventory.IPlayerInventoryState
     - BubbleFighter.Fantasy.Contracts.Inventory.IWeaponPresetPageSource
     - BubbleFighter.Fantasy.Contracts.Fighters.IFighterRoster
@@ -26,6 +27,8 @@
     version_major: 1256
     enabled: true
     publish_equipped_view_push: true
+    # Each preset page keeps the weapon worn while it was active, per build (kr-1256 sub_81B820 keys pages by position).
+    persist_preset_pages: true
 # The kr-1256 family's match transport, as the shared native rows already serve the legacy builds. The relay
 # handshake (join reader kr-1256 sub_95FD30, scene report reader kr-1256 sub_10F32C0, reconnect map reader
 # kr-1256 sub_9F02F0) is dialect.match; the relay success frames (S2C 22 settings then S2C 1 accepted, and the
@@ -74,6 +77,7 @@
   plugin: ingame
   parent_id: inventoryview
   config:
+    mode_name_table_path: data/room-modes.json
     game_protocol: "kr-1256/game"
     relay_protocol: "kr-1256/relay"
     relay_advertise_ipv4: "${BFF_PUBLIC_HOST:-127.0.0.1}"
@@ -159,3 +163,11 @@
     # and the member list republished.
     reinstall_room_on_first_probe: false
 # In-round traffic between the players: movement, actions, damager spawns, lives
+# Applies the server-wide ban-pick policies and room host bans to this build's rooms (see the banpick row). A child of
+# the room row, so it sees this build's client data and room policy host.
+- id: banpick.room
+  plugin: banpick.room
+  parent_id: ingame
+  config:
+    protocol: "kr-1256/game"
+    shop_item_client_path: "Config/ShopItem2.xml"

@@ -26,13 +26,16 @@ structs:
       offset: 72
     - regeneration_min_ms: list<u32>
       offset: 88
-    - unknown_104: list<u32>
+    # One entry per #sp_star_<a>_<b>_<n> or #sp_bigStar_<a>_<b>_<n> map helper (kr-812 sub_50C840): the kind
+    # sub_75CFF0 gives the name (1 for "star", 2 for "bigStar"), the helper's position, then the name's fourth
+    # segment <b> (sub_75D250) and its third segment <a> (sub_75D180), both read as numbers.
+    - star_kinds: list<u32>
       offset: 104
-    - unknown_120: list<SupplyPosition>
+    - star_positions: list<SupplyPosition>
       offset: 120
-    - unknown_136: list<u32>
+    - star_period_ms: list<u32>
       offset: 136
-    - unknown_152: list<u32>
+    - star_first_ms: list<u32>
       offset: 152
     - unknown_168: list<u32>
       offset: 168
@@ -256,13 +259,16 @@ structs:
       offset: 40
     - regeneration_min_ms: list<u32> # The builders use itemBoxRegenMinTime 15000 and itemBoxRegenMaxTime 30000.
       offset: 52
-    - unknown_64: list<u32>
+    # One entry per #sp_star_<a>_<b>_<n> or #sp_bigStar_<a>_<b>_<n> map helper while the client option
+    # starTypeSpawnPoint is set (kr-1256 sub_6DA5D0): kind 1 for "star" and 2 for "bigStar", the helper's
+    # position, then the name's fourth segment <b> and its third segment <a>, both read as numbers.
+    - star_kinds: list<u32>
       offset: 64
-    - unknown_76: list<SupplyPosition>
+    - star_positions: list<SupplyPosition>
       offset: 76
-    - unknown_88: list<u32>
+    - star_period_ms: list<u32>
       offset: 88
-    - unknown_100: list<u32>
+    - star_first_ms: list<u32>
       offset: 100
     - unknown_112: list<u32>
       offset: 112

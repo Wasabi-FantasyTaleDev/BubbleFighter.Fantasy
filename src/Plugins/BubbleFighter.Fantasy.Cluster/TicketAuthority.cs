@@ -95,7 +95,7 @@ internal sealed class TicketAuthority(WebApplication app, TicketAuthorityOptions
 internal sealed record TicketRedemption(string Ticket, string Build);
 
 /// <summary>Exposes an existing local ticket authority only to explicitly trusted worker nodes.</summary>
-[Plugin("cluster.ticket-authority", Description = "Private one-use ticket redemption for trusted workers.",
+[Plugin("cluster.ticket-authority", Category = "cluster", Names = ["en=Cluster ticket authority", "zh-Hans=集群票据签发", "zh-Hant=叢集票證簽發", "ko=클러스터 티켓 발급"], Description = "Private one-use ticket redemption for trusted workers.",
     Requires = [typeof(ILauncherTicketService)], Optional = [typeof(ICompanionFederation)])]
 public sealed class TicketAuthorityPlugin : IPlugin
 {

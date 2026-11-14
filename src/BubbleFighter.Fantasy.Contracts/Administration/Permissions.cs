@@ -48,4 +48,8 @@ public interface IPermissionService
 /// <param name="Subject">The effective account whose permissions and state apply.</param>
 /// <param name="Status">The outcome classification.</param>
 public sealed record CommandCompleted(string Command, string Owner, CommandPrincipal Actor,
-    CommandPrincipal Subject, CommandStatus Status) : IEvent;
+    CommandPrincipal Subject, CommandStatus Status) : IEvent
+{
+    /// <summary>Gets where the command came from.</summary>
+    public required CommandSource Source { get; init; }
+}

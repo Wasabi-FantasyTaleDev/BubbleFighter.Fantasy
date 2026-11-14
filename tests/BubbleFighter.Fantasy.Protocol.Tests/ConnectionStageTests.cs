@@ -201,7 +201,7 @@ public sealed class ConnectionStageTests
             }),
             Row("packet-log", "diagnostics.packet-log", new()
             {
-                ["file"] = file, ["console_packets"] = false, ["catalog_directory"] = "", ["preview_bytes"] = 0,
+                ["packets_enabled"] = true, ["file"] = file, ["console_packets"] = false, ["catalog_directory"] = "", ["preview_bytes"] = 0,
             }),
             Row("close-probe", "test.stage-close"),
         };

@@ -33,12 +33,12 @@ public sealed class LotteryGrantTests
             </Workbook>
             """);
         var prize = new LotteryItem { DisplayId = 1013069, ItemId = 100443, Quantity = 5, Stackable = true };
-        LotteryCatalog.Validate(workbook, [prize]);
+        LotteryCatalog.Validate(Bytes(workbook), [prize]);
         prize.DisplayId = 100443;
-        Assert.Throws<BubbleFighter.Fantasy.Abstractions.ConfigException>(() => LotteryCatalog.Validate(workbook, [prize]));
+        Assert.Throws<BubbleFighter.Fantasy.Abstractions.ConfigException>(() => LotteryCatalog.Validate(Bytes(workbook), [prize]));
         prize.DisplayId = 1013069;
         prize.Quantity = 10;
-        Assert.Throws<BubbleFighter.Fantasy.Abstractions.ConfigException>(() => LotteryCatalog.Validate(workbook, [prize]));
+        Assert.Throws<BubbleFighter.Fantasy.Abstractions.ConfigException>(() => LotteryCatalog.Validate(Bytes(workbook), [prize]));
     }
     /// <summary>Repeated consumable rewards increment the existing stack with a conditional transaction.</summary>
     [Fact]
@@ -108,4 +108,6 @@ public sealed class LotteryGrantTests
             Assert.All(cards.Where(c => c.Lucci > 0).GroupBy(c => c.Lucci), g => Assert.InRange(g.Count(), 1, 3));
         }
     }
+
+    private static byte[] Bytes(XDocument document) => System.Text.Encoding.UTF8.GetBytes(document.ToString());
 }

@@ -44,12 +44,15 @@ public sealed class LauncherServer : IAsyncDisposable
         LauncherSessions sessions, ISessionRegistry? players, IMatchConnectionTracker? matchConnections = null,
         IPlayerWalletRepository? wallets = null, IPlayerProgressRepository? progress = null, CancellationToken ct = default,
         ILogger? logger = null, IMessengerTicketIssuer? messenger = null, IHostReadiness? readiness = null,
-        ICompanionTicketIssuer? companion = null, IServerDirectory? directory = null, ILauncherServerSelection? serverSelection = null, ILauncherPresenceDirectory? presenceDirectory = null)
+        ICompanionTicketIssuer? companion = null, IServerDirectory? directory = null, ILauncherServerSelection? serverSelection = null, ILauncherPresenceDirectory? presenceDirectory = null,
+        IServerSelectionDirectory? clusterBuilds = null)
     {
         Validator.ValidateObject(options, new ValidationContext(options), true);
         var errors = options.Validate().ToArray(); if (errors.Length > 0) throw new ValidationException(string.Join("; ", errors.Select(e => e.ErrorMessage)));
         var center = new { enabled = options.Center.Enabled, mode = options.Center.Mode };
         var policy = new LauncherClientPolicy(options);
+        // The builds the cluster's nodes are configured to serve; null without a cluster, where every instance is local.
+        IReadOnlyList<string>? ServedBuilds() => clusterBuilds?.ClientBuilds;
         var presence = new LauncherPresence(options, players, matchConnections);
         if (options.PresenceGroup.Length > 0 && (presenceDirectory is null
             || !presenceDirectory.Groups.Contains(options.PresenceGroup, StringComparer.Ordinal)))
@@ -111,13 +114,27 @@ public sealed class LauncherServer : IAsyncDisposable
             profileFields = new[] { "level", "lucci", "cash" },
             presentation = presence.Presentation(options.ShowOnlinePlayers ? await Aggregate(false, context.RequestAborted).ConfigureAwait(false) : null),
             policy.MinimumLauncherVersion, clientPolicy = policy.ClientPolicy,
-            instances = options.Instances.Select(instance => CatalogInstance(instance, context.Request.Host.Host)),
+            instances = options.Instances.Select(instance => CatalogInstance(instance, context.Request.Host.Host, ServedBuilds())),
+            clusterBuilds = ServedBuilds(),
         })));
         if (directory is not null)
             app.MapGet("/v1/servers/{build}", (string build) =>
                 build.Length > 64 || !options.Instances.Any(instance => instance.Build == build)
                     ? Results.NotFound()
-                    : Results.Json(new { schema = 1, build, center, generated_at_utc = DateTimeOffset.UtcNow, servers = directory.ListServers(build) }));
+                    : Results.Json(new { schema = 1, build, center, generated_at_utc = DateTimeOffset.UtcNow, sections = directory.Sections, servers = directory.ListServers(build) }));
+        // Every published notice for the section, newest first; the Launcher remembers which ones the player has seen.
+        app.MapGet("/v1/notices", (HttpContext context) =>
+        {
+            var section = context.Request.Query["section"].ToString();
+            if (section.Length > 64) return Results.BadRequest(new { error = "invalid_section" });
+            var now = DateTimeOffset.UtcNow;
+            var notices = options.Notices
+                .Select(notice => (notice, published: LauncherOptions.NoticeTime(notice.PublishedAt!)))
+                .Where(item => item.published <= now && (item.notice.Sections.Length == 0 || section.Length > 0 && item.notice.Sections.Contains(section, StringComparer.Ordinal)))
+                .OrderByDescending(item => item.published)
+                .Select(item => new { item.notice.Id, item.notice.Title, item.notice.Body, item.notice.Level, publishedAt = item.published });
+            return Results.Json(new { schema = 1, notices });
+        });
         app.MapGet("/v1/players", (Delegate)(async (HttpContext context) =>
         {
             // Disabling disclosure must not even consult the session registry.
@@ -221,6 +238,8 @@ public sealed class LauncherServer : IAsyncDisposable
             var build = body.TryGetProperty("build", out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : throw new InvalidDataException();
             var preset = options.Instances.FirstOrDefault(i => i.Build == build);
             if (preset is null) return Results.BadRequest(new { error = "unsupported_build" });
+            // The catalog marks such an instance clusterServed: false and the launcher disables it; this refuses an older one.
+            if (ServedBuilds() is { } served && !served.Contains(build!, StringComparer.Ordinal)) return Error(409, "build_not_served");
             var metadata = LauncherLaunchMetadata.Read(body);
             RequireReady(readiness);
             bool? selectionRequested = body.TryGetProperty("serverSelection", out var selectionValue) ? selectionValue.ValueKind switch
@@ -334,7 +353,8 @@ public sealed class LauncherServer : IAsyncDisposable
     }
 
     // An instance without a host is served from this machine: it advertises the address the launcher used to reach the API.
-    private static Dictionary<string, object?> CatalogInstance(LauncherInstanceOptions instance, string requestHost)
+    private static Dictionary<string, object?> CatalogInstance(LauncherInstanceOptions instance, string requestHost,
+        IReadOnlyList<string>? clusterBuilds)
     {
         var result = new Dictionary<string, object?>
         {
@@ -344,6 +364,9 @@ public sealed class LauncherServer : IAsyncDisposable
             ["protocolVersion"] = instance.ProtocolVersion, ["patchVersion"] = instance.PatchVersion.Length == 0 ? null : instance.PatchVersion,
             ["endpoint"] = new { Host = instance.Host.Length == 0 ? requestHost : instance.Host, instance.Port }, ["launcherLogin"] = instance.LauncherLogin,
         };
+        // With a cluster, an instance whose build no node serves cannot be placed; the launcher must not offer it.
+        if (clusterBuilds is not null)
+            result["clusterServed"] = clusterBuilds.Contains(instance.Build, StringComparer.Ordinal);
         if (instance.DownloadSource is { } source)
             result["downloadSource"] = new { source.Kind, source.BaseUrl, source.CatalogPath, source.PackageId };
         return result;

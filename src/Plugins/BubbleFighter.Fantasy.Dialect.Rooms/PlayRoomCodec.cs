@@ -336,7 +336,11 @@ internal sealed partial class PlayRoomCodec(
         // (s2c#2114-2117), which the plaza burst carries elsewhere.
         await session.SendAsync(S2C(session, "gspGotoLobby"), RoomCodec.WriteSceneTransition(packetTables, lineage), ct).ConfigureAwait(false);
         var own = new BubbleFighter.Fantasy.Contracts.Lobby.MainMenuRoomOpened(message.Seat.UserNum, message.Seat.Nickname,
-            message.Seat.CharacterItemId, message.Seat.EquippedItemIds.Count > 0 ? message.Seat.EquippedItemIds : [message.Seat.CharacterItemId]) { ColorIndex = message.Seat.ColorIndex };
+            message.Seat.CharacterItemId, message.Seat.EquippedItemIds.Count > 0 ? message.Seat.EquippedItemIds : [message.Seat.CharacterItemId])
+        {
+            ColorIndex = message.Seat.ColorIndex,
+            ItemAttributes = message.Seat.ItemAttributes,
+        };
         await session.SendAsync(S2C(session, "gspRoomSetSlot"), PlazaRoomWire.WriteSetSlot(own, packetTables, lineage, schema, slot: 0, ready: false), ct)
             .ConfigureAwait(false);
     }
@@ -385,7 +389,7 @@ internal sealed partial class PlayRoomCodec(
         var scoreboard = EntryScoreboardValues(packetTables, lineage, message.Room);
         await session.SendAsync(S2C(session, "gspRoomEnterGame"),
             RoundEntryWire.Write(packetTables, lineage, unknown0: 0, mapKey: mapKey, roomState: 3,
-                scoreboardValues: scoreboard, series: message.Series), ct).ConfigureAwait(false);
+                scoreboardValues: scoreboard, series: message.Series, mapSeed: message.MapSeed), ct).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -564,7 +568,7 @@ internal sealed partial class PlayRoomCodec(
 
     private byte[] LeaveSlot(RoomMemberView seat) =>
         RoomCodec.WriteSeatEnvelope(packetTables, lineage, schema, seat.Slot,
-            Slot(seat) with { Occupied = false, Departed = true, EquippedItemIds = [], Ready = false }, leaving: true);
+            Slot(seat) with { Occupied = false, Departed = true, EquippedItemIds = [], ItemAttributes = [], Ready = false }, leaving: true);
 
     private RoomValues Values(RoomView room, int sessionState)
     {
@@ -596,5 +600,6 @@ internal sealed partial class PlayRoomCodec(
             Team = seat.Team == 0 ? 2 : seat.Team, Level = seat.Level, ColorIndex = seat.ColorIndex,
             ControllerSlot = seat.Slot,
             InventorySelection = seat.InventorySelection,
+            ItemAttributes = seat.ItemAttributes,
         };
 }

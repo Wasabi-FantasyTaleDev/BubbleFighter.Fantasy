@@ -12,6 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\Shared\PlayerSettingsContractTests.cs" Link="PlayerSettingsContractTests.cs" />
+    <Compile Include="..\Shared\OwnedInventorySelectionContractTests.cs" Link="OwnedInventorySelectionContractTests.cs" />
     <Compile Include="..\Shared\PresentStoreContractTests.cs" Link="PresentStoreContractTests.cs" />
     <Compile Include="..\Shared\MessengerStoreContractTests.cs" Link="MessengerStoreContractTests.cs" />
   </ItemGroup>

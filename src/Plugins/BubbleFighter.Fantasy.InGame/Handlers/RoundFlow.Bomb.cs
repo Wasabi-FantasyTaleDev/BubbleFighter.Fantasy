@@ -26,7 +26,7 @@ internal sealed partial class RoundFlow
             if (first != second && series.TryForfeit(first ? 1 : 2))
                 room.DecidedWinnerTeam = series.MatchWinner;
             end = series.Forfeited && room.Phase == RoomPhase.Playing;
-            settle = _options.RecordBattleStatistics && series.Forfeited
+            settle = series.Forfeited
                 && (room.Phase == RoomPhase.Result
                     || room.Phase == RoomPhase.Starting && series.RoundIndex > 0);
             canceled = !series.Forfeited && room.Phase == RoomPhase.Playing

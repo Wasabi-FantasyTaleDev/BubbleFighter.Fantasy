@@ -37,6 +37,8 @@ public static partial class Program
                 case "--state-dir": stateDirectory = RequireValue(args, ref index, "--state-dir"); break;
                 case "--patch": patches.Add(Path.GetFullPath(RequireValue(args, ref index, "--patch"))); break;
                 case "--log-level": _ = RequireValue(args, ref index, "--log-level"); break;
+                case "--log-file": _ = RequireValue(args, ref index, "--log-file"); break;
+                case "--log-file-level": _ = RequireValue(args, ref index, "--log-file-level"); break;
                 default: throw new ConfigException($"Unknown start option '{args[index]}'.");
             }
         }

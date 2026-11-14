@@ -1,8 +1,16 @@
 ---
 title: "문제 해결"
 description: "빌드, 설정, 시작, 네트워크, 영속성과 SDK 장애를 순서대로 진단합니다."
-updated: 2026-10-20
+updated: 2026-11-09
 ---
+
+## Host 파일 로그가 없거나 불완전한 경우 {#host-file-logs}
+
+실제 프로세스 환경이나 명령줄에 `BFF_LOG_FILE` 또는 `--log-file`이 설정되었는지 확인하세요. 파일 로깅은 기본적으로 꺼져 있고 파일 기준 수준은 `Warning`입니다. 정보 기록이 필요하면 `BFF_LOG_FILE_LEVEL=Information` 또는 `--log-file-level Information`을 설정하세요. 범주 필터는 계속 적용되며 콘솔 기준 수준은 바뀌지 않습니다.
+
+시작 시 경로, 권한 또는 잠금 오류가 발생하면 파일 작성기가 시작되지 않은 것입니다. 쓰기 가능한 영구 경로를 사용하고 실행 중인 Host마다 별도 파일을 지정하세요. 기존 현재 파일이 `BFF_LOG_FILE_MAX_BYTES`를 넘으면 시작 시 순환하며 이전 백업에는 고정 개수 제한이 적용됩니다. 기본 다섯 슬롯은 새 쓰기를 파일당 16 MiB로 제한하고 상한을 줄인 후에는 이전 백업이 더 클 수 있습니다.
+
+`dropped_entries=N`은 큐 또는 바이트 제한, 과대 기록, 형식화 실패나 I/O 사용 불가로 잃은 기록 수입니다. 실행 중 I/O 오류는 예외 유형을 담은 짧고 제한된 stderr 줄 하나를 남깁니다. 작성기는 스트림을 닫고 기본 1초에서 최대 60초까지 지수 백오프로 파일 열기를 재시도합니다. 사용 불가 기간의 기록은 손실로 집계하고 복구 후 새 기록보다 먼저 대기 중 집계를 씁니다. Windows에서 삭제 공유 없이 연 뷰어는 순환을 막을 수 있습니다. 뷰어를 닫거나 삭제 공유를 허용하여 다시 연 다음 재시도를 기다리세요. 디스크 접근, 지연 및 [구성](configuration.ko.md)의 제한을 확인하세요. 종료 시간 안에 큐를 처리하지 못하면 명시적인 오류를 냅니다. I/O 오류는 부분 기록을 남길 수 있고 강제 종료는 큐에 남은 기록을 잃을 수 있습니다. 전체 예외 기록에는 메시지, 내부 예외 및 스택이 포함됩니다. 로그 한 줄만으로 저장 트랜잭션의 커밋을 입증할 수 없으므로 영구 상태와 해당 감사 증거를 확인하세요.
 
 ## 최초 설정에서 프록시 요청 거부 {#setup-proxy-refused}
 
@@ -19,7 +27,7 @@ updated: 2026-10-20
 **시작하기 전에.**
 
 - 소스 체크아웃은 저장소 루트에서, 게시된 빌드는 릴리스 디렉터리에서 작업합니다.
-- 로컬 확인 시 `.env.example`을 git에서 무시되는 `.env`로 복사하고 `BFF_MYSQL_PASSWORD`를 비어 있지 않은 임시 값으로 설정합니다. MySQL을 비활성화해도 profile 보간에는 이 변수가 필요합니다.
+- 격리 메모리 패치를 사용하는 로컬 점검에는 `.env`나 데이터베이스 설정이 필요하지 않습니다. MySQL을 활성화하는 의도적인 배포에서만 `.env.example`을 git에서 무시되는 `.env`로 복사하세요.
 - 이 페이지의 모든 로컬 Host 명령에는 `--patch tools/local-checks/isolated-memory.patch.yaml`이 포함됩니다. 이 패치는 `persistence.mysql`을 비활성화하고 `persistence.memory`를 활성화하므로, 개발자의 `.env`나 로컬 패치가 서버를 실제 데이터베이스로 향하게 하지 않습니다.
 - 첫 번째 오류를 읽고, 시도마다 한 가지만 바꾸며, 실패 출력을 보관합니다.
 
@@ -64,11 +72,11 @@ updated: 2026-10-20
 
 ### 환경 변수에 값이 없음
 
-**증상.** `error: File '<file>', row '<row id>': environment variable '<NAME>' is not set and has no default.` **확인.** 오류에 나온 profile, bundle 또는 패치에서 `:-default`가 없는 `${NAME}`을 찾고, `.env`와 프로세스 환경을 확인합니다. `start`를 제외한 모든 명령은 profile을 조합하기 전에 저장소 루트의 `.env`를 설정되지 않은 프로세스 변수에 적용하며, 이미 있는 환경 변수가 우선합니다. **가능한 원인.** 변수가 내보내지지도 `.env`에 있지도 않은데, `BFF_MYSQL_PASSWORD`에는 기본값이 없으므로 모든 게임 또는 관리 profile이 이 변수 없이는 조합을 완료하지 못합니다. **해결.** 해당 명령에 변수를 설정하거나 git에서 무시되는 `.env`에 추가합니다. 실제 자격 증명을 커밋하지 마세요. **정상 확인.** 조합이 성공하고 `--dump-config`가 적용된 행을 출력합니다.
+**증상.** `error: File '<file>', row '<row id>': environment variable '<NAME>' is not set and has no default.` **확인.** 오류에 나온 profile, bundle 또는 패치에서 `:-default`가 없는 `${NAME}`을 찾고, `.env`와 프로세스 환경을 확인합니다. `start`를 제외한 모든 명령은 profile을 조합하기 전에 저장소 루트의 `.env`를 설정되지 않은 프로세스 변수에 적용하며, 이미 있는 환경 변수가 우선합니다. **가능한 원인.** 변수가 내보내지지도 `.env`에 있지도 않은데, 활성화된 행이 기본값 없이 그 변수를 읽습니다. 예를 들어 `persistence.mysql`은 `BFF_MYSQL_PASSWORD`를 읽습니다. profile이나 `--patch`로 비활성화된 행에는 변수가 필요하지 않습니다. **해결.** 해당 명령에 변수를 설정하거나 git에서 무시되는 `.env`에 추가합니다. 실제 자격 증명을 커밋하지 마세요. **정상 확인.** 조합이 성공하고 `--dump-config`가 적용된 행을 출력합니다.
 
 ### MySQL 비밀번호가 비어 있음
 
-**증상.** `error: Activation of row 'persistence.mysql' (plugin 'persistence.mysql') failed: Invalid configuration for row 'persistence.mysql': connection_string is missing Password (BFF_MYSQL_PASSWORD is required and must not be empty).` **확인.** 복사한 `.env.example`에는 `BFF_MYSQL_PASSWORD=`가 들어 있어 보간은 빈 문자열로 성공하고, 실패는 행이 활성화될 때만 나타납니다. **가능한 원인.** `.env`에 빈 자리 표시자가 남아 있습니다. **해결.** 로컬 확인에는 비어 있지 않은 임시 값을 사용하고 격리 패치를 추가해 데이터베이스에 접속하지 않도록 합니다. 실제 자격 증명은 의도적으로 구성한 영속성 배포에만 사용합니다. **정상 확인.** 격리 패치를 사용하면 `persistence.memory`가 활성화되고 로그가 메모리 영속성이 활성화되었음을 알립니다.
+**증상.** `error: Activation of row 'persistence.mysql' (plugin 'persistence.mysql') failed: Invalid configuration for row 'persistence.mysql': connection_string is missing Password (BFF_MYSQL_PASSWORD is required and must not be empty).` **확인.** 복사한 `.env.example`에는 `BFF_MYSQL_PASSWORD=`가 들어 있어 보간은 빈 문자열로 성공하고, 실패는 행이 활성화될 때만 나타납니다. **가능한 원인.** `.env`에 빈 자리 표시자가 남아 있습니다. **해결.** 실제 MySQL 데이터베이스를 사용할 때는 암호를 설정합니다. 로컬 확인에서는 대신 격리 패치를 추가합니다. 이 패치가 MySQL 행을 비활성화하므로 암호가 필요하지 않습니다. **정상 확인.** 격리 패치를 사용하면 `persistence.memory`가 활성화되고 로그가 메모리 영속성이 활성화되었음을 알립니다.
 
 ### profile, 패치 또는 옵션 이름이 잘못됨
 
@@ -93,11 +101,11 @@ dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile 
 시작 시도를 마치면 모든 행이 상태를 게시합니다. 콘솔 로그나 관리 API에서 읽습니다:
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:8080/api/plugins | Select-Object rowId, plugin, state, error
+Invoke-RestMethod http://127.0.0.1:7300/api/plugins | Select-Object rowId, plugin, state, error
 ```
 
 ```sh
-curl -s http://127.0.0.1:8080/api/plugins
+curl -s http://127.0.0.1:7300/api/plugins
 ```
 
 `/api/plugins`는 런타임 인스턴스마다 `rowId`, `plugin`, `source`, `state`, `error`, `codeRefreshPolicy`, `codeLifetime`, `restartRequiredForReclamation`, `isRetiring`, `overrides`, `version`, `contractVersions`, `supportedBuilds` 필드를 가진 객체를 반환합니다. `Active`만이 정상 실행 상태입니다.
@@ -153,7 +161,7 @@ curl -s http://127.0.0.1:8080/api/plugins
 
 ### 관리 API 또는 WebUI에 접속할 수 없거나 인증되지 않음
 
-**증상.** 브라우저가 WebUI에 접속하지 못하거나 `/api/...`가 401과 `{"error":"unauthorized"}`를 반환합니다. **확인.** 관리 행은 `${BFF_ADMIN_HOST:-127.0.0.1}:${BFF_ADMIN_PORT:-8080}`에 바인딩하며 기본값은 루프백입니다. `start`로 시작한 서버는 보호된 모든 `/api` 요청에 로그인한 관리자 세션이 필요하며, `/health`와 WebUI 파일은 열려 있습니다. 최초 설정 중에는 관리자 계정이 생기기 전까지 `/api/plugins`가 401을 반환합니다. 이는 인증 모델이며 서버 오류가 아닙니다. `/health`와 `/api/setup/status`는 계속 접근할 수 있습니다. **가능한 원인.** 리스너가 루프백에 있고 브라우저가 다른 곳에 있거나, 세션이 만료되었거나, `run --profile` 서버에 루프백이 아닌 주소를 지정했거나(계정이 없어 거부합니다), 루프백이 아닌 설치 리스너에 부트스트랩 토큰을 설정하지 않았습니다. **해결.** 다시 로그인하십시오. `start`로 시작한 서버에서는 `BFF_ADMIN_HOST`를 필요한 인터페이스로 설정하고, 루프백이 아닌 설치 리스너에는 `bootstrap_token`(`BFF_SETUP_TOKEN`)을 32자 이상으로 설정하십시오. 그렇지 않으면 행이 `A non-loopback installation listener requires an explicit bootstrap_token of at least 32 characters.`와 함께 실패합니다. **복구 확인.** `/health`가 `{"status":"ok", ...}`를 반환하고 로그인한 WebUI에 플러그인 목록이 표시됩니다.
+**증상.** 브라우저가 WebUI에 접속하지 못하거나 `/api/...`가 401과 `{"error":"unauthorized"}`를 반환합니다. **확인.** `start`로 시작한 서버는 `${BFF_ADMIN_HOST:-0.0.0.0}:${BFF_ADMIN_PORT:-7300}`에 바인딩하며, 보호된 모든 `/api` 요청에 로그인한 관리자 세션이 필요합니다. `/health`와 WebUI 파일은 열려 있습니다. 첫 설치 중에는 관리자 계정이 생기기 전까지 `/api/plugins`가 401을 반환하는데, 이는 인증 모델이지 서버 오류가 아닙니다. `/health`와 `/api/setup/status`는 계속 접근할 수 있습니다. `run --profile` 서버는 루프백에 바인딩합니다. **가능한 원인.** 세션이 만료되었거나, `BFF_ADMIN_HOST`가 리스너를 루프백에 두는데 브라우저가 다른 곳에 있거나, `run --profile` 서버에 루프백이 아닌 주소를 지정했거나(계정이 없어 거부합니다), `BFF_ADMIN_ALLOWED_HOSTS`가 브라우저가 쓴 이름을 나열하지 않습니다(접근 가능한 주소에서 비워 두면 모든 이름을 받습니다). 원격 설치는 `BFF_SETUP_TOKEN`이 설정된 경우에만 403 `bootstrap_token_required`를 반환합니다. **해결.** 다시 로그인하고, 서버 주소를 쓰거나 `BFF_ADMIN_HOST`와 `BFF_ADMIN_ALLOWED_HOSTS`를 맞추고, 설정된 설치 토큰을 보내거나 `BFF_SETUP_TOKEN`을 비우십시오. **복구 확인.** `/health`가 `{"status":"ok", ...}`를 반환하고 로그인한 WebUI가 플러그인을 나열합니다.
 
 ## 영속성과 마이그레이션
 

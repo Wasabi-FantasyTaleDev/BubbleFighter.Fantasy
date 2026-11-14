@@ -1,8 +1,10 @@
 using BubbleFighter.Fantasy.Contracts.Inventory;
+using BubbleFighter.Fantasy.Contracts.Progress;
+using BubbleFighter.Fantasy.Contracts.Rooms;
 
 namespace BubbleFighter.Fantasy.Contracts.Match;
 
-/// <summary>Freezes the accepted room equipment used to resolve the two round-start critical tables.</summary>
+/// <summary>Freezes the accepted room equipment and instance modifiers used to resolve round-start combat tables.</summary>
 public sealed class MatchSeedEquipment : IEquatable<MatchSeedEquipment>
 {
     private readonly int[] _items;
@@ -12,8 +14,10 @@ public sealed class MatchSeedEquipment : IEquatable<MatchSeedEquipment>
     /// <param name="wornItemIds">The authoritative worn item snapshot already published in the room.</param>
     /// <param name="primarySpecification">The accepted positive primary specification; null or nonpositive selects the worn primary.</param>
     /// <param name="sidearmSpecification">The accepted positive sidearm specification; null or nonpositive selects the worn sidearm.</param>
+    /// <param name="itemAttributes">The published native modifiers; their order and value vectors are copied.</param>
     public MatchSeedEquipment(int modeId, IReadOnlyList<int> wornItemIds,
-        int? primarySpecification = null, int? sidearmSpecification = null)
+        int? primarySpecification = null, int? sidearmSpecification = null,
+        IReadOnlyList<RoomItemAttribute>? itemAttributes = null)
     {
         ArgumentNullException.ThrowIfNull(wornItemIds);
         if (wornItemIds.Count > InventoryLimits.MaxEquippedSlots)
@@ -21,6 +25,7 @@ public sealed class MatchSeedEquipment : IEquatable<MatchSeedEquipment>
         ModeId = modeId;
         _items = wornItemIds.Distinct().Order().ToArray();
         WornItemIds = Array.AsReadOnly(_items);
+        ItemAttributes = new RoundEquipmentSnapshot(_items, itemAttributes ?? []).ItemAttributes;
         // cn-324 sub_805DE0 uses a temporary selector only when positive; zero and negative sentinels use the worn slot.
         PrimarySpecification = primarySpecification is > 0 ? primarySpecification : null;
         SidearmSpecification = sidearmSpecification is > 0 ? sidearmSpecification : null;
@@ -32,6 +37,9 @@ public sealed class MatchSeedEquipment : IEquatable<MatchSeedEquipment>
     /// <summary>Gets a private, canonical copy of the accepted worn set.</summary>
     public IReadOnlyList<int> WornItemIds { get; }
 
+    /// <summary>Gets the privately copied native modifiers in their original per-item application order.</summary>
+    public IReadOnlyList<RoomItemAttribute> ItemAttributes { get; }
+
     /// <summary>Gets the temporary primary specification when the room publishes one.</summary>
     public int? PrimarySpecification { get; }
 
@@ -41,7 +49,12 @@ public sealed class MatchSeedEquipment : IEquatable<MatchSeedEquipment>
     /// <summary>Compares equipment values so repeated snapshots do not become distinct seed installations.</summary>
     public bool Equals(MatchSeedEquipment? other) => other is not null && ModeId == other.ModeId
         && PrimarySpecification == other.PrimarySpecification && SidearmSpecification == other.SidearmSpecification
-        && _items.AsSpan().SequenceEqual(other._items);
+        && _items.AsSpan().SequenceEqual(other._items)
+        && ItemAttributes.Count == other.ItemAttributes.Count
+        && ItemAttributes.Zip(other.ItemAttributes).All(pair =>
+            pair.First.ItemId == pair.Second.ItemId && pair.First.Kind == pair.Second.Kind
+            && pair.First.Unknown28 == pair.Second.Unknown28 && pair.First.Unknown32 == pair.Second.Unknown32
+            && pair.First.Values.SequenceEqual(pair.Second.Values));
 
     /// <summary>Compares another object's frozen equipment values.</summary>
     public override bool Equals(object? obj) => obj is MatchSeedEquipment other && Equals(other);
@@ -54,6 +67,15 @@ public sealed class MatchSeedEquipment : IEquatable<MatchSeedEquipment>
         hash.Add(PrimarySpecification);
         hash.Add(SidearmSpecification);
         foreach (var item in _items) hash.Add(item);
+        foreach (var attribute in ItemAttributes)
+        {
+            hash.Add(attribute.ItemId);
+            hash.Add(attribute.Kind);
+            hash.Add(attribute.Unknown28);
+            hash.Add(attribute.Unknown32, StringComparer.Ordinal);
+            hash.Add(attribute.Values.Count);
+            foreach (var value in attribute.Values) hash.Add(value);
+        }
         return hash.ToHashCode();
     }
 }

@@ -90,6 +90,9 @@ public sealed class PluginBoundaryTests
             ["Match.FinalZoneMapItem"] = [24, 28, 32],
             // kr-1256 sub_1152110 reads two counted vectors through kr-1256 sub_1137C30.
             ["Match.FinalZoneReinforcement"] = [4, 20],
+            // kr-1256 sub_9601E0, cn-774 sub_B593D0, tw-454 sub_A79210, cn-738 sub_A3A470 and cn-742 sub_97D120
+            // discard the relay delay reply word (packets/relay-latency.yaml RelayLatencyReply).
+            ["Match.RelayLatencyAcknowledged"] = [4],
             // The 20-byte relay session key kr-1256 sub_1159210 writes and sub_11592A0 reads (verified
             // layout, formerly the InGame.Wire record). Its six words have no traced purpose; the room
             // registry mints them randomly and the match connection compares them byte for byte.
@@ -106,10 +109,17 @@ public sealed class PluginBoundaryTests
             // cn-324 sub_45D090 writes these weapon parameters at object offsets 32/36/40;
             // cn-324 sub_471630 consumes them without establishing their individual meanings.
             ["Match.RoundWeaponDropRequested"] = [32, 36, 40],
+            // kr-1256 sub_EE08A0 and cn-774 sub_E596A0 display only the selector at offset 16 on success; the
+            // words at 12 and 20 are carried but not consumed (packets/pet.yaml PetFollowerAbilityChange).
+            ["Pets.PetAbilityChangeReplied"] = [12, 20],
             // kr-1256 sub_10D9410 retains the final ItemAttr word and text; their kind-specific
             // meanings remain unproven, so room presets preserve the packet table's offset names.
             ["Rooms.RoomItemAttribute"] = [28, 32],
-        }.SelectMany(pair => pair.Value.Select(n => $"BubbleFighter.Fantasy.Contracts.{pair.Key}.Unknown{n}"));
+        }.SelectMany(pair => pair.Value.Select(n => $"BubbleFighter.Fantasy.Contracts.{pair.Key}.Unknown{n}"))
+            // PetEvolveResult's unconsumed words sit at different offsets per build (packets/pet.yaml: legacy 12,
+            // tw-454 16, the kr-1256 optional tail at 16), so the build-neutral record names them by position.
+            .Concat(["BubbleFighter.Fantasy.Contracts.Pets.PetEvolved.UnknownOptional",
+                "BubbleFighter.Fantasy.Contracts.Pets.PetEvolved.UnknownLast"]);
         Assert.Equal(expected.Order(StringComparer.Ordinal), actual.Order(StringComparer.Ordinal));
         Assert.DoesNotContain(typeof(IInventoryRepository).Assembly.GetExportedTypes(), t => t.Name.Contains("Unknown", StringComparison.Ordinal));
     }
@@ -170,9 +180,9 @@ public sealed class PluginBoundaryTests
         Assert.All(plugins, plugin =>
         {
             Assert.StartsWith(plugin.Id == "fighters" ? "2.0.0" : "1.0.0", plugin.Version);
-            Assert.Equal("8.19.0.0", plugin.ContractVersions["BubbleFighter.Fantasy.Abstractions"]);
+            Assert.Equal("8.25.0.0", plugin.ContractVersions["BubbleFighter.Fantasy.Abstractions"]);
             Assert.All(plugin.ContractVersions, pair => Assert.Equal(
-                pair.Key == "BubbleFighter.Fantasy.Contracts" ? contractsVersion : "8.19.0.0", pair.Value));
+                pair.Key == "BubbleFighter.Fantasy.Contracts" ? contractsVersion : "8.25.0.0", pair.Value));
         });
         // Shared plugins name no client builds: a build is added with profile and packet-table data alone.
         Assert.All(new[] { "protocol", "dialect", "lobby", "ingame", "shop", "equipment", "inventoryview", "centers",

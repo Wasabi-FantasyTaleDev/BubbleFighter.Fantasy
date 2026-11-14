@@ -134,6 +134,7 @@ internal sealed partial class RoundFlow
         _lucciPicked = senders.LucciPicked;
         _starCreated = senders.StarCreated;
         _starPicked = senders.StarPicked;
+        _starFever = senders.StarFever;
         _objectAdded = senders.ObjectAdded;
         _itemUsed = senders.ItemUsed;
         _itemSlotChanged = senders.ItemSlotChanged;
@@ -372,8 +373,10 @@ internal sealed partial class RoundFlow
     // burst sets to the seat index.
     private Task GrantRespawnAsync(ISession session, PlayRoom room, RoundSpawnAccepted request, int? spawnIndex,
         CancellationToken ct, ExtremeRacingResetStamp? raceReset = null, int? zombieGeneration = null) =>
+        IsBnBMode(room) ? RemoveBnBActorAsync(session, room, request, spawnIndex, ct).AsTask() :
         room.Executor.ExecuteAsync(async operationCt =>
         {
+            if (IsBnBMode(room)) return;
             if (await TryObserveInsteadOfRespawnAsync(session, room, request, operationCt).ConfigureAwait(false)) return;
             var rules = request.Rules;
             LifeParticipant character;
@@ -518,6 +521,11 @@ internal sealed partial class RoundFlow
     /// </summary>
     public async ValueTask OnSeatLeftAsync(PlayRoom room, CancellationToken ct)
     {
+        if (room.BnBRound is { } bnb && room.Phase is RoomPhase.Starting or RoomPhase.Playing)
+        {
+            await CancelBnBAsync(room, bnb).ConfigureAwait(false);
+            return;
+        }
         await OnBombSeatLeftAsync(room, ct).ConfigureAwait(false);
         await StartCountdownWhenAllLoadedAsync(room, ct).ConfigureAwait(false);
         await ReplaceDepartedCaptainsAsync(room, ct).ConfigureAwait(false);
@@ -665,6 +673,8 @@ internal sealed partial class RoundFlow
                 room.DecidedWinnerTeam ??= 34;
             if (IsStarMode(room))
                 DecideStarRound(room);
+            if (IsWeaponMasterMode(room))
+                DecideWeaponMasterRound(room);
             room.MarkResult();
             generation = room.StartGeneration;
             members = [.. room.Seats];
@@ -684,7 +694,7 @@ internal sealed partial class RoundFlow
             {
                 // A decided result belongs to the room. Closing its triggering connection cannot cancel other
                 // players' settlements; the retained source still honors room and plugin shutdown.
-                if (_options.RecordBattleStatistics && room.BombSeries is not { CanContinue: true })
+                if (room.BombSeries is not { CanContinue: true })
                     await GrantRewardsAsync(room, generation, reason, cancellation.Token).ConfigureAwait(false);
                 _logger.LogInformation("Room {Room}: round ended ({Reason}); running the result sequence.", room.Id, reason);
                 lock (room.Gate)
@@ -768,9 +778,19 @@ internal sealed partial class RoundFlow
     {
         if (_feed is null || _registry.TryGet(session.Id) is not { } room)
             return;
+        if (packet.OneKill is not null)
+        {
+            await HandleOneKillAsync(room, session, packet, ct).ConfigureAwait(false);
+            return;
+        }
         if (packet.ExtremeRacingCheckpoint is not null)
         {
             await HandleExtremeRacingCheckpointAsync(room, session, packet, ct).ConfigureAwait(false);
+            return;
+        }
+        if (packet.ExtremeRacingCannonShot is not null)
+        {
+            await HandleExtremeRacingCannonShotAsync(room, session, packet, ct).ConfigureAwait(false);
             return;
         }
         if (_criticalAuthority is not null && (packet.CriticalWeaponState is not null || packet.CriticalEffectActor is not null))
@@ -865,6 +885,7 @@ internal sealed partial class RoundFlow
 
         var seeds = _seedTables is null ? [] : PrepareSeedTables(room, members, generation);
         PrepareFinalZoneItems(room);
+        PrepareExtremeRacingInitialization(room);
         lock (room.Gate)
         {
             if (room.CountdownGeneration == generation) return;
@@ -887,6 +908,7 @@ internal sealed partial class RoundFlow
         }
         if (_seedTables is not null)
             await SendSeedTablesAsync(room, seeds, ct).ConfigureAwait(false);
+        await PublishExtremeRacingInitializationAsync(room, members, generation, ct).ConfigureAwait(false);
         _logger.LogInformation("Room {Room}: all {Count} player(s) loaded; the round starts in {Ms} ms.",
             room.Id, members.Length, countdownMs);
         room.CountdownTask = BackgroundWork.Detached(() => FinishCountdownAsync(room, generation));
@@ -904,21 +926,40 @@ internal sealed partial class RoundFlow
         return length > 0 ? length : null;
     }
 
+    /// <summary>Waits for the configured countdown while allowing deterministic scheduling of room-lifecycle checks.</summary>
+    internal Func<int, CancellationToken, Task> CountdownDelay { get; set; } = static (milliseconds, ct) => Task.Delay(milliseconds, ct);
+
     private async Task FinishCountdownAsync(PlayRoom room, int generation)
     {
+        BnBRuntimeState? bnbRound;
+        ExtremeRacingStamp? racingRound;
+        FinalZonePublication? finalZoneRound;
+        lock (room.Gate)
+        {
+            bnbRound = IsBnBMode(room) && room.BnBRound is { } state && state.Generation == generation ? state : null;
+            racingRound = IsExtremeRacingMode(room) && room.StartGeneration == generation ? new(generation, room.ExtremeRacing) : null;
+            finalZoneRound = null;
+            if (IsFinalZoneMode(room) && room.StartGeneration == generation)
+            {
+                var finalZone = room.FinalZone ??= CreateFinalZoneState(room);
+                finalZoneRound = new(finalZone, finalZone.Items, [.. room.Seats]);
+            }
+        }
         using var countdownLifetime = CancellationTokenSource.CreateLinkedTokenSource(_lifetime,
             room.TutorialCancellation?.Token ?? CancellationToken.None);
         var token = countdownLifetime.Token;
         try
         {
-            await Task.Delay(room.Tutorial?.CountdownMs ?? _options.StartTimerMs, token).ConfigureAwait(false);
+            await CountdownDelay(room.Tutorial?.CountdownMs ?? _options.StartTimerMs, token).ConfigureAwait(false);
             await room.Executor.ExecuteAsync(async operationCt =>
             {
                 RoomSeat[] members;
                 lock (room.Gate)
                 {
                     // A room that emptied, restarted or was cancelled meanwhile no longer owns this countdown.
-                    if (room.Phase != RoomPhase.Starting || room.StartGeneration != generation || room.RoundCancelled)
+                    if (room.Phase != RoomPhase.Starting || room.StartGeneration != generation || room.RoundCancelled || room.IsStopping
+                        || racingRound is not null && !OwnsExtremeRacing(room, racingRound)
+                        || finalZoneRound is not null && !OwnsFinalZonePublication(room, finalZoneRound))
                         return;
                     if (_options.NativeMatchRelay && room.Seats.Any(seat => !NativeMatchReady(room, seat)))
                     {
@@ -927,6 +968,7 @@ internal sealed partial class RoundFlow
                     }
                     room.MarkPlaying();
                     InitializeFinalZone(room);
+                    StartWeaponMaster(room, generation);
                     members = [.. room.Seats];
                 }
                 var timeLimit = room.Tutorial?.TimeLimitMs ?? (_options.ZombieConversionModeId > 0 && room.ModeId == _options.ZombieConversionModeId
@@ -941,10 +983,14 @@ internal sealed partial class RoundFlow
                     || IsExtremeRacingMode(room));
                 if (unlimited) timeLimit = 0;
                 var started = new RoundStarted(room.Id, timeLimit) { IsTutorial = room.Tutorial is not null, Unlimited = unlimited };
-                foreach (var member in members)
-                    await _started.SendAsync(member.Game, started, operationCt).ConfigureAwait(false);
+                if (finalZoneRound is not null)
+                    await PublishFinalZoneAsync(room, finalZoneRound, _started, started, operationCt).ConfigureAwait(false);
+                else
+                    foreach (var member in members)
+                        await _started.SendAsync(member.Game, started, operationCt).ConfigureAwait(false);
                 if (room.Tutorial is null)
                     await InitializePvePointsAsync(room, members, operationCt).ConfigureAwait(false);
+                await PublishWeaponMasterAsync(room, operationCt).ConfigureAwait(false);
                 _logger.LogInformation("Room {Room}: round started for {Count} player(s).", room.Id, members.Length);
                 if (room.BombSeries is { Forfeited: true })
                 {
@@ -952,26 +998,38 @@ internal sealed partial class RoundFlow
                     return;
                 }
                 if (room.Tutorial?.NativeSupplies != true) StartSupplies(room);
+                if (room.Tutorial is null) StartMapStars(room);
+                if (room.Tutorial is null) StartStarFever(room, timeLimit);
                 if (room.Tutorial is null) StartRescues(room);
                 if (room.Tutorial is null && _ended is not null && timeLimit > 0 && !IsFinalZoneMode(room))
                     room.CountdownTask = BackgroundWork.Detached(() => EndAtTimeLimitAsync(room, generation, timeLimit));
                 if (room.Tutorial is null) RoundPlaying?.Invoke(room, generation);
                 if (room.Tutorial is null) await PushStarCountsAsync(room, operationCt).ConfigureAwait(false);
                 if (room.Tutorial is null) await AppointCaptainsAsync(room, operationCt).ConfigureAwait(false);
-                await StartExtremeRacingAsync(room, operationCt).ConfigureAwait(false);
-                await StartFinalZoneItemsAsync(room, operationCt).ConfigureAwait(false);
+                await StartExtremeRacingAsync(room, racingRound, operationCt).ConfigureAwait(false);
+                await StartBnBAsync(room).ConfigureAwait(false);
+                await StartFinalZoneItemsAsync(room, finalZoneRound, operationCt).ConfigureAwait(false);
             }, token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
+            if (finalZoneRound is not null)
+                await CancelFinalZonePublicationAsync(room, finalZoneRound).ConfigureAwait(false);
         }
-        catch (ObjectDisposedException)
+        catch (ObjectDisposedException) when (bnbRound is null && racingRound is null && finalZoneRound is null || room.IsStopping)
         {
             // The room closed during the countdown.
         }
         catch (Exception failure)
         {
             _logger.LogError(failure, "Room {Room}: the round start after the countdown failed.", room.Id);
+            // Cleanup must also work when the room queue rejects the start and must retain this countdown's generation.
+            if (bnbRound is not null)
+                await CancelBnBAsync(room, bnbRound).ConfigureAwait(false);
+            if (racingRound is not null)
+                await CancelExtremeRacingAsync(room, racingRound).ConfigureAwait(false);
+            if (finalZoneRound is not null)
+                await CancelFinalZonePublicationAsync(room, finalZoneRound).ConfigureAwait(false);
         }
     }
 }
@@ -1004,6 +1062,7 @@ internal sealed partial class RoundFlow
 /// <param name="WeaponPicked">Confirms an accepted weapon pickup when its native binding is mounted.</param>
 /// <param name="Observer">Shows observation when the round's rules prohibit respawning and the native binding is mounted.</param>
 /// <param name="BombStateChanged">Cancels a departed bomb operator through the audited native state path.</param>
+/// <param name="StarFever">Starts a star round's closing fever; null on a build without the fever notice.</param>
 internal sealed record RoundSenders(
     IMessageSender<RoundPlayerLoaded>? PlayerLoaded,
     IMessageSender<RoundCountdownStarted> Countdown,
@@ -1031,7 +1090,8 @@ internal sealed record RoundSenders(
     IMessageSender<RoundWeaponCreated>? WeaponCreated = null,
     IMessageSender<RoundWeaponPicked>? WeaponPicked = null,
     IRoundObservationSender? Observer = null,
-    IMessageSender<RoundBombStateChanged>? BombStateChanged = null)
+    IMessageSender<RoundBombStateChanged>? BombStateChanged = null,
+    IMessageSender<RoundStarFeverStarted>? StarFever = null)
 {
     /// <summary>
     /// Resolves the encoders published for <paramref name="protocol"/>; a missing required one is a configuration error,
@@ -1072,7 +1132,8 @@ internal sealed record RoundSenders(
         PlaySenders.Optional<RoundWeaponCreated>(context, protocol),
         PlaySenders.Optional<RoundWeaponPicked>(context, protocol),
         ResolveObservation(context, protocol),
-        PlaySenders.Optional<RoundBombStateChanged>(context, protocol));
+        PlaySenders.Optional<RoundBombStateChanged>(context, protocol),
+        PlaySenders.Optional<RoundStarFeverStarted>(context, protocol));
 
     internal static IRoundObservationSender? ResolveObservation(IPluginContext context, string protocol)
     {

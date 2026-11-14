@@ -1,3 +1,4 @@
+using BubbleFighter.Fantasy.Contracts.Titles;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Contracts.Players;
 using BubbleFighter.Fantasy.Contracts.Inventory;
@@ -27,6 +28,11 @@ public sealed class SqlitePluginTests
             var user = await players.CreateAsync("one", "nickname", default);
             Assert.Equal(user.UserNum, (await registry.Get<ILauncherAccountRepository>().FindAsync("one", default))!.UserNumber);
             Assert.NotNull(registry.Get<IInventoryRepository>());
+            Assert.Same(registry.Get<IInventoryRepository>(), registry.Get<IPetMutationStore>());
+            Assert.Same(registry.Get<IInventoryRepository>(), registry.Get<IPetEntitlementStore>());
+            Assert.Same(registry.Get<IInventoryRepository>(), registry.Get<IItemEnhancementStore>());
+            Assert.Same(registry.Get<IInventoryRepository>(), registry.Get<IInventoryMetadataStore>());
+            Assert.Same(registry.Get<IInventoryRepository>(), registry.Get<ITitleMedalStore>());
             var progress = registry.Get<BubbleFighter.Fantasy.Contracts.Progress.IPlayerProgressRepository>();
             var records = registry.Get<BubbleFighter.Fantasy.Contracts.Progress.IPlayerBattleRecordsRepository>();
             Assert.Same(progress, records);
@@ -40,6 +46,11 @@ public sealed class SqlitePluginTests
             registry.Disposables.Clear();
             Assert.False(registry.TryGet<IPlayerRepository>(out _));
             Assert.False(registry.TryGet<IPlayerMovementState>(out _));
+            Assert.False(registry.TryGet<IPetMutationStore>(out _));
+            Assert.False(registry.TryGet<IPetEntitlementStore>(out _));
+            Assert.False(registry.TryGet<IItemEnhancementStore>(out _));
+            Assert.False(registry.TryGet<IInventoryMetadataStore>(out _));
+            Assert.False(registry.TryGet<ITitleMedalStore>(out _));
             using var reopened = new SqliteDatabase(new() { DatabasePath = path });
             Assert.Equal(user.UserNum, (await new SqliteRepositories(reopened).FindByUsernameAsync("one", default))!.UserNum);
         }

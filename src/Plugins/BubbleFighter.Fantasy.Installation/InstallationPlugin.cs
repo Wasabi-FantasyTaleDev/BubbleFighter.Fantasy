@@ -5,7 +5,7 @@ using BubbleFighter.Fantasy.Contracts.Installation;
 namespace BubbleFighter.Fantasy.Installation;
 
 /// <summary>Owns installation authority and administrator sessions as replaceable, unloadable services.</summary>
-[Plugin("installation", Requires = [typeof(IInstallationRuntime)], RequiresMany = [typeof(IInstallationDatabase)],
+[Plugin("installation", Category = "admin", Names = ["en=Setup assistant", "zh-Hans=安装向导", "zh-Hant=安裝助理", "ko=설치 도우미"], Requires = [typeof(IInstallationRuntime)], RequiresMany = [typeof(IInstallationDatabase)],
     Provides = [typeof(IInstallationService), typeof(IAdminAccessControl)])]
 public sealed class InstallationPlugin : IPlugin
 {

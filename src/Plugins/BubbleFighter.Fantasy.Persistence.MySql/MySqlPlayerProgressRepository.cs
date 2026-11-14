@@ -1,16 +1,18 @@
 using BubbleFighter.Fantasy.Contracts.Cluster;
 using BubbleFighter.Fantasy.Abstractions.Persistence;
 using BubbleFighter.Fantasy.Contracts.Progress;
+using BubbleFighter.Fantasy.Contracts.Titles;
 using SqlSugar;
 
 namespace BubbleFighter.Fantasy.Persistence.MySql;
 
 /// <summary>MySQL progress, reward and battle-statistics store with one account-locked transaction per match receipt.</summary>
-public sealed class MySqlPlayerProgressRepository : IPlayerBattleRecordsRepository
+public sealed class MySqlPlayerProgressRepository : IPlayerBattleRecordsRepository, IRoundTitleMedalSettlementRepository
 {
     private readonly IDbConnectionFactory connections;
     private readonly IAccountMutationFence? authority;
     private readonly int maxBattleModes;
+    private readonly TitleMedalLimits titleMedals;
 
     /// <summary>Creates a progress store whose battle aggregates share the account mutation transaction.</summary>
     /// <param name="connections">Connections to the account database.</param>
@@ -18,6 +20,13 @@ public sealed class MySqlPlayerProgressRepository : IPlayerBattleRecordsReposito
     /// <param name="maxBattleModesPerPlayer">Maximum distinct recorded modes per player.</param>
     public MySqlPlayerProgressRepository(IDbConnectionFactory connections, IAccountMutationFence? authority = null,
         int maxBattleModesPerPlayer = 128)
+        : this(connections, authority, maxBattleModesPerPlayer, new TitleMedalLimits())
+    {
+    }
+
+    /// <summary>Creates a progress store with the inventory store's medal limits for atomic match awards.</summary>
+    public MySqlPlayerProgressRepository(IDbConnectionFactory connections, IAccountMutationFence? authority,
+        int maxBattleModesPerPlayer, TitleMedalLimits titleMedals)
     {
         ArgumentNullException.ThrowIfNull(connections);
         ArgumentOutOfRangeException.ThrowIfLessThan(maxBattleModesPerPlayer, 1);
@@ -25,6 +34,9 @@ public sealed class MySqlPlayerProgressRepository : IPlayerBattleRecordsReposito
         this.connections = connections;
         this.authority = authority;
         maxBattleModes = maxBattleModesPerPlayer;
+        ArgumentNullException.ThrowIfNull(titleMedals);
+        titleMedals.Validate();
+        this.titleMedals = titleMedals;
     }
 
     /// <inheritdoc />
@@ -65,7 +77,9 @@ public sealed class MySqlPlayerProgressRepository : IPlayerBattleRecordsReposito
         var match = command.MatchId;
         await using var session = await SugarSession.OpenAsync(connections, ct).ConfigureAwait(false);
         var db = session.Db;
-        await using var tx = await session.BeginWriteAsync(user, authority, ct).ConfigureAwait(false);
+        await using var tx = command.TitleMedals is null
+            ? await session.BeginWriteAsync(user, authority, ct).ConfigureAwait(false)
+            : await session.BeginWriteAsync(user, authority, System.Data.IsolationLevel.ReadCommitted, ct).ConfigureAwait(false);
         // The player's row lock serializes settlements and every other progress write of this player, so the receipt
         // lookup and the read below see the latest committed state (the primary key is the backstop).
         await MySqlPlayerLock.AcquireAsync(db, user, ct).ConfigureAwait(false);
@@ -74,6 +88,9 @@ public sealed class MySqlPlayerProgressRepository : IPlayerBattleRecordsReposito
         if (receipts.Count == 1)
         {
             var receipt = receipts[0];
+            if (command.TitleMedals is { } repeatedMedals)
+                await MySqlInventoryRepository.ApplyTitleGrantInTransactionAsync(db, repeatedMedals, titleMedals, ct,
+                    requireExisting: true).ConfigureAwait(false);
             return new(RoundSettlementOutcome.AlreadySettled, new(user, receipt.BeforeLevel, receipt.BeforeExp),
                 new(user, receipt.AfterLevel, receipt.AfterExp), receipt.LucciEarned, await BalanceAsync(db, user, ct).ConfigureAwait(false));
         }
@@ -82,6 +99,12 @@ public sealed class MySqlPlayerProgressRepository : IPlayerBattleRecordsReposito
             throw new InvalidOperationException($"players row for user_num {user} not found.");
         var before = new PlayerProgress(user, players[0].Level, players[0].Exp);
         var after = command.AdvanceChecked(before);
+        if (command.TitleMedals is { } medals)
+        {
+            var applied = await MySqlInventoryRepository.ApplyTitleGrantInTransactionAsync(db, medals, titleMedals, ct)
+                .ConfigureAwait(false);
+            if (!applied.Applied) throw new InvalidDataException("The round receipt and its medal receipt disagree.");
+        }
         if (command.BattleRecord is { } battle)
         {
             var rows = await db.Queryable<BattleRecordRow>().Where(row => row.UserNum == user && row.ModeId == battle.ModeId)

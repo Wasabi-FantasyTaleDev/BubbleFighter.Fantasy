@@ -1,0 +1,46 @@
+version: 1
+# BnB mode 41 relay-space bodies. Offsets below are body offsets, not native object offsets.
+# kr-1256 sub_6D97D0 consumes 38285..38287; these purpose-based names are not recovered packet labels.
+# kr-1256 sub_95B0B0 can carry the same packet through the game connection when its relay path is unavailable.
+# The baseline has no audited bodies. Layout inheritance does not activate the exchange for another build.
+structs:
+
+  BnBPlacement: []
+
+  # kr-1256 sub_B43E40 writes actor then grid; kr-1256 sub_6D97D0 reads both words before kr-1256 sub_6FC0C0.
+  # kr-1256 sub_BFF340 installs a bomb at that grid cell and assigns the map-wide generation locally.
+  BnBPlacement@kr-1256:
+    - actor: u32
+      offset: 0
+    - grid_index: u32
+      offset: 4
+
+  BnBBomb: []
+
+  # kr-1256 sub_B440C0 selects the cell's generation and grid index; kr-1256 sub_6E78A0 writes that pair.
+  # kr-1256 sub_BFF540 compares the generation with cell +20 before chaining; it is not an actor identity.
+  BnBBomb@kr-1256:
+    - generation: u32
+      offset: 0
+    - grid_index: u32
+      offset: 4
+
+  BnBExplosion: []
+
+  # kr-1256 sub_6E78A0 writes the reporting actor and counted pairs. kr-1256 sub_6D97D0 reads the actor,
+  # then kr-1256 sub_10F4AE0 reads the count and pairs before kr-1256 sub_BFF540 applies chain explosions.
+  BnBExplosion@kr-1256:
+    - actor: u32
+      offset: 0
+    - bombs: list<BnBBomb>
+      offset: 4
+
+  BnBPickup: []
+
+  # kr-1256 sub_B44490 writes actor then grid; kr-1256 sub_6D97D0 reads both before kr-1256 sub_6FC240.
+  # The consumer takes the item type from the cell, clears its available flag and releases the actor's latch.
+  BnBPickup@kr-1256:
+    - actor: u32
+      offset: 0
+    - grid_index: u32
+      offset: 4

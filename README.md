@@ -46,7 +46,7 @@ The packages need the ASP.NET Core Runtime 10 on the machine that runs them.
   extract it to a short folder such as `C:\BubbleFighterFantasy` and double-click
   `BubbleFighter.Fantasy.Host.exe`. The setup assistant opens in your browser.
 - **Linux:** `curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash`, then run
-  `~/bubblefighter-fantasy/bff` and open `http://127.0.0.1:8080/`. The script installs the runtime
+  `~/bubblefighter-fantasy/bff` and open `http://127.0.0.1:7300/`. The script installs the runtime
   itself when it is missing.
 - **Docker:** `curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash -s -- --docker`
   runs the server in a container; add `--with-mysql` for a bundled MySQL 8.4.
@@ -63,9 +63,9 @@ dotnet build BubbleFighter.Fantasy.sln -c Release
 Copy-Item .env.example .env
 ```
 
-The build must finish with **zero warnings and zero errors**. Edit the git-ignored `.env` and
-set `BFF_MYSQL_PASSWORD` to a nonempty disposable value; profile interpolation requires it even
-when a check runs without MySQL.
+The build must finish with **zero warnings and zero errors**. A local check that uses the
+isolated-memory patch below needs no database settings: `BFF_MYSQL_PASSWORD` is required only
+when the MySQL row is enabled.
 
 Start a local server with in-memory storage and no game data, then verify it:
 
@@ -76,7 +76,7 @@ dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile 
 In another terminal:
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:8080/health
+Invoke-RestMethod http://127.0.0.1:7300/health
 ```
 
 `{"status":"ok", ...}` means the host is up. Stop the server with `Ctrl+C`; data kept in memory
@@ -88,7 +88,7 @@ For a game profile, provide client data first and choose the matching profile; s
 The build output is also a runnable package directory: start
 `src/BubbleFighter.Fantasy.Host/bin/Release/net10.0/BubbleFighter.Fantasy.Host.exe` with no
 arguments to open the first-run setup assistant, which prints its WebUI address
-(`WebUI: http://127.0.0.1:8080/`).
+(`WebUI: http://127.0.0.1:7300/`).
 
 ## Quick start from source (Linux)
 
@@ -100,15 +100,14 @@ dotnet build BubbleFighter.Fantasy.sln -c Release
 cp .env.example .env
 ```
 
-Set `BFF_MYSQL_PASSWORD` in `.env` to a nonempty disposable value, then run the same local
-check:
+A local check needs no database settings; run it with the isolated-memory patch:
 
 ```sh
 dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile management --patch tools/local-checks/isolated-memory.patch.yaml
 ```
 
 ```sh
-curl http://127.0.0.1:8080/health
+curl http://127.0.0.1:7300/health
 ```
 
 Stop with `Ctrl+C`.
@@ -120,15 +119,15 @@ container profile is a game profile, so provide client data first (see below), o
 exits at startup when the data is missing.
 
 ```sh
-cp .env.example .env      # set BFF_MYSQL_PASSWORD and review the values
+cp .env.example .env      # set BFF_MYSQL_PASSWORD (Compose requires it) and review the values
 docker compose -f deploy/docker/compose.yaml up --build
 ```
 
-The server publishes 7100 (game), 7101 (relay) and 8080 (admin API and web interface); MySQL
+The server publishes 7100 (game), 7101 (relay) and 7300 (admin API and web interface); MySQL
 listens on `${BFF_MYSQL_PORT:-3306}`. The client-data directory is mounted read-only at
 `/app/client-data`, and database state lives in the `mysql-data` volume. The admin listener
 binds `127.0.0.1` inside the container by default, so add `BFF_ADMIN_HOST=0.0.0.0` to `.env`
-if you need to reach it through the published 8080 port. See
+if you need to reach it through the published 7300 port. See
 [Deployment](docs/deployment.md) for the external-database Compose template, backups, upgrades
 and rollback.
 
@@ -192,6 +191,10 @@ python tools/ci/serial-gates.py --public --results-directory artifacts/validatio
 The public gate excludes only `Category=LocalClientData` cases and is not the complete release
 gate; see CONTRIBUTING.md for the local client workbooks the complete gate requires. Automated
 checks do not replace a real client test.
+
+## Implementation references
+
+Thanks to the open-source [bf-cn0261-go-server](https://github.com/kanomahoro/bf-cn0261-go-server) project by kanomahoro: we used it as a reference to implement some features and fix some bugs. Client-native evidence and this repository's own packet tables remain the authority for protocol details.
 
 ## License
 

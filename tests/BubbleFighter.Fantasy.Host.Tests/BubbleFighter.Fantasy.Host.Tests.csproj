@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <ProjectReference Include="../../src/BubbleFighter.Fantasy.Abstractions/BubbleFighter.Fantasy.Abstractions.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../../src/BubbleFighter.Fantasy.Host/DurableLogOptions.cs" Link="Host/DurableLogOptions.cs" />
+    <Compile Include="../../src/BubbleFighter.Fantasy.Host/RotatingFileLoggerProvider.cs" Link="Host/RotatingFileLoggerProvider.cs" />
+    <Compile Include="../../src/BubbleFighter.Fantasy.Host/HostLogging.cs" Link="Host/HostLogging.cs" />
+    <Compile Include="../../src/BubbleFighter.Fantasy.Host/StartupMemory.cs" Link="Host/StartupMemory.cs" />
+  </ItemGroup>
+</Project>

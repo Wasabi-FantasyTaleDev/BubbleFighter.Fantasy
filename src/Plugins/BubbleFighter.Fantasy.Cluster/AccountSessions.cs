@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 namespace BubbleFighter.Fantasy.Cluster;
 
 /// <summary>Binds shared account occupancy to game-connection lifetime and verifies retained holds.</summary>
-[Plugin("cluster.account-sessions", Description = "Bounded account admission and connection-owned authority verification.",
+[Plugin("cluster.account-sessions", Category = "cluster", Names = ["en=Cluster account sessions", "zh-Hans=集群账号会话", "zh-Hant=叢集帳號工作階段", "ko=클러스터 계정 세션"], Description = "Bounded account admission and connection-owned authority verification.",
     Requires = [typeof(IAccountOwnershipStore)], Optional = [typeof(IAccountMutationScopes), typeof(IAccountHandoffStore)],
     Provides = [typeof(IAccountSessionAdmission)], ConditionalProvides = [typeof(IAccountSessionHandoff)])]
 public sealed class AccountSessionsPlugin : IPlugin

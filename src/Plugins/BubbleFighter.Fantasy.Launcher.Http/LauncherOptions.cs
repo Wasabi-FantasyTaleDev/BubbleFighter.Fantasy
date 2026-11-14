@@ -51,11 +51,16 @@ public sealed class LauncherOptions : IValidatableOptions
     public string? MaintenanceEnd { get; set; }
     /// <summary>Gets or sets the public plain-text explanation attached to maintenance refusals.</summary>
     public string MaintenanceDescription { get; set; } = "";
+    /// <summary>
+    /// Gets or sets the operator notices shown in the Launcher. A notice is published from its publish time on; the
+    /// Launcher shows each one once when the player starts the game, and lists them all on request.
+    /// </summary>
+    public LauncherNoticeOptions[] Notices { get; set; } = [];
     /// <summary>Gets or sets whether only listed accounts may sign in or obtain new launch tickets.</summary>
     public bool WhitelistEnabled { get; set; }
     /// <summary>Gets or sets the account login names allowed by launcher admission.</summary>
     public string[] Whitelist { get; set; } = [];
-    /// <summary>Gets or sets the minimum Launcher SemVer for registration, login, refresh and tickets; empty disables the gate.</summary>
+    /// <summary>Gets or sets the minimum Launcher SemVer for registration, login, refresh and tickets; every earlier version, including pre-releases of this one, is refused. Empty disables the gate.</summary>
     public string MinimumLauncherVersion { get; set; } = "";
     /// <summary>Gets or sets the client policy sent to the Launcher: store sources and typed rules per plugin.</summary>
     public LauncherClientPolicyOptions ClientPolicy { get; set; } = new();
@@ -157,9 +162,27 @@ public sealed class LauncherOptions : IValidatableOptions
             if (instance.DownloadSource is { } source)
                 foreach (var error in source.Validate()) yield return error;
         }
+        if (Notices is null || Notices.Any(notice => notice is null))
+            yield return new("notices must be a list of non-null notices.", [nameof(Notices)]);
+        else
+        {
+            if (Notices.Select(notice => notice.Id).Distinct(StringComparer.Ordinal).Count() != Notices.Length)
+                yield return new("Notice identities must be unique.", [nameof(Notices)]);
+            foreach (var notice in Notices)
+                if (!NoticeId(notice.Id) || string.IsNullOrWhiteSpace(notice.Title) || notice.Title.Length > 200 || notice.Title.Any(char.IsControl)
+                    || notice.Body is null || notice.Body.Length is < 1 or > 8192 || notice.Body.Any(c => char.IsControl(c) && c is not ('\n' or '\r' or '\t'))
+                    || notice.Level is not ("info" or "warning" or "important") || notice.PublishedAt is null || !MaintenanceTime(notice.PublishedAt, out _)
+                    || notice.Sections is null || notice.Sections.Any(section => !NoticeId(section)))
+                    yield return new("Each notice needs an id, a title, a body, an info, warning or important level, a published_at time and valid section identities.", [nameof(Notices)]);
+        }
         if (LevelIconTemplate is null || LevelIconTemplate.Length > 0 && (!Uri.TryCreate(LevelIconTemplate.Replace("{level}", "1", StringComparison.Ordinal), UriKind.Absolute, out var uri) || uri.Scheme != "https" || uri.UserInfo.Length != 0))
             yield return new("level_icon_template must be HTTPS without credentials.", [nameof(LevelIconTemplate)]);
     }
+
+    private static bool NoticeId(string? value) => value is { Length: > 0 and <= 64 } && value.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or '.');
+
+    internal static DateTimeOffset NoticeTime(string value)
+    { MaintenanceTime(value, out var time); return time.ToUniversalTime(); }
 
     private static bool ValidId(string? value) => value is { Length: > 0 } && value.All(c => char.IsAsciiLetterOrDigit(c) || c == '-');
 
@@ -312,4 +335,21 @@ public sealed class LauncherLocalizedName
     public string Language { get; set; } = "";
     /// <summary>Gets or sets the region-and-year title rendered by the launcher.</summary>
     public string Text { get; set; } = "";
+}
+
+/// <summary>An operator notice; its identity stays fixed so a Launcher that showed it once does not show it again.</summary>
+public sealed class LauncherNoticeOptions
+{
+    /// <summary>Gets or sets the stable notice identity; a changed notice that must be shown again needs a new one.</summary>
+    public string Id { get; set; } = "";
+    /// <summary>Gets or sets the title.</summary>
+    public string Title { get; set; } = "";
+    /// <summary>Gets or sets the body in Markdown; the Launcher renders it without raw HTML.</summary>
+    public string Body { get; set; } = "";
+    /// <summary>Gets or sets info, warning or important.</summary>
+    public string Level { get; set; } = "info";
+    /// <summary>Gets or sets the publish time, ISO 8601 with seconds and an offset; the notice is hidden until then.</summary>
+    public string? PublishedAt { get; set; }
+    /// <summary>Gets or sets the sections the notice is for; empty shows it in every section.</summary>
+    public string[] Sections { get; set; } = [];
 }

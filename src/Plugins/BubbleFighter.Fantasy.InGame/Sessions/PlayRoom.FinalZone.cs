@@ -6,10 +6,14 @@ public sealed partial class PlayRoom
     internal FinalZoneRoundState? FinalZone { get; set; }
     internal RoomDeadlineClock? FinalZoneWaterClock { get; set; }
     internal RoomDeadlineClock? FinalZoneDroneClock { get; set; }
+    /// <summary>Retains terminal-publication cleanup through state reset and room shutdown.</summary>
+    internal Task FinalZoneCleanupTask { get; set; } = Task.CompletedTask;
 
     private void CancelModeClocks()
     {
         ExtremeRacingClock?.Cancel();
+        ExtremeRacingCannonClock?.Cancel();
+        BnBClock?.Cancel();
         FinalZoneWaterClock?.Cancel();
         FinalZoneDroneClock?.Cancel();
     }

@@ -41,22 +41,28 @@ structs:
       only: [kr-1256]
 
   # S2C gspNotifyFavoriteWeaponGrade at kr-1256 1548. Dispatcher kr-1256 sub_9D2FF0 stores the class
-  # vtable kr-1256 off_15B9288 for its case 1548 and calls kr-1256 sub_9D0E60, which reads a four-byte word
-  # (any nonzero value takes the notice branch), an eight-byte value, then three four-byte words, 24
-  # bytes in all. Names identify wire positions, not native object offsets. The values' meanings are unknown: the first is only proven
-  # to be a branch condition, so it keeps its offset name and the four-byte width is written as bool.
+  # vtable kr-1256 off_15B9288 for its case 1548 and calls kr-1256 sub_9D0E60, which reads a four-byte word,
+  # an eight-byte value, then three four-byte words, 24 bytes in all. A nonzero first word prints a fixed
+  # "points obtained" chat line and reads nothing else; a zero first word looks up the new grade's
+  # UpgradeMessage row (kr-1256 sub_ED2EE0), names the weapon from the item id (kr-1256 sub_825A20) and
+  # prints the promotion line when old < new, or a fixed demotion line when old > new. The eight-byte value
+  # is read and discarded, so its meaning stays unknown. Names identify wire positions, not native object offsets.
   FavoriteWeaponGrade:
-    - unknown_0: bool
+    - flag: bool
       only: [kr-1256]
+      except: [cn-774, tw-454]
     - unknown_4: u64
       only: [kr-1256]
-    - unknown_12: u32
+      except: [cn-774, tw-454]
+    - item_id: u32
       only: [kr-1256]
-    - unknown_16: u32
+      except: [cn-774, tw-454]
+    - old_grade: u32
       only: [kr-1256]
-    - unknown_20: u32
+      except: [cn-774, tw-454]
+    - new_grade: u32
       only: [kr-1256]
-
+      except: [cn-774, tw-454]
   # S2C gspHonorUserState at kr-1256 754 is not tabled. Handler kr-1256 sub_9D2660 reads three
   # four-byte words and then a counted list through kr-1256 sub_113B180; each element starts with a
   # two-byte value and continues in kr-1256 sub_113AF90 with a nested counted block and a

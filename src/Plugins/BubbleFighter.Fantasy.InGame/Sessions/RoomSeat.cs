@@ -1,6 +1,7 @@
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Match;
 using BubbleFighter.Fantasy.Contracts.Movement;
+using BubbleFighter.Fantasy.Contracts.Progress;
 using BubbleFighter.Fantasy.RoomCore;
 
 namespace BubbleFighter.Fantasy.InGame.Sessions;
@@ -141,6 +142,24 @@ public sealed class RoomSeat : IRoomMember
 
     /// <summary>Gets or sets the committed worn item snapshot used by every profile update; null means no inventory provider.</summary>
     public IReadOnlyList<int>? EquippedItemIds { get; set; }
+
+    /// <summary>Gets the saved native modifiers installed with this seat's current equipment snapshot.</summary>
+    public IReadOnlyList<BubbleFighter.Fantasy.Contracts.Rooms.RoomItemAttribute> ItemAttributes { get; internal set; } = [];
+
+    /// <summary>Gets the immutable equipment admitted for the current reward receipt.</summary>
+    internal RoundEquipmentSnapshot RewardEquipment { get; private set; } = RoundEquipmentSnapshot.Empty;
+
+    /// <summary>Gets the match whose opening equipment is retained, independently of bomb subround generations.</summary>
+    internal string RewardEquipmentMatchId { get; private set; } = "";
+
+    internal void FreezeRewardEquipment(string matchId, RoundEquipmentSnapshot? snapshot = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(matchId);
+        if (RewardEquipmentMatchId == matchId) return;
+        var captured = snapshot ?? new RoundEquipmentSnapshot(EquippedItemIds ?? [], ItemAttributes);
+        RewardEquipment = captured;
+        RewardEquipmentMatchId = matchId;
+    }
 
     /// <summary>
     /// Gets or sets the lobby character type for this seat (1 = Dao on the login path). The

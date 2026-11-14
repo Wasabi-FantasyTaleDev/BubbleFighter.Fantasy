@@ -7,6 +7,26 @@
     ]
   },
   "preview": {
+    "character_camera": {
+      "rotation": "yaw_only",
+      "status": "proven",
+      "source": "kr-812 sub_9731E0 sets the card's character branch; kr-812 sub_9B23D0 -> kr-812 sub_9B42B0 extracts item/user yaw only; cn-324 sub_831D50 -> cn-324 sub_833690 matches"
+    },
+    "character_motion": {
+      "workbook": "Models/Characters/AniList.xml",
+      "sheet": "CommonAni",
+      "header_row": 2,
+      "weapon": "Common",
+      "category": "basic",
+      "motion": "stop",
+      "status": "proven",
+      "source": "kr-812 sub_9B1630 -> kr-812 sub_9B13A0; cn-324 sub_8315A0 -> cn-324 sub_831280; cn-717 sub_A61840 -> cn-717 sub_A61420; CommonAni basic/stop, EyePitchFollowBone=NONE"
+    },
+    "accessories": {
+      "mounted_mesh_roll_degrees": -90,
+      "fighter_field_fallback": true,
+      "status": "kr-812 sub_AECA30 replaces the item's own motion root with the attachment. The measured cn-717 roll is retained only when item motion is absent; early fighter ID fallback follows the slot table when chrTypeIdx is absent."
+    },
     "camera_table": "Config/ShopItemCamera.csv",
     "camera_table_columns": [
       "shopItemId",

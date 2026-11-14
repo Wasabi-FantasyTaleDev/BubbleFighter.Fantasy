@@ -17,7 +17,7 @@ namespace BubbleFighter.Fantasy.Fighters;
 /// <remarks>The roster is published as <see cref="IFighterRoster"/> and <see cref="ISeatCharacterResolver"/>
 /// so the room row can resolve each seat's equipped character id for the S2C 117 profile map. The roster
 /// supplies the server-side equipped character identity.</remarks>
-[Plugin("fighters",
+[Plugin("fighters", Category = "gameplay", Names = ["en=Fighters", "zh-Hans=角色", "zh-Hant=角色", "ko=캐릭터"], 
     Description = "Playable fighter items from FighterConfig.xml; publishes IFighterRoster and ISeatCharacterResolver.",
     Requires = [typeof(IClientDataStore)],
     Optional = [typeof(IInventoryRepository), typeof(IFighterRepository), typeof(IEquipmentSelection)],

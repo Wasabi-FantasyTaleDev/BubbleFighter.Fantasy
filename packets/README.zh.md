@@ -21,6 +21,7 @@
 | `equipment-attributes.yaml` | 完整裝備清單中的原生 `ItemAttr` 與 `ItemExpiredTime` 元素布局。 |
 | `cash-inventory.yaml` | 帶數量的現金收件箱清單與領取封包，包含 modern 的展示尾段；結構表不會啟用道具領取。 |
 | `damagers.yaml` | 伺服器原樣轉發的回合內傷害體封包，例如 `SplashDamagerByDamager`（32900）以及 `packets/damagers.yaml` 中的七个生成封包。 |
+| `weapon-master.yaml` | kr-1256 在回合模式 26 中分配武器所用的装备封包（S2C 1001，`EquipmentApply`），以及客户端多次死亡后发送的空复活请求（C2S 765，`WeaponMasterRevivalRequest`）。仅为布局；能力 `weapon_master` 决定是否使用。 |
 | `recruit.yaml` | 共享擴音器請求與傳統招募訊息；排除尚未核實的現代招募格式。 |
 | `plaza-recruitment.yaml` | 原生廣場招募開關與文字、現代版本的招募發布及分頁清單；入隊由共享隊伍邏輯處理。 |
 | `round-feed-native.yaml` | 已核对字段顺序差异的原生战斗消息；封包表不会自行注册中继路由或启用对局。 |
@@ -37,9 +38,12 @@
 | `udp-peers.yaml` | 原生 peer 发现、端点表、打洞控制及 relay 成员消息；布局不会启用监听或直接移动。 |
 | `round-movement.yaml` | 原生完整及掩码移动、UDP 中继探测、身份、控制和头部布局，包含各版本身份宽度差异。 |
 | `relay-connection.yaml` | 已核對的原生中繼地址、key、連接通知、加入請求和連接報告；存在封包表不代表已啟用中繼監聽或握手。 |
+| `relay-latency.yaml` | 單一字值的原生中繼延遲請求與未知值回覆；存在封包表不代表已啟用被動回覆或客戶端取樣。 |
 | `relay-validation.yaml` | 加入中繼後的原生校驗報告與簽名資料；CN2011 改用直接報告連接成功的順序。 |
 | `relay-success.yaml` | 原生加入／場景成功的空消息體；不初始化場景種子表，也不啟用監聽器。 |
 | 其他 `*.yaml` | 更多結構。這個資料夾裡的每個檔案都會被讀取，插件可以放自己的檔案。 |
+| `dynamic-config-content.yml` | kr-1256 原生 DynamicConfig 各类别的内容；这是内容文件，`.yml` 后缀避免将其当作结构表读取，布局见 `dynamic-config.yaml`。 |
+| `dynamic-config-cn-pets.yml` | cn-774 第 14 类的角色创建模板，仅在活动宠物服务提供冷却时间和里程显示上限时发布；这是内容文件，布局见 `dynamic-config.yaml`。 |
 
 每個檔案開頭都有 `version: 1`。這是檔案格式的版本，不是遊戲版本：伺服器遇到不認識的版本會拒絕啟動，所以以後格式改動時舊檔案不會被誤讀。
 
@@ -192,6 +196,9 @@ bff packets json id-400                 # 一個版本的全部內容，JSON 格
 
 結構是資料，含義是程式。
 
+`relay_latency_builds` 明確列出被動中繼配接器可繫結原生請求／回覆組合的版本。
+繼承單一字值的布局不會加入此名單，也不會啟用任一插件列。
+
 `weapon_critical_seed_builds` 显式列出已审核种子消费路径、可在 `dialect.scene-seeds` 中
 启用 `weapon_critical_bonuses` 的客户端；后继版本不会自动启用。
 `weapon_critical_mode_fields` 将已审核模式映射到该模式的武器规格替换字段。
@@ -242,6 +249,17 @@ IReadOnlyList<PacketField> fields = tables.Resolve("id-400", "MyStructure");
 
 `round_score_row_marker` 指定 modern 结算适配器为已入座记录填写的 `ScoreRow` 首字段，必须是该行开头的 `u32` 字段；这个别名不为未知字段赋予未经恢复的含义。等级和奖励使用共享字段名，线上顺序由各自封包表决定。结算尾部的条件字符串通过该表显式提供的默认门控值保持缺省。
 
+`live_score_kinds` 将 `score`、`knockdowns`、`kills`、`deaths`、`stars`、`collected_lucci` 映射为实时席位向量中的原生单字节编号。六个键均须存在；后两项为可选计数，尚未核对原生投影时可显式设为 `null`，计数在获准发布后必须有对应编号，否则报错。编号必须互不相同。拾取 Lucci 的既有版本名单和 StarTeam 专用发布规则仍分别控制各自的路径；此映射不会启用发送路由或改变游戏计分规则。
+现有 modern 结算发送器会在第一队总分帧中发布发生变更席位的普通战斗计数，随后发送第二队总分，不重复席位向量。KR1256 的 WeaponMaster 进度附在战斗计数之后。持有星数仍由单独获准的版本和模式投影处理，其他星数不会进入普通战斗向量。
+
+
+`builds.yaml` 中的 `inventory` 决定共享背包服务如何发布各版本的背包。`envelope` 为 `plain` 或 `zlib`；`zlib` 表示一个 `u32` 压缩字节数，后接一条 zlib 数据流。`article_envelope` 单独选择 Article 列表的封装，省略时使用 `envelope`。kr-1256 的普通背包和 Article 都压缩；cn-774 普通背包不压缩而 Article 压缩；tw-454 两者均不压缩。现金背包始终不压缩。各版本读取函数及 CN/TW 覆盖值记录在 `inventory.yaml` 和 `builds.yaml`。
+
+`rows` 为 `ranked`（传统基线：按物品编号升序，完整发布时省略空行，天数相对于连接的时间基准）或 `mirror`（保留存储顺序并使用现代槽位字段）。`replaced`、`purchase` 和 `changed` 按顺序列出发布内容：`bag` 为角色背包的完整包，`slots` 为角色背包的槽位包，`equipped` 为装备背包的槽位包，`changed` 为变更行的槽位包，`articles` 为包含穿戴标志与展示属性的完整已拥有 Article 表，`cash` 为空现金背包。现代普通槽位列表不重复包含已由 Article 表示的行。服务按名称解析各封包，所选版本缺少某个列表项的封包时会报错。
+
+`inventory.ordinary_expiry_builds` 明确列出将普通限时所有权发布为相对天数双精度位模式的 `mirror` 版本。kr-1256、cn-774 和 tw-454 使用持久化的 UTC 到期时间；功能提供独立展示期限时，优先使用该期限。每次普通背包全量发布（包括购买后的重发）都建立新的时间基准，纯增量沿用此前基准；尚未全量发布时拒绝发送计时值。派生版本只有被明确列名才会启用。永久、未分类和生命次数物品沿用既有表示。Article 条目仍走独立列表，不通过此设置获得所有权计时。一次发布会验证有界条目并完成全部帧的编码，然后才推进时间基准并发送首帧。
+
+`dynamic_config.pet_configuration_builds` 明确列出第 14 类能够发布两项宠物设置的版本；派生版本只有被明确列名才会启用，不能仅靠继承列表。`pet_content_file` 可在没有普通 `content_file` 时提供第 14 类模板。CN 模板仅在当前协议的宠物服务提供完整的冷却时间和里程显示上限时发布。TW 清空宠物版本列表与模板，改用原生 PetConfig 文件。
 
 `builds.yaml` 的 `round_feed` 按动作标识配置原生 Opcode 名称、封包 `structure`、
 报告者身份字段（`actors`）及可选的发送者回显（`echo_sender`）。嵌套配置可以继承，
@@ -260,3 +278,16 @@ IReadOnlyList<PacketField> fields = tables.Resolve("id-400", "MyStructure");
 `nested: true` 使用完整封包表读取器，并校验原生复活确认的缺省标签。
 基线动作的结构和报告者证据记录在 `round-feed.yaml`；伤害体创建消息和仅有写入证据的中继移动消息
 继续使用其各自已记录的处理方式。
+
+`one_kill: request|confirmation` 为具备已核对 `native_one_kill` 能力的版本附加类型化参与者信息。
+请求由攻击者报告，确认由受害者报告。两者都使用标量结构，不向发送者回显，也不附加独立的
+`life_event`；房间先验证当前参与者与报告者归属，再处理已确认的死亡。部署时需要在 `ingame`
+开启默认关闭的 `native_one_kill`，并提供 FinalZone 交换流程。KR1256 的可选
+`one-kill.patch.yaml` 同时开启这两项，供真实客户端验收。
+
+`star_score_builds` 将已核对的星星投影限制在明确列出的版本；`star_score_modes` 选择适用模式，
+`star_score_team_modes` 选择其中需要发布独立团队星星总数的模式。`star_live_stat_kind` 与
+`star_live_team_total_field` 描述实时更新；`star_scoreboard_count_field` 与
+`star_scoreboard_team_total_field` 在完整记分板替换时保留同一状态。首个映射仅覆盖 KR1256
+模式 6，派生版本与其他模式沿用既有投影。`star_report_slot_builds` 单独列出已核对报告席位
+含义的版本，避免客户端为已离场玩家发送的清理报告改变仍在场报告者自身的数量。

@@ -2,6 +2,9 @@ id: all
 description: Every brought-up client build in one process, each on its own listener port.
 bundles:
   - core
+# always: every build starts with the server. on_demand: a build's listeners are bound, and its rows load when the
+# first client connects to it and unload after core.activation-groups' idle_minutes without a connection.
+build_activation: ${BFF_BUILD_ACTIVATION:-always}
 builds:
   - kr-1256
   - kr-812

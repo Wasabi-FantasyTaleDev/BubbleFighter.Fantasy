@@ -173,8 +173,81 @@ def test_export_refuses_client_folder(tmp_path):
         export_items(session, [1], tmp_path / "exports", ExportOptions())
 
 
-def test_outline_rule_keeps_weapons_and_skips_eyes():
+@pytest.mark.parametrize("part_name", ["Gun", "kEye", "KEYE"])
+def test_transparent_equipment_keeps_its_outline(part_name):
     from bf_item_viewer.rendering.raster import has_outline, is_alpha_blended
-    assert is_alpha_blended("Gun") and has_outline("Gun")        # blended texture, still outlined
-    assert not has_outline("kEyeL") and not has_outline("Eyebrow")
+
+    assert is_alpha_blended(part_name) and has_outline(part_name)
+
+
+@pytest.mark.parametrize("part_name", ["kEyeL", "kEyeR", "Eyebrow", "kLowerBR"])
+def test_character_eye_and_other_transparent_parts_keep_their_outline_exclusion(part_name):
+    from bf_item_viewer.rendering.raster import has_outline, is_alpha_blended
+
+    assert is_alpha_blended(part_name) and not has_outline(part_name)
     assert has_outline("Head")
+
+
+def test_goggles_render_adds_a_hull_without_changing_the_texture_alpha_pass():
+    from dataclasses import replace
+
+    from bf_item_viewer.rendering.camera import PreviewCamera
+    from bf_item_viewer.rendering.scene import Part, Scene, render
+    from bf_item_viewer.rendering.shading import ShadingData
+    from bf_item_viewer.resources.model import Material, Mesh
+
+    front = np.array([[-0.5, 0.5, 0.4], [0.5, 0.5, 0.4],
+                      [0.5, -0.5, 0.4], [-0.5, -0.5, 0.4]])
+    back = front.copy()
+    back[:, 2] = 0.6
+    positions = np.concatenate([front, back])
+    normals = positions.copy()
+    normals[:, 2] = np.sign(normals[:, 2] - 0.5)
+    normals /= np.linalg.norm(normals, axis=1, keepdims=True)
+    uvs = np.tile([[0, 0], [1, 0], [1, 1], [0, 1]], (2, 1))
+    material = Material((1, 1, 1, 1), (0, 0, 0, 1), (0, 0, 0, 1), (0, 0, 0, 1), 1, "fixture.dds")
+    mesh = Mesh(3, np.eye(4), 1, 1, 0, [], False, positions, normals, uvs,
+                np.array([[0, 1, 2], [0, 2, 3], [4, 6, 5], [4, 7, 6]]),
+                [material], [(0, 8, 0, 4)], [], 0, 0)
+    texture = np.ones((2, 2, 4), dtype=np.float32)
+    texture[:, :, :3] = (1, 0, 0)
+    resolver = SimpleNamespace(resolve=lambda *args: (Texture(texture), "fixture.dds", []))
+    camera = PreviewCamera(np.eye(4), np.eye(4), np.eye(4), 64, 64, CameraRecord(1))
+    shading = ShadingData(None, [], np.array([0, -1, 0]), 0.2, (0, 0, 0, 1), False, False)
+
+    def preview(slot, lighting):
+        return render(Scene([Part(slot, "fixture.msh", mesh, "item", rigid=True)], None, None),
+                      camera, resolver, supersample=1, shading=lighting).rgba
+
+    eyes = preview("kEyeL", shading)
+    goggles = preview("kEye", shading)
+    border = (eyes[:, :, 3] == 0) & (goggles[:, :, 3] == 255)
+    assert border.any() and np.all(goggles[border, :3] == 0)
+    assert tuple(goggles[32, 32]) == (255, 0, 0, 255)
+    assert goggles[0, 0, 3] == 0
+
+    texture[:, :, 3] = 0.25
+    without_outline = replace(shading, outline_colour=None)
+    transparent = preview("kEye", without_outline)
+    assert tuple(transparent[32, 32]) == (255, 0, 0, 64)
+    assert np.array_equal(transparent, preview("kEyeL", without_outline))
+
+
+def test_batch_webp_uses_inherited_layout_for_unprofiled_build(tmp_path):
+    from PIL import Image
+
+    from bf_item_viewer.cards.card import preview_size
+    from bf_item_viewer.export.batch import ExportOptions, export_items
+
+    session = FakeSession(tmp_path / "client")
+    session.build = "cn-717"
+    width, height = preview_size("kr-812")
+    manifest = export_items(session, [1], tmp_path / "out", ExportOptions(
+        width=width, height=height, format="webp", lossless=True, reference_build="kr-812"))
+    entry, = json.loads(manifest.read_text(encoding="utf-8"))["entries"]
+    assert entry["status"] == "written" and entry["build"] == "cn-717"
+    assert entry["camera"]["official_frame"] == [width, height]
+    preview, = (tmp_path / "out").glob("*.webp")
+    with Image.open(preview) as image:
+        assert image.format == "WEBP" and image.size == (width, height)
+        assert image.getpixel((0, 0))[3] == 0

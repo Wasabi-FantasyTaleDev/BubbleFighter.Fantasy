@@ -114,9 +114,10 @@ public sealed partial class PluginHost
     private bool BindingReconciliationNeeded()
     {
         if (_live.Any(item => Touches(item.Row.Id) && !item.Context.IsClosing && HasStaleActivationView(item))) return true;
+        var live = LiveRowIds();
         foreach (var row in _rows)
         {
-            if (!Touches(row.Id) || !_desiredRows.Contains(row.Id) || _live.Any(item => item.Row.Id == row.Id)) continue;
+            if (!Touches(row.Id) || !_desiredRows.Contains(row.Id) || live.Contains(row.Id)) continue;
             lock (_info) if (_info[row.Id].State == PluginState.Failed) continue;
             if (NamespaceIsReady(row) && DefinitionFor(row) is { } descriptor && RequiredEntryRows(row, Metadata(descriptor)).All(EntryIsReady) &&
                 PluginServiceDeclarations.Required(Metadata(descriptor)).All(type => _registry.IsRegistered(ScopeFor(row), type))) return true;

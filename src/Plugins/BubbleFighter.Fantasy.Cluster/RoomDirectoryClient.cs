@@ -7,7 +7,7 @@ using BubbleFighter.Fantasy.Contracts.Cluster;
 namespace BubbleFighter.Fantasy.Cluster;
 
 /// <summary>Publishes opt-in authenticated room discovery without altering standalone room behavior.</summary>
-[Plugin("cluster.room-directory", Description = "Bounded authenticated room discovery for a configured node.",
+[Plugin("cluster.room-directory", Category = "cluster", Names = ["en=Cluster room directory", "zh-Hans=集群房间目录", "zh-Hant=叢集房間目錄", "ko=클러스터 방 목록"], Description = "Bounded authenticated room discovery for a configured node.",
     Provides = [typeof(IFederatedRoomDiscovery)])]
 public sealed class RoomDirectoryClientPlugin : IPlugin
 {

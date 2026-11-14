@@ -4,6 +4,7 @@ using BubbleFighter.Fantasy.Abstractions.Net;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Match;
 using BubbleFighter.Fantasy.Contracts.ClientData;
+using BubbleFighter.Fantasy.Contracts.Pets;
 using BubbleFighter.Fantasy.Packets;
 using Microsoft.Extensions.Logging;
 
@@ -12,13 +13,13 @@ namespace BubbleFighter.Fantasy.Dialect.Messages;
 /// <summary>
 /// The native seed authority of a relay: issues each seat's seed tables when its round starts and keeps the tables a
 /// client reports back for diagnostics only. A build with the full seed exchange takes its critical, defence and
-/// cancellation tables from here, the critical chance drawn from its own CriticalHitTable; a build with only the
-/// ordinary-defence capability takes only the defence tables. The appliers drop a table whose actor does not
-/// exist yet, so the round flow asks for the tables after the countdown, never at the scene handshake.
+/// cancellation tables from here, the critical chance drawn from its own CriticalHitTable. Independently audited
+/// victim defence and cancellation tables can also mount for locally rolled critical attacks. The appliers drop a
+/// table whose actor does not exist yet, so the round flow asks after the countdown, never at the scene handshake.
 /// </summary>
-[Plugin("dialect.scene-seeds", Description = "Native relay seed authority.",
+[Plugin("dialect.scene-seeds", Category = "network", Names = ["en=Scene seeds", "zh-Hans=场景种子", "zh-Hant=場景種子", "ko=장면 시드"], Description = "Native relay seed authority.",
     Requires = [typeof(IPacketRouter), typeof(IOpcodeTableRegistry), typeof(IEventBus), typeof(IClientDataStore)],
-    OptionalMany = [typeof(IOpcodeTable)],
+    OptionalMany = [typeof(IOpcodeTable), typeof(IPetCombatEffects)],
     ProvidesMany = [typeof(INativeSceneSeedStore), typeof(IMessageSender<MatchSeedTablesRequested>), typeof(IMatchSeedInputValidator)],
     ConditionalProvidesMany = [typeof(IMatchCriticalSeedAuthority)])]
 public sealed class SceneSeedsPlugin : IPlugin
@@ -38,7 +39,10 @@ public sealed class SceneSeedsPlugin : IPlugin
         // cn-706 sub_50CAF0 and kr-1256 sub_483620) can mount without the other seed families.
         var seeded = tables.CapabilityOf(build, "native_scene_seed_tables");
         var defended = tables.CapabilityOf(build, "native_defence_seed_tables");
-        if (!seeded && !(defended && options.DefenceSeeds))
+        var cancelled = tables.CapabilityOf(build, "native_cancellation_seed_tables");
+        if (options.CriticalCancellationSeeds && !cancelled)
+            throw new ConfigException($"Build '{build}' has no audited victim cancellation-table consumer.");
+        if (!seeded && !(defended && options.DefenceSeeds) && !options.CriticalCancellationSeeds)
             throw new ConfigException($"Build '{build}' takes no seed tables from this authority; its defence needs defence_seeds.");
         if (options.DefenceSeeds && !defended)
             throw new ConfigException($"Build '{build}' does not read its ordinary defence from server tables.");
@@ -52,28 +56,44 @@ public sealed class SceneSeedsPlugin : IPlugin
                 ("entity_id", "u32"));
             if (tables.Resolve(build, "RelayCriticalSeedTable").Count(field => field.Type == "list<u32>") != 2)
                 throw new ConfigException($"Build '{build}' must state two critical seed word vectors.");
+        }
+        if (seeded || options.CriticalCancellationSeeds)
+        {
             PacketLayoutContract.RequireFields(tables, build, "RelayCriticalSeedCancelTable", "Native scene seeds",
                 ("entity_id", "u32"), ("unknown_8", "list<u32>"));
         }
         var opcodes = context.Services.Get<IOpcodeTableRegistry>().ForProtocol(options.Protocol);
         if (opcodes.Connection != OpcodeConnection.Relay || opcodes.Profile.Id != build)
             throw new ConfigException("Native scene seeds require an opcode table for the owning relay connection.");
+        PetSeedEffects? pets = null;
+        if (options.PetCombatEffects)
+        {
+            var resolvers = context.Services.GetAll<IPetCombatEffects>()
+                .Where(resolver => resolver.Protocol == build + "/game").ToArray();
+            if (resolvers.Length != 1)
+                throw new ConfigException($"Pet combat seeds require exactly one resolver for '{build}/game'.");
+            pets = new(resolvers[0], options.PetCombatModeIds);
+        }
         var data = context.Services.Get<IClientDataStore>();
         var chances = seeded
             ? CriticalHitChances.Load(data, options.CriticalHitTableClientPath, options.CriticalHitTableSheet,
                 options.CriticalHitTableMaxBytes)
             : null;
-        var weapons = options.WeaponCriticalBonuses ? WeaponCriticalCatalog.Load(data, tables, build, options) : null;
+        var weapons = options.WeaponCriticalBonuses ? WeaponCriticalCatalog.Load(data, tables, build, options, pets) : null;
         var defences = options.DefenceSeeds
             ? DefenceSeedCatalog.Load(data, tables, build, options.DefenceItemsClientPath, options.DefenceWorkbookMaxBytes,
-                "defence_workbook_max_bytes")
+                "defence_workbook_max_bytes", pets)
+            : null;
+        var combat = options.CriticalCancellationSeeds || (seeded && pets is not null && weapons is null)
+            ? CombatSeedCatalog.Load(data, options.CombatItemsClientPath, options.CombatWorkbookMaxBytes,
+                seeded && pets is not null && weapons is null, options.CriticalCancellationSeeds, pets)
             : null;
 
         var store = new SceneSeedStore(options.MaxSessions);
         var authority = new SceneSeedAuthority(options.Protocol, build, tables,
             seeded ? opcodes.S2C("rspSendCrtSeedTable") : null, opcodes.S2C("rspSendDefSeedTable"),
-            seeded ? opcodes.S2C("rspSendCrtCancelSeedTable") : null, chances, options.MaxSessions, Random.Shared,
-            weapons, defences);
+            seeded || options.CriticalCancellationSeeds ? opcodes.S2C("rspSendCrtCancelSeedTable") : null,
+            chances, options.MaxSessions, Random.Shared, weapons, defences, combat, options.CriticalCancellationSeeds);
         context.Effect(context.Services.RegisterMany<INativeSceneSeedStore>(store));
         context.Effect(context.Services.RegisterMany<IMessageSender<MatchSeedTablesRequested>>(authority));
         context.Effect(context.Services.RegisterMany<IMatchSeedInputValidator>(authority));
@@ -157,7 +177,7 @@ internal static class SceneSeedSender
 }
 
 /// <summary>Bounds the native seed authority of one legacy relay protocol and names its client data.</summary>
-public sealed class SceneSeedsOptions
+public sealed class SceneSeedsOptions : IValidatableOptions
 {
     /// <summary>Gets or sets the owning build's relay protocol.</summary>
     [Required, StringLength(128, MinimumLength = 1)]
@@ -231,6 +251,33 @@ public sealed class SceneSeedsOptions
     /// <summary>Gets or sets the inclusive byte bound of that workbook; the shipped builds' workbooks reach about 100 MB.</summary>
     [Range(1, int.MaxValue)]
     public int DefenceWorkbookMaxBytes { get; set; } = 268435456;
+
+    /// <summary>Gets or sets whether independently audited victim cancellation tables include equipment effects.</summary>
+    public bool CriticalCancellationSeeds { get; set; }
+
+    /// <summary>Gets or sets whether enabled combat seed families include native pet instance effects.</summary>
+    public bool PetCombatEffects { get; set; }
+
+    /// <summary>Gets or sets explicitly enabled native modes whose channel and feature settings permit pet effects.</summary>
+    public int[] PetCombatModeIds { get; set; } = [];
+
+    /// <summary>Gets or sets the item workbook whose static rows supply ordinary critical and cancellation effects.</summary>
+    [Required, StringLength(260, MinimumLength = 1)]
+    public string CombatItemsClientPath { get; set; } = "Config/ShopItem2.xml";
+
+    /// <summary>Gets or sets the maximum workbook byte size for static ordinary critical and cancellation effects.</summary>
+    [Range(1, int.MaxValue)]
+    public int CombatWorkbookMaxBytes { get; set; } = 268435456;
+
+    /// <summary>Rejects an implicit all-mode pet policy or malformed mode allowlist.</summary>
+    public IEnumerable<ValidationResult> Validate()
+    {
+        if (PetCombatModeIds is null || PetCombatModeIds.Length > 512
+            || PetCombatModeIds.Any(mode => mode <= 0) || PetCombatModeIds.Distinct().Count() != PetCombatModeIds.Length)
+            yield return new("pet_combat_mode_ids must contain at most 512 distinct positive native modes.", [nameof(PetCombatModeIds)]);
+        else if (PetCombatEffects && PetCombatModeIds.Length == 0)
+            yield return new("Enabled pet combat effects require explicit pet_combat_mode_ids.", [nameof(PetCombatModeIds)]);
+    }
 
     /// <summary>Gets the bounded packet-tree limits used for all three native seed structures.</summary>
     internal PacketReadLimits ReadLimits => new(MaxCollectionElements: MaxElements,

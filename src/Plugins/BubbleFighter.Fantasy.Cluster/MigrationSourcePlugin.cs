@@ -9,7 +9,7 @@ using BubbleFighter.Fantasy.Contracts.Players;
 namespace BubbleFighter.Fantasy.Cluster;
 
 /// <summary>Offers prepared remote rooms only after transferring the source connection's account authority.</summary>
-[Plugin("cluster.migration-source", Description = "Bounded native room departure and exact account-handoff withdrawal.",
+[Plugin("cluster.migration-source", Category = "cluster", Names = ["en=Room migration source", "zh-Hans=房间迁移来源", "zh-Hant=房間遷移來源", "ko=방 이동 출발지"], Description = "Bounded native room departure and exact account-handoff withdrawal.",
     Requires = [typeof(IMigrationBroker), typeof(INodeLeaseSource), typeof(IAccountSessionHandoff), typeof(IOnlinePlayers)],
     Optional = [typeof(IPartyDirectory), typeof(IHostReadiness), typeof(IMigrationTargetDirectory)], OptionalMany = [typeof(IRemoteRoomMigrationEndpoint), typeof(IMessageSender<ChannelMoveOffered>), typeof(IMessageSender<ServerNotice>)],
     ProvidesMany = [typeof(IRemoteRoomMigration)])]

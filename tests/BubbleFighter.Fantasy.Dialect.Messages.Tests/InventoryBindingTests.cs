@@ -90,19 +90,31 @@ public sealed class InventoryBindingTests
         Assert.Empty(session.Sent);
     }
 
+    /// <summary>Bounds retained origins, releases retired connection capacity and rejects admission after scope disposal.</summary>
     [Fact]
-    public void BaselineScopeBoundsOriginsAndReleasesThem()
+    public async Task BaselineScopeBoundsOriginsAndReleasesThem()
     {
         using var scope = new InventoryBaselineScope(1, TimeProvider.System);
-        var first = scope.Reset(1);
+        var connection = new StubConnection(1);
+        DateTimeOffset first;
+        using (var publication = await scope.EnterAsync(connection, default))
+        {
+            first = publication.PrepareReset();
+            publication.Reset(first);
+        }
         Assert.Equal(first, scope.Require(1));
-        Assert.Throws<InvalidOperationException>(() => scope.Reset(2));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => scope.EnterAsync(new StubConnection(2), default).AsTask());
         scope.Remove(1);
         Assert.Throws<InvalidOperationException>(() => scope.Require(1));
-        var second = scope.Reset(2);
+        DateTimeOffset second;
+        using (var publication = await scope.EnterAsync(new StubConnection(2), default))
+        {
+            second = publication.PrepareReset();
+            publication.Reset(second);
+        }
         Assert.Equal(second, scope.Require(2));
         scope.Dispose();
-        Assert.Throws<ObjectDisposedException>(() => scope.Reset(3));
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => scope.EnterAsync(new StubConnection(3), default).AsTask());
     }
 
     [Fact]

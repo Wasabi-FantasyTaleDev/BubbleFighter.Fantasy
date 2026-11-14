@@ -163,11 +163,13 @@ public static class ShopCatalogLoader
                 cards[index] = cards[index] with { SupplementalPriority = true };
         var setOffers = activeOffers.Where(offer => offer.StockSetId > 0).ToDictionary(offer => offer.StockSetId);
         var sets = ParseStockSets(RequireSheet(sheets, "StockSet"), byStockId, mainIds, subIds, path, secondaryCashColumns, schema, Report, setOffers);
+        var stockSetRows = RequireSheet(sheets, "StockSet");
+        var stockSetHeader = HeaderMap(stockSetRows[0]);
         foreach (var offer in setOffers.Values)
             if (!sets.Any(card => card.StockSetId == offer.StockSetId))
             {
-                if (offer.SkipIfMissing && !RequireSheet(sheets, "StockSet").Skip(1).Any(row =>
-                        IntCell(row, HeaderMap(RequireSheet(sheets, "StockSet")[0]), "stockSetId") == offer.StockSetId))
+                if (offer.SkipIfMissing && !stockSetRows.Skip(1).Any(row =>
+                        IntCell(row, stockSetHeader, "stockSetId") == offer.StockSetId))
                     diagnostic?.Invoke($"Shop supplement set {offer.StockSetId} is absent from this client workbook; skipped.");
                 else
                     throw new InvalidOperationException($"Shop supplement set {offer.StockSetId} has no renderable StockSet row.");
@@ -210,21 +212,19 @@ public static class ShopCatalogLoader
 
     // Every Stock with an item, and every StockSet whose slots all resolve and that grants items or Lucci, on sale or
     // not. The Lucci column is "lucci" in the kr-812 workbook and "Lucci" in id-400's, so it is matched without case.
-    private static Dictionary<int, ShopGift> ParseGifts(IReadOnlyList<IReadOnlyList<string>> setRows,
+    private static ShopGiftIndex ParseGifts(IReadOnlyList<IReadOnlyList<string>> setRows,
         IReadOnlyDictionary<int, ShopStockRow> stocks)
     {
-        var gifts = new Dictionary<int, ShopGift>(stocks.Count);
-        foreach (var stock in stocks.Values)
-            if (stock.ItemId > 0)
-                gifts[stock.StockId] = new ShopGift(stock.StockId, 0, 0, [stock]);
+        var sets = new Dictionary<int, ShopGift>();
         if (setRows.Count < 2)
-            return gifts;
+            return new ShopGiftIndex(stocks, sets);
         var header = HeaderMap(setRows[0]);
         var lucciColumn = header.Keys.SingleOrDefault(name => string.Equals(name, "lucci", StringComparison.OrdinalIgnoreCase));
         for (var i = 1; i < setRows.Count; i++)
         {
             var row = setRows[i];
-            if (!TryIntCell(row, header, "stockSetId", out var setId) || setId <= 0 || gifts.ContainsKey(setId))
+            if (!TryIntCell(row, header, "stockSetId", out var setId) || setId <= 0
+                || stocks.TryGetValue(setId, out var same) && same.ItemId > 0 || sets.ContainsKey(setId))
                 continue;
             var granted = new List<ShopStockRow>();
             var resolved = true;
@@ -240,9 +240,9 @@ public static class ShopCatalogLoader
             }
             var lucci = lucciColumn is not null && TryIntCell(row, header, lucciColumn, out var amount) ? amount : 0;
             if (resolved && (granted.Count > 0 || lucci > 0))
-                gifts.Add(setId, new ShopGift(setId, setId, lucci, granted));
+                sets.Add(setId, new ShopGift(setId, setId, lucci, granted));
         }
-        return gifts;
+        return new ShopGiftIndex(stocks, sets);
     }
 
     private static IReadOnlyList<IReadOnlyList<string>> RequireSheet(

@@ -215,13 +215,40 @@ public sealed partial class ServiceRegistry : IServiceRegistry
         return waiter;
     }
 
-    internal ServiceBindingSnapshot CaptureBindings(ServiceActivation? exclude = null, IReadOnlyCollection<Type>? bases = null)
+    /// <param name="exclude">The activation whose own registrations, and those of its definition's peers, are left out.</param>
+    /// <param name="bases">Contracts captured without their decorations.</param>
+    /// <param name="keys">
+    /// When given, only registrations under these keys are captured, each key whole. An activation reads only its
+    /// declared keys, and capturing every registration for each activation and each re-check was quadratic in rows
+    /// while a many-build profile started.
+    /// </param>
+    internal ServiceBindingSnapshot CaptureBindings(ServiceActivation? exclude = null, IReadOnlyCollection<Type>? bases = null,
+        IReadOnlySet<ServiceKey>? keys = null)
     {
         var peers = exclude?.Definition;
         lock (_gate) return new ServiceBindingSnapshot(Runtime, AllRegistrations()
-            .Where(entry => !entry.Publishing && entry.BaseBinding.Registration.Provider.Publication.IsReady && entry.BaseBinding.Registration.Provider != exclude &&
-                (peers is null || entry.BaseBinding.Registration.Provider.Definition != peers))
+            .Where(entry => (keys is null || keys.Contains(entry.Key)) &&
+                !entry.Publishing && entry.BaseBinding.Registration.Provider.Publication.IsReady && entry.BaseBinding.Registration.Provider != exclude &&
+                (peers is null || entry.BaseBinding.Registration.Provider.Definition != peers) &&
+                !entry.BaseBinding.Registration.Provider.IsHiddenFrom(exclude))
             .Select(entry => bases?.Contains(entry.Key.Contract) == true ? entry.BaseBinding : entry.Binding).ToArray());
+    }
+    // The providers a reader may see under one multiple-mode contract right now, by the rules CaptureBindings applies
+    // to a committed view. Nothing is retained: the next call sees the registry as it then stands.
+    internal IReadOnlyList<ServiceBinding> LiveBindings(ServiceScope scope, ServiceActivation reader, Type contract)
+    {
+        Runtime.RequireOwner(scope.Runtime);
+        Runtime.RequireOwner(reader.Runtime);
+        var key = scope.Resolve(contract);
+        lock (_gate)
+        {
+            if (_services.ContainsKey(key) || _waiters.ContainsKey(key))
+                throw new InvalidOperationException($"Service '{contract.FullName}' is in singleton mode; a live read needs RegisterMany providers.");
+            if (!_multiple.TryGetValue(key, out var entries)) return [];
+            return entries.Where(entry => entry.BaseBinding.Registration.Provider is var provider && provider.Publication.IsReady &&
+                    provider != reader && (reader.Definition is null || provider.Definition != reader.Definition) && !provider.IsHiddenFrom(reader))
+                .Select(entry => entry.Binding).OrderByDescending(binding => binding.Priority).ThenBy(binding => binding.Registration.Id).ToArray();
+        }
     }
     internal IReadOnlyList<ServiceBinding> OwnBindings(ServiceScope scope, ServiceActivation owner, Type contract)
     {

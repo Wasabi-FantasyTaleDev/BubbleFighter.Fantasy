@@ -38,6 +38,28 @@ public sealed class MigrationArrivalTests
     }
 
     [Fact]
+    public void TheCleanupSignalIsCompleteExactlyWhileAnArrivalIsHeld()
+    {
+        var arrivals = new MigrationArrivals(2, new Clock());
+        Assert.False(arrivals.WhenAnyTracked().IsCompleted);
+        var consumed = Arrival("0123456789abcdef0123456789abcdef");
+        arrivals.Expect(consumed);
+        Assert.True(arrivals.WhenAnyTracked().IsCompleted);
+        Assert.Equal(consumed, arrivals.TryConsume("kr-812", 7, MigrationTestConnection.Accept(arrivals, Player)));
+        Assert.False(arrivals.WhenAnyTracked().IsCompleted);
+
+        // A retired arrival still holds its seat, so the clean-up must keep running until it completes it.
+        var retired = Arrival("ffffffffffffffffffffffffffffffff");
+        arrivals.Expect(retired);
+        var waiting = arrivals.WhenAnyTracked();
+        Assert.Equal(retired, arrivals.Retire(retired.Request.MigrationId));
+        Assert.True(waiting.IsCompleted);
+        Assert.True(arrivals.WhenAnyTracked().IsCompleted);
+        arrivals.Complete(retired);
+        Assert.False(arrivals.WhenAnyTracked().IsCompleted);
+    }
+
+    [Fact]
     public async Task PluginObservesTransportEventsAndRemovesItsObservationHandlerOnUnload()
     {
         var services = new ServiceRegistry();

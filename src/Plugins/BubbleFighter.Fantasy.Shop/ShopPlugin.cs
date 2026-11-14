@@ -34,11 +34,11 @@ namespace BubbleFighter.Fantasy.Shop;
 /// opens its inventory dialog; with the option off, which is the default, <c>gcpEnterInventory</c>
 /// is not registered at all and no wire behaviour changes.
 /// </summary>
-[Plugin("shop",
+[Plugin("shop", Category = "items", Names = ["en=Shop", "zh-Hans=商店", "zh-Hant=商店", "ko=상점"], 
     Description = "Item shop and cash shop catalog from Config/ShopItem2.xml with persisted purchases. Dialect selected by the build's lineage.",
     Requires = [typeof(IMessageRouter), typeof(IShopSessionStore)],
     // An inventory-only row reads no workbook; a row that does fails at activation without the clientdata service.
-    Optional = [typeof(BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore), typeof(IShopPurchaseStore), typeof(IPlayerWalletRepository), typeof(IInventoryPushService), typeof(IInventoryRepository), typeof(IEquippedViewPush), typeof(IInventoryExpiry), typeof(IPresentStore), typeof(ISessionRegistry), typeof(IPlayerProgressRepository)], OptionalMany = [typeof(IInboundMessageBinding<PresentSendRequested>), typeof(IInboundMessageBinding<PresentListRequested>), typeof(IInboundMessageBinding<PresentActionRequested>), typeof(IInboundMessageBinding<PresentNoticeRequested>), typeof(IMessageSender<PresentSendReplied>), typeof(IMessageSender<PresentListReplied>), typeof(IMessageSender<PresentActionReplied>), typeof(IMessageSender<PresentNoticeSent>), typeof(IMessageSender<ShopStateUpdated>), typeof(IMessageSender<ShopBalanceUpdated>), typeof(IInboundMessageBinding<ShopBalanceRequested>), typeof(IMessageSender<ShopPurchaseReplied>), typeof(IInboundMessageBinding<ShopPurchaseRequested>), typeof(IInboundMessageBinding<ShopInventoryRequested>), typeof(IInboundMessageBinding<ShopCatalogRequested>), typeof(IInboundMessageBinding<ShopCashCatalogRequested>), typeof(IInboundMessageBinding<ShopCardInfoRequested>), typeof(IInboundMessageBinding<ShopCouponUseRequested>), typeof(IInboundMessageBinding<ShopCashCheckRequested>), typeof(IMessageSender<ShopCatalogPublished>), typeof(IMessageSender<ShopCashCatalogPublished>), typeof(IMessageSender<ShopCardInfoReplied>), typeof(IMessageSender<ShopCouponUseReplied>), typeof(IMessageSender<ShopCashCheckReplied>), typeof(IMessageSender<EquippedArticlesFlushed>), typeof(IMessageSender<InventoryReplaced>), typeof(IMessageSender<ItemsExpired>)],
+    Optional = [typeof(BubbleFighter.Fantasy.Contracts.Pets.IPetEntitlements), typeof(BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore), typeof(IShopPurchaseStore), typeof(IPlayerWalletRepository), typeof(IInventoryPushService), typeof(IInventoryRepository), typeof(IEquippedViewPush), typeof(IInventoryExpiry), typeof(IPresentStore), typeof(ISessionRegistry), typeof(IPlayerProgressRepository)], OptionalMany = [typeof(IInboundMessageBinding<PresentSendRequested>), typeof(IInboundMessageBinding<PresentListRequested>), typeof(IInboundMessageBinding<PresentActionRequested>), typeof(IInboundMessageBinding<PresentNoticeRequested>), typeof(IMessageSender<PresentSendReplied>), typeof(IMessageSender<PresentListReplied>), typeof(IMessageSender<PresentActionReplied>), typeof(IMessageSender<PresentNoticeSent>), typeof(IMessageSender<ShopStateUpdated>), typeof(IMessageSender<ShopBalanceUpdated>), typeof(IInboundMessageBinding<ShopBalanceRequested>), typeof(IMessageSender<ShopPurchaseReplied>), typeof(IInboundMessageBinding<ShopPurchaseRequested>), typeof(IInboundMessageBinding<ShopInventoryRequested>), typeof(IInboundMessageBinding<ShopCatalogRequested>), typeof(IInboundMessageBinding<ShopCashCatalogRequested>), typeof(IInboundMessageBinding<ShopCardInfoRequested>), typeof(IInboundMessageBinding<ShopCouponUseRequested>), typeof(IInboundMessageBinding<ShopCashCheckRequested>), typeof(IMessageSender<ShopCatalogPublished>), typeof(IMessageSender<ShopCashCatalogPublished>), typeof(IMessageSender<ShopCardInfoReplied>), typeof(IMessageSender<ShopCouponUseReplied>), typeof(IMessageSender<ShopCashCheckReplied>), typeof(IMessageSender<EquippedArticlesFlushed>), typeof(IMessageSender<InventoryReplaced>), typeof(IMessageSender<ItemsExpired>)],
     ConditionalProvides = [typeof(IShopGiftService)])]
 public sealed class ShopPlugin : IPlugin
 {
@@ -48,7 +48,7 @@ public sealed class ShopPlugin : IPlugin
     {
         if (!context.Services.TryGet<BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore>(out var data) || data is null)
             throw new ConfigException("shop_item_client_path requires a clientdata row for this build.");
-        return WorkbookFile.FromBytes(options.ShopItemClientPath, data.Read(options.ShopItemClientPath));
+        return WorkbookFile.FromStore(data, options.ShopItemClientPath);
     }
 
     private static IInventoryExpiry? OptionalExpiry(IPluginContext context) =>
@@ -241,9 +241,11 @@ public sealed class ShopPlugin : IPlugin
         if (persistPurchases || options.PresentBox)
             (workbookRules, workbookTerms) = Kr1256Terms(options, workbook,
                 catalog.Cards.SelectMany(card => card.Stocks).Select(stock => stock.ItemId).Where(id => id > 0).ToHashSet());
+        context.Services.TryGet<BubbleFighter.Fantasy.Contracts.Pets.IPetEntitlements>(out var petEntitlements);
         var purchaser = new Purchasing.ShopPurchaser(
             options, catalog, purchases, push, context.Logger, hold)
         {
+            PetEntitlements = petEntitlements,
             ItemPurchasePolicy = persistPurchases
                 ? Kr1256PurchasePolicy(workbookRules!, workbookTerms!, options.MaxPurchaseAttempts, purchases!,
                     context.Services.Get<IInventoryRepository>())

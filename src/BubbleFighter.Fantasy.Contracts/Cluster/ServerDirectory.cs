@@ -10,7 +10,29 @@ public interface IServerDirectory
 
     /// <summary>Returns fresh room summaries visible to the requesting node under explicit directory memberships.</summary>
     IReadOnlyList<FederatedRoom> ListRooms(string requestingNodeId, string clientBuild);
+
+    /// <summary>
+    /// Gets the named groups the servers are offered in (for example Main, Test Server, Oversea Server), first the default;
+    /// empty when the deployment does not group its servers.
+    /// </summary>
+    IReadOnlyList<ServerSection> Sections => [];
 }
+
+/// <summary>A named group of servers the Launcher offers as one choice.</summary>
+/// <param name="Id">The stable section identity that selectors refer to.</param>
+/// <param name="Name">The section's display name.</param>
+/// <param name="ApiUrl">
+/// The section's own Launcher API origin when it signs players in separately; null when the section shares the sign-in
+/// of the API that publishes the directory, so one login reaches its servers through the in-game server list.
+/// </param>
+public sealed record ServerSection(string Id, string Name,
+    [property: JsonPropertyName("api_url"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ApiUrl);
+
+/// <summary>An operator-announced maintenance period of a node, in UTC.</summary>
+/// <param name="Start">When the maintenance began or begins; null when it is open-ended at the start.</param>
+/// <param name="End">When the maintenance is expected to end; null when unknown.</param>
+/// <param name="Description">The operator's explanation shown to players; empty when none was given.</param>
+public sealed record ServerMaintenanceWindow(DateTimeOffset? Start, DateTimeOffset? End, string Description);
 
 /// <summary>Reads configured selector membership separately from current placement health, so an admitted node may recover during slow game startup.</summary>
 public interface IServerSelectionDirectory
@@ -42,6 +64,11 @@ public sealed record ServerSelectorEntry(int Id, string Name, bool Automatic, IR
     [JsonPropertyName("short_name")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ShortName { get; init; }
+
+    /// <summary>Gets the identity of the section this selector is offered in; null when the directory has no sections.</summary>
+    [JsonPropertyName("section")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Section { get; init; }
 }
 
 /// <summary>A build-specific endpoint with independent data, room and routing scopes.</summary>
@@ -60,6 +87,13 @@ public sealed record ServerNodeTarget(string NodeId, string Host, int Port, stri
     /// <summary>Gets the explicit authentication and policy source; absent metadata does not grant authentication trust.</summary>
     public ServerAuthentication? Authentication { get; init; }
 
+    /// <summary>
+    /// Gets every client build this node is configured to serve, so a list of one build's nodes also says which other
+    /// builds each node serves; a server's builds are the union over its nodes. Null where the source does not say.
+    /// </summary>
+    [JsonPropertyName("client_builds")]
+    public IReadOnlyList<string>? ClientBuilds { get; init; }
+
     /// <summary>Gets the source's UTC time for its last accepted node report, or null before any report.</summary>
     [JsonPropertyName("observed_at_utc")]
     public DateTimeOffset? ObservedAtUtc { get; init; }
@@ -71,6 +105,10 @@ public sealed record ServerNodeTarget(string NodeId, string Host, int Port, stri
     /// <summary>Gets an opaque identity for the last accepted report; compare equality only, never lexical or numeric order.</summary>
     [JsonPropertyName("status_revision")]
     public string? StatusRevision { get; init; }
+
+    /// <summary>Gets the node's maintenance period while it is in effect; null when the node is not under maintenance.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ServerMaintenanceWindow? Maintenance { get; init; }
 }
 
 /// <summary>The explicit ticket issuer and policy authority for a selected backend.</summary>

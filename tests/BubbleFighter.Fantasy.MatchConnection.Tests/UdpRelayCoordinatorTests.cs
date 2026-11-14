@@ -13,6 +13,39 @@ namespace BubbleFighter.Fantasy.MatchConnection.Tests;
 /// <summary>Checks loading barriers, single-player defaults, explicit overrides and stale-cookie revocation.</summary>
 public sealed class UdpRelayCoordinatorTests
 {
+    /// <summary>With no match connection the loop holds no timer; the first registration starts it and the offer follows.</summary>
+    [Fact]
+    public async Task TheLoopSleepsUntilAMatchConnectionRegisters()
+    {
+        var game = new Session(1);
+        var relay = new Session(11);
+        var roster = new Roster([new(0, 1, 1, game, relay, true)]) { Stage = RoomStage.Playing, Override = true };
+        using var directory = new MatchUdpDirectory(new() { Protocol = "test/relay" });
+        Assert.False(directory.WhenAnyRegistered().IsCompleted);
+        var control = new Control();
+        var coordinator = new UdpRelayCoordinator(new() { TickMs = 10 }, roster, directory, control, NullLogger.Instance);
+        using var stop = new CancellationTokenSource();
+        var run = coordinator.RunAsync(stop.Token).AsTask();
+        await Task.Delay(150);
+        Assert.Empty(control.Offers);
+        Assert.False(run.IsCompleted);
+
+        var lease = directory.Register(relay, () => true);
+        Assert.True(directory.WhenAnyRegistered().IsCompleted);
+        var deadline = Environment.TickCount64 + 10_000;
+        while (directory.StateOf(relay) == MatchUdpRelayState.Registered)
+        {
+            Assert.True(Environment.TickCount64 < deadline, "The loop did not wake for the registration.");
+            await Task.Delay(5);
+        }
+        Assert.Equal(MatchUdpRelayState.Offered, directory.StateOf(relay));
+
+        lease.Dispose();
+        Assert.False(directory.WhenAnyRegistered().IsCompleted);
+        stop.Cancel();
+        await run;
+    }
+
     [Theory]
     [InlineData(RoomStage.Waiting)]
     [InlineData(RoomStage.Starting)]

@@ -22,7 +22,7 @@ updated: 2026-10-18
 
 - [설치](installation.md)에 따라 검사를 빌드했고 터미널이 저장소 루트에 있습니다.
 - 선택한 언어의 SDK 도구 체인: 현재 Python 3 인터프리터(일관성 실행기는 `python`을 호출합니다), Node.js 20 이상과 npm(`sdk/typescript/package.json`이 `node >=20`을 선언), Go 1.22 이상(`sdk/go/go.mod`), 또는 edition 2021을 지원하는 Rust 도구 체인과 cargo(`sdk/rust/Cargo.toml`)입니다. 하나만 있으면 되고 네 가지가 모두 필요하지는 않습니다. WebAssembly 모듈에는 Rust의 `wasm32-wasip1` 또는 Go의 `wasip1` GOOS가 추가로 필요합니다.
-- 실행 단계에는 `BFF_MYSQL_PASSWORD`가 비어 있지 않은 임시 값인 `.env` 파일과 로컬 검사 패치 `tools/local-checks/isolated-memory.patch.yaml`이 필요합니다. 자세한 내용은 [빠른 시작](quickstart.md)을 참고하세요.
+- 실행 단계에는 로컬 검사 패치 `tools/local-checks/isolated-memory.patch.yaml`이 필요하며, 데이터베이스 설정은 필요하지 않습니다. 자세한 내용은 [빠른 시작](quickstart.md)을 참고하세요.
 - [플러그인](plugins.md)의 플러그인 모델: 플러그인 id, 행 id, 선언, effect.
 
 ## 빠른 시작

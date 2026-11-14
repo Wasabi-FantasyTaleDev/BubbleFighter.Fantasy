@@ -1,3 +1,4 @@
+using BubbleFighter.Fantasy.Contracts.Signals;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 
 namespace BubbleFighter.Fantasy.Contracts.Rooms;
@@ -84,4 +85,13 @@ public interface IRoomPeerRoster : IRoomRoster
     /// <param name="ct">Cancels queued work or cooperatively cancels the running publication.</param>
     /// <returns>Whether the room still existed when the operation began.</returns>
     ValueTask<bool> ExecuteAsync(int roomId, Func<RoomRosterView, CancellationToken, ValueTask> operation, CancellationToken ct);
+
+    /// <summary>
+    /// Gets a task that is complete while the protocol has at least one room and pending while it has none, so a
+    /// peer setup loop can sleep on an empty build instead of asking for a snapshot on every tick. The task never
+    /// faults and is never cancelled. A roster that cannot tell returns a completed task, which keeps its caller
+    /// checking on every tick.
+    /// </summary>
+    /// <returns>The level-triggered presence of rooms; see <see cref="PresenceSignal.WhenPresent"/>.</returns>
+    Task WhenAnyRoom() => Task.CompletedTask;
 }

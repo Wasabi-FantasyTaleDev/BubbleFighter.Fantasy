@@ -43,6 +43,8 @@ jobs:
         run: |
           python -m unittest discover -s tools/ci -p 'test_*.py'
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          python -m unittest discover -s tools/perf -p 'test_*.py'
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
           ./tools/ci/test-fixture-links.ps1
       - name: Link local validation fixtures
         shell: pwsh

@@ -1,4 +1,5 @@
 using BubbleFighter.Fantasy.Contracts.Inventory;
+using BubbleFighter.Fantasy.Contracts.Pets;
 using BubbleFighter.Fantasy.Contracts.Wallet;
 
 namespace BubbleFighter.Fantasy.Lobby.Data;
@@ -11,7 +12,11 @@ namespace BubbleFighter.Fantasy.Lobby.Data;
 /// <param name="EquippedBag">S2C 803 container-1 rows (bag 1).</param>
 public sealed record InventorySnapshot(
     IReadOnlyList<InventorySlotRecord> CharacterBag,
-    IReadOnlyList<InventorySlotRecord> EquippedBag);
+    IReadOnlyList<InventorySlotRecord> EquippedBag)
+{
+    /// <summary>Gets whether both bags include native metadata from one committed account snapshot.</summary>
+    public bool IsComplete { get; init; }
+}
 
 /// <summary>
 /// Loads one player's inventory from the store for the login burst. A player with no stored rows at
@@ -24,7 +29,8 @@ public sealed record InventorySnapshot(
 /// forever and render an empty shop. The top-up is idempotent, so a player who already owns every starter key
 /// triggers no write, and a purchased item is never duplicated or reordered. </remarks>
 public sealed class LoginInventoryResolver(IInventoryRepository inventory, bool seedStarterInventory,
-    IEquipmentSelection? selection = null, StarterKit? starter = null, TimeProvider? clock = null)
+    IEquipmentSelection? selection = null, StarterKit? starter = null, TimeProvider? clock = null,
+    IPetEntitlements? petEntitlements = null)
 {
     private readonly StarterKit _starter = starter ?? StarterKit.Default;
     private readonly TimeProvider _clock = clock ?? TimeProvider.System;
@@ -44,8 +50,13 @@ public sealed class LoginInventoryResolver(IInventoryRepository inventory, bool 
     public async ValueTask<InventorySnapshot> ResolveAsync(long userNum, CancellationToken ct)
     {
         var snapshot = await ResolveStoredAsync(userNum, ct).ConfigureAwait(false);
-        if (selection is null) return snapshot;
-        var canonical = await selection.ReadAsync(userNum, ct).ConfigureAwait(false);
+        var canonical = selection is null ? null : await selection.ReadAsync(userNum, ct).ConfigureAwait(false);
+        if (petEntitlements is not null)
+        {
+            var complete = await petEntitlements.PrepareAsync(userNum, ct).ConfigureAwait(false);
+            return new(complete.CharacterBag, complete.EquippedBag) { IsComplete = true };
+        }
+        if (canonical is null) return snapshot;
         // S2C 803 updates the same client map as 802; never replay a stale independent worn snapshot.
         return snapshot with { CharacterBag = canonical, EquippedBag = canonical };
     }

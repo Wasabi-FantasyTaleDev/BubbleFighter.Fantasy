@@ -3,6 +3,7 @@ import './noah/styles/glass.css'
 import './noah/styles/base.css'
 import './styles/app.css'
 import './styles/setup.css'
+import './styles/motion.css'
 
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'

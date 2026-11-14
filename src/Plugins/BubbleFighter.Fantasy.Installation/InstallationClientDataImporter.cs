@@ -93,8 +93,9 @@ internal sealed class InstallationClientDataImporter(InstallationOptions options
                 if (Directory.Exists(finalBuild) || File.Exists(finalBuild))
                     throw new ArgumentException("client_data_exists");
                 if (_remainingStorage <= 0) throw Limit();
+                // ClientDataFileLimit bounds the uploaded files only; archive members are bounded by their bytes.
                 new ClientDataGenerator().Generate(profile, Path.Combine(staging, profile, ".client"), generatedBuild,
-                    options.ClientDataFileLimit, Math.Min(options.ClientDataExtractedBytes, _remainingStorage), ct);
+                    Math.Min(options.ClientDataExtractedBytes, _remainingStorage), ct);
                 ct.ThrowIfCancellationRequested();
                 await InstallationDirectoryPublisher.SystemFileSystem.MoveAsync(generatedBuild, finalBuild, options, ct).ConfigureAwait(false);
                 return generated;

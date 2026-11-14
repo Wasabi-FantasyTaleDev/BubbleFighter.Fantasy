@@ -11,8 +11,11 @@ internal sealed record RoundFeedRoute(ushort GameInbound, ushort RelayInbound, u
     string? Success, string? DeathFlag)
 {
     internal bool ExtremeRacingCheckpoint { get; init; }
+    internal bool ExtremeRacingCannon { get; init; }
+    internal RoundOneKillKind? OneKill { get; init; }
 
-    internal static RoundFeedRoute[] Load(PacketTables packets, string build, IOpcodeTable game, IOpcodeTable relay)
+    internal static RoundFeedRoute[] Load(PacketTables packets, string build, IOpcodeTable game, IOpcodeTable relay,
+        bool extremeRacingCannon = false)
     {
         if (game.Connection != OpcodeConnection.Game || relay.Connection != OpcodeConnection.Relay || game.Profile.Id != relay.Profile.Id)
             throw new ConfigException("Round feed requires the same profile's separate game and relay opcode views.");
@@ -30,9 +33,14 @@ internal sealed record RoundFeedRoute(ushort GameInbound, ushort RelayInbound, u
                 throw new ConfigException($"{where} must be a route map.");
             if (map.Keys.FirstOrDefault(name => name is not ("enabled" or "opcode" or "structure" or "actors" or "echo_sender"
                 or "builds" or "nested" or "life_event" or "life_actor" or "life_initiator" or "life_success" or "life_death_flag"
-                or "extreme_racing_checkpoint")) is { } unknown)
+                or "extreme_racing_checkpoint" or "extreme_racing_cannon" or "one_kill")) is { } unknown)
                 throw new ConfigException($"{where} has unknown key '{unknown}'.");
             if (!Flag("enabled", true))
+                continue;
+            // The cannon shot route is opt-in per deployment (dialect.rooms extreme_racing_cannon); an unselected
+            // route stays unclaimed, so its opcode is unhandled exactly as before.
+            var cannon = Flag("extreme_racing_cannon", false);
+            if (cannon && !extremeRacingCannon)
                 continue;
             if (map.TryGetValue("builds", out var membership))
             {
@@ -97,8 +105,37 @@ internal sealed record RoundFeedRoute(ushort GameInbound, ushort RelayInbound, u
                     throw new ConfigException($"{where}.extreme_racing_checkpoint requires a scalar actor route without life events.");
                 PacketLayoutContract.RequireSignature(packets, build, structure, where, "actor:u32,round:u32,marker:u32");
             }
+            if (cannon)
+            {
+                if (life is not null || nested || extremeRacingCheckpoint || !actors.SequenceEqual(["actor"])
+                    || Flag("echo_sender", false) || structure != "ExtremeRacingCannonShot")
+                    throw new ConfigException($"{where}.extreme_racing_cannon requires a scalar actor route without life events or echo.");
+                ExtremeRacingBinding.RequireCannonLayouts(packets, build);
+            }
+            var oneKillName = Text("one_kill", required: false);
+            RoundOneKillKind? oneKill = oneKillName switch
+            {
+                null => null,
+                "request" => RoundOneKillKind.Request,
+                "confirmation" => RoundOneKillKind.Confirmation,
+                _ => throw new ConfigException($"{where}.one_kill must be request or confirmation."),
+            };
+            if (oneKill is { } action)
+            {
+                if (!packets.CapabilityOf(build, "native_one_kill") || life is not null || nested
+                    || extremeRacingCheckpoint || Flag("echo_sender", false)
+                    || !actors.SequenceEqual([action == RoundOneKillKind.Request ? "attacker" : "victim"]))
+                    throw new ConfigException($"{where}.one_kill requires an audited scalar route with its reporting owner, no echo and no separate life event.");
+                PacketLayoutContract.RequireSignature(packets, build, structure, where,
+                    action == RoundOneKillKind.Request
+                        ? "attacker:u32,victim:u32,position_x:f32,position_y:f32,position_z:f32"
+                        : "victim:u32,direction_x:f32,direction_y:f32,direction_z:f32,attacker:u32");
+            }
             result.Add(new(inbound, relayInbound, outbound, structure, actors, Flag("echo_sender", false), nested,
-                life, lifeActor, initiator, success, deathFlag) { ExtremeRacingCheckpoint = extremeRacingCheckpoint });
+                life, lifeActor, initiator, success, deathFlag)
+            {
+                ExtremeRacingCheckpoint = extremeRacingCheckpoint, ExtremeRacingCannon = cannon, OneKill = oneKill,
+            });
 
             string? Text(string field, bool required)
             {
@@ -127,12 +164,18 @@ internal sealed record RoundFeedRoute(ushort GameInbound, ushort RelayInbound, u
     {
         var values = Nested ? RoundRespawnBinding.ReadTagged(packets, build, Structure, body)
             : PacketCodec.ReadScalars(packets, build, Structure, body).ToDictionary(pair => pair.Key, pair => (object?)pair.Value);
+        if (OneKill is not null)
+            foreach (var (field, value) in values)
+                if (value is float coordinate && !float.IsFinite(coordinate))
+                    throw new PacketFormatException($"{Structure}.{field} must be finite.", 0);
         var feed = new RoundFeedSent(Outbound, body.ToArray())
         {
             OnRelay = true, IncludeSender = EchoSender,
             ReportedActors = Actors.Length == 0 ? null : Actors.Select(field => (int)values[field]!).ToArray(),
             ExtremeRacingCheckpoint = ExtremeRacingCheckpoint
                 ? new((int)values["actor"]!, (int)values["round"]!, (int)values["marker"]!) : null,
+            ExtremeRacingCannonShot = ExtremeRacingCannon ? ExtremeRacingBinding.ReadCannonShot(packets, build, body) : null,
+            OneKill = OneKill is { } action ? new(action, (int)values["attacker"]!, (int)values["victim"]!) : null,
         };
         if (LifeEvent is not { } kind || (Success is not null && !Truthy(Success)))
             return (feed, null);

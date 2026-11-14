@@ -378,8 +378,8 @@ opcodes:
     direction: c2s
     name: gcpReqAwardInfo
     name_source: label@kr-812
-    evidence: inferred
-    source: "Packet_gcpReqAwardInfo class and opcode setter sub_B25E90 in sender sub_6C2F80 (kr-812)"
+    evidence: verified
+    source: "kr-812 sub_6C2F80 writes one u32 target user number and stamps C2S 116; kr-812 sub_5BF890 passes the selected UserSlot +8 and kr-812 sub_8F78B0 resolves the same identity through kr-812 sub_806DB0 (packets/titles-medals.yaml)"
   - value: 117
     direction: c2s
     name: gcpReqEvent
@@ -1161,13 +1161,13 @@ opcodes:
     direction: c2s
     name: gcpMakeUserTitle
     name_source: label@kr-812
-    evidence: inferred
+    evidence: verified
     source: "kr-812 sub_886040 builds Packet_gcpMakeUserTitle (kr-812 vtable 0xD753C4, codec kr-812 sub_6DB1B0), writes two 4-byte words and stamps 929 through kr-812 sub_B25E90 (packets/titles-medals.yaml)"
   - value: 930
     direction: c2s
     name: gcpSetUserTitle
     name_source: label@kr-812
-    evidence: inferred
+    evidence: verified
     source: "kr-812 sub_885F80 builds Packet_gcpSetUserTitle (kr-812 vtable 0xD753D0, codec kr-812 sub_9D95D0), writes three 4-byte words and stamps 930 through kr-812 sub_B25E90 (packets/titles-medals.yaml)"
   - value: 931
     direction: c2s
@@ -1215,8 +1215,8 @@ opcodes:
     direction: c2s
     name: gcpSynthesisProcess
     name_source: label@kr-812
-    evidence: inferred
-    source: "Packet_gcpSynthesisProcess class and opcode setter sub_B25E90 in sender sub_9EA920 (kr-812)"
+    evidence: verified
+    source: "kr-812 sub_9EA920 constructs Packet_gcpSynthesisProcess and calls kr-812 sub_B25E90(941); kr-812 sub_9EC800 and kr-812 sub_9EC860 write SynthesisProcessRequest in packets/laboratory-legacy.yaml."
   - value: 943
     direction: c2s
     name: gcpReqLotteryRadomMissionCompensation
@@ -2252,7 +2252,7 @@ opcodes:
     name: gspReqHackShieldCheck
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 5: Packet_gspReqHackShieldCheck constructor path"
+    source: "dispatcher kr-812 sub_837170 case 5: Packet_gspReqHackShieldCheck constructor path"
   - value: 9
     direction: s2c
     name: gspRepMoveChannel
@@ -2270,25 +2270,25 @@ opcodes:
     name: gspRepMoveInto
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 11: Packet_gspRepMoveInto constructor path"
+    source: "dispatcher kr-812 sub_837170 case 11: Packet_gspRepMoveInto constructor path"
   - value: 13
     direction: s2c
     name: gspRepCheckCreateUserName
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 13: Packet_gspRepCheckCreateUserName constructor path"
+    source: "dispatcher kr-812 sub_837170 case 13: Packet_gspRepCheckCreateUserName constructor path"
   - value: 14
     direction: s2c
     name: gspRepCreateUserInfo
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 14: Packet_gspRepCreateUserInfo constructor path"
+    source: "dispatcher kr-812 sub_837170 case 14: Packet_gspRepCreateUserInfo constructor path"
   - value: 15
     direction: s2c
     name: gspQueryBadProgram
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 15: Packet_gspQueryBadProgram constructor path"
+    source: "dispatcher kr-812 sub_837170 case 15: Packet_gspQueryBadProgram constructor path"
   - value: 16
     direction: s2c
     name: gspRepCenterUserCnt
@@ -2307,31 +2307,31 @@ opcodes:
     name: gspRepUniquenessCheck
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 18: Packet_gspRepUniquenessCheck constructor path"
+    source: "dispatcher kr-812 sub_837170 case 18: Packet_gspRepUniquenessCheck constructor path"
   - value: 20
     direction: s2c
     name: gspDisconnectFromRestriction
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 20: Packet_gspDisconnectFromRestriction constructor path"
+    source: "dispatcher kr-812 sub_837170 case 20: Packet_gspDisconnectFromRestriction constructor path"
   - value: 21
     direction: s2c
     name: gspDisconnectBlockIP
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 21: Packet_gspDisconnectBlockIP constructor path"
+    source: "dispatcher kr-812 sub_837170 case 21: Packet_gspDisconnectBlockIP constructor path"
   - value: 22
     direction: s2c
     name: gspClanPassport
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 22: Packet_gspClanPassport constructor path"
+    source: "dispatcher kr-812 sub_837170 case 22: Packet_gspClanPassport constructor path"
   - value: 24
     direction: s2c
     name: gspClanPointAdd
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 24: Packet_gspClanPointAdd constructor path"
+    source: "dispatcher kr-812 sub_837170 case 24: Packet_gspClanPointAdd constructor path"
   - value: 101
     direction: s2c
     name: gspRepListSession
@@ -2351,7 +2351,7 @@ opcodes:
     name: gspReqUserPoll
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 104: Packet_gspReqUserPoll constructor path"
+    source: "dispatcher kr-812 sub_837170 case 104: Packet_gspReqUserPoll constructor path"
   - value: 105
     direction: s2c
     name: gspUserStat
@@ -2363,13 +2363,13 @@ opcodes:
     name: gspOveruseAlarmMsg
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 106: Packet_gspOveruseAlarmMsg constructor path"
+    source: "dispatcher kr-812 sub_837170 case 106: Packet_gspOveruseAlarmMsg constructor path"
   - value: 107
     direction: s2c
     name: gspReceiveServerNoticeMsg
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 107: Packet_gspReceiveServerNoticeMsg constructor path"
+    source: "dispatcher kr-812 sub_837170 case 107: Packet_gspReceiveServerNoticeMsg constructor path"
   - value: 108
     direction: s2c
     name: gspGotoMenu
@@ -2396,25 +2396,25 @@ opcodes:
     name: gspRepInvite
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 111: Packet_gspRepInvite constructor path"
+    source: "dispatcher kr-812 sub_837170 case 111: Packet_gspRepInvite constructor path"
   - value: 112
     direction: s2c
     name: gspNotifyInvite
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 112: Packet_gspNotifyInvite constructor path"
+    source: "dispatcher kr-812 sub_837170 case 112: Packet_gspNotifyInvite constructor path"
   - value: 113
     direction: s2c
     name: gspRepMoveToInviter
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 113: Packet_gspRepMoveToInviter constructor path"
+    source: "dispatcher kr-812 sub_837170 case 113: Packet_gspRepMoveToInviter constructor path"
   - value: 114
     direction: s2c
     name: gspRepMoveToFriend
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 114: Packet_gspRepMoveToFriend constructor path"
+    source: "dispatcher kr-812 sub_837170 case 114: Packet_gspRepMoveToFriend constructor path"
   - value: 117
     direction: s2c
     name: gspNotifyMatch
@@ -2427,25 +2427,25 @@ opcodes:
     name: gspRepFighterInfo
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 124: Packet_gspRepFighterInfo constructor path"
+    source: "dispatcher kr-812 sub_837170 case 124: Packet_gspRepFighterInfo constructor path"
   - value: 125
     direction: s2c
     name: gspRepAwardInfo
     name_source: label@kr-812
-    evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 125: Packet_gspRepAwardInfo constructor path"
+    evidence: verified
+    source: "dispatcher kr-812 sub_837170 case 125 calls kr-812 sub_82CEB0; reader kr-812 sub_83DC50 reads two u32 words and a counted sMedalInfo list through kr-812 sub_6DB1B0; result 1 replaces medal_id/count balances and opens the title view (packets/titles-medals.yaml)"
   - value: 126
     direction: s2c
     name: gspRepEvent
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 126: Packet_gspRepEvent constructor path"
+    source: "dispatcher kr-812 sub_837170 case 126: Packet_gspRepEvent constructor path"
   - value: 128
     direction: s2c
     name: gspNotifyPromotion
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 128: Packet_gspNotifyPromotion constructor path"
+    source: "dispatcher kr-812 sub_837170 case 128: Packet_gspNotifyPromotion constructor path"
   - value: 129
     direction: s2c
     name: gspChangedUserName
@@ -2458,31 +2458,31 @@ opcodes:
     name: gspRepRecommendResult
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 130: Packet_gspRepRecommendResult constructor path"
+    source: "dispatcher kr-812 sub_837170 case 130: Packet_gspRepRecommendResult constructor path"
   - value: 131
     direction: s2c
     name: gspReqClanMarkInfo
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 131: Packet_gspReqClanMarkInfo constructor path"
+    source: "dispatcher kr-812 sub_837170 case 131: Packet_gspReqClanMarkInfo constructor path"
   - value: 132
     direction: s2c
     name: gspRandomBox
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 132: Packet_gspRandomBox constructor path"
+    source: "dispatcher kr-812 sub_837170 case 132: Packet_gspRandomBox constructor path"
   - value: 133
     direction: s2c
     name: gspRepLmgUserRecord
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 133: Packet_gspRepLmgUserRecord constructor path"
+    source: "dispatcher kr-812 sub_837170 case 133: Packet_gspRepLmgUserRecord constructor path"
   - value: 134
     direction: s2c
     name: gspNotifySocialSystem
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 134: Packet_gspNotifySocialSystem constructor path"
+    source: "dispatcher kr-812 sub_837170 case 134: Packet_gspNotifySocialSystem constructor path"
   - value: 201
     direction: s2c
     name: gspUpdateParty
@@ -2495,61 +2495,61 @@ opcodes:
     name: gspRepJoinParty
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 202: Packet_gspRepJoinParty constructor path"
+    source: "dispatcher kr-812 sub_837170 case 202: Packet_gspRepJoinParty constructor path"
   - value: 203
     direction: s2c
     name: gspUpdatePartyLeader
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 203: Packet_gspUpdatePartyLeader constructor path"
+    source: "dispatcher kr-812 sub_837170 case 203: Packet_gspUpdatePartyLeader constructor path"
   - value: 204
     direction: s2c
     name: gspNotifyPartyLeaveSuccess
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 204: Packet_gspNotifyPartyLeaveSuccess constructor path"
+    source: "dispatcher kr-812 sub_837170 case 204: Packet_gspNotifyPartyLeaveSuccess constructor path"
   - value: 205
     direction: s2c
     name: gspNotifyMemberLeave
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 205: Packet_gspNotifyMemberLeave constructor path"
+    source: "dispatcher kr-812 sub_837170 case 205: Packet_gspNotifyMemberLeave constructor path"
   - value: 206
     direction: s2c
     name: gspNotifyNewMemberJoin
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 206: Packet_gspNotifyNewMemberJoin constructor path"
+    source: "dispatcher kr-812 sub_837170 case 206: Packet_gspNotifyNewMemberJoin constructor path"
   - value: 302
     direction: s2c
     name: gspRepKickFromParty
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 302: Packet_gspRepKickFromParty constructor path"
+    source: "dispatcher kr-812 sub_837170 case 302: Packet_gspRepKickFromParty constructor path"
   - value: 303
     direction: s2c
     name: gspRepChangePartyLeader
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 303: Packet_gspRepChangePartyLeader constructor path"
+    source: "dispatcher kr-812 sub_837170 case 303: Packet_gspRepChangePartyLeader constructor path"
   - value: 304
     direction: s2c
     name: gspNotifyKickFromParty
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 304: Packet_gspNotifyKickFromParty constructor path"
+    source: "dispatcher kr-812 sub_837170 case 304: Packet_gspNotifyKickFromParty constructor path"
   - value: 305
     direction: s2c
     name: gspReceivePartyChatMsg
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 305: Packet_gspReceivePartyChatMsg constructor path"
+    source: "dispatcher kr-812 sub_837170 case 305: Packet_gspReceivePartyChatMsg constructor path"
   - value: 307
     direction: s2c
     name: gspNotifyKickMember
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 307: Packet_gspNotifyKickMember constructor path"
+    source: "dispatcher kr-812 sub_837170 case 307: Packet_gspNotifyKickMember constructor path"
   - value: 308
     direction: s2c
     name: gspRepPartyQuickStart
@@ -2711,7 +2711,7 @@ opcodes:
     name: gspConnectToSuperPeer
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 603: Packet_gspConnectToSuperPeer constructor path"
+    source: "dispatcher kr-812 sub_837170 case 603: Packet_gspConnectToSuperPeer constructor path"
   - value: 607
     direction: s2c
     name: gspTryHolePunching
@@ -2846,11 +2846,12 @@ opcodes:
     source: "kr-812 sub_7FBBB0 case 736 (0x2E0) calls kr-812 sub_804D00 without reading a body; it raises event 177, which closes the award dialog and restores the room stage"
   - value: 737
     direction: s2c
+    connection: game
     name: gspGamePreCountDown
     name_source: label@kr-812
-    evidence: captured
-    source: "Packet_gspGamePreCountDown class (kr-812); sent between gspGameEverybodyLoadingComplete and gspGameCountDown"
-    notes: "u32 (2500 as sent)"
+    evidence: verified
+    source: "kr-812 sub_50B8C0 dispatches 737 to kr-812 sub_515190; Packet_gspGamePreCountDown RTTI at vtable 0xD1ECBC selects kr-812 sub_80A910 before the scene timer reset, clock sample and state flag"
+    notes: "One u32, unused by this consuming path; payload meaning and sender ordering are unknown"
   - value: 739
     direction: s2c
     name: gspGamePrepareLucciEvent
@@ -2929,7 +2930,7 @@ opcodes:
     name: gspInventoryUpdateInventorySlot
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 803: Packet_gspInventoryUpdateInventorySlot constructor path"
+    source: "dispatcher kr-812 sub_837170 case 803: Packet_gspInventoryUpdateInventorySlot constructor path"
   - value: 805
     direction: s2c
     name: gspInventoryViewUpdateView
@@ -2944,7 +2945,7 @@ opcodes:
     name: gspCashInvenUpdateAllInventorySlot
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 807: Packet_gspCashInvenUpdateAllInventorySlot constructor path"
+    source: "dispatcher kr-812 sub_837170 case 807: Packet_gspCashInvenUpdateAllInventorySlot constructor path"
   - value: 808
     direction: s2c
     name: gspRepInventoryEquip
@@ -2964,20 +2965,20 @@ opcodes:
     name: gspRepInventoryUseItem
     name_source: label@kr-812
     evidence: verified
-    source: "kr-812 dispatcher sub_837170 case 0x32A (810) -> kr-812 sub_825070 constructs Packet_gspRepInventoryUseItem (vtable 0xD6F510, the same u32,u32,wstr shape) and switches on the resolved catalog record TYPE (record+292) and the result word"
+    source: "dispatcher kr-812 sub_837170 case 0x32A (810) -> kr-812 sub_825070 constructs Packet_gspRepInventoryUseItem (vtable 0xD6F510, the same u32,u32,wstr shape) and switches on the resolved catalog record TYPE (record+292) and the result word"
     notes: "Body u32 result, u32 itemId (resolved through kr-812 sub_992C60; a 0 lookup aborts; the type word is read from record+292 of that returned element, element base +340), wstr data. Per-type result codes the client handles: type 2 subtype 1 win/draw/lose and win-rate reset 0 done, 8 all-zero, else code echo; type 2 subtype 2 flee-count reset in the same shape; name-change 9 in use, 10 banned, 11 length, 12 invalid characters, 0 success with separator-split data; gift 0/nonzero; generic type 10 0/nonzero; pet feeding types 19/20 any nonzero refuses with the full counter and type 21 result 1 growth too low, 0 success; clan expansion -102 master only, -101 full, -100 failed, 0 success. Consumption arrives via the inventory-update family, not this reply. The request-side type fetch goes through an obfuscated thunk, so record+292 is reply-side verified."
   - value: 811
     direction: s2c
     name: gspRepInventoryDeleteItem
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 811: Packet_gspRepInventoryDeleteItem constructor path"
+    source: "dispatcher kr-812 sub_837170 case 811: Packet_gspRepInventoryDeleteItem constructor path"
   - value: 812
     direction: s2c
     name: gspRepInventoryThrowItem
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 812: Packet_gspRepInventoryThrowItem constructor path"
+    source: "dispatcher kr-812 sub_837170 case 812: Packet_gspRepInventoryThrowItem constructor path"
   - value: 813
     direction: s2c
     name: gspRepShopBuy
@@ -2989,91 +2990,91 @@ opcodes:
     name: gspRepShopItemCardInfo
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 814: Packet_gspRepShopItemCardInfo constructor path"
+    source: "dispatcher kr-812 sub_837170 case 814: Packet_gspRepShopItemCardInfo constructor path"
   - value: 815
     direction: s2c
     name: gspRepPresentNewReceive
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 815: Packet_gspRepPresentNewReceive constructor path"
+    source: "dispatcher kr-812 sub_837170 case 815: Packet_gspRepPresentNewReceive constructor path"
   - value: 820
     direction: s2c
     name: gspRepRefund
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 820: Packet_gspRepRefund constructor path"
+    source: "dispatcher kr-812 sub_837170 case 820: Packet_gspRepRefund constructor path"
   - value: 821
     direction: s2c
     name: gspRepPresentSend
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 821: Packet_gspRepPresentSend constructor path"
+    source: "dispatcher kr-812 sub_837170 case 821: Packet_gspRepPresentSend constructor path"
   - value: 822
     direction: s2c
     name: gspRepPresentReceive
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 822: Packet_gspRepPresentReceive constructor path"
+    source: "dispatcher kr-812 sub_837170 case 822: Packet_gspRepPresentReceive constructor path"
   - value: 823
     direction: s2c
     name: gspRepPresentThrow
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 823: Packet_gspRepPresentThrow constructor path"
+    source: "dispatcher kr-812 sub_837170 case 823: Packet_gspRepPresentThrow constructor path"
   - value: 824
     direction: s2c
     name: gspRepPresentSendThankMsg
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 824: Packet_gspRepPresentSendThankMsg constructor path"
+    source: "dispatcher kr-812 sub_837170 case 824: Packet_gspRepPresentSendThankMsg constructor path"
   - value: 825
     direction: s2c
     name: gspRepPresentViewThankMsg
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 825: Packet_gspRepPresentViewThankMsg constructor path"
+    source: "dispatcher kr-812 sub_837170 case 825: Packet_gspRepPresentViewThankMsg constructor path"
   - value: 826
     direction: s2c
     name: gspRepPresentConfirm
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 826: Packet_gspRepPresentConfirm constructor path"
+    source: "dispatcher kr-812 sub_837170 case 826: Packet_gspRepPresentConfirm constructor path"
   - value: 827
     direction: s2c
     name: gspRepPresentDeleteSend
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 827: Packet_gspRepPresentDeleteSend constructor path"
+    source: "dispatcher kr-812 sub_837170 case 827: Packet_gspRepPresentDeleteSend constructor path"
   - value: 828
     direction: s2c
     name: gspRepPresentDeleteReceive
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 828: Packet_gspRepPresentDeleteReceive constructor path"
+    source: "dispatcher kr-812 sub_837170 case 828: Packet_gspRepPresentDeleteReceive constructor path"
   - value: 829
     direction: s2c
     name: gspRepRealCouponUse
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 829: Packet_gspRepRealCouponUse constructor path"
+    source: "dispatcher kr-812 sub_837170 case 829: Packet_gspRepRealCouponUse constructor path"
   - value: 831
     direction: s2c
     name: gspRepPickup
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 831: Packet_gspRepPickup constructor path"
+    source: "dispatcher kr-812 sub_837170 case 831: Packet_gspRepPickup constructor path"
   - value: 832
     direction: s2c
     name: gspReqInventoryChangeWeaponPresetIdx
     name_source: label@kr-812
     evidence: verified
-    source: "kr-812 dispatcher sub_837170 case 832 (0x340): Packet_gspReqInventoryChangeWeaponPresetIdx RTTI class, reader sub_83B880 (u8 slot + i32 player-map key), handler sub_832BD0 unlatches the C2S 830 sender at dword_E8283C+196"
+    source: "dispatcher kr-812 sub_837170 case 832 (0x340): Packet_gspReqInventoryChangeWeaponPresetIdx RTTI class, reader sub_83B880 (u8 slot + i32 player-map key), handler sub_832BD0 unlatches the C2S 830 sender at dword_E8283C+196"
   - value: 833
     direction: s2c
     name: gspReqWeaponPreSetUpdate
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 833: Packet_gspReqWeaponPreSetUpdate constructor path"
+    source: "dispatcher kr-812 sub_837170 case 833: Packet_gspReqWeaponPreSetUpdate constructor path"
   - value: 900
     direction: s2c
     name: gspRepGuildLineBoard
@@ -3085,13 +3086,13 @@ opcodes:
     name: gspRepGuildLineBoardWrite
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 901: Packet_gspRepGuildLineBoardWrite constructor path"
+    source: "dispatcher kr-812 sub_837170 case 901: Packet_gspRepGuildLineBoardWrite constructor path"
   - value: 902
     direction: s2c
     name: gspRepGuildLineBoardDelete
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 902: Packet_gspRepGuildLineBoardDelete constructor path"
+    source: "dispatcher kr-812 sub_837170 case 902: Packet_gspRepGuildLineBoardDelete constructor path"
   - value: 904
     direction: s2c
     name: gspRepStartNewWave
@@ -3121,55 +3122,55 @@ opcodes:
     name: gspManufactureRecipeInfo
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 913: Packet_gspManufactureRecipeInfo constructor path"
+    source: "dispatcher kr-812 sub_837170 case 913: Packet_gspManufactureRecipeInfo constructor path"
   - value: 914
     direction: s2c
     name: gspManufactureList
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 914: Packet_gspManufactureList constructor path"
+    source: "dispatcher kr-812 sub_837170 case 914: Packet_gspManufactureList constructor path"
   - value: 915
     direction: s2c
     name: gspManufactureStart
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 915: Packet_gspManufactureStart constructor path"
+    source: "dispatcher kr-812 sub_837170 case 915: Packet_gspManufactureStart constructor path"
   - value: 916
     direction: s2c
     name: gspManufactureGetItem
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 916: Packet_gspManufactureGetItem constructor path"
+    source: "dispatcher kr-812 sub_837170 case 916: Packet_gspManufactureGetItem constructor path"
   - value: 917
     direction: s2c
     name: gspManufactureTimeOut
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 917: Packet_gspManufactureTimeOut constructor path"
+    source: "dispatcher kr-812 sub_837170 case 917: Packet_gspManufactureTimeOut constructor path"
   - value: 918
     direction: s2c
     name: gspResTreasureChestInfo
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 918: Packet_gspResTreasureChestInfo constructor path"
+    source: "dispatcher kr-812 sub_837170 case 918: Packet_gspResTreasureChestInfo constructor path"
   - value: 919
     direction: s2c
     name: gspResOpenTreasureChest
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 919: Packet_gspResOpenTreasureChest constructor path"
+    source: "dispatcher kr-812 sub_837170 case 919: Packet_gspResOpenTreasureChest constructor path"
   - value: 920
     direction: s2c
     name: gspCustomizeString
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 920: Packet_gspCustomizeString constructor path"
+    source: "dispatcher kr-812 sub_837170 case 920: Packet_gspCustomizeString constructor path"
   - value: 921
     direction: s2c
     name: gspResGuildInfo
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 921: Packet_gspResGuildInfo constructor path"
+    source: "dispatcher kr-812 sub_837170 case 921: Packet_gspResGuildInfo constructor path"
   - value: 922
     direction: s2c
     name: gspResSingleStageInfo
@@ -3182,7 +3183,7 @@ opcodes:
     name: gspResSingleStageState
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 923: Packet_gspResSingleStageState constructor path"
+    source: "dispatcher kr-812 sub_837170 case 923: Packet_gspResSingleStageState constructor path"
   - value: 924
     direction: s2c
     name: gspMapMissionInfo
@@ -3235,62 +3236,62 @@ opcodes:
     direction: s2c
     name: gspResMakeUserTitle
     name_source: label@kr-812
-    evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 933 constructs Packet_gspResMakeUserTitle (kr-812 vtable 0xD6F690); reader kr-812 sub_8B9660 reads two 4-byte words and a counted UTF-16 string (packets/titles-medals.yaml)"
+    evidence: verified
+    source: "dispatcher kr-812 sub_837170 case 933 constructs Packet_gspResMakeUserTitle (kr-812 vtable 0xD6F690); reader kr-812 sub_8B9660 reads two 4-byte words and a counted UTF-16 string (packets/titles-medals.yaml)"
   - value: 934
     direction: s2c
     name: gspResSetUserTitle
     name_source: label@kr-812
-    evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 934 constructs Packet_gspResSetUserTitle (kr-812 vtable 0xD6F69C); reader kr-812 sub_9D95D0 reads three 4-byte words (packets/titles-medals.yaml)"
+    evidence: verified
+    source: "dispatcher kr-812 sub_837170 case 934 constructs Packet_gspResSetUserTitle (kr-812 vtable 0xD6F69C); reader kr-812 sub_9D95D0 reads three 4-byte words (packets/titles-medals.yaml)"
   - value: 935
     direction: s2c
     name: gspTitleSyncInfo
     name_source: label@kr-812
-    evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 935 constructs Packet_gspTitleSyncInfo (kr-812 vtable 0xD6F6A8); reader kr-812 sub_840820 reads a counted list of 4-byte words (packets/titles-medals.yaml)"
+    evidence: verified
+    source: "dispatcher kr-812 sub_837170 case 935 constructs Packet_gspTitleSyncInfo; reader kr-812 sub_840820 reads a counted u32 list; kr-812 sub_8239B0 sets each matched title definition conceal byte +105, loaded by kr-812 sub_4FCAB0 (packets/titles-medals.yaml)"
   - value: 936
     direction: s2c
     name: gspProvideMedal
     name_source: label@kr-812
-    evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 936 constructs Packet_gspProvideMedal (kr-812 vtable 0xD6F6B4); reader kr-812 sub_6DB1B0 reads two 4-byte words (packets/titles-medals.yaml)"
+    evidence: verified
+    source: "dispatcher kr-812 sub_837170 case 936 constructs Packet_gspProvideMedal (kr-812 vtable 0xD6F6B4); reader kr-812 sub_6DB1B0 reads two 4-byte words (packets/titles-medals.yaml)"
   - value: 937
     direction: s2c
     name: gspCharRankInfo
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 937: Packet_gspCharRankInfo constructor path"
+    source: "dispatcher kr-812 sub_837170 case 937: Packet_gspCharRankInfo constructor path"
   - value: 938
     direction: s2c
     name: gspResCoupleInvite
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 938: Packet_gspResCoupleInvite constructor path"
+    source: "dispatcher kr-812 sub_837170 case 938: Packet_gspResCoupleInvite constructor path"
   - value: 939
     direction: s2c
     name: gspResCoupleInviteResult
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 939: Packet_gspResCoupleInviteResult constructor path"
+    source: "dispatcher kr-812 sub_837170 case 939: Packet_gspResCoupleInviteResult constructor path"
   - value: 940
     direction: s2c
     name: gspResCoupleInviteAnswer
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 940: Packet_gspResCoupleInviteAnswer constructor path"
+    source: "dispatcher kr-812 sub_837170 case 940: Packet_gspResCoupleInviteAnswer constructor path"
   - value: 941
     direction: s2c
     name: gspResCoupleBreakUp
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 941: Packet_gspResCoupleBreakUp constructor path"
+    source: "dispatcher kr-812 sub_837170 case 941: Packet_gspResCoupleBreakUp constructor path"
   - value: 942
     direction: s2c
     name: gspResCoupleNotifyPartner
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 942: Packet_gspResCoupleNotifyPartner constructor path"
+    source: "dispatcher kr-812 sub_837170 case 942: Packet_gspResCoupleNotifyPartner constructor path"
   - value: 949
     direction: s2c
     name: gspNotifyRankInfo2
@@ -3301,26 +3302,28 @@ opcodes:
     direction: s2c
     name: gspSynthesisProcess
     name_source: label@kr-812
-    evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 951: Packet_gspSynthesisProcess constructor path"
+    evidence: verified
+    source: "kr-812 sub_837170 case 0x3B7 (951) calls kr-812 sub_830A20, which constructs and consumes Packet_gspSynthesisProcess; kr-812 sub_83C040 and kr-812 sub_83C0D0 read the 40-byte SynthesisProcessReply in packets/laboratory-legacy.yaml."
   - value: 952
     direction: s2c
     name: gspResRandomMissionInfo
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 952: Packet_gspResRandomMissionInfo constructor path"
+    source: "dispatcher kr-812 sub_837170 case 952: Packet_gspResRandomMissionInfo constructor path"
   - value: 955
     direction: s2c
+    connection: game
     name: gspEvolveResult
     name_source: label@kr-812
-    evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 955: Packet_gspEvolveResult constructor path"
+    evidence: verified
+    source: "kr-812 sub_9D95D0 -> kr-812 sub_832EC0 reads u32 outcome, u32 pet item id and one unused trailing u32"
+    notes: "Growth/regression presentation uses installed inventory state. The recipient layout is in packets/pet.yaml."
   - value: 956
     direction: s2c
     name: gspGMConsole
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 956: Packet_gspGMConsole constructor path"
+    source: "dispatcher kr-812 sub_837170 case 956: Packet_gspGMConsole constructor path"
   - value: 958
     direction: s2c
     connection: game
@@ -3333,43 +3336,43 @@ opcodes:
     name: gspNotifyMsg
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 959: Packet_gspNotifyMsg constructor path"
+    source: "dispatcher kr-812 sub_837170 case 959: Packet_gspNotifyMsg constructor path"
   - value: 963
     direction: s2c
     name: gspResBlueMarbleDice
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 963: Packet_gspResBlueMarbleDice constructor path"
+    source: "dispatcher kr-812 sub_837170 case 963: Packet_gspResBlueMarbleDice constructor path"
   - value: 966
     direction: s2c
     name: gspNotifySecondPassword
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 966: Packet_gspNotifySecondPassword constructor path"
+    source: "dispatcher kr-812 sub_837170 case 966: Packet_gspNotifySecondPassword constructor path"
   - value: 968
     direction: s2c
     name: gspSeasonLadderLevelUpNotice
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 968: Packet_gspSeasonLadderLevelUpNotice constructor path"
+    source: "dispatcher kr-812 sub_837170 case 968: Packet_gspSeasonLadderLevelUpNotice constructor path"
   - value: 969
     direction: s2c
     name: gspRepSeasonLadderGetRankList
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 969: Packet_gspRepSeasonLadderGetRankList constructor path"
+    source: "dispatcher kr-812 sub_837170 case 969: Packet_gspRepSeasonLadderGetRankList constructor path"
   - value: 970
     direction: s2c
     name: gspRepNotifyChangeLevelIcon
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 970: Packet_gspRepNotifyChangeLevelIcon constructor path"
+    source: "dispatcher kr-812 sub_837170 case 970: Packet_gspRepNotifyChangeLevelIcon constructor path"
   - value: 971
     direction: s2c
     name: gspRepArena
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 971: Packet_gspRepArena constructor path"
+    source: "dispatcher kr-812 sub_837170 case 971: Packet_gspRepArena constructor path"
   - value: 973
     direction: s2c
     name: gspBombState
@@ -3389,7 +3392,7 @@ opcodes:
     name: gspRepCustomizedKeyList
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 975: Packet_gspRepCustomizedKeyList constructor path"
+    source: "dispatcher kr-812 sub_837170 case 975: Packet_gspRepCustomizedKeyList constructor path"
   - value: 977
     direction: s2c
     name: gspRoomIntrudeGame
@@ -3401,19 +3404,19 @@ opcodes:
     name: gspReqGameReady
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 978: Packet_gspReqGameReady constructor path"
+    source: "dispatcher kr-812 sub_837170 case 978: Packet_gspReqGameReady constructor path"
   - value: 979
     direction: s2c
     name: gspResBaseballBatInfo
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 979: Packet_gspResBaseballBatInfo constructor path"
+    source: "dispatcher kr-812 sub_837170 case 979: Packet_gspResBaseballBatInfo constructor path"
   - value: 980
     direction: s2c
     name: gspResBaseballHitResult
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 980: Packet_gspResBaseballHitResult constructor path"
+    source: "dispatcher kr-812 sub_837170 case 980: Packet_gspResBaseballHitResult constructor path"
   - value: 982
     direction: s2c
     name: gspCreateCaptain
@@ -3425,19 +3428,19 @@ opcodes:
     name: gspResChangeCouplering
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 983: Packet_gspResChangeCouplering constructor path"
+    source: "dispatcher kr-812 sub_837170 case 983: Packet_gspResChangeCouplering constructor path"
   - value: 984
     direction: s2c
     name: gspUpdateClanInfoToClanServer
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 984: Packet_gspUpdateClanInfoToClanServer constructor path"
+    source: "dispatcher kr-812 sub_837170 case 984: Packet_gspUpdateClanInfoToClanServer constructor path"
   - value: 985
     direction: s2c
     name: gspResChangeClanMarkNoty
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 985: Packet_gspResChangeClanMarkNoty constructor path"
+    source: "dispatcher kr-812 sub_837170 case 985: Packet_gspResChangeClanMarkNoty constructor path"
   - value: 986
     direction: s2c
     name: gspUpdateScoreData
@@ -3449,7 +3452,7 @@ opcodes:
     name: gspGetGameAccessToken
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 987: Packet_gspGetGameAccessToken constructor path"
+    source: "dispatcher kr-812 sub_837170 case 987: Packet_gspGetGameAccessToken constructor path"
   - value: 989
     direction: s2c
     name: gspGameScoreData
@@ -3461,7 +3464,7 @@ opcodes:
     name: gspGMObserver
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 990: Packet_gspGMObserver constructor path"
+    source: "dispatcher kr-812 sub_837170 case 990: Packet_gspGMObserver constructor path"
   - value: 991
     direction: s2c
     name: gspUserHostStart
@@ -3474,14 +3477,14 @@ opcodes:
     name: gspUserHostSetting
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 992: Packet_gspUserHostSetting constructor path; reader kr-812 sub_80A400 reads four words at +4/+8/+12/+16"
+    source: "dispatcher kr-812 sub_837170 case 992: Packet_gspUserHostSetting constructor path; reader kr-812 sub_80A400 reads four words at +4/+8/+12/+16"
     notes: "four u32; their roles are unproven, so the table keeps them unknown_4 to unknown_16."
   - value: 993
     direction: s2c
     name: gspUserHostDefaultSetting
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 993: Packet_gspUserHostDefaultSetting constructor path; the class codec kr-812 sub_6DB1B0 reads two words at +4 and +8"
+    source: "dispatcher kr-812 sub_837170 case 993: Packet_gspUserHostDefaultSetting constructor path; the class codec kr-812 sub_6DB1B0 reads two words at +4 and +8"
     notes: "two u32; their roles are unproven, so the table keeps them unknown_4 and unknown_8."
   - value: 994
     direction: s2c
@@ -3494,19 +3497,19 @@ opcodes:
     name: gspBingoData
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 997: Packet_gspBingoData constructor path"
+    source: "dispatcher kr-812 sub_837170 case 997: Packet_gspBingoData constructor path"
   - value: 998
     direction: s2c
     name: gspResUpdateBingoNumber
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 998: Packet_gspResUpdateBingoNumber constructor path"
+    source: "dispatcher kr-812 sub_837170 case 998: Packet_gspResUpdateBingoNumber constructor path"
   - value: 999
     direction: s2c
     name: gspResGetBingoItem
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 999: Packet_gspResGetBingoItem constructor path"
+    source: "dispatcher kr-812 sub_837170 case 999: Packet_gspResGetBingoItem constructor path"
   - value: 32772
     direction: s2c
     connection: both
@@ -4312,7 +4315,7 @@ opcodes:
     name: gspCheckExpiredTimeResult
     name_source: label@kr-812
     evidence: verified
-    source: "kr-812 dispatcher sub_837170 case 0x326 -> sub_821620: reader sub_840820 (vtable slot D6F4B4) reads one counted u32 list, then sub_6D5890 shows one notice per id; packets/inventory.yaml ExpiredItems"
+    source: "dispatcher kr-812 sub_837170 case 0x326 -> sub_821620: reader sub_840820 (vtable slot D6F4B4) reads one counted u32 list, then sub_6D5890 shows one notice per id; packets/inventory.yaml ExpiredItems"
   - value: 823
     direction: c2s
     name: gcpReqPresentDeleteReceive
@@ -4324,13 +4327,13 @@ opcodes:
     name: gspRepPresentReceiveSubList
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 818: Packet_gspRepPresentReceiveSubList constructor path; reader sub_83F640; layout in packets/present.yaml"
+    source: "dispatcher kr-812 sub_837170 case 818: Packet_gspRepPresentReceiveSubList constructor path; reader sub_83F640; layout in packets/present.yaml"
   - value: 819
     direction: s2c
     name: gspRepPresentSendSubList
     name_source: label@kr-812
     evidence: inferred
-    source: "kr-812 dispatcher sub_837170 case 819: Packet_gspRepPresentSendSubList constructor path; reader sub_83F590; layout in packets/present.yaml"
+    source: "dispatcher kr-812 sub_837170 case 819: Packet_gspRepPresentSendSubList constructor path; reader sub_83F590; layout in packets/present.yaml"
 
   - value: 32885
     direction: s2c

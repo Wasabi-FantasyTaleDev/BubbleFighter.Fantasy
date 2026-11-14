@@ -50,6 +50,11 @@ public sealed class DirectoryOptions : IValidatableOptions
     public DirectoryNodeOptions[] Nodes { get; set; } = [];
     /// <summary>Gets or sets selector entries, separately from node membership.</summary>
     public SelectorOptions[] Selectors { get; set; } = [];
+    /// <summary>
+    /// Gets or sets the groups the Launcher offers the selectors in, the first being the default; empty leaves the
+    /// servers ungrouped. A section without its own API shares the sign-in of the API publishing this directory.
+    /// </summary>
+    public SectionOptions[] Sections { get; set; } = [];
 
     /// <summary>Gets or sets independent population groups; an empty list preserves standalone reporting.</summary>
     public PresenceGroupOptions[] PresenceGroups { get; set; } = [];
@@ -137,12 +142,37 @@ public sealed class DirectoryOptions : IValidatableOptions
                     : ((string, string, string, string)?)null).Distinct().Count() != 1)
                 yield return new("Automatic placement must use one exact authentication authority and policy source.", [nameof(Selectors)]);
         }
+        foreach (var error in ValidateSections()) yield return error;
+        foreach (var node in Nodes)
+            if (node.Maintenance is { } maintenance && (maintenance.Description is null || maintenance.Description.Length > 1024
+                || maintenance.Description.Any(c => char.IsControl(c) && c is not '\n')
+                || !MaintenanceWindowOptions.Valid(maintenance.Start) || !MaintenanceWindowOptions.Valid(maintenance.End)
+                || maintenance.StartTime is { } start && maintenance.EndTime is { } end && end <= start))
+                yield return new("A node's maintenance needs ISO 8601 times with an offset, an end after its start and a description of at most 1024 characters.", [nameof(Nodes)]);
         var automaticDomains = Selectors.Where(selector => selector.Automatic && selector.Nodes is not null)
             .SelectMany(selector => Nodes.Where(node => selector.Nodes.Contains(node.Id, StringComparer.Ordinal))
                 .Select(node => (node.DataScope, selector.PersistentDomainId)));
         if (automaticDomains.GroupBy(pair => pair.DataScope, StringComparer.Ordinal)
             .Any(group => group.Select(pair => pair.PersistentDomainId).Distinct(StringComparer.OrdinalIgnoreCase).Count() != 1))
             yield return new("Automatic selectors for one data scope must pin the same persistent_domain_id.", [nameof(Selectors)]);
+    }
+
+    private IEnumerable<ValidationResult> ValidateSections()
+    {
+        if (Sections is null || Sections.Any(section => section is null))
+        { yield return new("sections must be a list of non-null definitions.", [nameof(Sections)]); yield break; }
+        if (Sections.Select(section => section.Id).Distinct(StringComparer.Ordinal).Count() != Sections.Length
+            || Sections.Select(section => section.Name).Distinct(StringComparer.Ordinal).Count() != Sections.Length)
+            yield return new("Section identities and names must be unique.", [nameof(Sections)]);
+        foreach (var section in Sections)
+            if (!Identifier(section.Id) || !Text(section.Name, 128) || section.ApiUrl is null
+                || section.ApiUrl.Length > 0 && (!Uri.TryCreate(section.ApiUrl, UriKind.Absolute, out var api) || api.Scheme is not ("http" or "https")
+                    || api.UserInfo.Length > 0 || api.Query.Length > 0 || api.Fragment.Length > 0))
+                yield return new("Sections need an identifier, a name, and an empty or absolute HTTP api_url.", [nameof(Sections)]);
+        // Grouping is all or nothing: a selector names a known section exactly when the directory has sections.
+        if (Selectors.Any(selector => selector.Section is null || (Sections.Length == 0 ? selector.Section.Length != 0
+                : !Sections.Any(section => section.Id == selector.Section))))
+            yield return new("With sections configured every selector names one of them; without sections none does.", [nameof(Selectors)]);
     }
 
     private static string? CheckpointPath(string? path)
@@ -189,6 +219,40 @@ public sealed class DirectoryNodeOptions
     public string HeartbeatKey { get; set; } = "";
     /// <summary>Gets or sets per-build advertised game endpoints.</summary>
     public NodeEndpointOptions[] Endpoints { get; set; } = [];
+    /// <summary>Gets or sets an announced maintenance period; null when none is planned.</summary>
+    public MaintenanceWindowOptions? Maintenance { get; set; }
+}
+
+/// <summary>A node's announced maintenance period; it is in effect from its start (or now) until its end (or indefinitely).</summary>
+public sealed class MaintenanceWindowOptions
+{
+    /// <summary>Gets or sets when the maintenance begins, as ISO 8601 with seconds and an offset; null means it is already in effect.</summary>
+    public string? Start { get; set; }
+    /// <summary>Gets or sets when the maintenance is expected to end, as ISO 8601 with seconds and an offset; null means until the operator removes it.</summary>
+    public string? End { get; set; }
+    /// <summary>Gets or sets the explanation shown to players.</summary>
+    public string Description { get; set; } = "";
+
+    internal DateTimeOffset? StartTime => Parse(Start);
+    internal DateTimeOffset? EndTime => Parse(End);
+
+    // The Launcher API's maintenance format: seconds and an explicit offset, so a window means the same instant on every node.
+    private static readonly string[] Formats = ["yyyy-MM-dd'T'HH:mm:ss'Z'", "yyyy-MM-dd'T'HH:mm:ss.FFFFFFF'Z'", "yyyy-MM-dd'T'HH:mm:sszzz", "yyyy-MM-dd'T'HH:mm:ss.FFFFFFFzzz"];
+    internal static bool Valid(string? value) => value is null || DateTimeOffset.TryParseExact(value, Formats,
+        System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out _);
+    private static DateTimeOffset? Parse(string? value) => value is null ? null
+        : DateTimeOffset.ParseExact(value, Formats, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime();
+}
+
+/// <summary>A named group of selectors offered by the Launcher as one choice.</summary>
+public sealed class SectionOptions
+{
+    /// <summary>Gets or sets the stable section identity selectors refer to.</summary>
+    public string Id { get; set; } = "";
+    /// <summary>Gets or sets the display name.</summary>
+    public string Name { get; set; } = "";
+    /// <summary>Gets or sets the section's own Launcher API origin; empty shares the sign-in of the publishing API.</summary>
+    public string ApiUrl { get; set; } = "";
 }
 
 /// <summary>A configured build listener whose hostname stays unresolved until the connecting client needs it.</summary>
@@ -232,4 +296,6 @@ public sealed class SelectorOptions
     public string PersistentDomainId { get; set; } = "";
     /// <summary>Gets or sets allowed node identities; an empty manual entry remains visible without a configured target.</summary>
     public string[] Nodes { get; set; } = [];
+    /// <summary>Gets or sets the section this selector is offered in; empty when the directory has no sections.</summary>
+    public string Section { get; set; } = "";
 }

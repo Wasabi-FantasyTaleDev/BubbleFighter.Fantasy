@@ -33,11 +33,30 @@ public static class PacketFrame_5Bytes
             throw new ArgumentOutOfRangeException(nameof(payload), payload.Length,
                 $"A legacy frame payload is limited to {MaxPayloadBytes} bytes.");
         var frame = new byte[HeaderSize + payload.Length];
-        BinaryPrimitives.WriteUInt16LittleEndian(frame.AsSpan(0), (ushort)payload.Length);
-        BinaryPrimitives.WriteUInt16LittleEndian(frame.AsSpan(2), opcode);
-        frame[4] = Xor(payload);
-        payload.CopyTo(frame.AsSpan(HeaderSize));
+        Encode(opcode, payload, frame);
         return frame;
+    }
+
+    /// <summary>Encodes the frame into a caller buffer, so a send path can write straight into its output.</summary>
+    /// <param name="opcode">The wire opcode.</param>
+    /// <param name="payload">The payload bytes.</param>
+    /// <param name="destination">At least <see cref="HeaderSize"/> plus the payload length bytes.</param>
+    /// <returns>The number of bytes written.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the payload exceeds <see cref="MaxPayloadBytes"/>.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="destination"/> is too short.</exception>
+    public static int Encode(ushort opcode, ReadOnlySpan<byte> payload, Span<byte> destination)
+    {
+        if (payload.Length > MaxPayloadBytes)
+            throw new ArgumentOutOfRangeException(nameof(payload), payload.Length,
+                $"A legacy frame payload is limited to {MaxPayloadBytes} bytes.");
+        var length = HeaderSize + payload.Length;
+        if (destination.Length < length)
+            throw new ArgumentException($"The frame needs {length} bytes.", nameof(destination));
+        BinaryPrimitives.WriteUInt16LittleEndian(destination, (ushort)payload.Length);
+        BinaryPrimitives.WriteUInt16LittleEndian(destination[2..], opcode);
+        destination[4] = Xor(payload);
+        payload.CopyTo(destination[HeaderSize..]);
+        return length;
     }
 
     /// <summary>

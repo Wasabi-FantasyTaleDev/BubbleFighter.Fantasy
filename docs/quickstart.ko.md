@@ -43,11 +43,11 @@ cp .env.example .env
 
 `.env`는 Git에서 제외되므로 절대 커밋하지 마세요.
 
-### 2. 임시 비밀번호 설정
+### 2. 선택 사항: 데이터베이스 설정
 
-`.env`를 열고 `BFF_MYSQL_PASSWORD`를 비어 있지 않은 임시 값(예: `isolated-check-only`)으로 설정하세요. `persistence.mysql` 행은 기본값이 없는 `${BFF_MYSQL_PASSWORD}`를 읽으므로 변수가 없으면 구성이 실패합니다. 격리 메모리 패치는 구성 이후에만 해당 행을 비활성화합니다. 로컬 검사에는 실제 데이터베이스 자격 증명을 사용하지 말고, 실제 자격 증명은 의도적으로 구성한 배포에서만 사용하세요.
+격리 메모리 패치를 사용하는 로컬 검사에는 데이터베이스 설정이 필요하지 않으므로 `.env`를 복사한 그대로 두어도 됩니다. `BFF_MYSQL_PASSWORD`는 `persistence.mysql` 행이 활성화될 때만 필요하며 비어 있지 않아야 하고, 기본값이 없습니다. 로컬 검사에는 실제 데이터베이스 자격 증명을 사용하지 말고, 실제 자격 증명은 의도적으로 구성한 배포에서만 사용하세요.
 
-**확인:** `.env`가 존재하고(`Test-Path .env`가 `True` 출력) `BFF_MYSQL_PASSWORD` 줄이 비어 있지 않습니다. 이 파일이나 값을 채팅이나 이슈에 붙여 넣지 마세요.
+**확인:** `.env`가 존재합니다(`Test-Path .env`가 `True` 출력). 이 파일이나 값을 채팅이나 이슈에 붙여 넣지 마세요.
 
 ## 프로필 찾기
 
@@ -106,12 +106,12 @@ dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile 
 저장소 루트에 `.env`가 있으면 첫 줄이 `Loaded unset variables from <path>.`입니다. 이어서 서버가 관리 리스너, WebUI 주소, 활성 행 수를 출력합니다.
 
 ```text
-Row 'admin.http' admin API listening on 127.0.0.1:8080.
-WebUI: http://127.0.0.1:8080/
+Row 'admin.http' admin API listening on 127.0.0.1:7300.
+WebUI: http://127.0.0.1:7300/
 Server started with <count> active row(s).
 ```
 
-`<count>`는 Host가 출력하는 활성 행 수이며 고정된 숫자가 아닙니다. `management`에는 게임 또는 릴레이 포트가 없습니다. 관리 API 기본 주소는 `http://127.0.0.1:8080`이며, `profiles/bundles/core.yaml`의 `admin.http` 행(`${BFF_ADMIN_HOST:-127.0.0.1}:${BFF_ADMIN_PORT:-8080}`)에서 옵니다. 프로세스는 중지할 때까지 포그라운드에서 유지됩니다.
+`<count>`는 Host가 출력하는 활성 행 수이며 고정된 숫자가 아닙니다. `management`에는 게임 또는 릴레이 포트가 없습니다. 관리 API 기본 주소는 `http://127.0.0.1:7300`이며, `profiles/bundles/core.yaml`의 `admin.http` 행(`${BFF_ADMIN_HOST:-127.0.0.1}:${BFF_ADMIN_PORT:-7300}`)에서 옵니다. 프로세스는 중지할 때까지 포그라운드에서 유지됩니다.
 
 ### 2. 게임 프로필 시작(클라이언트 데이터 필요)
 
@@ -125,7 +125,7 @@ dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile 
 clientdata: neither data_directory '<working-directory>/client-data/kr-812/data' nor raw_directory '<working-directory>/client-data/kr-812/dataraw' exists. Provision the configured client-data directories before enabling this row.
 ```
 
-데이터를 제공하거나 [설치](installation.md)에서 설명한 설치 도우미로 가져온 뒤 프로필을 다시 시작하세요. 데이터가 준비되면 `kr-812`는 `${BFF_BIND_HOST:-0.0.0.0}:${LEGACY_PORT}`에 게임 리스너를 바인딩합니다. `profiles/kr-812/profile.yaml`이 `LEGACY_PORT`를 `${KR_812_GAME_PORT:-7110}`로 설정하므로 실제 값은 `0.0.0.0:7110`입니다. 레거시 빌드에는 릴레이 리스너가 없습니다. 관리 API는 계속 `127.0.0.1:8080`입니다.
+데이터를 제공하거나 [설치](installation.md)에서 설명한 설치 도우미로 가져온 뒤 프로필을 다시 시작하세요. 데이터가 준비되면 `kr-812`는 `${BFF_BIND_HOST:-0.0.0.0}:${LEGACY_PORT}`에 게임 리스너를 바인딩합니다. `profiles/kr-812/profile.yaml`이 `LEGACY_PORT`를 `${KR_812_GAME_PORT:-7110}`로 설정하므로 실제 값은 `0.0.0.0:7110`입니다. 레거시 빌드에는 릴레이 리스너가 없습니다. 관리 API는 계속 `127.0.0.1:7300`입니다.
 
 **확인:** 프로세스가 포그라운드에 유지되고 위의 시작 줄 세 개를 출력하며 활성화 오류로 종료되지 않습니다.
 
@@ -136,13 +136,13 @@ clientdata: neither data_directory '<working-directory>/client-data/kr-812/data'
 PowerShell:
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:8080/health
+Invoke-RestMethod http://127.0.0.1:7300/health
 ```
 
 Linux 셸:
 
 ```sh
-curl -s http://127.0.0.1:8080/health
+curl -s http://127.0.0.1:7300/health
 ```
 
 응답에는 `status` = `ok`와 UTC 타임스탬프가 들어 있습니다. `/health`는 항상 로그인 없이 열려 있습니다.
@@ -152,13 +152,13 @@ curl -s http://127.0.0.1:8080/health
 PowerShell:
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:8080/api/plugins | Format-Table rowId, state
+Invoke-RestMethod http://127.0.0.1:7300/api/plugins | Format-Table rowId, state
 ```
 
 Linux 셸:
 
 ```sh
-curl -s http://127.0.0.1:8080/api/plugins
+curl -s http://127.0.0.1:7300/api/plugins
 ```
 
 `/api/plugins`는 실행 중인 플러그인 행을 반환합니다. 각 항목에는 `rowId`, `plugin`, `source`, `state`, `error`가 있습니다. `state` = `Active`이고 `error`가 비어 있는 행을 찾으세요. `Failed` 또는 `Pending` 행은 `error`에 진단 정보를 담고 있습니다.
@@ -167,7 +167,7 @@ curl -s http://127.0.0.1:8080/api/plugins
 
 ### 3. WebUI 열기
 
-브라우저에서 `http://127.0.0.1:8080/`을 여세요. management 프로필은 관리 인터페이스를 제공합니다.
+브라우저에서 `http://127.0.0.1:7300/`을 여세요. management 프로필은 관리 인터페이스를 제공합니다.
 
 **확인:** 상태 확인이 `ok`를 반환하고, 인스턴스 목록에 활성 행이 보이며, WebUI가 열립니다. 이 검사는 Host와 관리 API가 실행 중임을 증명하며, 게임 클라이언트가 연결할 수 있음을 증명하지는 않습니다.
 
@@ -185,8 +185,8 @@ curl -s http://127.0.0.1:8080/api/plugins
 
 ## 문제가 발생하면
 
-- **`environment variable 'BFF_MYSQL_PASSWORD' is not set and has no default`:** `.env` 파일이 없거나 저장소 루트에서 찾지 못했거나 변수를 설정하지 않았습니다. `.env.example`을 복사하고 임시 값을 설정하세요.
-- **관리 포트가 이미 사용 중:** 리스너 행에서 시작이 실패합니다. `.env`에서 `BFF_ADMIN_PORT`를 설정하거나 8080을 점유한 프로세스를 중지하세요.
+- **`environment variable 'BFF_MYSQL_PASSWORD' is not set and has no default`:** 활성화된 행이 설정되지 않은 변수를 읽습니다. 예를 들어 비밀번호 없이 MySQL을 선택한 경우입니다. 로컬 검사에는 격리 메모리 패치를 추가하고, MySQL을 사용하는 배포에서는 저장소 루트의 `.env`에 변수를 설정하세요.
+- **관리 포트가 이미 사용 중:** 리스너 행에서 시작이 실패합니다. `.env`에서 `BFF_ADMIN_PORT`를 설정하거나 7300을 점유한 프로세스를 중지하세요.
 - **게임 포트가 이미 사용 중:** `.env`에서 `KR_812_GAME_PORT`를 설정하거나 7110을 점유한 프로세스를 중지하세요.
 - **`kr-812`가 `clientdata` 때문에 실패:** 위의 클라이언트 데이터 메시지를 참고하세요. 해당 빌드의 데이터가 있어야 프로필이 시작됩니다.
 - **`Server startup did not converge`:** 메시지가 비활성 행마다 상태와 진단을 나열합니다. 첫 번째 `Failed` 또는 `Pending` 행을 읽고 원인을 고치세요.

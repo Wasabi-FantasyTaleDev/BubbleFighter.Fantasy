@@ -9,7 +9,7 @@ using BubbleFighter.Fantasy.Contracts.Cluster;
 namespace BubbleFighter.Fantasy.Persistence.MySql;
 
 /// <summary>Provides bounded, connection-bound account holds in an explicitly pinned MySQL authority.</summary>
-[Plugin("persistence.mysql-account-ownership", Description = "Connection-bound account occupancy in a pinned MySQL data domain.",
+[Plugin("persistence.mysql-account-ownership", Category = "storage", Names = ["en=MySQL account ownership", "zh-Hans=MySQL 账号归属", "zh-Hant=MySQL 帳號歸屬", "ko=MySQL 계정 소유"], Description = "Connection-bound account occupancy in a pinned MySQL data domain.",
     Provides = [typeof(IAccountOwnershipStore), typeof(IAccountMutationFence), typeof(IAccountMutationScopes)],
     ConditionalProvides = [typeof(IAccountHandoffStore)])]
 public sealed class MySqlAccountOwnershipPlugin : IPlugin

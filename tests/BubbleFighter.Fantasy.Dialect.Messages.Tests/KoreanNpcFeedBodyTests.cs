@@ -17,6 +17,8 @@ public sealed class KoreanNpcFeedBodyTests
     [InlineData("gppDummyUnitMotion", "NpcDummyMotion", 32891, 14, "2A19230001000000410001000000", true)]
     [InlineData("gppAgentMoveTo", "NpcAgentMove", 32893, 20, "2A192300040000000000803F0000004000004040", true)]
     [InlineData("gppUseItemDirect", "NpcDirectItem", 32894, 8, "2A19230001000000", true)]
+    [InlineData("gppKillObject", "NpcObjectKill", 32778, 8, "2A19230001000000", true)]
+    [InlineData("gppChangeTurretState", "NpcTurretState", 32895, 8, "2A19230003000000", true)]
     public void NativeNpcFeedBodiesArePinned(string name, string structure, int opcode, int length, string hex, bool actor)
     {
         var body = Convert.FromHexString(hex);

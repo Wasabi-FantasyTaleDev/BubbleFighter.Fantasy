@@ -27,6 +27,7 @@ from PIL import Image
 
 from .. import __version__
 from ..cards.card import CardArt, draw_card, preview_size
+from .atlas import encode
 from ..service import ClientSession, PreviewRequest
 
 MAX_PIXELS = 4096 * 4096
@@ -48,6 +49,10 @@ class ExportOptions:
     overwrite: str = "skip"             # skip | overwrite | rename
     card_scale: float = 1.0
     background: tuple | None = None     # opaque RGBA background for "transparent" mode when set
+    format: str = "png"                 # png | webp (webp keeps the alpha channel)
+    quality: int = 85                   # lossy webp quality; alpha is always stored at 100
+    lossless: bool = False              # webp only: exact pixels
+    reference_build: str | None = None # explicit inherited card layout for multi-build exports
 
 
 @dataclass
@@ -86,7 +91,7 @@ def render_transparent(session: ClientSession, item_id: int, options: ExportOpti
     if inner_w <= 0 or inner_h <= 0:
         raise ValueError("padding leaves no room for the preview")
     if options.aspect_policy == "expand":
-        ref = _reference_aspect(session.build)
+        ref = _reference_aspect(options.reference_build or session.build)
         # The official framing is the card preview rectangle, fitted inside the output; the rest of
         # the output is the same canvas extended around it (same pixels per model unit).
         fit_w = min(inner_w, round(inner_h / ref))
@@ -227,13 +232,13 @@ def export_items(session: ClientSession, item_ids: list[int], out_dir: Path | st
                 parts.append(safe_name(wearer))
             if mode == "transparent":
                 parts.append(f"{options.width}x{options.height}")
-            target = _target(out_dir, "_".join(parts) + ".png", options.overwrite)
+            target = _target(out_dir, "_".join(parts) + "." + options.format, options.overwrite)
             if target is None:
                 entry.status = "skipped"
                 entry.error = "file exists (overwrite policy: skip)"
             else:
                 tmp = target.with_suffix(".part")
-                image.save(tmp, format="PNG")
+                tmp.write_bytes(encode(image, options.format, options.quality, options.lossless))
                 tmp.replace(target)
                 entry.status = "written"
                 entry.output = target.name

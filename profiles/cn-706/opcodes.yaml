@@ -1634,10 +1634,11 @@ opcodes:
     source: "cn-706 dispatcher sub_7C8720 case 952: Packet_gspResRandomMissionInfo"
   - value: 955
     direction: s2c
+    connection: game
     name: gspEvolveResult
     name_source: label@cn-706
-    evidence: inferred
-    source: "cn-706 dispatcher sub_7C8720 case 955: Packet_gspEvolveResult"
+    evidence: verified
+    source: "cn-706 dispatcher sub_7C8720 case 955; cn-706 sub_7A23F0 reads u32 outcome, u32 pet item id and one unused u32; cn-706 sub_7C5FC0 consumes the installed pet state"
   - value: 958
     direction: s2c
     name: gspPortalMove

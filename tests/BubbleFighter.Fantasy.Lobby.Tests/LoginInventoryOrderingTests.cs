@@ -8,6 +8,7 @@ using BubbleFighter.Fantasy.Persistence.Memory;
 using BubbleFighter.Fantasy.Persistence.Sqlite;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using InventorySnapshot = BubbleFighter.Fantasy.Lobby.Data.InventorySnapshot;
 
 namespace BubbleFighter.Fantasy.Lobby.Tests;
 

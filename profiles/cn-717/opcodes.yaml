@@ -1923,10 +1923,12 @@ opcodes:
     source: "cn-717 dispatcher sub_8C0080 case 952: Packet_gspResRandomMissionInfo"
   - value: 955
     direction: s2c
+    connection: game
     name: gspEvolveResult
     name_source: label@cn-717
-    evidence: inferred
-    source: "cn-717 dispatcher sub_8C0080 case 955: Packet_gspEvolveResult"
+    evidence: verified
+    source: "cn-717 sub_7F4370 -> cn-717 sub_8BB460 reads u32 outcome, u32 pet item id and one unused trailing u32"
+    notes: "Growth/regression presentation uses installed inventory state. The recipient layout is in packets/pet.yaml."
   - value: 958
     direction: s2c
     connection: game

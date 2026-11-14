@@ -150,7 +150,7 @@ internal sealed record NodeRegistration(string Instance);
 internal sealed record NodeRelease(string Token);
 
 /// <summary>Publishes a bounded directory and authenticated heartbeat listener when explicitly mounted.</summary>
-[Plugin("cluster.directory", Description = "Opt-in server selector and room discovery directory.", Provides = [typeof(IServerDirectory), typeof(IServerSelectionDirectory), typeof(ILauncherPresenceDirectory)])]
+[Plugin("cluster.directory", Category = "cluster", Names = ["en=Cluster directory", "zh-Hans=集群目录", "zh-Hant=叢集目錄", "ko=클러스터 디렉터리"], Description = "Opt-in server selector and room discovery directory.", Provides = [typeof(IServerDirectory), typeof(IServerSelectionDirectory), typeof(ILauncherPresenceDirectory)])]
 public sealed class ServerDirectoryPlugin : IPlugin
 {
     /// <inheritdoc />

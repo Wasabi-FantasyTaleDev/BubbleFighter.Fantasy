@@ -4,7 +4,7 @@ using BubbleFighter.Fantasy.Contracts.Administration;
 namespace BubbleFighter.Fantasy.Commands;
 
 /// <summary>Publishes bounded permission registrations and a resolver with isolated identity namespaces.</summary>
-[Plugin("permissions", Provides = [typeof(IPermissionRegistry), typeof(IPermissionService)])]
+[Plugin("permissions", Category = "admin", Names = ["en=Permissions", "zh-Hans=权限", "zh-Hant=權限", "ko=권한"], Provides = [typeof(IPermissionRegistry), typeof(IPermissionService)])]
 public sealed class PermissionsPlugin : IPlugin
 {
     /// <inheritdoc />

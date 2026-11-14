@@ -39,6 +39,9 @@ internal enum ExtremeRacingFinish
 /// </summary>
 internal sealed class ExtremeRacingRoundState
 {
+    /// <summary>Shares terminal connection cleanup across failed publications in this match.</summary>
+    internal Task? CleanupTask { get; set; }
+
     private readonly List<int> _finishers = [];
     private readonly Dictionary<int, int> _totals = [];
     private readonly Dictionary<int, int> _checkpoints = [];

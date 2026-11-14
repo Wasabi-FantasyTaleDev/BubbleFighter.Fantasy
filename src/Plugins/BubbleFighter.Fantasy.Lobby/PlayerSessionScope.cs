@@ -1,3 +1,4 @@
+using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Players;
 using BubbleFighter.Fantasy.Contracts.Sessions;
@@ -36,6 +37,14 @@ internal sealed class PlayerSessionScope : IDisposable, IOnlinePlayers
     private readonly Dictionary<long, Registration> _registrations = [];
     private readonly Dictionary<long, ISession> _holders = [];
     private readonly Dictionary<long, IDisposable> _languages = [];
+    private readonly IEventBus? _events;
+
+    /// <summary>Creates a scope whose sessions announce no scene changes.</summary>
+    public PlayerSessionScope() { }
+
+    /// <summary>Creates a scope whose sessions raise <see cref="GameSessionStateChanged"/> on every phase change.</summary>
+    /// <param name="events">The row's event bus.</param>
+    public PlayerSessionScope(IEventBus events) => _events = events ?? throw new ArgumentNullException(nameof(events));
 
     internal void SetLauncherLanguage(ISession session, string? language)
     {
@@ -106,7 +115,9 @@ internal sealed class PlayerSessionScope : IDisposable, IOnlinePlayers
                 return new LoginClaim(LoginClaimStatus.RefusedDuplicate, null, holder);
             }
 
-            var state = new PlayerSession(identity, connectionId);
+            var events = _events;
+            var state = events is null ? new PlayerSession(identity, connectionId)
+                : new PlayerSession(identity, connectionId, () => events.Emit(new GameSessionStateChanged(session)));
             var handle = session.RegisterFeature<IPlayerSession>(state);
             ISession? replaced = null;
             if (_holders.TryGetValue(identity.UserNum, out var taken) && taken is not null

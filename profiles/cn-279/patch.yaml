@@ -6,12 +6,10 @@
     id: persistence.memory
     disabled: false
 - replace:
-    id: admin.http
-    config:
-      listen: "${CN_279_ADMIN_HOST:-127.0.0.1}:${CN_279_ADMIN_PORT:-8087}"
-- replace:
     id: diagnostics.packet-log
     config:
+      packets_enabled: ${BFF_PACKET_LOG:-false}
+      capture_enabled: ${BFF_PACKET_CAPTURE:-false}
       file: logs/{date}/packets-cn-279_{timestamp}.log
       preview_bytes: 96
 - set:
@@ -114,7 +112,10 @@
       native_item_slot_count: 1
       # cn-279 sub_89DD80 latches a collided box before pickup; cn-279 sub_81BDA0 accepts seat -1 for removal alone.
       renew_full_slot_supplies: true
-      immediate_supply_item_kinds: []
+      # Config/ItemSpec.xml marks ordinary and zombie ammunition as magazineUp (121) and magazineUpZombie (10).
+      # cn-279 sub_85CA50 applies these through gspItemUsed and then clears the held item via sub_7E8370;
+      # the dialect restores the previously selected item after the effect.
+      immediate_supply_item_kinds: [10, 121]
       # The 2011 client picks its item sheet by room grade (cn-279 sub_885A70: ItemSpec + Junior, Rookie,
       # Intermediate, ...), not by mode, and its Config/ItemSpec.xml rows carry no enabled flag. The kinds with a
       # weight in any grade sheet are these seventeen; none of the kinds 136 to 141 exists in this build, so there is
@@ -169,3 +170,13 @@
     id: ingame
     config:
       plaza_recruitment: true
+
+- insert:
+    - id: tutorial-practice
+      plugin: tutorial.practice
+      parent_id: ingame
+      disabled: true
+      config:
+        protocol: cn-279/game
+        client_profile: cn-279
+        map_key: rel_Tutorial_01

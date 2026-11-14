@@ -27,7 +27,9 @@ internal sealed class WireSession : ISessionWithFeatures, ISessionOutputDrain, I
     private readonly CancellationTokenSource _stop = new();
     private readonly Task _writer;
     private readonly long _sendQueueBytes;
+    private readonly OutboundBudget? _budget;
     private long _retainedBytes;
+    private long _peakRetainedBytes;
     private int _closed;
 
     // A queued frame, or a flush marker completed once every frame queued before it is written.
@@ -42,6 +44,14 @@ internal sealed class WireSession : ISessionWithFeatures, ISessionOutputDrain, I
 
     public WireSession(IConnection connection, ClientProfile profile, string protocolName, IWireDialect dialect,
         IStreamTransform cipher, IEventBus events, int maxFeatures, int sendQueueCapacity, int sendQueueBytes, ILogger logger)
+        : this(connection, profile, protocolName, dialect, cipher, events, maxFeatures, sendQueueCapacity, sendQueueBytes,
+            null, logger)
+    {
+    }
+
+    public WireSession(IConnection connection, ClientProfile profile, string protocolName, IWireDialect dialect,
+        IStreamTransform cipher, IEventBus events, int maxFeatures, int sendQueueCapacity, int sendQueueBytes,
+        OutboundBudget? budget, ILogger logger)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(sendQueueCapacity, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(sendQueueBytes, 1);
@@ -55,6 +65,7 @@ internal sealed class WireSession : ISessionWithFeatures, ISessionOutputDrain, I
         _logger = logger;
         _features = new SessionFeatures(maxFeatures);
         _sendQueueBytes = sendQueueBytes;
+        _budget = budget;
         // Admission uses TryWrite only: a full queue fails the send instead of parking the sender.
         _queue = Channel.CreateBounded<Outbound>(new BoundedChannelOptions(sendQueueCapacity)
         {
@@ -62,6 +73,7 @@ internal sealed class WireSession : ISessionWithFeatures, ISessionOutputDrain, I
             FullMode = BoundedChannelFullMode.Wait,
         });
         _writer = Task.Run(() => WriteLoopAsync(_stop.Token));
+        _budget?.Add(this);
     }
 
     /// <inheritdoc />
@@ -96,6 +108,11 @@ internal sealed class WireSession : ISessionWithFeatures, ISessionOutputDrain, I
             return ValueTask.FromException(Closed());
         if (!TryReserveBytes(payload.Length))
             return Overflow(opcode, "send queue byte limit");
+        if (_budget is not null && !_budget.TryReserve(this, payload.Length))
+        {
+            Interlocked.Add(ref _retainedBytes, -payload.Length);
+            return Overflow(opcode, "protocol send budget");
+        }
         var admitted = false;
         try
         {
@@ -104,7 +121,7 @@ internal sealed class WireSession : ISessionWithFeatures, ISessionOutputDrain, I
         }
         finally
         {
-            if (!admitted) Interlocked.Add(ref _retainedBytes, -payload.Length);
+            if (!admitted) Release(payload.Length);
         }
         if (Volatile.Read(ref _closed) != 0)
             return ValueTask.FromException(Closed());
@@ -118,10 +135,38 @@ internal sealed class WireSession : ISessionWithFeatures, ISessionOutputDrain, I
         {
             var retained = Interlocked.Read(ref _retainedBytes);
             if (bytes > _sendQueueBytes - retained) return false;
-            if (Interlocked.CompareExchange(ref _retainedBytes, retained + bytes, retained) == retained)
-                return true;
+            if (Interlocked.CompareExchange(ref _retainedBytes, retained + bytes, retained) != retained)
+                continue;
+            // A lost race only under-reports the peak by one frame; it is a sizing aid, not a limit.
+            if (retained + bytes > Volatile.Read(ref _peakRetainedBytes))
+                Volatile.Write(ref _peakRetainedBytes, retained + bytes);
+            return true;
         }
     }
+
+    private void Release(int bytes)
+    {
+        Interlocked.Add(ref _retainedBytes, -bytes);
+        _budget?.Release(bytes);
+    }
+
+    /// <summary>Gets the outbound payload bytes this session holds queued now.</summary>
+    internal long RetainedBytes => Interlocked.Read(ref _retainedBytes);
+
+    /// <summary>
+    /// Closes the session because the protocol row's send budget is exhausted and it holds the most queued bytes. Its
+    /// queued frames are dropped with the connection, which releases them.
+    /// </summary>
+    internal void Evict(string reason)
+    {
+        if (Volatile.Read(ref _closed) != 0) return;
+        _logger.LogError("Session {Id} on connection {Connection} dropped: {Reason}.", Id, Connection.Id, reason);
+        StopQueue();
+        _ = CloseObservedAsync(reason);
+    }
+
+    /// <summary>Gets the most outbound payload bytes this session has held at once.</summary>
+    internal long PeakRetainedBytes => Volatile.Read(ref _peakRetainedBytes);
 
     private ValueTask Overflow(ushort opcode, string reason)
     {
@@ -162,6 +207,11 @@ internal sealed class WireSession : ISessionWithFeatures, ISessionOutputDrain, I
         await _stop.CancelAsync().ConfigureAwait(false);
         await _writer.ConfigureAwait(false);
         _stop.Dispose();
+        _budget?.Remove(this);
+        if (_logger.IsEnabled(LogLevel.Debug))
+            _logger.LogDebug(
+                "Session {Id} on connection {Connection} queued at most {PeakBytes} outbound bytes of the {LimitBytes} allowed.",
+                Id, Connection.Id, PeakRetainedBytes, _sendQueueBytes);
     }
 
     private async Task WriteLoopAsync(CancellationToken ct)
@@ -178,17 +228,23 @@ internal sealed class WireSession : ISessionWithFeatures, ISessionOutputDrain, I
                 try
                 {
                     // Encryption is continuous; the single reader preserves frame and cipher order.
-                    var frame = _dialect.EncodeFrame(outbound.Opcode, outbound.Payload);
-                    _cipher.Apply(frame);
-                    var written = await Connection.Output.WriteAsync(frame, ct).ConfigureAwait(false);
+                    // The frame is encoded and enciphered in the pipe's own buffer instead of a new array per frame.
+                    var output = Connection.Output;
+                    var span = output.GetSpan(outbound.Payload.Length + _dialect.MaxFrameOverheadBytes);
+                    var length = _dialect.EncodeFrame(outbound.Opcode, outbound.Payload, span);
+                    _cipher.Apply(span[..length]);
+                    output.Advance(length);
+                    var written = await output.FlushAsync(ct).ConfigureAwait(false);
                     if (written.IsCanceled || written.IsCompleted)
                         throw new IOException("The outbound transport stopped before the frame write completed.");
-                    _events.Emit(new PacketSentEvent(this, _protocolName, outbound.Opcode, outbound.Payload.Length)
-                    {
-                        Payload = outbound.Payload,
-                    });
+                    // Without a subscriber (the packet log is off by default) no event is built per frame.
+                    if (_events.HasHandlers<PacketSentEvent>())
+                        _events.Emit(new PacketSentEvent(this, _protocolName, outbound.Opcode, outbound.Payload.Length)
+                        {
+                            Payload = outbound.Payload,
+                        });
                 }
-                finally { Interlocked.Add(ref _retainedBytes, -outbound.Payload.Length); }
+                finally { Release(outbound.Payload.Length); }
             }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -207,7 +263,7 @@ internal sealed class WireSession : ISessionWithFeatures, ISessionOutputDrain, I
             // Frames still queued are dropped with the connection; flush markers learn it.
             while (_queue.Reader.TryRead(out var dropped))
             {
-                Interlocked.Add(ref _retainedBytes, -dropped.Payload.Length);
+                Release(dropped.Payload.Length);
                 dropped.Flushed?.TrySetException(Closed());
             }
         }

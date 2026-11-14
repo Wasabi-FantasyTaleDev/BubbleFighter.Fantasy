@@ -111,7 +111,7 @@ internal sealed class LaunchSelectionSource(LaunchSelectionOptions options, ISer
 }
 
 /// <summary>Publishes opt-in, authority-bound launch selection from the configured directory without changing standalone launches.</summary>
-[Plugin("cluster.launch-selection", Description = "Authority-bound launch admission and bounded node-health refresh.",
+[Plugin("cluster.launch-selection", Category = "cluster", Names = ["en=Cluster server choice", "zh-Hans=集群服务器选择", "zh-Hant=叢集伺服器選擇", "ko=클러스터 서버 선택"], Description = "Authority-bound launch admission and bounded node-health refresh.",
     Requires = [typeof(IServerSelectionDirectory)], Provides = [typeof(ILauncherServerSelection)])]
 public sealed class LaunchSelectionPlugin : IPlugin
 {

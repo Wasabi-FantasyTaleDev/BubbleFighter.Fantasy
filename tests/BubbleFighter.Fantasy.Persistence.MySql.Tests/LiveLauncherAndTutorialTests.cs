@@ -112,4 +112,23 @@ public sealed class LiveLauncherAndTutorialTests
         Assert.False(await stages.RecordClearAsync(user, new TutorialStageClear(1, 2, 45), default));
         Assert.Equal([new TutorialStageClear(1, 2, 45), new TutorialStageClear(2, 7, 60)], await stages.ListAsync(user, default));
     }
+
+    [Fact]
+    public async Task PracticeClearsCommitOnceAndSurviveStoreReconstruction()
+    {
+        if (await FactoryAsync() is not { } factory) return;
+        var practice = new MySqlTutorialPractice(factory);
+        var user = await NewPlayerAsync();
+        var key = new TutorialPracticeKey("cn-279", user, "rel_Tutorial_01");
+        Assert.False(await practice.HasClearedAsync(key, default));
+        var results = await Task.WhenAll(Enumerable.Range(0, 4)
+            .Select(_ => practice.RecordClearAsync(key, default).AsTask()));
+        Assert.Single(results, result => result);
+        var reopened = new MySqlTutorialPractice(factory);
+        Assert.True(await reopened.HasClearedAsync(new("CN-279", user, "REL_TUTORIAL_01"), default));
+        Assert.False(await reopened.HasClearedAsync(new("cn-324", user, "rel_Tutorial_01"), default));
+        Assert.False(await reopened.HasClearedAsync(new("cn-279", user + 1, "rel_Tutorial_01"), default));
+        Assert.False(await reopened.HasClearedAsync(new("cn-279", user, "rel_prologue_01"), default));
+        Assert.False(await reopened.RecordClearAsync(key, default));
+    }
 }

@@ -54,10 +54,15 @@ internal sealed partial class RoundFlow
 
     // Called on the executor once the round plays: the stage already starts on round 1 (kr-1256 sub_CE54F0), so only
     // the race clock is needed to let markers and goals count.
-    private async ValueTask StartExtremeRacingAsync(PlayRoom room, CancellationToken ct)
+    private async ValueTask StartExtremeRacingAsync(PlayRoom room, ExtremeRacingStamp? stamp, CancellationToken ct)
     {
-        if (!IsExtremeRacingMode(room)) return;
-        var previous = room.ExtremeRacingClock;
+        if (stamp is null || !IsExtremeRacingMode(room)) return;
+        RoomDeadlineClock? previous;
+        lock (room.Gate)
+        {
+            if (!ExtremeRacingIsPlaying(room, stamp)) return;
+            previous = room.ExtremeRacingClock;
+        }
         if (previous is not null)
         {
             previous.Cancel();
@@ -65,33 +70,39 @@ internal sealed partial class RoundFlow
         }
         lock (room.Gate)
         {
-            if (room.IsStopping || room.RoundCancelled || room.Phase != RoomPhase.Playing) return;
-            room.ExtremeRacingClock = new(room.Executor, _lifetime, failure =>
-                _logger.LogError(failure, "Room {Room}: a scheduled race step failed.", room.Id));
+            if (!ExtremeRacingIsPlaying(room, stamp)) return;
+            room.ExtremeRacingClock = new(room.Executor, _lifetime, (Func<Exception, ValueTask>)(async failure =>
+            {
+                _logger.LogError(failure, "Room {Room}: a scheduled race step failed.", room.Id);
+                await CancelExtremeRacingAsync(room, stamp).ConfigureAwait(false);
+            }));
         }
-        await BeginExtremeRacingRoundAsync(room, 1, ct).ConfigureAwait(false);
+        await PrepareExtremeRacingCannonClockAsync(room, stamp).ConfigureAwait(false);
+        await BeginExtremeRacingRoundAsync(room, stamp, 1, ct).ConfigureAwait(false);
     }
 
-    private async ValueTask BeginExtremeRacingRoundAsync(PlayRoom room, int round, CancellationToken ct)
+    private ValueTask BeginExtremeRacingRoundAsync(PlayRoom room, ExtremeRacingStamp stamp, int round, CancellationToken ct) =>
+        RunExtremeRacingTransitionAsync(room, stamp, () => BeginExtremeRacingRoundCoreAsync(room, stamp, round, ct));
+
+    private async ValueTask BeginExtremeRacingRoundCoreAsync(PlayRoom room, ExtremeRacingStamp stamp, int round, CancellationToken ct)
     {
         RoomSeat[] members;
-        int generation;
         lock (room.Gate)
         {
-            if (room.Phase != RoomPhase.Playing || room.RoundCancelled || room.IsStopping || !room.ExtremeRacing.Begin(round)) return;
-            generation = room.StartGeneration;
+            if (!ExtremeRacingIsPlaying(room, stamp) || !stamp.Race.Begin(round)) return;
             members = [.. room.Seats];
             if (round > 1)
                 foreach (var seat in members)
                     room.ExtremeRacing.ArmRoundReset(seat.Slot, seat.Life.Generation);
         }
         if (round > 1)
-            await SendExtremeRacingAsync(members, member => _extremeRacing!.Round.SendAsync(member, new(round), ct)).ConfigureAwait(false);
+            await SendExtremeRacingAsync(room, stamp, members, member => _extremeRacing!.Round.SendAsync(member, new(round), ct)).ConfigureAwait(false);
         var clock = _options.ExtremeRacingRoundMs;
-        await SendExtremeRacingAsync(members, member => _extremeRacing!.Timer.SendAsync(member,
+        await SendExtremeRacingAsync(room, stamp, members, member => _extremeRacing!.Timer.SendAsync(member,
             new(RoundExtremeRacingTimer.RaceRunning, clock, true), ct)).ConfigureAwait(false);
         _logger.LogInformation("Room {Room}: race round {Round} started for {Count} member(s).", room.Id, round, members.Length);
-        ScheduleExtremeRacing(room, generation, clock, operationCt => CloseExtremeRacingRoundAsync(room, generation, round, operationCt));
+        StartExtremeRacingCannons(room, stamp);
+        ScheduleExtremeRacing(room, stamp, clock, operationCt => CloseExtremeRacingRoundAsync(room, stamp, round, operationCt));
     }
 
     private sealed record ExtremeRacingResetStamp(int Generation, ExtremeRacingRoundState Race,
@@ -127,16 +138,17 @@ internal sealed partial class RoundFlow
     internal async ValueTask HandleExtremeRacingGoalAsync(ISession session, RoundExtremeRacingGoalReported report, CancellationToken ct)
     {
         if (FindGameReportRoom(session) is not { } room || !IsExtremeRacingMode(room)) return;
-        int generation;
+        ExtremeRacingStamp stamp;
         RoomSeat reporter;
         lock (room.Gate)
         {
             if (room.Phase != RoomPhase.Playing || room.RoundCancelled || room.IsStopping
                 || room.FindByGame(session.Id) is not { } seat || !ReferenceEquals(seat.Game, session)) return;
-            generation = room.StartGeneration;
+            stamp = new(room.StartGeneration, room.ExtremeRacing);
             reporter = seat;
         }
-        await room.Executor.ExecuteAsync(async operationCt =>
+        await RunExtremeRacingTransitionAsync(room, stamp, async () =>
+            await room.Executor.ExecuteAsync(async operationCt =>
         {
             RoomSeat[] members;
             ExtremeRacingFinish finish;
@@ -144,7 +156,7 @@ internal sealed partial class RoundFlow
             int place;
             lock (room.Gate)
             {
-                if (room.Phase != RoomPhase.Playing || room.RoundCancelled || room.IsStopping || room.StartGeneration != generation
+                if (!ExtremeRacingIsPlaying(room, stamp)
                     || !ReferenceEquals(room.FindByGame(session.Id), reporter))
                     return;
                 finish = room.ExtremeRacing.Finish(reporter.Slot, report.Round);
@@ -162,16 +174,16 @@ internal sealed partial class RoundFlow
                 room.Id, reporter.Slot, report.Round, place);
             if (everyone)
             {
-                await CloseExtremeRacingRoundAsync(room, generation, report.Round, operationCt).ConfigureAwait(false);
+                await CloseExtremeRacingRoundAsync(room, stamp, report.Round, operationCt).ConfigureAwait(false);
                 return;
             }
             if (finish != ExtremeRacingFinish.First) return;
             var countdown = (int)Math.Clamp(_options.ExtremeRacingRoundMs - (Environment.TickCount64 - room.ExtremeRacing.StartedAt),
                 1L, _options.ExtremeRacingFinishCountdownMs);
-            await SendExtremeRacingAsync(members, member => _extremeRacing!.Timer.SendAsync(member,
+            await SendExtremeRacingAsync(room, stamp, members, member => _extremeRacing!.Timer.SendAsync(member,
                 new(RoundExtremeRacingTimer.FinishCountdown, countdown, true), operationCt)).ConfigureAwait(false);
-            ScheduleExtremeRacing(room, generation, countdown, closeCt => CloseExtremeRacingRoundAsync(room, generation, report.Round, closeCt));
-        }, ct).ConfigureAwait(false);
+            ScheduleExtremeRacing(room, stamp, countdown, closeCt => CloseExtremeRacingRoundAsync(room, stamp, report.Round, closeCt));
+        }, ct).ConfigureAwait(false)).ConfigureAwait(false);
     }
 
     private async ValueTask HandleExtremeRacingCheckpointAsync(PlayRoom room, ISession session, RoundFeedSent feed, CancellationToken ct)
@@ -210,15 +222,17 @@ internal sealed partial class RoundFlow
     private async ValueTask OnExtremeRacingSeatLeftAsync(PlayRoom room, CancellationToken ct)
     {
         if (!IsExtremeRacingMode(room)) return;
-        int generation, round;
+        HandOverExtremeRacingCannonOrigin(room);
+        ExtremeRacingStamp stamp;
+        int round;
         lock (room.Gate)
         {
             if (room.Phase != RoomPhase.Playing || room.RoundCancelled || room.ExtremeRacing.Phase != ExtremeRacingPhase.Finishing
                 || !EveryoneFinished(room)) return;
-            generation = room.StartGeneration;
+            stamp = new(room.StartGeneration, room.ExtremeRacing);
             round = room.ExtremeRacing.Round;
         }
-        await CloseExtremeRacingRoundAsync(room, generation, round, ct).ConfigureAwait(false);
+        await CloseExtremeRacingRoundAsync(room, stamp, round, ct).ConfigureAwait(false);
     }
 
     private static bool EveryoneFinished(PlayRoom room) =>
@@ -226,7 +240,10 @@ internal sealed partial class RoundFlow
 
     // Closes one race round once: stops the countdown, shows the time-over pause and the boards, then begins the next
     // round or, after the last, ends the match through the shared result once the pause has run.
-    private async ValueTask CloseExtremeRacingRoundAsync(PlayRoom room, int generation, int round, CancellationToken ct)
+    private ValueTask CloseExtremeRacingRoundAsync(PlayRoom room, ExtremeRacingStamp stamp, int round, CancellationToken ct) =>
+        RunExtremeRacingTransitionAsync(room, stamp, () => CloseExtremeRacingRoundCoreAsync(room, stamp, round, ct));
+
+    private async ValueTask CloseExtremeRacingRoundCoreAsync(PlayRoom room, ExtremeRacingStamp stamp, int round, CancellationToken ct)
     {
         RoomSeat[] members;
         IReadOnlyDictionary<int, int> awarded;
@@ -234,11 +251,12 @@ internal sealed partial class RoundFlow
         RoundExtremeRacingRecordsUpdated records;
         lock (room.Gate)
         {
-            if (room.Phase != RoomPhase.Playing || room.RoundCancelled || room.IsStopping || room.StartGeneration != generation) return;
+            if (!ExtremeRacingIsPlaying(room, stamp)) return;
             countdown = room.ExtremeRacing.Phase == ExtremeRacingPhase.Finishing;
             if (room.ExtremeRacing.Close(round, _options.ExtremeRacingPlacePoints, _options.ExtremeRacingRounds) is not { } points)
                 return;
             awarded = points;
+            StopExtremeRacingCannons(room);
             last = room.ExtremeRacing.Phase == ExtremeRacingPhase.Over;
             members = [.. room.Seats];
             records = new([.. members.Select(seat => new RoundExtremeRacingRecord(seat.Slot,
@@ -249,16 +267,16 @@ internal sealed partial class RoundFlow
             if (last) DecideExtremeRacingMatch(room);
         }
         if (countdown)
-            await SendExtremeRacingAsync(members, member => _extremeRacing!.Timer.SendAsync(member,
+            await SendExtremeRacingAsync(room, stamp, members, member => _extremeRacing!.Timer.SendAsync(member,
                 new(RoundExtremeRacingTimer.FinishCountdown, 0, false), ct)).ConfigureAwait(false);
         var pause = _options.ExtremeRacingIntermissionMs;
-        await SendExtremeRacingAsync(members, member => _extremeRacing!.Timer.SendAsync(member,
+        await SendExtremeRacingAsync(room, stamp, members, member => _extremeRacing!.Timer.SendAsync(member,
             new(RoundExtremeRacingTimer.RoundOver, pause, true), ct)).ConfigureAwait(false);
-        await SendExtremeRacingAsync(members, member => _extremeRacing!.Records.SendAsync(member, records, ct)).ConfigureAwait(false);
+        await SendExtremeRacingAsync(room, stamp, members, member => _extremeRacing!.Records.SendAsync(member, records, ct)).ConfigureAwait(false);
         _logger.LogInformation("Room {Room}: race round {Round} closed with {Count} finisher(s).", room.Id, round, awarded.Count);
-        ScheduleExtremeRacing(room, generation, pause, last
+        ScheduleExtremeRacing(room, stamp, pause, last
             ? operationCt => EndRoundAsync(room, RoundEndReason.WinCondition, operationCt)
-            : operationCt => BeginExtremeRacingRoundAsync(room, round + 1, operationCt));
+            : operationCt => BeginExtremeRacingRoundAsync(room, stamp, round + 1, operationCt));
     }
 
     // Two teams that both have seats compare their summed points; otherwise the seats with the most points win.
@@ -280,22 +298,36 @@ internal sealed partial class RoundFlow
             : totals.Where(seat => seat.Points == most).Select(seat => seat.Slot).ToHashSet();
     }
 
-    private static async ValueTask SendExtremeRacingAsync(RoomSeat[] members, Func<ISession, ValueTask> send)
+    private static async ValueTask SendExtremeRacingAsync(PlayRoom room, ExtremeRacingStamp stamp,
+        RoomSeat[] members, Func<ISession, ValueTask> send)
     {
         foreach (var member in members)
-            if (!member.Game.Connection.IsClosed)
-                await send(member.Game).ConfigureAwait(false);
-    }
-
-    // Replacing the deadline cancels the old wait; the queued callback rechecks the match before touching its state.
-    private void ScheduleExtremeRacing(PlayRoom room, int generation, int delayMs, Func<CancellationToken, ValueTask> step) =>
-        room.ExtremeRacingClock!.Schedule(delayMs, operationCt =>
         {
             lock (room.Gate)
             {
-                if (room.StartGeneration != generation || room.Phase != RoomPhase.Playing || room.RoundCancelled || room.IsStopping)
-                    return ValueTask.CompletedTask;
+                if (!ExtremeRacingIsPlaying(room, stamp))
+                    throw new InvalidOperationException("Racing round changed during publication.");
+                if (member.Game.Connection.IsClosed || !room.Seats.Contains(member)) continue;
             }
-            return step(operationCt);
-        });
+            await send(member.Game).ConfigureAwait(false);
+            lock (room.Gate)
+                if (!ExtremeRacingIsPlaying(room, stamp))
+                    throw new InvalidOperationException("Racing round changed while its update was sent.");
+        }
+    }
+
+    // Replacing the deadline cancels the old wait; the queued callback rechecks the match before touching its state.
+    private static void ScheduleExtremeRacing(PlayRoom room, ExtremeRacingStamp stamp, int delayMs, Func<CancellationToken, ValueTask> step)
+    {
+        lock (room.Gate)
+        {
+            if (!ExtremeRacingIsPlaying(room, stamp)) return;
+            room.ExtremeRacingClock!.Schedule(delayMs, operationCt =>
+            {
+                lock (room.Gate)
+                    if (!ExtremeRacingIsPlaying(room, stamp)) return ValueTask.CompletedTask;
+                return step(operationCt);
+            });
+        }
+    }
 }

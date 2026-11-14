@@ -10,7 +10,7 @@ internal sealed partial class RoundFlow
     /// <summary>Applies a completed local equipment snapshot to its current round without interpreting preset pages as installed weapons.</summary>
     internal async ValueTask OnEquipmentViewPublishedAsync(EquipmentViewPublished publication, CancellationToken ct)
     {
-        if (_criticalAuthority is null || publication.Protocol != _options.GameProtocol
+        if (publication.IsSceneReplay || _criticalAuthority is null || publication.Protocol != _options.GameProtocol
             || _registry.TryGame(publication.Session) is not { } owned)
             return;
         var (room, seat) = owned;
@@ -33,7 +33,8 @@ internal sealed partial class RoundFlow
                 try
                 {
                     equipment = new MatchSeedEquipment(current.Equipment.ModeId, publication.View.EquippedItemIds,
-                        current.Equipment.PrimarySpecification, current.Equipment.SidearmSpecification);
+                        current.Equipment.PrimarySpecification, current.Equipment.SidearmSpecification,
+                        publication.View.ItemAttributes);
                     candidate = _criticalAuthority.WithPublishedEquipment(current, equipment);
                     if (candidate == current) return;
                     candidate = candidate with { Revision = checked(current.Revision + 1) };
@@ -46,6 +47,7 @@ internal sealed partial class RoundFlow
                 }
                 seat.CharacterId = publication.View.CharacterId;
                 seat.EquippedItemIds = equipment.WornItemIds;
+                seat.ItemAttributes = equipment.ItemAttributes;
                 transition = new(seat, state, candidate, state.ActiveUntil);
             }
             await PublishCriticalTransitionAsync(room, transition, operationCt).ConfigureAwait(false);

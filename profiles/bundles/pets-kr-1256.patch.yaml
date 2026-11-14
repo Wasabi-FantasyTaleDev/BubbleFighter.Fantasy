@@ -1,0 +1,15 @@
+# Include after pets.patch.yaml and pets-modern.patch.yaml for kr-1256 only.
+# kr-1256 sub_EDD680 checks the configured feed deadline; native food item100643 describes seven hours.
+# The client civil-clock offset remains a deployment setting, independent of this duration.
+- set:
+    id: pets.entitlements
+    config:
+      feed_cooldown_seconds: 25200
+- set:
+    id: pets
+    config:
+      feed_cooldown_seconds: 25200
+- set:
+    id: pets.combat-effects
+    config:
+      single_precision_input: true

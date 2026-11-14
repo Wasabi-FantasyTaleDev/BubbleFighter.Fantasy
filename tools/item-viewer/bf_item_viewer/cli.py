@@ -5,6 +5,12 @@
     python -m bf_item_viewer preview  <client-root> --item ID [--size 512x512] [--spray N] [--wearer NAME] --out f.png
     python -m bf_item_viewer export   <client-root> --items 1,2,3|@file --output DIR [options]
     python -m bf_item_viewer export-all <client-root> --filter EXPR --output DIR [--yes] [options]
+    python -m bf_item_viewer atlas    <client-root> --filter EXPR --output DIR [--format webp] [--quality 85]
+    python -m bf_item_viewer pack     --output DIR [--builds a,b] [--games-dir DIR] [--jobs N] [--quality 85]
+
+``export``/``export-all``/``atlas`` take ``--format png|webp`` (webp keeps alpha) with ``--quality`` and
+``--lossless``. ``atlas`` combines previews into 328x240-cell images (8 x 8 per image) with a JSON index;
+``pack`` does that for every client build in ``data/builds.json`` and stores identical cells once.
 
 ``--filter`` is a small expression over item fields, e.g. ``kind=weapon,status=Renderable`` or
 ``main=Clothes,sub=Shoes``; every comma-separated term must match (case-insensitive).
@@ -78,7 +84,8 @@ def _export_options(args) -> ExportOptions:
         sprays = "ALL"
     return ExportOptions(width=w, height=h, mode=args.mode, aspect_policy=args.aspect, padding=args.padding,
                          supersample=args.supersample, sprays=sprays, wearers=[args.wearer],
-                         overwrite=args.overwrite, card_scale=args.card_scale)
+                         overwrite=args.overwrite, card_scale=args.card_scale, format=args.format,
+                         quality=args.quality, lossless=args.lossless)
 
 
 def _run_export(session: ClientSession, ids: list[int], args) -> int:
@@ -102,6 +109,12 @@ def _run_export(session: ClientSession, ids: list[int], args) -> int:
         counts[entry["status"]] = counts.get(entry["status"], 0) + 1
     print(json.dumps({"manifest": str(manifest), "counts": counts}, ensure_ascii=False))
     return 0 if not counts.get("failed") else 2
+
+
+def _image_options(p) -> None:
+    p.add_argument("--format", choices=["png", "webp"], default="png")
+    p.add_argument("--quality", type=int, default=85, help="lossy webp quality 0..100 (alpha is always 100)")
+    p.add_argument("--lossless", action="store_true", help="webp only: exact pixels")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -149,8 +162,42 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--wearer")
         p.add_argument("--overwrite", choices=["skip", "overwrite", "rename"], default="skip")
         p.add_argument("--card-scale", type=float, default=1.0)
+        _image_options(p)
+
+    p = sub.add_parser("atlas", help="combine many previews into atlas images with a JSON index")
+    p.add_argument("client_root")
+    p.add_argument("--filter", default="", help="e.g. kind=weapon,status=Renderable")
+    p.add_argument("--output", required=True)
+    p.add_argument("--columns", type=int, default=8)
+    p.add_argument("--rows", type=int, default=8)
+    p.add_argument("--cell", type=_size, default=(328, 240))
+    p.add_argument("--supersample", type=int, default=3)
+    p.add_argument("--yes", action="store_true")
+    _image_options(p)
+    p.set_defaults(format="webp")
+
+    p = sub.add_parser("pack", help="preview atlases of every client build, identical cells stored once")
+    p.add_argument("--output", required=True)
+    p.add_argument("--games-dir", help="folder holding the mapped client folders (or set BFIV_GAMES_DIR)")
+    p.add_argument("--builds", help="comma-separated build ids (default: all)")
+    p.add_argument("--jobs", type=int, default=2)
+    p.add_argument("--work-dir", help="render cache folder (default: <output>-work)")
+    p.add_argument("--supersample", type=int, default=3)
+    _image_options(p)
+    p.set_defaults(format="webp")
 
     args = parser.parse_args(argv)
+    if args.command == "pack":
+        from .export.pack import build_pack
+        try:
+            stats = build_pack(args.output, args.games_dir, args.builds.split(",") if args.builds else None, args.jobs,
+                               args.format, args.quality, args.lossless, args.work_dir, args.supersample,
+                               progress=lambda m: print(m, file=sys.stderr, flush=True))
+        except (ValueError, KeyError) as error:
+            print(f"error: {error}", file=sys.stderr)
+            return 1
+        print(json.dumps(stats, ensure_ascii=False, indent=1))
+        return 0 if stats["per_build"] else 1
     try:
         session = _session(args)
     except (LookupError, FileNotFoundError, ValueError) as error:
@@ -182,6 +229,18 @@ def main(argv: list[str] | None = None) -> int:
         if args.meta:
             Path(args.meta).write_text(json.dumps(result.metadata, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
         print(args.out)
+        return 0
+    if args.command == "atlas":
+        from .export.atlas_export import export_atlas
+        ids = [i.item_id for i in session.catalog.items if match_filter(i, args.filter) and i.is_3d]
+        if len(ids) > 2000 and not args.yes:
+            print(f"{len(ids)} items match; re-run with --yes", file=sys.stderr)
+            return 3
+        path = export_atlas(session, ids, args.output, args.format, args.quality, args.lossless, args.columns,
+                            args.rows, args.cell, args.supersample,
+                            progress=lambda d, t, label: print(f"  {d}/{t} {label:<20}", end="", file=sys.stderr))
+        print(file=sys.stderr)
+        print(path)
         return 0
     if args.command == "export":
         return _run_export(session, _item_ids(args.items), args)

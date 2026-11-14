@@ -1,4 +1,4 @@
-# Explicit opt-in to the audited Zombie Escape mode on kr-1256, cn-774 and tw-454.
+# Included by the build profile: the audited Zombie Escape mode on kr-1256, cn-774 and tw-454.
 # Native-client acceptance is pending; apply to one supported build or its ignored local patch.
 - set:
     id: dialect.rooms

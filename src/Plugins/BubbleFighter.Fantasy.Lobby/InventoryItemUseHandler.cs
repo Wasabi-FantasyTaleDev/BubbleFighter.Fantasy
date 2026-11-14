@@ -16,6 +16,11 @@ internal sealed class InventoryItemUseHandler(IPlayerRepository players, IMessag
     {
         if (!session.TryFeature<IPlayerSession>(out var player))
             throw new InvalidOperationException("Inventory use requires an authenticated player.");
+        if (request.SecondaryParameter is not null)
+        {
+            await replies.SendAsync(session, new(1, "") { ItemId = request.ItemId }, ct).ConfigureAwait(false);
+            return;
+        }
         if (paints is not null && paints.TryGetColorIndex(request.ItemId, out var color))
         {
             await ApplyPaintAsync(session, player, request, color, ct).ConfigureAwait(false);

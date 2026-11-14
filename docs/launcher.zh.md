@@ -230,7 +230,8 @@ hook 的预期工作方式：
 | `supports_instances` / `supports_plugins` | 公布服务器是否允许选择实例与客户端插件。 | `true` / `true` |
 | `registration_enabled` | 启动器账号是否可以注册。 | `true` |
 | `create_account_on_login` | 用未知名称登录时是否以所填密码创建该账号，使玩家无需注册。名称输错会创建新账号。 | `false` |
-| `minimum_launcher_version` | 注册、登录、刷新与票据签发所需的最低启动器 SemVer。留空则禁用门禁。 | 空 |
+| `minimum_launcher_version` | 注册、登录、刷新与票据签发所需的最低启动器 SemVer。低于它的所有版本都以 HTTP 426 拒绝，包括该版本自身的预发布版本（`0.2.0-rc.1` 低于 `0.2.0`）。留空则禁用检查。随附的 core 包设为 `${BFF_LAUNCHER_MINIMUM_VERSION:-0.2.0}`。 | 代码中为空；core 包中为 `0.2.0` |
+| `notices` | 运营公告，经 `GET /v1/notices?section=` 提供：每条有 `id`、`title`、Markdown 格式的 `body`（不渲染原始 HTML）、`level`（`info`、`warning`、`important`）、`published_at`（含秒与时区偏移的 ISO 8601，此前不显示）和可选的 `sections`。按发布时间从新到旧。启动器在玩家开始游戏时把未读公告各显示一次，并在“查看全部”中列出全部公告。 | 空 |
 | `client_policy` | 发送给启动器的商店来源和按插件的类型化规则，见[客户端策略](#client-policy)。 | 空 |
 | `session_seconds` / `refresh_session_seconds` | 访问令牌与可续期会话的有效期（秒）。 | 1800 / 2592000 |
 | `ticket_seconds` | 启动票据有效期（秒）。 | 600 |
@@ -399,6 +400,7 @@ Fantasy Tale Nirinsou Link（简称 Nirinsou）是运行中的启动器与其启
 | --- | --- |
 | `companion` | 监听器与启动表。启用后，每个 `/v1/launch` 回复都带有 `companion` 对象：`url`、一次性 `ticket`、`launchId` 和 `expiresAt`。 |
 | `companion.notices` | 启动器弹窗（`ui.notification.show`）与 `popup <文字>` 管理命令，权限为 `game.management.popup`。 |
+| `companion.native_ui` | 游戏原生的消息框、通知、横幅公告和本地聊天行（`ui.native.invoke`/`ui.native.result`）。服务器插件调用 `IClientNativeUi.ShowAsync` 并得到玩家的选择；启动器优先使用客户端原生控件，浮层作为后备。开发测试命令 `clientui <昵称> <box|notice|banner|chat> <文字>`（权限 `game.management.clientui`）向一名玩家显示并输出结果。 |
 | `companion.commands` | 通过共享玩家权限和聊天额度执行已登录游戏命令。 |
 
 三行在 core 包中默认禁用，由 `all` 配置启用。`companion` 的选项：
@@ -478,6 +480,28 @@ payload 只能包含以下两个字符串，操作编号放在 payload 内：
 不接受身份参数，不读取客户端内存，也不改变游戏状态。未知、缺失、不一致或超时的结果不能授权离场。
 快照不预留离场权限，命令执行时仍重新检查房间成员和阶段。
 
+### 场景变化
+
+`companion.scene` 行在玩家场景变化时推送 `game.session.changed` v1 事件，payload 与 `game.session.state` 相同。
+主菜单、广场、进入或离开房间，房间的等待、倒计时、加载、对局与结算阶段，模式变化，教程与训练都会触发；
+Launcher 连接每次完成绑定（包括重连）时也会发送一次，因此浮层无需轮询即可知道玩家所在位置。相同场景不会重复发送。
+
+`companion.room_create` 行告诉 Launcher 玩家此时能否创建房间。它在每次变化和每次连接绑定时推送
+`game.room.create.context` v1，并以同样的对象回复 `game.room.create.context.get` v1 请求（payload 为 `{}`）：
+
+```json
+{"context_id":"6f1c0d2e9b8a4c7d8e5f4a3b2c1d0e9f","revision":2,"active":true}
+```
+
+只有在主菜单和广场（服务器接受创建房间的两个场景）中 `active` 才为 true。成功创建或加入房间、对局中以及对局结束回到原房间
+都是 inactive；被拒绝的创建或加入不会改变状态。`context_id` 是不透明值，属于一次游戏登录，Launcher 重连后保持不变。
+`revision` 从 1 开始，每次 `active` 变化加一，重复送达保持相同 revision，较小的可以忽略。服务器不知道客户端自身的
+创建房间窗口何时打开；进入广场后没有时间限制。
+
+两行都在场景变化之后、在游戏锁之外读取场景，每个已绑定的游戏连接只保留最新状态，连接关闭时丢弃。
+Launcher 队列已满而未送出的状态会在 `retry_milliseconds`（默认 250）后重发，因此最新状态（包括 inactive）不会丢失。
+未协商这些类型的 Launcher 不会收到任何消息。
+
 ### 首次登录其他节点
 
 在工作节点启用 `cluster.ticket-client.companion`，并在签发节点对应 peer 的 `companion_url` 填入工作节点的明确 HTTP(S) origin。
@@ -527,6 +551,10 @@ payload 只能包含以下两个字符串，操作编号放在 payload 内：
 - [服务器配置](configuration.md)介绍启动器 API 背后的 profile 行与环境变量。
 - [部署](deployment.md)介绍如何运行服务器、持久化、备份与网络安全。
 - [故障排查](troubleshooting.md)介绍与启动器无关的服务端故障。
+
+## 集群客户端版本 {#cluster-client-builds}
+
+使用集群时，服务器支持的客户端版本是其所有节点版本的并集。此时 `GET /v1/catalog` 返回 `clusterBuilds`（至少有一个节点支持的版本），并在每个预设上标注 `clusterServed`；没有集群时两者都不返回。没有节点支持的版本仍保留在启动器的版本列表中，但启动按钮会禁用，`POST /v1/launch` 以 409 `build_not_served` 拒绝。某版本的服务器列表（`/v1/servers/{build}`）只提供有节点支持该版本的服务器，每个节点目标附带 `client_builds`，因此网关的服务器中心只列出支持该客户端版本的节点。
 
 ## 服务器公开展示与准入 {#server-presentation-and-admission}
 

@@ -79,7 +79,7 @@ internal sealed partial class RoundFlow
                 room.Scoring.AddLucci(seat.Slot, _options.LucciKindValues[kind - 1], _options.MaxRoundLucci);
                 picked = new RoundLucciPicked(request.CharacterObjectId, request.ObjectId);
                 // kr-812 sub_7527C0 renders row +128; kr-812 sub_804850 replaces it from live stat 13.
-                update = new(room.Id, 0, [.. room.Scoring.TeamTotals], [room.Scoring.Stats(seat.Slot)], LiveScoreboard(room))
+                update = new(room.Id, 0, LiveTeamTotals(room), [room.Scoring.Stats(seat.Slot)], LiveScoreboard(room))
                     { CollectedLucciOnly = true };
                 members = [.. room.Seats];
             }

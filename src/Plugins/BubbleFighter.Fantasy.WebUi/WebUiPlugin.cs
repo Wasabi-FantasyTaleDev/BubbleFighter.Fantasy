@@ -10,7 +10,7 @@ namespace BubbleFighter.Fantasy.WebUi;
 /// embedded in this assembly, so the row needs no files next to the server; the <c>admin.http</c>
 /// row picks both services up and serves them.
 /// </summary>
-[Plugin("webui", Description = "Administration web interface.", Provides = [typeof(IAdminWebContent), typeof(IBuildReleaseLabels)])]
+[Plugin("webui", Category = "admin", Names = ["en=Web interface", "zh-Hans=网页管理界面", "zh-Hant=網頁管理介面", "ko=웹 관리 화면"], Description = "Administration web interface.", Provides = [typeof(IAdminWebContent), typeof(IBuildReleaseLabels)])]
 public sealed class WebUiPlugin : IPlugin
 {
     /// <inheritdoc />

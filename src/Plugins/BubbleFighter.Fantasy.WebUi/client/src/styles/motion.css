@@ -1,0 +1,55 @@
+/* Shared popup and list motion. Dialogs opt in with class="bff-pop"; lists with class="bff-stagger" and --i per item. */
+/* The global reset sets margin: 0 on every element; a modal dialog centers itself only with the browser's margin: auto. */
+dialog.bff-pop { margin: auto; }
+dialog.bff-pop[open] { animation: bff-pop-in .34s cubic-bezier(.2, .9, .25, 1.12) both; }
+dialog.bff-pop[open]::backdrop { animation: bff-backdrop-in .3s ease both; }
+dialog.bff-pop.is-closing { animation: bff-pop-out .18s cubic-bezier(.4, 0, 1, 1) both; }
+dialog.bff-pop.is-closing::backdrop { animation: bff-backdrop-out .18s ease both; }
+dialog.bff-pop[open] > * { animation: bff-rise .4s cubic-bezier(.2, .8, .2, 1) backwards; animation-delay: calc(60ms + var(--i, 0) * 45ms); }
+.bff-stagger > * { animation: bff-rise .32s cubic-bezier(.2, .8, .2, 1) backwards; animation-delay: calc(min(var(--i, 0), 14) * 24ms); }
+
+@keyframes bff-pop-in { from { opacity: 0; transform: translateY(18px) scale(.94); } to { opacity: 1; transform: none; } }
+@keyframes bff-pop-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(8px) scale(.97); } }
+@keyframes bff-backdrop-in { from { opacity: 0; backdrop-filter: blur(0); } to { opacity: 1; } }
+@keyframes bff-backdrop-out { to { opacity: 0; backdrop-filter: blur(0); } }
+@keyframes bff-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes bff-shake { 0%, 100% { transform: none; } 20% { transform: translateX(-5px); } 40% { transform: translateX(5px); } 60% { transform: translateX(-3px); } 80% { transform: translateX(2px); } }
+@keyframes bff-pulse { 0% { transform: scale(.96); opacity: .4; } 60% { transform: scale(1.02); opacity: 1; } 100% { transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  dialog.bff-pop[open], dialog.bff-pop[open]::backdrop, dialog.bff-pop.is-closing, dialog.bff-pop.is-closing::backdrop,
+  dialog.bff-pop[open] > *, .bff-stagger > * { animation: none !important; }
+}
+
+/* Setup feedback: a verified connection settles in, an error shakes once, summary rows and choices rise in turn. */
+.setup-connection-status.is-verified { animation: bff-pulse .42s cubic-bezier(.2, .8, .2, 1); transform-origin: left center; }
+.setup-connection-status.is-error { animation: bff-shake .4s ease; }
+.setup-summary > div, .setup-choice-row > button, .setup-existing-choices > label { animation: bff-rise .34s cubic-bezier(.2, .8, .2, 1) backwards; }
+.setup-summary > div:nth-child(2) { animation-delay: 35ms; } .setup-summary > div:nth-child(3) { animation-delay: 70ms; } .setup-summary > div:nth-child(4) { animation-delay: 105ms; } .setup-summary > div:nth-child(5) { animation-delay: 140ms; } .setup-summary > div:nth-child(6) { animation-delay: 175ms; } .setup-summary > div:nth-child(7) { animation-delay: 210ms; } .setup-summary > div:nth-child(8) { animation-delay: 245ms; } .setup-summary > div:nth-child(9) { animation-delay: 280ms; } .setup-summary > div:nth-child(10) { animation-delay: 315ms; } .setup-summary > div:nth-child(11) { animation-delay: 350ms; } .setup-summary > div:nth-child(12) { animation-delay: 385ms; } .setup-summary > div:nth-child(13) { animation-delay: 420ms; } .setup-summary > div:nth-child(14) { animation-delay: 455ms; } .setup-summary > div:nth-child(15) { animation-delay: 490ms; } .setup-summary > div:nth-child(16) { animation-delay: 525ms; }
+.setup-choice-row > button:nth-child(2), .setup-existing-choices > label:nth-child(2) { animation-delay: 60ms; }
+@media (prefers-reduced-motion: reduce) {
+  .setup-connection-status, .setup-summary > div, .setup-choice-row > button, .setup-existing-choices > label { animation: none !important; }
+}
+
+/* The close button in a popup's upper-right corner. */
+dialog.bff-pop { position: fixed; }
+.bff-pop-close { position: absolute; top: 14px; right: 14px; z-index: 1; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #6b7280; cursor: pointer; transition: background .15s ease, color .15s ease, transform .2s ease; }
+.bff-pop-close:hover { background: #1f293712; color: #111827; }
+.bff-pop-close:focus-visible { outline: 2px solid #2f7fd1; outline-offset: 2px; }
+.bff-pop-close svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+
+/* Plugin category colours: a soft tile background and its ink, readable on light and dark surfaces. */
+[data-category="gameplay"] { --cat-bg: rgb(99 102 241 / .14); --cat-ink: #5b5bd6; }
+[data-category="items"] { --cat-bg: rgb(245 158 11 / .16); --cat-ink: #c27803; }
+[data-category="social"] { --cat-bg: rgb(236 72 153 / .14); --cat-ink: #d0367f; }
+[data-category="network"] { --cat-bg: rgb(14 165 233 / .14); --cat-ink: #0b84c6; }
+[data-category="launcher"] { --cat-bg: rgb(168 85 247 / .14); --cat-ink: #8b46d8; }
+[data-category="storage"] { --cat-bg: rgb(16 185 129 / .14); --cat-ink: #0f9670; }
+[data-category="cluster"] { --cat-bg: rgb(20 184 166 / .14); --cat-ink: #0e9488; }
+[data-category="admin"] { --cat-bg: rgb(239 68 68 / .12); --cat-ink: #d03b3b; }
+[data-category="distribution"] { --cat-bg: rgb(132 204 22 / .16); --cat-ink: #5d8f0c; }
+[data-category="core"] { --cat-bg: rgb(100 116 139 / .14); --cat-ink: #55657a; }
+[data-category="other"] { --cat-bg: rgb(148 163 184 / .16); --cat-ink: #64748b; }
+
+/* The global selection colour is dark text for light surfaces; on the console's dark surface it keeps the text light. */
+.noah-terminal ::selection { background: rgb(96 165 250 / .42); color: #fff; }

@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 namespace BubbleFighter.Fantasy.InGame.Data;
 
 /// <summary>
-/// Reads the <c>#id#</c> mode tag a player can put in a new room's title (for example <c>Fun room #8#</c>) to force
+/// Reads a numeric or configured localized mode tag in a room title (for example <c>Fun room #8#</c>) to force
 /// the room's game mode. The tag is removed from the title the room shows; the rest of the title is unchanged.
 /// </summary>
 internal static partial class RoomModeTag
@@ -17,6 +17,9 @@ internal static partial class RoomModeTag
 
     [GeneratedRegex(@"#(\d+)#", RegexOptions.CultureInvariant)]
     private static partial Regex Pattern();
+
+    [GeneratedRegex(@"(?=(#[^#\s]+#))", RegexOptions.CultureInvariant)]
+    private static partial Regex NamePattern();
 
     /// <summary>The outcome of reading a title.</summary>
     /// <param name="Title">The title to show: without the tag when it named a valid mode, otherwise unchanged.</param>
@@ -31,18 +34,32 @@ internal static partial class RoomModeTag
     internal static bool TryParseModeId(string text, out int modeId) =>
         int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out modeId) && modeId is >= MinModeId and <= MaxModeId;
 
-    /// <summary>Reads the first <c>#number#</c> tag of a title.</summary>
+    /// <summary>Reads the first numeric or recognized name tag; unrelated hash-delimited text remains ordinary title text.</summary>
     /// <param name="title">The title the player typed; may be empty.</param>
+    /// <param name="names">Optional configured mode names; absent preserves numeric-only parsing.</param>
     /// <returns>The title to show and the mode the tag names, if any.</returns>
-    internal static Result Extract(string title)
+    internal static Result Extract(string title, RoomModeNames? names = null)
     {
         var match = Pattern().Match(title);
+        if (names is not null)
+            foreach (Match nameMatch in NamePattern().Matches(title))
+            {
+                if (match.Success && nameMatch.Index >= match.Index) break;
+                var tag = nameMatch.Groups[1].Value;
+                if (names.TryResolve(tag[1..^1], out var namedMode))
+                    return Remove(title, nameMatch.Index, tag.Length, namedMode);
+            }
         if (!match.Success)
             return new(title, null, null);
         if (!TryParseModeId(match.Groups[1].Value, out var modeId))
             return new(title, null, match.Value);
-        var before = title[..match.Index].TrimEnd();
-        var after = title[(match.Index + match.Length)..].TrimStart();
+        return Remove(title, match.Index, match.Length, modeId);
+    }
+
+    private static Result Remove(string title, int index, int length, int modeId)
+    {
+        var before = title[..index].TrimEnd();
+        var after = title[(index + length)..].TrimStart();
         var joined = before.Length > 0 && after.Length > 0 ? before + " " + after : before + after;
         return new(joined, modeId, null);
     }

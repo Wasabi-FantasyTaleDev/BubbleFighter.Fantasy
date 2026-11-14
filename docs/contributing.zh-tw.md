@@ -88,19 +88,25 @@ python -m unittest discover -s tools/ci -p "test_*.py"
 python tools/ci/serial-gates.py --public --results-directory artifacts/validation/public-01
 ```
 
-每次嘗試都使用新的、不存在的結果目錄——執行器拒絕已存在的目錄。它會建置 Release、執行 SDK 一致性檢查、逐一序列執行測試專案、檢查 packet 表，並傾印帶隔離修補檔的 `kr-1256` 設定。最後輸出 `PASS public gates: <n> populated test reports, <n> tests, no skips`，並把排除範圍記錄到 `scope.json`。公開模式執行每個被追蹤的測試專案，只排除 `Category=LocalClientData` 案例；它不是完整發行關卡。如果設定了 `CI=true`，執行器還會拒絕含有 `.env` 或 `profiles/*/local.patch.yaml` 的檢出。
+每次嘗試都使用新的、不存在的結果目錄——執行器拒絕已存在的目錄。它會建置 Release、執行 SDK 一致性檢查、平行執行彼此獨立的測試專案、隨後單獨執行對時序敏感的專案、檢查 packet 表，並傾印帶隔離修補檔的 `kr-1256` 設定。最後輸出 `PASS public gates: <n> populated test reports, <n> tests, no skips`，並把排除範圍記錄到 `scope.json`。公開模式執行每個被追蹤的測試專案，只排除 `Category=LocalClientData` 案例；它不是完整發行關卡。如果設定了 `CI=true`，執行器還會拒絕含有 `.env` 或 `profiles/*/local.patch.yaml` 的檢出。
+
+日常開發可加上 `--affected <ref>`，只執行能觀察到自該 ref 合併基點以來變更（包括未提交檔案）的測試專案：自身檔案有變更，或直接或透過萬用字元參照了變更專案的專案。只改文件時不執行測試；變更不屬於任何專案（例如 `profiles/`、`packets/` 或建置檔案）時執行全部專案。部署批次或發布前仍須執行完整關卡。
+
+```sh
+python tools/ci/serial-gates.py --public --affected origin/main --results-directory artifacts/validation/affected-01
+```
 
 **確認成功。** 結束碼為 0，最後一行是上面的 `PASS` 行。非零結束會印出 `FAIL <reason>`；失敗步驟的記錄在結果目錄中。
 
 ### 執行本機 Host 檢查
 
-遵循[快速開始](quickstart.md)：將 `.env.example` 複製為 `.env`，把 `BFF_MYSQL_PASSWORD` 設為非空的臨時值，並且一律加上隔離修補檔——`--dump-config` 也一樣：
+遵循[快速開始](quickstart.md)。本機檢查不需要資料庫設定或 `.env`，並且一律加上隔離修補檔——`--dump-config` 也一樣：
 
 ```sh
 dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile management --patch tools/local-checks/isolated-memory.patch.yaml
 ```
 
-該修補檔停用 `persistence.mysql` 並啟用記憶體持久化，因此開發者的 `.env` 或本機覆寫不會連線真實資料庫。絕不要把測試或本機檢查指向生產資料庫。**確認成功：** 另一個終端機從 `http://127.0.0.1:8080/health` 得到 `{"status":"ok", ...}`；用 Ctrl+C 停止。
+該修補檔停用 `persistence.mysql` 並啟用記憶體持久化，因此開發者的 `.env` 或本機覆寫不會連線真實資料庫。絕不要把測試或本機檢查指向生產資料庫。**確認成功：** 另一個終端機從 `http://127.0.0.1:7300/health` 得到 `{"status":"ok", ...}`；用 Ctrl+C 停止。
 
 ## 儲存庫結構
 
@@ -188,8 +194,9 @@ npm run build
 | 設定或路徑 | 必要檔案 |
 | --- | --- |
 | `client-data/cn-324/` | `Config/ShopItem2.xml` |
-| `client-data/kr-1256/data/` | `Packs/Config_00000.pkn`（商店與角色工作簿）與 `Packs/ConfigSh_00000.pkn`（寵物疊加表） |
-| `artifacts/shop-tables-survey/id400/xml/` | `Config/ShopItem2.xml` |
+| `BFF_CN324_CONFIG_ARCHIVE`, `BFF_CN404_CONFIG_ARCHIVE`, `BFF_CN406_CONFIG_ARCHIVE`, `BFF_CN408_CONFIG_ARCHIVE`, `BFF_ID400_CONFIG_ARCHIVE` | 各環境變數必須指向對應版本自己的 `Config.bfz` 檔案。完整關卡會在建置前檢查這些路徑。 |
+| `client-data/kr-1256/data/` | `Packs/Config_00000.pkn`（商店與角色工作簿及 BnB 規則）、`Packs/ConfigSh_00000.pkn`（寵物疊加表）和 `Packs/Maps_00023.pkn`（BnB 村莊地圖與物品配置） |
+| `artifacts/shop-tables-survey/id400/xml/` | `Config/ShopItem2.xml`，以 `bffarchive extract <id-400>/Config/Config.bfz artifacts/shop-tables-survey/id400/xml --path Config/Config.bfz --filter ShopItem2.xml` 從 id-400 用戶端的 `Config/Config.bfz` 中擷取 |
 
 如果檔案缺少，完整關卡會列出缺少的前置條件並停止：`Local game data is missing for <tests>; provision it or pass --public to run the publicly reproducible gates only.`
 

@@ -5,7 +5,11 @@ namespace BubbleFighter.Fantasy.Contracts.Inventory;
 /// <summary>The player's whole inventory is republished, for example after an equipment change.</summary>
 /// <param name="CharacterBag">Every owned slot.</param>
 /// <param name="EquippedBag">The equipped selection.</param>
-public sealed record InventoryReplaced(IReadOnlyList<InventorySlotRecord> CharacterBag, IReadOnlyList<InventorySlotRecord> EquippedBag) : IMessage;
+public sealed record InventoryReplaced(IReadOnlyList<InventorySlotRecord> CharacterBag, IReadOnlyList<InventorySlotRecord> EquippedBag) : IMessage
+{
+    /// <summary>Gets whether both bags were read from one transaction and include initialized feature metadata.</summary>
+    public bool IsCompleteSnapshot { get; init; }
+}
 
 /// <summary>A purchase changed the bag; the codec restates the complete bag the way its build expects.</summary>
 /// <param name="CharacterBag">Every owned slot after the purchase.</param>

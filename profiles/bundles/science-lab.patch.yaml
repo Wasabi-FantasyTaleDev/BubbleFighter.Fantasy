@@ -1,0 +1,23 @@
+# Include only after this build's synthesis request and result consumers have been audited.
+- insert:
+    - id: science-lab
+      plugin: science-lab
+      parent_id: ingame
+      config:
+        enabled: ${BFF_SCIENCE_LAB_ENABLED:-true}
+        protocol: "${BFF_PROFILE_ID}/game"
+        build_key: "${BFF_PROFILE_ID}"
+        catalog_path: Config/ShopItem2.xml
+        configuration_path: Config/SynthesisSystem.ini
+        # Synthesis uses the native synthesis card 100622 and keeps the first selected item; the card debit and the
+        # duration cap below the native 730-day permanent display are server policy. Decomposition needs reward pools,
+        # which the client does not list; add them in a local patch.
+        synthesis_card_item_id: 100622
+        card_quantity: 1
+        synthesis_survivor: first
+        synthesis_maximum_days: 729
+        synthesis_permanent_at_days: 730
+- set:
+    id: dialect.messages
+    config:
+      legacy_science_lab: ${BFF_SCIENCE_LAB_ENABLED:-true}

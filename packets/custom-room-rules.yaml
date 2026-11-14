@@ -1,0 +1,43 @@
+version: 1
+# CustomGameMode changes options inside an existing game mode. It is not a game mode id.
+# kr-1256 sub_544790 compares the vector against mode defaults and the installed SessionSetting +468.
+# cn-774 sub_B6A610 emits the same request on C2S 2084 through cn-774 sub_4944D0 and cn-774 sub_456CD0.
+# Its feature 61 is not registered by cn-774 sub_106CE80, and its resource is absent; codec coverage does not activate it.
+# The header bool reports that comparison; it must not be treated as a feature toggle.
+structs:
+  CustomGameModeRequest:
+    - matches_mode_defaults: bool
+      offset: 44
+      only: [kr-1256]
+      except: [tw-454]
+    - rules: "list<CustomGameModeValue>"
+      offset: 48
+      only: [kr-1256]
+      except: [tw-454]
+
+  # kr-1256 sub_546150 emits C2S 2086, then kr-1256 sub_10D2560 writes the counted keyed vector.
+  # kr-1256 sub_10BE6F0 writes its counted u32 values. GameSetting +328 uses the same writer.
+  CustomGameModeValue:
+    - value_id: u16
+      offset: 0
+      only: [kr-1256]
+      except: [tw-454]
+    - values: "list<u32>"
+      offset: 4
+      only: [kr-1256]
+      except: [tw-454]
+
+  # kr-1256 sub_9D2A60 consumes S2C 1558: two shorts followed by kr-1256 sub_1119C10 counted UTF-16.
+  # cn-774 sub_BCEAF0 consumes the same shape on S2C 1555 through cn-774 sub_1093FE0.
+  # Master results 0/1/2 mean success/failure/invalid values. Non-master results 4/5 show change notices.
+  # This consumer does not install options: kr-1256 sub_9DB8A0 installs the preceding full GameSetting.
+  CustomGameModeReply:
+    - result: u16
+      only: [kr-1256]
+      except: [tw-454]
+    - unknown_2: u16
+      only: [kr-1256]
+      except: [tw-454]
+    - unknown_4: wstr
+      only: [kr-1256]
+      except: [tw-454]

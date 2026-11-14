@@ -1,0 +1,21 @@
+# Include after pets.patch.yaml and pets-modern.patch.yaml for tw-454 only.
+# tw-454 sub_DCDBB0 and tw-454 sub_DCDD40 read FeedCoolTime=420 minutes from this installed native workbook.
+# Activation verifies this duration against the configured client data; the civil-clock offset remains explicit.
+- set:
+    id: pets.entitlements
+    config:
+      client_configuration_source: NativePetConfig
+      native_pet_config_path: Config/PetConfig.xml
+      feed_cooldown_seconds: 25200
+      mileage:
+        enabled: false
+        display_maximum: null
+- set:
+    id: pets
+    config:
+      client_configuration_source: NativePetConfig
+      native_pet_config_path: Config/PetConfig.xml
+      feed_cooldown_seconds: 25200
+      mileage:
+        enabled: false
+        display_maximum: null

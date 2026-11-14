@@ -1727,3 +1727,10 @@ opcodes:
   name_source: label@cn-406
   evidence: verified
   source: cn-406 sub_700EE0 case 516 reaches cn-406 sub_706C20; cn-406 sub_7005A0 reads a u16 plaza seat then one counted UTF-16 message
+- value: 955
+  direction: s2c
+  connection: game
+  name: gspEvolveResult
+  name_source: label@cn-406
+  evidence: verified
+  source: cn-406 sub_738290 case 955 reaches cn-406 sub_736AD0; cn-406 sub_715B70 reads u32 outcome, u32 pet item id and one unused u32

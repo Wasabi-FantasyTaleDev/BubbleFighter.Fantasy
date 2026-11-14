@@ -15,7 +15,7 @@ using Microsoft.Extensions.Logging;
 namespace BubbleFighter.Fantasy.Cluster;
 
 /// <summary>Reports build readiness, populations and published rooms without changing standalone game handlers.</summary>
-[Plugin("cluster.node", Description = "Authenticated node lease and room summary reporting.",
+[Plugin("cluster.node", Category = "cluster", Names = ["en=Cluster node", "zh-Hans=集群节点", "zh-Hant=叢集節點", "ko=클러스터 노드"], Description = "Authenticated node lease and room summary reporting.",
     Requires = [typeof(ISessionRegistry), typeof(IHostReadiness)], Provides = [typeof(INodeLeaseSource)],
     Optional = [typeof(IPersistentDataDomainIdentity), typeof(ILocalLauncherPresence)],
     OptionalMany = [typeof(IPublishedRoomDirectory), typeof(IListenerEndpoint)])]

@@ -8,7 +8,7 @@ using BubbleFighter.Fantasy.Contracts.Settings;
 namespace BubbleFighter.Fantasy.PlayerSettings;
 
 /// <summary>Persists typed key-map updates under the authenticated identity and restores them at the shared login boundary.</summary>
-[Plugin("player.settings", Description = "Authenticated customized-key storage and login restoration.",
+[Plugin("player.settings", Category = "gameplay", Names = ["en=Player settings", "zh-Hans=玩家设置", "zh-Hant=玩家設定", "ko=플레이어 설정"], Description = "Authenticated customized-key storage and login restoration.",
     Requires = [typeof(IMessageRouter), typeof(IPlayerSettingsRepository)],
     RequiresMany = [typeof(IInboundMessageBinding<CustomizedKeysUpdated>), typeof(IMessageSender<CustomizedKeysRestored>)])]
 public sealed class PlayerSettingsPlugin : IPlugin

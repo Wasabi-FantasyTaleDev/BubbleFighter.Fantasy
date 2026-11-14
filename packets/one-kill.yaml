@@ -1,0 +1,39 @@
+version: 1
+structs:
+  # kr-1256 sub_50AFC0 writes the attacker, victim and attacker's position. kr-1256 sub_6D97D0
+  # resolves both actors and calls the victim's kr-1256 sub_50B470 to request authority confirmation.
+  OneKillRequest:
+    - attacker: u32
+      offset: 0
+      only: [kr-1256]
+    - victim: u32
+      offset: 4
+      only: [kr-1256]
+    - position_x: f32
+      offset: 8
+      only: [kr-1256]
+    - position_y: f32
+      offset: 12
+      only: [kr-1256]
+    - position_z: f32
+      offset: 16
+      only: [kr-1256]
+
+  # kr-1256 sub_50B470 writes victim, direction from kr-1256 sub_460F00, then attacker.
+  # kr-1256 sub_6FBA90 reads these words; kr-1256 sub_50B730 enters cssDeadOneKilled.
+  OneKillConfirmation:
+    - victim: u32
+      offset: 0
+      only: [kr-1256]
+    - direction_x: f32
+      offset: 4
+      only: [kr-1256]
+    - direction_y: f32
+      offset: 8
+      only: [kr-1256]
+    - direction_z: f32
+      offset: 12
+      only: [kr-1256]
+    - attacker: u32
+      offset: 16
+      only: [kr-1256]

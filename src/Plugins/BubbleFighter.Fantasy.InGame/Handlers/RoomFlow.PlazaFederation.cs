@@ -93,7 +93,8 @@ internal sealed partial class RoomFlow
             var updated = entered.Seat.ToMember();
             if (previousView is not null && (previousView.Nickname != updated.Nickname || previousView.Level != updated.Level
                 || previousView.ColorIndex != updated.ColorIndex || previousView.CharacterItemId != updated.CharacterItemId
-                || !previousView.EquippedItemIds.SequenceEqual(updated.EquippedItemIds)))
+                || !previousView.EquippedItemIds.SequenceEqual(updated.EquippedItemIds)
+                || !Equal(previousView.ItemAttributes, updated.ItemAttributes)))
             {
                 foreach (var other in _plaza.Sessions())
                 {

@@ -1,0 +1,15 @@
+version: 1
+structs:
+  # kr-812 sub_8118D0 stores the local tick at +4; kr-812 sub_844A30 writes it through kr-812 sub_A56A80.
+  # kr-1256 sub_961990, cn-774 sub_B5ADF0 and tw-454 sub_A7A930 write the same single u32.
+  # cn-738 sub_A3B960 / cn-738 sub_CF2810 and cn-742 sub_97E7C0 also write exactly four bytes.
+  RelayLatencyRequest:
+    - client_tick: u32
+      offset: 4
+
+  # kr-812 sub_810C20 reads object +4 through kr-812 sub_A56C10, then uses local arrival time alone.
+  # kr-1256 sub_9601E0, cn-774 sub_B593D0 and tw-454 sub_A79210 discard the same single u32.
+  # cn-738 sub_A3A470 and cn-742 sub_97D120 also discard it; no consumer requires a timestamp echo.
+  RelayLatencyReply:
+    - unknown_4: u32
+      offset: 4

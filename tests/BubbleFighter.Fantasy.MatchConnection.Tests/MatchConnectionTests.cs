@@ -145,6 +145,26 @@ public sealed class MatchConnectionTests
         await lifecycle.AuthenticateAsync(new Session(11), Authentication(seat), CancellationToken.None);
     }
 
+    /// <summary>
+    /// The expiry sweep is armed only while a connection is tracked: none before the first authentication, armed by
+    /// it, and disarmed again once the expired handshake has been removed.
+    /// </summary>
+    [Fact]
+    public async Task ExpirySweepRunsOnlyWhileAConnectionIsTracked()
+    {
+        var (registry, _, seat) = Room();
+        using var lifecycle = Lifecycle(registry, new() { HandshakeTimeoutMs = 1000 });
+        Assert.False(lifecycle.Sweeping);
+        var relay = new Session(10);
+        await lifecycle.AuthenticateAsync(relay, Authentication(seat), CancellationToken.None);
+        Assert.True(lifecycle.Sweeping);
+        await ((Connection)relay.Connection).Closed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (lifecycle.Sweeping && DateTime.UtcNow < deadline)
+            await Task.Delay(20);
+        Assert.False(lifecycle.Sweeping);
+    }
+
     [Fact]
     public async Task HandshakeExpiresAndReleasesTheLease()
     {
@@ -283,6 +303,140 @@ public sealed class MatchConnectionTests
         Assert.True(relay.Connection.IsClosed);
     }
 
+    /// <summary>Admits current authenticated leases on either side of scene completion without requiring a new handshake.</summary>
+    [Fact]
+    public async Task AuthenticatedOperationsUseTheCurrentLeaseBeforeAndAfterSceneCompletion()
+    {
+        var (registry, _, seat) = Room();
+        using var lifecycle = Lifecycle(registry);
+        IMatchConnectionOperations operations = lifecycle;
+        Assert.Equal("kr-1256/relay", operations.Protocol);
+        var relay = new Session(10);
+        await lifecycle.AuthenticateAsync(relay, Authentication(seat), default);
+        Assert.False(seat.RelayInitialized);
+        await operations.RunAuthenticatedAsync(relay, ct => relay.SendAsync(21, new byte[4], ct), default);
+        await lifecycle.RegisterSceneAsync(relay, new(7, 1000000, "host"), default);
+        Assert.True(seat.RelayInitialized);
+        await operations.RunAuthenticatedAsync(relay, ct => relay.SendAsync(21, new byte[4], ct), default);
+        Assert.Equal(2, relay.Sent.Count(frame => frame.Opcode == 21));
+    }
+
+    /// <summary>Rejects unbound, replaced, stale or closed transports before invoking the operation callback.</summary>
+    [Theory]
+    [InlineData("unbound")]
+    [InlineData("same-id")]
+    [InlineData("replaced")]
+    [InlineData("stale-generation")]
+    [InlineData("closed")]
+    [InlineData("game-closed")]
+    public async Task AuthenticatedOperationsRejectNonCurrentLeases(string fault)
+    {
+        var (registry, room, seat) = Room();
+        using var lifecycle = Lifecycle(registry);
+        var relay = new Session(10);
+        if (fault != "unbound") await lifecycle.AuthenticateAsync(relay, Authentication(seat), default);
+        if (fault == "same-id") relay = new Session(10);
+        if (fault == "replaced") await lifecycle.AuthenticateAsync(new Session(11), Authentication(seat), default);
+        if (fault == "stale-generation") { room.ResetToWaiting(); room.MarkStarting(); }
+        if (fault == "closed") await relay.Connection.CloseAsync("test closure");
+        if (fault == "game-closed") await seat.Game.Connection.CloseAsync("test closure");
+        var invoked = false;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => lifecycle.RunAuthenticatedAsync(relay, _ =>
+        {
+            invoked = true;
+            return ValueTask.CompletedTask;
+        }, default).AsTask());
+        Assert.False(invoked);
+        Assert.DoesNotContain(relay.Sent, frame => frame.Opcode == 21);
+        if (fault == "replaced") Assert.Equal(11, seat.Relay!.Id);
+    }
+
+    /// <summary>Keeps an admitted operation behind the complete authentication or scene publication batch.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AuthenticatedOperationsCannotInterruptHandshakePublicationBatches(bool scene)
+    {
+        var (registry, _, seat) = Room();
+        using var lifecycle = Lifecycle(registry);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var resume = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var relay = new Session(10)
+        {
+            BeforeSendAsync = async (opcode, ct) =>
+            {
+                if (opcode != (scene ? 13 : 1)) return;
+                entered.TrySetResult();
+                await resume.Task.WaitAsync(ct);
+            },
+        };
+        var handshake = lifecycle.AuthenticateAsync(relay, Authentication(seat), default).AsTask();
+        if (scene)
+        {
+            await handshake;
+            handshake = lifecycle.RegisterSceneAsync(relay, new(7, 1000000, "host"), default).AsTask();
+        }
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var probe = lifecycle.RunAuthenticatedAsync(relay, ct => relay.SendAsync(21, new byte[4], ct), default).AsTask();
+        Assert.False(probe.IsCompleted);
+        Assert.DoesNotContain(relay.Sent, frame => frame.Opcode == 21);
+        resume.TrySetResult();
+        await handshake;
+        await probe;
+        Assert.Equal(scene ? new ushort[] { 22, 1, 4, 5, 6, 13, 21 } : new ushort[] { 22, 1, 21 },
+            relay.Sent.Select(frame => frame.Opcode));
+    }
+
+    /// <summary>Cancels a queued operation with its owner and prevents replies after handshake teardown.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CancelOrUnloadWhileWaitingForTheHandshakeGateCannotPublishLate(bool unload)
+    {
+        var (registry, _, seat) = Room();
+        using var lifecycle = Lifecycle(registry);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var resume = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var relay = new Session(10)
+        {
+            BeforeSendAsync = async (opcode, ct) =>
+            {
+                if (opcode != 1) return;
+                entered.TrySetResult();
+                await resume.Task.WaitAsync(ct);
+            },
+        };
+        var handshake = lifecycle.AuthenticateAsync(relay, Authentication(seat), default).AsTask();
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        using var canceled = new CancellationTokenSource();
+        var probe = lifecycle.RunAuthenticatedAsync(relay, ct => relay.SendAsync(21, new byte[4], ct), canceled.Token).AsTask();
+        Assert.False(probe.IsCompleted);
+        if (unload) lifecycle.Dispose(); else canceled.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => probe.WaitAsync(TimeSpan.FromSeconds(2)));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => handshake.WaitAsync(TimeSpan.FromSeconds(2)));
+        Assert.Null(seat.Relay);
+        Assert.True(relay.Connection.IsClosed);
+        Assert.False(lifecycle.Sweeping);
+        Assert.DoesNotContain(relay.Sent, frame => frame.Opcode is 1 or 21);
+    }
+
+    /// <summary>Revokes a failed operation lease and makes its bounded connection capacity available to a replacement.</summary>
+    [Fact]
+    public async Task FailedAuthenticatedPublicationRevokesTheLeaseAndReleasesCapacity()
+    {
+        var (registry, _, seat) = Room();
+        using var lifecycle = Lifecycle(registry, new() { MaxConnections = 1 });
+        var relay = new Session(10);
+        await lifecycle.AuthenticateAsync(relay, Authentication(seat), default);
+        await Assert.ThrowsAsync<IOException>(() => lifecycle.RunAuthenticatedAsync(relay,
+            _ => ValueTask.FromException(new IOException("send queue full")), default).AsTask());
+        Assert.Null(seat.Relay);
+        Assert.True(relay.Connection.IsClosed);
+        Assert.False(lifecycle.Sweeping);
+        await lifecycle.AuthenticateAsync(new Session(11), Authentication(seat), default);
+        Assert.Equal(11, seat.Relay!.Id);
+    }
+
     private sealed class DelayedDirectory(IMatchRoomDirectory inner) : IMatchRoomDirectory
     {
         public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -354,13 +508,16 @@ public sealed class MatchConnectionTests
         public List<(ushort Opcode, byte[] Body)> Sent { get; } = [];
         public bool FailSend { get; init; }
         public Action<ushort>? BeforeSend { get; init; }
-        public ValueTask SendAsync(ushort opcode, ReadOnlyMemory<byte> payload, CancellationToken ct)
+        /// <summary>Gets the optional asynchronous publication barrier used to hold handshake frames in flight.</summary>
+        public Func<ushort, CancellationToken, ValueTask>? BeforeSendAsync { get; init; }
+        /// <summary>Runs configured send barriers and records the accepted frame while propagating fixture failures and cancellation.</summary>
+        public async ValueTask SendAsync(ushort opcode, ReadOnlyMemory<byte> payload, CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();
             if (FailSend) throw new IOException("Test send failure.");
             BeforeSend?.Invoke(opcode);
+            if (BeforeSendAsync is { } beforeSend) await beforeSend(opcode, ct);
             Sent.Add((opcode, payload.ToArray()));
-            return ValueTask.CompletedTask;
         }
     }
     private sealed class Connection(long id) : IConnection

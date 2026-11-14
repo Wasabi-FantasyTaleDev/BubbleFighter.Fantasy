@@ -4,6 +4,7 @@ import NoahButton from '../noah/components/ui/NoahButton.vue'
 import NoahInput from '../noah/components/ui/NoahInput.vue'
 import { api, jsonRequest } from '../api/client'
 import { useI18n } from '../i18n'
+import { animatedCancel, closeDialog, openDialog } from '../composables/dialogMotion'
 
 const props = defineProps({ modelValue: { type: String, default: '' } })
 const emit = defineEmits(['update:modelValue'])
@@ -29,10 +30,10 @@ async function browse(path) {
 async function open() {
   location.value = props.modelValue
   await nextTick()
-  dialog.value.showModal()
+  openDialog(dialog.value)
   await browse(location.value)
 }
-function close() { request?.abort(); dialog.value.close() }
+function close() { request?.abort(); return closeDialog(dialog.value) }
 function choose() { if (page.value?.path) { emit('update:modelValue', page.value.path); close() } }
 onBeforeUnmount(() => request?.abort())
 </script>
@@ -40,29 +41,30 @@ onBeforeUnmount(() => request?.abort())
 <template>
   <NoahButton @click="open">{{ t('setup.chooseFolder') }}</NoahButton>
   <Teleport to="body">
-    <dialog ref="dialog" class="setup-directory-dialog" :aria-label="t('setup.chooseFolder')" @cancel="request?.abort()" @click="e => { if (e.target === dialog) close() }">
-      <header><h2>{{ t('setup.chooseFolder') }}</h2><p>{{ t('setup.serverFolderHint') }}</p></header>
-      <form class="setup-directory-location" @submit.prevent="browse(location)">
+    <dialog ref="dialog" class="setup-directory-dialog bff-pop" :aria-label="t('setup.chooseFolder')" @cancel="e => { request?.abort(); animatedCancel(e) }" @click="e => { if (e.target === dialog) close() }">
+      <button type="button" class="bff-pop-close" :aria-label="t('setup.closeDialog')" @click="close"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" /></svg></button>
+      <header style="--i: 0"><h2>{{ t('setup.chooseFolder') }}</h2><p>{{ t('setup.serverFolderHint') }}</p></header>
+      <form class="setup-directory-location" style="--i: 1" @submit.prevent="browse(location)">
         <NoahInput v-model="location" :aria-label="t('setup.clientData')" :placeholder="t('setup.absolutePath')" maxlength="2048" />
         <NoahButton html-type="submit" :disabled="busy">{{ t('setup.openFolder') }}</NoahButton>
       </form>
-      <nav class="setup-directory-nav" :aria-label="t('setup.chooseFolder')">
+      <nav class="setup-directory-nav" style="--i: 2" :aria-label="t('setup.chooseFolder')">
         <NoahButton variant="ghost" :disabled="busy" @click="browse(null)">{{ t('setup.folderRoots') }}</NoahButton>
         <NoahButton variant="ghost" :disabled="busy || !page?.parent" @click="browse(page.parent)">{{ t('setup.parentFolder') }}</NoahButton>
       </nav>
-      <div class="setup-directory-list" :aria-busy="busy">
+      <div class="setup-directory-list" style="--i: 3" :aria-busy="busy">
         <p v-if="error" role="alert" class="setup-error">{{ error }}</p>
         <p v-else-if="busy" role="status">{{ t('setup.loadingFolders') }}</p>
-        <template v-else>
-          <button v-for="folder in page?.directories" :key="folder.path" type="button" @click="browse(folder.path)">
+        <div v-else :key="page?.path ?? ''" class="bff-stagger">
+          <button v-for="(folder, index) in page?.directories" :key="folder.path" type="button" :style="{ '--i': index }" @click="browse(folder.path)">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z" /></svg>
             <span>{{ folder.name }}</span>
           </button>
           <p v-if="!page?.directories.length">{{ t('setup.noFolders') }}</p>
           <p v-if="page?.truncated" role="status">{{ t('setup.foldersTruncated') }}</p>
-        </template>
+        </div>
       </div>
-      <footer><NoahButton variant="ghost" @click="close">{{ t('setup.cancelFolder') }}</NoahButton><NoahButton variant="primary" :disabled="busy || !page?.path" @click="choose">{{ t('setup.useFolder') }}</NoahButton></footer>
+      <footer style="--i: 4"><NoahButton variant="ghost" @click="close">{{ t('setup.cancelFolder') }}</NoahButton><NoahButton variant="primary" :disabled="busy || !page?.path" @click="choose">{{ t('setup.useFolder') }}</NoahButton></footer>
     </dialog>
   </Teleport>
 </template>
@@ -76,9 +78,10 @@ onBeforeUnmount(() => request?.abort())
 .setup-directory-location > :first-child { flex: 1; min-width: 0; }
 .setup-directory-nav { display: flex; gap: 8px; }
 .setup-directory-list { height: min(300px, 40dvh); overflow: auto; margin: 12px 0; }
-.setup-directory-list > button { display: flex; align-items: center; gap: 12px; padding: 11px 12px; width: 100%; border: 0; border-radius: 10px; background: transparent; color: inherit; text-align: left; font: inherit; font-size: 13px; cursor: pointer; }
-.setup-directory-list > button:hover { background: #151b2308; }
-.setup-directory-list > button span { overflow-wrap: anywhere; }
+.setup-directory-list .bff-stagger > button { display: flex; align-items: center; gap: 12px; padding: 11px 12px; width: 100%; border: 0; border-radius: 10px; background: transparent; color: inherit; text-align: left; font: inherit; font-size: 13px; cursor: pointer; }
+.setup-directory-list .bff-stagger > button:hover { background: #151b2308; transform: translateX(3px); }
+.setup-directory-list .bff-stagger > button { transition: background .15s ease, transform .15s ease; }
+.setup-directory-list .bff-stagger > button span { overflow-wrap: anywhere; }
 .setup-directory-list svg { flex-shrink: 0; width: 20px; height: 20px; fill: #e5e9ef; stroke: #75808e; stroke-width: 1.3; }
 .setup-directory-dialog footer { display: flex; justify-content: flex-end; gap: 10px; }
 </style>

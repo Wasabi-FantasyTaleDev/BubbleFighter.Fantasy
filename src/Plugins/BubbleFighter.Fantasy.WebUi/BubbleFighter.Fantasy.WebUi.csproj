@@ -1,6 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <Description>Administration web interface for Bubble Fighter Fantasy: the built client embedded as resources.</Description>
+    <!-- The embedded client is served straight from the loaded assembly, which takes one pointer-based view
+         (WebContentFiles.MappedResource). Nothing else in this project is unsafe. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\BubbleFighter.Fantasy.Abstractions\BubbleFighter.Fantasy.Abstractions.csproj" />

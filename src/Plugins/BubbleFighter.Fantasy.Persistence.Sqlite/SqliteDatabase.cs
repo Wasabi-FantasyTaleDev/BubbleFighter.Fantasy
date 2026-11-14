@@ -1,3 +1,4 @@
+using BubbleFighter.Fantasy.Contracts.Titles;
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Text.Json.Serialization;
@@ -26,14 +27,14 @@ namespace BubbleFighter.Fantasy.Persistence.Sqlite;
 /// <see cref="SqliteOptions.MaxDatabaseBytes"/>, and configured with WAL, <c>synchronous=FULL</c> and
 /// foreign keys. Writes run in one transaction that the ORM joins and that ends with a truncating WAL
 /// checkpoint; if that checkpoint fails after a commit, the store refuses all further operations
-/// rather than reporting a committed transaction as rolled back. Schema versions 1 through 8 are
+/// rather than reporting a committed transaction as rolled back. Schema versions 1 through 9 are
 /// migrated in order, each in its own transaction; fresh files are created at version 1 and stamped
 /// with the application id.
 /// </summary>
 internal sealed class SqliteDatabase : IDisposable
 {
-    // Schema v9 admits durable per-mode battle aggregates in the coupled player snapshot.
-    private const int SchemaVersion = 9;
+    // Schema v10 stores supplementary practice independently of dismissed onboarding and numbered stages.
+    private const int SchemaVersion = 13;
     private const int ApplicationId = 0x42464653;
     private readonly object _gate = new();
     private readonly FileStream _lease;
@@ -76,6 +77,8 @@ internal sealed class SqliteDatabase : IDisposable
             throw new ConfigException(string.Join(" ", validation.Select(result => result.ErrorMessage)));
         ArgumentNullException.ThrowIfNull(options.CustomizedKeys);
         options.CustomizedKeys.Validate();
+        ArgumentNullException.ThrowIfNull(options.TitleMedals);
+        options.TitleMedals.Validate();
         Options = new()
         {
             DatabasePath = Path.GetFullPath(options.DatabasePath), MaxDatabaseBytes = options.MaxDatabaseBytes,
@@ -83,6 +86,7 @@ internal sealed class SqliteDatabase : IDisposable
             MaxMovementActors = options.MaxMovementActors, BusyTimeoutMs = options.BusyTimeoutMs,
             MaxPurchaseHistoryPerPlayer = options.MaxPurchaseHistoryPerPlayer,
             CustomizedKeys = options.CustomizedKeys,
+            TitleMedals = options.TitleMedals,
             MaxLoadoutsPerPlayer = options.MaxLoadoutsPerPlayer,
             MaxBattleModesPerPlayer = options.MaxBattleModesPerPlayer,
         };
@@ -105,7 +109,7 @@ internal sealed class SqliteDatabase : IDisposable
             var version = Convert.ToInt32(RawScalar("PRAGMA user_version"), CultureInfo.InvariantCulture);
             var application = Convert.ToInt32(RawScalar("PRAGMA application_id"), CultureInfo.InvariantCulture);
             var tables = UserTableCount();
-            if (version != SchemaVersion && version is not (1 or 2 or 3 or 4 or 5 or 6 or 7 or 8) && !(version == 0 && application == 0 && tables == 0))
+            if (version != SchemaVersion && version is not (1 or 2 or 3 or 4 or 5 or 6 or 7 or 8 or 9 or 10 or 11 or 12) && !(version == 0 && application == 0 && tables == 0))
                 throw new InvalidDataException($"Unsupported SQLite save schema {version}.");
             if (version != 0 && application != ApplicationId)
                 throw new InvalidDataException("SQLite save belongs to another application.");
@@ -249,6 +253,54 @@ internal sealed class SqliteDatabase : IDisposable
                 // Version 9 adds optional battle aggregates; absent history remains unknown.
                 using var transaction = _connection.BeginTransaction();
                 RawExecute("PRAGMA user_version=9", transaction);
+                transaction.Commit();
+                version = 9;
+            }
+            if (version == 9)
+            {
+                using var transaction = _connection.BeginTransaction();
+                RawExecute("""
+                    CREATE TABLE IF NOT EXISTS tutorial_practice_clears(profile TEXT NOT NULL, user_num INTEGER NOT NULL CHECK(user_num > 0),
+                        map_key TEXT NOT NULL, PRIMARY KEY(profile,user_num,map_key));
+                    """, transaction);
+                RawExecute("PRAGMA user_version=10", transaction);
+                transaction.Commit();
+                version = 10;
+            }
+            if (version == 10)
+            {
+                // Version 11 adds pet metadata and a database-wide allocator; unsigned counters remain exact text.
+                using var transaction = _connection.BeginTransaction();
+                RawExecute("""
+                    CREATE TABLE pet_identity_allocator(singleton INTEGER PRIMARY KEY CHECK(singleton=1),
+                        entitlement_id TEXT NOT NULL, article_key TEXT NOT NULL);
+                    INSERT INTO pet_identity_allocator(singleton,entitlement_id,article_key) VALUES(1,'0','99999999');
+                    """, transaction);
+                RawExecute("PRAGMA user_version=11", transaction);
+                transaction.Commit();
+                version = 11;
+            }
+            if (version == 11)
+            {
+                // Version 12 preserves ordinary Article identities and enhancement revisions in the player snapshot.
+                // The existing allocator is shared so a new equipment key cannot collide with a retained pet key.
+                using var transaction = _connection.BeginTransaction();
+                RawExecute("PRAGMA user_version=12", transaction);
+                transaction.Commit();
+                version = 12;
+            }
+            if (version == 12)
+            {
+                // Version 13 retains scoped medal balances in the player snapshot and applied medal events as keyed rows,
+                // so deduplication is a primary-key lookup that never grows the snapshot.
+                using var transaction = _connection.BeginTransaction();
+                RawExecute("""
+                    CREATE TABLE IF NOT EXISTS title_medal_receipts(user_num INTEGER NOT NULL REFERENCES players(user_num) ON DELETE CASCADE,
+                        catalog_scope TEXT NOT NULL COLLATE BINARY, grant_key TEXT NOT NULL COLLATE BINARY,
+                        source TEXT NOT NULL COLLATE BINARY, fingerprint TEXT NOT NULL COLLATE BINARY,
+                        PRIMARY KEY(user_num, catalog_scope, grant_key)) WITHOUT ROWID;
+                    """, transaction);
+                RawExecute("PRAGMA user_version=13", transaction);
                 transaction.Commit();
             }
             ValidateExistingState();
@@ -466,6 +518,14 @@ internal sealed class SqliteDatabase : IDisposable
 
     private void ValidateState(long user, SaveState state)
     {
+        if (state.TitleMedals is null || state.TitleMedals.Count > Options.TitleMedals.MaxScopes)
+            throw new InvalidDataException("Title medal catalogue scopes exceed their configured capacity.");
+        foreach (var (scope, ledger) in state.TitleMedals)
+        {
+            InventoryLoadoutScope.ValidateKey(scope);
+            if (ledger is null) throw new InvalidDataException("Stored title medal ledger is null.");
+            ledger.Validate(Options.TitleMedals);
+        }
         if (state.BattleRecords is null || state.BattleRecords.Count > Options.MaxBattleModesPerPlayer
             || state.BattleRecords.Any(record => record is null || record.ModeId <= 0
                 || record.Wins < 0 || record.Draws < 0 || record.Losses < 0 || record.Escapes < 0
@@ -517,6 +577,14 @@ internal sealed class SqliteDatabase : IDisposable
                 || row.EquippedItemId != 0 && row.EquippedItemId - 300000 is not (>= 1 and <= 31))
             || state.Purchases.Any(row => row.UserNum != user || row.Price < 0 || row.MoneyType is not ("cash" or "lucci")))
             throw new InvalidDataException("SQLite player snapshot contains invalid domain rows.");
+        foreach (var slot in state.Slots)
+        {
+            slot.Pet?.Validate(Options.MaxLoadoutsPerPlayer);
+            slot.Enhancements?.Validate(Options.MaxLoadoutsPerPlayer);
+            slot.Modifications?.Validate(Options.MaxLoadoutsPerPlayer);
+            slot.Favorites?.Validate(Options.MaxLoadoutsPerPlayer);
+        }
+        PetEntitlementInventory.ValidateRows(user, state.Slots);
         // Pages are positional: anything but a full table would shift later pages onto the wrong hotkey.
         if (state.WeaponPresetPages is { } pages
             && (pages.Length != InventoryLimits.MaxWeaponPresetSlot + 1 || pages.Any(page => page is null)))
@@ -539,6 +607,9 @@ internal sealed class SqliteDatabase : IDisposable
 // Schema-versioned domain snapshots keep all of a player's coupled state in one atomic row.
 internal sealed class SaveState
 {
+    // Older snapshots have no medal balances; title ownership remains in Slots.
+    public Dictionary<string, TitleMedalLedger> TitleMedals { get; set; } = new(StringComparer.Ordinal);
+
     // Older snapshots have no recorded history; it must not be reconstructed from level or experience.
     public List<PlayerBattleRecord> BattleRecords { get; set; } = [];
 

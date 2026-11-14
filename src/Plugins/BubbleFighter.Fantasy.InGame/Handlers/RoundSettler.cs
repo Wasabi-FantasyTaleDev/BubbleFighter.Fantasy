@@ -1,4 +1,5 @@
 using BubbleFighter.Fantasy.Contracts.Progress;
+using BubbleFighter.Fantasy.Contracts.Titles;
 using BubbleFighter.Fantasy.InGame.Data;
 using Microsoft.Extensions.Logging;
 
@@ -22,20 +23,23 @@ internal static class RoundSettler
     /// <param name="logger">Logs a failed attempt before the next one.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <param name="battleRecord">Accepted match counters, or null when recording is disabled.</param>
+    /// <param name="titleMedals">Frozen medal credits to commit with this round, or null when none were prepared.</param>
     /// <returns>The stored settlement; the last failure is thrown when every attempt failed.</returns>
     internal static async ValueTask<RoundSettlementResult> SettleAsync(IPlayerProgressRepository progress, LevelTable levels,
         string matchId, long userNum, int expEarned, int lucciEarned, int attempts, ILogger logger, CancellationToken ct,
-        RoundBattleRecord? battleRecord = null)
+        RoundBattleRecord? battleRecord = null, TitleMedalGrantCommand? titleMedals = null)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(expEarned);
         ArgumentOutOfRangeException.ThrowIfLessThan(attempts, 1);
+        if (titleMedals is not null && progress is not IRoundTitleMedalSettlementRepository)
+            throw new InvalidOperationException("The progress store cannot commit round medals atomically.");
         var command = new RoundSettlementCommand(matchId, userNum, lucciEarned, stored =>
         {
             // A stored experience below its level's start (an older save) counts from that start.
             var before = Math.Max(stored.Exp, levels.Start(Math.Max(1, stored.Level)));
             var total = checked(before + expEarned);
             return new PlayerProgress(userNum, levels.LevelFor(total), total);
-        }) { BattleRecord = battleRecord };
+        }) { BattleRecord = battleRecord, TitleMedals = titleMedals };
         for (var attempt = 1; ; attempt++)
         {
             try

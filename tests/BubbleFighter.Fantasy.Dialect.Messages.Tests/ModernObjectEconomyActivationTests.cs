@@ -24,6 +24,7 @@ public sealed class ModernObjectEconomyActivationTests
         var context = fixture.Context(build, build + "/game", "dialect.rooms", extra: new()
         {
             ["modern_rooms"] = true, ["relay_protocol"] = build + "/relay", [option] = true,
+            ["result_scoreboard_modes"] = new[] { 1, 5, 6 },
         });
         context.BindServices(typeof(RoomsPlugin).GetCustomAttribute<PluginAttribute>()!);
         try
@@ -33,12 +34,39 @@ public sealed class ModernObjectEconomyActivationTests
             if (option == "lucci_drops")
                 Assert.Single(fixture.Services.GetAll<IMessageSender<RoundLucciCreated>>());
             else
+            {
                 Assert.Single(fixture.Services.GetAll<IMessageSender<RoundStarCreated>>());
+                Assert.Single(fixture.Services.GetAll<IMessageSender<RoundStarFeverStarted>>());
+                Assert.Single(fixture.Services.GetAll<IInboundMessageBinding<RoundStarReported>>());
+                Assert.Contains((build + "/game", table.ForConnection(OpcodeConnection.Game).C2S("gcpGameUpdateScoreOptimze")),
+                    fixture.Packets.Handlers.Keys);
+            }
         }
         finally { await context.UnwindAsync(); }
         Assert.Empty(fixture.Packets.Handlers);
         Assert.Empty(fixture.Services.GetAll<IMessageSender<RoundLucciCreated>>());
         Assert.Empty(fixture.Services.GetAll<IMessageSender<RoundStarCreated>>());
+        Assert.Empty(fixture.Services.GetAll<IMessageSender<RoundStarFeverStarted>>());
+    }
+
+    /// <summary>Star items refuse a modern result configuration that would end star rounds without a table.</summary>
+    [Fact]
+    public async Task StarItemsRequireTheStarScoreboardModes()
+    {
+        using var fixture = new MatchMessagesMountTests.Fixture(TestBuilds.Opcodes("kr-1256"));
+        var context = fixture.Context("kr-1256", "kr-1256/game", "dialect.rooms", extra: new()
+        {
+            ["modern_rooms"] = true, ["relay_protocol"] = "kr-1256/relay", ["star_items"] = true,
+            ["result_scoreboard_modes"] = new[] { 1, 5 },
+        });
+        context.BindServices(typeof(RoomsPlugin).GetCustomAttribute<PluginAttribute>()!);
+        try
+        {
+            var failure = await Assert.ThrowsAsync<ConfigException>(async () => await new RoomsPlugin().ActivateAsync(context, default));
+            Assert.Contains("result_scoreboard_modes", failure.Message);
+            Assert.Empty(fixture.Services.GetAll<IMessageSender<RoundStarCreated>>());
+        }
+        finally { await context.UnwindAsync(); }
     }
 
     /// <summary>Default modern profiles do not publish optional object creation senders.</summary>

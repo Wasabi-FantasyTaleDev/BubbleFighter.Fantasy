@@ -21,12 +21,12 @@ from . import __version__
 from .archives.index import ResourceIndex
 from .catalog.builder import CatalogBuilder
 from .catalog.model import Catalog, CatalogItem, Kind
-from .catalog.spreadsheet import read_sheets
-from .rendering.attach import SlotTable
-from .rendering.camera import (CameraRecord, PreviewProfile, ViewSettings, available_profiles, build_camera,
+from .rendering.attach import SLOT_ITEM_LOCATION, SLOT_LOCATION, SlotTable, accessory_screen_points
+from .rendering.camera import (CameraRecord, PreviewProfile, ViewSettings, available_profiles, build_camera, fit_accessory_in_view,
                                parse_camera_table)
-from .rendering.compose import Composer
-from .rendering.scene import render
+from .rendering.compose import Composer, Composition
+from .rendering.pose import evaluate, yaw_pitch_roll
+from .rendering.scene import Scene, load_motion, load_part, render
 from .resources.textures import TextureResolver
 
 CATALOG_CACHE_VERSION = 4
@@ -113,7 +113,7 @@ class ClientSession:
             self.camera_problems = [f"{table} is missing; every item uses the default camera record"]
         self.catalog = self._load_catalog(report, cancel)
         self._resolver = TextureResolver(self.index, self.profile.raw.get("texture_pools", ["Models/Characters/Texture"]))
-        self._composer = Composer(self.index)
+        self._composer = Composer(self.index, preview_motion=self.profile.preview.get("character_motion"))
         from .rendering.shading import load_shading
         self.shading = load_shading(self.index, self.profile)
         report("ready", 1, 1)
@@ -202,18 +202,13 @@ class ClientSession:
 
     def slot_table(self) -> SlotTable:
         if self._slot_table is None:
-            sockets = {}
-            wb = self.profile.raw["catalog"]["shop_workbook"]
-            for row in read_sheets(self.index.read(wb), {"Socket"}).get("Socket", []):
-                values = list(row.values())
-                if len(values) >= 3 and values[0]:
-                    sockets[values[0]] = values[2]
-            path = "Models/SlotItem/SlotLocation.csv"
-            self._slot_table = SlotTable(self.index.read(path) if self.index.exists(path) else None, sockets)
+            locations = [self.index.read(path) if self.index.exists(path) else None
+                         for path in (SLOT_LOCATION, SLOT_ITEM_LOCATION)]
+            self._slot_table = SlotTable(*locations)
         return self._slot_table
 
-    def render_preview(self, request: PreviewRequest) -> PreviewResult:
-        """Render one item exactly as the build's preview control composes it."""
+    def _prepare(self, request: PreviewRequest):
+        """Everything a render needs before rasterizing: item, framing, composed scene and tint."""
         item = self.item(request.item_id)
         record = self.camera_record(item.item_id)
         limit = self.profile.preview.get("weapon_zoom_limit")
@@ -222,16 +217,53 @@ class ClientSession:
             zoom_note = f"zoom {record.zoom:g} limited to {float(limit['zoom']):g} ({limit['status']})"
             record = replace(record, zoom=float(limit["zoom"]))
         view = ViewSettings(tuple(request.user_quaternion))
-        camera = build_camera(self.profile, record, request.width, request.height, view, request.canvas_scale)
+        camera = build_camera(self.profile, record, request.width, request.height, view, request.canvas_scale,
+                              character=item.kind in (Kind.CHARACTER, Kind.COSTUME_PART))
         tint, tint_note = self.spray_tint(request.spray_index)
         dyed = {n.lower() for n in self.profile.raw.get("paint", {}).get("dyed_parts", {}).get("names", [])}
         with self._lock:
             scene, composition = self._composer.compose(item, request.wearer, tint)
             if item.kind == Kind.SLOT_ITEM:
-                self._wear_slot_item(item, scene, composition)
+                self._wear_slot_item(item, scene, composition, request.wearer)
             for part in scene.parts:
                 if part.origin in ("default", "item") and item.kind in (Kind.COSTUME_PART, Kind.CHARACTER, Kind.SLOT_ITEM):
                     part.tint = tint if (not dyed or part.slot.lower() in dyed) else (1.0, 1.0, 1.0)
+        return item, record, view, camera, tint, tint_note, zoom_note, scene, composition
+
+    def input_files(self, request: PreviewRequest) -> list[str]:
+        """Scene resources in render order, followed by attachment and character animation tables.
+
+        Two previews whose request, camera row and file contents agree are the same picture, so the
+        pack builder hashes exactly these files to skip a render it has already done."""
+        item, record, view, camera, tint, tint_note, zoom_note, scene, composition = self._prepare(request)
+        files = list(scene.sources)
+        for part in scene.parts:
+            if part.motion is not None:
+                files.append(part.mesh_path[:-4] + ".mtn")
+            for material in part.mesh.materials:
+                if material.texture:
+                    for candidate in self._resolver.candidates(part.mesh_path, material.texture):
+                        if self.index.exists(candidate):
+                            files.append(candidate)
+                            break
+        if item.kind == Kind.SLOT_ITEM:
+            files.extend(path for path in (SLOT_LOCATION, SLOT_ITEM_LOCATION, "Config/FighterConfig.xml",
+                                          self.profile.raw["catalog"]["shop_workbook"])
+                         if self.index.exists(path))
+        if item.kind in (Kind.CHARACTER, Kind.COSTUME_PART):
+            animation_table = self.profile.preview.get("character_motion", {}).get("workbook")
+            if animation_table and self.index.exists(animation_table):
+                files.append(animation_table)
+        return files
+
+    def render_preview(self, request: PreviewRequest) -> PreviewResult:
+        """Render one item with the build's preview settings."""
+        item, record, view, camera, tint, tint_note, zoom_note, scene, composition = self._prepare(request)
+        with self._lock:
+            if item.kind == Kind.SLOT_ITEM and not composition.default_parts and view.official:
+                points = accessory_screen_points(scene, camera)
+                if len(points):
+                    fit_accessory_in_view(camera, points)
             result = render(scene, camera, self._resolver, request.supersample,
                             self.shading if request.shading else None)
         composition.tint = tint
@@ -264,38 +296,70 @@ class ClientSession:
         }
         return PreviewResult(result.rgba, metadata)
 
-    def _wear_slot_item(self, item: CatalogItem, scene, composition) -> None:
-        """Slot items are shown worn (measured: their camera records frame the wearer's body)."""
-        from .rendering.scene import load_motion, load_part
-        wearer = composition.wearer
-        fighters = {f.model.lower(): f for f in (self.catalog.fighters if self.catalog else [])}
-        if wearer is None:
-            wearer = next((f.model for f in sorted(self.catalog.fighters, key=lambda f: f.field_id)
-                           if f.selectable and self.index.list_prefix(f"Models/Characters/{f.model}/Default", ".msh")),
-                          None)
-        if wearer is None:
-            composition.notes.append("no wearer available; slot item drawn alone")
-            return
-        body = self._composer._default_parts(wearer)
-        motion, rule = self._composer._stand_motion(wearer)
-        chr_type = fighters.get(wearer.lower()).chr_type if wearer.lower() in fighters else 0
-        table = self.slot_table()
+    def _wear_slot_item(self, item: CatalogItem, scene: Scene, composition: Composition,
+                        requested_wearer: str | None) -> None:
+        """Pose an accessory using the inventory preview's empty equipment slots."""
+        # kr-812 sub_9800A0 uses kr-812 sub_9B1630, which hides empty body slots unless a display flag asks for them.
+        tags = set(item.raw.get("displayOption", "").split())
+        draws_character = bool(tags & {"DrawCharacter", "CharacterOnly"})
+        fighters = sorted((fighter for fighter in self.catalog.fighters if fighter.selectable),
+                          key=lambda fighter: fighter.field_id)
+        if requested_wearer:
+            fighters.sort(key=lambda fighter: fighter.model.casefold() != requested_wearer.casefold())
+        fighter = next((fighter for fighter in fighters if self._composer._default_parts(fighter.model)), None)
         for part in scene.parts:
-            placement = table.placement(chr_type, part.slot, item.item_id)
-            if placement:
-                part.attach_bone = placement.bone
-                part.attach_matrix = placement.matrix()
-                composition.notes.append(f"{part.slot} -> {placement.bone} ({placement.source}, item row "
-                                         f"{placement.item_id})")
+            own_motion = part.mesh_path[:-4] + ".mtn"
+            if self.index.exists(own_motion):
+                part.motion = load_motion(self.index, own_motion)
             else:
-                composition.notes.append(f"{part.slot}: no socket or SlotLocation row; drawn unattached")
-        scene.parts[:0] = [load_part(self.index, p, "default") for p in body]
-        scene.motion_path = motion
-        scene.motion = load_motion(self.index, motion) if motion else None
-        composition.wearer = wearer
-        composition.default_parts = body
-        composition.motion, composition.motion_rule = motion, rule
-        composition.notes.append("slot item attachment rule is under investigation (graded inferred)")
+                part.rigid = True
+        if fighter is None:
+            composition.notes.append("no preview skeleton available; accessory kept in mesh space")
+            return
+
+        wearer = fighter.model
+        policy = self.profile.preview.get("accessories", {})
+        chr_type = fighter.chr_type
+        if not chr_type and policy.get("fighter_field_fallback", False):
+            chr_type = fighter.field_id
+        stop = f"Models/Characters/{wearer}/common/pis-basic-stop.mtn"
+        # kr-812 sub_9B1630 -> kr-812 sub_9B13A0 selects the AniList basic/stop pose.
+        if self.index.exists(stop):
+            scene.motion_path = stop
+            scene.motion = load_motion(self.index, stop)
+            composition.motion, composition.motion_rule = stop, "AniList basic/stop"
+        else:
+            composition.notes.append(f"missing basic/stop for {wearer}; accessory kept in mesh space")
+
+        if scene.motion:
+            table = self.slot_table()
+            model_item_id = item.model.borrowed_from or item.item_id
+            roll = float(policy.get("mounted_mesh_roll_degrees", 0.0))
+            for part in scene.parts:
+                mount = table.preview_mount(chr_type, part.slot, model_item_id)
+                if mount is None:
+                    composition.notes.append(f"{part.slot}: no default socket for character type {chr_type}; mesh space")
+                else:
+                    part.attach_bone, part.attach_matrix = mount
+                    if part.motion is not None:
+                        root = evaluate(part.motion, 0).worlds.get("slot_root")
+                        if root is None:
+                            raise ValueError(f"{part.mesh_path}: item motion has no Slot_Root attachment node")
+                        # kr-812 sub_AECA30 replaces the attached model's root with item*socket*bone.
+                        # Remove that root from its already skinned geometry; retain child articulation.
+                        part.attach_matrix = np.linalg.inv(root) @ part.attach_matrix
+                        composition.notes.append(f"{part.slot}: motion root replaced by socket attachment")
+                    else:
+                        basis = yaw_pitch_roll(0.0, 0.0, np.deg2rad(roll))
+                        part.attach_matrix = basis @ part.attach_matrix
+                        composition.notes.append(f"{part.slot}: no item motion; measured mount basis fallback")
+                    composition.notes.append(f"{part.slot} -> {part.attach_bone} (socket and item transforms)")
+
+        if draws_character:
+            body = self._composer._default_parts(wearer)
+            scene.parts[:0] = [load_part(self.index, path, "default") for path in body]
+            composition.default_parts = body
+            composition.wearer = wearer
 
     def _prov(self, path: str) -> dict:
         p = self.index.provenance(path)

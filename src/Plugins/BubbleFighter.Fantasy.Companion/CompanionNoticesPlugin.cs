@@ -14,7 +14,7 @@ namespace BubbleFighter.Fantasy.Companion;
 /// message box above the game, takes the launcher's <c>ui.notification.result</c> back, and adds the <c>popup</c>
 /// command that shows a message to every online player whose launcher negotiated it.
 /// </summary>
-[Plugin("companion.notices", Description = "Launcher popups over Nirinsou Link and the popup management command.",
+[Plugin("companion.notices", Category = "launcher", Names = ["en=Nirinsou Link notices", "zh-Hans=Nirinsou Link 通知", "zh-Hant=Nirinsou Link 通知", "ko=Nirinsou Link 알림"], Description = "Launcher popups over Nirinsou Link and the popup management command.",
     Requires = [typeof(ICompanionHub), typeof(ICommandRegistry), typeof(IPermissionRegistry), typeof(IGameText)])]
 public sealed class CompanionNoticesPlugin : IPlugin
 {

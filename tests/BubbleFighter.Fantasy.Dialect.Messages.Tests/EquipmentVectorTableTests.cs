@@ -86,7 +86,8 @@ public sealed class EquipmentVectorTableTests
         var slot = new RoomSlotValues(true, false, 7, "test", 300001, [0x11223344, 0x55667788], false);
         var values = RoomCodec.PlaySeatValues(schema, slot, equipment: true);
         Assert.Equal(bytes, PacketCodec.Write(TestBuilds.Packets, build, "EquippedItemList", values));
+        var decoded = PacketCodec.Read(TestBuilds.Packets, build, "EquippedItemList", bytes);
         Assert.All(schema.EquippedItemList.Where(field => field.Type == RoomFieldType.EmptyVector),
-            field => Assert.Null(values[field.Name]));
+            field => Assert.Empty(Assert.IsType<object?[]>(decoded[field.Name])));
     }
 }

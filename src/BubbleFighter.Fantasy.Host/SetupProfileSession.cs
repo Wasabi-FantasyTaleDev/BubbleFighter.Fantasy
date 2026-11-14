@@ -16,7 +16,10 @@ internal sealed class SetupProfileSession : IInstallationRuntime, IPluginExecuti
     private IPluginHost? _host;
     private Dispatcher? _dispatcher;
     private readonly PluginAttribute _declaration = new("host.profiles")
-    { Requires = [typeof(IPluginHost)], Provides = [typeof(IInstallationRuntime)] };
+    {
+        Category = "core", Names = ["en=Profile composer", "zh-Hans=配置组合器", "zh-Hant=設定檔組合器", "ko=프로필 구성기"],
+        Requires = [typeof(IPluginHost)], Provides = [typeof(IInstallationRuntime)],
+    };
 
     public SetupProfileSession(string profilesDirectory, string stateDirectory, IReadOnlyList<string> patches)
     {
@@ -116,14 +119,39 @@ internal sealed class SetupProfileSession : IInstallationRuntime, IPluginExecuti
                 File.Move(temporary, overlay, true);
             }
             finally { if (File.Exists(temporary)) File.Delete(temporary); }
-            // Retain the chosen build in durable settings while deliberately withholding game listeners until import.
+            // A build whose import was skipped keeps its game listeners withheld until import, unless its client data is
+            // already installed on this server under the shared client-data directory: then it starts from there.
+            var installed = InstalledClientDataRoot();
+            bool Usable(InstallationClient client) => !client.DeferClientDataImport
+                || installed is not null && Directory.Exists(Path.Combine(installed, client.Profile, "data"));
+            string ClientData(InstallationClient client) => client.DeferClientDataImport ? installed! : ClientDataRoot(client);
             return settings.Clients is { } clients
-                ? composer.ComposeBuilds("management", clients.Where(c => !c.DeferClientDataImport).Select(c => c.Profile).ToArray(),
+                ? composer.ComposeBuilds("management", clients.Where(Usable).Select(c => c.Profile).ToArray(),
                     [overlay, .. _patches], (profile, key) => key == "BFF_CLIENT_DATA"
-                        ? clients.Single(c => c.Profile == profile).ClientDataPath
+                        ? ClientData(clients.Single(c => c.Profile == profile))
                         : environment.TryGetValue(key, out var value) ? value : Environment.GetEnvironmentVariable(key))
                 : composer.Compose(settings.DeferClientDataImport ? "management" : settings.Profile, [overlay, .. _patches]);
         }
+    }
+
+    // BFF_CLIENT_DATA names the directory holding one folder per build. A server folder chosen in setup may be that
+    // directory or the build's own folder (which holds data/); the latter resolves to its parent.
+    private static string ClientDataRoot(InstallationClient client)
+    {
+        var path = client.ClientDataPath;
+        var own = Path.GetFileName(Path.TrimEndingDirectorySeparator(path));
+        return string.Equals(own, client.Profile, StringComparison.OrdinalIgnoreCase) && Directory.Exists(Path.Combine(path, "data"))
+            && Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(path)) is { } parent ? parent : path;
+    }
+
+    // The shared client-data directory a server already holds: BFF_CLIENT_DATA when set, else client-data beside the
+    // executable, the same default the profiles use. Null when neither exists.
+    private static string? InstalledClientDataRoot()
+    {
+        var configured = Environment.GetEnvironmentVariable("BFF_CLIENT_DATA");
+        var root = Path.GetFullPath(string.IsNullOrWhiteSpace(configured)
+            ? Path.Combine(AppContext.BaseDirectory, "client-data") : configured);
+        return Directory.Exists(root) ? root : null;
     }
 
     /// <summary>

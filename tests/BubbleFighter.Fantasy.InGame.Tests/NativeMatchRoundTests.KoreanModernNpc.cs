@@ -104,6 +104,8 @@ public sealed partial class NativeMatchRoundTests
                 ("gppDummyUnitMotion", [.. Words(actor, 1), 65, 0, .. Words(1)]),
                 ("gppUseItemDirect", Words(actor, 1)),
                 ("gppDeleteObject", Words(actor)),
+                ("gppKillObject", Words(actor, 1)),
+                ("gppChangeTurretState", Words(actor, 3)),
             };
             var input = relayInput ? hostRelay : rig.Host;
             var inputOnRelay = relayInput;

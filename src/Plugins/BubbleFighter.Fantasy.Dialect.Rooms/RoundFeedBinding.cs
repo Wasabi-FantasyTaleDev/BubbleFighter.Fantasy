@@ -41,6 +41,9 @@ internal sealed partial class RoundFeedBinding(string protocol, string relayProt
     /// <summary>Gets whether a client's direct item effect (gppUseItemDirect) also returns to its sender.</summary>
     internal bool EchoDirectItemEffects { get; init; }
 
+    /// <summary>Gets whether the audited racing cannon shot route is claimed; it stays unclaimed unless a deployment opts in.</summary>
+    internal bool ExtremeRacingCannon { get; init; }
+
     /// <summary>Gets whether a seat's peer frames may arrive on its match relay connection.</summary>
     internal bool AcceptRelayFrames { get; init; }
 
@@ -57,7 +60,7 @@ internal sealed partial class RoundFeedBinding(string protocol, string relayProt
     internal void Mount(IPluginContext context)
     {
         var passthrough = packets.ValuesOf(build).GetValueOrDefault("round_feed_passthrough") is "true";
-        var routes = RoundFeedRoute.Load(packets, build, game, relay);
+        var routes = RoundFeedRoute.Load(packets, build, game, relay, ExtremeRacingCannon);
         if (routes.Length == 0 && !passthrough)
             throw new ConfigException($"{build} states neither round_feed routes nor round_feed_passthrough.");
         // Each typed route validates its own reporting identities; legacy death reports have no reset confirmation.

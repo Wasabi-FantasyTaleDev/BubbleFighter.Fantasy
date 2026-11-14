@@ -1,0 +1,139 @@
+# KR1256: ShopItem2 ItemAttr 98/99 and RandomTable 87/88 are presence effects.
+# Other builds require their own inventory, configuration and result-consumer audit before including this patch.
+- insert:
+    - id: item-enhancement.articles
+      plugin: item-enhancement.articles
+      parent_id: pets.entitlements
+      isolated_services:
+        - BubbleFighter.Fantasy.Contracts.Enhancement.IEquipmentArticleResolver
+      config:
+        # Persisted identities and earned modifiers remain usable after the economy is disabled.
+        enabled: true
+        initialize_articles: ${BFF_ITEM_ENHANCEMENT_ENABLED:-true}
+        protocol: "${BFF_PROFILE_ID}/game"
+        build_key: "${BFF_PROFILE_ID}"
+        weapon_attribute_id: 98
+        weapon_buff_id: 87
+        clothing_attribute_id: 99
+        clothing_buff_id: 88
+        # Presents each weapon's Favorite points as the native attribute 164; awards live on the enhancement row.
+        favorite:
+          enabled: ${BFF_FAVORITE_WEAPON_ENABLED:-true}
+    - id: item-enhancement
+      plugin: item-enhancement
+      parent_id: ingame
+      config:
+        enabled: ${BFF_ITEM_ENHANCEMENT_ENABLED:-true}
+        protocol: "${BFF_PROFILE_ID}/game"
+        build_key: "${BFF_PROFILE_ID}"
+        weapon_attribute_id: 98
+        weapon_buff_id: 87
+        clothing_attribute_id: 99
+        clothing_buff_id: 88
+        # kr-1256 sub_DD5E70 sends the selected Article and additive flag; the config reply names these materials.
+        card_item_id: 190111
+        kit_item_ids: [190106, 190107, 190108, 190109]
+        additive_item_id: 101745
+        # The client states no success chance or debit; these defaults are server policy and each has its own variable.
+        success_basis_points: ${BFF_ENHANCEMENT_SUCCESS_BASIS_POINTS:-5000}
+        additive_success_basis_points: ${BFF_ENHANCEMENT_ADDITIVE_SUCCESS_BASIS_POINTS:-10000}
+        card_quantity: ${BFF_ENHANCEMENT_CARD_QUANTITY:-1}
+        kit_quantity: ${BFF_ENHANCEMENT_KIT_QUANTITY:-2}
+        additive_quantity: ${BFF_ENHANCEMENT_ADDITIVE_QUANTITY:-1}
+        # Successful weapon enhancement adds the workbook's IncreasePointEnchant points to the weapon; needs enabled enhancement.
+        favorite:
+          enabled: ${BFF_FAVORITE_WEAPON_ENABLED:-true}
+        modification:
+          enabled: ${BFF_ITEM_MODIFICATION_ENABLED:-true}
+          # The parts, their seven selectors and signed values, and both weight tables are the native laboratory
+          # configuration (S2C 162 ModificationConfig and ModificationRandomTable, kr-1256 sub_114BF10, sub_114B040).
+          # The client states no debit or price, so these four are server policy; override them in a local patch.
+          part_quantity: 1
+          apply_lucci_cost: 0
+          delete_lucci_cost: 0
+          parts:
+            - { item_id: 102461, numeric_tag: 0, effect_category: 1, attribute_ids: [101, 102, 103, 104, 105, 106, 107], value0: 160,
+                negative_values: [{ attribute_id: 101, value: -40 }, { attribute_id: 102, value: -360 }, { attribute_id: 103, value: -160 }, { attribute_id: 104, value: -160 }, { attribute_id: 105, value: -50 }, { attribute_id: 106, value: -240 }, { attribute_id: 107, value: -60 }] }
+            - { item_id: 102462, numeric_tag: 0, effect_category: 2, attribute_ids: [108, 109, 110, 111, 112, 113, 114], value0: 120,
+                negative_values: [{ attribute_id: 108, value: -50 }, { attribute_id: 109, value: -360 }, { attribute_id: 110, value: -160 }, { attribute_id: 111, value: -160 }, { attribute_id: 112, value: -50 }, { attribute_id: 113, value: -240 }, { attribute_id: 114, value: -60 }] }
+            - { item_id: 102463, numeric_tag: 0, effect_category: 3, attribute_ids: [115, 116, 117, 118, 119, 120, 121], value0: 1200,
+                negative_values: [{ attribute_id: 115, value: -50 }, { attribute_id: 116, value: -40 }, { attribute_id: 117, value: -160 }, { attribute_id: 118, value: -160 }, { attribute_id: 119, value: -50 }, { attribute_id: 120, value: -240 }, { attribute_id: 121, value: -60 }] }
+            - { item_id: 102464, numeric_tag: 0, effect_category: 4, attribute_ids: [122, 123, 124, 125, 126, 127, 128], value0: 560,
+                negative_values: [{ attribute_id: 122, value: -50 }, { attribute_id: 123, value: -40 }, { attribute_id: 124, value: -360 }, { attribute_id: 125, value: -160 }, { attribute_id: 126, value: -50 }, { attribute_id: 127, value: -240 }, { attribute_id: 128, value: -60 }] }
+            - { item_id: 102465, numeric_tag: 0, effect_category: 5, attribute_ids: [129, 130, 131, 132, 133, 134, 135], value0: 560,
+                negative_values: [{ attribute_id: 129, value: -50 }, { attribute_id: 130, value: -40 }, { attribute_id: 131, value: -360 }, { attribute_id: 132, value: -160 }, { attribute_id: 133, value: -50 }, { attribute_id: 134, value: -240 }, { attribute_id: 135, value: -60 }] }
+            - { item_id: 102466, numeric_tag: 0, effect_category: 6, attribute_ids: [136, 137, 138, 139, 140, 141, 142], value0: 160,
+                negative_values: [{ attribute_id: 136, value: -50 }, { attribute_id: 137, value: -40 }, { attribute_id: 138, value: -360 }, { attribute_id: 139, value: -160 }, { attribute_id: 140, value: -160 }, { attribute_id: 141, value: -240 }, { attribute_id: 142, value: -60 }] }
+            - { item_id: 102467, numeric_tag: 0, effect_category: 7, attribute_ids: [143, 144, 145, 146, 147, 148, 149], value0: 800,
+                negative_values: [{ attribute_id: 143, value: -50 }, { attribute_id: 144, value: -40 }, { attribute_id: 145, value: -360 }, { attribute_id: 146, value: -160 }, { attribute_id: 147, value: -160 }, { attribute_id: 148, value: -50 }, { attribute_id: 149, value: -60 }] }
+            - { item_id: 102468, numeric_tag: 0, effect_category: 8, attribute_ids: [150, 151, 152, 153, 154, 155, 156], value0: 200,
+                negative_values: [{ attribute_id: 150, value: -50 }, { attribute_id: 151, value: -40 }, { attribute_id: 152, value: -360 }, { attribute_id: 153, value: -160 }, { attribute_id: 154, value: -160 }, { attribute_id: 155, value: -50 }, { attribute_id: 156, value: -240 }] }
+            - { item_id: 102469, numeric_tag: 1, effect_category: 1, attribute_ids: [101, 102, 103, 104, 105, 106, 107], value0: 160,
+                negative_values: [{ attribute_id: 101, value: -50 }, { attribute_id: 102, value: -540 }, { attribute_id: 103, value: -250 }, { attribute_id: 104, value: -250 }, { attribute_id: 105, value: -70 }, { attribute_id: 106, value: -360 }, { attribute_id: 107, value: -90 }] }
+            - { item_id: 102470, numeric_tag: 1, effect_category: 2, attribute_ids: [108, 109, 110, 111, 112, 113, 114], value0: 120,
+                negative_values: [{ attribute_id: 108, value: -70 }, { attribute_id: 109, value: -540 }, { attribute_id: 110, value: -250 }, { attribute_id: 111, value: -250 }, { attribute_id: 112, value: -70 }, { attribute_id: 113, value: -360 }, { attribute_id: 114, value: -90 }] }
+            - { item_id: 102471, numeric_tag: 1, effect_category: 3, attribute_ids: [115, 116, 117, 118, 119, 120, 121], value0: 1200,
+                negative_values: [{ attribute_id: 115, value: -70 }, { attribute_id: 116, value: -50 }, { attribute_id: 117, value: -250 }, { attribute_id: 118, value: -250 }, { attribute_id: 119, value: -70 }, { attribute_id: 120, value: -360 }, { attribute_id: 121, value: -90 }] }
+            - { item_id: 102472, numeric_tag: 1, effect_category: 4, attribute_ids: [122, 123, 124, 125, 126, 127, 128], value0: 560,
+                negative_values: [{ attribute_id: 122, value: -70 }, { attribute_id: 123, value: -50 }, { attribute_id: 124, value: -540 }, { attribute_id: 125, value: -250 }, { attribute_id: 126, value: -70 }, { attribute_id: 127, value: -360 }, { attribute_id: 128, value: -90 }] }
+            - { item_id: 102473, numeric_tag: 1, effect_category: 5, attribute_ids: [129, 130, 131, 132, 133, 134, 135], value0: 560,
+                negative_values: [{ attribute_id: 129, value: -70 }, { attribute_id: 130, value: -50 }, { attribute_id: 131, value: -540 }, { attribute_id: 132, value: -250 }, { attribute_id: 133, value: -70 }, { attribute_id: 134, value: -360 }, { attribute_id: 135, value: -90 }] }
+            - { item_id: 102474, numeric_tag: 1, effect_category: 6, attribute_ids: [136, 137, 138, 139, 140, 141, 142], value0: 160,
+                negative_values: [{ attribute_id: 136, value: -70 }, { attribute_id: 137, value: -50 }, { attribute_id: 138, value: -540 }, { attribute_id: 139, value: -250 }, { attribute_id: 140, value: -250 }, { attribute_id: 141, value: -360 }, { attribute_id: 142, value: -90 }] }
+            - { item_id: 102475, numeric_tag: 1, effect_category: 7, attribute_ids: [143, 144, 145, 146, 147, 148, 149], value0: 800,
+                negative_values: [{ attribute_id: 143, value: -70 }, { attribute_id: 144, value: -50 }, { attribute_id: 145, value: -540 }, { attribute_id: 146, value: -250 }, { attribute_id: 147, value: -250 }, { attribute_id: 148, value: -70 }, { attribute_id: 149, value: -90 }] }
+            - { item_id: 102476, numeric_tag: 1, effect_category: 8, attribute_ids: [150, 151, 152, 153, 154, 155, 156], value0: 200,
+                negative_values: [{ attribute_id: 150, value: -70 }, { attribute_id: 151, value: -50 }, { attribute_id: 152, value: -540 }, { attribute_id: 153, value: -250 }, { attribute_id: 154, value: -250 }, { attribute_id: 155, value: -70 }, { attribute_id: 156, value: -360 }] }
+            - { item_id: 102477, numeric_tag: 2, effect_category: 1, attribute_ids: [101, 102, 103, 104, 105, 106, 107], value0: 160,
+                negative_values: [{ attribute_id: 101, value: -90 }, { attribute_id: 102, value: -960 }, { attribute_id: 103, value: -440 }, { attribute_id: 104, value: -440 }, { attribute_id: 105, value: -120 }, { attribute_id: 106, value: -640 }, { attribute_id: 107, value: -160 }] }
+            - { item_id: 102478, numeric_tag: 2, effect_category: 2, attribute_ids: [108, 109, 110, 111, 112, 113, 114], value0: 120,
+                negative_values: [{ attribute_id: 108, value: -120 }, { attribute_id: 109, value: -960 }, { attribute_id: 110, value: -440 }, { attribute_id: 111, value: -440 }, { attribute_id: 112, value: -120 }, { attribute_id: 113, value: -640 }, { attribute_id: 114, value: -160 }] }
+            - { item_id: 102479, numeric_tag: 2, effect_category: 3, attribute_ids: [115, 116, 117, 118, 119, 120, 121], value0: 1200,
+                negative_values: [{ attribute_id: 115, value: -120 }, { attribute_id: 116, value: -90 }, { attribute_id: 117, value: -440 }, { attribute_id: 118, value: -440 }, { attribute_id: 119, value: -120 }, { attribute_id: 120, value: -640 }, { attribute_id: 121, value: -160 }] }
+            - { item_id: 102480, numeric_tag: 2, effect_category: 4, attribute_ids: [122, 123, 124, 125, 126, 127, 128], value0: 560,
+                negative_values: [{ attribute_id: 122, value: -120 }, { attribute_id: 123, value: -90 }, { attribute_id: 124, value: -960 }, { attribute_id: 125, value: -440 }, { attribute_id: 126, value: -120 }, { attribute_id: 127, value: -640 }, { attribute_id: 128, value: -160 }] }
+            - { item_id: 102481, numeric_tag: 2, effect_category: 5, attribute_ids: [129, 130, 131, 132, 133, 134, 135], value0: 560,
+                negative_values: [{ attribute_id: 129, value: -120 }, { attribute_id: 130, value: -90 }, { attribute_id: 131, value: -960 }, { attribute_id: 132, value: -440 }, { attribute_id: 133, value: -120 }, { attribute_id: 134, value: -640 }, { attribute_id: 135, value: -160 }] }
+            - { item_id: 102482, numeric_tag: 2, effect_category: 6, attribute_ids: [136, 137, 138, 139, 140, 141, 142], value0: 160,
+                negative_values: [{ attribute_id: 136, value: -120 }, { attribute_id: 137, value: -90 }, { attribute_id: 138, value: -960 }, { attribute_id: 139, value: -440 }, { attribute_id: 140, value: -440 }, { attribute_id: 141, value: -640 }, { attribute_id: 142, value: -160 }] }
+            - { item_id: 102483, numeric_tag: 2, effect_category: 7, attribute_ids: [143, 144, 145, 146, 147, 148, 149], value0: 800,
+                negative_values: [{ attribute_id: 143, value: -120 }, { attribute_id: 144, value: -90 }, { attribute_id: 145, value: -960 }, { attribute_id: 146, value: -440 }, { attribute_id: 147, value: -440 }, { attribute_id: 148, value: -120 }, { attribute_id: 149, value: -160 }] }
+            - { item_id: 102484, numeric_tag: 2, effect_category: 8, attribute_ids: [150, 151, 152, 153, 154, 155, 156], value0: 200,
+                negative_values: [{ attribute_id: 150, value: -120 }, { attribute_id: 151, value: -90 }, { attribute_id: 152, value: -960 }, { attribute_id: 153, value: -440 }, { attribute_id: 154, value: -440 }, { attribute_id: 155, value: -120 }, { attribute_id: 156, value: -640 }] }
+          tag_weights:
+            - { key: 0, weights: [10, 10, 10] }
+            - { key: 1, weights: [20, 28, 39] }
+            - { key: 2, weights: [30, 54, 97] }
+          effect_weights:
+            - { key: 1, weights: [10, 10, 10] }
+            - { key: 2, weights: [10, 10, 10] }
+            - { key: 3, weights: [13, 16, 20] }
+            - { key: 4, weights: [13, 16, 20] }
+            - { key: 5, weights: [13, 16, 20] }
+            - { key: 6, weights: [10, 10, 10] }
+            - { key: 7, weights: [13, 16, 20] }
+            - { key: 8, weights: [13, 16, 20] }
+        # Permanent conversion (ChangeUnlimited): card and day threshold as the native configuration names them
+        # (S2C 162 tab-5 card and its scalar threshold, kr-1256 sub_DCB180). Sets need a per-set quantity the client
+        # does not state; one card per set is server policy.
+        conversion:
+          enabled: ${BFF_ITEM_ENHANCEMENT_ENABLED:-true}
+          card_item_id: 190151
+          minimum_days: 30
+          set_card_quantity: 1
+        # Grade-up (MakeItemAdvanced): the catalog has one grade-up card, 190247, which the native configuration names
+        # for the tab. Cards are distinct per rule, so it serves the first grade step; one card per run is server policy.
+        advancement:
+          enabled: ${BFF_ITEM_ENHANCEMENT_ENABLED:-true}
+          tab_card_item_id: 190247
+          rules:
+            - { card_item_id: 190247, source_tier: 3, card_quantity: 1 }
+- replace:
+    id: inventoryview
+    parent_id: item-enhancement.articles
+- set:
+    id: dialect.messages
+    config:
+      science_lab: ${BFF_ITEM_ENHANCEMENT_ENABLED:-true}
+      science_lab_configuration: ${BFF_ITEM_ENHANCEMENT_ENABLED:-true}
+      favorite_weapon_grade_notices: ${BFF_FAVORITE_WEAPON_ENABLED:-true}

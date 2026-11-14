@@ -1,4 +1,5 @@
 using BubbleFighter.Fantasy.Contracts.Inventory;
+using BubbleFighter.Fantasy.Contracts.Pets;
 using BubbleFighter.Fantasy.Contracts.Sessions;
 using BubbleFighter.Fantasy.Contracts.Shop;
 using BubbleFighter.Fantasy.Contracts.Wallet;
@@ -24,6 +25,9 @@ public sealed class ShopPurchaser(
 {
     // A dialect supplies catalog term interpretation; the shared purchase path retains pricing and audit inputs.
     internal ItemPurchasePolicy? ItemPurchasePolicy { get; init; }
+
+    // Pet ownership is published from its durable entitlement, never from a provisional purchase slot key.
+    internal IPetEntitlements? PetEntitlements { get; init; }
 
     // The typed reply paths of the modern family; PurchaseAsync needs both.
     internal IMessageSender<ShopPurchaseReplied>? ReplySender { get; init; }
@@ -161,11 +165,12 @@ public sealed class ShopPurchaser(
         var itemId = card.Stocks[0].ItemId;
         var price = card.Price;
         var currency = NormalizeCurrency(card.MoneyType, key);
+        var holdItem = options.HoldEquipUntilInventoryOpen && PetEntitlements?.IsPetItem(itemId) != true;
         if (price < 0)
             throw new InvalidOperationException($"Purchase {key} has invalid currency or price.");
-        if (options.HoldEquipUntilInventoryOpen && hold is null)
+        if (holdItem && hold is null)
             throw new InvalidOperationException("Equip hold is enabled without a hold store.");
-        if (options.HoldEquipUntilInventoryOpen && !hold!.CanHold(user))
+        if (holdItem && !hold!.CanHold(user))
         {
             logger.LogWarning(
                 "Session {Id} shop buy key={Key} refused before charging: the equip hold queue for player {User} is full.",
@@ -189,7 +194,7 @@ public sealed class ShopPurchaser(
         // frames below are byte-identical to the pre-hold build. With it on the
         // equip record is queued here, right after the grant it belongs to, and
         // travels later on the client's own C2S 803.
-        if (options.HoldEquipUntilInventoryOpen)
+        if (holdItem)
         {
             if (hold is null)
             {

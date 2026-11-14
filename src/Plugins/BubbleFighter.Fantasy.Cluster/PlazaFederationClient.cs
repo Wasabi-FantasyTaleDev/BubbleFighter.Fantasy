@@ -6,6 +6,7 @@ using System.Text.Json;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Contracts.Cluster;
 using BubbleFighter.Fantasy.Contracts.Rooms;
+using BubbleFighter.Fantasy.Contracts.Signals;
 using Microsoft.Extensions.Logging;
 
 namespace BubbleFighter.Fantasy.Cluster;
@@ -14,7 +15,7 @@ namespace BubbleFighter.Fantasy.Cluster;
 /// Shares this node's plaza with the other nodes of its account domain through the directory: local members are
 /// published as they enter, move and leave, and the other nodes' members are shown in each build's plaza here.
 /// </summary>
-[Plugin("cluster.plaza-federation", Description = "Plaza members shared across nodes of one account domain.",
+[Plugin("cluster.plaza-federation", Category = "cluster", Names = ["en=Plaza federation", "zh-Hans=广场联合", "zh-Hant=廣場聯合", "ko=광장 연합"], Description = "Plaza members shared across nodes of one account domain.",
     Requires = [typeof(INodeLeaseSource)], OptionalMany = [typeof(IPlazaFederationEndpoint)])]
 public sealed class PlazaFederationPlugin : IPlugin
 {
@@ -81,6 +82,8 @@ internal sealed class PlazaFederationClient(PlazaFederationOptions options, INod
     // The local members as last published, replayed whenever the directory may have lost them.
     private readonly Dictionary<(string Build, int User), (PlazaWireEvent Entered, PlazaWireEvent? Moved)> _local = [];
     private readonly CancellationTokenSource _stop = new();
+    // Present while the queue holds changes or a resend is due; the send loop sleeps on it.
+    private readonly PresenceSignal _pending = new();
     private string? _sentToken;
     private string _hub = "";
     private long _cursor;
@@ -125,21 +128,51 @@ internal sealed class PlazaFederationClient(PlazaFederationOptions options, INod
                     _republish = true;
                     if (!_queueFullReported) logger.LogWarning("The plaza federation queue is full; the local plaza will be resent.");
                     _queueFullReported = true;
+                    RefreshPending();
                     return;
                 }
             }
             _queue.Add(change);
+            RefreshPending();
         }
+    }
+
+    // Called with _gate held after every change to the queue or the resend flag.
+    private void RefreshPending() => _pending.Refresh(() => _queue.Count != 0 || _republish);
+
+    // Complete while the send loop has something to do: a lease whose token has not been sent to, queued changes or
+    // a pending resend. Pending otherwise, until a change is queued or the lease becomes a different one. Both
+    // halves are levels read after the state they describe, so nothing that happens before the wait is missed; a
+    // lease source that cannot report changes returns a completed task and the loop keeps its period.
+    private Task WhenWork()
+    {
+        var lease = leases.Current;
+        if (lease is null) return leases.WhenChangedFrom(null);
+        lock (_gate)
+            if (_sentToken != lease.Token || _pending.IsPresent) return Task.CompletedTask;
+        var changed = leases.WhenChangedFrom(lease);
+        return changed.IsCompleted ? changed : Task.WhenAny(_pending.WhenPresent, changed);
     }
 
     internal async ValueTask SendLoopAsync(CancellationToken ct)
     {
         using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(ct, _stop.Token);
-        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(options.FlushIntervalMs));
+        var period = TimeSpan.FromMilliseconds(options.FlushIntervalMs);
+        PeriodicTimer? timer = null;
         try
         {
-            while (await timer.WaitForNextTickAsync(lifetime.Token).ConfigureAwait(false))
+            while (true)
             {
+                var work = WhenWork();
+                if (!work.IsCompleted)
+                {
+                    // A periodic timer fires whether or not anyone waits on it, so it is released, not just ignored.
+                    timer?.Dispose();
+                    timer = null;
+                    await work.WaitAsync(lifetime.Token).ConfigureAwait(false);
+                }
+                timer ??= new PeriodicTimer(period);
+                if (!await timer.WaitForNextTickAsync(lifetime.Token).ConfigureAwait(false)) return;
                 if (leases.Current is not { } lease) continue;
                 PlazaWireEvent[] batch;
                 lock (_gate)
@@ -156,9 +189,14 @@ internal sealed class PlazaFederationClient(PlazaFederationOptions options, INod
                         _republish = false;
                         _queueFullReported = false;
                     }
-                    if (_queue.Count == 0 && _sentToken == lease.Token) continue;
+                    if (_queue.Count == 0 && _sentToken == lease.Token)
+                    {
+                        RefreshPending();
+                        continue;
+                    }
                     batch = [.. _queue];
                     _queue.Clear();
+                    RefreshPending();
                 }
                 try
                 {
@@ -168,13 +206,21 @@ internal sealed class PlazaFederationClient(PlazaFederationOptions options, INod
                 catch (Exception error) when (error is HttpRequestException or IOException or InvalidDataException
                     or OperationCanceledException && !lifetime.IsCancellationRequested)
                 {
-                    lock (_gate) _republish = true;
+                    lock (_gate)
+                    {
+                        _republish = true;
+                        RefreshPending();
+                    }
                     logger.LogWarning("Plaza changes could not reach the directory ({FailureType}); they will be resent.", error.GetType().Name);
                     await Task.Delay(options.RetryDelayMs, lifetime.Token).ConfigureAwait(false);
                 }
             }
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        finally
+        {
+            timer?.Dispose();
+        }
     }
 
     internal async ValueTask ReceiveLoopAsync(CancellationToken ct)
@@ -198,7 +244,12 @@ internal sealed class PlazaFederationClient(PlazaFederationOptions options, INod
                     if (batch is null || batch.Hub.Length is 0 or > 128 || batch.Cursor < 0 || batch.Events is null
                         || !batch.Events.All(PlazaTransport.Valid))
                         throw new InvalidDataException("The directory returned an invalid plaza batch.");
-                    if (batch.Hub != _hub && _hub.Length > 0) lock (_gate) _republish = true;
+                    if (batch.Hub != _hub && _hub.Length > 0)
+                        lock (_gate)
+                        {
+                            _republish = true;
+                            RefreshPending();
+                        }
                     _hub = batch.Hub;
                     _cursor = batch.Cursor;
                     await ApplyAsync(batch, lifetime.Token).ConfigureAwait(false);

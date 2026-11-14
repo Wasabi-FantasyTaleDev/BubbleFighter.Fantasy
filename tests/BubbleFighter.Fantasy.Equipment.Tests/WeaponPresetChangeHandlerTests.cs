@@ -55,6 +55,25 @@ public sealed class WeaponPresetChangeHandlerTests
         Assert.Equal(["grant", "view", "reply"], order);
     }
 
+    /// <summary>Preset persistence cannot replace the selected bag or its pet progression before the view receives it.</summary>
+    [Fact]
+    public async Task GrantedPresetPublishesTheBagFrozenBeforeItsStoreWrite()
+    {
+        var pet = PetProgressions.Empty.With("kr-812", new(1, 23, DateTimeOffset.UnixEpoch, null, new(8, 1, 2, 3, 4), null));
+        var bag = new[] { Worn(300001), Worn(202001), Worn(201001), Worn(301001) with { Pet = pet } };
+        var state = new FakeState
+        {
+            DuringGrant = () => bag[3] = bag[3] with { Pet = pet.With("kr-812", new(1, 99, DateTimeOffset.UnixEpoch, null, new(8, 9, 9, 9, 9), null)) },
+        };
+        var view = new FakeView();
+        var handler = new WeaponPresetChangeHandler(state, new FakeSelection(bag), view, new FakeReplies(), NullLogger.Instance);
+        await handler.HandleAsync(new RecordingSession(1, 42), new(-1, 1), default);
+        var frozen = Assert.Single(view.Bags).Single(row => row.ItemId == 301001);
+        Assert.Equal(23, frozen.Pet!.Find("kr-812")!.Experience);
+        Assert.Equal(99, bag[3].Pet!.Find("kr-812")!.Experience);
+        Assert.True(Assert.IsAssignableFrom<ICollection<InventorySlotRecord>>(view.Bags[0]).IsReadOnly);
+    }
+
     [Theory]
     [InlineData(4)] // the fifth hotkey stays unbound in the derived bar
     [InlineData(5)] // past MaxWeaponPresetSlot; the client builder already refuses it
@@ -165,6 +184,7 @@ public sealed class WeaponPresetChangeHandlerTests
         private readonly List<string> _order = order ?? [];
         internal byte Current { get; set; }
         internal (long User, byte Slot)? Granted { get; private set; }
+        internal Action? DuringGrant { get; init; }
         /// <summary>Gets or sets materialized pages; null keeps the derived bar (the default-off look).</summary>
         internal WeaponPresetPage[]? Pages { get; set; }
         public ValueTask<WeaponPresetPage[]?> ReadAsync(long userNum, CancellationToken ct) =>
@@ -176,6 +196,7 @@ public sealed class WeaponPresetChangeHandlerTests
             _order.Add("grant");
             Granted = (userNum, slot);
             Current = slot;
+            DuringGrant?.Invoke();
             return ValueTask.CompletedTask;
         }
         public ValueTask<WeaponPresetPage[]?> GetWeaponPresetPagesAsync(long userNum, CancellationToken ct) =>
@@ -198,16 +219,24 @@ public sealed class WeaponPresetChangeHandlerTests
     {
         private readonly List<string> _order = order ?? [];
         internal List<(int UserNum, int CharacterId, int[] EquippedItemIds)> Selections { get; } = [];
+        internal List<IReadOnlyList<InventorySlotRecord>> Bags { get; } = [];
         public ValueTask SendAsync(ISession session, int userNum, int characterId, IReadOnlyList<int> equippedIds, CancellationToken ct) =>
             throw new InvalidOperationException("Preset grants publish the committed selection.");
         public ValueTask SendRemoteAsync(ISession recipient, int userNum, int characterId, IReadOnlyList<int> equippedIds, CancellationToken ct) =>
             throw new InvalidOperationException("Preset grants never touch remote observers.");
-        public ValueTask SendSelectionAsync(ISession session, int userNum, int characterId, IReadOnlyList<int> equippedIds, CancellationToken ct)
+        /// <summary>Records the preset grant's committed character bag and derived worn item view in publication order.</summary>
+        public ValueTask SendSnapshotAsync(ISession session, int userNum, int characterId,
+            IReadOnlyList<InventorySlotRecord> characterBag, CancellationToken ct)
         {
             _order.Add("view");
+            Bags.Add(characterBag);
+            var equippedIds = characterBag.Where(row => (row.Flags & InventorySlotRecord.WornFlagBit) != 0).Select(row => row.ItemId).Distinct().ToArray();
             Selections.Add((userNum, characterId, equippedIds.ToArray()));
             return ValueTask.CompletedTask;
         }
+        /// <summary>Rejects an ID-only preset publication because the selected character bag must remain available.</summary>
+        public ValueTask SendSelectionAsync(ISession session, int userNum, int characterId, IReadOnlyList<int> equippedIds, CancellationToken ct) =>
+            throw new InvalidOperationException("Preset grants must retain the selected character bag.");
     }
 
     private sealed class FakeReplies(List<string>? order = null) : IMessageSender<WeaponPresetChangeReplied>

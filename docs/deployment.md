@@ -1,7 +1,7 @@
 ---
 title: "Deployment"
 description: "Run the server reproducibly with release builds, Docker Compose, backups and rollback."
-updated: 2026-11-07
+updated: 2026-11-09
 ---
 
 This page is for running Bubble Fighter Fantasy for other people. It covers the release build, the Docker Compose setups in this repository, manual installation on Linux and Windows, persistent data and backups, logs, network security, and how to upgrade and roll back safely.
@@ -30,7 +30,7 @@ A deployment has four network and storage concerns:
 | --- | --- | --- |
 | Game ports | One TCP listener per served build. | `kr-1256` uses 7100; legacy `kr-812` uses 7110. |
 | Relay | Only builds whose profile opens a relay listener. | `kr-1256` uses 7101; legacy builds do not open one. |
-| Administration / WebUI | Keep on loopback or a controlled network; remote administration needs a server started with `start`, which signs in with an administrator account. | `127.0.0.1:8080`. |
+| Administration / WebUI | A server started with `start` is reachable from other machines by default and signs in with an administrator account; `BFF_ADMIN_HOST=127.0.0.1` keeps it local. A `run --profile` server has no accounts and stays on loopback. | `0.0.0.0:7300` (`start`), `127.0.0.1:7300` (`run`). |
 | MySQL | Reachable from the server only; never public. | `127.0.0.1:3306`, database `bf_game_db`. |
 
 Provision client data on local storage and mount or copy it read-only where possible. The server only reads it.
@@ -57,6 +57,30 @@ For example, add this to `profiles/kr-1256/local.patch.yaml` to opt in on that b
 ```
 
 Keep `persist_worn_state: true` and the inventory-view provider enabled. Missing client data, an unsupported build or overlapping equipment groups causes an explicit error. This option covers owned-pet equipment and restoration from the inventory store. It does not implement feeding, growth, evolution or ability changes; those require persistent per-pet state and their own verified operations. Validate equip, refusal of a second pet, removal and login restoration with the intended native client before deploying the option.
+
+## Optional pet growth and skills
+
+The separate pet bundles add feeding, growth, skill replacement and regression, plus optional match rewards and combat effects. All switches default off, and native-client acceptance is still required. Ownership is shared across builds; each build keeps its own growth and skills. Modern Article identities come from durable storage. Both bags refer to the same entitlement, and removing then granting a pet creates a new identity.
+
+The profiles of `kr-812`, `kr-1256`, `cn-406`, `cn-404`, `cn-408`, `cn-706`, `cn-717`, `id-400` and `id-1809` already include these patches with feeding, growth and skills on. Rewards, combat effects and mileage stay off. Set `BFF_PETS_ENABLED=false` to turn growth, skills and the single pet slot off together. Each profile states its client's civil-clock offset in `PET_CLIENT_UTC_OFFSET_MINUTES` (Korea 540, China and Taiwan 480, Indonesia 420). `cn-774` and `tw-454` do not include them yet, because their profiles mount no native inventory-use handler for feeding.
+
+Include `profiles/bundles/pets.patch.yaml` after the selected build's normal patch. For `kr-1256`, `cn-774` and `tw-454`, also include `pets-modern.patch.yaml`; finish with `pets-kr-1256.patch.yaml` or `pets-tw-454.patch.yaml` for the corresponding build. Other audited pet builds use the base pet patch. These patches mount the `pets.entitlements`, `pets` and `pets.combat-effects` rows. `BFF_PETS_ENABLED` also enables `equipment.pet_shared_slot`, so only one pet can be worn at a time. Keep that equipment rule enabled when customizing the growth bundle. Keep their build keys and the inventory row's filtered catalog aligned.
+
+The `pets` row requires the matching room policy host. Pet equip/remove, feeding, level and skill requests hold manual and automatic room starts until their committed inventory and appearance publications finish. Requests received after starting are refused, as is a second concurrent pet request from the same session. `max_in_flight_sessions` bounds active requests and `max_held_rooms` bounds retained start records; both default to 128 and accept 1–65536. The replay worker owns at most one additional claimed record. Capacity exhaustion refuses new mutations or reports a held-record error; size the bounds for the protocol's expected concurrency. Other room policies are evaluated again before a held start proceeds.
+
+Before enabling `BFF_PETS_ENABLED`, set `client_utc_offset_minutes` explicitly on both pet rows: native feeding dates use the client's civil clock. Set the feeding policy on both rows as follows:
+
+| Client policy | Required configuration |
+| --- | --- |
+| Automatic growth | `client_configuration_source: None`; no nonzero feeding cooldown. |
+| KR1256 and CN774 | `client_configuration_source: DynamicConfig`, explicit `feed_cooldown_seconds` and positive `mileage.display_maximum`. The mounted dialect must accept both settings, even when mileage gains are disabled. |
+| TW454 | `client_configuration_source: NativePetConfig`, `native_pet_config_path: Config/PetConfig.xml`, and an explicit cooldown matching that file's `PetSystem.FeedCoolTime` in minutes. The audited file says 420 minutes, or 25200 seconds. TW does not receive the KR/CN configuration fields. |
+
+`skill_resets_enabled` is a separate opt-in. Builds with the native mileage balance require a complete enabled `mileage` policy: an explicit gain for every reset consumable, including deliberate zero gains, and a display maximum. Optional conversion also requires a threshold, `Single` or `All` mode, `Preserve` or `Discard` remainder, a bounded conversion count and a reward bundle with explicit item kinds and quantities. No original-server gains, thresholds or rewards are assumed. The audited TW catalog has no mileage balance. Consumable, progression, mileage and reward changes commit together; refusal consumes nothing.
+
+Enable reward and combat switches separately and supply explicit mode lists in `rewards.mode_ids` and `dialect.scene-seeds.pet_combat_mode_ids`. Reward stacking and rounding are operator policy. Cancellation seeds remain available only where the build's own consumer has been established. Test feeding, ordinary and premium growth, skill changes, login restoration, room/party/plaza appearances and match effects on each intended client before rollout. Review the additive MySQL migration files separately; coordinate their application with every node sharing that database.
+
+For MySQL, migration `0042_inventory_slot_key_watermark.sql` retains ordinary inventory keys after an item is consumed. Before enabling pet mileage rewards, update every process that grants items in the shared database to the watermark-aware purchase allocator. An older purchase or gift writer cannot see a consumed mileage reward's retired key and could reuse it. Reading purchase history protects new writers from older purchases; it does not make older writers honor the new watermark. Keep mileage disabled until all grant writers are updated, and do not roll them back after mileage has allocated keys without preserving this allocator behavior.
 
 ## Build a release directory
 
@@ -105,7 +129,7 @@ Check the result before you copy it: the directory contains the host executable,
 
 `deploy/docker/compose.yaml` starts a server and a MySQL database from this repository's source. It is the shortest path to a running container setup.
 
-1. Copy the environment file, set a nonempty database password and a setup token. The Compose file requires `BFF_MYSQL_PASSWORD` and `BFF_SETUP_TOKEN` (at least 32 random characters) and refuses to start without them:
+1. Copy the environment file and set a nonempty database password. The Compose file requires `BFF_MYSQL_PASSWORD` and refuses to start without it; `BFF_SETUP_TOKEN` is optional and, when set (at least 32 random characters), a remote first-run setup asks for it:
 
    ```sh
    cp .env.example .env
@@ -121,11 +145,11 @@ Check the result before you copy it: the directory contains the host executable,
 
 What this starts:
 
-- The `bff` service builds from `deploy/docker/Dockerfile`: a multi-stage build on the .NET SDK and ASP.NET 10 images, running as the unprivileged `bff` user (uid 1001). It runs the host without a command, which is first-run setup: open `http://<docker-host>:8080`, enter `BFF_SETUP_TOKEN` when the page asks for it, create the administrator account, choose MySQL with host `mysql`, the database name, user and password from `.env`, and select your clients with the data folder `/app/client-data`. Later starts run the saved installation and sign administrators in with that account. It publishes 7100 (game), 7101 (relay) and 8080 (administration and WebUI); Compose sets `BFF_ADMIN_HOST=0.0.0.0` so the published administration port reaches the container.
-- The `mysql` service runs MySQL 8.4, creates the database and account from `BFF_MYSQL_DATABASE`, `BFF_MYSQL_USER` and `BFF_MYSQL_PASSWORD`, publishes `${BFF_MYSQL_PORT:-3306}` on the host, and keeps its data in the `mysql-data` volume. The server waits for its health check before starting and receives `BFF_MYSQL_HOST=mysql` inside the container network.
+- The `bff` service builds from `deploy/docker/Dockerfile`: a multi-stage build on the .NET SDK and ASP.NET 10 images, running as the unprivileged `bff` user (uid 1001). It runs the host without a command, which is first-run setup: open `http://<docker-host>:7300`, enter `BFF_SETUP_TOKEN` when the page asks for it, create the administrator account, choose MySQL with host `mysql`, the database name, user and password from `.env`, and select your clients with the data folder `/app/client-data`. Later starts run the saved installation and sign administrators in with that account. It publishes 7100 (game), 7101 (relay) and 7300 (administration and WebUI); Compose sets `BFF_ADMIN_HOST=0.0.0.0` so the published administration port reaches the container.
+- The `mysql` service runs the image named by `BFF_DB_IMAGE` (MariaDB 11.4 with a `.env` copied from `.env.example`; MySQL 8.4 when the line is absent, so an existing `mysql-data` volume keeps the server that created it), creates the database and account from `BFF_MYSQL_DATABASE`, `BFF_MYSQL_USER` and `BFF_MYSQL_PASSWORD`, publishes `${BFF_MYSQL_PORT:-3306}` on the host, and keeps its data in the `mysql-data` volume. The server waits for its health check before starting and receives `BFF_MYSQL_HOST=mysql` inside the container network.
 - Client data is mounted read-only at `/app/client-data`; the saved installation lives in the `bff-state` volume and database state in the `mysql-data` volume. The server's own logs are written inside the container and are not persisted to the host by this Compose file.
 
-Check it worked: `curl http://127.0.0.1:8080/health` on the Docker host returns JSON with a `status` field, and the console shows the setup or installation progress. Follow the console with:
+Check it worked: `curl http://127.0.0.1:7300/health` on the Docker host returns JSON with a `status` field, and the console shows the setup or installation progress. Follow the console with:
 
 ```sh
 docker compose -f deploy/docker/compose.yaml logs -f bff
@@ -192,7 +216,7 @@ Use the manual path when you do not want a container: copy the Linux publish out
 
 6. The repository ships no service unit. For a long-running deployment, run the host under a supervisor you manage (for example a systemd service), with the working directory set to `<release-root>` and the variables supplied through its environment file. Keep the service account unprivileged and give it access only to the release, the logs directory and, if used, the SQLite file.
 
-Check it worked with `curl http://127.0.0.1:8080/health` from the host, and with the listening-port checks below. Stop it with SIGTERM from the supervisor or `Ctrl+C` in the foreground.
+Check it worked with `curl http://127.0.0.1:7300/health` from the host, and with the listening-port checks below. Stop it with SIGTERM from the supervisor or `Ctrl+C` in the foreground.
 
 ## Manual deployment on Windows
 
@@ -217,7 +241,7 @@ Check it worked with `curl http://127.0.0.1:8080/health` from the host, and with
 4. Allow only the planned game, relay and administration ports through the firewall. Keep the administration port reachable only from trusted networks, and keep MySQL off the public interface.
 5. There is no Windows service wrapper in this repository. Run the executable under a supervisor you manage if it must start with the machine; keep the service account unprivileged.
 
-Check it worked with `Invoke-RestMethod http://127.0.0.1:8080/health`, which returns JSON with a `status` field. Stop with `Ctrl+C`; the host also handles SIGTERM and SIGINT where the platform provides them.
+Check it worked with `Invoke-RestMethod http://127.0.0.1:7300/health`, which returns JSON with a `status` field. Stop with `Ctrl+C`; the host also handles SIGTERM and SIGINT where the platform provides them.
 
 ## Persistent data and backups
 
@@ -227,6 +251,7 @@ Check it worked with `Invoke-RestMethod http://127.0.0.1:8080/health`, which ret
 | Client data | Read-only files under `client-data/<build>/`. | Once, or whenever you change your client copy. |
 | Configuration and secrets | Compose `.env` or the supervisor's environment file. | Yes; store it securely. |
 | Logs and packet logs | `logs/<date>/` under the working directory, or a container path. | Optional; rotate and retain per policy. |
+| Compiled client data | `state/compiled-data/<build>.bffdata` under the working directory, or `BFF_COMPILED_DATA`. | No; it is a cache the server rebuilds. |
 | Previous release | A separate directory. | Keep until the rollback window closes. |
 
 Keep the database, its backups and the SQLite save file outside the release directory, because releases are replaced. For MySQL, use the database's own backup tooling, for example a logical dump (`mysqldump`) or a consistent storage snapshot, while the server is stopped or quiet. For SQLite, stop the server first and copy the single save file. Never copy a live SQLite file while the server is writing it.
@@ -235,11 +260,92 @@ Test a restore on a separate instance before you rely on it: restore the databas
 
 The client data is input, not state: the server reads it, and the Docker setups mount it read-only, so replacing a release does not change it.
 
+## Memory
+
+The Host ships its memory settings in `BubbleFighter.Fantasy.Host.runtimeconfig.json`: the workstation collector, concurrent collection, and `System.GC.ConserveMemory` set to 9, which makes the collector compact eagerly. When every row is active, the Host compacts the heap once and logs `Startup allocated N MB in C collection(s); the managed heap was compacted from A MB to B MB committed`. B is close to what the loaded profile keeps; the process is larger than B by the runtime's own code and the mapped program files.
+
+Starting costs far more memory than running. In our measurements one client build peaked near 140 MB while its client data was parsed and settled near 40 MB of private memory; every build together peaked near 300 MB (see [Small servers](#small-servers)). Give a small machine swap for the start rather than a limit below the peak.
+
+Environment variables override the file. Two details matter:
+
+- The runtime reads numeric `DOTNET_GC*` variables as **hexadecimal**. `DOTNET_GCHeapHardLimit=20000000` is 512 MB, not 20 MB. Write `0x20000000` so the base is visible.
+- A heap limit that the start reaches stops the server with `OutOfMemoryException`. The start peak includes the parsing of every build's client data, so a limit that fits the idle server can still stop the start. In a container with a memory limit the runtime applies a heap limit of 75 percent of it by itself. Leave the heap limit unset unless you have measured that your profile starts under it.
+
+`python tools/perf/measure.py --profile <id>` measures a start on your own machine; `tools/perf/README.md` explains the numbers.
+
+A connection holds a socket, a session and a read buffer from the moment it is accepted. Every supported client sends its first frame as soon as it has the greeting, so a connection that sends no complete frame within `first_frame_seconds` (a key of each `protocol` row, default 30) is closed. Raise it only if a client of yours is measured to wait longer.
+
+A client that stops reading makes the server queue what it sends to it. Each session stops at `send_queue_bytes` (4 MB) and is closed; `total_send_queue_bytes` (each `protocol` row, default 64 MB) caps what all sessions of the row hold together, so many stalled clients at once cannot add up. When a frame would cross it, the session holding the most queued bytes is closed and the frame is sent; no sender waits. On a small machine lower it to what the machine can spare; sessions log the most they queued at Debug when they end.
+
+### Small servers
+
+What a server needs is set by the client builds it serves, the database it uses and what starts at the same time. The numbers below were measured with `tools/perf/measure.py` on a release build with memory persistence; use them to choose, then measure your own profile the same way.
+
+| | One build (`kr-812`) | Every build (`all`) |
+| --- | --- | --- |
+| Peak while starting | about 140 MB | about 300 MB (up to 370 MB on the first start) |
+| Private memory when idle | about 40 MB | about 95 MB |
+| CPU of the first start, one fast core | about 5 s | about 27 s |
+| CPU of later starts | about 2 s | about 16 s |
+
+A slow VPS core needs two to four times the start CPU. The peak lasts only while client data is parsed; the server then returns that memory.
+
+**Compiled client data.** The first start of a build parses the client's workbooks and keeps the result in `state/compiled-data/<build>.bffdata` under the working directory (set `BFF_COMPILED_DATA` to move the folder). Later starts read that file, which is why they need far less CPU. The file is a cache: the server uses it only while the client data and the server release are the ones it was written from, rebuilds it otherwise, and works the same without it, so it can be deleted at any time and needs no backup. After an upgrade the first start is a first start again. `bff data compile <profile>` does that first start and stops, which lets a deployment pay for it before players are let in. In a container, mount the folder as a volume or every new container starts from nothing.
+
+**512 MB.** Serve one or two builds with SQLite (a patch that enables the `persistence.sqlite` row, see [SQLite](configuration.md#sqlite)), not MySQL: a database server alone needs most of such a machine. Add 1 GB of swap or zram so the start peak never meets the out-of-memory killer. Leave `BFF_PACKET_LOG` off.
+
+**1 GB.** Serve a few builds with SQLite, or one or two builds with MariaDB configured as below. Keep 512 MB of swap.
+
+**2 GB and more.** Serve every build (`profiles/all`) with MariaDB or MySQL.
+
+**The small-server patch.** `profiles/bundles/small-vps.patch.yaml` turns off the administration web page and the client and plugin distribution rows, which a server that only serves players does not need. The administration API stays on. Add `--patch profiles/bundles/small-vps.patch.yaml` after the profile's own patches, to `run` or to `start`. Each build's listeners accept 512 connections by default (`max_connections` on its listener rows); lower them in your own patch if the machine cannot hold that many players.
+
+**Builds that sleep.** A server that serves several builds from one process (`profiles/all`, or a server profile of your own that lists `builds`) can leave a build unloaded until a player needs it. Set `BFF_BUILD_ACTIVATION=on_demand`; in your own server profile write `build_activation: on_demand`. Each build's listeners and wire dialect start with the server, so every port accepts connections from the first second. The rest of a build loads when the first client connects to it, and unloads after `BFF_BUILD_IDLE_MINUTES` (default 30) with no connection and no room. In our measurements `all` was ready in about 2 s with 30 MB of private memory instead of about 16 s of CPU and 95 MB; with two builds loaded it peaked near 155 MB instead of 300 MB, and returned to 32 MB once both were asleep again. The price is paid by the first player of a sleeping build, whose connection waits while the build loads: about 11 s for the first build after a server start and about 2 s for a later one on the test machine, more on a slow core. A connection that would wait longer than `wake_timeout_seconds` (30, on the `core.activation-groups` row) is closed, and the client can connect again once the build is up. Loading or unloading one build does not disturb the players of another, the administration API or the launcher channel. A row that must always run can say `activation: always` in a patch. This was measured on one node; a profile that mounts cluster rows has not been examined with sleeping builds, so leave it at `always` there.
+
+MariaDB on a small machine, in `[mysqld]`:
+
+```ini
+innodb_buffer_pool_size = 64M    # the game's tables are small; raise it if the database grows past it
+performance_schema      = OFF
+max_connections         = 50
+innodb_log_buffer_size  = 8M
+key_buffer_size         = 8M
+aria_pagecache_buffer_size = 16M
+tmp_table_size          = 16M
+max_heap_table_size     = 16M
+```
+
+Bind it to `127.0.0.1` when the game server runs on the same machine. In our measurements MariaDB held about 32 MB resident beside a running server; MySQL 8.4 with its defaults reserves several hundred megabytes, which is why new Docker installations use MariaDB.
+
+**Docker.** `deploy/docker/compose.yaml` and `install.sh --docker --with-mysql` start MariaDB 11.4 for a new installation (`BFF_DB_IMAGE=mariadb:11.4`). An installation whose database MySQL 8.4 created has no `BFF_DB_IMAGE` line and keeps MySQL, because MariaDB cannot open that volume; to move it, dump the database and restore it into a new one. To cap the containers, add a Compose override such as this one for a 1 GB machine:
+
+```yaml
+services:
+  bff:
+    mem_limit: 512m
+    memswap_limit: 1g
+  mysql:
+    mem_limit: 192m
+    memswap_limit: 384m
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci",
+              "--innodb-buffer-pool-size=64M", "--performance-schema=OFF", "--max-connections=50"]
+```
+
+The runtime limits its heap to 75 percent of a container's memory limit, so keep the server's limit well above the start peak in the table.
+
+Do not set a heap limit below the start peak (see the hexadecimal note above): the server would stop while it starts.
+
 ## Logs
+
+Set `BFF_LOG_FILE` or `--log-file` to retain Host `ILogger` records beside the console output. File logging is disabled when no path is set. Its threshold defaults to `Warning`; `BFF_LOG_FILE_LEVEL` or `--log-file-level` selects it independently of `BFF_LOG_LEVEL`. Normal logging-factory category and provider filters still apply. Each accepted record includes a UTC timestamp, level, category, event id and the full exception text, including inner exceptions and stacks.
+
+Choose a writable path inside an existing persistent volume. For `deploy/docker/compose.yaml`, `/app/state/logs/host.log` is inside the `bff-state:/app/state` mount; add the variable to the container environment. Native services should use their own persistent data directory. The writer creates the parent directory and holds `host.log.lock` exclusively while running. Another process cannot write to the same log. An invalid path, permissions failure or locked destination is a startup error.
+
+Files rotate through fixed slots: `host.log`, `host.1.log`, and so on. The defaults retain five files, including the active file, and limit new writes to 16 MiB per file. The count also applies after restart or a count reduction. An existing oversized active file rotates into the first backup at startup; historical backups may exceed a newly reduced size bound until normal retention replaces them. With one retained slot, rotation replaces the active file. A single writer uses bounded record and UTF-8 byte budgets. Callers never wait for disk: a full queue, exhausted byte budget, oversized record or formatting failure drops the newest complete record and produces a counted `dropped_entries=N` line. Exceptions are never shortened to fit. On a write, flush or rotation I/O failure, the writer emits one bounded stderr line containing the exception type, closes the stream and counts records as dropped while unavailable. It retries opening with exponential backoff, by default from one second up to 60 seconds. After recovery it writes the pending drop report before new records. A failed rotation resumes from its last completed file move. Warning and higher records and drop reports are flushed to the operating system before the next write; shutdown drains for a bounded interval and reports failure if it cannot finish. An I/O failure can leave a partial record, and this does not guarantee recovery after power loss. See [configuration](configuration.md) for every limit. Full exceptions can contain account or connection data; restrict access and apply your normal retention policy.
 
 The server logs to the console. Lines are single-line and carry UTC timestamps; the level comes from `BFF_LOG_LEVEL` or `--log-level` and defaults to `Information`. A normal start reports each activated row, the listening address of each listener and, once ready, `Server started with <n> active row(s).` A graceful stop ends with `Shutdown complete.`
 
-The diagnostics row also writes packet log files. They are separate from the console and contain one line per packet and connection event:
+The diagnostics row can also write packet log files. They are off by default, because every packet then costs a formatted line and a file write; set `BFF_PACKET_LOG=true` to turn them on while debugging. Connection events are logged to the console either way. The files are separate from the console and contain one line per packet and connection event:
 
 - The default path is `logs/{date}/packets_{timestamp}.log`, relative to the working directory. Profiles override the name: `kr-812` writes `packets-kr-812_{timestamp}.log` and the `all` profile writes `packets-all_{timestamp}.log`.
 - Each file rotates to `.1` at 10 MiB; the `{date}` component starts a new file when the date changes. By default up to 100 files are kept per configured name pattern, and older files are deleted when the sink starts. The filename time zone defaults to China Standard Time.
@@ -250,7 +356,7 @@ Packet log lines can contain player and connection data; treat the `logs` direct
 
 ## Admin and network security
 
-- The administration listener binds to `127.0.0.1:8080` by default. A server started with `start` (what the executable does without arguments) signs administrators in by account and password; `/health` and the WebUI files stay open so a browser can load the sign-in page. A server started with `run --profile` has no accounts, needs no sign-in and listens on loopback only.
+- A server started with `start` (what the executable does without arguments) binds the administration listener to `0.0.0.0:7300` by default and signs administrators in by account and password; `/health` and the WebUI files stay open so a browser can load the sign-in page. Until the first administrator exists, anyone who reaches the port can complete the setup, so finish it right after the first start or set `BFF_SETUP_TOKEN`. On a reachable address any host name is accepted unless `BFF_ADMIN_ALLOWED_HOSTS` lists them. A server started with `run --profile` has no accounts, needs no sign-in and listens on loopback only.
 - Before exposing the administration port beyond loopback, restrict the source network. If you cannot restrict it, keep it on loopback and use a tunnel or a reverse proxy you manage.
 - Open only the game and relay ports that the selected profiles serve on the firewall. Do not publish the administration port or MySQL to the public interface.
 - Use a dedicated database account, keep the MySQL port on loopback or a private network, and never reuse the database administrator account for the server.

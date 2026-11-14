@@ -6,7 +6,7 @@ namespace BubbleFighter.Fantasy.Loader.Remote;
 /// Spawns each configured child process, asks it to describe the plugins it serves and publishes them as owned
 /// definition sources, so rows can bind plugins written in other languages exactly like native ones.
 /// </summary>
-[Plugin("loader.process", Description = "Publishes plugin definitions served by child processes over a JSON-lines stdio protocol.",
+[Plugin("loader.process", Category = "core", Names = ["en=Process plugin loader", "zh-Hans=进程插件加载器", "zh-Hant=行程模組載入器", "ko=프로세스 플러그인 로더"], Description = "Publishes plugin definitions served by child processes over a JSON-lines stdio protocol.",
     Requires = [typeof(IPluginHost)])]
 public sealed class RemoteLoaderPlugin : IPlugin
 {

@@ -1,0 +1,54 @@
+# WeaponMaster (round mode 26) on kr-1256: ten levels, 200 experience apart, a kill worth 100. The first seat to reach
+# level 10 wins and ends the round. Every weapon is drawn at random from one pool, whatever the level: the old main
+# weapons (Cotton, Burst, Saber, Brute and Revolver rifles, shotguns and sniper rifles) of generations L1, L2, L3,
+# S1, S2 and R3, equal weights. The equipment frame names a weapon by its weapon-catalog id, which kr-1256
+# sub_4ADD70 resolves (with a mode-26 branch); a main weapon's shop item id is 200000 plus that id. The client has
+# no pool or experience table of its own, so all of this is server policy; replace it in a local patch.
+- set:
+    id: dialect.rooms
+    config:
+      weapon_master: true
+- set:
+    id: ingame
+    config:
+      native_life_every_mode: true
+      weapon_master_experience:
+        - { event: kill, points: 100 }
+      weapon_master_levels: [{ experience: 0 }, { experience: 200 }, { experience: 400 }, { experience: 600 }, { experience: 800 }, { experience: 1000 }, { experience: 1200 }, { experience: 1400 }, { experience: 1600 }, { experience: 1800 }]
+      weapon_master_weapons:
+        - { item: 2011, weight: 1 }
+        - { item: 2012, weight: 1 }
+        - { item: 2014, weight: 1 }
+        - { item: 2021, weight: 1 }
+        - { item: 2022, weight: 1 }
+        - { item: 2023, weight: 1 }
+        - { item: 2024, weight: 1 }
+        - { item: 2032, weight: 1 }
+        - { item: 2041, weight: 1 }
+        - { item: 2042, weight: 1 }
+        - { item: 2043, weight: 1 }
+        - { item: 2072, weight: 1 }
+        - { item: 3011, weight: 1 }
+        - { item: 3012, weight: 1 }
+        - { item: 3015, weight: 1 }
+        - { item: 3021, weight: 1 }
+        - { item: 3022, weight: 1 }
+        - { item: 3023, weight: 1 }
+        - { item: 3031, weight: 1 }
+        - { item: 3032, weight: 1 }
+        - { item: 3041, weight: 1 }
+        - { item: 3042, weight: 1 }
+        - { item: 3043, weight: 1 }
+        - { item: 3072, weight: 1 }
+        - { item: 4011, weight: 1 }
+        - { item: 4012, weight: 1 }
+        - { item: 4014, weight: 1 }
+        - { item: 4021, weight: 1 }
+        - { item: 4023, weight: 1 }
+        - { item: 4024, weight: 1 }
+        - { item: 4025, weight: 1 }
+        - { item: 4032, weight: 1 }
+        - { item: 4041, weight: 1 }
+        - { item: 4042, weight: 1 }
+        - { item: 4043, weight: 1 }
+        - { item: 4053, weight: 1 }

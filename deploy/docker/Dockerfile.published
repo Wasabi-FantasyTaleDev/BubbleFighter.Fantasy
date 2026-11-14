@@ -1,6 +1,9 @@
 # Build this image from a framework-dependent Linux release directory containing server/.
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
+# The web listeners read no appsettings files, so they do not watch for them either: one watcher thread and one
+# inotify instance less per listener.
+ENV DOTNET_hostBuilder__reloadConfigOnChange=false
 COPY --chown=1654:1654 server/ ./
 USER 1654:1654
 ENTRYPOINT ["dotnet", "BubbleFighter.Fantasy.Host.dll"]

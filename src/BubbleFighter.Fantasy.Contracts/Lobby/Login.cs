@@ -1,5 +1,7 @@
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Inventory;
+using BubbleFighter.Fantasy.Contracts.Progress;
+using BubbleFighter.Fantasy.Contracts.Rooms;
 using BubbleFighter.Fantasy.Contracts.Wallet;
 
 namespace BubbleFighter.Fantasy.Contracts.Lobby;
@@ -47,6 +49,9 @@ public sealed record LoginSucceeded(
     IReadOnlyList<InventorySlotRecord>? CharacterBag,
     IReadOnlyList<InventorySlotRecord>? EquippedBag) : IMessage
 {
+    /// <summary>Gets whether both supplied bags already include metadata from one committed inventory snapshot.</summary>
+    public bool InventoryIsComplete { get; init; }
+
     /// <summary>Gets whether this login should offer the initial tutorial, or null to use the dialect profile's policy.</summary>
     public bool? OfferTutorial { get; init; }
 
@@ -90,6 +95,23 @@ public sealed record MainMenuRoomOpened(
     IReadOnlyList<int> EquippedItemIds,
     int Level = 1) : IMessage
 {
+    private IReadOnlyList<RoomItemAttribute> _itemAttributes = [];
+    private IReadOnlyList<int> _equippedItemIds = new RoundEquipmentSnapshot(EquippedItemIds, []).WornItemIds;
+
+    /// <summary>Gets copied worn identities from the same committed appearance as the menu modifiers.</summary>
+    public IReadOnlyList<int> EquippedItemIds
+    {
+        get => _equippedItemIds;
+        init => _equippedItemIds = new RoundEquipmentSnapshot(value, []).WornItemIds;
+    }
+
+    /// <summary>Gets bounded, copied instance modifiers; an empty vector explicitly clears prior menu modifiers.</summary>
+    public IReadOnlyList<RoomItemAttribute> ItemAttributes
+    {
+        get => _itemAttributes;
+        init => _itemAttributes = new RoundEquipmentSnapshot(EquippedItemIds, value).ItemAttributes;
+    }
+
     /// <summary>Gets whether to offer the initial tutorial, or null to use the dialect profile's policy.</summary>
     public bool? OfferTutorial { get; init; }
 

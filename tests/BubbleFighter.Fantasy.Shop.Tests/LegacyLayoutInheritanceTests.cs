@@ -43,8 +43,31 @@ public sealed class LegacyLayoutInheritanceTests
     {
         Assert.Equal(new EnterShopReplyLayout(true, false, LegacyCategoryTree.Ordered, false, LegacyCatalogTrailer.IdsMain),
             LegacyLayouts.Of("kr-812"));
-        Assert.Equal(new EnterShopReplyLayout(false, true, LegacyCategoryTree.Landing, true, LegacyCatalogTrailer.None),
+        Assert.Equal(new EnterShopReplyLayout(false, true, LegacyCategoryTree.LandingDefaults, false, LegacyCatalogTrailer.None),
             LegacyLayouts.Of("cn-279"));
+    }
+
+    /// <summary>Pins the default All page and distinct native filters for two CN2011 subcategories.</summary>
+    [Fact]
+    public void Cn279RestoresMainDefaultsWithoutOverwritingSubcategoryFilters()
+    {
+        var categories = new[]
+        {
+            new BubbleFighter.Fantasy.Contracts.Shop.ShopCategoryRow(500, "Weapons", 1,
+                [new(501, "Primary", 1, 1, 0), new(502, "Secondary", 2, 1, 0)]),
+        };
+        var merged = ShopWire.MergeMainClickDefaults(categories,
+            [new(500, "All", 0, 1, 2)], new Dictionary<int, int>());
+        var main = Assert.Single(merged);
+        Assert.Equal(new[] { 500, 501, 502 }, main.Subcategories.Select(sub => sub.Id));
+        var body = ShopWire.RepEnterShopLegacy(LegacyLayouts.Of("cn-279"), 0, [], merged);
+        // cn-279 sub_66AE10 falls back to the main id; cn-279 sub_66AB50 filters modes 2/0 by main/sub respectively.
+        Assert.Equal(136, body.Length);
+        Assert.Equal(500, BitConverter.ToInt32(body, 20));
+        Assert.Equal(3, BitConverter.ToInt32(body, 46));
+        Assert.Equal(2, BitConverter.ToInt32(body, 68));
+        Assert.Equal(0, BitConverter.ToInt32(body, 98));
+        Assert.Equal(0, BitConverter.ToInt32(body, 132));
     }
 
     [Fact]

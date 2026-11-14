@@ -1,0 +1,32 @@
+{
+  "windows": {
+    "kr-812": {
+      "peak_mb": 145,
+      "private_idle_mb": 45,
+      "heap_committed_mb": 26,
+      "startup_allocated_mb": 230,
+      "start_cpu_s": 5
+    },
+    "kr-812 cold": {
+      "peak_mb": 150,
+      "private_idle_mb": 45,
+      "heap_committed_mb": 30,
+      "startup_allocated_mb": 250,
+      "start_cpu_s": 8
+    },
+    "all": {
+      "peak_mb": 240,
+      "private_idle_mb": 100,
+      "heap_committed_mb": 80,
+      "startup_allocated_mb": 1600,
+      "start_cpu_s": 25
+    },
+    "all cold": {
+      "peak_mb": 280,
+      "private_idle_mb": 100,
+      "heap_committed_mb": 80,
+      "startup_allocated_mb": 2300,
+      "start_cpu_s": 50
+    }
+  }
+}

@@ -1,0 +1,1855 @@
+{
+  "format": 1,
+  "modes": [
+    {
+      "id": 1,
+      "key": "Pvp",
+      "names": {
+        "zh-CN": "竞技模式",
+        "zh-TW": "經典模式",
+        "ko": "노템전",
+        "en": "No Item",
+        "id": "No Item Mode",
+        "vi": "Đấu không vật phẩm",
+        "th": "โหมดไร้ไอเทม"
+      },
+      "tokens": {
+        "zh-CN": "竞技模式",
+        "zh-TW": "經典模式",
+        "ko": "노템전",
+        "en": "NoItem",
+        "id": "NoItemMode",
+        "vi": "Đấukhôngvậtphẩm",
+        "th": "โหมดไร้ไอเทม"
+      },
+      "aliases": [
+        "Pvp"
+      ],
+      "nativeNames": {
+        "zh-CN": "竞技模式",
+        "zh-TW": "經典模式",
+        "ko": "노템전",
+        "en": "No Item",
+        "id": "No Item Mode"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "client-name",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 3,
+      "key": "Item",
+      "names": {
+        "zh-CN": "道具模式",
+        "zh-TW": "道具模式",
+        "ko": "아이템전",
+        "en": "Item",
+        "id": "Item Mode",
+        "vi": "Đấu vật phẩm",
+        "th": "โหมดไอเทม"
+      },
+      "tokens": {
+        "zh-CN": "道具模式",
+        "zh-TW": "道具模式",
+        "ko": "아이템전",
+        "en": "Item",
+        "id": "ItemMode",
+        "vi": "Đấuvậtphẩm",
+        "th": "โหมดไอเทม"
+      },
+      "aliases": [],
+      "nativeNames": {
+        "zh-CN": "道具模式",
+        "zh-TW": "道具模式",
+        "ko": "아이템전",
+        "en": "Item",
+        "id": "Item Mode"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "client-name",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 5,
+      "key": "PvpStar",
+      "names": {
+        "zh-CN": "夺星个人战",
+        "zh-TW": "奪星個人戰",
+        "ko": "별먹기 개인전",
+        "en": "Star Solo",
+        "id": "Star Solo Mode",
+        "vi": "Tranh sao cá nhân",
+        "th": "ชิงดาวเดี่ยว"
+      },
+      "tokens": {
+        "zh-CN": "夺星个人战",
+        "zh-TW": "奪星個人戰",
+        "ko": "별먹기개인전",
+        "en": "StarSolo",
+        "id": "StarSoloMode",
+        "vi": "Tranhsaocánhân",
+        "th": "ชิงดาวเดี่ยว"
+      },
+      "aliases": [
+        "PvpStar"
+      ],
+      "nativeNames": {
+        "zh-CN": "夺星个人战",
+        "zh-TW": "奪星個人戰",
+        "ko": "별먹기 개인전",
+        "en": "Star Solo",
+        "id": "Star Solo Mode"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "client-name",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 6,
+      "key": "PvpStarTeam",
+      "names": {
+        "zh-CN": "夺星团队战",
+        "zh-TW": "奪星團隊戰",
+        "ko": "별먹기 팀전",
+        "en": "Star Team",
+        "id": "Star Team Mode",
+        "vi": "Tranh sao đồng đội",
+        "th": "ชิงดาวทีม"
+      },
+      "tokens": {
+        "zh-CN": "夺星团队战",
+        "zh-TW": "奪星團隊戰",
+        "ko": "별먹기팀전",
+        "en": "StarTeam",
+        "id": "StarTeamMode",
+        "vi": "Tranhsaođồngđội",
+        "th": "ชิงดาวทีม"
+      },
+      "aliases": [
+        "PvpStarTeam",
+        "星星争夺战"
+      ],
+      "nativeNames": {
+        "zh-CN": "夺星团队战",
+        "zh-TW": "奪星團隊戰",
+        "ko": "별먹기 팀전",
+        "en": "Star Team",
+        "id": "Star Team Mode"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "client-name",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 7,
+      "key": "EventLucci",
+      "names": {
+        "zh-CN": "大量金币",
+        "zh-TW": "大量LUCCI",
+        "ko": "대박루찌",
+        "en": "Jackpot Lucci",
+        "id": "Jackpot Lucci",
+        "vi": "Lucci may mắn",
+        "th": "ลุคกี้แจ็กพอต"
+      },
+      "tokens": {
+        "zh-CN": "大量金币",
+        "zh-TW": "大量LUCCI",
+        "ko": "대박루찌",
+        "en": "JackpotLucci",
+        "id": "JackpotLucci",
+        "vi": "Luccimaymắn",
+        "th": "ลุคกี้แจ็กพอต"
+      },
+      "aliases": [
+        "EventLucci"
+      ],
+      "nativeNames": {
+        "zh-CN": "大量金币",
+        "zh-TW": "大量LUCCI",
+        "ko": "대박루찌",
+        "en": "Jackpot Lucci"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "translation",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 8,
+      "key": "Zombie",
+      "names": {
+        "zh-CN": "僵尸模式",
+        "zh-TW": "殭屍模式",
+        "ko": "좀비대전",
+        "en": "Zombie Battle",
+        "id": "Zombie Battle",
+        "vi": "Đấu thây ma",
+        "th": "โหมดซอมบี้"
+      },
+      "tokens": {
+        "zh-CN": "僵尸模式",
+        "zh-TW": "殭屍模式",
+        "ko": "좀비대전",
+        "en": "ZombieBattle",
+        "id": "ZombieBattle",
+        "vi": "Đấuthâyma",
+        "th": "โหมดซอมบี้"
+      },
+      "aliases": [
+        "Zombie"
+      ],
+      "nativeNames": {
+        "zh-CN": "僵尸模式",
+        "zh-TW": "殭屍模式",
+        "ko": "좀비대전",
+        "en": "Zombie Battle",
+        "id": "Zombie Battle"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "client-name",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 9,
+      "key": "Npc",
+      "names": {
+        "zh-CN": "NPC",
+        "zh-TW": "NPC",
+        "ko": "NPC",
+        "en": "NPC",
+        "id": "NPC Mode",
+        "vi": "NPC",
+        "th": "NPC"
+      },
+      "tokens": {
+        "zh-CN": "NPC",
+        "zh-TW": "NPC",
+        "ko": "NPC",
+        "en": "NPC",
+        "id": "NPCMode",
+        "vi": "NPC",
+        "th": "NPC"
+      },
+      "aliases": [
+        "Npc"
+      ],
+      "nativeNames": {
+        "zh-CN": "NPC",
+        "zh-TW": "NPC",
+        "ko": "NPC",
+        "en": "NPC",
+        "id": "NPC Mode"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "client-name",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 10,
+      "key": "ConquerTeam",
+      "names": {
+        "zh-CN": "ConquerTeam",
+        "zh-TW": "ConquerTeam",
+        "ko": "ConquerTeam",
+        "en": "ConquerTeam",
+        "id": "ConquerTeam",
+        "vi": "ConquerTeam",
+        "th": "ConquerTeam"
+      },
+      "tokens": {
+        "zh-CN": "ConquerTeam",
+        "zh-TW": "ConquerTeam",
+        "ko": "ConquerTeam",
+        "en": "ConquerTeam",
+        "id": "ConquerTeam",
+        "vi": "ConquerTeam",
+        "th": "ConquerTeam"
+      },
+      "aliases": [],
+      "nativeNames": {},
+      "nameSources": {
+        "zh-CN": "client-codename",
+        "zh-TW": "client-codename",
+        "ko": "client-codename",
+        "en": "client-codename",
+        "id": "client-codename",
+        "vi": "client-codename",
+        "th": "client-codename"
+      }
+    },
+    {
+      "id": 11,
+      "key": "EventSoccer",
+      "names": {
+        "zh-CN": "足球大战",
+        "zh-TW": "足球大戰",
+        "ko": "축구대전 탑뷰모드",
+        "en": "Soccer Top View",
+        "id": "Pertandingan Sepak Bola",
+        "vi": "Bóng đá",
+        "th": "ฟุตบอล"
+      },
+      "tokens": {
+        "zh-CN": "足球大战",
+        "zh-TW": "足球大戰",
+        "ko": "축구대전탑뷰모드",
+        "en": "SoccerTopView",
+        "id": "PertandinganSepakBola",
+        "vi": "Bóngđá",
+        "th": "ฟุตบอล"
+      },
+      "aliases": [
+        "EventSoccer"
+      ],
+      "nativeNames": {
+        "zh-CN": "足球大战",
+        "zh-TW": "足球大戰",
+        "ko": "축구대전 탑뷰모드",
+        "en": "Soccer Top View"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "translation",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 12,
+      "key": "Sniper",
+      "names": {
+        "zh-CN": "狙击模式",
+        "zh-TW": "狙擊模式",
+        "ko": "스나이퍼전",
+        "en": "Sniper",
+        "id": "Sniper Mode",
+        "vi": "Đấu bắn tỉa",
+        "th": "โหมดสไนเปอร์"
+      },
+      "tokens": {
+        "zh-CN": "狙击模式",
+        "zh-TW": "狙擊模式",
+        "ko": "스나이퍼전",
+        "en": "Sniper",
+        "id": "SniperMode",
+        "vi": "Đấubắntỉa",
+        "th": "โหมดสไนเปอร์"
+      },
+      "aliases": [],
+      "nativeNames": {
+        "zh-CN": "狙击模式",
+        "zh-TW": "狙擊模式",
+        "ko": "스나이퍼전",
+        "en": "Sniper",
+        "id": "Sniper Mode"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "client-name",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 13,
+      "key": "SinglePvp",
+      "names": {
+        "zh-CN": "热血个人模式",
+        "zh-TW": "熱血模式(個人)",
+        "ko": "서바이벌개인전",
+        "en": "Survival Solo",
+        "id": "Survival Solo Mode",
+        "vi": "Sinh tồn cá nhân",
+        "th": "เอาชีวิตรอดเดี่ยว"
+      },
+      "tokens": {
+        "zh-CN": "热血个人模式",
+        "zh-TW": "熱血模式(個人)",
+        "ko": "서바이벌개인전",
+        "en": "SurvivalSolo",
+        "id": "SurvivalSoloMode",
+        "vi": "Sinhtồncánhân",
+        "th": "เอาชีวิตรอดเดี่ยว"
+      },
+      "aliases": [
+        "SinglePvp"
+      ],
+      "nativeNames": {
+        "zh-CN": "热血个人模式",
+        "zh-TW": "熱血模式(個人)",
+        "ko": "서바이벌개인전",
+        "en": "Survival Solo",
+        "id": "Survival Solo Mode"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "client-name",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 14,
+      "key": "TeamSurvival",
+      "names": {
+        "zh-CN": "热血团队模式",
+        "zh-TW": "熱血模式(團體)",
+        "ko": "서바이벌팀전",
+        "en": "Survival Team",
+        "id": "Survival Team",
+        "vi": "Sinh tồn đồng đội",
+        "th": "เอาชีวิตรอดทีม"
+      },
+      "tokens": {
+        "zh-CN": "热血团队模式",
+        "zh-TW": "熱血模式(團體)",
+        "ko": "서바이벌팀전",
+        "en": "SurvivalTeam",
+        "id": "SurvivalTeam",
+        "vi": "Sinhtồnđồngđội",
+        "th": "เอาชีวิตรอดทีม"
+      },
+      "aliases": [
+        "TeamSurvival",
+        "SurvivalTeamMode"
+      ],
+      "nativeNames": {
+        "zh-CN": "热血团队模式",
+        "zh-TW": "熱血模式(團體)",
+        "ko": "서바이벌팀전",
+        "en": "Survival Team",
+        "id": "Survival Team"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "client-name",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 15,
+      "key": "SinglePlay",
+      "names": {
+        "zh-CN": "单人教程",
+        "zh-TW": "單人教學",
+        "ko": "혼자놀기(튜토리얼)",
+        "en": "Single Play Tutorial",
+        "id": "Tutorial Bermain Sendiri",
+        "vi": "Hướng dẫn",
+        "th": "บทฝึกสอน"
+      },
+      "tokens": {
+        "zh-CN": "单人教程",
+        "zh-TW": "單人教學",
+        "ko": "혼자놀기(튜토리얼)",
+        "en": "SinglePlayTutorial",
+        "id": "TutorialBermainSendiri",
+        "vi": "Hướngdẫn",
+        "th": "บทฝึกสอน"
+      },
+      "aliases": [],
+      "nativeNames": {
+        "zh-CN": "教程",
+        "zh-TW": "新手教學",
+        "ko": "혼자놀기",
+        "en": "Single Play",
+        "id": "Single Play"
+      },
+      "nameSources": {
+        "zh-CN": "qualified-name",
+        "zh-TW": "qualified-name",
+        "ko": "qualified-name",
+        "en": "qualified-name",
+        "id": "qualified-name",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 16,
+      "key": "ZombiePve",
+      "names": {
+        "zh-CN": "僵尸袭击BOSS",
+        "zh-TW": "殭屍襲擊王",
+        "ko": "좀비습격보스",
+        "en": "Zombie Attack Boss",
+        "id": "Zombie Attack Boss",
+        "vi": "Trùm thây ma",
+        "th": "บอสซอมบี้"
+      },
+      "tokens": {
+        "zh-CN": "僵尸袭击BOSS",
+        "zh-TW": "殭屍襲擊王",
+        "ko": "좀비습격보스",
+        "en": "ZombieAttackBoss",
+        "id": "ZombieAttackBoss",
+        "vi": "Trùmthâyma",
+        "th": "บอสซอมบี้"
+      },
+      "aliases": [
+        "ZombiePve"
+      ],
+      "nativeNames": {
+        "zh-CN": "僵尸袭击BOSS",
+        "zh-TW": "殭屍襲擊王",
+        "ko": "좀비습격보스",
+        "en": "Zombie Attack Boss",
+        "id": "Zombie Attack Boss"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "client-name",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 17,
+      "key": "EventMole",
+      "names": {
+        "zh-CN": "打地鼠活动",
+        "zh-TW": "地鼠活動",
+        "ko": "두더지 이벤트",
+        "en": "Mole Event",
+        "id": "Mole event",
+        "vi": "Đập chuột",
+        "th": "ตีตุ่น"
+      },
+      "tokens": {
+        "zh-CN": "打地鼠活动",
+        "zh-TW": "地鼠活動",
+        "ko": "두더지이벤트",
+        "en": "MoleEvent",
+        "id": "Moleevent",
+        "vi": "Đậpchuột",
+        "th": "ตีตุ่น"
+      },
+      "aliases": [
+        "EventMole"
+      ],
+      "nativeNames": {
+        "zh-CN": "打地鼠活动",
+        "zh-TW": "地鼠活動",
+        "ko": "두더지 이벤트",
+        "en": "Mole Event",
+        "id": "Mole event"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "client-name",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 18,
+      "key": "SniperTeamSurvival",
+      "names": {
+        "zh-CN": "热血 狙击战",
+        "zh-TW": "熱血狙擊戰",
+        "ko": "서바이벌 스나전",
+        "en": "Survival Sniper",
+        "id": "Survival Sniper match",
+        "vi": "Sinh tồn bắn tỉa",
+        "th": "เอาชีวิตรอดสไนเปอร์"
+      },
+      "tokens": {
+        "zh-CN": "热血狙击战",
+        "zh-TW": "熱血狙擊戰",
+        "ko": "서바이벌스나전",
+        "en": "SurvivalSniper",
+        "id": "SurvivalSnipermatch",
+        "vi": "Sinhtồnbắntỉa",
+        "th": "เอาชีวิตรอดสไนเปอร์"
+      },
+      "aliases": [
+        "SniperTeamSurvival"
+      ],
+      "nativeNames": {
+        "zh-CN": "热血 狙击战",
+        "zh-TW": "熱血狙擊戰",
+        "ko": "서바이벌 스나전",
+        "en": "Survival Sniper",
+        "id": "Survival Sniper match"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "client-name",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 19,
+      "key": "Bomb",
+      "names": {
+        "zh-CN": "爆破模式",
+        "zh-TW": "爆炸模式",
+        "ko": "폭파미션",
+        "en": "Bomb Mission",
+        "id": "Bomb mission",
+        "vi": "Đặt bom",
+        "th": "โหมดวางระเบิด"
+      },
+      "tokens": {
+        "zh-CN": "爆破模式",
+        "zh-TW": "爆炸模式",
+        "ko": "폭파미션",
+        "en": "BombMission",
+        "id": "Bombmission",
+        "vi": "Đặtbom",
+        "th": "โหมดวางระเบิด"
+      },
+      "aliases": [
+        "Bomb"
+      ],
+      "nativeNames": {
+        "zh-CN": "爆破模式",
+        "zh-TW": "爆炸模式",
+        "ko": "폭파미션",
+        "en": "Bomb Mission",
+        "id": "Bomb mission"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "client-name",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 20,
+      "key": "Captain",
+      "names": {
+        "zh-CN": "队长战",
+        "zh-TW": "大長戰",
+        "ko": "대장전",
+        "en": "Captain",
+        "id": "Champion Mode",
+        "vi": "Đấu đội trưởng",
+        "th": "โหมดกัปตัน"
+      },
+      "tokens": {
+        "zh-CN": "队长战",
+        "zh-TW": "大長戰",
+        "ko": "대장전",
+        "en": "Captain",
+        "id": "ChampionMode",
+        "vi": "Đấuđộitrưởng",
+        "th": "โหมดกัปตัน"
+      },
+      "aliases": [],
+      "nativeNames": {
+        "zh-CN": "队长战",
+        "zh-TW": "大長戰",
+        "ko": "대장전",
+        "en": "Captain",
+        "id": "Champion Mode"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "client-name",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 21,
+      "key": "BfRunner",
+      "names": {
+        "zh-CN": "疯狂跑跑",
+        "zh-TW": "瘋狂馬拉松",
+        "ko": "크레이지 레이싱",
+        "en": "Crazy Racing",
+        "id": "Balapan Gila",
+        "vi": "Đua điên cuồng",
+        "th": "แข่งวิ่งสุดป่วน"
+      },
+      "tokens": {
+        "zh-CN": "疯狂跑跑",
+        "zh-TW": "瘋狂馬拉松",
+        "ko": "크레이지레이싱",
+        "en": "CrazyRacing",
+        "id": "BalapanGila",
+        "vi": "Đuađiêncuồng",
+        "th": "แข่งวิ่งสุดป่วน"
+      },
+      "aliases": [
+        "BfRunner"
+      ],
+      "nativeNames": {
+        "zh-CN": "疯狂跑跑",
+        "zh-TW": "瘋狂馬拉松",
+        "ko": "크레이지 레이싱",
+        "en": "Crazy Racing"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "translation",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 23,
+      "key": "Area32",
+      "names": {
+        "zh-CN": "生存模式(个人)",
+        "zh-TW": "生存模式(個人)",
+        "ko": "생존모드 개인전",
+        "en": "Survival Mode Solo",
+        "id": "Bertahan Hidup Solo",
+        "vi": "Sinh tồn mở rộng cá nhân",
+        "th": "เอาชีวิตรอดพิเศษเดี่ยว"
+      },
+      "tokens": {
+        "zh-CN": "生存模式(个人)",
+        "zh-TW": "生存模式(個人)",
+        "ko": "생존모드개인전",
+        "en": "SurvivalModeSolo",
+        "id": "BertahanHidupSolo",
+        "vi": "Sinhtồnmởrộngcánhân",
+        "th": "เอาชีวิตรอดพิเศษเดี่ยว"
+      },
+      "aliases": [
+        "Area32"
+      ],
+      "nativeNames": {
+        "zh-CN": "生存模式",
+        "zh-TW": "生存模式",
+        "ko": "생존모드 개인전",
+        "en": "Survival Mode Solo"
+      },
+      "nameSources": {
+        "zh-CN": "qualified-name",
+        "zh-TW": "qualified-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "translation",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 24,
+      "key": "ExtremeRacing",
+      "names": {
+        "zh-CN": "挑战极限",
+        "zh-TW": "極限模式",
+        "ko": "익스트림 레이싱",
+        "en": "Extreme Racing",
+        "id": "Balapan Ekstrem",
+        "vi": "Đua cực hạn",
+        "th": "แข่งวิ่งสุดขีด"
+      },
+      "tokens": {
+        "zh-CN": "挑战极限",
+        "zh-TW": "極限模式",
+        "ko": "익스트림레이싱",
+        "en": "ExtremeRacing",
+        "id": "BalapanEkstrem",
+        "vi": "Đuacựchạn",
+        "th": "แข่งวิ่งสุดขีด"
+      },
+      "aliases": [],
+      "nativeNames": {
+        "zh-CN": "挑战极限",
+        "zh-TW": "極限模式",
+        "ko": "익스트림 레이싱",
+        "en": "Extreme Racing"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "translation",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 25,
+      "key": "SuddenSurvival",
+      "names": {
+        "zh-CN": "生存模式(团队)",
+        "zh-TW": "生存模式(團隊)",
+        "ko": "생존모드 팀전",
+        "en": "Survival Mode Team",
+        "id": "Bertahan Hidup Tim",
+        "vi": "Sinh tồn mở rộng đồng đội",
+        "th": "เอาชีวิตรอดพิเศษทีม"
+      },
+      "tokens": {
+        "zh-CN": "生存模式(团队)",
+        "zh-TW": "生存模式(團隊)",
+        "ko": "생존모드팀전",
+        "en": "SurvivalModeTeam",
+        "id": "BertahanHidupTim",
+        "vi": "Sinhtồnmởrộngđồngđội",
+        "th": "เอาชีวิตรอดพิเศษทีม"
+      },
+      "aliases": [
+        "SuddenSurvival"
+      ],
+      "nativeNames": {
+        "zh-CN": "生存模式",
+        "zh-TW": "生存模式",
+        "ko": "생존모드 팀전",
+        "en": "Survival Mode Team"
+      },
+      "nameSources": {
+        "zh-CN": "qualified-name",
+        "zh-TW": "qualified-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "translation",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 26,
+      "key": "WeaponMaster",
+      "names": {
+        "zh-CN": "武器大师",
+        "zh-TW": "武器達人",
+        "ko": "웨폰마스터",
+        "en": "Weapon Master",
+        "id": "Master Senjata",
+        "vi": "Bậc thầy vũ khí",
+        "th": "เจ้าแห่งอาวุธ"
+      },
+      "tokens": {
+        "zh-CN": "武器大师",
+        "zh-TW": "武器達人",
+        "ko": "웨폰마스터",
+        "en": "WeaponMaster",
+        "id": "MasterSenjata",
+        "vi": "Bậcthầyvũkhí",
+        "th": "เจ้าแห่งอาวุธ"
+      },
+      "aliases": [],
+      "nativeNames": {
+        "zh-CN": "武器大师",
+        "zh-TW": "武器達人",
+        "ko": "웨폰마스터",
+        "en": "Weapon Master"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "translation",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 27,
+      "key": "Snowfight",
+      "names": {
+        "zh-CN": "打雪仗",
+        "zh-TW": "雪仗",
+        "ko": "눈폭탄 싸움",
+        "en": "Snow Bomb Fight",
+        "id": "Perang Bola Salju",
+        "vi": "Đấu tuyết",
+        "th": "สงครามหิมะ"
+      },
+      "tokens": {
+        "zh-CN": "打雪仗",
+        "zh-TW": "雪仗",
+        "ko": "눈폭탄싸움",
+        "en": "SnowBombFight",
+        "id": "PerangBolaSalju",
+        "vi": "Đấutuyết",
+        "th": "สงครามหิมะ"
+      },
+      "aliases": [
+        "Snowfight"
+      ],
+      "nativeNames": {
+        "zh-CN": "打雪仗",
+        "zh-TW": "雪仗",
+        "ko": "눈폭탄 싸움",
+        "en": "Snow Bomb Fight"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "translation",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 28,
+      "key": "ZombieGhost",
+      "names": {
+        "zh-CN": "幽灵僵尸大战",
+        "zh-TW": "幽靈殭屍大戰",
+        "ko": "고스트 좀비대전",
+        "en": "Ghost Zombie Battle",
+        "id": "Pertempuran Zombi Hantu",
+        "vi": "Thây ma bóng ma",
+        "th": "ซอมบี้ผี"
+      },
+      "tokens": {
+        "zh-CN": "幽灵僵尸大战",
+        "zh-TW": "幽靈殭屍大戰",
+        "ko": "고스트좀비대전",
+        "en": "GhostZombieBattle",
+        "id": "PertempuranZombiHantu",
+        "vi": "Thâymabóngma",
+        "th": "ซอมบี้ผี"
+      },
+      "aliases": [
+        "ZombieGhost"
+      ],
+      "nativeNames": {
+        "zh-CN": "幽灵僵尸大战",
+        "zh-TW": "幽靈殭屍大戰",
+        "ko": "고스트 좀비대전",
+        "en": "Ghost Zombie Battle"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "translation",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 29,
+      "key": "ControlPoint",
+      "names": {
+        "zh-CN": "占领战",
+        "zh-TW": "佔領戰",
+        "ko": "점령전",
+        "en": "Control Point",
+        "id": "Perebutan Titik",
+        "vi": "Chiếm điểm",
+        "th": "ยึดพื้นที่"
+      },
+      "tokens": {
+        "zh-CN": "占领战",
+        "zh-TW": "佔領戰",
+        "ko": "점령전",
+        "en": "ControlPoint",
+        "id": "PerebutanTitik",
+        "vi": "Chiếmđiểm",
+        "th": "ยึดพื้นที่"
+      },
+      "aliases": [],
+      "nativeNames": {
+        "zh-CN": "占领战",
+        "zh-TW": "佔領戰",
+        "ko": "점령전",
+        "en": "Control Point"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "translation",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 30,
+      "key": "FinalZone",
+      "names": {
+        "zh-CN": "终极战区",
+        "zh-TW": "最終區域",
+        "ko": "생존모드",
+        "en": "Final Zone",
+        "id": "Zona Terakhir",
+        "vi": "Khu vực cuối cùng",
+        "th": "เขตสุดท้าย"
+      },
+      "tokens": {
+        "zh-CN": "终极战区",
+        "zh-TW": "最終區域",
+        "ko": "생존모드",
+        "en": "FinalZone",
+        "id": "ZonaTerakhir",
+        "vi": "Khuvựccuốicùng",
+        "th": "เขตสุดท้าย"
+      },
+      "aliases": [],
+      "nativeNames": {
+        "zh-CN": "终极战区",
+        "zh-TW": "最終區域",
+        "ko": "생존모드",
+        "en": "Final Zone"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "translation",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 31,
+      "key": "Shotgun",
+      "names": {
+        "zh-CN": "散弹枪",
+        "zh-TW": "狙擊戰",
+        "ko": "샷건전",
+        "en": "Shotgun",
+        "id": "ShotGun",
+        "vi": "Đấu súng săn",
+        "th": "โหมดลูกซอง"
+      },
+      "tokens": {
+        "zh-CN": "散弹枪",
+        "zh-TW": "狙擊戰",
+        "ko": "샷건전",
+        "en": "Shotgun",
+        "id": "ShotGun",
+        "vi": "Đấusúngsăn",
+        "th": "โหมดลูกซอง"
+      },
+      "aliases": [
+        "散弹枪战"
+      ],
+      "nativeNames": {
+        "zh-CN": "散弹枪",
+        "zh-TW": "狙擊戰",
+        "ko": "샷건전",
+        "en": "Shotgun",
+        "id": "ShotGun"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "client-name",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 32,
+      "key": "ZombieEscape",
+      "names": {
+        "zh-CN": "逃离僵尸",
+        "zh-TW": "殭屍大逃殺",
+        "ko": "좀비탈출",
+        "en": "Zombie Escape",
+        "id": "Pelarian Zombi",
+        "vi": "Thoát khỏi thây ma",
+        "th": "หนีซอมบี้"
+      },
+      "tokens": {
+        "zh-CN": "逃离僵尸",
+        "zh-TW": "殭屍大逃殺",
+        "ko": "좀비탈출",
+        "en": "ZombieEscape",
+        "id": "PelarianZombi",
+        "vi": "Thoátkhỏithâyma",
+        "th": "หนีซอมบี้"
+      },
+      "aliases": [],
+      "nativeNames": {
+        "zh-CN": "逃离僵尸",
+        "zh-TW": "殭屍大逃殺",
+        "ko": "좀비탈출",
+        "en": "Zombie Escape"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "translation",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 33,
+      "key": "AllPang",
+      "names": {
+        "zh-CN": "泡泡大战",
+        "zh-TW": "星爆戰",
+        "ko": "올팡전",
+        "en": "All Pang",
+        "id": "Semua Pang",
+        "vi": "Đấu toàn Pang",
+        "th": "โหมดออลปัง"
+      },
+      "tokens": {
+        "zh-CN": "泡泡大战",
+        "zh-TW": "星爆戰",
+        "ko": "올팡전",
+        "en": "AllPang",
+        "id": "SemuaPang",
+        "vi": "ĐấutoànPang",
+        "th": "โหมดออลปัง"
+      },
+      "aliases": [],
+      "nativeNames": {
+        "zh-CN": "泡泡大战",
+        "zh-TW": "星爆戰",
+        "ko": "올팡전",
+        "en": "All Pang"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "translation",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 34,
+      "key": "NoItemPractice",
+      "names": {
+        "zh-CN": "无道具战练习",
+        "zh-TW": "經典模式自主練習",
+        "ko": "노템전 연습하기",
+        "en": "No Item Practice",
+        "id": "Latihan Tanpa Item",
+        "vi": "Luyện tập không vật phẩm",
+        "th": "ฝึกไร้ไอเทม"
+      },
+      "tokens": {
+        "zh-CN": "无道具战练习",
+        "zh-TW": "經典模式自主練習",
+        "ko": "노템전연습하기",
+        "en": "NoItemPractice",
+        "id": "LatihanTanpaItem",
+        "vi": "Luyệntậpkhôngvậtphẩm",
+        "th": "ฝึกไร้ไอเทม"
+      },
+      "aliases": [],
+      "nativeNames": {
+        "zh-CN": "无道具战练习",
+        "zh-TW": "經典模式練習",
+        "ko": "노템전 연습하기",
+        "en": "No Item Practice"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "qualified-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "translation",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 35,
+      "key": "JumpJump",
+      "names": {
+        "zh-CN": "2段跳跃战",
+        "zh-TW": "2段跳躍戰",
+        "ko": "무중력 제트",
+        "en": "Zero Gravity Jet",
+        "id": "Jet Tanpa Gravitasi",
+        "vi": "Phản lực không trọng lực",
+        "th": "เจ็ตไร้แรงโน้มถ่วง"
+      },
+      "tokens": {
+        "zh-CN": "2段跳跃战",
+        "zh-TW": "2段跳躍戰",
+        "ko": "무중력제트",
+        "en": "ZeroGravityJet",
+        "id": "JetTanpaGravitasi",
+        "vi": "Phảnlựckhôngtrọnglực",
+        "th": "เจ็ตไร้แรงโน้มถ่วง"
+      },
+      "aliases": [
+        "JumpJump"
+      ],
+      "nativeNames": {
+        "zh-CN": "2段跳跃战",
+        "zh-TW": "2段跳躍戰",
+        "ko": "무중력 제트",
+        "en": "Zero Gravity Jet"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "translation",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 36,
+      "key": "NoItemTutorial",
+      "names": {
+        "zh-CN": "无道具电脑练习",
+        "zh-TW": "經典模式練習(AI)",
+        "ko": "노템전 AI(연습)",
+        "en": "No Item AI Tutorial",
+        "id": "Tanpa Item AI",
+        "vi": "Đấu máy không vật phẩm",
+        "th": "ไร้ไอเทมกับบอต"
+      },
+      "tokens": {
+        "zh-CN": "无道具电脑练习",
+        "zh-TW": "經典模式練習(AI)",
+        "ko": "노템전AI(연습)",
+        "en": "NoItemAITutorial",
+        "id": "TanpaItemAI",
+        "vi": "Đấumáykhôngvậtphẩm",
+        "th": "ไร้ไอเทมกับบอต"
+      },
+      "aliases": [
+        "NoItemTutorial"
+      ],
+      "nativeNames": {
+        "zh-CN": "无道具电脑模式",
+        "zh-TW": "經典模式練習",
+        "ko": "노템전 AI",
+        "en": "No Item AI"
+      },
+      "nameSources": {
+        "zh-CN": "qualified-name",
+        "zh-TW": "qualified-name",
+        "ko": "qualified-name",
+        "en": "qualified-name",
+        "id": "translation",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 37,
+      "key": "Psionic",
+      "names": {
+        "zh-CN": "超能力战",
+        "zh-TW": "超能力戰",
+        "ko": "초능력전 탑뷰모드",
+        "en": "Psychic Top View",
+        "id": "Kekuatan Psikis",
+        "vi": "Siêu năng lực",
+        "th": "พลังจิต"
+      },
+      "tokens": {
+        "zh-CN": "超能力战",
+        "zh-TW": "超能力戰",
+        "ko": "초능력전탑뷰모드",
+        "en": "PsychicTopView",
+        "id": "KekuatanPsikis",
+        "vi": "Siêunănglực",
+        "th": "พลังจิต"
+      },
+      "aliases": [
+        "Psionic"
+      ],
+      "nativeNames": {
+        "zh-CN": "超能力战",
+        "ko": "초능력전 탑뷰모드",
+        "en": "Psychic Top View"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "translation",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "translation",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 38,
+      "key": "NoItemCustomAiWar",
+      "names": {
+        "zh-CN": "自定义无道具电脑模式",
+        "zh-TW": "自訂經典電腦模式",
+        "ko": "노템전 AI(사용자 설정)",
+        "en": "No Item Custom AI",
+        "id": "Tanpa Item AI Kustom",
+        "vi": "Đấu máy tùy chỉnh",
+        "th": "ไร้ไอเทมกับบอตแบบกำหนดเอง"
+      },
+      "tokens": {
+        "zh-CN": "自定义无道具电脑模式",
+        "zh-TW": "自訂經典電腦模式",
+        "ko": "노템전AI(사용자설정)",
+        "en": "NoItemCustomAI",
+        "id": "TanpaItemAIKustom",
+        "vi": "Đấumáytùychỉnh",
+        "th": "ไร้ไอเทมกับบอตแบบกำหนดเอง"
+      },
+      "aliases": [
+        "NoItemCustomAiWar"
+      ],
+      "nativeNames": {
+        "zh-CN": "无道具电脑模式",
+        "ko": "노템전 AI",
+        "en": "No Item AI"
+      },
+      "nameSources": {
+        "zh-CN": "qualified-name",
+        "zh-TW": "translation",
+        "ko": "qualified-name",
+        "en": "qualified-name",
+        "id": "translation",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 39,
+      "key": "TeamSurvivalCustomAiWar",
+      "names": {
+        "zh-CN": "生存电脑战",
+        "zh-TW": "生存電腦戰",
+        "ko": "서바이벌팀전 AI",
+        "en": "Survival Team AI",
+        "id": "Bertahan Hidup Tim AI",
+        "vi": "Sinh tồn đồng đội với máy",
+        "th": "เอาชีวิตรอดทีมกับบอต"
+      },
+      "tokens": {
+        "zh-CN": "生存电脑战",
+        "zh-TW": "生存電腦戰",
+        "ko": "서바이벌팀전AI",
+        "en": "SurvivalTeamAI",
+        "id": "BertahanHidupTimAI",
+        "vi": "Sinhtồnđồngđộivớimáy",
+        "th": "เอาชีวิตรอดทีมกับบอต"
+      },
+      "aliases": [
+        "TeamSurvivalCustomAiWar"
+      ],
+      "nativeNames": {
+        "zh-CN": "生存电脑战",
+        "ko": "서바이벌팀전 AI",
+        "en": "Survival Team AI"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "translation",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "translation",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 40,
+      "key": "TrainingRoom",
+      "names": {
+        "zh-CN": "训练场",
+        "zh-TW": "訓練場",
+        "ko": "훈련장",
+        "en": "Training Room",
+        "id": "Ruang Latihan",
+        "vi": "Phòng luyện tập",
+        "th": "ห้องฝึก"
+      },
+      "tokens": {
+        "zh-CN": "训练场",
+        "zh-TW": "訓練場",
+        "ko": "훈련장",
+        "en": "TrainingRoom",
+        "id": "RuangLatihan",
+        "vi": "Phòngluyệntập",
+        "th": "ห้องฝึก"
+      },
+      "aliases": [],
+      "nativeNames": {
+        "ko": "훈련장",
+        "en": "Training Room"
+      },
+      "nameSources": {
+        "zh-CN": "translation",
+        "zh-TW": "translation",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "translation",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 41,
+      "key": "BnB",
+      "names": {
+        "zh-CN": "泡泡堂模式",
+        "zh-TW": "爆爆王模式",
+        "ko": "크아모드",
+        "en": "Crazy Arcade",
+        "id": "Mode Arkade",
+        "vi": "Chế độ đặt bóng",
+        "th": "โหมดวางลูกโป่ง"
+      },
+      "tokens": {
+        "zh-CN": "泡泡堂模式",
+        "zh-TW": "爆爆王模式",
+        "ko": "크아모드",
+        "en": "CrazyArcade",
+        "id": "ModeArkade",
+        "vi": "Chếđộđặtbóng",
+        "th": "โหมดวางลูกโป่ง"
+      },
+      "aliases": [
+        "BnB"
+      ],
+      "nativeNames": {
+        "ko": "크아모드",
+        "en": "Crazy Arcade"
+      },
+      "nameSources": {
+        "zh-CN": "translation",
+        "zh-TW": "translation",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "translation",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 42,
+      "key": "TopViewSurvival",
+      "names": {
+        "zh-CN": "俯视生存模式",
+        "zh-TW": "俯視生存模式",
+        "ko": "탑뷰생존모드",
+        "en": "Survival Top View",
+        "id": "Bertahan Hidup Tampak Atas",
+        "vi": "Sinh tồn góc nhìn từ trên",
+        "th": "เอาชีวิตรอดมุมสูง"
+      },
+      "tokens": {
+        "zh-CN": "俯视生存模式",
+        "zh-TW": "俯視生存模式",
+        "ko": "탑뷰생존모드",
+        "en": "SurvivalTopView",
+        "id": "BertahanHidupTampakAtas",
+        "vi": "Sinhtồngócnhìntừtrên",
+        "th": "เอาชีวิตรอดมุมสูง"
+      },
+      "aliases": [
+        "TopViewSurvival"
+      ],
+      "nativeNames": {
+        "ko": "탑뷰생존모드",
+        "en": "Survival Top View"
+      },
+      "nameSources": {
+        "zh-CN": "translation",
+        "zh-TW": "translation",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "translation",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 43,
+      "key": "ZombieOrigin",
+      "names": {
+        "zh-CN": "僵尸模式G",
+        "zh-TW": "殭屍模式G",
+        "ko": "좀비대전 G",
+        "en": "Zombie Battle G",
+        "id": "Pertempuran Zombi G",
+        "vi": "Đấu thây ma G",
+        "th": "โหมดซอมบี้G"
+      },
+      "tokens": {
+        "zh-CN": "僵尸模式G",
+        "zh-TW": "殭屍模式G",
+        "ko": "좀비대전G",
+        "en": "ZombieBattleG",
+        "id": "PertempuranZombiG",
+        "vi": "ĐấuthâymaG",
+        "th": "โหมดซอมบี้G"
+      },
+      "aliases": [
+        "ZombieOrigin"
+      ],
+      "nativeNames": {
+        "ko": "좀비대전 G",
+        "en": "Zombie Battle G"
+      },
+      "nameSources": {
+        "zh-CN": "translation",
+        "zh-TW": "translation",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "translation",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 44,
+      "key": "SimpleSuddenSurvival",
+      "names": {
+        "zh-CN": "紧凑生存模式",
+        "zh-TW": "精簡生存模式",
+        "ko": "생존모드 콤팩트",
+        "en": "Compact Survival",
+        "id": "Bertahan Hidup Ringkas",
+        "vi": "Sinh tồn thu gọn",
+        "th": "เอาชีวิตรอดฉบับย่อ"
+      },
+      "tokens": {
+        "zh-CN": "紧凑生存模式",
+        "zh-TW": "精簡生存模式",
+        "ko": "생존모드콤팩트",
+        "en": "CompactSurvival",
+        "id": "BertahanHidupRingkas",
+        "vi": "Sinhtồnthugọn",
+        "th": "เอาชีวิตรอดฉบับย่อ"
+      },
+      "aliases": [
+        "SimpleSuddenSurvival"
+      ],
+      "nativeNames": {
+        "ko": "생존모드 콤팩트",
+        "en": "Compact Survival"
+      },
+      "nameSources": {
+        "zh-CN": "translation",
+        "zh-TW": "translation",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "translation",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 45,
+      "key": "ZombieSurvival",
+      "names": {
+        "zh-CN": "僵尸身份战",
+        "zh-TW": "殭屍身分戰",
+        "ko": "좀피아게임",
+        "en": "Zompia Game",
+        "id": "Permainan Zompia",
+        "vi": "Trò chơi Zompia",
+        "th": "เกมซอมเปีย"
+      },
+      "tokens": {
+        "zh-CN": "僵尸身份战",
+        "zh-TW": "殭屍身分戰",
+        "ko": "좀피아게임",
+        "en": "ZompiaGame",
+        "id": "PermainanZompia",
+        "vi": "TròchơiZompia",
+        "th": "เกมซอมเปีย"
+      },
+      "aliases": [
+        "ZombieSurvival"
+      ],
+      "nativeNames": {
+        "ko": "좀피아게임",
+        "en": "Zompia Game"
+      },
+      "nameSources": {
+        "zh-CN": "translation",
+        "zh-TW": "translation",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "translation",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 101,
+      "key": "Horde",
+      "names": {
+        "zh-CN": "海盗模式",
+        "zh-TW": "海盜大戰",
+        "ko": "해적대전",
+        "en": "Pirate Battle",
+        "id": "Pirate Battle",
+        "vi": "Đấu hải tặc",
+        "th": "โหมดโจรสลัด"
+      },
+      "tokens": {
+        "zh-CN": "海盗模式",
+        "zh-TW": "海盜大戰",
+        "ko": "해적대전",
+        "en": "PirateBattle",
+        "id": "PirateBattle",
+        "vi": "Đấuhảitặc",
+        "th": "โหมดโจรสลัด"
+      },
+      "aliases": [
+        "Horde"
+      ],
+      "nativeNames": {
+        "zh-CN": "海盗模式",
+        "zh-TW": "海盜大戰",
+        "ko": "해적대전",
+        "en": "Pirate Battle",
+        "id": "Pirate Battle"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "client-name",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 102,
+      "key": "HordeZhe",
+      "names": {
+        "zh-CN": "海盗大战 - 僵尸万圣节活动",
+        "zh-TW": "海盜大戰 - 殭屍 HALLOWEEN 活動",
+        "ko": "해적대전 - 좀비 할로윈 이벤트",
+        "en": "Pirate Battle - Zombie Halloween",
+        "id": "Pirate Battle - Zombi Mini halloween Event",
+        "vi": "Hải tặc Halloween",
+        "th": "โจรสลัดฮาโลวีน"
+      },
+      "tokens": {
+        "zh-CN": "海盗大战-僵尸万圣节活动",
+        "zh-TW": "海盜大戰-殭屍HALLOWEEN活動",
+        "ko": "해적대전-좀비할로윈이벤트",
+        "en": "PirateBattle-ZombieHalloween",
+        "id": "PirateBattle-ZombiMinihalloweenEvent",
+        "vi": "HảitặcHalloween",
+        "th": "โจรสลัดฮาโลวีน"
+      },
+      "aliases": [
+        "HordeZhe"
+      ],
+      "nativeNames": {
+        "zh-CN": "海盗大战 - 僵尸万圣节活动",
+        "zh-TW": "海盜大戰 - 殭屍 HALLOWEEN 活動",
+        "ko": "해적대전 - 좀비 할로윈 이벤트",
+        "en": "Pirate Battle - Zombie Halloween",
+        "id": "Pirate Battle - Zombi Mini halloween Event"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "client-name",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 103,
+      "key": "HordeTutor",
+      "names": {
+        "zh-CN": "海盗教程",
+        "zh-TW": "海盜教學",
+        "ko": "혼자놀기(해적)",
+        "en": "Pirate Tutorial",
+        "id": "Tutorial Bajak Laut",
+        "vi": "Hướng dẫn hải tặc",
+        "th": "ฝึกต่อสู้โจรสลัด"
+      },
+      "tokens": {
+        "zh-CN": "海盗教程",
+        "zh-TW": "海盜教學",
+        "ko": "혼자놀기(해적)",
+        "en": "PirateTutorial",
+        "id": "TutorialBajakLaut",
+        "vi": "Hướngdẫnhảitặc",
+        "th": "ฝึกต่อสู้โจรสลัด"
+      },
+      "aliases": [
+        "HordeTutor"
+      ],
+      "nativeNames": {
+        "zh-CN": "教程",
+        "zh-TW": "新手教學",
+        "ko": "혼자놀기",
+        "en": "Single Play",
+        "id": "Single Play"
+      },
+      "nameSources": {
+        "zh-CN": "qualified-name",
+        "zh-TW": "qualified-name",
+        "ko": "qualified-name",
+        "en": "qualified-name",
+        "id": "qualified-name",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 105,
+      "key": "ZombiePvePrologue",
+      "names": {
+        "zh-CN": "僵尸袭击序章",
+        "zh-TW": "殭屍襲擊序章",
+        "ko": "좀비습격 서막",
+        "en": "Zombie Raid Prologue",
+        "id": "Prolog Serangan Zombi",
+        "vi": "Mở đầu đột kích thây ma",
+        "th": "บทนำจู่โจมซอมบี้"
+      },
+      "tokens": {
+        "zh-CN": "僵尸袭击序章",
+        "zh-TW": "殭屍襲擊序章",
+        "ko": "좀비습격서막",
+        "en": "ZombieRaidPrologue",
+        "id": "PrologSeranganZombi",
+        "vi": "Mởđầuđộtkíchthâyma",
+        "th": "บทนำจู่โจมซอมบี้"
+      },
+      "aliases": [
+        "ZombiePvePrologue"
+      ],
+      "nativeNames": {},
+      "nameSources": {
+        "zh-CN": "translation",
+        "zh-TW": "translation",
+        "ko": "translation",
+        "en": "translation",
+        "id": "translation",
+        "vi": "translation",
+        "th": "translation"
+      }
+    },
+    {
+      "id": 106,
+      "key": "PirateAssaultSeason3",
+      "names": {
+        "zh-CN": "海盗大入侵",
+        "zh-TW": "海盜大襲擊",
+        "ko": "해적 대침공",
+        "en": "Pirate Invasion",
+        "id": "Invasi Bajak Laut",
+        "vi": "Hải tặc xâm lược",
+        "th": "โจรสลัดบุก"
+      },
+      "tokens": {
+        "zh-CN": "海盗大入侵",
+        "zh-TW": "海盜大襲擊",
+        "ko": "해적대침공",
+        "en": "PirateInvasion",
+        "id": "InvasiBajakLaut",
+        "vi": "Hảitặcxâmlược",
+        "th": "โจรสลัดบุก"
+      },
+      "aliases": [
+        "PirateAssaultSeason3"
+      ],
+      "nativeNames": {
+        "zh-CN": "海盗大入侵",
+        "zh-TW": "海盜大襲擊",
+        "ko": "해적 대침공",
+        "en": "Pirate Invasion"
+      },
+      "nameSources": {
+        "zh-CN": "client-name",
+        "zh-TW": "client-name",
+        "ko": "client-name",
+        "en": "published-gloss",
+        "id": "translation",
+        "vi": "translation",
+        "th": "translation"
+      }
+    }
+  ]
+}

@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 namespace BubbleFighter.Fantasy.Dialect.Messages;
 
 /// <summary>Mounts audited native game-side relay offers and complete connection reports, without opening a listener.</summary>
-[Plugin("dialect.match-offers", Description = "Native legacy room endpoint offers and connection reports.",
+[Plugin("dialect.match-offers", Category = "network", Names = ["en=Match offers", "zh-Hans=对局邀请", "zh-Hant=對局邀請", "ko=매치 제안"], Description = "Native legacy room endpoint offers and connection reports.",
     Requires = [typeof(IPacketRouter), typeof(IMessageRouter), typeof(IOpcodeTableRegistry)],
     OptionalMany = [typeof(IOpcodeTable)],
     ProvidesMany = [typeof(IMatchCapabilityOfferSender), typeof(IInboundMessageBinding<MatchConnectionReported>)])]

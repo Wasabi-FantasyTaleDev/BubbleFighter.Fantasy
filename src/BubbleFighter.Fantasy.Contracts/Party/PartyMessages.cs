@@ -224,7 +224,22 @@ public sealed record PartyUpdated(PartySnapshot Party, PartyAppearance? Appearan
 /// <param name="UserNum">The member whose client profile is refreshed.</param>
 /// <param name="CharacterItemId">The resolved native character item.</param>
 /// <param name="EquippedItemIds">The committed worn items, including the character when present.</param>
-public sealed record PartyAppearance(int UserNum, int CharacterItemId, IReadOnlyList<int> EquippedItemIds);
+public sealed record PartyAppearance(int UserNum, int CharacterItemId, IReadOnlyList<int> EquippedItemIds)
+{
+    private IReadOnlyList<Rooms.RoomItemAttribute> _itemAttributes = [];
+
+    /// <summary>Gets copied instance modifiers belonging to the committed party appearance.</summary>
+    public IReadOnlyList<Rooms.RoomItemAttribute> ItemAttributes
+    {
+        get => _itemAttributes;
+        init
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            _itemAttributes = value.Count == 0 ? Array.Empty<Rooms.RoomItemAttribute>()
+                : new Progress.RoundEquipmentSnapshot(EquippedItemIds, value).ItemAttributes;
+        }
+    }
+}
 
 /// <summary>A new leader after the old one left (S2C gspUpdatePartyLeader).</summary>
 /// <param name="Left">The nickname of the member who left.</param>

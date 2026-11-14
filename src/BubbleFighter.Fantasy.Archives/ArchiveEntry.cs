@@ -21,6 +21,23 @@ public interface IArchiveReader : IDisposable
     /// <exception cref="FileNotFoundException">No member has that path.</exception>
     /// <exception cref="InvalidDataException">The member's stored data is damaged.</exception>
     byte[] Read(string path);
+
+    /// <summary>Gets a member's unpacked size from the index, without reading the member.</summary>
+    /// <param name="path">The member path; the lookup ignores case and accepts <c>\</c> separators.</param>
+    /// <returns>The unpacked size in bytes.</returns>
+    /// <exception cref="FileNotFoundException">No member has that path.</exception>
+    long Length(string path);
+
+    /// <summary>
+    /// Opens one member for a single read from start to end. The member is decrypted and unpacked as it is read,
+    /// so its size never has to fit in memory at once. The read that delivers the last byte checks the member's
+    /// length and checksum; a caller that stops early has the rest checked when it disposes the stream.
+    /// </summary>
+    /// <param name="path">The member path; the lookup ignores case and accepts <c>\</c> separators.</param>
+    /// <returns>A read-only, forward-only stream of the member's bytes.</returns>
+    /// <exception cref="FileNotFoundException">No member has that path.</exception>
+    /// <exception cref="InvalidDataException">Thrown by a read or by disposal when the stored data is damaged.</exception>
+    Stream OpenRead(string path);
 }
 
 /// <summary>

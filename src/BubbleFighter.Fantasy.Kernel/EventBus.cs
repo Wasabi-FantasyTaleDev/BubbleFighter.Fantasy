@@ -29,14 +29,15 @@ public sealed class EventBusOptions
 /// </remarks>
 public sealed class EventBus : IEventBus
 {
-    private sealed record Key(Type EventType, Type? ResultType);
+    private readonly record struct Key(Type EventType, Type? ResultType);
 
     private sealed record Frame(Entry Entry, Frame? Parent);
 
     private static readonly AsyncLocal<Frame?> Running = new();
 
     private readonly object _gate = new();
-    private readonly Dictionary<Key, List<Entry>> _handlers = [];
+    // Each array is kept in dispatch order and replaced, never changed, so a dispatch reads it without copying or sorting.
+    private readonly Dictionary<Key, Entry[]> _handlers = [];
     private readonly ILogger _logger;
     private readonly TimeSpan _drainTimeout;
     private long _sequence;
@@ -64,9 +65,16 @@ public sealed class EventBus : IEventBus
         lock (_gate)
         {
             var entry = new Entry(this, key, priority, ++_sequence, handler);
-            if (!_handlers.TryGetValue(key, out var list))
-                _handlers[key] = list = [];
-            list.Add(entry);
+            var current = _handlers.TryGetValue(key, out var list) ? list : [];
+            // Higher priority first; the new entry has the highest sequence, so it goes after every equal priority.
+            var at = 0;
+            while (at < current.Length && current[at].Priority >= priority)
+                at++;
+            var next = new Entry[current.Length + 1];
+            current.AsSpan(0, at).CopyTo(next);
+            next[at] = entry;
+            current.AsSpan(at).CopyTo(next.AsSpan(at + 1));
+            _handlers[key] = next;
             return entry;
         }
     }
@@ -74,21 +82,28 @@ public sealed class EventBus : IEventBus
     private void Remove(Key key, Entry entry)
     {
         lock (_gate)
-            if (_handlers.TryGetValue(key, out var list))
+            if (_handlers.TryGetValue(key, out var list) && Array.IndexOf(list, entry) is var at and >= 0)
             {
-                list.Remove(entry);
-                if (list.Count == 0)
+                if (list.Length == 1)
+                {
                     _handlers.Remove(key);
+                    return;
+                }
+                var next = new Entry[list.Length - 1];
+                list.AsSpan(0, at).CopyTo(next);
+                list.AsSpan(at + 1).CopyTo(next.AsSpan(at));
+                _handlers[key] = next;
             }
     }
 
     private Entry[] Snapshot(Key key)
     {
         lock (_gate)
-            return _handlers.TryGetValue(key, out var list)
-                ? list.OrderByDescending(e => e.Priority).ThenBy(e => e.Sequence).ToArray()
-                : [];
+            return _handlers.TryGetValue(key, out var list) ? list : [];
     }
+
+    /// <inheritdoc />
+    public bool HasHandlers<TEvent>() where TEvent : IEvent => Snapshot(new Key(typeof(TEvent), null)).Length > 0;
 
     /// <inheritdoc />
     public IDisposable On<TEvent>(Action<TEvent> handler, int priority = 0) where TEvent : IEvent
@@ -208,8 +223,11 @@ public sealed class EventBus : IEventBus
     {
         ArgumentNullException.ThrowIfNull(terminal);
         Func<CancellationToken, ValueTask<TResult>> next = terminal;
-        foreach (var entry in Snapshot(new Key(typeof(TEvent), typeof(TResult))).Reverse())
+        // The snapshot is shared by every dispatch; walk it backwards rather than reversing it.
+        var entries = Snapshot(new Key(typeof(TEvent), typeof(TResult)));
+        for (var index = entries.Length - 1; index >= 0; index--)
         {
+            var entry = entries[index];
             if (entry.Handler is not Func<TEvent, Func<CancellationToken, ValueTask<TResult>>, CancellationToken, ValueTask<TResult>> middleware)
                 continue;
             var inner = next;

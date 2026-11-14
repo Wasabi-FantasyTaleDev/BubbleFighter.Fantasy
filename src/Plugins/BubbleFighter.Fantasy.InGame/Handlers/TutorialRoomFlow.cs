@@ -17,16 +17,19 @@ internal sealed class TutorialRoomFlow(RoomRegistry registry, IReadOnlyDictionar
         if (request.ModeId is < 1 or > ushort.MaxValue || string.IsNullOrEmpty(request.MapKey)
             || request.CharacterItemId <= 0 || request.CountdownMs < 0)
             throw new InvalidOperationException("Tutorial admission requires a native mode, map, character and nonnegative countdown.");
+        var equipment = new RoundEquipmentSnapshot(request.EquippedItemIds, request.ItemAttributes);
+        request = request with { EquippedItemIds = equipment.WornItemIds, ItemAttributes = equipment.ItemAttributes };
         await CloseAsync(session, new TutorialRoundClosed(), ct).ConfigureAwait(false);
         var (user, nickname) = SessionPlayer.RequireIdentity(session);
         var (room, seat) = registry.CreateForMode(session, checked((ushort)request.ModeId), request.MapKey,
             string.Empty, user, nickname, listed: false);
         lock (room.Gate)
         {
-            room.Tutorial = request with { EquippedItemIds = request.EquippedItemIds.ToArray() };
+            room.Tutorial = request;
             room.TutorialCancellation = new CancellationTokenSource();
             seat.CharacterId = request.CharacterItemId;
             seat.EquippedItemIds = request.EquippedItemIds.ToArray();
+            seat.ItemAttributes = equipment.ItemAttributes;
             seat.Team = request.Team;
             room.MarkStarting();
             if (request.GameConnectionOnly)

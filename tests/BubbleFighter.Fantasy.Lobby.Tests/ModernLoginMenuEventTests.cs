@@ -57,7 +57,15 @@ public sealed class ModernLoginMenuEventTests
         using var subscription = rig.Events.OnAsync<LoginMenuInstalled>((installed, _) =>
         {
             Assert.Same(session, installed.Session);
-            Assert.Same(login, installed.Login);
+            Assert.Equal((login.UserNumber, login.Account, login.Nickname, login.Level, login.ServerTime, login.CharacterItemId,
+                    login.Wallet, login.InventoryIsComplete, login.OfferTutorial, login.ColorIndex),
+                (installed.Login.UserNumber, installed.Login.Account, installed.Login.Nickname, installed.Login.Level,
+                    installed.Login.ServerTime, installed.Login.CharacterItemId, installed.Login.Wallet,
+                    installed.Login.InventoryIsComplete, installed.Login.OfferTutorial, installed.Login.ColorIndex));
+            Assert.Equal(login.EquippedItemIds, installed.Login.EquippedItemIds);
+            Assert.Equal(login.CharacterBag, installed.Login.CharacterBag);
+            Assert.Equal(login.EquippedBag, installed.Login.EquippedBag);
+            Assert.Equal(login.ExpiredItemIds, installed.Login.ExpiredItemIds);
             Assert.Equal("kr-1256/game", installed.Protocol);
             Assert.Equal(rig.Opcodes.S2C("gspNotifyFirstMoveChannel"), session.Sent[^1]);
             seen.Add(installed);

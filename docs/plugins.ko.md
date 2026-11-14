@@ -13,13 +13,15 @@ updated: 2026-10-23
 - [설치](installation.md)를 마쳤습니다: `dotnet build BubbleFighter.Fantasy.sln -c Release`가 경고 0개, 오류 0개를 보고합니다.
 - 터미널이 저장소 루트에 있습니다. 별도 안내가 없는 한 이 페이지의 모든 명령은 여기서 실행합니다.
 - .NET 10 SDK를 사용할 수 있습니다: `dotnet --version`이 10.x 버전을 보고합니다.
-- 실행 단계에는 `BFF_MYSQL_PASSWORD`가 비어 있지 않은 임시 값인 `.env` 파일이 필요합니다. MySQL을 비활성화해도 이 변수가 필요한 이유는 [빠른 시작](quickstart.md)을 참고하세요.
+- 격리 메모리 패치를 사용하는 로컬 점검에는 `.env`나 데이터베이스 설정이 필요하지 않습니다. [빠른 시작](quickstart.md)을 참고하세요.
 - 로컬 검사 패치 `tools/local-checks/isolated-memory.patch.yaml`이 존재합니다. 이 페이지의 모든 로컬 실행은 이 패치를 적용하므로 실제 데이터베이스를 건드리지 않습니다.
 - 첫 실행에 사용하는 `management` profile은 관리 기능만 제공하며 클라이언트 데이터가 필요 없습니다. `kr-812` 같은 게임 profile은 해당 빌드의 클라이언트 데이터도 필요합니다.
 
 ## 플러그인 모델
 
 플러그인은 `[Plugin("plugin.id")]`로 표시되고 `BubbleFighter.Fantasy.Abstractions`의 `IPlugin`을 구현하는 클래스입니다. 속성의 id가 행이 참조하는 **플러그인 id**입니다. profile은 **플러그인 행**을 제공하며, 각 행의 `id`는 **행 id**, 즉 구성된 profile 안에서 유일한 인스턴스 식별자입니다. 하나의 구현을 여러 번 마운트할 수 있습니다. `kr-1256` bundle은 `net.tcp` 플러그인을 `game-listener`와 `relay-listener` 두 행으로 마운트하고, `all` profile은 각 빌드의 행에 `<build>.<행 id>` 접두사를 붙여 마운트합니다.
+
+플러그인 id는 필수입니다. 플러그인은 관리 화면에 표시될 방식도 선언할 수 있습니다. `Names`에는 언어마다 `language=name` 항목을 하나씩 적고(`en`, `zh-Hans`, `zh-Hant`, `ko`), `Category`는 그룹을 지정합니다(`gameplay`, `items`, `social`, `network`, `launcher`, `storage`, `cluster`, `admin`, `distribution`, `core`). 예: `[Plugin("lobby", Category = "gameplay", Names = ["en=Lobby and login", "ko=로비와 로그인"])]`. 둘 다 선택 사항이며, WebUI는 화면 언어의 이름, 영어 이름, 플러그인 id 순으로 표시합니다. 형식이 잘못된 항목은 플러그인 로드를 막으므로 오타를 바로 찾을 수 있습니다. 여러 빌드가 같은 플러그인을 마운트해도 WebUI는 그 플러그인을 한 번만 표시하고 실행 중인 클라이언트 빌드를 함께 보여 줍니다.
 
 플러그인은 서로의 클래스를 볼 수 없습니다. 플러그인은 공유 인터페이스 형식으로만 서비스를 게시하고 사용합니다. 이 인터페이스는 Host가 한 번 로드하고 모든 플러그인에 공유하는 두 어셈블리에 있습니다: `BubbleFighter.Fantasy.Abstractions`(`IPlugin`, `IServiceRegistry`, `IEventBus`, `IMessageRouter` 같은 커널 계약)와 `BubbleFighter.Fantasy.Contracts`(메시지 레코드와 도메인 서비스 같은 게임 계약). 행은 필요한 것과 게시하는 것을 선언하며, Host는 요구 사항이 등록된 뒤에만 해당 행을 활성화합니다. 따라서 활성화 순서는 YAML의 행 순서가 아니라 서비스 가용성으로 정해집니다.
 
@@ -29,6 +31,7 @@ updated: 2026-10-23
 | `Optional` | 없어도 되는 서비스. 선택된 제공자는 언로드와 다시 로드 순서에 참여 |
 | `Provides`, `ConditionalProvides` | 이 행이 활성화 중에 반드시, 또는 일부 설정에서 게시하는 서비스 |
 | `ProvidesMany`, `RequiresMany`, `OptionalMany` | 순서형 확장 지점: 게시, 하나 이상 요구, 빈 목록 허용 |
+| `LiveMany` | `GetAll`을 호출할 때마다 그 시점의 상태로 읽는 확장 지점. 제공자는 의존성이 아니므로 이 행은 제공자를 기다리지 않고, 제공자가 로드되거나 언로드되어도 다시 시작되지 않습니다. 작업마다 다시 읽고 멤버를 보관하지 마세요. 네이티브 플러그인 전용 |
 | `Decorates` | `RegisterDecoratable`로 명시적으로 허용된 싱글턴을 감싸는 데코레이터 계층 |
 | `Overrides`, `Middleware` | 형식화된 메시지 처리기 교체와 래핑. `rowId:정규화된 메시지 타입`으로 표기 |
 | `SupportedBuilds`, `SupportedFamilies` | 행이 속한 profile에 대한 클라이언트 빌드 호환성 검사 |
@@ -58,11 +61,11 @@ dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- plugins list -
 실행 중인 서버는 `GET /api/plugins`에서 행 인스턴스를 노출합니다:
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:8080/api/plugins | Select-Object rowId, plugin, state, error
+Invoke-RestMethod http://127.0.0.1:7300/api/plugins | Select-Object rowId, plugin, state, error
 ```
 
 ```sh
-curl -s http://127.0.0.1:8080/api/plugins
+curl -s http://127.0.0.1:7300/api/plugins
 ```
 
 각 항목에는 `rowId`, `plugin`, `source`, `state`, `error`, `codeRefreshPolicy`, `codeLifetime`, `restartRequiredForReclamation`, `isRetiring`, `overrides`, `version`, `contractVersions`, `supportedBuilds`가 있습니다. 상태는 문자열로 기록되며 `PluginState` 열거형에서 가져옵니다. `start`로 시작한 서버에서는 `/api/plugins`에 로그인한 관리자 세션이 필요하며, `run --profile` 서버는 루프백에서 로그인 없이 응답합니다. 자세한 내용은 [빠른 시작](quickstart.md)을 참고하세요.
@@ -279,6 +282,10 @@ context.Effect(context.Services.Get<ICommandRegistry>().Register(context,
 `ingame` 행의 config에 `shared_chat_commands: true`를 설정하면 해당 게임 범위의 채팅을 공유 명령에 연결합니다. 네이티브 클라이언트 검증 전까지 기본값은 `false`이며, 비활성 범위는 기존 방장 전용 `!start`, `!set`을 유지합니다. 활성화하려면 두 공유 명령 서비스가 모두 필요하며 없으면 활성화에 실패합니다.
 
 core 번들의 `commands.game` 행은 활성 범위를 같은 디스패처에 연결하며 네이티브 플러그인이 등록한 명령도 호출합니다. 모든 게임 범위에 `/start`, `/mode <번호>`(별칭 `/set`)를 한 번만 등록하고 `!`, `！` 접두사도 지원합니다. `game.room.start`, `game.room.mode` 권한은 기본적으로 일반 플레이어에게 허용되며 자신의 대기 중인 방에만 적용됩니다. 설정된 모드 표에 없는 번호는 거부됩니다. 명령 시작은 준비 표시를 건너뛰지만 기본 시작 버튼의 방장 검사는 유지됩니다. 권한이 거부된 접두사 입력은 로컬 처리기로 우회하지 않습니다.
+
+`ingame` 행은 방 제목의 `#19#`, `#폭파미션#` 같은 모드 태그도 처리합니다. 공통 번들은 `mode_name_table_path: data/room-modes.json`을 설정하며, 이 목록에는 기본 방 만들기 창의 모드도 포함한 알려진 모드 47개가 있습니다. 선택 이름과 공백 없는 태그는 중국어 간체·번체, 한국어, 영어, 인도네시아어, 베트남어, 태국어로 제공됩니다. 예를 들어 `#폭파미션#내 방`은 폭파미션 방을 만들고 제목을 `내 방`으로 표시합니다. 클라이언트가 나중에 제목을 다시 제출할 때도 같은 규칙을 사용합니다. 알 수 없거나 모호한 원래 이름은 일반 제목으로 남습니다. 처음 인식된 태그가 모드를 결정하고 뒤의 태그는 제목에 남으며 숫자 태그의 기존 범위와 우선순위는 유지됩니다.
+
+모드 이름 표는 데이터만 정의하며 모드 로직을 새로 구현하지 않습니다. 형식 1의 `modes` 배열에는 고유한 `id`와 `key`, 언어 키가 일치하는 `names`와 `tokens` 객체, 선택적인 공백 없는 `aliases`가 있습니다. 태그는 이름에서 공백을 제거한 Unicode 값이어야 하며 문자 대소문자는 순서 비교로 무시합니다. 서로 다른 번호가 같은 태그나 별칭을 가질 수 없습니다. 개인/팀 생존과 두 AI 모드처럼 이름이 같은 항목에는 구분자를 붙입니다. `nativeNames`와 `nameSources`는 이름의 근거를 보존하지만 모호한 원래 이름을 자동으로 별칭에 넣지는 않습니다. 원래 표시 이름이 없는 모드는 출처를 구분한 번역이나 알려진 코드명을 사용합니다. `mode_name_table_path`를 비우면 숫자 태그만 사용합니다. 설정 파일이 없거나 형식 또는 이름 충돌이 있으면 활성화가 실패합니다. 이 설정은 패킷 구조나 기본 제목 입력란의 길이 제한을 변경하지 않습니다.
 
 게임 플러그인은 `IGameCommandEndpoints`를 통해 `IGameCommandEndpoint`를 등록하고 반환된 해제 핸들을 소유합니다. 라우팅은 인증된 게임 계정을 현재 좌석과 대조하고 중복된 세션 소유권을 거부하며 게임 플러그인의 수명 안에서 실행합니다. `commands.game.max_endpoints`는 기본 512로 동시 범위 등록 저장소를 제한합니다. 이 행은 지도, 관리 또는 방 이동 명령을 아직 제공하지 않습니다.
 

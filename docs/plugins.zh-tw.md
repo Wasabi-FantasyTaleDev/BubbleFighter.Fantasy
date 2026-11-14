@@ -13,13 +13,15 @@ updated: 2026-10-23
 - 已完成[安裝](installation.md)：`dotnet build BubbleFighter.Fantasy.sln -c Release` 報告零警告、零錯誤。
 - 終端機位於儲存庫根目錄；除步驟另有說明外，本頁命令都在此執行。
 - .NET 10 SDK 可用：`dotnet --version` 輸出 10.x 版本。
-- 執行步驟需要一份 `.env` 檔案，其中 `BFF_MYSQL_PASSWORD` 為非空的臨時值。為什麼即使停用 MySQL 也需要該變數，見[快速入門](quickstart.md)。
+- 使用隔離記憶體修補檔的本機檢查不需要 `.env` 或資料庫設定，見[快速入門](quickstart.md)。
 - 本機檢查修補檔 `tools/local-checks/isolated-memory.patch.yaml` 存在。本頁所有本機執行都會套用它，因此不會接觸真實資料庫。
 - 首次執行使用的 `management` profile 只提供管理功能，不需要用戶端資料。`kr-812` 這類遊戲 profile 還需要該版本對應的用戶端資料。
 
 ## 模組模型
 
 模組是標記 `[Plugin("plugin.id")]` 並實作 `BubbleFighter.Fantasy.Abstractions` 中 `IPlugin` 的類別。屬性的 id 就是資料列引用的**模組 id**。profile 提供**模組資料列**，每個資料列的 `id` 是**資料列 id**，也就是組合後 profile 內唯一的執行個體識別。同一個實作可以掛載多次：`kr-1256` bundle 把 `net.tcp` 模組掛載為 `game-listener` 與 `relay-listener` 兩個資料列，`all` profile 則為每個版本的資料列加上 `<build>.<資料列 id>` 前綴。
+
+插件 id 為必填。插件也可以宣告管理介面如何顯示它：`Names` 每種語言寫一筆 `language=name`（`en`、`zh-Hans`、`zh-Hant`、`ko`），`Category` 指定分組（`gameplay`、`items`、`social`、`network`、`launcher`、`storage`、`cluster`、`admin`、`distribution` 或 `core`），例如 `[Plugin("lobby", Category = "gameplay", Names = ["en=Lobby and login", "zh-Hant=大廳與登入"])]`。兩者皆為選用：WebUI 依序顯示介面語言的名稱、英文名稱、插件 id。格式錯誤的項目會讓插件無法載入，因此拼寫錯誤能立即發現。無論有多少個版本掛載同一個插件，WebUI 都只顯示它一次，並列出它執行的用戶端版本。
 
 模組彼此看不到對方的類別，只透過共用介面類型發布與取得服務。這些介面位於 Host 只載入一次、並共用給所有模組的兩個組件：`BubbleFighter.Fantasy.Abstractions`（`IPlugin`、`IServiceRegistry`、`IEventBus`、`IMessageRouter` 等核心契約）與 `BubbleFighter.Fantasy.Contracts`（訊息記錄、領域服務等遊戲契約）。資料列宣告自己需要什麼、發布什麼，Host 只在其相依性已註冊後啟用該資料列，因此啟用順序由服務可用性決定，而不是 YAML 中資料列的先後。
 
@@ -29,6 +31,7 @@ updated: 2026-10-23
 | `Optional` | 可以缺席的服務；已選取的提供者參與卸載與重新載入順序 |
 | `Provides`、`ConditionalProvides` | 本列在啟用時必須發布、或在某些設定下可以發布的服務 |
 | `ProvidesMany`、`RequiresMany`、`OptionalMany` | 有序擴充點：發布、要求至少一個、或允許空清單 |
+| `LiveMany` | 每次呼叫 `GetAll` 時依當下狀態讀取的擴充點。其提供者不是相依項：本列不等待它們，也不會因某個提供者載入或卸載而重新啟動。每次操作都重新讀取，不要保留成員。僅限原生外掛 |
 | `Decorates` | 包裹透過 `RegisterDecoratable` 明確允許裝飾的單例的裝飾層 |
 | `Overrides`、`Middleware` | 型別化訊息處理常式的替換與包裝，寫成 `rowId:完整限定訊息型別` |
 | `SupportedBuilds`、`SupportedFamilies` | 針對資料列所屬 profile 的用戶端版本相容性檢查 |
@@ -58,11 +61,11 @@ dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- plugins list -
 執行中的伺服器在 `GET /api/plugins` 暴露資料列執行個體：
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:8080/api/plugins | Select-Object rowId, plugin, state, error
+Invoke-RestMethod http://127.0.0.1:7300/api/plugins | Select-Object rowId, plugin, state, error
 ```
 
 ```sh
-curl -s http://127.0.0.1:8080/api/plugins
+curl -s http://127.0.0.1:7300/api/plugins
 ```
 
 每個項目包含 `rowId`、`plugin`、`source`、`state`、`error`、`codeRefreshPolicy`、`codeLifetime`、`restartRequiredForReclamation`、`isRetiring`、`overrides`、`version`、`contractVersions` 與 `supportedBuilds`。狀態以字串寫出，取自 `PluginState` 列舉。在以 `start` 啟動的伺服器上，`/api/plugins` 需要已登入的管理員工作階段；`run --profile` 伺服器在回送上不需登入即可回應，詳見[快速入門](quickstart.md)。
@@ -279,6 +282,10 @@ context.Effect(context.Services.Get<ICommandRegistry>().Register(context,
 在 `ingame` 列的 config 設定 `shared_chat_commands: true`，將該遊戲範圍接入共用聊天指令。等待原生用戶端驗收期間，此項預設 `false`；關閉時保留原有僅房主可用的 `!start`、`!set`。啟用時必須同時提供兩項共用指令服務，否則啟用失敗。
 
 核心組合的 `commands.game` 列將啟用的範圍接入同一分派器，也能呼叫原生模組註冊的指令。它在所有遊戲範圍中統一註冊 `/start`、`/mode <編號>`（別名 `/set`），也支援 `!`、`！` 前綴。`game.room.start`、`game.room.mode` 權限節點預設允許一般玩家使用，只操作自己所在的等候中房間；已設定的模式表仍會拒絕不支援的編號。指令開始會略過準備標記，原生開始按鈕仍要求房主操作。前綴輸入在權限拒絕後不會回退至本機處理常式。
+
+`ingame` 列也接受房間標題中的 `#19#`、`#爆炸模式#` 等模式標記。共用組合設定 `mode_name_table_path: data/room-modes.json`，目錄包含 47 個已知模式，也保留原生建立房間介面已有的模式。目錄提供簡體中文、繁體中文、韓文、英文、印尼文、越南文和泰文的選擇名稱及無空白標記。例如，`#爆炸模式#我的房間` 會建立爆炸模式房間，顯示名稱為 `我的房間`。原生用戶端稍後補交房間標題時使用同一解析規則。未知或有歧義的原生名稱仍視為一般標題；第一個識別出的標記決定模式，後續標記保留在標題中。數字標記沿用原有範圍和優先順序。
+
+模式名稱表只定義資料，不另行實作玩法。格式版本為 1，`modes` 陣列的每列包含不重複的 `id`、`key`，語言鍵一致的 `names`、`tokens` 物件，以及選填的無空白 `aliases`。標記必須等於名稱去除空白後的 Unicode 文字；比對採用不區分字母大小寫的序號比較。同一個標記或別名不能指派給不同編號。個人／團隊生存、兩種電腦模式等原生同名項使用帶明確限定的選擇名稱。`nativeNames`、`nameSources` 保留名稱依據，不會自動把有歧義的原生名稱變成別名。沒有原生顯示名稱的模式使用註明來源的翻譯或已知代號，不虛構原生名稱。將 `mode_name_table_path` 留空可恢復僅數字標記；設定的檔案不存在、格式錯誤或名稱衝突都會導致啟用失敗。這些選項不改變用戶端封包配置，也不略過原生標題輸入框的長度限制。
 
 遊戲模組透過 `IGameCommandEndpoints` 註冊 `IGameCommandEndpoint`，並持有回傳的取消註冊控制代碼。路由會核對已驗證遊戲帳戶與目前座位，拒絕重複的工作階段歸屬，並在遊戲模組的生命週期內執行。`commands.game.max_endpoints` 預設 512，用於約束同時註冊的範圍儲存。本列尚未提供地圖、管理或房間傳送指令。
 

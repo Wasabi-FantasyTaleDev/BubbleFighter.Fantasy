@@ -10,7 +10,8 @@
 #   state/            the setup assistant's saved installation; kept across upgrades
 #   dotnet/           the ASP.NET Core Runtime 10, only when the system has none
 #   bff               launcher; with no arguments it starts the setup assistant
-# Docker mode builds a local image from the same package into docker/; --with-mysql adds a MySQL 8.4 container.
+# Docker mode builds a local image from the same package into docker/; --with-mysql adds a database container:
+# MariaDB 11.4 for a new stack, the MySQL 8.4 it was created with for an existing one.
 set -euo pipefail
 
 REPOSITORY="Wasabi-FantasyTaleDev/BubbleFighter.Fantasy"
@@ -24,6 +25,9 @@ WITH_MYSQL=0
 ADMIN_PORT=""
 MYSQL_PORT=3306
 FROM=""
+REMOTE_ADMIN=""
+SETUP_TOKEN=""
+PROMPT=1
 
 usage() {
     cat <<'EOF'
@@ -35,9 +39,14 @@ Usage: install.sh [options]
   --service         as root: install and enable a systemd unit (bubblefighter-fantasy.service)
   --start           start the server in the foreground when the installation finishes
   --docker          run the server with Docker Compose instead
-  --with-mysql      with --docker: also run a MySQL 8.4 container for the server's data
-  --admin-port <n>  port of the setup assistant and administration WebUI (default 8080)
-  --mysql-port <n>  with --with-mysql: loopback port of the bundled MySQL (default 3306)
+  --with-mysql      with --docker: also run a MySQL-compatible database container (MariaDB 11.4) for the server's data
+  --admin-port <n>  port of the setup assistant and administration WebUI (default 7300)
+  --remote-admin    let other machines open the WebUI (default: only this machine; use an SSH tunnel)
+  --local-admin     keep the WebUI on this machine only (the default)
+  --setup-token     require a generated token before the first-run setup wizard can be used (default: off)
+  --no-setup-token  do not require a setup token (the default)
+  --no-prompt       do not ask questions; use the options given and the defaults
+  --mysql-port <n>  with --with-mysql: loopback port of the bundled database (default 3306)
   --from <dir>      install from a directory holding the release assets instead of downloading them
   -h, --help        show this help
 
@@ -56,6 +65,11 @@ while [ $# -gt 0 ]; do
         --with-mysql) WITH_MYSQL=1; shift ;;
         --admin-port) ADMIN_PORT="${2:?--admin-port needs a port}"; shift 2 ;;
         --mysql-port) MYSQL_PORT="${2:?--mysql-port needs a port}"; shift 2 ;;
+        --remote-admin) REMOTE_ADMIN=1; shift ;;
+        --local-admin) REMOTE_ADMIN=0; shift ;;
+        --setup-token) SETUP_TOKEN=1; shift ;;
+        --no-setup-token) SETUP_TOKEN=0; shift ;;
+        --no-prompt|--yes) PROMPT=0; shift ;;
         --from) FROM="${2:?--from needs a directory}"; shift 2 ;;
         -h|--help) usage; exit 0 ;;
         *) echo "error: unknown option '$1' (see --help)" >&2; exit 2 ;;
@@ -64,6 +78,57 @@ done
 
 fail() { echo "error: $*" >&2; exit 1; }
 step() { printf '==> %s\n' "$*"; }
+secret() { head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'; }
+# Asks a yes/no question on the terminal, also when the script itself is piped into bash; no terminal means the default.
+ask() {
+    local answer=""
+    if [ "$PROMPT" -eq 1 ] && { : </dev/tty; } 2>/dev/null; then
+        printf '%s [y/N] ' "$1" >/dev/tty
+        read -r answer </dev/tty || answer=""
+    fi
+    case "$answer" in [yY]|[yY][eE][sS]) echo 1 ;; *) echo 0 ;; esac
+}
+# The WebUI choices are kept in a settings file next to the installation, so an upgrade keeps them.
+saved_setting() { [ -f "$1" ] && sed -n "s/^$2=//p" "$1" | tail -n 1; }
+choose_admin_access() {
+    local file="$1" saved_host saved_token
+    saved_host="$(saved_setting "$file" BFF_ADMIN_HOST)"
+    saved_token="$(saved_setting "$file" BFF_SETUP_TOKEN)"
+    if [ -z "$REMOTE_ADMIN" ]; then
+        if [ -n "$saved_host" ]; then [ "$saved_host" = "0.0.0.0" ] && REMOTE_ADMIN=1 || REMOTE_ADMIN=0
+        else REMOTE_ADMIN="$(ask "Allow other machines to open the WebUI (setup and administration)?")"; fi
+    fi
+    if [ -z "$SETUP_TOKEN" ]; then
+        if [ -n "$saved_host" ]; then [ -n "$saved_token" ] && SETUP_TOKEN=1 || SETUP_TOKEN=0
+        elif [ "$REMOTE_ADMIN" -eq 1 ]; then SETUP_TOKEN="$(ask "Require a setup token before the first-run wizard can be used?")"
+        else SETUP_TOKEN=0; fi
+    fi
+    ADMIN_HOST=127.0.0.1
+    [ "$REMOTE_ADMIN" -eq 0 ] || ADMIN_HOST=0.0.0.0
+    TOKEN_VALUE=""
+    if [ "$SETUP_TOKEN" -eq 1 ]; then TOKEN_VALUE="${saved_token:-$(secret)}"; fi
+}
+admin_address() {
+    if [ "$REMOTE_ADMIN" -eq 1 ]; then
+        local ip
+        ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+        echo "http://${ip:-<server-address>}:$1/"
+    else
+        echo "http://127.0.0.1:$1/"
+    fi
+}
+print_admin_access() {
+    echo "  Open $(admin_address "$1") to finish setup."
+    if [ "$REMOTE_ADMIN" -eq 1 ]; then
+        echo "  The WebUI accepts other machines; open TCP port $1 in the firewall or cloud security group if needed."
+    else
+        echo "  The WebUI accepts this machine only. From another computer, tunnel it: ssh -L $1:127.0.0.1:$1 <user>@<server>"
+        echo "  (run the installer again with --remote-admin to allow other machines)"
+    fi
+    if [ -n "$TOKEN_VALUE" ]; then
+        echo "  Setup token (enter it on the first page of the wizard): $TOKEN_VALUE"
+    fi
+}
 
 [ "$(uname -s)" = "Linux" ] || fail "this installer supports Linux only; on Windows download the zip package."
 case "$(uname -m)" in
@@ -140,7 +205,7 @@ CMD ["start"]
 EOF
     # A stack that was created with MySQL keeps it on upgrade, so its database is never orphaned.
     if [ -f "$STACK/.env" ] && grep -q '^BFF_MYSQL_PASSWORD=' "$STACK/.env"; then WITH_MYSQL=1; fi
-    # Host networking publishes whichever game ports the chosen clients use; the bundled MySQL stays on loopback.
+    # Host networking publishes whichever game ports the chosen clients use; the bundled database stays on loopback.
     {
         cat <<'EOF'
 # Generated by install.sh. Settings live in .env; the installation state lives in the bff-state volume.
@@ -161,7 +226,7 @@ EOF
       mysql:
         condition: service_healthy
   mysql:
-    image: mysql:8.4
+    image: ${BFF_DB_IMAGE}
     environment:
       MYSQL_ROOT_PASSWORD: ${BFF_MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: bf_game_db
@@ -173,7 +238,8 @@ EOF
     volumes:
       - mysql-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
+      # MariaDB 11 images name the tool mariadb-admin; MySQL images name it mysqladmin.
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 || mysqladmin ping -h 127.0.0.1"]
       interval: 5s
       timeout: 3s
       retries: 30
@@ -183,31 +249,36 @@ EOF
         printf 'volumes:\n  bff-state:\n'
         [ "$WITH_MYSQL" -eq 0 ] || printf '  mysql-data:\n'
     } > "$STACK/compose.yaml"
-    secret() { head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n'; }
     ( umask 077; touch "$STACK/.env" )
     set_env() { sed -i "/^$1=/d" "$STACK/.env"; echo "$1=$2" >> "$STACK/.env"; }
-    grep -q '^BFF_ADMIN_PORT=' "$STACK/.env" || set_env BFF_ADMIN_PORT "${ADMIN_PORT:-8080}"
+    choose_admin_access "$STACK/.env"
+    set_env BFF_ADMIN_HOST "$ADMIN_HOST"
+    set_env BFF_SETUP_TOKEN "$TOKEN_VALUE"
+    grep -q '^BFF_ADMIN_PORT=' "$STACK/.env" || set_env BFF_ADMIN_PORT "${ADMIN_PORT:-7300}"
     [ -z "$ADMIN_PORT" ] || set_env BFF_ADMIN_PORT "$ADMIN_PORT"
     if [ "$WITH_MYSQL" -eq 1 ] && ! grep -q '^BFF_MYSQL_PASSWORD=' "$STACK/.env"; then
         # Generated once; an upgrade keeps the passwords the database volume was created with.
         set_env BFF_MYSQL_PASSWORD "$(secret)"
         set_env BFF_MYSQL_ROOT_PASSWORD "$(secret)"
         set_env BFF_MYSQL_PORT "$MYSQL_PORT"
+        # A new stack gets MariaDB, which idles in a fraction of MySQL 8.4's default memory.
+        set_env BFF_DB_IMAGE "mariadb:11.4"
     fi
+    # A stack created before BFF_DB_IMAGE existed holds a MySQL 8.4 data volume, which MariaDB cannot open.
+    if [ "$WITH_MYSQL" -eq 1 ] && ! grep -q '^BFF_DB_IMAGE=' "$STACK/.env"; then set_env BFF_DB_IMAGE "mysql:8.4"; fi
     set_env BFF_RELEASE "$TAG"
     step "Building and starting the containers"
     (cd "$STACK" && docker compose up -d --build --remove-orphans)
     PORT="$(sed -n 's/^BFF_ADMIN_PORT=//p' "$STACK/.env")"
     echo
     echo "Bubble Fighter Fantasy $TAG is running in Docker ($STACK)."
-    echo "  Open http://127.0.0.1:$PORT/ to finish setup."
-    echo "  On a remote machine, forward the port first: ssh -L $PORT:127.0.0.1:$PORT <user>@<server>"
+    print_admin_access "$PORT"
     if [ "$WITH_MYSQL" -eq 1 ]; then
-        echo "  Database for the assistant: MySQL, host 127.0.0.1, port $(sed -n 's/^BFF_MYSQL_PORT=//p' "$STACK/.env"),"
+        echo "  Database for the assistant: MySQL ($(sed -n 's/^BFF_DB_IMAGE=//p' "$STACK/.env")), host 127.0.0.1, port $(sed -n 's/^BFF_MYSQL_PORT=//p' "$STACK/.env"),"
         echo "  database bf_game_db, user bff, password: the BFF_MYSQL_PASSWORD line of $STACK/.env"
     else
         echo "  Database: choose SQLite in the assistant (stored in the bff-state volume), or an existing MySQL."
-        echo "  Run the installer with --docker --with-mysql to add a bundled MySQL 8.4 instead."
+        echo "  Run the installer with --docker --with-mysql to add a bundled MariaDB 11.4 instead."
     fi
     echo "  Logs:    cd $STACK && docker compose logs -f bff"
     echo "  Upgrade: run this installer again with --docker; the volumes and .env are kept."
@@ -242,14 +313,30 @@ rm -rf "$RELEASE"
 mv "$RELEASE.partial" "$RELEASE"
 ln -sfn "releases/$TAG" "$DIRECTORY/current"
 
-PORT_LINE=""
-[ -z "$ADMIN_PORT" ] || PORT_LINE="export BFF_ADMIN_PORT=\"\${BFF_ADMIN_PORT:-$ADMIN_PORT}\""
+SETTINGS="$DIRECTORY/settings.env"
+choose_admin_access "$SETTINGS"
+( umask 077; touch "$SETTINGS" )
+for line in "BFF_ADMIN_HOST=$ADMIN_HOST" "BFF_SETUP_TOKEN=$TOKEN_VALUE"; do
+    sed -i "/^${line%%=*}=/d" "$SETTINGS"; echo "$line" >> "$SETTINGS"
+done
+if [ -n "$ADMIN_PORT" ]; then sed -i '/^BFF_ADMIN_PORT=/d' "$SETTINGS"; echo "BFF_ADMIN_PORT=$ADMIN_PORT" >> "$SETTINGS"; fi
+PORT="$(saved_setting "$SETTINGS" BFF_ADMIN_PORT)"; PORT="${PORT:-7300}"
 cat > "$DIRECTORY/bff" <<EOF
 #!/bin/sh
 # Generated by install.sh. With no arguments the setup assistant starts; see 'bff --help'.
+# WebUI access and the setup token live in the settings file; a variable already set in the environment wins.
+SETTINGS_FILE="$SETTINGS"
+EOF
+cat >> "$DIRECTORY/bff" <<'EOF'
+while IFS='=' read -r name value; do
+    case "$name" in BFF_*) eval "[ -n \"\${$name+x}\" ] || export $name=\"\$value\"" ;; esac
+done < "$SETTINGS_FILE"
+EOF
+cat >> "$DIRECTORY/bff" <<EOF
 export BFF_STATE_DIR="\${BFF_STATE_DIR:-$DIRECTORY/state}"
-$PORT_LINE
 export DOTNET_ROOT="$(dirname "$(readlink -f "$DOTNET")")"
+# The web listeners read no appsettings files; do not start a file watcher per listener for them.
+export DOTNET_hostBuilder__reloadConfigOnChange="\${DOTNET_hostBuilder__reloadConfigOnChange:-false}"
 exec "$DOTNET" "$DIRECTORY/current/BubbleFighter.Fantasy.Host.dll" "\$@"
 EOF
 chmod 755 "$DIRECTORY/bff"
@@ -258,6 +345,7 @@ if [ "$SERVICE" -eq 1 ]; then
     step "Installing bubblefighter-fantasy.service"
     id bff >/dev/null 2>&1 || useradd --system --home-dir "$DIRECTORY" --shell /usr/sbin/nologin bff
     chown -R bff:bff "$DIRECTORY/state"
+    chown bff:bff "$SETTINGS"
     cat > /etc/systemd/system/bubblefighter-fantasy.service <<EOF
 [Unit]
 Description=Bubble Fighter Fantasy server
@@ -280,9 +368,8 @@ fi
 
 echo
 echo "Bubble Fighter Fantasy $TAG is installed in $DIRECTORY."
-echo "  Start:   $DIRECTORY/bff"
-echo "  Then open http://127.0.0.1:${ADMIN_PORT:-8080}/ to finish setup."
-echo "  On a remote machine, forward the port first: ssh -L ${ADMIN_PORT:-8080}:127.0.0.1:${ADMIN_PORT:-8080} <user>@<server>"
+[ "$SERVICE" -eq 1 ] || echo "  Start:   $DIRECTORY/bff"
+print_admin_access "$PORT"
 echo "  Upgrade: run this installer again; $DIRECTORY/state is kept."
 if [ "$START" -eq 1 ] && [ "$SERVICE" -eq 0 ]; then
     echo

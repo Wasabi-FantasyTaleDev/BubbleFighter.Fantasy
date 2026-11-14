@@ -5,7 +5,7 @@ using BubbleFighter.Fantasy.Contracts.Distribution;
 namespace BubbleFighter.Fantasy.Distribution;
 
 /// <summary>Owns supervised download jobs and an exclusive staging directory through ordinary plugin effects.</summary>
-[Plugin("distribution.jobs", Requires = [typeof(IDistributionPlans), typeof(IDistributionPackages), typeof(IDistributionTransport)], Provides = [typeof(IDistributionJobs)])]
+[Plugin("distribution.jobs", Category = "distribution", Names = ["en=Distribution jobs", "zh-Hans=分发任务", "zh-Hant=發布工作", "ko=배포 작업"], Requires = [typeof(IDistributionPlans), typeof(IDistributionPackages), typeof(IDistributionTransport)], Provides = [typeof(IDistributionJobs)])]
 public sealed class DistributionJobsPlugin : IPlugin
 {
     /// <inheritdoc />

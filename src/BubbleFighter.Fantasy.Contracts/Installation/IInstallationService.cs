@@ -18,6 +18,10 @@ public interface IInstallationService
     ValueTask ProbeAsync(InstallationSettings settings, CancellationToken cancellationToken);
     /// <summary>Checks an authenticated correction, optionally retaining the saved password for the same database endpoint.</summary>
     ValueTask ProbeUpdateAsync(InstallationUpdate update, CancellationToken cancellationToken);
+    /// <summary>Reports whether the supplied database already exists and holds tables, so setup can ask before reusing or replacing it.</summary>
+    /// <returns>The contents found, or null when the provider cannot inspect its database.</returns>
+    ValueTask<InstallationDatabaseContents?> InspectDatabaseAsync(InstallationSettings settings, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<InstallationDatabaseContents?>(null);
     /// <summary>Durably claims the first administrator and starts one supervised apply operation; matching retries are idempotent.</summary>
     ValueTask BeginAsync(InstallationRequest request, CancellationToken cancellationToken);
     /// <summary>Retries the retained configuration without replacing its administrator or database selection.</summary>
@@ -116,6 +120,21 @@ public sealed record InstallationSettings
     /// Used only with <see cref="PlayerLogin"/> <c>launcher</c>; open sign-in always creates unknown accounts.
     /// </summary>
     public bool CreateAccountOnLogin { get; init; }
+    /// <summary>
+    /// Gets what the first apply does with a database that already holds tables: <c>keep</c> reuses the data and applies
+    /// only missing migrations; <c>replace</c> deletes every table first. A replace runs once and is then saved as keep.
+    /// </summary>
+    public string ExistingData { get; init; } = "keep";
+}
+
+/// <summary>What setup found in the selected database before applying.</summary>
+/// <param name="Exists">Whether the database (or SQLite file) exists; a missing one is created on apply.</param>
+/// <param name="Tables">The number of tables it holds.</param>
+/// <param name="Accounts">The number of game accounts, or null when it has no accounts table.</param>
+public sealed record InstallationDatabaseContents(bool Exists, int Tables, long? Accounts)
+{
+    /// <summary>Gets whether the database holds any table, so applying would reuse existing data.</summary>
+    public bool HasData => Tables > 0;
 }
 
 /// <summary>A client build selected for this server, with activation deferred until its prepared data is supplied.</summary>
@@ -165,6 +184,8 @@ public sealed record InstallationStatus(string Phase, bool Installed, bool HasAd
     string ServerName, string? Profile, Guid? OperationId, string? ErrorCode,
     IReadOnlyList<InstallationProfile> Profiles, string DefaultSqlitePath, bool ClientDataDeferred = false)
 {
+    /// <summary>Gets the one-line reason behind a failed apply, with the database password removed; only administrators read it.</summary>
+    public string? ErrorDetail { get; init; }
     /// <summary>Gets the configured upload limits so the picker can reject an oversized selection before transmission.</summary>
     public InstallationDataLimits? ImportLimits { get; init; }
 }
@@ -200,6 +221,13 @@ public interface IInstallationDatabase
     /// <summary>Validates and opens the real save, optionally applying the provider's existing migrations.</summary>
     /// <returns>The validated native provider configuration for profile composition.</returns>
     ValueTask<IReadOnlyDictionary<string, object?>> PrepareAsync(InstallationSettings settings, bool initialize, CancellationToken cancellationToken);
+    /// <summary>Reports whether the database exists and what it holds, without changing it.</summary>
+    /// <returns>The contents found, or null when this provider cannot inspect its database.</returns>
+    ValueTask<InstallationDatabaseContents?> InspectAsync(InstallationSettings settings, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<InstallationDatabaseContents?>(null);
+    /// <summary>Deletes every table of the selected database so the apply starts from an empty schema.</summary>
+    ValueTask ClearAsync(InstallationSettings settings, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This database provider cannot replace existing data.");
 }
 
 /// <summary>Adapts packaged profile composition and normal lifecycle admission for the installation plugin.</summary>

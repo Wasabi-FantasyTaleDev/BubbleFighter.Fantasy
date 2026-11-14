@@ -202,7 +202,8 @@ public sealed class LegacyShopVariantTests
         const int emptyMainStubBytes = 24;
         Assert.Equal(without279.Length + emptyMainStubBytes, with279.Length);
         Assert.Equal(without324.Length + emptyMainStubBytes, with324.Length);
-        Assert.Equal(2, BitConverter.ToInt32(with279.AsSpan(with279.Length - 4, 4)));
+        // cn-279 sub_66AB50 uses the workbook's mode 0 for this subcategory, rather than its whole main.
+        Assert.Equal(0, BitConverter.ToInt32(with279.AsSpan(with279.Length - 4, 4)));
         Assert.Equal(0, BitConverter.ToInt32(with324.AsSpan(with324.Length - 4, 4)));
     }
 

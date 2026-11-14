@@ -19,7 +19,7 @@ namespace BubbleFighter.Fantasy.Dialect.Rooms;
 /// login adapters so a build whose session layout is not decoded yet can log in without it.
 /// Plaza C2S handlers register only for opcodes that are not part of the login burst.
 /// </summary>
-[Plugin("dialect.rooms", Description = "Main-menu room, tutorial select/start, and plaza create/ready/start adapters, with per-build layouts from the packet tables.",
+[Plugin("dialect.rooms", Category = "network", Names = ["en=Room messages", "zh-Hans=房间消息", "zh-Hant=房間訊息", "ko=방 메시지"], Description = "Main-menu room, tutorial select/start, and plaza create/ready/start adapters, with per-build layouts from the packet tables.",
     Requires = [typeof(IOpcodeTableRegistry), typeof(IPacketRouter)],
     Optional = [typeof(BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore), typeof(IMessageRouter), typeof(IInventoryRepository), typeof(IGameText), typeof(BubbleFighter.Fantasy.Contracts.Progress.ITutorialStageStore)],
     OptionalMany = [typeof(IOpcodeTable), typeof(IUdpDatagramEndpoint), typeof(IMatchUdpRelayDirectory)],
@@ -35,6 +35,11 @@ namespace BubbleFighter.Fantasy.Dialect.Rooms;
         typeof(IMessageSender<RoundScriptZombieTeamChanged>),
         typeof(IInboundMessageBinding<RoundExtremeRacingGoalReported>), typeof(IMessageSender<RoundExtremeRacingTimerChanged>),
         typeof(IMessageSender<RoundExtremeRacingRoundChanged>), typeof(IMessageSender<RoundExtremeRacingRecordsUpdated>),
+        typeof(IMessageSender<RoundExtremeRacingInitialized>), typeof(IMessageSender<RoundExtremeRacingCannonCommand>),
+        typeof(IMessageSender<RoundEquipmentApplied>), typeof(IInboundMessageBinding<RoundWeaponMasterRevivalRequested>),
+        typeof(IInboundMessageBinding<RoundBnBPlacementReported>), typeof(IInboundMessageBinding<RoundBnBExplosionReported>),
+        typeof(IInboundMessageBinding<RoundBnBPickupReported>), typeof(IMessageSender<RoundBnBPlacementPublished>),
+        typeof(IMessageSender<RoundBnBExplosionPublished>), typeof(IMessageSender<RoundBnBPickupPublished>),
         typeof(IInboundMessageBinding<RoundFinalZoneItemPickupRequested>), typeof(IInboundMessageBinding<RoundFinalZoneItemsDropped>),
         typeof(IInboundMessageBinding<RoundFinalZoneBackpackDropped>), typeof(IInboundMessageBinding<RoundFinalZoneBackpackPickupRequested>),
         typeof(IInboundMessageBinding<RoundFinalZoneMapEffectChanged>), typeof(IMessageSender<RoundFinalZoneMapEffectChanged>),
@@ -56,13 +61,14 @@ namespace BubbleFighter.Fantasy.Dialect.Rooms;
         typeof(IInboundMessageBinding<InitialTutorialNpcReported>), typeof(IMessageSender<InitialTutorialNpcAcknowledged>),
         typeof(IInboundMessageBinding<RoundNpcReported>), typeof(IMessageSender<RoundNpcAcknowledged>),
         typeof(IInboundMessageBinding<TutorialScoreReported>), typeof(IMessageSender<TutorialScoreUpdated>),
+        typeof(IMessageSender<TutorialPracticeProgress>),
         typeof(IInboundMessageBinding<InitialTutorialRequested>), typeof(IMessageSender<InitialTutorialEntered>), typeof(IInboundMessageBinding<InitialTutorialExitRequested>),
         typeof(IMessageSender<RoomTeamConverted>), typeof(IInboundMessageBinding<RoomMatchRequested>), typeof(IMessageSender<RoomMatchNotified>), typeof(IMessageSender<RoomAutoStartNotified>),
         typeof(IInboundMessageBinding<RoomListRequested>), typeof(IInboundMessageBinding<RoomCreateRequested>), typeof(IInboundMessageBinding<RoomJoinRequested>), typeof(IInboundMessageBinding<RoomLeaveRequested>),
         typeof(IInboundMessageBinding<RoomReadyRequested>), typeof(IInboundMessageBinding<RoomTeamChangeRequested>), typeof(IInboundMessageBinding<RoomStartRequested>), typeof(IMessageSender<RoomListSnapshot>),
         typeof(IMessageSender<RoomEntered>), typeof(IMessageSender<RoomSeatUpdated>), typeof(IMessageSender<RoomSeatVacated>), typeof(IMessageSender<RoomMasterChanged>),
         typeof(IMessageSender<RoomJoinRefused>), typeof(IMessageSender<RoomLeft>), typeof(IMessageSender<RoomMatchStarting>), typeof(IInboundMessageBinding<RoomSettingsChangeRequested>),
-        typeof(IMessageSender<RoomSettingsChanged>), typeof(IInboundMessageBinding<RoomRoundSettingsChangeRequested>), typeof(IInboundMessageBinding<RoomMasterChangeRequested>), typeof(IMessageSender<RoomMasterChangeReplied>),
+        typeof(IMessageSender<RoomSettingsChanged>), typeof(IInboundMessageBinding<RoomRoundSettingsChangeRequested>), typeof(IInboundMessageBinding<RoomCustomRulesChangeRequested>), typeof(IMessageSender<RoomCustomRulesReplied>), typeof(IInboundMessageBinding<RoomMasterChangeRequested>), typeof(IMessageSender<RoomMasterChangeReplied>),
         typeof(IInboundMessageBinding<RoundLoadReported>), typeof(IInboundMessageBinding<RoundFeedSent>), typeof(IMessageSender<RoundPlayerLoaded>), typeof(IMessageSender<RoundCountdownStarted>),
         typeof(IMessageSender<RoundStarted>), typeof(IMessageSender<RoundFeedReceived>), typeof(IInboundMessageBinding<RoundLotteryRequested>), typeof(IMessageSender<RoundLotteryOpened>),
         typeof(IMessageSender<RoundLotteryClosed>), typeof(IMessageSender<RoundLotterySelected>), typeof(IMessageSender<RoundLotteryRevealed>), typeof(IInboundMessageBinding<RoundEndRequested>),
@@ -82,7 +88,7 @@ namespace BubbleFighter.Fantasy.Dialect.Rooms;
         typeof(IMessageSender<RoundSupplyPicked>), typeof(IInboundMessageBinding<RoundWeaponDropRequested>), typeof(IInboundMessageBinding<RoundWeaponPickupRequested>),
         typeof(IMessageSender<RoundWeaponCreated>), typeof(IMessageSender<RoundWeaponPicked>),
         typeof(IInboundMessageBinding<RoundLucciDropRequested>), typeof(IInboundMessageBinding<RoundHordeAwardRequested>), typeof(IInboundMessageBinding<RoundLucciPickupRequested>),
-        typeof(IMessageSender<RoundLucciCreated>), typeof(IMessageSender<RoundLucciPicked>), typeof(IInboundMessageBinding<RoundStarDropRequested>), typeof(IInboundMessageBinding<RoundStarPickupRequested>),
+        typeof(IMessageSender<RoundLucciCreated>), typeof(IMessageSender<RoundLucciPicked>), typeof(IInboundMessageBinding<RoundStarDropRequested>), typeof(IInboundMessageBinding<RoundStarPickupRequested>), typeof(IInboundMessageBinding<RoundStarPointsReported>), typeof(IMessageSender<RoundStarFeverStarted>),
         typeof(IInboundMessageBinding<RoundStarReported>), typeof(IMessageSender<RoundStarCreated>), typeof(IMessageSender<RoundStarPicked>), typeof(IInboundMessageBinding<RoundItemUseRequested>),
         typeof(IMessageSender<RoundItemUsed>), typeof(IInboundMessageBinding<RoundItemSlotSwitchRequested>), typeof(IMessageSender<RoundItemSlotChanged>), typeof(IInboundMessageBinding<RoundInstantRevivalRequested>),
         typeof(IInboundMessageBinding<RoundPveRevivalRequested>), typeof(IInboundMessageBinding<RoundCountedItemUseRequested>), typeof(IMessageSender<RoundCountedItemsPrepared>), typeof(IMessageSender<RoundCountedItemUsed>),
@@ -102,6 +108,8 @@ public sealed class RoomsPlugin : IPlugin
         var options = context.Config.Bind<RoomsOptions>();
         if (context.Row.ClientBuild is null)
             throw new ConfigException("dialect.rooms requires an explicit client_build.");
+        if (options.CustomRoomRules && (!options.ModernRooms || options.PlazaOnly || options.MenuOnly || options.BrowserOnly))
+            throw new ConfigException("custom_room_rules requires the audited modern waiting-room surface.");
         if (options.RoomKicking && (!options.ModernRooms || options.PlazaOnly))
             throw new ConfigException("room_kicking requires modern_rooms with waiting-room bindings, not plaza_only.");
         if (options.RoomInventorySelection && (!options.TypedPlayRooms || options.ModernRooms || options.MenuOnly || options.BrowserOnly))
@@ -113,6 +121,16 @@ public sealed class RoomsPlugin : IPlugin
             throw new ConfigException("bomb_mission and captain_mode require the complete typed round surface.");
         if (options.ExtremeRacing && (!options.ModernRooms || options.PlazaOnly || options.WaitingRoomsOnly))
             throw new ConfigException("extreme_racing requires modern_rooms with round bindings.");
+        if (options.ExtremeRacingInitialization && !options.ExtremeRacing)
+            throw new ConfigException("extreme_racing_initialization requires extreme_racing.");
+        if (options.ExtremeRacingCannon && !options.ExtremeRacingInitialization)
+            throw new ConfigException("extreme_racing_cannon requires extreme_racing_initialization.");
+        if (options.WeaponMaster && (!options.ModernRooms || options.PlazaOnly || options.WaitingRoomsOnly
+            || !options.ResultScoreboardModes.Contains((int)GameModeId.WeaponMaster)))
+            throw new ConfigException("weapon_master requires modern round bindings and result_scoreboard_modes including mode 26.");
+        if (options.BnB && (!options.ModernRooms || options.PlazaOnly || options.WaitingRoomsOnly
+            || !options.ResultScoreboardModes.Contains((int)GameModeId.BnB)))
+            throw new ConfigException("bnb requires modern round bindings and result_scoreboard_modes including mode 41.");
         if (options.RheaCharacterSkill && (!options.ModernRooms || options.MenuOnly || options.BrowserOnly
             || options.PlazaOnly || options.WaitingRoomsOnly))
             throw new ConfigException("rhea_character_skill requires modern_rooms with round bindings.");
@@ -130,6 +148,10 @@ public sealed class RoomsPlugin : IPlugin
         if (options.GhostZombies && (!options.ModernRooms || options.PlazaOnly || options.WaitingRoomsOnly
             || !options.ResultScoreboardModes.Contains(28)))
             throw new ConfigException("ghost_zombies requires modern round bindings and result_scoreboard_modes including mode 28.");
+        if (options.StarItems && options.ModernRooms
+            && (!options.ResultScoreboardModes.Contains((int)GameModeId.PvpStar)
+                || !options.ResultScoreboardModes.Contains((int)GameModeId.PvpStarTeam)))
+            throw new ConfigException("star_items on modern rooms requires result_scoreboard_modes including modes 5 and 6.");
         var lineage = context.Row.LineageOrBuild();
         if (options.ModernRooms)
         {
@@ -258,6 +280,8 @@ public sealed class RoomsPlugin : IPlugin
 
             if (options.TypedPlayRooms)
             {
+                if (builds.Tables.CapabilityOf(room.Profile, "tutorial_practice_progress"))
+                    new TutorialPracticeBinding(options.Protocol, table, builds.Tables, room.Profile).Mount(context);
                 if (options.RoomInventorySelection)
                 {
                     if (!builds.Tables.CapabilityOf(room.Profile, "room_inventory_selection"))
@@ -355,12 +379,22 @@ public sealed class RoomsPlugin : IPlugin
         var packets = BubbleFighter.Fantasy.Packets.PacketTables.Load(options.PacketsDirectory);
         var tableBuild = packets.NearestBuild(lineage)
             ?? throw new ConfigException($"dialect.rooms modern_rooms: no build of [{string.Join(", ", lineage)}] is named in '{options.PacketsDirectory}'.");
+        var customRules = options.CustomRoomRules ? new CustomRulesBinding(options.Protocol, table, packets, tableBuild, context.Logger) : null;
+        customRules?.Validate();
         if (options.BombMission && !packets.CapabilityOf(tableBuild, "bomb_mission"))
             throw new ConfigException($"bomb_mission requires the build's audited native capability: {tableBuild}.");
         if (options.CaptainMode && !packets.CapabilityOf(tableBuild, "captain_mode"))
             throw new ConfigException($"captain_mode requires the build's audited native capability: {tableBuild}.");
         if (options.ExtremeRacing && !packets.CapabilityOf(tableBuild, "extreme_racing"))
             throw new ConfigException($"extreme_racing requires the build's audited native capability: {tableBuild}.");
+        if (options.ExtremeRacingInitialization && !packets.CapabilityOf(tableBuild, "extreme_racing_initialization"))
+            throw new ConfigException($"extreme_racing_initialization requires the audited initialization capability: {tableBuild}.");
+        if (options.ExtremeRacingCannon && !packets.CapabilityOf(tableBuild, "extreme_racing_cannon"))
+            throw new ConfigException($"extreme_racing_cannon requires the audited cannon capability: {tableBuild}.");
+        if (options.WeaponMaster && !packets.CapabilityOf(tableBuild, "weapon_master"))
+            throw new ConfigException($"weapon_master requires the build's audited equipment capability: {tableBuild}.");
+        if (options.BnB && !packets.CapabilityOf(tableBuild, "bnb"))
+            throw new ConfigException($"bnb requires the audited map and relay capability: {tableBuild}.");
         if (options.ScriptZombies && !packets.CapabilityOf(tableBuild, "script_zombies"))
             throw new ConfigException($"script_zombies requires the audited native capability: {tableBuild}.");
         if (options.ZombieEscape && !packets.CapabilityOf(tableBuild, "zombie_escape"))
@@ -378,6 +412,7 @@ public sealed class RoomsPlugin : IPlugin
         // result hands the waiting room, which every typed round needs.
         new RoomCommandsBinding(options.Protocol, table, packets, tableBuild, context.Logger,
             roundsBound: !options.WaitingRoomsOnly, roomKicking: options.RoomKicking, scriptZombies: options.ScriptZombies || options.GhostZombies || options.ZombieEscape).Mount(context);
+        customRules?.Mount(context);
         if (table.Find(PacketDirection.ClientToServer, "gcpRoomAddNpcBot_") is not null)
             new RoomAiBinding(options.Protocol, table, packets, tableBuild, context.Logger).Mount(context);
         new PlazaSceneBinding(options.Protocol, table, packets, tableBuild, context.Logger).Mount(context);
@@ -387,7 +422,7 @@ public sealed class RoomsPlugin : IPlugin
             return;
         new RoundStartBinding(options.Protocol, table, packets, tableBuild, options.RoundLoadingFlags, context.Logger)
         {
-            SuppliesBound = options.SupplyItems,
+            MapReportBound = options.SupplyItems || options.StarItems,
         }.Mount(context);
         if (options.InitialTutorial)
         {
@@ -419,7 +454,10 @@ public sealed class RoomsPlugin : IPlugin
             context.Services.Get<IOpcodeTableRegistry>().ForProtocol(options.RelayProtocol), packets, tableBuild,
             context.Logger, options.UdpEnabled ? options.UdpProtocol : string.Empty, options.UdpKeepaliveMs).Mount(context);
         new RoundFeedBinding(options.Protocol, options.RelayProtocol, table,
-            context.Services.Get<IOpcodeTableRegistry>().ForProtocol(options.RelayProtocol), packets, tableBuild).Mount(context);
+            context.Services.Get<IOpcodeTableRegistry>().ForProtocol(options.RelayProtocol), packets, tableBuild)
+        {
+            ExtremeRacingCannon = options.ExtremeRacingCannon,
+        }.Mount(context);
         if (packets.CapabilityOf(tableBuild, "map_portals"))
             new PortalMoveBinding(options.Protocol, table, packets, tableBuild).Mount(context);
         if (options.RheaCharacterSkill)
@@ -430,7 +468,20 @@ public sealed class RoomsPlugin : IPlugin
         if (options.CaptainMode)
             new CaptainModeBinding(options.Protocol, table, packets, tableBuild, context.Logger).Mount(context);
         if (options.ExtremeRacing)
-            new ExtremeRacingBinding(options.Protocol, table, packets, tableBuild, context.Logger).Mount(context);
+        {
+            var racing = new ExtremeRacingBinding(options.Protocol, table, packets, tableBuild, context.Logger);
+            racing.Mount(context);
+            if (options.ExtremeRacingInitialization) racing.MountInitialization(context);
+            if (options.ExtremeRacingCannon) racing.MountCannon(context);
+        }
+        if (options.WeaponMaster)
+            new WeaponMasterBinding(options.Protocol, table, packets, tableBuild, context.Logger).Mount(context);
+        if (options.BnB)
+        {
+            var relayTable = context.Services.Get<IOpcodeTableRegistry>().ForProtocol(options.RelayProtocol);
+            new BnBBinding(options.Protocol, relayTable, packets, tableBuild, context.Logger).Mount(context);
+            new BnBBinding(options.RelayProtocol, relayTable, packets, tableBuild, context.Logger).Mount(context);
+        }
         if (options.FinalZone)
         {
             new FinalZoneBinding(options.Protocol, table, packets, tableBuild).Mount(context);
@@ -474,13 +525,18 @@ public sealed class RoomsPlugin : IPlugin
             new SupplyBinding(options.Protocol, table, packets, build, options.MaxSupplyPoints)
             {
                 MapReportFirst = mapReportFirst,
+                ReportsStars = options.StarItems,
             }.Mount(context, messageRouter);
         if (options.WeaponObjects)
             new WeaponObjectsBinding(options.Protocol, table, packets, build).Mount(context, messageRouter);
         if (options.LucciDrops)
             new LucciBinding(options.Protocol, table, packets, build).Mount(context, messageRouter);
         if (options.StarItems)
-            new StarBinding(options.Protocol, table, packets, build).Mount(context, messageRouter);
+            new StarBinding(options.Protocol, table, packets, build)
+            {
+                MapReportLimit = options.SupplyItems ? 0 : options.MaxSupplyPoints,
+                ReadsStarReports = options.ModernRooms,
+            }.Mount(context, messageRouter);
         if (options.HordeLottery)
             new LotteryBinding(options.Protocol, table, packets, build).Mount(context, messageRouter);
         if (options.InstantRevival)
@@ -550,6 +606,9 @@ internal sealed class RoomBinding(string protocol, RoomSchema shape, IOpcodeTabl
 /// <summary>Selects the game connection scope for the legacy room adapter.</summary>
 public sealed class RoomsOptions
 {
+    /// <summary>Gets or sets the audited custom-option exchange within existing game modes; disabled by default.</summary>
+    public bool CustomRoomRules { get; set; }
+
     /// <summary>Gets or sets whether audited native plaza recruitment controls and sign updates are mounted.</summary>
     public bool PlazaRecruitment { get; set; }
 
@@ -615,6 +674,27 @@ public sealed class RoomsOptions
     /// acceptance; YAML key <c>extreme_racing</c>.
     /// </summary>
     public bool ExtremeRacing { get; set; }
+
+    /// <summary>Gets or sets the native racing object initialization sender; requires an explicit map policy in the in-game row.</summary>
+    public bool ExtremeRacingInitialization { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether the racing cannon exchange is mounted: the S2C 718 command sender and the relay 32902 shot
+    /// route. It schedules nothing and requires <c>extreme_racing_initialization</c> and the build's
+    /// <c>extreme_racing_cannon</c> capability; the in-game row must enable it too. Disabled by default; YAML key
+    /// <c>extreme_racing_cannon</c>.
+    /// </summary>
+    public bool ExtremeRacingCannon { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether the WeaponMaster equipment frame (S2C 1001, round mode 26) is mounted for modern rooms. Needs
+    /// the build's <c>weapon_master</c> capability and <c>result_scoreboard_modes</c> including 26; the in-game row's
+    /// <c>weapon_master_*</c> settings choose the weapons. Disabled by default; YAML key <c>weapon_master</c>.
+    /// </summary>
+    public bool WeaponMaster { get; set; }
+
+    /// <summary>Gets or sets the native BnB exchange on both match transports; disabled by default.</summary>
+    public bool BnB { get; set; }
 
     /// <summary>Gets or sets the audited FinalZone item, elimination and map-script exchange; disabled by default.</summary>
     public bool FinalZone { get; set; }
@@ -816,6 +896,6 @@ internal sealed class TableMenuOpenSender(string protocol, ushort opcode, Bubble
             ? message.CharacterItemId
             : throw new ArgumentOutOfRangeException(nameof(message), "The modern menu needs a 300001..301999 character item.");
         return session.SendAsync(opcode, MainMenuInstall.Write(packets, build, message.UserNumber,
-            message.Nickname, message.Level, character), ct);
+            message.Nickname, message.Level, character, message.EquippedItemIds, ItemAttributeWire.Values(message.ItemAttributes)), ct);
     }
 }

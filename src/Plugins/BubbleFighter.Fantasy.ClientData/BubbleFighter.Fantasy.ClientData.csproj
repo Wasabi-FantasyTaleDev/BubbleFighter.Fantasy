@@ -3,6 +3,7 @@
     <Description>Serves the game client's own data files straight from its PKN and BFZ archives.</Description>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="MemoryPack.Generator" PrivateAssets="all" />
     <ProjectReference Include="..\..\BubbleFighter.Fantasy.Abstractions\BubbleFighter.Fantasy.Abstractions.csproj" />
     <ProjectReference Include="..\..\BubbleFighter.Fantasy.Contracts\BubbleFighter.Fantasy.Contracts.csproj" />
     <ProjectReference Include="..\..\BubbleFighter.Fantasy.Archives\BubbleFighter.Fantasy.Archives.csproj" />

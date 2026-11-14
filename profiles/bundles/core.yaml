@@ -14,6 +14,14 @@
   plugin: core.opcode-tables
 - id: core.wire-dialects
   plugin: core.wire-dialects
+# Loads a client build that is on demand (a server profile's build_activation) when a client connects to its
+# listener, and unloads it after it had no connection for idle_minutes. Without on-demand builds it does nothing.
+- id: core.activation-groups
+  plugin: core.activation-groups
+  config:
+    idle_minutes: ${BFF_BUILD_IDLE_MINUTES:-30}
+    # How long the connection that finds its build asleep is held before it is closed.
+    wake_timeout_seconds: 30
 - id: permissions
   plugin: permissions
   config:
@@ -84,6 +92,7 @@
 - id: diagnostics.packet-log
   plugin: diagnostics.packet-log
   config:
+    packets_enabled: ${BFF_PACKET_LOG:-false}
     file: logs/{date}/packets_{timestamp}.log
     capture_enabled: ${BFF_PACKET_CAPTURE:-false}
     preview_bytes: 96
@@ -91,7 +100,7 @@
 - id: admin.http
   plugin: admin.http
   config:
-    listen: "${BFF_ADMIN_HOST:-127.0.0.1}:${BFF_ADMIN_PORT:-8080}"
+    listen: "${BFF_ADMIN_HOST:-127.0.0.1}:${BFF_ADMIN_PORT:-7300}"
 # The admin web interface: embedded files that admin.http serves at its root. Disable the row
 # to keep the HTTP API without the page. The release names are what operators know each build
 # by; a build left out shows its id alone.
@@ -162,6 +171,8 @@
     ticket_seconds: ${BFF_LAUNCHER_TICKET_SECONDS:-600}
     host_policy: "${BFF_LAUNCHER_HOST_POLICY:-auto}"
     region: "${BFF_LAUNCHER_REGION:-}"
+    # Launchers before 0.2.0 are refused (HTTP 426) for sign-in, refresh and tickets, including 0.2.0 pre-releases.
+    minimum_launcher_version: "${BFF_LAUNCHER_MINIMUM_VERSION:-0.2.0}"
 
 # Messenger (friends) for native messenger clients, opt-in. messenger.tickets signs this server's messenger
 # tickets and launcher.http hands one out with every launch; messenger is the game-neutral core and
@@ -258,3 +269,50 @@
 - id: companion.commands
   plugin: companion.commands
   disabled: true
+# game.session.changed: the player's current scene (main menu, plaza, room phases, match), pushed when it changes.
+- id: companion.scene
+  plugin: companion.scene
+  disabled: true
+# game.room.create.context: whether the player can create a room now (main menu or plaza), for the launcher's Mode
+# Extension, which watches the client's Create Room form only while it is active.
+- id: companion.room_create
+  plugin: companion.room_create
+  disabled: true
+# The game's own message boxes, notifications, banners and local chat lines on request from server plugins (and the
+# clientui developer command), shown by the launcher's native controls with an overlay fallback.
+- id: companion.native_ui
+  plugin: companion.native_ui
+  disabled: true
+# Ban-pick: server-wide ban policies (admin command gbanpick / gbp) and room host bans (banpick / bp) on weapons,
+# clothes, characters and pets. Each build's banpick.room row applies them to its rooms. It is installed and on by
+# default but bans nothing until a policy or a room list names something; disable this row and the banpick.room rows
+# to remove it. Groups select items by the ShopItem2 MainCategory / SubCategory sheet ids, which every build shares,
+# and pets by their function column (10001).
+- id: banpick
+  plugin: banpick
+  config:
+    state_path: data/banpick-policy.json
+    announcement_items: 25
+    reclick_window_ms: 10000
+    confirm_timeout_ms: 30000
+    policy:
+      groups:
+        - { name: weapon, main_categories: [300] }
+        - { name: rifle, sub_categories: [302] }
+        - { name: shotgun, sub_categories: [303] }
+        - { name: sniper, sub_categories: [304] }
+        - { name: sub_weapon, sub_categories: [305] }
+        - { name: melee, sub_categories: [306] }
+        - { name: special_weapon, sub_categories: [307] }
+        - { name: clothes, main_categories: [100] }
+        - { name: hat, sub_categories: [102] }
+        - { name: gloves, sub_categories: [105] }
+        - { name: shoes, sub_categories: [106] }
+        - { name: set_clothes, sub_categories: [107] }
+        - { name: shirt, sub_categories: [108] }
+        - { name: pants, sub_categories: [109] }
+        - { name: costume, sub_categories: [110] }
+        - { name: accessory, main_categories: [200] }
+        - { name: character, main_categories: [400] }
+        - { name: pet, functions: [10001] }
+      policies: []

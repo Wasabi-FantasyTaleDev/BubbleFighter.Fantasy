@@ -376,8 +376,6 @@ def main():
     ap.add_argument("--json", metavar="FILE", help="also write the raw data as JSON")
     args = ap.parse_args()
     env = dict(os.environ)
-    # dump-config only needs the variable to exist; the value is never used or printed.
-    env.setdefault("BFF_MYSQL_PASSWORD", "audit-placeholder")
     builds_yaml = yaml.safe_load((ROOT / "packets/builds.yaml").read_text(encoding="utf8"))["builds"]
     bases = {k: (v or {}).get("base") for k, v in builds_yaml.items()}
     features = map_features()

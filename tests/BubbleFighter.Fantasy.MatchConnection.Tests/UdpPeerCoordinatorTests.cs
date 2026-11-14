@@ -1,3 +1,4 @@
+using BubbleFighter.Fantasy.Contracts.Signals;
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.IO.Pipelines;
@@ -14,6 +15,49 @@ namespace BubbleFighter.Fantasy.MatchConnection.Tests;
 /// <summary>Exercises authenticated discovery, room barriers, privacy, native fallback and round revocation.</summary>
 public sealed class UdpPeerCoordinatorTests
 {
+    /// <summary>A build that learns of a round from the load report has work exactly while a round is tracked.</summary>
+    [Fact]
+    public async Task TheLoopHasWorkOnlyWhileARoundIsTracked()
+    {
+        var fixture = new Fixture();
+        var coordinator = fixture.Create();
+        Assert.False(coordinator.WhenWork().IsCompleted);
+        await fixture.Load(coordinator);
+        Assert.True(coordinator.WhenWork().IsCompleted);
+        // The round ends; the next tick prunes it and the loop may sleep again.
+        fixture.Roster.Stage = RoomStage.Result;
+        await coordinator.TickAsync(100, default);
+        Assert.False(coordinator.WhenWork().IsCompleted);
+        await fixture.Load(coordinator);
+        fixture.Roster.Stage = RoomStage.Starting;
+        await fixture.Load(coordinator);
+        Assert.True(coordinator.WhenWork().IsCompleted);
+        coordinator.Dispose();
+        Assert.False(coordinator.WhenWork().IsCompleted);
+    }
+
+    /// <summary>A build that prepares UDP in the waiting room is woken by the first room, and keeps ticking for a tracked round.</summary>
+    [Fact]
+    public async Task AWaitingRoomBuildWakesForTheFirstRoomAndStaysAwakeForItsRound()
+    {
+        var fixture = new Fixture();
+        fixture.Wire.DiscoveryInWaitingRoom = true;
+        fixture.Roster.Stage = RoomStage.Waiting;
+        var rooms = new PresenceSignal();
+        fixture.Roster.Rooms = rooms;
+        using var coordinator = fixture.Create();
+        var work = coordinator.WhenWork();
+        Assert.False(work.IsCompleted);
+        rooms.Refresh(() => true);
+        await work.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.True(coordinator.WhenWork().IsCompleted);
+        await coordinator.TickAsync(100, default);
+        Assert.Equal(2, fixture.Wire.Offers.Count);
+        // The registry reports no room, but the tracked round still has to be ticked until it is pruned.
+        rooms.Refresh(() => false);
+        Assert.True(coordinator.WhenWork().IsCompleted);
+    }
+
     [Fact]
     public async Task TwoPeersRequireObservedEndpointsAndBothTableAcksBeforeDirectDelivery()
     {
@@ -786,6 +830,8 @@ public sealed class UdpPeerCoordinatorTests
 
     private sealed class Roster(IReadOnlyList<RoomSeatView> seats) : IRoomPeerRoster
     {
+        internal PresenceSignal? Rooms;
+        public Task WhenAnyRoom() => Rooms?.WhenPresent ?? Task.CompletedTask;
         internal IReadOnlyList<RoomSeatView> Seats = seats;
         public string Protocol => "cn-324/game";
         internal RoomStage Stage = RoomStage.Starting;

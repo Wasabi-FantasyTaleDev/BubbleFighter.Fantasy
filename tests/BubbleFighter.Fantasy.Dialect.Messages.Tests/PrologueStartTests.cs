@@ -16,7 +16,7 @@ using Xunit;
 namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
 
 /// <summary>Exercises the KR2015 prologue mode and its one-seat loading release through the real tutorial handler.</summary>
-public sealed class PrologueStartTests
+public sealed partial class PrologueStartTests
 {
     [Theory]
     [InlineData("kr-812")]
@@ -326,6 +326,30 @@ public sealed class PrologueStartTests
         Assert.Equal(new ushort[] { 110, 108 }, session.Sent.TakeLast(2).Select(item => item.Opcode));
         Assert.IsType<TutorialRoundClosed>(Assert.Single(lifecycle.Messages));
         Assert.False(await handler.TryHandleEnterGameAsync(session, new(503, ReadOnlyMemory<byte>.Empty), default));
+    }
+
+    /// <summary>CN2011 reports successful practice before cleanup; dismissal alone never reports a clear.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Cn279PracticeClearIsSeparateFromDismissedOnboarding(bool completed)
+    {
+        const string build = "cn-279";
+        var (schema, play) = TestBuilds.Of(build);
+        var session = new TutorialSession(build);
+        var lifecycle = new TutorialLifecycleRouter();
+        using var handler = new TutorialHandler(TestBuilds.Packets, build, schema, play.Tutorial,
+            play.MatchStart, play.Wire, new TutorialTables(new TutorialTable()), NullLogger.Instance,
+            scoreRowFields: schema.ScoreRow, score: play.Score, messages: lifecycle, sharedLifecycle: true);
+        var body = PacketCodec.Write(TestBuilds.Packets, build, "TutorialPlayRequest",
+            new Dictionary<string, object?> { ["map_key"] = "rel_Tutorial_01" });
+        await handler.HandlePlayTutorialAsync(session, new(107, body), default);
+        Assert.True(await handler.TryHandleEndStageAsync(session, new(723, BitConverter.GetBytes(completed ? 1 : 0)), default));
+        Assert.Single(lifecycle.Messages, message => message is BubbleFighter.Fantasy.Contracts.Lobby.InitialTutorialCompleted);
+        var clear = lifecycle.Messages.FindIndex(message => message is TutorialStageCleared { MapKey: "rel_Tutorial_01" });
+        var closed = lifecycle.Messages.FindIndex(message => message is TutorialRoundClosed);
+        if (completed) Assert.InRange(clear, 0, closed - 1);
+        else Assert.Equal(-1, clear);
     }
 
     /// <summary>Leaving the initial tutorial early records it as done, so the next login does not offer it again.</summary>

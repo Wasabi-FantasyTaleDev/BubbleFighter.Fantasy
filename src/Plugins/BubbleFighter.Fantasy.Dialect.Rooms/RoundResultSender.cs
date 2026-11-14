@@ -17,6 +17,7 @@ internal sealed class RoundResultSender : IMessageSender<RoundScoreUpdated>, IMe
     private readonly RoundResultWire.MaskedRows? _maskedRows;
     private readonly IReadOnlyCollection<int> _scoreboardModes = [];
     private readonly IGameText? _texts;
+    private readonly StarScoreFields? _starScores;
 
     /// <summary>Uses the build's fixed-row result settings and recipient-local opcode table.</summary>
     internal RoundResultSender(string protocol, PacketTables packets, string build, Func<ISession, IOpcodeTable> opcodes,
@@ -28,6 +29,7 @@ internal sealed class RoundResultSender : IMessageSender<RoundScoreUpdated>, IMe
         _opcodes = opcodes;
         _fixedRows = fixedRows;
         RoundResultWire.RequireFixedScalarLayouts(packets, build);
+        _ = LiveScoreKinds.Require(packets, build);
         _ = RoundResultWire.CollectedLucciField(packets, build);
     }
 
@@ -42,8 +44,12 @@ internal sealed class RoundResultSender : IMessageSender<RoundScoreUpdated>, IMe
         _scoreboardModes = scoreboardModes;
         _maskedRows = maskedRows;
         _texts = texts;
+        _starScores = StarScoreFields.Load(packets, build);
+        _ = LiveScoreKinds.Require(packets, build);
         PacketLayoutContract.RequireFields(packets, build, "RoundLiveScore", "Round result sender",
-            ("team", "u8"), ("total", "u16"));
+            ("team", "u8"), ("total", "u16"), ("scorer_slot", "u8"), ("victim_slot", "u8"),
+            ("scorer_stats", "list<RoundLiveScoreStat>"), ("victim_stats", "list<RoundLiveScoreStat>"),
+            ("unknown_32", "list<RoundLiveScoreStat>"));
         PacketLayoutContract.RequireFields(packets, build, "RoundResultOpen", "Round result sender",
             ("unknown_n0", "u32"), ("unknown_n1", "u32"));
         PacketLayoutContract.RequireFields(packets, build, "RoundResultClose", "Round result sender", ("unknown_n0", "u8"));
@@ -62,11 +68,11 @@ internal sealed class RoundResultSender : IMessageSender<RoundScoreUpdated>, IMe
     /// <summary>Sends native live-score vectors, full-board restatements or separate team totals.</summary>
     public async ValueTask SendAsync(ISession session, RoundScoreUpdated message, CancellationToken ct)
     {
+        ArgumentNullException.ThrowIfNull(message);
         if (message.CollectedLucciOnly && RoundResultWire.CollectedLucciField(_packets, _build) is null)
             return;
         if (_fixedRows is { } fixedRows)
         {
-            ArgumentNullException.ThrowIfNull(message);
             if (fixedRows.LiveScorePacket)
                 await session.SendAsync(Resolve(session, "gspUpdateScoreData"),
                     RoundResultWire.WriteScoreUpdate(_packets, _build, message), ct).ConfigureAwait(false);
@@ -75,14 +81,24 @@ internal sealed class RoundResultSender : IMessageSender<RoundScoreUpdated>, IMe
                     RoundResultWire.WriteScoreboard(_packets, _build, board), ct).ConfigureAwait(false);
             return;
         }
-        // kr-1256 sub_9E3420 applies one total per team; fixed-row clients also consume seat vectors.
-        for (byte team = 1; team <= 2; team++)
-            await session.SendAsync(Resolve(session, "gspUpdateScoreData"),
-                PacketCodec.Write(_packets, _build, "RoundLiveScore", new Dictionary<string, object?>
-                {
-                    ["team"] = team,
-                    ["total"] = checked((ushort)message.TeamTotals[team - 1]),
-                }), ct).ConfigureAwait(false);
+        RoundResultWire.RequireModernScoreUpdate(message);
+        // kr-1256 sub_9E8B20 applies held-star stats and a separate team-star vector before the next full board.
+        var stars = _starScores is { } fields && message.Scoreboard is { } starBoard && fields.Modes.Contains(starBoard.ModeId)
+            ? fields : null;
+        // kr-1256 sub_9E8B20, cn-774 sub_8E33A0 and tw-454 sub_A63910 apply seats independently of the scalar team's index.
+        // Held stars retain their admitted mode-specific path; ordinary updates carry combat and WeaponMaster counters.
+        var first = stars is not null
+            ? RoundResultWire.WriteStarScoreUpdate(_packets, _build, stars, message)
+            : RoundResultWire.WriteScoreUpdate(_packets, _build, message with { ScoringTeam = 1 }, includeStars: false);
+        var second = PacketCodec.Write(_packets, _build, "RoundLiveScore", new Dictionary<string, object?>
+        {
+            ["team"] = (byte)2,
+            ["total"] = checked((ushort)message.TeamTotals[1]),
+        });
+        // Validate both bodies before the first send, so an invalid second total cannot publish a partial update.
+        var opcode = Resolve(session, "gspUpdateScoreData");
+        await session.SendAsync(opcode, first, ct).ConfigureAwait(false);
+        await session.SendAsync(opcode, second, ct).ConfigureAwait(false);
     }
 
     /// <summary>Sends the existing recipient outcome or the native result-open event.</summary>

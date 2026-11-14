@@ -5,7 +5,7 @@ using BubbleFighter.Fantasy.Contracts.Distribution;
 namespace BubbleFighter.Fantasy.Distribution;
 
 /// <summary>Owns source-specific distribution selections as a separate ordinary plugin row.</summary>
-[Plugin("distribution.plans", Requires = [typeof(IDistributionSources)], Provides = [typeof(IDistributionPlans)])]
+[Plugin("distribution.plans", Category = "distribution", Names = ["en=Distribution plans", "zh-Hans=分发计划", "zh-Hant=發布計畫", "ko=배포 계획"], Requires = [typeof(IDistributionSources)], Provides = [typeof(IDistributionPlans)])]
 public sealed class DistributionPlansPlugin : IPlugin
 {
     /// <inheritdoc />

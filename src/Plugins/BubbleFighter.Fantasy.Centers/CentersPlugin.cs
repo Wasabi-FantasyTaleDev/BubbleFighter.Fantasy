@@ -7,7 +7,7 @@ using BubbleFighter.Fantasy.Contracts.Lobby;
 namespace BubbleFighter.Fantasy.Centers;
 
 /// <summary>Supplies named native center entries while all entries share the mounted game services.</summary>
-[Plugin("centers", Description = "Native center selector metadata; shared backend routing.",
+[Plugin("centers", Category = "network", Names = ["en=Server directory", "zh-Hans=服务器目录", "zh-Hant=伺服器目錄", "ko=서버 목록"], Description = "Native center selector metadata; shared backend routing.",
     Requires = [typeof(IMessageRouter)],
     OptionalMany = [typeof(IInboundMessageBinding<CenterStatusRequested>), typeof(IInboundMessageBinding<CenterAvailabilityRequested>),
         typeof(IMessageSender<CenterStatusReplied>), typeof(IMessageSender<CenterAvailabilityReplied>)])]

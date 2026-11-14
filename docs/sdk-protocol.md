@@ -22,7 +22,7 @@ This page first explains what the SDKs are and are not, gives one runnable quick
 
 - A built checkout per [Installation](installation.md), with a terminal at the repository root.
 - The SDK toolchain for the language you picked: a current Python 3 interpreter (the conformance runner invokes `python`), Node.js 20 or later with npm (`sdk/typescript/package.json` declares `node >=20`), Go 1.22 or later (`sdk/go/go.mod`), or Rust with edition 2021 support and cargo (`sdk/rust/Cargo.toml`). You need one, not all four. WebAssembly modules additionally need `wasm32-wasip1` for Rust or the `wasip1` GOOS for Go.
-- For the run steps: an `.env` file with a disposable nonempty `BFF_MYSQL_PASSWORD` and the local-check patch `tools/local-checks/isolated-memory.patch.yaml`, as explained in [Quickstart](quickstart.md).
+- For the run steps: the local-check patch `tools/local-checks/isolated-memory.patch.yaml`, which needs no database settings, as explained in [Quickstart](quickstart.md).
 - The plugin model from [Plugins](plugins.md): plugin ids, row ids, declarations and effects.
 
 ## Quick start

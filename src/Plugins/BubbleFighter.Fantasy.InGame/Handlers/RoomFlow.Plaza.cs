@@ -187,7 +187,12 @@ internal sealed partial class RoomFlow
             // cn-324 sub_707520 only switches the stage; it retains the selection scene's
             // session. Reuse the login installer before constructing the menu avatar.
             await _mainMenu.SendAsync(session, new MainMenuRoomOpened(userNum, nickname, equipment.CharacterId,
-                equipment.ItemIds ?? [equipment.CharacterId], SessionPlayer.ResolveLevel(session)) { OfferTutorial = false, ColorIndex = SessionPlayer.ResolveColorIndex(session) }, ct).ConfigureAwait(false);
+                equipment.ItemIds ?? [equipment.CharacterId], SessionPlayer.ResolveLevel(session))
+            {
+                OfferTutorial = false,
+                ColorIndex = SessionPlayer.ResolveColorIndex(session),
+                ItemAttributes = equipment.ItemAttributes ?? [],
+            }, ct).ConfigureAwait(false);
             ScenePhase.Entered(session, SessionPhase.Plaza, _logger);
             ScenePhase.Entered(session, SessionPhase.MainMenu, _logger);
             return;
@@ -203,7 +208,8 @@ internal sealed partial class RoomFlow
         var (menuUser, menuName) = SessionPlayer.RequireIdentity(session);
         var menuEquipment = await ResolveEquipmentAsync(session, menuUser, ct).ConfigureAwait(false);
         var menuMember = new PlazaMember(0, menuUser, menuName, SessionPlayer.ResolveLevel(session),
-            menuEquipment.CharacterId, menuEquipment.ItemIds ?? [menuEquipment.CharacterId]) { ColorIndex = SessionPlayer.ResolveColorIndex(session) };
+            menuEquipment.CharacterId, menuEquipment.ItemIds ?? [menuEquipment.CharacterId])
+            { ColorIndex = SessionPlayer.ResolveColorIndex(session), ItemAttributes = menuEquipment.ItemAttributes ?? [] };
         await _menuReturn.SendAsync(session, request with { You = menuMember }, ct).ConfigureAwait(false);
         ScenePhase.Entered(session, SessionPhase.MainMenu, _logger);
     }
@@ -285,6 +291,8 @@ internal sealed partial class RoomFlow
         /// <summary>The worn items.</summary>
         internal IReadOnlyList<int> EquippedItemIds { get; set; } = [];
 
+        internal IReadOnlyList<RoomItemAttribute> ItemAttributes { get; set; } = [];
+
         /// <summary>The identity of this plaza entry, used to distinguish reentry from a state refresh.</summary>
         internal int EntrySeed { get; set; }
 
@@ -295,7 +303,7 @@ internal sealed partial class RoomFlow
         internal ReadOnlyMemory<byte> LastPosition { get; set; }
 
         internal PlazaMember ToMember() => new(Slot, UserNumber, Nickname, Math.Max(1, Level), CharacterItemId, EquippedItemIds, EntrySeed)
-            { ColorIndex = ColorIndex, Recruitment = Recruitment };
+            { ColorIndex = ColorIndex, Recruitment = Recruitment, ItemAttributes = ItemAttributes };
     }
 
     /// <summary>
@@ -368,7 +376,10 @@ internal sealed partial class RoomFlow
                 seat.Level = SessionPlayer.ResolveLevel(session);
                 seat.ColorIndex = SessionPlayer.ResolveColorIndex(session);
                 seat.CharacterItemId = equipment.CharacterId;
-                seat.EquippedItemIds = equipment.ItemIds ?? [equipment.CharacterId];
+                var snapshot = new BubbleFighter.Fantasy.Contracts.Progress.RoundEquipmentSnapshot(
+                    equipment.ItemIds ?? [equipment.CharacterId], equipment.ItemAttributes ?? []);
+                seat.EquippedItemIds = snapshot.WornItemIds;
+                seat.ItemAttributes = snapshot.ItemAttributes;
                 seat.PositionSequence = 0;
                 // Only equality matters: a later entry invalidates the previous actor and its movement history.
                 seat.EntrySeed = unchecked(++_entries);
@@ -456,7 +467,9 @@ internal sealed partial class RoomFlow
                 existing.Level = member.Level;
                 existing.ColorIndex = member.ColorIndex;
                 existing.CharacterItemId = member.CharacterItemId;
-                existing.EquippedItemIds = member.EquippedItemIds;
+                var snapshot = new BubbleFighter.Fantasy.Contracts.Progress.RoundEquipmentSnapshot(member.EquippedItemIds, member.ItemAttributes);
+                existing.EquippedItemIds = snapshot.WornItemIds;
+                existing.ItemAttributes = snapshot.ItemAttributes;
                 existing.Recruitment = member.Recruitment;
                 return (existing, added);
             }

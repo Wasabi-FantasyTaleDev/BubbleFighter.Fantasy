@@ -47,7 +47,7 @@ internal sealed class RoundStartBinding(string protocol, IOpcodeTable table, Pac
 
     public bool SupportsMode(int modeId) => modeId == (int)GameModeId.Bomb && _seriesFields is not null;
 
-    internal bool SuppliesBound { get; init; }
+    internal bool MapReportBound { get; init; }
 
     public string Protocol => protocol;
 
@@ -96,8 +96,8 @@ internal sealed class RoundStartBinding(string protocol, IOpcodeTable table, Pac
             return new RoundLoadReported();
         });
         // The game-side relay report (C2S 571 gcpReportRelayConnected) belongs to dialect.match-offers now.
-        // The supply binding owns the audited map report when enabled; neither report advances loading.
-        if (!SuppliesBound)
+        // The supply or star binding owns the audited map report when enabled; neither report advances loading.
+        if (!MapReportBound)
             RoomRoutes.LogOnly(context, protocol, table, logger, "gcpGameReportMapData");
         RoomRoutes.LogOnly(context, protocol, table, logger, "gcpReqRecheckMap");
     }
@@ -148,7 +148,7 @@ internal sealed class RoundStartBinding(string protocol, IOpcodeTable table, Pac
         var stage = message.StageKey.Length > 0 ? message.StageKey : message.MapKey;
         await session.SendAsync(S2C("gspRoomEnterGame"), RoundEntryWire.Write(packets, build,
             unknown0: 0, mapKey: message.MapKey, roomState: message.IsMission ? room.ModeId : MapRoomState,
-            stageKey: stage, mapSelection: message.MapKey, series: message.Series), ct).ConfigureAwait(false);
+            stageKey: stage, mapSelection: message.MapKey, series: message.Series, mapSeed: message.MapSeed), ct).ConfigureAwait(false);
     }
 
     /// <summary>

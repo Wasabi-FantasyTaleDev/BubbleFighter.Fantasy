@@ -9,6 +9,8 @@ parent: id-400
 description: Chinese 2013 client, shared login, waiting rooms and ordinary rounds.
 bundles: [core, legacy]
 vars:
+  # The client builds native feeding dates in its own region's civil time (UTC+8).
+  PET_CLIENT_UTC_OFFSET_MINUTES: 480
   LEGACY_PORT: ${CN_406_GAME_PORT:-7230}
   LEGACY_PUBLIC_PORT: ${CN_406_PUBLIC_PORT:-7230}
   # The game port players reach; the migration destination advertises it.
@@ -16,4 +18,4 @@ vars:
   LEGACY_RELAY_PORT: ${CN_406_RELAY_PORT:-7231}
   LEGACY_RELAY_PUBLIC_PORT: ${CN_406_PUBLIC_RELAY_PORT:-7231}
   LEGACY_SEATS: 8
-patches: [patch.yaml, local.patch.yaml]
+patches: [patch.yaml, ../bundles/pets.patch.yaml, local.patch.yaml]

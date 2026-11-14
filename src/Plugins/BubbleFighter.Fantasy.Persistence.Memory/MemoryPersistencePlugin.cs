@@ -1,3 +1,4 @@
+using BubbleFighter.Fantasy.Contracts.Titles;
 using BubbleFighter.Fantasy.Contracts.Launcher;
 using BubbleFighter.Fantasy.Contracts.Clans;
 using BubbleFighter.Fantasy.Contracts.Couples;
@@ -37,7 +38,7 @@ namespace BubbleFighter.Fantasy.Persistence.Memory;
 /// of the two rows is enabled at a time. Enabling both fails the second row at
 /// load, which is the loud outcome the architecture requires.
 /// </remarks>
-[Plugin("persistence.memory",
+[Plugin("persistence.memory", Category = "storage", Names = ["en=Memory storage", "zh-Hans=内存存储", "zh-Hant=記憶體儲存", "ko=메모리 저장소"], 
     Description = "Bounded in-process persistence for deployments without a database. State resets on restart.",
     Provides = [
         typeof(IClanStore),
@@ -47,13 +48,15 @@ namespace BubbleFighter.Fantasy.Persistence.Memory;
         typeof(IShopSessionStore),
         typeof(IFighterRepository),
         typeof(IInventoryRepository),
-        typeof(IInventoryLoadoutStore),
+        typeof(IInventoryLoadoutStore), typeof(IPetMutationStore), typeof(IPetEntitlementStore), typeof(IItemEnhancementStore),
+        typeof(IItemModificationStore), typeof(ILaboratoryInventoryStore), typeof(IRoundTitleMedalSettlementRepository),
+        typeof(IInventoryMetadataStore), typeof(ITitleMedalStore),
         typeof(IPlayerWalletRepository),
         typeof(IPlayerRepository),
         typeof(IPlayerSettingsRepository),
         typeof(BubbleFighter.Fantasy.Contracts.Progress.IPlayerProgressRepository),
         typeof(BubbleFighter.Fantasy.Contracts.Progress.IPlayerBattleRecordsRepository),
-        typeof(BubbleFighter.Fantasy.Contracts.Progress.ITutorialStageStore),
+        typeof(BubbleFighter.Fantasy.Contracts.Progress.ITutorialStageStore), typeof(BubbleFighter.Fantasy.Contracts.Progress.ITutorialPracticeStore),
         typeof(IPlayerInventoryState),
         typeof(IShopPurchaseStore),
         typeof(IPresentStore),
@@ -72,6 +75,7 @@ public sealed class MemoryPersistencePlugin : IPlugin
         context.Effect(context.Services.Register<ILauncherAccountRepository>(new MemoryLauncherAccounts(options.MaxPlayers)));
         context.Effect(context.Services.Register<ILauncherSessionStore>(new MemoryLauncherSessions(options.MaxPlayers)));
         context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Progress.ITutorialStageStore>(new MemoryTutorialStages(options.MaxPlayers)));
+        context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Progress.ITutorialPracticeStore>(new MemoryTutorialPractice(options.MaxPlayers)));
         var players = new MemoryPlayerRepository(table);
         var presents = new MemoryPresentStore(table, players);
         context.Effect(context.Services.Register<IPlayerRepository>(players));
@@ -83,11 +87,20 @@ public sealed class MemoryPersistencePlugin : IPlugin
             options.Couples.MaxPendingPerAccount, options.Couples.MaxCompletedInvitations,
             options.Couples.MaxMessageLength, options.Couples.MaxAuthorityLength)));
         context.Effect(context.Services.Register<IFighterRepository>(new MemoryFighterRepository(table)));
-        var inventory = new MemoryInventoryRepository(table, options.MaxLoadoutsPerPlayer);
+        var inventory = new MemoryInventoryRepository(table, options.MaxLoadoutsPerPlayer, options.TitleMedals);
         context.Effect(context.Services.Register<IInventoryRepository>(inventory));
         context.Effect(context.Services.Register<IInventoryLoadoutStore>(inventory));
+        context.Effect(context.Services.Register<IPetMutationStore>(inventory));
+        context.Effect(context.Services.Register<IPetEntitlementStore>(inventory));
+        context.Effect(context.Services.Register<IItemEnhancementStore>(inventory));
+        context.Effect(context.Services.Register<IItemModificationStore>(inventory));
+        context.Effect(context.Services.Register<ILaboratoryInventoryStore>(inventory));
+        context.Effect(context.Services.Register<IInventoryMetadataStore>(inventory));
+        context.Effect(context.Services.Register<ITitleMedalStore>(inventory));
         context.Effect(context.Services.Register<IPlayerWalletRepository>(new MemoryPlayerWalletRepository(table)));
-        var progress = new MemoryPlayerProgressRepository(table, options.MaxBattleSettlementsPerPlayer, options.MaxBattleModesPerPlayer);
+        var progress = new MemoryPlayerProgressRepository(table, options.MaxBattleSettlementsPerPlayer, options.MaxBattleModesPerPlayer,
+            options.TitleMedals);
+        context.Effect(context.Services.Register<IRoundTitleMedalSettlementRepository>(progress));
         context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Progress.IPlayerProgressRepository>(progress));
         context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Progress.IPlayerBattleRecordsRepository>(progress));
         context.Effect(context.Services.Register<IPlayerInventoryState>(new MemoryPlayerInventoryState(table)));
@@ -106,6 +119,10 @@ public sealed class MemoryPersistencePlugin : IPlugin
 /// <summary>Configuration for the <see cref="MemoryPersistencePlugin"/> row.</summary>
 public sealed class MemoryPersistenceOptions
 {
+    /// <summary>Gets or sets catalogue medal balances and credit receipt budgets per account.</summary>
+    [System.ComponentModel.DataAnnotations.Required]
+    public TitleMedalLimits TitleMedals { get; set; } = new();
+
     /// <summary>Gets or sets the number of independently saved client-build loadouts allowed per player.</summary>
     [System.ComponentModel.DataAnnotations.Range(1, 256)]
     public int MaxLoadoutsPerPlayer { get; set; } = 32;

@@ -13,6 +13,19 @@ public enum CommandArgumentKind
     RemainingText
 }
 
+/// <summary>Where a command was typed or sent from; set by the entry point that received it, never by the text.</summary>
+public enum CommandSource
+{
+    /// <summary>A player's in-game chat line.</summary>
+    InGameChat,
+    /// <summary>A launcher plugin's request over the launch-bound Nirinsou Link command channel.</summary>
+    Nirinsou,
+    /// <summary>The administration web interface or its HTTP API.</summary>
+    WebUi,
+    /// <summary>The server's own console.</summary>
+    Terminal,
+}
+
 /// <summary>Declares one positional command argument.</summary>
 /// <param name="Name">The unique argument name used in help.</param>
 /// <param name="Kind">The validation and text-consumption rule.</param>
@@ -26,7 +39,11 @@ public sealed record CommandArgument(string Name, CommandArgumentKind Kind = Com
 /// <param name="Description">Help text for users and graphical panels.</param>
 /// <param name="Arguments">The ordered positional schema.</param>
 public sealed record CommandDefinition(string Name, IReadOnlyList<string> Aliases, string Permission,
-    string Description, IReadOnlyList<CommandArgument> Arguments);
+    string Description, IReadOnlyList<CommandArgument> Arguments)
+{
+    /// <summary>Gets the sources the command accepts; null accepts every source. Others are denied before permissions.</summary>
+    public IReadOnlyList<CommandSource>? Sources { get; init; }
+}
 
 /// <summary>Server-established identity and presentation information for one invocation.</summary>
 /// <param name="Subject">The effective authenticated principal.</param>
@@ -35,6 +52,9 @@ public sealed record CommandDefinition(string Name, IReadOnlyList<string> Aliase
 /// <param name="SessionId">The transport's verified game session identifier, when applicable.</param>
 public sealed record CommandCaller(CommandPrincipal Subject, CommandPrincipal Actor, string Language = "en", string? SessionId = null)
 {
+    /// <summary>Gets where the command came from; every entry point states it.</summary>
+    public required CommandSource Source { get; init; }
+
     /// <summary>Requires a scene-departure command to recheck an ordinary playing match on its room executor.</summary>
     public bool RequireMatchDeparture { get; init; }
 }

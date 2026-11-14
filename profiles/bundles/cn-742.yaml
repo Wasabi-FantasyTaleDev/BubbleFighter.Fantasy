@@ -4,6 +4,9 @@
 # Same legacy stream as cn-735: 258-byte greeting (recv(..., 258 - i, 0)), five-byte frame, seeds (0, 1) / (5, 3).
 - id: dialect
   plugin: dialect
+  # Stays loaded while the build sleeps: the shared dialect table is built from these rows, and a row that came or
+  # went would restart that table and every build that frames packets through it.
+  activation: always
   config:
     profile_id: "${BFF_PROFILE_ID}"
     frame: legacy_5
@@ -25,6 +28,8 @@
         port: ${CN_742_PUBLIC_PORT:-7180}
 - id: game-listener
   plugin: net.tcp
+  # Bound while the build sleeps: a client that connects is what wakes it.
+  activation: always
   config:
     listen: "${BFF_BIND_HOST:-0.0.0.0}:${CN_742_GAME_PORT:-7180}"
     protocol: "cn-742/game"

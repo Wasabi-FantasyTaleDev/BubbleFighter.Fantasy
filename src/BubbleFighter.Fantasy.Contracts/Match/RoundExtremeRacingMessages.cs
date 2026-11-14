@@ -1,10 +1,11 @@
+using System.Numerics;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 
 namespace BubbleFighter.Fantasy.Contracts.Match;
 
 /// <summary>
-/// The race clocks of an ExtremeRacing round (round mode 24). The numbers are the client's own code words:
-/// kr-1256 sub_67E8B0 switches on 2500, 20000 and 210000 and ignores any other value.
+/// The logical race clocks of an ExtremeRacing round (round mode 24). Numeric identities retain the KR1256
+/// values; the dialect maps them to the selected build's native code words through its packet tables.
 /// </summary>
 public enum RoundExtremeRacingTimer
 {
@@ -92,3 +93,49 @@ public sealed record RoundExtremeRacingRecord(int Seat, IReadOnlyList<RoundExtre
 /// </summary>
 /// <param name="Records">The seats' updates.</param>
 public sealed record RoundExtremeRacingRecordsUpdated(IReadOnlyList<RoundExtremeRacingRecord> Records) : IMessage;
+
+/// <summary>
+/// One initialized coin: kr-1256 sub_67B270 stores its variant at coin +584 and round at +592;
+/// kr-1256 sub_BF45D0 permits pickup only during that round. The variant selects presentation, not an award amount.
+/// </summary>
+/// <param name="Identity">The coin's scene-object identity, in numeric map-helper order.</param>
+/// <param name="Variant">The zero-based presentation variant.</param>
+/// <param name="Round">The one-based race round in which the coin is available.</param>
+public sealed record RoundExtremeRacingCoin(uint Identity, int Variant, int Round);
+
+/// <summary>
+/// Creates a loaded race stage's cannon pairs, coins and stone disposers once, before play starts
+/// (kr-1256 sub_CE5600 case 0x2C9 and kr-1256 sub_CE6F80). Replaying this message appends native objects again.
+/// </summary>
+/// <param name="FirstCannonIdentity">The first identity; each numeric cannon pair consumes a cannon and a disposer identity.</param>
+/// <param name="FirstCoinIdentity">The first coin identity; every coin consumes one consecutive identity.</param>
+/// <param name="Coins">The complete coin assignments, in consecutive identity order.</param>
+/// <param name="FirstStoneDisposerIdentity">The first consecutive stone-disposer identity.</param>
+/// <param name="StoneDisposerCount">The number of native stone-disappear helpers to initialize.</param>
+public sealed record RoundExtremeRacingInitialized(uint FirstCannonIdentity, uint FirstCoinIdentity,
+    IReadOnlyList<RoundExtremeRacingCoin> Coins, uint FirstStoneDisposerIdentity, int StoneDisposerCount) : IMessage;
+
+/// <summary>
+/// A command that makes the receiving client fire one cannon (kr-1256 S2C 718, read inline by kr-1256 sub_CE5600 and
+/// applied by kr-1256 sub_67B6E0). The client derives the shot's origin and direction from its own initialized cannon
+/// object and answers with the relay shot <see cref="RoundExtremeRacingCannonShot"/>, so the server sends the command
+/// to exactly one participant.
+/// </summary>
+/// <param name="Group">The cannon group word; the client accepts a cannon whose group equals it, or any group when it is zero.</param>
+/// <param name="Identity">The initialized cannon's scene-object identity.</param>
+/// <param name="Weapon">The bullet weapon, from 50000 through 50008 (kr-1256 sub_67B6E0 ignores anything else).</param>
+/// <param name="Scale">The bullet scale the receiving client stores on its cannon; the relayed shot does not carry it.</param>
+public sealed record RoundExtremeRacingCannonCommand(uint Group, uint Identity, uint Weapon, float Scale) : IMessage;
+
+/// <summary>
+/// A cannon shot decoded from the native peer frame (kr-1256 relay 32902, written by kr-1256 sub_6E1E90 and read by
+/// kr-1256 sub_6F0650). The server forwards the original bytes unchanged; this view only lets the round check them.
+/// </summary>
+/// <param name="Actor">The firing character's scene identity.</param>
+/// <param name="Weapon">The bullet weapon, a u16 on the wire.</param>
+/// <param name="Origin">The bullet origin, taken from the firing client's cannon.</param>
+/// <param name="Direction">The bullet direction, from the cannon toward its destination.</param>
+/// <param name="CannonIdentity">The cannon's scene-object identity.</param>
+/// <param name="Serial">The sender's per-seat projectile serial; the server never rewrites it.</param>
+public sealed record RoundExtremeRacingCannonShot(int Actor, ushort Weapon, Vector3 Origin, Vector3 Direction,
+    uint CannonIdentity, uint Serial);

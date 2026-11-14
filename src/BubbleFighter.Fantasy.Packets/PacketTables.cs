@@ -52,6 +52,8 @@ public sealed class PacketTables
     private readonly Dictionary<string, BuildEntry> _builds = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<string, Table>> _structs = new(StringComparer.Ordinal);
     private readonly Dictionary<(string Build, string Struct), IReadOnlyList<PacketField>> _resolved = new();
+    // Each build's merged values, built once when builds.yaml is read; nothing writes to them afterwards.
+    private readonly Dictionary<string, Dictionary<string, object?>> _values = new(StringComparer.Ordinal);
     private readonly List<string> _buildOrder = [];
     private readonly List<string> _structOrder = [];
     private readonly IReadOnlyList<string> _buildView;
@@ -139,8 +141,10 @@ public sealed class PacketTables
         var buildsPath = files[0].Path;
         tables.ReadBuilds(buildsPath, ReadFile(files[0], deserializer));
         foreach (var build in tables.Builds)
+            tables._values[build] = tables.MergeValues(build);
+        foreach (var build in tables.Builds)
         {
-            if (tables.ValuesOf(build).TryGetValue("capabilities", out var rawCapabilities))
+            if (tables.MergedValues(build).TryGetValue("capabilities", out var rawCapabilities))
             {
                 if (rawCapabilities is not Dictionary<string, object?> capabilities)
                     throw new ConfigException($"'{buildsPath}' build '{build}': capabilities must be a map of boolean values.");
@@ -233,9 +237,32 @@ public sealed class PacketTables
     /// <summary>Gets a build's own values of <c>builds.yaml</c> laid over its base's, as nested maps of text.</summary>
     /// <param name="build">The build.</param>
     /// <returns>The merged values; a nested map is a <see cref="Dictionary{TKey,TValue}"/> of the same kind and a
-    /// list of scalars is a <see cref="string"/> array that replaces the base's list as a whole.</returns>
+    /// list of scalars is a <see cref="string"/> array that replaces the base's list as a whole. The lineage is merged
+    /// once when the tables load; each call returns its own copy, so a caller may change it without affecting the
+    /// tables or another caller.</returns>
     /// <exception cref="ConfigException">Thrown for an unknown build.</exception>
-    public Dictionary<string, object?> ValuesOf(string build)
+    public Dictionary<string, object?> ValuesOf(string build) => Copy(MergedValues(build));
+
+    // The once-merged values, shared; only code in this class that never changes them reads it.
+    private Dictionary<string, object?> MergedValues(string build) =>
+        _values.TryGetValue(build, out var values) ? values : MergeValues(build);
+
+    private static Dictionary<string, object?> Copy(Dictionary<string, object?> source)
+    {
+        var copy = new Dictionary<string, object?>(source.Count, StringComparer.Ordinal);
+        foreach (var (key, value) in source)
+            copy[key] = value switch
+            {
+                Dictionary<string, object?> nested => Copy(nested),
+                string[] list => (string[])list.Clone(),
+                _ => value,
+            };
+        return copy;
+    }
+
+    // Merging walks the whole lineage and copies every nested map; dialect rows ask for values hundreds of times per
+    // start, so this runs once per build at load. An unknown build falls through to Entry's error.
+    private Dictionary<string, object?> MergeValues(string build)
     {
         var merged = new Dictionary<string, object?>(StringComparer.Ordinal);
         foreach (var member in LineageOf(build).Reverse())
@@ -251,7 +278,7 @@ public sealed class PacketTables
     /// <exception cref="ConfigException">Thrown for an unknown build, missing capability, or non-boolean value.</exception>
     public bool CapabilityOf(string build, string capability)
     {
-        var values = ValuesOf(build);
+        var values = MergedValues(build);
         if (values.TryGetValue("capabilities", out var raw) && raw is Dictionary<string, object?> capabilities
             && capabilities.TryGetValue(capability, out var value) && value is string text
             && bool.TryParse(text, out var enabled))

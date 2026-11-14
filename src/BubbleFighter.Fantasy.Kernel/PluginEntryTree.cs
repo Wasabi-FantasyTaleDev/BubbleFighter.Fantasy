@@ -160,7 +160,7 @@ internal sealed class PluginEntryTree
         var fields = typeof(PluginAttribute).GetProperties().Where(property => property.PropertyType == typeof(Type[])).ToArray();
         foreach (var descriptor in catalog.Plugins)
         {
-            var declaration = descriptor.Declaration;
+            var declaration = descriptor.ReadOnlyDeclaration;
             foreach (var field in fields)
                 foreach (var contract in (Type[])field.GetValue(declaration)!) Add(contract);
         }

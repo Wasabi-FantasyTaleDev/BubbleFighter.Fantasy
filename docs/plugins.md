@@ -13,13 +13,15 @@ Everything the server does is implemented by a plugin. A profile composes plugin
 - [Installation](installation.md) is complete: `dotnet build BubbleFighter.Fantasy.sln -c Release` reports zero warnings and zero errors.
 - A terminal is open at the repository root; the commands on this page run there unless a step says otherwise.
 - The .NET 10 SDK is available: `dotnet --version` reports a 10.x version.
-- For the run steps, an `.env` file with a disposable, nonempty `BFF_MYSQL_PASSWORD` exists. See [Quickstart](quickstart.md) for why profile composition needs that variable even when MySQL is disabled.
+- A local check needs no `.env` or database settings when it uses the isolated-memory patch; see [Quickstart](quickstart.md).
 - The local-check patch `tools/local-checks/isolated-memory.patch.yaml` exists. Every local run on this page passes it so no real database is touched.
 - The `management` profile used for the first run serves administration only and needs no client data. Game profiles such as `kr-812` also need that build's client data.
 
 ## The model
 
 A plugin is a class marked with `[Plugin("plugin.id")]` that implements `IPlugin` from `BubbleFighter.Fantasy.Abstractions`. The attribute id is the **plugin id** referenced by rows. A profile contributes **plugin rows**; each row's `id` is the **row id**, the unique instance identity inside that composed profile. One implementation can be mounted many times: the `kr-1256` bundle mounts the `net.tcp` plugin twice as `game-listener` and `relay-listener`, and the `all` profile mounts every build's rows with a `<build>.<row id>` prefix.
+
+The plugin id is required. A plugin may also declare how administration interfaces show it: `Names` holds one `language=name` entry per language (`en`, `zh-Hans`, `zh-Hant`, `ko`), and `Category` groups it (`gameplay`, `items`, `social`, `network`, `launcher`, `storage`, `cluster`, `admin`, `distribution` or `core`), for example `[Plugin("lobby", Category = "gameplay", Names = ["en=Lobby and login", "zh-Hans=大厅与登录"])]`. Both are optional: the WebUI shows the name in the interface language, then the English one, then the plugin id. A malformed entry stops the plugin from loading, so a typo is found at once. The WebUI shows each plugin once, with the client builds it runs on, however many builds mount it.
 
 Plugins never see each other's classes. They publish and consume services by shared interface type. The interfaces live in two assemblies the host loads once and shares into every plugin: `BubbleFighter.Fantasy.Abstractions` (kernel contracts such as `IPlugin`, `IServiceRegistry`, `IEventBus`, `IMessageRouter`) and `BubbleFighter.Fantasy.Contracts` (game contracts such as message records and domain services). A row declares what it needs and what it publishes, and the host activates rows only when their requirements are registered, so activation order comes from service availability, not from the order of rows in YAML.
 
@@ -29,6 +31,7 @@ Plugins never see each other's classes. They publish and consume services by sha
 | `Optional` | Services that may be absent; selected providers take part in unload and reload order |
 | `Provides`, `ConditionalProvides` | Services this row must, or may, publish during activation |
 | `ProvidesMany`, `RequiresMany`, `OptionalMany` | Ordered extension points: publish, require at least one, or accept an empty list |
+| `LiveMany` | Extension points read as they stand at each `GetAll` call. Their providers are not dependencies: the row does not wait for them and is not restarted when one loads or unloads. Ask again for each operation and keep no member. Native plugins only |
 | `Decorates` | Wrapper layers around a singleton that opted in with `RegisterDecoratable` |
 | `Overrides`, `Middleware` | Typed message handler replacement and wrapping, declared as `rowId:fully.qualified.MessageType` |
 | `SupportedBuilds`, `SupportedFamilies` | Client build compatibility checks for the row's profile |
@@ -58,11 +61,11 @@ The third column is empty when the plugin is build-independent (for example `loa
 A running server exposes its row instances at `GET /api/plugins`:
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:8080/api/plugins | Select-Object rowId, plugin, state, error
+Invoke-RestMethod http://127.0.0.1:7300/api/plugins | Select-Object rowId, plugin, state, error
 ```
 
 ```sh
-curl -s http://127.0.0.1:8080/api/plugins
+curl -s http://127.0.0.1:7300/api/plugins
 ```
 
 Each item carries `rowId`, `plugin`, `source`, `state`, `error`, `codeRefreshPolicy`, `codeLifetime`, `restartRequiredForReclamation`, `isRetiring`, `overrides`, `version`, `contractVersions` and `supportedBuilds`. State names are written as strings and come from the `PluginState` enumeration. On a server started with `start`, `/api/plugins` needs a signed-in administrator session; a `run --profile` server answers it on loopback without sign-in, as described in [Quickstart](quickstart.md).
@@ -280,6 +283,10 @@ Only trusted adapters construct `CommandCaller`: resolve stable account IDs thro
 Set `shared_chat_commands: true` in an `ingame` row's config to connect that gameplay scope to shared chat dispatch. This option defaults to `false` pending native-client acceptance; disabled scopes retain their original host-only `!start` and `!set` handlers. Enabling it requires both shared command services, otherwise activation fails.
 
 The core bundle's `commands.game` row connects enabled scopes to the same dispatcher, including native plugin commands. It registers `/start` and `/mode <id>` (alias `/set`) once across gameplay scopes; `!` and `！` also work. Their `game.room.start` and `game.room.mode` permission nodes allow ordinary players by default, acting only on their own waiting room. A configured mode table still rejects unsupported IDs. Command start bypasses ready marks; the native start button retains its room-master check. Prefix input that fails permissions is consumed, with no fallback to the local command path.
+
+The `ingame` row also accepts room-title tags such as `#19#` or `#BombMission#`. The shared bundles set `mode_name_table_path: data/room-modes.json`, whose 47 known mode identities include the modes already present in native create-room dialogs. The table provides selection names and whitespace-free tokens in Simplified Chinese, Traditional Chinese, Korean, English, Indonesian, Vietnamese and Thai. For example, `#爆破模式#My room` creates Bomb Mission and displays `My room`. A later native title submission uses the same parser. Unknown or ambiguous native names remain ordinary title text; the first recognized tag selects the mode and later tags remain in the title. Numeric tags keep their existing range and precedence.
+
+The mode-name table is data, not another mode implementation. Its format-one `modes` array contains a distinct `id` and `key`, matching language-keyed `names` and `tokens` objects, and optional whitespace-free `aliases`. Each token must equal its name with whitespace removed; matching ignores ordinal letter case. Different IDs cannot claim the same token or alias. The selector uses explicit qualifiers for native labels shared by several modes, such as personal/team survival and the two AI variants. `nativeNames` and `nameSources` retain display-name provenance; they do not automatically authorize ambiguous aliases. Modes without a native display name use a documented translation or their known codename rather than an invented native label. An empty `mode_name_table_path` keeps numeric-only tags; a missing, malformed or ambiguous configured table fails activation. These options do not change client packet layouts or bypass the native title editor's own length limit.
 
 Gameplay owners register `IGameCommandEndpoint` through `IGameCommandEndpoints` and own the returned handle. Routing verifies the authenticated game account against the current seat, rejects ambiguous session ownership, and runs under the gameplay owner's lifetime. `commands.game.max_endpoints` defaults to 512 and bounds live scope registrations. This row does not implement map, management or room-transfer commands.
 

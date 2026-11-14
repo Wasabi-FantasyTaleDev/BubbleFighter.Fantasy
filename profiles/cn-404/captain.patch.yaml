@@ -1,4 +1,4 @@
-# Explicit opt-in to the build-audited captain exchange; native-client acceptance remains required.
+# Included by the build profile: the build-audited captain exchange; native-client acceptance remains required.
 - set:
     id: dialect.rooms
     config:

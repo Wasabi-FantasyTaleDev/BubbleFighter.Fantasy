@@ -2,7 +2,7 @@ using BubbleFighter.Fantasy.Contracts.Match;
 
 namespace BubbleFighter.Fantasy.Dialect.Messages;
 
-/// <summary>Selects the actors whose defence tables one seat's round request covers.</summary>
+/// <summary>Selects the actors whose victim defence and cancellation tables one seat's round request covers.</summary>
 internal static class DefenceSeedRoster
 {
     /// <summary>

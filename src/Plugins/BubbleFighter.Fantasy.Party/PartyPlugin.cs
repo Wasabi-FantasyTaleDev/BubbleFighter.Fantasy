@@ -15,7 +15,7 @@ namespace BubbleFighter.Fantasy.Party;
 /// build's dialect. The party list is the client's own S2C gspUpdateParty, leader first; parties live in memory while
 /// their members are logged in, and a disconnect is a leave.
 /// </summary>
-[Plugin("party", Description = "Party invitations, membership and leadership shared by every client build.",
+[Plugin("party", Category = "social", Names = ["en=Parties", "zh-Hans=队伍", "zh-Hant=隊伍", "ko=파티"], Description = "Party invitations, membership and leadership shared by every client build.",
     Requires = [typeof(IMessageRouter), typeof(IOnlinePlayers)],
     OptionalMany = [typeof(IInboundMessageBinding<PartyInviteRequested>), typeof(IInboundMessageBinding<PartyInviteAccepted>),
         typeof(IInboundMessageBinding<PartyInviteAnswered>), typeof(IInboundMessageBinding<PartyInviteTokenRefused>),

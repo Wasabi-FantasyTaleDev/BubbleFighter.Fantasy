@@ -1,5 +1,6 @@
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Contracts.Match;
+using BubbleFighter.Fantasy.Contracts.Pets;
 
 namespace BubbleFighter.Fantasy.Dialect.Messages;
 
@@ -68,11 +69,10 @@ internal sealed partial class WeaponCriticalCatalog
         var equipped = 0;
         var duration = 0;
         var timed = 0.0f;
-        // id-400 sub_8FC4E0 applies the character first, then the deduplicated ordered worn set.
-        foreach (var item in equipment.WornItemIds.OrderBy(id => id is >= 300000 and < 400000 ? 0 : 1).ThenBy(id => id))
+        // id-400 sub_8FC4E0 applies the character first; kr-1256 sub_818AA0 limits that range to 300000..300999.
+        foreach (var item in equipment.WornItemIds.OrderBy(id => id is >= 300000 and < 301000 ? 0 : 1).ThenBy(id => id))
         {
-            if (!catalogEffects.TryGetValue(item, out var effects)) continue;
-            foreach (var effect in effects)
+            foreach (var effect in catalogEffects.GetValueOrDefault(item) ?? [])
             {
                 // cn-324 sub_816450 cases 3/74 assign; cases 76/77/80 accumulate with different native widths.
                 switch (effect.Kind)
@@ -86,7 +86,11 @@ internal sealed partial class WeaponCriticalCatalog
                 }
             }
         }
-        if (!float.IsFinite(timed) || duration < 0)
+        // kr-812 sub_9871F0 applies the supplied scene vector through kr-812 sub_99C310 after every static item.
+        if (pets is not null)
+            foreach (var effect in pets.ForEquipment(equipment))
+                if (effect.Kind == PetCombatEffectKind.AssignCriticalChancePercent) ordinary = effect.Amount;
+        if (!float.IsFinite(ordinary) || !float.IsFinite(timed) || duration < 0)
             throw new InvalidOperationException("Equipped timed critical attributes have an invalid amount or duration.");
         return new(ordinary, threshold, equipped, duration, timed);
     }

@@ -29,9 +29,10 @@ def is_alpha_blended(part_name: str) -> bool:
 
 
 def has_outline(part_name: str) -> bool:
-    """Weapons (``Gun``) blend their texture alpha but still get the outline hull: every weapon in
-    the kr-812 inventory grid is drawn with it. Eyes, eyebrows and kLowerBR stay without one."""
-    return part_name.lower() == "gun" or not is_alpha_blended(part_name)
+    """Keep texture opacity separate from the outline eligibility of weapons and goggles."""
+    # kr-812 sub_AED080 selects kEye texture blending; kr-812 sub_AED400 checks a separate outline exclusion.
+    # Exact kEye accessories retain their hull; the existing eye, eyebrow and kLowerBR rules stay intact.
+    return part_name.lower() in ("gun", "keye") or not is_alpha_blended(part_name)
 
 
 @dataclass

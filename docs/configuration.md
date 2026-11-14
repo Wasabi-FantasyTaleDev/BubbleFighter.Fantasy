@@ -1,7 +1,7 @@
 ---
 title: "Server configuration"
 description: "Compose plugin profiles, set environment variables, ports and persistence."
-updated: 2026-11-07
+updated: 2026-11-12
 ---
 
 Bubble Fighter Fantasy has no fixed set of server components. A **profile** under `profiles/` selects the plugin rows that run, the client build they serve, the listeners they open and the storage they use. This page explains how a profile becomes a running server, where the configuration files live, how environment variables and ports work, and how to switch persistence and client data.
@@ -12,7 +12,7 @@ Bubble Fighter Fantasy has no fixed set of server components. A **profile** unde
 
 - Build the server once: `dotnet build BubbleFighter.Fantasy.sln -c Release` must finish with zero warnings. See [installation](installation.md).
 - Open a terminal at the repository root. Commands on this page that use `dotnet run` assume that directory, because profiles, packets and client data are resolved relative to the working directory.
-- Copy `.env.example` to `.env` and set a nonempty `BFF_MYSQL_PASSWORD`. Profile interpolation requires it even for a check that disables MySQL. Never put real credentials in a file you intend to commit.
+- Copy `.env.example` to `.env` for a real deployment. A check that disables MySQL or uses memory or SQLite needs no `BFF_MYSQL_*` variables. Never put real credentials in a file you intend to commit.
 - Have client data ready if you intend to start a game build. The repository does not include it; see [Client data](#client-data).
 
 ## How configuration works
@@ -43,7 +43,7 @@ Everything that runs is a **plugin row**. A row names the plugin implementation 
 - id: admin.http
   plugin: admin.http
   config:
-    listen: "${BFF_ADMIN_HOST:-127.0.0.1}:${BFF_ADMIN_PORT:-8080}"
+    listen: "${BFF_ADMIN_HOST:-127.0.0.1}:${BFF_ADMIN_PORT:-7300}"
 ```
 
 | Key | Required | Meaning |
@@ -84,6 +84,12 @@ A patch file is a YAML list of single-key operations:
 `${VAR}` inserts the variable's value and `${VAR:-default}` supplies a fallback. If neither the profile `vars` nor the process environment defines the variable and no default is given, composition fails and names the file, row and variable. A profile's own `vars` take precedence over environment variables of the same name, and disabled rows are not interpolated.
 
 Configuration binding maps `snake_case` keys to the plugin's typed options. Unknown keys, wrong types, out-of-range numbers and failed option validation are all reported together as one `Invalid configuration for row '<id>': ...` error.
+
+### Inventory publication limits
+
+The `dialect.messages` row serializes inventory, shop-state and legacy laboratory completion publications for each connection. `max_inventory_publications_per_connection` limits the running publication plus queued callers (default `8`, range `1..256`). `max_shop_sessions` bounds connections retaining an origin or admitted publication (default `512`, range `1..65536`); retired work remains counted until it drains. Different connections can publish independently. Exceeding either limit fails immediately before another caller is queued.
+
+A connection close or row unload cancels pending callers and invalidates active preparation, so a delayed continuation cannot restore an old origin. Deterministic encoding errors leave the standing origin unchanged. A failure once a send sequence starts retires that connection's publication state and requests connection closure; already committed inventory is retained and is not charged or granted again by this cleanup. Raising the queue limit does not turn publication into a client acknowledgment or a database transaction.
 
 ## Where files live
 
@@ -136,9 +142,20 @@ The dump lists every row with its `id`, `plugin`, the `source` file that supplie
 | --- | --- | --- |
 | `BFF_BIND_HOST` | Address the game and relay listeners bind to. | `0.0.0.0` |
 | `BFF_PUBLIC_HOST` | Address advertised to clients for connect and relay endpoints. | `127.0.0.1` |
-| `BFF_ADMIN_HOST` / `BFF_ADMIN_PORT` | Administration HTTP bind address. | `127.0.0.1` / `8080` |
+| `BFF_ADMIN_HOST` / `BFF_ADMIN_PORT` | Administration HTTP bind address. | `127.0.0.1` / `7300` |
 | `BFF_LOG_LEVEL` | Console log level: Trace, Debug, Information, Warning, Error, Critical, None. | `Information` |
+| `BFF_LOG_FILE` | Optional Host log file; `--log-file` overrides it. Unset disables file logging. | unset |
+| `BFF_LOG_FILE_LEVEL` | File threshold; `--log-file-level` overrides it. Uses the same named levels as console logging. | `Warning` |
+| `BFF_LOG_FILE_MAX_BYTES` | Maximum UTF-8 bytes per retained file; 1024–1073741824. | `16777216` (16 MiB) |
+| `BFF_LOG_FILE_COUNT` | Retained file count, including the active file; 1–32. | `5` |
+| `BFF_LOG_FILE_QUEUE_CAPACITY` | Pending record slots; 1–65536. | `256` |
+| `BFF_LOG_FILE_MAX_QUEUED_BYTES` | UTF-8 payload budget, including the in-flight record; 1024–268435456. | `16777216` (16 MiB) |
+| `BFF_LOG_FILE_SHUTDOWN_TIMEOUT_MS` | Shutdown drain budget in milliseconds; 100–30000. | `5000` |
+| `BFF_LOG_FILE_RETRY_INITIAL_MS` | Initial reopen retry delay in milliseconds; 100–60000. | `1000` |
+| `BFF_LOG_FILE_RETRY_MAX_MS` | Maximum exponential retry delay in milliseconds; 100–60000 and at least the initial delay. | `60000` |
 | `BFF_CLIENT_DATA` | Root directory of per-build client data. | `client-data` |
+| `BFF_COMPILED_DATA` | Folder of the per-build compiled client data files, a cache the server rebuilds; see [Small servers](deployment.md#small-servers). | `state/compiled-data` |
+| `BFF_PACKET_LOG` | Writes one line per packet to the packet log file, for debugging. | `false` |
 | `BFF_PACKET_CAPTURE` | Enables the optional full packet recorder. | `false` |
 | `BFF_STATE_DIR` | State directory for the first-run setup flow (`start`). | `state` beside the executable |
 | `BFF_SQLITE_DATABASE_PATH` | Absolute save-file path for the SQLite provider when a patch enables it. | none |
@@ -151,7 +168,7 @@ The MySQL variables are required by the default composition:
 | `BFF_MYSQL_HOST` | Database host. Docker Compose overrides it to its `mysql` service. | `127.0.0.1` |
 | `BFF_MYSQL_PORT` | Database port. | `3306` |
 | `BFF_MYSQL_USER` | Database account. | `bff` |
-| `BFF_MYSQL_PASSWORD` | Password. Must be nonempty because interpolation runs before a disabling patch. | empty, must be set |
+| `BFF_MYSQL_PASSWORD` | Password. Required and nonempty when the MySQL row is enabled; a disabled row does not read it. | empty, must be set when MySQL is enabled |
 | `BFF_MYSQL_DATABASE` | Database name. Any existing database works. | `bf_game_db` |
 
 Ports and gameplay values are documented in the sections below. `.env.example` is the full commented list; copy it rather than inventing variable names.
@@ -166,7 +183,7 @@ Listener ports come from the profile, usually through per-build variables and `v
 | --- | --- | --- |
 | Game TCP | `7100` (`KR_1256_GAME_PORT`) | `7110` (`KR_812_GAME_PORT`) |
 | Relay TCP | `7101` (`KR_1256_RELAY_PORT`) | `7111` (`KR_812_RELAY_PORT`) |
-| Administration HTTP | `8080` (`BFF_ADMIN_PORT`) | `8081`, moved by the profile patch |
+| Administration HTTP | `7300` (`BFF_ADMIN_PORT`) | `7300` (`BFF_ADMIN_PORT`), the same single WebUI |
 | Optional native selector | not used | `7112` when `center-selector.yaml` is mounted |
 
 The `all` profile composes the brought-up client builds into one process, each on its own game listener. Its default game ports run from `7100` in steps of ten (`kr-1256` 7100, `kr-812` 7110, `id-400` 7120, and so on through `cn-408` 7250), and each build's relay listens one above its game port (`<BUILD>_RELAY_PORT`, advertised as `<BUILD>_PUBLIC_RELAY_PORT`). The legacy builds play a round over their relay when it connects and fall back to the game connection when it fails; `cn-706` and `cn-705` keep their rounds on the game connection because their relay packets are not audited. Use `--dump-config` to read the exact `listen` strings for the profile you selected before opening firewall rules.
@@ -290,11 +307,11 @@ The first recipe is an isolated check. The others are deliberate durable configu
 
 ```sh
 cp .env.example .env
-# Edit .env and set BFF_MYSQL_PASSWORD to a disposable nonempty value.
+# No database settings are needed: the isolated-memory patch disables MySQL.
 dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile management --patch tools/local-checks/isolated-memory.patch.yaml
 ```
 
-The console reports the activated rows and, once the host is ready, `Server started with <n> active row(s).` Check `GET /health` on `http://127.0.0.1:8080/`: it returns JSON with a `status` field. Stop with `Ctrl+C`.
+The console reports the activated rows and, once the host is ready, `Server started with <n> active row(s).` Check `GET /health` on `http://127.0.0.1:7300/`: it returns JSON with a `status` field. Stop with `Ctrl+C`.
 
 ### SQLite server
 
@@ -382,13 +399,30 @@ Choose a profile by the client build you intend to connect: read the client's ve
 
 What a listed profile means: the repository composes these rows and carries this build's packet data and capability records. What it does not mean: that every gameplay feature is implemented, or that a real client has been verified. A passing automated check, an enabled capability or a listed profile does not establish real-client compatibility; capability records describe audited native support, and native acceptance remains a separate test.
 
+## Features on by default
+
+Every implemented feature is on in the shipped profiles, so a fresh server can test all of it. Each gameplay switch below defaults to `true`; set it to `false` in `.env` to turn that feature off. Where the client does not state a value (a success chance, a debit, a weapon pool), the profile carries a working server policy that a local patch can replace.
+
+| Variable | Feature |
+| --- | --- |
+| `BFF_TITLES_ENABLED` | Titles, medal exchange and automatic round medals (`kr-812`, `kr-1256`) |
+| `BFF_FAVORITE_WEAPON_ENABLED` | Favorite weapon points and grade notices (`kr-1256`) |
+| `BFF_FAVORITE_TITLES_ENABLED` | Favorite challenge titles and their progress (`kr-1256`) |
+| `BFF_ITEM_ENHANCEMENT_ENABLED` | Enhancement, permanent conversion and grade-up in the laboratory (`kr-1256`) |
+| `BFF_ITEM_MODIFICATION_ENABLED` | Weapon Modification (`kr-1256`) |
+| `BFF_SCIENCE_LAB_ENABLED` | Legacy synthesis (`kr-812`) |
+| `BFF_PET_COMBAT_ENABLED`, `BFF_PET_REWARDS_ENABLED`, `BFF_PET_CANCELLATION_SEEDS` | Pet combat effects, round rewards and cancellation seeds in every ordinary mode |
+| `BFF_CUSTOM_ROOM_RULES_ENABLED` | Custom room options (`kr-1256`) |
+
+The build profiles also list every audited mode patch: `kr-1256` bomb, captain, BnB, Extreme Racing, Final Zone, OneKill, stars, ghost and script zombies, Rhea, AI rooms, Zombie Escape, waiting-room kicking, defence seeds and WeaponMaster; `cn-774` and `tw-454` their audited subset; the legacy builds bomb and captain. Each build's `modes.patch.yaml` comes last and states the union of the result scoreboard modes. Launcher tickets, the UDP transports, cluster rows and the packet log stay off: they change how clients connect rather than what the game does.
+
 ## Optional feature bundles
 
 A few bundles are opt-in and are listed only by profiles whose client audit supports them.
 
 **`player-settings`** mounts `player.settings`, the typed storage of players' customized key bindings. The packets themselves are bound by the `customized_keys` option of the `dialect.messages` row, stated by `kr-812`, `kr-1256`, `cn-774` and `tw-454`; other profiles need an audit of their native control names and packet paths first. Each `player.settings` row requires `protocol` and uses a per-profile `scope` so names from different builds are not mixed. The persistence providers store the maps per account; MySQL stores them through migration `0032_customized_keys.sql`. The per-account budgets are configured on each provider with `customized_keys` (`max_scopes` 1–64, `max_mappings` 1–512, `max_name_characters` 1–1024, and their combination must fit the packet body). Exceeding a budget fails instead of evicting another saved map.
 
-`dialect.messages.config.science_lab` defaults to `false`. The verified operation rows for `kr-1256`, `cn-774` and `tw-454` allow this option to answer all eight laboratory operations with the client's closed-laboratory result (5 on KR, 4 on CN/TW). Activation requires every verified request/reply pair and the request/reply layouts; incomplete tables fail. This is not a complete laboratory: recipes, costs, success probabilities, rewards and item mutations are absent, and no reliable request chain for opening the laboratory state has been established. Enabling this option does not publish laboratory state or enable its UI. The 34-byte KR state, 36-byte CN state and 26-byte KR empty item-list pins cover data only.
+`dialect.messages.config.science_lab` defaults to `false` and routes the verified laboratory operation families for `kr-1256`, `cn-774` and `tw-454`. An operation without an owning handler returns the client's closed-laboratory result (5 on KR, 4 on CN/TW). Activation requires every verified request/reply pair and the request/reply layouts; incomplete tables fail. This option alone supplies no recipe, economy policy, item mutation or laboratory configuration. The [optional item enhancement](#optional-item-enhancement) bundle pairs it with `science_lab_configuration` and an enhancement handler for `kr-1256`, with an optional Modification policy enabled separately for that build. Legacy `kr-812` synthesis and decomposition use the separate [optional legacy science room](#optional-legacy-science-room) configuration. Native laboratory UI acceptance is still pending.
 
 The expired-item discard is stated the same way: the `inventory_actions` option of the `dialect.messages` row binds `gcpReqInventoryThrowItem`/`gspRepInventoryThrowItem` (on for every legacy build and `kr-1256`), and the `inventory.throw` row inside the build's own bundle removes the item through the stored equipment services. The behavior is deliberately narrow: one authenticated player's expired item is removed from both bags, active entitlements refuse the whole removal, and the build's category-6 exclusion is honored. Requests from matches are refused. Real-client acceptance remains pending; table coverage alone is not enough to state the option on another build.
 
@@ -405,6 +439,25 @@ Launcher request and sign-in limits are configured on the `launcher.http` row:
 
 Revoking an old sign-in also removes its local access bearer and pending game tickets. Expired refresh sessions are deleted before the listener starts, then during sign-in at most once per hour. The account limit survives a server restart because it is enforced by the session store.
 
+## Passive relay latency replies
+
+The `relay-latency` bundle adds disabled `dialect.relay-latency` and `match-latency` rows only to `kr-1256`, `cn-738`, `cn-742`, `cn-774` and `tw-454`. For native-client acceptance testing, enable both rows with a deployment patch:
+
+```yaml
+- set:
+    id: dialect.relay-latency
+    disabled: false
+- set:
+    id: match-latency
+    disabled: false
+    config:
+      reply_word: 0
+```
+
+Both rows require the owning build's `protocol`, such as `kr-1256/relay`; the bundle supplies it. The dialect's `packets_directory` defaults to `packets`. The logic row's `reply_word` accepts `0..4294967295` and defaults to `0`. It is the opaque four-byte word consumed and discarded by the native reply handler, not a timestamp echo.
+
+Each complete request receives one reply on its originating current authenticated relay lease. Replies share the connection owner's gate with handshake publication; scene completion is not required. Malformed bodies, revoked leases and failed sends remain connection errors. Existing connection and send-queue budgets bound resources. The handshake order and client sampler settings remain unchanged: enabling these rows does not start client probes. Both rows remain disabled by default pending native-client acceptance. In an `all` profile patch, use the build-prefixed row IDs.
+
 ## Optional UDP transport
 
 UDP is provided by the `net.udp` plugin. Game login, room admission and match authentication continue over TCP; UDP carries the audited native movement and discovery traffic. No shipped profile mounts a UDP listener by default.
@@ -419,9 +472,6 @@ Apply one patch to one matching profile. The patches are alternatives, and their
 For example, after assigning the profile's ordinary TCP/admin ports to free local ports and provisioning its client data:
 
 ```powershell
-$env:BFF_MYSQL_PASSWORD = "isolated-unused"
-$env:BFF_MYSQL_HOST = "127.0.0.1"
-$env:BFF_MYSQL_PORT = "1"
 $env:BFF_LOGIN_AUTHENTICATION = "open"
 $env:BFF_BIND_HOST = "127.0.0.1"
 $env:BFF_UDP_PORT = "7603"
@@ -483,6 +533,8 @@ The `ingame` row may opt into destination seat preparation with `room_admission_
 Manual selectors may have an empty `nodes` list to reserve a disabled choice without guessing an endpoint. Automatic selectors still require configured candidates. The Launcher API preserves empty entries; clients must keep them disabled and must not resolve or connect to an invented address.
 
 Selectors accept an optional `short_name` of 1..128 UTF-16 code units with nonblank text, no control characters and only paired surrogates. The directory and launch grants expose it as `short_name`; omission retains the full `name` fallback. Grants retain both labels across health refreshes. Set a concise region label explicitly rather than deriving it from the full name; labels never change endpoint or authentication bindings.
+
+Selectors may be grouped into `sections` (for example Main, Test Server, Oversea Server); the first section is the default. Each section has an `id`, a `name` and an optional `api_url`. A section without `api_url` shares the sign-in of the Launcher API that publishes the directory, so one login reaches its servers through the in-game list; a section with `api_url` signs players in through that API, which issues its own tickets, and the Launcher keeps its accounts apart. Grouping is all or nothing: with sections configured every selector names one in `section`, without sections none does. `GET /v1/servers/{build}` adds `sections` and each selector's `section`. A node may also declare `maintenance` with `start` and `end` (ISO 8601 with seconds and an offset, either may be omitted) and a Markdown `description`; while it is in effect its targets carry the window, automatic placement leaves the node out, and the Launcher shows the server under maintenance and leaves it out of the in-game list. The Launcher keeps the last directory it read, so while the publishing API cannot be reached it still lists every section, asks separate sections through their own APIs and shows the other servers offline.
 
 `selectors[].nodes` controls visibility; a manual entry has zero or one node. `selectors[].automatic` returns only fresh, ready, non-draining candidates below capacity and requires one nonempty persistent `data_scope` across its members. `nodes[].data_scope` and `nodes[].join_scope` are opaque declarations; empty values grant no sharing or joining, and matching values do not implement either capability. `nodes[].room_directories` independently controls room-summary sharing, including friendly servers whose accounts remain isolated.
 
@@ -627,13 +679,56 @@ Each client build declares `display_level_max` in `packets/builds.yaml`, using t
 
 `dialect.rooms.config.bomb_mission` enables the audited native bomb operation and result bindings. `ingame.config.bomb_round_series` additionally enables a native round series, alternating attack roles and keeping round wins separate from kill totals. Legacy formats use two wins in at most three rounds; kr-1256, cn-774 and tw-454 use three wins in at most five rounds. Both options default to `false`; the complete series supports kr-812, cn-717, id-400, id-1809, cn-404, cn-408, cn-706, kr-1256, cn-774 and tw-454 and requires shared results and an audited series-entry sender. Apply the matching `profiles/<build>/bomb.patch.yaml` to enable both and exclude mode 19 from ordinary respawning. Observation support is required for that exclusion. Modern opt-in patches also include modes 19 and 20 in the scoreboard selection. CN2013 cn-406 remains excluded because its own mode factory has neither specialized branch; this does not classify other CN2013 revisions.
 
-`dialect.rooms.config.extreme_racing` defaults to `false` and requires the audited `extreme_racing` build capability, currently kr-1256 only, with `modern_rooms` and its round bindings; cn-774 and tw-454 have audited timer, round, record, goal, coin and checkpoint table rows, but their racing capability remains disabled and refuses the option pending a complete round audit. Apply `profiles/kr-1256/extreme-racing.patch.yaml` to enable it. Mode 24 then plays `ingame.config.extreme_racing_rounds` race rounds (1 to 5, default 3). Each round starts the race clock (`extreme_racing_round_ms`, default 180000). The first goal starts the finish countdown (`extreme_racing_finish_countdown_ms`, default 10000), and the round closes when the countdown or the race clock runs out, or when every connected player has finished. Finishers score `extreme_racing_place_points` by place (default 10, 8, 6, 5, 4, 3, 2, 1), the race boards show round and total points, and a pause of `extreme_racing_intermission_ms` (default 5000, more than 1000) separates rounds. After the last round the shared result runs once: the team with more points wins, or the players with the most points when the room does not have two teams. The common round time limit does not end a race. Checkpoint touches are relayed so every player's progress mark moves; the client places its own markers and respawn points. Map objects that need a server object list (cannons, coins and stones) are not created. Round counts, clocks and points are server policy, and native-client acceptance is pending.
+`dialect.rooms.config.extreme_racing` defaults to `false` and requires the audited `extreme_racing` build capability, currently kr-1256 only, with `modern_rooms` and its round bindings; cn-774 and tw-454 have audited timer, round, record, goal, coin and checkpoint table rows, but their racing capability remains disabled and refuses the option pending a complete round audit. Apply `profiles/kr-1256/extreme-racing.patch.yaml` to enable it. Mode 24 then plays `ingame.config.extreme_racing_rounds` race rounds (1 to 5, default 3). Each round starts the race clock (`extreme_racing_round_ms`, default 180000). The first goal starts the finish countdown (`extreme_racing_finish_countdown_ms`, default 10000), and the round closes when the countdown or the race clock runs out, or when every connected player has finished. Finishers score `extreme_racing_place_points` by place (default 10, 8, 6, 5, 4, 3, 2, 1), the race boards show round and total points, and a pause of `extreme_racing_intermission_ms` (default 5000, more than 1000) separates rounds. After the last round the shared result runs once: the team with more points wins, or the players with the most points when the room does not have two teams. The common round time limit does not end a race. Checkpoint touches are relayed so every player's progress mark moves; the client places its own markers and respawn points. Map objects that need a server object list require the separate initialization option described below. Round counts, clocks and points are server policy, and native-client acceptance is pending.
 
 The server validates planting, cancellation and defusing against the exact operation owner, team and active round. The native master reports detonation and objective results; the armed bomb retains its own countdown when the ordinary round time expires. Each subround uses shared loading, participant life and cancellation handling. Rewards settle once after the match, retaining the same match identity. A whole team's voluntary departure forfeits the match without inventing unplayed round wins; the existing disconnect-cancellation policy remains in effect. This option does not enable unaudited builds or establish native-client acceptance.
 
+### Racing map initialization
+
+`extreme_racing_initialization` defaults to `false` on both `dialect.rooms.config` and `ingame.config`; enable both together with the existing racing exchange. The runtime capability currently supports kr-1256 only. Packet tables also describe cn-738, cn-742, cn-774 and tw-454, including the earlier two-map initialization without stone disposers. A table entry alone does not enable gameplay on those builds.
+
+Set `ingame.config.extreme_racing_stages` to explicit stage policies. Each entry requires `stage_directory`, positive `first_cannon_identity`, `first_coin_identity` and `first_stone_disposer_identity`, `coin_variant: 0`, and `coin_rounds`: one one-based round per native coin helper in numeric suffix order. The selected map's `SavePoint/StageCount` must equal `extreme_racing_rounds`. Cannon/disposer, coin and stone identity ranges must be disjoint and below the player actor namespace. Import the matching `Maps/<stage_directory>/option.ini` and `track.wb`; missing helpers, overlapping identities or incomplete coin assignments fail activation.
+
+Resource limits are `extreme_racing_maximum_file_bytes` (default 8388608, range 8..67108864), `extreme_racing_maximum_helpers` (4096, 1..65536) and `extreme_racing_maximum_objects` (1024, 1..4096). Up to 128 distinct stage policies are accepted. Initialization sends each loaded participant the same object identities once per map entry, before the start countdown completes. A partial send or membership change cancels that round and closes its connections. This enables the initial object list; moving collision vehicles, cannon scheduling and native-client acceptance remain unfinished.
+
+### Racing cannon relay
+
+`extreme_racing_cannon` defaults to `false` on both `dialect.rooms.config` and `ingame.config`; enable both together with `extreme_racing_initialization`. It requires the build capability `extreme_racing_cannon`, currently kr-1256 only. When enabled, the room reads `Maps/<stage_directory>/cannon.ini` of every configured stage next to its `option.ini`. The file must declare as many cannons as the map's `Cannon/PairCount`, or none; each cannon needs `WEAPONCOUNT`, a positive `INTERVAL` and a `STAGE` the map has, and every weapon a `[CannonN_WeaponM]` section with `WEAPONID` (50000 to 50008), `COUNT` and a positive finite `SCALE`. Any other mismatch or malformed value fails activation. A map that declares no cannon, such as rel_Racing01_Extreme with nine initialized pairs, schedules none: its pairs stay idle and no shot passes. The room accepts a relayed cannon shot (relay 32902) only when its actor is the sender's own seat, its vectors are finite, its cannon identity was initialized in this room generation, its weapon is in that cannon's resource list and it answers one outstanding server command exactly. It then forwards the original bytes once to the other initialized participants, never back to the sender, with no retry and no serial rewrite. A cannon pair has at most one command outstanding, so the ledger is as large as the map's cannon count. This option alone sends no cannon commands: no shot passes until the schedule below issues them. Native-client acceptance is pending.
+
+### Racing cannon schedule
+
+`extreme_racing_cannon_fire` defaults to `false` on `ingame.config` and requires `extreme_racing_cannon`. No client timer fires a cannon, so without this option nothing does. When it is on, each race round arms the cannons right after the race clock (S2C 711) was sent, and a command (S2C 718) goes to exactly one seat, the origin, whose client fires the bullet and relays it (relay 32902) for the room route to forward. The origin, the cadence and the weapon order are server policy, not native behaviour, and no client code that reads `INTERVAL` has been found:
+
+- The origin is the lowest-slot seat that received the initialization and still has an open game connection. Commands are never sent to more than one seat, because each receiver fires its own bullet.
+- Each cannon is due one `INTERVAL` after the race clock starts and again one interval after every due time. A cannon whose pair still has a command outstanding is skipped, not queued, and a stalled clock never makes up missed shots. `STAGE` is not consulted. A cannon with several weapons cycles through them in file order.
+- The command carries group 0 (any cannon group), the cannon's first pair identity and scale 1.0: the relayed shot has no scale, so another value would change only the origin's cannon.
+- The cadence stops, and its outstanding commands are revoked, when the race round closes, the round is cancelled or ends, the room stops, or the generation changes. The next race round arms it again.
+- When the origin leaves or disconnects, its outstanding commands are revoked and never resent; the lowest-slot remaining initialized seat becomes the origin for later commands only. A seat that did not receive the initialization is never chosen and receives no command history.
+- A failed send ends that generation's schedule: the command is revoked, nothing is retried and the race goes on without cannon traffic.
+
+Native-client acceptance is pending.
+
+### WeaponMaster rounds
+
+`dialect.rooms.config.weapon_master` defaults to `false`; the `kr-1256` profile turns it on through `profiles/kr-1256/weapon-master.patch.yaml`. It requires the build capability `weapon_master`, currently kr-1256 only (cn-774 and tw-454 do not inherit it), together with `modern_rooms` and mode 26 in `result_scoreboard_modes`. It mounts the equipment frame that hands a seat a weapon and the client's request for a new weapon after repeated deaths.
+
+Enable it together with `ingame.config.weapon_master_levels` on the in-game row of the same protocol; one without the other fails activation. The option has no default: an empty list leaves mode 26 an ordinary timed round. Each list entry is one level, in order, with its `experience` threshold (the first level `0`, each later level higher, below 65535) and an optional `weapons` list of `item` (positive item id, distinct within the level) and `weight` (positive). A level without weapons draws from the shared `weapon_master_weapons` pool, so weapons that do not depend on the level are stated once. `weapon_master_experience` lists the experience each accepted event gives, as `{ event, points }` with distinct events from `kill`, `knockdown` and `rescue` and positive points; an unlisted event gives none. Mode 26 must also use native life admission through `native_life_every_mode` or `native_life_mode_ids` containing 26. The frame names a weapon by its weapon-catalog id, which `kr-1256 sub_4ADD70` resolves; a main weapon's shop item id is 200000 plus that id. The `kr-1256` profile's patch uses ten levels 200 experience apart, 100 experience per kill, and one random pool of the old L1, L2, L3, S1, S2 and R3 main weapons.
+
+Every seat receives a weapon when the round starts. Accepted events add their experience; when a seat's experience reaches a later level's threshold it rises to that level and is handed one weapon of it, however many thresholds the event crossed. The live score carries each seat's level, experience, the experience at which its level starts and that of the next level as kinds 31 to 34 (`kr-1256 sub_9E9160` stores them at seat record +204 to +216); at the last level the next value is one more than its start. The first seat to reach the last level wins and the round ends at once. When the client reports that its player has died the required number of times since the last weapon, the server hands it a new weapon of the same level. The server reads that count, `WeaponMasterNoPangDeadCount`, from the client's `Config/GameOption.xml`, which must therefore be imported; a missing, repeated or non-positive value fails activation. A premature request is logged and ignored. Revival follows the common rules. When the clock runs out before anyone reaches the last level, the seats at the highest level win; equal levels across all seats are a draw. The result screen's level column still shows the account level. Native-client acceptance is pending.
+
+### BnB rounds
+
+`bnb` defaults to `false` on both `dialect.rooms.config` and `ingame.config`. Enable both for the audited kr-1256 mode 41 exchange, with `modern_rooms`, mode 41 included in `result_scoreboard_modes`, `native_match_relay: true`, and native life admission through `native_life_every_mode` or `native_life_mode_ids` containing 41. Other builds reject the option until their complete exchange is audited. Bots are not admitted to this path. Apply `profiles/kr-1256/bnb.patch.yaml` to enable the exchange for `rel_bnb01_village06` with its verified scene bounds.
+
+Import `Config/GameSpec/BnBSpec.yaml` and each selected stage's `Maps/<stage_directory>/CustomMap.json` and `BnBItemLayout.json`. Set `ingame.config.bnb_stages` to at most 128 distinct entries, each with `stage_directory`, `tile_layer_minimum_x` and `tile_layer_maximum_z`. These are the original native TileLayer bounds before the JSON offset is applied; both coordinates are mandatory, finite values. Obtain them from the selected map's scene data. A guessed origin can select the wrong cells even when item generation agrees.
+
+`bnb_maximum_file_bytes` defaults to 1048576 (1..16777216), `bnb_maximum_cells` to 1024 (1..4096), `bnb_maximum_position_cell_distance` to 1 (0..4 Manhattan cells from the latest accepted movement sample), and `bnb_explosion_report_grace_ms` to 1000 (0..10000). Native resources supply fuse, flame and block-destruction times and ability limits. The shared map seed precedes loading, and the server retains one ordered placement, explosion and pickup state per round. Duplicate placement on an occupied cell neither publishes nor advances the sequence; an already-consumed pickup is still acknowledged so native input state can clear without awarding twice. Invalid ownership, stale lives and stale rounds cannot mutate the current state. Failed publication or loss of a required participant connection cancels the affected round. Native-client acceptance remains pending.
+
+A pickup that follows a bubble report in the same actor incarnation remains eligible under the same position and ownership checks. Dead or removed actors cannot pick up items. A completed death-cleanup request receives one actor-removal reply without granting a respawn; a later reset confirmation cannot revive that actor. A new round creates a fresh incarnation.
+
 ### FinalZone
 
-`dialect.rooms.config.final_zone` defaults to `false`. Apply `profiles/kr-1256/final-zone.patch.yaml` to enable the audited Area32 exchange for modes 23, 25, 30 and 45. It requires modern round bindings, the `final_zone` build capability and scoreboard mode 30; only kr-1256 is audited. The patch also retains scoreboard modes 1, 19, 20 and 24, so it can be applied after the other mode patches. It does not enable those other modes itself.
+`dialect.rooms.config.final_zone` defaults to `false`. Apply `profiles/kr-1256/final-zone.patch.yaml` to enable the audited Area32 exchange for modes 23, 25, 30 and 45. It requires modern round bindings, the `final_zone` build capability and scoreboard mode 30; only kr-1256 is audited. The patch also retains scoreboard modes 1, 5, 6, 19, 20 and 24, so it can be applied after the other mode patches. It does not enable those other modes itself.
 
 Import the matching client's `Config/GameSpec/GenItemSetting.yaml`, `Config/GenDroneSpec.csv`, `Config/SurvivalMode.xml`, `ServerShared/MapMeta.xml` and each selected map's `GenClusterTable.csv`, `GenSpawnTable.csv`, `GenSpotList.csv` through `client-data`. Import `GenDroneRewardTable.csv` for maps that use drone or golden supplies. The apartment maps disable drones and do not have this table. Missing or malformed resources fail before the countdown. The current explicit-item path supports ordinary generated items, including the `rel_Sudden08_Finalzone` map. Maps using the distinct `AutoItem` terrain class, including `rel_space04_64room`, are rejected. Equipped optional starting packs are also rejected before countdown until their native consumption and grant exchange is integrated.
 
@@ -655,6 +750,29 @@ Resource and object bounds are `ingame.config` fields:
 | `final_zone_maximum_bonus_items` | 64 | Accompanying objects per spawn choice. |
 
 This remains a guarded increment. The ledger bounds issued quantities but does not reproduce all native inventory slots, weapon variants or live ammunition consumption. Alliance and assassination behavior for mode 30 has not been established. Automated checks and resource imports do not establish native-client acceptance or complete map-mechanic coverage.
+
+### Star modes
+
+`ingame.config.star_mode_ids` and `star_team_mode_ids` select the individual and team star modes (modes 5 and 6 in the native clients) and require `dialect.rooms.config.star_items`. A star round lasts `star_round_time_limit_ms` (default 240000) and uses the map's own star points. The host's map report gives their positions, kinds and timing; when the host reports none, the server reads the `#sp_star_` and `#sp_bigStar_` helpers of the map's `track.wb` instead (`star_map_fallback`, default `true`). Each point shows its first star after its own delay and refills only once that star has been taken. A star round is decided on the stars each seat holds, and its live score and result carry each team's stars as the team total. On modern rooms `star_items` also requires `result_scoreboard_modes` to include modes 5 and 6, because the result table is sent only for listed modes. `star_fever_lead_ms` (default 0, off) starts the build's closing star fever that many milliseconds before the time limit; only kr-1256 has an audited fever packet. Apply `profiles/kr-1256/stars.patch.yaml` to enable both modes on kr-1256 with a 45-second fever. The patch restates the full scoreboard selection, so it can be applied after the other mode patches. Native-client acceptance is pending.
+
+## Ban-pick
+
+Ban-pick is a server feature the native clients never had. It is installed and on by default but bans nothing until someone sets a rule. The `banpick` row in `core` holds the server-wide document, and each build's `banpick.room` row (a child of its `ingame` row) applies it to that build's rooms. Disable both rows to remove the feature.
+
+There are two kinds of bans:
+
+- **Room bans** are set by the room host and live only as long as the room. `!banpick` (alias `!bp`) takes `add <item id, name or group>`, `remove <...>`, `set <ids or groups...>` (replaces the whole list at once, as the overlay does), `clear` and `list [page]`. Anyone may list; only the host may change the list, and only before the game starts.
+- **Server policies** are set by administrators with `gbanpick` (alias `gbp`, permission `game.management.banpick`). They are saved to `state_path` (default `data/banpick-policy.json`), and every save names the revision it edited. An empty `state_path` keeps the configured `policy` read-only.
+
+The document has the same shape as the client policy. `policy.groups` names item groups by the `ShopItem2` `MainCategory`/`SubCategory` sheet ids, which every build shares, or by the `function` column; the shipped groups include `weapon`, `sniper`, `rifle`, `shotgun`, `clothes`, `hat`, `character` and `pet`. `policy.policies` lists any number of policies. Each one has a scope (`builds`, `modes`, `rooms: all|public|password`) and typed rules:
+
+| Rule type | Effect |
+|---|---|
+| `block` | Equipping the item is refused where the policy applies, and a round with it worn cannot start. |
+| `confirm` | The same strength as a room ban: the host is warned and can start anyway. |
+| `warn` | Allowed, but the room is told who wears it; a newcomer hears about everyone already wearing one. |
+
+When the host presses start while someone wears a room-banned or `confirm` item, every member is told who wears what. A host with the Nirinsou Link overlay gets a confirmation dialog; any other host has `reclick_window_ms` (default 10000) to press start again or type `!bp start`. A list longer than `announcement_items` (default 25) is announced by its count. The overlay receives `game.ban.list.changed`, `game.ban.start.confirm` and `game.ban.warn`, and reads with the `game.ban.list.get` and `game.ban.catalog.search` requests. Every change it makes, the dialog's yes included, is a `bp` command run through the launch-bound command channel (`game.command.execute`), so it is checked exactly like a typed command; this needs the `companion.commands` row, which `core` ships disabled. A build whose message row sends no server notice receives the same text as system chat lines. Native-client acceptance is pending.
 
 ## Native plaza recruitment
 
@@ -704,4 +822,136 @@ The `inventory.loadouts` row gives each build its own worn character, clothing, 
 
 On first use, the row imports compatible legacy selections and repairs required equipment positions through the existing selection rules. Later changes affect only that build. Preset initialization preserves previously materialized pages. The row belongs below `clientdata`, isolates `IInventoryRepository` and `IPlayerInventoryState`, and parents the build's equipment consumers; it consumes the shared provider's `IInventoryLoadoutStore`. Custom profiles must keep the lobby, inventory view, equipment, shop, room dialect and gameplay consumers in this subtree.
 
+The `inventoryview` row's `persist_preset_pages` switch makes weapon preset pages server-owned state. The legacy bundle and the kr-1256 bundle turn it on; cn-774 and tw-454 keep it off because their page record has a different shape. No client packet saves a page, so the server records it: a committed equipment change writes the worn primary and special weapon into the page that is active at that moment, and the other pages keep their weapons, so each tab holds its own loadout. Removing the primary weapon leaves the page's weapon in place, and a login replay never writes. Switching to another page wears that page's weapon when this build's own bag holds it, through the ordinary equipment commit; a page weapon that cannot be worn is kept on the page and the worn set stays unchanged. Pages belong to the build's `inventory.loadouts` scope. Pages that also hold a crystal or pet in newer builds are not covered yet.
+
 Memory, MySQL and SQLite providers expose `max_loadouts_per_player` (default `32`, range `1..256`). Exhaustion rejects a new build selection without evicting existing ones. MySQL migration `0038` adds `player_loadouts`; SQLite schema `8` adds loadout snapshots while retaining older account state. Back up durable storage before upgrading. Rolling back MySQL code leaves the additive table intact; older SQLite readers refuse schema `8`, so a rollback needs a compatible reader. Do not restore an old save over newer player progress.
+
+## Optional item enhancement
+
+The `kr-1256` profile includes `profiles/bundles/item-enhancement.patch.yaml`. `BFF_ITEM_ENHANCEMENT_ENABLED` defaults to `true` and controls new ordinary Article allocation, enhancement mutations, and laboratory operation and configuration bindings. The `item-enhancement.articles` metadata row remains enabled; its validated `initialize_articles` field defaults to `false` and follows the same flag. With the flag off, persisted identities still resolve, support equip/unequip, and display their saved enhancement and modification attributes, while fresh ordinary inventory receives no new Article identities. The profile supplies all five recipe values below as server policy (50% success, 100% with the additive, one card, two of each kit, one additive); each has its own variable, and out-of-range values fail activation.
+
+An enabled row refuses a value outside the ranges below.
+
+Enhancement accepts one eligible, permanent, unequipped weapon or clothing Article from the main menu. An already enhanced item is ineligible. This bundle's enhancement and weapon Modification admission is audited for `kr-1256`; it does not establish support for other client builds or enable other laboratory operations.
+
+| Environment variable | Enhancement row field | Required integer value |
+| --- | --- | --- |
+| `BFF_ENHANCEMENT_SUCCESS_BASIS_POINTS` | `success_basis_points` | `0..10000`; `5000` means a 50% success chance. |
+| `BFF_ENHANCEMENT_ADDITIVE_SUCCESS_BASIS_POINTS` | `additive_success_basis_points` | `0..10000`; the success chance when the player selects the additive (`10000` makes it certain). |
+| `BFF_ENHANCEMENT_CARD_QUANTITY` | `card_quantity` | `1..1000000` of card `190111` per accepted attempt. |
+| `BFF_ENHANCEMENT_KIT_QUANTITY` | `kit_quantity` | `2..1000000` of each of the four kits `190106`, `190107`, `190108` and `190109` per accepted attempt. |
+| `BFF_ENHANCEMENT_ADDITIVE_QUANTITY` | `additive_quantity` | `1..1000000` of additive `101745` when the player selects the additive. |
+
+These values define the server's recipe policy. The commented numbers in `.env.example` are examples, with no economic defaults or claim to historical prices. Every accepted attempt consumes the configured card quantity and each kit quantity, including an unsuccessful attempt. Selecting the additive also consumes its configured quantity and uses `additive_success_basis_points` instead of `success_basis_points`. Insufficient or ambiguous materials are rejected before any change is committed.
+
+Weapon Modification follows `BFF_ITEM_MODIFICATION_ENABLED`, which defaults to `true` and needs `BFF_ITEM_ENHANCEMENT_ENABLED=true`. The bundle's nested `modification` policy carries the native laboratory configuration's 24 parts, their selectors and signed values, and both weight tables; one part per selection and zero Lucci for applying or deleting are server policy. A local patch can replace any field.
+
+| Modification field | Required policy |
+| --- | --- |
+| `part_quantity` | Quantity consumed for each of exactly three selected parts, `1..715827882`; three repeated parts must fit an Int32 debit. |
+| `apply_lucci_cost`, `delete_lucci_cost` | Explicit Lucci cost of applying or deleting one group, each `0..2147483647`. Zero must be chosen explicitly. |
+| `parts` | One to 24 entries with distinct `item_id` and distinct `(numeric_tag, effect_category)` pairs. Each item must be a native count-based modification part. |
+| `parts[].numeric_tag`, `parts[].effect_category` | Native categories `0..2` and `1..8`, respectively. Every combination of configured tag and effect categories must have a part entry. |
+| `parts[].attribute_ids` | Exactly seven distinct audited native ItemAttr selectors in `101..156`. A selector can occur only once within the same numeric tag; different tags may reuse it. |
+| `parts[].value0` | Positive signed effect units, `1..2147483647`; `160` displays as `1.60%`. |
+| `parts[].negative_values` | Exactly seven `{ attribute_id, value }` entries matching the selectors. Values are signed units in `-2147483648..0`; `-40` displays as `-0.40%`. |
+| `tag_weights`, `effect_weights` | Entries contain `key` and three `weights`, for zero, one and two already installed groups. Keys must match the part categories. Each weight is `1..715827882`, keeping the sum for three repeated parts within Int32. |
+
+Modification accepts an eligible permanent, unequipped weapon Article in the main menu. The player selects exactly three owned parts; repeated selections consume their combined quantity. Selection sums the chosen parts' tag and effect weights independently, then chooses uniformly among the resulting category pair's seven selectors. The same policy populates the native laboratory preview. Preview magnitudes are floating-point percentages; installed Article attributes retain their signed integer units, group and numeric tag. These values define explicit deployment policy.
+
+Each weapon stores up to three groups numbered `0..2`, independently of its enchantment. Applying uses the first vacant group; deleting requires an installed group. Each successful apply or delete advances the weapon's revision in its catalogue scope, and deleting the last group retains the empty state and revision. An exact stale persistence plan cannot debit again; a later separately resolved apply request may legitimately install another group.
+
+Material debits and a successful enhancement commit together. Modification commits its Lucci cost, all selected materials, group change and required Article/pet metadata together. It publishes the committed balance and complete inventory before the operation result, so the native handler can resolve the changed Article. Existing attributes remain present when the spending flags are disabled. Native-client acceptance and validation against live MySQL are still pending.
+
+Permanent conversion (the laboratory's ChangeUnlimited tab, `kr-1256` only) is on with the enhancement flag. The bundle's nested `conversion` policy uses card `190151`, a 30-day minimum (both from the native laboratory configuration) and one card per set:
+
+| Conversion field | Required policy |
+| --- | --- |
+| `enabled` | `true` shows the tab and admits requests; the default `false` keeps it hidden and refused. |
+| `card_item_id` | The counted card spent by one conversion, for example the native `190151`. It must be a counted material of the build's catalog, never a conversion target. |
+| `minimum_days` | Whole days a target must still have, `1..10000`. The client checks the same value before it sends a request. |
+| `set_card_quantity` | Optional. Cards one native set conversion spends, at least 1. Empty keeps sets refused; the client names one card for the tab but no per-set quantity, so the deployment states it. |
+
+A conversion accepts one individual timed item, selected by its item ID, in the main menu. The item must carry the client's own conversion flag, be a weapon or clothing item, have no equipment identity yet, be neither worn nor otherwise flagged, and have at least `minimum_days` left, with the client's half-second allowance. One card is spent and the same row becomes permanent, keeping its slot, flags and equipped copies; it receives its equipment identity even when Enchant and Modification do not cover the item. The server judges the timer again at the moment the store holds the account, so a timer that runs out while waiting, a stale request, or a repeated request after the item became permanent spends nothing. The complete inventory is published before the result. With `set_card_quantity` set, a request that names a native set converts every member listed in the set row (the first `setCnt` ids) in one transaction: each member must pass the same checks as an individual item, the cards are spent once, and one failing member leaves the whole set untouched. The reply names the set and the first member's Article key. The kr-1256 client sends a set request only when every member's part location is set, and its workbook leaves that empty for every set made only of convertible items, so the native client cannot request one with that data. Native-client acceptance is still pending.
+
+Laboratory grade-up (the MakeItemAdvanced tab, `kr-1256` only) is on with the enhancement flag. The bundle's nested `advancement` policy names the catalog's one grade-up card, `190247`, for the tab and for the HC to advanced HC step at one card per run; a local patch can add rules for other cards. The policy fields are `enabled`, `tab_card_item_id` (the card the client lists for the tab; it must be one of the rules' cards, and the client also compares the selected card with it to choose the confirmation text for ordinary HC sets) and `rules`, one per upgrade card, each with `card_item_id` (a counted catalog material, for example the native `190247`), `source_tier` (the client's tier numbers: `3` HC to advanced HC, `4` advanced HC to advanced L4HC, `5` L4HC to advanced L4HC), `card_quantity` (the cards one grade-up spends) and an optional `set_ids` limiting the card to named native sets. The client names no card, price or chance, so none is assumed, and the cards must be distinct. The server publishes the rules in the laboratory configuration exactly as the client's own rule engine reads them, and judges each request with the same rules: the request names a native clothing set and the Article of every member of the complete set (a partial set is refused), all members must be permanent and not worn, the card must match a rule that the set's current grade-up allows, and the cards are spent in the same transaction. The result is the native grade-up attribute (ItemAttr `100` for HC to advanced HC, `157` for advanced HC to advanced L4HC, `158` for L4HC to advanced L4HC) stored on the first member in the set row's order, carrying the fixed buff values of the workbook; a later grade-up replaces it and an enhancement attempt keeps it. It lives in the Article's existing enhancement metadata, so no migration is needed. The grade-up is deterministic because the client has no failure display for this tab; a refused request answers the closed result and spends nothing. The complete inventory is published before the reply, which names the set and the carrying member. The client merges the effects of all members and does not say which member carries the attribute; choosing the first is server policy. Native-client acceptance is still pending.
+
+## Favorite weapons
+
+`BFF_FAVORITE_WEAPON_ENABLED` defaults to `true`. When true, both `item-enhancement.articles` and `item-enhancement` read the client's `Config/FavoriteWeaponSystem.xml` (`favorite.workbook_path`) sheets `Base` and `Upgrade`. A successful weapon enhancement adds the workbook's `IncreasePointEnchant` points to that weapon in the same transaction as the revision and material debits; a failed attempt adds nothing. Points are stored per weapon and catalogue scope as plain non-negative integers; the grade (Normal, Expert, Special, Master) is always derived from them with the `Upgrade` thresholds and is never stored. The weapon's item presentation then carries ItemAttr 164 with the grade and points. Weapons without progress carry no entry, and external inventory writes cannot create or change the points. MySQL needs migration `0047`; SQLite keeps schema `13`. A successfully installed laboratory Modification also adds the workbook's `IncreasePointModification` points for its grade (S, A or B, the installed attribute's first category 0, 1 or 2) to the weapon in the same transaction as the installed group; deleting a Modification adds nothing. When an enhancement or Modification award carries a weapon across a grade threshold, the player gets the client's grade chat notice (S2C 1548, flag zero) after the inventory refresh; the `dialect.messages` option `favorite_weapon_grade_notices` follows the same variable. Round awards, decay, grade-up rewards and the demotion notice are not implemented. Native-client acceptance is pending.
+
+## Optional titles and medals
+
+The `kr-812` and `kr-1256` profiles include `profiles/bundles/titles.patch.yaml`. `BFF_TITLES_ENABLED` defaults to `true` and enables the titles row and its message bindings together. The row loads `Config/BF_title.xml` and `Config/ShopItem2.xml` using the build's declared title-catalog schema.
+
+The feature supports medal queries, medal-for-title exchange, and equipping or removing an owned, eligible title. Ownership comes from the existing inventory, and title selection follows the build's equipment loadout. An exchange commits the medal debit and title grant atomically; inventory publication retains ordinary Article and pet metadata. SQLite and MySQL persist medal balances, and the memory provider supports the same operations for local use.
+
+Automatic round medals follow the same flag. The bundle sets `round_medals_enabled` with one rule (medal `30007` for an Item Mode round with five to nine knockdowns), `acquisition_time_zone: Asia/Seoul` and `bonus_medal_quantity: 1`; add rules in a local patch. A rule list on the `titles` row is required whenever `round_medals_enabled` is true. Each rule names a native `medal_id`, exact `mode_ids`, a `metric`, inclusive `minimum` and optional `maximum`, the awarded `count` (default `1`), and `minimum_participants` (default `2`, counting human participants). Metrics are `Completed`, `Wins`, `Kills`, `Knockdowns`, `Rescues`, `Score`, `Deaths` and `Stars`. A medal may appear in only one rule. `max_round_medal_rules` (default `256`) and `max_modes_per_round_medal_rule` (default `128`) bound the retained policy. Thresholds and eligible modes are explicit deployment policy; enabling titles alone does not select historical award rules.
+
+The round policy uses the server's accepted terminal counters. Medal credits, round progress, wallet rewards and the match receipt commit together through a provider that declares atomic round-medal support. Memory, MySQL and SQLite implement that capability. An exact match replay cannot award medals twice. An award does not open the title window; the next medal query returns the current balances. For example, this patch awards one native medal for an Item Mode round with five through nine accepted knockdowns and at least two human participants. The thresholds are an example policy:
+
+```yaml
+- set:
+    id: titles
+    config:
+      round_medals_enabled: true
+      round_medal_rules:
+        - medal_id: 30007
+          mode_ids: [3]
+          metric: Knockdowns
+          minimum: 5
+          maximum: 9
+          count: 1
+          minimum_participants: 2
+```
+
+Timed acquisitions require an explicit `acquisition_time_zone`. Every time zone setting accepts an IANA id (`Asia/Seoul`) or a Windows id (`Korea Standard Time`) on every host: the server runs with invariant globalization, so it translates between the two with its own embedded mapping instead of the operating system's. An empty value leaves timed claims unavailable. The native acquisition interval compares month, day, hour and minute inclusively and ignores the year (`kr-812 sub_4FE3D0`, `kr-1256 sub_EAE090`); it is an annual local-time window, without implicit year-end wrapping. This restriction does not prevent equipping a title already owned.
+
+Native stock and stock-set acquisition bonuses resolve through the same shop workbook and commit with the title and its medal costs. Memory and MySQL retain a separate receipt so deleting or expiring the title cannot repeat its bonus; MySQL requires migration `0046`. SQLite schema `13` has no acquisition-bonus receipt capability, so it rejects only bonus-bearing acquisitions while retaining ordinary title claims, medal queries and round medals. The currently audited stock bonuses use permanent or day grants; stock sets with a Lucci reward are unavailable. Native medal-bonus references have no quantity column: `bonus_medal_quantity` supplies an explicit positive credit count, and omission leaves those acquisitions unavailable.
+
+Partner and challenge title acquisition remains unavailable. A relationship alone does not establish a diamond-ring condition, and Luxury, Gallery and Honor conditions require their own authoritative gameplay state and automatic grant path. The Favorite titles are the exception on kr-1256: with `BFF_FAVORITE_TITLES_ENABLED=true` (needs `BFF_TITLES_ENABLED` and `BFF_FAVORITE_WEAPON_ENABLED`; on by default, kr-1256 only) titles 400312, 400313 and 400314 are granted permanently, without medals, when 1, 2 or 3 of the account's weapon Articles are at Favorite Master, checked at login and after every Favorite award. The grant publishes the inventory, and the title window's progress (S2C 933, condition 6, current capped at the requirement) is sent after it. A check that finds the account busy with another write is skipped; the titles are granted at the next login or Favorite award. Acquiring them with medals stays refused. Native-client acceptance and validation against live MySQL are still pending.
+
+## Optional custom room rules
+
+The `kr-1256` profile includes `profiles/bundles/custom-room-rules.patch.yaml`. `BFF_CUSTOM_ROOM_RULES_ENABLED` defaults to `true` and enables `custom_room_rules` on both `dialect.rooms` and `ingame`, using `Config/CustomGameMode.xml` from the client data. Other builds are not enabled by this bundle.
+
+Only the current master of a waiting room may change options. The native catalog supplies the allowed controls and values for modes `1`, `3`, `8`, `11`, `13`, `28`, `30`, `32`, `37`, `38` and `39`. These are options for existing modes; their separate gameplay features retain their own activation requirements. Full room settings are synchronized before change feedback. New members receive the current settings, master changes preserve them, and a mode change or reset restores the native mode defaults. Custom rules follow the room's lifetime and are not database settings retained across a server restart.
+
+The `ingame` row bounds workbook parsing with `custom_room_rules_max_bytes` (default `8388608`), `custom_room_rules_max_rows` (`4096` across the selected sheets, including sparse-row padding), `custom_room_rules_max_columns` (`64`) and `custom_room_rules_max_cell_characters` (`8192`). Missing client data, unsupported bindings and invalid configuration fail activation. Native-client acceptance is still pending.
+
+
+## Optional legacy science room
+
+The `kr-812` profile includes `profiles/bundles/science-lab.patch.yaml`. `BFF_SCIENCE_LAB_ENABLED` defaults to `true` and enables the `science-lab` row together with `dialect.messages.config.legacy_science_lab`. The row requires the shared inventory binding, an inventory scope whose `build_key` matches the client catalog, and native `Config/ShopItem2.xml` and `Config/SynthesisSystem.ini`. Only the exact audited `kr-812` build is admitted; another build needs its own reader, result-consumer and eligibility review before its admission data changes. This row handles synthesis and decomposition. The existing item-enhancement row remains the sole owner of its laboratory-configuration request handler.
+
+Synthesis consumes three distinct eligible, unequipped, unexpired duration items or three complete native sets and returns one configured survivor. Native set selection uses `stockSetId` and the exact ordered `setCnt` members, which may differ from `setId`; mixed grouped and ordinary selections are refused. Each selected set must have matching lifetimes across all members. Decomposition consumes one eligible permanent item or complete permanent set. Both operations require the configured counted card; optional selected additives have separate explicit debits. Requests must come from the main menu. Missing, stale, ambiguous, worn, expired or unsupported ownership refuses the entire operation before persistence commits.
+
+The following `profiles/kr-812/local.patch.yaml` example defines a synthesis-only deployment policy. These numbers are examples, not recovered native economics; the installed `SYNTHESISINFO` values do not establish the server's recipe prices or probabilities. Select the intended policy before enabling the feature.
+
+```yaml
+- set:
+    id: science-lab
+    config:
+      enabled: true
+      synthesis_card_item_id: 100622
+      card_quantity: 1
+      synthesis_survivor: first
+      synthesis_maximum_days: 729
+      synthesis_permanent_at_days: 730
+- set:
+    id: dialect.messages
+    config:
+      legacy_science_lab: true
+```
+
+`card_quantity` is a positive counted debit shared by configured recipes. `synthesis_survivor` must be `first` or `uniform`. Synthesis sums exact remaining fractional days, applies `synthesis_maximum_days` below the native 730-day permanent-display threshold, and promotes a sum at or above the higher `synthesis_permanent_at_days` to permanent ownership. A permanent input also produces permanent ownership. No synthesis card or decomposition recipe is enabled by an implicit economic default.
+
+Optional `decomposition` entries contain `card_item_id` (`100623` or `100656` when using this native catalog), `category` (`0` accessories, `1` clothing/sets, `2` weapons), and a nonempty `rewards` array. Each reward has a native `stock_id`, a distinct `item_id`, `kind` (`Count` or `Days`), positive integral `amount`, `maximum`, and positive integer `weight`. The `Stock` row must reference the same item and its `duration` must exactly equal the awarded count or days. The client displays that stock term, not accumulated inventory ownership. Off-sale stock rows can still represent rewards. Fractional stock rewards are rejected; synthesis-primary durations continue to retain fractions. Permanent decomposition and additive rewards are unavailable: the native result formatter does not treat `Stock.duration: -1` as permanent, and this catalog has no audited stock term that presents permanent ownership. Synthesis-primary permanent conversion uses a separate supported path. The configured terms must agree with the native catalog and the total weight must fit the signed 32-bit sampling range. One reward is selected per decomposition.
+
+`permanent_additive_item_id` (`100624`) requires `permanent_additive_quantity` and `permanent_additive_basis_points` (`0..10000`); when its chance is below 10000, it also requires `permanent_failure_reward` in the reward format above. It is accepted only for synthesis that has not already become permanent. `bonus_additive_item_id` (`100655`) requires `bonus_additive_quantity` and `bonus_reward`. Additive identities and operation/effect roles are checked against native `ASSISTINFO`; zero disables an additive. Reward identities may not collide in an accepted recipe.
+
+Resource budgets are validated deployment fields: `max_workbook_bytes` defaults to `134217728` per native source, `max_catalog_rows` to `65536`, `max_catalog_columns` to `256`, `max_cell_characters` to `16384`, `max_in_flight_accounts` to `128`, `max_decomposition_recipes` to `64`, and `max_rewards_per_recipe` to `128`. Each is a positive integer that can be raised for the deployment. The column bound applies to nonempty values; native styled empty trailing cells do not allocate sparse padding, while their indices must still increase. Inventory capacity and native selection/frame limits remain independently enforced.
+
+Memory, SQLite and MySQL use one consume-and-grant transaction, retaining unrelated ownership, survivor metadata, consistent bag mirrors and the slot-allocation watermark. Ordinary Article and pet preparation runs after new rewards exist and commits with them. The complete inventory is published before the result. Fractional expiry is stored as an absolute timestamp; the synthesis primary result's day value uses the same full-inventory session baseline as the client, not a fresh countdown at result-send time. Decomposition and additive results carry the configured stock identities; their quantities and durations are read from the client's `Stock` table. Transport failure after commit does not undo ownership or announce a successful result without its inventory publication.
+
+The leading native string is a secondary password (`kr-812 sub_9E29F0` and `kr-812 sub_4F8A20`). This implementation refuses nonempty passwords because no verified password-check service is installed; it also refuses the nonzero diagnostic request path. Distinct weapon evolution is unavailable: the `gspEvolveResult` path belongs to pets, and a separate weapon request/result flow has not been established. Native gameplay/UI acceptance and laboratory validation against live MySQL remain pending; automated protocol and persistence checks do not establish either.

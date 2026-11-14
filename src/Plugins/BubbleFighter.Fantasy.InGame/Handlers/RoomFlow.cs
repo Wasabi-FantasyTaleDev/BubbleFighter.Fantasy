@@ -25,6 +25,8 @@ namespace BubbleFighter.Fantasy.InGame.Handlers;
 internal sealed partial class RoomFlow
 {
     private readonly RoomRegistry _registry;
+    // Session -> rooms its open equipment writes were marked in, oldest first. Bounded by one entry per open write.
+    private readonly Dictionary<long, Queue<PlayRoom>> _selectionRooms = [];
     private readonly ILogger _logger;
     private readonly IEquipmentSelection? _selection;
     private readonly IAccountMutationScopes? _mutations;
@@ -74,8 +76,14 @@ internal sealed partial class RoomFlow
 
     internal void BindCommands(IPluginContext context, string scope, bool enabled) => _commands.BindShared(context, scope, enabled);
 
-    internal void BindSessionState(IPluginContext context) => context.Effect(context.Services.RegisterMany<IGameSessionStateReader>(
-        new GameSessionStateReader(_registry, context.Lifetime, () => PlazaBound && _left is not null)));
+    internal void BindSessionState(IPluginContext context)
+    {
+        context.Effect(context.Services.RegisterMany<IGameSessionStateReader>(
+            new GameSessionStateReader(_registry, context.Lifetime, () => PlazaBound && _left is not null)));
+        var events = context.Events;
+        _registry.SessionSceneChanged = session => events.Emit(new GameSessionStateChanged(session));
+        context.Effect(() => _registry.SessionSceneChanged = null);
+    }
 
     internal Func<ISession, CancellationToken, bool>? CommandAdmission { set => _commands.AdmitInput = value; }
 
@@ -86,7 +94,13 @@ internal sealed partial class RoomFlow
     }
 
     internal ModeCatalog Modes { get; set; } = new();
+    internal IEventBus? AttributeEvents { get; set; }
+    internal RoomModeNames? ModeNames { get; set; }
+    /// <summary>Gets or sets the deployment room policies consulted at start, entry and appearance changes, or null.</summary>
+    internal RoomPolicyHost? PolicyHost { get; set; }
     internal Action<PlayRoom>? ScriptZombiesStarting { get; set; }
+    internal Action<PlayRoom, string>? ValidateRoundMap { get; set; }
+    internal Func<PlayRoom, int?>? MapSeedPreparing { get; set; }
     internal Func<ISession, ScriptZombieConversion, CancellationToken, ValueTask>? ScriptZombieConversionRequested { get; set; }
 
     /// <summary>
@@ -235,7 +249,7 @@ internal sealed partial class RoomFlow
         var equipment = await ResolveEquipmentAsync(session, userNum, ct).ConfigureAwait(false);
         if (PlazaBound)
             await LeavePlazaForRoomAsync(session, ct).ConfigureAwait(false);
-        // A "#id#" tag in the title forces the mode and is not part of the title the room shows.
+        // A recognized mode tag forces the mode and is not part of the title the room shows.
         var titleTag = ReadModeTag(session, request.Name);
         var modeId = titleTag.ModeId ?? request.ModeId;
         var (room, seat) = _registry.CreateForMode(session, checked((ushort)modeId), request.MapKey,
@@ -248,11 +262,16 @@ internal sealed partial class RoomFlow
             room.BuildSettings = titleTag.ModeId is { } forced && request.BuildSettings is { } own
                 ? own with { Mode = forced }
                 : request.BuildSettings;
+            ResetCustomRules(room);
         }
         _logger.LogInformation("Session {Id} created room {Room} '{Name}' mode={Mode} map={Map} character={Character}.",
             session.Id, room.Id, titleTag.Title, modeId, request.MapKey, seat.CharacterId);
-        await room.Executor.ExecuteAsync(operationCt => SendEnteredAsync(session, room, operationCt, RoomEntryReason.Created,
-            group is not null), ct).ConfigureAwait(false);
+        await room.Executor.ExecuteAsync(async operationCt =>
+        {
+            await SendEnteredAsync(session, room, operationCt, RoomEntryReason.Created, group is not null).ConfigureAwait(false);
+            if (PolicyHost is { } policies)
+                await policies.MemberEnteredAsync(room, session.Id, operationCt).ConfigureAwait(false);
+        }, ct).ConfigureAwait(false);
         _registry.Publish(room);
         await FollowRoomAsync(group, room, request.Password, ct).ConfigureAwait(false);
         if (titleTag.ModeId is { } tagged)
@@ -341,6 +360,12 @@ internal sealed partial class RoomFlow
         }
 
         var (room, joined) = joinedRoom ?? throw new InvalidOperationException("Accepted room admission did not install a seat.");
+        lock (room.Gate)
+        {
+            equipment.Apply(joined);
+            if (room.Phase is RoomPhase.Starting or RoomPhase.Playing)
+                room.FreezeRewardEquipment(joined);
+        }
         _logger.LogInformation("Session {Id} joined room {Room} slot={Slot} character={Character}.",
             session.Id, room.Id, joined.Slot, joined.CharacterId);
         // The joiner gets the whole room; the members already inside get only the new seat.
@@ -357,8 +382,76 @@ internal sealed partial class RoomFlow
         await PublishRoomUiAsync(room, ct).ConfigureAwait(false);
         if (room.AutoStartArmed && _autoStart is not null)
             await _autoStart.SendAsync(session, new RoomAutoStartNotified(), ct).ConfigureAwait(false);
+        if (PolicyHost is { } policies)
+            await policies.MemberEnteredAsync(room, session.Id, ct).ConfigureAwait(false);
         await ArmWhenFullAsync(room, ct).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Marks the seat's equipment write as open while its room waits, so a start in between is held instead of capturing
+    /// the appearance the write replaces. A write that begins after the start leaves the room as it is.
+    /// </summary>
+    internal void OnEquipmentSelectionStarting(EquipmentSelectionStarting change)
+    {
+        if (_registry.TryGet(change.Session.Id) is not { } room) return;
+        lock (room.Gate)
+        {
+            if (room.Phase != RoomPhase.Waiting || room.FindByGame(change.Session.Id) is not { } seat
+                || !ReferenceEquals(seat.Game, change.Session))
+                return;
+            room.PendingSelections[change.Session.Id] = room.PendingSelections.GetValueOrDefault(change.Session.Id) + 1;
+        }
+        // The settlement finds the room it was marked in even if the player has moved on since.
+        lock (_selectionRooms)
+        {
+            if (!_selectionRooms.TryGetValue(change.Session.Id, out var marked))
+                _selectionRooms.Add(change.Session.Id, marked = new Queue<PlayRoom>());
+            marked.Enqueue(room);
+        }
+    }
+
+    /// <summary>Closes the seat's open equipment write and repeats a start it held once no write in the room is open.</summary>
+    internal async ValueTask OnEquipmentSelectionSettledAsync(EquipmentSelectionSettled change, CancellationToken ct)
+    {
+        PlayRoom room;
+        lock (_selectionRooms)
+        {
+            // A write that began outside a waiting room marked nothing and has nothing to settle.
+            if (!_selectionRooms.TryGetValue(change.Session.Id, out var marked)) return;
+            room = marked.Dequeue();
+            if (marked.Count == 0) _selectionRooms.Remove(change.Session.Id);
+        }
+        bool resume;
+        lock (room.Gate)
+        {
+            if (room.PendingSelections.TryGetValue(change.Session.Id, out var open))
+            {
+                if (open <= 1) room.PendingSelections.Remove(change.Session.Id);
+                else room.PendingSelections[change.Session.Id] = open - 1;
+            }
+            resume = room.PendingSelections.Count == 0 && room.HeldStart is not null && room.Phase == RoomPhase.Waiting;
+        }
+        if (resume)
+            await ResumeHeldStartIfIdleAsync(room, ct).ConfigureAwait(false);
+    }
+
+    // Repeats the held start on the room's executor if nothing changed meanwhile: the same holder is seated, the room
+    // still waits and no equipment write reopened. The start itself asks the policies again.
+    private ValueTask ResumeHeldStartIfIdleAsync(PlayRoom room, CancellationToken ct) =>
+        new(room.Executor.ExecuteAsync(async operationCt =>
+        {
+            PlayRoom.HeldRoomStart held;
+            ISession session;
+            lock (room.Gate)
+            {
+                if (room.HeldStart is not { } current || room.PendingSelections.Count != 0 || room.Phase != RoomPhase.Waiting
+                    || room.FindByGame(current.SessionId) is not { } seat)
+                    return;
+                held = current;
+                session = seat.Game;
+            }
+            await StartRoomCoreAsync(room, session, held.Request, operationCt, held.AllowMemberStart, resumed: true).ConfigureAwait(false);
+        }, ct));
 
     /// <summary>Updates the waiting-room snapshot and its observers from the committed inventory selection.</summary>
     internal async ValueTask OnEquipmentSelectionCommittedAsync(EquipmentSelectionCommitted change, CancellationToken ct)
@@ -375,12 +468,14 @@ internal sealed partial class RoomFlow
                 if (seat is null || !ReferenceEquals(seat.Game, change.Session)
                     || seat.UserNum != change.UserNum || room.Phase != RoomPhase.Waiting)
                     return;
-                new SeatEquipment(change.CharacterId, change.EquippedItemIds).Apply(seat);
+                new SeatEquipment(change.CharacterId, change.EquippedItemIds) { ItemAttributes = change.ItemAttributes }.Apply(seat);
                 members = [.. room.Seats];
                 update = new RoomSeatUpdated(room.Id, View(seat)) { Room = View(room) };
             }
             foreach (var member in members)
                 await _seatUpdated.SendAsync(member.Game, update, operationCt).ConfigureAwait(false);
+            if (PolicyHost is { } policies)
+                await policies.AppearanceChangedAsync(room, change.Session.Id, operationCt).ConfigureAwait(false);
         }, ct).ConfigureAwait(false);
     }
 
@@ -479,6 +574,45 @@ internal sealed partial class RoomFlow
         await ReturnHomeAfterSceneAsync(session, returnGeneration, ct).ConfigureAwait(false);
     }
 
+    private sealed record RelayDeparture(PlayRoom Room, RoomSeat Seat, ISession Relay, int Generation);
+
+    /// <summary>Leaves through the game scene owner only while the requesting relay still owns its captured seat.</summary>
+    internal async ValueTask HandleMatchLeaveAsync(ISession relay, MatchLeaveRequested request, CancellationToken ct)
+    {
+        if (_registry.TryGet(relay.Id) is not { } room) return;
+        RelayDeparture departure;
+        lock (room.Gate)
+        {
+            var seat = room.Seats.FirstOrDefault(candidate => ReferenceEquals(candidate.Relay, relay));
+            if (seat is null) return;
+            departure = new(room, seat, relay, room.StartGeneration);
+            if (!RelayDepartureIsCurrent(departure, seat.Game)) return;
+        }
+        var game = departure.Seat.Game;
+        long? returnGeneration = null;
+        await RunSceneAsync(game, async (group, token) =>
+        {
+            var canFollow = room.Phase == RoomPhase.Waiting;
+            if (!await LeaveSceneAsync(game, group is not null && canFollow, token,
+                    relayDeparture: departure).ConfigureAwait(false)) return;
+            if (canFollow && PlazaBound)
+                await FollowRoomLeaveAsync(group, room, token).ConfigureAwait(false);
+            returnGeneration = CaptureHomeReturn(game);
+        }, ct).ConfigureAwait(false);
+        await ReturnHomeAfterSceneAsync(game, returnGeneration, ct).ConfigureAwait(false);
+    }
+
+    // Checked again inside the room executor: reconnects and new rounds may overtake a queued scene request.
+    private bool RelayDepartureIsCurrent(RelayDeparture departure, ISession game) =>
+        !departure.Relay.Connection.IsClosed && !game.Connection.IsClosed
+        && departure.Room.Phase != RoomPhase.Closed && departure.Room.StartGeneration == departure.Generation
+        && departure.Seat.RelayGeneration == departure.Generation
+        && ReferenceEquals(departure.Seat.Relay, departure.Relay)
+        && ReferenceEquals(departure.Room.FindByGame(game.Id), departure.Seat)
+        && ReferenceEquals(departure.Seat.Game, game)
+        && ReferenceEquals(_registry.TryGet(departure.Relay.Id), departure.Room)
+        && ReferenceEquals(_registry.TryGet(game.Id), departure.Room);
+
     // !plaza and a cancelled round: the seat is released as on a voluntary leave, in any phase (a round settles the
     // leaver and an empty room closes), then the player gets the plaza a waiting-room leaver gets.
     private ValueTask<bool> LeaveToPlazaAsync(ISession session, CancellationToken ct) =>
@@ -507,14 +641,15 @@ internal sealed partial class RoomFlow
         return _registry.TryGet(session.Id) is null;
     }
 
-    private async ValueTask LeaveSceneAsync(ISession session, bool partyTransition, CancellationToken ct,
+    private async ValueTask<bool> LeaveSceneAsync(ISession session, bool partyTransition, CancellationToken ct,
         SceneGroup? followingGroup = null, PlayRoom? followingSource = null,
-        PlayRoom? cancelledSource = null, int? cancelledGeneration = null, bool requirePlayingMatch = false)
+        PlayRoom? cancelledSource = null, int? cancelledGeneration = null, bool requirePlayingMatch = false,
+        RelayDeparture? relayDeparture = null)
     {
         if (_registry.TryGet(session.Id) is not { } room)
         {
             _logger.LogInformation("Session {Id} asked to leave a room but is seated in none.", session.Id);
-            return;
+            return false;
         }
         RoomMemberView? left = null;
         RoomView? view = null;
@@ -524,6 +659,8 @@ internal sealed partial class RoomFlow
                 || !ReferenceEquals(room, followingSource) || room.Phase != RoomPhase.Waiting)) return;
             lock (room.Gate)
             {
+                if (relayDeparture is not null && (!ReferenceEquals(room, relayDeparture.Room)
+                    || !RelayDepartureIsCurrent(relayDeparture, session))) return;
                 if (requirePlayingMatch && (!room.IsMatchRoom || room.Phase != RoomPhase.Playing || room.RoundCancelled
                     || !ReferenceEquals(room.FindByGame(session.Id)?.Game, session)
                     || !session.TryFeature<IPlayerSession>(out var player) || player.Phase is not (SessionPhase.Room or SessionPhase.Match))) return;
@@ -534,13 +671,14 @@ internal sealed partial class RoomFlow
             }
             left = await LeaveCoreAsync(room, session.Id, operationCt).ConfigureAwait(false);
         }, ct).ConfigureAwait(false);
-        if (left is null) return;
+        if (left is null) return false;
         ScenePhase.Entered(session, SessionPhase.Plaza, _logger);
         if (_left is not null && left is not null)
             await _left.SendAsync(session, new RoomLeft(room.Id, left) { Room = view }, ct).ConfigureAwait(false);
         // Restore the plaza entry after leaving the room without waiting for another request.
         if (PlazaBound && left is not null)
             await EnterPlazaAsync(session, ct, partyTransition).ConfigureAwait(false);
+        return true;
     }
 
     /// <summary>
@@ -606,6 +744,9 @@ internal sealed partial class RoomFlow
                     return;
                 }
                 removedBots = _options?.AiModeIds.Contains(request.ModeId) == true ? [] : room.RemoveBots();
+                var modeChanged = room.ModeId != request.ModeId;
+                var customRulesNeedDefaults = room.BuildSettings is null
+                    || request.BuildSettings is { } incoming && incoming.Lineage != room.BuildSettings.Lineage;
                 room.ModeId = checked((ushort)request.ModeId);
                 if (request.MapKey.Length > 0)
                     room.MapKey = request.MapKey;
@@ -620,6 +761,7 @@ internal sealed partial class RoomFlow
                 }
                 else if (room.BuildSettings is { Mode: not null } serverSet)
                     room.BuildSettings = serverSet with { Mode = room.ModeId };
+                if (modeChanged || customRulesNeedDefaults) ResetCustomRules(room);
                 members = [.. room.Seats];
                 changed = new RoomSettingsChanged(View(room));
             }
@@ -633,7 +775,7 @@ internal sealed partial class RoomFlow
     // Reads the mode tag of a room title; a tag that names no valid mode is logged and the title stays as typed.
     private (string Title, int? ModeId) ReadModeTag(ISession session, string title)
     {
-        var tag = RoomModeTag.Extract(title);
+        var tag = RoomModeTag.Extract(title, ModeNames);
         if (tag.RejectedTag is { } rejected)
             _logger.LogWarning("Session {Id} room title '{Title}' has the mode tag {Tag}, which is not a mode id from {Min} to {Max}; the tag is ignored.",
                 session.Id, title, rejected, RoomModeTag.MinModeId, RoomModeTag.MaxModeId);
@@ -655,9 +797,11 @@ internal sealed partial class RoomFlow
             if (room.Phase != RoomPhase.Waiting)
                 return false;
             removedBots = _options?.AiModeIds.Contains(mode) == true ? [] : room.RemoveBots();
+            var modeChanged = room.ModeId != mode;
             room.ModeId = mode;
             if (room.BuildSettings is { } held)
                 room.BuildSettings = held with { Mode = mode };
+            if (modeChanged) ResetCustomRules(room);
             members = [.. room.Seats.Where(seat => seat.Game.Id != except?.Id)];
             changed = new RoomSettingsChanged(View(room));
         }
@@ -704,12 +848,19 @@ internal sealed partial class RoomFlow
         }, ct));
     }
 
-    private async ValueTask StartRoomCoreAsync(PlayRoom room, ISession session, RoomStartRequested request, CancellationToken ct, bool allowMemberStart = false)
+    /// <summary>Repeats a start a room policy held; the caller already runs on the room's executor.</summary>
+    internal ValueTask ResumeHeldStartAsync(PlayRoom room, ISession session, RoomStartRequested request, bool allowMemberStart, CancellationToken ct) =>
+        StartRoomCoreAsync(room, session, request, ct, allowMemberStart, resumed: true);
+
+    private async ValueTask StartRoomCoreAsync(PlayRoom room, ISession session, RoomStartRequested request, CancellationToken ct,
+        bool allowMemberStart = false, bool resumed = false)
     {
         var sender = _matchStarting
             ?? throw new InvalidOperationException("Room start requested on a build without a match start encoder.");
-        RoomSeat[] members;
-        RoomMatchStarting starting;
+        RoomPolicyHost.HeldStartPolicies? held = null;
+        var selectionBusy = false;
+        RoomSeat[] members = [];
+        RoomMatchStarting? starting = null;
         var humanTeams = new List<RoomTeamConverted>();
         lock (room.Gate)
         {
@@ -733,6 +884,7 @@ internal sealed partial class RoomFlow
                     session.Id, room.Id, refusal);
                 return;
             }
+            // The draw only picks a map; it changes no room state, so it may run before the policies are asked.
             var draw = _options?.ServerMapDraw == true ? DrawRoundMap(room, request) : null;
             if (_options?.ServerMapDraw == true && draw is null)
             {
@@ -740,6 +892,8 @@ internal sealed partial class RoomFlow
                     room.Id, room.ModeId, request.MapSelection);
                 return;
             }
+            var selectedMap = draw?.Map ?? (request.MapKey.Length > 0 ? request.MapKey : room.MapKey);
+            ValidateRoundMap?.Invoke(room, draw?.Stage is { Length: > 0 } selectedStage ? selectedStage : selectedMap);
             if (_options?.UsesScriptZombieMode(room.ModeId) == true && room.Bots.Count != 0)
                 throw new InvalidOperationException("Script zombie selection requires native player-controlled participants.");
             if (ZombieEscapeStarting is not null && room.ModeId == (int)GameModeId.ZombieEscape && room.Bots.Count != 0)
@@ -747,39 +901,66 @@ internal sealed partial class RoomFlow
                 _logger.LogWarning("Room {Room}: Zombie Escape requires human-controlled participants.", room.Id);
                 return;
             }
-            room.MarkStarting();
-            if (_options?.BombRoundSeries == true && room.ModeId == (int)GameModeId.Bomb)
-                room.BeginBombSeries(((IRoundSeriesEntrySender)_matchStarting!).RoundsToWin);
-            // kr-812 sub_816300 copies session+132 and session+188 into separate request strings.
-            room.RoundMapKey = draw?.Map ?? (request.MapKey.Length > 0 ? request.MapKey : room.MapKey);
-            room.RoundStageKey = draw?.Stage ?? "";
-            room.RoundTimeLimits = request.TimeLimits;
-            if (_options?.AssignSpawnTeamsOnStart == true)
-                room.AssignSpawnTeams();
-            if (_options?.ZombieConversionModeId > 0 && room.ModeId == _options.ZombieConversionModeId)
-                foreach (var member in room.Seats)
-                {
-                    member.Team = 2;
-                    humanTeams.Add(new(member.Slot, 2));
-                }
-            // Every player starts the zombie battle human; outside play the client only stores the team
-            // (kr-812 sub_776870 -> sub_7FCF50).
-            if (IsZombiePvp(room))
-                foreach (var member in room.Seats)
-                {
-                    member.Team = ZombiePvpHumanTeam;
-                    humanTeams.Add(new(member.Slot, ZombiePvpHumanTeam));
-                }
-            ScriptZombiesStarting?.Invoke(room);
-            ZombieEscapeStarting?.Invoke(room);
-            room.AutoStartCancellation?.Cancel();
-            members = [.. room.Seats];
-            PrepareRescues(room);
-            starting = new RoomMatchStarting(View(room), room.RoundMapKey)
+            // A seat whose equipment write is still open would start with the appearance it is replacing; the room waits
+            // and the write's settlement resumes this start.
+            selectionBusy = room.PendingSelections.Count != 0;
+            // Deployment room policies (a ban list, a pending inventory write) decide last, in the same locked section
+            // that leaves waiting: a start they let proceed always starts, and nothing they would hold can slip in
+            // between. The native automatic start and a policy's replay are asked too, each flagged as such.
+            if (PolicyHost is { Active: true } policies)
+                held = policies.EvaluateStart(room, session.Id, nativeAutoStart, resumed, roomHeld: selectionBusy);
+            if (held is not null || selectionBusy)
+                room.HeldStart = new(session.Id, request, allowMemberStart);
+            else
             {
-                StageKey = room.RoundStageKey, IsMission = draw?.IsMission == true,
-                Series = SeriesEntry(room),
-            };
+                room.MarkStarting();
+                room.HeldStart = null;
+                if (_options?.BombRoundSeries == true && room.ModeId == (int)GameModeId.Bomb)
+                    room.BeginBombSeries(((IRoundSeriesEntrySender)_matchStarting!).RoundsToWin);
+                // kr-812 sub_816300 copies session+132 and session+188 into separate request strings.
+                room.RoundMapKey = draw?.Map ?? (request.MapKey.Length > 0 ? request.MapKey : room.MapKey);
+                room.RoundStageKey = draw?.Stage ?? "";
+                room.RoundTimeLimits = request.TimeLimits;
+                if (_options?.AssignSpawnTeamsOnStart == true)
+                    room.AssignSpawnTeams();
+                if (_options?.ZombieConversionModeId > 0 && room.ModeId == _options.ZombieConversionModeId)
+                    foreach (var member in room.Seats)
+                    {
+                        member.Team = 2;
+                        humanTeams.Add(new(member.Slot, 2));
+                    }
+                // Every player starts the zombie battle human; outside play the client only stores the team
+                // (kr-812 sub_776870 -> sub_7FCF50).
+                if (IsZombiePvp(room))
+                    foreach (var member in room.Seats)
+                    {
+                        member.Team = ZombiePvpHumanTeam;
+                        humanTeams.Add(new(member.Slot, ZombiePvpHumanTeam));
+                    }
+                ScriptZombiesStarting?.Invoke(room);
+                ZombieEscapeStarting?.Invoke(room);
+                room.AutoStartCancellation?.Cancel();
+                members = [.. room.Seats];
+                PrepareRescues(room);
+                starting = new RoomMatchStarting(View(room), room.RoundMapKey)
+                {
+                    StageKey = room.RoundStageKey, IsMission = draw?.IsMission == true,
+                    Series = SeriesEntry(room),
+                    MapSeed = MapSeedPreparing?.Invoke(room),
+                };
+            }
+        }
+        if (starting is null)
+        {
+            // Every refusal returned inside the lock, so leaving it without a start means a policy or an open equipment
+            // write held it.
+            if (held is null && !selectionBusy)
+                throw new InvalidOperationException("A room start left the room lock without starting or being held.");
+            _logger.LogInformation("Session {Id} start of room {Room} held: policy={Policy} equipment write={Busy}.",
+                session.Id, room.Id, held is { Holders.Count: > 0 }, selectionBusy);
+            if (held is not null)
+                await RoomPolicyHost.StartHeldAsync(held, session.Id, ct).ConfigureAwait(false);
+            return;
         }
         foreach (var change in humanTeams)
             foreach (var member in members)
@@ -969,6 +1150,7 @@ internal sealed partial class RoomFlow
     /// <summary>Queues the departure of the player on a closed connection without blocking the event bus.</summary>
     public void OnConnectionClosed(ConnectionClosedEvent closed)
     {
+        _registry.ObserveConnectionClosed(closed.Connection);
         var connectionId = closed.Connection.Id;
         var room = _registry.FindByConnection(connectionId);
         if (room is null)
@@ -1048,8 +1230,15 @@ internal sealed partial class RoomFlow
         lock (room.Gate)
         {
             remaining = [.. room.Seats];
-            if (remaining.Length == 0)
-                return left;
+        }
+        if (remaining.Length == 0)
+        {
+            if (PolicyHost is { } emptied)
+                await emptied.MemberLeftAsync(room, departing.Game, ct).ConfigureAwait(false);
+            return left;
+        }
+        lock (room.Gate)
+        {
             inRound = room.Phase != RoomPhase.Waiting;
             cancelRound = (disconnected && _options?.CancelRoundOnDisconnect == true
                 || wasMaster && (room.ScriptZombies is not null || room.ZombieEscape is not null)
@@ -1091,6 +1280,8 @@ internal sealed partial class RoomFlow
         }
         _logger.LogInformation("Room {Room} slot {Slot} left; {Count} member(s) told{Master}.",
             room.Id, slot, remaining.Length, wasMaster ? $", master moved to slot {newMaster}" : "");
+        if (PolicyHost is { } policies)
+            await policies.MemberLeftAsync(room, departing.Game, ct).ConfigureAwait(false);
         if (cancelRound)
         {
             ReturnCancelledRound(room, wasMaster && (room.ScriptZombies is not null || room.ZombieEscape is not null)
@@ -1116,6 +1307,8 @@ internal sealed partial class RoomFlow
             await SendEnteredAsync(member.Game, room, ct, RoomEntryReason.RoundReturned).ConfigureAwait(false);
         await ScheduleAutoStartCoreAsync(room, ct).ConfigureAwait(false);
         HoldRematch(room);
+        if (PolicyHost is { } policies)
+            await policies.WaitingAgainAsync(room, ct).ConfigureAwait(false);
     }
 
     /// <summary>Answers a seated player's stage probe without treating its wire word as a room to join.</summary>
@@ -1178,7 +1371,8 @@ internal sealed partial class RoomFlow
     {
         // Normalization writes inventory; followers need their own authority on the leader's asynchronous flow.
         using var authority = _mutations?.Enter(session);
-        return await SeatCharacter.ResolveEquipmentAsync(session, userNum, _selection, _characters, ct).ConfigureAwait(false);
+        return await SeatCharacter.ResolveEquipmentAsync(session, userNum, _selection, _characters, ct,
+            AttributeEvents, _options?.GameProtocol).ConfigureAwait(false);
     }
 
     private async ValueTask SendEnteredAsync(ISession session, PlayRoom room, CancellationToken ct,
@@ -1233,7 +1427,8 @@ internal sealed partial class RoomFlow
 
     private static RoomMemberView View(RoomSeat seat) => new(seat.Slot, seat.UserNum, seat.Nickname, Math.Max(1, seat.Level),
         seat.Team, seat.Ready, seat.CharacterId != 0 ? seat.CharacterId : seat.LocalCharacterId,
-        seat.EquippedItemIds ?? []) { InShop = seat.InShop, InInventory = seat.InInventory, ColorIndex = seat.ColorIndex, InventorySelection = seat.InventorySelection };
+        seat.EquippedItemIds ?? []) { InShop = seat.InShop, InInventory = seat.InInventory, ColorIndex = seat.ColorIndex,
+            InventorySelection = seat.InventorySelection, ItemAttributes = seat.ItemAttributes };
 }
 
 /// <summary>The encoders a build's dialect publishes for the room flow; the first four are needed by every room.</summary>

@@ -111,16 +111,16 @@ public sealed partial class RoomCommandsBindingTests
         Assert.Empty(services.GetAll<IMessageSender<RoomMemberKicked>>());
     }
 
-    /// <summary>Every shipped modern profile keeps kicking disabled until native acceptance and the opt-in patch changes only that setting.</summary>
+    /// <summary>Every shipped modern profile includes the kick patch; without the option the binding publishes no route or service.</summary>
     [Theory]
     [InlineData("kr-1256")]
     [InlineData("cn-774")]
     [InlineData("tw-454")]
-    public async Task NativeKickIsExplicitlyOptIn(string build)
+    public async Task NativeKickIsOnInTheProfileAndOffWithoutTheOption(string build)
     {
         var composer = new ProfileComposer(Path.Combine(Root, "profiles"), name => name == "BFF_MYSQL_PASSWORD" ? "unused" : null);
         var rows = composer.Compose(build, []);
-        Assert.False(new PluginConfig(rows.Single(row => row.Id == "dialect.rooms")).Bind<RoomsOptions>().RoomKicking);
+        Assert.True(new PluginConfig(rows.Single(row => row.Id == "dialect.rooms")).Bind<RoomsOptions>().RoomKicking);
         var patched = composer.Compose(build, [Path.Combine(Root, "profiles", "bundles", "modern-room-kicking.patch.yaml")]);
         Assert.True(new PluginConfig(patched.Single(row => row.Id == "dialect.rooms")).Bind<RoomsOptions>().RoomKicking);
         var services = new ServiceRegistry();

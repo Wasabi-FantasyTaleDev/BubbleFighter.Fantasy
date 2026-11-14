@@ -28,7 +28,10 @@ internal sealed partial class RoundFlow
     // All participants have loaded. Resource failures must occur before announcing the countdown.
     private void PrepareFinalZoneItems(PlayRoom room)
     {
-        if (!IsFinalZoneMode(room) || _finalZoneData is null) return;
+        if (!IsFinalZoneMode(room)) return;
+        if (!room.FinalZoneCleanupTask.IsCompleted)
+            throw new InvalidOperationException("FinalZone cannot start while its previous connection cleanup is pending.");
+        if (_finalZoneData is null) return;
         if (room.FinalZone?.Generation == room.StartGeneration) return;
         foreach (var seat in room.Seats) _finalZoneCatalog!.ValidateOpeningEquipment(seat.EquippedItemIds);
         var map = FinalZoneMapItems.Load(_finalZoneData, room.RoundStageKey, _finalZoneCatalog!, _finalZoneDataLimits!);
@@ -50,13 +53,24 @@ internal sealed partial class RoundFlow
         room.FinalZone = state;
     }
 
-    private async ValueTask StartFinalZoneItemsAsync(PlayRoom room, CancellationToken ct)
+    private async ValueTask StartFinalZoneItemsAsync(PlayRoom room, FinalZonePublication? publication, CancellationToken ct)
     {
-        if (!IsFinalZoneMode(room) || room.FinalZone is not { OpeningItems: { } manifest } state) return;
+        if (publication is null) return;
+        IReadOnlyList<FinalZoneMapItem> manifest;
+        lock (room.Gate)
+        {
+            RequireFinalZonePublication(room, publication, ct);
+            if (publication.State.OpeningItems is not { } opening) return;
+            manifest = opening;
+        }
         // kr-1256 sub_CDB180 consumes explicit objects after the scene has loaded, with no seed prerequisite.
-        await PublishFinalZoneAsync(room, FinalZoneItemsSpawned!, new RoundFinalZoneItemsSpawned(manifest), ct).ConfigureAwait(false);
-        state.OpeningItems = null;
-        await StartFinalZoneWaterAsync(room).ConfigureAwait(false);
-        await StartFinalZoneDronesAsync(room).ConfigureAwait(false);
+        await PublishFinalZoneAsync(room, publication, FinalZoneItemsSpawned!, new RoundFinalZoneItemsSpawned(manifest), ct).ConfigureAwait(false);
+        lock (room.Gate)
+        {
+            RequireFinalZonePublication(room, publication, ct);
+            publication.State.OpeningItems = null;
+        }
+        await StartFinalZoneWaterAsync(room, publication, ct).ConfigureAwait(false);
+        await StartFinalZoneDronesAsync(room, publication, ct).ConfigureAwait(false);
     }
 }

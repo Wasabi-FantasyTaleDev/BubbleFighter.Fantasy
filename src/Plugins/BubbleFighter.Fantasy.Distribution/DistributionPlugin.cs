@@ -5,7 +5,7 @@ using BubbleFighter.Fantasy.Contracts.Distribution;
 namespace BubbleFighter.Fantasy.Distribution;
 
 /// <summary>Publishes catalog transports and release discovery as an ordinary owned plugin service.</summary>
-[Plugin("distribution.sources", Provides = [typeof(IDistributionSources), typeof(IDistributionTransport), typeof(IDistributionGithubMirror)])]
+[Plugin("distribution.sources", Category = "distribution", Names = ["en=Package sources", "zh-Hans=包来源", "zh-Hant=套件來源", "ko=패키지 출처"], Provides = [typeof(IDistributionSources), typeof(IDistributionTransport), typeof(IDistributionGithubMirror)])]
 public sealed class DistributionPlugin : IPlugin
 {
     /// <inheritdoc />

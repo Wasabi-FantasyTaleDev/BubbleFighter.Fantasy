@@ -18,18 +18,38 @@ public sealed partial class PluginHost
     public IPluginTransition RequestState(string rowId, bool enabled, bool restart = false)
     {
         if (restart && !enabled) throw new ArgumentException("Restart requires an enabled target.", nameof(restart));
+        return RequestTargets(new HashSet<string>(StringComparer.Ordinal) { rowId }, enabled, restart);
+    }
+
+    /// <inheritdoc />
+    public IPluginTransition RequestStates(IReadOnlyCollection<string> rowIds, bool enabled)
+    {
+        ArgumentNullException.ThrowIfNull(rowIds);
+        var roots = rowIds.ToHashSet(StringComparer.Ordinal);
+        if (roots.Count == 0) throw new ArgumentException("At least one row is required.", nameof(rowIds));
+        return RequestTargets(roots, enabled, restart: false);
+    }
+
+    // One row is the case every caller had before groups; a set is one intent whose rows start in provider order and
+    // stop in reverse, with no reconciliation between its members.
+    private TransitionRequest RequestTargets(HashSet<string> roots, bool enabled, bool restart)
+    {
         DefinitionSource[] stopSources = [];
         TransitionRequest accepted;
         lock (_intentGate)
         {
-            var row = KnownRow(rowId, allowRetiring: !enabled);
+            var rows = roots.Order(StringComparer.Ordinal).Select(id => KnownRow(id, allowRetiring: !enabled)).ToArray();
             // An enabled target must be activatable; otherwise the row would poison every later
             // configuration revision through NeedsConfigurationConvergence. Shutdown keeps the
             // superseded contract instead of failing loud.
-            var descriptor = DefinitionFor(row);
-            if (enabled && descriptor is null && !_shutdownInProgress)
-                throw new ConfigException($"Row '{rowId}' references unknown plugin '{row.Plugin}'.");
-            var request = new TransitionRequest(this, rowId, checked(++_intentRevision), enabled, restart);
+            var descriptors = rows.Select(DefinitionFor).ToArray();
+            for (var index = 0; index < rows.Length; index++)
+                if (enabled && descriptors[index] is null && !_shutdownInProgress)
+                    throw new ConfigException($"Row '{rows[index].Id}' references unknown plugin '{rows[index].Plugin}'.");
+            var revision = checked(++_intentRevision);
+            var request = rows.Length == 1
+                ? new TransitionRequest(this, rows[0].Id, revision, enabled, restart)
+                : new TransitionRequest(this, rows[0].Id, revision, enabled, restart, roots: roots, key: GroupIntentKey(revision));
             if (_shutdownInProgress) { request.Supersede(); return request; }
             try { ValidateCodeRefreshPlan(request); }
             catch (Exception error) { request.Fail(error); return request; }
@@ -43,16 +63,20 @@ public sealed partial class PluginHost
                 }
                 catch (Exception error) { request.Fail(error); return request; }
             }
-            request.PreviousDesiredTarget = _desiredRows.Contains(rowId);
+            request.PreviousDesiredTargets = roots.Where(_desiredRows.Contains).ToHashSet(StringComparer.Ordinal);
             request.OwnsDesiredTarget = true;
-            if (enabled) _desiredRows.Add(rowId); else _desiredRows.Remove(rowId);
-            if (_pendingIntents.Remove(rowId, out var previous)) previous.Supersede();
-            var writes = descriptor is null ? [] : AdvertisedServices(descriptor).Concat(Metadata(descriptor).Decorates)
-                .Select(ScopeFor(row).Resolve).ToHashSet();
+            if (enabled) _desiredRows.UnionWith(roots); else _desiredRows.ExceptWith(roots);
+            // A queued single-row request for one of these rows states a target this request has just replaced.
+            foreach (var rowId in roots)
+                if (_pendingIntents.Remove(rowId, out var previous)) previous.Supersede();
+            var writes = new HashSet<ServiceKey>();
+            for (var index = 0; index < rows.Length; index++)
+                if (descriptors[index] is { } descriptor)
+                    writes.UnionWith(AdvertisedServices(descriptor).Concat(Metadata(descriptor).Decorates).Select(ScopeFor(rows[index]).Resolve));
             foreach (var execution in _runningExecutions)
-                if ((execution.Request.Configuration && execution.Rows.Contains(rowId)) ||
-                    ((!enabled || restart) && execution.EntryReads.Contains(rowId)) ||
-                    execution.Request.RowId == rowId || execution.Context?.Row.Id == rowId ||
+                if ((execution.Request.Configuration && execution.Rows.Overlaps(roots)) ||
+                    ((!enabled || restart) && execution.EntryReads.Overlaps(roots)) ||
+                    roots.Contains(execution.Request.RowId) || (execution.Context is { } running && roots.Contains(running.Row.Id)) ||
                     ((!enabled || restart) && execution.Context?.NativeServices?.Access is { } access && access.View.Selections.Values.Any(selection => writes.Contains(selection.Key))))
                 {
                     execution.Context?.Supersede(); execution.Request.Supersede();
@@ -60,7 +84,7 @@ public sealed partial class PluginHost
                     if (_bindingSettlement is null || _bindingSettlement.Task.IsCompleted)
                         _bindingSettlement = new(TaskCreationOptions.RunContinuationsAsynchronously);
                 }
-            _pendingIntents[rowId] = request;
+            _pendingIntents[request.Key] = request;
             ScheduleIntents();
             accepted = request;
         }
@@ -68,6 +92,9 @@ public sealed partial class PluginHost
         foreach (var source in stopSources) RequestDefinitionSourceCancellation(source);
         return accepted;
     }
+
+    // A group intent has no single row to be queued under; a row identity never starts with a NUL.
+    private static string GroupIntentKey(long revision) => "\0group:" + revision.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     private void ScheduleIntents()
     {
@@ -109,7 +136,7 @@ public sealed partial class PluginHost
         try { execution = DescribeExecution(request); }
         catch (Exception error)
         {
-            _pendingIntents.Remove(request.RowId); _bindingDirtyRows.Remove(request.RowId);
+            _pendingIntents.Remove(request.Key); _bindingDirtyRows.Remove(request.RowId);
             request.Fail(error);
             lock (_info) _info[request.RowId] = InstanceInfo(KnownRow(request.RowId, allowRetiring: true), null, PluginState.Failed, error.Message);
             return;
@@ -128,11 +155,11 @@ public sealed partial class PluginHost
         catch (Exception error)
         {
             RestoreRejectedDesiredTarget(request);
-            _pendingIntents.Remove(request.RowId);
+            _pendingIntents.Remove(request.Key);
             request.Fail(error);
             return;
         }
-        _pendingIntents.Remove(request.RowId);
+        _pendingIntents.Remove(request.Key);
         if (!request.Automatic) foreach (var rowId in execution.Rows) _automaticAttempts.Remove(rowId);
         launch.Add(execution);
     }
@@ -205,15 +232,16 @@ public sealed partial class PluginHost
 
     private async ValueTask<PluginTransitionResult> ApplyIntentAsync(TransitionRequest request)
     {
-        var row = KnownRow(request.RowId, allowRetiring: !request.Enabled);
-        var descriptor = DefinitionFor(row) ?? throw new ConfigException($"Unknown plugin '{row.Plugin}'.");
-        var live = _live.FirstOrDefault(item => item.Row.Id == row.Id);
+        var roots = request.Roots.Order(StringComparer.Ordinal).Select(id => KnownRow(id, allowRetiring: !request.Enabled)).ToArray();
+        var descriptors = roots.Select(row => DefinitionFor(row) ?? throw new ConfigException($"Unknown plugin '{row.Plugin}'.")).ToArray();
         var affected = new HashSet<string>(StringComparer.Ordinal);
-        if (live is not null && (!request.Enabled || request.Restart || live.Context.IsClosing || live.Context.WorkFailure is not null))
-        {
-            affected.Add(row.Id);
-            foreach (var dependent in DependentsClosure(row.Id)) affected.Add(dependent.Row.Id);
-        }
+        foreach (var row in roots)
+            if (_live.FirstOrDefault(item => item.Row.Id == row.Id) is { } live &&
+                (!request.Enabled || request.Restart || live.Context.IsClosing || live.Context.WorkFailure is not null))
+            {
+                affected.Add(row.Id);
+                foreach (var dependent in DependentsClosure(row.Id)) affected.Add(dependent.Row.Id);
+            }
         var changed = new HashSet<string>(StringComparer.Ordinal);
         try
         {
@@ -232,9 +260,11 @@ public sealed partial class PluginHost
             throw;
         }
         await ReconcileBindingsAsync(request, changed).ConfigureAwait(false);
-        if (!request.Enabled && !_live.Any(item => item.Row.Id == row.Id))
-            lock (_info) _info[row.Id] = InstanceInfo(row, descriptor, PluginState.Unloaded, null);
-        var waiting = request.Enabled && !_live.Any(item => item.Row.Id == row.Id && !item.Context.IsClosing);
+        if (!request.Enabled)
+            for (var index = 0; index < roots.Length; index++)
+                if (!_live.Any(item => item.Row.Id == roots[index].Id))
+                    lock (_info) _info[roots[index].Id] = InstanceInfo(roots[index], descriptors[index], PluginState.Unloaded, null);
+        var waiting = request.Enabled && roots.Any(row => !_live.Any(item => item.Row.Id == row.Id && !item.Context.IsClosing));
         return new(waiting ? PluginTransitionOutcome.WaitingForDependencies : PluginTransitionOutcome.Converged,
             Array.AsReadOnly(changed.ToArray()));
     }
@@ -246,7 +276,10 @@ public sealed partial class PluginHost
         lock (_intentGate) desired = _desiredRows.Where(id => !_pendingIntents.ContainsKey(id)).ToHashSet(StringComparer.Ordinal);
         HashSet<string> failed;
         lock (_info) failed = _info.Values.Where(info => info.State == PluginState.Failed).Select(info => info.RowId).ToHashSet(StringComparer.Ordinal);
-        var pending = _rows.Where(row => Touches(row.Id) && desired.Contains(row.Id) && !_live.Any(item => item.Row.Id == row.Id) &&
+        // Live row ids as a set: checking each candidate against the live list made a many-build start cubic in rows.
+        // Refreshed after every activation, which may itself change what is live.
+        var live = LiveRowIds();
+        var pending = _rows.Where(row => Touches(row.Id) && desired.Contains(row.Id) && !live.Contains(row.Id) &&
             (!failed.Contains(row.Id) || (!recovering && !request.Automatic && automaticAttempts is null && request.Roots.Contains(row.Id)))).ToList();
         foreach (var row in pending.ToArray())
             if (DefinitionFor(row) is null)
@@ -263,6 +296,10 @@ public sealed partial class PluginHost
                 lock (_info) _info[row.Id] = InstanceInfo(row, DefinitionFor(row), PluginState.Pending, $"Plugin '{row.Plugin}' was published during this configuration revision.");
                 pending.Remove(row);
             }
+        // A set of rows requested together starts the way a server does: providers before the rows that read them,
+        // including a row that is already live and reads what a member is about to provide.
+        var together = request.Roots.Count > 1 && !request.Configuration && !request.Automatic && !recovering;
+        Dictionary<ServiceKey, HashSet<string>>? awaiting = null;
         var progress = true;
         while (progress && pending.Count > 0)
         {
@@ -274,10 +311,16 @@ public sealed partial class PluginHost
                 if (!NamespaceIsReady(row)) continue;
                 var descriptor = DefinitionFor(row)!;
                 var declaration = Metadata(descriptor);
-                var potential = _rows.Where(candidate => desired.Contains(candidate.Id) && !failed.Contains(candidate.Id) && !_live.Any(item => item.Row.Id == candidate.Id));
+                var potential = _rows.Where(candidate => desired.Contains(candidate.Id) && !failed.Contains(candidate.Id) && !live.Contains(candidate.Id));
                 if (!PluginServiceDeclarations.Required(declaration).All(type => _registry.IsRegistered(ScopeFor(row), type)) ||
                     PendingProviders(row, declaration, potential).Any() ||
                     RequiredEntryRows(row, declaration).Any(id => !EntryIsReady(id))) continue;
+                if (together)
+                {
+                    awaiting ??= ServicesAwaitingProviders(potential.ToArray());
+                    if (PluginServiceDeclarations.Required(declaration).Select(ScopeFor(row).Resolve)
+                        .Any(key => awaiting.TryGetValue(key, out var providers) && providers.Any(id => id != row.Id))) continue;
+                }
                 if (automaticAttempts is not null)
                 {
                     lock (_intentGate)
@@ -293,9 +336,17 @@ public sealed partial class PluginHost
                     }
                 }
                 await ReactivateAsync(row, descriptor, "converge", token, refreshBackend: !request.Configuration && !request.Automatic).ConfigureAwait(false);
+                live = LiveRowIds();
                 changed.Add(row.Id);
                 pending.Remove(row);
                 progress = true;
+                if (together)
+                {
+                    awaiting = null;
+                    pending.AddRange(await SuspendStaleRowsAsync(request, changed, desired, failed, pending).ConfigureAwait(false));
+                    // The rows just stopped are no longer live and are providers the rest must wait for again.
+                    live = LiveRowIds();
+                }
             }
         }
         foreach (var row in pending)
@@ -313,6 +364,54 @@ public sealed partial class PluginHost
                 lock (_info) _info[row.Id] = InstanceInfo(row, descriptor, PluginState.Pending, reason);
             }
     }
+
+    // A row that has just started may be one a live row reads: that reader's view is now out of date, and a later
+    // member that requires the reader would activate against what it no longer provides correctly. Server start never
+    // meets this because a reader waits for every pending provider; a set of rows started later does, so the stale
+    // readers and their dependents are stopped here and started again in order with the rest of the set.
+    private async ValueTask<IReadOnlyList<PluginRow>> SuspendStaleRowsAsync(TransitionRequest request, HashSet<string> changed,
+        HashSet<string> desired, HashSet<string> failed, List<PluginRow> pending)
+    {
+        var stale = _live.Where(item => Touches(item.Row.Id) && !item.Context.IsClosing && HasStaleActivationView(item)).ToArray();
+        if (stale.Length == 0) return [];
+        var affected = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var item in stale)
+        {
+            affected.Add(item.Row.Id);
+            foreach (var dependent in DependentsClosure(item.Row.Id)) affected.Add(dependent.Row.Id);
+        }
+        var stopped = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var item in _live.Where(item => Touches(item.Row.Id) && affected.Contains(item.Row.Id)).Reverse().ToArray())
+        {
+            request.Token.ThrowIfCancellationRequested();
+            await UnloadCoreAsync(item.Row.Id, request.Token).ConfigureAwait(false);
+            changed.Add(item.Row.Id);
+            stopped.Add(item.Row.Id);
+        }
+        return _rows.Where(row => stopped.Contains(row.Id) && desired.Contains(row.Id) && !failed.Contains(row.Id) &&
+            !pending.Any(waiting => waiting.Id == row.Id) && !_live.Any(item => item.Row.Id == row.Id)).ToArray();
+    }
+
+    // The services of live rows that will be restarted once a pending row starts (the row reads what that pending row
+    // provides), and of everything that depends on them, each with the pending rows it waits for.
+    private Dictionary<ServiceKey, HashSet<string>> ServicesAwaitingProviders(IReadOnlyList<PluginRow> potential)
+    {
+        var result = new Dictionary<ServiceKey, HashSet<string>>();
+        foreach (var live in _live.Where(item => Touches(item.Row.Id) && !item.Context.IsClosing).ToArray())
+        {
+            var providers = PendingProviders(live.Row, Metadata(live.Descriptor), potential).ToArray();
+            if (providers.Length == 0) continue;
+            foreach (var holder in DependentsClosure(live.Row.Id).Prepend(live))
+                foreach (var key in AdvertisedServices(holder.Descriptor).Select(holder.Context.NativeServices!.Scope.Resolve))
+                {
+                    if (!result.TryGetValue(key, out var waits)) result[key] = waits = new(StringComparer.Ordinal);
+                    waits.UnionWith(providers);
+                }
+        }
+        return result;
+    }
+
+    private HashSet<string> LiveRowIds() => _live.Select(item => item.Row.Id).ToHashSet(StringComparer.Ordinal);
 
     private void ExitTransition()
     {
@@ -354,7 +453,7 @@ public sealed partial class PluginHost
 
     private sealed class TransitionFrame { internal bool Active = true; }
 
-    private sealed class TransitionRequest(PluginHost host, string rowId, long revision, bool enabled, bool restart, bool automatic = false, bool compatibility = false, IReadOnlySet<string>? roots = null, bool configuration = false) : IPluginTransition
+    private sealed class TransitionRequest(PluginHost host, string rowId, long revision, bool enabled, bool restart, bool automatic = false, bool compatibility = false, IReadOnlySet<string>? roots = null, bool configuration = false, string? key = null) : IPluginTransition
     {
         private readonly TaskCompletionSource<PluginTransitionResult> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private CancellationTokenSource? _cancellation;
@@ -370,7 +469,9 @@ public sealed partial class PluginHost
         internal bool Compatibility { get; } = compatibility;
         internal IReadOnlySet<string> Roots { get; } = roots ?? new HashSet<string>(StringComparer.Ordinal) { rowId };
         internal bool Configuration { get; } = configuration;
-        internal bool PreviousDesiredTarget;
+        /// <summary>The identity this request is queued under: its row, or a private one for a set of rows.</summary>
+        internal string Key { get; } = key ?? rowId;
+        internal IReadOnlySet<string> PreviousDesiredTargets = new HashSet<string>(StringComparer.Ordinal);
         internal bool OwnsDesiredTarget;
         internal Task<PluginTransitionResult> Completion => _completion.Task;
         internal bool IsSuperseded => Volatile.Read(ref _superseded) != 0;

@@ -156,7 +156,8 @@ internal sealed partial class RoundFlow
             var equipment = members.ToDictionary(member => member.Slot, member =>
                 member.EquippedItemIds is { } items
                     ? new MatchSeedEquipment(room.ModeId, items,
-                        member.InventorySelection?.WeaponSelections[0], member.InventorySelection?.WeaponSelections[1])
+                        member.InventorySelection?.WeaponSelections[0], member.InventorySelection?.WeaponSelections[1],
+                        member.ItemAttributes)
                     : null);
             var roster = new MatchSeedRoster(members.Select(member =>
                 new MatchSeedOccupant(RoomRegistry.SceneEntity(member.Slot), equipment[member.Slot])));

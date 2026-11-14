@@ -4,7 +4,7 @@ using BubbleFighter.Fantasy.Contracts.Administration;
 namespace BubbleFighter.Fantasy.Commands;
 
 /// <summary>Provides the shared native command pipeline; transports remain separate plugin adapters.</summary>
-[Plugin("commands", Requires = [typeof(IPermissionService), typeof(IPermissionRegistry)],
+[Plugin("commands", Category = "admin", Names = ["en=Commands", "zh-Hans=命令", "zh-Hant=指令", "ko=명령"], Requires = [typeof(IPermissionService), typeof(IPermissionRegistry)],
     Provides = [typeof(ICommandRegistry), typeof(ICommandExecutor)])]
 public sealed class CommandsPlugin : IPlugin
 {

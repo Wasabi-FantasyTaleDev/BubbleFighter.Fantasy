@@ -14,7 +14,7 @@ services:
       BFF_BIND_HOST: 0.0.0.0
       BFF_MYSQL_HOST: 127.0.0.1
       BFF_ADMIN_HOST: 127.0.0.1
-      BFF_ADMIN_PORT: 8080
+      BFF_ADMIN_PORT: 7300
     volumes:
       - ./logs:/app/logs
       # Client data stays on the host, outside the image: <build>/data archives and <build>/dataraw loose

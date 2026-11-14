@@ -28,6 +28,9 @@ public sealed record RoomCreateRequested(string Name, string Password, int ModeI
 /// <param name="Change">The lineage's latest encoded settings change, which its codec applies over <paramref name="Bytes"/>; empty when there was none.</param>
 public sealed record RoomBuildSettings(string Lineage, ReadOnlyMemory<byte> Bytes, ReadOnlyMemory<byte> Change = default)
 {
+    /// <summary>Gets committed native custom options; null preserves the original block, and an empty list clears them.</summary>
+    public IReadOnlyList<RoomCustomRuleValue>? CustomRules { get; init; }
+
     /// <summary>Gets the latest selections for the three native round-map controls, retained across room refreshes.</summary>
     public IReadOnlyList<RoomRoundSelection> RoundSelections { get; init; } = [];
 
@@ -122,6 +125,9 @@ public sealed record RoomTeamConverted(int Slot, int Team) : IMessage;
 /// <param name="MapKey">The map the round is played on.</param>
 public sealed record RoomMatchStarting(RoomView Room, string MapKey) : IMessage
 {
+    /// <summary>Gets the shared map-generation seed delivered before loading, or null for an unseeded stage.</summary>
+    public int? MapSeed { get; init; }
+
     /// <summary>Gets the round index and role for a multi-round match; null retains ordinary single-round entry.</summary>
     public BubbleFighter.Fantasy.Contracts.Match.RoundSeriesEntry? Series { get; init; }
 

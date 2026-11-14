@@ -1,5 +1,4 @@
 using System.Buffers.Binary;
-using System.Runtime.CompilerServices;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Party;
 using BubbleFighter.Fantasy.Contracts.Rooms;
@@ -11,13 +10,11 @@ namespace BubbleFighter.Fantasy.Dialect.Rooms;
 /// <summary>Supplies typed identity and equipment values to the audited native room containers.</summary>
 internal static class RoomRecords
 {
-    private static readonly ConditionalWeakTable<PacketTables, RoomTables> EquippedListTables = new();
-
     private static bool UsesEquippedLists(PacketTables tables, string build) =>
         tables.Resolve(build, "gspGotoRoom").Any(field => field is { Name: "equipped_item_lists", Type: "list<EquippedItemList>" });
 
     private static RoomSchema EquippedListSchema(PacketTables tables, string build) =>
-        EquippedListTables.GetValue(tables, static snapshot => RoomTables.Load(snapshot)).Of(build).Schema;
+        RoomTables.For(tables).Of(build).Schema;
 
     private static RoomSlotValues EquippedListSeat(RoomMemberView seat, ISession? recipient, IGameText? texts)
     {
@@ -28,6 +25,7 @@ internal static class RoomRecords
             seat.CharacterItemId, seat.EquippedItemIds, seat.Ready)
         {
             ColorIndex = seat.ColorIndex, Team = seat.Team, Level = Math.Max(1, seat.Level), ControllerSlot = seat.Slot,
+            ItemAttributes = seat.ItemAttributes,
         };
     }
 
@@ -127,6 +125,13 @@ internal static class RoomRecords
         };
     }
 
+    internal static Dictionary<string, object?>[] AttributeValues(IReadOnlyList<RoomItemAttribute> attributes) =>
+        attributes.Select(attribute => new Dictionary<string, object?>
+        {
+            ["unknown_4"] = attribute.ItemId, ["unknown_8"] = attribute.Kind, ["unknown_12"] = attribute.Values,
+            ["unknown_28"] = attribute.Unknown28, ["unknown_32"] = attribute.Unknown32,
+        }).ToArray();
+
     internal static Dictionary<string, object?>[] Profiles(IReadOnlyList<RoomMemberView> seats) =>
         seats.Select((seat, position) => Profile(seat, position)).ToArray();
 
@@ -190,7 +195,7 @@ internal static class RoomRecords
             ["unknown_588"] = HumanProfiles(seats),
             ["local_slot"] = localSlot,
             ["party_transition"] = partyTransition,
-            ["equipped_objects"] = native ? seats.Select(EquippedObject).ToArray() : [],
+            ["equipped_objects"] = native ? seats.Select(seat => EquippedObject(tables, build, seat)).ToArray() : [],
         });
     }
 
@@ -205,7 +210,7 @@ internal static class RoomRecords
         {
             ["slot"] = seat.Slot,
             ["user"] = UsesEquippedObjects(tables, build) ? PlazaRecords.Seat(tables, build, seat, recipient, texts) : Seat(tables, build, seat, recipient, texts),
-            ["equipment"] = UsesEquippedObjects(tables, build) ? EquippedObject(seat) : null,
+            ["equipment"] = UsesEquippedObjects(tables, build) ? EquippedObject(tables, build, seat) : null,
             ["profile_entries"] = SlotProfiles(seats),
             ["unknown_n3"] = HumanProfiles(seats),
         });
@@ -246,7 +251,8 @@ internal static class RoomRecords
         var party = session is not null && session.TryFeature<IPartyMembership>(out var membership)
             ? membership.Party : new PartySnapshot([new(seat.UserNum, seat.Nickname, seat.Level)]);
         return PartyRecords.Write(tables, build,
-            new PartyUpdated(party, new(seat.UserNum, seat.CharacterItemId, seat.EquippedItemIds)));
+            new PartyUpdated(party, new(seat.UserNum, seat.CharacterItemId, seat.EquippedItemIds)
+                { ItemAttributes = seat.ItemAttributes }));
     }
 
     /// <summary>
@@ -299,11 +305,16 @@ internal static class RoomRecords
             ("slot", "u32"), ("user", "UserSlot"));
     }
 
-    internal static Dictionary<string, object?> EquippedObject(RoomMemberView seat) => new()
+    internal static Dictionary<string, object?> EquippedObject(PacketTables tables, string build, RoomMemberView seat)
     {
-        ["user_number"] = seat.UserNum, ["character_id"] = seat.CharacterItemId,
-        // cn-774 sub_9B82D0 keeps bot equipment by slot; ordinary humans retain the account lookup sentinel.
-        ["unknown_16"] = seat.Ai is null ? -1 : seat.Slot,
-        ["equipped_items"] = seat.EquippedItemIds.Where(id => id != seat.CharacterItemId).ToArray(),
-    };
+        var values = new Dictionary<string, object?>
+        {
+            ["user_number"] = seat.UserNum, ["character_id"] = seat.CharacterItemId,
+            // cn-774 sub_9B82D0 keeps bot equipment by slot; ordinary humans retain the account lookup sentinel.
+            ["unknown_16"] = seat.Ai is null ? -1 : seat.Slot,
+            ["equipped_items"] = seat.EquippedItemIds.Where(id => id != seat.CharacterItemId).ToArray(),
+        };
+        ItemAttributeWire.Apply(tables, build, "EquippedObjectEntry", values, seat.ItemAttributes);
+        return values;
+    }
 }

@@ -5,7 +5,7 @@ namespace BubbleFighter.Fantasy.Persistence.MySql;
 // Entity maps over the schema created by Migrations/*.sql. The migrations stay the source of truth for
 // types, keys and defaults; these classes only name the tables and columns the repositories touch.
 
-/// <summary>The <c>players</c> columns this plugin reads or writes (migrations 0003, 0018, 0027).</summary>
+/// <summary>The <c>players</c> columns this plugin reads or writes (migrations 0003, 0018, 0027, 0042).</summary>
 [SugarTable("players")]
 internal sealed class PlayerRow
 {
@@ -23,6 +23,10 @@ internal sealed class PlayerRow
 
     [SugarColumn(ColumnName = "last_login_day", IsNullable = true)]
     public DateTime? LastLoginDay { get; set; }
+
+    /// <summary>Gets or sets the greatest ordinary inventory key retained after grants and ownership removal.</summary>
+    [SugarColumn(ColumnName = "last_inventory_slot_key")]
+    public long LastInventorySlotKey { get; set; }
 }
 
 /// <summary>A <c>fighters</c> row (migration 0004).</summary>
@@ -68,7 +72,7 @@ internal sealed class WalletRow
     public DateTime UpdatedAt { get; set; }
 }
 
-/// <summary>An <c>inventory_slots</c> row (migrations 0005, 0016, 0021, 0022, 0027).</summary>
+/// <summary>An <c>inventory_slots</c> row (migrations 0005, 0016, 0021, 0022, 0027, 0041, 0045, 0047).</summary>
 [SugarTable("inventory_slots")]
 internal sealed class InventorySlotRow
 {
@@ -101,6 +105,31 @@ internal sealed class InventorySlotRow
 
     [SugarColumn(ColumnName = "expires_at_unix_ms", IsNullable = true)]
     public long? ExpiresAtUnixMilliseconds { get; set; }
+
+    [SugarColumn(ColumnName = "pet_json", IsNullable = true)]
+    public string? PetJson { get; set; }
+
+    // Native BIGINT UNSIGNED values cross the ORM as decimal text, never as signed or floating-point values.
+    [SugarColumn(ColumnName = "pet_entitlement_id", IsNullable = true)]
+    public string? PetEntitlementId { get; set; }
+
+    [SugarColumn(ColumnName = "pet_article_key", IsNullable = true)]
+    public string? PetArticleKey { get; set; }
+
+    [SugarColumn(ColumnName = "article_entitlement_id", IsNullable = true)]
+    public string? ArticleEntitlementId { get; set; }
+
+    [SugarColumn(ColumnName = "article_key", IsNullable = true)]
+    public string? ArticleKey { get; set; }
+
+    [SugarColumn(ColumnName = "enhancements_json", IsNullable = true)]
+    public string? EnhancementsJson { get; set; }
+
+    [SugarColumn(ColumnName = "modifications_json", IsNullable = true)]
+    public string? ModificationsJson { get; set; }
+
+    [SugarColumn(ColumnName = "favorites_json", IsNullable = true)]
+    public string? FavoritesJson { get; set; }
 }
 
 /// <summary>A <c>purchase_log</c> row (migrations 0017, 0019); <c>id</c> and <c>created_at</c> come from the database.</summary>

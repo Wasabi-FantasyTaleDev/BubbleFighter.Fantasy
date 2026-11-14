@@ -1,18 +1,17 @@
 # Profile patch for kr-812: applied after the bundle rows (see profiles/kr-1256/patch.yaml
-# for the supported operations). The admin API moves off 8080 so this profile can run
-# beside kr-1256 on one machine.
+# for the supported operations).
 - set:
     id: ingame
     config:
       # kr-812 sub_6378A0 latches refused boxes; sub_515290 supports removal without a pickup effect.
       renew_full_slot_supplies: true
-- replace:
-    id: admin.http
-    config:
-      listen: "${KR_812_ADMIN_HOST:-127.0.0.1}:${KR_812_ADMIN_PORT:-8081}"
+      # kr-812 sub_525E40 consumes gspSwitchItemSlot and installs the selected slot/kind for every peer.
+      auto_advance_item_slot_after_use: true
 - replace:
     id: diagnostics.packet-log
     config:
+      packets_enabled: ${BFF_PACKET_LOG:-false}
+      capture_enabled: ${BFF_PACKET_CAPTURE:-false}
       file: logs/{date}/packets-kr-812_{timestamp}.log
       preview_bytes: 96
 - set:

@@ -19,8 +19,8 @@ public sealed class LotteryCatalogBoundsTests
         row.Add(new XElement(Spreadsheet + "Cell", new XAttribute(Spreadsheet + "Index", 256)));
         row.Add(new XElement(Spreadsheet + "Cell"));
         row.Add(new XElement(Spreadsheet + "Cell", new XAttribute(Spreadsheet + "Index", 16384)));
-        LotteryCatalog.Validate(document, [Prize()]);
-        Assert.Throws<ConfigException>(() => LotteryCatalog.Validate(document,
+        LotteryCatalog.Validate(Bytes(document), [Prize()]);
+        Assert.Throws<ConfigException>(() => LotteryCatalog.Validate(Bytes(document),
             [new LotteryItem { ItemId = 100208, DisplayId = 1000920, Days = 3 }]));
     }
 
@@ -34,7 +34,7 @@ public sealed class LotteryCatalogBoundsTests
         var document = Workbook();
         document.Descendants(Spreadsheet + "Row").Last().Add(new XElement(Spreadsheet + "Cell",
             new XAttribute(Spreadsheet + "Index", index), new XElement(Spreadsheet + "Data", value)));
-        Assert.Throws<ConfigException>(() => LotteryCatalog.Validate(document, [Prize()]));
+        Assert.Throws<ConfigException>(() => LotteryCatalog.Validate(Bytes(document), [Prize()]));
     }
 
     private static LotteryItem Prize() => new() { ItemId = 100207, DisplayId = 1000920, Days = 3 };
@@ -46,4 +46,6 @@ public sealed class LotteryCatalogBoundsTests
 
     private static XElement Row(params string[] values) => new(Spreadsheet + "Row",
         values.Select(value => new XElement(Spreadsheet + "Cell", new XElement(Spreadsheet + "Data", value))));
+
+    private static byte[] Bytes(XDocument document) => System.Text.Encoding.UTF8.GetBytes(document.ToString());
 }

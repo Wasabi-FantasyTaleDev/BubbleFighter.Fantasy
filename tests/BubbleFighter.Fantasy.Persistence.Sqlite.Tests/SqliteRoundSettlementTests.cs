@@ -1,4 +1,5 @@
 using BubbleFighter.Fantasy.Contracts.Progress;
+using BubbleFighter.Fantasy.Contracts.Titles;
 using BubbleFighter.Fantasy.Contracts.Wallet;
 using BubbleFighter.Fantasy.Persistence.Sqlite;
 using Microsoft.Data.Sqlite;
@@ -64,7 +65,7 @@ public sealed class SqliteRoundSettlementTests : IDisposable
             user = (await stores.CreateAsync("account", "player", default)).UserNum;
             await stores.UpsertAsync(new PlayerWallet(user, 0, 0), default);
         }
-        Execute("DROP TABLE messenger_requests; DROP TABLE messenger_categories; DROP TABLE messenger_relations; DROP TABLE messenger_users; DROP TABLE round_settlements; PRAGMA user_version=5;");
+        Execute("DROP TABLE messenger_requests; DROP TABLE messenger_categories; DROP TABLE messenger_relations; DROP TABLE messenger_users; DROP TABLE round_settlements; DROP TABLE IF EXISTS pet_identity_allocator; PRAGMA user_version=5;");
         using (var database = new SqliteDatabase(Options()))
         {
             var stores = new SqliteRepositories(database);
@@ -74,7 +75,7 @@ public sealed class SqliteRoundSettlementTests : IDisposable
         connection.Open();
         using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA user_version";
-        Assert.Equal(9L, command.ExecuteScalar());
+        Assert.Equal(13L, command.ExecuteScalar());
     }
 
     private void Execute(string sql)
@@ -84,6 +85,37 @@ public sealed class SqliteRoundSettlementTests : IDisposable
         using var command = connection.CreateCommand();
         command.CommandText = sql;
         command.ExecuteNonQuery();
+    }
+
+    /// <summary>Wallet failure rolls back medals and their receipt; a committed retry remains idempotent after reopen.</summary>
+    [Fact]
+    public async Task RoundMedalsShareRollbackAndDurableSettlementReceipt()
+    {
+        long user;
+        RoundSettlementCommand command;
+        using (var database = new SqliteDatabase(Options()))
+        {
+            var stores = new SqliteRepositories(database);
+            user = (await stores.CreateAsync("medals", "player", default)).UserNum;
+            await stores.UpsertAsync(new PlayerWallet(user, int.MaxValue, 0), default);
+            command = Add("medal-round", user, 40, 1) with
+                { TitleMedals = new(user, "kr-1256", "round", "round:medal-round", [new(30001, 3)]) };
+            await Assert.ThrowsAsync<OverflowException>(() => stores.SettleRoundAsync(command, default).AsTask());
+            Assert.Empty(await stores.ReadAsync(user, "kr-1256", default));
+            await stores.UpsertAsync(new PlayerWallet(user, 0, 0), default);
+            Assert.Equal(RoundSettlementOutcome.Settled, (await stores.SettleRoundAsync(command, default)).Outcome);
+        }
+        using (var database = new SqliteDatabase(Options()))
+        {
+            var stores = new SqliteRepositories(database);
+            Assert.Equal(RoundSettlementOutcome.AlreadySettled, (await stores.SettleRoundAsync(command, default)).Outcome);
+            Assert.Equal(new[] { new TitleMedalCount(30001, 3) }, await stores.ReadAsync(user, "kr-1256", default));
+            Assert.Equal(1, (await stores.FindByUserNumAsync(user, default))!.Lucci);
+            var different = command with
+                { TitleMedals = new(user, "kr-1256", "round", "round:medal-round", [new(30001, 4)]) };
+            await Assert.ThrowsAsync<InvalidOperationException>(() => stores.SettleRoundAsync(different, default).AsTask());
+            Assert.Equal(3, Assert.Single(await stores.ReadAsync(user, "kr-1256", default)).Count);
+        }
     }
 
     /// <inheritdoc />

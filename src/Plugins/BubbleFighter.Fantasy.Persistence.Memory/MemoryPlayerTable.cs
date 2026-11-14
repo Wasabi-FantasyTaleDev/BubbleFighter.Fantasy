@@ -21,6 +21,11 @@ public sealed class MemoryPlayerTable
     private readonly object _gate = new();
     private readonly ConcurrentDictionary<long, PlayerEntry> _players = [];
 
+    // Always acquired after the player's gate; committed identifiers are never rewound or retained in a retired map.
+    internal object PetAllocatorGate { get; } = new();
+    internal ulong LastPetEntitlementId { get; set; }
+    internal ulong LastPetArticleKey { get; set; } = PetArticleKeys.First - 1;
+
     /// <summary>Initializes the table with its player bound.</summary>
     /// <param name="maxPlayers">Maximum distinct players the table tracks before it refuses more.</param>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="maxPlayers"/> is below 1.</exception>
@@ -79,6 +84,10 @@ public sealed class MemoryPlayerTable
 /// </summary>
 internal sealed class PlayerEntry
 {
+    internal Dictionary<string, BubbleFighter.Fantasy.Contracts.Titles.TitleMedalLedger> TitleMedals { get; } = new(StringComparer.Ordinal);
+    // Applied medal events by (catalogue scope, grant key); kept apart from balances so deduplication is never evicted.
+    internal Dictionary<(string Scope, string GrantKey), BubbleFighter.Fantasy.Contracts.Titles.TitleMedalGrantReceipt> TitleReceipts { get; } = new();
+    internal Dictionary<(string Scope, int TitleId), BubbleFighter.Fantasy.Contracts.Titles.TitleAcquisitionReceipt> TitleAcquisitions { get; } = new();
     internal Dictionary<string, InventoryLoadoutState> Loadouts { get; } = new(StringComparer.Ordinal);
     /// <summary>Gets saved control maps by explicit scope; guarded by <see cref="Gate"/>.</summary>
     public Dictionary<string, BubbleFighter.Fantasy.Contracts.Settings.CustomizedKey[]> CustomizedKeys { get; } = new(StringComparer.Ordinal);

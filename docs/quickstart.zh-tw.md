@@ -43,11 +43,11 @@ cp .env.example .env
 
 `.env` 被 Git 忽略，絕不要提交。
 
-### 2. 設定臨時密碼
+### 2. 選用：資料庫設定
 
-開啟 `.env`，把 `BFF_MYSQL_PASSWORD` 設為非空的臨時值，例如 `isolated-check-only`。`persistence.mysql` 列讀取沒有預設值的 `${BFF_MYSQL_PASSWORD}`，變數缺少時組合會失敗；隔離記憶體修補檔只在組合之後才停用該列。本機檢查不要使用真實資料庫憑證，真實憑證只用於刻意設定的部署。
+使用隔離記憶體修補檔的本機檢查不需要資料庫設定，`.env` 保持複製時的內容即可。只有啟用 `persistence.mysql` 列時才需要 `BFF_MYSQL_PASSWORD`，且必須非空，它沒有預設值。本機檢查不要使用真實資料庫憑證，真實憑證只用於刻意設定的部署。
 
-**檢查是否成功：** `.env` 存在（`Test-Path .env` 輸出 `True`），且 `BFF_MYSQL_PASSWORD` 列非空。不要把該檔案或其值貼到聊天或問題中。
+**檢查是否成功：** `.env` 存在（`Test-Path .env` 輸出 `True`）。不要把該檔案或其值貼到聊天或問題中。
 
 ## 找到 profile
 
@@ -106,12 +106,12 @@ dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile 
 如果儲存庫根目錄存在 `.env`，第一行是 `Loaded unset variables from <path>.`。隨後伺服器會列印管理監聽位址、WebUI 位址與作用中的列數：
 
 ```text
-Row 'admin.http' admin API listening on 127.0.0.1:8080.
-WebUI: http://127.0.0.1:8080/
+Row 'admin.http' admin API listening on 127.0.0.1:7300.
+WebUI: http://127.0.0.1:7300/
 Server started with <count> active row(s).
 ```
 
-`<count>` 是 Host 列印的作用中列數量，不是固定數字。`management` 沒有遊戲或中繼連接埠。它的管理 API 基礎位址是 `http://127.0.0.1:8080`，來自 `profiles/bundles/core.yaml` 中的 `admin.http` 列（`${BFF_ADMIN_HOST:-127.0.0.1}:${BFF_ADMIN_PORT:-8080}`）。處理程序會一直保持在前景，直到你停止它。
+`<count>` 是 Host 列印的作用中列數量，不是固定數字。`management` 沒有遊戲或中繼連接埠。它的管理 API 基礎位址是 `http://127.0.0.1:7300`，來自 `profiles/bundles/core.yaml` 中的 `admin.http` 列（`${BFF_ADMIN_HOST:-127.0.0.1}:${BFF_ADMIN_PORT:-7300}`）。處理程序會一直保持在前景，直到你停止它。
 
 ### 2. 改為啟動遊戲 profile（需要用戶端資料）
 
@@ -125,7 +125,7 @@ dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile 
 clientdata: neither data_directory '<working-directory>/client-data/kr-812/data' nor raw_directory '<working-directory>/client-data/kr-812/dataraw' exists. Provision the configured client-data directories before enabling this row.
 ```
 
-請提供資料，或依[安裝](installation.md)所述透過安裝助理匯入，然後重新啟動該 profile。資料就位後，`kr-812` 會在 `${BFF_BIND_HOST:-0.0.0.0}:${LEGACY_PORT}` 上綁定遊戲監聽，因為 `profiles/kr-812/profile.yaml` 把 `LEGACY_PORT` 設為 `${KR_812_GAME_PORT:-7110}`，所以實際是 `0.0.0.0:7110`。舊版（legacy）版本沒有中繼監聽。管理 API 仍是 `127.0.0.1:8080`。
+請提供資料，或依[安裝](installation.md)所述透過安裝助理匯入，然後重新啟動該 profile。資料就位後，`kr-812` 會在 `${BFF_BIND_HOST:-0.0.0.0}:${LEGACY_PORT}` 上綁定遊戲監聽，因為 `profiles/kr-812/profile.yaml` 把 `LEGACY_PORT` 設為 `${KR_812_GAME_PORT:-7110}`，所以實際是 `0.0.0.0:7110`。舊版（legacy）版本沒有中繼監聽。管理 API 仍是 `127.0.0.1:7300`。
 
 **檢查是否成功：** 處理程序保持在前景，列印上面三行啟動資訊，且沒有以啟用錯誤結束。
 
@@ -136,13 +136,13 @@ clientdata: neither data_directory '<working-directory>/client-data/kr-812/data'
 PowerShell：
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:8080/health
+Invoke-RestMethod http://127.0.0.1:7300/health
 ```
 
 Linux shell：
 
 ```sh
-curl -s http://127.0.0.1:8080/health
+curl -s http://127.0.0.1:7300/health
 ```
 
 回應包含 `status` = `ok` 以及 UTC 時間戳。`/health` 始終不需登入。
@@ -152,13 +152,13 @@ curl -s http://127.0.0.1:8080/health
 PowerShell：
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:8080/api/plugins | Format-Table rowId, state
+Invoke-RestMethod http://127.0.0.1:7300/api/plugins | Format-Table rowId, state
 ```
 
 Linux shell：
 
 ```sh
-curl -s http://127.0.0.1:8080/api/plugins
+curl -s http://127.0.0.1:7300/api/plugins
 ```
 
 `/api/plugins` 傳回正在執行的模組列。每一項包含 `rowId`、`plugin`、`source`、`state` 與 `error`。請尋找 `state` = `Active` 且 `error` 為空的列；`Failed` 或 `Pending` 列會在 `error` 中提供診斷資訊。
@@ -167,7 +167,7 @@ curl -s http://127.0.0.1:8080/api/plugins
 
 ### 3. 開啟 WebUI
 
-在瀏覽器開啟 `http://127.0.0.1:8080/`。management profile 會提供管理介面。
+在瀏覽器開啟 `http://127.0.0.1:7300/`。management profile 會提供管理介面。
 
 **檢查是否成功：** 健康檢查傳回 `ok`，實例清單顯示作用中的列，且 WebUI 可以載入。這些檢查證明 Host 及其管理 API 正在執行；它們不能證明遊戲用戶端可以連線。
 
@@ -185,8 +185,8 @@ curl -s http://127.0.0.1:8080/api/plugins
 
 ## 發生問題時
 
-- **`environment variable 'BFF_MYSQL_PASSWORD' is not set and has no default`：** `.env` 檔案缺少、沒有在儲存庫根目錄找到，或沒有設定該變數。請複製 `.env.example` 並設定一個臨時值。
-- **管理連接埠已被占用：** 啟動會在監聽列失敗。請在 `.env` 中設定 `BFF_ADMIN_PORT`，或停止占用 8080 的處理程序。
+- **`environment variable 'BFF_MYSQL_PASSWORD' is not set and has no default`：** 某個已啟用的列讀取了未設定的變數，例如選擇了 MySQL 卻沒有設定其密碼。本機檢查請加上隔離記憶體修補檔；使用 MySQL 的部署請在儲存庫根目錄的 `.env` 中設定該變數。
+- **管理連接埠已被占用：** 啟動會在監聽列失敗。請在 `.env` 中設定 `BFF_ADMIN_PORT`，或停止占用 7300 的處理程序。
 - **遊戲連接埠已被占用：** 請在 `.env` 中設定 `KR_812_GAME_PORT`，或停止占用 7110 的處理程序。
 - **`kr-812` 因 `clientdata` 失敗：** 參見上面的用戶端資料訊息；該版本的資料必須存在，profile 才能啟動。
 - **`Server startup did not converge`：** 訊息會列出每個未啟用的列及其狀態與診斷。先閱讀第一個 `Failed` 或 `Pending` 列並修正其原因。

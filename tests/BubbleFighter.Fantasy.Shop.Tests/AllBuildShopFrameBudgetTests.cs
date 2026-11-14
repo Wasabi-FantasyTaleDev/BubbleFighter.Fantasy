@@ -80,7 +80,10 @@ public sealed class AllBuildShopFrameBudgetTests(ITestOutputHelper output)
                 Assert.Contains(selected, card => (card.MainCategoryId, card.SubCategoryId) == category);
         }
         var frame = (string)Assert.Single(rows, row => row.Id == "dialect").Config!["frame"]!;
-        Assert.InRange(body.Length, 1, frame.StartsWith("legacy_", StringComparison.Ordinal) ? ushort.MaxValue : protocol.MaxPayloadBytes);
+        // A 16-bit length caps a legacy frame; any frame must also fit the session's send queue to be sent at all.
+        if (frame.StartsWith("legacy_", StringComparison.Ordinal))
+            Assert.InRange(body.Length, 1, ushort.MaxValue);
+        Assert.InRange(body.Length, 1, protocol.SendQueueBytes);
         Assert.True(sent > 0);
         output.WriteLine($"{build}: {sent}/{eligible} cards, {body.Length} payload bytes");
     }

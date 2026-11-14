@@ -8,7 +8,7 @@ using BubbleFighter.Fantasy.Packets;
 namespace BubbleFighter.Fantasy.Dialect.Messages;
 
 /// <summary>Publishes native relay success signals after the shared lifecycle has validated a room lease.</summary>
-[Plugin("dialect.match-replies", Description = "Native legacy match success signals.",
+[Plugin("dialect.match-replies", Category = "network", Names = ["en=Match replies", "zh-Hans=对局回应", "zh-Hant=對局回應", "ko=매치 응답"], Description = "Native legacy match success signals.",
     Requires = [typeof(IOpcodeTableRegistry)], OptionalMany = [typeof(IOpcodeTable), typeof(IMatchUdpRelayDirectory), typeof(IUdpDatagramEndpoint)],
     ProvidesMany = [typeof(IMessageSender<MatchAuthenticationAccepted>)],
     ConditionalProvidesMany = [typeof(IMessageSender<MatchSceneAccepted>)])]

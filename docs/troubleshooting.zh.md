@@ -1,8 +1,16 @@
 ---
 title: "故障排查"
 description: "按顺序诊断构建、配置、启动、网络、持久化与 SDK 故障。"
-updated: 2026-10-20
+updated: 2026-11-09
 ---
+
+## Host 文件日志缺失或不完整 {#host-file-logs}
+
+检查实际进程环境或命令行是否设置 `BFF_LOG_FILE` 或 `--log-file`。文件日志默认关闭，文件阈值默认 `Warning`。需要信息记录时，设置 `BFF_LOG_FILE_LEVEL=Information` 或 `--log-file-level Information`；类别筛选规则仍然适用。这不会改变控制台阈值。
+
+启动时的路径、权限或锁定错误表示文件写入器未启动。请选择可写的持久路径，并为每个运行中的 Host 使用独立文件。已有当前文件超过 `BFF_LOG_FILE_MAX_BYTES` 时会在启动时轮转，旧备份仍受固定数量限制。默认五个槽位限制新写入为每个文件最多 16 MiB；调低上限后，历史备份可能更大。
+
+`dropped_entries=N` 统计因队列或字节上限、记录过大、格式化失败或 I/O 不可用而丢失的记录。运行中的 I/O 错误会向 stderr 输出一条包含异常类型的有界短行。写入器关闭文件流并按指数退避重试打开，默认从 1 秒到最多 60 秒；不可用期间的记录计为丢弃，恢复后先写待报告的计数，再写新记录。Windows 上，未允许删除共享的查看器可能阻止轮转：请关闭查看器或以允许删除共享的方式重新打开，再等待重试完成。检查磁盘访问、延迟与[配置](configuration.zh.md)中的上限。限时关闭未能排空会明确报错。I/O 错误可能留下部分记录，强制停止也可能丢失队列内的记录。完整异常记录包含消息、内部异常与堆栈。单条日志不能证明存储事务已提交；应核对持久状态及对应审计证据。
 
 ## 首次安装拒绝代理请求 {#setup-proxy-refused}
 
@@ -19,7 +27,7 @@ updated: 2026-10-20
 **开始之前。**
 
 - 源码检出在仓库根目录操作，发布构建在发布目录操作。
-- 本地检查时，把 `.env.example` 复制为被 git 忽略的 `.env`，并把 `BFF_MYSQL_PASSWORD` 设为非空的临时值。即使禁用 MySQL，profile 插值也需要这个变量。
+- 使用隔离内存补丁的本地检查不需要 `.env` 或数据库设置。只有刻意启用 MySQL 的部署才需要把 `.env.example` 复制为被 git 忽略的 `.env`。
 - 本页所有本地 Host 命令都带 `--patch tools/local-checks/isolated-memory.patch.yaml`。该补丁禁用 `persistence.mysql` 并启用 `persistence.memory`，因此开发者自己的 `.env` 或本地补丁不会把服务器指向真实数据库。
 - 先读第一个错误，每次只改一处，并保留失败输出。
 
@@ -64,11 +72,11 @@ updated: 2026-10-20
 
 ### 环境变量没有值
 
-**症状。** `error: File '<file>', row '<row id>': environment variable '<NAME>' is not set and has no default.` **检查。** 在错误所指的 profile、bundle 或补丁中查找没有 `:-default` 的 `${NAME}`，然后检查 `.env` 和进程环境。除 `start` 外，每个命令都会在组合 profile 之前把仓库根目录的 `.env` 应用到未设置的进程变量；已存在的环境变量优先。**可能原因。** 变量既没有导出也不在 `.env` 中，而 `BFF_MYSQL_PASSWORD` 没有默认值，因此任何游戏或管理 profile 都无法在缺少它时完成组合。**修复。** 为该命令设置变量，或写入被 git 忽略的 `.env`；绝不提交真实凭证。**确认恢复。** 组合成功，`--dump-config` 打印生效的行。
+**症状。** `error: File '<file>', row '<row id>': environment variable '<NAME>' is not set and has no default.` **检查。** 在错误所指的 profile、bundle 或补丁中查找没有 `:-default` 的 `${NAME}`，然后检查 `.env` 和进程环境。除 `start` 外，每个命令都会在组合 profile 之前把仓库根目录的 `.env` 应用到未设置的进程变量；已存在的环境变量优先。**可能原因。** 变量既没有导出也不在 `.env` 中，而某个启用的行读取它且没有默认值，例如 `persistence.mysql` 读取 `BFF_MYSQL_PASSWORD`。被 profile 或 `--patch` 禁用的行不需要它的任何变量。**修复。** 为该命令设置变量，或写入被 git 忽略的 `.env`；绝不提交真实凭证。**确认恢复。** 组合成功，`--dump-config` 打印生效的行。
 
 ### MySQL 密码为空
 
-**症状。** `error: Activation of row 'persistence.mysql' (plugin 'persistence.mysql') failed: Invalid configuration for row 'persistence.mysql': connection_string is missing Password (BFF_MYSQL_PASSWORD is required and must not be empty).` **检查。** 复制来的 `.env.example` 含有 `BFF_MYSQL_PASSWORD=`，因此插值会以空字符串成功，失败只会在该行激活时出现。**可能原因。** `.env` 中留下了空占位值。**修复。** 本地检查使用非空的临时值，并加上隔离补丁以免连接数据库；真实凭证只用于刻意配置的持久化部署。**确认恢复。** 加上隔离补丁后，`persistence.memory` 激活，日志报告内存持久化已启用。
+**症状。** `error: Activation of row 'persistence.mysql' (plugin 'persistence.mysql') failed: Invalid configuration for row 'persistence.mysql': connection_string is missing Password (BFF_MYSQL_PASSWORD is required and must not be empty).` **检查。** 复制来的 `.env.example` 含有 `BFF_MYSQL_PASSWORD=`，因此插值会以空字符串成功，失败只会在该行激活时出现。**可能原因。** `.env` 中留下了空占位值。**修复。** 使用真实 MySQL 数据库时设置其密码。本地检查则改为加上隔离补丁：它会禁用 MySQL 行，该行随之不再需要密码。**确认恢复。** 加上隔离补丁后，`persistence.memory` 激活，日志报告内存持久化已启用。
 
 ### profile、补丁或选项名写错
 
@@ -93,11 +101,11 @@ dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile 
 每次启动尝试后，每个行都会发布状态。从控制台日志或管理 API 读取：
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:8080/api/plugins | Select-Object rowId, plugin, state, error
+Invoke-RestMethod http://127.0.0.1:7300/api/plugins | Select-Object rowId, plugin, state, error
 ```
 
 ```sh
-curl -s http://127.0.0.1:8080/api/plugins
+curl -s http://127.0.0.1:7300/api/plugins
 ```
 
 `/api/plugins` 为每个运行时实例返回一个对象，字段包括 `rowId`、`plugin`、`source`、`state`、`error`、`codeRefreshPolicy`、`codeLifetime`、`restartRequiredForReclamation`、`isRetiring`、`overrides`、`version`、`contractVersions` 和 `supportedBuilds`。只有 `Active` 是健康的运行状态。
@@ -153,7 +161,7 @@ curl -s http://127.0.0.1:8080/api/plugins
 
 ### 管理 API 或 WebUI 无法访问或未授权
 
-**症状。** 浏览器打不开 WebUI，或 `/api/...` 返回 401 和 `{"error":"unauthorized"}`。**检查。** 管理行绑定 `${BFF_ADMIN_HOST:-127.0.0.1}:${BFF_ADMIN_PORT:-8080}`，默认为回环。以 `start` 启动的服务器对每个受保护的 `/api` 请求都要求已登录的管理员会话；`/health` 和 WebUI 文件保持开放。首次安装期间，在管理员账号建立之前 `/api/plugins` 会返回 401——这是认证模型，而非服务器故障；`/health` 和 `/api/setup/status` 仍可访问。**可能原因。** 监听器在回环上而浏览器在别处、会话已过期、给 `run --profile` 服务器配置了非回环地址（它没有账号，会拒绝该地址），或非回环的安装监听器未配置引导令牌。**修复。** 重新登录；在以 `start` 启动的服务器上，把 `BFF_ADMIN_HOST` 设为所需接口，并为非回环的安装监听器将 `bootstrap_token`（`BFF_SETUP_TOKEN`）设为至少 32 个字符。否则该行会以 `A non-loopback installation listener requires an explicit bootstrap_token of at least 32 characters.` 失败。**确认恢复。** `/health` 返回 `{"status":"ok", ...}`，且登录后的 WebUI 列出插件。
+**症状。** 浏览器打不开 WebUI，或 `/api/...` 返回 401 和 `{"error":"unauthorized"}`。**检查。** 以 `start` 启动的服务器绑定 `${BFF_ADMIN_HOST:-0.0.0.0}:${BFF_ADMIN_PORT:-7300}`，每个受保护的 `/api` 请求都需要已登录的管理员会话；`/health` 和 WebUI 文件保持开放。首次安装期间，在管理员账号创建之前 `/api/plugins` 返回 401——这是认证模型，不是服务器故障；`/health` 和 `/api/setup/status` 仍可访问。`run --profile` 服务器绑定回环地址。**可能原因。** 会话过期；`BFF_ADMIN_HOST` 让监听留在回环地址而浏览器在别处；给 `run --profile` 服务器设置了非回环地址（它没有账号，会拒绝）；或 `BFF_ADMIN_ALLOWED_HOSTS` 没有列出浏览器使用的名称（在可访问地址上留空则接受任何名称）。只有设置了 `BFF_SETUP_TOKEN` 时，远程安装才会返回 403 `bootstrap_token_required`。**修复。** 重新登录；使用服务器地址，或让 `BFF_ADMIN_HOST` 和 `BFF_ADMIN_ALLOWED_HOSTS` 与之匹配；发送已配置的安装令牌，或清空 `BFF_SETUP_TOKEN`。**确认恢复。** `/health` 返回 `{"status":"ok", ...}`，登录后的 WebUI 列出插件。
 
 ## 持久化与迁移
 

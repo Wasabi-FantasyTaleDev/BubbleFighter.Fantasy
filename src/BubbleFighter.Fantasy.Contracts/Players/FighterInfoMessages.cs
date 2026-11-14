@@ -1,6 +1,7 @@
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Inventory;
 using BubbleFighter.Fantasy.Contracts.Progress;
+using BubbleFighter.Fantasy.Contracts.Rooms;
 using BubbleFighter.Fantasy.Contracts.Sessions;
 
 namespace BubbleFighter.Fantasy.Contracts.Players;
@@ -37,6 +38,16 @@ public sealed class FighterAppearance
     /// <param name="characterItemId">The selected character item, 300000 plus its native type.</param>
     /// <param name="equippedItemIds">The owned, unexpired worn items, including the selected character.</param>
     public FighterAppearance(int characterItemId, IReadOnlyList<int> equippedItemIds)
+        : this(characterItemId, equippedItemIds, [])
+    {
+    }
+
+    /// <summary>Copies a complete inspected appearance together with its instance modifiers.</summary>
+    /// <param name="characterItemId">The selected character item, 300000 plus its native type.</param>
+    /// <param name="equippedItemIds">The owned, unexpired worn items, including the selected character.</param>
+    /// <param name="itemAttributes">Instance modifiers derived from the same inspected inventory; an empty vector clears cached modifiers.</param>
+    public FighterAppearance(int characterItemId, IReadOnlyList<int> equippedItemIds,
+        IReadOnlyList<RoomItemAttribute> itemAttributes)
     {
         ArgumentNullException.ThrowIfNull(equippedItemIds);
         if (characterItemId is < 300001 or > 300031)
@@ -49,7 +60,9 @@ public sealed class FighterAppearance
             || copy.Count(id => id is >= 300001 and <= 300031) != 1)
             throw new ArgumentException("A fighter appearance requires one character first and distinct positive worn items.", nameof(equippedItemIds));
         CharacterItemId = characterItemId;
-        EquippedItemIds = Array.AsReadOnly(copy);
+        var snapshot = new RoundEquipmentSnapshot(copy, itemAttributes);
+        EquippedItemIds = snapshot.WornItemIds;
+        ItemAttributes = snapshot.ItemAttributes;
     }
 
     /// <summary>Gets the selected character's inventory identity.</summary>
@@ -57,4 +70,7 @@ public sealed class FighterAppearance
 
     /// <summary>Gets the copied worn identities, with the selected character first.</summary>
     public IReadOnlyList<int> EquippedItemIds { get; }
+
+    /// <summary>Gets bounded instance modifiers with copied value vectors from the inspected worn snapshot.</summary>
+    public IReadOnlyList<RoomItemAttribute> ItemAttributes { get; }
 }

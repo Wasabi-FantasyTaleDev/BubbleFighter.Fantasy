@@ -1654,10 +1654,11 @@ opcodes:
     source: "cn-404 dispatcher sub_7EC320 case 952 (Packet_gspResRandomMissionInfo); Packet_gspResRandomMissionInfo reader and writer bodies match id-400's"
   - value: 955
     direction: s2c
+    connection: game
     name: gspEvolveResult
     name_source: label@cn-404
-    evidence: inferred
-    source: "cn-404 dispatcher sub_7EC320 case 955 (Packet_gspEvolveResult); Packet_gspEvolveResult reader and writer bodies match id-400's"
+    evidence: verified
+    source: "cn-404 dispatcher sub_7EC320 case 955; cn-404 sub_7C7100 reads u32 outcome, u32 pet item id and one unused u32; cn-404 sub_7E9E30 consumes the installed pet state"
   - value: 958
     direction: s2c
     connection: game

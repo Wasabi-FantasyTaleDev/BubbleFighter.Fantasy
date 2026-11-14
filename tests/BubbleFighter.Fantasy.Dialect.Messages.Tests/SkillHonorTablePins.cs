@@ -57,11 +57,11 @@ public sealed class SkillHonorTablePins
     {
         var body = PacketCodec.Write(Tables, "kr-1256", "FavoriteWeaponGrade", new Dictionary<string, object?>
         {
-            ["unknown_0"] = true,
+            ["flag"] = true,
             ["unknown_4"] = 0x1122334455667788L,
-            ["unknown_12"] = 3,
-            ["unknown_16"] = 4,
-            ["unknown_20"] = 5,
+            ["item_id"] = 3,
+            ["old_grade"] = 4,
+            ["new_grade"] = 5,
         });
         Assert.Equal(24, body.Length);
         Assert.Equal("010000008877665544332211030000000400000005000000", Convert.ToHexString(body));
@@ -71,6 +71,17 @@ public sealed class SkillHonorTablePins
         Assert.Equal(body, PacketCodec.Write(Tables, "kr-1256", "FavoriteWeaponGrade", fields));
         Assert.Throws<PacketFormatException>(() => PacketCodec.Read(Tables, "kr-1256", "FavoriteWeaponGrade", body[..^1]));
         Assert.Throws<PacketFormatException>(() => PacketCodec.Read(Tables, "kr-1256", "FavoriteWeaponGrade", [.. body, 0]));
+    }
+
+    /// <summary>The binding writes the zero-flag grade branch with the discarded eight-byte word zero, and refuses a notice that changes nothing.</summary>
+    [Fact]
+    public void GradeNoticeEncodesTheZeroFlagBranch()
+    {
+        var body = FavoriteWeaponGradeBinding.Encode(Tables, "kr-1256", new(202020, 1, 2));
+        Assert.Equal("00000000" + "0000000000000000" + Convert.ToHexString(BitConverter.GetBytes(202020)) + "01000000" + "02000000", Convert.ToHexString(body));
+        Assert.Equal(24, body.Length);
+        Assert.Throws<ArgumentException>(() => FavoriteWeaponGradeBinding.Encode(Tables, "kr-1256", new(202020, 2, 2)));
+        Assert.Throws<ArgumentException>(() => FavoriteWeaponGradeBinding.Encode(Tables, "kr-1256", new(0, 1, 2)));
     }
 
     /// <summary>

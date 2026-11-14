@@ -4,11 +4,12 @@ using System.Runtime.CompilerServices;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Net;
 using BubbleFighter.Fantasy.Contracts.Cluster;
+using BubbleFighter.Fantasy.Contracts.Signals;
 
 namespace BubbleFighter.Fantasy.Cluster;
 
 /// <summary>Publishes the destination's bounded table of accepted logged-in migrations.</summary>
-[Plugin("cluster.migration-arrivals", Description = "One-use, address-bound arrivals for native logged-in migration.",
+[Plugin("cluster.migration-arrivals", Category = "cluster", Names = ["en=Room migration arrivals", "zh-Hans=房间迁移到达", "zh-Hant=房間遷移抵達", "ko=방 이동 도착"], Description = "One-use, address-bound arrivals for native logged-in migration.",
     Provides = [typeof(IMigrationArrivals), typeof(IMigrationArrivalCleanup)])]
 public sealed class MigrationArrivalsPlugin : IPlugin
 {
@@ -39,6 +40,10 @@ internal sealed class MigrationArrivals(int capacity, TimeProvider clock) : IMig
     private readonly Dictionary<(string Build, long User), Pending> _byAccount = [];
     // Weak keys retain no connection beyond its transport lifetime; each bounded live connection has one observation.
     private readonly ConditionalWeakTable<IConnection, AcceptedListener> _listeners = new();
+    // Present while any arrival, pending or retired, is held; the destination's clean-up sleeps on it.
+    private readonly PresenceSignal _tracked = new();
+
+    public Task WhenAnyTracked() => _tracked.WhenPresent;
 
     internal void Observe(ConnectionAcceptedEvent accepted)
     {
@@ -76,6 +81,7 @@ internal sealed class MigrationArrivals(int capacity, TimeProvider clock) : IMig
             var pending = new Pending(arrival, Normalize(request.ClientAddress), clock.GetTimestamp());
             _byMigration.Add(request.MigrationId, pending);
             _byAccount.Add((request.ClientBuild, request.UserNum), pending);
+            _tracked.Refresh(() => _byMigration.Count != 0);
         }
     }
 
@@ -152,6 +158,7 @@ internal sealed class MigrationArrivals(int capacity, TimeProvider clock) : IMig
     {
         _byMigration.Remove(pending.Arrival.Request.MigrationId);
         _byAccount.Remove((pending.Arrival.Request.ClientBuild, pending.Arrival.Request.UserNum));
+        _tracked.Refresh(() => _byMigration.Count != 0);
     }
 
     private sealed record Pending(MigrationArrival Arrival, IPAddress Address, long Created)

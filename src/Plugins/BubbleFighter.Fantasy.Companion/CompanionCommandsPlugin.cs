@@ -7,8 +7,9 @@ using BubbleFighter.Fantasy.Contracts.Sessions;
 namespace BubbleFighter.Fantasy.Companion;
 
 /// <summary>Routes launch-bound command requests through the player's existing gameplay command input.</summary>
-[Plugin("companion.commands", Requires = [typeof(ICompanionHub)],
-    OptionalMany = [typeof(IGameCommandInput), typeof(IGameSessionStateReader)])]
+[Plugin("companion.commands", Category = "launcher", Names = ["en=Nirinsou Link commands", "zh-Hans=Nirinsou Link 命令", "zh-Hant=Nirinsou Link 指令", "ko=Nirinsou Link 명령"], Requires = [typeof(ICompanionHub)],
+    // Each build's gameplay owner comes and goes with the build; reading them live keeps the launcher channel up.
+    LiveMany = [typeof(IGameCommandInput), typeof(IGameSessionStateReader)])]
 public sealed class CompanionCommandsPlugin : IPlugin
 {
     /// <inheritdoc />

@@ -54,6 +54,13 @@ public sealed record PluginDescriptor(string Id, string? Description, Type? Type
 
     /// <summary>Gets a defensive copy of the definition's service and dependency declaration.</summary>
     public PluginAttribute Declaration => Snapshot(_declaration ?? throw new ConfigException($"Plugin '{Id}' has no declaration."));
+
+    /// <summary>
+    /// Gets the validated declaration this descriptor captured, without copying it. The kernel's scheduling reads a
+    /// declaration for every pair of rows it orders, and a copy per read allocated tens of megabytes while a
+    /// many-build profile started. Callers only read it; anything handed to plugin code uses <see cref="Declaration"/>.
+    /// </summary>
+    internal PluginAttribute ReadOnlyDeclaration => _declaration ?? throw new ConfigException($"Plugin '{Id}' has no declaration.");
     /// <summary>Gets the factory responsible for creating and refreshing backend executions.</summary>
     public IPluginExecutionFactory ExecutionFactory => _factory ?? throw new ConfigException($"Plugin '{Id}' has no execution factory.");
     /// <summary>Gets the captured backend key used to serialize overlapping module operations.</summary>
@@ -64,6 +71,32 @@ public sealed record PluginDescriptor(string Id, string? Description, Type? Type
     public IReadOnlyDictionary<string, string> ContractVersions => _contractVersions;
     /// <summary>Gets the declared executable build intervals.</summary>
     public IReadOnlyList<string> SupportedBuilds => Array.AsReadOnly(Declaration.SupportedBuilds);
+
+    /// <summary>Gets the optional display names the plugin declares, keyed by language; empty when it declares none.</summary>
+    public IReadOnlyDictionary<string, string> DisplayNames => _declaration is null ? EmptyNames : ParseNames(_declaration);
+
+    /// <summary>Gets the optional administration group the plugin declares.</summary>
+    public string? Category => _declaration?.Category;
+
+    private static readonly IReadOnlyDictionary<string, string> EmptyNames = new ReadOnlyDictionary<string, string>(new Dictionary<string, string>());
+
+    // Each entry is "language=name" with a language tag such as en, zh-Hans or ko. A malformed entry is a declaration
+    // error, reported when the plugin is discovered rather than shown as a broken name.
+    private static IReadOnlyDictionary<string, string> ParseNames(PluginAttribute value)
+    {
+        if (value.Names.Length == 0) return EmptyNames;
+        var names = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var entry in value.Names)
+        {
+            var split = entry?.IndexOf('=') ?? -1;
+            var language = split > 0 ? entry![..split].Trim() : "";
+            var name = split > 0 ? entry![(split + 1)..].Trim() : "";
+            if (!System.Text.RegularExpressions.Regex.IsMatch(language, "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$") || name.Length is 0 or > 80 ||
+                name.Any(char.IsControl) || !names.TryAdd(language, name))
+                throw new ConfigException($"Plugin '{value.Id}' declares an invalid name '{entry}': use one 'language=name' entry per language.");
+        }
+        return new ReadOnlyDictionary<string, string>(names);
+    }
 
     internal PluginDescriptor ResolveExecution(IPluginExecution execution)
     {
@@ -111,14 +144,18 @@ public sealed record PluginDescriptor(string Id, string? Description, Type? Type
             }
     }
 
+    private static string[] ValidNames(PluginAttribute value) { ParseNames(value); return value.Names.ToArray(); }
+
     private static PluginAttribute Snapshot(PluginAttribute value) => new(value.Id)
     {
         Description = value.Description, SupportedBuilds = value.SupportedBuilds.ToArray(),
+        Names = ValidNames(value), Category = value.Category,
         SupportedFamilies = value.SupportedFamilies.ToArray(),
         Requires = CopyContracts(value.Id, nameof(PluginAttribute.Requires), value.Requires),
         RequiresMany = CopyContracts(value.Id, nameof(PluginAttribute.RequiresMany), value.RequiresMany),
         Optional = CopyContracts(value.Id, nameof(PluginAttribute.Optional), value.Optional),
         OptionalMany = CopyContracts(value.Id, nameof(PluginAttribute.OptionalMany), value.OptionalMany),
+        LiveMany = CopyContracts(value.Id, nameof(PluginAttribute.LiveMany), value.LiveMany),
         Provides = CopyContracts(value.Id, nameof(PluginAttribute.Provides), value.Provides),
         ProvidesMany = CopyContracts(value.Id, nameof(PluginAttribute.ProvidesMany), value.ProvidesMany),
         ConditionalProvides = CopyContracts(value.Id, nameof(PluginAttribute.ConditionalProvides), value.ConditionalProvides),

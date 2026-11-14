@@ -12,19 +12,27 @@ experimental: true
 parent: cn-774
 description: Taiwanese 2019 client build, ClientVersion_Major 454.
 vars:
-  # No audited native server notice consumer; rejected home returns remain logged.
-  MIGRATION_HOME_NOTICE: "false"
   # The game port players reach; the migration destination advertises it.
   GAME_PUBLIC_PORT: "${TW_454_PUBLIC_PORT:-7200}"
   BFF_MODERN_RELAY_PORT: "${TW_454_RELAY_PORT:-7201}"
   BFF_MODERN_RELAY_PUBLIC_PORT: "${TW_454_RELAY_PUBLIC_PORT:-7201}"
 bundles:
   - core
+  - relay-latency
   - tw-454
   - player-settings
   - modern-plaza
   - modern-commerce
 patches:
   - patch.yaml
+  # Every audited mode is on by default.
+  - bomb.patch.yaml
+  - captain.patch.yaml
+  - script-zombies.patch.yaml
+  - rhea-character-skill.patch.yaml
+  - ../bundles/zombie-escape.patch.yaml
+  - ../bundles/modern-room-kicking.patch.yaml
+  - ../bundles/defence-seeds.patch.yaml
+  - modes.patch.yaml
   # Optional developer override; git-ignored and skipped when absent.
   - local.patch.yaml

@@ -1,0 +1,17 @@
+# Included by the build profile: the audited BnB exchange for this native village map; client acceptance remains required.
+- set:
+    id: dialect.rooms
+    config:
+      bnb: true
+      result_scoreboard_modes: [1, 5, 6, 8, 19, 20, 23, 24, 25, 28, 30, 32, 41, 45]
+- set:
+    id: ingame
+    config:
+      bnb: true
+      native_match_relay: true
+      native_life_every_mode: true
+      bnb_stages:
+        - stage_directory: rel_bnb01_village06
+          # kr-1256 sub_109A880 bounds the original TileLayer vertices; kr-1256 sub_7AEBB0 adds the JSON offset later.
+          tile_layer_minimum_x: 163.96731567382812
+          tile_layer_maximum_z: 392.6912841796875

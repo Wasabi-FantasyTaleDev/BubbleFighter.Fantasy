@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><Description>Ban-pick: server-wide ban policies and room host bans on weapons, clothes, characters and pets, with optional Nirinsou Link overlay messages.</Description></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\BubbleFighter.Fantasy.Abstractions\BubbleFighter.Fantasy.Abstractions.csproj" />
+    <ProjectReference Include="..\..\BubbleFighter.Fantasy.Contracts\BubbleFighter.Fantasy.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="BubbleFighter.Fantasy.BanPick.Tests" />
+  </ItemGroup>
+</Project>

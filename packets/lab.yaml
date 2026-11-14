@@ -1,8 +1,9 @@
 version: 1
-# Modern science-lab operation bodies. Requests use the shared class written by
+# Science-lab operation bodies. Modern requests use the shared class written by
 # kr-1256 sub_114B300, cn-774 sub_48CE60 and tw-454 sub_479B90; the operation's
 # dialog selects the opcode. Opcode tables record each build's independent assignments.
-# The runtime option answers closed. Recipes, costs, results and item mutations are absent.
+# The earlier CN laboratory uses word-sized item identifiers and two reply vectors.
+# Layout coverage alone does not admit a build to a feature's successful mutation path.
 structs:
 
   # C2S RequestScienceLab (kr-1256 vtable 0x163be5c, writer kr-1256 sub_114B300, reader
@@ -16,11 +17,22 @@ structs:
     - argument: u64
       offset: 16
 
+  # cn-735 sub_41B700 and cn-738 sub_41D560 write counted u32 identifiers and one u32
+  # argument. cn-742 sub_421C40 calls cn-742 sub_42E010 for that same counted word list.
+  # cn-735 sub_593AB0 registers gcpReqEnchant; cn-735 sub_592B50 selects its target IDs.
+  ScienceLabRequest@cn-735:
+    - keys: list<u32>
+      offset: 4
+    - argument: u32
+      offset: 20
+
   # kr-1256 sub_10E2550 reads result, three counted u64 vectors and a trailing u64.
   # cn-774 sub_BD8070 and tw-454 sub_AB45B0 read the same body via counted u64
   # helpers cn-774 sub_48DB40 and tw-454 sub_47ABA0. The closed result is build data:
   # kr-1256 sub_DF5130 uses 5; cn-774 sub_E975C0 and tw-454 sub_E09730 use 4.
-  # Vector meanings remain unproven across operations and retain their object offsets.
+  # kr-1256 sub_9C5F10 passes the third vector to the Enchant result path.
+  # kr-1256 sub_DF9DA0 resolves its Article references after inventory publication.
+  # Meanings across other operations remain unproven, so shared fields retain their object offsets.
   ScienceLabReply:
     - result: u32
       offset: 0
@@ -30,6 +42,19 @@ structs:
       offset: 16
     - unknown_28: list<u64>
       offset: 28
+    - unknown_40: u64
+      offset: 40
+
+  # cn-735 sub_41B810, cn-738 sub_41D670 and cn-742 sub_421D10 consume two word lists.
+  # The tail is eight bytes, unlike the four-byte argument in the corresponding request.
+  # cn-735 sub_A3D0E0, cn-738 sub_A66060 and cn-742 sub_9AA450 use closed result 4.
+  ScienceLabReply@cn-735:
+    - result: u32
+      offset: 4
+    - unknown_8: list<u32>
+      offset: 8
+    - unknown_24: list<u32>
+      offset: 24
     - unknown_40: u64
       offset: 40
 

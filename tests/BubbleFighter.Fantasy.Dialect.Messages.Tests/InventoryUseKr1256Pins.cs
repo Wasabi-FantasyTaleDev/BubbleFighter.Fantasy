@@ -27,7 +27,7 @@ public sealed class InventoryUseKr1256Pins
         Assert.Equal("000000005487010000000000", Convert.ToHexString(body));
     }
 
-    /// <summary>A request that carried more than one parameter is answered with result 1 and no parameters.</summary>
+    /// <summary>A refused action is answered with result 1 and no parameters.</summary>
     [Fact]
     public void RefusedReplyWithTwoRequestParametersIsPinned()
     {

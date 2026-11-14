@@ -16,6 +16,20 @@ namespace BubbleFighter.Fantasy.Contracts.Rooms;
 public sealed record PlazaMember(int Slot, int UserNumber, string Nickname, int Level, int CharacterItemId,
     IReadOnlyList<int> EquippedItemIds, int EntrySeed = 0)
 {
+    private IReadOnlyList<RoomItemAttribute> _itemAttributes = [];
+
+    /// <summary>Gets copied instance modifiers from the same snapshot as the worn item identities.</summary>
+    public IReadOnlyList<RoomItemAttribute> ItemAttributes
+    {
+        get => _itemAttributes;
+        init
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            _itemAttributes = value.Count == 0 ? Array.Empty<RoomItemAttribute>()
+                : new Progress.RoundEquipmentSnapshot(EquippedItemIds, value).ItemAttributes;
+        }
+    }
+
     /// <summary>Gets the player's committed avatar material color.</summary>
     public ushort ColorIndex { get; init; }
 

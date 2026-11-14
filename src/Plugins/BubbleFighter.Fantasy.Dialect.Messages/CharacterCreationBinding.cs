@@ -14,12 +14,14 @@ namespace BubbleFighter.Fantasy.Dialect.Messages;
 /// (<c>gspNotifyCreateUserInfo</c>, <c>Unknown33</c>) and the legacy family (<c>gspNotifyAutoTutorial_</c>,
 /// <c>gcpLoginAfterCreateUserInfo</c>), so each is resolved by the single name the build's table states.
 /// </summary>
-internal sealed class CharacterCreationBinding(string protocol, IOpcodeTable opcodes, PacketTables tables, string build)
+internal sealed class CharacterCreationBinding(string protocol, IOpcodeTable opcodes, PacketTables tables, string build,
+    IEventBus? events = null, DynamicConfigWire? configuration = null)
     : IInboundMessageBinding<CharacterNameRequested>, IInboundMessageBinding<CharacterCreateRequested>,
       IInboundMessageBinding<CharacterLoginRequested>, IMessageSender<CharacterCreationOpened>,
       IMessageSender<CharacterNameReplied>, IMessageSender<CharacterCreateReplied>
 {
-    private readonly DynamicConfigWire _configuration = new(tables, build);
+    private readonly DynamicConfigWire _configuration = configuration ?? new(tables, build, protocol);
+    private IEventBus? _events = events;
 
     /// <summary>The S2C creation-opened names; the client reads no field of this frame on either family.</summary>
     internal static readonly string[] OpenNames = ["gspNotifyAutoTutorial_", "gspNotifyCreateUserInfo"];
@@ -31,6 +33,7 @@ internal sealed class CharacterCreationBinding(string protocol, IOpcodeTable opc
 
     internal void Bind(IPluginContext context, IMessageRouter messages)
     {
+        _events ??= context.Events;
         ValidateLayouts();
         var nameRequest = ResolveNameRequestOpcode(opcodes);
         var openName = ResolveSingleName(OpenNames, PacketDirection.ServerToClient, "creation opened");
@@ -103,9 +106,11 @@ internal sealed class CharacterCreationBinding(string protocol, IOpcodeTable opc
     // field, so both families send the zero-length body the table states, not a code-side assumption.
     public async ValueTask SendAsync(ISession session, CharacterCreationOpened message, CancellationToken ct)
     {
+        var settings = _events is null ? null
+            : await DynamicConfigWire.ResolvePetConfigurationAsync(_events, protocol, ct).ConfigureAwait(false);
         // kr-1256 sub_53D410 reads the content when constructing the stage; a later reply cannot repair its form.
-        if (_configuration.HasCreationContent)
-            await session.SendAsync(opcodes.S2C("gspRepDynamicConfig"), _configuration.CreationSnapshot(), ct).ConfigureAwait(false);
+        if (_configuration.HasCreationContent || settings is not null)
+            await session.SendAsync(opcodes.S2C("gspRepDynamicConfig"), _configuration.CreationSnapshot(settings), ct).ConfigureAwait(false);
         await session.SendAsync(opcodes.S2C(ResolveSingleName(OpenNames, PacketDirection.ServerToClient, "creation opened")),
             Write("CharacterCreationOpened", new Dictionary<string, object?>(StringComparer.Ordinal)), ct).ConfigureAwait(false);
     }

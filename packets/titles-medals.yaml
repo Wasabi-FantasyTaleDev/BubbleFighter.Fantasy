@@ -1,79 +1,172 @@
 version: 1
-# Title and medal packet bodies. These tables do not register routes, grant medals or change a title.
-# The title workbook is Config/BF_title.xml (sheets title, title_dec, medal, bonus, program, P2); its
-# `title` sheet maps a title id to a medal id plus the required count, so those ids are the catalogue's
-# identifiers. What the packet bodies below carry is not proven: the first word of both requests is
-# built from a session-derived XOR value (kr-812 sub_886040, kr-812 sub_885F80), the reply words'
-# meanings are unproven, and the reply string's provenance is unknown. Only the widths, order and
-# counted shapes are proven; every field name stays unknown_<offset> until the client's consuming path
-# assigns a meaning.
+# Title definitions, inventory ownership and medal balances are separate native state.
+# Config/BF_title.xml maps title_id to Stock_id and medal requirements. The make/set replies refresh
+# installed inventory; TitleSyncInfo instead sets catalogue conceal flags and must never carry ownership.
+# Table coverage alone does not activate a title route or establish another build's state lifecycle.
 structs:
-  # C2S gcpMakeUserTitle: kr-812 sub_886040 builds Packet_gcpMakeUserTitle (kr-812 vtable 0xD753C4,
-  # codec kr-812 sub_6DB1B0 reading two words) and stamps C2S 929 through kr-812 sub_B25E90 after
-  # writing two words. The modern family has no row that proves a make-title request.
+  # C2S 929: kr-812 sub_885020 selects the title definition; kr-812 sub_886040 writes two words.
+  # The first is the local user number installed by kr-812 sub_818680 -> kr-812 sub_812470 from LoginReply.
+  # kr-1256 sub_EAE090 emits C2S 925 with the same two words after the medal-claim confirmation.
   MakeTitleRequest:
-    - unknown_4: u32
+    - user_number: u32
       offset: 4
-      except: [kr-1256, cn-774, tw-454]
-    - unknown_8: u32
+      except: [cn-774, tw-454]
+    - title_id: u32
       offset: 8
-      except: [kr-1256, cn-774, tw-454]
+      except: [cn-774, tw-454]
 
-  # C2S gcpSetUserTitle: kr-812 sub_885F80 builds Packet_gcpSetUserTitle (kr-812 vtable 0xD753D0,
-  # codec kr-812 sub_9D95D0 reading three words) and stamps C2S 930 through kr-812 sub_B25E90 after
-  # writing three words.
+  # C2S 930: kr-812 sub_885020 -> kr-812 sub_885F80; shared three-word codec kr-812 sub_9D95D0.
+  # kr-812 sub_886220 checks the mapped stock's installed inventory flags before action 0/1.
+  # kr-1256 sub_EAE090 -> kr-1256 sub_EA93B0 -> kr-1256 sub_9403D0 emits C2S 926 in the same order.
   SetTitleRequest:
-    - unknown_4: u32
+    - user_number: u32
       offset: 4
-      except: [kr-1256, cn-774, tw-454]
-    - unknown_8: u32
+      except: [cn-774, tw-454]
+    - action: u32                 # 0 equips; 1 removes the selected title.
       offset: 8
-      except: [kr-1256, cn-774, tw-454]
-    - unknown_12: u32
+      except: [cn-774, tw-454]
+    - title_id: u32
       offset: 12
-      except: [kr-1256, cn-774, tw-454]
+      except: [cn-774, tw-454]
 
-  # S2C gspResMakeUserTitle (kr-812 S2C 933): reader kr-812 sub_8B9660 reads two 4-byte words and then
-  # a counted UTF-16 string through kr-812 sub_A56D70.
+  # S2C 933: reader kr-812 sub_8B9660; consumer kr-812 sub_8230F0 refreshes installed inventory.
+  # Result 3 uses MakeTitleRewardReply below. kr-1256 sub_9B0F70 ordinary success instead passes the
+  # second word to kr-1256 sub_432F80 (title_id lookup) for its title-acquisition presentation/telemetry.
   MakeTitleReply:
-    - unknown_4: u32
+    - result: u32                # 0 ordinary success; 3 reward dialog; -3 missing title; -10 unavailable interval.
       offset: 4
-      except: [kr-1256, cn-774, tw-454]
-    - unknown_8: u32
+      except: [cn-774, tw-454]
+    - stock_id: u32             # The kr-812 ordinary-success consumer does not use this word.
       offset: 8
-      except: [kr-1256, cn-774, tw-454]
+      except: [cn-774, tw-454]
+      kr-1256:
+        - title_id: u32
+          offset: 4
+    - unknown_12: wstr           # kr-812 sub_8230F0 and kr-1256 sub_9B0F70 ignore this on ordinary success/refusal.
+      offset: 12
+      except: [cn-774, tw-454]
+
+  # Result 3 of the make-title reply opens DlgTitleBox in both builds. kr-812 sub_896C80 -> kr-812 sub_4FDC70
+  # and kr-1256 sub_629480 -> kr-1256 sub_432FD0 resolve Stock_id (+108 and +104 respectively).
+  # kr-1256 sub_9B0F70 later reuses this word as title_id for telemetry; that conflicting lookup must
+  # not replace the Stock_id required by the visible reward consumer.
+  MakeTitleRewardReply:
+    - result: u32
+      offset: 4
+      except: [cn-774, tw-454]
+    - stock_id: u32
+      offset: 8
+      except: [cn-774, tw-454]
+    # kr-812 sub_896C80 uses this prefix for type 11; kr-1256 sub_629480 specializes title 400080.
+    # Their authoritative text source is unresolved; supported ordinary titles leave the prefix empty.
     - unknown_12: wstr
       offset: 12
-      except: [kr-1256, cn-774, tw-454]
+      except: [cn-774, tw-454]
 
-  # S2C gspResSetUserTitle (kr-812 S2C 934): reader kr-812 sub_9D95D0 reads three 4-byte words.
+  # S2C 934: reader kr-812 sub_9D95D0; consumer kr-812 sub_823640 refreshes already installed worn flags.
   SetTitleReply:
-    - unknown_4: u32
+    - result: u32                # 1 equipped; 2 removed; -13 no partner; other values fail the operation.
       offset: 4
-      except: [kr-1256, cn-774, tw-454]
-    - unknown_8: u32
+      except: [cn-774, tw-454]
+    - unknown_8: u32             # kr-812 sub_823640 and kr-1256 sub_9B1680 read but do not consume this word.
       offset: 8
-      except: [kr-1256, cn-774, tw-454]
-    - unknown_12: u32
+      except: [cn-774, tw-454]
+      default: 0
+    - unknown_12: u32            # Unused by the legacy handler; modern kr-1256 sub_9B1680 resolves title_id.
       offset: 12
-      except: [kr-1256, cn-774, tw-454]
+      except: [cn-774, tw-454]
+      default: 0
+      kr-1256:
+        - title_id: u32
+          offset: 8
 
-  # S2C gspTitleSyncInfo (kr-812 S2C 935, kr-1256 S2C 932): reader kr-812 sub_840820 reads a 4-byte
-  # count through kr-812 sub_A56B30 and then that many 4-byte words. The modern family reads the same
-  # counted word list: kr-1256 sub_9B1B40 hands the body to kr-1256 sub_998FB0, whose kr-1256 sub_999C00
-  # reads a 4-byte count and then the words; the modern parser's destination offsets were not read, so
-  # this structure keeps the legacy offsets.
+  # S2C 935: reader kr-812 sub_840820. Consumer kr-812 sub_8239B0 matches title_id then sets record +105.
+  # kr-812 sub_4FCAB0 loads +105 as conceal; kr-812 sub_885AE0 hides it. Omitted flags are not cleared.
+  # S2C 932: kr-1256 sub_9B1B40 likewise sets record +101; readers kr-1256 sub_998FB0 -> kr-1256 sub_999C00.
   TitleSyncInfo:
-    - unknown_4: "list<u32>"
+    - concealed_title_ids: "list<u32>"
       offset: 4
 
-  # S2C gspProvideMedal (kr-812 S2C 936, kr-1256 S2C 934): the kr-812 class Packet_gspProvideMedal
-  # (kr-812 vtable 0xD6F6B4) uses the shared two-word codec kr-812 sub_6DB1B0. The kr-1256 body was not
-  # decoded here; its handler kr-1256 sub_9B1C70 is tabled only by the dispatcher label.
+  # S2C 936: shared reader kr-812 sub_6DB1B0; kr-812 sub_823A90 looks up medal components by /10000 and
+  # %10000, falling back to an item reward dialog. This presentation does not update the medal balance map.
+  # kr-1256 sub_9B1C70 reads the same two words and follows the same medal/item presentation split.
   ProvideMedal:
-    - unknown_4: u32
+    - reference: u32
       offset: 4
-      except: [kr-1256, cn-774, tw-454]
-    - unknown_8: u32
+      except: [cn-774, tw-454]
+    - unknown_8: u32             # kr-812 sub_823A90 and kr-1256 sub_9B1C70 present only the first word's reference.
       offset: 8
-      except: [kr-1256, cn-774, tw-454]
+      except: [cn-774, tw-454]
+      default: 0
+
+  # C2S 116: kr-812 sub_6C2F80 writes the selected user number. kr-812 sub_5BF890 passes UserSlot +8;
+  # kr-812 sub_8F78B0 -> kr-812 sub_806DB0 finds the same identity at player-array +7440 by nickname.
+  # kr-1256 sub_9446C0 passes the selected player to kr-1256 sub_931B10, which emits C2S 119 as one word.
+  MedalInfoRequest:
+    - target_user_number: u32
+      offset: 4
+      except: [cn-774, tw-454]
+
+  # S2C 125: kr-812 sub_83DC50 reads two words then a counted list of sMedalInfo records.
+  # kr-812 sub_82CEB0 on result 1 replaces the medal map and calls kr-812 sub_6C4C40 to open/refresh title UI.
+  # kr-1256 S2C 134: kr-1256 sub_9BD4F0 -> kr-1256 sub_10CF360 uses the same header and pair list,
+  # replaces the map at inventory manager +148, and opens/refreshes through kr-1256 sub_9337F0.
+  MedalInfoReply:
+    - result: u32
+      offset: 4
+      except: [cn-774, tw-454]
+    - unknown_8: u32             # kr-812 sub_82CEB0 and kr-1256 sub_9BD4F0 use only result and the following medal list.
+      offset: 8
+      except: [cn-774, tw-454]
+      default: 0
+    - medals: "list<TitleMedalCount>"
+      offset: 12
+      except: [cn-774, tw-454]
+
+  # sMedalInfo uses kr-812 sub_6DB1B0; kr-812 sub_82CEB0 installs member +4 as key and +8 as balance.
+  # kr-1256 sub_92A630 reads the same two words; kr-1256 sub_9BD4F0 installs the same key/balance pair.
+  TitleMedalCount:
+    - medal_id: u32
+      offset: 4
+      except: [cn-774, tw-454]
+    - count: u32
+      offset: 8
+      except: [cn-774, tw-454]
+  # S2C 933 gspNotifyUserTitleInstance, kr-1256 only. Dispatcher kr-1256 sub_9D2FF0 case 933 calls kr-1256 sub_9D1350, which reads a
+  # counted list of title records through kr-1256 sub_10CF5D0 (record reader kr-1256 sub_113DC60). The client stores them in a pending
+  # vector, merges them into an open title window and refreshes only when that window exists; it never opens one and carries no ownership.
+  TitleInstanceNotice:
+    - titles: "list<TitleInstance>"
+      only: [kr-1256]
+      except: [cn-774, tw-454]
+
+  # One title record of S2C 933 (kr-1256 sub_113DC60): the title id, two words the client stores at map-node +28 and +32 (the first as a
+  # bool) that no reader of the progress rows consumes (kr-1256 sub_EADF30, sub_EABC60 and sub_EAF010 read only the nested vector), so
+  # they stay unknown, then a counted list of condition rows.
+  TitleInstance:
+    - title_id: u32
+      only: [kr-1256]
+      except: [cn-774, tw-454]
+    - unknown_28: bool
+      only: [kr-1256]
+      except: [cn-774, tw-454]
+    - unknown_32: u32
+      only: [kr-1256]
+      except: [cn-774, tw-454]
+    - conditions: "list<TitleConditionProgress>"
+      only: [kr-1256]
+      except: [cn-774, tw-454]
+
+  # A condition row of S2C 933: kr-1256 sub_EABC60 matches condition_id (read into object +4) against the control's condition kind and calls
+  # kr-1256 sub_EABD50 with required (+8) and current (+12); the draw callback kr-1256 sub_EABE20 (PE 0xEABE20) multiplies the control width by
+  # current and divides by required for the bar and prints "current/required". The words are read in the order condition_id, current, required.
+  TitleConditionProgress:
+    - condition_id: u32
+      only: [kr-1256]
+      except: [cn-774, tw-454]
+    - current: u32
+      only: [kr-1256]
+      except: [cn-774, tw-454]
+    - required: u32
+      only: [kr-1256]
+      except: [cn-774, tw-454]

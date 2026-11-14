@@ -1,0 +1,62 @@
+version: 1
+structs:
+  # cn-279 sub_6FFDE0 case 118 calls cn-279 sub_6FB0C0. Its packet reader
+  # cn-279 sub_44EEE0 -> cn-279 sub_453380 reads a count and EventNoticeItem elements.
+  TutorialPracticeNotice:
+    - events: list<TutorialPracticeEvent>
+      offset: 4
+      only: [cn-279]
+  # cn-279 sub_44DD40 reads the complete EventNoticeItem in this order.
+  # cn-279 sub_6FB0C0 stores rows keyed by object +4; cn-279 sub_787290
+  # looks up key 23 and draws the practice completion marker when object +8 is 1.
+  # The three bytes are kept zero to avoid unrelated event dialogs in cn-279 sub_6FB0C0.
+  TutorialPracticeEvent:
+    - event_id: u32
+      only: [cn-279]
+      offset: 4
+      default: 23
+    - progress: u32
+      only: [cn-279]
+      offset: 8
+    - unknown_12: u8
+      only: [cn-279]
+      offset: 12
+    - unknown_13: u8
+      only: [cn-279]
+      offset: 13
+    - unknown_14: u8
+      only: [cn-279]
+      offset: 14
+    - unknown_16: u32[8]
+      only: [cn-279]
+      offset: 16
+    - unknown_48: wstr
+      only: [cn-279]
+      offset: 48
+    - unknown_52: wstr
+      only: [cn-279]
+      offset: 52
+    - unknown_56: wstr
+      only: [cn-279]
+      offset: 56
+    - unknown_60: wstr
+      only: [cn-279]
+      offset: 60
+    - unknown_64: wstr
+      only: [cn-279]
+      offset: 64
+    - unknown_68: u32
+      only: [cn-279]
+      offset: 68
+    - unknown_72: wstr
+      only: [cn-279]
+      offset: 72
+    - unknown_76: u32
+      only: [cn-279]
+      offset: 76
+    - unknown_80: u32
+      only: [cn-279]
+      offset: 80
+    - unknown_84: list<wstr>
+      only: [cn-279]
+      offset: 84

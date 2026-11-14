@@ -3,6 +3,55 @@ profile: cn-742
 # separate numeric spaces. Login plus main-menu GotoRoom/GotoMenu are wired; shop,
 # tutorial, and plaza are not claimed here. See profiles/opcode-policy.md.
 opcodes:
+  - value: 17
+    direction: c2s
+    connection: relay
+    name: rcpGameStart
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_967130 selects the relay session during native game-start processing and calls cn-742 sub_971AF0, which stamps 17 and sends on that session; matched to kr-812 sub_803590 constructing Packet_rcpGameStart and kr-812 sub_809DA0 stamping 17"
+  - value: 24
+    direction: c2s
+    connection: relay
+    name: rcpCriticalBuffData
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_5F0AF0 constructs CriticalBuffData and selects the relay session; cn-742 sub_614C90 stamps 24 and writes the actor followed by that component; matched to kr-812 sub_5117C0 constructing Packet_rcpCriticalBuffData and kr-812 sub_52DC30 stamping 24"
+  - value: 20006
+    direction: c2s
+    connection: relay
+    name: rcpReqLagDisPing
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_506F30 selects the active relay session for cn-742 sub_97DEA0; cn-742 sub_97E7C0 stamps 20006, writes the native tick as one u32 and sends it on that session; matched to kr-812 sub_8118D0 constructing Packet_rcpReqLagDisPing and kr-812 sub_811EA0 stamping 20006"
+  - value: 21
+    direction: s2c
+    connection: relay
+    name: rspRepLagDisPing
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_97D120 case 0x15 reads one u32 and passes local arrival time to cn-742 sub_5072E0, which clears the pending delay probe; matched to kr-812 sub_810C20 case 0x15 constructing Packet_rspRepLagDisPing and calling kr-812 sub_463300"
+  - value: 103
+    direction: c2s
+    connection: game
+    name: gcpReportUserTracking
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_967CE0 constructs UserTracking and selects the game session at 0x967EB3; cn-742 sub_971DA0 stamps 103, invokes the native tracking writer and sends on that session; matched to kr-812 sub_803DF0 constructing Packet_gcpReportUserTracking and stamping 103"
+  - value: 29
+    direction: c2s
+    connection: relay
+    name: rcpReqHackDataRandomCheck
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_97D120 builds a random report on the relay session; cn-742 sub_97EDA0 installs HackDataRandomCheckData and SessionSignatureData, and cn-742 sub_97E6E0 stamps 29 and sends both components; matched to kr-812 sub_810C20 constructing Packet_rcpReqHackDataRandomCheck and kr-812 sub_811E30 stamping 29"
+  - value: 32889
+    direction: c2s
+    connection: relay
+    name: gppCharactersPlayData
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_601870 reduces a 16-byte character/play digest, stamps 32889 and writes one u32; cn-742 sub_9794D0 selects a relay session and sends through its native session writer; matched to kr-812 sub_51EA10 constructing Packet_gppCharactersPlayData, reducing the character/play digest and stamping 32889"
   - value: 1
     direction: c2s
     name: gcpFirstConnect
@@ -444,6 +493,15 @@ opcodes:
     evidence: verified
     source: "cn-742 sub_95E440 dispatches 613 to cn-742 sub_97A410, which consumes no stream fields and finalizes peer attempts"
 
+  - value: 739
+    direction: s2c
+    connection: game
+    name: gspGamePreCountDown
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-742 sub_5E95E0 dispatches 739 to cn-742 sub_5F5BE0, which reads and discards one u32 before resetting scene timer storage, sampling the clock and setting a state flag; matched to kr-812 sub_515190 (Packet_gspGamePreCountDown)"
+    notes: "Payload meaning and sender ordering are unknown"
+
   - value: 740
     direction: s2c
     connection: game
@@ -483,3 +541,108 @@ opcodes:
     name_source: mirrored
     evidence: verified
     source: "cn-742 sub_78BF80 routes 101 to cn-742 sub_78F7D0: u32 page, bool32 and vector via cn-742 sub_794830; rows read by cn-742 sub_42CC90"
+
+  - value: 132
+    direction: c2s
+    connection: game
+    name: gcpReqEnchant
+    name_source: label@cn-735
+    evidence: verified
+    source: "cn-742 sub_CD6020 builds the DlgEnchant request and stamps 132; cn-742 sub_421C40 writes a counted u32 list plus one u32 argument; cn-735 sub_593AB0 registers the native label gcpReqEnchant"
+
+  - value: 145
+    direction: s2c
+    connection: game
+    name: gspRepEnchant
+    name_source: label@cn-742
+    evidence: verified
+    source: "cn-742 sub_9AA450 reads ReplyScienceLab through cn-742 sub_421D10, maps result 4 to errorCloseMsg and sends results 0 and 16 to the enchantment result UI"
+
+  - value: 136
+    direction: c2s
+    connection: game
+    name: gcpReqSciendLabConfig
+    name_source: label@cn-735
+    evidence: verified
+    source: "cn-742 sub_CEB1B0 sends an empty request stamped 136; cn-735 sub_5A89A0 registers the native label gcpReqSciendLabConfig"
+
+  - value: 150
+    direction: s2c
+    connection: game
+    name: gspRepSciendLabConfig
+    name_source: label@cn-742
+    evidence: verified
+    source: "cn-742 sub_9AB740 reads NotifyScienceLab and installs the laboratory configuration"
+
+  - value: 761
+    direction: s2c
+    connection: game
+    name: gspExtremeRacingTimer_
+    name_source: coined
+    evidence: verified
+    source: "cn-742 sub_C78980 case 761 reads code u32, duration_ms u32 and bool32; cn-742 sub_C79590 consumes codes 5000, 20000 and 210000"
+    notes: "packets/extreme-racing.yaml ExtremeRacingTimer; the round-over code differs from kr-1256's 2500."
+  - value: 762
+    direction: s2c
+    connection: game
+    name: gspExtremeRacingRound_
+    name_source: coined
+    evidence: verified
+    source: "cn-742 sub_C78980 case 762 reads two u32 words and applies only the second as the stage round"
+    notes: "packets/extreme-racing.yaml ExtremeRacingRound; unknown_0 is read but unused."
+  - value: 764
+    direction: s2c
+    connection: game
+    name: gspExtremeRacingUpdatePlayRecord_
+    name_source: coined
+    evidence: verified
+    source: "cn-742 sub_C78980 case 764 reads scope u32 and a counted record list; cn-742 sub_C7B1F0 reads each u16 seat and cn-742 sub_C7B150 reads counted pairs of u8 field and u32 value"
+    notes: "packets/extreme-racing.yaml ExtremeRacingRecords; native pair stride 8 is not wire padding."
+  - value: 763
+    direction: s2c
+    connection: game
+    name: gspExtremeRacingInitGameData_
+    name_source: coined
+    evidence: verified
+    source: "cn-742 sub_C78980 case 763 uses cn-742 sub_417600 to read four u32 words and two independently counted u32-key/u32-value maps and returns without a tail"
+    notes: "packets/extreme-racing.yaml ExtremeRacingInitialization; 24+8*(N+M) bytes, without stone disposers."
+  - value: 766
+    direction: s2c
+    connection: game
+    name: gspExtremeRacingMapState_
+    name_source: coined
+    evidence: verified
+    source: "cn-742 sub_C78980 case 766 reads two u32 selector words"
+    notes: "packets/extreme-racing.yaml ExtremeRacingMapState; 8 bytes; no third word or vector."
+  - value: 767
+    direction: s2c
+    connection: game
+    name: gspExtremeRacingTotalTime_
+    name_source: coined
+    evidence: verified
+    source: "cn-742 sub_C78980 case 767 reads one unused u32 and invokes HUD action 42; cn-742 sub_944C30 selects comboMsgGetTotalTime"
+    notes: "packets/extreme-racing.yaml ExtremeRacingTotalTime; 4 bytes; this notification does not carry a time value."
+  - value: 768
+    direction: s2c
+    connection: game
+    name: gspExtremeRacingCannon_
+    name_source: coined
+    evidence: verified
+    source: "cn-742 sub_C78980 case 768 reads group u32, cannon identity u32 and weapon u32; cn-742 sub_468D60 requires the exact group and has no scale input"
+    notes: "packets/extreme-racing.yaml ExtremeRacingCannon; 12 bytes. Eligible clients can generate relay 32902; the command does not select a unique sender."
+  - value: 32902
+    direction: c2s
+    connection: relay
+    name: gppExtremeRacingCannon_
+    name_source: coined
+    evidence: verified
+    source: "cn-742 sub_619050 writes actor u32, weapon u16, origin f32[3], direction f32[3], cannon identity u32 and serial u32; cn-742 sub_5EFC90 stamps 0x8086"
+    notes: "packets/extreme-racing.yaml ExtremeRacingCannonShot; 38 bytes; table coverage does not register an echo or traffic schedule."
+  - value: 32902
+    direction: s2c
+    connection: relay
+    name: gppExtremeRacingCannon_
+    name_source: coined
+    evidence: verified
+    source: "cn-742 sub_5E95E0 case 32902 dispatches to cn-742 sub_5FDD80 and cn-742 sub_618FB0, which read actor u32, weapon u16, six f32 values and two u32 words"
+    notes: "packets/extreme-racing.yaml ExtremeRacingCannonShot; 38 bytes; table coverage does not register an echo or traffic schedule."

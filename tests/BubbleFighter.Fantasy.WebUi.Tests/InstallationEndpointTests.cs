@@ -140,6 +140,20 @@ public sealed class InstallationEndpointTests
     }
 
     [Fact]
+    public async Task GameFolderArchiveMembersAreNotCountedAgainstTheUploadedFileLimit()
+    {
+        // client_data_file_limit bounds uploaded files; one uploaded archive may hold many more members.
+        await using var fixture = await Fixture.StartAsync(new() { ["client_data_file_limit"] = 2 });
+        using var folder = new MultipartFormDataContent();
+        folder.Add(new ByteArrayContent(ClientPack(("Config/ShopItem2.xml", "shop"), ("Textures/A.dds", "a"),
+            ("Textures/B.dds", "b"), ("Textures/C.dds", "c"))), "files", "Client/Packs/Config_00000.pkn");
+        var response = await fixture.Http.PostAsync("/api/setup/client-data?profile=fixture-build&kind=folder", folder);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("shop", await File.ReadAllTextAsync(
+            Path.Combine(fixture.Directory, "client-data", "fixture-build", "dataraw", "Config", "ShopItem2.xml")));
+    }
+
+    [Fact]
     public async Task GameFolderExtractsSelectedFilesAndRejectsMissingRequiredFilesWithoutPublishing()
     {
         await using var fixture = await Fixture.StartAsync();
@@ -403,6 +417,43 @@ public sealed class InstallationEndpointTests
         Assert.True((await fixture.WaitForAsync("ready")).Installed);
         Assert.Equal(HttpStatusCode.OK, (await fixture.PostAsync("/api/auth/logout", new { })).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await fixture.Http.GetAsync("/api/setup/status")).StatusCode);
+    }
+
+    [Fact]
+    public async Task ExistingDataIsReportedKeptByDefaultAndReplacedOnlyOnce()
+    {
+        await using var fixture = await Fixture.StartAsync();
+        var path = Path.Combine(fixture.Directory, "existing.db");
+        var settings = new InstallationSettings { PlayerLogin = "open", SqlitePath = path };
+        // A path with no save yet is reported as missing, so the assistant can say setup creates it.
+        var probe = await (await fixture.PostAsync("/api/setup/probe", settings)).Content.ReadFromJsonAsync<JsonElement>();
+        Assert.False(probe.GetProperty("database").GetProperty("exists").GetBoolean());
+        await using (var database = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ConnectionString))
+        {
+            await database.OpenAsync();
+            await using var command = database.CreateCommand();
+            command.CommandText = "CREATE TABLE accounts(username TEXT); CREATE TABLE old_rows(value INTEGER); INSERT INTO accounts VALUES ('a'), ('b');";
+            await command.ExecuteNonQueryAsync();
+        }
+        probe = await (await fixture.PostAsync("/api/setup/probe", settings)).Content.ReadFromJsonAsync<JsonElement>();
+        var found = probe.GetProperty("database");
+        Assert.True(found.GetProperty("hasData").GetBoolean());
+        Assert.Equal(2, found.GetProperty("tables").GetInt32());
+        Assert.Equal(2, found.GetProperty("accounts").GetInt64());
+        Assert.Equal(HttpStatusCode.BadRequest, (await fixture.PostAsync("/api/setup/probe", settings with { ExistingData = "drop" })).StatusCode);
+
+        await fixture.ClaimAsync(settings with { ExistingData = "replace" });
+        await fixture.SignInAsync();
+        Assert.True((await fixture.WaitForAsync("ready")).Installed);
+        await using (var database = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ConnectionString))
+        {
+            await database.OpenAsync();
+            await using var command = database.CreateCommand();
+            command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE name = 'old_rows'";
+            Assert.Equal(0L, (long)(await command.ExecuteScalarAsync())!);
+        }
+        // The replace ran once: the saved settings now keep the data, so a restart never deletes it again.
+        Assert.Contains("\"existingData\":\"keep\"", (await File.ReadAllTextAsync(fixture.StatePath)).Replace(" ", ""), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

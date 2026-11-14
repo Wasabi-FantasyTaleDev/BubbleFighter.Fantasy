@@ -124,6 +124,20 @@ public sealed class InventoryThrowHandlerTests
         Assert.True(Assert.IsAssignableFrom<ICollection<int>>(state.Events[0].EquippedItemIds).IsReadOnly);
     }
 
+    /// <summary>Discard publishes modifiers before subscriber mutation and passes that same frozen bag to the final view.</summary>
+    [Fact]
+    public async Task ThrowKeepsAttributesAndRowsFromItsSelectedSnapshot()
+    {
+        var state = new State();
+        state.DuringEvent = () => state.Bag[1] = state.Bag[1] with { Quantity = 9 };
+        await RunAsync(state, attributes: true);
+        var attribute = Assert.Single(Assert.Single(state.Events).ItemAttributes!);
+        Assert.Equal(new uint[] { 1, 0, 0, 0 }, attribute.Values);
+        Assert.Equal(1, state.ViewBag!.Single(row => row.ItemId == 202001).Quantity);
+        Assert.Same(state.Published, state.ViewBag);
+        Assert.Equal(["remove", "read", "event", "reply", "inventory", "view"], state.Order);
+    }
+
     [Theory]
     [InlineData("foreign-owner")]
     [InlineData("wrong-bag")]
@@ -149,9 +163,13 @@ public sealed class InventoryThrowHandlerTests
     }
 
     private static async Task RunAsync(State state, RecordingSession? session = null, int itemId = 202003,
-        CancellationToken ct = default)
+        CancellationToken ct = default, bool attributes = false)
     {
         var events = new EventBus(NullLogger.Instance);
+        using var presentation = events.Intercept<InventoryPresentationRequested, InventoryItemPresentation>((request, _, _) =>
+            ValueTask.FromResult(attributes && request.Slot.ItemId == 202001
+                ? new InventoryItemPresentation([new(202001, 7, [(uint)request.Slot.Quantity, 0, 0, 0], 0, "")], null)
+                : InventoryItemPresentation.Empty));
         using var subscription = events.OnAsync<EquipmentSelectionCommitted>((change, _) =>
         {
             state.Step("event");
@@ -175,6 +193,7 @@ public sealed class InventoryThrowHandlerTests
         internal IReadOnlyList<InventorySlotRecord>? Removed { get; init; } = [Row(202003)];
         internal IReadOnlyList<InventorySlotRecord>? Published { get; private set; }
         internal IReadOnlyList<int>? ViewItems { get; private set; }
+        internal IReadOnlyList<InventorySlotRecord>? ViewBag { get; private set; }
         internal List<InventoryThrowReplied> Replies { get; } = [];
         internal List<EquipmentSelectionCommitted> Events { get; } = [];
         internal (long User, int Item) Target { get; private set; }
@@ -210,14 +229,20 @@ public sealed class InventoryThrowHandlerTests
             Published = slots;
             return ValueTask.CompletedTask;
         }
-        public ValueTask SendSelectionAsync(ISession session, int userNum, int characterId, IReadOnlyList<int> equippedIds, CancellationToken ct)
+        /// <summary>Records the discarded-item operation's complete selected bag and its derived worn item view after inventory publication.</summary>
+        public ValueTask SendSnapshotAsync(ISession session, int userNum, int characterId,
+            IReadOnlyList<InventorySlotRecord> characterBag, CancellationToken ct)
         {
             Step("view");
             Assert.Equal(42, userNum);
             Assert.Equal(300001, characterId);
-            ViewItems = equippedIds;
+            ViewBag = characterBag;
+            ViewItems = characterBag.Where(row => (row.Flags & InventorySlotRecord.WornFlagBit) != 0).Select(row => row.ItemId).Distinct().ToArray();
             return ValueTask.CompletedTask;
         }
+        /// <summary>Rejects an ID-only appearance update because item discard must retain the complete selected bag.</summary>
+        public ValueTask SendSelectionAsync(ISession session, int userNum, int characterId, IReadOnlyList<int> equippedIds, CancellationToken ct) =>
+            throw new InvalidOperationException("Inventory throw must retain its complete selected bag.");
         public ValueTask<IReadOnlyList<InventorySlotRecord>?> ApplyAsync(long userNum, int itemId, bool worn, CancellationToken ct) => throw new NotSupportedException();
         public ValueTask PushInventoryAsync(ISession session, long userNum, CancellationToken ct) => throw new NotSupportedException();
         public ValueTask PushPurchaseAsync(ISession session, long userNum, IReadOnlyList<InventorySlotRecord> grants, CancellationToken ct) => throw new NotSupportedException();

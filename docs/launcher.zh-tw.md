@@ -230,7 +230,8 @@ hook 的預期工作方式：
 | `supports_instances` / `supports_plugins` | 公布伺服器是否允許選取執行個體與用戶端模組。 | `true` / `true` |
 | `registration_enabled` | 啟動器帳號是否可以註冊。 | `true` |
 | `create_account_on_login` | 以未知名稱登入時是否以所填密碼建立該帳號，讓玩家不必註冊。名稱輸錯會建立新帳號。 | `false` |
-| `minimum_launcher_version` | 註冊、登入、更新與票據簽發所需的最低啟動器 SemVer。留空則停用閘門。 | 空 |
+| `minimum_launcher_version` | 註冊、登入、更新與票據簽發所需的最低啟動器 SemVer。低於它的所有版本都以 HTTP 426 拒絕，包括該版本本身的預發布版本（`0.2.0-rc.1` 低於 `0.2.0`）。留空則停用檢查。隨附的 core 套件設為 `${BFF_LAUNCHER_MINIMUM_VERSION:-0.2.0}`。 | 程式碼中為空；core 套件中為 `0.2.0` |
+| `notices` | 營運公告，經 `GET /v1/notices?section=` 提供：每則有 `id`、`title`、Markdown 格式的 `body`（不呈現原始 HTML）、`level`（`info`、`warning`、`important`）、`published_at`（含秒與時區偏移的 ISO 8601，在此之前不顯示）和選填的 `sections`。依發布時間由新到舊。啟動器在玩家開始遊戲時將未讀公告各顯示一次，並在「查看全部」中列出所有公告。 | 空 |
 | `client_policy` | 傳送給啟動器的商店來源與依模組的型別化規則，見[用戶端策略](#client-policy)。 | 空 |
 | `session_seconds` / `refresh_session_seconds` | 存取權杖與可續期工作階段的有效期限（秒）。 | 1800 / 2592000 |
 | `ticket_seconds` | 啟動票據有效期限（秒）。 | 600 |
@@ -399,6 +400,7 @@ Fantasy Tale Nirinsou Link（簡稱 Nirinsou）是執行中的啟動器與其啟
 | --- | --- |
 | `companion` | 監聽器與啟動表。啟用後，每個 `/v1/launch` 回覆都帶有 `companion` 物件：`url`、一次性 `ticket`、`launchId` 和 `expiresAt`。 |
 | `companion.notices` | 啟動器彈窗（`ui.notification.show`）與 `popup <文字>` 管理指令，權限為 `game.management.popup`。 |
+| `companion.native_ui` | 遊戲原生的訊息框、通知、橫幅公告和本地聊天行（`ui.native.invoke`/`ui.native.result`）。伺服器外掛呼叫 `IClientNativeUi.ShowAsync` 並取得玩家的選擇；啟動器優先使用用戶端原生控制項，浮層作為後備。開發測試指令 `clientui <暱稱> <box|notice|banner|chat> <文字>`（權限 `game.management.clientui`）向一名玩家顯示並輸出結果。 |
 | `companion.commands` | 透過共用玩家權限及聊天額度執行已登入遊戲指令。 |
 
 三列在 core 套件中預設停用，由 `all` 設定啟用。`companion` 的選項：
@@ -478,6 +480,28 @@ payload 僅接受以下兩個字串，操作編號放在 payload 內：
 不接受身分參數、不讀取客戶端記憶體，也不變更遊戲狀態。未知、缺失、不一致或逾時的結果不能授權離場。
 快照不預留離場權限，執行指令時仍重新檢查房間成員與階段。
 
+### 場景變化
+
+`companion.scene` 列在玩家場景變化時推送 `game.session.changed` v1 事件，payload 與 `game.session.state` 相同。
+主選單、廣場、進入或離開房間，房間的等待、倒數、載入、對局與結算階段，模式變化，教學與訓練都會觸發；
+Launcher 連線每次完成綁定（包括重新連線）時也會傳送一次，因此浮層不需輪詢即可知道玩家所在位置。相同場景不會重複傳送。
+
+`companion.room_create` 列告訴 Launcher 玩家此時能否建立房間。它在每次變化與每次連線綁定時推送
+`game.room.create.context` v1，並以相同物件回覆 `game.room.create.context.get` v1 請求（payload 為 `{}`）：
+
+```json
+{"context_id":"6f1c0d2e9b8a4c7d8e5f4a3b2c1d0e9f","revision":2,"active":true}
+```
+
+只有在主選單與廣場（伺服器接受建立房間的兩個場景）中 `active` 才為 true。成功建立或加入房間、對局中以及對局結束回到原房間
+皆為 inactive；被拒絕的建立或加入不會改變狀態。`context_id` 是不透明值，屬於一次遊戲登入，Launcher 重新連線後保持不變。
+`revision` 從 1 開始，每次 `active` 變化加一，重複送達保持相同 revision，較小者可忽略。伺服器不知道客戶端本身的
+建立房間視窗何時開啟；進入廣場後沒有時間限制。
+
+兩列都在場景變化之後、於遊戲鎖之外讀取場景，每個已綁定的遊戲連線只保留最新狀態，連線關閉時捨棄。
+Launcher 佇列已滿而未送出的狀態會在 `retry_milliseconds`（預設 250）後重送，因此最新狀態（包括 inactive）不會遺失。
+未協商這些類型的 Launcher 不會收到任何訊息。
+
 ### 首次登入其他節點
 
 在工作節點啟用 `cluster.ticket-client.companion`，並於簽發節點對應 peer 的 `companion_url` 填入工作節點的明確 HTTP(S) origin。
@@ -527,6 +551,10 @@ payload 僅接受以下兩個字串，操作編號放在 payload 內：
 - [伺服器設定](configuration.md)介紹啟動器 API 背後的 profile 列與環境變數。
 - [部署](deployment.md)介紹如何執行伺服器、持續性、備份與網路安全。
 - [疑難排解](troubleshooting.md)介紹與啟動器無關的伺服器端故障。
+
+## 叢集用戶端版本 {#cluster-client-builds}
+
+使用叢集時，伺服器支援的用戶端版本是其所有節點版本的聯集。此時 `GET /v1/catalog` 回傳 `clusterBuilds`（至少有一個節點支援的版本），並在每個預設上標註 `clusterServed`；沒有叢集時兩者都不回傳。沒有節點支援的版本仍保留在啟動器的版本列表中，但啟動按鈕會停用，`POST /v1/launch` 以 409 `build_not_served` 拒絕。某版本的伺服器列表（`/v1/servers/{build}`）只提供有節點支援該版本的伺服器，每個節點目標附帶 `client_builds`，因此閘道的伺服器中心只列出支援該用戶端版本的節點。
 
 ## 伺服器公開展示與准入 {#server-presentation-and-admission}
 

@@ -55,6 +55,23 @@ public interface IWireDialect
     /// <param name="payload">The unframed payload.</param>
     /// <returns>The complete plaintext frame.</returns>
     byte[] EncodeFrame(ushort opcode, ReadOnlySpan<byte> payload);
+    /// <summary>
+    /// Encodes a plaintext frame into a caller buffer, so a session can write it straight into its output
+    /// pipe. A dialect that does not override this encodes a new frame and copies it.
+    /// </summary>
+    /// <param name="opcode">The opcode to encode.</param>
+    /// <param name="payload">The unframed payload.</param>
+    /// <param name="destination">At least the payload length plus <see cref="MaxFrameOverheadBytes"/> bytes.</param>
+    /// <returns>The number of bytes written.</returns>
+    /// <exception cref="ArgumentException"><paramref name="destination"/> is shorter than the frame.</exception>
+    int EncodeFrame(ushort opcode, ReadOnlySpan<byte> payload, Span<byte> destination)
+    {
+        var frame = EncodeFrame(opcode, payload);
+        if (destination.Length < frame.Length)
+            throw new ArgumentException($"The frame needs {frame.Length} bytes.", nameof(destination));
+        frame.CopyTo(destination);
+        return frame.Length;
+    }
 }
 
 /// <summary>Exports stateless dialects without requiring a running plugin host.</summary>

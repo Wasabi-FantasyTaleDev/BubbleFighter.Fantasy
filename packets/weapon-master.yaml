@@ -1,0 +1,52 @@
+version: 1
+# WeaponMaster is round mode 26 (wgtWeaponMaster, kr-1256 GameWeaponMasterStrategy). The client has no
+# weapon table of its own for the mode: the server assigns every weapon with the equipment frame below, and the
+# client applies it through the equipment applier that every mode shares. The one request the client makes for
+# the mode is the empty revival request below. Layout coverage does not enable the mode, choose a weapon or
+# establish client acceptance. cn-774 and tw-454 carry the strategy class too, but their readers and senders are
+# not audited, so the structures are used for kr-1256 only (packets/builds.yaml capability weapon_master).
+structs:
+
+  # S2C 1001 on the game connection: kr-1256 sub_9D2FF0 hands each game packet to kr-1256 sub_6D55D0 first, whose
+  # case 1001 calls kr-1256 sub_6DD900 and reports the packet handled.
+  # Reader kr-1256 sub_10BF400 (called by kr-1256 sub_6DD900): a u32 seat, a counted u32 list, a second counted
+  # u32 list, then a trailing u32. kr-1256 sub_6DD900 refuses a seat above 0x23 or without a character and requires
+  # both lists to have the same length; it pairs element i of each list into one 16-byte entry
+  # {-1, -1, second[i], first[i]} and passes the entries with the trailing word to kr-1256 sub_4996C0.
+  # kr-1256 sub_4996C0 hands entry +12 (the first list) to kr-1256 sub_4ADC80, which refuses a value above 5 and
+  # indexes the character's six equipment slots with it, and entry +8 (the second list) to the item lookup of
+  # kr-1256 sub_4ADD70. kr-1256 sub_D24CB0, the weapon-change popup, takes the same item value and shows its icon,
+  # so the first list is the slot and the second list is the item.
+  # The trailing word reaches kr-1256 sub_4996C0 as its third argument. In mode 26 the value 2 or 3 with slot 1
+  # or 2 skips the weapon creation; slot 0 resets the character's death counter (character dword 849, byte +3396)
+  # and, for the local character, shows the popup of kr-1256 sub_D24CB0, which picks its text by this word:
+  # 1 the text at kr-1256 0x160633C ("game start"), 2 the text at kr-1256 0x1597CD4 ("level up"), any other
+  # value the text at kr-1256 0x1606330 ("loser revival"). kr-1256 sub_6ED460 (the weapon pickup, relay-space
+  # 657) calls the same applier with 0.
+  EquipmentApply:
+    - seat: u32
+      offset: 0
+      only: [kr-1256]
+      except: [cn-774, tw-454]    # the cn-774 and tw-454 readers are not audited
+    - slots: "list<u32>"
+      offset: 4
+      only: [kr-1256]
+      except: [cn-774, tw-454]
+    - items: "list<u32>"
+      offset: 16
+      only: [kr-1256]
+      except: [cn-774, tw-454]
+    - reason: u32
+      offset: 28
+      only: [kr-1256]
+      except: [cn-774, tw-454]
+
+  # C2S 765 on the game connection, with no body. kr-1256 sub_4A73A0, the character's death handler, adds one to
+  # the character's death counter (dword 849) on every death; for the local character in mode 26 it reads the
+  # Config/GameOption.xml value WeaponMasterNoPangDeadCount (key string kr-1256 0x1586C6C) and, while the counter
+  # is at least that value, builds a TcpPacket (kr-1256 sub_10BB220), stamps 765 and sends it through
+  # kr-1256 sub_896820 without writing a field. The same check is skipped while kr-1256 sub_547950(21) is set,
+  # whose meaning is unknown. Only a slot-0 weapon of the equipment frame above (kr-1256 sub_4996C0) or
+  # kr-1256 sub_CF18E0 resets the counter, so the client repeats the request on each later death until the
+  # server hands it a new weapon.
+  WeaponMasterRevivalRequest: []

@@ -79,18 +79,22 @@ internal sealed class CompanionLaunches(CompanionOptions options, TimeProvider c
     internal bool? Attach(Launch launch, CompanionSocket socket)
     {
         CompanionSocket? previous;
-        bool bound;
+        ISession? session;
         lock (_gate)
         {
             if (_closed || launch.Remote || !_launches.TryGetValue(launch.Id, out var live) || !ReferenceEquals(live, launch)) return null;
             previous = launch.Socket;
             launch.Socket = socket;
-            bound = launch.Session is not null;
-            socket.Initialize(launch, bound);
+            session = launch.Session;
+            socket.Initialize(launch, session is not null);
         }
         previous?.Close("companion.replaced");
-        return bound;
+        if (session is not null) Connected?.Invoke(session);
+        return session is not null;
     }
+
+    /// <summary>Gets or sets what runs, outside the table's lock, when a launcher connection becomes a game session's bound one.</summary>
+    internal Action<ISession>? Connected { get; set; }
 
     /// <summary>Forgets <paramref name="socket"/> when it is still the launch's connection.</summary>
     internal void Detach(CompanionSocket socket)
@@ -115,7 +119,9 @@ internal sealed class CompanionLaunches(CompanionOptions options, TimeProvider c
             _games[redeemed.Session.Connection] = launch;
             socket = launch.Socket;
         }
-        socket?.MarkConnected();
+        if (socket is null) return;
+        socket.MarkConnected();
+        Connected?.Invoke(redeemed.Session);
     }
 
     /// <summary>Ends the launch bound to a closed game connection.</summary>

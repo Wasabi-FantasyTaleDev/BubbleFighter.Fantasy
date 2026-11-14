@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Runtime.Loader;
 using BubbleFighter.Fantasy.Abstractions;
 
@@ -6,10 +8,14 @@ namespace BubbleFighter.Fantasy.Native;
 
 /// <summary>
 /// Isolated load context for one plugin directory. Assemblies shared with the host —
-/// the plugin abstractions and domain contracts, logging abstractions, and anything resolvable only outside
+/// the plugin abstractions and domain contracts with their binary serializer, logging abstractions, and anything resolvable only outside
 /// the plugin directory such as shared-framework assemblies — defer to the default context
 /// so service interface types unify across the plugin tree. Everything else resolves from
-/// the plugin's own directory through its dependency manifest.
+/// the plugin's own directory through its dependency manifest, except the packet tables and their YAML reader when
+/// the plugin's file is byte-identical to the one the host ships beside itself: every plugin directory carries them,
+/// and a private copy per plugin parsed the same tables once per plugin and kept every copy's code. They depend on
+/// nothing but the shared abstractions, so sharing them unifies no other type. Every other dependency, and these two
+/// when they differ from the host's in any byte, stays the plugin's own.
 /// </summary>
 /// <remarks>
 /// Public construction and catalog loading remain noncollectible. A protected constructor
@@ -24,7 +30,19 @@ public class NativePluginLoadContext : AssemblyLoadContext
         "BubbleFighter.Fantasy.Abstractions",
         "BubbleFighter.Fantasy.Contracts",
         "Microsoft.Extensions.Logging.Abstractions",
+        // The contracts' binary serializer: a plugin's packed types and the contracts' catalog helper must see one copy.
+        "MemoryPack.Core",
     };
+
+    // The only dependencies shared by content: the packet tables and the YAML reader they need, nothing else.
+    private static readonly HashSet<string> SharedWhenIdentical = new(StringComparer.Ordinal)
+    {
+        "BubbleFighter.Fantasy.Packets",
+        "YamlDotNet",
+    };
+
+    // Content hashes by full path; a file is hashed once per process however many plugins carry it.
+    private static readonly ConcurrentDictionary<string, byte[]> Hashes = new(StringComparer.OrdinalIgnoreCase);
 
     private readonly AssemblyDependencyResolver _resolver;
     private readonly string _pluginDirectory;
@@ -73,6 +91,8 @@ public class NativePluginLoadContext : AssemblyLoadContext
         var path = _resolver.ResolveAssemblyToPath(assemblyName);
         if (path is null || !IsInsidePluginDirectory(path))
             return null;
+        if (HostCopy(assemblyName, path) is { } hostCopy)
+            return hostCopy;
         try
         {
             var assembly = LoadFromAssemblyPath(path);
@@ -95,6 +115,38 @@ public class NativePluginLoadContext : AssemblyLoadContext
             ? LoadUnmanagedDllFromPath(path)
             : nint.Zero;
     }
+
+    // The host's copy when the plugin's file has exactly the host's bytes; otherwise null and the plugin keeps its own.
+    internal static Assembly? HostCopy(AssemblyName assemblyName, string pluginPath)
+    {
+        if (assemblyName.Name is not { Length: > 0 } simple || !SharedWhenIdentical.Contains(simple))
+            return null;
+        var hostPath = Path.Combine(AppContext.BaseDirectory, simple + ".dll");
+        if (!File.Exists(hostPath) || string.Equals(Path.GetFullPath(hostPath), Path.GetFullPath(pluginPath),
+                OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+            return null;
+        if (new FileInfo(hostPath).Length != new FileInfo(pluginPath).Length
+            || !Hash(hostPath).AsSpan().SequenceEqual(Hash(pluginPath)))
+            return null;
+        // By name, so the host's dependency list answers and an assembly the host already loaded is returned as is.
+        try
+        {
+            var shared = Default.LoadFromAssemblyName(new AssemblyName(simple));
+            return string.Equals(Path.GetFullPath(shared.Location), Path.GetFullPath(hostPath),
+                OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal) ? shared : null;
+        }
+        catch (FileNotFoundException)
+        {
+            return null;
+        }
+    }
+
+    private static byte[] Hash(string path) =>
+        Hashes.GetOrAdd(Path.GetFullPath(path), static full =>
+        {
+            using var stream = File.OpenRead(full);
+            return SHA256.HashData(stream);
+        });
 
     private bool IsInsidePluginDirectory(string path) => Path.GetFullPath(path).StartsWith(
         _pluginDirectory, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);

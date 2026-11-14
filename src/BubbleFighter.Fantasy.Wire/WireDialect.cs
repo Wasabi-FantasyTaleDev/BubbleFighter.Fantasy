@@ -74,6 +74,16 @@ public abstract partial class WireDialect : IWireDialect
     public abstract byte[] EncodeFrame(ushort opcode, ReadOnlySpan<byte> payload);
 
     /// <inheritdoc />
+    public virtual int EncodeFrame(ushort opcode, ReadOnlySpan<byte> payload, Span<byte> destination)
+    {
+        var frame = EncodeFrame(opcode, payload);
+        if (destination.Length < frame.Length)
+            throw new ArgumentException($"The frame needs {frame.Length} bytes.", nameof(destination));
+        frame.CopyTo(destination);
+        return frame.Length;
+    }
+
+    /// <inheritdoc />
     public override string ToString() => Id;
 
     /// <summary>
@@ -135,6 +145,13 @@ public abstract partial class WireDialect : IWireDialect
             PacketFrameKind.Modern8 => PacketFrame_8Bytes.Encode(opcode, payload),
             PacketFrameKind.Legacy5 => PacketFrame_5Bytes.Encode(opcode, payload),
             _ => PacketFrame_10Bytes.Encode(opcode, payload),
+        };
+
+        public override int EncodeFrame(ushort opcode, ReadOnlySpan<byte> payload, Span<byte> destination) => stream.Frame switch
+        {
+            PacketFrameKind.Modern8 => PacketFrame_8Bytes.Encode(opcode, payload, destination),
+            PacketFrameKind.Legacy5 => PacketFrame_5Bytes.Encode(opcode, payload, destination),
+            _ => PacketFrame_10Bytes.Encode(opcode, payload, destination),
         };
 
         private SimpleCipher CreateCipher(PacketDirection direction)

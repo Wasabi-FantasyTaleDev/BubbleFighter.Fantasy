@@ -1,0 +1,26 @@
+{
+  "note": "Maps every client build id to the local folder that holds its client. 'base' names the preview profile (data/profiles) whose camera, shading and paint constants the build inherits: kr-812 for legacy builds (packet classes keep their names), kr-1256 for modern ones. A build is only a difference from its base; a measured difference becomes a profile file of its own. Build ids and releases follow profiles/ and the webui release list in profiles/bundles/core.yaml.",
+  "builds": [
+    {"id": "kr-812",  "release": "KR2015",           "folder": "BFLegacy_KR2015",                  "base": "kr-812"},
+    {"id": "cn-279",  "release": "CN2011 0.1.5.005", "folder": "BFLegacy_CN2011_0.1.5.005/BubbleFighter", "base": "kr-812", "text_column": "Translated_Cn"},
+    {"id": "cn-324",  "release": "CN2012",           "folder": "BFLegacy_CN2012",                  "base": "kr-812", "text_column": "Translated_Cn"},
+    {"id": "cn-406",  "release": "CN2013 0.2.35.001","folder": "BFLegacy_CN2013_0.2.35.001",       "base": "kr-812", "text_column": "Translated_Cn"},
+    {"id": "cn-404",  "release": "CN2014 0.2.46.001","folder": "BFLegacy_CN2014_0.2.46.001/BubbleFighter", "base": "kr-812", "text_column": "Translated_Cn"},
+    {"id": "cn-408",  "release": "CN2014 0.2.48.001","folder": "BFLegacy_CN2014_0.2.48.001",       "base": "kr-812", "text_column": "Translated_Cn"},
+    {"id": "cn-705",  "release": "CN2014 0.2.50.004","folder": "BFLegacy_CN2014_0.2.50.004",       "base": "kr-812", "text_column": "Translated_Cn"},
+    {"id": "cn-706",  "release": "CN2014 0.2.51.002","folder": "BFLegacy_CN2014_0.2.51.002",       "base": "kr-812"},
+    {"id": "cn-717",  "release": "CN2015",           "folder": "BFLegacy_CN2015/BubbleFighter",    "base": "kr-812", "text_column": "Translated_Cn"},
+    {"id": "id-400",  "release": "ID2014",           "folder": "BFLegacy_ID2014/CrazyShooter",     "base": "kr-812"},
+    {"id": "id-1809", "release": "ID2015",           "folder": "BFLegacy_ID2015/CrazyShooter",     "base": "kr-812"},
+    {"id": "cn-735",  "release": "CN2016 0.2.70.4",  "folder": "BFLegacy_CN2016_0.2.70.4/BubbleFighter",  "base": "kr-1256", "text_column": "Translated_Cn"},
+    {"id": "cn-738",  "release": "CN2016 0.2.72.01", "folder": "BFLegacy_CN2016_0.2.72.01/BubbleFighter", "base": "kr-1256", "text_column": "Translated_Cn"},
+    {"id": "cn-742",  "release": "CN2017 0.2.74.01", "folder": "BFLegacy_CN2017_0.2.74.01/BubbleFighter", "base": "kr-1256", "text_column": "Translated_Cn"},
+    {"id": "cn-774",  "release": "CN2019 0.2.98.3",  "folder": "BFLegacy_CN2019_0.2.98.3",         "base": "kr-1256", "text_column": "Translated_Cn"},
+    {"id": "tw-454",  "release": "TW2019",           "folder": "BFLegacy_TW2019/BubbleFighter",    "base": "kr-1256"},
+    {"id": "kr-1256", "release": "KR2026",           "folder": "BFKorea/BubbleFighter",            "base": "kr-1256"}
+  ],
+  "unmapped": [
+    {"folder": "BFLegacy_CN2016_0.2.67.004/BubbleFighter", "reason": "no profile or release name for client 0.2.67.004 exists in profiles/"},
+    {"folder": "BFLegacy_CN2018_0.92.1/BubbleFighter", "reason": "no profile or release name for client 0.92.1 exists in profiles/"}
+  ]
+}

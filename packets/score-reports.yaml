@@ -76,7 +76,10 @@ structs:
 
   # cn-279 sub_403B10/sub_403B60 carries five words, not the CN2012 eight.
   # cn-279 sub_827A30/sub_8268D0 -> sub_818DE0 independently admit ordinary
-  # kinds 1/2 through offsets 8/12, without interpreting the auxiliary words.
+  # character kinds 1/2 through offsets 8/12. The NPC knockdown consumer
+  # cn-279 sub_773950 calls sub_818DE0 with kind 2, -1 at offset 16 and the
+  # computed reporter seat at offset 20; name that fifth word for its proven
+  # NPC score path rather than treating it as an unknown player reference.
   RoundScoreReport@cn-279:
     - kind: u32
       offset: 4
@@ -86,7 +89,7 @@ structs:
       offset: 12
     - unknown_16: u32
       offset: 16
-    - unknown_20: u32
+    - npc_scorer_slot: u32
       offset: 20
 
   # cn-706 sub_4B9630/sub_4B96A0 and cn-705 sub_4B9400/sub_4B9470 prove the

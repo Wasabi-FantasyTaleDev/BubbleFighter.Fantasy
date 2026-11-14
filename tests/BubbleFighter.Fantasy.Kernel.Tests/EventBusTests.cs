@@ -111,6 +111,54 @@ public sealed class EventBusTests
         Assert.Null(bus.Bail<Ping, string>(new Ping(1)));
     }
 
+    /// <summary>
+    /// Handler order survives removals from the middle of a priority band and later additions, and a dispatch that
+    /// already took its snapshot is not reordered by them.
+    /// </summary>
+    [Fact]
+    public void OrderSurvivesRemovalAndLaterRegistration()
+    {
+        var bus = CreateBus();
+        var order = new List<string>();
+        bus.On<Ping>(_ => order.Add("a"), priority: 5);
+        var middle = bus.On<Ping>(_ => order.Add("b"), priority: 5);
+        bus.On<Ping>(_ => order.Add("c"), priority: 5);
+        bus.On<Ping>(_ => order.Add("low"), priority: -1);
+        middle.Dispose();
+        bus.On<Ping>(_ => order.Add("d"), priority: 5);
+        bus.On<Ping>(_ => order.Add("top"), priority: 9);
+        bus.Emit(new Ping(1));
+        Assert.Equal(["top", "a", "c", "d", "low"], order);
+    }
+
+    /// <summary>Waterfall middleware still wraps outer-first after the shared snapshot is walked backwards.</summary>
+    [Fact]
+    public async Task WaterfallOrderIsStableAcrossDispatches()
+    {
+        var bus = CreateBus();
+        bus.Intercept<Ping, string>(async (_, next, ct) => "outer(" + await next(ct) + ")", priority: 10);
+        bus.Intercept<Ping, string>(async (_, next, ct) => "inner(" + await next(ct) + ")", priority: 0);
+        for (var round = 0; round < 3; round++)
+            Assert.Equal("outer(inner(end))", await bus.WaterfallAsync<Ping, string>(new Ping(1), _ => ValueTask.FromResult("end"), default));
+    }
+
+    /// <summary>HasHandlers follows synchronous and asynchronous subscriptions, and ignores result-typed ones.</summary>
+    [Fact]
+    public void HasHandlersFollowsSubscriptions()
+    {
+        var bus = CreateBus();
+        Assert.False(bus.HasHandlers<Ping>());
+        using (bus.OnBail<Ping, string>(_ => null))
+            Assert.False(bus.HasHandlers<Ping>());
+        var sync = bus.On<Ping>(_ => { });
+        Assert.True(bus.HasHandlers<Ping>());
+        var async = bus.OnAsync<Ping>((_, _) => ValueTask.CompletedTask);
+        sync.Dispose();
+        Assert.True(bus.HasHandlers<Ping>());
+        async.Dispose();
+        Assert.False(bus.HasHandlers<Ping>());
+    }
+
     [Fact]
     public void DisposalRemovesHandlers()
     {

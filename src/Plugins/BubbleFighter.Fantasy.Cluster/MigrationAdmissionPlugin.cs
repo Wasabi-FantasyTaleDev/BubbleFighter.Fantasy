@@ -9,7 +9,7 @@ using BubbleFighter.Fantasy.Contracts.Party;
 namespace BubbleFighter.Fantasy.Cluster;
 
 /// <summary>Coordinates shared-account room arrival without making lobby and room plugins depend on each other.</summary>
-[Plugin("cluster.migration-admission", Description = "Authorizes prepared native room arrivals and completes pending promotion.",
+[Plugin("cluster.migration-admission", Category = "cluster", Names = ["en=Room migration admission", "zh-Hans=房间迁移准入", "zh-Hant=房間遷移准入", "ko=방 이동 허가"], Description = "Authorizes prepared native room arrivals and completes pending promotion.",
     Requires = [typeof(IMessageRouter), typeof(IRetainedPlayerAdmission), typeof(IMigrationArrivals), typeof(INodeLeaseSource),
         typeof(IAccountSessionHandoff), typeof(IAccountSessionAdmission)], Optional = [typeof(IHostReadiness), typeof(IPartyDirectory)],
     OptionalMany = [typeof(IMigrationRoomRecovery), typeof(IMigrationHomeAdmission), typeof(IRoomAdmissionDirectory), typeof(IInboundMessageBinding<MoveIntoRequested>),

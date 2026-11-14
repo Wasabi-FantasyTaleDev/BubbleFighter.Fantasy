@@ -1,0 +1,15 @@
+# Included by the build profile: the star modes (5 individual, 6 team); native-client acceptance remains required.
+# Apply it after profiles/bundles/zombie-escape.patch.yaml, whose shared list lacks modes 5 and 6;
+# activation refuses star items without them.
+- set:
+    id: dialect.rooms
+    config:
+      star_items: true
+      result_scoreboard_modes: [1, 5, 6, 8, 19, 20, 23, 24, 25, 28, 30, 32, 45]
+- set:
+    id: ingame
+    config:
+      star_mode_ids: [5]
+      star_team_mode_ids: [6]
+      star_round_time_limit_ms: 240000
+      star_fever_lead_ms: 45000

@@ -43,6 +43,8 @@ public sealed class NativeMatchMountTests
             if (index == 0) fixture.Binding<MatchMapNamed>(registry.Protocol);
             var context = fixture.MatchRow(build, report);
             await new MatchConnectionPlugin().ActivateAsync(context, default);
+            Assert.Equal(registry.Protocol, Assert.Single(fixture.Services.GetAll<IMatchConnectionOperations>(),
+                service => service.Protocol == registry.Protocol).Protocol);
             var ticket = await registry.IssueCapabilityAsync(seat.Game, lengths[index], default);
             var relay = new Session(10 + index, build);
             Assert.True(await fixture.Router.DispatchAsync(registry.Protocol, relay, new MatchCapabilityAuthenticate(ticket), default));
@@ -74,6 +76,7 @@ public sealed class NativeMatchMountTests
         Assert.Same(entries[5].Relay, entries[5].Seat.Relay);
         foreach (var entry in entries) await entry.Context.UnwindAsync();
         Assert.Empty(fixture.Router.Handlers);
+        Assert.Empty(fixture.Services.GetAll<IMatchConnectionOperations>());
         Assert.All(entries, entry => Assert.Null(entry.Seat.Relay));
     }
 

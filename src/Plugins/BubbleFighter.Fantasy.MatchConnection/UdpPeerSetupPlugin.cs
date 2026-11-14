@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Net;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
+using BubbleFighter.Fantasy.Contracts.Signals;
 using BubbleFighter.Fantasy.Contracts.Match;
 using BubbleFighter.Fantasy.Contracts.Rooms;
 using Microsoft.Extensions.Logging;
@@ -12,7 +13,7 @@ using Microsoft.Extensions.Logging;
 namespace BubbleFighter.Fantasy.MatchConnection;
 
 /// <summary>Coordinates bounded, authenticated room-local UDP discovery and native peer punching.</summary>
-[Plugin("match-udp-peers", Description = "Room-scoped native UDP peer setup.", Requires = [typeof(IMessageRouter)],
+[Plugin("match-udp-peers", Category = "network", Names = ["en=UDP match peers", "zh-Hans=UDP 对局对等端", "zh-Hant=UDP 對局對等端", "ko=UDP 매치 피어"], Description = "Room-scoped native UDP peer setup.", Requires = [typeof(IMessageRouter)],
     OptionalMany = [typeof(IRoomPeerRoster), typeof(IUdpPeerDialect), typeof(IUdpDatagramEndpoint), typeof(IUdpTransportStatusRegistry)])]
 public sealed class UdpPeerSetupPlugin : IPlugin
 {
@@ -170,6 +171,8 @@ internal sealed class UdpPeerCoordinator : IDisposable, IUdpTransportStatus
     private readonly IUdpPeerDialect _wire;
     private readonly ILogger _logger;
     private readonly ushort _port;
+    // Complete while any round is tracked; refreshed under _gate wherever _rounds changes.
+    private readonly PresenceSignal _tracking = new();
     private bool _disposed;
     private bool _capacityReported;
 
@@ -219,6 +222,7 @@ internal sealed class UdpPeerCoordinator : IDisposable, IUdpTransportStatus
                                 _identities.Add(peer.Identity, peer);
                             }
                             _rounds.Add(key, round);
+                            _tracking.Refresh(() => _rounds.Count != 0);
                         }
                         catch
                         {
@@ -375,9 +379,8 @@ internal sealed class UdpPeerCoordinator : IDisposable, IUdpTransportStatus
     {
         try
         {
-            using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(_options.TickMs));
-            while (await timer.WaitForNextTickAsync(lifetime).ConfigureAwait(false))
-                await TickAsync(Environment.TickCount64, lifetime).ConfigureAwait(false);
+            await DemandLoop.RunAsync(TimeSpan.FromMilliseconds(_options.TickMs), WhenWork,
+                ct => TickAsync(Environment.TickCount64, ct), lifetime).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         finally
@@ -396,6 +399,17 @@ internal sealed class UdpPeerCoordinator : IDisposable, IUdpTransportStatus
                 }
             }
         }
+    }
+
+    // A tracked round always needs the tick. A build that prepares UDP in the waiting room also needs it while any
+    // room exists, because that is where its rounds are found (TrackWaitingRooms); other builds learn of a round
+    // from the load report, which adds it here.
+    internal Task WhenWork()
+    {
+        var rounds = _tracking.WhenPresent;
+        if (rounds.IsCompleted || !_wire.DiscoveryInWaitingRoom) return rounds;
+        var rooms = _roster.WhenAnyRoom();
+        return rooms.IsCompleted ? rooms : Task.WhenAny(rounds, rooms);
     }
 
     internal async ValueTask TickAsync(long now, CancellationToken ct)
@@ -670,6 +684,7 @@ internal sealed class UdpPeerCoordinator : IDisposable, IUdpTransportStatus
                         _identities.Add(peer.Identity, peer);
                     }
                     _rounds.Add(key, round);
+                    _tracking.Refresh(() => _rounds.Count != 0);
                 }
                 catch
                 {
@@ -722,7 +737,8 @@ internal sealed class UdpPeerCoordinator : IDisposable, IUdpTransportStatus
                     round.Peers.Remove(peer);
                     foreach (var remaining in round.Peers) remaining.Direct.Remove(peer.Game.Id);
                 }
-                if (round.Peers.Count == 0) _rounds.Remove((round.RoomId, round.Generation));
+                if (round.Peers.Count == 0 && _rounds.Remove((round.RoomId, round.Generation)))
+                    _tracking.Refresh(() => _rounds.Count != 0);
             }
         }
     }
@@ -758,6 +774,7 @@ internal sealed class UdpPeerCoordinator : IDisposable, IUdpTransportStatus
             foreach (var peer in _identities.Values) peer.Direct.Clear();
             _identities.Clear();
             _rounds.Clear();
+            _tracking.Refresh(() => false);
         }
     }
 }

@@ -114,56 +114,69 @@ const handleOverlayClick = () => {
   align-items: center;
   justify-content: center;
   padding: 16px;
+  background: rgb(15 23 42 / .26);
+  backdrop-filter: blur(8px);
 }
 
 .noah-modal-dialog {
+  position: relative;
   width: 100%;
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-lg);
+  border: 1px solid rgb(255 255 255 / .7);
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgb(15 23 42 / .06), 0 24px 64px rgb(15 23 42 / .18);
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  transition: height 220ms cubic-bezier(.2, .8, .2, 1), max-width 220ms cubic-bezier(.2, .8, .2, 1);
+  transition: height 240ms cubic-bezier(.2, .8, .2, 1), max-width 240ms cubic-bezier(.2, .8, .2, 1);
 }
 
 .noah-modal-content { display: flex; flex-direction: column; flex: none; min-width: 0; }
 
 .noah-modal-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border-soft);
+  gap: 16px;
+  padding: 22px 20px 6px 26px;
 }
 
 .noah-modal-title {
-  margin: 0;
-  font-size: var(--text-subtitle);
+  margin: 4px 0 0;
+  font-size: 18px;
   font-weight: 600;
+  letter-spacing: -.01em;
+  line-height: 1.4;
   color: var(--text);
 }
 
 .noah-modal-close-btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
   border: none;
+  border-radius: 50%;
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  padding: 4px;
-  border-radius: var(--radius-xs);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.12s ease;
+  transition: background-color .15s ease, color .15s ease, transform .2s ease;
 }
 .noah-modal-close-btn:hover {
   background-color: var(--hover);
   color: var(--text);
 }
+.noah-modal-close-btn:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
 
 .noah-modal-body {
-  padding: 20px;
+  padding: 12px 26px 22px;
   overflow-y: auto;
-  max-height: calc(85vh - 120px);
+  max-height: calc(85vh - 140px);
+  color: var(--text);
+  font-size: var(--text-control);
+  line-height: 1.7;
 }
 
 .noah-modal-footer {
@@ -171,29 +184,29 @@ const handleOverlayClick = () => {
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
-  padding: 14px 20px;
-  border-top: 1px solid var(--border-soft);
-  background-color: var(--surface-raised);
+  padding: 4px 26px 24px;
 }
 
-/* Transitions */
-.noah-modal-fade-enter-active,
-.noah-modal-fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-
+/* Open: the backdrop fades and blurs in, the dialog pops up from slightly below. Close plays it back faster. */
+.noah-modal-fade-enter-active { transition: opacity .24s ease, backdrop-filter .24s ease; }
+.noah-modal-fade-leave-active { transition: opacity .18s ease, backdrop-filter .18s ease; }
 .noah-modal-fade-enter-from,
 .noah-modal-fade-leave-to {
   opacity: 0;
+  backdrop-filter: blur(0);
 }
-
 .noah-modal-fade-enter-active .noah-modal-dialog {
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), height 220ms cubic-bezier(.2, .8, .2, 1), max-width 220ms cubic-bezier(.2, .8, .2, 1);
+  transition: transform .36s cubic-bezier(.2, .9, .25, 1.12), opacity .24s ease, height 240ms cubic-bezier(.2, .8, .2, 1), max-width 240ms cubic-bezier(.2, .8, .2, 1);
 }
-.noah-modal-fade-enter-from .noah-modal-dialog {
-  transform: scale(0.96) translateY(8px);
-}
+.noah-modal-fade-leave-active .noah-modal-dialog { transition: transform .18s cubic-bezier(.4, 0, 1, 1), opacity .18s ease; }
+.noah-modal-fade-enter-from .noah-modal-dialog { transform: translateY(18px) scale(.94); opacity: 0; }
+.noah-modal-fade-leave-to .noah-modal-dialog { transform: translateY(8px) scale(.97); opacity: 0; }
+.noah-modal-fade-enter-active .noah-modal-body > *,
+.noah-modal-fade-enter-active .noah-modal-footer { animation: noah-modal-rise .4s cubic-bezier(.2, .8, .2, 1) backwards; animation-delay: 70ms; }
+.noah-modal-fade-enter-active .noah-modal-footer { animation-delay: 120ms; }
+@keyframes noah-modal-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {
-  .noah-modal-dialog, .noah-modal-fade-enter-active .noah-modal-dialog { transition: none; }
+  .noah-modal-dialog, .noah-modal-fade-enter-active .noah-modal-dialog, .noah-modal-fade-leave-active .noah-modal-dialog { transition: none; }
+  .noah-modal-fade-enter-active .noah-modal-body > *, .noah-modal-fade-enter-active .noah-modal-footer { animation: none; }
 }
 </style>

@@ -1,4 +1,7 @@
 using BubbleFighter.Fantasy.Abstractions.Protocol;
+using BubbleFighter.Fantasy.Contracts.Rooms;
+using BubbleFighter.Fantasy.Dialect.Rooms;
+using BubbleFighter.Fantasy.Packets;
 using Xunit;
 
 namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
@@ -12,6 +15,30 @@ namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
 public sealed class EquipmentViewTableTests
 {
     private const string Kr1256 = "kr-1256";
+
+    /// <summary>CN and TW scene and direct appearances retain the exact native modifier words and text.</summary>
+    [Theory]
+    [InlineData("cn-774", "0000000000000000", 78)]
+    [InlineData("tw-454", "00000000", 74)]
+    public void ModernEquipmentAttributesMatchBothNativeAppearanceContainers(string build, string emptyContainers, int length)
+    {
+        // cn-774 sub_449C80 and tw-454 sub_44A090 read the same ItemAttr after different preceding vectors.
+        var attribute = new RoomItemAttribute(203100, 7, [4294965296u, 0x3F800000u, 0, 7], uint.MaxValue, "A");
+        var expected = Convert.FromHexString("2A000000E193040000000000FFFFFFFF010000005C190300" + emptyContainers
+            + "010000005C190300070000000400000030F8FFFF0000803F0000000007000000FFFFFFFF01000000410000000000");
+        Assert.Equal(length, expected.Length);
+        Assert.Equal(expected, EquipmentViewBinding.WriteView(TestBuilds.Packets, build, 42, 300001, [203100], [attribute]));
+        var seat = new RoomMemberView(0, 42, "member", 1, 0, false, 300001, [203100]) { ItemAttributes = [attribute] };
+        Assert.Equal(expected, PacketCodec.Write(TestBuilds.Packets, build, "EquippedObjectEntry",
+            RoomRecords.EquippedObject(TestBuilds.Packets, build, seat)));
+        foreach (var structure in new[] { "SoloPartyEquippedItem", "EquippedObjectEntry" })
+        {
+            var decoded = PacketCodec.Read(TestBuilds.Packets, build, structure, expected);
+            Assert.Equal(expected, PacketCodec.Write(TestBuilds.Packets, build, structure, decoded));
+            for (var end = 0; end < expected.Length; end++)
+                Assert.Throws<PacketFormatException>(() => PacketCodec.Read(TestBuilds.Packets, build, structure, expected[..end]));
+        }
+    }
 
     /// <summary>CN and TW retain their own native container counts when publishing a worn weapon.</summary>
     [Theory]

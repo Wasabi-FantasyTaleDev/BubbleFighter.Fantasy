@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 namespace BubbleFighter.Fantasy.Net.Udp;
 
 /// <summary>Listens for bounded connectionless UDP datagrams and hands them to an owning plugin handler.</summary>
-[Plugin("net.udp", Description = "UDP datagram listener.", ConditionalProvidesMany = [typeof(IUdpDatagramEndpoint)])]
+[Plugin("net.udp", Category = "network", Names = ["en=UDP listener", "zh-Hans=UDP 监听", "zh-Hant=UDP 監聽", "ko=UDP 리스너"], Description = "UDP datagram listener.", ConditionalProvidesMany = [typeof(IUdpDatagramEndpoint)])]
 public sealed class UdpListenerPlugin : IPlugin
 {
     /// <inheritdoc />

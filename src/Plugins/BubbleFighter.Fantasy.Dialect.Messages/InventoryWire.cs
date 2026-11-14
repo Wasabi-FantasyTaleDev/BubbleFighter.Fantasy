@@ -8,7 +8,7 @@ namespace BubbleFighter.Fantasy.Dialect.Messages;
 /// <summary>
 /// Writes the bag publication bodies from <c>packets/inventory.yaml</c>: the counted slot list of
 /// <c>gspInventoryUpdateAllInventorySlot</c> and <c>gspInventoryUpdateInventorySlots</c>, the three
-/// containers of the modern slots packet, the always-empty article table and the always-empty cash
+/// containers of the modern slots packet, the owned Article table and the always-empty cash
 /// inventory. The legacy slot record is mapped here; the modern family supplies its own field names
 /// through <see cref="RepInventoryAllValues"/> and <see cref="RepInventorySlotsValues"/>, because the
 /// eight-byte field at record +8 has no proven meaning and is named by its offset.
@@ -19,6 +19,9 @@ internal sealed class InventoryWire(PacketTables tables, string build)
 {
     // Whether the build's slot carries the string extension (cn-324 and cn-279 do not).
     private readonly bool _hasExtension = CheckedExtension(tables, build);
+
+    /// <summary>Gets whether this build reads owned Article rows in its full replacement.</summary>
+    internal bool SupportsArticles { get; } = tables.Resolve(build, "ArticleSlots")[0].Type == "list<ArticleSlot>";
 
     internal byte[] RepInventoryAll(IReadOnlyList<InventorySlot> slots)
     {
@@ -47,11 +50,21 @@ internal sealed class InventoryWire(PacketTables tables, string build)
         PacketCodec.Write(tables, build, "InventorySlots", Slots(slots));
 
     /// <summary>
-    /// Writes the empty article table of <c>gspUpdateAllArticleSlot</c>: the server never populates it
-    /// (the equipped articles ride the view record instead).
+    /// Writes the complete Article table; kr-1256 sub_804FC0 clears every previous Article before installation.
     /// </summary>
+    /// <param name="articles">One named row per owned entitlement, without equipped-bag duplicates.</param>
     /// <returns>The plain body.</returns>
-    internal byte[] RepArticleSlots() => PacketCodec.Write(tables, build, "ArticleSlots", new Dictionary<string, object?>(StringComparer.Ordinal));
+    internal byte[] RepArticleSlots(IReadOnlyList<IReadOnlyDictionary<string, object?>>? articles = null)
+    {
+        if (articles is { Count: > InventoryLimits.MaxInventorySlotsPerBag })
+            throw new ArgumentOutOfRangeException(nameof(articles));
+        if (!SupportsArticles && articles is { Count: > 0 })
+            throw new InvalidOperationException("This inventory layout cannot publish Article rows.");
+        return PacketCodec.Write(tables, build, "ArticleSlots", new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            ["articles"] = articles?.ToArray() ?? [],
+        });
+    }
 
     /// <summary>Writes the always-empty cash inventory of <c>gspCashInvenUpdateAllInventorySlot</c>.</summary>
     /// <returns>The plain body.</returns>
@@ -63,7 +76,7 @@ internal sealed class InventoryWire(PacketTables tables, string build)
             ["slots"] = slots.ToArray(),
         };
 
-    private static Dictionary<string, object?> ToValues(InventorySlot slot) =>
+    internal static Dictionary<string, object?> ToValues(InventorySlot slot) =>
         new(StringComparer.Ordinal)
         {
             ["item_id"] = slot.ItemId,
@@ -98,7 +111,20 @@ internal sealed class InventoryWire(PacketTables tables, string build)
     {
         PacketLayoutContract.RequireFields(tables, build, "InventoryUpdate", "Inventory wire", ("slots", "list<InventorySlot>"));
         PacketLayoutContract.RequireFields(tables, build, "InventorySlots", "Inventory wire", ("slots", "list<InventorySlot>"));
-        PacketLayoutContract.RequireFields(tables, build, "ArticleSlots", "Inventory wire", ("articles", "empty_list"));
+        PacketLayoutContract.RequireSignature(tables, build, "ArticleSlots", "Inventory wire",
+            "articles:empty_list", "articles:list<ArticleSlot>");
+        var articleDeltas = tables.Resolve(build, "InventorySlots").Any(field => field.Name == "articles");
+        if (articleDeltas)
+            PacketLayoutContract.RequireFields(tables, build, "InventorySlots", "Inventory articles", ("articles", "list<ArticleSlot>"));
+        if (tables.Resolve(build, "ArticleSlots")[0].Type == "list<ArticleSlot>" || articleDeltas)
+        {
+            PacketLayoutContract.RequireFields(tables, build, "ArticleSlot", "Inventory articles",
+                ("article_key", "u64"), ("item_id", "u32"), ("state", "u32"),
+                ("equipped", "bool"), ("attributes", "list<ItemAttr>"));
+            PacketLayoutContract.RequireFields(tables, build, "ItemAttr", "Inventory articles",
+                ("unknown_4", "u32"), ("unknown_8", "u32"), ("unknown_12", "list<u32>"),
+                ("unknown_28", "u32"), ("unknown_32", "wstr"));
+        }
         PacketLayoutContract.RequireFields(tables, build, "CashInventoryUpdate", "Inventory wire", ("slots", "list<CashInventorySlot>"));
         return tables.Resolve(build, "InventorySlot").Any(field => field.Name == "unknown_48");
     }

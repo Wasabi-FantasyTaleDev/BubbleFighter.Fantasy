@@ -288,8 +288,10 @@ public sealed partial class RoundFlowTests
     {
         private readonly List<(long Session, T Message)> _sent = [];
         public string Protocol => "test/game";
+        public Action<ISession, T, CancellationToken>? OnSending { get; set; }
         public ValueTask SendAsync(ISession session, T message, CancellationToken ct)
         {
+            OnSending?.Invoke(session, message, ct);
             lock (_sent)
                 _sent.Add((session.Id, message));
             return ValueTask.CompletedTask;
@@ -348,6 +350,7 @@ public sealed partial class RoundFlowTests
         public Sink<RoundLucciPicked> LucciPicked { get; } = new();
         public Sink<RoundStarCreated> StarCreated { get; } = new();
         public Sink<RoundStarPicked> StarPicked { get; } = new();
+        public Sink<RoundStarFeverStarted> StarFever { get; } = new();
         public Sink<RoundItemUsed> ItemUsed { get; } = new();
         public Sink<RoundItemSlotChanged> ItemSlotChanged { get; } = new();
         public Sink<RoundCountedItemsPrepared> CountedItemsPrepared { get; } = new();
@@ -415,7 +418,7 @@ public sealed partial class RoundFlowTests
                 CountedItemUsed: CountedItemUsed, RescueStarted: RescueStarted, RescueFailed: RescueFailed, RescueSucceeded: RescueSucceeded, RescuePrepared: RescuePrepared, PvePoints: PvePoints, ItemSlotChanged: ItemSlotChanged, LucciCreated: LucciCreated, LucciPicked: LucciPicked,
                 StarCreated: StarCreated, StarPicked: StarPicked, ObjectAdded: ObjectAdded,
                 WeaponCreated: WeaponCreated, WeaponPicked: WeaponPicked, Observer: observation ? Observed : null,
-                BombStateChanged: BombChanged), NullLogger.Instance, CancellationToken.None,
+                BombStateChanged: BombChanged, StarFever: StarFever), NullLogger.Instance, CancellationToken.None,
                 Rooms.ReturnToRoomAsync, resultContext, continueSeries: Rooms.ContinueSeriesAsync);
             Rooms.SeatLeftDuringRound = Round.OnSeatLeftAsync;
             Rooms.BeforeSeatLeaves = Round.RecordDepartureAsync;
@@ -1492,6 +1495,34 @@ public sealed partial class RoundFlowTests
         finally { await rig.Registry.StopAllAsync(); }
     }
 
+    /// <summary>
+    /// Only the master's map star points count; each gets its star with the map look, and a point whose star was
+    /// claimed gets a new one at its next check while an unclaimed star stays the only one.
+    /// </summary>
+    [Fact]
+    public async Task HostStarPointsAppearAndRefillOnlyWhenClaimed()
+    {
+        var rig = StarRig();
+        try
+        {
+            await StartZombiePvpAsync(rig);
+            RoundStarPoint small = new(1, 2, 3, 1, 0, 200), big = new(4, 5, 6, 2, 0, 200);
+            await rig.Round.HandleStarPointsReportedAsync(rig.Guest, new RoundStarPointsReported([big]), default);
+            await rig.Round.HandleStarPointsReportedAsync(rig.Host, new RoundStarPointsReported([small, big]), default);
+            for (var i = 0; i < 200 && rig.StarCreated.To(rig.Guest).Length < 2; i++) await Task.Delay(10);
+            var first = rig.StarCreated.To(rig.Guest);
+            Assert.Equal(new[] { (1, 1f, 3), (2, 4f, 3) }, first.Select(star => (star.Kind, star.Point.X, star.Tag)));
+            await rig.Round.HandleStarPickupAsync(rig.Guest, new RoundStarPickupRequested(1_100_000, first[0].ObjectId), default);
+            for (var i = 0; i < 200 && rig.StarCreated.To(rig.Guest).Length < 3; i++) await Task.Delay(10);
+            var refill = rig.StarCreated.To(rig.Guest)[2];
+            Assert.Equal((1, 1f), (refill.Kind, refill.Point.X));
+            Assert.True(refill.ObjectId > first[1].ObjectId);
+            await Task.Delay(500);
+            Assert.Equal(3, rig.StarCreated.To(rig.Guest).Length);
+        }
+        finally { await rig.Registry.StopAllAsync(); }
+    }
+
     /// <summary>Outside the star modes the star packets and reports change nothing.</summary>
     [Fact]
     public async Task StarPacketsAreIgnoredOutsideTheStarModes()
@@ -1568,6 +1599,7 @@ public sealed partial class RoundFlowTests
             await FinishLoadingAsync(rig);
             Assert.Equal(RoundOutcome.Draw, (await WaitEndedAsync(rig, rig.Host)).Outcome);
             Assert.Equal(RoundOutcome.Draw, (await WaitEndedAsync(rig, rig.Guest)).Outcome);
+            Assert.Empty(rig.StarFever.To(rig.Host));
         }
         finally { await rig.Registry.StopAllAsync(); }
     }
@@ -1596,6 +1628,68 @@ public sealed partial class RoundFlowTests
         finally { await rig.Registry.StopAllAsync(); }
     }
 
+    /// <summary>A seat left alone in an individual star round wins it when time runs out.</summary>
+    [Fact]
+    public async Task IndividualStarRoundLeftToOneSeatGoesToThatSeat()
+    {
+        var rig = StarRig(timeLimitMs: 600);
+        try
+        {
+            await rig.StartAsync();
+            await FinishLoadingAsync(rig);
+            await rig.WaitStartedAsync(rig.Host);
+            await rig.Rooms.HandleLeaveAsync(rig.Guest, new(), default);
+            Assert.Equal(RoundOutcome.Won, (await WaitEndedAsync(rig, rig.Host)).Outcome);
+        }
+        finally { await rig.Registry.StopAllAsync(); }
+    }
+
+    /// <summary>
+    /// A team star round's live score and result carry each team's stars as the team totals, not its kills: the
+    /// clients read the result's winner off those totals.
+    /// </summary>
+    [Fact]
+    public async Task TeamStarRoundSendsStarTotalsAsTeamTotals()
+    {
+        var services = new ServiceRegistry();
+        var context = new PluginContext(new PluginRow { Id = "star-total-test", Plugin = "star-total-test", Source = "test" },
+            services, new EventBus(NullLogger.Instance), NullLogger.Instance);
+        var scores = new Sink<RoundScoreUpdated>();
+        var boards = new Sink<RoundScoreboard>();
+        context.Effect(services.RegisterMany<IMessageSender<RoundScoreUpdated>>(scores));
+        context.Effect(services.RegisterMany<IMessageSender<RoundScoreboard>>(boards));
+        context.Effect(services.RegisterMany<IMessageSender<RoundEnded>>(new Sink<RoundEnded>()));
+        context.Effect(services.RegisterMany<IMessageSender<ResultStageAdvanced>>(new Sink<ResultStageAdvanced>()));
+        try
+        {
+            var rig = new Rig(resultContext: context, configure: options =>
+            {
+                options.StarTeamModeIds = [4];
+                options.StarRoundTimeLimitMs = 600;
+                options.ResultScoreboardDelayMs = 0;
+                options.ResultRewardDelayMs = 0;
+            });
+            await rig.StartAsync();
+            var room = rig.Registry.Find(rig.RoomId)!;
+            lock (room.Gate)
+            {
+                room.FindByGame(rig.Host.Id)!.Team = 1;
+                room.FindByGame(rig.Guest.Id)!.Team = 2;
+                room.Scoring.AddKill(room.FindByGame(rig.Host.Id)!.Slot, 1);
+            }
+            await ReportStarsAsync(rig, rig.Guest, RoundStarChange.SmallGained, 4);
+            await ReportStarsAsync(rig, rig.Host, RoundStarChange.SmallGained, 1);
+            await FinishLoadingAsync(rig);
+            for (var i = 0; i < 200 && scores.To(rig.Host).Length == 0; i++) await Task.Delay(10);
+            Assert.Equal(new[] { 1, 4 }, scores.To(rig.Host).Last().TeamTotals.ToArray());
+            for (var i = 0; i < 300 && boards.To(rig.Host).Length == 0; i++) await Task.Delay(10);
+            var board = boards.To(rig.Host).Last();
+            Assert.Equal(2, board.WinnerTeam);
+            Assert.Equal(new[] { 1, 4 }, board.TeamTotals.ToArray());
+        }
+        finally { context.Unwind(); }
+    }
+
     [Theory]
     [InlineData(new[] { 5 }, new[] { 5 })]
     [InlineData(new[] { 8 }, new int[0])]
@@ -1605,6 +1699,38 @@ public sealed partial class RoundFlowTests
         Assert.Empty(new InGameOptions { StarModeIds = [5], StarTeamModeIds = [6], ZombiePvpModeIds = [8] }.Validate());
         Assert.Contains(new InGameOptions { StarModeIds = modes, StarTeamModeIds = teamModes, ZombiePvpModeIds = [8] }.Validate(),
             result => result.ErrorMessage!.Contains("star_mode_ids"));
+    }
+
+    /// <summary>The star fever starts before the star round's time limit or not at all.</summary>
+    [Fact]
+    public void StarFeverLeadStaysWithinTheTimeLimit()
+    {
+        Assert.Empty(new InGameOptions { StarRoundTimeLimitMs = 240000, StarFeverLeadMs = 45000 }.Validate());
+        Assert.Contains(new InGameOptions { StarRoundTimeLimitMs = 240000, StarFeverLeadMs = 240000 }.Validate(),
+            result => result.ErrorMessage!.Contains("star_fever_lead_ms"));
+    }
+
+    /// <summary>A star round's closing fever reaches every member once, the configured lead before the time limit.</summary>
+    [Fact]
+    public async Task StarRoundFeverStartsTheLeadBeforeTheTimeLimit()
+    {
+        var rig = new Rig(configure: options =>
+        {
+            options.StarModeIds = [4];
+            options.StarRoundTimeLimitMs = 1000;
+            options.StarFeverLeadMs = 600;
+        });
+        try
+        {
+            await rig.StartAsync();
+            await FinishLoadingAsync(rig);
+            await rig.WaitStartedAsync(rig.Host);
+            Assert.Empty(rig.StarFever.To(rig.Host));
+            await WaitEndedAsync(rig, rig.Host);
+            Assert.Single(rig.StarFever.To(rig.Host));
+            Assert.Single(rig.StarFever.To(rig.Guest));
+        }
+        finally { await rig.Registry.StopAllAsync(); }
     }
 
     /// <summary>A mission whose duration would overlap Boss spawning is never announced or spawned.</summary>

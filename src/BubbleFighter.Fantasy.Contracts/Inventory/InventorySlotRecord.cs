@@ -20,6 +20,24 @@ public sealed record InventorySlotRecord(
     /// <summary>Gets the durable lifetime; existing rows remain unspecified until their terms are established.</summary>
     public InventoryLifetime Lifetime { get; init; }
 
+    /// <summary>Gets independently saved growth and abilities by client build; null identifies an uninitialized pet or another item.</summary>
+    public PetProgressions? Pet { get; init; }
+
+    /// <summary>Gets this pet ownership's immutable identity and native Article key, shared by existing bag mirrors.</summary>
+    public PetEntitlementIdentity? PetIdentity { get; init; }
+
+    /// <summary>Gets durable Article ownership for ordinary equipment; pet ownership retains its compatible identity.</summary>
+    public InventoryArticleIdentity? ArticleIdentity { get; init; }
+
+    /// <summary>Gets immutable enhancement outcomes and attempt revisions indexed by the defining catalog scope.</summary>
+    public ItemEnhancements? Enhancements { get; init; }
+
+    /// <summary>Gets installed modification attributes and revisions in their original catalog scopes.</summary>
+    public ItemModifications? Modifications { get; init; }
+
+    /// <summary>Gets the Favorite weapon points earned by this Article, indexed by the defining catalog scope; the grade is derived, never stored.</summary>
+    public ItemFavorites? Favorites { get; init; }
+
     /// <summary>
     /// The worn bit of the packed flags <c>u8</c>. The client's slot parse expands
     /// wire <c>flags &amp; 1</c> into the parsed record byte that

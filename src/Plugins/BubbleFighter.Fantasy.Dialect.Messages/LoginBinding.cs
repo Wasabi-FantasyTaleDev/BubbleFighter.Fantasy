@@ -4,6 +4,7 @@ using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Inventory;
 using BubbleFighter.Fantasy.Contracts.Lobby;
 using BubbleFighter.Fantasy.Contracts.Presents;
+using BubbleFighter.Fantasy.Contracts.Progress;
 using BubbleFighter.Fantasy.Packets;
 using Microsoft.Extensions.Logging;
 
@@ -152,6 +153,20 @@ internal sealed class LoginBinding : IInboundMessageBinding<LoginRequested>, IMe
     {
         if (login.Wallet is not null && login.Wallet.UserNum != login.UserNumber)
             throw new InvalidOperationException("Login publication contains another player's wallet.");
+        if (login.CharacterBag?.Count > InventoryLimits.MaxInventorySlotsPerBag
+            || login.EquippedBag?.Count > InventoryLimits.MaxInventorySlotsPerBag
+            || login.ExpiredItemIds.Count > InventoryLimits.MaxInventorySlotsPerBag)
+            throw new InvalidDataException("Login inventory exceeds its snapshot bounds.");
+        login = login with
+        {
+            EquippedItemIds = new RoundEquipmentSnapshot(login.EquippedItemIds, []).WornItemIds,
+            CharacterBag = login.CharacterBag is null ? null : Array.AsReadOnly(login.CharacterBag.ToArray()),
+            EquippedBag = login.EquippedBag is null ? null : Array.AsReadOnly(login.EquippedBag.ToArray()),
+            ExpiredItemIds = Array.AsReadOnly(login.ExpiredItemIds.ToArray()),
+        };
+        var attributes = login.CharacterBag is null ? []
+            : await InventoryPresentations.EquippedAsync(_events, _protocol, login.CharacterBag, login.EquippedItemIds, ct).ConfigureAwait(false);
+        var appearance = new RoundEquipmentSnapshot(login.EquippedItemIds, attributes);
         var accepted = new LoginAccepted(login.UserNumber, login.Account, login.Nickname, login.ServerTime, login.CharacterItemId);
         var lucci = login.Wallet?.Lucci ?? 0;
         var cash = login.Wallet?.Cash ?? 0;
@@ -188,7 +203,7 @@ internal sealed class LoginBinding : IInboundMessageBinding<LoginRequested>, IMe
                     await SendInventoryAsync(session, login, ct).ConfigureAwait(false);
                     break;
                 case LoginBurstStep.MainMenu:
-                    await SendMainMenuAsync(session, login, ct).ConfigureAwait(false);
+                    await SendMainMenuAsync(session, login, appearance, ct).ConfigureAwait(false);
                     break;
                 case LoginBurstStep.EquipmentView:
                     // The inventory-view row publishes the equipped view through this awaited scene boundary,
@@ -250,19 +265,21 @@ internal sealed class LoginBinding : IInboundMessageBinding<LoginRequested>, IMe
             character ??= StarterInventory.Slots(0, InventoryBag.CharacterBag, now);
             equipped ??= StarterInventory.Slots(0, InventoryBag.EquippedBag, now);
         }
-        await _inventory.SendAsync(session, new InventoryReplaced(character, equipped), ct).ConfigureAwait(false);
+        await _inventory.SendAsync(session, new InventoryReplaced(character, equipped)
+            { IsCompleteSnapshot = login.InventoryIsComplete }, ct).ConfigureAwait(false);
     }
 
     // The main menu install is data-selected: the modern family writes it from the packet tables (its readers
     // are kr-1256 sub_10D4520, cn-774 sub_BAB9F0 and tw-454 sub_A89100), the legacy builds ask their room
     // adapter, which may activate after this row. A room adapter that is not mounted leaves the login ending at
     // the reply, as before.
-    private async ValueTask SendMainMenuAsync(ISession session, LoginSucceeded login, CancellationToken ct)
+    private async ValueTask SendMainMenuAsync(ISession session, LoginSucceeded login, RoundEquipmentSnapshot appearance, CancellationToken ct)
     {
         if (_values.MainMenu == LoginValues.TableMainMenu)
         {
             await session.SendAsync(_gotoRoomOpcode!.Value, MainMenuInstall.Write(_tables, _build, login.UserNumber,
-                login.Nickname, login.Level, login.CharacterItemId), ct).ConfigureAwait(false);
+                login.Nickname, login.Level, login.CharacterItemId, appearance.WornItemIds,
+                ItemAttributeWire.Values(appearance.ItemAttributes)), ct).ConfigureAwait(false);
             return;
         }
         var senders = _services.GetAll<IMessageSender<MainMenuRoomOpened>>()
@@ -276,7 +293,8 @@ internal sealed class LoginBinding : IInboundMessageBinding<LoginRequested>, IMe
             return;
         }
         await senders[0].SendAsync(session, new MainMenuRoomOpened(login.UserNumber, login.Nickname,
-            login.CharacterItemId, login.EquippedItemIds, login.Level) { OfferTutorial = login.OfferTutorial, ColorIndex = login.ColorIndex }, ct)
+            login.CharacterItemId, appearance.WornItemIds, login.Level)
+            { OfferTutorial = login.OfferTutorial, ColorIndex = login.ColorIndex, ItemAttributes = appearance.ItemAttributes }, ct)
             .ConfigureAwait(false);
     }
 

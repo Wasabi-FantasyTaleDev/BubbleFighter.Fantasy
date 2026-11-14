@@ -70,6 +70,50 @@ public sealed class ServerDirectoryApiTests
         Assert.Equal("gateway", body.GetProperty("center").GetProperty("mode").GetString());
     }
 
+    /// <summary>
+    /// The catalog lists the builds the cluster's nodes serve together and marks every instance, keeping the ones no
+    /// node serves so the launcher can show them disabled; a launch of such a build is refused by name.
+    /// </summary>
+    [Fact]
+    public async Task CatalogMarksInstancesTheClusterDoesNotServe()
+    {
+        var options = Options();
+        options.Instances = [.. options.Instances,
+            new() { Id = "kr-812", Build = "kr-812", Port = 7110, Name = [new() { Language = "en", Text = "Other build" }] }];
+        await using var server = await LauncherServer.StartAsync(options, new MemoryLauncherAccounts(4),
+            new LauncherSessions(options, new MemoryLauncherSessions(4)), players: null, directory: new Directory(),
+            clusterBuilds: new Builds(["kr-1256", "id-400"]));
+        using var http = new HttpClient { BaseAddress = new(server.Addresses.Single()) };
+        var catalog = await http.GetFromJsonAsync<JsonElement>("/v1/catalog");
+        Assert.Equal(["kr-1256", "id-400"], catalog.GetProperty("clusterBuilds").EnumerateArray().Select(build => build.GetString()));
+        var instances = catalog.GetProperty("instances");
+        Assert.Equal(2, instances.GetArrayLength());
+        Assert.True(instances[0].GetProperty("clusterServed").GetBoolean());
+        Assert.False(instances[1].GetProperty("clusterServed").GetBoolean());
+        using var refused = await http.PostAsJsonAsync("/v1/launch", new { build = "kr-812" });
+        Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
+        Assert.Equal("build_not_served", (await refused.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error").GetString());
+    }
+
+    /// <summary>Without a cluster the catalog says nothing about cluster service, as before.</summary>
+    [Fact]
+    public async Task StandaloneCatalogHasNoClusterBuilds()
+    {
+        var options = Options();
+        await using var server = await LauncherServer.StartAsync(options, new MemoryLauncherAccounts(4),
+            new LauncherSessions(options, new MemoryLauncherSessions(4)), players: null);
+        using var http = new HttpClient { BaseAddress = new(server.Addresses.Single()) };
+        var catalog = await http.GetFromJsonAsync<JsonElement>("/v1/catalog");
+        Assert.Equal(JsonValueKind.Null, catalog.GetProperty("clusterBuilds").ValueKind);
+        Assert.False(catalog.GetProperty("instances")[0].TryGetProperty("clusterServed", out _));
+    }
+
+    private sealed class Builds(IReadOnlyList<string> builds) : IServerSelectionDirectory
+    {
+        public IReadOnlyList<string> ClientBuilds => builds;
+        public IReadOnlyList<ServerSelectorEntry> ListSelectionServers(string clientBuild) => throw new NotSupportedException();
+    }
+
     private static LauncherOptions Options() => new()
     {
         Listen = "127.0.0.1:0", PasswordIterations = 100000,

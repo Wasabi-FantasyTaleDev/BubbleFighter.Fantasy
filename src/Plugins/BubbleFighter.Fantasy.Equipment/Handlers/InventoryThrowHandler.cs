@@ -53,11 +53,13 @@ public sealed class InventoryThrowHandler(IInventoryItemRemoval removal, IEquipm
         var characters = worn.Where(id => id is >= 300001 and <= 300031).ToArray();
         if (characters.Length != 1 || worn.Count > InventoryLimits.MaxEquippedSlots)
             throw new InvalidOperationException("Inventory throw requires one selected character and a bounded equipment set.");
-        await events.SerialAsync(new EquipmentSelectionCommitted(session, user, characters[0], worn), ct).ConfigureAwait(false);
+        var attributes = await InventoryPresentations.EquippedAsync(events, replies.Protocol, snapshot, worn, ct).ConfigureAwait(false);
+        await events.SerialAsync(new EquipmentSelectionCommitted(session, user, characters[0], worn)
+            { ItemAttributes = attributes }, ct).ConfigureAwait(false);
         // Native success erases the identity; slot upserts then restore any replacement from this snapshot.
         await ReplyAsync(0).ConfigureAwait(false);
         await inventoryPush.PushSlotUpdatesAsync(session, snapshot, ct).ConfigureAwait(false);
-        await equippedView.SendSelectionAsync(session, user, characters[0], worn, ct).ConfigureAwait(false);
+        await equippedView.SendSnapshotAsync(session, user, characters[0], snapshot, ct).ConfigureAwait(false);
 
         ValueTask ReplyAsync(int result) => replies.SendAsync(session, new(request.ItemId, result), ct);
     }

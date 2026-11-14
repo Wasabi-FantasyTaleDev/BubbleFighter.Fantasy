@@ -3,12 +3,13 @@ using System.Net;
 using System.Security.Cryptography;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
+using BubbleFighter.Fantasy.Contracts.Signals;
 using BubbleFighter.Fantasy.Contracts.Match;
 
 namespace BubbleFighter.Fantasy.MatchConnection;
 
 /// <summary>Publishes a bounded UDP identity directory independently of the match reply adapters.</summary>
-[Plugin("match-udp-directory", Description = "Authenticated match UDP endpoint leases.",
+[Plugin("match-udp-directory", Category = "network", Names = ["en=UDP match directory", "zh-Hans=UDP 对局目录", "zh-Hant=UDP 對局目錄", "ko=UDP 매치 디렉터리"], Description = "Authenticated match UDP endpoint leases.",
     ProvidesMany = [typeof(IMatchUdpRelayDirectory)])]
 public sealed class MatchUdpDirectoryPlugin : IPlugin
 {
@@ -53,6 +54,8 @@ public sealed class MatchUdpDirectory : IMatchUdpRelayDirectory, IDisposable
     private readonly object _gate = new();
     private readonly Dictionary<long, Entry> _entries = [];
     private readonly MatchUdpDirectoryOptions _options;
+    // Complete while any entry exists; the relay setup loop sleeps on it. Refreshed under _gate with each change.
+    private readonly PresenceSignal _registered = new();
     private bool _disposed;
 
     /// <summary>Creates an empty directory using validated protocol and retention bounds.</summary>
@@ -83,6 +86,7 @@ public sealed class MatchUdpDirectory : IMatchUdpRelayDirectory, IDisposable
                 throw new InvalidOperationException("Duplicate UDP match registration.");
             var entry = new Entry(session, isCurrent);
             _entries.Add(session.Id, entry);
+            _registered.Refresh(() => _entries.Count != 0);
             return new Registration(this, entry);
         }
     }
@@ -151,6 +155,9 @@ public sealed class MatchUdpDirectory : IMatchUdpRelayDirectory, IDisposable
             return _entries.Values.Where(entry => !entry.Revoked && !entry.Disabled && entry.Endpoint is not null)
                 .Select(entry => entry.Session).ToArray();
     }
+
+    /// <inheritdoc />
+    public Task WhenAnyRegistered() => _registered.WhenPresent;
 
     /// <inheritdoc />
     public IReadOnlyList<ISession> RegisteredSessions()
@@ -287,6 +294,7 @@ public sealed class MatchUdpDirectory : IMatchUdpRelayDirectory, IDisposable
             entry.Endpoint = null;
             if (_entries.TryGetValue(entry.Session.Id, out var current) && ReferenceEquals(current, entry))
                 _entries.Remove(entry.Session.Id);
+            _registered.Refresh(() => _entries.Count != 0);
         }
     }
 
@@ -304,6 +312,7 @@ public sealed class MatchUdpDirectory : IMatchUdpRelayDirectory, IDisposable
                 entry.Endpoint = null;
             }
             _entries.Clear();
+            _registered.Refresh(() => false);
         }
     }
 

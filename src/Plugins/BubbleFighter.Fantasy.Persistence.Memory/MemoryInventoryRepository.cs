@@ -10,7 +10,8 @@ namespace BubbleFighter.Fantasy.Persistence.Memory;
 /// list reads it back in that order. Bag storage is keyed per player and per
 /// bag, so the 802 character bag and the 803 container-1 bag never share rows.
 /// </summary>
-public sealed partial class MemoryInventoryRepository(MemoryPlayerTable table, int maxLoadoutsPerPlayer = 32) : IInventoryLoadoutStore
+public sealed partial class MemoryInventoryRepository(MemoryPlayerTable table, int maxLoadoutsPerPlayer = 32,
+    BubbleFighter.Fantasy.Contracts.Titles.TitleMedalLimits? titleMedalLimits = null) : IInventoryLoadoutStore
 {
     /// <inheritdoc />
     public ValueTask<IReadOnlyList<InventorySlotRecord>?> RemoveExpiredItemAsync(long userNum, int itemId,
@@ -132,6 +133,8 @@ public sealed partial class MemoryInventoryRepository(MemoryPlayerTable table, i
         lock (entry.Gate)
         {
             var bag2 = entry.Bags;
+            if (bag2.TryGetValue((int)bag, out var existing))
+                foreach (var row in existing) row.Pet?.Validate(maxLoadoutsPerPlayer);
             return ValueTask.FromResult<IReadOnlyList<InventorySlotRecord>>(
                 bag2.TryGetValue((int)bag, out var rows) ? [.. rows] : []);
         }
@@ -149,6 +152,7 @@ public sealed partial class MemoryInventoryRepository(MemoryPlayerTable table, i
 
         foreach (var slot in slots)
         {
+            slot.Pet?.Validate(maxLoadoutsPerPlayer);
             if (slot.UserNum != userNum)
                 throw new ArgumentException($"inventory slot user_num {slot.UserNum} does not match replace target {userNum}.", nameof(slots));
             if (slot.Bag != bag)
@@ -157,7 +161,11 @@ public sealed partial class MemoryInventoryRepository(MemoryPlayerTable table, i
 
         var entry = table.GetOrAdd(userNum);
         lock (entry.Gate)
+        {
+            ct.ThrowIfCancellationRequested();
+            PetEntitlementInventory.ValidateExternalWrite(userNum, PetRows(entry), slots);
             entry.Bags[(int)bag] = [.. slots];
+        }
         return ValueTask.CompletedTask;
     }
 
@@ -174,6 +182,8 @@ public sealed partial class MemoryInventoryRepository(MemoryPlayerTable table, i
         {
             var current = entry.Bags.TryGetValue((int)bag, out var rows) ? rows : [];
             var merged = InventoryAppend.Merge(userNum, bag, current, candidates);
+            PetEntitlementInventory.ValidateExternalWrite(userNum, PetRows(entry), merged.Skip(current.Count).ToArray());
+            foreach (var slot in merged) slot.Pet?.Validate(maxLoadoutsPerPlayer);
             if (merged.Count != current.Count)
                 entry.Bags[(int)bag] = [.. merged];
             return ValueTask.FromResult<IReadOnlyList<InventorySlotRecord>>([.. merged]);

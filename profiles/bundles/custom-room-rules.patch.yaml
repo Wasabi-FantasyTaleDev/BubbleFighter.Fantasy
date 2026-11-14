@@ -1,0 +1,10 @@
+# KR1256 CustomGameMode is an option vector within supported modes, loaded from this build's native workbook.
+- set:
+    id: dialect.rooms
+    config:
+      custom_room_rules: ${BFF_CUSTOM_ROOM_RULES_ENABLED:-true}
+- set:
+    id: ingame
+    config:
+      custom_room_rules: ${BFF_CUSTOM_ROOM_RULES_ENABLED:-true}
+      custom_room_rules_path: Config/CustomGameMode.xml

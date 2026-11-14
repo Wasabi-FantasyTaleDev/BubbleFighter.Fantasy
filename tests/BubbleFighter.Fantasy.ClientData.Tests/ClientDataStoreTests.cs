@@ -69,6 +69,86 @@ public sealed class ClientDataStoreTests : IDisposable
         Assert.False(store.Exists("Config/../../outside.txt"));
     }
 
+    /// <summary>A name is asked of the file system as a pattern; only the exact name, case aside, is that file.</summary>
+    [Fact]
+    public void ALooseNameWithPatternCharactersMatchesNothingElse()
+    {
+        Directory.CreateDirectory(Path.Combine(Raw, "Config"));
+        File.WriteAllText(Path.Combine(Raw, "Config", "ShopItem2.xml"), "loose");
+        using var store = Open();
+        Assert.True(store.Exists("config/SHOPITEM2.XML"));
+        Assert.False(store.Exists("Config/*.xml"));
+        Assert.False(store.Exists("Config/ShopItem?.xml"));
+        Assert.False(store.Exists("*/ShopItem2.xml"));
+        Assert.False(store.Exists("Config/ShopItem2.xml/"));
+    }
+
+    [Theory]
+    [InlineData("loose")]
+    [InlineData("bfz")]
+    [InlineData("pkn")]
+    public void AFileIsStreamedAndMeasuredWithoutBeingReadWhole(string source)
+    {
+        var text = "<workbook>" + new string('w', 200_000) + "</workbook>";
+        switch (source)
+        {
+            case "loose":
+                Directory.CreateDirectory(Path.Combine(Raw, "Config"));
+                File.WriteAllText(Path.Combine(Raw, "Config", "ShopItem2.xml"), text);
+                break;
+            case "bfz":
+                Bfz("Config/Config.bfz", ("Config/ShopItem2.xml", text));
+                break;
+            default:
+                Pkn("Packs/Config_00000.pkn", ("Config/ShopItem2.xml", text));
+                break;
+        }
+        using var store = Open();
+        Assert.Equal(text.Length, store.Length("config/shopitem2.XML"));
+        using (var stream = store.OpenRead("config/shopitem2.XML"))
+        using (var reader = new StreamReader(stream, Encoding.UTF8))
+            Assert.Equal(text, reader.ReadToEnd());
+
+        // The contract's workbook streams from the store and asks only for the size up front.
+        var workbook = BubbleFighter.Fantasy.Contracts.ClientData.WorkbookFile.FromStore(store, "Config/ShopItem2.xml");
+        Assert.Equal(text.Length, workbook.Length);
+        using (var stream = workbook.Open())
+        using (var reader = new StreamReader(stream, Encoding.UTF8))
+            Assert.Equal(text, reader.ReadToEnd());
+        Assert.Throws<InvalidDataException>(() =>
+            BubbleFighter.Fantasy.Contracts.ClientData.WorkbookFile.FromStore(store, "Config/ShopItem2.xml", text.Length - 1));
+        Assert.Equal(text.Length,
+            BubbleFighter.Fantasy.Contracts.ClientData.WorkbookFile.FromStore(store, "Config/ShopItem2.xml", text.Length).Length);
+    }
+
+    [Fact]
+    public void AMissingFileIsReportedByLengthOpenAndTheWorkbook()
+    {
+        Bfz("Config/Config.bfz", ("Config/ShopItem2.xml", "archive"));
+        using var store = Open();
+        Assert.Throws<FileNotFoundException>(() => store.Length("Config/Missing.xml"));
+        Assert.Throws<FileNotFoundException>(() => store.OpenRead("Config/Missing.xml"));
+        Assert.Throws<FileNotFoundException>(() =>
+            BubbleFighter.Fantasy.Contracts.ClientData.WorkbookFile.FromStore(store, "Config/Missing.xml"));
+    }
+
+    /// <summary>A store that only implements whole reads still serves the streaming members of the contract.</summary>
+    [Fact]
+    public void AStoreWithoutStreamingFallsBackToAWholeRead()
+    {
+        BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore store = new WholeReadStore(Encoding.UTF8.GetBytes("whole"));
+        Assert.Equal(5, store.Length("any"));
+        using var stream = store.OpenRead("any");
+        using var reader = new StreamReader(stream, Encoding.UTF8);
+        Assert.Equal("whole", reader.ReadToEnd());
+    }
+
+    private sealed class WholeReadStore(byte[] bytes) : BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore
+    {
+        public bool Exists(string path) => true;
+        public byte[] Read(string path) => bytes;
+    }
+
     [Fact]
     public void MissingDirectoriesFailLoud()
     {
@@ -88,6 +168,9 @@ public sealed class ClientDataStoreTests : IDisposable
         }
         using var store = Open();
         Assert.Throws<InvalidDataException>(() => store.Read("maps/nested/TRACK.WB", 4));
+        Assert.Throws<InvalidDataException>(() => store.OpenRead("maps/nested/TRACK.WB", 10));
+        using (var stream = store.OpenRead("maps/nested/TRACK.WB", 11))
+            Assert.Equal(11, stream.Length);
         Assert.Equal("world-block", Encoding.UTF8.GetString(store.Read("maps/nested/TRACK.WB", 11)));
     }
 

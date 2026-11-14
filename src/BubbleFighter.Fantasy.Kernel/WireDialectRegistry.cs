@@ -5,7 +5,7 @@ using BubbleFighter.Fantasy.Abstractions.Protocol;
 namespace BubbleFighter.Fantasy.Kernel;
 
 /// <summary>Composes dialect providers into a replaceable, bounded deployment registry.</summary>
-[Plugin("core.wire-dialects", Description = "Wire dialect registry populated by deployment providers.",
+[Plugin("core.wire-dialects", Category = "core", Names = ["en=Wire dialects", "zh-Hans=线路方言", "zh-Hant=線路方言", "ko=와이어 방언"], Description = "Wire dialect registry populated by deployment providers.",
     OptionalMany = [typeof(IWireDialectProvider)], Provides = [typeof(IWireDialectRegistry)])]
 public sealed class WireDialectRegistryPlugin : IPlugin
 {

@@ -29,14 +29,16 @@ namespace BubbleFighter.Fantasy.Admin.Http;
 /// that needs HTTP reachability should register endpoints through it rather than hosting a
 /// second listener.
 /// </summary>
-[Plugin("admin.http", Description = "Kestrel administration API.",
+[Plugin("admin.http", Category = "admin", Names = ["en=Administration API", "zh-Hans=管理接口", "zh-Hant=管理介面", "ko=관리 API"], Description = "Kestrel administration API.",
     Requires = [typeof(IPluginHost)],
     Optional = [typeof(IClientProfileRegistry), typeof(IOpcodeTableRegistry), typeof(ISessionRegistry), typeof(IRoomStartService),
         typeof(IAdminWebContent), typeof(IBuildReleaseLabels), typeof(IMatchConnectionTracker),
         typeof(IInstallationService), typeof(IClientPolicyView), typeof(IAdminAccessControl), typeof(IPermissionService), typeof(IPermissionRegistry),
         typeof(IHostReadiness), typeof(IServerRestartService), typeof(IServerLogFeed), typeof(ICommandRegistry), typeof(ICommandExecutor),
         typeof(IDistributionSources), typeof(IDistributionGithubMirror), typeof(IDistributionPlans), typeof(IDistributionPackages), typeof(IDistributionJobs)],
-    OptionalMany = [typeof(IListenerEndpoint), typeof(IRoomAdminDirectory)])]
+    OptionalMany = [typeof(IListenerEndpoint)],
+    // Each build's room directory comes and goes with the build; reading it live keeps this row up across that.
+    LiveMany = [typeof(IRoomAdminDirectory)])]
 public sealed partial class AdminHttpPlugin : IPlugin
 {
     /// <inheritdoc />
@@ -84,8 +86,8 @@ public sealed partial class AdminHttpPlugin : IPlugin
         context.Services.TryGet<IInstallationService>(out var installation);
         if (access is not null)
         {
-            if (!IPAddress.IsLoopback(endPoint!.Address) && !access.AllowsRemoteBootstrap)
-                throw new ConfigException(context.Row.Id, ["A non-loopback installation listener requires an explicit bootstrap_token of at least 32 characters."]);
+            // A reachable installation listener needs no setup token: the first administrator account guards it once
+            // created. A configured bootstrap_token still restricts the first-run setup to whoever holds it.
             ConfigureInstallation(app, access, installation, options, endPoint!);
         }
         else if (!IPAddress.IsLoopback(endPoint!.Address))
@@ -172,7 +174,8 @@ public sealed partial class AdminHttpPlugin : IPlugin
                 {
                     total = instances.Count,
                     active = instances.Count(i => i.State == PluginState.Active),
-                    disabled = instances.Count(i => i.State == PluginState.Unloaded),
+                    disabled = instances.Count(i => i.State == PluginState.Unloaded && !i.IsSleeping),
+                    sleeping = instances.Count(i => i.IsSleeping),
                     failed = instances.Count(i => i.State is PluginState.Failed or PluginState.CleanupFailed or PluginState.WorkFailed),
                 },
                 builds = profiles.Select(p =>
@@ -372,7 +375,7 @@ public sealed class AdminHttpOptions
 {
     /// <summary>Gets or sets the bind address as <c>host:port</c>; defaults to loopback only.</summary>
     [Required]
-    public string Listen { get; set; } = "127.0.0.1:8080";
+    public string Listen { get; set; } = "127.0.0.1:7300";
 
     /// <summary>Gets or sets how many recent log lines the <c>/api/logs</c> buffer keeps; older lines are dropped.</summary>
     [Range(16, 100_000)]

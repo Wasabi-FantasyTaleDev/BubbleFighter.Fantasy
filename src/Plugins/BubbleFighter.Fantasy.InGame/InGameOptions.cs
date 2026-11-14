@@ -76,6 +76,9 @@ public sealed partial class InGameOptions : IValidatableOptions
     /// </summary>
     public bool NativeLifeEveryMode { get; set; }
 
+    /// <summary>Gets or sets native OneKill requests and victim confirmations in Area32; requires the FinalZone exchange and is disabled by default.</summary>
+    public bool NativeOneKill { get; set; }
+
     /// <summary>Gets or sets the mode with counted cooperative item slots; zero disables them.</summary>
     [Range(0, ushort.MaxValue)]
     public int CountedItemModeId { get; set; }
@@ -196,6 +199,19 @@ public sealed partial class InGameOptions : IValidatableOptions
     [Range(1, int.MaxValue - 65536)]
     public int StarObjectIdBase { get; set; } = 0x64000000;
 
+    /// <summary>
+    /// Gets or sets whether a star round whose host reported no star points reads them from the star helpers of the
+    /// map's <c>track.wb</c> instead. It needs the client map data and reads within the item-mode helper reader's limits.
+    /// </summary>
+    public bool StarMapFallback { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets how long before a star round's time limit its closing fever starts; zero, the default, starts none.
+    /// Only builds whose packet table has the empty fever notice send it (kr-1256 S2C 634, read by sub_6ECD60).
+    /// </summary>
+    [Range(0, 3600000)]
+    public int StarFeverLeadMs { get; set; }
+
     /// <summary>Gets or sets cooperative modes whose native stage result replaces team-score comparison.</summary>
     [MaxLength(64)]
     public int[] CooperativeStageResultModes { get; set; } = [];
@@ -274,6 +290,13 @@ public sealed partial class InGameOptions : IValidatableOptions
 
     /// <summary>Gets or sets whether boxes refused for full held slots are recreated once space becomes available.</summary>
     public bool RenewFullSlotSupplies { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether using a held item selects the other occupied native slot after consumption.
+    /// The client must expose the audited slot-switch reply for this to be safe; disabled by default for builds
+    /// whose post-use selection behavior has not been read.
+    /// </summary>
+    public bool AutoAdvanceItemSlotAfterUse { get; set; }
 
     /// <summary>Gets or sets confirmed pickup kinds that run a native effect immediately instead of occupying an item slot.</summary>
     [MaxLength(64)]
@@ -713,6 +736,9 @@ public sealed partial class InGameOptions : IValidatableOptions
     /// </summary>
     public string ModeTablePath { get; set; } = string.Empty;
 
+    /// <summary>Gets or sets the localized room-mode name table; an empty path retains numeric-only room tags.</summary>
+    public string ModeNameTablePath { get; set; } = string.Empty;
+
     /// <summary>
     /// Gets or sets whether the server relays a seat's character position report (C2S 301 in the
     /// plaza, C2S 511 in a room) to the other seats as the 26-byte S2C 301 / S2C 514 body documented in
@@ -984,6 +1010,8 @@ public sealed partial class InGameOptions : IValidatableOptions
     public IEnumerable<ValidationResult> Validate()
     {
         foreach (var result in ValidateAi()) yield return result;
+        foreach (var result in ValidateExtremeRacingInitialization()) yield return result;
+        foreach (var result in ValidateBnB()) yield return result;
         if (LotteryModes.Length > 0)
         {
             if (string.IsNullOrWhiteSpace(LotteryWorkbookPath) == string.IsNullOrWhiteSpace(LotteryWorkbookClientPath)
@@ -995,6 +1023,7 @@ public sealed partial class InGameOptions : IValidatableOptions
                 yield return new ValidationResult("Grouped rewards require sufficient native prize families and bounded positive count/group weights.");
         }
         foreach (var result in ValidateRescue()) yield return result;
+        foreach (var result in ValidateWeaponMaster()) yield return result;
         foreach (var result in ValidatePvePoints()) yield return result;
         if (NativeLifeModeIds.Any(mode => mode is <= 0 or > ushort.MaxValue) || NativeLifeModeIds.Distinct().Count() != NativeLifeModeIds.Length)
             yield return new ValidationResult("native_life_mode_ids must be distinct mode ids from 1 to 65535.", [nameof(NativeLifeModeIds)]);
@@ -1016,6 +1045,8 @@ public sealed partial class InGameOptions : IValidatableOptions
             || CountedImmediateItemKinds.Any(kind => kind <= 0 || CountedItemKinds.Contains(kind))
             || CountedImmediateItemKinds.Distinct().Count() != CountedImmediateItemKinds.Length)
             yield return new ValidationResult("counted_immediate_item_kinds requires a counted mode and distinct positive kinds outside its counted slots.");
+        if (AutoAdvanceItemSlotAfterUse && NativeItemSlotCount < 2)
+            yield return new ValidationResult("auto_advance_item_slot_after_use requires at least two native item slots.", [nameof(AutoAdvanceItemSlotAfterUse)]);
         if (CooperativeStageResultModes.Any(mode => mode is <= 0 or > ushort.MaxValue)
             || CooperativeStageResultModes.Distinct().Count() != CooperativeStageResultModes.Length)
             yield return new ValidationResult("cooperative_stage_result_modes must contain distinct positive mode identifiers.");
@@ -1064,6 +1095,8 @@ public sealed partial class InGameOptions : IValidatableOptions
         if (starModes.Any(mode => mode is <= 0 or > ushort.MaxValue || mode == ZombieConversionModeId || ZombiePvpModeIds.Contains(mode))
             || starModes.Distinct().Count() != starModes.Length)
             yield return new ValidationResult("star_mode_ids and star_team_mode_ids must contain distinct positive mode ids that no zombie mode uses.");
+        if (StarFeverLeadMs >= StarRoundTimeLimitMs)
+            yield return new ValidationResult("star_fever_lead_ms must be shorter than star_round_time_limit_ms.");
         if (AutoStartModeIds.Any(mode => mode is <= 0 or > ushort.MaxValue) || AutoStartModeIds.Distinct().Count() != AutoStartModeIds.Length)
             yield return new ValidationResult("auto_start_mode_ids must contain distinct positive mode ids.");
         if (LucciKindValues.Length != 5 || LucciKindValues.Any(value => value is < 0 or > 1000000))

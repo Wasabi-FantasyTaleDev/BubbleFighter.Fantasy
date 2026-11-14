@@ -9,6 +9,15 @@ public interface INodeLeaseSource
     string DirectoryUrl { get; }
     /// <summary>Gets the last successfully reported lease, or null when the heartbeat is unavailable.</summary>
     NodeLeaseCredentials? Current { get; }
+    /// <summary>
+    /// Gets a task that is complete once <see cref="Current"/> no longer equals <paramref name="seen"/>, so a worker
+    /// that has dealt with one lease can sleep until the next instead of reading <see cref="Current"/> on a timer.
+    /// The comparison and the task are taken together: a lease that changes before the caller waits is not missed.
+    /// A source that cannot tell returns a completed task, and its caller keeps checking at its own period.
+    /// </summary>
+    /// <param name="seen">The lease the caller last read from <see cref="Current"/>, or null when it read none.</param>
+    /// <returns>A task that never faults; add cancellation with <see cref="Task.WaitAsync(CancellationToken)"/>.</returns>
+    Task WhenChangedFrom(NodeLeaseCredentials? seen) => Task.CompletedTask;
 }
 
 /// <summary>Identifies one authenticated directory lease; its token must never appear in diagnostics.</summary>
@@ -29,4 +38,11 @@ public interface IMigrationArrivalCleanup
     IReadOnlyList<MigrationArrival> Collect(bool drain = false);
     /// <summary>Releases a retired record's capacity after successful seat cleanup; requires the same arrival instance returned by this service.</summary>
     void Complete(MigrationArrival arrival);
+    /// <summary>
+    /// Gets a task that is complete while any arrival, pending or retired, is held and pending while there is none,
+    /// so the clean-up can sleep instead of collecting from an empty store. A store that cannot tell returns a
+    /// completed task, and its clean-up keeps collecting at its own period.
+    /// </summary>
+    /// <returns>A level-triggered task that never faults.</returns>
+    Task WhenAnyTracked() => Task.CompletedTask;
 }

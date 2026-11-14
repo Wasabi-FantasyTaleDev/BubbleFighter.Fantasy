@@ -1,8 +1,10 @@
+using BubbleFighter.Fantasy.Contracts.Signals;
 using BubbleFighter.Fantasy.Contracts.Match;
 using BubbleFighter.Fantasy.RoomCore;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using BubbleFighter.Fantasy.Abstractions;
+using BubbleFighter.Fantasy.Abstractions.Net;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Sessions;
 using Microsoft.Extensions.Logging;
@@ -23,6 +25,8 @@ namespace BubbleFighter.Fantasy.InGame.Sessions;
 public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabilityDirectory, IRoomAdminDirectory, IRoomPeerRoster, IPublishedRoomDirectory
 {
     private readonly ConcurrentDictionary<int, PlayRoom> _rooms = new();
+    // Complete while any room exists; peer setup loops sleep on it. Refreshed after every add and removal.
+    private readonly PresenceSignal _anyRoom = new();
     private readonly ConcurrentDictionary<long, int> _sessionToRoom = new();
     // Connection id to the session this registry attached, so a close event (which names only
     // the connection) can detach it. One entry per live attached connection; removed on close.
@@ -40,6 +44,9 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
 
     /// <inheritdoc />
     public string ClientBuild => _options.GameProtocol.Split('/')[0];
+
+    /// <summary>Gets how many rooms exist or are still shutting down; zero is what unloading an idle build requires.</summary>
+    internal int LiveRoomCount => _rooms.Count + _retiring.Count;
     private int _nextId;
 
     // Room ids travel as the u16 SessionSetting+0 of list rows and room sessions, so they cycle
@@ -205,10 +212,14 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
             {
                 CreateRules = rules,
                 Listed = listed,
+                SceneChanged = NotifyMembers,
             };
             room.SetAdmissionClock(_admissionClock);
             if (_rooms.TryAdd(id, room))
+            {
+                _anyRoom.Refresh(() => !_rooms.IsEmpty);
                 break;
+            }
             // Lost a race for the id: this executor never ran an operation, so its stop is immediate.
             var unused = room.Executor;
             _ = Task.Run(() => unused.DisposeAsync().AsTask());
@@ -491,7 +502,7 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
             if (session.Connection.IsClosed) throw new InvalidOperationException("A closed match transport cannot replace a seat binding.");
             var previous = seat.Relay;
             if (!_sessionToRoom.TryAdd(session.Id, room.Id)) throw new InvalidOperationException("Duplicate room transport.");
-            if (previous is not null) Release(previous);
+            if (previous is not null) ReleaseCore(previous, observeClose: false);
             seat.Relay = session;
             seat.RelayGeneration = room.StartGeneration;
             seat.RelayInitialized = false;
@@ -538,7 +549,9 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
     }
 
     /// <inheritdoc />
-    public void Release(ISession session)
+    public void Release(ISession session) => ReleaseCore(session, observeClose: true);
+
+    private void ReleaseCore(ISession session, bool observeClose)
     {
         if (_sessionToRoom.TryGetValue(session.Id, out var roomId) && _rooms.TryGetValue(roomId, out var room))
         {
@@ -547,6 +560,7 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
                 var seat = room.Seats.FirstOrDefault(s => ReferenceEquals(s.Relay, session));
                 if (seat is not null)
                 {
+                    if (observeClose && session.Connection.IsClosed) ParticipantConnectionClosed?.Invoke(room, session);
                     seat.Relay = null;
                     seat.RelayInitialized = false;
                     seat.RelayConfirmed = false;
@@ -589,6 +603,7 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
             if (relaySeat is not null)
             {
                 var relay = relaySeat.Relay!;
+                if (relay.Connection.IsClosed) ParticipantConnectionClosed?.Invoke(room, relay);
                 relaySeat.Relay = null;
                 relaySeat.RelayInitialized = false;
                 relaySeat.RelayConfirmed = false;
@@ -605,8 +620,12 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
                 UnsharePlayer(attachedRelay.Id);
             }
             room.RemoveSession(sessionId);
+            if (gameSeat is not null) SessionSceneChanged?.Invoke(gameSeat.Game);
             if (room.Phase == RoomPhase.Closed && _rooms.TryRemove(id, out _))
+            {
+                _anyRoom.Refresh(() => !_rooms.IsEmpty);
                 Retire(room);
+            }
         }
     }
 
@@ -629,6 +648,22 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
     /// <param name="connectionId">The connection id.</param>
     public PlayRoom? FindByConnection(long connectionId) =>
         _connectionToSession.TryGetValue(connectionId, out var sessionId) ? TryGet(sessionId) : null;
+
+    /// <summary>Observes a closed participant under the room gate; callbacks may only mark state and schedule cleanup.</summary>
+    internal Action<PlayRoom, ISession>? ParticipantConnectionClosed { get; set; }
+
+    /// <summary>Captures a close before queue admission or transport release can erase its current room ownership.</summary>
+    internal void ObserveConnectionClosed(IConnection connection)
+    {
+        if (!connection.IsClosed || !_connectionToSession.TryGetValue(connection.Id, out var sessionId)
+            || TryGet(sessionId) is not { } room) return;
+        lock (room.Gate)
+        {
+            var session = room.Seats.SelectMany(seat => new[] { seat.Game, seat.Relay })
+                .OfType<ISession>().FirstOrDefault(candidate => candidate.Id == sessionId && ReferenceEquals(candidate.Connection, connection));
+            if (session is not null) ParticipantConnectionClosed?.Invoke(room, session);
+        }
+    }
 
     /// <inheritdoc />
     public ValueTask<IReadOnlyList<AdminRoomSnapshot>> ListAsync(CancellationToken cancellationToken)
@@ -701,21 +736,30 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
         lock (room.Gate)
         {
             room.IsStopping = true;
+            room.BnBClock?.Cancel();
             room.CancelBattleSettlement();
             room.ExtremeRacingClock?.Cancel();
+            room.ExtremeRacingCannonClock?.Cancel();
             room.FinalZoneWaterClock?.Cancel();
             room.FinalZoneDroneClock?.Cancel();
             room.CancelResultSequence();
         }
         await room.Executor.DisposeAsync().ConfigureAwait(false);
-        Task result, extremeRacing, finalZoneWater, finalZoneDrones;
+        Task result, extremeRacing, extremeRacingCannon, extremeRacingCleanup,finalZoneWater, finalZoneDrones, finalZoneCleanup, bnb, bnbCleanup;
         lock (room.Gate)
         {
             // A running executor operation may have started its result after shutdown began.
             room.CancelResultSequence();
             result = room.ResultTask;
+            room.BnBClock?.Cancel();
+            bnb = room.BnBClock?.Completion ?? Task.CompletedTask;
+            bnbCleanup = room.BnBCleanupTask;
             room.ExtremeRacingClock?.Cancel();
             extremeRacing = room.ExtremeRacingClock?.Completion ?? Task.CompletedTask;
+            room.ExtremeRacingCannonClock?.Cancel();
+            extremeRacingCannon = room.ExtremeRacingCannonClock?.Completion ?? Task.CompletedTask;
+            extremeRacingCleanup = room.ExtremeRacingCleanupTask;
+            finalZoneCleanup = room.FinalZoneCleanupTask;
             room.FinalZoneWaterClock?.Cancel();
             finalZoneWater = room.FinalZoneWaterClock?.Completion ?? Task.CompletedTask;
             room.FinalZoneDroneClock?.Cancel();
@@ -723,15 +767,24 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
         }
         await result.ConfigureAwait(false);
         await extremeRacing.ConfigureAwait(false);
+        await extremeRacingCannon.ConfigureAwait(false);
+        await extremeRacingCleanup.ConfigureAwait(false);
+        await bnb.ConfigureAwait(false);
+        await bnbCleanup.ConfigureAwait(false);
         await finalZoneWater.ConfigureAwait(false);
         await finalZoneDrones.ConfigureAwait(false);
+        await finalZoneCleanup.ConfigureAwait(false);
     }
 
     // A room is usually deleted by the operation running on its own executor, which may not stop itself
     // (RoomExecutor rejects reentry), so shutdown starts outside the operation's execution context and
     // completes once that operation returns.
+    /// <summary>Gets or sets the observer told once when a room is deleted, such as the room policies.</summary>
+    internal Action<PlayRoom>? Retired { get; set; }
+
     private void Retire(PlayRoom room)
     {
+        Retired?.Invoke(room);
         lock (room.Gate)
         {
             room.AutoStartCancellation?.Cancel();
@@ -763,6 +816,19 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
         if (!_sessionToRoom.TryAdd(game.Id, roomId))
             throw new InvalidOperationException($"Session {game.Id} is already in a room.");
         _connectionToSession[game.Connection.Id] = game.Id;
+        SessionSceneChanged?.Invoke(game);
+    }
+
+    /// <summary>
+    /// Gets or sets what runs after a game session joins or leaves a room, or its room's scene changes; it is called
+    /// under the room's gate and only schedules work.
+    /// </summary>
+    internal Action<ISession>? SessionSceneChanged { get; set; }
+
+    private void NotifyMembers(PlayRoom room)
+    {
+        if (SessionSceneChanged is not { } changed) return;
+        foreach (var seat in room.Seats) changed(seat.Game);
     }
 
     private void SharePlayer(ISession game, ISession relay)

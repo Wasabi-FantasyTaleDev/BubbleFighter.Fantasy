@@ -1,17 +1,14 @@
-# Profile patch for cn-324: applied after the bundle rows. The admin API moves off 8080
-# so this profile can run beside other profiles on one machine.
+# Profile patch for cn-324: applied after the bundle rows.
 - set:
     id: dialect.scene-seeds
     config:
       # cn-324 sub_4AA0E0 consumes seed decisions without adding the equipped weapon's chance.
       weapon_critical_bonuses: true
 - replace:
-    id: admin.http
-    config:
-      listen: "${CN_324_ADMIN_HOST:-127.0.0.1}:${CN_324_ADMIN_PORT:-8083}"
-- replace:
     id: diagnostics.packet-log
     config:
+      packets_enabled: ${BFF_PACKET_LOG:-false}
+      capture_enabled: ${BFF_PACKET_CAPTURE:-false}
       file: logs/{date}/packets-cn-324_{timestamp}.log
       preview_bytes: 96
       console_packets: false

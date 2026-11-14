@@ -15,6 +15,11 @@ internal sealed class RoomDeadlineClock
     private bool _disposed;
 
     internal RoomDeadlineClock(RoomExecutor executor, CancellationToken lifetime, Action<Exception> failed)
+        : this(executor, lifetime, failure => { failed(failure); return ValueTask.CompletedTask; })
+    {
+    }
+
+    internal RoomDeadlineClock(RoomExecutor executor, CancellationToken lifetime, Func<Exception, ValueTask> failed)
     {
         _stopping = CancellationTokenSource.CreateLinkedTokenSource(lifetime);
         Completion = BackgroundWork.Detached(() => RunAsync(executor, failed));
@@ -45,7 +50,7 @@ internal sealed class RoomDeadlineClock
         }
     }
 
-    private async Task RunAsync(RoomExecutor executor, Action<Exception> failed)
+    private async Task RunAsync(RoomExecutor executor, Func<Exception, ValueTask> failed)
     {
         var token = _stopping.Token;
         try
@@ -90,7 +95,7 @@ internal sealed class RoomDeadlineClock
             }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
-        catch (Exception failure) { failed(failure); }
+        catch (Exception failure) { await failed(failure).ConfigureAwait(false); }
         finally
         {
             lock (_gate)

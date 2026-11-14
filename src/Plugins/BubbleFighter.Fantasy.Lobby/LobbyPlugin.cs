@@ -350,9 +350,9 @@ public sealed class LobbyOptions : IValidatableOptions
 /// which republishes inventory through the build's inventory codec. The row holds no opcode or
 /// layout of any build. Plaza enter (C2S 106) is owned by <c>ingame</c> after the main menu.
 /// </summary>
-[Plugin("lobby", Description = "Login and main-menu logic shared by every client build.",
+[Plugin("lobby", Category = "gameplay", Names = ["en=Lobby and login", "zh-Hans=大厅与登录", "zh-Hant=大廳與登入", "ko=로비와 로그인"], Description = "Login and main-menu logic shared by every client build.",
     Requires = [typeof(IMessageRouter)],
-    Optional = [typeof(IAccountMutationFence), typeof(IAccountSessionAdmission), typeof(IPlayerRepository), typeof(IPlayerBattleRecordsRepository), typeof(IPaintItemCatalog), typeof(ILauncherTicketService), typeof(IEquipmentSelection), typeof(IDbConnectionFactory), typeof(IInventoryRepository), typeof(IPlayerWalletRepository), typeof(IHostReadiness)], OptionalMany = [typeof(IMessageSender<ServerNotice>), typeof(IInboundMessageBinding<InventoryItemUseRequested>), typeof(IMessageSender<InventoryItemUseReplied>), typeof(IMessageSender<UserStatUpdated>), typeof(IInboundMessageBinding<CharacterNameRequested>), typeof(IInboundMessageBinding<CharacterCreateRequested>), typeof(IInboundMessageBinding<CharacterLoginRequested>), typeof(IMessageSender<CharacterCreationOpened>), typeof(IMessageSender<CharacterNameReplied>), typeof(IMessageSender<CharacterCreateReplied>), typeof(IInboundMessageBinding<BubbleFighter.Fantasy.Contracts.Lobby.MainMenuInitRequest>), typeof(IMessageSender<EmptySessionSignature>), typeof(IInboundMessageBinding<LoginRequested>), typeof(IMessageSender<LoginSucceeded>), typeof(IMessageSender<LoginRejected>), typeof(IMessageSender<InventoryReplaced>), typeof(IMessageSender<InventoryPurchaseApplied>), typeof(IMessageSender<InventorySlotsUpdated>), typeof(IMessageSender<ItemsExpired>), typeof(IInboundMessageBinding<FighterInfoRequested>), typeof(IMessageSender<FighterInfoReplied>)],
+    Optional = [typeof(BubbleFighter.Fantasy.Contracts.Pets.IPetEntitlements), typeof(IAccountMutationFence), typeof(IAccountSessionAdmission), typeof(IPlayerRepository), typeof(IPlayerBattleRecordsRepository), typeof(IPaintItemCatalog), typeof(ILauncherTicketService), typeof(IEquipmentSelection), typeof(IDbConnectionFactory), typeof(IInventoryRepository), typeof(IInventoryLoadoutStore), typeof(IInventoryBuildScope), typeof(IPlayerWalletRepository), typeof(IHostReadiness)], OptionalMany = [typeof(IMessageSender<ServerNotice>), typeof(IInboundMessageBinding<InventoryItemUseRequested>), typeof(IMessageSender<InventoryItemUseReplied>), typeof(IMessageSender<UserStatUpdated>), typeof(IInboundMessageBinding<CharacterNameRequested>), typeof(IInboundMessageBinding<CharacterCreateRequested>), typeof(IInboundMessageBinding<CharacterLoginRequested>), typeof(IMessageSender<CharacterCreationOpened>), typeof(IMessageSender<CharacterNameReplied>), typeof(IMessageSender<CharacterCreateReplied>), typeof(IInboundMessageBinding<BubbleFighter.Fantasy.Contracts.Lobby.MainMenuInitRequest>), typeof(IMessageSender<EmptySessionSignature>), typeof(IInboundMessageBinding<LoginRequested>), typeof(IMessageSender<LoginSucceeded>), typeof(IMessageSender<LoginRejected>), typeof(IMessageSender<InventoryReplaced>), typeof(IMessageSender<InventoryPurchaseApplied>), typeof(IMessageSender<InventorySlotsUpdated>), typeof(IMessageSender<ItemsExpired>), typeof(IInboundMessageBinding<FighterInfoRequested>), typeof(IMessageSender<FighterInfoReplied>)],
     ConditionalProvides = [typeof(IRetainedPlayerAdmission), typeof(IInventoryPushService), typeof(IInventoryExpiry), typeof(IInventoryItemRemoval), typeof(IOnlinePlayers)])]
 public sealed class LobbyPlugin : IPlugin
 {
@@ -392,7 +392,8 @@ public sealed class LobbyPlugin : IPlugin
             }
 
             context.Services.TryGet<IEquipmentSelection>(out var selection);
-            inventory = new LoginInventoryResolver(store, options.SeedStarterInventory, selection, starter);
+            context.Services.TryGet<BubbleFighter.Fantasy.Contracts.Pets.IPetEntitlements>(out var petEntitlements);
+            inventory = new LoginInventoryResolver(store, options.SeedStarterInventory, selection, starter, petEntitlements: petEntitlements);
             var removal = new InventoryExpirySweep(store, selection, starter, TimeProvider.System);
             context.Effect(context.Services.Register<IInventoryItemRemoval>(removal));
             if (options.ExpireItems)
@@ -431,7 +432,7 @@ public sealed class LobbyPlugin : IPlugin
             context.Logger.LogInformation("Lobby money source mysql.");
         }
 
-        var playerSessions = new PlayerSessionScope();
+        var playerSessions = new PlayerSessionScope(context.Events);
         context.Effect(playerSessions);
         context.Effect(context.Events.On<ConnectionClosedEvent>(e => playerSessions.Remove(e.Connection.Id)));
         if (options.OnlinePlayers)
@@ -447,13 +448,16 @@ public sealed class LobbyPlugin : IPlugin
                 throw new ConfigException("fighter_info requires IInventoryRepository for the target's current equipment.");
             RequireBinding<FighterInfoRequested>(context, p);
             var fighterReplies = RequireSender<FighterInfoReplied>(context, p);
+            context.Services.TryGet<IInventoryBuildScope>(out var fighterScope);
+            var fighterLoadouts = fighterScope is null ? null : context.Services.Get<IInventoryLoadoutStore>();
+            context.Services.TryGet<BubbleFighter.Fantasy.Contracts.Pets.IPetEntitlements>(out var fighterPets);
             IPlayerBattleRecordsRepository? fighterRecords = null;
             if (options.FighterBattleStatistics
                 && (!context.Services.TryGet(out fighterRecords) || fighterRecords is null))
                 throw new ConfigException("fighter_battle_statistics requires IPlayerBattleRecordsRepository in the same data domain.");
             context.Effect(messages.For(context).On<FighterInfoRequested>(p,
                 (session, request, ct) => FighterInfoHandler.HandleAsync(playerSessions, fighterInventory, fighterReplies,
-                    session, request, ct, fighterRecords)));
+                    session, request, ct, fighterRecords, context.Events, fighterLoadouts, fighterScope?.Scope, fighterPets)));
         }
 
         // A build whose codec decodes the main-menu probe gets its empty signature reply.
@@ -705,6 +709,7 @@ public sealed class LobbyPlugin : IPlugin
             var player = account.Player!;
             var playerSession = account.Session!;
             IReadOnlyList<InventorySlotRecord>? characterBag = null, equippedBag = null;
+            var inventoryIsComplete = false;
             int[] equipped;
             IReadOnlyList<int> expiredItemIds = [];
             if (inventory is null)
@@ -721,6 +726,7 @@ public sealed class LobbyPlugin : IPlugin
                     expiredItemIds = await expiry.SweepForLoginAsync(player.UserNum, inventory, ct).ConfigureAwait(false);
                 var snapshot = await inventory.ResolveAsync(player.UserNum, ct).ConfigureAwait(false);
                 (characterBag, equippedBag) = (snapshot.CharacterBag, snapshot.EquippedBag);
+                inventoryIsComplete = snapshot.IsComplete;
                 equipped = snapshot.CharacterBag.Where(row => (row.Flags & 1) != 0).Select(row => row.ItemId).Distinct().ToArray();
             }
             var character = equipped.FirstOrDefault(id => id is >= 300001 and <= 300031, StarterInventory.DaoCharacterItemId);
@@ -730,7 +736,8 @@ public sealed class LobbyPlugin : IPlugin
             await succeeded.SendAsync(session, new LoginSucceeded(
                 checked((int)player.UserNum), player.Username, player.Nickname, Math.Max(1, player.Level), DateTime.Now,
                 character, equipped, wallet, characterBag, equippedBag)
-                { OfferTutorial = creation is not null ? offerTutorial : null, ExpiredItemIds = expiredItemIds, ColorIndex = player.ColorIndex }, ct).ConfigureAwait(false);
+                { OfferTutorial = creation is not null ? offerTutorial : null, ExpiredItemIds = expiredItemIds,
+                    ColorIndex = player.ColorIndex, InventoryIsComplete = inventoryIsComplete }, ct).ConfigureAwait(false);
             playerSession.MoveTo(SessionPhase.MainMenu);
         }
 

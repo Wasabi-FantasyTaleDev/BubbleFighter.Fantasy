@@ -73,6 +73,7 @@ public sealed class MatchMessagesMountTests
         Assert.Null(table.Find(PacketDirection.ClientToServer, "rcpReqJoinRelaySession"));
         Assert.Equal((ushort)(remap ? 5001 : 1), relay.C2S("rcpReqJoinRelaySession"));
         var hasReport = TestBuilds.Packets.CapabilityOf(build, "relay_validation_report");
+        var leaveOpcode = relay.Find(PacketDirection.ClientToServer, "rcpReqLeaveGame");
         Assert.Equal(hasReport, relay.Find(PacketDirection.ClientToServer, "rcpReqReportHackCheckData").HasValue);
         using var fixture = new Fixture(table);
         var context = fixture.Context(build, build + "/relay");
@@ -83,7 +84,7 @@ public sealed class MatchMessagesMountTests
         var join = Convert.FromHexString((string)joinFixture[1] + (string)joinFixture[2]);
         try
         {
-            Assert.Equal(hasReport ? 2 : 1, fixture.Packets.Handlers.Count);
+            Assert.Equal((hasReport ? 2 : 1) + (leaveOpcode.HasValue ? 1 : 0), fixture.Packets.Handlers.Count);
             await Request(relay.C2S("rcpReqJoinRelaySession"), join);
             Assert.Equal(key, Assert.IsType<MatchCapabilityAuthenticate>(Assert.Single(fixture.Messages.Received)).Ticket.ToArray());
             Assert.Empty(session.Sent);
@@ -105,6 +106,16 @@ public sealed class MatchMessagesMountTests
                 await Assert.ThrowsAsync<PacketFormatException>(() => Request(relay.C2S("rcpReqReportHackCheckData"), [.. report, 0]));
                 Assert.Equal(2, fixture.Messages.Received.Count);
             }
+            Assert.Equal(leaveOpcode.HasValue ? 1 : 0, fixture.Services.GetAll<IInboundMessageBinding<MatchLeaveRequested>>().Count);
+            if (leaveOpcode is { } leave)
+            {
+                Assert.Empty(TestBuilds.Packets.Resolve(build, "RelayLeaveGameRequest"));
+                await Request(leave, []);
+                Assert.IsType<MatchLeaveRequested>(fixture.Messages.Received[^1]);
+                var received = fixture.Messages.Received.Count;
+                await Assert.ThrowsAsync<PacketFormatException>(() => Request(leave, [0]));
+                Assert.Equal(received, fixture.Messages.Received.Count);
+            }
             var before = fixture.Messages.Received.Count;
             var other = new Session(Profile(build == "kr-812" ? "cn-324" : "kr-812"));
             await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Packets.DispatchAsync(build + "/relay", other,
@@ -118,6 +129,7 @@ public sealed class MatchMessagesMountTests
         Assert.Empty(fixture.Packets.Handlers);
         Assert.Empty(fixture.Services.GetAll<IInboundMessageBinding<MatchCapabilityAuthenticate>>());
         Assert.Empty(fixture.Services.GetAll<IInboundMessageBinding<MatchSceneIdentityRegistered>>());
+        Assert.Empty(fixture.Services.GetAll<IInboundMessageBinding<MatchLeaveRequested>>());
 
         Task Request(ushort opcode, byte[] body) => fixture.Packets.DispatchAsync(build + "/relay", session, new(opcode, body), default).AsTask();
     }

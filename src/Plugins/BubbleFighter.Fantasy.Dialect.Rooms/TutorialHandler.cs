@@ -369,6 +369,7 @@ internal sealed class TutorialHandler : IDisposable
         {
             // The solo tutorial scene gets no relay offer; it plays over its game connection as it always has.
             GameConnectionOnly = true,
+            ItemAttributes = player.Room.ItemAttributes,
         };
         if (!_skipStart && !_play.SkipEnter)
         {
@@ -385,6 +386,7 @@ internal sealed class TutorialHandler : IDisposable
         {
             Team = tutorialTeam,
             ControllerSlot = TutorialSeat,
+            ItemAttributes = player.Room.ItemAttributes,
         };
         var room = RoomCodec.WriteRoomEnvelope(_packetTables, _build, _room,
             new RoomValues(RoomCodec.PlayRoomKind, [tutorialSlot])
@@ -950,7 +952,7 @@ internal sealed class TutorialHandler : IDisposable
         if (entry.Old)
             await CompleteInitialTutorialAsync(session, ct).ConfigureAwait(false);
         // The clear is reported while the round still runs, so its time is measured from the round's start.
-        if (completed && !entry.Old && _sharedLifecycle)
+        if (completed && _sharedLifecycle && (!entry.Old || _packetTables.CapabilityOf(_build, "tutorial_practice_progress")))
             await DispatchLifecycleAsync(session, new TutorialStageCleared(entry.MapKey), ct).ConfigureAwait(false);
         if (_sharedLifecycle)
             await DispatchLifecycleAsync(session, new TutorialRoundClosed(), ct).ConfigureAwait(false);
@@ -1132,10 +1134,15 @@ internal sealed class TutorialHandler : IDisposable
         if (_events is not null)
             bag = await _events.WaterfallAsync<EquipmentSelectionReadRequested, IReadOnlyList<InventorySlotRecord>>(
                 new(session.Profile.Id + "/game", player.Room.UserNumber), _ => ValueTask.FromResult(bag), ct).ConfigureAwait(false);
+        if (bag.Count > InventoryLimits.MaxInventorySlotsPerBag)
+            throw new InvalidDataException("Tutorial inventory exceeds its appearance snapshot bound.");
+        bag = Array.AsReadOnly(bag.ToArray());
         var worn = bag.Where(row => (row.Flags & InventorySlotRecord.WornFlagBit) != 0)
             .Select(row => row.ItemId).Distinct().ToArray();
         var character = worn.Single(id => id is >= 300001 and <= 300031);
-        return player with { Room = player.Room with { CharacterItemId = character, EquippedItemIds = worn } };
+        var attributes = _events is null ? []
+            : await InventoryPresentations.EquippedAsync(_events, session.Profile.Id + "/game", bag, worn, ct).ConfigureAwait(false);
+        return player with { Room = player.Room with { CharacterItemId = character, EquippedItemIds = worn, ItemAttributes = attributes } };
     }
 
     /// <summary>

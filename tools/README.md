@@ -6,6 +6,7 @@ Public tools cover build and deployment packaging, CI checks, packet-table cover
 
 - `ci/serial-gates.py` builds Release, checks SDKs, runs each test project serially and checks packet/configuration data. Complete mode requires the documented local fixtures; `--public` excludes only local-data cases.
 - `legacy-audit/audit.py` checks declared feature coverage. It reads source and isolated configuration; it cannot prove gameplay acceptance.
+- `perf/` measures the memory and CPU of one isolated Host start against budgets, and reports a running Linux process from `/proc` without changing it. See [perf/README.md](perf/README.md).
 - `TrxSummary/` summarizes result records with bounded input sizes.
 - `ReloadLeakProbe/` measures synthetic assembly-context fixtures; it does not measure Host reloads.
 - `publish-windows-x64.ps1`, `publish-linux.ps1` and `prepare-linux-deployment.py` prepare framework-dependent outputs. Review their parameters before use and keep credentials and client data outside release archives.

@@ -80,8 +80,9 @@ The script detects x86_64 or aarch64, downloads the matching package and `SHA256
 | `state/` | The setup assistant's saved installation, kept across upgrades |
 | `dotnet/` | The runtime, only when the installer had to install it |
 | `bff` | The launcher; with no arguments it starts the setup assistant |
+| `settings.env` | WebUI access, setup token and port chosen by the installer; kept across upgrades |
 
-Start the server with `~/bubblefighter-fantasy/bff` and open `http://127.0.0.1:8080/`. The assistant listens on loopback only; on a remote server, forward the port from your own computer first with `ssh -L 8080:127.0.0.1:8080 <user>@<server>`.
+Start the server with `~/bubblefighter-fantasy/bff` and open `http://127.0.0.1:7300/` on the server itself. The installer asks two questions, and both answers default to no: whether other machines may open the WebUI (`--remote-admin`), and whether the first-run wizard needs a setup token (`--setup-token`). With the WebUI kept local, open it from your own computer through a tunnel: `ssh -L 7300:127.0.0.1:7300 <user>@<server>`, then `http://127.0.0.1:7300/`. With remote access on, open `http://<server>:7300/` and allow TCP port 7300 in the firewall or cloud security group. The answers are saved in `settings.env` in the install directory and kept by upgrades; a variable set in the environment overrides them.
 
 Pass options after `bash -s --`, for example `curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash -s -- --service`:
 
@@ -89,7 +90,11 @@ Pass options after `bash -s --`, for example `curl -fsSL https://wasabi-fantasyt
 | --- | --- |
 | `--version <tag>` | Install that release instead of the latest |
 | `--dir <path>` | Install directory |
-| `--admin-port <n>` | Port of the setup assistant and WebUI (default 8080) |
+| `--admin-port <n>` | Port of the setup assistant and WebUI (default 7300) |
+| `--remote-admin` | Let other machines open the WebUI; without it the WebUI only accepts the server itself |
+| `--setup-token` | Generate a token the first-run wizard asks for before it can be used; the installer prints it |
+| `--local-admin`, `--no-setup-token` | State the defaults explicitly |
+| `--no-prompt` | Ask nothing; use the options given and the defaults (also used when no terminal is attached) |
 | `--service` | As root: create and start the `bubblefighter-fantasy` systemd service, running as the `bff` system user |
 | `--start` | Start the server when the installation finishes |
 | `--no-runtime` | Fail instead of installing the runtime |
@@ -105,7 +110,7 @@ curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash -s -- --doc
 
 This needs Docker Engine with the Compose plugin. The installer unpacks the Linux package into `~/bubblefighter-fantasy/docker`, builds a local image from it, and starts the server container with Docker Compose. The container uses host networking, so the game ports of the clients you select are reachable. No database container is started: in the setup assistant, choose SQLite, which keeps its file in the `bff-state` volume, or enter an existing MySQL server.
 
-To run a bundled MySQL 8.4 as well, add `--with-mysql`:
+To run a bundled database as well, add `--with-mysql`. A new stack gets MariaDB 11.4, which the server uses as MySQL; a stack that was created with MySQL 8.4 keeps it on upgrade, because MariaDB cannot open its data:
 
 ```bash
 curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash -s -- --docker --with-mysql
@@ -242,12 +247,12 @@ docker compose -f deploy/docker/compose.yaml --env-file .env up --build
 
 The compose file starts two services:
 
-- `bff` is built from `deploy/docker/Dockerfile` with the repository as the build context. The Dockerfile publishes the host without a bundled runtime, then runs it on the ASP.NET Core Runtime 10 image as a non-root system user, with the entrypoint `dotnet BubbleFighter.Fantasy.Host.dll run --profile kr-1256`. The image exposes ports 7100, 7101 and 8080.
-- `mysql` uses the `mysql:8.4` image with the `bf_game_db` database, the `bff` user and utf8mb4 character settings, stores its files in the `mysql-data` volume and is health-checked before the server starts.
+- `bff` is built from `deploy/docker/Dockerfile` with the repository as the build context. The Dockerfile publishes the host without a bundled runtime, then runs it on the ASP.NET Core Runtime 10 image as a non-root system user, with the entrypoint `dotnet BubbleFighter.Fantasy.Host.dll run --profile kr-1256`. The image exposes ports 7100, 7101 and 7300.
+- `mysql` uses the image named by `BFF_DB_IMAGE`: `mariadb:11.4` in `.env.example`, and `mysql:8.4` for an older `.env` without the line, whose `mysql-data` volume MySQL created. It runs with the `bf_game_db` database, the `bff` user and utf8mb4 character settings, stores its files in the `mysql-data` volume and is health-checked before the server starts.
 
-Published ports are 7100, 7101 and 8080 for the server, and `${BFF_MYSQL_PORT:-3306}` for MySQL. The server mounts client data read-only at `/app/client-data` from `${BFF_CLIENT_DATA_HOST:-../../client-data}`, which resolves to the repository's `client-data` directory; the container needs `client-data/kr-1256/data` or `client-data/kr-1256/dataraw`, and the clientdata row fails without it. Both services use `restart: unless-stopped`.
+Published ports are 7100, 7101 and 7300 for the server, and `${BFF_MYSQL_PORT:-3306}` for MySQL. The server mounts client data read-only at `/app/client-data` from `${BFF_CLIENT_DATA_HOST:-../../client-data}`, which resolves to the repository's `client-data` directory; the container needs `client-data/kr-1256/data` or `client-data/kr-1256/dataraw`, and the clientdata row fails without it. Both services use `restart: unless-stopped`.
 
-The container path starts MySQL deliberately. It is not an isolated local check and does not use the local-check patch. The administration listener binds `127.0.0.1:8080` inside the container, so add `BFF_ADMIN_HOST=0.0.0.0` to `.env` if you need to reach the WebUI through the published 8080 port.
+The container path starts MySQL deliberately. It is not an isolated local check and does not use the local-check patch. The administration listener binds `127.0.0.1:7300` inside the container, so add `BFF_ADMIN_HOST=0.0.0.0` to `.env` if you need to reach the WebUI through the published 7300 port.
 
 ### 3. Follow the logs
 
@@ -273,7 +278,7 @@ If you run one container yourself instead of the compose pair, build the image f
 
 ```sh
 docker build -f deploy/docker/Dockerfile -t bff-fantasy .
-docker run --rm --env-file .env -e BFF_MYSQL_HOST=<mysql-host> -e BFF_ADMIN_HOST=0.0.0.0 -p 7100:7100 -p 7101:7101 -p 8080:8080 -v "<client-data-directory>:/app/client-data:ro" bff-fantasy
+docker run --rm --env-file .env -e BFF_MYSQL_HOST=<mysql-host> -e BFF_ADMIN_HOST=0.0.0.0 -p 7100:7100 -p 7101:7101 -p 7300:7300 -v "<client-data-directory>:/app/client-data:ro" bff-fantasy
 ```
 
 The image copies the published host and the `profiles` directory; it contains neither a database nor client data. Point `BFF_MYSQL_HOST` at an address the container can reach.
@@ -301,21 +306,21 @@ The state directory defaults to `state/` beside the executable. `BFF_STATE_DIR` 
 The console prints the administration listener and the WebUI address:
 
 ```text
-Row 'admin.http' admin API listening on 127.0.0.1:8080.
-WebUI: http://127.0.0.1:8080/
+Row 'admin.http' admin API listening on 127.0.0.1:7300.
+WebUI: http://127.0.0.1:7300/
 ```
 
-Open `http://127.0.0.1:8080/` in a browser. The admin listener defaults to `127.0.0.1:8080`; set `BFF_ADMIN_HOST` or `BFF_ADMIN_PORT` in the process environment to change it (`start` does not read `.env`).
+Open `http://127.0.0.1:7300/` in a browser, or the server's address from another machine. The admin listener of a server started with `start` defaults to `0.0.0.0:7300`; set `BFF_ADMIN_HOST` or `BFF_ADMIN_PORT` in the process environment to change it (`start` does not read `.env`). The first-run setup needs no token; setting `BFF_SETUP_TOKEN` (at least 32 characters) makes a remote setup ask for it.
 
 ### 3. Complete the assistant
 
 1. Choose the interface language: English, Simplified Chinese, Traditional Chinese or Korean.
 2. Give the server a name (1 to 80 characters).
 3. Select one or more client versions to bring up. Each selected version gets its own client-data choice; you may leave a version without data now and import it later from the server settings.
-4. Optionally import client data now: choose a local folder or a prepared ZIP package, review the filtered file count and size, then press Start import. The browser's own folder confirmation may count every file in the folder; the assistant filters the selection to client archives and `data`/`dataraw` files before showing the summary. An import stages a copy in the state directory; a failed or cancelled import removes only its temporary files.
-5. Choose the database. MySQL is selected by default: host `127.0.0.1`, port `3306`, database `bf_game_db`, user `bff`. SQLite stores its database in the state directory by default. Run Test connection; the assistant does not continue until the test succeeds.
-6. Create the administrator account. The username is 3 to 64 characters; the password is at least 12 characters. This account manages the server, is stored with the installation, and is separate from game accounts.
-7. Review the choices and apply. The host starts the selected profile rows and reports an error code you can retry if activation fails.
+4. Optionally import client data now: choose a local folder or a prepared ZIP package, review the filtered file count and size, then press Start import. The browser's own folder confirmation may count every file in the folder; the assistant filters the selection to client archives and `data`/`dataraw` files before showing the summary. An import stages a copy in the state directory; a failed or cancelled import removes only its temporary files. When the data is already on the server, press Choose folder on the server and pick the folder that holds `<build>/data`, or skip the import: a skipped build whose data already sits in the server's client-data folder starts with that data.
+5. Choose the database. MySQL is selected by default: host `localhost`, port `3306`, database `bf_game_db`, user `root`. When the test fails, the message ends with the database's own reason, such as access denied or an unknown database. SQLite stores its database in the state directory by default. Run Test connection; the assistant does not continue until the test succeeds. When the database does not exist yet, the test says so and the apply creates it. When it already holds tables, a popup shows how many tables and game accounts it has and asks what to do: Use the existing data (the default; accounts, characters and items stay and only missing upgrades are applied) or Replace it with an empty database. Replacing asks again in a second confirmation, deletes every table once, and is then saved as keep, so a restart never deletes data again. Press the link under the test result to change the answer.
+6. Create the administrator account. The username is 3 to 64 characters; the password is at least 6 characters. This account manages the server, is stored with the installation, and is separate from game accounts.
+7. Review the choices and apply. The host starts the selected profile rows and reports an error code you can retry if activation fails. When activation fails, the reason is shown under the error code.
 
 ### 4. What a successful apply leaves on disk
 
@@ -335,7 +340,7 @@ An installed game folder is also accepted: the server generates its required dat
 
 Prepared data imports copy files into the installation state; their required tables and archive contents are checked when the game services start. Importing successfully does not prove gameplay or client compatibility.
 
-The default bounds are 8 GiB per upload, 16 GiB of extracted data per import, 32,768 files per import, 64 retained copies, 64 GiB of total import storage and 20 minutes per import. Adjust them on the `installation` row with `client_data_upload_bytes`, `client_data_extracted_bytes`, `client_data_file_limit`, `client_data_copy_limit`, `client_data_storage_bytes` and `client_data_import_seconds`. Importing again does not delete earlier successful copies.
+The default bounds are 8 GiB per upload, 16 GiB of extracted data per import, 32,768 uploaded files per import (the members inside an uploaded game archive are not counted), 64 retained copies, 64 GiB of total import storage and 20 minutes per import. Adjust them on the `installation` row with `client_data_upload_bytes`, `client_data_extracted_bytes`, `client_data_file_limit`, `client_data_copy_limit`, `client_data_storage_bytes` and `client_data_import_seconds`. Importing again does not delete earlier successful copies.
 
 On Windows, a scanner or another process can briefly block the final directory rename after the files have been written. Only this publication step retries Windows access, sharing or lock conflicts, up to `client_data_publish_attempts` (default 20, range 1–100), waiting `client_data_publish_retry_ms` (default 50 ms, range 1–1000) between attempts. Set attempts to 1 to disable retries. The overall import deadline and cancellation still apply; uploads are not replayed, existing destinations are never replaced, and permanent or unrelated failures are reported.
 
@@ -367,7 +372,7 @@ The command prints one line per discovered plugin definition: the plugin id, its
 dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile kr-812 --patch tools/local-checks/isolated-memory.patch.yaml --dump-config
 ```
 
-This needs `BFF_MYSQL_PASSWORD` to be set, because the profile interpolates `${BFF_MYSQL_PASSWORD}` while composing the MySQL row; the final patch disables that row afterwards. Prepare `.env` as in [Quickstart](quickstart.md) if you have not done so.
+This needs no database settings: the isolated-memory patch disables the MySQL row, and a disabled row never reads `${BFF_MYSQL_PASSWORD}`.
 
 The command prints the effective row list as YAML, one `- id:` block per row, then exits with code 0. Confirm these points in the output:
 
@@ -387,10 +392,10 @@ With the assistant running on the default address:
 
 | Check | Command | What you should see |
 | --- | --- | --- |
-| Health | `Invoke-RestMethod http://127.0.0.1:8080/health` | `status` = `ok` and a UTC timestamp |
-| Setup status | `Invoke-RestMethod http://127.0.0.1:8080/api/setup/status` | `phase`, `installed`, `profiles` and the import limits |
+| Health | `Invoke-RestMethod http://127.0.0.1:7300/health` | `status` = `ok` and a UTC timestamp |
+| Setup status | `Invoke-RestMethod http://127.0.0.1:7300/api/setup/status` | `phase`, `installed`, `profiles` and the import limits |
 
-On Linux, use `curl -s http://127.0.0.1:8080/health` and `curl -s http://127.0.0.1:8080/api/setup/status`. The `/health` endpoint and the WebUI files stay open; before an administrator exists, `/api/plugins` answers 401 by design, so set up the administrator through the assistant first.
+On Linux, use `curl -s http://127.0.0.1:7300/health` and `curl -s http://127.0.0.1:7300/api/setup/status`. The `/health` endpoint and the WebUI files stay open; before an administrator exists, `/api/plugins` answers 401 by design, so set up the administrator through the assistant first.
 
 **Check it worked:** all three source-build commands exit successfully and the browser checks return the described JSON.
 
@@ -422,7 +427,7 @@ The `.env` file is applied to unset process variables before profile composition
 
 - **The build fails:** warnings are errors in this repository. The first `error` line names the project and cause; fix it and rebuild. See [troubleshooting](troubleshooting.md).
 - **A framework-dependent build does not start:** the ASP.NET Core Runtime 10 is missing. Confirm it with `dotnet --list-runtimes`, then install the runtime for the same architecture.
-- **A port is already in use:** the assistant uses port 8080 and a game profile uses its own game port, for example 7110 for `kr-812`. Set `BFF_ADMIN_PORT` or the build's port variable in `.env`, or stop the process that owns the port.
+- **A port is already in use:** the assistant uses port 7300 and a game profile uses its own game port, for example 7110 for `kr-812`. Set `BFF_ADMIN_PORT` or the build's port variable in `.env`, or stop the process that owns the port.
 - **A game profile fails on client data:** the `clientdata` row reports that neither its `data_directory` nor its `raw_directory` exists. Supply the matching client data, or import it through the setup assistant, then start the profile again. See [troubleshooting](troubleshooting.md).
 
 ## Next

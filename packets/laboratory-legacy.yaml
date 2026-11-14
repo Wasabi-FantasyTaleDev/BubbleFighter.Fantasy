@@ -1,0 +1,54 @@
+version: 1
+# kr-812 Packet_gcpSynthesisProcess: kr-812 sub_9EC800 writes the leading string,
+# then kr-812 sub_9EC860 writes the embedded record; kr-812 sub_9EA920 supplies it.
+# Offsets below include the packet's leading vtable/string and embedded-record vtable.
+structs:
+  SynthesisProcessRequest:
+    # kr-812 sub_9E29F0 obtains this text from DlgSPwdCheck (kr-812 sub_4F8A20)
+    # when feature 707 and the account's secondary-password gate require confirmation.
+    - secondary_password: wstr
+      offset: 4
+    - card_item_id: u32
+      offset: 36
+    - operation: u32               # kr-812 sub_9E7DF0 selects synthesis 1 or decomposition 2.
+      offset: 40
+    - material_category: u32       # kr-812 sub_9EA680: accessories 0, clothing/groups 1, weapons 2.
+      offset: 44
+    - grouped: bool               # kr-812 sub_9EA920 writes negative stockSetId then setCnt members.
+      offset: 48
+    - unknown_52: u32              # kr-812 sub_9E4E90 passes zero on the normal animation-completion path.
+      offset: 52
+      default: 0
+    - materials: list<u32>         # Signed bit patterns matter; the UI has three or one primary slots.
+      offset: 56
+    - additives: list<u32>         # kr-812 sub_9DA400 / kr-812 sub_9D9860 copy two slots; empty is -1.
+      offset: 72
+
+  # kr-812 Packet_gspSynthesisProcess: kr-812 sub_83C040 delegates to kr-812 sub_83C0D0.
+  # kr-812 sub_830A20 consumes these eight words and one double, exactly 40 bytes.
+  SynthesisProcessReply:
+    - operation: u32
+      offset: 4
+    - result: u32                  # kr-812 sub_830A20 rejects every signed negative value; ordinary success is zero.
+      offset: 8
+    - duration_outcome: u32        # 3 permanent, 4 capped, 100 additive permanent, 101 additive failure with bonus.
+      offset: 12
+      default: 0
+    - bonus_promotion: u32         # kr-812 sub_830A20 recognizes 200 for bonus-item promotion.
+      offset: 16
+      default: 0
+    - primary_reference: u32       # kr-812 sub_9DBED0: synthesis resolves itemId/stockSetId; decomposition resolves Stock.stockId.
+      offset: 20
+      default: 0
+    - remaining_days: f64          # Synthesis only: kr-812 sub_9DBED0 / kr-812 sub_9EB4E0 share the full-inventory session time origin.
+      offset: 24
+      default: 0
+    - second_reference: u32        # kr-812 sub_9DDAA0 resolves Stock/StockSet, including synthesis additives; never a base itemId.
+      offset: 32
+      default: 0
+    - third_reference: u32         # kr-812 sub_9DF060 resolves Stock/StockSet for synthesis; decomposition has no third slot.
+      offset: 36
+      default: 0
+    - unknown_40: u32              # kr-812 sub_830A20 reserves 9999 for its repeated diagnostic path.
+      offset: 40
+      default: 0

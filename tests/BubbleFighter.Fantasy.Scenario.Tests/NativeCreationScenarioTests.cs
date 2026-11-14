@@ -89,7 +89,7 @@ public sealed class NativeCreationScenarioTests
             var burst = client.Since(cursor);
             Assert.Equal(Burst, burst.Select(frame => frame.Opcode));
             // Pin inflated bag lengths: the selected character changes the compressed stream's size.
-            Assert.Equal(new[] { 63, 486, 24, 14, 4, 68, 0, 504, 512, 16, 4, 628, 0 },
+            Assert.Equal(new[] { 63, 486, 24, 14, 4, 68, 0, 504, 512, 16, 4, 660, 0 },
                 burst.Select((frame, index) => index is 7 or 8 ? Inflate(frame.Payload).Length : frame.Payload.Length));
 
             var userNumber = CheckLogin(burst[0].Payload, "Ab", characterType);

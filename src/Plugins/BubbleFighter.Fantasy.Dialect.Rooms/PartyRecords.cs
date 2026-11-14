@@ -21,15 +21,15 @@ internal static class PartyRecords
                 throw new InvalidOperationException("The scene recipient is absent from its party membership.");
             if (appearance.CharacterItemId is < 300000 or > 301999)
                 throw new ArgumentException("A party appearance requires a resolved native character item.", nameof(message));
-            fields["profile_entries"] = new[]
+            var profile = new Dictionary<string, object?>
             {
-                new Dictionary<string, object?>
-                {
-                    ["user_number"] = appearance.UserNum,
-                    ["character_id"] = appearance.CharacterItemId,
-                    ["equipped_items"] = appearance.EquippedItemIds.Where(id => id != appearance.CharacterItemId).ToArray(),
-                },
+                ["user_number"] = appearance.UserNum,
+                ["character_id"] = appearance.CharacterItemId,
+                ["equipped_items"] = appearance.EquippedItemIds.Where(id => id != appearance.CharacterItemId).ToArray(),
             };
+            var element = tables.Resolve(build, "SoloPartySnapshot").Single(field => field.Name == "profile_entries").Type[5..^1];
+            ItemAttributeWire.Apply(tables, build, element, profile, appearance.ItemAttributes);
+            fields["profile_entries"] = new[] { profile };
         }
         return PacketCodec.Write(tables, build, "SoloPartySnapshot", fields);
     }

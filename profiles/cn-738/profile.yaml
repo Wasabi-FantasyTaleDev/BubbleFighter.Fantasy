@@ -12,6 +12,7 @@ parent: cn-735
 description: Chinese 2016 client build 0.2.72.01, ClientVersion_Major 738.
 bundles:
   - core
+  - relay-latency
   - cn-738
 patches:
   - patch.yaml

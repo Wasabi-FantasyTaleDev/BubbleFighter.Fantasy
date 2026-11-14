@@ -43,10 +43,13 @@ public static partial class Program
             // composition so ${VAR} / ${VAR:-default} can resolve.
             var envFile = args[0] == "start" ? null : RepoRootEnvFile.Apply();
             var logLevel = ParseLogLevel(args);
+            var fileOptions = DurableLogOptions.Parse(args);
+            await using var fileLog = fileOptions is null ? null : new RotatingFileLoggerProvider(fileOptions);
             var logFeed = new ServerLogFeed();
             using var loggerFactory = LoggerFactory.Create(builder => builder
                 .SetMinimumLevel(logLevel)
                 .AddProvider(logFeed)
+                .AddDurableFile(fileLog)
                 .AddConsole(options =>
                 {
                     if (args[0] == "contracts") options.LogToStandardErrorThreshold = LogLevel.Trace;
@@ -65,6 +68,10 @@ public static partial class Program
             {
                 "start" => await StartAsync(args[1..], openBrowser, loggerFactory, logger, logFeed).ConfigureAwait(false),
                 "run" => await RunAsync(args[1..], loggerFactory, logger, logFeed).ConfigureAwait(false),
+                // A real start of the profile that stops once it has started: the clientdata rows write their compiled files then.
+                "data" when args.Length > 2 && args[1] == "compile" && !args[2].StartsWith('-') =>
+                    await RunAsync(["--profile", args[2], .. args[3..]], loggerFactory, logger, logFeed, stopWhenStarted: true).ConfigureAwait(false),
+                "data" => Fail("usage: bff data compile <profile> [--profiles-dir dir] [--patch file]..."),
                 "profiles" when args.Length > 1 && args[1] == "list" => ListProfiles(args[2..]),
                 "packets" when args.Length > 1 && args[1] is "show" or "diff" or "check" or "json" => Packets(args[1], args[2..]),
                 "plugins" when args.Length > 1 && args[1] == "list" => await ListPluginsAsync(args[2..], loggerFactory).ConfigureAwait(false),
@@ -72,7 +79,7 @@ public static partial class Program
                 _ => Fail($"Unknown command '{args[0]}'."),
             };
         }
-        catch (Exception ex) when (ex is ConfigException or InvalidOperationException or IOException ||
+        catch (Exception ex) when (ex is ConfigException or InvalidOperationException or IOException or UnauthorizedAccessException ||
             PluginCatalog.GetLoadFailureDiagnostics(ex) is not null)
         {
             Console.Error.WriteLine($"error: {ex.Message}");
@@ -82,13 +89,16 @@ public static partial class Program
         }
     }
 
-    private static async Task<int> RunAsync(string[] args, ILoggerFactory loggerFactory, ILogger logger, IServerLogFeed logFeed)
+    private static async Task<int> RunAsync(string[] args, ILoggerFactory loggerFactory, ILogger logger, IServerLogFeed logFeed,
+        bool stopWhenStarted = false)
     {
         var options = ParseRunOptions(args);
         if (options.Profile is null)
             return Fail("run requires --profile <id>.");
         if (options.ManagedStdio && (options.DumpConfig || !Console.IsInputRedirected || !Console.IsOutputRedirected))
             throw new ConfigException("--managed-stdio requires redirected stdin/stdout and cannot be combined with --dump-config.");
+        if (stopWhenStarted && (options.DumpConfig || options.ManagedStdio))
+            throw new ConfigException("data compile starts the profile and stops; it takes neither --dump-config nor --managed-stdio.");
 
         var profilesDir = Path.GetFullPath(options.ProfilesDir ?? "profiles");
         var composer = new ProfileComposer(profilesDir);
@@ -137,7 +147,8 @@ public static partial class Program
             var startup = new PluginStartupPlan(initial, rows);
             var host = new PluginHost(startup, catalog, loggerFactory, restartService, logFeed);
             var candidate = startup.InitialRows.Concat(startup.DeferredRows).ToArray();
-            result = await RunServerAsync(host, candidate, logger, shutdown.Token, managed).ConfigureAwait(false);
+            result = await RunServerAsync(host, candidate, logger, shutdown.Token, managed,
+                stopWhenStarted ? shutdown.RequestCancellation : null).ConfigureAwait(false);
         }
         catch (Exception error)
         {
@@ -200,13 +211,17 @@ public static partial class Program
             var result = await host.ReconcileConfigurationAsync(candidate, shutdownToken).ConfigureAwait(false);
             shutdownToken.ThrowIfCancellationRequested();
             var instances = host.Instances.ToDictionary(instance => instance.RowId, StringComparer.Ordinal);
+            // An on-demand row that nothing requested yet is asleep, which is where a start leaves it.
             var incomplete = candidate.Where(row => !row.Disabled)
-                .Where(row => !instances.TryGetValue(row.Id, out var info) || info.State != PluginState.Active)
+                .Where(row => !instances.TryGetValue(row.Id, out var info) || (info.State != PluginState.Active && !info.IsSleeping))
                 .Select(row => instances.TryGetValue(row.Id, out var info)
                     ? $"{row.Id}: {info.State} ({info.Error ?? "no diagnostic"})" : $"{row.Id}: missing runtime instance")
                 .ToArray();
             if (result.Outcome != PluginTransitionOutcome.Converged || incomplete.Length > 0)
                 throw new InvalidOperationException($"Server startup did not converge ({result.Outcome}): {string.Join("; ", incomplete)}.");
+            // Rows drop what they kept only for the start, then the one pause falls before any player is admitted.
+            host.MarkConverged();
+            StartupMemory.ReleaseAndLog(logger);
             ready?.Invoke();
             managed?.PublishReady();
             logger.LogInformation("Server started with {Count} active row(s).", instances.Values.Count(instance => instance.State == PluginState.Active));
@@ -252,8 +267,8 @@ public static partial class Program
         var names = new List<string>();
         for (var i = 0; i < args.Length; i++)
         {
-            if (args[i] == "--packets-dir")
-                i++;
+            if (args[i] is "--packets-dir" or "--log-file" or "--log-file-level")
+                _ = RequireValue(args, ref i, args[i]);
             else
                 names.Add(args[i]);
         }
@@ -317,6 +332,8 @@ public static partial class Program
                 case "--log-level":
                     _ = RequireValue(args, ref index, "--log-level");
                     break;
+                case "--log-file": _ = RequireValue(args, ref index, "--log-file"); break;
+                case "--log-file-level": _ = RequireValue(args, ref index, "--log-file-level"); break;
                 default:
                     throw new ConfigException($"Unknown plugin-list option '{args[index]}'.");
             }
@@ -370,6 +387,8 @@ public static partial class Program
                 case "--plugin-root": roots.Add(Path.GetFullPath(RequireValue(args, ref index, "--plugin-root"))); break;
                 case "--bootstrap-dir": bootstrapDirectory = Path.GetFullPath(RequireValue(args, ref index, "--bootstrap-dir")); break;
                 case "--log-level": _ = RequireValue(args, ref index, "--log-level"); break;
+                case "--log-file": _ = RequireValue(args, ref index, "--log-file"); break;
+                case "--log-file-level": _ = RequireValue(args, ref index, "--log-file-level"); break;
                 default: throw new ConfigException($"Unknown contracts-schema option '{args[index]}'.");
             }
         }
@@ -447,6 +466,8 @@ public static partial class Program
                 case "--log-level":
                     _ = RequireValue(args, ref i, "--log-level");
                     break;
+                case "--log-file": _ = RequireValue(args, ref i, "--log-file"); break;
+                case "--log-file-level": _ = RequireValue(args, ref i, "--log-file-level"); break;
                 default:
                     throw new ConfigException($"Unknown option '{args[i]}'.");
             }
@@ -496,6 +517,7 @@ public static partial class Program
             usage:
               bff [start] [--state-dir dir] [--patch file]...
               bff run --profile <id> [--profiles-dir dir] [--patch file]... [--plugin-root dir]... [--bootstrap-dir dir] [--dump-config | --managed-stdio]
+              bff data compile <profile> [--profiles-dir dir] [--patch file]... [--plugin-root dir]... [--bootstrap-dir dir]
               bff profiles list [--profiles-dir dir]
               bff packets show <build> [structure]... [--packets-dir dir]
               bff packets diff <build> <build> [structure]... [--packets-dir dir]
@@ -513,6 +535,12 @@ public static partial class Program
               --dump-config         print the effective row list as YAML and exit
               --managed-stdio       redirected control pipe: FT_HOST_READY 1 on startup; stop or EOF shuts down
               --log-level <level>   console log level (or BFF_LOG_LEVEL)
+              --log-file <path>     optional durable rotating log (or BFF_LOG_FILE; disabled when unset)
+              --log-file-level <level> file log level (or BFF_LOG_FILE_LEVEL; default: Warning)
+
+            data compile starts the profile exactly as run does (same ports, same database), lets every clientdata
+            row write its compiled client data file, and stops. A server that has started once has already written
+            them; the command prepares an installation before its first start. Deleting the files is always safe.
 
             With no command the packaged installation assistant starts; its state defaults
             to state/ next to the executable (BFF_STATE_DIR or --state-dir overrides it).

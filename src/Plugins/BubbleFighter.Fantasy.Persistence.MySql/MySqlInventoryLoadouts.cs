@@ -25,7 +25,7 @@ public sealed partial class MySqlInventoryRepository
         var bagId = (int)bag;
         var rows = await session.Db.Queryable<InventorySlotRow>().Where(row => row.UserNum == userNum && row.Bag == bagId)
             .OrderBy(row => row.Ordinal).Take(InventoryLimits.MaxInventorySlotsPerBag + 1).ToListAsync(ct).ConfigureAwait(false);
-        var result = InventoryLoadouts.Project(rows.Select(ToRecord).ToArray(), state, scope).Take(maxCount).ToArray();
+        var result = InventoryLoadouts.Project(rows.Select(ReadRecord).ToArray(), state, scope).Take(maxCount).ToArray();
         ct.ThrowIfCancellationRequested();
         await transaction.CommitAsync().ConfigureAwait(false);
         return result;
@@ -48,10 +48,26 @@ public sealed partial class MySqlInventoryRepository
 
     /// <inheritdoc />
     public async ValueTask<IReadOnlyList<InventorySlotRecord>?> UpdateLoadoutSelectionAsync(long userNum,
-        InventoryLoadoutScope scope, IReadOnlyList<InventoryWearGroup> groups, int? itemId, bool worn, CancellationToken ct)
+        InventoryLoadoutScope scope, IReadOnlyList<InventoryWearGroup> groups, int? itemId, bool worn, CancellationToken ct) =>
+        (await UpdateLoadoutSelectionSnapshotAsync(userNum, scope, groups, itemId, worn, ct).ConfigureAwait(false))?.CharacterBag;
+
+    /// <inheritdoc />
+    public ValueTask<PetInventorySnapshot?> UpdateLoadoutSelectionSnapshotAsync(long userNum, InventoryLoadoutScope scope,
+        IReadOnlyList<InventoryWearGroup> groups, int? itemId, bool worn, CancellationToken ct,
+        PetInitializationCommand? initialization = null) =>
+        UpdateLoadoutSelectionSnapshotAsync(userNum, scope, groups, itemId, worn, ct, initialization, null);
+
+    /// <inheritdoc />
+    public async ValueTask<PetInventorySnapshot?> UpdateLoadoutSelectionSnapshotAsync(long userNum, InventoryLoadoutScope scope,
+        IReadOnlyList<InventoryWearGroup> groups, int? itemId, bool worn, CancellationToken ct,
+        PetInitializationCommand? initialization, ArticleInitializationCommand? articleInitialization,
+        InventorySelectionTarget? target = null)
     {
         RequireUserNum(userNum);
         ArgumentNullException.ThrowIfNull(scope);
+        initialization?.ValidateFor(userNum, scope);
+        articleInitialization?.ValidateFor(userNum, scope);
+        target?.ValidateFor(userNum, scope, itemId);
         await using var session = await SugarSession.OpenAsync(connections, ct).ConfigureAwait(false);
         await using var transaction = await session.BeginWriteAsync(userNum, authority, ct).ConfigureAwait(false);
         await MySqlPlayerLock.AcquireAsync(session.Db, userNum, ct).ConfigureAwait(false);
@@ -60,18 +76,19 @@ public sealed partial class MySqlInventoryRepository
             .Where(row => row.UserNum == userNum && (row.Bag == 0 || row.Bag == 1))
             .OrderBy(row => row.Bag).OrderBy(row => row.UpdatedAt).OrderBy(row => row.Ordinal)
             .Take(2 * InventoryLimits.MaxInventorySlotsPerBag + 1).TranLock(DbLockType.Wait).ToListAsync(ct).ConfigureAwait(false);
-        var changed = InventoryWearSelection.Apply(
-            InventoryLoadouts.Project(stored.Select(ToRecord).ToArray(), state, scope), groups, itemId, worn);
+        var rows = stored.Select(ReadRecord).ToArray();
+        if (target is not null && !target.Matches(InventoryLoadouts.Project(rows, state, scope))) return null;
+        var plan = await PreparePetInventoryAsync(session.Db, rows, state, scope, initialization, ct, articleInitialization).ConfigureAwait(false);
+        var projected = InventoryLoadouts.Project(plan.Rows, plan.Loadout, scope);
+        var changed = InventoryWearSelection.Apply(projected, groups, itemId, worn);
         if (changed is null) return null;
-        state = state with
-        {
-            WornItemIds = changed.Where(row => row.Bag == InventoryBag.CharacterBag
-                && (row.Flags & InventorySlotRecord.WornFlagBit) != 0).Select(row => row.ItemId).Distinct().ToArray(),
-        };
-        await SaveLoadoutAsync(session.Db, userNum, scope.Key, state, exists, ct).ConfigureAwait(false);
+        state = InventoryLoadouts.Selection(plan.Loadout, changed);
+        var result = new PetInventorySnapshot(changed.Where(row => row.Bag == InventoryBag.CharacterBag).ToArray(),
+            changed.Where(row => row.Bag == InventoryBag.EquippedBag).ToArray());
+        await CommitPetPreparationAsync(session.Db, userNum, scope, plan, plan.Rows, state, exists, ct).ConfigureAwait(false);
         ct.ThrowIfCancellationRequested();
         await transaction.CommitAsync().ConfigureAwait(false);
-        return changed.Where(row => row.Bag == InventoryBag.CharacterBag).ToArray();
+        return result;
     }
 
     /// <inheritdoc />
@@ -107,7 +124,7 @@ public sealed partial class MySqlInventoryRepository
             var rows = await db.Queryable<PlayerLoadoutRow>()
                 .Where(row => row.UserNum == userNum && row.BuildKey == scope.Key).Take(1).ToListAsync(ct).ConfigureAwait(false);
             var json = rows.Single().StateJson;
-            if (json.Length > InventoryLimits.MaxInventorySlotsPerBag * 12 + 2048)
+            if (json.Length > InventoryLimits.MaxInventorySlotsPerBag * 34 + 2048)
                 throw new InvalidDataException("Stored build loadout exceeds its serialized bound.");
             state = JsonSerializer.Deserialize<InventoryLoadoutState>(json, LoadoutJson)
                 ?? throw new InvalidDataException("Stored build loadout is null.");

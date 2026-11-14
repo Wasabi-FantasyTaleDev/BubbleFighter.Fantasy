@@ -21,10 +21,10 @@ internal sealed class ServiceRuntime
     internal ServiceRealm RootRealm { get; }
     internal ServiceScope RootScope { get; }
 
-    internal ServiceActivation NewActivation(string entryId, string? definition = null)
+    internal ServiceActivation NewActivation(string entryId, string? definition = null, string? group = null, bool onDemand = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(entryId);
-        return ServiceActivation.Allocate(this, entryId, definition);
+        return ServiceActivation.Allocate(this, entryId, definition, group, onDemand);
     }
 
     internal long NextIdentity()
@@ -61,18 +61,26 @@ internal sealed class ServiceRuntime
 internal sealed record ServiceActivation
 {
     internal ActivationPublication Publication { get; } = new();
-    private ServiceActivation(ServiceRuntime runtime, string entryId, long generation, string? definition)
-    { Runtime = runtime; EntryId = entryId; Generation = generation; Definition = definition; }
+    private ServiceActivation(ServiceRuntime runtime, string entryId, long generation, string? definition, string? group, bool onDemand)
+    { Runtime = runtime; EntryId = entryId; Generation = generation; Definition = definition; Group = group; OnDemand = onDemand; }
     internal ServiceRuntime Runtime { get; }
     internal string EntryId { get; }
     internal long Generation { get; }
     // Activations of one definition are symmetric peers whose publications never enter each other's views.
     internal string? Definition { get; }
-    internal static ServiceActivation Allocate(ServiceRuntime runtime, string entryId, string? definition = null)
+    // The activation group of the entry's row, and whether the row loads on demand.
+    internal string? Group { get; }
+    internal bool OnDemand { get; }
+    // A group that loads on demand comes and goes while the other groups run. What it publishes never enters the view
+    // of an entry of another group, so that entry is not restarted by it; an entry of no group sees every group.
+    internal bool IsHiddenFrom(ServiceActivation? consumer) => IsHidden(OnDemand, Group, consumer?.Group);
+    internal static bool IsHidden(bool providerOnDemand, string? providerGroup, string? consumerGroup) =>
+        providerOnDemand && providerGroup is not null && consumerGroup is not null && !string.Equals(providerGroup, consumerGroup, StringComparison.Ordinal);
+    internal static ServiceActivation Allocate(ServiceRuntime runtime, string entryId, string? definition = null, string? group = null, bool onDemand = false)
     {
         ArgumentNullException.ThrowIfNull(runtime);
         ArgumentException.ThrowIfNullOrWhiteSpace(entryId);
-        return new ServiceActivation(runtime, entryId, runtime.NextIdentity(), definition);
+        return new ServiceActivation(runtime, entryId, runtime.NextIdentity(), definition, group, onDemand);
     }
 }
 

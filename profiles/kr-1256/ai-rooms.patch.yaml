@@ -1,4 +1,4 @@
-# Optional operator patch; it is not included by the default profile.
+# AI rooms, included by the build profile.
 # kr-1256 sub_DBD9A0 selects difficulty/preset; kr-1256 sub_91F720 consumes the worn catalog items.
 # Modifier words retain their native bits through kr-1256 sub_10D9410; do not reinterpret them as prices or stats.
 # Names are translated for each recipient by launcher_language. The literal nickname is the Korean fallback.

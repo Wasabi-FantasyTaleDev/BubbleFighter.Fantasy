@@ -56,20 +56,24 @@ internal sealed class ShopBinding(string protocol, IOpcodeTable table,
         return new((int)values["key"], !(bool)values["unknown_8"]);
     }
 
+    /// <summary>Publishes the shop inventory and wallet together under the connection's shared inventory publication lease.</summary>
     public async ValueTask SendAsync(ISession session, ShopStateUpdated message, CancellationToken ct)
     {
         if (message.Wallet.UserNum != message.Player.UserNum || message.Slots.Any(s =>
             s.UserNum != message.Player.UserNum || s.Bag != InventoryBag.CharacterBag))
             throw new InvalidOperationException("Shop publication contains another player's state.");
+        using var publication = await scope.EnterAsync(session.Connection, ct).ConfigureAwait(false);
         var baseline = message.FullInventory
-            ? scope.Reset(session.Connection.Id)
-            : scope.Require(session.Connection.Id);
+            ? publication.PrepareReset()
+            : publication.Require();
         var slots = message.Slots.Select(s => InventoryBinding.Map(s, baseline)).ToArray();
         var inventory = _inventory.RepInventoryAll(slots);
         var stat = WriteStat(tables, build, message.Player.Nickname, message.Player.Level, message.Wallet.Lucci,
             message.Wallet.Cash, message.Player.ColorIndex, message.Player.UserNum);
-        await session.SendAsync(message.FullInventory ? _full : _update, inventory, ct).ConfigureAwait(false);
-        await session.SendAsync(_stat, stat, ct).ConfigureAwait(false);
+        publication.ThrowIfInvalid();
+        if (message.FullInventory) publication.Reset(baseline);
+        await publication.SendAsync(session, message.FullInventory ? _full : _update, inventory).ConfigureAwait(false);
+        await publication.SendAsync(session, _stat, stat).ConfigureAwait(false);
     }
 
     public ValueTask SendAsync(ISession session, ShopPurchaseReplied message, CancellationToken ct) =>

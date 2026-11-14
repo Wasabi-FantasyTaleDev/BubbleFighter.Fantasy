@@ -1,4 +1,6 @@
+using BubbleFighter.Fantasy.Contracts.Enhancement;
 using BubbleFighter.Fantasy.Contracts.Inventory;
+using BubbleFighter.Fantasy.Contracts.Pets;
 
 namespace BubbleFighter.Fantasy.InventoryView;
 
@@ -16,8 +18,14 @@ namespace BubbleFighter.Fantasy.InventoryView;
 /// <param name="inventory">Persistence for the worn state; supplies the bag the current character is read from.</param>
 /// <param name="masks">The parsed catalog positions and exclusivity rules.</param>
 /// <param name="contributions">Protocol-owned optional positions committed with the catalog selections.</param>
+/// <param name="pets">Resolves pet ownership inside the build's selection transaction.</param>
+/// <param name="articles">Commits exact ordinary Article selections.</param>
+/// <param name="scope">The canonical catalog and loadout used for Article selection.</param>
+/// <param name="articleResolver">Supplies native equipment metadata initialization for the selection transaction.</param>
+/// <param name="loadouts">Commits ordinary selections with metadata even when pets are disabled.</param>
 internal sealed class EquipmentSelectionCatalogMasks(IInventoryRepository inventory, ItemCatalogMasks masks,
-    EquipmentWearGroups contributions) : IEquipmentSelection
+    EquipmentWearGroups contributions, IPetEntitlements? pets = null,
+    IItemEnhancementStore? articles = null, InventoryLoadoutScope? scope = null, IEquipmentArticleResolver? articleResolver = null, IInventoryLoadoutStore? loadouts = null) : IEquipmentSelection
 {
     /// <summary>Normalizes the worn set against the catalog positions without changing any item.</summary>
     public async ValueTask<IReadOnlyList<InventorySlotRecord>> ReadAsync(long userNum, CancellationToken ct) =>
@@ -45,5 +53,54 @@ internal sealed class EquipmentSelectionCatalogMasks(IInventoryRepository invent
             .ConfigureAwait(false);
         return bag.LastOrDefault(row => row.ItemId is >= ItemCatalogMasks.SeatFirstItemId and <= ItemCatalogMasks.SeatLastItemId
             && (row.Flags & InventorySlotRecord.WornFlagBit) != 0)?.ItemId ?? 0;
+    }
+
+    /// <summary>Checks the worn character's catalog restrictions before committing the resolved pet Article against the catalog's equipment groups.</summary>
+    public async ValueTask<PetInventorySnapshot?> ApplyPetAsync(long userNum, PetEquipmentTarget target, bool worn, CancellationToken ct)
+    {
+        if (pets is null) throw new InvalidOperationException("Article selection requires a pet entitlement provider.");
+        if (worn && !masks.AllowsCharacter(target.ItemId, await CurrentCharacterAsync(userNum, ct).ConfigureAwait(false)))
+            return null;
+        return await pets.SelectAsync(userNum, target, await contributions.ResolveAsync(masks.Groups, ct).ConfigureAwait(false),
+            worn, ct, articleResolver?.CreateInitialization(userNum, DateTimeOffset.UtcNow)).ConfigureAwait(false);
+    }
+
+    /// <summary>Checks the current character mask before committing an exact owned Article with catalog conflicts.</summary>
+    public async ValueTask<InventorySnapshot?> ApplyArticleAsync(long userNum, InventorySlotRecord expectedTarget, bool worn, CancellationToken ct)
+    {
+        if (articles is null || scope is null || articleResolver is null) throw new InvalidOperationException("Article selection requires its build-scoped store and native metadata catalog.");
+        if (worn && !masks.AllowsCharacter(expectedTarget.ItemId, await CurrentCharacterAsync(userNum, ct).ConfigureAwait(false))) return null;
+        var now = DateTimeOffset.UtcNow;
+        return await articles.SelectArticleAsync(new(userNum, scope, expectedTarget,
+            await contributions.ResolveAsync(masks.Groups, ct).ConfigureAwait(false), worn, now)
+            { ArticleInitialization = articleResolver.CreateInitialization(userNum, now), PetInitialization = pets?.CreateInitialization(userNum, now) }, ct)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>Checks character compatibility and retains exact ordinary ownership through the catalog's atomic selection.</summary>
+    public async ValueTask<PetInventorySnapshot?> ApplyOwnedSnapshotAsync(long userNum, InventorySlotRecord expectedTarget, bool worn, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(expectedTarget);
+        if (loadouts is null || scope is null)
+            throw new InvalidOperationException("Owned selection requires the build-scoped inventory store.");
+        if (worn && !masks.AllowsCharacter(expectedTarget.ItemId, await CurrentCharacterAsync(userNum, ct).ConfigureAwait(false))) return null;
+        var groups = await contributions.ResolveAsync(masks.Groups, ct).ConfigureAwait(false);
+        var now = DateTimeOffset.UtcNow;
+        return await loadouts.UpdateLoadoutSelectionSnapshotAsync(userNum, scope, groups, expectedTarget.ItemId, worn, ct,
+            pets?.CreateInitialization(userNum, now), articleResolver?.CreateInitialization(userNum, now), new(expectedTarget, now))
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>Checks character compatibility and commits an item selection with pet metadata under the catalog's equipment groups.</summary>
+    public async ValueTask<PetInventorySnapshot?> ApplySnapshotAsync(long userNum, int itemId, bool worn, CancellationToken ct)
+    {
+        if (worn && !masks.AllowsCharacter(itemId, await CurrentCharacterAsync(userNum, ct).ConfigureAwait(false))) return null;
+        var initialization = articleResolver?.CreateInitialization(userNum, DateTimeOffset.UtcNow);
+        var groups = await contributions.ResolveAsync(masks.Groups, ct).ConfigureAwait(false);
+        if (pets is not null) return await pets.SelectItemAsync(userNum, itemId, groups, worn, ct, initialization).ConfigureAwait(false);
+        if (loadouts is null || scope is null)
+            throw new InvalidOperationException("Complete metadata selection requires a build-scoped initialization provider.");
+        return await loadouts.UpdateLoadoutSelectionSnapshotAsync(userNum, scope, groups, itemId, worn, ct,
+            initialization: null, articleInitialization: initialization).ConfigureAwait(false);
     }
 }

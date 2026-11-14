@@ -207,3 +207,6 @@ body { -webkit-font-smoothing: antialiased; }
 .setup-help-link, .setup-help summary { color: #174e70; font-size: 12px; cursor: pointer; }
 .setup-help p, .setup-complete p { font-size: 13px; line-height: 1.85; }
 .setup-complete { display: flex; flex-direction: column; align-items: flex-start; gap: 18px; }
+.setup-summary-danger { color: #b42318; font-weight: 500; }
+.setup-failure-detail { max-width: 560px; margin: 0 auto; padding: 10px 14px; border-radius: 10px; background: #fff1f0; color: #9a3412 !important; font: 12px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; text-align: left; animation: bff-rise .34s ease backwards; }
+.setup-existing-change { align-self: flex-start; margin: 2px 0 0; padding: 0; border: 0; background: none; color: #2f7fd1; font: inherit; font-size: 12px; text-decoration: underline; cursor: pointer; }

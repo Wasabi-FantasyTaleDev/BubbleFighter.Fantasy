@@ -1,3 +1,4 @@
+using BubbleFighter.Fantasy.Contracts.Titles;
 using System.ComponentModel.DataAnnotations;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Contracts.Settings;
@@ -7,6 +8,10 @@ namespace BubbleFighter.Fantasy.Persistence.Sqlite;
 /// <summary>Defines the explicit local database location and limits for the SQLite provider.</summary>
 public sealed class SqliteOptions : IValidatableOptions
 {
+    /// <summary>Gets or sets catalogue medal balances and credit receipt budgets per account.</summary>
+    [Required]
+    public TitleMedalLimits TitleMedals { get; set; } = new();
+
     /// <summary>Gets or sets the maximum number of recorded game modes per player without evicting history.</summary>
     [Range(1, 4096)]
     public int MaxBattleModesPerPlayer { get; set; } = 128;

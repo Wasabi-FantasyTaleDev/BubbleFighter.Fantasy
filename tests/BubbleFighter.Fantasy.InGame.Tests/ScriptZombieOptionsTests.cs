@@ -8,21 +8,22 @@ namespace BubbleFighter.Fantasy.InGame.Tests;
 /// <summary>Checks explicit script activation, cumulative optional patches and incompatible life policies.</summary>
 public sealed class ScriptZombieOptionsTests
 {
-    /// <summary>Every profile requires its optional patch to activate either side of the native exchange.</summary>
+    /// <summary>Every modern profile includes its audited zombie patches, enabling both sides of each exchange.</summary>
     [Theory]
     [InlineData("kr-1256")]
     [InlineData("cn-774")]
     [InlineData("tw-454")]
-    public void DefaultProfileLeavesTheScriptExchangeDisabled(string build)
+    public void DefaultProfileEnablesTheZombieExchanges(string build)
     {
         var (rooms, game) = Compose(build, []);
-        Assert.False(rooms.ScriptZombies);
-        Assert.False(game.ScriptZombies);
-        Assert.False(rooms.ZombieEscape);
-        Assert.False(game.ZombieEscape);
-        Assert.False(rooms.GhostZombies);
-        Assert.False(game.GhostZombies);
-        Assert.DoesNotContain(8, rooms.ResultScoreboardModes);
+        Assert.True(rooms.ScriptZombies);
+        Assert.True(game.ScriptZombies);
+        Assert.True(rooms.ZombieEscape);
+        Assert.True(game.ZombieEscape);
+        // tw-454 has no audited ghost mode-28 patch.
+        Assert.Equal(build != "tw-454", rooms.GhostZombies);
+        Assert.Equal(build != "tw-454", game.GhostZombies);
+        Assert.Contains(8, rooms.ResultScoreboardModes);
     }
 
     /// <summary>The optional script patch composes with the other audited mode patches and retains every enabled scoreboard.</summary>

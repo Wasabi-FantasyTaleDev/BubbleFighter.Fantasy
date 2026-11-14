@@ -18,6 +18,7 @@ public sealed partial class MemoryInventoryRepository
         lock (entry.Gate)
         {
             var state = ReadLoadout(entry, scope);
+            foreach (var row in entry.Bags.GetValueOrDefault((int)bag) ?? []) row.Pet?.Validate(maxLoadoutsPerPlayer);
             return ValueTask.FromResult<IReadOnlyList<InventorySlotRecord>>(InventoryLoadouts.Project(
                 entry.Bags.GetValueOrDefault((int)bag) ?? [], state, scope).Take(maxCount).ToArray());
         }
@@ -40,27 +41,45 @@ public sealed partial class MemoryInventoryRepository
     }
 
     /// <inheritdoc />
-    public ValueTask<IReadOnlyList<InventorySlotRecord>?> UpdateLoadoutSelectionAsync(long userNum,
-        InventoryLoadoutScope scope, IReadOnlyList<InventoryWearGroup> groups, int? itemId, bool worn, CancellationToken ct)
+    public async ValueTask<IReadOnlyList<InventorySlotRecord>?> UpdateLoadoutSelectionAsync(long userNum,
+        InventoryLoadoutScope scope, IReadOnlyList<InventoryWearGroup> groups, int? itemId, bool worn, CancellationToken ct) =>
+        (await UpdateLoadoutSelectionSnapshotAsync(userNum, scope, groups, itemId, worn, ct).ConfigureAwait(false))?.CharacterBag;
+
+    /// <inheritdoc />
+    public ValueTask<PetInventorySnapshot?> UpdateLoadoutSelectionSnapshotAsync(long userNum, InventoryLoadoutScope scope,
+        IReadOnlyList<InventoryWearGroup> groups, int? itemId, bool worn, CancellationToken ct,
+        PetInitializationCommand? initialization = null) =>
+        UpdateLoadoutSelectionSnapshotAsync(userNum, scope, groups, itemId, worn, ct, initialization, null);
+
+    /// <inheritdoc />
+    public ValueTask<PetInventorySnapshot?> UpdateLoadoutSelectionSnapshotAsync(long userNum, InventoryLoadoutScope scope,
+        IReadOnlyList<InventoryWearGroup> groups, int? itemId, bool worn, CancellationToken ct,
+        PetInitializationCommand? initialization, ArticleInitializationCommand? articleInitialization,
+        InventorySelectionTarget? target = null)
     {
         RequireUserNum(userNum);
         ArgumentNullException.ThrowIfNull(scope);
+        initialization?.ValidateFor(userNum, scope);
+        articleInitialization?.ValidateFor(userNum, scope);
+        target?.ValidateFor(userNum, scope, itemId);
         ct.ThrowIfCancellationRequested();
         var entry = table.GetOrAdd(userNum);
         lock (entry.Gate)
         {
             ct.ThrowIfCancellationRequested();
-            var state = ReadLoadout(entry, scope);
-            var rows = new[] { InventoryBag.CharacterBag, InventoryBag.EquippedBag }
-                .SelectMany(bag => entry.Bags.GetValueOrDefault((int)bag) ?? []).ToArray();
-            var changed = InventoryWearSelection.Apply(InventoryLoadouts.Project(rows, state, scope), groups, itemId, worn);
-            if (changed is null) return ValueTask.FromResult<IReadOnlyList<InventorySlotRecord>?>(null);
-            entry.Loadouts[scope.Key] = state with
+            if (target is not null && !target.Matches(InventoryLoadouts.Project(ArticleRows(entry), ReadLoadout(entry, scope), scope)))
+                return ValueTask.FromResult<PetInventorySnapshot?>(null);
+            return ValueTask.FromResult(WithPetPreparation<PetInventorySnapshot?>(entry, scope, initialization, plan =>
             {
-                WornItemIds = changed.Where(row => row.Bag == InventoryBag.CharacterBag
-                    && (row.Flags & InventorySlotRecord.WornFlagBit) != 0).Select(row => row.ItemId).Distinct().ToArray(),
-            };
-            return ValueTask.FromResult<IReadOnlyList<InventorySlotRecord>?>(changed.Where(row => row.Bag == InventoryBag.CharacterBag).ToArray());
+                var projected = InventoryLoadouts.Project(plan.Rows, plan.Loadout, scope);
+                var changed = InventoryWearSelection.Apply(projected, groups, itemId, worn);
+                if (changed is null) return null;
+                var state = InventoryLoadouts.Selection(plan.Loadout, changed);
+                var result = new PetInventorySnapshot(changed.Where(row => row.Bag == InventoryBag.CharacterBag).ToArray(),
+                    changed.Where(row => row.Bag == InventoryBag.EquippedBag).ToArray());
+                CommitPetPreparation(entry, scope, plan, plan.Rows, state, ct);
+                return result;
+            }, articleInitialization));
         }
     }
 

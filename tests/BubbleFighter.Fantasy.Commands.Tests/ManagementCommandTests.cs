@@ -21,11 +21,11 @@ public sealed class ManagementCommandTests
 {
     private static readonly TimeSpan Limit = TimeSpan.FromSeconds(10);
     private static readonly ConcurrentDictionary<string, Action<IPluginContext>> Plans = new();
-    private static CommandCaller ConsoleCaller => new(new(PrincipalKind.Console, "local"), new(PrincipalKind.Console, "local"));
+    private static CommandCaller ConsoleCaller => new(new(PrincipalKind.Console, "local"), new(PrincipalKind.Console, "local")) { Source = CommandSource.Terminal };
     private static CommandCaller GameCaller(Session session) => new(
         new(PrincipalKind.Game, session.Feature<IPlayerSession>().Identity.UserNum.ToString(System.Globalization.CultureInfo.InvariantCulture)),
         new(PrincipalKind.Game, session.Feature<IPlayerSession>().Identity.UserNum.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-        SessionId: session.Id.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        SessionId: session.Id.ToString(System.Globalization.CultureInfo.InvariantCulture)) { Source = CommandSource.InGameChat };
 
     [Plugin("test.management.owner", Requires = [typeof(IOnlineCommandScopes), typeof(ICommandExecutor)])]
     public sealed class Owner : IPlugin

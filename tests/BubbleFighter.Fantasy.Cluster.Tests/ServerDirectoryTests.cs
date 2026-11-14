@@ -389,6 +389,31 @@ public sealed class ServerDirectoryTests
         Assert.All(directory.ListServers("kr-999"), selector => Assert.Empty(selector.Targets));
     }
 
+    /// <summary>
+    /// Nodes need not serve every build: a manual server is listed for a build only when one of its nodes serves it,
+    /// while the automatic selector and a reserved server without nodes are listed for every build.
+    /// </summary>
+    [Fact]
+    public void ManualServersAreListedOnlyForBuildsTheirNodesServe()
+    {
+        var both = Node("both", "formal", []);
+        both.Endpoints = [.. both.Endpoints, new() { Build = "kr-812", Host = "both.example", Port = 7110, Capacity = 8 }];
+        var options = Options(Node("modern", "formal", []), both);
+        options.Selectors = [.. options.Selectors, new() { Id = 9, Name = "Reserved" }];
+        Assert.Empty(options.Validate());
+        var directory = new ServerDirectory(options, new Clock());
+        foreach (var list in new Func<string, IReadOnlyList<ServerSelectorEntry>>[] { directory.ListServers, directory.ListSelectionServers })
+        {
+            Assert.Equal(["Automatic", "modern", "both", "Reserved"], list("kr-1256").Select(entry => entry.Name));
+            var legacy = list("kr-812");
+            Assert.Equal(["Automatic", "both", "Reserved"], legacy.Select(entry => entry.Name));
+            Assert.Empty(legacy[0].Targets);
+            Assert.Equal("both", Assert.Single(legacy[1].Targets).NodeId);
+            Assert.Equal(["kr-1256", "kr-812"], legacy[1].Targets[0].ClientBuilds);
+        }
+        Assert.Equal(["kr-1256", "kr-812"], directory.ClientBuilds.Order(StringComparer.Ordinal));
+    }
+
     internal static DirectoryNodeOptions Node(string id, string data, string[] groups) => new()
     {
         Id = id, Name = id, DataScope = data, RoomDirectories = groups, HeartbeatKey = new string('x', 32) + id,

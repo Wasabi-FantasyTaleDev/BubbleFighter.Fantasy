@@ -153,8 +153,12 @@ structs:
       offset: 80
     - unknown_84: u8
       offset: 84
-    - unknown_88: u32
+    # kr-1256 sub_9E5E70 stores this in session+432; kr-1256 sub_756040 seeds generation via kr-1256 sub_F99280.
+    - map_seed: u32
       offset: 88
+      cn-774:
+        - unknown_88: u32
+          offset: 88
     - unknown_92: u8
       offset: 92
     # kr-1256 sub_10D2CF0

@@ -1,0 +1,30 @@
+# Include after pets.patch.yaml for kr-1256, cn-774 or tw-454 only.
+# tw-454 must also include pets-tw-454.patch.yaml for its independently read native configuration source.
+# kr-1256 sub_EE2C70 uses the item parameter as the grade cap; kr-1256 sub_A0E7B0 selects grade-one skills.
+# The feed cooldown is stated by each build's own patch. The mileage display maximum is the value the native service
+# published in DynamicConfig category 14's last word (graded captured); mileage gains stay disabled.
+# Handlers also require the build's audited client-configuration route; persistence can be prepared separately.
+- set:
+    id: pets.entitlements
+    config:
+      manual_level_up: true
+      client_configuration_source: DynamicConfig
+      grade_cap_from_pet_parameter: true
+      shared_skill_pool: true
+      experience_from_food_parameter: true
+      feed_cooldown_seconds: null
+      mileage:
+        enabled: false
+        display_maximum: 110
+- set:
+    id: pets
+    config:
+      manual_level_up: true
+      client_configuration_source: DynamicConfig
+      grade_cap_from_pet_parameter: true
+      shared_skill_pool: true
+      experience_from_food_parameter: true
+      feed_cooldown_seconds: null
+      mileage:
+        enabled: false
+        display_maximum: 110

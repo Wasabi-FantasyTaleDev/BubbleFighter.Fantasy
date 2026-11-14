@@ -69,7 +69,7 @@ internal sealed class RoomListCodec(string protocol, ushort request, ushort repl
         RequireReplyLayout(tables, build);
         if (UsesPageHeader(tables, build))
         {
-            var schema = RoomTables.Load(tables).Of(build).Schema;
+            var schema = RoomTables.For(tables).Of(build).Schema;
             var rooms = message.Rooms;
             var skip = 0;
             if (Paging(tables, build))
@@ -128,7 +128,7 @@ internal sealed class RoomListCodec(string protocol, ushort request, ushort repl
         {
             PacketLayoutContract.RequireFields(tables, build, "RoomListReply", "Room list",
                 ("page", "u32"), ("more", "bool"), ("rooms", "list<SessionSetting>"));
-            _ = RoomTables.Load(tables).Of(build);
+            _ = RoomTables.For(tables).Of(build);
         }
         else
         {

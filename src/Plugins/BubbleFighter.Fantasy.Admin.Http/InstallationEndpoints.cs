@@ -23,15 +23,19 @@ public sealed partial class AdminHttpPlugin
         var allowedHosts = options.AllowedHosts.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         allowedHosts.Add(endpoint.Address.ToString());
-        if (IPAddress.IsLoopback(endpoint.Address))
+        var loopback = IPAddress.IsLoopback(endpoint.Address);
+        if (loopback)
         { allowedHosts.Add("localhost"); allowedHosts.Add("127.0.0.1"); allowedHosts.Add("::1"); }
+        // The host check defends a loopback-only listener against DNS rebinding. A listener bound to a reachable
+        // address is meant to be opened by any name or address that reaches it, unless allowed_hosts lists them.
+        var anyHost = !loopback && options.AllowedHosts.Trim().Length == 0;
 
         app.Use(async (http, next) =>
         {
             http.Response.Headers.XContentTypeOptions = "nosniff";
             http.Response.Headers["Referrer-Policy"] = "no-referrer";
             http.Response.Headers["X-Frame-Options"] = "DENY";
-            if (!allowedHosts.Contains(http.Request.Host.Host))
+            if (!anyHost && !allowedHosts.Contains(http.Request.Host.Host))
             { http.Response.StatusCode = 400; return; }
             if (!http.Request.Path.StartsWithSegments("/api")) { await next().ConfigureAwait(false); return; }
             http.Response.Headers.CacheControl = "no-store";
@@ -54,7 +58,8 @@ public sealed partial class AdminHttpPlugin
             // the in-memory sessions are gone.
             var publicAuth = path is "/api/auth/status" or "/api/auth/login" or "/api/health";
             var freshSetup = !access.HasAdministrator && (path is "/api/setup/status" or "/api/setup/probe" or "/api/setup/complete" or "/api/setup/directories" or "/api/setup/client-data");
-            if (freshSetup && !(http.Connection.RemoteIpAddress is { } remote && IPAddress.IsLoopback(remote)) &&
+            // The setup token is optional: only a configured bootstrap_token restricts a remote first-run setup.
+            if (freshSetup && access.AllowsRemoteBootstrap && !(http.Connection.RemoteIpAddress is { } remote && IPAddress.IsLoopback(remote)) &&
                 !access.AcceptsBootstrapToken(http.Request.Headers["X-BFF-Setup-Token"].ToString()))
             { await RejectAsync(http, 403, "bootstrap_token_required").ConfigureAwait(false); return; }
             // An installation signs administrators in by account and password only; a bearer token is not accepted here.
@@ -84,7 +89,7 @@ public sealed partial class AdminHttpPlugin
                 };
                 var status = error is BadHttpRequestException requestError ? requestError.StatusCode :
                     error is ArgumentException ? 400 : code is "login_rate_limited" or "login_busy" ? 429 : 409;
-                await RejectAsync(http, status, code).ConfigureAwait(false);
+                await RejectAsync(http, status, code, code == "database_failed" ? DatabaseReason(error) : null).ConfigureAwait(false);
             }
         });
 
@@ -145,7 +150,9 @@ public sealed partial class AdminHttpPlugin
         app.MapPost("/api/setup/probe", async (InstallationSettings settings, CancellationToken ct) =>
         {
             await installation.ProbeAsync(settings, ct).ConfigureAwait(false);
-            return Results.Ok(new { connected = true });
+            // A database that already holds tables is reported, so the assistant asks whether to keep or replace it.
+            var database = await installation.InspectDatabaseAsync(settings, ct).ConfigureAwait(false);
+            return Results.Ok(new { connected = true, database });
         });
         app.MapPost("/api/setup/complete", async (InstallationRequest request, CancellationToken ct) =>
         {
@@ -178,10 +185,21 @@ public sealed partial class AdminHttpPlugin
         }
     }
 
-    private static Task RejectAsync(HttpContext http, int status, string code)
+    private static Task RejectAsync(HttpContext http, int status, string code, string? detail = null)
     {
         http.Response.StatusCode = status;
-        return http.Response.WriteAsJsonAsync(new { error = code });
+        return detail is null ? http.Response.WriteAsJsonAsync(new { error = code })
+            : http.Response.WriteAsJsonAsync(new { error = code, detail });
+    }
+
+    // The database provider's one-line reason behind database_failed, without the stack, for the administrator.
+    private static string? DatabaseReason(Exception error)
+    {
+        var cause = error.InnerException;
+        while (cause is AggregateException { InnerException: { } next }) cause = next;
+        if (cause is null) return null;
+        var text = cause.Message.ReplaceLineEndings(" ").Trim();
+        return text.Length > 300 ? text[..300] : text;
     }
 
     private sealed record LoginRequest(string Username, string Password);

@@ -2,6 +2,7 @@ using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Match;
 using BubbleFighter.Fantasy.Contracts.Progress;
+using BubbleFighter.Fantasy.Contracts.Titles;
 using BubbleFighter.Fantasy.Contracts.Wallet;
 using BubbleFighter.Fantasy.InGame.Data;
 using BubbleFighter.Fantasy.InGame.Sessions;
@@ -23,6 +24,9 @@ internal sealed partial class RoundFlow
     private readonly LevelTable? _levels;
     private readonly IPlayerProgressRepository? _progress;
     private readonly IEventBus? _events;
+
+    /// <summary>Gets whether this flow can prepare rewards and commit them through the atomic progress store.</summary>
+    internal bool SupportsPreparedRewards => _progress is not null && _levels is not null && _events is not null;
 
     /// <summary>
     /// Resolves what the result sequence needs beyond the round itself: the build's result
@@ -107,9 +111,15 @@ internal sealed partial class RoundFlow
         if (_result is null || _registry.TryGet(session.Id) is not { } room || room.Tutorial is not null)
             return;
         var captainReport = IsCaptainMode(room) ? CaptureCaptainReport(room, session, report.Victim) : null;
-        int? finalZoneGeneration = IsFinalZoneMode(room) ? room.StartGeneration : null;
+        FinalZoneRoundState? finalZoneState;
+        lock (room.Gate)
+        {
+            finalZoneState = IsFinalZoneMode(room) ? room.FinalZone : null;
+            if (IsFinalZoneMode(room) && finalZoneState is null) return;
+        }
+        int? finalZoneGeneration = finalZoneState?.Generation;
         if (IsCaptainMode(room) && captainReport is null) return;
-        await room.Executor.ExecuteAsync(async operationCt =>
+        await ExecuteFinalZoneGuardedAsync(room, finalZoneState, async operationCt =>
         {
             RoundScoreUpdated update;
             string nickname;
@@ -120,6 +130,7 @@ internal sealed partial class RoundFlow
                 if (room.Phase != RoomPhase.Playing || room.FindByGame(session.Id) is not { } controller)
                     return;
                 if (captainReport is { } stamp && !CaptainReportIsCurrent(room, stamp)) return;
+                if (finalZoneState is not null ? !ReferenceEquals(room.FinalZone, finalZoneState) : IsFinalZoneMode(room)) return;
                 if (finalZoneGeneration is { } generation && !FinalZoneReportIsCurrent(room, session, generation)) return;
                 var reporter = ScoreReporter(room, controller, report.ReporterSlot,
                     report.RequiresReporterOwnership || report.RequiresDirectKillMode || IsCaptainMode(room)
@@ -156,20 +167,29 @@ internal sealed partial class RoundFlow
     // The live score goes to every member of the running round; the counters were read under the gate.
     private async ValueTask SendScoreAsync(PlayRoom room, RoundScoreUpdated update, CancellationToken ct)
     {
-        if (_result is not { } result)
-            return;
+        // Every accepted score reaches this point, so the weapons it earned follow it immediately.
+        await PublishWeaponMasterAsync(room, ct).ConfigureAwait(false);
         RoomSeat[] members;
+        var weaponMasterWon = false;
         lock (room.Gate)
         {
             if (room.Phase != RoomPhase.Playing)
                 return;
             members = [.. room.Seats];
+            if (room.WeaponMaster is { } state)
+            {
+                update = update with { Seats = [.. update.Seats.Select(seat => seat with { WeaponMaster = state.Progress(seat.Slot) })] };
+                weaponMasterWon = DecideWeaponMasterWinner(room, state);
+            }
         }
-        foreach (var member in members)
-        {
-            ct.ThrowIfCancellationRequested();
-            await result.Score.SendAsync(member.Game, update, ct).ConfigureAwait(false);
-        }
+        if (_result is { } result)
+            foreach (var member in members)
+            {
+                ct.ThrowIfCancellationRequested();
+                await result.Score.SendAsync(member.Game, update, ct).ConfigureAwait(false);
+            }
+        if (weaponMasterWon)
+            await EndRoundAsync(room, RoundEndReason.WinCondition, ct).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -389,7 +409,7 @@ internal sealed partial class RoundFlow
                 Outcome = reason is null ? null : WinnerTeam(room) == 0 ? RoundOutcome.Draw
                     : WinnerTeam(room) == bot.Team ? RoundOutcome.Won : RoundOutcome.Lost,
             });
-        var totals = room.Scoring.TeamTotals.ToArray();
+        var totals = LiveTeamTotals(room);
         var winner = WinnerTeam(room);
         if (objectiveScores)
         {
@@ -487,11 +507,11 @@ internal sealed partial class RoundFlow
 
     // The team with the strictly higher total wins and equal totals are a draw - the same rule the
     // client applies to the totals it is sent.
-    private static int WinnerTeam(PlayRoom room)
+    private int WinnerTeam(PlayRoom room)
     {
         if (room.DecidedWinnerTeam is { } decided)
             return decided;
-        var totals = room.Scoring.TeamTotals;
+        var totals = LiveTeamTotals(room);
         if (totals[0] > totals[1])
             return 1;
         return totals[1] > totals[0] ? 2 : 0;
@@ -556,35 +576,54 @@ internal sealed partial class RoundFlow
     internal async ValueTask<Dictionary<int, RoundReward>> GrantRewardsAsync(PlayRoom room, int generation,
         RoundEndReason reason, CancellationToken ct)
     {
-        var rewards = ComputeRewards(room, generation, reason);
-        if (_progress is null || _levels is null) return rewards;
+        if (_progress is null || _levels is null) return ComputeRewards(room, generation, reason);
         string matchId;
-        IReadOnlyList<BattleSettlementPlan> plans;
+        IReadOnlyList<BattleSettlementPlan>? plans;
+        BattleSettlementCandidate[] candidates = [];
         lock (room.Gate)
         {
-            if (room.StartGeneration != generation || room.RoundCancelled
-                || room.Phase != RoomPhase.Result
-                    && !(_options.RecordBattleStatistics && room.Phase == RoomPhase.Starting
-                        && room.BombSeries is { Forfeited: true, RoundIndex: > 0 })) return [];
+            ct.ThrowIfCancellationRequested();
+            if (!CanSettleRewards(room, generation)) return [];
             matchId = room.MatchId;
-            if (_options.RecordBattleStatistics)
+            plans = room.BattleSettlements;
+            if (plans is null)
             {
-                if (room.BombSeries is { CanContinue: true }) return [];
+                var rewards = ComputeRewards(room, generation, reason);
                 var outcome = OutcomeOf(room, generation, reason);
-                room.BattleSettlements ??= room.Seats.Where(seat => rewards.ContainsKey(seat.Slot))
-                    .Select(seat => new BattleSettlementPlan(seat, rewards[seat.Slot],
-                        BattleRecord(room, seat, outcome(seat) switch
-                        {
-                            RoundOutcome.Won => BattleRecordOutcome.Won,
-                            RoundOutcome.Draw => BattleRecordOutcome.Draw,
-                            RoundOutcome.Lost => BattleRecordOutcome.Lost,
-                            _ => throw new InvalidOperationException("Unknown round outcome."),
-                        }))).ToArray();
-                plans = room.BattleSettlements;
+                var participantCount = room.Seats.Count(seat => seat.UserNum > 0 && seat.RewardEquipmentMatchId == matchId);
+                candidates = room.Seats.Where(seat => rewards.ContainsKey(seat.Slot)).Select(seat =>
+                {
+                    if (seat.RewardEquipmentMatchId != matchId)
+                        throw new InvalidOperationException($"Room {room.Id} seat {seat.Slot} has no admitted equipment for match {matchId}.");
+                    var reward = rewards[seat.Slot];
+                    var collected = room.Scoring.Lucci(seat.Slot);
+                    var amounts = new RoundRewardAmounts(reward.ExpEarned,
+                        checked(reward.LucciEarned - collected), collected);
+                    amounts.Validate();
+                    var record = _options.RecordBattleStatistics ? BattleRecord(room, seat, outcome(seat) switch
+                    {
+                        RoundOutcome.Won => BattleRecordOutcome.Won,
+                        RoundOutcome.Draw => BattleRecordOutcome.Draw,
+                        RoundOutcome.Lost => BattleRecordOutcome.Lost,
+                        _ => throw new InvalidOperationException("Unknown round outcome."),
+                    }) : null;
+                    return new BattleSettlementCandidate(seat, reward, record,
+                        new(_options.GameProtocol, matchId, seat.UserNum, room.ModeId, reason, seat.RewardEquipment, amounts),
+                        new(_options.GameProtocol, matchId, seat.UserNum, room.ModeId, outcome(seat), reason,
+                            room.Scoring.Stats(seat.Slot) with { }, participantCount));
+                }).ToArray();
             }
-            else
-                plans = room.Seats.Where(seat => rewards.ContainsKey(seat.Slot))
-                    .Select(seat => new BattleSettlementPlan(seat, rewards[seat.Slot], null)).ToArray();
+        }
+        if (plans is null)
+        {
+            var prepared = await Task.WhenAll(candidates.Select(candidate => PrepareRewardAsync(candidate, ct))).ConfigureAwait(false);
+            lock (room.Gate)
+            {
+                ct.ThrowIfCancellationRequested();
+                if (!CanSettleRewards(room, generation) || room.MatchId != matchId) return [];
+                // Concurrent preparations all use the first adopted plan, including its isolated seat failures.
+                plans = room.BattleSettlements ??= Array.AsReadOnly(prepared);
+            }
         }
         var committed = await Task.WhenAll(plans.Select(async plan =>
         {
@@ -592,18 +631,27 @@ internal sealed partial class RoundFlow
             var estimate = plan.Reward;
             try
             {
+                ct.ThrowIfCancellationRequested();
+                if (plan.PreparationFailure is { } failure)
+                    throw new InvalidOperationException("The terminal reward could not be prepared.", failure);
+                if (plan.SettledReward is { } completed)
+                    return new KeyValuePair<int, RoundReward>?(new(seat.Slot, completed));
                 using var authority = _mutations?.Enter(seat.Game);
                 var settled = await RoundSettler.SettleAsync(_progress, _levels, matchId, seat.UserNum, estimate.ExpEarned,
-                    estimate.LucciEarned, _options.SettlementAttempts, _logger, ct, plan.Record).ConfigureAwait(false);
+                    estimate.LucciEarned, _options.SettlementAttempts, _logger, ct, plan.Record, plan.TitleMedals).ConfigureAwait(false);
                 var after = settled.After;
+                var creditedExperience = after.Exp == settled.Before.Exp ? 0
+                    : checked((int)(after.Exp - Math.Max(settled.Before.Exp, _levels.Start(Math.Max(1, settled.Before.Level)))));
+                ArgumentOutOfRangeException.ThrowIfNegative(creditedExperience);
                 var reward = estimate with
                 {
                     Exp = after.Exp, Level = after.Level, LevelStart = _levels.Start(after.Level),
-                    NextLevelStart = _levels.Start(after.Level + 1), LucciEarned = settled.LucciEarned,
+                    NextLevelStart = _levels.Start(after.Level + 1), ExpEarned = creditedExperience, LucciEarned = settled.LucciEarned,
                 };
+                reward = plan.RememberSettledReward(reward);
                 _logger.LogInformation("Room {Room} seat {Slot}: {Outcome} {Exp} experience and {Lucci} Lucci for match {Match}; balance {Balance}.",
                     room.Id, seat.Slot, settled.Outcome, reward.ExpEarned, reward.LucciEarned, matchId, settled.LucciBalance);
-                if (plan.Record is null || plan.TryBeginLevelAnnouncement())
+                if (plan.TryBeginLevelAnnouncement())
                     await LevelRaisedPublisher.PublishAsync(_events, _logger, _options.GameProtocol, seat.UserNum,
                         Math.Max(1, settled.Before.Level), after.Level, ct).ConfigureAwait(false);
                 return new KeyValuePair<int, RoundReward>?(new(seat.Slot, reward));
@@ -617,6 +665,42 @@ internal sealed partial class RoundFlow
             }
         })).ConfigureAwait(false);
         return committed.OfType<KeyValuePair<int, RoundReward>>().ToDictionary(pair => pair.Key, pair => pair.Value);
+    }
+
+    private bool CanSettleRewards(PlayRoom room, int generation) =>
+        room.StartGeneration == generation && !room.RoundCancelled && !room.IsStopping && !_lifetime.IsCancellationRequested
+        && room.Tutorial is null && room.BombSeries is not { CanContinue: true }
+        && (room.Phase == RoomPhase.Result
+            || room.Phase == RoomPhase.Starting && room.BombSeries is { Forfeited: true, RoundIndex: > 0 });
+
+    private async Task<BattleSettlementPlan> PrepareRewardAsync(BattleSettlementCandidate candidate, CancellationToken ct)
+    {
+        try
+        {
+            var request = candidate.Preparation;
+            var amounts = _events is null ? request.BaseReward
+                : await _events.WaterfallAsync<RoundRewardPreparing, RoundRewardAmounts>(request,
+                    _ => ValueTask.FromResult(request.BaseReward), ct).ConfigureAwait(false);
+            ArgumentNullException.ThrowIfNull(amounts);
+            amounts.Validate();
+            var total = checked(candidate.Reward.Exp - candidate.Reward.ExpEarned + amounts.Experience);
+            var levels = _levels ?? throw new InvalidOperationException("Reward preparation requires a level table.");
+            var level = levels.LevelFor(total);
+            var reward = candidate.Reward with
+            {
+                Exp = total, Level = level, LevelStart = levels.Start(level), NextLevelStart = levels.Start(level + 1),
+                ExpEarned = amounts.Experience, LucciEarned = amounts.TotalLucci,
+            };
+            var medals = _events is null ? null
+                : await _events.WaterfallAsync<RoundTitleMedalsPreparing, TitleMedalGrantCommand?>(candidate.MedalPreparation,
+                    _ => ValueTask.FromResult<TitleMedalGrantCommand?>(null), ct).ConfigureAwait(false);
+            medals?.Validate();
+            return new(candidate.Seat, reward, candidate.Record) { TitleMedals = medals };
+        }
+        catch (Exception failure) when (failure is not OperationCanceledException)
+        {
+            return new(candidate.Seat, candidate.Reward, candidate.Record, failure);
+        }
     }
 
     // The reward row the scoreboard shows: before the rewards, the experience the seat came in with

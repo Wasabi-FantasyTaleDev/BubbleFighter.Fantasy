@@ -1,4 +1,6 @@
+using BubbleFighter.Fantasy.Contracts.Enhancement;
 using BubbleFighter.Fantasy.Contracts.Inventory;
+using BubbleFighter.Fantasy.Contracts.Pets;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.InventoryView.Handlers;
@@ -13,10 +15,10 @@ namespace BubbleFighter.Fantasy.InventoryView;
 /// request has no proven reply. Disabled rows register nothing, and request-only rows
 /// need no outbound codec.
 /// </summary>
-[Plugin("inventoryview",
+[Plugin("inventoryview", Category = "items", Names = ["en=Inventory", "zh-Hans=背包", "zh-Hant=背包", "ko=인벤토리"], 
     Description = "Equipment selection and typed view publication with a strict view request parser.", 
     Requires = [typeof(IPacketRouter), typeof(IOpcodeTableRegistry)],
-    Optional = [typeof(IPlayerInventoryState), typeof(IInventoryRepository), typeof(BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore)],
+    Optional = [typeof(IPlayerInventoryState), typeof(IInventoryRepository), typeof(IPetEntitlements), typeof(IItemEnhancementStore), typeof(IEquipmentArticleResolver), typeof(IInventoryLoadoutStore), typeof(IInventoryBuildScope), typeof(BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore)],
     OptionalMany = [typeof(IOpcodeTable), typeof(IMessageSender<LocalEquipmentViewUpdated>), typeof(IMessageSender<RemoteEquipmentViewUpdated>)],
     ConditionalProvides = [typeof(IEquippedViewPush), typeof(IEquipmentSelection), typeof(IWeaponPresetPageSource)])]
 public sealed class InventoryViewPlugin : IPlugin
@@ -75,16 +77,21 @@ public sealed class InventoryViewPlugin : IPlugin
             if (context.Services.TryGet<IInventoryRepository>(out var inventory) && inventory is not null)
             {
                 var contributions = new EquipmentWearGroups(context.Events, protocol);
+                context.Services.TryGet<IPetEntitlements>(out var pets);
+                context.Services.TryGet<IItemEnhancementStore>(out var articles);
+                context.Services.TryGet<IEquipmentArticleResolver>(out var articleResolver);
+                context.Services.TryGet<IInventoryBuildScope>(out var buildScope);
+                context.Services.TryGet<IInventoryLoadoutStore>(out var loadouts);
                 IEquipmentSelection inner = options.Selection == "catalog_masks"
-                    ? new EquipmentSelectionCatalogMasks(inventory, CatalogMasks(context, options), contributions)
-                    : new EquipmentSelection(inventory, WearLocations(context, options), contributions);
+                    ? new EquipmentSelectionCatalogMasks(inventory, CatalogMasks(context, options), contributions, pets, articles, buildScope?.Scope, articleResolver, loadouts)
+                    : new EquipmentSelection(inventory, WearLocations(context, options), contributions, pets, articles, buildScope?.Scope, articleResolver, loadouts);
                 selection = new EquipmentSelectionPolicy(inner, context.Events, protocol, context.Logger);
                 context.Effect(context.Services.Register<IEquipmentSelection>(selection));
                 context.Effect(context.Events.Intercept<EquipmentSelectionReadRequested, IReadOnlyList<InventorySlotRecord>>(
                     (request, next, ct) => request.Protocol == protocol ? selection.ReadAsync(request.UserNum, ct) : next(ct)));
             }
             var push = new EquippedViewPush(context.Logger, localSender!, remoteSender!, playerState, selection,
-                options.PersistPresetPages, context.Events);
+                options.PersistPresetPages, context.Events, inventory);
             context.Effect(context.Services.Register<IEquippedViewPush>(push));
             if (options.PersistPresetPages)
                 context.Effect(context.Services.Register<IWeaponPresetPageSource>(push));
@@ -92,7 +99,9 @@ public sealed class InventoryViewPlugin : IPlugin
             {
                 if (request.Protocol != protocol)
                     return await next(ct).ConfigureAwait(false);
-                if (request.Remote)
+                if (request.ItemAttributes is not null)
+                    await push.SendSuppliedAsync(request, ct).ConfigureAwait(false);
+                else if (request.Remote)
                     await push.SendRemoteAsync(request.Session, request.UserNum, request.CharacterItemId, request.EquippedItemIds, ct).ConfigureAwait(false);
                 else
                     await push.SendSelectionAsync(request.Session, request.UserNum, request.CharacterItemId, request.EquippedItemIds, ct).ConfigureAwait(false);
@@ -101,7 +110,19 @@ public sealed class InventoryViewPlugin : IPlugin
             context.Effect(context.Events.Intercept<BubbleFighter.Fantasy.Contracts.Lobby.LoginEquipmentRequested, bool>(async (request, next, ct) =>
             {
                 if (request.Protocol == protocol)
-                    await push.SendSelectionAsync(request.Session, request.Login.UserNumber, request.CharacterItemId, request.Login.EquippedItemIds, ct).ConfigureAwait(false);
+                {
+                    if (request.Login.CharacterBag is { } bag)
+                    {
+                        var rows = Array.AsReadOnly(bag.ToArray());
+                        var ids = Array.AsReadOnly(request.Login.EquippedItemIds.ToArray());
+                        var attributes = await InventoryPresentations.EquippedAsync(context.Events, protocol, rows,
+                            ids, ct).ConfigureAwait(false);
+                        await push.SendSuppliedAsync(new(protocol, request.Session, request.Login.UserNumber,
+                            request.CharacterItemId, ids, false) { ItemAttributes = attributes }, ct).ConfigureAwait(false);
+                    }
+                    else
+                        await push.SendSelectionAsync(request.Session, request.Login.UserNumber, request.CharacterItemId, request.Login.EquippedItemIds, ct).ConfigureAwait(false);
+                }
                 return await next(ct).ConfigureAwait(false);
             }));
             context.Logger.LogInformation(
@@ -135,8 +156,18 @@ public sealed class InventoryViewPlugin : IPlugin
             throw new ConfigException("Set at most one of item_locations_client_path and item_locations_path.");
         if (!context.Services.TryGet<BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore>(out var data) || data is null)
             throw new ConfigException("item_locations_client_path requires a clientdata row for this build.");
-        using var stream = new MemoryStream(data.Read(options.ItemLocationsClientPath), writable: false);
-        return ItemWearLocations.Load(stream, options.ClothingCategory, options.AccessoryCategory);
+        // The positions depend on the workbook and the two category names only, so a later start reads them from the
+        // build's compiled client data instead of unpacking and parsing the workbook.
+        var inputs = new BubbleFighter.Fantasy.Contracts.ClientData.CompiledInputs()
+            .Add("workbook", options.ItemLocationsClientPath)
+            .Add("clothing_category", options.ClothingCategory)
+            .Add("accessory_category", options.AccessoryCategory).ToString();
+        return BubbleFighter.Fantasy.Contracts.ClientData.CompiledClientData.Load(data, WearLocationsCatalog.Instance, inputs, store =>
+        {
+            // The workbook unpacks to tens of megabytes; it is parsed as it is unpacked instead of being read whole.
+            using var stream = store.OpenRead(options.ItemLocationsClientPath);
+            return ItemWearLocations.Load(stream, options.ClothingCategory, options.AccessoryCategory);
+        });
     }
 
     /// <summary>
@@ -165,6 +196,6 @@ public sealed class InventoryViewPlugin : IPlugin
             throw new ConfigException($"Set at most one of {clientKey} and {fileKey}.");
         if (!context.Services.TryGet<BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore>(out var data) || data is null)
             throw new ConfigException($"{clientKey} requires a clientdata row for this build.");
-        return BubbleFighter.Fantasy.Contracts.ClientData.WorkbookFile.FromBytes(clientPath, data.Read(clientPath));
+        return BubbleFighter.Fantasy.Contracts.ClientData.WorkbookFile.FromStore(data, clientPath);
     }
 }

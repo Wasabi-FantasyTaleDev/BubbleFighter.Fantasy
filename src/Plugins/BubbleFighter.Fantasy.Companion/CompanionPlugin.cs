@@ -11,7 +11,7 @@ namespace BubbleFighter.Fantasy.Companion;
 /// connects here with the launch's ticket, and once the game login redeems the launch's game ticket the connection is
 /// bound to that game session, so server plugins can talk to the launcher of a player they already know.
 /// </summary>
-[Plugin("companion", Description = "Fantasy Tale Nirinsou Link: launch-bound WebSocket channel between launchers and server plugins.",
+[Plugin("companion", Category = "launcher", Names = ["en=Nirinsou Link", "zh-Hans=Nirinsou Link", "zh-Hant=Nirinsou Link", "ko=Nirinsou Link"], Description = "Fantasy Tale Nirinsou Link: launch-bound WebSocket channel between launchers and server plugins.",
     Provides = [typeof(ICompanionTicketIssuer), typeof(ICompanionHub), typeof(ICompanionFederation)])]
 public sealed class CompanionPlugin : IPlugin
 {
@@ -20,6 +20,8 @@ public sealed class CompanionPlugin : IPlugin
     {
         var options = context.Config.Bind<CompanionOptions>();
         var launches = new CompanionLaunches(options, TimeProvider.System, context.Logger);
+        var events = context.Events;
+        launches.Connected = session => events.Emit(new CompanionSessionConnected(session));
         var federation = new CompanionFederation(launches, options, TimeProvider.System, context.Logger);
         context.Effect(federation);
         var hub = new CompanionHub(launches);

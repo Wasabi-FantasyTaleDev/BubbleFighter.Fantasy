@@ -19,6 +19,7 @@
   parent_id: clientdata
   isolated_services:
     - BubbleFighter.Fantasy.Contracts.Inventory.IInventoryRepository
+    - BubbleFighter.Fantasy.Contracts.Inventory.IInventoryBuildScope
     - BubbleFighter.Fantasy.Contracts.Inventory.IPlayerInventoryState
     - BubbleFighter.Fantasy.Contracts.Fighters.IFighterRoster
     - BubbleFighter.Fantasy.Contracts.Fighters.ISeatCharacterResolver
@@ -59,6 +60,7 @@
   plugin: ingame
   parent_id: inventoryview
   config:
+    mode_name_table_path: data/room-modes.json
     game_protocol: "${BFF_PROFILE_ID}/game"
     relay_protocol: "${BFF_PROFILE_ID}/relay"
     relay_advertise_ipv4: "${BFF_PUBLIC_HOST:-127.0.0.1}"
@@ -105,11 +107,22 @@
     # cn-774 sub_BAB9F0 / tw-454 sub_A89100 rebuild the stage on every room install.
     reinstall_room_on_first_probe: false
 
+# Applies the server-wide ban-pick policies and room host bans to this build's rooms (see the banpick row). A child of
+# the room row, so it sees this build's client data and room policy host.
+- id: banpick.room
+  plugin: banpick.room
+  parent_id: ingame
+  config:
+    protocol: "${BFF_PROFILE_ID}/game"
+    shop_item_client_path: "Config/ShopItem2.xml"
+
 # The native modern relay is a separate listener and protocol scope. These rows
 # are shared by CN2019 and TW2019; the profile's packet table supplies each
 # build's numbers and handshake bodies.
 - id: relay-listener
   plugin: net.tcp
+  # Bound while the build sleeps: a client that connects is what wakes it.
+  activation: always
   config:
     listen: "${BFF_BIND_HOST:-0.0.0.0}:${BFF_MODERN_RELAY_PORT:-7101}"
     protocol: "${BFF_PROFILE_ID}/relay"

@@ -95,6 +95,12 @@ public sealed record RoundFeedSent(ushort Code, ReadOnlyMemory<byte> Payload) : 
 
     /// <summary>Gets the audited race checkpoint whose current-round and monotonic-progress checks precede forwarding.</summary>
     public RoundExtremeRacingCheckpoint? ExtremeRacingCheckpoint { get; init; }
+
+    /// <summary>Gets the audited race cannon shot whose sender, initialization and outstanding-command checks precede forwarding.</summary>
+    public RoundExtremeRacingCannonShot? ExtremeRacingCannonShot { get; init; }
+
+    /// <summary>Gets the OneKill participants whose current ownership and mode must be admitted before forwarding or death credit.</summary>
+    public RoundOneKillAction? OneKill { get; init; }
 }
 
 /// <summary>A feed packet from another player of the round, passed on unread.</summary>

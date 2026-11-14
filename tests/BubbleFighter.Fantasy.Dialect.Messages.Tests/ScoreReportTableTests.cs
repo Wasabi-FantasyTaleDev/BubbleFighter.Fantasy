@@ -36,6 +36,8 @@ public sealed class ScoreReportTableTests
             Assert.Equal(0x14131211, fields["reporter_slot"]);
             Assert.Equal(0x1C1B1A19, fields["combo"]);
         }
+        if (build == "cn-279")
+            Assert.Equal(0x14131211, fields["npc_scorer_slot"]);
         Assert.Throws<PacketFormatException>(() => PacketCodec.ReadScalars(TestBuilds.Packets, build, "RoundScoreReport", body[..^1]));
         Assert.Throws<PacketFormatException>(() => PacketCodec.ReadScalars(TestBuilds.Packets, build, "RoundScoreReport", [.. body, 0]));
     }

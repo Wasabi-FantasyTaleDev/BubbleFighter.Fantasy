@@ -3,6 +3,22 @@ namespace BubbleFighter.Fantasy.Contracts.Inventory;
 /// <summary>Resolves and changes the player's exclusive equipped positions using the current build's item rules.</summary>
 public interface IEquipmentSelection
 {
+    /// <summary>Commits only while the exact owned row remains unique and live, returning both bags with initialized metadata.</summary>
+    ValueTask<PetInventorySnapshot?> ApplyOwnedSnapshotAsync(long userNum, InventorySlotRecord expectedTarget, bool worn, CancellationToken ct) =>
+        throw new NotSupportedException("This equipment provider does not implement ownership-checked inventory selection.");
+
+    /// <summary>Changes one resolved equipment Article only while its exact ownership snapshot remains current.</summary>
+    ValueTask<InventorySnapshot?> ApplyArticleAsync(long userNum, InventorySlotRecord expectedTarget, bool worn, CancellationToken ct) =>
+        throw new NotSupportedException("This equipment provider does not implement exact Article selection.");
+
+    /// <summary>Commits an ordinary selection and returns both bags with initialized feature metadata from that transaction.</summary>
+    ValueTask<PetInventorySnapshot?> ApplySnapshotAsync(long userNum, int itemId, bool worn, CancellationToken ct) =>
+        throw new NotSupportedException("This equipment provider does not implement complete inventory selection snapshots.");
+
+    /// <summary>Applies an Article selection without losing its ownership precondition; returns both bags from the commit.</summary>
+    ValueTask<PetInventorySnapshot?> ApplyPetAsync(long userNum, PetEquipmentTarget target, bool worn, CancellationToken ct) =>
+        throw new NotSupportedException("This equipment provider does not implement entitlement-checked pet selection.");
+
     /// <summary>
     /// Normalizes every exclusive position of the character bag and returns the complete authoritative
     /// character bag. Ambiguous legacy selections are repaired through the same serialized store

@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, shallowRef } from 'vue'
 import NoahButton from '../noah/components/ui/NoahButton.vue'
+import ServerDirectoryPicker from './ServerDirectoryPicker.vue'
 import { api } from '../api/client'
 import { useI18n } from '../i18n'
 import { useServerStore } from '../stores/server'
@@ -15,6 +16,16 @@ const busy = ref(false)
 const error = ref('')
 const selection = ref('')
 const pending = shallowRef(null)
+// A folder that already exists on the server is used in place, without an upload: large client data exceeds what a
+// browser upload can carry, and a server that already has it should not copy it again.
+const serverFolder = ref('')
+function useServerFolder(chosen) {
+  const path = (chosen ?? serverFolder.value).trim()
+  if (!path) return
+  serverFolder.value = path
+  selection.value = ''; pending.value = null; error.value = ''
+  emit('update:modelValue', path)
+}
 const exceedsLimit = computed(() => {
   const limits = server.setupStatus?.importLimits
   return !!pending.value && !!limits && (pending.value.bytes > limits.uploadBytes || pending.value.files.length > limits.fileCount)
@@ -81,6 +92,7 @@ onBeforeUnmount(() => { controller?.abort(); emit('busy', false) })
     <div class="client-data-picker-actions">
       <NoahButton :disabled="busy" @click="folder?.click()">{{ t('setup.chooseLocalFolder') }}</NoahButton>
       <NoahButton :disabled="busy" @click="archive?.click()">{{ t('setup.chooseDataPackage') }}</NoahButton>
+      <ServerDirectoryPicker v-if="!busy" :model-value="serverFolder" @update:model-value="useServerFolder" />
       <NoahButton v-if="busy" variant="ghost" @click="controller?.abort()">{{ t('setup.client_data_cancel') }}</NoahButton>
       <NoahButton v-else-if="modelValue" variant="ghost" @click="clear">{{ t('setup.clearClientData') }}</NoahButton>
     </div>

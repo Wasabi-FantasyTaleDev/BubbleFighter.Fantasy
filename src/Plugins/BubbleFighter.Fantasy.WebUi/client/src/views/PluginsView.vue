@@ -19,6 +19,8 @@ import { api } from '../api/client'
 import { useResource } from '../composables/useResource'
 import { useI18n } from '../i18n'
 import { comparePluginVersions } from '../utils/pluginVersion'
+import { useUiStore } from '../stores/ui'
+import { buildGroups, categoryIcon, decorateRow, groupStatus, sectionGroups } from '../components/pluginGroups'
 
 // The row that serves this page cannot reload itself from here: the request would cut its own connection.
 const SELF_PLUGIN = 'admin.http'
@@ -26,6 +28,7 @@ const SELF_PLUGIN = 'admin.http'
 const { t, te } = useI18n()
 const router = useRouter()
 const toast = useNoahToast()
+const ui = useUiStore()
 // The server reports rows, not packages: a row's id is the name operators give it in profiles, and rows composed
 // from packaged profiles ship with the server. Store versions are read once, not on every five-second refresh.
 const catalog = ref([])
@@ -38,7 +41,8 @@ function decorate(row) {
   const builtIn = /^(bundle|group):/.test(row.source || '')
   const entry = catalog.value.find(item => item.identity.id === row.plugin)
   const newest = (entry?.downloads || []).map(offer => offer.package.version).reduce((best, version) => comparePluginVersions(version, best) === 1 ? version : best, row.version || '')
-  return { ...row, name: row.plugin, builtIn, author: builtIn ? 'Bubble Fighter Fantasy' : null,
+  // A row of a client version that loads on demand is asleep until a client connects, which is not "unloaded by an operator".
+  return { ...decorateRow(row, ui.lang), state: row.isSleeping ? 'Sleeping' : row.state, builtIn, author: builtIn ? 'Bubble Fighter Fantasy' : null,
     storeEntry: entry ? { id: entry.identity.id } : null, availableVersion: newest !== (row.version || '') ? newest : '' }
 }
 const resource = useResource(() => api('plugins'), { interval: 5000 })
@@ -62,7 +66,7 @@ const category = ref('all')
 const categories = computed(() => ['all', 'enabled', 'disabled', 'updates', 'builtIn'].map(id => ({ id, label: t('plugins.category.' + id) })))
 const categoryIndicator = computed(() => ({ width: `calc((100% - 8px) / ${categories.value.length})`, transform: `translateX(${categories.value.findIndex(item => item.id === category.value) * 100}%)` }))
 function matchesCategory(row) {
-  if (category.value === 'enabled') return row.state === 'Active'
+  if (category.value === 'enabled') return row.state === 'Active' || row.state === 'Sleeping'
   if (category.value === 'disabled') return row.disabled === true || row.state === 'Unloaded'
   if (category.value === 'updates') return !!row.availableVersion?.trim()
   if (category.value === 'builtIn') return row.builtIn === true
@@ -75,8 +79,16 @@ const filtered = computed(() => {
   return (data.value || []).filter(row => matchesCategory(row) && (!stateFilter.value || row.state === stateFilter.value)
     && [row.name, row.description, row.plugin, row.rowId, row.source, row.version, stateName(row.state)].some(value => String(value ?? '').toLocaleLowerCase().includes(search)))
 })
-const current = computed(() => filtered.value.find(row => row.rowId === selectedId.value) || filtered.value[0])
-watch(current, row => { selectedId.value = row?.rowId ?? null })
+// The browse view shows one card per plugin: its rows on every client build are merged for display only.
+const groups = computed(() => buildGroups(filtered.value))
+const sections = computed(() => sectionGroups(groups.value, ui.lang))
+const totalGroups = computed(() => new Set((data.value || []).map(row => row.plugin)).size)
+const current = computed(() => groups.value.find(group => group.plugin === selectedId.value) || sections.value[0]?.groups[0])
+watch(current, group => { selectedId.value = group?.plugin ?? null })
+const categoryLabel = id => te('plugins.categoryName.' + id) ? t('plugins.categoryName.' + id) : id
+const cardStatus = group => groupStatus(group.rows, t, te)
+// One line of build chips: three names and a count of the rest keep every card the same height.
+const MAX_CHIPS = 3
 watch([query, stateFilter, category], () => { mobileDetails.value = false })
 const stateOptions = computed(() => [
   { value: '', label: t('plugins.allStates') },
@@ -84,14 +96,18 @@ const stateOptions = computed(() => [
 ])
 
 const columns = computed(() => [
-  { key: 'name', title: t('plugins.name'), width: '16%' },
-  { key: 'plugin', title: t('plugins.code'), width: '23%' },
-  { key: 'rowId', title: t('plugins.configurationId'), width: '23%' },
-  { key: 'version', title: t('col.version'), width: '16%' },
-  { key: 'state', title: t('col.status'), width: '22%' }
+  { key: 'name', title: t('plugins.name'), width: '20%' },
+  { key: 'plugin', title: t('plugins.code'), width: '20%' },
+  { key: 'build', title: t('plugins.build'), width: '12%' },
+  { key: 'rowId', title: t('plugins.configurationId'), width: '20%' },
+  { key: 'version', title: t('col.version'), width: '11%' },
+  { key: 'state', title: t('col.status'), width: '17%' }
 ])
 const drawerRowId = ref(null)
-const drawerRow = computed(() => (data.value || []).find(row => row.rowId === drawerRowId.value))
+const drawerRow = computed(() => {
+  const row = (data.value || []).find(item => item.rowId === drawerRowId.value)
+  return row ? { ...buildGroups([row])[0] } : null
+})
 const drawerOpen = computed(() => !!drawerRow.value)
 const drawerPanel = ref(null)
 let drawerTrigger
@@ -189,7 +205,7 @@ function requestPluginAction(action, row) { targetAction.value = action; target.
       <NoahInput v-model="query" prefix-icon="search" :placeholder="t('plugins.search')" :aria-label="t('plugins.search')" />
       <NoahSelect v-model="stateFilter" :options="stateOptions" :aria-label="t('col.status')" />
       <div class="plugin-filter-summary">
-        <span class="plugin-count text-muted">{{ t('plugins.count', { shown: filtered.length, total: data.length }) }}</span>
+        <span class="plugin-count text-muted">{{ view === 'browse' ? t('plugins.countGroups', { shown: groups.length, total: totalGroups, rows: filtered.length }) : t('plugins.count', { shown: filtered.length, total: data.length }) }}</span>
         <div class="plugin-layout-switch plugin-category-switch" role="group" :aria-label="t('plugins.categoryLabel')">
           <span class="plugin-layout-highlight" :style="categoryIndicator" aria-hidden="true" />
           <button v-for="item in categories" :key="item.id" type="button" :aria-pressed="category === item.id" @click="category = item.id">{{ item.label }}</button>
@@ -200,21 +216,32 @@ function requestPluginAction(action, row) { targetAction.value = action; target.
     <Transition name="plugin-view">
     <div v-if="view === 'browse'" key="browse" class="plugin-browser" :class="{ 'show-details': mobileDetails }">
       <div class="plugin-list" :aria-label="t('nav.plugins')">
-        <div class="plugin-grid">
-          <button v-for="row in filtered" :key="row.rowId" type="button" class="plugin-item" :class="{ selected: current?.rowId === row.rowId }"
-            :aria-pressed="current?.rowId === row.rowId" @click="selectedId = row.rowId; mobileDetails = true">
-            <span class="plugin-icon" aria-hidden="true"><NoahIcon name="plugins" :size="22" /></span>
-            <span class="plugin-summary"><strong :title="row.name">{{ row.name }}</strong><span :title="subtitle(row)">{{ subtitle(row) }}</span></span>
-            <NoahTag pill size="sm" :tone="stateTone(row.state)">{{ stateName(row.state) }}</NoahTag>
-          </button>
-        </div>
+        <section v-for="section in sections" :key="section.id" class="plugin-section">
+          <h3 class="plugin-section-title"><span class="plugin-section-dot" :data-category="section.id" aria-hidden="true" />{{ categoryLabel(section.id) }}<span class="plugin-section-count">{{ section.groups.length }}</span></h3>
+          <div class="plugin-grid">
+            <button v-for="(group, index) in section.groups" :key="group.plugin" type="button" class="plugin-card" :class="{ selected: current?.plugin === group.plugin }"
+              :style="{ '--i': index }" :aria-pressed="current?.plugin === group.plugin" @click="selectedId = group.plugin; mobileDetails = true">
+              <span class="plugin-card-icon" :data-category="group.category" aria-hidden="true"><NoahIcon :name="categoryIcon(group.category)" :size="20" /></span>
+              <span class="plugin-card-main">
+                <span class="plugin-card-head"><strong :title="group.name">{{ group.name }}</strong><NoahTag pill size="sm" :tone="cardStatus(group).tone">{{ cardStatus(group).label }}</NoahTag></span>
+                <span class="plugin-card-id mono" :title="group.plugin">{{ group.plugin }}</span>
+                <span class="plugin-card-builds">
+                  <span v-if="!group.builds.length" class="plugin-chip is-shared">{{ t('plugins.shared') }}</span>
+                  <span v-for="build in group.builds.slice(0, MAX_CHIPS)" :key="build" class="plugin-chip">{{ build }}</span>
+                  <span v-if="group.builds.length > MAX_CHIPS" class="plugin-chip is-more" :title="group.builds.slice(MAX_CHIPS).join(', ')">+{{ group.builds.length - MAX_CHIPS }}</span>
+                </span>
+              </span>
+            </button>
+          </div>
+        </section>
         <p v-if="!filtered.length" class="plugin-empty text-muted">{{ t(data.length ? 'plugins.noMatches' : 'plugins.empty') }}</p>
       </div>
       <PluginDetails :current="current" @back="mobileDetails = false" @reload="requestPluginAction('reload', $event)" @unload="requestPluginAction('unload', $event)" @disable="requestPluginAction('disable', $event)" @load="requestPluginAction('load', $event)" />
     </div>
     <div v-else key="table" class="table-wrap plugin-table">
       <NoahTable :columns="columns" :data="filtered" :empty-text="t(data.length ? 'plugins.noMatches' : 'plugins.empty')" :loading-text="t('common.loading')">
-        <template #name="{ row }"><span class="plugin-table-text cell-strong" :title="row.name">{{ row.name }}</span></template>
+        <template #name="{ row }"><span class="plugin-table-name"><span class="plugin-table-icon" :data-category="row.category" aria-hidden="true"><NoahIcon :name="categoryIcon(row.category)" :size="14" /></span><span class="plugin-table-text cell-strong" :title="row.name">{{ row.name }}</span></span></template>
+        <template #build="{ row }"><span class="plugin-table-text">{{ row.build || t('plugins.shared') }}</span></template>
         <template #rowId="{ row }"><span class="plugin-table-text mono" :title="row.rowId">{{ row.rowId }}</span></template>
         <template #plugin="{ row }"><span class="plugin-table-text mono" :title="row.plugin">{{ row.plugin }}</span></template>
         <template #state="{ row }">
@@ -284,17 +311,31 @@ function requestPluginAction(action, row) { targetAction.value = action; target.
 .plugin-view-enter-from { opacity: 0; transform: translateY(6px); }
 .plugin-view-leave-to { opacity: 0; }
 .plugin-list { min-width: 0; overflow-y: auto; scrollbar-gutter: stable; overscroll-behavior: contain; padding: 3px 8px 3px 3px; }
-.plugin-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-content: start; }
-.plugin-item { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 10px 12px; min-height: 64px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); text-align: left; font: inherit; cursor: pointer; transition: background-color .16s, border-color .16s; }
-.plugin-item:hover { background: var(--hover); }
-.plugin-item.selected { border-color: var(--accent); background: var(--accent-soft); }
-.plugin-item:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 1px; }
-.plugin-icon { display: grid; place-items: center; flex: none; width: 32px; height: 36px; color: var(--text-muted); }
-.plugin-summary { display: grid; gap: 5px; min-width: 0; flex: 1; }
-.plugin-summary strong, .plugin-summary > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.plugin-summary strong { font-size: var(--text-control); font-weight: 600; }
-.plugin-summary > span { color: var(--text-muted); font-size: var(--text-caption); }
-.plugin-item > .noah-tag { flex: none; padding: 5px 9px; line-height: 1.2; }
+.plugin-section + .plugin-section { margin-top: 26px; }
+.plugin-section-title { display: flex; align-items: center; gap: 10px; margin: 2px 0 12px; font-size: 13px; font-weight: 600; letter-spacing: .02em; color: var(--text); }
+.plugin-section-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--cat-ink, #94a3b8); box-shadow: 0 0 0 4px var(--cat-bg, #eef2f7); }
+.plugin-section-count { padding: 1px 8px; border-radius: 99px; background: var(--hover); color: var(--text-muted); font-size: 11px; font-weight: 500; }
+.plugin-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-content: start; }
+.plugin-card { position: relative; display: flex; align-items: flex-start; gap: 14px; min-width: 0; padding: 16px; border: 1px solid var(--border-soft); border-radius: 18px; background: var(--surface); color: var(--text); text-align: left; font: inherit; cursor: pointer;
+  box-shadow: 0 1px 2px rgb(15 23 42 / .04); transition: transform .18s cubic-bezier(.2,.8,.2,1), box-shadow .18s, border-color .18s, background-color .18s;
+  animation: plugin-card-in .36s cubic-bezier(.2,.8,.2,1) backwards; animation-delay: calc(min(var(--i), 12) * 24ms); }
+.plugin-card:hover { transform: translateY(-2px); border-color: var(--border); box-shadow: 0 10px 28px rgb(15 23 42 / .08); }
+.plugin-card.selected { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft), 0 10px 28px rgb(15 23 42 / .08); }
+.plugin-card:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
+.plugin-card-icon { display: grid; place-items: center; flex: none; width: 42px; height: 42px; border-radius: 13px; color: var(--cat-ink, #475569); background: var(--cat-bg, #eef2f7); transition: transform .2s; }
+.plugin-card:hover .plugin-card-icon { transform: scale(1.06) rotate(-3deg); }
+.plugin-card-main { display: grid; gap: 4px; min-width: 0; flex: 1; }
+.plugin-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
+.plugin-card-head strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14.5px; font-weight: 600; letter-spacing: -.005em; }
+.plugin-card-head .noah-tag { flex: none; padding: 3px 9px; line-height: 1.2; }
+.plugin-card-id { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-size: 11.5px; }
+.plugin-card-builds { display: flex; flex-wrap: nowrap; gap: 5px; margin-top: 8px; min-width: 0; overflow: hidden; }
+.plugin-chip { flex: none; padding: 2px 8px; border-radius: 7px; background: var(--hover); color: var(--text-muted); font-size: 11px; font-weight: 500; line-height: 1.6; }
+.plugin-chip.is-shared { background: var(--accent-soft); color: var(--text); }
+.plugin-chip.is-more { background: transparent; box-shadow: inset 0 0 0 1px var(--border-soft); }
+@keyframes plugin-card-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+.plugin-table-name { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.plugin-table-icon { display: grid; place-items: center; flex: none; width: 26px; height: 26px; border-radius: 8px; color: var(--cat-ink, #475569); background: var(--cat-bg, #eef2f7); }
 .plugin-reload.noah-btn { min-height: 40px; padding: 10px 18px; font-size: var(--text-control); }
 @media (max-width: 1200px) { .plugin-grid { grid-template-columns: minmax(0, 1fr); } }
 @media (min-width: 861px) {
@@ -319,7 +360,7 @@ function requestPluginAction(action, row) { targetAction.value = action; target.
   .plugin-category-switch button { padding-inline: 10px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .plugin-item, .plugin-detail-enter-active, .plugin-detail-leave-active, .plugin-view-enter-active, .plugin-view-leave-active, .plugin-layout-highlight, .plugin-layout-switch button { transition: none; }
+  .plugin-card, .plugin-card-icon, .plugin-detail-enter-active, .plugin-detail-leave-active, .plugin-view-enter-active, .plugin-view-leave-active, .plugin-layout-highlight, .plugin-layout-switch button { transition: none; }
   .plugin-view-enter-from { transform: none; }
 }
 
@@ -330,11 +371,11 @@ function requestPluginAction(action, row) { targetAction.value = action; target.
 .plugin-table-open { display: grid; place-items: center; flex: none; width: 30px; height: 32px; border: 0; border-radius: var(--radius-xs); background: transparent; color: var(--text-muted); cursor: pointer; transition: background-color 160ms, color 160ms; }
 .plugin-table-open:hover { color: var(--text); background: var(--hover); }
 .plugin-table-open:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
-.plugin-drawer-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; justify-content: flex-end; background: rgb(0 0 0 / .22); }
-.plugin-drawer-panel { width: min(460px, 100%); height: 100dvh; min-width: 0; box-shadow: var(--shadow-lg); }
-.plugin-drawer-enter-active, .plugin-drawer-leave-active { transition: background-color 240ms ease; }
-.plugin-drawer-enter-active .plugin-drawer-panel, .plugin-drawer-leave-active .plugin-drawer-panel { transition: transform 240ms cubic-bezier(.2,.8,.2,1); }
-.plugin-drawer-enter-from, .plugin-drawer-leave-to { background: transparent; }
+.plugin-drawer-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; justify-content: flex-end; background: rgb(15 23 42 / .28); backdrop-filter: blur(6px); }
+.plugin-drawer-panel { width: min(480px, 100%); height: 100dvh; min-width: 0; box-shadow: -24px 0 60px rgb(15 23 42 / .18); }
+.plugin-drawer-enter-active, .plugin-drawer-leave-active { transition: background-color 260ms ease, backdrop-filter 260ms ease; }
+.plugin-drawer-enter-active .plugin-drawer-panel, .plugin-drawer-leave-active .plugin-drawer-panel { transition: transform 320ms cubic-bezier(.16,1,.3,1); }
+.plugin-drawer-enter-from, .plugin-drawer-leave-to { background: transparent; backdrop-filter: blur(0); }
 .plugin-drawer-enter-from .plugin-drawer-panel, .plugin-drawer-leave-to .plugin-drawer-panel { transform: translateX(100%); }
 @media (max-width: 560px) {
   .plugin-table :deep(th), .plugin-table :deep(td) { padding: 10px 5px; font-size: 11px; }

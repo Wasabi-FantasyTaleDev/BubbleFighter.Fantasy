@@ -1,4 +1,5 @@
 using BubbleFighter.Fantasy.Contracts.Progress;
+using BubbleFighter.Fantasy.Contracts.Titles;
 
 namespace BubbleFighter.Fantasy.Persistence.Memory;
 
@@ -6,17 +7,25 @@ namespace BubbleFighter.Fantasy.Persistence.Memory;
 /// In-process level / experience store with the MySQL store's guards: an untracked player reads
 /// as <see langword="null"/>, and a round credit needs the wallet the login created.
 /// </summary>
-public sealed class MemoryPlayerProgressRepository : IPlayerBattleRecordsRepository
+public sealed class MemoryPlayerProgressRepository : IPlayerBattleRecordsRepository, IRoundTitleMedalSettlementRepository
 {
     private readonly MemoryPlayerTable table;
     private readonly int _maxBattleSettlements;
     private readonly int _maxBattleModes;
+    private readonly TitleMedalLimits _titleMedals;
 
     /// <summary>Creates a bounded progress store with non-evicting battle receipts.</summary>
     /// <param name="table">The shared account table.</param>
     /// <param name="maxBattleSettlements">Maximum battle receipts per player; a full store refuses new matches.</param>
     /// <param name="maxBattleModes">Maximum recorded game modes per player.</param>
     public MemoryPlayerProgressRepository(MemoryPlayerTable table, int maxBattleSettlements = 4096, int maxBattleModes = 128)
+        : this(table, maxBattleSettlements, maxBattleModes, new TitleMedalLimits())
+    {
+    }
+
+    /// <summary>Creates a progress store using the same medal budgets as the account inventory store.</summary>
+    public MemoryPlayerProgressRepository(MemoryPlayerTable table, int maxBattleSettlements, int maxBattleModes,
+        TitleMedalLimits titleMedals)
     {
         ArgumentNullException.ThrowIfNull(table);
         ArgumentOutOfRangeException.ThrowIfLessThan(maxBattleSettlements, 1);
@@ -24,6 +33,9 @@ public sealed class MemoryPlayerProgressRepository : IPlayerBattleRecordsReposit
         this.table = table;
         _maxBattleSettlements = maxBattleSettlements;
         _maxBattleModes = maxBattleModes;
+        ArgumentNullException.ThrowIfNull(titleMedals);
+        titleMedals.Validate();
+        _titleMedals = titleMedals;
     }
 
     /// <inheritdoc />
@@ -69,6 +81,13 @@ public sealed class MemoryPlayerProgressRepository : IPlayerBattleRecordsReposit
             ?? throw new InvalidOperationException($"No wallet for user_num {command.UserNum}.");
         lock (entry.Gate)
         {
+            var medals = command.TitleMedals is { } grant
+                ? MemoryInventoryRepository.PrepareTitleGrant(entry, grant, _titleMedals)
+                : ((TitleMedalLedger Ledger, TitleMedalGrantReceipt Receipt, bool Applied)?)null;
+            var alreadySettled = entry.BattleSettlements.ContainsKey(command.MatchId)
+                || entry.SettlementMatches.Contains(command.MatchId);
+            if (medals is { } preparedMedals && preparedMedals.Applied == alreadySettled)
+                throw new InvalidDataException("The round receipt and its medal receipt disagree.");
             if (entry.BattleSettlements.TryGetValue(command.MatchId, out var battleReceipt))
                 return ValueTask.FromResult(battleReceipt with
                 {
@@ -88,10 +107,10 @@ public sealed class MemoryPlayerProgressRepository : IPlayerBattleRecordsReposit
             var before = entry.Progress ?? new PlayerProgress(command.UserNum, entry.Level, 0);
             var after = command.AdvanceChecked(before);
             PlayerBattleRecord? battle = null;
+            if ((command.BattleRecord is not null || medals is not null) && entry.BattleSettlements.Count >= _maxBattleSettlements)
+                throw new InvalidOperationException("The player's battle receipt capacity is full; no settlement was stored.");
             if (command.BattleRecord is { } recorded)
             {
-                if (entry.BattleSettlements.Count >= _maxBattleSettlements)
-                    throw new InvalidOperationException("The player's battle receipt capacity is full; no settlement was stored.");
                 if (!entry.BattleRecords.ContainsKey(recorded.ModeId) && entry.BattleRecords.Count >= _maxBattleModes)
                     throw new InvalidOperationException("The player's battle mode capacity is full; no settlement was stored.");
                 battle = (entry.BattleRecords.GetValueOrDefault(recorded.ModeId) ?? new(recorded.ModeId)).Add(recorded);
@@ -99,13 +118,16 @@ public sealed class MemoryPlayerProgressRepository : IPlayerBattleRecordsReposit
             var money = wallet with { Lucci = checked(wallet.Lucci + command.LucciEarned) };
             var result = new RoundSettlementResult(RoundSettlementOutcome.Settled, before, after, command.LucciEarned, money.Lucci);
             // Every checked computation precedes the first mutation, including both independent overflow checks.
+            ct.ThrowIfCancellationRequested();
+            if (medals is { } prepared)
+                MemoryInventoryRepository.CommitTitleGrant(entry, command.TitleMedals!, prepared);
             entry.Money = money;
             entry.Progress = after;
             if (battle is not null)
             {
                 entry.BattleRecords[battle.ModeId] = battle;
-                entry.BattleSettlements.Add(command.MatchId, result);
             }
+            if (battle is not null || medals is not null) entry.BattleSettlements.Add(command.MatchId, result);
             if (entry.Settlements.Count == KeptSettlements)
             {
                 entry.Settlements.RemoveAt(0);

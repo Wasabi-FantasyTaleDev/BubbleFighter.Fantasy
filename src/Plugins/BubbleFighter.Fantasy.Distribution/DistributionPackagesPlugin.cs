@@ -4,7 +4,7 @@ using BubbleFighter.Fantasy.Contracts.Distribution;
 namespace BubbleFighter.Fantasy.Distribution;
 
 /// <summary>Provides source-bound file preparation as an ordinary service without loading downloaded code.</summary>
-[Plugin("distribution.packages", Requires = [typeof(IDistributionPlans), typeof(IDistributionTransport)], Provides = [typeof(IDistributionPackages)])]
+[Plugin("distribution.packages", Category = "distribution", Names = ["en=Package store", "zh-Hans=包仓库", "zh-Hant=套件倉庫", "ko=패키지 저장소"], Requires = [typeof(IDistributionPlans), typeof(IDistributionTransport)], Provides = [typeof(IDistributionPackages)])]
 public sealed class DistributionPackagesPlugin : IPlugin
 {
     /// <inheritdoc />

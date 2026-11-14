@@ -13,13 +13,15 @@ updated: 2026-10-23
 - 已完成[安装](installation.md)：`dotnet build BubbleFighter.Fantasy.sln -c Release` 报告零警告、零错误。
 - 终端位于仓库根目录；除步骤另有说明外，本页命令都在此执行。
 - .NET 10 SDK 可用：`dotnet --version` 输出 10.x 版本。
-- 运行步骤需要一份 `.env` 文件，其中 `BFF_MYSQL_PASSWORD` 为非空的临时值。为什么即使停用 MySQL 也需要该变量，见[快速开始](quickstart.md)。
+- 使用隔离内存补丁的本地检查不需要 `.env` 或数据库设置，见[快速开始](quickstart.md)。
 - 本地检查补丁 `tools/local-checks/isolated-memory.patch.yaml` 存在。本页所有本地运行都会应用它，因此不会接触真实数据库。
 - 首次运行使用的 `management` profile 只提供管理功能，不需要客户端数据。`kr-812` 这类游戏 profile 还需要该版本对应的客户端数据。
 
 ## 插件模型
 
 插件是标记了 `[Plugin("plugin.id")]` 并实现 `BubbleFighter.Fantasy.Abstractions` 中 `IPlugin` 的类。属性中的 id 就是行引用的**插件 id**。profile 提供**插件行**，每个行的 `id` 是**行 id**，即组合后 profile 内唯一的实例标识。同一个实现可以挂载多次：`kr-1256` bundle 把 `net.tcp` 插件挂载为 `game-listener` 和 `relay-listener` 两行，`all` profile 则为每个版本的行加上 `<build>.<行 id>` 前缀。
+
+插件 id 必填。插件还可以声明管理界面如何显示它：`Names` 每种语言写一条 `language=name`（`en`、`zh-Hans`、`zh-Hant`、`ko`），`Category` 指定分组（`gameplay`、`items`、`social`、`network`、`launcher`、`storage`、`cluster`、`admin`、`distribution` 或 `core`），例如 `[Plugin("lobby", Category = "gameplay", Names = ["en=Lobby and login", "zh-Hans=大厅与登录"])]`。两者都是可选的：WebUI 依次显示界面语言的名称、英文名称、插件 id。格式错误的条目会让插件无法加载，因此拼写错误能立即发现。无论有多少个版本挂载同一个插件，WebUI 都只显示它一次，并列出它运行的客户端版本。
 
 插件之间看不到彼此的类，它们只通过共享接口类型发布和获取服务。这些接口位于 Host 只加载一次、并共享给所有插件的两个程序集：`BubbleFighter.Fantasy.Abstractions`（`IPlugin`、`IServiceRegistry`、`IEventBus`、`IMessageRouter` 等内核契约）和 `BubbleFighter.Fantasy.Contracts`（消息记录、领域服务等游戏契约）。行声明自己需要什么、发布什么，Host 只在其依赖已注册后激活对应行，因此激活顺序由服务可用性决定，而不是 YAML 中行的先后。
 
@@ -29,6 +31,7 @@ updated: 2026-10-23
 | `Optional` | 可以缺失的服务；已选中的提供者参与卸载与重新加载顺序 |
 | `Provides`、`ConditionalProvides` | 本行在激活时必须发布、或在某些配置下可以发布的服务 |
 | `ProvidesMany`、`RequiresMany`、`OptionalMany` | 有序扩展点：发布、要求至少一个、或允许空列表 |
+| `LiveMany` | 每次调用 `GetAll` 时按当时状态读取的扩展点。其提供者不是依赖：本行不等待它们，也不会因某个提供者加载或卸载而重启。每次操作都重新读取，不要保留成员。仅限原生插件 |
 | `Decorates` | 包裹通过 `RegisterDecoratable` 明确允许装饰的单例的装饰层 |
 | `Overrides`、`Middleware` | 类型化消息处理器的替换与包装，写作 `rowId:完全限定消息类型` |
 | `SupportedBuilds`、`SupportedFamilies` | 针对行所在 profile 的客户端版本兼容性检查 |
@@ -58,11 +61,11 @@ dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- plugins list -
 运行中的服务器在 `GET /api/plugins` 暴露行实例：
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:8080/api/plugins | Select-Object rowId, plugin, state, error
+Invoke-RestMethod http://127.0.0.1:7300/api/plugins | Select-Object rowId, plugin, state, error
 ```
 
 ```sh
-curl -s http://127.0.0.1:8080/api/plugins
+curl -s http://127.0.0.1:7300/api/plugins
 ```
 
 每个条目包含 `rowId`、`plugin`、`source`、`state`、`error`、`codeRefreshPolicy`、`codeLifetime`、`restartRequiredForReclamation`、`isRetiring`、`overrides`、`version`、`contractVersions` 和 `supportedBuilds`。状态以字符串写出，取值来自 `PluginState` 枚举。在以 `start` 启动的服务器上，`/api/plugins` 需要已登录的管理员会话；`run --profile` 服务器在回环上无需登录即可应答，详见[快速开始](quickstart.md)。
@@ -279,6 +282,10 @@ context.Effect(context.Services.Get<ICommandRegistry>().Register(context,
 在 `ingame` 行的 config 中设置 `shared_chat_commands: true`，将该游戏作用域接入共享聊天指令。等待原生客户端验收期间，此项默认 `false`；关闭时保留原有仅房主可用的 `!start`、`!set`。启用时必须同时提供两项共享指令服务，否则激活失败。
 
 核心组合的 `commands.game` 行将启用的作用域接入同一分派器，也能调用原生插件注册的指令。它在所有游戏作用域中统一注册 `/start`、`/mode <编号>`（别名 `/set`），也支持 `!`、`！` 前缀。`game.room.start`、`game.room.mode` 权限节点默认允许普通玩家使用，只操作自己所在的等待中房间；已配置的模式表仍会拒绝不支持的编号。指令开始会跳过准备标记，原生开始按钮仍要求房主操作。前缀输入在权限拒绝后不会回退到本地处理器。
+
+`ingame` 行还接受房间标题中的 `#19#`、`#爆破模式#` 等模式标记。共用组合配置 `mode_name_table_path: data/room-modes.json`，目录包含 47 个已知模式，也保留原生创建房间界面已有的模式。目录提供简体中文、繁体中文、韩文、英文、印尼文、越南文和泰文的选择名称及无空白标记。例如，`#爆破模式#我的房间` 会创建爆破模式房间，显示名称为 `我的房间`。原生客户端稍后补交房间标题时使用同一解析规则。未知或有歧义的原生名称仍作为普通标题；第一个识别出的标记决定模式，后面的标记保留在标题中。数字标记沿用原有范围和优先顺序。
+
+模式名称表只定义数据，不另行实现玩法。格式版本为 1，`modes` 数组的每行包含互不重复的 `id`、`key`，语言键一致的 `names`、`tokens` 对象，以及可选的无空白 `aliases`。标记必须等于名称去除空白后的 Unicode 文字；匹配采用不区分字母大小写的序号比较。同一个标记或别名不能分配给不同编号。个人／团队生存、两种电脑模式等原生重名项使用带明确限定的选择名称。`nativeNames`、`nameSources` 保留名称依据，不会自动把有歧义的原生名称变成别名。没有原生显示名的模式使用注明来源的翻译或已知代号，不虚构原生名称。将 `mode_name_table_path` 留空可恢复仅数字标记；配置的文件不存在、格式错误或名称冲突都会导致激活失败。这些选项不改变客户端包布局，也不绕过原生标题输入框的长度限制。
 
 游戏插件通过 `IGameCommandEndpoints` 注册 `IGameCommandEndpoint`，并持有返回的注销句柄。路由会核对已认证游戏账户与当前座位，拒绝重复的会话归属，并在游戏插件的生命周期内执行。`commands.game.max_endpoints` 默认 512，用于约束同时注册的作用域存储。本行尚未提供地图、管理或房间传送指令。
 

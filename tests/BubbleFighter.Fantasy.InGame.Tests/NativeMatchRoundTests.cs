@@ -395,6 +395,7 @@ public sealed partial class NativeMatchRoundTests
         internal Sink<RoundStarted> Started { get; } = new();
         internal Recorder<RoundFeedReceived> Feed { get; } = new();
         internal Recorder<MatchSeedTablesRequested> Seeds { get; } = new();
+        internal Recorder<RoomLeft> Departures { get; } = new();
         internal Recorder<RoundWeaponCreated> WeaponDrops { get; } = new();
         internal Recorder<RoundWeaponPicked> WeaponPickups { get; } = new();
         internal Session Host { get; }
@@ -411,7 +412,7 @@ public sealed partial class NativeMatchRoundTests
                 MatchTransportFallback = fallback };
             Registry = new(options);
             Rooms = new(Registry, new RoomSenders(new Sink<RoomEntered>(), new Sink<RoomSeatUpdated>(), new Sink<RoomSeatVacated>(),
-                new Sink<RoomMasterChanged>(), MatchStarting: new Sink<RoomMatchStarting>()), NullLogger.Instance, options: options);
+                new Sink<RoomMasterChanged>(), Left: Departures, MatchStarting: new Sink<RoomMatchStarting>()), NullLogger.Instance, options: options);
             Round = new(Registry, options, new RoundSenders(new Sink<RoundPlayerLoaded>(), Countdowns, Started, Feed,
                     WeaponCreated: weaponObjects ? WeaponDrops : null, WeaponPicked: weaponObjects ? WeaponPickups : null),
                 NullLogger.Instance, _lifetime.Token, Rooms.ReturnToRoomAsync, capabilityOffers: Offers, seedTables: Seeds,

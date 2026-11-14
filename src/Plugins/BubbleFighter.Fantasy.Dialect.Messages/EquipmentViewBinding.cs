@@ -42,7 +42,7 @@ internal sealed class EquipmentViewBinding(string protocol, ushort view, ushort?
             switch (part)
             {
                 case "view":
-                    parts.Add((view, WriteView(tables, build, _values, message.UserNum, message.CharacterId, message.EquippedItemIds)));
+                    parts.Add((view, WriteView(tables, build, _values, message.UserNum, message.CharacterId, message.EquippedItemIds, message.ItemAttributes)));
                     break;
                 case "preset_update" when presetUpdate is { } update:
                     // Persisted pages (persist_preset_pages, default off) replace the derived records: the
@@ -66,28 +66,31 @@ internal sealed class EquipmentViewBinding(string protocol, ushort view, ushort?
     public ValueTask SendAsync(ISession session, RemoteEquipmentViewUpdated message, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(message.EquippedItemIds);
-        return session.SendAsync(view, WriteView(tables, build, _values, message.UserNum, message.CharacterId, message.EquippedItemIds), ct);
+        return session.SendAsync(view, WriteView(tables, build, _values, message.UserNum, message.CharacterId, message.EquippedItemIds, message.ItemAttributes), ct);
     }
 
     /// <summary>
     /// Writes the view body: the build's <c>equipment.view</c> structure with the worn item ids. kr-812's is
     /// <c>EquippedItemList</c> (kr-812 sub_80A4F0, keyed by user number in kr-812 sub_9883E0); kr-1256's is the
-    /// profile record <c>RoomProfileEntry</c> (kr-1256 sub_9AF2F0). The trailing vectors are always empty.
+    /// profile record <c>RoomProfileEntry</c> (kr-1256 sub_9AF2F0), including supplied instance modifiers.
     /// </summary>
-    internal static byte[] WriteView(PacketTables tables, string build, int userNum, int characterId, IReadOnlyList<int> equippedIds) =>
-        WriteView(tables, build, EquipmentViewValues.Of(tables, build), userNum, characterId, equippedIds);
+    internal static byte[] WriteView(PacketTables tables, string build, int userNum, int characterId, IReadOnlyList<int> equippedIds,
+        IReadOnlyList<BubbleFighter.Fantasy.Contracts.Rooms.RoomItemAttribute>? attributes = null) =>
+        WriteView(tables, build, EquipmentViewValues.Of(tables, build), userNum, characterId, equippedIds, attributes);
 
     private static byte[] WriteView(PacketTables tables, string build, EquipmentViewValues values, int userNum, int characterId,
-        IReadOnlyList<int> equippedIds)
+        IReadOnlyList<int> equippedIds, IReadOnlyList<BubbleFighter.Fantasy.Contracts.Rooms.RoomItemAttribute>? attributes = null)
     {
         ArgumentNullException.ThrowIfNull(equippedIds);
         if (equippedIds.Count > InventoryLimits.MaxInventorySlotsPerBag)
             throw new ArgumentOutOfRangeException(nameof(equippedIds), "Equipped items exceed the inventory bound.");
-        return PacketCodec.Write(tables, build, values.ViewStructure, new Dictionary<string, object?>(StringComparer.Ordinal)
+        var fields = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
             ["user_number"] = userNum, ["character_item"] = characterId, ["character_id"] = characterId,
             ["equipped_items"] = equippedIds,
-        });
+        };
+        ItemAttributeWire.Apply(tables, build, values.ViewStructure, fields, attributes ?? []);
+        return PacketCodec.Write(tables, build, values.ViewStructure, fields);
     }
 }
 

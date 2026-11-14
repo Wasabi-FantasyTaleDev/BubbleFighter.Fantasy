@@ -1,4 +1,6 @@
 using System.Buffers;
+using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Lobby;
@@ -23,18 +25,28 @@ internal static class RoundResultWire
             ("red_total", "u8"), ("blue_total", "u8"));
     }
 
-    // The stat kinds the live score carries, in wire order.
-    private const byte StatScore = 29;
-    private const byte StatKnockdowns = 0;
-    private const byte StatKills = 24;
-    private const byte StatDeaths = 10;
-    // The live stat that writes the score row's star count (kr-812 sub_804850 case 0x23 stores it at row +112).
-    private const byte StatStars = 35;
-    // kr-812 sub_804850 replaces row +128 from stat 13; kr-812 sub_7527C0 renders that count.
-    private const byte StatCollectedLucci = 13;
+    // kr-1256 sub_9E9160 stores kinds 31..34 at seat record +204, +208, +212 and +216: the WeaponMaster level, the
+    // experience earned, the experience at which the level starts and that of the next level.
+    private const byte StatWeaponMasterLevel = 31;
+    private const byte StatWeaponMasterExperience = 32;
+    private const byte StatWeaponMasterLevelExperience = 33;
+    private const byte StatWeaponMasterNextLevelExperience = 34;
 
     /// <summary>Resolves an explicitly audited pickup-counter field without enabling it for descendants.</summary>
     internal static string? CollectedLucciField(PacketTables tables, string build)
+    {
+        // Score rows and live scores ask once per frame; resolving copies the build's values, so a
+        // snapshot remembers each build's answer. A configuration error throws and is never stored.
+        var resolved = CollectedLucciFields.GetValue(tables, static _ => new ConcurrentDictionary<string, string?>(StringComparer.Ordinal));
+        if (resolved.TryGetValue(build, out var known)) return known;
+        var field = ResolveCollectedLucciField(tables, build);
+        resolved.TryAdd(build, field);
+        return field;
+    }
+
+    private static readonly ConditionalWeakTable<PacketTables, ConcurrentDictionary<string, string?>> CollectedLucciFields = new();
+
+    private static string? ResolveCollectedLucciField(PacketTables tables, string build)
     {
         var values = tables.ValuesOf(build);
         if (!values.TryGetValue("collected_lucci_builds", out var raw)) return null;
@@ -54,12 +66,14 @@ internal static class RoundResultWire
     /// <param name="tables">The audited client packet structures.</param>
     /// <param name="build">The client build whose structures are resolved.</param>
     /// <param name="message">The live score.</param>
+    /// <param name="includeStars">Includes held stars when this caller admits their generic projection.</param>
     /// <returns>The packet body.</returns>
-    internal static byte[] WriteScoreUpdate(PacketTables tables, string build, RoundScoreUpdated message)
+    internal static byte[] WriteScoreUpdate(PacketTables tables, string build, RoundScoreUpdated message, bool includeStars = true)
     {
         ArgumentNullException.ThrowIfNull(message);
         ArgumentNullException.ThrowIfNull(message.Seats);
         ArgumentNullException.ThrowIfNull(message.TeamTotals);
+        var kinds = LiveScoreKinds.Require(tables, build);
         RoundSeatStats? scorer = message.Seats.Count > 0 ? message.Seats[0] : null;
         RoundSeatStats? victim = message.Seats.Count > 1 ? message.Seats[1] : null;
         return PacketCodec.Write(tables, build, "RoundLiveScore", new Dictionary<string, object?>
@@ -69,20 +83,29 @@ internal static class RoundResultWire
             ["total"] = checked((ushort)TeamTotal(message.TeamTotals, message.ScoringTeam)),
             ["scorer_slot"] = unchecked((byte)(scorer?.Slot ?? -1)),
             ["victim_slot"] = unchecked((byte)(victim?.Slot ?? -1)),
-            ["scorer_stats"] = StatValues(scorer, CollectedLucciField(tables, build) is not null, message.CollectedLucciOnly),
-            ["victim_stats"] = StatValues(victim, CollectedLucciField(tables, build) is not null, message.CollectedLucciOnly),
+            ["scorer_stats"] = StatValues(scorer, kinds, CollectedLucciField(tables, build) is not null, message.CollectedLucciOnly, includeStars),
+            ["victim_stats"] = StatValues(victim, kinds, CollectedLucciField(tables, build) is not null, message.CollectedLucciOnly, includeStars),
         });
     }
 
     // Combat updates keep their established counter order; pickup events carry only the audited coin counter.
-    private static IReadOnlyDictionary<string, object?>[] StatValues(RoundSeatStats? seat, bool collectedLucci, bool coinsOnly) => seat is null
+    private static IReadOnlyDictionary<string, object?>[] StatValues(RoundSeatStats? seat, LiveScoreKinds kinds,
+        bool collectedLucci, bool coinsOnly, bool includeStars) => seat is null
         ? []
         : [.. coinsOnly ? Array.Empty<IReadOnlyDictionary<string, object?>>()
-               : [StatValue(StatScore, seat.Score), StatValue(StatKnockdowns, seat.Knockdowns),
-                  StatValue(StatKills, seat.Kills), StatValue(StatDeaths, seat.Deaths)],
-           .. !coinsOnly && seat.Stars is { } stars ? [StatValue(StatStars, stars)] : Array.Empty<IReadOnlyDictionary<string, object?>>(),
+               : [StatValue(kinds.Score, seat.Score), StatValue(kinds.Knockdowns, seat.Knockdowns),
+                  StatValue(kinds.Kills, seat.Kills), StatValue(kinds.Deaths, seat.Deaths)],
+           .. !coinsOnly && includeStars && seat.Stars is { } stars ? [StatValue(RequiredKind(kinds.Stars, "stars"), stars)] : Array.Empty<IReadOnlyDictionary<string, object?>>(),
            .. collectedLucci && seat.CollectedLucci is { } coins
-               ? [StatValue(StatCollectedLucci, coins)] : Array.Empty<IReadOnlyDictionary<string, object?>>()];
+               ? [StatValue(RequiredKind(kinds.CollectedLucci, "collected_lucci"), coins)] : Array.Empty<IReadOnlyDictionary<string, object?>>(),
+           .. !coinsOnly && seat.WeaponMaster is { } progress
+               ? [StatValue(StatWeaponMasterLevel, progress.Level), StatValue(StatWeaponMasterExperience, progress.Experience),
+                  StatValue(StatWeaponMasterLevelExperience, progress.LevelExperience),
+                  StatValue(StatWeaponMasterNextLevelExperience, progress.NextLevelExperience)]
+               : Array.Empty<IReadOnlyDictionary<string, object?>>()];
+
+    private static byte RequiredKind(byte? kind, string counter) => kind
+        ?? throw new InvalidOperationException($"This build has no audited live-score kind for {counter}.");
 
     private static IReadOnlyDictionary<string, object?> StatValue(byte kind, int value) =>
         new Dictionary<string, object?>
@@ -93,6 +116,46 @@ internal static class RoundResultWire
 
     private static int TeamTotal(IReadOnlyList<int> totals, int team) =>
         team >= 1 && team <= totals.Count ? totals[team - 1] : 0;
+
+    /// <summary>Rejects changed seats that cannot be represented by the modern two-seat update and its two totals.</summary>
+    internal static void RequireModernScoreUpdate(RoundScoreUpdated message)
+    {
+        ArgumentNullException.ThrowIfNull(message.Seats);
+        ArgumentNullException.ThrowIfNull(message.TeamTotals);
+        if (message.TeamTotals.Count != 2)
+            throw new ArgumentException("A modern score update requires two team totals.", nameof(message));
+        // kr-1256 sub_9E8B20, cn-774 sub_8E33A0 and tw-454 sub_A63910 address two optional rows in a 36-seat table.
+        if (message.Seats.Count > 2 || message.Seats.Any(seat => seat.Slot is < 0 or >= 36)
+            || message.Seats.Select(seat => seat.Slot).Distinct().Count() != message.Seats.Count)
+            throw new ArgumentException("A modern score update requires at most two distinct seats in the native 36-seat table.", nameof(message));
+    }
+
+    /// <summary>Replaces audited held-star counters and the star team's separate totals without adding combat stats.</summary>
+    internal static byte[] WriteStarScoreUpdate(PacketTables tables, string build, StarScoreFields fields,
+        RoundScoreUpdated message)
+    {
+        if (message.Scoreboard is not { } board || !fields.Modes.Contains(board.ModeId))
+            throw new ArgumentException("A star update requires its audited mode and two team totals.", nameof(message));
+        RequireModernScoreUpdate(message);
+        var first = message.Seats.Count > 0 ? message.Seats[0] : null;
+        var second = message.Seats.Count > 1 ? message.Seats[1] : null;
+        return PacketCodec.Write(tables, build, "RoundLiveScore", new Dictionary<string, object?>
+        {
+            ["team"] = 1,
+            ["total"] = checked((ushort)message.TeamTotals[0]),
+            ["scorer_slot"] = unchecked((byte)(first?.Slot ?? -1)),
+            ["victim_slot"] = unchecked((byte)(second?.Slot ?? -1)),
+            ["scorer_stats"] = StarValues(first),
+            ["victim_stats"] = StarValues(second),
+            // kr-1256 sub_10D9890 reads signed byte indices; kr-1256 sub_9E8B20 replaces each total with its u16.
+            [fields.LiveTeamTotals] = fields.TeamModes.Contains(board.ModeId)
+                ? new[] { StatValue(1, message.TeamTotals[0]), StatValue(2, message.TeamTotals[1]) }
+                : Array.Empty<IReadOnlyDictionary<string, object?>>(),
+        });
+
+        IReadOnlyDictionary<string, object?>[] StarValues(RoundSeatStats? seat) => seat?.Stars is { } stars
+            ? [StatValue(fields.LiveStatKind, stars)] : [];
+    }
 
     /// <summary>
     /// The outcome word the S2C 705 handler <c>kr-812 sub_803DF0</c> reads: 3 sets the win flag and 1 or 2
@@ -310,6 +373,8 @@ internal static class RoundResultWire
             && !((GameModeId)message.ModeId is (GameModeId.Zombie or GameModeId.ZombieGhost or GameModeId.ZombieEscape) && message.WinnerTeam == 34))
             throw new InvalidOperationException("A final team scoreboard requires a supported winner allegiance for its mode.");
         var rows = message.Rows.OrderBy(row => row.Slot).ToArray();
+        var starFields = StarScoreFields.Load(packets, build);
+        if (starFields is not null && !starFields.Modes.Contains(message.ModeId)) starFields = null;
         RoundSeriesFields? series = null;
         if (message.RoundWins is { } wins)
         {
@@ -330,7 +395,8 @@ internal static class RoundResultWire
             PacketCodec.Write(writer, packets, build, "ScoreHeadEntry", new Dictionary<string, object?>
             {
                 ["team_total"] = checked((ushort)message.TeamTotals[team]),
-                ["unknown_160"] = 0,
+                [starFields?.BoardTeamTotals ?? "unknown_160"] = starFields is not null && starFields.TeamModes.Contains(message.ModeId)
+                    ? message.TeamTotals[team] : 0,
                 [series?.TeamWins ?? "unknown_308"] = message.RoundWins?[team] ?? 0,
             });
         var mask = 0UL;
@@ -349,7 +415,11 @@ internal static class RoundResultWire
             ["presence_mask"] = unchecked((long)mask),
         });
         foreach (var row in rows)
-            PacketCodec.Write(writer, packets, build, "ScoreRow", MaskedRowValues(packets, build, shape.RowMarker, row, session, texts));
+        {
+            var values = MaskedRowValues(packets, build, shape.RowMarker, row, session, texts);
+            if (starFields is not null) values[starFields.BoardCount] = row.Stats.Stars ?? 0;
+            PacketCodec.Write(writer, packets, build, "ScoreRow", values);
+        }
         // One word of each trailing array per set mask bit, ascending; the emit recipe carries zeros.
         for (var gated = 0; gated < rows.Length * 2; gated++)
             PacketCodec.Write(writer, packets, build, "ScoreGatedWord", new Dictionary<string, object?> { ["unknown_0"] = 0 });

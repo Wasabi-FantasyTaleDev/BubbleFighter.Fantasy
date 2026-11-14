@@ -13,6 +13,8 @@ bundles:
   - legacy
 # What this build differs in; everything else is the legacy bundle's (kr-812).
 vars:
+  # The client builds native feeding dates in its own region's civil time (UTC+8).
+  PET_CLIENT_UTC_OFFSET_MINUTES: 480
   LEGACY_PORT: ${CN_717_GAME_PORT:-7150}
   LEGACY_PUBLIC_PORT: ${CN_717_PUBLIC_PORT:-7150}
   # The game port players reach; the migration destination advertises it.
@@ -23,6 +25,9 @@ vars:
   LEGACY_GATE_SUB_KEY: 1
 patches:
   - patch.yaml
+  - bomb.patch.yaml
+  - captain.patch.yaml
   - ../bundles/shop-supplement.yaml
+  - ../bundles/pets.patch.yaml
   # Optional developer override; git-ignored and skipped when absent.
   - local.patch.yaml

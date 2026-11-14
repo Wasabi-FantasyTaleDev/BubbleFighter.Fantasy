@@ -1,0 +1,12 @@
+# cn-774 sub_5F6B40 registers category 14; cn-774 sub_5F67F0 reads the complete form and two words.
+# The trailing cooldown and mileage maximum are supplied together by the active typed Pets provider.
+slots:
+  14:
+    schema: CreationContent
+    content:
+      # cn-774 sub_6BD410 binds this installed form's four intro/introCheck pairs and confirmation controls.
+      ui_path: Ui/DlgCreateUser3.ui
+      # The native zoomIn.xml characters map to these indices in CN FighterConfig.xml.
+      character_types: [10, 19, 25, 27]
+      # cn-774 sub_5FDF30 skips its override loop when empty, preserving the native scene appearances.
+      preview_overrides: []
