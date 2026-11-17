@@ -121,6 +121,9 @@ internal sealed class PlayerEntry
     /// <summary>Gets or sets the bounded purchase audit, guarded by Gate.</summary>
     public List<ShopPurchaseRecord> Purchases { get; set; } = [];
 
+    /// <summary>Gets the current Mysterystore selection per build scope key, guarded by Gate.</summary>
+    public Dictionary<string, BubbleFighter.Fantasy.Contracts.MysteryStore.MysteryStoreSelection> MysteryStores { get; } = new(StringComparer.Ordinal);
+
     /// <summary>Gets or sets the last allocated purchase identity, including removed items.</summary>
     public long LastPurchaseSlotKey { get; set; }
 
@@ -129,6 +132,9 @@ internal sealed class PlayerEntry
 
     /// <summary>Gets or sets the stored money snapshot, or <see langword="null"/> before the first write.</summary>
     public PlayerWallet? Money { get; set; }
+
+    /// <summary>Gets or sets the plaza booths' day record, or <see langword="null"/> before the first booth action. Guards: <see cref="Gate"/>.</summary>
+    public BubbleFighter.Fantasy.Contracts.Progress.PlazaGameRecord? PlazaGame { get; set; }
 
     /// <summary>Gets or sets the level and experience, or <see langword="null"/> before the first round. Guards: <see cref="Gate"/>.</summary>
     public BubbleFighter.Fantasy.Contracts.Progress.PlayerProgress? Progress { get; set; }

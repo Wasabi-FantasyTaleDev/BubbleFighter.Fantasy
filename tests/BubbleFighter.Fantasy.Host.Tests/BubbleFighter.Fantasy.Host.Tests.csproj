@@ -14,5 +14,6 @@
     <Compile Include="../../src/BubbleFighter.Fantasy.Host/RotatingFileLoggerProvider.cs" Link="Host/RotatingFileLoggerProvider.cs" />
     <Compile Include="../../src/BubbleFighter.Fantasy.Host/HostLogging.cs" Link="Host/HostLogging.cs" />
     <Compile Include="../../src/BubbleFighter.Fantasy.Host/StartupMemory.cs" Link="Host/StartupMemory.cs" />
+    <Compile Include="../../src/BubbleFighter.Fantasy.Host/ConfigDumpOutput.cs" Link="Host/ConfigDumpOutput.cs" />
   </ItemGroup>
 </Project>

@@ -139,9 +139,19 @@ public sealed class InventoryBinding : IMessageSender<InventoryReplaced>, IMessa
         using var publication = _baselines is null ? null : await _baselines.EnterAsync(session.Connection, ct).ConfigureAwait(false);
         ct = publication?.CancellationToken ?? ct;
         var omitEmpty = isComplete;
+        IReadOnlyList<BubbleFighter.Fantasy.Contracts.CashInbox.CashInboxEntryRecord> cashEntries = [];
         if (_events is not null)
         {
             var userNum = PublicationOwner(session, character.Concat(equipped).Concat(changed ?? []));
+            if (userNum > 0 && _values.Uses("cash"))
+            {
+                cashEntries = await _events.WaterfallAsync<
+                    BubbleFighter.Fantasy.Contracts.CashInbox.CashInboxSnapshotRequested,
+                    IReadOnlyList<BubbleFighter.Fantasy.Contracts.CashInbox.CashInboxEntryRecord>>(
+                    new(_protocol, userNum),
+                    static _ => ValueTask.FromResult<IReadOnlyList<BubbleFighter.Fantasy.Contracts.CashInbox.CashInboxEntryRecord>>([]),
+                    ct).ConfigureAwait(false);
+            }
             var snapshot = await _events.WaterfallAsync<InventoryPublicationPreparing, InventoryReplaced?>(
                 new(_protocol, userNum, character, equipped, changed, isComplete),
                 static _ => ValueTask.FromResult<InventoryReplaced?>(null), ct).ConfigureAwait(false);
@@ -162,6 +172,14 @@ public sealed class InventoryBinding : IMessageSender<InventoryReplaced>, IMessa
             }
         }
         CheckPublicationBounds(steps, character, equipped, changed);
+        if (!isComplete && !loginBagOnly && !_values.OrdinaryArticlesAdmitted)
+        {
+            // Accounts are shared across builds: a pet another build turned into an Article reaches a build whose
+            // profile mounts no pet row to prepare it. Without that row the pet is an ordinary item here.
+            character = WithoutPetArticles(character);
+            equipped = WithoutPetArticles(equipped);
+            changed = changed is null ? null : WithoutPetArticles(changed);
+        }
         var supplied = character.Concat(equipped).Concat(changed ?? []).ToArray();
         if (!isComplete && !loginBagOnly && supplied.Any(row => PublishedArticleIdentity(row) is not null))
             throw new InvalidOperationException("Article publication requires a complete prepared inventory snapshot.");
@@ -192,7 +210,7 @@ public sealed class InventoryBinding : IMessageSender<InventoryReplaced>, IMessa
                 "changed" => (_slotsOpcode!.Value, Body(changed ?? [], baseline, false, presentations, false, omitEmpty)),
                 "equipped" => (_slotsOpcode!.Value, Body(equipped, baseline, false, presentations, false, omitEmpty)),
                 "articles" => (_articleOpcode!.Value, _wire.RepArticleSlots(articles)),
-                "cash" => (_cashOpcode!.Value, _wire.RepCashInventory()),
+                "cash" => (_cashOpcode!.Value, _wire.RepCashInventory(cashEntries)),
                 _ => throw new InvalidOperationException($"Unknown inventory publication entry '{step}'."),
             };
             // kr-1256 sub_10D8150 reads cash counts directly; the other publication wrappers are table values.
@@ -283,6 +301,11 @@ public sealed class InventoryBinding : IMessageSender<InventoryReplaced>, IMessa
                     (presentations.GetValueOrDefault(row) ?? InventoryItemPresentation.Empty).Attributes),
             }).ToArray();
     }
+
+    private static IReadOnlyList<InventorySlotRecord> WithoutPetArticles(IReadOnlyList<InventorySlotRecord> rows) =>
+        rows.Any(row => row.PetIdentity is not null)
+            ? rows.Select(row => row.PetIdentity is null ? row : row with { PetIdentity = null }).ToArray()
+            : rows;
 
     private InventoryArticleIdentity? PublishedArticleIdentity(InventorySlotRecord row)
     {

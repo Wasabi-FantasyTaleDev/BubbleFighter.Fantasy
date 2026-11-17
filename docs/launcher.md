@@ -55,7 +55,7 @@ server profiles and client records currently documented here are:
 | --- | --- | --- | --- | --- | --- |
 | `kr-1256` | Korea | KR 2026 | 2026-05-08 | 1256 | Experimental |
 | `kr-812` | Korea | KR 2015 | 2015-04-22 | 812 | Supported |
-| `kr-186` | Korea | KR 2009 | 2009-12-20 | 186 | Experimental |
+| `kr-186` | Korea | KR 2009 | 2009-12-21 | 186 | Experimental |
 | `cn-279` | China | CN 2011 | 2011-04-08 | 279 | Supported |
 | `cn-324` | China | CN 2012 | 2012-09-23 | 324 | Supported |
 | `tw-410` | Taiwan | TW 2013 | 2013-01-22 | 410 | Experimental |
@@ -349,6 +349,7 @@ The row's configuration is validated as one unit; unknown keys fail binding. The
 | `listen` | IP address and port of the API listener. Plain HTTP; remote deployments are expected to terminate HTTPS in front of it. | `127.0.0.1:8090` |
 | `name` | Public server name shown in the catalog. | `Bubble Fighter Fantasy`, at most 128 characters |
 | `host_policy` | How the launcher should reach the game endpoint. | `auto`, `ip` or `domain` |
+| `clan_port` | The shared clan port, handed to every build with a clan connection; the launcher writes the client's `login.ini` `clanServerAddr` and `clanServerPort` from it. `0` hands out none. | `${BFF_CLAN_PORT:-7400}` |
 | `region` | Optional region shown to players. | empty, or two uppercase letters |
 | `supports_instances` / `supports_plugins` | Advertise whether the server allows choosing instances and client plugins. | `true` / `true` |
 | `registration_enabled` | Whether launcher accounts may register. | `true` |
@@ -559,7 +560,7 @@ before.
 | --- | --- |
 | `companion` | The listener and the launch table. With it, every `/v1/launch` reply carries a `companion` object: `url`, a one-time `ticket`, the `launchId` and `expiresAt`. |
 | `companion.notices` | Launcher popups (`ui.notification.show`) and the `popup <text>` management command, permission `game.management.popup`. |
-| `companion.native_ui` | The game's own message boxes, notifications, banners and local chat lines (`ui.native.invoke`/`ui.native.result`). Server plugins call `IClientNativeUi.ShowAsync` and get the player's answer; the launcher uses the client's native control first and its overlay as the fallback. The `clientui <nickname> <box|notice|banner|chat> <text>` developer command, permission `game.management.clientui`, shows one to a player and prints the outcome. |
+| `companion.native_ui` | The game's own message boxes, notifications, banners and local chat lines (`ui.native.invoke`/`ui.native.result`). Server plugins call `IClientNativeUi.ShowAsync` and get the player's answer; the launcher uses the client's native control first and its overlay as the fallback. The `clientui <nickname> <box\|notice\|banner\|chat> <text>` developer command, permission `game.management.clientui`, shows one to a player and prints the outcome. |
 | `companion.commands` | Authenticated game command requests using the shared player permissions and chat budget. |
 
 All three rows are disabled in the core bundle and enabled by the `all` profile. Options of `companion`:

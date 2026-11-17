@@ -24,7 +24,7 @@ structs:
   # message and then one byte; the sender kr-812 sub_839BB0 stamps 2027 and the reader kr-812 sub_845670 reads
   # the same two fields. The byte's purpose is not proven.
   # No modern form is stated: the kr-1256 dispatcher kr-1256 sub_9D2FF0 has no recruit label, and kr-1256 C2S
-  # 2027 carries a different body (a horde-wave drop, recorded as Unknown2027), so a recruit request must not be
+  # 2027 carries a different body (gcpReqCreateHordeAward, written by kr-1256 sub_6E8D30), so a recruit request must not be
   # read from kr-1256 2027. kr-1256, cn-774 and tw-454 therefore resolve this structure empty; the other legacy
   # builds inherit the kr-812 shape until their own reader is read.
   RoomRecruitRequest@kr-812:

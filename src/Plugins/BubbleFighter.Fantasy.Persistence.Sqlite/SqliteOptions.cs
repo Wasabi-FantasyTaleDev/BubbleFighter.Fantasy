@@ -8,6 +8,10 @@ namespace BubbleFighter.Fantasy.Persistence.Sqlite;
 /// <summary>Defines the explicit local database location and limits for the SQLite provider.</summary>
 public sealed class SqliteOptions : IValidatableOptions
 {
+    /// <summary>Gets or sets the bounded process-local couple invitations; relationships are durable.</summary>
+    [Required]
+    public BubbleFighter.Fantasy.Contracts.Couples.CoupleInvitationLimits CoupleInvitations { get; set; } = new();
+
     /// <summary>Gets or sets catalogue medal balances and credit receipt budgets per account.</summary>
     [Required]
     public TitleMedalLimits TitleMedals { get; set; } = new();

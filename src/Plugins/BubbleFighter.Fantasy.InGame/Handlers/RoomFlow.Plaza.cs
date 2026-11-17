@@ -5,6 +5,7 @@ using BubbleFighter.Fantasy.Contracts.Fighters;
 using BubbleFighter.Fantasy.Contracts.Inventory;
 using BubbleFighter.Fantasy.Contracts.Lobby;
 using BubbleFighter.Fantasy.Contracts.Rooms;
+using BubbleFighter.Fantasy.Contracts.Couples;
 using BubbleFighter.Fantasy.Contracts.Sessions;
 using BubbleFighter.Fantasy.InGame.Sessions;
 using Microsoft.Extensions.Logging;
@@ -61,6 +62,8 @@ internal sealed partial class RoomFlow
         var equipment = await ResolveEquipmentAsync(session, userNum, ct).ConfigureAwait(false);
         await _plaza.Executor.ExecuteAsync(
             operationCt => EnterPlazaCoreAsync(session, userNum, nickname, equipment, operationCt, partyTransition), ct).ConfigureAwait(false);
+        // The booths' day record is read outside the scene executor; it only restores the entrant's own booths.
+        await PublishPlazaGameRecordAsync(session, userNum, ct).ConfigureAwait(false);
     }
 
     // Runs on the plaza executor: the entrant hears the whole plaza, every present player hears the entrant.
@@ -120,7 +123,12 @@ internal sealed partial class RoomFlow
     private async ValueTask LeavePlazaCoreAsync(long sessionId, CancellationToken ct)
     {
         var left = _plaza.Remove(sessionId);
-        if (left is not null) ClearPlazaRecruitment(left);
+        if (left is not null)
+        {
+            if (left.Game is { } game) ForgetCoupleRoster(game, _plaza);
+            ClearPlazaRecruitment(left);
+            _plazaCasts.TryRemove(left.UserNumber, out _);
+        }
         if (left is null || left.Reserved)
             return;
         if (!left.Remote) PublishPlaza(new(PlazaFederationEventKind.Left, left.UserNumber, null, default));
@@ -293,6 +301,9 @@ internal sealed partial class RoomFlow
 
         internal IReadOnlyList<RoomItemAttribute> ItemAttributes { get; set; } = [];
 
+        /// <summary>The committed partner identity shown without replacing the scene actor.</summary>
+        internal CoupleSceneState? Couple { get; set; }
+
         /// <summary>The identity of this plaza entry, used to distinguish reentry from a state refresh.</summary>
         internal int EntrySeed { get; set; }
 
@@ -303,7 +314,7 @@ internal sealed partial class RoomFlow
         internal ReadOnlyMemory<byte> LastPosition { get; set; }
 
         internal PlazaMember ToMember() => new(Slot, UserNumber, Nickname, Math.Max(1, Level), CharacterItemId, EquippedItemIds, EntrySeed)
-            { ColorIndex = ColorIndex, Recruitment = Recruitment, ItemAttributes = ItemAttributes };
+            { ColorIndex = ColorIndex, Recruitment = Recruitment, ItemAttributes = ItemAttributes, Couple = Couple };
     }
 
     /// <summary>
@@ -375,6 +386,7 @@ internal sealed partial class RoomFlow
                 seat.Nickname = nickname;
                 seat.Level = SessionPlayer.ResolveLevel(session);
                 seat.ColorIndex = SessionPlayer.ResolveColorIndex(session);
+                seat.Couple = SceneCouple(session);
                 seat.CharacterItemId = equipment.CharacterId;
                 var snapshot = new BubbleFighter.Fantasy.Contracts.Progress.RoundEquipmentSnapshot(
                     equipment.ItemIds ?? [equipment.CharacterId], equipment.ItemAttributes ?? []);
@@ -471,6 +483,7 @@ internal sealed partial class RoomFlow
                 existing.EquippedItemIds = snapshot.WornItemIds;
                 existing.ItemAttributes = snapshot.ItemAttributes;
                 existing.Recruitment = member.Recruitment;
+                existing.Couple = member.Couple;
                 return (existing, added);
             }
         }

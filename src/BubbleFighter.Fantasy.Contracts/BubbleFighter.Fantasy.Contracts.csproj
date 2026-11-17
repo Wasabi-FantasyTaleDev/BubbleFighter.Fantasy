@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Version>5.62.0</Version>
+    <Version>5.84.0</Version>
     <AssemblyVersion>4.0.0.0</AssemblyVersion>
     <Description>Shared domain services and records for the server plugin tree.</Description>
   </PropertyGroup>

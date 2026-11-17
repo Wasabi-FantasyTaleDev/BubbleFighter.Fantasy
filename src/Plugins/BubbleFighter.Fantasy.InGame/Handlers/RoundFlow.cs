@@ -39,6 +39,9 @@ internal sealed partial class RoundFlow
     private readonly IMatchCriticalSeedAuthority? _criticalAuthority;
     private readonly IAccountMutationScopes? _mutations;
 
+    /// <summary>Gets or sets optional user-host prize escrow settlement/refund invoked when a round finishes.</summary>
+    internal Func<PlayRoom, int, int?, IReadOnlySet<int>?, string?, CancellationToken, ValueTask>? UserHostSettlement { get; set; }
+
     /// <summary>Builds the flow over the build's round encoders.</summary>
     /// <param name="registry">The room registry.</param>
     /// <param name="options">The row configuration: countdown length, round time limit and result delays.</param>
@@ -372,12 +375,14 @@ internal sealed partial class RoundFlow
     // Without a spawn point from the client the grant names the player's start position, which every build's start
     // burst sets to the seat index.
     private Task GrantRespawnAsync(ISession session, PlayRoom room, RoundSpawnAccepted request, int? spawnIndex,
-        CancellationToken ct, ExtremeRacingResetStamp? raceReset = null, int? zombieGeneration = null) =>
-        IsBnBMode(room) ? RemoveBnBActorAsync(session, room, request, spawnIndex, ct).AsTask() :
-        room.Executor.ExecuteAsync(async operationCt =>
+        CancellationToken ct, ExtremeRacingResetStamp? raceReset = null, int? zombieGeneration = null)
+    {
+        if (IsBnBMode(room)) return RemoveBnBActorAsync(session, room, request, spawnIndex, ct).AsTask();
+        var observation = CaptureObservationRequest(room, session, request);
+        return room.Executor.ExecuteAsync(async operationCt =>
         {
             if (IsBnBMode(room)) return;
-            if (await TryObserveInsteadOfRespawnAsync(session, room, request, operationCt).ConfigureAwait(false)) return;
+            if (await TryObserveInsteadOfRespawnAsync(session, room, request, observation, operationCt).ConfigureAwait(false)) return;
             var rules = request.Rules;
             LifeParticipant character;
             ISession[] audience;
@@ -461,6 +466,7 @@ internal sealed partial class RoundFlow
                 throw;
             }
         }, ct);
+    }
 
     private bool OwnsActor(RoomSeat seat, int actor, int? actorSeat)
     {
@@ -521,11 +527,13 @@ internal sealed partial class RoundFlow
     /// </summary>
     public async ValueTask OnSeatLeftAsync(PlayRoom room, CancellationToken ct)
     {
-        if (room.BnBRound is { } bnb && room.Phase is RoomPhase.Starting or RoomPhase.Playing)
+        if (room.BnBRound is { } bnb && room.Phase is RoomPhase.Starting or RoomPhase.Playing
+            && !ReleaseDepartedBnBMembers(room, bnb))
         {
             await CancelBnBAsync(room, bnb).ConfigureAwait(false);
             return;
         }
+        await BnBOutcomeAsync(room, ct).ConfigureAwait(false);
         await OnBombSeatLeftAsync(room, ct).ConfigureAwait(false);
         await StartCountdownWhenAllLoadedAsync(room, ct).ConfigureAwait(false);
         await ReplaceDepartedCaptainsAsync(room, ct).ConfigureAwait(false);
@@ -638,6 +646,11 @@ internal sealed partial class RoundFlow
         return EndRoundAsync(room, RoundEndReason.WinCondition, ct);
     }
 
+    /// <summary>Ends a playing round at once, as its time limit would; a round that already ended is left alone.</summary>
+    internal async ValueTask EndRoundNowAsync(PlayRoom room, CancellationToken ct) =>
+        await room.Executor.ExecuteAsync(operationCt => EndRoundAsync(room, RoundEndReason.TimeLimit, operationCt), ct)
+            .ConfigureAwait(false);
+
     // Runs on the room's executor. The first caller ends the round; later ones find it already ended.
     private async ValueTask EndRoundAsync(PlayRoom room, RoundEndReason reason, CancellationToken ct)
     {
@@ -675,6 +688,7 @@ internal sealed partial class RoundFlow
                 DecideStarRound(room);
             if (IsWeaponMasterMode(room))
                 DecideWeaponMasterRound(room);
+            DecideSoccerRound(room);
             room.MarkResult();
             generation = room.StartGeneration;
             members = [.. room.Seats];
@@ -706,6 +720,17 @@ internal sealed partial class RoundFlow
                 throw;
             }
             return;
+        }
+        if (UserHostSettlement is not null)
+        {
+            int? prizeWinnerTeam;
+            IReadOnlySet<int>? prizeWinnerSlots;
+            lock (room.Gate)
+            {
+                prizeWinnerTeam = room.StartGeneration == generation ? WinnerTeam(room) : null;
+                prizeWinnerSlots = room.StartGeneration == generation ? room.DecidedWinnerSlots : null;
+            }
+            await UserHostSettlement(room, generation, prizeWinnerTeam, prizeWinnerSlots, null, ct).ConfigureAwait(false);
         }
         var outcome = OutcomeOf(room, generation, reason);
         RememberOutcomes(room, generation, outcome);
@@ -819,7 +844,9 @@ internal sealed partial class RoundFlow
             // A character that belongs to no seat is an NPC the host's client runs and reports as its own, in any mode
             // that has NPCs (pirate waves, zombie PvE, rescues, tutorials); only another member's character (a seat or a
             // bot the sender does not control) is refused.
-            if (packet.ReportedActors is { Count: > 0 } actors && !actors.Any(actor => room.ControlsActor(sender, actor))
+            // An NPC the sender runs from its own scene range counts as its own, so a pirate that pops a player is passed on.
+            if (packet.ReportedActors is { Count: > 0 } actors
+                && !actors.Any(actor => room.ControlsActor(sender, actor) || PlayRoom.OwnsSceneObject(sender, actor))
                 && actors.Any(room.IsMemberCharacter))
             {
                 _logger.LogWarning("Room {Room} session {Session} slot {Slot} feed packet {Code} acts for another seat's character; dropped.",
@@ -898,6 +925,7 @@ internal sealed partial class RoundFlow
             room.CountdownGeneration = generation;
         }
 
+        await PublishExtremeRacingMapStateAsync(room, members, generation, ct).ConfigureAwait(false);
         var countdownMs = room.Tutorial?.CountdownMs ?? _options.StartTimerMs;
         var countdown = new RoundCountdownStarted(room.Id, countdownMs) { IsTutorial = room.Tutorial is not null };
         foreach (var member in members)

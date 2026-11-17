@@ -28,8 +28,34 @@ structs:
       offset: 32
     - unknown_36: u32
       offset: 36
-    - unknown_40: bool
+    - armed: bool
       offset: 40
+  # kr-1256 C2S 629: kr-1256 sub_6E7580 packs the Lua RequestCreateWeaponObject arguments (kr-1256 sub_770500)
+  # and kr-1256 sub_708D50 writes ten u32 words and the byte at +40 widened. It is cn-324's request with one
+  # word inserted before the flag: kr-1256 sub_4993B0 passes the dropped weapon's slot index there (0..5).
+  WeaponDropRequest@kr-1256:
+    - x: f32
+      offset: 4
+    - y: f32
+      offset: 8
+    - z: f32
+      offset: 12
+    - velocity_x: f32
+      offset: 16
+    - velocity_y: f32
+      offset: 20
+    - velocity_z: f32
+      offset: 24
+    - weapon_spec: u32
+      offset: 28
+    - unknown_32: u32
+      offset: 32
+    - unknown_36: u32
+      offset: 36
+    - weapon_slot: u32
+      offset: 40
+    - armed: bool
+      offset: 44
   # C2S 628. kr-1256 sub_708C10 (wrappers sub_6E7380 life 20000, sub_6E7480 life 10000,
   # sub_4988C0 kind 14), cn-774 sub_8C8140, tw-454 sub_71AE40 and three more tw senders: the
   # position and direction triplets, the item kind, one byte, and the item lifetime
@@ -45,29 +71,6 @@ structs:
     - kind: u32
     - unknown_flag: u8
     - lifetime: u32
-  # C2S 629. kr-1256 sub_708D50 via sub_6E7580, cn-774 sub_8C8280, tw-454 sub_71B220: ten fields
-  # and the byte at object +40 widened to u32; the drop-weapon path of the pickup flow.
-  WeaponCreateRequest@kr-812: []
-  WeaponCreateRequest@kr-1256:
-    - unknown_4: u32
-    - unknown_8: u32
-    - unknown_12: u32
-    - unknown_16: u32
-    - unknown_20: u32
-    - unknown_24: u32
-    - unknown_28: u32
-    - unknown_32: u32
-    - unknown_36: u32
-    - unknown_40: u32
-    - unknown_widened: u32
-  # C2S 630. kr-1256 sub_498F50, cn-774 sub_529530, tw-454 sub_78D7F0: the walked-over weapon
-  # object and the player's character id, in that order in all three builds.
-  WeaponPickupRequest@kr-812: []
-  WeaponPickupRequest@kr-1256:
-    - weapon_object: u32
-      offset: 4
-    - actor: u32
-      offset: 8
   # C2S 631 / 633 / 635 / 641: the four overlap-eat requests, each two words (the character id and
   # the item object id) from the item class's vtable slot 34 handlers: kr-1256 sub_6DC3C0 (star),
   # sub_6DC4E0 (event box), sub_6DC600 (lucci), sub_C131F0 (heart); cn-774 sub_89DD80/sub_89DE60/
@@ -242,28 +245,6 @@ structs:
   HeartEatenNotice@kr-1256:
     - actor: u32
     - item_object: u32
-  # kr-1256 656 / cn-774 and tw-454 645: the weapon object create. kr-1256 sub_C1BBB0 (twelve
-  # u32); cn-774 sub_D547A0 (twelve u32, object size 704); tw-454 sub_721380.
-  WeaponObjectCreateNotice@kr-812: []
-  WeaponObjectCreateNotice@kr-1256:
-    - unknown_4: u32
-    - unknown_8: u32
-    - unknown_12: u32
-    - unknown_16: u32
-    - unknown_20: u32
-    - unknown_24: u32
-    - unknown_28: u32
-    - unknown_32: u32
-    - unknown_36: u32
-    - unknown_40: u32
-    - unknown_44: u32
-    - unknown_48: u32
-  # kr-1256 657 / cn-774 and tw-454 646: the weapon pickup notice. Two u32 words; the constructed
-  # class is the same WeaponObject the create notice builds.
-  WeaponPickupNotice@kr-812: []
-  WeaponPickupNotice@kr-1256:
-    - actor: u32
-    - weapon_object: u32
   # kr-1256 634 / cn-774 and tw-454 607: the big-drop event tick. Zero-byte body; the client
   # logs "starSpawnBig" or "lucci-bigdrop-splash" timers.
   BigDropEventTickNotice@kr-812: []
@@ -313,12 +294,12 @@ structs:
     - unknown_24: u32
     - unknown_28: u32
     - unknown_32: u32
-  # The legacy weapon object notices: cn-324 sub_45C8F0, id-400 sub_4803B0 and id-1809 sub_4D55F0
-  # read ten u32 words plus a bool32 tail (44 bytes), and the pickup pair runs object first —
-  # the reverse of kr-1256's actor-first order. cn-324 numbers the create 744 and the pickup 745;
-  # the id builds number the create 745 and the pickup 746.
-  LegacyWeaponCreateNotice@kr-812: []
-  LegacyWeaponCreateNotice@cn-324:
+  # The weapon object notices: cn-324 sub_45C8F0, id-400 sub_4803B0 and id-1809 sub_4D55F0 read ten u32 words
+  # plus a bool32 tail (44 bytes): identity, weapon spec, two words, launch vector, position, armed flag
+  # (cn-324 sub_471630 constructs the object from them, then sets the position). cn-324 numbers the create 744
+  # and the pickup 745; the id builds number the create 745 and the pickup 746.
+  WeaponCreateNotice@kr-812: []
+  WeaponCreateNotice@cn-324:
     - unknown_4: u32
     - unknown_8: u32
     - unknown_12: u32
@@ -330,7 +311,7 @@ structs:
     - unknown_36: u32
     - unknown_40: u32
     - armed: bool
-  LegacyWeaponCreateNotice@id-400:
+  WeaponCreateNotice@id-400:
     - unknown_4: u32
     - unknown_8: u32
     - unknown_12: u32
@@ -342,7 +323,7 @@ structs:
     - unknown_36: u32
     - unknown_40: u32
     - armed: bool
-  LegacyWeaponCreateNotice@id-1809:
+  WeaponCreateNotice@id-1809:
     - unknown_4: u32
     - unknown_8: u32
     - unknown_12: u32
@@ -354,14 +335,37 @@ structs:
     - unknown_36: u32
     - unknown_40: u32
     - armed: bool
-  LegacyWeaponPickupNotice@kr-812: []
-  LegacyWeaponPickupNotice@cn-324:
+  # kr-1256 S2C 656: kr-1256 sub_6ED290 reads twelve u32 words and constructs the WeaponObject with
+  # kr-1256 sub_C1BBB0 from words 1-8 and the flag, then applies words 9-11 through its vtable slot 196, as
+  # cn-324 sub_471630 sets the position last. It is cn-324's notice with the request's slot word inserted
+  # after the two unknown words; word 12 is tested against zero (the armed flag).
+  WeaponCreateNotice@kr-1256:
+    - unknown_4: u32
+    - unknown_8: u32
+    - unknown_12: u32
+    - unknown_16: u32
+    - weapon_slot: u32
+    - unknown_24: u32
+    - unknown_28: u32
+    - unknown_32: u32
+    - unknown_36: u32
+    - unknown_40: u32
+    - unknown_44: u32
+    - armed: bool
+  # The pickup request and notice share one body, weapon object first: cn-324 sub_4CB0F0 / cn-324 sub_408DF0;
+  # kr-1256 C2S 630 is written by kr-1256 sub_498F50 and S2C 657 read by kr-1256 sub_6ED460, whose first word
+  # keys the room's weapon object map and whose second resolves the character (kr-1256 sub_6D3940).
+  WeaponPickup@kr-812: []
+  WeaponPickup@kr-1256:
     - weapon_object: u32
     - actor: u32
-  LegacyWeaponPickupNotice@id-400:
+  WeaponPickup@cn-324:
     - weapon_object: u32
     - actor: u32
-  LegacyWeaponPickupNotice@id-1809:
+  WeaponPickup@id-400:
+    - weapon_object: u32
+    - actor: u32
+  WeaponPickup@id-1809:
     - weapon_object: u32
     - actor: u32
   # The room utility S2C frames the id lineage lost from its catalog: the inventory change

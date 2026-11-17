@@ -14,7 +14,7 @@ internal sealed record ExtremeRacingMapPolicy(uint FirstCannonIdentity, uint Fir
 internal sealed record ExtremeRacingMapLimits(int MaximumFileBytes, int MaximumHelpers, int MaximumObjects);
 
 /// <summary>A validated map's native counts, numeric coin positions and complete one-time initialization.</summary>
-internal sealed record ExtremeRacingMapData(int StageCount, int CannonPairCount,
+internal sealed partial record ExtremeRacingMapData(int StageCount, int CannonPairCount,
     IReadOnlyList<Vector3> CoinPositions, RoundExtremeRacingInitialized Initialization)
 {
     /// <summary>Gets the validated cannon data, or null when the cannon relay is not enabled for this map.</summary>
@@ -32,10 +32,7 @@ internal sealed record ExtremeRacingMapData(int StageCount, int CannonPairCount,
         ArgumentOutOfRangeException.ThrowIfLessThan(limits.MaximumFileBytes, 8);
         ArgumentOutOfRangeException.ThrowIfLessThan(limits.MaximumHelpers, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(limits.MaximumObjects, 1);
-        if (string.IsNullOrWhiteSpace(stageDirectory) || stageDirectory.Contains(':') || stageDirectory.Contains('\\')
-            || stageDirectory.Any(char.IsControl)
-            || stageDirectory.Split('/').Any(part => part.Length == 0 || part is "." or ".."))
-            throw new InvalidDataException("ExtremeRacing requires a relative map Directory without traversal.");
+        ValidateStageDirectory(stageDirectory);
         if (policy.CoinVariant != 0)
             throw new InvalidDataException("ExtremeRacing initialization currently supports only explicitly selected coin variant zero.");
         // kr-1256 sub_1155540 has 32 fixed bytes and two eight-byte map entries per coin.
@@ -47,7 +44,7 @@ internal sealed record ExtremeRacingMapData(int StageCount, int CannonPairCount,
         // kr-1256 sub_67B920 supplies these native fallbacks when the corresponding option key is absent.
         var cannonCount = Number(values, "Cannon/PairCount", 9, 0, limits.MaximumObjects);
         var coinCount = Number(values, "Coin/PairCount", 33, 0, limits.MaximumObjects);
-        var stageCount = Number(values, "SavePoint/StageCount", 5, 1, limits.MaximumHelpers);
+        var stageCount = Number(values, "SavePoint/StageCount", 5, 1, Math.Min(5, limits.MaximumHelpers));
         var stoneStage = Number(values, "GrenadeStoneArea/ProcessStage", null, 0, stageCount);
         // kr-1256 sub_BF4DB0 loads stone_disappear helpers only when ProcessStage is positive; its count fallback is 18.
         var stoneCount = stoneStage == 0 ? 0 : Number(values, "GrenadeStoneArea/DisappearCount", 18, 0, limits.MaximumObjects);
@@ -92,6 +89,25 @@ internal sealed record ExtremeRacingMapData(int StageCount, int CannonPairCount,
                 policy.FirstStoneDisposerIdentity, stoneCount));
     }
 
+    /// <summary>Reads the selected map's native round count without initializing unrelated scene objects.</summary>
+    internal static int ReadStageCount(IClientDataStore store, string stageDirectory, int maximumFileBytes)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+        ArgumentOutOfRangeException.ThrowIfLessThan(maximumFileBytes, 8);
+        ValidateStageDirectory(stageDirectory);
+        var values = ReadOptions(store.Read($"Maps/{stageDirectory}/option.ini", maximumFileBytes), maximumFileBytes);
+        // kr-1256 sub_67B920 reads SavePoint/StageCount with fallback 5 for the native five-stage track data.
+        return Number(values, "SavePoint/StageCount", 5, 1, 5);
+    }
+
+    private static void ValidateStageDirectory(string stageDirectory)
+    {
+        if (string.IsNullOrWhiteSpace(stageDirectory) || stageDirectory.Contains(':') || stageDirectory.Contains('\\')
+            || stageDirectory.Any(char.IsControl)
+            || stageDirectory.Split('/').Any(part => part.Length == 0 || part is "." or ".."))
+            throw new InvalidDataException("ExtremeRacing requires a relative map Directory without traversal.");
+    }
+
     private static (uint First, uint Last, long Count) IdentityRange(uint first, long count)
     {
         if (first == 0 || count < 0 || count > uint.MaxValue || (ulong)first + (ulong)Math.Max(0, count - 1) > uint.MaxValue)
@@ -116,7 +132,7 @@ internal sealed record ExtremeRacingMapData(int StageCount, int CannonPairCount,
         return Enumerable.Range(0, count).Select(index => indexed[index]).ToArray();
     }
 
-    private static Dictionary<string, string> ReadOptions(byte[] bytes, int maximumBytes)
+    private static Dictionary<string, string> ReadOptions(byte[] bytes, int maximumBytes, Func<string, bool>? select = null)
     {
         if (bytes.Length > maximumBytes) throw new InvalidDataException("ExtremeRacing options exceed their resource byte limit.");
         // Only ASCII section/key names and integer values are consumed; the native file's legacy comment bytes are preserved.
@@ -138,7 +154,7 @@ internal sealed record ExtremeRacingMapData(int StageCount, int CannonPairCount,
             var equals = line.IndexOf('=');
             if (equals < 1) throw new InvalidDataException("ExtremeRacing option field is malformed.");
             var key = section + "/" + line[..equals].Trim();
-            if (!IsRequiredField(key)) continue;
+            if (!(select?.Invoke(key) ?? IsRequiredField(key))) continue;
             if (!fields.TryAdd(key, line[(equals + 1)..].Trim()))
                 throw new InvalidDataException($"ExtremeRacing option '{key}' is duplicated.");
         }

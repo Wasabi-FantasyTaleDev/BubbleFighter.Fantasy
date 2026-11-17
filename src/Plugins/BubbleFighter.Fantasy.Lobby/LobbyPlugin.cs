@@ -61,6 +61,12 @@ public sealed class LobbyOptions : IValidatableOptions
     public bool PaintItems { get; set; }
 
     /// <summary>
+    /// Gets or sets whether the item-use handler is mounted without a rename or paint consumable, so rows such as
+    /// pets can answer their own items through it; every other use is refused.
+    /// </summary>
+    public bool InventoryItemUse { get; set; }
+
+    /// <summary>
     /// Gets or sets whether the row publishes <see cref="IOnlinePlayers"/> for party invites and player lookups. The
     /// row must sit in a service realm of its own build (the legacy bundle's inventoryview subtree), because every
     /// build's lobby publishes the same contract.
@@ -73,6 +79,28 @@ public sealed class LobbyOptions : IValidatableOptions
     /// the request and the reply.
     /// </summary>
     public bool FighterInfo { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether the row answers the couple packets (proposal, answer, breakup, ring change) where the build's
+    /// codec binds them. On by default; it needs <see cref="OnlinePlayers"/> and an <c>ICoupleStore</c>.
+    /// YAML key <c>couples</c>.
+    /// </summary>
+    public bool Couples { get; set; } = true;
+
+    /// <summary>Gets or sets how long a proposal waits for its answer, in seconds. Default 180. YAML key <c>couple_proposal_seconds</c>.</summary>
+    [Range(10, 3600)]
+    public int CoupleProposalSeconds { get; set; } = 180;
+
+    /// <summary>
+    /// Gets or sets how long a new couple must wait before a breakup, in hours; the client's refusal says
+    /// "at least one day". Default 24. YAML key <c>couple_breakup_wait_hours</c>.
+    /// </summary>
+    [Range(0, 8760)]
+    public int CoupleBreakUpWaitHours { get; set; } = 24;
+
+    /// <summary>Gets or sets the longest proposal message in UTF-16 units. Default 256. YAML key <c>couple_message_length</c>.</summary>
+    [Range(1, 512)]
+    public int CoupleMessageLength { get; set; } = 256;
 
     /// <summary>
     /// Gets or sets whether fighter inspection requires recorded battle history from a capable provider.
@@ -261,6 +289,15 @@ public sealed class LobbyOptions : IValidatableOptions
     [Range(0, int.MaxValue)]
     public int StartingCash { get; set; }
 
+    /// <summary>Gets or sets whether player-hosted prize defaults (<c>gspUserHostDefaultSetting</c>) and claim flushing are active.</summary>
+    public bool UserHostEnabled { get; set; }
+
+    /// <summary>Gets or sets the minimum Lucci prize advertised on login for user-host prize rooms.</summary>
+    public uint UserHostMinPrize { get; set; } = 1_000;
+
+    /// <summary>Gets or sets the maximum Lucci prize advertised on login for user-host prize rooms.</summary>
+    public uint UserHostMaxPrize { get; set; } = 100_000;
+
     /// <inheritdoc />
     public IEnumerable<ValidationResult> Validate()
     {
@@ -339,6 +376,13 @@ public sealed class LobbyOptions : IValidatableOptions
                 "starter_worn_ids entries must be unique and present in starter_item_ids.",
                 [nameof(StarterWornIds)]);
         }
+
+        if (UserHostEnabled && (UserHostMinPrize == 0 || UserHostMinPrize > UserHostMaxPrize))
+        {
+            yield return new ValidationResult(
+                "user_host_min_prize must be positive and no greater than user_host_max_prize when user_host_enabled is true.",
+                [nameof(UserHostMinPrize), nameof(UserHostMaxPrize)]);
+        }
     }
 }
 
@@ -352,12 +396,12 @@ public sealed class LobbyOptions : IValidatableOptions
 /// </summary>
 [Plugin("lobby", Category = "gameplay", Names = ["en=Lobby and login", "zh-Hans=大厅与登录", "zh-Hant=大廳與登入", "ko=로비와 로그인"], Description = "Login and main-menu logic shared by every client build.",
     Requires = [typeof(IMessageRouter)],
-    Optional = [typeof(BubbleFighter.Fantasy.Contracts.Pets.IPetEntitlements), typeof(IAccountMutationFence), typeof(IAccountSessionAdmission), typeof(IPlayerRepository), typeof(IPlayerBattleRecordsRepository), typeof(IPaintItemCatalog), typeof(ILauncherTicketService), typeof(IEquipmentSelection), typeof(IDbConnectionFactory), typeof(IInventoryRepository), typeof(IInventoryLoadoutStore), typeof(IInventoryBuildScope), typeof(IPlayerWalletRepository), typeof(IHostReadiness)], OptionalMany = [typeof(IMessageSender<ServerNotice>), typeof(IInboundMessageBinding<InventoryItemUseRequested>), typeof(IMessageSender<InventoryItemUseReplied>), typeof(IMessageSender<UserStatUpdated>), typeof(IInboundMessageBinding<CharacterNameRequested>), typeof(IInboundMessageBinding<CharacterCreateRequested>), typeof(IInboundMessageBinding<CharacterLoginRequested>), typeof(IMessageSender<CharacterCreationOpened>), typeof(IMessageSender<CharacterNameReplied>), typeof(IMessageSender<CharacterCreateReplied>), typeof(IInboundMessageBinding<BubbleFighter.Fantasy.Contracts.Lobby.MainMenuInitRequest>), typeof(IMessageSender<EmptySessionSignature>), typeof(IInboundMessageBinding<LoginRequested>), typeof(IMessageSender<LoginSucceeded>), typeof(IMessageSender<LoginRejected>), typeof(IMessageSender<InventoryReplaced>), typeof(IMessageSender<InventoryPurchaseApplied>), typeof(IMessageSender<InventorySlotsUpdated>), typeof(IMessageSender<ItemsExpired>), typeof(IInboundMessageBinding<FighterInfoRequested>), typeof(IMessageSender<FighterInfoReplied>)],
+    Optional = [typeof(BubbleFighter.Fantasy.Contracts.Pets.IPetEntitlements), typeof(IAccountMutationFence), typeof(IAccountSessionAdmission), typeof(IPlayerRepository), typeof(IPlayerBattleRecordsRepository), typeof(IPaintItemCatalog), typeof(ILauncherTicketService), typeof(IEquipmentSelection), typeof(IDbConnectionFactory), typeof(IInventoryRepository), typeof(IInventoryLoadoutStore), typeof(IInventoryBuildScope), typeof(IPlayerWalletRepository), typeof(IHostReadiness), typeof(BubbleFighter.Fantasy.Contracts.Couples.ICoupleStore), typeof(BubbleFighter.Fantasy.Contracts.Couples.ICoupleRingCatalog), typeof(BubbleFighter.Fantasy.Contracts.Rooms.IUserHostPrizeStore), typeof(IAccountBuildLock)], OptionalMany = [typeof(IMessageSender<BubbleFighter.Fantasy.Contracts.Rooms.UserHostDefaultsPublished>), typeof(IMessageSender<BubbleFighter.Fantasy.Contracts.Couples.CoupleProfilePublished>), typeof(IInboundMessageBinding<BubbleFighter.Fantasy.Contracts.Couples.CoupleInviterStatusRequested>), typeof(IInboundMessageBinding<BubbleFighter.Fantasy.Contracts.Couples.CoupleInitialInviteRequested>), typeof(IMessageSender<BubbleFighter.Fantasy.Contracts.Couples.CoupleInviterStatusPublished>), typeof(IMessageSender<BubbleFighter.Fantasy.Contracts.Couples.CoupleConfirmationReady>), typeof(IInboundMessageBinding<BubbleFighter.Fantasy.Contracts.Couples.CoupleProposed>), typeof(IInboundMessageBinding<BubbleFighter.Fantasy.Contracts.Couples.CoupleProposalLapsed>), typeof(IInboundMessageBinding<BubbleFighter.Fantasy.Contracts.Couples.CoupleAnswered>), typeof(IInboundMessageBinding<BubbleFighter.Fantasy.Contracts.Couples.CoupleBreakUpRequested>), typeof(IInboundMessageBinding<BubbleFighter.Fantasy.Contracts.Couples.CoupleRingChangeRequested>), typeof(IMessageSender<BubbleFighter.Fantasy.Contracts.Couples.CoupleProposalDelivered>), typeof(IMessageSender<BubbleFighter.Fantasy.Contracts.Couples.CoupleProposalReplied>), typeof(IMessageSender<BubbleFighter.Fantasy.Contracts.Couples.CoupleAnswerPublished>), typeof(IMessageSender<BubbleFighter.Fantasy.Contracts.Couples.CoupleBreakUpReplied>), typeof(IMessageSender<BubbleFighter.Fantasy.Contracts.Couples.CouplePartnerPublished>), typeof(IMessageSender<BubbleFighter.Fantasy.Contracts.Couples.CoupleRingChangeReplied>), typeof(IMessageSender<ServerNotice>), typeof(IInboundMessageBinding<InventoryItemUseRequested>), typeof(IMessageSender<InventoryItemUseReplied>), typeof(IMessageSender<UserStatUpdated>), typeof(IInboundMessageBinding<CharacterNameRequested>), typeof(IInboundMessageBinding<CharacterCreateRequested>), typeof(IInboundMessageBinding<CharacterLoginRequested>), typeof(IMessageSender<CharacterCreationOpened>), typeof(IMessageSender<CharacterNameReplied>), typeof(IMessageSender<CharacterCreateReplied>), typeof(IInboundMessageBinding<BubbleFighter.Fantasy.Contracts.Lobby.MainMenuInitRequest>), typeof(IMessageSender<EmptySessionSignature>), typeof(IInboundMessageBinding<LoginRequested>), typeof(IMessageSender<LoginSucceeded>), typeof(IMessageSender<LoginRejected>), typeof(IMessageSender<InventoryReplaced>), typeof(IMessageSender<InventoryPurchaseApplied>), typeof(IMessageSender<InventorySlotsUpdated>), typeof(IMessageSender<ItemsExpired>), typeof(IInboundMessageBinding<FighterInfoRequested>), typeof(IMessageSender<FighterInfoReplied>)],
     ConditionalProvides = [typeof(IRetainedPlayerAdmission), typeof(IInventoryPushService), typeof(IInventoryExpiry), typeof(IInventoryItemRemoval), typeof(IOnlinePlayers)])]
 public sealed class LobbyPlugin : IPlugin
 {
     /// <inheritdoc />
-    public ValueTask ActivateAsync(IPluginContext context, CancellationToken cancellationToken)
+    public async ValueTask ActivateAsync(IPluginContext context, CancellationToken cancellationToken)
     {
         var options = context.Config.Bind<LobbyOptions>();
         var accountAdmission = ResolveAccountAdmission(options, context.Services);
@@ -460,6 +504,71 @@ public sealed class LobbyPlugin : IPlugin
                     session, request, ct, fighterRecords, context.Events, fighterLoadouts, fighterScope?.Scope, fighterPets)));
         }
 
+        // The couple packets answer where the build's codec binds them (capability couple).
+        CoupleFlow? couples = null;
+        if (options.Couples && context.Services.GetAll<IInboundMessageBinding<BubbleFighter.Fantasy.Contracts.Couples.CoupleProposed>>().Any(b => b.Protocol == p))
+        {
+            if (!options.OnlinePlayers)
+                throw new ConfigException("couples requires online_players: true, because both fighters are found among the logged-in players.");
+            if (!context.Services.TryGet<BubbleFighter.Fantasy.Contracts.Couples.ICoupleStore>(out var coupleStore) || coupleStore is null
+                || !context.Services.TryGet<IInventoryRepository>(out var coupleInventory) || coupleInventory is null)
+                throw new ConfigException("couples requires an ICoupleStore and IInventoryRepository for the proposer's ring and appearance.");
+            if (!context.Services.TryGet<BubbleFighter.Fantasy.Contracts.Couples.ICoupleRingCatalog>(out var coupleRings) || coupleRings is null)
+                throw new ConfigException("couples requires inventory.couple-catalog for this client's invitation and display rings.");
+            context.Services.TryGet<IInventoryBuildScope>(out var coupleScope);
+            var coupleLoadouts = coupleScope is null ? null : context.Services.Get<IInventoryLoadoutStore>();
+            var coupleProfile = OptionalSender<BubbleFighter.Fantasy.Contracts.Couples.CoupleProfilePublished>(context, p);
+            Func<ISession, long, CancellationToken, ValueTask>? coupleStat = null;
+            if (coupleProfile is null)
+            {
+                if (!context.Services.TryGet<IPlayerWalletRepository>(out var coupleWallet) || coupleWallet is null)
+                    throw new ConfigException("couples requires a wallet repository for the native user-stat refresh.");
+                var stat = RequireSender<UserStatUpdated>(context, p);
+                coupleStat = async (session, userNum, ct) =>
+                {
+                    var current = await players.FindByUserNumAsync(userNum, ct).ConfigureAwait(false)
+                        ?? throw new InvalidOperationException("The coupled player no longer exists.");
+                    // The partner may be refreshed under the other player's request authority; this must remain read-only.
+                    var wallet = await coupleWallet.FindByUserNumAsync(userNum, ct).ConfigureAwait(false)
+                        ?? throw new InvalidOperationException("The coupled player's login has no wallet.");
+                    await stat.SendAsync(session, new(current, wallet), ct).ConfigureAwait(false);
+                };
+            }
+            couples = new CoupleFlow(coupleStore, playerSessions, coupleInventory, players, new(
+                RequireSender<BubbleFighter.Fantasy.Contracts.Couples.CoupleProposalDelivered>(context, p),
+                RequireSender<BubbleFighter.Fantasy.Contracts.Couples.CoupleProposalReplied>(context, p),
+                RequireSender<BubbleFighter.Fantasy.Contracts.Couples.CoupleAnswerPublished>(context, p),
+                RequireSender<BubbleFighter.Fantasy.Contracts.Couples.CoupleBreakUpReplied>(context, p),
+                RequireSender<BubbleFighter.Fantasy.Contracts.Couples.CouplePartnerPublished>(context, p),
+                OptionalSender<BubbleFighter.Fantasy.Contracts.Couples.CoupleRingChangeReplied>(context, p),
+                coupleProfile,
+                OptionalSender<BubbleFighter.Fantasy.Contracts.Couples.CoupleInviterStatusPublished>(context, p),
+                OptionalSender<BubbleFighter.Fantasy.Contracts.Couples.CoupleConfirmationReady>(context, p)), options, TimeProvider.System,
+                coupleRings, coupleLoadouts, coupleScope, context.Events, coupleStat, context.Logger, context.Lifetime);
+            context.Effect(couples);
+            await context.RunTaskAsync("couple-presence", couples.RunPresenceAsync, cancellationToken).ConfigureAwait(false);
+            var coupleRouter = messages.For(context);
+            context.Effect(coupleRouter.On<BubbleFighter.Fantasy.Contracts.Couples.CoupleProposed>(p, couples.ProposeAsync));
+            context.Effect(coupleRouter.On<BubbleFighter.Fantasy.Contracts.Couples.CoupleProposalLapsed>(p, couples.LapseAsync));
+            context.Effect(coupleRouter.On<BubbleFighter.Fantasy.Contracts.Couples.CoupleAnswered>(p, couples.AnswerAsync));
+            context.Effect(coupleRouter.On<BubbleFighter.Fantasy.Contracts.Couples.CoupleBreakUpRequested>(p, couples.BreakUpAsync));
+            if (context.Services.GetAll<IInboundMessageBinding<BubbleFighter.Fantasy.Contracts.Couples.CoupleRingChangeRequested>>().Any(b => b.Protocol == p))
+            {
+                _ = RequireSender<BubbleFighter.Fantasy.Contracts.Couples.CoupleRingChangeReplied>(context, p);
+                context.Effect(coupleRouter.On<BubbleFighter.Fantasy.Contracts.Couples.CoupleRingChangeRequested>(p, couples.ChangeRingAsync));
+            }
+            if (context.Services.GetAll<IInboundMessageBinding<BubbleFighter.Fantasy.Contracts.Couples.CoupleInviterStatusRequested>>().Any(b => b.Protocol == p))
+            {
+                RequireBinding<BubbleFighter.Fantasy.Contracts.Couples.CoupleInitialInviteRequested>(context, p);
+                _ = RequireSender<BubbleFighter.Fantasy.Contracts.Couples.CoupleInviterStatusPublished>(context, p);
+                _ = RequireSender<BubbleFighter.Fantasy.Contracts.Couples.CoupleConfirmationReady>(context, p);
+                context.Effect(coupleRouter.On<BubbleFighter.Fantasy.Contracts.Couples.CoupleInviterStatusRequested>(p, couples.InviterStatusAsync));
+                context.Effect(coupleRouter.On<BubbleFighter.Fantasy.Contracts.Couples.CoupleInitialInviteRequested>(p, couples.InitialInviteAsync));
+            }
+            context.Effect(context.Events.On<ConnectionClosedEvent>(e => couples.ConnectionClosed(e.Connection.Id)));
+            context.Effect(context.Events.On<GameSessionStateChanged>(e => couples.SceneChanged(e.Session)));
+        }
+
         // A build whose codec decodes the main-menu probe gets its empty signature reply.
         if (context.Services.GetAll<IInboundMessageBinding<BubbleFighter.Fantasy.Contracts.Lobby.MainMenuInitRequest>>().Any(b => b.Protocol == p))
         {
@@ -501,7 +610,7 @@ public sealed class LobbyPlugin : IPlugin
                 await creation.CreateAsync(session, request, created, ct).ConfigureAwait(false);
             }));
         }
-        if (options.RenameItemId != 0 || options.PaintItems)
+        if (options.RenameItemId != 0 || options.PaintItems || options.InventoryItemUse)
         {
             RequireBinding<InventoryItemUseRequested>(context, p);
             var useReplies = RequireSender<InventoryItemUseReplied>(context, p);
@@ -547,7 +656,22 @@ public sealed class LobbyPlugin : IPlugin
             context.Effect(context.Services.Register<IRetainedPlayerAdmission>(new RetainedPlayerAdmission(
                 p, players, playerSessions, inventory!, money!)));
         }
-        var handlers = new Handlers(options, players, inventory, money, playerSessions, starter, context.Logger, creation, creationOpened, tickets, expiry, lifeRule, context.Events, readiness, accountAdmission);
+        context.Services.TryGet<BubbleFighter.Fantasy.Contracts.Rooms.IUserHostPrizeStore>(out var userHostPrizes);
+        var userHostDefaults = OptionalSender<BubbleFighter.Fantasy.Contracts.Rooms.UserHostDefaultsPublished>(context, p);
+        var lineage = context.Row.LineageOrBuild();
+        var userHostProfileId = lineage.Count > 0 ? lineage[0] : p.Split('/')[0];
+        if (options.UserHostEnabled)
+        {
+            if (userHostPrizes is null)
+                throw new ConfigException("user_host_enabled requires a persistence row publishing IUserHostPrizeStore.");
+            if (userHostDefaults is null)
+                throw new ConfigException($"user_host_enabled requires UserHostDefaultsPublished sender on '{p}'.");
+            if (money is null)
+                throw new ConfigException("user_host_enabled requires money_source: mysql with IPlayerWalletRepository.");
+        }
+        var handlers = new Handlers(options, players, inventory, money, playerSessions, starter, context.Logger, creation, creationOpened, tickets, expiry, lifeRule, context.Events, readiness, accountAdmission, userHostPrizes, userHostProfileId, userHostDefaults,
+            context.Services.TryGet<IAccountBuildLock>(out var accountBuilds) ? accountBuilds : null)
+            { LoggedIn = couples is null ? null : couples.RestoreAsync };
         context.Effect(messages.For(context).On<InitialTutorialCompleted>(p, (session, _, ct) =>
         {
             if (!session.TryFeature<IPlayerSession>(out var player))
@@ -576,7 +700,6 @@ public sealed class LobbyPlugin : IPlugin
             }));
         context.Effect(messages.For(context).On<LoginRequested>(p,
             (session, request, ct) => handlers.HandleLoginRequestedAsync(session, request, succeeded, rejected, ct)));
-        return ValueTask.CompletedTask;
     }
 
     internal static IPlayerRepository ResolvePlayerRepository(IServiceRegistry services, bool requireAccountWriteAuthority = false)
@@ -627,9 +750,16 @@ public sealed class LobbyPlugin : IPlugin
         ILauncherTicketService? tickets,
         InventoryExpirySweep? expiry = null,
         LoginLifeRule? lifeRule = null,
-        IEventBus? events = null, IHostReadiness? readiness = null, IAccountSessionAdmission? accountAdmission = null)
+        IEventBus? events = null, IHostReadiness? readiness = null, IAccountSessionAdmission? accountAdmission = null,
+        BubbleFighter.Fantasy.Contracts.Rooms.IUserHostPrizeStore? userHostPrizes = null,
+        string userHostProfileId = "",
+        IMessageSender<BubbleFighter.Fantasy.Contracts.Rooms.UserHostDefaultsPublished>? userHostDefaults = null,
+        IAccountBuildLock? accountBuilds = null)
     {
-        private readonly DuplicateLoginGuard _duplicateLogins = new(playerSessions, options.DuplicateLoginPolicy, logger);
+        private readonly DuplicateLoginGuard _duplicateLogins = new(playerSessions, options.DuplicateLoginPolicy, logger, accountBuilds);
+
+        /// <summary>Runs after a login reached the main menu, with the player's account number (the couple restore).</summary>
+        public Func<ISession, long, CancellationToken, ValueTask>? LoggedIn { get; set; }
 
         /// <summary>Authenticates the account, loads the player's state, and hands it to the build's codec.</summary>
         public async ValueTask HandleLoginRequestedAsync(ISession session, LoginRequested request,
@@ -731,6 +861,23 @@ public sealed class LobbyPlugin : IPlugin
             }
             var character = equipped.FirstOrDefault(id => id is >= 300001 and <= 300031, StarterInventory.DaoCharacterItemId);
             var wallet = money is null ? null : await money.ResolveAsync(player.UserNum, ct).ConfigureAwait(false);
+            if (userHostPrizes is not null && money is not null && !string.IsNullOrEmpty(userHostProfileId))
+            {
+                var claimed = await userHostPrizes.FlushPendingClaimsAsync(
+                    userHostProfileId,
+                    player.UserNum,
+                    BubbleFighter.Fantasy.Contracts.Rooms.UserHostLimits.MaxPendingClaimsPerLogin,
+                    DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    ct).ConfigureAwait(false);
+                if (claimed.WalletAfter is { } flushedWallet)
+                    wallet = flushedWallet;
+                if (claimed.ClaimedCount > 0)
+                {
+                    logger.LogInformation(
+                        "Flushed {Count} pending user-host prize/refund claim(s) totaling {Lucci} Lucci for user {UserNum}.",
+                        claimed.ClaimedCount, claimed.CreditedLucci, player.UserNum);
+                }
+            }
             var offerTutorial = options.CharacterCreation
                 ? await players.NeedsTutorialAsync(player.UserNum, ct).ConfigureAwait(false) : afterCreation;
             await succeeded.SendAsync(session, new LoginSucceeded(
@@ -739,6 +886,10 @@ public sealed class LobbyPlugin : IPlugin
                 { OfferTutorial = creation is not null ? offerTutorial : null, ExpiredItemIds = expiredItemIds,
                     ColorIndex = player.ColorIndex, InventoryIsComplete = inventoryIsComplete }, ct).ConfigureAwait(false);
             playerSession.MoveTo(SessionPhase.MainMenu);
+            if (options.UserHostEnabled && userHostDefaults is not null)
+                await userHostDefaults.SendAsync(session, new(options.UserHostMinPrize, options.UserHostMaxPrize), ct).ConfigureAwait(false);
+            if (LoggedIn is { } loggedIn)
+                await loggedIn(session, player.UserNum, ct).ConfigureAwait(false);
         }
 
         /// <summary>

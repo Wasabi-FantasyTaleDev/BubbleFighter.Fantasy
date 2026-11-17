@@ -1,6 +1,66 @@
 # Audited game and relay assignments occupy separate connection spaces.
 # Ordinary rounds and supplies use the shared dialect; mode-specific activation remains separate.
 opcodes:
+- value: 947
+  direction: s2c
+  name: gspUpdateCoupleSlot
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 dispatcher sub_738290 case 947 calls sub_736630; Packet_gspUpdateCoupleSlot reader sub_714CF0 reads a counted vector of this build's full UserSlot; handler copies native partner number at +168"
+- value: 934
+  direction: c2s
+  name: gcpReqCoupleConfirmInvite
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_8E67B0 stamps 934 through cn-406 sub_A04C00; native confirmation dialog supplies the complete body matching the kr-812 Packet_gcpReqCoupleConfirmInvite label"
+- value: 935
+  direction: c2s
+  name: gcpReqCoupleInviteExpire
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_8E5370 writes bool32; reader sub_7151D0; opcode setter cn-406 sub_A04C00"
+- value: 936
+  direction: c2s
+  name: gcpReqCoupleInviteAnswer
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_8E6820 writes two bool32 values and two names; reader sub_8E2EF0; opcode setter cn-406 sub_A04C00"
+- value: 937
+  direction: c2s
+  name: gcpReqCoupleBreakUp
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_8E6900 writes one name; reader sub_75A200; opcode setter cn-406 sub_A04C00"
+- value: 938
+  direction: s2c
+  name: gspResCoupleInvite
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 dispatcher sub_738290 case 938 constructs Packet_gspResCoupleInvite; handler sub_733790, complete reader sub_714AB0"
+- value: 939
+  direction: s2c
+  name: gspResCoupleInviteResult
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 dispatcher sub_738290 case 939 constructs Packet_gspResCoupleInviteResult; handler sub_7339E0, complete reader sub_713EA0"
+- value: 940
+  direction: s2c
+  name: gspResCoupleInviteAnswer
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 dispatcher sub_738290 case 940 constructs Packet_gspResCoupleInviteAnswer; handler sub_734960, complete reader sub_714C10"
+- value: 941
+  direction: s2c
+  name: gspResCoupleBreakUp
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 dispatcher sub_738290 case 941 constructs Packet_gspResCoupleBreakUp; handler sub_734FF0, complete reader sub_714C10"
+- value: 942
+  direction: s2c
+  name: gspResCoupleNotifyPartner
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 dispatcher sub_738290 case 942 constructs Packet_gspResCoupleNotifyPartner; handler sub_7353E0, complete reader sub_714C70"
 - value: 32836
   direction: s2c
   connection: both
@@ -1734,3 +1794,52 @@ opcodes:
   name_source: label@cn-406
   evidence: verified
   source: cn-406 sub_738290 case 955 reaches cn-406 sub_736AD0; cn-406 sub_715B70 reads u32 outcome, u32 pet item id and one unused u32
+- value: 941
+  direction: c2s
+  connection: game
+  name: gcpSynthesisProcess
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_8D47C0 constructs Packet_gcpSynthesisProcess (vtable 0xC2C6DC) and calls cn-406 sub_A04C00(941); cn-406 sub_8D1550 writes SynthesisProcessRequest@cn-406 in packets/laboratory-legacy.yaml."
+- value: 951
+  direction: s2c
+  connection: game
+  name: gspSynthesisProcess
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 dispatcher sub_738290 case 0x3B7 (951) calls cn-406 sub_7356D0, which consumes Packet_gspSynthesisProcess; cn-406 sub_714760 reads the 28-byte SynthesisProcessReply@cn-406 in packets/laboratory-legacy.yaml."
+- value: 826
+  direction: c2s
+  connection: game
+  name: gcpReqCashInven
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_837970 and cn-406 sub_839E90 construct Packet_gcpReqCashInven and stamp C2S 826 with an empty body"
+- value: 827
+  direction: c2s
+  connection: game
+  name: gcpReqPickup
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_868B20 constructs Packet_gcpReqPickup and calls cn-406 sub_86BE60, which stamps C2S 827 with one u32 cash_slot_key"
+- value: 828
+  direction: c2s
+  connection: game
+  name: gcpReqCloseGiftBox
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 sub_5D0460 constructs Packet_gcpReqCloseGiftBox and calls cn-406 sub_5DBD70, which stamps C2S 828 with an empty body"
+- value: 807
+  direction: s2c
+  connection: game
+  name: gspCashInvenUpdateAllInventorySlot
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 dispatcher cn-406 sub_738290 case 0x327 calls cn-406 sub_725410, which reads Packet_gspCashInvenUpdateAllInventorySlot"
+- value: 831
+  direction: s2c
+  connection: game
+  name: gspRepPickup
+  name_source: label@cn-406
+  evidence: verified
+  source: "cn-406 dispatcher cn-406 sub_738290 case 0x33F calls cn-406 sub_727FB0, which reads Packet_gspRepPickup"

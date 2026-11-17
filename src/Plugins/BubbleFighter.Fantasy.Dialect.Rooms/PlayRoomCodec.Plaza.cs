@@ -243,7 +243,8 @@ internal sealed partial class PlayRoomCodec
     {
         var slot = PlazaSlot(member);
         var values = RoomCodec.MenuSeatValues(schema, slot);
-        values["level"] = RoomCodec.PlaySeatValues(schema, slot, equipment: false)["level"];
+        if (RoomCodec.PlaySeatValues(schema, slot, equipment: false).TryGetValue("level", out var level))
+            values["level"] = level;
         NativePlazaRecruitment.Project(tables, build, values, canRecruit);
         NativePlazaRecruitment.Project(tables, build, values, member.Recruitment);
         return PacketCodec.Write(tables, build, "UserSlot", values);
@@ -268,5 +269,6 @@ internal sealed partial class PlayRoomCodec
         {
             Level = Math.Max(1, member.Level), ColorIndex = member.ColorIndex,
             ItemAttributes = member.ItemAttributes,
+            Couple = member.Couple,
         };
 }

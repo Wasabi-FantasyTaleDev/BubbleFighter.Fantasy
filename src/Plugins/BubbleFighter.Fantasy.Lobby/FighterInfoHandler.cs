@@ -6,6 +6,7 @@ using BubbleFighter.Fantasy.Contracts.Inventory;
 using BubbleFighter.Fantasy.Contracts.Pets;
 using BubbleFighter.Fantasy.Contracts.Progress;
 using BubbleFighter.Fantasy.Contracts.Sessions;
+using BubbleFighter.Fantasy.Contracts.Couples;
 
 namespace BubbleFighter.Fantasy.Lobby;
 
@@ -76,7 +77,10 @@ internal static class FighterInfoHandler
                 {
                     var character = characters[0];
                     var appearance = new FighterAppearance(character, [character, .. worn.Where(id => id != character)], attributes);
-                    reply = new(current.Identity, appearance, history);
+                    reply = new(current.Identity, appearance, history)
+                    {
+                        CouplePartner = target.TryFeature<ICoupleProfile>(out var couple) ? couple.CapturePartner() : null,
+                    };
                 }
             }
         }

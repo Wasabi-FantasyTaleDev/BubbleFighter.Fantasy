@@ -42,13 +42,13 @@ internal sealed partial class RoundFlow
     private static void ValidateExtremeRacingOptions(InGameOptions options)
     {
         if (options.ExtremeRacingRounds is < 1 or > 5)
-            throw new ConfigException("extreme_racing_rounds must be between 1 and 5, the rounds the client accepts.");
+            throw new ConfigException("extreme_racing_rounds must be between 1 and 5, the supported track range.");
         if (options.ExtremeRacingRoundMs <= 0 || options.ExtremeRacingFinishCountdownMs <= 0)
             throw new ConfigException("extreme_racing_round_ms and extreme_racing_finish_countdown_ms must be positive.");
         if (options.ExtremeRacingIntermissionMs <= 1000)
             throw new ConfigException("extreme_racing_intermission_ms must exceed 1000, the client's time-over lead.");
         if (options.ExtremeRacingPlacePoints is not { Length: > 0 and <= 16 } points
-            || points.Any(value => value < 0 || value > int.MaxValue / options.ExtremeRacingRounds))
+            || points.Any(value => value < 0 || value > int.MaxValue / (options.ExtremeRacingMapRounds ? 5 : options.ExtremeRacingRounds)))
             throw new ConfigException("extreme_racing_place_points must list 1 to 16 non-negative values whose match totals fit a signed word.");
     }
 
@@ -127,7 +127,9 @@ internal sealed partial class RoundFlow
         && room.ExtremeRacing.Round == stamp.Round && ReferenceEquals(seat, stamp.Seat)
         && seat.Life.Generation == stamp.Life && CanResetInRace(room, seat);
 
-    private static bool CanResetInRace(PlayRoom room, RoomSeat seat) => room.ExtremeRacing.IsActive
+    // A racer who falls in the pause after a stage closes is reset too; refusing it left the character down for good.
+    private static bool CanResetInRace(PlayRoom room, RoomSeat seat) =>
+        (room.ExtremeRacing.IsActive || room.ExtremeRacing.Phase == ExtremeRacingPhase.Intermission)
         && seat.Life.State != SeatLife.ResetPending
         && (seat.Life.State == SeatLife.Alive || room.ExtremeRacing.HasRoundReset(seat.Slot, seat.Life.Generation));
 
@@ -253,7 +255,8 @@ internal sealed partial class RoundFlow
         {
             if (!ExtremeRacingIsPlaying(room, stamp)) return;
             countdown = room.ExtremeRacing.Phase == ExtremeRacingPhase.Finishing;
-            if (room.ExtremeRacing.Close(round, _options.ExtremeRacingPlacePoints, _options.ExtremeRacingRounds) is not { } points)
+            if (room.ExtremeRacing.Close(round, _options.ExtremeRacingPlacePoints,
+                room.ExtremeRacing.MatchRounds ?? throw new InvalidOperationException("Racing match length was not prepared.")) is not { } points)
                 return;
             awarded = points;
             StopExtremeRacingCannons(room);

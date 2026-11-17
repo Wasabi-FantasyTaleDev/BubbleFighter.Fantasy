@@ -34,8 +34,10 @@ export default defineConfig({
     },
   },
   markdown: { theme: { light: 'github-light', dark: 'github-dark' } },
-  // The site serves the Linux installer at <base>install.sh; deploy/install.sh stays its only source.
+  // The site serves the installers at <base>install.sh and <base>install.ps1; deploy/ stays their only source.
   buildEnd(site) {
-    copyFileSync(fileURLToPath(new URL('../../deploy/install.sh', import.meta.url)), join(site.outDir, 'install.sh'))
+    for (const name of ['install.sh', 'install.ps1']) {
+      copyFileSync(fileURLToPath(new URL(`../../deploy/${name}`, import.meta.url)), join(site.outDir, name))
+    }
   },
 })

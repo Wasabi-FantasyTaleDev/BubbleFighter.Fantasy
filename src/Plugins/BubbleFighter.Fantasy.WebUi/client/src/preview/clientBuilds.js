@@ -129,10 +129,10 @@ export default [
     "id": "cn-705",
     "region": "cn",
     "displayNames": {
-      "en": "China 2014-08",
-      "zh-Hans": "中国 2014-08",
-      "zh-Hant": "中國 2014-08",
-      "ko": "중국 2014-08"
+      "en": "China 2014-07-31",
+      "zh-Hans": "中国 2014-07-31",
+      "zh-Hant": "中國 2014-07-31",
+      "ko": "중국 2014-07-31"
     },
     "listening": false,
     "clientVersionMajor": 705,

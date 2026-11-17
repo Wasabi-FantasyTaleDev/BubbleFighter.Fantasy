@@ -21,6 +21,9 @@ internal sealed partial class RoundFlow
     private BnBSenders? _bnbRelay;
     internal Func<long> BnBMilliseconds { get; set; } = static () => Environment.TickCount64;
 
+    /// <summary>Whether a decided BnB elimination ends the round; tests of a dead actor's later reports turn it off.</summary>
+    internal bool BnBEndsOnElimination { get; set; } = true;
+
     internal void ConfigureBnB(IClientDataStore store, BnBSenders game, BnBSenders relay)
     {
         if (!_options.BnB) throw new ConfigException("BnB bindings require bnb on the in-game row.");
@@ -90,6 +93,11 @@ internal sealed partial class RoundFlow
         }
     }
 
+    /// <summary>Whether this server holds the per-map data the room's mode needs on <paramref name="stage"/>.</summary>
+    internal bool HostsModeMap(PlayRoom room, string stage) =>
+        (!IsBnBMode(room) || _bnbMaps?.ContainsKey(stage) == true)
+        && (!IsExtremeRacingMode(room) || !_options.ExtremeRacingInitialization || _racingMaps?.ContainsKey(stage) == true);
+
     internal void ValidateModeMap(PlayRoom room, string stage)
     {
         if (!room.BnBCleanupTask.IsCompleted)
@@ -113,6 +121,34 @@ internal sealed partial class RoundFlow
             members.Select(member => RoomRegistry.SceneEntity(member.Slot)).ToArray(), _options.MaxPlayersPerMatch);
         room.BnBRound = new(room.StartGeneration, ledger, members);
         return seed;
+    }
+
+    // BnB has no respawn: the round ends when at most one side still has a member alive or bubbled (a bubbled
+    // member can still be released), or when the other sides left. Seats on different teams are sides; when every seat shares one team each
+    // seat is its own side. The surviving side wins; nobody surviving is a draw.
+    private ValueTask BnBOutcomeAsync(PlayRoom room, CancellationToken ct)
+    {
+        lock (room.Gate)
+        {
+            if (!BnBEndsOnElimination || !IsBnBMode(room) || room.Phase != RoomPhase.Playing || room.RoundCancelled || room.IsStopping
+                || room.DecidedWinnerTeam is not null || room.DecidedWinnerSlots is not null || room.Seats.Count == 0)
+                return ValueTask.CompletedTask;
+            static bool Standing(RoomSeat seat) => seat.Life.State is SeatLife.Alive or SeatLife.Bubble;
+            var teams = room.Seats.Select(seat => seat.Team).Distinct().Count() > 1;
+            var sides = room.Seats.GroupBy(seat => teams ? seat.Team : seat.Slot).ToArray();
+            var standing = sides.Where(side => side.Any(Standing)).ToArray();
+            // A round started alone never decides itself; one that started contested is won by whoever stays.
+            var contested = sides.Length > 1 || room.BnBRound?.Actors.Length > 1;
+            if (standing.Length > 1 || standing.Length == 1 && !contested)
+                return ValueTask.CompletedTask;
+            if (teams && standing.Length == 1)
+                room.DecidedWinnerTeam = standing[0].Key;
+            else
+                room.DecidedWinnerSlots = standing.Length == 1 ? new HashSet<int> { standing[0].Key } : new HashSet<int>();
+            _logger.LogInformation("Room {Room}: BnB round decided; {Outcome}.", room.Id,
+                standing.Length == 1 ? (teams ? $"team {standing[0].Key}" : $"slot {standing[0].Key}") + " is the last standing" : "nobody is left standing");
+        }
+        return EndRoundAsync(room, RoundEndReason.WinCondition, ct);
     }
 
     internal ValueTask HandleBnBPlacementAsync(ISession session, RoundBnBPlacementReported report, CancellationToken ct) =>
@@ -161,7 +197,10 @@ internal sealed partial class RoundFlow
 
     private bool BnBPositionMatches(BnBMapData map, RoomSeat seat, int requested)
     {
-        if (!map.Contains(requested) || seat.Movement is not { } movement) return false;
+        if (!map.Contains(requested)) return false;
+        // The kr-1256 client reports no movement on the relay during mode 41 (capture 2026-11-14: only pings and
+        // placements), so a seat without a report is bounded by the map alone rather than refused.
+        if (seat.Movement is not { } movement) return true;
         var current = map.PositionToGrid(movement.X, movement.Y, movement.Z);
         return current >= 0 && Math.Abs(current % map.Width - requested % map.Width)
             + Math.Abs(current / map.Width - requested / map.Width) <= _options.BnBMaximumPositionCellDistance;
@@ -290,9 +329,8 @@ internal sealed partial class RoundFlow
             try
             {
                 var now = BnBMilliseconds();
-                foreach (var member in state.Members)
+                foreach (var actor in state.Actors)
                 {
-                    var actor = RoomRegistry.SceneEntity(member.Slot);
                     var due = state.Ledger.DueBombs(actor, now, _options.BnBExplosionReportGraceMs);
                     if (due.Count > 0) await ApplyBnBExplosionAsync(room, state, actor, due, now, ct).ConfigureAwait(false);
                 }
@@ -323,6 +361,19 @@ internal sealed partial class RoundFlow
     }
 
     private ValueTask CancelBnBAsync(PlayRoom room, BnBRuntimeState state) => new(BeginBnBCancellation(room, state));
+
+    // A seat that leaves is no longer a BnB member; the others keep playing and the elimination check decides the
+    // round. Cancelling here closed every remaining player's connection, so leaving a BnB round disconnected them.
+    private bool ReleaseDepartedBnBMembers(PlayRoom room, BnBRuntimeState state)
+    {
+        lock (room.Gate)
+        {
+            if (!ReferenceEquals(room.BnBRound, state) || state.Generation != room.StartGeneration || room.RoundCancelled)
+                return false;
+            state.Members = [.. state.Members.Where(member => ReferenceEquals(room.FindByGame(member.Game.Id), member))];
+            return state.Members.Length > 0;
+        }
+    }
 
     private Task BeginBnBCancellation(PlayRoom room, BnBRuntimeState state)
     {

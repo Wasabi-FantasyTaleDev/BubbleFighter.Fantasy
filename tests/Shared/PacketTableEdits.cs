@@ -7,7 +7,8 @@ namespace BubbleFighter.Fantasy.Tests;
 internal static class PacketTableEdits
 {
     /// <summary>
-    /// Copies every packets/*.yaml into a fresh TestTempDirectories.ForTest("bff-packets") folder and, inside the
+    /// Copies every packets/*.yaml and the *.yml content files beside them into a fresh
+    /// TestTempDirectories.ForTest("bff-packets") folder and, inside the
     /// block of <paramref name="structure"/> only, replaces the line `- {field}: {fromType}` with
     /// `- {field}: {toType}` (any trailing comment kept). Throws if the structure block is not found or the line
     /// is not found exactly once inside it. Returns the folder.
@@ -25,7 +26,7 @@ internal static class PacketTableEdits
         ArgumentException.ThrowIfNullOrEmpty(toType);
         var source = RepositoryPackets();
         var target = new DirectoryInfo(TestTempDirectories.ForTest("bff-packets"));
-        foreach (var file in Directory.GetFiles(source, "*.yaml"))
+        foreach (var file in Directory.GetFiles(source, "*.yaml").Concat(Directory.GetFiles(source, "*.yml")))
             File.Copy(file, Path.Combine(target.FullName, Path.GetFileName(file)));
         var header = new Regex($@"^  {Regex.Escape(structure)}:\s*(#.*)?$", RegexOptions.CultureInvariant);
         // A structure header is two spaces and a name; a comment line at the same indent (restated

@@ -18,14 +18,14 @@ summary:
   c2s_cross: 20
   c2s_none: 291
   c2s_ordered: 4
-  c2s_pair: 94
-  c2s_reviewed: 10
+  c2s_pair: 93
+  c2s_reviewed: 11
   c2s_runtime: 2
   c2s_shape: 27
   c2s_strong: 10
   c2s_weak: 1
   s2c_label: 248
-  s2c_reviewed: 2
+  s2c_reviewed: 3
   s2c_runtime: 1
 opcodes:
   - {value: 0, direction: c2s, name: Unknown0, grade: none, name_source: none, connection_hint: game, senders: [656070, 7F0CF0, 82CEC0, A578B0, A75280, A75D20]}
@@ -456,7 +456,7 @@ opcodes:
   - {value: 33271, direction: c2s, name: Unknown33271, grade: none, name_source: none, connection_hint: relay, senders: [726560]}
   - {value: 33272, direction: c2s, name: Unknown33272, grade: none, name_source: none, connection_hint: relay, senders: [7EF0B0]}
   - {value: 33273, direction: c2s, name: Unknown33273, grade: none, name_source: none, connection_hint: relay, senders: [7EF570]}
-  - {value: 33274, direction: c2s, name: Unknown33274, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [C5F0B0], note: pairs with Unknown33274 at the same number}
+  - {value: 33274, direction: c2s, name: gppSetNightVision_, grade: reviewed, method: own-reviewed-table, name_source: reviewed@tw-454, connection_hint: relay}
   - {value: 33275, direction: c2s, name: Unknown33275, grade: none, name_source: none, connection_hint: relay, senders: [57F1D0]}
   - {value: 33276, direction: c2s, name: Unknown33276, grade: none, name_source: none, connection_hint: relay, senders: [71CD10]}
   - {value: 33278, direction: c2s, name: gppNearDamager, grade: pair, method: s2c-same-number, name_source: pair@tw-454, senders: [716E50], note: pairs with gppNearDamager at the same number}
@@ -740,6 +740,7 @@ opcodes:
   - {value: 1549, direction: s2c, name: gspRepGetPirateAssaultTopRanking, grade: label, name_source: label@tw-454, connection_hint: game}
   - {value: 1550, direction: s2c, name: gspRepGetPirateAssaultUserRanking, grade: label, name_source: label@tw-454, connection_hint: game}
   - {value: 516, direction: s2c, connection: game, name: gspRoomReceiveRecruitMsg, name_source: label@kr-812, evidence: verified, source: tw-454 sub_A60EC0 reads a u16 seat and counted UTF-16 text and calls tw-454 sub_A65E20 for the installed actor bubble; matched to kr-812 Packet_gspRoomReceiveRecruitMsg, grade: runtime, method: own-client-reader, connection_hint: game}
+  - {value: 33274, direction: s2c, name: gppSetNightVision_, grade: reviewed, method: own-reviewed-table, name_source: reviewed@tw-454, connection_hint: relay}
 # Transport paths for the packet writers above:
 # tw-454 sub_6323B0 sends through the relay session; tw-454 sub_FD60A0 sends UDP.
 # tw-454 sub_A74520 routes 32840. tw-454 sub_A74E00 routes 32884 and 32923;

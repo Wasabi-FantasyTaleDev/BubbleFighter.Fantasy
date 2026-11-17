@@ -1,0 +1,543 @@
+version: 1
+# Bodies of the clan-server connection: the client's second TCP socket, opened at startup to the address in
+# its login.ini (clanServerAddr / clanServerPort), framed by a 4-byte header and a per-frame cipher
+# (kr-1256 sub_1114A80, kr-1256 sub_11143A0). One generic NxPacket class builds every packet inline, so the
+# layouts below are the field writes of each sender and the field reads of each dispatcher case
+# (kr-1256 sub_525170; kr-812 sub_498790). Strings on this connection are wcstr: UTF-16LE up to a NUL word,
+# no count (writer kr-1256 sub_1114AF0, reader kr-1256 sub_1114B60; kr-812 sub_A51D80 / kr-812 sub_A51D50).
+# The numbers are the build's `connection: clan` opcode rows. The base tables are kr-812's (kr-1256 is based on it);
+# kr-1256 states its longer profile and search row in full as `@kr-1256` and its extra words with `only: [kr-1256]`.
+structs:
+  # S2C ClanHello. kr-1256 sub_525170 case 0x3EA and kr-812 sub_498790 case 0x3EA read nothing.
+  ClanServerHello: []
+  # C2S ClanHeartbeat. kr-1256 sub_525050 stamps the opcode and sends without writing a field.
+  ClanServerHeartbeat: []
+  # C2S ClanLogin: the game connection's passport echoed back (packets/clan.yaml ClanPassport). Writers
+  # kr-1256 sub_525DF0 and kr-812 sub_498C30 take the values as arguments, so there is no packet object;
+  # the two unknown words carry the offsets the kr-812 passport reader keeps them at.
+  ClanServerLogin:
+    - user_number: u32      # the passport's first word (kr-1256 sub_525DF0 argument 1)
+    - nickname: wcstr       # the passport's string, written NUL-terminated by kr-1256 sub_1114AF0
+    - unknown_36: u32       # the passport's second word (argument 2); the server writes 0 there and ignores it here
+    - unknown_40: u32       # the passport's third word (argument 3); the server writes 0 there and ignores it here
+    - ticket: list<u8>      # the passport's byte list: an i32 count (end minus begin of the vector), then the bytes
+  # S2C ClanLoginResult. kr-1256 sub_525170 case 0x3EE reads one word: 1 logs the connection in and requests
+  # the clan home; -1 shows "authentication not completed" and -2 "login failed" (kr-1256 sub_51AC70).
+  ClanServerLoginResult:
+    - result: u32
+  # C2S ClanHomeRequest. kr-1256 sub_526E90 stamps the opcode and writes no field. Sent when the login result
+  # is 1 (kr-1256 sub_525170 case 0x3EE) and after each change of the player's own membership.
+  ClanServerHomeRequest: []
+  # S2C ClanHome: the player's own clan state. kr-1256 sub_526330 reads the five fields in this order and hands
+  # them to kr-1256 sub_51A3A0, which stores them in the clan state object (kr-1256 dword_18E5564).
+  ClanServerHome:
+    - profile_follows: u8   # non-zero makes kr-1256 sub_526330 send ClanProfileRequest (kr-1256 sub_526F50)
+    - clan_id: u32          # stored at +44; 0 for no clan. 99 is the client's own training clan and is never a stored clan
+      offset: 44
+    - role: u32             # stored at +48. 1 = application pending (the clan id is then kept at +244 as "applied to"),
+      offset: 48            # 100 member, 101 master, 102 deputy; kr-1256 sub_51A3A0 shows a clan name only for these four
+    - clan_name: wcstr      # stored at +52
+      offset: 52
+    - disband_date: f64     # days since 1899-12-30. kr-1256 sub_51A3A0 converts it to a SYSTEMTIME and compares it
+                            # with 2100-01-01: an earlier date with a clan id and a role of 100 or more marks the clan
+                            # as disbanding. The server writes 2100-01-01 while no disband is pending.
+  # C2S ClanProfileRequest. kr-1256 sub_526F50 stamps the opcode and writes no field.
+  ClanServerProfileRequest: []
+  # S2C ClanProfile: the profile of the player's own clan. kr-1256 sub_5268A0 reads the sixteen fields in this
+  # order; kr-1256 sub_51A5F0 stores them at the offsets given (the capacity is read last but stored at +168).
+  # kr-812 ClanProfile: kr-812 sub_499140 reads fourteen fields in this order and kr-812 sub_4905D0 stores them in the clan
+  # state object (kr-812 dword_E82674) at the offsets given. It has one date and no recruitment word.
+  ClanServerProfile:
+    - clan_name: wcstr      # +36
+      offset: 36
+    - master_id: u32        # +120
+      offset: 120
+    - master_name: wcstr    # +64
+      offset: 64
+    - deputy_id: u32        # +124; 0 without a deputy
+      offset: 124
+    - deputy_name: wcstr    # +92
+      offset: 92
+    - level: u32            # +128, shown as the clan level by kr-812 sub_4C2C20
+      offset: 128
+    - points: u32           # +132
+      offset: 132
+    - unknown_136: f64      # +136, stored unread; the server writes the creation date as in the search row
+      offset: 136
+    - member_count: u32     # +144: kr-812 sub_4C2C20 formats it together with the capacity at +148
+      offset: 144
+    - unknown_152: u32      # +152; no reader found. The server writes 0
+      offset: 152
+    - notice: wcstr         # +156
+      offset: 156
+    - introduction: wcstr   # +184
+      offset: 184
+    - mark: u32             # +212; also copied to the member list (kr-812 sub_48E210 +272)
+      offset: 212
+      except: [id-400]      # id-400 sub_443700 and cn-706 sub_452F10 stop after the introduction
+    - capacity: u32         # read last, stored at +148
+      offset: 148
+      except: [id-400]
+  ClanServerProfile@kr-1256:
+    - clan_name: wcstr      # +52
+      offset: 52
+    - master_id: u32        # +124
+      offset: 124
+    - master_name: wcstr    # +76
+      offset: 76
+    - deputy_id: u32        # +128; 0 without a deputy
+      offset: 128
+    - deputy_name: wcstr    # +100
+      offset: 100
+    - level: u32            # +132
+      offset: 132
+    - points: u32           # +136
+      offset: 136
+    - unknown_144: f64      # 8 bytes stored unread at +144 by kr-1256 sub_51A5F0. The search row (kr-1256 sub_524300)
+      offset: 144           # carries two dates in the same position, so the server writes the creation date here
+    - unknown_152: f64      # 8 bytes stored unread at +152; the server writes the disband date or 2100-01-01
+      offset: 152
+    - recruitment: u32      # +160; the word ClanRecruitment requests change
+      offset: 160
+    - member_count: u32     # +164
+      offset: 164
+    - unknown_172: u32      # +172; no reader found. The server writes 0
+      offset: 172
+    - notice: wcstr         # +176: the notice; ClanNoticeChanged rewrites it (kr-1256 sub_52DA40 -> kr-1256 sub_51D1C0)
+      offset: 176           # and the notice dialog (kr-1256 sub_5B82C0) compares its text with it
+    - introduction: wcstr   # +200: the introduction; ClanIntroductionEditResult and ClanIntroductionChanged rewrite it
+      offset: 200           # (kr-1256 sub_52DC60, kr-1256 sub_52E000)
+    - mark: u32             # +224
+      offset: 224
+    - capacity: u32         # +168
+      offset: 168
+  # cn-735 sub_5CFDF0 (dispatcher cn-735 sub_5CF340 case 0x3FA) reads kr-1256's sixteen profile fields in kr-1256's
+  # order under kr-812's number (1018); the builds based on cn-735 follow it. Where the client stores them is not
+  # traced, so no offsets are given.
+  ClanServerProfile@cn-735:
+    - clan_name: wcstr
+    - master_id: u32
+    - master_name: wcstr
+    - deputy_id: u32
+    - deputy_name: wcstr
+    - level: u32
+    - points: u32
+    - unknown_144: f64      # named by kr-1256's offset; the server writes the creation date, as for kr-1256
+    - unknown_152: f64      # the disband date or 2100-01-01, as for kr-1256
+    - recruitment: u32
+    - member_count: u32
+    - unknown_172: u32      # the server writes 0, as for kr-1256
+    - notice: wcstr
+    - introduction: wcstr
+    - mark: u32
+    - capacity: u32
+  # C2S ClanCreate. kr-1256 sub_5275B0 writes the name, one word, the introduction and two words, all taken from
+  # its arguments (caller kr-1256 sub_5C3740, the create dialog). There is no packet object, so the unknown word
+  # is numbered by its position in the writer's order. The dialog itself allows names of 4 to 12 characters and
+  # introductions of 1 to 96.
+  ClanServerCreate:
+    - name: wcstr
+    - unknown_1: u32        # argument 7 of kr-1256 sub_5275B0; kr-1256 sub_5C3740 passes 0
+    - introduction: wcstr
+    - item: u32             # argument 14, the dialog's +1640: kr-1256 sub_51BA40 opens the dialog with the id of an owned
+                            # item of kind 22 (item-table +252), a clan creation card
+    - capacity: u32         # argument 15, the dialog's +1644: that item's table word +260, the card's ShopItem parameter
+                            # (30 and 10 for the cards named for 30 and 10 members). kr-812 sub_499760 writes only the
+      only: [kr-1256, cn-738]  # name, a word, the introduction and the item; cn-738 sub_60B1C0 writes the capacity too
+  # S2C ClanCreateResult. kr-1256 sub_525170 case 0x404 reads three words and calls kr-1256 sub_517FE0 with them.
+  ClanServerCreateResult:
+    - result: u32           # signed. 1: success notice, then the client requests its home again (kr-1256 sub_526E90).
+                            # 2 and -100..-105 (written as two's complement): one refusal notice each. Other: general failure
+    - item: u32             # on result 1 only: kr-1256 sub_805C50(item, 1, ...) takes one out of the client's inventory
+                            # view and kr-1256 sub_D9A2A0 dereferences the item-table entry of it without a null check,
+                            # so a success with an item the client does not know crashes the client
+    - unknown_8: u32        # on result 1 only: first argument of kr-1256 sub_D9A2A0, which never reads it. kr-812
+      only: [kr-1256]       # sub_49A7C0 reads two words and calls kr-812 sub_48EC20 with them; tw-454 sub_685A10
+      except: [tw-454]      # case 0x404 reads two words and calls tw-454 sub_679D20 with them (cn-774 reads three)
+  # C2S ClanRosterRequest. kr-1256 sub_527890 stamps the opcode and writes no field.
+  ClanServerRosterRequest: []
+  # S2C ClanRoster. kr-1256 sub_52B4B0 reads an i32 count, then per member the fields below, and keeps each as a
+  # 40-byte record: id +0, name +4, then the three words at +36, +28 and +32 in wire order. The client's own
+  # training-clan row (kr-1256 sub_5166E0 from the same function) puts the constant 100 at +32 and, at +28 and
+  # +36, the two words its ClanMemberReport sends (kr-1256 sub_517E70), so the server echoes each member's last
+  # report and the stored role.
+  ClanServerRoster:
+    - members: list<ClanServerRosterMember>
+  ClanServerRosterMember:
+    - user_number: u32
+    - nickname: wcstr
+    - unknown_36: u32       # record +36: the second word of the member's ClanMemberReport; 0 when not connected
+    - unknown_28: u32       # record +28: the first word of the member's ClanMemberReport; 0 when not connected
+    - role: u32             # record +32: the training-clan row writes 100 (member) here; ClanRole values
+  # C2S ClanMemberDetailsRequest. kr-1256 sub_527910 writes one word, always 1.
+  ClanServerMemberDetailsRequest:
+    - unknown_0: u32
+  # S2C ClanMemberDetails. kr-1256 sub_52C010 skips the first word and reads the count at body offset 4, then per
+  # member the fields below into a 96-byte record (kr-1256 sub_5244E0 builds the same record from a roster row
+  # and leaves every word after +36 at 0). +36 is written as 0 by kr-1256 sub_52C010 itself.
+  ClanServerMemberDetails:
+    - unknown_0: u32        # never read; the server writes 0
+    - members: list<ClanServerMemberDetail>
+  ClanServerMemberDetail:
+    - user_number: u32      # record +0
+    - nickname: wcstr       # record +4
+    - unknown_28: u32       # record +28, the roster's reported first word
+    - role: u32             # record +32, the roster's role
+    - unknown_40: u32       # record +40 to +84: not read back yet; the server writes 0, as kr-1256 sub_5244E0 does
+    - unknown_44: u32
+    - unknown_48: u64       # 8 bytes, two i32 reads low then high
+    - unknown_56: u64
+    - unknown_64: u64
+    - unknown_72: u32
+    - unknown_76: u32
+    - unknown_80: u32
+    - unknown_84: u32
+  # C2S ClanMemberReport. kr-1256 sub_527AB0 writes two words; its caller kr-1256 sub_517E70 passes the local
+  # player's word at kr-1256 dword_18E56E8 +60 and the word at kr-1256 dword_18E56A4 +72 (sent only while that
+  # word is 1, 3, 4 or 6). Their meaning is not established; rosters echo them.
+  ClanServerMemberReport:
+    - unknown_0: u32
+    - unknown_4: u32
+  # C2S ClanSearch. kr-1256 sub_526020 writes two words and the search text. Every sender passes the search
+  # dialog's (FrmClanSearch, built by kr-1256 sub_578F10) stored mode at +1580, page at +1572 and text at +1584
+  # (kr-1256 sub_57BA90, kr-1256 sub_5A9410, kr-1256 sub_5189F0), except kr-1256 sub_533AC0, which asks for mode 6,
+  # page 1 and no text.
+  ClanServerSearch:
+    - mode: u32             # set by the dialog's buttons (kr-1256 sub_57BA90): 4 btnSearch with the typed text; 6 btnRefreshSearch
+                            # and 5 btnPointSearch, which become 7 and 8 while chkRecruitSearch is ticked; modes 5 to 8 clear the text
+    - page: u32             # 1-based: btnPrev sends page - 1 only above 1, btnNext sends page + 1
+    - text: wcstr
+  # S2C ClanSearchResult: a header, then `count` ClanServerSearchEntry bodies. kr-1256 sub_5290A0 reads the count,
+  # two words and a string, then the entries into 200-byte records (kr-1256 sub_524300 over kr-1256 sub_516630),
+  # and hands the two words and the records to kr-1256 sub_57CFE0, which fills five rows.
+  ClanServerSearchResult:
+    - count: u32
+    - unknown_4: u32        # passed to kr-1256 sub_57CFE0 as its first argument, which never reads it; the server echoes the mode
+    - page: u32             # kept by kr-1256 sub_57CFE0 as the dialog's page (+1572); page 1 disables btnPrev
+    - text: wcstr           # read and dropped by kr-1256 sub_5290A0; the server echoes the request's text
+  # kr-812 search row: kr-812 sub_49A800 reads twelve fields per row and hands them to kr-812 sub_4979B0 in the record
+  # order the kr-1256 table below gives by offset. It has one date before the counts, no recruitment word and no
+  # last-login date.
+  ClanServerSearchEntry:
+    - clan_id: u32
+    - clan_name: wcstr
+    - unknown_88: u32       # as in kr-1256: the word before the master's name; the server writes the master id
+    - master_name: wcstr
+    - level: u32
+    - points: u32
+    - founded_date: f64
+    - member_count: u32     # passed to kr-812 sub_4979B0 right after the level and points, the record's member count
+    - unknown_10: u32       # read by kr-812 sub_49A800 and never passed on. The server writes 0
+    - introduction: wcstr
+    - disband_date: f64     # compared with 2100-01-01 by kr-812 sub_49A800 as in kr-1256
+    - mark: u32
+      except: [id-400]      # id-400 sub_444CD0 and cn-706 sub_454550 read no mark after the disband date
+  ClanServerSearchEntry@kr-1256:
+    - clan_id: u32          # record +0: the id the join button applies to (kr-1256 sub_527010 / kr-1256 sub_527130)
+      offset: 0
+    - clan_name: wcstr      # record +4, shown in lblClanName
+      offset: 4
+    - unknown_88: u32       # record +88: copied to the clan state's +248 when the player applies (kr-1256 sub_57BA90) and
+      offset: 88            # passed on after approval (kr-1256 sub_51D330). It precedes the master's name as the profile's
+                            # master id does; the server writes the master id, unproven
+    - master_name: wcstr    # record +92, shown in lblMasterName
+      offset: 92
+    - level: u32            # record +28, shown in lblLevel
+      offset: 28
+    - points: u32           # record +32, shown in lblClanPoint
+      offset: 32
+    - founded_date: f64     # record +48, shown in lblClanBirth as %Y-%m-%d
+      offset: 48
+    - unknown_56: f64       # record +56: no reader found. The server writes 0
+      offset: 56
+    - recruitment: u32      # record +72: lblRecruitState shows for any value but 0; with 2 the join button sends the
+      offset: 72            # application with a message (kr-1256 sub_527130) instead of the plain one (kr-1256 sub_527010)
+    - member_count: u32     # record +36, shown in lblUserCount
+      offset: 36
+    - unknown_10: u32       # skipped by kr-1256 sub_5290A0 without being stored; numbered by its position. The server writes 0
+    - introduction: wcstr   # record +168, shown in lblClanIntro, cut at 70 characters with "..."
+      offset: 168
+    - disband_date: f64     # compared with 2100-01-01 as in the home; an earlier date sets record +192, which shows
+                            # pnlCloseIcon and refuses the join button ("disbanding clan"). The server writes 2100-01-01 while none is pending
+    - last_login_date: f64  # record +64, shown in lblLastLoginDate as %Y-%m-%d
+      offset: 64
+    - mark: u32             # record +84: the row's pnlLogo shows Images/Clan/ClanIcon/ClanIcon_<mark>_01.png, or icon 01 below 2
+      offset: 84
+  # cn-735 sub_5D1780 (dispatcher cn-735 sub_5CF340 case 0x3FC) reads kr-1256's fifteen-field search row after the
+  # four-field header, under kr-812's number (1020); the builds based on cn-735 follow it.
+  ClanServerSearchEntry@cn-735:
+    - clan_id: u32
+    - clan_name: wcstr
+    - unknown_88: u32       # named by kr-1256's record offset; the server writes the master id, as for kr-1256
+    - master_name: wcstr
+    - level: u32
+    - points: u32
+    - founded_date: f64
+    - unknown_56: f64       # named by kr-1256's record offset; the server writes 0
+    - recruitment: u32
+    - member_count: u32
+    - unknown_10: u32       # skipped by the reader, as in kr-1256; the server writes 0
+    - introduction: wcstr
+    - disband_date: f64
+    - last_login_date: f64
+    - mark: u32
+  # C2S ClanApply. kr-1256 sub_527010 writes the selected search row's clan id (record +0) and clan name (record +4,
+  # copied by kr-1256 sub_51F5A0). The search dialog (kr-1256 sub_57BA90) sends it for a row whose recruitment word is
+  # not 2 and whose disband flag (+192) is clear.
+  ClanServerApply:
+    - clan_id: u32
+    - clan_name: wcstr
+  # C2S ClanJoin. kr-1256 sub_527130 writes the same two fields and the sender's own nickname
+  # (kr-1256 dword_18E56E8 +24). Sent instead of ClanApply for a row whose recruitment word is 2.
+  ClanServerJoin:
+    - clan_id: u32
+    - clan_name: wcstr
+    - nickname: wcstr
+  # S2C ClanApplyResult. kr-1256 sub_52E2A0 reads three words and a string and passes them to kr-1256 sub_51F920.
+  ClanServerApplyResult:
+    - result: u32           # signed. 1 "join request sent"; 2 "joined the training clan"; -1 applicant limit; -2 already in a
+                            # clan; -3 clan disbanding; -5 not recruiting; -6 not an auto-approve clan; other: general failure
+    - role: u32             # stored for every result as the client's own clan role (clan state +48), the word the
+                            # client compares with 1, 100, 101 and 102 everywhere (e.g. kr-1256 sub_5A7A20, kr-1256 sub_5B61C0)
+    - clan_id: u32          # on result 1: stored as the clan applied to (clan state +244); the search dialog then offers
+                            # to cancel for that row
+    - clan_name: wcstr      # on result 1: stored at clan state +52
+  # C2S ClanCancelApplication. kr-1256 sub_527250 writes one word, the selected row's clan id, when that row is the
+  # clan applied to (kr-1256 sub_57BA90 compares it with clan state +244).
+  ClanServerCancelApplication:
+    - clan_id: u32
+  # S2C ClanCancelApplicationResult. kr-1256 sub_525170 case 0x428 reads two words for kr-1256 sub_5201C0.
+  ClanServerCancelApplicationResult:
+    - result: u32           # 1: "join request cancelled", clears clan state +244 and +48; other: failure path
+    - unknown_4: u32        # second argument of kr-1256 sub_5201C0, which never reads it. The server echoes the clan id
+  # C2S ClanApplicantsRequest. kr-1256 sub_5279B0 stamps the opcode and writes no field.
+  ClanServerApplicantsRequest: []
+  # S2C ClanApplicants. kr-1256 sub_52C750 reads a count, then per applicant the fields below into 64-byte records
+  # (id +0, name +4, then +28, +32, +56, +40, +44, +48, +52 in wire order) for kr-1256 sub_588480. While clan state +160
+  # (the recruitment word) is 0 it then sends a ClanMemberChange (kr-1256 sub_527B80) for every row with the row's +32
+  # word as the old role and -10 as the new one.
+  ClanServerApplicants:
+    - applicants: list<ClanServerApplicant>
+  ClanServerApplicant:
+    - user_number: u32
+    - nickname: wcstr
+    - unknown_28: u32       # record +28: copied on by kr-1256 sub_588480; no reader found. The server writes 0
+    - role: u32             # record +32: sent back as the old role of the member change above
+    - unknown_56: u64       # record +56: copied on by kr-1256 sub_588480; no reader found. The server writes 0
+    - unknown_40: u32       # record +40..+52: copied on by kr-1256 sub_588480; no reader found. The server writes 0
+    - unknown_44: u32
+    - unknown_48: u32
+    - unknown_52: u32
+  # C2S ClanMemberChange. kr-1256 sub_527B80 writes a row's id, its name, the role the sender's list stores for it
+  # and the new role or event word. Senders: the applicant dialog (kr-1256 sub_588850: 100 approve, -10 reject), the
+  # member list (kr-1256 sub_5B5FE0: 100 or -10, kr-1256 sub_5B6A50: 102 while clan state +128 is not positive), the
+  # removal dialog (kr-1256 sub_58D660: -30) and the applicant list itself (kr-1256 sub_52C750: -10 for every
+  # applicant while recruitment is 0).
+  ClanServerMemberChange:
+    - user_number: u32
+    - nickname: wcstr
+    - old_role: u32         # the sender's stored role for the row; the server reads its own instead
+    - new_role: u32         # signed: 100 member, 102 deputy, -10 turn the applicant away, -30 remove
+  # S2C ClanMemberChangeResult. kr-1256 sub_52D090 reads a word, a string and two words for kr-1256 sub_51E2C0.
+  ClanServerMemberChangeResult:
+    - result: u32           # signed. 1 done; 2 "maximum number of members exceeded"; -102 "a deputy already exists";
+                            # other: general failure
+    - nickname: wcstr       # shown in the result notice
+    - role: u32             # on result 1: -10 "rejected %s", -50 "%s cancelled the application", 100 with joined 1
+                            # refreshes the member list (kr-1256 sub_51C630)
+    - joined: u32           # 1 when an applicant was seated
+  # S2C ClanMemberChanged. kr-1256 sub_52CE70 reads the fields below; for the local player (id equal to
+  # kr-1256 dword_18E56E8 +48) it calls kr-1256 sub_51D330(clan name, role, joined), which stores the role as the
+  # client's own and asks for the home again for a seat or a removal, else kr-1256 sub_51EA80(nickname, role, joined)
+  # with one notice per role: -60 graduated, -30 removed, -20 left, 100 joined (joined 1) or made a member,
+  # 101 master, 102 deputy.
+  ClanServerMemberChanged:
+    - clan_name: wcstr
+    - user_number: u32
+    - nickname: wcstr
+    - role: u32             # signed: a seated role or -10 / -20 / -30 / -60
+    - joined: u32
+  # C2S ClanLeave. kr-1256 sub_527DC0 stamps the opcode and writes no field.
+  ClanServerLeave: []
+  # S2C ClanMemberLeft. kr-1256 sub_52E640 reads the same fields as ClanMemberChanged and passes its last two words
+  # to the same two consumers in swapped order, so the last word is the event (-20 left) and the fourth the flag.
+  ClanServerMemberLeft:
+    - clan_name: wcstr
+    - user_number: u32
+    - nickname: wcstr
+    - unknown_3: u32        # passed as the consumers' joined flag, which they do not read for -20. The server writes 0
+    - event: u32            # signed: -20
+  # C2S ClanIntroductionEdit. kr-1256 sub_527D30 writes one string, sent by the clan management dialog kr-1256 sub_5BAC70.
+  ClanServerIntroductionEdit:
+    - introduction: wcstr
+  # S2C ClanIntroductionEditResult. kr-1256 sub_52DC60 reads a word and a string.
+  ClanServerIntroductionEditResult:
+    - result: u32           # 1: stores the text at clan state +200; other: the forbidden-word notice
+    - introduction: wcstr
+  # S2C ClanIntroductionChanged. kr-1256 sub_52E000 skips a word, reads a string, shows "the introduction was changed
+  # to '%s'" and stores the text at clan state +200.
+  ClanServerIntroductionChanged:
+    - unknown_0: u32        # skipped by the reader. The server writes 0
+    - introduction: wcstr
+  # C2S ClanNoticeEdit. kr-1256 sub_527CA0 writes one string, sent by the notice dialog kr-1256 sub_5B82C0 when the text
+  # differs from clan state +176.
+  ClanServerNoticeEdit:
+    - notice: wcstr
+  # S2C ClanNoticeEditResult. kr-1256 sub_52D7A0 reads one word; -1 shows the forbidden-word notice, nothing else is done.
+  ClanServerNoticeEditResult:
+    - result: u32
+  # S2C ClanNoticeChanged. kr-1256 sub_52DA40 reads a string, shows "the notice was changed to '%s'" and stores it at
+  # clan state +176 (kr-1256 sub_51D1C0).
+  ClanServerNoticeChanged:
+    - notice: wcstr
+  # C2S ClanRecruitmentEdit. kr-1256 sub_528460 writes two words, passed by kr-1256 sub_51C750: clan state +44 (the
+  # clan id) and the word of the management dialog's button (kr-1256 sub_5BAC70: 1, 2 or 0).
+  ClanServerRecruitmentEdit:
+    - clan_id: u32
+    - recruitment: u32
+  # S2C ClanRecruitmentEditResult. kr-1256 sub_525170 case 0x44F reads three words.
+  ClanServerRecruitmentEditResult:
+    - unknown_0: u32        # skipped. The server echoes the clan id
+    - result: u32           # not 0: the next word is stored at clan state +160 and the clan views refresh
+                            # (kr-1256 sub_51F770, kr-1256 sub_5189F0); 0 changes nothing
+    - recruitment: u32      # 0 also makes the client request the applicant list and turn every applicant away
+  # C2S ClanMarkEdit. kr-1256 sub_530C50 writes two words, clan state +44 and the chosen mark, and sends nothing when
+  # the first is 0 or 99. Sender kr-1256 sub_9CA450.
+  ClanServerMarkEdit:
+    - clan_id: u32
+    - mark: u32
+  # S2C ClanMarkChanged. kr-1256 sub_5335F0 reads one word, stores it at clan state +224 and shows "the clan mark was
+  # updated".
+  ClanServerMarkChanged:
+    - mark: u32
+  # C2S ClanTransferRequest. kr-1256 sub_527F60 writes one word, the member offered the clan.
+  ClanServerTransferRequest:
+    - user_number: u32
+  # S2C ClanTransferRequestResult. kr-1256 sub_52F320 reads a byte and a word; a zero byte or the word 2 shows "the
+  # transfer request failed; it can only be sent to an online member", anything else nothing.
+  ClanServerTransferRequestResult:
+    - sent: u8
+    - result: u32
+  # S2C ClanTransferOffer. kr-1256 sub_52F620 reads a string and a word, asks "%s sent a clan transfer request. Accept?"
+  # and answers with ClanTransferAnswer carrying the word back.
+  ClanServerTransferOffer:
+    - nickname: wcstr       # the master's nickname, shown in the question
+    - unknown_1: u32        # echoed in the answer; the server writes the master's id
+  # C2S ClanTransferAnswer. Written by kr-1256 sub_52F620 itself: a byte (1 accept, 0 decline) and the offer's word.
+  ClanServerTransferAnswer:
+    - accepted: u8
+    - unknown_1: u32
+  # S2C ClanTransferAnswerResult. kr-1256 sub_5300C0 reads one byte; any value but 1 shows "accepting the transfer failed".
+  ClanServerTransferAnswerResult:
+    - result: u8
+  # S2C ClanTransferAnswered. kr-1256 sub_52FB70 reads a byte, a word and a string: "%s accepted the transfer", after
+  # which it sends ClanTransferConfirm with the word and the string, or "%s declined the transfer".
+  ClanServerTransferAnswered:
+    - accepted: u8
+    - user_number: u32
+    - nickname: wcstr
+  # C2S ClanTransferConfirm. kr-1256 sub_528070 writes a word and a string, the new master as ClanTransferAnswered named them.
+  ClanServerTransferConfirm:
+    - user_number: u32
+    - nickname: wcstr
+  # S2C ClanMasterChanged. kr-1256 sub_52E430 skips a word, reads a word, a string, a word and a string for
+  # kr-1256 sub_51A830, which sets the client's own role to 100 when it is the first id and to 101 when it is the second.
+  ClanServerMasterChanged:
+    - unknown_0: u32        # skipped by the reader. The server writes 0
+    - old_master_id: u32
+    - old_master_name: wcstr
+    - new_master_id: u32
+    - new_master_name: wcstr
+  # C2S ClanDisband. kr-1256 sub_528190 writes one word: the management dialog (kr-1256 sub_5BAC70) sends 2 while a
+  # disband is pending and 1 otherwise.
+  ClanServerDisband:
+    - kind: u32             # 1 request a disband, 2 cancel it
+  # S2C ClanDisbandResult. kr-1256 sub_525170 case 0x406 reads two words for kr-1256 sub_520680.
+  ClanServerDisbandResult:
+    - result: u32           # 1 done; other: "the disband request failed" (kind 1) or "cancelling the disband failed" (kind 2)
+    - kind: u32
+  # S2C ClanDisbandChanged. kr-1256 sub_52E860 reads two words; with the first 1 it shows, for kind 1, "the clan will be
+  # disbanded at the next maintenance time" (and the master's client starts its countdown, kr-1256 sub_D9A7F0) or, for
+  # kind 2, "the disband was cancelled", then refreshes the clan views.
+  ClanServerDisbandChanged:
+    - unknown_0: u32        # the reader acts only when it is 1. The server writes 1
+    - kind: u32
+  # C2S ClanBoardRequest. kr-1256 sub_527360 writes two words: kr-1256 sub_583F60 sends (1, 0) for the newest page and
+  # kr-1256 sub_584A80 sends (2, last row's post id) for older posts and (3, first row's post id) for newer ones.
+  ClanServerBoardRequest:
+    - mode: u32
+    - cursor: u32
+  # S2C ClanBoard: a header, then `count` ClanServerBoardPost bodies. kr-1256 sub_5285B0 reads them and hands the two
+  # header words to kr-1256 sub_584250, which keeps them at dialog +1548 / +1552; kr-1256 sub_584A80 offers the older
+  # page only while the last row is not +1552 and the newer page only while the first row is not +1548.
+  ClanServerBoard:
+    - count: u32
+    - newest_post_id: u32
+    - oldest_post_id: u32
+  ClanServerBoardPost:
+    - unknown_0: u32        # kept at the row's +8; no reader found. The server writes 0
+    - author: wcstr
+    - unknown_2: u32        # kept at the row's +4; no reader found. The server writes 0
+    - post_id: u32          # the row's +0: the page cursors and the delete request take it
+    - shown: u16            # a row is listed only when this is not 0 (its id still counts for paging)
+    - date: f64             # shown as %m-%d %H:%M
+    - body: wcstr
+  # C2S ClanBoardWrite. kr-1256 sub_527430 writes a word and the post, sent by kr-1256 sub_51B600 for 1..60 characters;
+  # the word is kr-1256 dword_18E56E8 +60, the same word the member report sends first.
+  ClanServerBoardWrite:
+    - unknown_0: u32
+    - body: wcstr
+  # S2C ClanBoardWriteResult. kr-1256 sub_528BD0 reads one word: -1 "contains a forbidden word", -2 "you cannot post
+  # several times in a row", 1 posted (the client then asks for the newest page, kr-1256 sub_51B560).
+  ClanServerBoardWriteResult:
+    - result: u32
+  # C2S ClanBoardDelete. kr-1256 sub_5274E0 writes the sender's id and the selected row's post id (kr-1256 sub_584750).
+  ClanServerBoardDelete:
+    - user_number: u32
+    - post_id: u32
+  # S2C ClanBoardDeleted. kr-1256 sub_525170 case 0x402 reads nothing and asks for the board again (kr-1256 sub_51B560).
+  ClanServerBoardDeleted: []
+  # C2S ClanChat. kr-1256 sub_5282A0 writes the constant 2, the sender's name and the line; kr-1256 sub_518F70 sends
+  # it only for a non-empty line and a client role of 100, 101 or 102.
+  ClanServerChat:
+    - unknown_0: u32        # always 2
+    - nickname: wcstr       # the server uses the sender's own name instead
+    - text: wcstr
+  # S2C ClanChatResult. kr-1256 sub_52EDC0 reads one word; 3 shows "contains a forbidden word". The server has no word
+  # filter and sends nothing for a delivered line.
+  ClanServerChatResult:
+    - result: u32
+  # S2C ClanChatMessage. kr-1256 sub_52EFC0 reads the name and the line for the chat window.
+  ClanServerChatMessage:
+    - unknown_0: u32        # read first and never used: kr-812 sub_49D1D0, kr-1256 sub_52EFC0 (skips 4 bytes before
+                            # the strings), cn-774 sub_5E2F70 and tw-454 sub_685A10 case 0x42C inline
+    - nickname: wcstr
+    - text: wcstr
+  # C2S ClanWhisper. kr-1256 sub_526160 writes a word, two strings and a byte. Its automatic answers from
+  # kr-1256 sub_52A8A0 (kinds 3 and 4) pass the incoming whisper's sender as the first string, so it is the target.
+  ClanServerWhisper:
+    - kind: u32             # 1 typed; 3 and 4 the client's automatic answers
+    - target: wcstr
+    - text: wcstr
+    - unknown_3: u8         # the sender's player object +78 +392 under a channel condition; passed through. kr-812
+      only: [kr-1256]       # sub_498DB0 and tw-454 sub_6871C0 write the word and the two strings only
+      except: [tw-454]
+  # S2C ClanWhisperResult. kr-1256 sub_529D30 reads two words and three strings: result 1 shows the whisper in the
+  # sender's chat by kind, 2 "the player cannot be found", 3 "forbidden word", 4 "try again later". The strings are
+  # written in ClanWhisperMessage's order (from, to, text): inferred, not traced.
+  ClanServerWhisperResult:
+    - result: u32
+    - kind: u32
+    - from: wcstr
+    - to: wcstr
+    - text: wcstr
+  # S2C ClanWhisperMessage. kr-1256 sub_52A8A0 reads a word, three strings and a byte; its automatic answers go to
+  # the first string, so it is the sender.
+  ClanServerWhisperMessage:
+    - kind: u32
+    - from: wcstr
+    - to: wcstr             # the second name; inferred to be the receiver
+    - text: wcstr
+    - unknown_4: u8         # kr-812 sub_49B1F0 and tw-454 sub_68A520 read the word and three strings only
+      only: [kr-1256]
+      except: [tw-454]

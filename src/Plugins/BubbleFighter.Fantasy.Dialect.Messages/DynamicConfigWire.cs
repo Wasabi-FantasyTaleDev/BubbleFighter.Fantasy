@@ -3,18 +3,19 @@ using System.IO.Compression;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Contracts.Pets;
 using BubbleFighter.Fantasy.Packets;
-using YamlDotNet.Serialization;
 
 namespace BubbleFighter.Fantasy.Dialect.Messages;
 
 /// <summary>
 /// Serves the build's native DynamicConfig generation. The per-slot content rows in the build's
-/// <c>dynamic_config</c> block are marshaled through their packet schemas, deflated, and framed as
-/// the S2C 1500 category mask plus one zlib blob per set bit: kr-1256 sub_9D2FF0 case 1500 walks
-/// the set bits ascending through kr-1256 sub_65F370, which inflates each blob, restamps the
-/// slot's registry entry (an Adler-32 over the compressed bytes seeded with zero, kr-1256
-/// sub_65F370 -> kr-1256 sub_12CB730) and applies the slot decoder. A failed bit abandons the
-/// rest of the frame, so a bit is served only when its schema and content rows actually exist.
+/// <c>dynamic_config</c> block are marshaled through their packet schemas and framed as the S2C 1500 category mask
+/// plus one body per set bit. What a body is depends on the build's own <c>DynamicConfigReply</c> table, which names
+/// each slot's carrier: <c>DynamicConfigBlob</c> (kr-1256 sub_9D2FF0 case 1500 walks the set bits ascending through
+/// kr-1256 sub_65F370, which inflates a counted zlib blob, restamps the slot's registry entry with an Adler-32 over the
+/// compressed bytes seeded with zero, kr-1256 sub_65F370 -> kr-1256 sub_12CB730, and applies the slot decoder) or the
+/// slot's own schema (kr-812 sub_45B5E0 hands the plain packet bytes to the decoder and stamps the Adler-32 of the
+/// bytes it consumed, kr-812 sub_A5FB20). A failed bit abandons the rest of the frame, so a bit is served only when its
+/// schema and content rows actually exist.
 /// Bits 7, 10, 11 and 15 are absent from the served mask here: the slot 7 and 11 schemas are
 /// only partially split and slots 10 and 15 register at runtime without a static decoder.
 /// </summary>
@@ -26,8 +27,11 @@ internal sealed class DynamicConfigWire : IPetClientConfigurationSink
     private readonly byte[]? _creationSnapshot;
     private readonly Template? _petTemplate;
 
-    /// <summary>One served category: its registry bit, schema and marshaled body.</summary>
-    private sealed record Slot(int Bit, string Schema, byte[] Compressed, uint Stamp);
+    /// <summary>
+    /// One served category: its registry bit, schema, the body the client's stamp covers (the zlib bytes of a blob
+    /// carrier, the plain marshaled bytes of a direct one) and the content a direct carrier writes in place.
+    /// </summary>
+    private sealed record Slot(int Bit, string Schema, byte[] Body, bool Blob, Dictionary<string, object?> Content, uint Stamp);
 
     private sealed record Template(string Schema, Dictionary<string, object?> Content);
 
@@ -36,7 +40,7 @@ internal sealed class DynamicConfigWire : IPetClientConfigurationSink
         _tables = tables;
         _build = build;
         Protocol = protocol;
-        var rows = LoadContent(tables, build);
+        var rows = DynamicConfigContent.Load(tables, build);
         var supportsPets = PetConfigurationBuilds(tables, build).Contains(build, StringComparer.Ordinal);
         if (rows.Count != 0 || supportsPets) ValidateEnvelope();
         foreach (var (rawBit, raw) in rows)
@@ -51,12 +55,12 @@ internal sealed class DynamicConfigWire : IPetClientConfigurationSink
                 throw new ConfigException($"Build '{build}' dynamic_config declares bit {bit} twice.");
             if (bit == 14 && tables.CapabilityOf(build, "character_creation"))
                 content = MergeCreationContent(tables, build, content);
-            _slots[bit] = Compress(bit, schema, content);
+            _slots[bit] = Encode(bit, schema, content);
             if (bit == 14 && supportsPets) _petTemplate = new(schema, content);
         }
         if (supportsPets)
         {
-            var petRows = LoadContent(tables, build, "pet_content_file");
+            var petRows = DynamicConfigContent.Load(tables, build, "pet_content_file");
             if (petRows.Count != 0)
             {
                 if (_petTemplate is not null || petRows.Count != 1
@@ -136,10 +140,9 @@ internal sealed class DynamicConfigWire : IPetClientConfigurationSink
     {
         var values = new Dictionary<string, object?> { ["mask"] = bits.Aggregate(0, (mask, bit) => mask | 1 << bit) };
         foreach (var bit in bits)
-            values["slot_" + bit.ToString(CultureInfo.InvariantCulture)] = new Dictionary<string, object?>
-            {
-                ["compressed"] = slots[bit].Compressed,
-            };
+            values["slot_" + bit.ToString(CultureInfo.InvariantCulture)] = slots[bit].Blob
+                ? new Dictionary<string, object?> { ["compressed"] = slots[bit].Body }
+                : slots[bit].Content;
         return PacketCodec.Write(_tables, _build, "DynamicConfigReply", values);
     }
 
@@ -154,16 +157,57 @@ internal sealed class DynamicConfigWire : IPetClientConfigurationSink
             ["unknown_52"] = BitConverter.SingleToInt32Bits((float)(configuration.FeedCooldownSeconds / 86400d)),
             ["unknown_56"] = configuration.MileageDisplayMaximum,
         };
-        return new Dictionary<int, Slot>(_slots) { [14] = Compress(14, template.Schema, content) };
+        return new Dictionary<int, Slot>(_slots) { [14] = Encode(14, template.Schema, content) };
     }
 
-    private Slot Compress(int bit, string schema, Dictionary<string, object?> content)
+    private Slot Encode(int bit, string schema, Dictionary<string, object?> content)
     {
         var plain = PacketCodec.Write(_tables, _build, schema, content);
-        using var target = new MemoryStream();
-        using (var zlib = new ZLibStream(target, CompressionLevel.Fastest)) zlib.Write(plain);
-        var compressed = target.ToArray();
-        return new(bit, schema, compressed, Checksum(compressed));
+        var carrier = CarrierOf(_tables, _build, bit);
+        if (carrier == "DynamicConfigBlob")
+        {
+            PacketLayoutContract.RequireFields(_tables, _build, "DynamicConfigBlob", "Native dynamic config", ("compressed", "list<u8>"));
+            using var target = new MemoryStream();
+            using (var zlib = new ZLibStream(target, CompressionLevel.Fastest)) zlib.Write(plain);
+            var compressed = target.ToArray();
+            return new(bit, schema, compressed, true, content, Checksum(compressed));
+        }
+        if (carrier != schema)
+            throw new ConfigException($"Build '{_build}' frames dynamic config bit {bit} as {carrier}, but its content is {schema}.");
+        return new(bit, schema, plain, false, content, Checksum(plain));
+    }
+
+    /// <summary>
+    /// Reads what the build's <c>DynamicConfigReply</c> carries for a bit: the type of its <c>slot_N</c> field,
+    /// <c>DynamicConfigBlob</c> for a counted zlib blob or the slot's own schema for plain bytes.
+    /// </summary>
+    internal static string CarrierOf(PacketTables tables, string build, int bit)
+    {
+        var name = "slot_" + bit.ToString(CultureInfo.InvariantCulture);
+        var type = tables.Resolve(build, "DynamicConfigReply").FirstOrDefault(field => field.Name == name)?.Type
+            ?? throw new ConfigException($"Build '{build}' DynamicConfigReply has no {name}, so dynamic config bit {bit} cannot be served.");
+        const string prefix = "when<";
+        var comma = type.LastIndexOf(',');
+        if (!type.StartsWith(prefix, StringComparison.Ordinal) || !type.EndsWith('>') || comma < 0)
+            throw new ConfigException($"Build '{build}' {name} must be a 'when<mask&bit,Carrier>' field, not '{type}'.");
+        return type[(comma + 1)..^1].Trim();
+    }
+
+    /// <summary>
+    /// Whether a request whose categories are all current is answered: <c>dynamic_config.unchanged_reply</c> of the
+    /// build is <c>ack</c> (the default; the caller sends its acknowledgement frame) or <c>none</c> (nothing waits for
+    /// an answer, as in kr-812 sub_820060, so none is sent).
+    /// </summary>
+    internal static bool AnswersUnchanged(PacketTables tables, string build)
+    {
+        if (tables.ValuesOf(build).GetValueOrDefault("dynamic_config") is not Dictionary<string, object?> block
+            || block.GetValueOrDefault("unchanged_reply") is not string mode) return true;
+        return mode switch
+        {
+            "ack" => true,
+            "none" => false,
+            _ => throw new ConfigException($"Build '{build}' dynamic_config.unchanged_reply must be 'ack' or 'none', not '{mode}'."),
+        };
     }
 
     private void ValidateEnvelope()
@@ -173,7 +217,6 @@ internal sealed class DynamicConfigWire : IPetClientConfigurationSink
             throw new ConfigException($"Build '{_build}' DynamicConfig requires an audited u16 or u32 mask.");
         PacketLayoutContract.RequireFields(_tables, _build, "DynamicConfigRequest", "Native dynamic config", ("mask", maskType));
         PacketLayoutContract.RequireFields(_tables, _build, "DynamicConfigReply", "Native dynamic config", ("mask", maskType));
-        PacketLayoutContract.RequireFields(_tables, _build, "DynamicConfigBlob", "Native dynamic config", ("compressed", "list<u8>"));
     }
 
     private void ValidatePetTemplate(Template template)
@@ -197,44 +240,6 @@ internal sealed class DynamicConfigWire : IPetClientConfigurationSink
             || !block.TryGetValue("pet_configuration_builds", out var admitted)) return [];
         return admitted as string[]
             ?? throw new ConfigException($"Build '{build}' pet_configuration_builds must be an explicit build list.");
-    }
-
-    /// <summary>
-    /// Loads the build's content file: the build block names it (as
-    /// <c>dynamic_config.content_file</c>), it sits beside the schemas, and it carries one entry
-    /// per registry bit. YamlDotNet hands back longs, doubles and object dictionaries, so the
-    /// tree is normalized to the shapes the packet codec writes.
-    /// </summary>
-    private static Dictionary<string, object?> LoadContent(PacketTables tables, string build, string fileKey = "content_file")
-    {
-        if (tables.ValuesOf(build).GetValueOrDefault("dynamic_config") is not Dictionary<string, object?> block
-            || block.GetValueOrDefault(fileKey) is not string { Length: > 0 } name)
-            return [];
-        var path = Path.Combine(tables.Directory, name);
-        if (!File.Exists(path))
-            throw new ConfigException($"Build '{build}' dynamic_config names the missing content file '{path}'.");
-        var deserializer = new DeserializerBuilder().Build();
-        var parsed = deserializer.Deserialize<Dictionary<object, object>>(new StringReader(File.ReadAllText(path)));
-        if (parsed.GetValueOrDefault("slots") is not IDictionary<object, object> slots || slots.Count == 0)
-            throw new ConfigException($"'{path}' must list at least one slot under 'slots'.");
-        return new Dictionary<string, object?>(Normalize(slots), StringComparer.Ordinal);
-    }
-
-    private static Dictionary<string, object?> Normalize(IDictionary<object, object> map)
-    {
-        var normalized = new Dictionary<string, object?>(StringComparer.Ordinal);
-        foreach (var (rawKey, rawValue) in map)
-        {
-            var key = rawKey as string ?? rawKey.ToString() ?? "";
-            normalized[key] = rawValue switch
-            {
-                IDictionary<object, object> nested => Normalize(nested),
-                IList<object> list => list.Select(item => item is IDictionary<object, object> nestedItem
-                    ? (object?)Normalize(nestedItem) : item).ToArray(),
-                _ => rawValue,
-            };
-        }
-        return normalized;
     }
 
     /// <summary>
@@ -268,7 +273,8 @@ internal sealed class DynamicConfigWire : IPetClientConfigurationSink
 
     // kr-1256 sub_65F370 -> kr-1256 sub_12CB730 hashes the compressed bytes, seeding the running
     // sum with zero; the value the client reports back in C2S 1500 is exactly this seed-zero
-    // Adler-32 over the compressed bytes it holds.
+    // Adler-32 over the compressed bytes it holds. kr-812 sub_A5FB20 -> kr-812 sub_BC81B0 hashes the plain bytes
+    // its decoder consumed the same way.
     internal static uint Checksum(ReadOnlySpan<byte> bytes)
     {
         uint low = 0, high = 0;

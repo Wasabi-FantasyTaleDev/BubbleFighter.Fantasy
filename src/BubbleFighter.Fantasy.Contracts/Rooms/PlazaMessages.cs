@@ -35,7 +35,14 @@ public sealed record PlazaMember(int Slot, int UserNumber, string Nickname, int 
 
     /// <summary>Gets the shared scene owner's recruitment state, when recruitment is enabled.</summary>
     public PlazaRecruitmentState? Recruitment { get; init; }
+
+    /// <summary>Gets the persistent partner identity used by the native scene's couple markers.</summary>
+    public Couples.CoupleSceneState? Couple { get; init; }
 }
+
+/// <summary>Updates an installed plaza member's relationship without replacing their actor or position.</summary>
+/// <param name="Member">The current seat snapshot; only its relationship fields change in the client.</param>
+public sealed record PlazaCoupleUpdated(PlazaMember Member) : IMessage;
 
 /// <summary>A client asks to enter the plaza from the main menu, or after leaving a room.</summary>
 public sealed record PlazaEnterRequested : IMessage;

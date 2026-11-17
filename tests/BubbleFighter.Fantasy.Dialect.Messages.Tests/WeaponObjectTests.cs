@@ -65,11 +65,50 @@ public sealed class WeaponObjectTests
         Assert.Empty(fixture.Services.GetAll<IMessageSender<RoundWeaponPicked>>());
     }
 
+    /// <summary>
+    /// kr-1256 inserts a weapon slot word before the request's flag (kr-1256 sub_708D50) and after the notice's two
+    /// weapon words (kr-1256 sub_6ED290); the pickup runs weapon object first in both directions (kr-1256 sub_6ED460).
+    /// </summary>
+    [Fact]
+    public async Task KoreanWeaponObjectsCarryTheSlotWordAndPinBothDirections()
+    {
+        var profile = new ClientProfile("kr-1256", "kr", 1256, 0, 1304, "kr-1256");
+        var root = Directory.GetParent(TestBuilds.PacketsDirectory())!.FullName;
+        var table = OpcodeTableLoader.Load(Path.Combine(root, "profiles/kr-1256/opcodes.yaml"), profile).ForConnection(OpcodeConnection.Game);
+        using var fixture = new MatchMessagesMountTests.Fixture(table);
+        const string protocol = "kr-1256/game";
+        var context = fixture.Context("kr-1256", protocol, "dialect.rooms");
+        var session = new MatchMessagesMountTests.Session(profile);
+        try
+        {
+            var binding = new WeaponObjectsBinding(protocol, table, TestBuilds.All.Tables, "kr-1256");
+            binding.Mount(context, fixture.Messages);
+            Assert.Equal((ushort)629, table.C2S("gcpReqCreateWeaponObject"));
+            var bytes = Convert.FromHexString(Position + Velocity + Parameters + "02000000" + "01000000");
+            Assert.Equal(44, bytes.Length);
+            await fixture.Packets.DispatchAsync(protocol, session, new InboundPacket(table.C2S("gcpReqCreateWeaponObject"), bytes), default);
+            var drop = Assert.IsType<RoundWeaponDropRequested>(fixture.Messages.Received[^1]);
+            Assert.Equal(new(1, -2, 3, 0.5f, 2, -1, 2101, 0x01020304, -1, true) { WeaponSlot = 2 }, drop);
+            await binding.SendAsync(session, new RoundWeaponCreated(0x64000001, drop), default);
+            Assert.Equal((ushort)656, session.Sent[^1]);
+            Assert.Equal("01000064" + Parameters + "02000000" + Velocity + Position + "01000000", Convert.ToHexString(session.Bodies[^1]));
+            Assert.Equal(48, session.Bodies[^1].Length);
+            await fixture.Packets.DispatchAsync(protocol, session,
+                new InboundPacket(table.C2S("gcpPickUpWeapon"), Convert.FromHexString("01000064E0C81000")), default);
+            Assert.Equal(new RoundWeaponPickupRequested(0x64000001, 1100000, 1), fixture.Messages.Received[^1]);
+            await binding.SendAsync(session, new RoundWeaponPicked(0x64000001, 1100000), default);
+            Assert.Equal((ushort)657, session.Sent[^1]);
+            Assert.Equal("01000064E0C81000", Convert.ToHexString(session.Bodies[^1]));
+        }
+        finally { await context.UnwindAsync(); }
+    }
+
     /// <summary>Native support is explicit and mounting this feature cannot silently cover an unaudited build.</summary>
     [Theory]
     [InlineData("kr-812")]
     [InlineData("cn-279")]
-    [InlineData("kr-1256")]
+    [InlineData("cn-774")]
+    [InlineData("tw-454")]
     public void UnauditedBuildsDoNotAdvertiseWeaponObjectSupport(string build) =>
         Assert.False(TestBuilds.All.Tables.CapabilityOf(build, "weapon_objects"));
 }

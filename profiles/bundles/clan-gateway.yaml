@@ -1,0 +1,25 @@
+# The clan-server connection, one port for every client build. The client opens this second socket at startup
+# to the address in its login.ini (clanServerAddr / clanServerPort: kr-1256 sub_524FA0, kr-812 sub_8EA9F0; the
+# address must be dotted IPv4), before it has logged in, so every build's login.ini names the same port. The
+# gateway row greets the connection and, at its login, hands it to the build of the account's game session
+# (that build's <build>/clan protocol, mounted by its protocol row where its opcode table has clan rows).
+# List this bundle in every profile that lists `clan`, and in a server profile composing such builds, so the
+# port is bound once.
+- id: clan.connections
+  plugin: clan.connections
+  # The node's table of logged-in clan connections, shared by every build's clan row so members on different
+  # builds hear each other's notices, chat and whispers; it lives as long as the port does.
+  activation: always
+- id: clan-gateway
+  plugin: protocol.clan-gateway
+  config:
+    protocol: clan
+- id: clan-listener
+  plugin: net.tcp
+  # Bound while the builds sleep, like their game listeners: the client connects here before it logs in.
+  activation: always
+  config:
+    listen: "${BFF_BIND_HOST:-0.0.0.0}:${BFF_CLAN_PORT:-7400}"
+    protocol: clan
+    max_connections: 512
+    idle_timeout_seconds: 0

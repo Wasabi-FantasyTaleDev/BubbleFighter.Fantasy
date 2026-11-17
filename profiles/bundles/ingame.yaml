@@ -21,6 +21,8 @@
   # Retained login admission belongs to this build and its migration siblings.
   isolated_services:
     - BubbleFighter.Fantasy.Contracts.Lobby.IRetainedPlayerAdmission
+    - BubbleFighter.Fantasy.Contracts.Couples.ICoupleRingCatalog
+    - BubbleFighter.Fantasy.Contracts.Clans.IClanCreationCards
   config:
     protocol: "kr-1256/game"
     client_profile: "kr-1256"

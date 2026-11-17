@@ -32,7 +32,9 @@ internal sealed class LaboratoryCatalog(
             var name = subcategories.Cell(row, "name");
             if (!categories.TryAdd(name, id)) categories[name] = -1;
         }
-        var catalog = new Table(sheets["ShopItem"], "itemId", "subCategory", "durationType", "maxDuration", "using", "lockType");
+        var catalog = new Table(sheets["ShopItem"], "itemId", "subCategory", "durationType", "maxDuration", "using");
+        // lockType is server-side shop policy that no client reads; cn-717's ShopItem2 has no such column, so nothing there is locked.
+        var locks = catalog.Has("lockType");
         var items = new Dictionary<int, LaboratoryItem>();
         foreach (var row in catalog.Rows)
         {
@@ -41,11 +43,13 @@ internal sealed class LaboratoryCatalog(
             // kr-812 sub_9EA680 defines these material categories; grouped selections use category one.
             var category = sub is >= 302 and <= 306 ? 0 : sub is >= 102 and <= 110 ? 1 : sub is >= 202 and <= 205 ? 2 : -1;
             if (!items.TryAdd(id, new(id, category, catalog.Cell(row, "durationType"), catalog.Integer(row, "maxDuration"),
-                catalog.Integer(row, "using") == 1 && catalog.Integer(row, "lockType") == 0)))
+                catalog.Integer(row, "using") == 1 && (!locks || catalog.Integer(row, "lockType") == 0))))
                 throw new InvalidDataException($"Science-room catalog repeats item {id}.");
         }
-        var sets = new Table(sheets["SetItem"], "setId", "setCnt", "stockSetId");
         var groups = new Dictionary<int, List<int[]>>();
+        // A build without a SetItem worksheet has no stock sets; its header-only stand-in yields no groups.
+        string[] setColumns = ["setId", "setCnt", "stockSetId"];
+        var sets = new Table(sheets.GetValueOrDefault("SetItem") ?? [setColumns], setColumns);
         foreach (var row in sets.Rows)
         {
             if (!sets.TryId(row, "setId", out _)) continue;
@@ -114,6 +118,29 @@ internal sealed class LaboratoryCatalog(
         }
     }
 
+    /// <summary>
+    /// Resolves each configured bonus entry to a native Stock row. Equal item and duration rows display identically, so the lowest
+    /// stock id stands for them; an entry without such a row, or on an unavailable or non-day item, fails at load.
+    /// </summary>
+    internal IReadOnlyList<LaboratoryRewardOptions> ResolveBonusPool(ScienceLabOptions options, InventoryLoadoutScope scope)
+    {
+        var pool = new List<LaboratoryRewardOptions>();
+        foreach (var entry in options.SynthesisBonusPool)
+        {
+            if (!scope.Supports(entry.ItemId) || !Items.TryGetValue(entry.ItemId, out var item) || !item.Available
+                || item.DurationType != "day" || entry.Days > item.Maximum)
+                throw new InvalidDataException($"Science-room bonus item {entry.ItemId} is not an available timed native item that holds {entry.Days} days.");
+            var stock = stocks?.Values.Where(row => row.ItemId == entry.ItemId && row.Duration == entry.Days)
+                .OrderBy(row => row.Id).FirstOrDefault()
+                ?? throw new InvalidDataException($"Science-room bonus item {entry.ItemId} has no native Stock row of {entry.Days} days.");
+            var reward = new LaboratoryRewardOptions { StockId = stock.Id, ItemId = entry.ItemId, Kind = InventoryGrantKind.Days,
+                Amount = entry.Days, Maximum = item.Maximum, Weight = entry.Weight };
+            RequireRewardStock(reward);
+            pool.Add(reward);
+        }
+        return pool.AsReadOnly();
+    }
+
     internal void RequireRewardStock(LaboratoryRewardOptions reward)
     {
         // kr-812 sub_99E300 keys Stock by stockId; kr-812 sub_9DBED0 reads its itemId and duration for decomposition.
@@ -162,6 +189,7 @@ internal sealed class LaboratoryCatalog(
             throw new InvalidDataException("Science-room configuration exceeds its row or text bounds.");
         var active = false;
         int? count = null;
+        var rows = 0;
         var entries = new Dictionary<int, LaboratoryAssistant>();
         foreach (var raw in lines)
         {
@@ -176,10 +204,13 @@ internal sealed class LaboratoryCatalog(
             if (values.Length < 8) throw new InvalidDataException("Native science-room assistant lacks required fields.");
             var id = Integer(values[0]);
             var additive = Integer(values[2]);
-            if (id <= 0 || additive is not (0 or 1) || !entries.TryAdd(id, new(id, Integer(values[1]), additive == 1, Integer(values[3]))))
-                throw new InvalidDataException("Native science-room assistant has an invalid or duplicate identity.");
+            rows++;
+            // cn-324's own SynthesisSystem.ini lists its eight assistants twice; an identical repeat is the same assistant.
+            var assistant = new LaboratoryAssistant(id, Integer(values[1]), additive == 1, Integer(values[3]));
+            if (id <= 0 || additive is not (0 or 1) || !entries.TryAdd(id, assistant) && entries[id] != assistant)
+                throw new InvalidDataException("Native science-room assistant has an invalid or conflicting identity.");
         }
-        if (count != entries.Count || entries.Count == 0) throw new InvalidDataException("Native science-room assistant count disagrees with its rows.");
+        if (count != rows || entries.Count == 0) throw new InvalidDataException("Native science-room assistant count disagrees with its rows.");
         return entries;
     }
 
@@ -222,7 +253,9 @@ internal sealed class LaboratoryCatalog(
             }
             if (!sheets.TryAdd(name, rows.AsReadOnly())) throw new InvalidDataException($"Science-room workbook repeats worksheet {name}.");
         }
-        if (sheets.Count != 4) throw new InvalidDataException("Science-room workbook lacks native item, subcategory, set or stock data.");
+        // kr-812 sub_9A2DB0 reads SetItem's setCnt; cn-324 has no SetItem loader at all, so its workbook may omit the sheet.
+        var missing = new[] { "ShopItem", "SubCategory", "Stock" }.Where(name => !sheets.ContainsKey(name)).ToArray();
+        if (missing.Length > 0) throw new InvalidDataException($"Science-room workbook lacks worksheets: {string.Join(", ", missing)}.");
         return sheets;
     }
 
@@ -238,10 +271,13 @@ internal sealed class LaboratoryCatalog(
             for (var index = 0; index < rows[0].Count; index++)
                 if (rows[0][index].Length > 0 && !_columns.TryAdd(rows[0][index], index))
                     throw new InvalidDataException("Science-room worksheet repeats a column.");
-            if (required.Any(column => !_columns.ContainsKey(column))) throw new InvalidDataException("Science-room worksheet lacks required columns.");
+            var missing = required.Where(column => !_columns.ContainsKey(column)).ToArray();
+            if (missing.Length > 0)
+                throw new InvalidDataException($"Science-room worksheet lacks required columns: {string.Join(", ", missing)}.");
             Rows = rows.Skip(1);
         }
         internal IEnumerable<IReadOnlyList<string>> Rows { get; }
+        internal bool Has(string column) => _columns.ContainsKey(column);
         internal string Cell(IReadOnlyList<string> row, string column) => _columns.TryGetValue(column, out var index)
             ? index < row.Count ? row[index] : "" : throw new InvalidDataException($"Science-room worksheet lacks {column}.");
         internal int Integer(IReadOnlyList<string> row, string column) => LaboratoryCatalog.Integer(Cell(row, column));

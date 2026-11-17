@@ -29,7 +29,11 @@ public sealed record FighterInfoRequested(int TargetUserNum) : IMessage;
 /// Each dialect projects only the modes its native page establishes, without inventing earlier history.
 /// </param>
 public sealed record FighterInfoReplied(PlayerIdentity? Fighter, FighterAppearance? Appearance = null,
-    IReadOnlyList<PlayerBattleRecord>? BattleRecords = null) : IMessage;
+    IReadOnlyList<PlayerBattleRecord>? BattleRecords = null) : IMessage
+{
+    /// <summary>Gets the inspected player's persistent partner, including an offline partner, when that feature is mounted.</summary>
+    public Couples.CouplePartnerProfile? CouplePartner { get; init; }
+}
 
 /// <summary>A bounded, immutable copy of the target's selected character and worn item identities.</summary>
 public sealed class FighterAppearance

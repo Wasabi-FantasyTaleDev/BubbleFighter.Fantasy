@@ -37,9 +37,10 @@ public sealed class SharedGameCommandTests
         internal IPluginContext Context = null!;
         internal ICommandExecutor Executor => Context.Services.Get<ICommandExecutor>();
 
-        internal Harness(bool denyMode = false, Action<IPluginContext>? configure = null, bool enabled = true, bool udpEnabled = false)
+        internal Harness(bool denyMode = false, Action<IPluginContext>? configure = null, bool enabled = true, bool udpEnabled = false,
+            bool plazaDuringRound = true)
         {
-            Rig = new(options: new InGameOptions { UdpEnabled = udpEnabled });
+            Rig = new(options: new InGameOptions { UdpEnabled = udpEnabled, PlazaCommandDuringRound = plazaDuringRound });
             Plans[Owner] = context =>
             {
                 Context = context;
@@ -566,6 +567,38 @@ public sealed class SharedGameCommandTests
         await h.Rig.Flow.HandleChatAsync(host, new(0, "!plaza"), default);
         Assert.Null(h.Rig.Registry.TryGet(host.Id));
         Assert.Null(h.Rig.Registry.Find(id));
+        Assert.Empty(h.Rig.Chat.Sent);
+    }
+
+    [Fact]
+    public async Task PlazaWithoutRoundLeaveEndsAPlayingRoundAndKeepsEveryoneSeated()
+    {
+        await using var h = new Harness(plazaDuringRound: false);
+        await h.Start();
+        var ended = new List<PlayRoom>();
+        h.Rig.Flow.EndRoundNow = (room, _) => { ended.Add(room); return ValueTask.CompletedTask; };
+        var host = RoomFlowTests.Rig.Player(11, "host");
+        var guest = RoomFlowTests.Rig.Player(22, "guest");
+        var id = await h.Rig.CreateAsync(host);
+        await h.Rig.Flow.HandleJoinAsync(guest, new(id, ""), default);
+        await h.Rig.Flow.HandleReadyAsync(guest, new(true), default);
+        await h.Rig.Flow.HandleStartAsync(host, new("rel_Village07_Easy02"), default);
+        var room = h.Rig.Registry.Find(id)!;
+        Assert.NotEqual(RoomPhase.Waiting, room.Phase);
+        if (room.Phase != RoomPhase.Playing)
+        {
+            // A loading round cannot be ended yet: the player is told to wait and stays.
+            await h.Rig.Flow.HandleChatAsync(guest, new(0, "!plaza"), default);
+            Assert.Same(room, h.Rig.Registry.TryGet(guest.Id));
+            Assert.Empty(ended);
+            Assert.StartsWith("command.result.invalidstate", Assert.Single(h.Rig.Notices.To(guest)).Text);
+            lock (room.Gate) room.MarkPlaying();
+        }
+        await h.Rig.Flow.HandleChatAsync(guest, new(0, "!plaza"), default);
+        Assert.Same(room, Assert.Single(ended));
+        Assert.Same(room, h.Rig.Registry.TryGet(guest.Id));
+        Assert.Same(room, h.Rig.Registry.TryGet(host.Id));
+        Assert.Empty(h.Rig.Left.To(guest));
         Assert.Empty(h.Rig.Chat.Sent);
     }
 

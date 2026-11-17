@@ -1,0 +1,8 @@
+# Native invitation item -> Stock -> display ring, loaded independently of shop and lobby dependencies.
+- id: inventory.couple-catalog
+  plugin: inventory.couple-catalog
+  parent_id: inventoryview
+  config:
+    shop_item_client_path: "Config/ShopItem2.xml"
+    max_shop_item_bytes: 134217728
+    max_couple_rings: 256

@@ -45,7 +45,7 @@ public sealed class LauncherServer : IAsyncDisposable
         IPlayerWalletRepository? wallets = null, IPlayerProgressRepository? progress = null, CancellationToken ct = default,
         ILogger? logger = null, IMessengerTicketIssuer? messenger = null, IHostReadiness? readiness = null,
         ICompanionTicketIssuer? companion = null, IServerDirectory? directory = null, ILauncherServerSelection? serverSelection = null, ILauncherPresenceDirectory? presenceDirectory = null,
-        IServerSelectionDirectory? clusterBuilds = null)
+        IServerSelectionDirectory? clusterBuilds = null, Func<string, bool>? servesClans = null)
     {
         Validator.ValidateObject(options, new ValidationContext(options), true);
         var errors = options.Validate().ToArray(); if (errors.Length > 0) throw new ValidationException(string.Join("; ", errors.Select(e => e.ErrorMessage)));
@@ -114,7 +114,8 @@ public sealed class LauncherServer : IAsyncDisposable
             profileFields = new[] { "level", "lucci", "cash" },
             presentation = presence.Presentation(options.ShowOnlinePlayers ? await Aggregate(false, context.RequestAborted).ConfigureAwait(false) : null),
             policy.MinimumLauncherVersion, clientPolicy = policy.ClientPolicy,
-            instances = options.Instances.Select(instance => CatalogInstance(instance, context.Request.Host.Host, ServedBuilds())),
+            instances = options.Instances.Select(instance => CatalogInstance(instance, context.Request.Host.Host, ServedBuilds(),
+                options.ClanPort > 0 && servesClans?.Invoke(instance.Build) == true ? options.ClanPort : null)),
             clusterBuilds = ServedBuilds(),
         })));
         if (directory is not null)
@@ -354,7 +355,7 @@ public sealed class LauncherServer : IAsyncDisposable
 
     // An instance without a host is served from this machine: it advertises the address the launcher used to reach the API.
     private static Dictionary<string, object?> CatalogInstance(LauncherInstanceOptions instance, string requestHost,
-        IReadOnlyList<string>? clusterBuilds)
+        IReadOnlyList<string>? clusterBuilds, int? clanPort)
     {
         var result = new Dictionary<string, object?>
         {
@@ -367,6 +368,9 @@ public sealed class LauncherServer : IAsyncDisposable
         // With a cluster, an instance whose build no node serves cannot be placed; the launcher must not offer it.
         if (clusterBuilds is not null)
             result["clusterServed"] = clusterBuilds.Contains(instance.Build, StringComparer.Ordinal);
+        // The clan server shares the game host; the launcher writes it into login.ini as clanServerAddr/clanServerPort.
+        if (clanPort is { } port)
+            result["clanPort"] = port;
         if (instance.DownloadSource is { } source)
             result["downloadSource"] = new { source.Kind, source.BaseUrl, source.CatalogPath, source.PackageId };
         return result;
@@ -394,7 +398,9 @@ public sealed class LauncherServer : IAsyncDisposable
     {
         schema = 1, grantId = grant.GrantId, build = grant.Build, authorityId = grant.AuthorityId,
         policyRevision = grant.PolicyRevision, dataScope = grant.DataScope, expiresAtUtc = grant.ExpiresAtUtc,
-        generated_at_utc = snapshot.GeneratedAtUtc, servers = snapshot.Servers,
+        // A grant admits servers; sections belong to the server list. Launcher 0.2.0 validates a grant's servers as an
+        // ungrouped directory and refuses a selector that names a section, so the grant leaves sections out.
+        generated_at_utc = snapshot.GeneratedAtUtc, servers = snapshot.Servers.Select(server => server with { Section = null }).ToArray(),
     };
 
     private static async Task<object> Profile(LauncherAccount account, LauncherOptions options, IPlayerWalletRepository? wallets, IPlayerProgressRepository? progress, CancellationToken ct)

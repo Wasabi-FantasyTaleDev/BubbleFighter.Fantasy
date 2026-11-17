@@ -1,0 +1,59 @@
+[
+  {
+    "slug": "install-script",
+    "title": {
+      "en": "Deploy with the install script",
+      "zh-CN": "用安装脚本部署",
+      "zh-TW": "用安裝腳本部署",
+      "ko": "설치 스크립트로 배포"
+    },
+    "description": {
+      "en": "An animated walkthrough for Linux (over SSH) or Windows (PowerShell): paste one command, answer a few questions, and finish the setup wizard in the browser. Switch to Commands to copy them.",
+      "zh-CN": "动画演示 Linux（通过 SSH）或 Windows（PowerShell）：粘贴一条命令，回答几个问题，然后在浏览器中完成设置向导。切换到“命令”即可复制。",
+      "zh-TW": "動畫演示 Linux（透過 SSH）或 Windows（PowerShell）：貼上一個命令，回答幾個問題，然後在瀏覽器中完成設定精靈。切換到「命令」即可複製。",
+      "ko": "Linux(SSH) 또는 Windows(PowerShell) 애니메이션 안내: 명령 하나를 붙여 넣고 몇 가지 질문에 답한 뒤 브라우저에서 설정 마법사를 마칩니다. 명령으로 바꾸면 복사할 수 있습니다."
+    }
+  },
+  {
+    "slug": "install-windows-workbuddy",
+    "languages": [
+      "zh-CN"
+    ],
+    "title": {
+      "zh-CN": "用 WorkBuddy 在 Windows 上部署"
+    },
+    "description": {
+      "zh-CN": "动画演示：下载 WorkBuddy，准备工作区，再让它的智能体为你安装并启动服务器。"
+    }
+  },
+  {
+    "slug": "install-windows-dsh",
+    "title": {
+      "en": "Deploy on Windows by DeepSeek Harness",
+      "zh-CN": "用 DeepSeek Harness 在 Windows 上部署",
+      "zh-TW": "用 DeepSeek Harness 在 Windows 上部署",
+      "ko": "DeepSeek Harness로 Windows에 배포"
+    },
+    "description": {
+      "en": "An animated walkthrough: download DeepSeek Harness, choose a workspace, allow full access, and let its agent install and start the server for you.",
+      "zh-CN": "动画演示：下载 DeepSeek Harness，选择工作区并开启完全权限，再让它的智能体为你安装并启动服务器。",
+      "zh-TW": "動畫演示：下載 DeepSeek Harness，選擇工作區並開啟完全權限，再讓它的 AI 代理為你安裝並啟動伺服器。",
+      "ko": "애니메이션 안내: DeepSeek Harness를 내려받고 작업 공간을 고른 뒤 전체 접근을 허용하면, 에이전트가 서버를 설치하고 시작합니다."
+    }
+  },
+  {
+    "slug": "install-windows-codex",
+    "title": {
+      "en": "Deploy on Windows by Codex (ChatGPT)",
+      "zh-CN": "用 Codex（ChatGPT） 在 Windows 上部署",
+      "zh-TW": "用 Codex（ChatGPT） 在 Windows 上部署",
+      "ko": "Codex(ChatGPT)로 Windows에 배포"
+    },
+    "description": {
+      "en": "An animated walkthrough: install ChatGPT from the Microsoft Store, switch to Codex, create a project for the server folder, and let Codex install and start the server for you.",
+      "zh-CN": "动画演示：从 Microsoft Store 安装 ChatGPT，切换到 Codex，为服务器文件夹创建项目，再让 Codex 为你安装并启动服务器。",
+      "zh-TW": "動畫演示：從 Microsoft Store 安裝 ChatGPT，切換到 Codex，為伺服器資料夾建立專案，再讓 Codex 為你安裝並啟動伺服器。",
+      "ko": "애니메이션 안내: Microsoft Store에서 ChatGPT를 설치하고 Codex로 전환해 서버 폴더용 프로젝트를 만들면, Codex가 서버를 설치하고 시작합니다."
+    }
+  }
+]

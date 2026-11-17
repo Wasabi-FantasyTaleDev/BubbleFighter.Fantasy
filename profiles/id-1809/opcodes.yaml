@@ -4,6 +4,12 @@
 # plaza packets, so those numbers are carried over by matching the builder or handler to the
 # id-400 one, not by the opcode value.
 opcodes:
+  - value: 934
+    direction: c2s
+    name: gcpReqCoupleConfirmInvite
+    name_source: label@id-1809
+    evidence: verified
+    source: "id-1809 sub_99A1B0 stamps 934 through id-1809 sub_ABB1C0; native confirmation dialog supplies the complete body matching the kr-812 Packet_gcpReqCoupleConfirmInvite label"
   - value: 20005
     direction: c2s
     connection: relay
@@ -401,7 +407,7 @@ opcodes:
     name_source: label@id-1809
     evidence: inferred
     source: "send helpers sub_6432D0 and sub_71AFD0, opcode setter sub_ABB1C0(503); Packet_gcpRoomReqEnterGame serializer sub_581670, reader sub_5816C0 (vtable 0xC63674); id-400 reader sub_567520"
-    notes: "bool32, wstr x3, u32, MapMetaData as on id-400, but MapMetaData (serializer sub_416B70, reader sub_416C60) ends with 6 bool32 here against 5 on id-400; gcpUserHostStart has no proven opcode on this build, so plaza host-start stays unregistered"
+    notes: "bool32, wstr x3, u32, MapMetaData as on id-400, but MapMetaData (serializer id-400 sub_416B70, reader id-400 sub_416C60) ends with 6 bool32 here against 5 on id-400; C2S gcpUserHostStart is registered at 2024 for prize rooms while plaza host-start remains disabled"
   - value: 521
     direction: c2s
     name: gcpSendSessionInit
@@ -1101,8 +1107,8 @@ opcodes:
     direction: c2s
     name: gcpSynthesisProcess
     name_source: label@id-1809
-    evidence: inferred
-    source: "Packet_gcpSynthesisProcess class and opcode setter sub_ABB1C0 in sender sub_986EF0 (id-1809)"
+    evidence: verified
+    source: "id-1809 sub_986EF0 constructs Packet_gcpSynthesisProcess (vtable 0xCC6B8C) as kr-812 sub_9EA920 does and calls id-1809 sub_ABB1C0(941); id-1809 sub_983CD0 writes the leading text and embedded record of kr-812's SynthesisProcessRequest."
   - value: 943
     direction: c2s
     name: gcpReqLotteryRadomMissionCompensation
@@ -1760,8 +1766,8 @@ opcodes:
     direction: s2c
     name: gspSynthesisProcess
     name_source: label@id-1809
-    evidence: inferred
-    source: "id-1809 dispatcher sub_7E3180 case 951: Packet_gspSynthesisProcess"
+    evidence: verified
+    source: "id-1809 dispatcher sub_7E3180 case 0x3B7 (951) calls id-1809 sub_7DDDE0, which tests kr-812's outcome word, 100 and 200; id-1809 sub_7A59E0 delegates to the embedded reader of kr-812's 40-byte SynthesisProcessReply."
   - value: 952
     direction: s2c
     name: gspResRandomMissionInfo
@@ -4426,3 +4432,477 @@ opcodes:
     name_source: label@id-1809
     evidence: verified
     source: id-1809 sub_7A6A40 case 516 reaches id-1809 sub_7AD240; id-1809 sub_7A5DD0 reads a u16 plaza seat then one counted UTF-16 message
+  - value: 26
+    direction: c2s
+    connection: game
+    name: gcpReqClanPassport
+    name_source: mirrored
+    evidence: verified
+    source: "id-1809 sub_4689D0 (the clan hello, id-1809 sub_4682F0 case 0x3EA) stamps 26 through id-1809 sub_ABB1C0 and sends it without a body, as kr-812 sub_498E70 sends gcpReqClanPassport"
+    notes: "Empty body."
+  # The clan-server connection (connection: clan), numbered as in kr-812: dispatcher id-1809 sub_4682F0; each row
+  # was matched to kr-812's by the reader's or writer's field order. Bodies in packets/clan-server.yaml.
+  - value: 1002
+    direction: s2c
+    connection: clan
+    name: ClanHello
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x3EA: the same fields as kr-812 (kr-812 sub_498790 case 0x3EA reads no field and sends the game-connection gcpReqClanPassport (kr-812 sub_498E70))"
+    notes: "Empty body."
+  - value: 1006
+    direction: s2c
+    connection: clan
+    name: ClanLoginResult
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x3EE -> id-1809 sub_468A60: the same fields as kr-812 (kr-812 sub_498790 case 0x3EE)"
+    notes: "Body ClanServerLoginResult."
+  - value: 1012
+    direction: s2c
+    connection: clan
+    name: ClanRoster
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x3F4 -> id-1809 sub_46B100: the same fields as kr-812 (kr-812 sub_498790 case 0x3F4)"
+    notes: "Body ClanServerRoster."
+  - value: 1014
+    direction: s2c
+    connection: clan
+    name: ClanMemberDetails
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x3F6 -> id-1809 sub_46B3C0: the same fields as kr-812 (kr-812 sub_498790 case 0x3F6)"
+    notes: "Body ClanServerMemberDetails."
+  - value: 1016
+    direction: s2c
+    connection: clan
+    name: ClanHome
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x3F8 -> id-1809 sub_468AB0: the same fields as kr-812 (kr-812 sub_498790 case 0x3F8)"
+    notes: "Body ClanServerHome."
+  - value: 1018
+    direction: s2c
+    connection: clan
+    name: ClanProfile
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x3FA -> id-1809 sub_468CA0: the same fields as kr-812 (kr-812 sub_498790 case 0x3FA)"
+    notes: "Body ClanServerProfile."
+  - value: 1020
+    direction: s2c
+    connection: clan
+    name: ClanSearchResult
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x3FC -> id-1809 sub_46A380: the same fields as kr-812 (kr-812 sub_498790 case 0x3FC)"
+    notes: "Body ClanServerSearchResult."
+  - value: 1022
+    direction: s2c
+    connection: clan
+    name: ClanBoard
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x3FE -> id-1809 sub_469AE0: the same fields as kr-812 (kr-812 sub_498790 case 0x3FE)"
+    notes: "Body ClanServerBoard."
+  - value: 1024
+    direction: s2c
+    connection: clan
+    name: ClanBoardWriteResult
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x400 -> id-1809 sub_469F90: the same fields as kr-812 (kr-812 sub_498790 case 0x400)"
+    notes: "Body ClanServerBoardWriteResult."
+  - value: 1026
+    direction: s2c
+    connection: clan
+    name: ClanBoardDeleted
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x402: the same fields as kr-812 (kr-812 sub_498790 case 0x402 reads no field and refreshes the board (kr-812 sub_491270))"
+    notes: "Empty body."
+  - value: 1028
+    direction: s2c
+    connection: clan
+    name: ClanCreateResult
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x404 -> id-1809 sub_46A340: the same fields as kr-812 (kr-812 sub_498790 case 0x404)"
+    notes: "Body ClanServerCreateResult."
+  - value: 1030
+    direction: s2c
+    connection: clan
+    name: ClanDisbandResult
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x406 -> id-1809 sub_46CB80: the same fields as kr-812 (kr-812 sub_498790 case 0x406)"
+    notes: "Body ClanServerDisbandResult."
+  - value: 1031
+    direction: s2c
+    connection: clan
+    name: ClanDisbandChanged
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x407 -> id-1809 sub_46CBC0: the same fields as kr-812 (kr-812 sub_498790 case 0x407)"
+    notes: "Body ClanServerDisbandChanged."
+  - value: 1033
+    direction: s2c
+    connection: clan
+    name: ClanApplyResult
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x409 -> id-1809 sub_46C810: the same fields as kr-812 (kr-812 sub_498790 case 0x409)"
+    notes: "Body ClanServerApplyResult."
+  - value: 1036
+    direction: s2c
+    connection: clan
+    name: ClanMemberLeft
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x40C -> id-1809 sub_46CA60: the same fields as kr-812 (kr-812 sub_498790 case 0x40C)"
+    notes: "Body ClanServerMemberLeft."
+  - value: 1039
+    direction: s2c
+    connection: clan
+    name: ClanMemberChangeResult
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x40F -> id-1809 sub_46BC20: the same fields as kr-812 (kr-812 sub_498790 case 0x40F)"
+    notes: "Body ClanServerMemberChangeResult."
+  - value: 1040
+    direction: s2c
+    connection: clan
+    name: ClanMemberChanged
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x410 -> id-1809 sub_46BB00: the same fields as kr-812 (kr-812 sub_498790 case 0x410)"
+    notes: "Body ClanServerMemberChanged."
+  - value: 1042
+    direction: s2c
+    connection: clan
+    name: ClanWhisperResult
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x412 -> id-1809 sub_46A980: the same fields as kr-812 (kr-812 sub_498790 case 0x412)"
+    notes: "Body ClanServerWhisperResult."
+  - value: 1043
+    direction: s2c
+    connection: clan
+    name: ClanWhisperMessage
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x413 -> id-1809 sub_46AD70: the same fields as kr-812 (kr-812 sub_498790 case 0x413)"
+    notes: "Body ClanServerWhisperMessage."
+  - value: 1048
+    direction: s2c
+    connection: clan
+    name: ClanIntroductionEditResult
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x418 -> id-1809 sub_46C390: the same fields as kr-812 (kr-812 sub_498790 case 0x418)"
+    notes: "Body ClanServerIntroductionEditResult."
+  - value: 1049
+    direction: s2c
+    connection: clan
+    name: ClanIntroductionChanged
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x419 -> id-1809 sub_46C6A0: the same fields as kr-812 (kr-812 sub_498790 case 0x419)"
+    notes: "Body ClanServerIntroductionChanged."
+  - value: 1051
+    direction: s2c
+    connection: clan
+    name: ClanNoticeEditResult
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x41B -> id-1809 sub_46BFA0: the same fields as kr-812 (kr-812 sub_498790 case 0x41B)"
+    notes: "Body ClanServerNoticeEditResult."
+  - value: 1052
+    direction: s2c
+    connection: clan
+    name: ClanNoticeChanged
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x41C -> id-1809 sub_46C260: the same fields as kr-812 (kr-812 sub_498790 case 0x41C)"
+    notes: "Body ClanServerNoticeChanged."
+  - value: 1055
+    direction: s2c
+    connection: clan
+    name: ClanMasterChanged
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x41F -> id-1809 sub_46C960: the same fields as kr-812 (kr-812 sub_498790 case 0x41F)"
+    notes: "Body ClanServerMasterChanged."
+  - value: 1057
+    direction: s2c
+    connection: clan
+    name: ClanTransferRequestResult
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x421 -> id-1809 sub_46CEA0: the same fields as kr-812 (kr-812 sub_498790 case 0x421)"
+    notes: "Body ClanServerTransferRequestResult."
+  - value: 1058
+    direction: s2c
+    connection: clan
+    name: ClanTransferOffer
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x422 -> id-1809 sub_46D080: the same fields as kr-812 (kr-812 sub_498790 case 0x422)"
+    notes: "Body ClanServerTransferOffer."
+  - value: 1060
+    direction: s2c
+    connection: clan
+    name: ClanTransferAnswerResult
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x424: the same fields as kr-812 (kr-812 sub_498790 case 0x424 reads one byte and on a set byte calls kr-812 sub_49DD30 (kr-1256 1061))"
+    notes: "Body ClanServerTransferAnswerResult."
+  - value: 1061
+    direction: s2c
+    connection: clan
+    name: ClanTransferAnswered
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x425 -> id-1809 sub_46D420: the same fields as kr-812 (kr-812 sub_498790 case 0x425)"
+    notes: "Body ClanServerTransferAnswered."
+  - value: 1063
+    direction: s2c
+    connection: clan
+    name: ClanCancelApplicationResult
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x427: the same fields as kr-812 (kr-812 sub_498790 case 0x427 reads two words and calls kr-812 sub_4941A0 (kr-1256 1064))"
+    notes: "Body ClanServerCancelApplicationResult."
+  - value: 1066
+    direction: s2c
+    connection: clan
+    name: ClanChatResult
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x42A -> id-1809 sub_46CC00: the same fields as kr-812 (kr-812 sub_498790 case 0x42A)"
+    notes: "Body ClanServerChatResult."
+  - value: 1067
+    direction: s2c
+    connection: clan
+    name: ClanChatMessage
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x42B -> id-1809 sub_46CD00: the same fields as kr-812 (kr-812 sub_498790 case 0x42B)"
+    notes: "Body ClanServerChatMessage."
+  - value: 1069
+    direction: s2c
+    connection: clan
+    name: ClanApplicants
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x42D -> id-1809 sub_46B7B0: the same fields as kr-812 (kr-812 sub_498790 case 0x42D)"
+    notes: "Body ClanServerApplicants."
+  - value: 1096
+    direction: s2c
+    connection: clan
+    name: ClanMarkChanged
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4682F0 case 0x448 -> id-1809 sub_46F660: the same fields as kr-812 (kr-812 sub_498790 case 0x448)"
+    notes: "Body ClanServerMarkChanged."
+  - value: 1003
+    direction: c2s
+    connection: clan
+    name: ClanHeartbeat
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4681F0 stamps 1003: the same fields as kr-812 (kr-812 sub_498690 stamps 1003 and sends it without a body every 3000 ms)"
+    notes: "Empty body."
+  - value: 1005
+    direction: c2s
+    connection: clan
+    name: ClanLogin
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_468790 stamps 1005: the same fields as kr-812 (kr-812 sub_498C30 writes a word, a string, three words and the passport bytes (called from kr-812 sub_819690))"
+    notes: "Body ClanServerLogin."
+  - value: 1011
+    direction: c2s
+    connection: clan
+    name: ClanRosterRequest
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_469450 stamps 1011: the same fields as kr-812 (kr-812 sub_4998D0 stamps the opcode and writes no field)"
+    notes: "Empty body."
+  - value: 1013
+    direction: c2s
+    connection: clan
+    name: ClanMemberDetailsRequest
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4694C0 stamps 1013: the same fields as kr-812 (kr-812 sub_499940 writes one word)"
+    notes: "Body ClanServerMemberDetailsRequest."
+  - value: 1015
+    direction: c2s
+    connection: clan
+    name: ClanHomeRequest
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_468FB0 stamps 1015: the same fields as kr-812 (kr-812 sub_499430 stamps the opcode and writes no field)"
+    notes: "Empty body."
+  - value: 1017
+    direction: c2s
+    connection: clan
+    name: ClanProfileRequest
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_468C30 stamps 1017: the same fields as kr-812 (kr-812 sub_4990D0 stamps the opcode and writes no field)"
+    notes: "Empty body."
+  - value: 1019
+    direction: c2s
+    connection: clan
+    name: ClanSearch
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_468880 stamps 1019: the same fields as kr-812 (kr-812 sub_498D20 writes two words and a string)"
+    notes: "Body ClanServerSearch."
+  - value: 1021
+    direction: c2s
+    connection: clan
+    name: ClanBoardRequest
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_469130 stamps 1021: the same fields as kr-812 (kr-812 sub_4995B0 writes two words)"
+    notes: "Body ClanServerBoardRequest."
+  - value: 1023
+    direction: c2s
+    connection: clan
+    name: ClanBoardWrite
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4691C0 stamps 1023: the same fields as kr-812 (kr-812 sub_499640 writes a word and a string)"
+    notes: "Body ClanServerBoardWrite."
+  - value: 1025
+    direction: c2s
+    connection: clan
+    name: ClanBoardDelete
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_469250 stamps 1025: the same fields as kr-812 (kr-812 sub_4996D0 writes two words)"
+    notes: "Body ClanServerBoardDelete."
+  - value: 1027
+    direction: c2s
+    connection: clan
+    name: ClanCreate
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4692E0 stamps 1027: the same fields as kr-812 (kr-812 sub_499760 writes a string, a word, a string and a word (kr-1256 adds the capacity))"
+    notes: "Body ClanServerCreate."
+  - value: 1029
+    direction: c2s
+    connection: clan
+    name: ClanDisband
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4699D0 stamps 1029: the same fields as kr-812 (kr-812 sub_499E50 writes one word)"
+    notes: "Body ClanServerDisband."
+  - value: 1032
+    direction: c2s
+    connection: clan
+    name: ClanApply
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_469020 stamps 1032: the same fields as kr-812 (kr-812 sub_4994A0 writes a word and a string)"
+    notes: "Body ClanServerApply."
+  - value: 1035
+    direction: c2s
+    connection: clan
+    name: ClanLeave
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_469850 stamps 1035: the same fields as kr-812 (kr-812 sub_499CD0 stamps the opcode and writes no field (kr-1256 1036))"
+    notes: "Empty body."
+  - value: 1038
+    direction: c2s
+    connection: clan
+    name: ClanMemberChange
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4696B0 stamps 1038: the same fields as kr-812 (kr-812 sub_499B30 writes a word, a string and two words (kr-1256 1039))"
+    notes: "Body ClanServerMemberChange."
+  - value: 1041
+    direction: c2s
+    connection: clan
+    name: ClanWhisper
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_468910 stamps 1041: the same fields as kr-812 (kr-812 sub_498DB0 writes a word and two strings (kr-1256 1042 adds a byte))"
+    notes: "Body ClanServerWhisper."
+  - value: 1044
+    direction: c2s
+    connection: clan
+    name: ClanMemberReport
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_469620 stamps 1044: the same fields as kr-812 (kr-812 sub_499AA0 writes two words (kr-1256 1045))"
+    notes: "Body ClanServerMemberReport."
+  - value: 1047
+    direction: c2s
+    connection: clan
+    name: ClanIntroductionEdit
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4697D0 stamps 1047: the same fields as kr-812 (kr-812 sub_499C50 writes one string (kr-1256 1048))"
+    notes: "Body ClanServerIntroductionEdit."
+  - value: 1050
+    direction: c2s
+    connection: clan
+    name: ClanNoticeEdit
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_469750 stamps 1050: the same fields as kr-812 (kr-812 sub_499BD0 writes one string (kr-1256 1051))"
+    notes: "Body ClanServerNoticeEdit."
+  - value: 1053
+    direction: c2s
+    connection: clan
+    name: ClanTransferConfirm
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_469940 stamps 1053: the same fields as kr-812 (kr-812 sub_499DC0 writes a word and a string (kr-1256 1054))"
+    notes: "Body ClanServerTransferConfirm."
+  - value: 1056
+    direction: c2s
+    connection: clan
+    name: ClanTransferRequest
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4698C0 stamps 1056: the same fields as kr-812 (kr-812 sub_499D40 writes one word (kr-1256 1057))"
+    notes: "Body ClanServerTransferRequest."
+  - value: 1059
+    direction: c2s
+    connection: clan
+    name: ClanTransferAnswer
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_46D080 stamps 1059: the same fields as kr-812 (kr-812 row)"
+    notes: "Body ClanServerTransferAnswer."
+  - value: 1062
+    direction: c2s
+    connection: clan
+    name: ClanCancelApplication
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_4690B0 stamps 1062: the same fields as kr-812 (kr-812 sub_499530 writes one word (kr-1256 1063))"
+    notes: "Body ClanServerCancelApplication."
+  - value: 1065
+    direction: c2s
+    connection: clan
+    name: ClanChat
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_469A50 stamps 1065: the same fields as kr-812 (kr-812 sub_499ED0 writes a word and two strings (kr-1256 1066))"
+    notes: "Body ClanServerChat."
+  - value: 1068
+    direction: c2s
+    connection: clan
+    name: ClanApplicantsRequest
+    name_source: coined
+    evidence: verified
+    source: "id-1809 sub_469540 stamps 1068: the same fields as kr-812 (kr-812 sub_4999C0 stamps the opcode and writes no field (kr-1256 1069))"
+    notes: "Empty body."

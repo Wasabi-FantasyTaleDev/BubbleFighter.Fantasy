@@ -49,7 +49,8 @@ internal sealed partial class RoundFlow
             victim = claim.HasVictimReference ? victim : paired;
             // cn-324 sub_476B90 establishes terminal king evidence; kr-812 sub_430640 names a Captain fall.
             // Both use the shared per-life credit, including duplicate reports from kr-812 sub_520A20.
-            if (_options.ZombiePvpModeIds.Contains(room.ModeId) || IsCaptainMode(room) || IsFinalZoneMode(room))
+            if (_options.ZombiePvpModeIds.Contains(room.ModeId) || IsCaptainMode(room) || IsFinalZoneMode(room)
+                || IsWeaponMasterMode(room))
             {
                 if (victim is not { } lifeVictim
                     || LifeActor(room, RoomRegistry.SceneEntity(lifeVictim)) is not { } target)
@@ -75,12 +76,21 @@ internal sealed partial class RoundFlow
             seatedVictim is { } died ? [stats, room.Scoring.Stats(died)] : [stats], LiveScoreboard(room)), null, victim);
     }
 
-    private bool IsScoringTeam(PlayRoom room, int team) => IsFinalZoneMode(room)
-        || (_options.ZombiePvpModeIds.Contains(room.ModeId)
-            ? team is RoomFlow.ZombiePvpHumanTeam or RoomFlow.ZombiePvpZombieTeam : team is 1 or 2);
+    // Script zombie and Zombie Escape rounds seat humans and zombies on their own pair, so a human popping a
+    // bubbled zombie is an opposing pop: it kills the zombie, whose cleaned death then admits the endless reset.
+    private bool IsScoringTeam(PlayRoom room, int team) => UsesFinalZoneGroups(room)
+        ? team >= 1 && team <= _options.SurvivalMaximumGroups
+        : IsFinalZoneMode(room) || (_options.ZombiePvpModeIds.Contains(room.ModeId)
+            ? team is RoomFlow.ZombiePvpHumanTeam or RoomFlow.ZombiePvpZombieTeam
+            : IsScriptZombieMode(room) || IsZombieEscapeMode(room)
+                ? team is ScriptZombieRoundState.HumanTeam or ScriptZombieRoundState.ZombieTeam
+                : team is 1 or 2);
 
-    private bool AreOpponents(PlayRoom room, int first, int second) => IsFinalZoneMode(room)
-        || first != second && IsScoringTeam(room, first) && IsScoringTeam(room, second);
+    // kr-1256 sub_5159C0 selects individual revival for mode 26; neutral identities are not proof of allies.
+    private bool AreOpponents(PlayRoom room, int first, int second) => IsWeaponMasterMode(room)
+        ? first != 36 && second != 36
+        : IsFinalZoneMode(room) && !UsesFinalZoneGroups(room)
+            || first != second && IsScoringTeam(room, first) && IsScoringTeam(room, second);
 
     // kr-1256 sub_6F8280, cn-774 sub_8B7CA0 and tw-454 sub_72BEE0 identify the source and victim.
     // Native life evidence and confirmed score reports share counters; release routes name their rescuer in build data.
@@ -91,10 +101,11 @@ internal sealed partial class RoundFlow
         var victim = victimSlot is { } targetSlot ? ScoreMember(room, targetSlot) : null;
         if (rescue && (victim is null || victim.Slot == slot || victim.Team != reporter.Team))
             return null;
-        if (lifeEvidence)
+        if (lifeEvidence || IsWeaponMasterMode(room))
         {
-            if (victim is null || victim.Slot == slot || !IsScoringTeam(room, reporter.Team) || !IsScoringTeam(room, victim.Team)
-                || (!rescue && !AreOpponents(room, reporter.Team, victim.Team)))
+            if (victim is null || victim.Slot == slot || (rescue
+                ? !IsScoringTeam(room, reporter.Team) || !IsScoringTeam(room, victim.Team)
+                : !AreOpponents(room, reporter.Team, victim.Team)))
                 return null;
             var life = LifeActor(room, RoomRegistry.SceneEntity(victim.Slot))!.Life;
             if (!(rescue ? life.CreditRescue() : life.CreditKnockdown())) return null;

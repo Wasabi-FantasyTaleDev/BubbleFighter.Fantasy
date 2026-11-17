@@ -183,6 +183,7 @@ dotnet run --project src/BubbleFighter.Fantasy.Host -c Release -- run --profile 
 | --- | --- | --- |
 | 游戏 TCP | `7100`（`KR_1256_GAME_PORT`） | `7110`（`KR_812_GAME_PORT`） |
 | 中继 TCP | `7101`（`KR_1256_RELAY_PORT`） | `7111`（`KR_812_RELAY_PORT`） |
+| 公会 TCP | `7400`（`BFF_CLAN_PORT`），所有版本共用 | `7400`（`BFF_CLAN_PORT`），同一端口 |
 | 管理 HTTP | `7300`（`BFF_ADMIN_PORT`） | `7300`（`BFF_ADMIN_PORT`），同一个 WebUI |
 | 可选原生选择器 | 不使用 | 挂载 `center-selector.yaml` 时为 `7112` |
 
@@ -270,7 +271,19 @@ Memory、MySQL 和 SQLite 均支持此选项。MySQL 迁移 `0039` 新增 `playe
 ```
 ### 情侣关系存储
 
-内存行还提供作为基础准备的 `ICoupleStore` 关系契约。其 `couples` 映射具有独立上限：`max_relationships`（默认 4096，范围 1–65536）、`max_pending_invitations`（1024，1–65536）、`max_pending_per_account`（16，1–1024）、`max_completed_invitations`（1024，1–65536）、`max_message_length`（512 个 UTF-16 代码单元，1–4096）和 `max_authority_length`（128 个 UTF-16 代码单元，1–1024）。接受邀请与分手会在同一进程内原子更新双方关系。已完成回执有容量限制，可能被淘汰；调用方必须始终使用服务端生成的全新邀请标识。此契约尚无 MySQL 或 SQLite 提供程序，不消耗戒指，也不启用原生情侣请求、登录恢复或跨节点通知。仅有包结构表覆盖不代表这些玩法已经启用。
+内存行通过 `ICoupleStore` 提供进程内情侣存储。`couples` 配置保留这些上限：`max_relationships`（默认 4096，范围 1–65536）、`max_pending_invitations`（1024，1–65536）、`max_pending_per_account`（16，1–1024）、`max_completed_invitations`（1024，1–65536）、`max_message_length`（512 个 UTF-16 代码单元，1–4096）和 `max_authority_length`（128 个 UTF-16 代码单元，1–1024）。SQLite 和 MySQL 也提供该接口：已接受的关系、建立时间和戒指选择会持久保存；未完成邀请和答复回执不会跨进程重启保留。事务同时建立双方关系，一个账号不能以任一位置加入另一对情侣。MySQL 迁移 0060 新增 `couples`、`couple_members`；本分支使用 SQLite schema 15，与其他待合入的 SQLite 迁移集成时需要协调编号。
+
+`lobby` 的 `couples` 默认开启，在已验证情侣绑定的版本（`kr-812`、`kr-1256`、`cn-324`、`tw-410`、`cn-404`、`cn-406`、`cn-408`、`cn-705`、`cn-706`、`cn-717`、`id-400`、`id-1809`、`cn-774`、`tw-454`）生效，要求 `online_players: true`、库存、情侣存储及本版本的 `inventory.couple-catalog` 服务。`couple_proposal_seconds` 默认 180（10–3600），`couple_breakup_wait_hours` 默认 24（0–8760），`couple_message_length` 默认 256 个 UTF-16 代码单元（1–512）。双方必须在该版本服务内在线，且不在对局中。邀请或使用邀请戒指换戒指时，必须拥有数量大于零且未过期的原生情侣邀请物品，普通已拥有物品不能代替；接受邀请时再次检查所有权。邀请物品保留、不消耗；持久保存的是邀请物品 ID，实际显示戒指通过该版本原生库存目录映射得到，两者不同。支持接受、拒绝、撤回和过期；旧连接或旧场景的邀请不能建立关系。分手需要满足配置的等待时间，换戒指要求双方在线，重新登录恢复伴侣信息。即时通知限于本服务，尚不提供跨节点在线通知。邀请中的人物外观只读本版本的规范装备选择，并附带原生物品属性，不初始化或修复库存。
+
+`dialect.messages` 行的 `couples` 也默认开启，并受已审计的版本能力限制。如需主动关闭情侣功能，应同时将 `lobby` 与 `dialect.messages` 的 `couples` 设为 `false`；关闭后的传输绑定不要求情侣 opcode 名称。戒指目录查询使用原生 out 参数，目前没有远程 SDK 适配器。
+
+独立的 `inventory.couple-catalog` 行从所选版本的客户端数据服务读取 `shop_item_client_path`（默认 `Config/ShopItem2.xml`）内的 `ShopItem`、`Stock` 两张表。`max_shop_item_bytes` 默认 134217728（范围 1–268435456），`max_couple_rings` 默认 256（1–65535）。原生功能值 17 标识邀请物品，其 `parameter` 对应 `Stock.stockId`，该行的 `itemId` 才是显示戒指。缺少引用库存行、定义歧义或超出容量时启动失败。`allowed_missing_display_stock_ids` 默认空列表，最多接受 256 个互不重复的正数库存编号，只允许该版本原生数据中已记录的缺项：邀请物品仍然有效，但显示戒指为零。CN408 声明库存 1004192，ID400 声明库存 1002134；若库存行存在，其显示物品仍必须有效。不借用其他版本的库存编号或戒指映射。
+
+配对、换戒指和登录后会刷新自己的情侣资料；伴侣在线状态与关系是否存在分别维护，普通人物资料刷新保留这些状态。若保存的邀请物品不受当前客户端目录支持，仍保留关系与建立时间，显示戒指设为零，不替换成其他戒指，也不改写所有权。
+
+右键人物资料显示被查看者持久保存的伴侣，即使伴侣离线也保留身份。房间和广场入场信息包含伴侣身份，后续关系变化使用本版本原生情侣更新包，只发送给已经在当前场景成功加载目标人物的客户端，不重建人物，也不重置移动。广场联邦同步在外观快照中携带关系身份。**目录服务和所有参与的工作节点必须一起升级：**旧版联邦解析器会拒绝新增的关系字段。这项场景同步不提供跨节点求婚邀请或在线状态通知。
+
+SQLite 和 MySQL 行支持 `couple_invitations`：`max_pending_invitations`（1024，1–65536）、`max_pending_per_account`（16，1–1024）、`max_completed_invitations`（1024，1–65536）、`max_message_length`（512 个 UTF-16 代码单元，1–4096）。数据域名称不能为空、不能带首尾空白，最多 128 个 UTF-16 代码单元。重复答复不会再次配对；旧关系的分手或换戒指请求不会修改新关系。回执被淘汰后返回未找到，调用方必须始终生成全新的邀请 ID。
 
 ### 本地隔离检查
 
@@ -410,7 +423,7 @@ BFF_PUBLIC_HOST=<public-address-clients-use>
 | `BFF_FAVORITE_TITLES_ENABLED` | Favorite 挑战称号及其进度（`kr-1256`） |
 | `BFF_ITEM_ENHANCEMENT_ENABLED` | 研究所的强化、永久转换与升级（`kr-1256`） |
 | `BFF_ITEM_MODIFICATION_ENABLED` | 武器改造（`kr-1256`） |
-| `BFF_SCIENCE_LAB_ENABLED` | 旧版合成（`kr-812`） |
+| `BFF_SCIENCE_LAB_ENABLED` | 旧版合成（`kr-812` 及已审计的较早版本） |
 | `BFF_PET_COMBAT_ENABLED`, `BFF_PET_REWARDS_ENABLED`, `BFF_PET_CANCELLATION_SEEDS` | 宠物战斗效果、回合奖励与抵消种子，适用于所有普通模式 |
 | `BFF_CUSTOM_ROOM_RULES_ENABLED` | 自定义房间选项（`kr-1256`） |
 
@@ -516,6 +529,8 @@ schema-1 服务器目录新增响应字段 `generated_at_utc` 和目标字段 `o
 
 可选的 `profiles/bundles/cluster-plaza-federation.patch.yaml` 挂载 `cluster.plaza-federation`，在节点之间共享广场：同一客户端版本的玩家无论登录哪个节点，都能在广场中看到彼此。在目录行设置 `plaza_federation: true`，并在每个节点列出共享的 `builds`，`node_id`、`directory_url`、`access_key` 与心跳行相同。只有 `data_scope` 相同且非空、心跳证明了该范围数据库的节点才共享广场；拥有独立数据的友好服务器互相不可见。每个节点提交本地广场的进入、移动和离开（`flush_interval_ms`，默认 100），并用一个请求为所有版本长轮询其他节点的变化（`poll_wait_seconds`）。远端玩家在本地广场占一个座位，使用与本地玩家相同的座位和位置数据包显示，客户端看不出区别。租约失效的节点会带走其玩家；重连或目录重启后，节点会收到快照并重新发送自己的广场。`max_queued_events`、`max_plaza_events` 和 `max_plaza_members` 限制队列大小；客户端广场仍为 36 个座位。Contracts 4.25.0 增加 `IPlazaFederationEndpoint`。
 
+可选的 `profiles/bundles/cluster-clan-federation.patch.yaml` 挂载 `cluster.clan-federation`，在节点之间中继公会通知：连接在其他节点上的公会成员也能像同一节点的成员一样实时收到公会聊天、悄悄话、成员变化、介绍、公告、会徽和会长变化以及解散通知。目录默认中继公会通知（`clan_federation` 默认为 `true`，设为 `false` 可关闭中继）；在每个提供公会的节点上挂载该补丁，`node_id`、`directory_url` 和 `access_key` 与心跳行相同。适用与共享广场相同的范围规则：只有 `data_scope` 相同且非空、并且心跳证明了该范围数据库的节点才会互相中继。节点只把自己无法送达的成员交给中继，持有该成员公会连接的节点按该成员自己的客户端版本写出通知。通知不会保存：离线、落后或遇到目录重启的节点会跳到最新的通知，其成员在下次打开公会窗口时看到变化。发给其他节点成员的悄悄话会被回复为已送达。转让会长是由发起节点记住的多次请求对话，因此仍然只在同一节点、同一版本的成员之间有效。`max_queued_notices`（节点）和 `max_clan_notices`（目录）限制队列长度；一次读取最多携带 256 条通知。Contracts 5.83.0 新增 `IClanRelayEndpoint` 和 `IClanConnections.Forward`。
+
 可选补丁 `profiles/bundles/cluster-migration.patch.yaml` 包含节点级迁移行（broker、arrivals、destination），`cluster-migration-build.patch.yaml` 包含按版本的行（浏览、来源、准入，以及 `lobby`、`dialect.messages`、`ingame` 开关）。先挂载 node、room-directory、account-store、account-sessions 与 write-fencing 补丁，再挂载这两个，并在目录上设置 `migrations: true` 与 `native_migration_builds`。目标端点的 `listener_id` 指游戏监听行：单版本配置为 `game-listener`，多版本配置为 `<build>.game-listener`。须在来源行设置 `channel`、在准入行设置 `channels`，取该版本经核查的值；补丁本身不填写，未核查的版本会启动失败，而不会继承其他版本的值。客户端只接受其允许频道的迁移回复：kr-812 无条件允许 50、60、80，cn-324 允许 50、60 而拒绝 80。每个被持有的账号占用一个数据库连接，数据库连接上限必须覆盖所有节点的在线玩家。
 
 该按版本补丁还会设置 `protocol.config.accept_retained_moves: true`，使迁移客户端的 `gcpReqMoveInto` 可以在补丁请求之前打开目标连接；其处理程序仍须授权继续握手。启动列表只写数据包名称，不写数字：`pre_handshake_opcodes` 和 `alternate_handshake_sequence` 接受客户端到服务器的数据包名称，由各版本通过自己的操作码表解析；数字、未知名称、服务器到客户端的名称或仅限中继连接的名称都会在启动时终止服务器。客户端在每条辅助连接上先发送空标记的版本，在其配置档中以 `auxiliary_prefix` 声明一次（cn-279、cn-324 和 cn-406 发送 `gcpStartGPK`）。`answer_center_status: true` 将原生选服的状态查询识别为该前缀加 `gcpReqCenterUserCnt`；显式配置的 `alternate_handshake_sequence` 仍然优先。目标端点公布配置档自身的版本及其 `GAME_PUBLIC_PORT` 配置档变量（取自 `<BUILD>_PUBLIC_PORT`）；多版本配置档需用每个版本一项的端点列表替换它。
@@ -547,6 +562,8 @@ schema-1 服务器目录新增响应字段 `generated_at_utc` 和目标字段 `o
 可选行 `persistence.mysql-account-ownership` 提供账号占用原语 `IAccountOwnershipStore`。完成迁移 0036 后才能挂载 `profiles/bundles/cluster-account-store.patch.yaml`，并设置 `BFF_CLUSTER_ACCOUNT_CONNECTION_STRING` 和权威数据库标识；根据数据库内存设置 `max_owners`。每个占用使用独立、禁用连接池的连接立即尝试获取命名锁。校验同时检查原始锁和固定的数据库标识，失去占用后不会自动重新获取。卸载会等待进行中的获取操作结束并关闭已有占用。该原语尚未接入游戏登录或隔离仓储写入，不能单独保证共享节点登录安全；单服配置不加载它。 获取占用返回持有原生连接的生命周期句柄，远程 SDK 尚无对应结果适配器，契约清单明确标记该获取操作不受支持。
 
 可选行 `cluster.account-sessions` 将账号占用接入游戏登录。先挂载账号存储补丁，再挂载 `profiles/bundles/cluster-account-sessions.patch.yaml`，并对每个大厅设置 `require_account_ownership: true` 和 `duplicate_login: reject_new`。缺少接入服务时激活失败。会话只为打开的游戏连接创建，其数量由监听器的连接上限决定；`verification_seconds` 和 `verification_concurrency` 限制后台检查。失去权威会关闭连接；卸载会取消等待中的接入、关闭已接入连接并等待清理完成。`IAccountSession` 特征允许验证占用，但不转移其生命周期。该层尚未隔离进行中的仓储写入和角色创建；完成这些写入路径的隔离与排空前，不要启用共享生产数据库。随包提供的单服配置均不挂载这两个补丁。
+
+账号由所有客户端版本共用，同一账号同一时间只在一个版本上游戏。核心包中的 `account-builds` 行让每个版本的登录都在同一把服务器级锁下进行：账号已在另一个版本在线时，新登录会关闭那边的会话（`duplicate_login: kick_old`，默认），或被拒绝（`reject_new`），按大厅自己的 `duplicate_login` 决定。
 
 账号交接还要求迁移 0037，并在 `persistence.mysql-account-ownership` 上显式设置与目录身份一致的 `node_id`。默认空值保留普通占用功能，不发布 `IAccountHandoffStore`。源节点只能登记自己的交接；数据库仅允许记录中的目标节点认领、源节点撤回。`cluster.account-sessions` 只有在该存储存在时才发布 `IAccountSessionHandoff`。远程 SDK 无法传输原生占用句柄、迁移 IP 地址或代理回调注册，这些方法在提供适配器前明确不受支持。此设置不会在单服配置中启用原生迁移。
 
@@ -598,7 +615,7 @@ HTTP 超时必须大于轮询等待和回调时限。目标收件箱由一个受
 
 ## 对局取消与开局规则
 
-以下 `ingame` 行选项适用于所有版本。对局加载或进行中有玩家掉线时，对局会被取消：不显示结算，其余所有玩家都被送回广场，方式与等待房间中退出的玩家相同。`cancel_round_on_disconnect`（默认 `true`）可关闭此行为，此时掉线的玩家只是单独离开。玩家主动退出房间或输入 `!plaza` 通常让其他人继续对局。启用僵尸逃生后，Lua 房主离开会取消本局且不发奖励。`load_timeout_ms`（默认 `60000`，`0` 表示不限，最大 `600000`）在届时仍有玩家未完成加载时以同样方式取消对局；该值应大于最慢客户端的地图加载与比赛连接建立时间。
+以下 `ingame` 行选项适用于所有版本。对局加载或进行中有玩家掉线时，对局会被取消：不显示结算，其余所有玩家都被送回广场，方式与等待房间中退出的玩家相同。`cancel_round_on_disconnect`（默认 `true`）可关闭此行为，此时掉线的玩家只是单独离开。玩家主动退出房间或输入 `!plaza` 通常让其他人继续对局。启用僵尸逃生后，Lua 房主离开会取消本局且不发奖励。`load_timeout_ms`（默认 `60000`，`0` 表示不限，最大 `600000`）在届时仍有玩家未完成加载时以同样方式取消对局；该值应大于最慢客户端的地图加载与比赛连接建立时间。`plaza_command_during_round`（默认 `true`）设为 `false` 时，`!plaza` 会像时间到一样立即结束进行中的对局，而不是把玩家移出对局，适用于被移出进行中对局就会出错的客户端（kr-186）；玩家随后在房间中再次输入 `!plaza`。`menu_session_chat`（默认 `false`）会回应在菜单中用等待房间聊天封包发送的聊天：该版本所有在菜单中的玩家都会看到一条带发言者昵称的系统消息，适用于没有聊天模块封包的版本（kr-186）。
 
 在僵尸模式中，只有所有在场玩家都被感染时僵尸才获胜；连接已经关闭的玩家不算作幸存者。
 
@@ -616,9 +633,9 @@ HTTP 超时必须大于轮询等待和回调时限。目标收件箱由一个受
 
 单版本隔离试验时，在 `--patch tools/local-checks/isolated-memory.patch.yaml` 之外增加 `--patch profiles/bundles/modern-room-kicking.patch.yaml`。使用 `all` 部署时，将补丁中的 `set` 操作复制到各目标版本被忽略的 `local.patch.yaml`，行 ID 使用不带前缀的 `dialect.rooms`。真实客户端验收前保持关闭。此选项不改变旧版现有的踢人绑定。
 
-## 带类型的快速匹配
+## 现代版本快速匹配
 
-对于已审计此能力的构建，`dialect.rooms.config.quick_matching` 挂载原生匹配请求。`quick_match_default_mode_id` 选择共享匹配模式（0–65535，默认 0 拒绝请求）。类型 1 开始匹配，类型 2 刷新匹配；各自不同的原生尾部均完整校验。组队加入和列表条目请求在流程实现前返回原生拒绝。随附现代版本配置保持关闭，等待真实客户端验收。
+在 `cn-774` 与 `tw-454` 上，`dialect.rooms.config.quick_matching` 挂载原生的大厅状态匹配请求。`quick_match_default_mode_id` 选择共享匹配模式（0–65535，默认 0 拒绝请求）。`kr-1256` 尚未确认匹配请求，因此在该版本上启用此选项会在加载时报错。随附现代版本配置保持关闭，等待真实客户端验收。
 
 ## 原生选服登录衔接
 
@@ -655,6 +672,12 @@ InGame 的 `return_on_leave` 默认 `home`，设为 `stay` 则留在访问节点
 
 现代版房间方言与旧版复用相同的可选物件经济绑定：`supply_items`、`lucci_drops`、`star_items`、`horde_lottery`、`instant_revival`、`pve_points`、`rescue_missions`、`counted_pve_items`。每项绑定仍要求自身已确认的包能力，不支持的选项会在激活时失败。kr-1256、cn-774、tw-454 配置启用补给、合作模式计数道具及 PvE 实时计分。模式 3 使用自身启用的道具池和两个普通持有槽。模式 16 初始化三个计数槽；槽内道具选择及其余即时生效的合作模式拾取道具，均为来自各版本自身已启用 ItemSpec 数据的可配置服务端策略。现代版地图上报有十四个向量，队伍元素为单字节；生成、丢弃消息分别为 37、33 字节。KR 切槽回复有三个字段，CN、TW 额外携带第四个结果字段。原生客户端验收仍待完成。
 
+
+奖励翻牌通过 `ingame.config.lottery_maximum_file_bytes` 限制解压后的原生商店表字节数及 XML 字符数。默认值为 `67108864`（64 MiB），允许范围为 `1024..536870912`。kr-1256 模式 101 的配置使用 `134217728`（128 MiB），以容纳更大的表文件。`lottery_modes` 非空时，必须且只能配置 `lottery_workbook_path` 或 `lottery_workbook_client_path` 之一；每个启用模式都必须支持结果计分板。原生商店表用于核对 `lottery_items` 的编号及奖励内容，奖池权重由部署配置决定。修改大小限制会使已缓存的商店表验证失效。现代 cn-774 和 tw-454 的奖励翻牌仍保持关闭。自动检查不代表原生翻牌界面或物品入库已通过实机验收。
+
+`ingame.config.extreme_racing_map_rounds` 默认为 `false`，kr-1256 配置将其启用。启用后会从所选赛道的 `Maps/<map>/option.ini` 读取 `SavePoint/StageCount`，缺少该键时沿用客户端的五关默认值，允许范围为一至五关。读取受 `extreme_racing_maximum_file_bytes` 限制；资源缺失、格式错误或超限会在开局前拒绝该地图。本局关卡数固定不变，每关重新使用完整的 `extreme_racing_round_ms` 计时，超时后推进下一关，最后一关才结束。关闭该选项时仍由 `extreme_racing_rounds` 决定局长。读取关卡数不会启用大炮、金币或障碍物初始化。
+
+`extreme_racing_map_state` 在 `ingame` 和 `dialect.rooms` 两行中均默认为 `false`；KR1256 配置同时启用两者。所有玩家载入场景后，服务器通过一条共同消息发送两种爆炸格图案、落石生成器种子和完整的消失路线选择，本局保持不变。服务器选择策略 `extreme_racing_map_state_selection` 默认为 `random`；`seeded` 要求明确的非负 `extreme_racing_map_state_seed`，相同资源输入会重复相同选择。随机模式拒绝配置种子。原生客户端使用自己的随机数算法消费选定的落石种子。`extreme_racing_maximum_vanish_groups`、`extreme_racing_maximum_vanish_routes` 和 `extreme_racing_maximum_vanish_tiles` 分别默认为 32、128、1024，允许范围分别为 1–1024、1–4096、1–65536，并继续应用已有的文件和辅助对象数量限制。路线缺失、索引无效或格子辅助对象缺失会在开局前拒绝地图；状态发送中途失败会取消当前对局。两行开关必须一致。CN/TW 不启用此交换。
 
 `dialect.rooms.config.weapon_objects` 默认为 `false`。仅在版本声明已核对的 `weapon_objects` 能力时挂载原生武器掉落创建和拾取，目前为 cn-324。共用 `ingame` 行通过 `max_weapon_objects_per_round` 限制每局累计创建数量（默认 256，范围 1..65536），对象标识从 `weapon_object_id_base` 之后分配（默认 `0x64000000`）。该区间应与玩家及其他对局对象标识分开。拾取仅接受上报玩家自身角色，同一对象只能消耗一次；对局重置清除状态。自动化检查不等于实机验收。
 
@@ -711,7 +734,7 @@ InGame 的 `return_on_leave` 默认 `home`，设为 `stay` 则留在访问节点
 
 `dialect.rooms.config.weapon_master` 默认 `false`，要求版本具备 `weapon_master` 能力（目前仅 kr-1256；cn-774 与 tw-454 不继承），并同时启用 `modern_rooms`、在 `result_scoreboard_modes` 中包含模式 26。它挂载为座位分配武器的装备封包，以及客户端在多次死亡后请求新武器的封包。
 
-在同一协议的游戏内行上同时设置 `ingame.config.weapon_master_levels`，缺少任一项都会使激活失败。该选项没有默认值：空列表时模式 26 只是普通的计时对局。列表每一项按顺序代表一个等级，包含其 `experience` 门槛（第一级为 `0`，之后每级更高，且小于 65535）以及可选的 `weapons` 列表（`item` 为正的物品 ID，同级内不重复；`weight` 为正数）。没有列出武器的等级从共享的 `weapon_master_weapons` 武器池抽取，因此与等级无关的武器只需写一次。`weapon_master_experience` 以 `{ event, points }` 列出每种被接受的事件给予的经验，事件取自 `kill`、`knockdown` 与 `rescue` 且互不重复，点数为正；未列出的事件不给经验。模式 26 还必须通过 `native_life_every_mode` 或包含 26 的 `native_life_mode_ids` 使用原生生命判定。帧以武器目录 ID 指定武器，由 `kr-1256 sub_4ADD70` 解析；主武器的商店物品 ID 为 200000 加上该 ID。`kr-1256` 配置的补丁使用十个等级、每级相差 200 经验、每次击杀 100 经验，以及由旧版 L1、L2、L3、S1、S2、R3 主武器组成的单一随机武器池。
+在同一协议的游戏内行上同时设置 `ingame.config.weapon_master_levels`，缺少任一项都会使激活失败。该选项没有默认值：空列表时模式 26 只是普通的计时对局。列表每一项按顺序代表一个等级，包含其 `experience` 门槛（第一级为 `0`，之后每级更高，且小于 65535）以及可选的 `weapons` 列表（`item` 为正的物品 ID，同级内不重复；`weight` 为正数）。没有列出武器的等级从共享的 `weapon_master_weapons` 武器池抽取，因此与等级无关的武器只需写一次。`weapon_master_experience` 以 `{ event, points }` 列出每种被接受的事件给予的经验，事件取自 `kill`、`knockdown` 与 `rescue` 且互不重复，点数为正；未列出的事件不给经验。模式 26 还必须通过 `native_life_every_mode` 或包含 26 的 `native_life_mode_ids` 使用原生生命判定。帧以武器目录 ID 指定武器，由 `kr-1256 sub_4ADD70` 解析；主武器的商店物品 ID 为 200000 加上该 ID。`kr-1256` 配置的补丁使用六个等级、每级相差 200 经验、每次击杀 100 经验，以及由旧版 L1、L2、L3、S1、S2、R3 主武器组成的单一随机武器池。
 
 每个座位在对局开始时获得一把武器。被接受的事件累加其经验；当经验达到后续等级的门槛时，座位升到该等级并获得该等级的一把武器，一次事件跨越多个门槛也只发一把。实时比分以种类 31 到 34 传送每个座位的等级、经验、当前等级的起始经验和下一等级的经验（`kr-1256 sub_9E9160` 将其存放在座位记录 +204 到 +216）；在最后一级时，下一等级的值为其起始值加一。最先到达最后一级的座位获胜，对局立即结束。当客户端报告其玩家自上次换武器后已死亡规定次数时，服务器发给它同一等级的新武器。服务器从客户端的 `Config/GameOption.xml` 读取该次数 `WeaponMasterNoPangDeadCount`，因此必须导入该文件；数值缺失、重复或不为正都会使激活失败。过早的请求会被记录并忽略。复活遵循通用规则。若时间结束时仍无人到达最后一级，等级最高的座位获胜；所有座位等级相同则为平局。结果画面的等级栏仍显示账号等级。原生客户端验收尚未完成。
 
@@ -727,11 +750,13 @@ InGame 的 `return_on_leave` 默认 `home`，设为 `stay` 则留在访问节点
 
 ### FinalZone
 
+`ingame.config.survival_team_assignments` 默认为 `false`；KR1256 FinalZone 补丁在模式 23 和 30 的手动房间中启用它。模式 23 为每位参与者分配不同的身份编号。模式 30 把单人进入者分配到不同的空组；当 `survival_pair_parties` 为默认值 `true` 时，仅在队伍目录确认双方均属于当前双人队伍后才分入同组。这是手动房间的分组策略，并未实现正式服务器的单人／双人匹配队列。换队按钮依次选择未满的组，可以组成双人组；开始时保留手动选择。`survival_maximum_groups` 默认为 `12`，允许 `1..12`，每组最多两人。无法按此策略容纳时，房间拒绝加入或模式切换，不会自动把互不相关的单人玩家组成一队。模式 30 在最后一个敌对组被淘汰后结束；已经淘汰的队友与存活队友共同获胜。模式 23 仍为个人赛。模式 42 和 44 未启用。
+
 `dialect.rooms.config.final_zone` 默认 `false`。应用 `profiles/kr-1256/final-zone.patch.yaml` 可启用模式 23、25、30、45 共用的 Area32 交互，需要 modern 对局绑定、`final_zone` 版本能力和记分板模式 30，目前仅审核 kr-1256。补丁同时保留记分板模式 1、5、6、19、20、24，可以在其他模式补丁之后应用，但不会自行开启这些模式。
 
 通过 `client-data` 导入对应客户端的 `Config/GameSpec/GenItemSetting.yaml`、`Config/GenDroneSpec.csv`、`Config/SurvivalMode.xml`、`ServerShared/MapMeta.xml`，以及所选地图的 `GenClusterTable.csv`、`GenSpawnTable.csv`、`GenSpotList.csv`。使用无人机或金色补给的地图还需要 `GenDroneRewardTable.csv`。公寓地图关闭了无人机，原始资源也没有这张表。资源缺失或格式错误会在倒计时前报错。当前显式物品生成路径支持普通生成物，包括 `rel_Sudden08_Finalzone` 地图；使用独立 `AutoItem` 地形物件类别的地图（包括 `rel_space04_64room`）会被拒绝。可选开局包的原生消耗与发放交互尚未接入，因此装备开局包也会在倒计时前被拒绝。
 
-服务器在对局开始后发布地面物品，每个物件只授予一名领取者，依据已发放数量校验主动丢弃和一次死亡背包，并使用原生用户编号转移背包内容。洪水阶段遵循地图资源时序。无人机使用受限的房间计时器，补给箱与房主去重后的金色补给申请采用原生奖励种子。陷阱每个端点消耗一根已持有的杆，只允许放置者连接已确认的两个端点；必要确认包含发送者。玩家淘汰后不能复活，存活人数只更新一次，有竞争者的对局在只剩一人时进行一次结算，模式 25 则按最后存活的队伍结算。模式 45 接入共用物资和淘汰流程，独有的僵尸机制另行实现。普通分数和时限不会结束 FinalZone。取消、房间销毁与最终结算都会停止模式计时器。
+服务器在对局开始后发布地面物品，每个物件只授予一名领取者，依据已发放数量校验主动丢弃和一次死亡背包，并使用原生用户编号转移背包内容。洪水阶段遵循地图资源时序。无人机使用受限的房间计时器，补给箱与房主去重后的金色补给申请采用原生奖励种子。陷阱每个端点消耗一根已持有的杆，只允许放置者连接已确认的两个端点；必要确认包含发送者。玩家淘汰后不能复活，存活人数只更新一次，有竞争者的对局在只剩一位个人参赛者或一个已配置的组时进行一次结算。模式 25 按普通队伍结算；启用 `survival_team_assignments` 后，模式 30 按分组结算。模式 45 接入共用物资和淘汰流程，独有的僵尸机制另行实现。普通分数和时限不会结束 FinalZone。取消、房间销毁与最终结算都会停止模式计时器。
 
 资源与物件限制位于 `ingame.config`：
 
@@ -778,6 +803,21 @@ InGame 的 `return_on_leave` 默认 `home`，设为 `stay` 则留在访问节点
 支持的十三个配置已启用原生广场招募。自定义配置需在 `dialect.rooms` 和 `ingame` 两行设置 `plaza_recruitment: true`，并挂载对应的 `party` 行。两个选项默认均为 `false`；缺少原生绑定、队伍目录或广场支持时，激活会失败。`ingame.plaza_recruitment_text_length` 默认限制为 128 个 UTF-16 字符，可设置 1–1024。发布和修改共用聊天限流窗口，取消招募不受该窗口阻止。
 
 只有当前广场队长能招募。原生木牌标志、文字气泡、队伍成员与场景跟随共同更新；取消、离开、切换场景和失去队长身份会清除旧木牌。KR1256 和 CN2019 还提供每页十条的原生招募列表，使用队长选定的分类和人数上限。列表只允许加入本节点队长的队伍；显示远端玩家的广场外观不代表可以跨节点入队。入场位置由原生客户端决定，服务端只重放真实的位置报告。
+
+## 广场小游戏
+
+kr-1256、kr-812、cn-774 和 tw-454 的玩家可以在广场投篮、钓鱼和抽运势签。构建的封包数据标记了这些摊位（`plaza_games` 能力）且 `ingame.config.plaza_games` 开启（默认 `true`）时，服务器会回应。`cn-774` 以带长度的 zlib 块发送小游戏配置，`tw-454` 以原始字节发送，各自有独立文件（`packets/dynamic-config-cn-774.yml`、`packets/dynamic-config-tw-454.yml`）。
+
+价格就是构建在小游戏配置里发布给客户端的价格（`packets/dynamic-config-content.yml` 第 3 槽：`basketball_cost` 50，`fishing_cost` 和 `fishing_second_cost` 0，`fortune_cost` 200；kr-812 有自己的文件 `packets/dynamic-config-kr-812.yml`，槽位和价格相同），因此服务器收取的永远是玩家看到的价格。显示其他价格的请求会被拒绝。收费的抛竿价格为该价格乘以当天钓到的鱼数加一，与客户端的显示一致；默认钓鱼免费。投篮前玩家必须付得起投篮价格，即使投中返还的更多。
+
+| 选项 | 默认值 | 含义 |
+|---|---|---|
+| `plaza_basketball_hit_reward` | 100 | 投中时返还的 Lucci（在支付投篮价格之后）。 |
+| `plaza_fishing_catch_reward` | 200 | 每钓到一条鱼的 Lucci。 |
+| `plaza_fishing_daily_limit` | 10 | 每位玩家每天最多钓到的鱼数。 |
+| `plaza_games_utc_offset_hours` | 8 | 广场新的一天从 UTC 以东多少小时的午夜开始。 |
+
+每次收竿都需要一次已接受的抛竿；离开广场会丢弃尚未收竿的抛竿。当天的钓鱼数和运势签按玩家保存（MySQL `plaza_game_records`，SQLite 架构 14），每次进入广场时发回。摊位操作在同一个事务里写入当天记录和钱包，所以不会出现付了钱却没记鱼数、或存了运势签却没扣费的情况。
 
 ## 可选的装备防御表
 
@@ -921,7 +961,9 @@ Memory、MySQL 和 SQLite 提供者均有 `max_loadouts_per_player`，默认 `32
 
 ## 可选旧版科学室
 
-`kr-812` 配置已包含 `profiles/bundles/science-lab.patch.yaml`。`BFF_SCIENCE_LAB_ENABLED` 默认 `true`，同时控制 `science-lab` 行和 `dialect.messages.config.legacy_science_lab`。该行需要共享背包绑定、与客户端目录一致的背包作用域 `build_key`，以及原生 `Config/ShopItem2.xml` 和 `Config/SynthesisSystem.ini`。目前只接受已审计的 `kr-812`；其他版本必须先核对自己的请求读取器、结果消费路径和材料资格，再修改准入数据。该行处理合成与拆解，现有 item-enhancement 行仍独占其科学室配置请求处理器。
+每次异步配方操作始终绑定原登录。替换后的登录不会消耗旧玩家的材料，也不会收到旧操作的完成结果。场景或登录变化前已提交的库存仍然有效，会通过后续普通库存发布恢复。
+
+`kr-812`、`id-1809`、`cn-324`、`cn-406`、`cn-404`、`cn-408`、`cn-705`、`cn-706` 和 `cn-717` 配置已包含 `profiles/bundles/science-lab.patch.yaml`。`BFF_SCIENCE_LAB_ENABLED` 默认 `true`，同时控制 `science-lab` 行和 `dialect.messages.config.legacy_science_lab`。该行需要共享背包绑定、与客户端目录一致的背包作用域 `build_key`，以及原生 `Config/ShopItem2.xml` 和 `Config/SynthesisSystem.ini`。目前只接受这些已审计版本；其他版本必须先核对自己的请求读取器、结果消费路径和材料资格，再修改准入数据。`kr-812` 和 `id-1809` 使用完整请求（二级密码字符串、套装分组标志）和 40 字节回复；其余版本使用不含这两项的旧请求和 28 字节回复，其结果字同时携带永久（3）和封顶（4）结果，并且只有一个额外结果槽。因此这些版本无法显示添加剂结果，请不要为它们设置添加剂选项；它们发送的套装选择没有分组标志，服务器会拒绝。`tw-410` 与 `cn-324` 使用相同数据包，但其安装的客户端没有 `Config/SynthesisSystem.ini`，因此不予准入。该行处理合成与拆解，现有 item-enhancement 行仍独占其科学室配置请求处理器。成功的合成还会随机额外获得一件限时奖励道具。`synthesis_bonus_basis_points`（0 到 10000）是每次合成获得奖励的概率，`synthesis_bonus_pool` 列出由 `item_id`、`days`（整数天）和 `weight` 组成的条目；默认值为 10000，以及道具 100140 和 100172 各 1 天。奖励池是服务器策略而不是客户端数据：客户端只解析收到的 Stock 编号并显示对应道具及其时长。每个条目必须指向可用的限时道具，且其原生目录中存在时长恰好等于该天数的 Stock 行（取编号最小的相同行），否则该行加载失败。拆解不会获得奖励；添加剂奖励已占用回复第二个槽位时也不会再获得。背包存储会拒绝的候选（玩家已永久持有、已过期、已穿戴、重复或已超过最大时长的道具）以及配方已经发放或消耗的道具会被跳过，因此有效的合成不会因奖励而被拒绝。将概率设为 0 或清空奖励池即可关闭该奖励。
 
 合成消耗三个互不重复、符合条件、未穿戴且未过期的期限物品，或三套完整原生套装，再返回按配置选择的保留物品。原生套装使用 `stockSetId` 和按顺序排列的 `setCnt` 个成员，编号可能不同于 `setId`；拒绝混合套装与普通物品的请求。同一套装的所有成员必须具有相同有效期。拆解消耗一个符合条件的永久物品或一套完整永久套装。两种操作都扣除配置的计数卡片，选中的添加剂另按明确配置扣除。请求必须来自主菜单；缺失、陈旧、有歧义、已穿戴、已过期或不支持的所有权会使整项操作拒绝提交。
 
@@ -954,3 +996,43 @@ Memory、MySQL 和 SQLite 提供者均有 `max_loadouts_per_player`，默认 `32
 Memory、SQLite 和 MySQL 使用同一消耗与发放事务，保留无关所有权、保留物品的元数据、一致的背包镜像和槽位分配水位。普通 Article 与宠物准备在新奖励存在后执行，并随事务一起提交。完整背包先于结果发布。小数有效期按绝对时间戳保存；合成主结果天数采用客户端同一次完整背包同步的会话基准，而不是发送结果时重新计算的倒计时。拆解和附加奖励结果携带配置的 Stock 编号，数量和期限由客户端 `Stock` 表读取。提交后的传输失败不会撤销所有权，也不会在背包未发布时宣告成功。
 
 原生开头字符串是二级密码（`kr-812 sub_9E29F0` 和 `kr-812 sub_4F8A20`）。当前没有经验证的密码校验服务，因此拒绝非空密码，也拒绝非零诊断请求路径。独立武器进化尚不可用：`gspEvolveResult` 属于宠物，尚未建立独立武器请求/结果流程。原生玩法与界面验收、真实 MySQL 科学室验证仍待完成；自动协议和持久化检查不能证明这两项验收。
+
+## 现金物品收件箱（`cash_inbox`）
+
+现金物品收件箱将按账号保存的待领现金物品与普通背包分开存储，直到玩家主动领取进角色背包（`gcpReqCashInven`、`gcpReqPickup`、`gcpReqCloseGiftBox`、`gspCashInvenUpdateAllInventorySlot` 与 `gspRepPickup`）。该功能在已审计版本（`kr-812`、`kr-1256`、`cn-774`、`tw-454`、`id-400`、`id-1809`、`cn-324`、`tw-410`、`cn-406`、`cn-404`、`cn-408`、`cn-705`、`cn-706`、`cn-717`）默认启用，在未验证现金收件箱封包的版本（`kr-186`、`cn-279`、`cn-735`、`cn-738`、`cn-742`）保持关闭。
+
+在 `shop` 上启用 `cash_inbox: true` 需要 `grant_purchased_items: true`、`inventory_only: false`、版本的 `cash_inbox` 能力、`dialect.messages.config.cash_inbox: true` 以及 `ICashInboxStore` 提供者。需要显式关闭时，请同时在 `shop` 与 `dialect.messages` 将 `cash_inbox` 设为 `false`。使用隔离背包作用域的配置会在 `inventoryview.isolated_services` 中列出 `ICashInboxService`。
+
+| 选项（`shop.config`） | 默认值 | 范围 / 约束 | 行为 |
+| --- | --- | --- | --- |
+| `cash_inbox` | `false` | 布尔值 | 启用 `ICashInboxService`、收件箱入站处理器、登录快照同步与可选迎新发放；随仓已审计配置设为 `true`。 |
+| `max_cash_inbox_entries_per_player` | `64` | `1..256` | 限制单个版本下每个账号保存或加载的有效收件箱条目数。 |
+| `max_cash_inbox_frame_bytes` | `60000` | `512..65535` | 单帧 `gspCashInvenUpdateAllInventorySlot` 载荷上限，超限会截断条目并记录警告，不跨包拆分。 |
+| `cash_inbox_ttl_seconds` | `2592000` | `0..315360000` | 新入箱条目的默认有效期秒数（30 天）；`0` 表示永不过期。 |
+| `cash_inbox_welcome_stocks` | `[]` | 最多 `256` 个正整数 Stock/StockSet 编号 | 可选编号列表，在激活时对照商城目录校验，并在登录后安装菜单时为每个账号幂等写入一次现金收件箱。 |
+| `cash_inbox_welcome_note` | `"Welcome"` | 非空字符串，最多 `256` 字符 | 由 `cash_inbox_welcome_stocks` 生成条目时附带的备注文本。 |
+
+Memory、SQLite（架构版本 `16`）和 MySQL（迁移 `0062_cash_inbox.sql`）均实现了 `ICashInboxStore`。领取条目时会在同一事务中原子标记已领取并通过商城购买路径发放到角色背包，先发布更新后的背包与钱包再回复结果；重复或并发领取至多成功一次。真实客户端界面验收仍待完成。
+
+## 玩家举办赏金房（`user_host`）
+
+玩家举办的赏金赛房间（`is_user_host`）允许持有举办券（`101164` 或 `101859`）且拥有足够 Lucci 的房主创建赏金 PvP 房间，自己位于方言配置的裁判槽位（`12`），在配置范围内调整赏金金额（`gcpUserHostSetting` / `gspUserHostSetting`），并触发全员同步的开局倒计时（`gcpUserHostStart` / `gspUserHostStart`）。共享补丁 `profiles/bundles/user-host.patch.yaml` 为 `kr-812`、`cn-717`、`id-1809`、`kr-1256`、`cn-774` 与 `tw-454` 默认开启该功能（`BFF_USER_HOST_ENABLED`，默认 `true`），其余版本保持默认关闭。
+
+启用 `user_host` 需在三行配置协同生效：`dialect.rooms.config.user_host: true`、`lobby.config.user_host_enabled: true`（需搭配 `money_source: mysql`）以及 `ingame.config.user_host_enabled: true`，并由持久化插件提供 `IUserHostPrizeStore`（Memory、SQLite 架构版本 `17` 或 MySQL 迁移 `0063_user_host_prizes.sql`）。
+
+| 选项 | 所属行 / 默认值 | 范围 / 约束 | 行为 |
+| --- | --- | --- | --- |
+| `user_host` | `dialect.rooms` / `false` | 布尔值 | 在具备 `user_host` 能力的版本上挂载 `IUserHostDialectPolicy`、赏金房封包编解码与 `GameSetting.is_user_host` 投影。 |
+| `user_host_enabled` | `lobby`, `ingame` / `false` | 布尔值 | 在登录时推送 `gspUserHostDefaultSetting` 并结清离线待领款项（`lobby`），启动时恢复未决托管（`ingame`；挂载集群节点时只恢复本节点发起的托管，重启不会退还共用数据库的其他节点仍在进行的比赛），开启赏金房逻辑。 |
+| `user_host_min_prize` | `lobby`, `ingame` / `1000` | 正整数 `u32`，`<= user_host_max_prize` | 登录广播与等待房间允许设置的最小赏金 Lucci。 |
+| `user_host_max_prize` | `lobby`, `ingame` / `100000` | `u32 >= user_host_min_prize` | 登录广播与等待房间允许设置的最大赏金 Lucci。 |
+| `user_host_fee_percent` | `ingame` / `10` | `0..99` | 分出胜负时从总赏金中扣除的手续费百分比；平局、对局取消或启动恢复均全额退还不扣费。 |
+| `user_host_node_id` | `ingame` / `""` | 最多 64 个字符 | 本服务器的集群节点 ID（`user-host.patch.yaml` 中的 `BFF_CLUSTER_NODE_ID`），记录在每笔托管上。启动恢复只退还本节点的托管；单台服务器留空即可。 |
+| `user_host_countdown_ms` | `ingame` / `5000` | `0..60000` | `gspUserHostStart(0)` 之后与客户端 5 秒倒计时对齐的服务端开局计时（毫秒）。 |
+| `user_host_ticket_item_id` | `ingame` / `101164` | 正整数道具 ID | 进入对局托管时与赏金 Lucci 原子扣除的主举办券物品 ID。 |
+| `user_host_capture_ticket_item_id` | `ingame` / `101859` | `>= 0`（`0` 关闭） | 主举办券缺失时备选接受的次要举办券物品 ID。 |
+| `user_host_playable_seats` | `ingame` / `12` | `2..14` 内的偶数且 `<= 12` | 参赛者可加入席位数量（`0 .. playable - 1`），预留高位槽并将房主固定在裁判槽 `12`。 |
+| `user_host_allowed_modes` | `ingame` / 团队 PvP 列表 | 非空、互异的模式 ID（`1..65535`） | 允许用于玩家举办赏金房的游戏模式列表。 |
+
+倒计时结束后，服务端在进入对局前原子消耗一张举办券并扣除房主赏金，局末按胜方队伍人数均分净奖金（余数按槽位顺序确定性分配），离线胜者或离线房主奖金自动进入待领表并在下次登录原子发放，异常中断的活跃托管在启动时恢复为房主待领退款。真实客户端实机验收仍待完成。
+`shop.mystery_store` 在已验证神秘商店绑定的版本生效，目前为 `kr-1256` 和 `cn-774`（`cn-774` 的配置文件自带货币，即物品 100386，以及来自其工作簿的 115 个套装的奖池；`tw-454` 有这些封包，但它的工作簿里没有神秘分类的 StockSet，所以它的商店保持关闭）。`coin_item_id` 指定库存货币；`offers` 是互不重复的 Stock 或 StockSet 编号或闭区间（6–4096 项）。`offer_coin_price` 和 `refresh_coin_cost` 是服务端设定的金币价格（0–32767），`rotation_seconds` 为 1–65535，`group_stock_variants` 控制客户端分组标志。KR1256 使用物品 100385 和专用非卖 StockSet。购买会原子提交扣币、全部奖励和购买标记；刷新也原子替换列表。MySQL 需要迁移 0061。客户端打开商店需要 slot-4 动态配置中的有效日期。 同时奖励 Lucci 的商品会记录日志并排除，直到钱包变更能够原子提交。

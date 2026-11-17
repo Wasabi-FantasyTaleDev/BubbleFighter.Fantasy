@@ -14,6 +14,10 @@ public sealed partial class InGameOptions
     /// </summary>
     public string LotteryWorkbookClientPath { get; set; } = string.Empty;
 
+    /// <summary>Gets or sets the inclusive uncompressed workbook byte limit and its XML character limit.</summary>
+    [Range(1024, 536870912)]
+    public int LotteryMaximumFileBytes { get; set; } = Data.LotteryCatalog.DefaultMaximumFileBytes;
+
     /// <summary>Gets or sets a custom result-to-card interval; zero opens cards when the ordinary result would return to the room.</summary>
     [Range(0, 60000)]
     public int LotteryOpenDelayMs { get; set; }

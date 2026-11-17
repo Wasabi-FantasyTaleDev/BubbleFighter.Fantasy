@@ -12,7 +12,11 @@ public sealed record CoupleAccount(string Authority, long UserNum);
 /// <param name="CreatedAt">The authoritative creation time.</param>
 /// <param name="ExpiresAt">The exclusive end of the authoritative acceptance interval.</param>
 public sealed record CoupleInvitationDraft(
-    Guid Id, CoupleAccount Recipient, string Message, DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt);
+    Guid Id, CoupleAccount Recipient, string Message, DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt)
+{
+    /// <summary>Gets the couple ring item the sender proposes with, or zero when the caller requires none.</summary>
+    public int RingItemId { get; init; }
+}
 
 /// <summary>An invitation tied to both accounts and one immutable generation.</summary>
 /// <param name="Id">The server-created invitation identity.</param>
@@ -23,14 +27,22 @@ public sealed record CoupleInvitationDraft(
 /// <param name="ExpiresAt">The exclusive end of the acceptance interval.</param>
 public sealed record CoupleInvitation(
     Guid Id, CoupleAccount Sender, CoupleAccount Recipient, string Message,
-    DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt);
+    DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt)
+{
+    /// <summary>Gets the couple ring item the sender proposed with, or zero.</summary>
+    public int RingItemId { get; init; }
+}
 
 /// <summary>A mutually accepted relationship; both account lookups return the same immutable pair.</summary>
 /// <param name="Id">The invitation generation that established the pair.</param>
 /// <param name="First">The account that sent the accepted invitation.</param>
 /// <param name="Second">The account that accepted the invitation.</param>
 /// <param name="CreatedAt">The authoritative acceptance time.</param>
-public sealed record CoupleRelationship(Guid Id, CoupleAccount First, CoupleAccount Second, DateTimeOffset CreatedAt);
+public sealed record CoupleRelationship(Guid Id, CoupleAccount First, CoupleAccount Second, DateTimeOffset CreatedAt)
+{
+    /// <summary>Gets the couple ring both partners show: the proposed ring, or the last one changed to; zero for none.</summary>
+    public int RingItemId { get; init; }
+}
 
 /// <summary>The storage outcome, independent of any client's numeric result code.</summary>
 public enum CoupleStoreResult
@@ -111,4 +123,11 @@ public interface ICoupleStore
     /// </summary>
     ValueTask<CoupleStoreOutcome> BreakUpAsync(
         CoupleAccount member, Guid relationshipId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Sets the couple ring of the actor's current relationship when it is still the expected generation; returns
+    /// <see cref="CoupleStoreResult.Accepted"/> with the changed relationship, or NotFound/Conflict.
+    /// </summary>
+    ValueTask<CoupleStoreOutcome> ChangeRingAsync(
+        CoupleAccount member, Guid relationshipId, int ringItemId, CancellationToken cancellationToken);
 }

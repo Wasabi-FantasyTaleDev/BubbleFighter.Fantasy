@@ -1,3 +1,7 @@
+using BubbleFighter.Fantasy.Abstractions;
+using BubbleFighter.Fantasy.Abstractions.Protocol;
+using BubbleFighter.Fantasy.Contracts.Match;
+
 namespace BubbleFighter.Fantasy.InGame.Sessions;
 
 /// <summary>Where an ExtremeRacing match stands.</summary>
@@ -41,6 +45,15 @@ internal sealed class ExtremeRacingRoundState
 {
     /// <summary>Shares terminal connection cleanup across failed publications in this match.</summary>
     internal Task? CleanupTask { get; set; }
+
+    /// <summary>Gets or sets the selected map's round count frozen for this match before its first countdown.</summary>
+    internal int? MatchRounds { get; set; }
+
+    /// <summary>Gets or sets the immutable native map choices shared by every recipient in this match.</summary>
+    internal RoundExtremeRacingMapState? MapState { get; set; }
+
+    /// <summary>Tracks the bounded room membership that received this match's map choices.</summary>
+    internal HashSet<ISession> MapStateRecipients { get; } = new(ReferenceEqualityComparer.Instance);
 
     private readonly List<int> _finishers = [];
     private readonly Dictionary<int, int> _totals = [];

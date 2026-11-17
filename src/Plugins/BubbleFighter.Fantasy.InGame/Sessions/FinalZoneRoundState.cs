@@ -4,7 +4,8 @@ using BubbleFighter.Fantasy.InGame.Data;
 namespace BubbleFighter.Fantasy.InGame.Sessions;
 
 /// <summary>Match-bounded elimination publication over the shared participant life records.</summary>
-internal sealed class FinalZoneRoundState(int generation, IReadOnlyList<RoomSeat> participants, bool teamMatch = false)
+internal sealed class FinalZoneRoundState(int generation, IReadOnlyList<RoomSeat> participants, bool teamMatch = false,
+    bool requireAssignedTeams = false)
 {
     private readonly RoomSeat[] _participants = [.. participants];
     private readonly HashSet<int> _eliminated = [];
@@ -41,9 +42,10 @@ internal sealed class FinalZoneRoundState(int generation, IReadOnlyList<RoomSeat
             Finished = true;
         else if (teamMatch)
         {
-            // kr-1256 sub_9E1710 selects the team strategy for mode 25; kr-1256 sub_C6B6C0 uses its team result.
+            // kr-1256 sub_9E1710 distinguishes ordinary teams from multi-group FinalZone; both retain teammate affinity.
             var winningTeam = remaining[0].Team;
-            if (remaining.All(seat => seat.Team == winningTeam) && _participants.Any(seat => seat.Team != winningTeam))
+            if ((!requireAssignedTeams || _participants.All(seat => seat.Team is not (0 or 36)))
+                && remaining.All(seat => seat.Team == winningTeam) && _participants.Any(seat => seat.Team != winningTeam))
             {
                 Finished = true;
                 WinnerSlots = _participants.Where(seat => seat.Team == winningTeam).Select(seat => seat.Slot).ToHashSet();

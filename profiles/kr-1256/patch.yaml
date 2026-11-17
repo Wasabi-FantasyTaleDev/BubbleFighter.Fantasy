@@ -38,10 +38,12 @@
     id: dialect.messages
     config:
       present_box: true
+      cash_inbox: true
 - set:
     id: shop
     config:
       present_box: true
+      cash_inbox: true
 
 # kr-1256 sub_6DC720 / kr-1256 sub_9E1EB0 establish the score-unit request and point delta.
 - set:
@@ -65,6 +67,9 @@
     id: ingame
     config:
       native_item_slot_count: 2
+      # kr-1256 sub_491940 only empties the used slot; kr-1256 sub_6D55D0 case 658 (gspSwitchItemSlot) is what moves the
+      # selection, so without it the other held item stays unselected and no further item can be used or picked up.
+      auto_advance_item_slot_after_use: true
       random_supply_item_kinds: [101, 102, 104, 108, 109, 112, 115, 122, 124, 126, 127, 129, 130, 135, 136, 138, 141, 146, 147, 220, 229, 230, 231, 235, 236, 300, 302, 303]
       immediate_supply_item_kinds: [10, 11, 15, 16]
       item_mode_ids: [3]
@@ -84,3 +89,9 @@
     id: ingame
     config:
       plaza_recruitment: true
+# kr-1256 asks for a clan passport on every clan-server hello (kr-1256 sub_525170 case 0x3EA), so none is sent
+# unasked after the game login.
+- set:
+    id: clan
+    config:
+      passport_on_login: false

@@ -102,9 +102,8 @@ public sealed class DynamicConfigWireTests
     /// <summary>Builds without the Korean creation content retain their native empty-mask byte widths.</summary>
     [Theory]
     [InlineData("cn-735", 2)]
-    [InlineData("cn-774", 2)]
-    [InlineData("tw-454", 2)]
-    [InlineData("kr-812", 4)]
+    [InlineData("cn-717", 2)]
+    [InlineData("id-400", 2)]
     public void OtherBuildsKeepTheirNativeEmptyMaskWidth(string build, int bytes)
     {
         var wire = new DynamicConfigWire(TestBuilds.Packets, build);

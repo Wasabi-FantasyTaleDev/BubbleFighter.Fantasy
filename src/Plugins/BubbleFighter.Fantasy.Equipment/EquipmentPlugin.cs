@@ -9,7 +9,6 @@ using BubbleFighter.Fantasy.Contracts.Sessions;
 using BubbleFighter.Fantasy.Packets;
 using BubbleFighter.Fantasy.Equipment.Data;
 using BubbleFighter.Fantasy.Equipment.Handlers;
-using BubbleFighter.Fantasy.Equipment.Selection;
 using BubbleFighter.Fantasy.Equipment.Sessions;
 using Microsoft.Extensions.Logging;
 
@@ -82,13 +81,10 @@ public sealed class EquipmentPlugin : IPlugin
             var pets = PetItemCatalogLoader.Load(
                 WorkbookFile.FromStore(clientData, options.PetCatalogClientPath),
                 options.MaxPetCatalogBytes, "equipment.max_pet_catalog_bytes");
-            var petPolicy = new PetSharedSlotPolicy(pets, inventory, options.Protocol, context.Logger);
             var petItems = Array.AsReadOnly(pets.Order().ToArray());
-            var petGroup = new InventoryWearGroup(petItems[0], petItems[^1], petItems[0])
-            {
-                ItemIds = petItems,
-                RejectWhenOccupied = true,
-            };
+            // One shared location: wearing another pet takes the current one off in the same transaction, the switch
+            // the client asks for when a second pet is chosen while one is worn.
+            var petGroup = new InventoryWearGroup(petItems[0], petItems[^1], petItems[0]) { ItemIds = petItems };
             context.Effect(context.Events.Intercept<EquipmentWearGroupsRequested, IReadOnlyList<InventoryWearGroup>>(
                 async (request, next, ct) =>
                 {
@@ -98,10 +94,6 @@ public sealed class EquipmentPlugin : IPlugin
                         throw new ConfigException("The shared pet slot exceeds the equipment position limit.");
                     return Array.AsReadOnly(groups.Append(petGroup).ToArray());
                 }));
-            // One middleware of the shared EquipmentSelectionApplying waterfall: the denial
-            // rides the selection's existing refusal path, and any other selection policy
-            // (a character mask, for instance) stays in the chain untouched.
-            context.Effect(context.Events.Intercept<EquipmentSelectionApplying, EquipmentSelectionDecision>(petPolicy.ApplyAsync));
             context.Logger.LogInformation(
                 "Pet shared slot rule is live on {Protocol}: {Pets} function-10001 items share one worn slot.",
                 options.Protocol, pets.Count);

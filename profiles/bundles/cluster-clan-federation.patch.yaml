@@ -1,0 +1,11 @@
+# Optional clan relay. Nodes of one verified account domain (same data_scope and database identity at the
+# directory) hand each other clan notices for members connected elsewhere: clan chat, whispers, member changes,
+# the introduction, notice, mark and master, and disband notices. The directory relays by default (clan_federation: true).
+# Mount it on every node that serves clans (the clan.connections row) together with its heartbeat row.
+- insert:
+    - id: cluster-clan-federation
+      plugin: cluster.clan-federation
+      config:
+        node_id: "${BFF_CLUSTER_NODE_ID}"
+        directory_url: "${BFF_CLUSTER_DIRECTORY_URL:-http://127.0.0.1:8093}"
+        access_key: "${BFF_CLUSTER_NODE_KEY}"

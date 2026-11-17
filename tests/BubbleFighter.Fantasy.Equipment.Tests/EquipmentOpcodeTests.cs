@@ -242,9 +242,9 @@ public sealed class EquipmentOpcodeTests
         using var h = await Harness.CreateAsync(new OpcodeTable(LoadTable().Profile, []));
         // The shared row now mounts the login path in a real profile; this scenario asks only that disabled
         // feature rows need no packet names, so it turns login, the main-menu probe, the round signature
-        // and the bag row off.
+        // and the bag and couple rows off.
         await new BubbleFighter.Fantasy.Dialect.Messages.MessagesPlugin().ActivateAsync(h.Context("dialect.messages",
-            new() { ["login"] = false, ["main_menu_init"] = false, ["session_signature"] = false, ["inventory"] = false, ["equipment"] = false, ["equipment_view"] = false }), default);
+            new() { ["login"] = false, ["main_menu_init"] = false, ["session_signature"] = false, ["inventory"] = false, ["equipment"] = false, ["equipment_view"] = false, ["couples"] = false, ["mystery_store"] = false }), default);
         await new EquipmentPlugin().ActivateAsync(h.Context("equipment", new() { ["enabled"] = false }), default);
         Assert.Empty(h.Services.GetAll<IInboundMessageBinding<EquipmentChangeRequested>>());
         Assert.Empty(h.Services.GetAll<IMessageSender<EquipmentChangeReplied>>());

@@ -23,7 +23,9 @@ function isPreparing(profile) {
   return profile?.setupEnabled === false || profile?.activationEnabled === false
 }
 function isExperimental(profile) { return profile?.experimental === true }
-const choices = computed(() => props.profiles.filter(p => p.id !== 'management')
+// A build whose profile says setup_visible: false is left out unless this installation already uses it.
+const choices = computed(() => props.profiles.filter(p => p.id !== 'management'
+    && (p.setupVisible !== false || props.modelValue.some(c => c.profile === p.id)))
   .sort((left, right) => Number(isPreparing(left)) - Number(isPreparing(right))))
 const selectedCount = computed(() => choices.value.filter(p => !isPreparing(p) && props.modelValue.some(c => c.profile === p.id)).length)
 const availableChoices = computed(() => choices.value.filter(p => !isPreparing(p)))

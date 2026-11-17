@@ -186,7 +186,7 @@ public sealed class NativeModernRoundScenarioTests(ITestOutputHelper output)
                 Assert.Equal(0, BinaryPrimitives.ReadInt32LittleEndian(board.Payload.AsSpan(18)));
                 Assert.Equal(3UL, BinaryPrimitives.ReadUInt64LittleEndian(board.Payload.AsSpan(30)));
                 await client.WaitFor(ResultOpcode("gspRoundRewardStage_", "Unknown615"), cursor);
-                await client.WaitFor(ResultOpcode("gspRoundStageReset_", "Unknown620"), cursor);
+                await client.WaitFor(ResultOpcode("gspRoundStageReset_", "gspGameReturnAfterAward_"), cursor);
             }
         }
 
@@ -333,7 +333,7 @@ public sealed class NativeModernRoundScenarioTests(ITestOutputHelper output)
             ["udp_protocol"] = udp ? build + "/udp" : "",
         }));
         Add("lobby", "lobby", new() { ["protocol"] = build + "/game", ["auto_create_players"] = true, ["authentication"] = "open",
-            ["inventory_source"] = "mysql", ["money_source"] = "mysql" });
+            ["inventory_source"] = "mysql", ["money_source"] = "mysql", ["couples"] = false });
         Add("equipment", "equipment", new() { ["protocol"] = build + "/game", ["client_profile"] = build, ["version_major"] = profile.ClientVersionMajor });
         Add("inventoryview", "inventoryview", new() { ["protocol"] = build + "/game", ["client_profile"] = build,
             ["version_major"] = profile.ClientVersionMajor, ["enabled"] = true, ["publish_equipped_view_push"] = true });

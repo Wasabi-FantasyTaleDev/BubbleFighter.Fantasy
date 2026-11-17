@@ -6,6 +6,7 @@ structs:
   # cn-324 sub_40B470/sub_45D1A0 match; cn-279 gcpReqSelectAward (vtable 9F8878)
   # uses the two-word cn-279 sub_47E650.
   # cn-406 sub_8EB3E0/sub_420FC0 and cn-705 sub_985A80/sub_4BA7A0 match.
+  # kr-1256 sub_5E37E0 writes the same card/seat pair for C2S 519.
   HordeLotteryRequest:
     - card: u32
       offset: 4
@@ -17,6 +18,7 @@ structs:
   # and cn-706 sub_733020/sub_7A23F0 match. cn-279 gspRepAwardSelectSuccess
   # (vtable 9DDA94) reads only card and seat through cn-279 sub_47E650.
   # cn-406 sub_715B70 and cn-705 sub_80C530 read all three words.
+  # kr-1256 sub_9E1EB0 case 0x26D dispatches all three words to kr-1256 sub_7D2230.
   HordeLotterySelected:
     - card: u32
       offset: 4
@@ -30,6 +32,8 @@ structs:
   # cn-324 sub_6EB680, cn-279 sub_48E8E0, id-400 sub_799E30,
   # id-1809 sub_7BF1A0 and cn-706 sub_7A2420 match.
   # cn-406 sub_715650 and cn-705 sub_7A0D00 also read counted u32 vectors.
+  # kr-1256 sub_9E2FE0 case 0x26A reads the vector through kr-1256 sub_998FB0/kr-1256 sub_999C00.
+  # kr-1256 sub_7D2340 reveals ten cards and preserves already selected cards where the id is zero.
   HordeLotteryRevealed:
     - items: "list<u32>"
       offset: 4

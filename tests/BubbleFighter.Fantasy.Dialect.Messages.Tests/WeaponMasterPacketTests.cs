@@ -10,16 +10,17 @@ using Xunit;
 
 namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
 
-/// <summary>Pins the kr-1256 equipment frame (S2C 1001) that assigns weapons in round mode 26.</summary>
+/// <summary>Pins the kr-1256 and cn-774 equipment frame (S2C 1001) that assigns weapons in round mode 26.</summary>
 public sealed class WeaponMasterPacketTests
 {
-    private const string Build = "kr-1256";
-
-    /// <summary>Two counted lists keep their order and the trailing reason word closes the 32-byte body.</summary>
-    [Fact]
-    public void EquipmentApplyPinsSeatSlotListItemListAndReason()
+    /// <summary>Two counted lists keep their order and the trailing reason word closes the 32-byte body; cn-774
+    /// sub_89F3D0 reads the same body as kr-1256 sub_6DD900.</summary>
+    [Theory]
+    [InlineData("kr-1256")]
+    [InlineData("cn-774")]
+    public void EquipmentApplyPinsSeatSlotListItemListAndReason(string build)
     {
-        var body = PacketCodec.Write(TestBuilds.Packets, Build, "EquipmentApply", new Dictionary<string, object?>
+        var body = PacketCodec.Write(TestBuilds.Packets, build, "EquipmentApply", new Dictionary<string, object?>
         {
             ["seat"] = 5,
             ["slots"] = new object[] { 0u, 1u },
@@ -29,28 +30,30 @@ public sealed class WeaponMasterPacketTests
         Assert.Equal(32, body.Length);
         Assert.Equal("05000000" + "02000000" + "0000000001000000" + "02000000" + "1B87010068880100" + "03000000",
             Convert.ToHexString(body));
-        var decoded = PacketCodec.Read(TestBuilds.Packets, Build, "EquipmentApply", body);
-        Assert.Equal(body, PacketCodec.Write(TestBuilds.Packets, Build, "EquipmentApply", decoded));
+        var decoded = PacketCodec.Read(TestBuilds.Packets, build, "EquipmentApply", body);
+        Assert.Equal(body, PacketCodec.Write(TestBuilds.Packets, build, "EquipmentApply", decoded));
         foreach (var malformed in new[] { body[..^1], body.Concat(new byte[] { 0 }).ToArray() })
-            Assert.Throws<PacketFormatException>(() => PacketCodec.Read(TestBuilds.Packets, Build, "EquipmentApply", malformed));
+            Assert.Throws<PacketFormatException>(() => PacketCodec.Read(TestBuilds.Packets, build, "EquipmentApply", malformed));
     }
 
     /// <summary>An empty assignment is the 16-byte minimum; the counts alone decide the length.</summary>
-    [Fact]
-    public void EmptyListsAreSixteenBytes()
+    [Theory]
+    [InlineData("kr-1256")]
+    [InlineData("cn-774")]
+    public void EmptyListsAreSixteenBytes(string build)
     {
-        var body = PacketCodec.Write(TestBuilds.Packets, Build, "EquipmentApply", new Dictionary<string, object?>
+        var body = PacketCodec.Write(TestBuilds.Packets, build, "EquipmentApply", new Dictionary<string, object?>
         {
             ["seat"] = 0, ["slots"] = Array.Empty<object>(), ["items"] = Array.Empty<object>(), ["reason"] = 0,
         });
         Assert.Equal(16, body.Length);
     }
 
-    /// <summary>Only kr-1256 states the frame and the capability; the descendants whose reader is not audited do not.</summary>
+    /// <summary>kr-1256 and cn-774 state the frame and the capability; tw-454, whose reader is not audited, does not.</summary>
     [Theory]
     [InlineData("kr-1256", true)]
     [InlineData("kr-812", false)]
-    [InlineData("cn-774", false)]
+    [InlineData("cn-774", true)]
     [InlineData("tw-454", false)]
     public void OnlyTheAuditedBuildStatesTheFrame(string build, bool audited)
     {
@@ -58,39 +61,45 @@ public sealed class WeaponMasterPacketTests
         Assert.Equal(audited ? 4 : 0, TestBuilds.Packets.Resolve(build, "EquipmentApply").Count);
     }
 
-    /// <summary>The frame is numbered 1001 and the revival request 765 on the game connection of kr-1256.</summary>
-    [Fact]
-    public void ProfileNumbersBothFramesOnTheGameConnection()
+    /// <summary>The frame is numbered 1001 and the revival request 765 on the game connection of kr-1256 and cn-774.</summary>
+    [Theory]
+    [InlineData("kr-1256")]
+    [InlineData("cn-774")]
+    public void ProfileNumbersBothFramesOnTheGameConnection(string build)
     {
-        Assert.Equal((ushort)1001, TestBuilds.Opcodes(Build).S2C("gspApplyEquipment_"));
-        Assert.Equal((ushort)765, TestBuilds.Opcodes(Build).C2S("gcpReqWeaponMasterRevival_"));
+        Assert.Equal((ushort)1001, TestBuilds.Opcodes(build).S2C("gspApplyEquipment_"));
+        Assert.Equal((ushort)765, TestBuilds.Opcodes(build).C2S("gcpReqWeaponMasterRevival_"));
     }
 
     /// <summary>The revival request has no field: zero bytes round-trip and any byte is refused.</summary>
-    [Fact]
-    public void RevivalRequestIsZeroBytes()
+    [Theory]
+    [InlineData("kr-1256")]
+    [InlineData("cn-774")]
+    public void RevivalRequestIsZeroBytes(string build)
     {
-        Assert.Empty(TestBuilds.Packets.Resolve(Build, "WeaponMasterRevivalRequest"));
-        Assert.Empty(PacketCodec.Write(TestBuilds.Packets, Build, "WeaponMasterRevivalRequest", new Dictionary<string, object?>()));
-        Assert.Equal(new RoundWeaponMasterRevivalRequested(), WeaponMasterBinding.ReadRevival(TestBuilds.Packets, Build, []));
-        Assert.Throws<PacketFormatException>(() => WeaponMasterBinding.ReadRevival(TestBuilds.Packets, Build, [0]));
-        Assert.Throws<PacketFormatException>(() => WeaponMasterBinding.ReadRevival(TestBuilds.Packets, Build, new byte[4]));
+        Assert.Empty(TestBuilds.Packets.Resolve(build, "WeaponMasterRevivalRequest"));
+        Assert.Empty(PacketCodec.Write(TestBuilds.Packets, build, "WeaponMasterRevivalRequest", new Dictionary<string, object?>()));
+        Assert.Equal(new RoundWeaponMasterRevivalRequested(), WeaponMasterBinding.ReadRevival(TestBuilds.Packets, build, []));
+        Assert.Throws<PacketFormatException>(() => WeaponMasterBinding.ReadRevival(TestBuilds.Packets, build, [0]));
+        Assert.Throws<PacketFormatException>(() => WeaponMasterBinding.ReadRevival(TestBuilds.Packets, build, new byte[4]));
     }
 
     /// <summary>The mounted request reaches the message router, refuses a body, and fails loud without a handler.</summary>
-    [Fact]
-    public async Task RevivalRequestIsRoutedAndUnloads()
+    [Theory]
+    [InlineData("kr-1256")]
+    [InlineData("cn-774")]
+    public async Task RevivalRequestIsRoutedAndUnloads(string build)
     {
-        var table = TestBuilds.Opcodes(Build);
+        var table = TestBuilds.Opcodes(build);
         using var fixture = new MatchMessagesMountTests.Fixture(table);
-        const string protocol = Build + "/game";
-        var context = fixture.Context(Build, protocol, "dialect.rooms");
+        var protocol = build + "/game";
+        var context = fixture.Context(build, protocol, "dialect.rooms");
         context.BindServices(typeof(RoomsPlugin).GetCustomAttribute<PluginAttribute>()!);
         var session = new MatchMessagesMountTests.Session(table.Profile);
         var opcode = table.C2S("gcpReqWeaponMasterRevival_");
         try
         {
-            new WeaponMasterBinding(protocol, table, TestBuilds.Packets, Build, NullLogger.Instance).Mount(context);
+            new WeaponMasterBinding(protocol, table, TestBuilds.Packets, build, NullLogger.Instance).Mount(context);
             Assert.Single(fixture.Services.GetAll<IInboundMessageBinding<RoundWeaponMasterRevivalRequested>>());
             await fixture.Packets.DispatchAsync(protocol, session, new InboundPacket(opcode, Array.Empty<byte>()), default);
             Assert.IsType<RoundWeaponMasterRevivalRequested>(Assert.Single(fixture.Messages.Received));
@@ -106,14 +115,16 @@ public sealed class WeaponMasterPacketTests
     }
 
     /// <summary>The sender writes the frame under the profile's opcode, refuses what the client refuses, and unloads.</summary>
-    [Fact]
-    public async Task SenderWritesTheFrameAndRefusesWhatTheClientRefuses()
+    [Theory]
+    [InlineData("kr-1256")]
+    [InlineData("cn-774")]
+    public async Task SenderWritesTheFrameAndRefusesWhatTheClientRefuses(string build)
     {
-        var table = TestBuilds.Opcodes(Build);
+        var table = TestBuilds.Opcodes(build);
         using var fixture = new MatchMessagesMountTests.Fixture(table);
-        var context = fixture.Context(Build, Build + "/game", "dialect.rooms");
+        var context = fixture.Context(build, build + "/game", "dialect.rooms");
         context.BindServices(typeof(RoomsPlugin).GetCustomAttribute<PluginAttribute>()!);
-        var binding = new WeaponMasterBinding(Build + "/game", table, TestBuilds.Packets, Build, NullLogger.Instance);
+        var binding = new WeaponMasterBinding(build + "/game", table, TestBuilds.Packets, build, NullLogger.Instance);
         try
         {
             binding.Mount(context);
@@ -138,7 +149,8 @@ public sealed class WeaponMasterPacketTests
     /// <summary>The dialect option needs the capability and the result scoreboard of mode 26; descendants without audit refuse it.</summary>
     [Theory]
     [InlineData("kr-1256", new[] { 1 }, "result_scoreboard_modes")]
-    [InlineData("cn-774", new[] { 1, 26 }, "capability")]
+    [InlineData("cn-774", new[] { 1 }, "result_scoreboard_modes")]
+    [InlineData("tw-454", new[] { 1, 26 }, "capability")]
     public async Task OptionIsRefusedWithoutItsPrerequisites(string build, int[] scoreboardModes, string expected)
     {
         using var fixture = new MatchMessagesMountTests.Fixture(TestBuilds.Opcodes(build));
@@ -157,12 +169,14 @@ public sealed class WeaponMasterPacketTests
     }
 
     /// <summary>The enabled option publishes the sender through the whole dialect row and removes it again.</summary>
-    [Fact]
-    public async Task EnabledOptionMountsTheSenderThroughTheDialectRow()
+    [Theory]
+    [InlineData("kr-1256")]
+    [InlineData("cn-774")]
+    public async Task EnabledOptionMountsTheSenderThroughTheDialectRow(string build)
     {
-        var table = TestBuilds.Opcodes(Build);
+        var table = TestBuilds.Opcodes(build);
         using var fixture = new MatchMessagesMountTests.Fixture(table);
-        var context = fixture.Context(Build, Build + "/game", "dialect.rooms", extra: new()
+        var context = fixture.Context(build, build + "/game", "dialect.rooms", extra: new()
         {
             ["modern_rooms"] = true, ["weapon_master"] = true, ["result_scoreboard_modes"] = new[] { 1, 26 },
         });

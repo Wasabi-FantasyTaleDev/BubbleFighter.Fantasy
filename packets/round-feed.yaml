@@ -535,15 +535,28 @@ structs:
       offset: 15
       only: [kr-1256]
 
-  # 38284: kr-1256 reader kr-1256 sub_6D8832 (i32 actor, bool32 render flag, not a release command). No
-  # kr-812 row for 38284.
-  Unknown38284:
-    - actor: u32
+  # kr-1256 sub_8EC3C0 and cn-774 sub_ADC7C0 send the actor and inverted wall-contact Boolean.
+  # kr-1256 sub_6D8832 and cn-774 sub_897E80 write the first protected Boolean in ChrLogic state.
+  # kr-1256 sub_482F70 and cn-774 sub_502F20 require it for passive healing, alongside native mode/timer gates.
+  WallHealAllowed:
+    - actor: u32              # The character whose wall permission changes.
       offset: 0
       only: [kr-1256]
-    - unknown_4: bool
+      except: [tw-454]
+    - allowed: bool           # A four-byte Boolean; the receiver applies it to the protected eligibility byte.
       offset: 4
       only: [kr-1256]
+      except: [tw-454]
+
+  # tw-454 sub_C5F0B0 writes actor and Boolean; tw-454 sub_70E250 dispatches to tw-454 sub_778970.
+  # That setter changes the night-vision byte and effect; tw-454 sub_767DD0 heals without reading it.
+  NightVisionState:
+    - actor: u32              # The character whose night-vision state changes.
+      offset: 0
+      only: [tw-454]
+    - enabled: bool           # A four-byte Boolean controlling the character effect and local UI.
+      offset: 4
+      only: [tw-454]
 
   # ---------------------------------------------------------------------------------------------------
   # The client's own reports the in-game flow parses and never relays: the kr-1256 frames whose bodies the
@@ -699,5 +712,104 @@ structs:
       offset: 4
       only: [kr-1256]
     - marker: u32
+      offset: 8
+      only: [kr-1256]
+
+  # Soccer (round mode 11): the host's client drives the goal and restart and relays each step to the other
+  # players. kr-1256 sub_6E6F90 (cn-774 sub_8A75F0, tw-454 sub_71A9A0) tests the ball against the two goal
+  # boxes, writes the goal's index as one byte, and later writes the two empty restart frames from its own
+  # timers; kr-812 sub_514150 builds the same three frames as named classes. The consumers are kr-1256
+  # sub_6D55D0 (cases 32878, 32879, 32880), cn-774 sub_8BE740 / sub_8BE8E0 / sub_8BEAD0 and tw-454 sub_732380 /
+  # sub_732520 / sub_7326C0.
+  SoccerModeGoal:
+    # Which of the two goal boxes the ball entered (the host's two-box loop), not a team.
+    - goal_index: u8
+      offset: 4
+  SoccerModeCountDown: []
+  SoccerModeContinueGame: []
+
+  # kr-1256 relay 33293: the Lua SetCharEffectVisibleBySync binding (kr-1256 sub_4A2180) calls kr-1256 sub_6E0AF0,
+  # which writes the character, a counted UTF-16 effect path and the visibility byte widened to a word, and hands the
+  # frame to the peer sender kr-1256 sub_7AB190. kr-1256 sub_6D55D0 case 33293 runs kr-1256 sub_6E15C0, which reads the
+  # same fields and shows or hides the effect on that character. Zombie Escape's scripts use it for character effects.
+  CharacterEffectVisible:
+    - actor: u32
+      offset: 0
+      only: [kr-1256]
+    - effect: wstr
+      offset: 4
+      only: [kr-1256]
+    - visible: bool
+      only: [kr-1256]
+  # kr-1256 relay 34275: kr-1256 sub_6E8050 builds it with kr-1256 sub_708EC0 (character, two bytes, a counted byte
+  # blob) and sends it through kr-1256 sub_7AB190; its callers are character skill routines. kr-1256 sub_6D97D0 reads
+  # the same fields and passes them to kr-1256 sub_6E82A0.
+  Unknown34275:
+    - actor: u32
+      offset: 0
+      only: [kr-1256]
+    - unknown_4: u8
+      only: [kr-1256]
+    - unknown_5: u8
+      only: [kr-1256]
+    - unknown_6: 'list<u8>'
+      only: [kr-1256]
+  # kr-1256 relay 34276: kr-1256 sub_6E8130 writes the character, one byte and a counted byte blob and sends it
+  # through kr-1256 sub_7AB190; kr-1256 sub_6D97D0 reads them, resolves the Character and applies the blob to it.
+  Unknown34276:
+    - actor: u32
+      offset: 0
+      only: [kr-1256]
+    - unknown_4: u8
+      only: [kr-1256]
+    - unknown_5: 'list<u8>'
+      only: [kr-1256]
+
+  # kr-1256 sub_6E9D40 / cn-774 sub_8A9520 write the character handle, target handle or 0xFFFFFFFF,
+  # kind, three hit-position floats and three unresolved words; kr-1256 sub_6FDFA0 / cn-774 sub_8BE180 read them.
+  # The input paths kr-1256 sub_504940 / cn-774 sub_59DB90 take the character handle at +448 / +440.
+  # Displays kr-1256 sub_A40FC0 / cn-774 sub_C21D30 retain native mode gates, including the narrower kind-4 set.
+  SmartPing:
+    - actor: u32
+      offset: 0
+      only: [kr-1256, cn-774]
+    - target: u32
+      offset: 4
+      only: [kr-1256, cn-774]
+    - kind: u32
+      offset: 8
+      only: [kr-1256, cn-774]
+    - position_x: f32
+      offset: 12
+      only: [kr-1256, cn-774]
+    - position_y: f32
+      offset: 16
+      only: [kr-1256, cn-774]
+    - position_z: f32
+      offset: 20
+      only: [kr-1256, cn-774]
+    - unknown_24: u32
+      offset: 24
+      only: [kr-1256, cn-774]
+    - unknown_28: u32
+      offset: 28
+      only: [kr-1256, cn-774]
+    - unknown_32: u32
+      offset: 32
+      only: [kr-1256, cn-774]
+  # tw-454's 33283 is a different action (tw-454 sub_587500 / tw-454 sub_731D40), so it does not inherit this one.
+  SmartPing@tw-454: []
+
+  # kr-1256 sub_6E40C0 writes victim, rescuer and a byte; kr-1256 sub_6D97D0 case 0x8200 reads them in that order.
+  # The victim's kr-1256 sub_5103F0 checks local control and bubble state before kr-1256 sub_85CB70 reports release.
+  TryRescued:
+    - victim: u32
+      offset: 0
+      only: [kr-1256]
+    - rescuer: u32
+      offset: 4
+      only: [kr-1256]
+    # kr-1256 sub_50A4D0, kr-1256 sub_510460 and kr-1256 sub_485BE0 supply 0, 1, 3 or 4; meanings are unresolved.
+    - unknown_8: u8
       offset: 8
       only: [kr-1256]

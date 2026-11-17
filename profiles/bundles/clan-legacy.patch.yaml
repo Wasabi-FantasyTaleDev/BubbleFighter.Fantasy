@@ -1,0 +1,17 @@
+# The clan for a legacy build. Include after the build patch, together with the clan and clan-gateway bundles,
+# in a profile whose opcode table states the build's `connection: clan` rows (profiles/<build>/opcodes.yaml) and
+# whose packets/builds.yaml entry has the clan capability. The protocol row mounts <build>/clan because the
+# opcode table has clan-connection rows; the shared clan port (bundles/clan-gateway.yaml) hands each logged-in
+# connection to it.
+# kr-812's creation card (100819, a plain one-use ticket) states no member count in its ShopItem parameter, so the
+# founding capacity is the server's: 30, the larger of kr-1256's two cards.
+- set:
+    id: clan.creation-cards
+    config:
+      capacity_without_parameter: ${BFF_CLAN_CAPACITY_WITHOUT_PARAMETER:-30}
+# The clan window on the game connection: the passport request (C2S 25) and replies (packets/clan.yaml). The clan
+# bundle's row handles them; without this option it has no binding, and without the bundle the option fails.
+- set:
+    id: dialect.messages
+    config:
+      clan: true

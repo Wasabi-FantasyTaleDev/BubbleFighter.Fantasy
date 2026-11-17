@@ -11,7 +11,8 @@ namespace BubbleFighter.Fantasy.Protocol;
 /// decrypts the stream with the client-to-server cipher into a bounded intermediate
 /// pipe, parses frames from that pipe, and dispatches each packet through the
 /// <see cref="IPacketRouter"/> under this protocol's name. Frame integrity failures close
-/// the connection, and a packet handler that throws closes only this connection. When
+/// the connection. Handler failures close this connection unless the row permits a game
+/// request to recover after admission; relay handler failures always close it. When
 /// <see cref="ProtocolOptions.EnforceClientVersion"/> is on and the protocol requires the
 /// patch handshake, the first inbound frame must be the row's patch request
 /// (<c>gcpReqGamePatch</c> on kr-1256, <c>gcpFirstConnect</c> on the legacy builds).
@@ -35,6 +36,8 @@ internal sealed class WireProtocol : IConnectionProtocol
     private readonly ushort _patchRequestOpcode;
     private readonly ushort[] _preHandshakeOpcodes;
     private readonly ushort[] _alternateHandshakeSequence;
+    // A shared port: each session's frames go to the protocol its WireSession.Route chose, once one is chosen.
+    private readonly bool _routable;
 
     public WireProtocol(
         string name,
@@ -48,7 +51,8 @@ internal sealed class WireProtocol : IConnectionProtocol
         VersionVerifiedScope versionVerified,
         ILogger logger,
         CancellationToken lifetime,
-        bool requiresPatchHandshake)
+        bool requiresPatchHandshake,
+        bool routable = false)
     {
         Name = name;
         _profile = dialect.Profile;
@@ -64,6 +68,7 @@ internal sealed class WireProtocol : IConnectionProtocol
         _logger = logger;
         _budget = new OutboundBudget(_options.TotalSendQueueBytes, _logger);
         _requiresPatchHandshake = requiresPatchHandshake;
+        _routable = routable;
         _patchRequestOpcode = requiresPatchHandshake ? opcodes.C2S(options.PatchRequestName) : default(ushort);
         _preHandshakeOpcodes = requiresPatchHandshake ? ResolveNames(opcodes, options.PreHandshakeOpcodes, "pre_handshake_opcodes") : [];
         _alternateHandshakeSequence = requiresPatchHandshake ? ResolveNames(opcodes, options.AlternateHandshakeSequence, "alternate_handshake_sequence") : [];
@@ -291,12 +296,12 @@ internal sealed class WireProtocol : IConnectionProtocol
                 {
                     using var continuation = new InitialHandshakeContinuation();
                     using var registration = session.RegisterFeature<IInitialHandshakeContinuation>(continuation);
-                    if (!await DispatchAsync(connection, session, packet, ct).ConfigureAwait(false))
+                    if (!await DispatchAsync(connection, session, packet, admitted: false, ct).ConfigureAwait(false))
                         return;
                     if (continuation.Complete() && !connection.IsClosed)
                         handshakePending = false;
                 }
-                else if (!await DispatchAsync(connection, session, packet, ct).ConfigureAwait(false))
+                else if (!await DispatchAsync(connection, session, packet, admitted: !handshakePending, ct).ConfigureAwait(false))
                     return;
 
                 if (handshakePending && !preHandshake && alternateHandshakeIndex == 0)
@@ -325,12 +330,18 @@ internal sealed class WireProtocol : IConnectionProtocol
         }
     }
 
-    /// <summary>Dispatches one packet; returns <see langword="false"/> when the loop must stop.</summary>
-    private async ValueTask<bool> DispatchAsync(IConnection connection, ISession session, InboundPacket packet, CancellationToken ct)
+    /// <summary>
+    /// Dispatches one packet; returns <see langword="false"/> when the loop must stop. A failed handler on an
+    /// admitted game connection drops that one request and keeps the player connected when the row allows it;
+    /// malformed packets, relay handler failures and failures before game admission end the connection.
+    /// </summary>
+    private async ValueTask<bool> DispatchAsync(IConnection connection, ISession session, InboundPacket packet, bool admitted,
+        CancellationToken ct)
     {
         try
         {
-            await _router.DispatchAsync(Name, session, packet, ct).ConfigureAwait(false);
+            var protocol = _routable && session is WireSession wire ? wire.ProtocolName : Name;
+            await _router.DispatchAsync(protocol, session, packet, ct).ConfigureAwait(false);
             return true;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -340,6 +351,14 @@ internal sealed class WireProtocol : IConnectionProtocol
         catch (Exception ex)
         {
             var description = _opcodes.Describe(PacketDirection.ClientToServer, packet.Opcode);
+            if (_requiresPatchHandshake && admitted && _options.KeepConnectionOnHandlerFailure
+                && ex is not PacketFormatException && !connection.IsClosed)
+            {
+                _logger.LogError(ex,
+                    "Handler for {Packet} failed on session {SessionId} ({Remote}); the request is dropped and the connection stays open.",
+                    description, session.Id, connection.RemoteEndPoint);
+                return true;
+            }
             _logger.LogError(ex,
                 "Handler for {Packet} failed on session {SessionId} ({Remote}); closing the connection.",
                 description, session.Id, connection.RemoteEndPoint);

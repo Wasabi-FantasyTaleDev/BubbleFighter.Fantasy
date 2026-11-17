@@ -87,6 +87,9 @@ public sealed class NpcWaveMountTests
                 if (table.Find(PacketDirection.ClientToServer, name) is { } opcode)
                     Assert.Equal(!browserOnly, packets.Routes.ContainsKey((build + "/game", opcode)));
             Assert.Equal(browserOnly ? 0 : 1, services.GetAll<IMessageSender<RoundWaveChanged>>().Count);
+            // The main menu's clan entry is answered wherever the build names it.
+            if (table.Find(PacketDirection.ClientToServer, "gcpReqGotoClan") is { } gotoClan)
+                Assert.Equal(!browserOnly, packets.Routes.ContainsKey((build + "/game", gotoClan)));
         }
         finally { await context.UnwindAsync(); }
         Assert.Empty(packets.Routes);

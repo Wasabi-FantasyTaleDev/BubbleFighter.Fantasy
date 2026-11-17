@@ -22,6 +22,14 @@ public sealed class DynamicConfigGenerationTests
     private static readonly int[] ServedBits = [1, 2, 3, 4, 5, 6, 8, 9, 12, 13, 14, 16];
 
     /// <summary>
+    /// Byte ranges that are server policy rather than reference content: the four plaza booth prices of slot 3
+    /// (basketball_cost, fishing_cost, fishing_second_cost, fortune_cost), which the server charges as served, and
+    /// the Mysterystore's open window of slot 4 (start, end), which the server keeps open instead of the reference's
+    /// past dates.
+    /// </summary>
+    private static readonly (int Bit, int Offset, int Length)[] PolicyRanges = [(3, 4, 2), (3, 16, 4), (3, 40, 2), (4, 0, 16)];
+
+    /// <summary>
     /// Parses the private reference generation: a mask, then one compressed blob per set bit
     /// ascending. Each blob's inflated bytes are the reference the marshaller must reproduce.
     /// </summary>
@@ -69,8 +77,8 @@ public sealed class DynamicConfigGenerationTests
     }
 
     /// <summary>
-    /// Every served slot's marshaled body must equal the reference bytes exactly, and the
-    /// unserved bits (7, 10, 11, 15) must stay out of the mask.
+    /// Every served slot's marshaled body must equal the reference bytes exactly outside the policy ranges, and
+    /// the unserved bits (7, 10, 11, 15) must stay out of the mask.
     /// </summary>
     [Fact]
     [Trait("Category", "LocalClientData")]
@@ -97,7 +105,10 @@ public sealed class DynamicConfigGenerationTests
             var plain = output.ToArray();
             Assert.True(reference.ContainsKey(bit), $"Bit {bit} is framed but the reference generation has no such slot.");
             Assert.Equal(reference[bit].Length, plain.Length);
-            Assert.Equal(reference[bit], plain);
+            var expected = reference[bit].ToArray();
+            foreach (var range in PolicyRanges.Where(range => range.Bit == bit))
+                plain.AsSpan(range.Offset, range.Length).CopyTo(expected.AsSpan(range.Offset));
+            Assert.Equal(expected, plain);
             offset += 4 + length;
         }
         Assert.Equal(frame.Length, offset);
@@ -161,5 +172,22 @@ public sealed class DynamicConfigGenerationTests
             high = (high + low) % 65521;
         }
         Assert.Equal((high << 16) | low, wire.StampOf(1));
+    }
+
+    /// <summary>
+    /// Content dates written as text load as the OLE automation day numbers the f64 fields carry, the values the
+    /// Mysterystore window and the roulette dates were served as before.
+    /// </summary>
+    [Fact]
+    public void TextDatesLoadAsOleAutomationDays()
+    {
+        var store = DynamicConfigContent.PublishedSlot(TestBuilds.Packets, Build, 4, "MysteryStoreContext");
+        Assert.NotNull(store);
+        Assert.Equal(43831.0, store["start"]);
+        Assert.Equal(73050.0, store["end"]);
+        var roulette = DynamicConfigContent.PublishedSlot(TestBuilds.Packets, Build, 9, "TwirlingRouletteContext");
+        Assert.NotNull(roulette);
+        Assert.Equal(42361.0, roulette["start"]);
+        Assert.Equal(58317.0, roulette["end"]);
     }
 }

@@ -20,7 +20,7 @@ public sealed class SqliteTutorialPracticeTests : IDisposable
         {
             connection.Open();
             using var command = connection.CreateCommand();
-            command.CommandText = "DROP TABLE tutorial_practice_clears; DROP TABLE IF EXISTS pet_identity_allocator; PRAGMA user_version=9;";
+            command.CommandText = "DROP TABLE tutorial_practice_clears; DROP TABLE IF EXISTS pet_identity_allocator; DROP TABLE IF EXISTS couple_members; DROP TABLE IF EXISTS couples; PRAGMA user_version=9;";
             command.ExecuteNonQuery();
         }
         using (var upgraded = new SqliteDatabase(Options()))

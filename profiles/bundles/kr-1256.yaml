@@ -86,6 +86,10 @@
     # present_box capability and the opcode rows of profiles/kr-1256/opcodes.yaml.
     # Opt in on both the dialect.messages and shop rows for native-client acceptance.
     present_box: false
+    # Cash item inbox (packets/cash-inbox.yaml, packets/cash-inventory.yaml): kr-1256 sub_5F4C90/kr-1256 sub_5F8A50 (open),
+    # kr-1256 sub_9D79E0 (pickup), kr-1256 sub_9369E0 (close), kr-1256 sub_10D8150/kr-1256 sub_9AF590 (list), kr-1256 sub_99B0E0/kr-1256 sub_9B2900 (pickup reply).
+    # Opt in on both the dialect.messages and shop rows for native-client acceptance.
+    cash_inbox: false
     # The player menu's "view info" (packets/fighter-info.yaml): kr-1256 sender sub_9319E0 (C2S 118),
     # reader sub_99A430, handler sub_9BCE60 (S2C 133). Needs the lobby row's fighter_info.
     fighter_info: true

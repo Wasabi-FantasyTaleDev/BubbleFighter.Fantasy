@@ -62,7 +62,11 @@ def lint_file(path: Path) -> list[dict[str, Any]]:
             problems.append(issue("missing_name", "missing name", profile, index))
         else:
             name_source = str(row.get("name_source", ""))
-            if name_source == "coined" and not name.endswith("_"):
+            # No build labels a clan-server packet, so every name on that connection is coined and plain.
+            if connection == "clan":
+                if name.endswith("_") or name_source not in ("coined", "none"):
+                    problems.append(issue("clan_name", "clan-connection names are plain coined names or UnknownNNN", profile, index))
+            elif name_source == "coined" and not name.endswith("_"):
                 problems.append(issue("coined_name", "coined name must end with _", profile, index))
             if name_source == "none" and not UNKNOWN_RE.fullmatch(name):
                 problems.append(issue("unknown_name", "name_source none must use UnknownNNN", profile, index))

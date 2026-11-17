@@ -7,7 +7,7 @@ namespace BubbleFighter.Fantasy.Dialect.Rooms;
 /// <summary>Retains the native creator's opaque settings and overlays the shared room's committed identity.</summary>
 internal static class RoomProjection
 {
-    internal static RoomCreateRequested Create(PacketTables tables, string build, ReadOnlySpan<byte> body)
+    internal static RoomCreateRequested Create(PacketTables tables, string build, ReadOnlySpan<byte> body, bool userHost = false)
     {
         ValidateLayouts(tables, build);
         var fields = RoomRequests.ReadCreate(tables, build, body);
@@ -19,11 +19,16 @@ internal static class RoomProjection
         };
         // kr-1256 sub_962200 writes the title at SessionSetting+8; the trailing string is the password.
         var projection = RoomProjectionFields.Load(tables, build);
+        var isUserHost = userHost && game.TryGetValue("is_user_host", out var hostFlag) && hostFlag is true;
         return new((string)setting["title"]!, (string)fields["password"]!, projection.ReadMode(game),
-            projection.ReadMap(game), settings) { UpdateExistingTitle = true };
+            projection.ReadMap(game), settings)
+        {
+            UpdateExistingTitle = true,
+            IsUserHost = isUserHost,
+        };
     }
 
-    internal static Dictionary<string, object?> Session(PacketTables tables, string build, RoomView room)
+    internal static Dictionary<string, object?> Session(PacketTables tables, string build, RoomView room, bool userHost = false)
     {
         ValidateLayouts(tables, build);
         var source = room.BuildSettings;
@@ -59,11 +64,17 @@ internal static class RoomProjection
         if (source.CustomRules is { } customRules)
             RoomCustomRuleFields.Load(tables, build).Apply(game, customRules);
         RoomProjectionFields.Load(tables, build).Apply(game, room.ModeId);
+        if (userHost && game.ContainsKey("is_user_host"))
+            game["is_user_host"] = room.IsUserHost;
+        else if (game.ContainsKey("is_user_host"))
+            game["is_user_host"] = false;
         // kr-1256 sub_970590 requires waiting state 2; sub_9AC490 selects the room stage for kind 2.
         setting["room_id"] = checked((ushort)room.RoomId);
         setting["session_state"] = 2;
         setting["title"] = room.Name;
         setting["kind"] = 2;
+        if (room.PlayableMaxSeats is { } playable && setting.ContainsKey("open_seats"))
+            setting["open_seats"] = checked((ushort)(playable - room.ClosedSlots.Count(slot => slot < playable)));
         // kr-1256 sub_9681C0 offers the add-computer-player panel only when the room's session word at +72 has its
         // lowest bit set (builds.yaml room_ai_seat).
         RoomAiSeatFlag.Load(tables, build)?.Apply(setting, room.ModeId);
@@ -77,8 +88,8 @@ internal static class RoomProjection
     /// <summary>
     /// Checks the rows the projection overlays: the session words the waiting room reads back (the join request
     /// returns the room id, kr-1256 sub_854C90; the stage select reads the kind, kr-1256 sub_9AC490) and the game
-    /// words the room gates test (kr-1256 sub_97C610, sub_9201D0 and sub_96F3A0 need the flag word, the referee
-    /// byte and the channel word as stated, and the mode is the word the list row and the settings change carry).
+    /// fields selected by build metadata. The KR hammer selection survives at +20 because its gameplay consumer
+    /// (kr-1256 sub_4954A0) restricts weapon changes when that word is 1.
     /// This helper has no bind step of its own, so it checks before every use rather than on the first send.
     /// </summary>
     /// <param name="tables">The shared native packet layouts.</param>

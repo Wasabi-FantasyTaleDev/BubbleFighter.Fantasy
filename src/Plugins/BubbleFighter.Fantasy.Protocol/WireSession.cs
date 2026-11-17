@@ -21,7 +21,10 @@ internal sealed class WireSession : ISessionWithFeatures, ISessionOutputDrain, I
     private readonly IWireDialect _dialect;
     private readonly IEventBus _events;
     private readonly ILogger _logger;
-    private readonly string _protocolName;
+    // A shared-port session starts under the gateway's name and profile and is rebound once, by Route.
+    private volatile string _protocolName;
+    private volatile ClientProfile _profile;
+    private int _routed;
     private readonly SessionFeatures _features;
     private readonly Channel<Outbound> _queue;
     private readonly CancellationTokenSource _stop = new();
@@ -57,7 +60,7 @@ internal sealed class WireSession : ISessionWithFeatures, ISessionOutputDrain, I
         ArgumentOutOfRangeException.ThrowIfLessThan(sendQueueBytes, 1);
         Id = Interlocked.Increment(ref _nextId);
         Connection = connection;
-        Profile = profile;
+        _profile = profile;
         _protocolName = protocolName;
         _cipher = cipher;
         _dialect = dialect;
@@ -83,7 +86,24 @@ internal sealed class WireSession : ISessionWithFeatures, ISessionOutputDrain, I
     public IConnection Connection { get; }
 
     /// <inheritdoc />
-    public ClientProfile Profile { get; }
+    public ClientProfile Profile => _profile;
+
+    /// <summary>The protocol whose handlers receive this session's frames.</summary>
+    internal string ProtocolName => _protocolName;
+
+    /// <summary>
+    /// Rebinds a session accepted on a shared port to the client build its login resolved to: its later frames
+    /// go to that build's protocol, and it reports that build's profile. A session is routed at most once.
+    /// </summary>
+    internal void Route(ClientProfile profile, string protocolName)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        ArgumentException.ThrowIfNullOrEmpty(protocolName);
+        if (Interlocked.Exchange(ref _routed, 1) != 0)
+            throw new InvalidOperationException($"Session {Id} is already routed to {_protocolName}.");
+        _profile = profile;
+        _protocolName = protocolName;
+    }
 
     /// <inheritdoc />
     public ConcurrentDictionary<string, object> Items { get; } = new(StringComparer.Ordinal);

@@ -35,6 +35,8 @@
       packets_directory: packets
       # This build's customized-key builder and login consumer are not audited; only kr-812's are.
       customized_keys: false
+      # cn-279 has no cash_inbox capability in packets/builds.yaml.
+      cash_inbox: false
 - replace:
     id: dialect.rooms
     parent_id: clientdata
@@ -154,6 +156,8 @@
     id: shop
     config:
       life_items: false
+      # Cash inbox is off on dialect.messages (see above).
+      cash_inbox: false
 # CN2011 reports relay success on the game connection straight after relay 1, without a validation report
 # (cn-279 sub_701270), and has no seed tables (packets/builds.yaml native_scene_seed_tables: false; its critical
 # hit is a local roll, cn-279 sub_7EC4D0).

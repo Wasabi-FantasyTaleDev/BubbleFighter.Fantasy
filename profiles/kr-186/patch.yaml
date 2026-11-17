@@ -34,6 +34,8 @@
       # kr-186's present family has no sub-list packets (its sub_67E140 cases 815..826 carry no
       # gspRepPresent*SubList), so the gift box stays off until its own lists are mapped.
       present_box: false
+      # This early build has no cash_inbox capability in packets/builds.yaml.
+      cash_inbox: false
       # The player menu's "view info" is served from FighterInfoReply@cn-279 (packets/fighter-info.yaml).
       server_notices: true
       # cn-279 sub_664890 stamps 805 and sub_450430 reads item/quantity/parameters; paint is independent of rename.
@@ -74,6 +76,11 @@
     config:
       # kr-186 has no award dialog (cn-279 S2C 727 has no counterpart in kr-186 sub_686740), so no reward cards.
       lottery_modes: []
+      # kr-186 faults at 0x71A9C1 in its round renderer when the server moves it out of a running round, so !plaza
+      # ends the round as its time limit would and the player leaves from the room.
+      plaza_command_during_round: false
+      # kr-186 has no chat-module packet: its main, tutorial and lobby menus send chat with the waiting-room packet.
+      menu_session_chat: true
       instant_revival_item_id: 0
       # Stock and currency-only StockSet identities are validated against this build at activation.
       lottery_grouped_draw: true
@@ -129,12 +136,14 @@
       # weight in any grade sheet are these seventeen; none of the kinds 136 to 141 exists in this build, so there is
       # no bazooka, air bomb, turret, machine gun or shield field, and the giant drink (112) is among them.
       random_supply_item_kinds: [101, 102, 108, 109, 112, 115, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132]
-      # Mode 3 loads no sheet of its own here, so the item mode offers all of them. This build has no team box:
-      # its map report has no team vector and its item box has no team (cn-279 sub_89E0A0, sub_89DD80).
+      # Mode 3 loads no sheet of its own here, so the item mode offers every random supply kind; item_mode_kinds may
+      # only name supply kinds. This build has no team box: its map report has no team vector and its item box has no
+      # team (cn-279 sub_89E0A0, sub_89DD80).
       item_mode_ids: [3]
       item_mode_kinds: [101, 102, 108, 109, 112, 115, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132]
-      # Server policy: mode 3 reports no native random-box points; reuse map helpers for neutral periodic boxes.
-      item_mode_fallback_point_count: 4
+      # Server policy: kr-186's item-mode maps report no random-box points, so neutral periodic boxes reuse the map's
+      # star and supply helpers; sixteen spread them over the whole map.
+      item_mode_fallback_point_count: 16
       # cn-279 sub_704EC0 can return zero; cn-279 sub_820120 installs the server's resolved positive kind.
       item_mode_resolve_invalid_random_pickups: true
 - set:
@@ -193,3 +202,5 @@
     config:
       # The gift box is off on dialect.messages (see above).
       present_box: false
+      # Cash inbox is off on dialect.messages (see above).
+      cash_inbox: false

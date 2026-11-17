@@ -9,38 +9,40 @@ internal static class LotteryCatalog
 {
     private const string Ss = "urn:schemas-microsoft-com:office:spreadsheet";
     private const int MaxRows = 65536;
+    internal const int DefaultMaximumFileBytes = 64 * 1024 * 1024;
 
-    internal static void Validate(string path, IReadOnlyList<LotteryItem> prizes)
+    internal static void Validate(string path, IReadOnlyList<LotteryItem> prizes,
+        int maximumBytes = DefaultMaximumFileBytes)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumBytes);
         if (!File.Exists(path)) throw new ConfigException($"Reward-card workbook does not exist: {path}.");
-        if (new FileInfo(path).Length > 64 * 1024 * 1024)
-            throw new ConfigException("Reward-card workbook exceeds its byte bound.");
         using var stream = File.OpenRead(path);
-        Validate(stream, prizes);
+        Validate(stream, prizes, maximumBytes);
     }
 
-    internal static void Validate(byte[] workbook, IReadOnlyList<LotteryItem> prizes)
+    internal static void Validate(byte[] workbook, IReadOnlyList<LotteryItem> prizes,
+        int maximumBytes = DefaultMaximumFileBytes)
     {
-        if (workbook.Length > 64 * 1024 * 1024)
-            throw new ConfigException("Reward-card workbook exceeds its byte bound.");
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumBytes);
         using var stream = new MemoryStream(workbook, writable: false);
-        Validate(stream, prizes);
+        Validate(stream, prizes, maximumBytes);
     }
 
     /// <summary>Validates the workbook at a client path, parsing it as the store unpacks it.</summary>
     internal static void Validate(BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore data, string clientPath,
-        IReadOnlyList<LotteryItem> prizes)
+        IReadOnlyList<LotteryItem> prizes, int maximumBytes = DefaultMaximumFileBytes)
     {
-        // The verdict depends only on the workbook and the configured prizes, so a store with compiled client data
-        // keeps that this pair passed and the next start does not read the workbook. A failure is never kept.
-        var inputs = new BubbleFighter.Fantasy.Contracts.ClientData.CompiledInputs().Add("path", clientPath);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumBytes);
+        // A changed resource limit must revalidate even when the workbook and configured prizes are unchanged.
+        var inputs = new BubbleFighter.Fantasy.Contracts.ClientData.CompiledInputs()
+            .Add("path", clientPath).Add("maximum_bytes", maximumBytes);
         AddPrizes(inputs, "prizes", prizes);
         BubbleFighter.Fantasy.Contracts.ClientData.CompiledClientData.Load(data, ValidatedLottery.Instance, inputs.ToString(), store =>
         {
-            if (store.Length(clientPath) > 64 * 1024 * 1024)
+            if (store.Length(clientPath) > maximumBytes)
                 throw new ConfigException("Reward-card workbook exceeds its byte bound.");
-            using var stream = store.OpenRead(clientPath);
-            Validate(stream, prizes);
+            using var stream = store.OpenRead(clientPath, maximumBytes);
+            Validate(stream, prizes, maximumBytes);
             return true;
         });
     }
@@ -73,15 +75,17 @@ internal static class LotteryCatalog
     // column 16384, so a document tree cost hundreds of megabytes per start. Each worksheet's defects are kept and
     // judged after the document's end, StockSet before Stock, so a malformed document still fails as XML first and the
     // verdict does not depend on the order of the worksheets in the file.
-    private static void Validate(Stream stream, IReadOnlyList<LotteryItem> prizes)
+    private static void Validate(Stream stream, IReadOnlyList<LotteryItem> prizes, int maximumBytes)
     {
+        if (stream.Length > maximumBytes)
+            throw new ConfigException("Reward-card workbook exceeds its byte bound.");
         var bundles = prizes.Where(p => p.DisplayId >= 2000000).ToArray();
         var items = prizes.SelectMany(p => p.Components.Length > 0 ? p.Components : p.Lucci > 0 ? [] : new[] { p }).ToArray();
         var stock = new StockSheet(items);
         var sets = new StockSetSheet(bundles);
         using (var reader = XmlReader.Create(stream, new XmlReaderSettings
         {
-            DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null, MaxCharactersInDocument = 64 * 1024 * 1024,
+            DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null, MaxCharactersInDocument = maximumBytes,
         }))
         {
             Sheet? sheet = null;

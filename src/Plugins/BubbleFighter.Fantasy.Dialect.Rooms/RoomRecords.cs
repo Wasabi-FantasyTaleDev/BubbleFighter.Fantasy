@@ -26,6 +26,7 @@ internal static class RoomRecords
         {
             ColorIndex = seat.ColorIndex, Team = seat.Team, Level = Math.Max(1, seat.Level), ControllerSlot = seat.Slot,
             ItemAttributes = seat.ItemAttributes,
+            Couple = seat.Couple,
         };
     }
 
@@ -74,6 +75,7 @@ internal static class RoomRecords
             };
         }
         NativePlazaRecruitment.Project(tables, build, values, seat.Recruitment);
+        NativeCoupleScene.Project(tables, build, values, seat.Couple);
         return values;
     }
 

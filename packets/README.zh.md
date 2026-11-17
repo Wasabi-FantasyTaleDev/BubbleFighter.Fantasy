@@ -35,6 +35,7 @@
 | `user-stat.yaml` | `UserStat`（S2C `gspUserStat`，錢包和 FighterInfo），以及其中的 `FighterInfo`、`EloRating`。 |
 | `fighter-info.yaml` | `FighterInfoRequest`、`FighterInfoReply`：legacy 版本與 kr-1256 家族（`FighterInfoReply@kr-1256`）玩家菜單的「查看資訊」（C2S `gcpReqFighterInfo`，S2C `gspRepFighterInfo`）。 |
 | `clan.yaml` | 氏族（clan）game 連線的封包體：`ClanPassport`、`ClanMarkInfo`、`ClanGuildInfo`、`ClanAttendanceState`，以及空的氏族請求；以 kr-1256 的結構為主，並列 kr-812 的基底結構。 |
+| `clan-server.yaml` | 氏族伺服器連線的握手封包體：`ClanServerHello`、`ClanServerHeartbeat`、`ClanServerLogin`、`ClanServerLoginResult`；編號是該版本 `connection: clan` 的 opcode 列。 |
 | `udp-peers.yaml` | 原生 peer 发现、端点表、打洞控制及 relay 成员消息；布局不会启用监听或直接移动。 |
 | `round-movement.yaml` | 原生完整及掩码移动、UDP 中继探测、身份、控制和头部布局，包含各版本身份宽度差异。 |
 | `relay-connection.yaml` | 已核對的原生中繼地址、key、連接通知、加入請求和連接報告；存在封包表不代表已啟用中繼監聽或握手。 |
@@ -134,7 +135,7 @@ structs:
 只有第一行是必填的。
 
 - **名字**決定伺服器往這個欄位填什麼。伺服器認得的名字（房間結構裡有 `nickname`、`user_number`、`room_id`、`title`、`mode` 等；完整清單是 `RoomFieldValue` 列舉的小寫底線形式，再加上 `seated`）會從房間資料填入。其他名字一律寫預設值。用途未知的欄位叫 `unknown_<位移>`；查明用途後再改名。名字只能用小寫字母、數字和底線，不能有空格，同一結構內不能重複。
-- **型別**有 `u8`、`u16`、`u32`、`u64`、`bool`（4 位元組）、`f32`、`f64`、`wstr`（u32 字元數 + UTF-16LE）、`list<T>`（u32 個數 + 那麼多個 `T`）、`empty_list`（伺服器永遠送空的列表）、固定連續欄位如 `u32[49]`（同一種數字型別連續那麼多個，沒有個數前綴；用於客戶端逐個讀取、用途還不清楚的欄位，其中某個有了名字就把它拆出來），`optional<0x3A,Tail>`（一個標記位元組，只有它等於 `0x3A` 時後面才跟著結構 `Tail`；寫入時沒有給出對應的值就把欄位的 `default` 當作「不存在」標記寫出，讀取時保留這個標記位元組，所以讀回的記錄能原樣寫回），或另一個結構的名字。`ScoreRow[16]` 表示沒有個數前綴的十六個結構；供給值的長度必須完全相同，固定陣列最多 65,535 個元素。型別裡有 `<` 或 `[` 時要加引號。
+- **型別**有 `u8`、`u16`、`u32`、`u64`、`bool`（4 位元組）、`f32`、`f64`、`wstr`（u32 字元數 + UTF-16LE）、`wcstr`（UTF-16LE 到 NUL 字為止，沒有個數；氏族伺服器連線的字串）、`list<T>`（u32 個數 + 那麼多個 `T`）、`empty_list`（伺服器永遠送空的列表）、固定連續欄位如 `u32[49]`（同一種數字型別連續那麼多個，沒有個數前綴；用於客戶端逐個讀取、用途還不清楚的欄位，其中某個有了名字就把它拆出來），`optional<0x3A,Tail>`（一個標記位元組，只有它等於 `0x3A` 時後面才跟著結構 `Tail`；寫入時沒有給出對應的值就把欄位的 `default` 當作「不存在」標記寫出，讀取時保留這個標記位元組，所以讀回的記錄能原樣寫回），或另一個結構的名字。`ScoreRow[16]` 表示沒有個數前綴的十六個結構；供給值的長度必須完全相同，固定陣列最多 65,535 個元素。型別裡有 `<` 或 `[` 時要加引號。
 - **offset**：客戶端讀取函式把這個欄位存進物件的位置。伺服器不使用它；它的用途是方便到反編譯裡查，`bff packets show` 也會印出來。在重寫的表裡或版本名底下，寫的是那個版本自己的位移。
 - **default**：伺服器沒有自己的值時寫這個（沒寫就是 0 或空字串）。
 - **vacant**：空座位時改寫這個。

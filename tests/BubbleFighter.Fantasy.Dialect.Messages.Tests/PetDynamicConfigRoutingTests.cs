@@ -36,9 +36,12 @@ public sealed class PetDynamicConfigRoutingTests
                 new(table.C2S("gcpReqDynamicConfig"), PetDynamicConfigTestData.Request(maskBytes, 1u << 14, stamp)), default);
 
             await Request(0);
-            Assert.Equal(table.S2C("gspRepDynamicConfig"), Assert.Single(session.Sent));
+            // cn-774 serves its Mysterystore window (category 4) without a provider, so a request that names only
+            // category 14 finds nothing stale and gets the acknowledgement; kr-1256 frames category 14 itself.
+            var baselineSent = build == "cn-774" ? table.S2C("gspReqPing") : table.S2C("gspRepDynamicConfig");
+            Assert.Equal(baselineSent, Assert.Single(session.Sent));
             var baseline = Assert.Single(session.Bodies);
-            if (build == "cn-774") Assert.Equal(new byte[2], baseline);
+            if (build == "cn-774") Assert.Empty(baseline);
             using var unrelated = context.Events.Intercept<PetClientConfigurationRequested, PetClientConfiguration?>(
                 (request, next, ct) => request.Protocol == "other/game"
                     ? ValueTask.FromResult<PetClientConfiguration?>(second) : next(ct));
@@ -75,7 +78,7 @@ public sealed class PetDynamicConfigRoutingTests
 
             await Request(0);
             Assert.Equal(3, calls);
-            Assert.Equal(table.S2C("gspRepDynamicConfig"), session.Sent[^1]);
+            Assert.Equal(baselineSent, session.Sent[^1]);
             Assert.Equal(baseline, session.Bodies[^1]);
         }
         finally { await context.UnwindAsync(); }

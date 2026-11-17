@@ -16,6 +16,9 @@ public sealed record RoomCreateRequested(string Name, string Password, int ModeI
 {
     /// <summary>Gets whether a repeated request may update the waiting-room master's title.</summary>
     public bool UpdateExistingTitle { get; init; }
+
+    /// <summary>Gets whether the room was created with the client sponsor (<c>is_user_host</c>) flag enabled.</summary>
+    public bool IsUserHost { get; init; }
 }
 
 /// <summary>
@@ -99,6 +102,9 @@ public sealed record RoomStartRequested(string MapKey = "") : IMessage
 
     /// <summary>Gets the round lengths the start request carries, or null when the build's start carries no rule record.</summary>
     public RoomRoundTimeLimits? TimeLimits { get; init; }
+
+    /// <summary>Gets whether the request originated from <c>gcpUserHostStart</c> inside a waiting sponsor room.</summary>
+    public bool FromUserHostPacket { get; init; }
 }
 
 /// <summary>The round lengths a start request carries in its rule record, per kind of mode.</summary>
@@ -215,7 +221,14 @@ public sealed record RoomMemberView(int Slot, int UserNum, string Nickname, int 
 
     /// <summary>Gets the recruitment state when this record represents a plaza member.</summary>
     public PlazaRecruitmentState? Recruitment { get; init; }
+
+    /// <summary>Gets the persistent partner identity used by the native scene's couple markers.</summary>
+    public Couples.CoupleSceneState? Couple { get; init; }
 }
+
+/// <summary>Updates an installed room member's relationship without reconstructing their character.</summary>
+/// <param name="Member">The current seat snapshot; only its relationship fields change in the client.</param>
+public sealed record RoomCoupleUpdated(RoomMemberView Member) : IMessage;
 
 /// <summary>A waiting room as a member's client needs it to draw the room.</summary>
 /// <param name="RoomId">The room number.</param>
@@ -237,6 +250,18 @@ public sealed record RoomView(int RoomId, string Name, int ModeId, string MapKey
     /// order separately from its slot-indexed seat vector. Null uses <see cref="Seats"/> order.
     /// </summary>
     public IReadOnlyList<int>? MemberOrder { get; init; }
+
+    /// <summary>Gets whether this waiting room is a sponsor (<c>user_host</c>) prize room.</summary>
+    public bool IsUserHost { get; init; }
+
+    /// <summary>Gets the configured sponsor prize Lucci locked or previewed for this room.</summary>
+    public uint UserHostPrize { get; init; }
+
+    /// <summary>
+    /// Gets the playable seat count advertised in room occupancy when the physical seat table extends
+    /// further for a reserved referee seat (<c>null</c> uses <see cref="MaxSeats"/>).
+    /// </summary>
+    public int? PlayableMaxSeats { get; init; }
 }
 
 /// <summary>Sent to a player who was just seated, by create or by join: the whole room and their own seat.</summary>

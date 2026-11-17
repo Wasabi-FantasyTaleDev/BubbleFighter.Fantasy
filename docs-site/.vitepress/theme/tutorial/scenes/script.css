@@ -1,0 +1,138 @@
+/* The install-script tutorial: taskbar search, Windows PowerShell, the server window and the setup page. */
+.sc-search { position: absolute; left: 50%; bottom: 58px; z-index: 45; width: 760px; margin-left: -380px; padding: 16px; border: 1px solid rgba(0, 0, 0, .08); border-radius: 12px; background: rgba(243, 246, 251, .97); box-shadow: 0 24px 60px rgba(20, 30, 50, .25);
+  opacity: 0; transform: translateY(20px); pointer-events: none; transition: opacity .3s ease, transform .5s var(--tp-out); }
+.sc-search.is-open { opacity: 1; transform: none; }
+.sc-search-box { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 14px; border: 1px solid #c9d2df; border-bottom: 2px solid #1a73e8; border-radius: 8px; background: #fff; font-size: 15px; color: #222; }
+.sc-search-body { display: grid; grid-template-columns: 1fr 260px; gap: 14px; margin-top: 14px; animation: tp-soft-in .4s var(--tp-out) both; }
+.sc-best small { display: block; margin: 0 0 8px 4px; color: #555; font-size: 12.5px; font-weight: 600; }
+.sc-result { display: grid; grid-template-columns: 40px 1fr; grid-template-rows: auto auto; align-items: center; column-gap: 10px; padding: 10px 12px; border-radius: 8px; background: #fff; transition: background .2s, transform .25s var(--tp-spring); }
+.sc-result .sc-ps-icon { grid-row: span 2; }
+.sc-result b { font-size: 14px; font-weight: 600; color: #111; }
+.sc-result small { margin: 0; color: #666; font-weight: 400; }
+.sc-result.is-hover { background: #e3ecfa; }
+.sc-result.is-pressed { transform: scale(.98); }
+.sc-side { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 16px; border-radius: 8px; background: #fff; color: #222; font-size: 14px; }
+.sc-side small { color: #666; }
+.sc-side hr { width: 100%; margin: 10px 0 6px; border: 0; border-top: 1px solid #e3e6ea; }
+.sc-side > span:not(.sc-ps-icon) { display: flex; align-items: center; gap: 8px; align-self: stretch; padding: 6px 4px; font-size: 13px; color: #1a4fa0; }
+.sc-ps-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 6px; color: #fff; background: linear-gradient(160deg, #2b6fc7, #12408a); }
+.sc-ps-icon.is-big { width: 56px; height: 56px; border-radius: 10px; margin-bottom: 4px; }
+.sc-ps-icon.is-small { width: 18px; height: 18px; border-radius: 3px; }
+
+.sc-console { left: 120px; top: 60px; width: 1040px; height: 560px; border-color: #0b1b3a; background: #012456; transition: opacity .35s ease, transform .55s var(--tp-out), filter .4s ease; }
+.sc-console.is-behind, .sc-server.is-behind { filter: brightness(.82); }
+.sc-title { display: flex; align-items: center; gap: 9px; height: 34px; padding-left: 12px; color: #1d1d1d; background: #fff; font-size: 12.5px; }
+.sc-title.is-cmd { background: #f3f3f3; }
+.sc-body { position: relative; padding: 10px 14px; color: #eeedf0; font: 13px/20px 'Cascadia Mono', Consolas, 'Courier New', monospace; white-space: pre; }
+.sc-line { min-height: 20px; overflow: hidden; text-overflow: clip; }
+.sc-line.is-step { color: #61d6d6; }
+.sc-line.is-ok { color: #16c60c; }
+.sc-line.is-dim { color: #b8bec8; }
+.sc-line.is-ask { color: #f9f1a5; }
+.sc-cursor { display: inline-block; width: 8px; height: 15px; margin-left: 1px; vertical-align: -3px; background: #eeedf0; animation: tp-blink 1s step-end infinite; }
+.sc-anchor { position: absolute; left: 380px; width: 1px; height: 1px; }
+
+.sc-server { left: 560px; top: 380px; width: 640px; height: 200px; z-index: 11; background: #0c0c0c; }
+.sc-body.is-cmd { color: #cccccc; }
+
+.sc-browser { left: 90px; top: 30px; width: 1100px; height: 690px; z-index: 12; background: #f7f8fa; }
+.sc-tabs { display: flex; align-items: flex-end; height: 40px; padding-left: 10px; background: #e7eaf0; }
+.sc-tab { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 16px; border-radius: 9px 9px 0 0; background: #fff; color: #222; font-size: 12.5px; }
+.sc-tabs .bs-caption { align-self: stretch; }
+.sc-address { display: flex; align-items: center; gap: 16px; height: 42px; padding: 0 16px; border-bottom: 1px solid #e3e6ea; background: #fff; color: #555; }
+.sc-address span { flex: 1; height: 30px; padding: 0 14px; border-radius: 15px; background: #f0f2f5; color: #222; font-size: 13.5px; line-height: 30px; }
+.sc-page { position: relative; height: calc(100% - 82px); overflow: hidden; background:
+  radial-gradient(55% 60% at 80% 20%, rgba(110, 180, 245, .75), transparent 70%),
+  radial-gradient(60% 70% at 15% 85%, rgba(150, 200, 250, .7), transparent 70%),
+  linear-gradient(160deg, #eef6fe, #bfe0fb); }
+.sc-intro { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-bottom: 30px; animation: tp-soft-in .6s var(--tp-out) both; }
+.sc-studio { position: absolute; left: 22px; top: 18px; color: rgba(15, 53, 79, .73); font-size: 11.5px; font-weight: 500; }
+.sc-intro p { margin: 0 0 11px; color: rgba(16, 49, 75, .78); font-size: 30px; font-weight: 400; letter-spacing: -.024em; line-height: 1.1; }
+.sc-intro h3 { margin: 0; padding: 0; border: 0; color: #0d2033; font-family: 'Geist Variable', 'Geist', 'Inter', -apple-system, 'Segoe UI', sans-serif; font-size: 76px; font-weight: 400; letter-spacing: -.05em; line-height: 1.02; }
+.sc-intro-go { display: inline-grid; place-items: center; min-width: 160px; min-height: 48px; margin-top: 46px; padding: 0 24px; border: 1px solid rgba(255, 255, 255, .72); border-radius: 999px; color: #102335; background: linear-gradient(111deg, rgba(255, 255, 255, .25), rgba(255, 255, 255, .45) 49%, rgba(203, 235, 255, .3)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .72), 0 10px 28px rgba(33, 104, 145, .13); font-size: 15px; transition: transform .25s var(--tp-spring); }
+.sc-intro-go.is-pressed { transform: scale(.96); }
+.sc-assist { position: absolute; inset: 0; padding: 16px 22px; background: linear-gradient(160deg, #f1f7fd, #dcecf9); animation: tp-soft-in .5s var(--tp-out) both; }
+.sc-assist header { display: flex; justify-content: space-between; align-items: center; color: #0f1d2c; }
+.sc-assist header b { font-size: 12.5px; font-weight: 600; }
+.sc-assist header small { color: #5a6d7e; font-size: 11px; }
+.sc-card { position: absolute; left: 50%; top: 52px; display: grid; grid-template-columns: 260px 1fr; width: 760px; height: 500px; margin-left: -380px; overflow: hidden; border: 1px solid rgba(255, 255, 255, .95); border-radius: 18px; background: linear-gradient(150deg, rgba(255, 255, 255, .95), rgba(236, 245, 253, .9)); box-shadow: 0 20px 50px rgba(60, 110, 160, .14); }
+.sc-card aside { padding: 34px 26px; border-right: 1px solid #e3edf5; background: rgba(255, 255, 255, .5); }
+.sc-card aside small, .sc-card-body > small { color: #64798b; font-size: 10.5px; letter-spacing: .02em; }
+.sc-card aside h4 { margin: 8px 0 12px; padding: 0; border: 0; color: #0f1d2c; font-size: 24px; font-weight: 500; letter-spacing: -.03em; line-height: 1.2; }
+.sc-card aside p { margin: 0 0 22px; color: #5a6d7e; font-size: 12px; line-height: 1.6; }
+.sc-card ol { margin: 0; padding: 0; list-style: none; }
+.sc-card li { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; color: #6a7d8d; font-size: 11.5px; }
+.sc-card li span { display: grid; place-items: center; width: 20px; height: 20px; border: 1px solid #c7dde8; border-radius: 50%; font-size: 10px; }
+.sc-card-body { position: relative; padding: 34px 30px 0; }
+.sc-card-body h3 { margin: 10px 0 10px; padding: 0; border: 0; color: #0f1d2c; font-size: 32px; font-weight: 500; letter-spacing: -.04em; line-height: 1.15; }
+.sc-card-body p { margin: 0 0 30px; color: #5a6d7e; font-size: 12.5px; line-height: 1.5; }
+.sc-langs { display: flex; flex-direction: column; gap: 6px; }
+.sc-langs span { padding: 13px 16px; border: 1px solid transparent; border-radius: 10px; color: #13202c; font-size: 13px; line-height: 1.2; transition: background .2s, border-color .2s; }
+.sc-langs span.is-on { border-color: #d5e6ef; background: rgba(255, 255, 255, .95); }
+.sc-card-body footer { position: absolute; left: 30px; right: 26px; bottom: 26px; display: flex; align-items: center; justify-content: space-between; }
+.sc-card-body footer small { color: #64798b; font-size: 10.5px; }
+.sc-next { padding: 10px 30px; border-radius: 999px; color: #fff; background: #8b9096; font-size: 13px; font-weight: 600; }
+
+/* Linux over SSH from a Mac: a macOS desktop (kit/MacDesktop.vue), Terminal and a Safari-like window. */
+.mac-desk { position: absolute; inset: 0; overflow: hidden; color: #1d1d1f; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', 'PingFang SC', 'PingFang TC', 'Apple SD Gothic Neo', sans-serif; }
+/* Wallpaper artwork by pixiv@seamonsterping. The file is left out of the public source (.publicignore); without
+   it the url does not resolve and the gradient under it shows instead. */
+.mac-wall { position: absolute; inset: 0; background: url('../assets/mac-wallpaper.jpg') center / cover no-repeat,
+  linear-gradient(180deg, #86bde6 0%, #bfe0f0 34%, #eadcb0 52%, #cfc479 66%, #94b462 82%, #6a8e4c 100%); }
+.mac-menubar { position: absolute; left: 0; right: 0; top: 0; z-index: 30; display: flex; align-items: center; gap: 19px; height: 28px; padding: 0 16px 0 20px; color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, .25); font-size: 13px; }
+.mac-menubar b { font-weight: 700; }
+.mac-apple { margin-right: 4px; }
+.mac-status { display: flex; align-items: center; gap: 17px; margin-left: auto; }
+.mac-widgets { position: absolute; left: 22px; top: 44px; z-index: 2; display: flex; flex-direction: column; gap: 14px; }
+.mac-widget { width: 158px; padding: 14px 16px; border: 1px solid rgba(255, 255, 255, .45); border-radius: 22px; color: #fff; background: rgba(255, 255, 255, .22); backdrop-filter: blur(20px) saturate(1.4); box-shadow: 0 8px 24px rgba(0, 0, 0, .1); text-shadow: 0 1px 2px rgba(0, 0, 0, .2); }
+.mac-widget.is-clock b { display: block; font-size: 38px; font-weight: 600; letter-spacing: -.02em; line-height: 1.1; }
+.mac-widget.is-clock small { font-size: 12px; opacity: .9; }
+.mac-widget.is-calendar small { color: #ff5a4f; font-size: 11px; font-weight: 700; text-shadow: none; }
+.mac-cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px 0; margin-top: 6px; font-size: 10px; text-align: center; }
+.mac-cal span.is-head { font-weight: 700; opacity: .85; }
+.mac-cal span.is-today { border-radius: 50%; color: #fff; background: #ff3b30; text-shadow: none; }
+.mac-icons { position: absolute; right: 26px; top: 46px; z-index: 2; display: flex; flex-direction: column; gap: 18px; align-items: center; color: #fff; font-size: 12px; text-align: center; text-shadow: 0 1px 3px rgba(0, 0, 0, .45); }
+.mac-icons span { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 90px; }
+.mac-folder { width: 58px; height: 46px; border-radius: 6px; background: linear-gradient(#70c3f7, #3a9de8); box-shadow: inset 0 6px 0 rgba(255, 255, 255, .25), 0 3px 8px rgba(0, 0, 0, .18); clip-path: polygon(0 12%, 38% 12%, 46% 0, 100% 0, 100% 100%, 0 100%); }
+.mac-file { width: 42px; height: 54px; border-radius: 3px; background: linear-gradient(#fff, #eceff3); box-shadow: 0 3px 8px rgba(0, 0, 0, .2); clip-path: polygon(0 0, 72% 0, 100% 22%, 100% 100%, 0 100%); }
+.mac-term { position: absolute; left: 230px; top: 150px; z-index: 10; width: 820px; height: 460px; overflow: hidden; border: 1px solid rgba(0, 0, 0, .3); border-radius: 16px; background: #1c2131; box-shadow: 0 0 0 .5px rgba(255, 255, 255, .25) inset, 0 28px 70px rgba(0, 0, 0, .35), 0 6px 18px rgba(0, 0, 0, .18);
+  opacity: 0; transform: translateY(160px) scale(.2); transform-origin: 50% 100%; transition: opacity .3s ease, transform .55s var(--tp-out), filter .4s ease; }
+.mac-term.is-open { opacity: 1; transform: none; }
+.mac-term.is-static { transition: none; }
+.mac-term.is-behind { filter: brightness(.88); }
+.mac-titlebar { position: relative; display: flex; align-items: center; justify-content: center; height: 28px; border-bottom: 1px solid #c8c8c8; background: linear-gradient(#ececec, #e2e2e2); }
+.mac-lights { position: absolute; left: 10px; top: 8px; display: flex; gap: 8px; }
+.mac-lights i { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 .5px rgba(0, 0, 0, .18); }
+.mac-lights i:nth-child(1) { background: #ff5f57; }
+.mac-lights i:nth-child(2) { background: #febc2e; }
+.mac-lights i:nth-child(3) { background: #28c840; }
+.mac-lights.is-idle i { background: #cfcfcf; }
+.mac-title { display: flex; align-items: center; gap: 6px; color: #4d4d4d; font-size: 13px; font-weight: 600; }
+.mac-title svg { color: #8a8a8a; }
+.mac-term-body { padding: 5px 8px; color: #e8e8e8; font: 12px/17px 'SF Mono', Menlo, Monaco, Consolas, monospace; }
+.mac-line { min-height: 17px; white-space: pre-wrap; word-break: break-all; }
+.mac-cursor { display: inline-block; width: 7px; height: 14px; margin-left: 1px; vertical-align: -2px; border: 1px solid #e8e8e8; box-sizing: border-box; }
+.mac-dock { position: absolute; left: 50%; bottom: 8px; z-index: 30; display: flex; align-items: center; gap: 7px; padding: 7px 9px; transform: translateX(-50%); border: 1px solid rgba(255, 255, 255, .55); border-radius: 24px; background: rgba(255, 255, 255, .28); backdrop-filter: blur(26px) saturate(1.6); box-shadow: 0 10px 30px rgba(0, 0, 0, .15), inset 0 1px 0 rgba(255, 255, 255, .5); }
+.mac-dock-sep { width: 1px; height: 40px; margin: 0 2px; background: rgba(0, 0, 0, .18); }
+.mac-app { position: relative; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 12px; color: #fff; background: linear-gradient(160deg, #6aa8f5, #2f6fd8); box-shadow: 0 2px 6px rgba(0, 0, 0, .15), inset 0 1px 0 rgba(255, 255, 255, .35); transition: transform .25s var(--tp-spring); }
+.mac-app.is-pressed { transform: scale(.88); filter: brightness(.8); }
+.mac-app.is-finder { background: linear-gradient(160deg, #8fd0ff, #2a8bf2); }
+.mac-app.is-launchpad { background: linear-gradient(160deg, #f4f4f6, #cfd3da); color: #555; }
+.mac-app.is-safari { background: linear-gradient(160deg, #6fd6ff, #1a7ef2); }
+.mac-app.is-mail { background: linear-gradient(160deg, #5ab8ff, #1565e0); }
+.mac-app.is-photos { background: linear-gradient(160deg, #fff, #f0f0f2); color: #f2994a; }
+.mac-app.is-music { background: linear-gradient(160deg, #ff6a85, #fa2d55); }
+.mac-app.is-notes { background: linear-gradient(160deg, #fff6c8, #ffd84a); color: #8a6a00; }
+.mac-app.is-calendar { background: #fff; color: #ff3b30; }
+.mac-app.is-code { background: linear-gradient(160deg, #3fa8ff, #0f5fc4); }
+.mac-app.is-terminal { background: linear-gradient(160deg, #3a3a3c, #121214); color: #e8e8e8; }
+.mac-app.is-settings { background: linear-gradient(160deg, #b8bec7, #6d747e); }
+.mac-app.is-trash { background: rgba(255, 255, 255, .35); color: #555; }
+.mac-app.is-running::after { content: ''; position: absolute; bottom: -6px; left: 50%; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: rgba(0, 0, 0, .55); }
+/* The browser with macOS window controls. */
+.sc-browser.is-mac .sc-tabs { position: relative; justify-content: center; align-items: center; height: 38px; padding: 0; background: #f2f2f4; }
+.sc-browser.is-mac .sc-tab { height: 26px; padding: 0 14px; border-radius: 7px; background: #e4e4e8; }
+.sc-browser.is-mac .mac-lights { left: 14px; top: 13px; }
+.sc-browser.is-mac .sc-address { justify-content: center; }
+.sc-browser.is-mac .sc-address span { flex: none; width: 420px; text-align: center; }
+.sc-browser.is-mac { border-radius: 16px; top: 44px; height: 640px; }

@@ -1,0 +1,27 @@
+# The DynamicConfig content kr-812 is served: one entry per registry bit, each naming its schema in
+# packets/dynamic-config.yaml and carrying the content rows that schema marshals. kr-812 reads the category's plain
+# bytes (no zlib frame, kr-812 sub_45B5E0), so the server frames exactly the bytes its schema writes. Like
+# dynamic-config-content.yml this is content, not a layout, so it keeps the .yml suffix. A bit whose schema or content
+# is missing is simply not served.
+slots:
+  # kr-812 registers category 3 as the plaza mini-game configuration (kr-812 sub_464390, decoder kr-812 sub_464240). The
+  # prices are the values the booths show and send back as their displayed cost, so the server charges exactly these.
+  3:
+    schema: LobbyMinigameContext
+    content:
+      flag_a: 1
+      basketball_cost: 50
+      unknown_6: 2000
+      unknown_8: 500
+      unknown_10: 4000
+      flag_12: 1
+      # Fishing is free: a priced cast would cost this times the day's catches plus one.
+      fishing_cost: 0
+      fishing_second_cost: 0
+      unknown_20: 120
+      unknown_22: 10
+      unknown_24: 15
+      unknown_26: 8
+      unknown_28: 190083
+      flag_32: 1
+      fortune_cost: 200

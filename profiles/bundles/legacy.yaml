@@ -102,6 +102,10 @@
     # The gift box: kr-812 sub_837170 cases 815..828 and the client's gift dialogs (kr-812 sub_96F350, sub_960BE0).
     # Every build of this bundle has the classes (packets/builds.yaml present_box); the shop row below serves them.
     present_box: true
+    # Cash item inbox (packets/cash-inbox.yaml, packets/cash-inventory.yaml): kr-812 sub_950870/kr-812 sub_952F40 (open),
+    # kr-812 sub_80A910 (pickup), kr-812 sub_6D8620 (close), kr-812 sub_842C70/kr-812 sub_842980 (list), kr-812
+    # kr-812 sub_6DB1B0/kr-812 sub_824310 (pickup reply). Unsupported early builds (kr-186, cn-279) turn this off in patch.yaml.
+    cash_inbox: true
     # kr-812 sub_837170 case 12 sets the creation flag that kr-812 sub_681FE0 turns into the creation stage.
     character_creation: true
     # Party packets (packets/party.yaml); a build without the party capability or one of its opcode rows turns
@@ -193,6 +197,8 @@
   # build subtree publishes its own copies, and nothing here sees another build's.
   isolated_services:
     - BubbleFighter.Fantasy.Contracts.Lobby.IRetainedPlayerAdmission
+    - BubbleFighter.Fantasy.Contracts.Couples.ICoupleRingCatalog
+    - BubbleFighter.Fantasy.Contracts.Clans.IClanCreationCards
     - BubbleFighter.Fantasy.Contracts.Inventory.IInventoryPushService
     - BubbleFighter.Fantasy.Contracts.Inventory.IEquipmentSelection
     - BubbleFighter.Fantasy.Contracts.Inventory.IInventoryExpiry
@@ -200,6 +206,7 @@
     - BubbleFighter.Fantasy.Contracts.Inventory.IEquippedViewPush
     - BubbleFighter.Fantasy.Contracts.Inventory.IWeaponPresetPageSource
     - BubbleFighter.Fantasy.Contracts.Shop.IShopGiftService
+    - BubbleFighter.Fantasy.Contracts.CashInbox.ICashInboxService
     - BubbleFighter.Fantasy.Contracts.Inventory.IPaintItemCatalog
     - BubbleFighter.Fantasy.Contracts.Players.IOnlinePlayers
     - BubbleFighter.Fantasy.Contracts.Party.IPartyDirectory
@@ -1005,6 +1012,10 @@
     # the same purchase transaction when the receiver takes it (packets/present.yaml).
     present_box: true
     max_presents_per_player: 100
+    # Cash item inbox (packets/cash-inbox.yaml, packets/cash-inventory.yaml): stores granted cash stock items and commits
+    # pickups atomically into the character bag; unsupported early builds turn this off in patch.yaml.
+    cash_inbox: true
+    max_cash_inbox_entries_per_player: 64
     # Native reward previews resolve through the build's full workbook, including off-sale stocks and Lucci sets.
     # Missing or placeholder-only guides grant nothing. Explicit entries override native milestones. Login recovers
     # every attained, unclaimed milestone, including levels attained before enablement. Example:

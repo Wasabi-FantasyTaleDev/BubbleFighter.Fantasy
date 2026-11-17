@@ -12,6 +12,24 @@ internal sealed partial class RoundFlow
     private IMessageSender<RoundExtremeRacingInitialized>? _racingInitialized;
     private IMessageSender<RoundExtremeRacingCannonCommand>? _racingCannonCommand;
     private IReadOnlyDictionary<string, ExtremeRacingMapData>? _racingMaps;
+    private IClientDataStore? _racingRoundData;
+
+    /// <summary>Uses bounded native map options for each selected track's race length.</summary>
+    internal void ConfigureExtremeRacingMapRounds(IClientDataStore store)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+        if (!_options.ExtremeRacingMapRounds || _extremeRacing is null)
+            throw new ConfigException("extreme_racing_map_rounds requires the enabled racing round exchange.");
+        _racingRoundData = store;
+    }
+
+    private int ExtremeRacingRoundCount(string stage)
+    {
+        if (!_options.ExtremeRacingMapRounds) return _options.ExtremeRacingRounds;
+        if (_racingMaps?.TryGetValue(stage, out var map) == true) return map.StageCount;
+        var store = _racingRoundData ?? throw new InvalidOperationException("Native racing map rounds have no client data store.");
+        return ExtremeRacingMapData.ReadStageCount(store, stage, _options.ExtremeRacingMaximumFileBytes);
+    }
 
     private void ValidateExtremeRacingMap(PlayRoom room, string stage)
     {
@@ -20,6 +38,8 @@ internal sealed partial class RoundFlow
         if (!IsExtremeRacingMode(room)) return;
         if (_options.ExtremeRacingInitialization && _racingMaps?.ContainsKey(stage) != true)
             throw new InvalidOperationException($"Racing stage '{stage}' has no validated initialization policy.");
+        _ = ExtremeRacingRoundCount(stage);
+        if (_options.ExtremeRacingMapState) _ = ReadExtremeRacingMapState(stage);
     }
 
     internal void ConfigureExtremeRacingInitialization(IClientDataStore store,
@@ -38,7 +58,7 @@ internal sealed partial class RoundFlow
                 stage.FirstStoneDisposerIdentity, stage.CoinVariant!.Value, stage.CoinRounds);
             var map = ExtremeRacingMapData.Load(store, stage.StageDirectory, policy, limits,
                 Enumerable.Range(0, 16).Select(RoomRegistry.SceneEntity).ToArray());
-            if (map.StageCount != _options.ExtremeRacingRounds)
+            if (!_options.ExtremeRacingMapRounds && map.StageCount != _options.ExtremeRacingRounds)
                 throw new ConfigException($"Racing stage '{stage.StageDirectory}' provides {map.StageCount} rounds; extreme_racing_rounds is {_options.ExtremeRacingRounds}.");
             if (_options.ExtremeRacingCannon)
                 map = map with
@@ -57,11 +77,13 @@ internal sealed partial class RoundFlow
 
     private void PrepareExtremeRacingInitialization(PlayRoom room)
     {
-        if (!IsExtremeRacingMode(room) || !_options.ExtremeRacingInitialization) return;
+        if (!IsExtremeRacingMode(room)) return;
         lock (room.Gate)
         {
-            if (room.RacingInitialization?.Generation == room.StartGeneration) return;
             var stage = room.RoundStageKey.Length > 0 ? room.RoundStageKey : room.RoundMapKey;
+            room.ExtremeRacing.MatchRounds ??= ExtremeRacingRoundCount(stage);
+            PrepareExtremeRacingMapState(room, stage);
+            if (!_options.ExtremeRacingInitialization || room.RacingInitialization?.Generation == room.StartGeneration) return;
             if (_racingMaps is null || !_racingMaps.TryGetValue(stage, out var map))
                 throw new InvalidOperationException($"Racing stage '{stage}' has no validated initialization policy.");
             room.RacingInitialization = new(room.StartGeneration, map);

@@ -153,6 +153,12 @@ internal enum RoomFieldValue
     /// <summary>The seated player's level.</summary>
     Level,
 
+    /// <summary>The account identity matched to another seated player for the couple icon.</summary>
+    CouplePartnerUserNum,
+
+    /// <summary>The partner name carried beside the native couple identity.</summary>
+    CouplePartnerName,
+
     /// <summary>The slot index of the room master, <c>gspGotoRoom</c> +680.</summary>
     MasterSlot,
 
@@ -209,6 +215,9 @@ internal sealed record RoomSlotValues(bool Occupied, bool Closed, int UserNumber
 
     /// <summary>Gets the player's level.</summary>
     public int Level { get; init; } = 1;
+
+    /// <summary>Gets the committed partner identity, independent of the player's level.</summary>
+    public BubbleFighter.Fantasy.Contracts.Couples.CoupleSceneState? Couple { get; init; }
 
     /// <summary>The character item an empty slot carries.</summary>
     public const int VacantCharacterItem = 300000;
@@ -359,6 +368,13 @@ internal static class RoomCodec
     public const int TutorialSelectKind = 5;
 
     /// <summary>
+    /// Clan scene. <c>kr-812 sub_820060</c> and <c>cn-717 sub_8A6D50</c> kind 6 call <c>SetStage(15)</c>; the stage
+    /// factory (<c>cn-717 sub_97C300</c> case 15) builds <c>ClanStage</c> (<c>cn-717 sub_44C3F0</c>), whose setup
+    /// (<c>cn-717 sub_44C790</c>) reads the local player only; members come from the clan server's roster.
+    /// </summary>
+    public const int ClanSceneKind = 6;
+
+    /// <summary>
     /// Writes the <c>gspGotoMenu</c>/<c>gspGotoLobby</c> scene transition and its party notice flag.
     /// kr-812 sub_80C160 reads one bool32; kr-812 sub_81FDA0 and kr-812 sub_81FF00 consume it.
     /// </summary>
@@ -438,7 +454,7 @@ internal static class RoomCodec
     {
         // Main menu and tutorial select share the zero mode / empty map strings. Only kind 2
         // (and other play kinds) may carry PlayTutorial's mode 103 + Directory / CurrentMap / key.
-        if (kind is MainMenuKind or TutorialSelectKind)
+        if (kind is MainMenuKind or TutorialSelectKind or ClanSceneKind)
         {
             mode = 0;
             mapName = "";
@@ -589,7 +605,7 @@ internal static class RoomCodec
         RoomSchema schema, int kind, int mode = 0, string mapName = "", string mapDirectory = "",
         string currentMap = "", int difficulty = 0, string npcTableKey = "")
     {
-        var neutral = kind is MainMenuKind or TutorialSelectKind;
+        var neutral = kind is MainMenuKind or TutorialSelectKind or ClanSceneKind;
         return WriteRoomEnvelope(tables, build, schema, new RoomValues(kind, [Seated(player, ready: false)])
         {
             Mode = neutral ? 0 : mode, MapName = neutral ? "" : mapName,
@@ -741,10 +757,12 @@ internal static class RoomCodec
             RoomFieldValue.SpawnIndex => slot?.SpawnIndex ?? 0xFF,
             RoomFieldValue.ControllerSlot => slot is { Occupied: true } ? slot.ControllerSlot : 0xFF,
             RoomFieldValue.Level => slot is not null && (slot.Occupied || slot.Departed) ? slot.Level : field.Vacant ?? 0,
+            RoomFieldValue.CouplePartnerUserNum => slot is { Occupied: true, Couple: { } couple }
+                ? NativeCoupleScene.PartnerUserNumber(couple) : field.Constant,
             RoomFieldValue.MasterSlot => room.MasterSlot,
             RoomFieldValue.LocalSlot => room.LocalSlot,
             RoomFieldValue.PartyTransition => room.PartyTransition ? 1 : 0,
-            RoomFieldValue.Nickname or RoomFieldValue.MapName or RoomFieldValue.MapDirectory
+            RoomFieldValue.Nickname or RoomFieldValue.CouplePartnerName or RoomFieldValue.MapName or RoomFieldValue.MapDirectory
                 or RoomFieldValue.CurrentMap or RoomFieldValue.NpcTableKey or RoomFieldValue.MasterNickname
                 or RoomFieldValue.MapTheme or RoomFieldValue.Title => 0,
             _ => throw new InvalidOperationException($"Unknown room field value {field.Value}."),
@@ -754,6 +772,7 @@ internal static class RoomCodec
         field.Value switch
         {
             RoomFieldValue.Nickname => slot?.Nickname ?? "",
+            RoomFieldValue.CouplePartnerName => slot is { Occupied: true, Couple: { } couple } ? couple.PartnerName : "",
             RoomFieldValue.MapName => room.MapName,
             RoomFieldValue.MapDirectory => room.MapDirectory,
             RoomFieldValue.CurrentMap => room.CurrentMap,

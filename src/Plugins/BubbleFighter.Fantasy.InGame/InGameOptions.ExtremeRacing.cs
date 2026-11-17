@@ -4,10 +4,16 @@ public sealed partial class InGameOptions
 {
     /// <summary>
     /// Gets or sets how many race rounds an ExtremeRacing match (round mode 24) plays when the build's exchange is
-    /// mounted. The client accepts rounds 1 to 5 (kr-1256 sub_67B800 and kr-1256 sub_CE5600 compare the round minus one with
-    /// 4); how many goals a map provides is map data the server does not read. YAML key <c>extreme_racing_rounds</c>.
+    /// mounted. Supported tracks have one to five stages; kr-1256 sub_67B920 reads SavePoint/StageCount with fallback five.
+    /// Used when extreme_racing_map_rounds is off; YAML key <c>extreme_racing_rounds</c>.
     /// </summary>
     public int ExtremeRacingRounds { get; set; } = 3;
+
+    /// <summary>
+    /// Gets or sets whether the selected map's native SavePoint/StageCount determines its match length instead of
+    /// extreme_racing_rounds. The value is frozen before play; YAML key <c>extreme_racing_map_rounds</c>.
+    /// </summary>
+    public bool ExtremeRacingMapRounds { get; set; }
 
     /// <summary>
     /// Gets or sets the race clock of one round in milliseconds; a round whose clock runs out ends without waiting

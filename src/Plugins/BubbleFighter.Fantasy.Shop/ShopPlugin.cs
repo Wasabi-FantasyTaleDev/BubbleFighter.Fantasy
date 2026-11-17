@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Net;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
+using BubbleFighter.Fantasy.Contracts.CashInbox;
 using BubbleFighter.Fantasy.Contracts.Presents;
 using BubbleFighter.Fantasy.Contracts.Progress;
 using BubbleFighter.Fantasy.Contracts.Sessions;
@@ -38,8 +39,8 @@ namespace BubbleFighter.Fantasy.Shop;
     Description = "Item shop and cash shop catalog from Config/ShopItem2.xml with persisted purchases. Dialect selected by the build's lineage.",
     Requires = [typeof(IMessageRouter), typeof(IShopSessionStore)],
     // An inventory-only row reads no workbook; a row that does fails at activation without the clientdata service.
-    Optional = [typeof(BubbleFighter.Fantasy.Contracts.Pets.IPetEntitlements), typeof(BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore), typeof(IShopPurchaseStore), typeof(IPlayerWalletRepository), typeof(IInventoryPushService), typeof(IInventoryRepository), typeof(IEquippedViewPush), typeof(IInventoryExpiry), typeof(IPresentStore), typeof(ISessionRegistry), typeof(IPlayerProgressRepository)], OptionalMany = [typeof(IInboundMessageBinding<PresentSendRequested>), typeof(IInboundMessageBinding<PresentListRequested>), typeof(IInboundMessageBinding<PresentActionRequested>), typeof(IInboundMessageBinding<PresentNoticeRequested>), typeof(IMessageSender<PresentSendReplied>), typeof(IMessageSender<PresentListReplied>), typeof(IMessageSender<PresentActionReplied>), typeof(IMessageSender<PresentNoticeSent>), typeof(IMessageSender<ShopStateUpdated>), typeof(IMessageSender<ShopBalanceUpdated>), typeof(IInboundMessageBinding<ShopBalanceRequested>), typeof(IMessageSender<ShopPurchaseReplied>), typeof(IInboundMessageBinding<ShopPurchaseRequested>), typeof(IInboundMessageBinding<ShopInventoryRequested>), typeof(IInboundMessageBinding<ShopCatalogRequested>), typeof(IInboundMessageBinding<ShopCashCatalogRequested>), typeof(IInboundMessageBinding<ShopCardInfoRequested>), typeof(IInboundMessageBinding<ShopCouponUseRequested>), typeof(IInboundMessageBinding<ShopCashCheckRequested>), typeof(IMessageSender<ShopCatalogPublished>), typeof(IMessageSender<ShopCashCatalogPublished>), typeof(IMessageSender<ShopCardInfoReplied>), typeof(IMessageSender<ShopCouponUseReplied>), typeof(IMessageSender<ShopCashCheckReplied>), typeof(IMessageSender<EquippedArticlesFlushed>), typeof(IMessageSender<InventoryReplaced>), typeof(IMessageSender<ItemsExpired>)],
-    ConditionalProvides = [typeof(IShopGiftService)])]
+    Optional = [typeof(BubbleFighter.Fantasy.Contracts.Pets.IPetEntitlements), typeof(BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore), typeof(IShopPurchaseStore), typeof(IPlayerWalletRepository), typeof(IInventoryPushService), typeof(IInventoryRepository), typeof(IEquippedViewPush), typeof(IInventoryExpiry), typeof(IPresentStore), typeof(ICashInboxStore), typeof(ISessionRegistry), typeof(IPlayerProgressRepository), typeof(BubbleFighter.Fantasy.Contracts.MysteryStore.IMysteryStore), typeof(IInventoryBuildScope), typeof(BubbleFighter.Fantasy.Contracts.Enhancement.IEquipmentArticleResolver)], OptionalMany = [typeof(IInboundMessageBinding<PresentSendRequested>), typeof(IInboundMessageBinding<PresentListRequested>), typeof(IInboundMessageBinding<PresentActionRequested>), typeof(IInboundMessageBinding<PresentNoticeRequested>), typeof(IMessageSender<PresentSendReplied>), typeof(IMessageSender<PresentListReplied>), typeof(IMessageSender<PresentActionReplied>), typeof(IMessageSender<PresentNoticeSent>), typeof(IInboundMessageBinding<CashInboxOpenRequested>), typeof(IInboundMessageBinding<CashInboxPickupRequested>), typeof(IInboundMessageBinding<CashInboxCloseRequested>), typeof(IMessageSender<CashInventoryPublished>), typeof(IMessageSender<CashInboxPickupReplied>), typeof(IMessageSender<ShopStateUpdated>), typeof(IMessageSender<ShopBalanceUpdated>), typeof(IInboundMessageBinding<ShopBalanceRequested>), typeof(IMessageSender<ShopPurchaseReplied>), typeof(IInboundMessageBinding<ShopPurchaseRequested>), typeof(IInboundMessageBinding<ShopInventoryRequested>), typeof(IInboundMessageBinding<ShopCatalogRequested>), typeof(IInboundMessageBinding<ShopCashCatalogRequested>), typeof(IInboundMessageBinding<ShopCardInfoRequested>), typeof(IInboundMessageBinding<ShopCouponUseRequested>), typeof(IInboundMessageBinding<ShopCashCheckRequested>), typeof(IMessageSender<ShopCatalogPublished>), typeof(IMessageSender<ShopCashCatalogPublished>), typeof(IMessageSender<ShopCardInfoReplied>), typeof(IMessageSender<ShopCouponUseReplied>), typeof(IMessageSender<ShopCashCheckReplied>), typeof(IMessageSender<EquippedArticlesFlushed>), typeof(IMessageSender<InventoryReplaced>), typeof(IMessageSender<ItemsExpired>), typeof(IInboundMessageBinding<BubbleFighter.Fantasy.Contracts.MysteryStore.MysteryStoreRequested>), typeof(IMessageSender<BubbleFighter.Fantasy.Contracts.MysteryStore.MysteryStoreReplied>)],
+    ConditionalProvides = [typeof(IShopGiftService), typeof(ICashInboxService)])]
 public sealed class ShopPlugin : IPlugin
 {
     // The workbook always comes from the build's client data by client path; a row without the clientdata
@@ -66,6 +67,8 @@ public sealed class ShopPlugin : IPlugin
             context.Logger.LogWarning("shop.level_rewards is set but the gift box is off on '{Protocol}'; level rewards are skipped.", options.Protocol);
         if (options.InventoryOnly)
         {
+            if (options.CashInbox)
+                throw new ConfigException("cash_inbox cannot be used with inventory_only.");
             var inventory = context.Services.Get<IInventoryRepository>();
             var replaced = RequireShopSender<InventoryReplaced>(context, options.Protocol);
             if (!context.Services.GetAll<IInboundMessageBinding<ShopInventoryRequested>>()
@@ -171,10 +174,16 @@ public sealed class ShopPlugin : IPlugin
                     context.Effect(legacyRoutes.On<ShopBalanceRequested>(options.Protocol, buy.BalanceAsync));
                 if (options.PresentBox)
                     MountPresentBox(context, options, tables, catalog, conditional, resolveTerms, inventoryLegacy, ready, stateSender, legacyRoutes!);
+                if (options.CashInbox)
+                    MountCashInbox(context, options, tables, catalog, resolveTerms, stateSender, legacyRoutes!);
             }
             else if (options.PresentBox)
             {
                 throw new ConfigException("present_box requires grant_purchased_items: a receiver takes a gift through the purchase path.");
+            }
+            else if (options.CashInbox)
+            {
+                throw new ConfigException("cash_inbox requires grant_purchased_items: picking up a cash inbox item grants into the inventory through the purchase path.");
             }
             else if (enterInventory is not null)
             {
@@ -238,7 +247,7 @@ public sealed class ShopPlugin : IPlugin
         // path; one parse serves both.
         ItemTermRules? workbookRules = null;
         IReadOnlyDictionary<int, ItemTerms>? workbookTerms = null;
-        if (persistPurchases || options.PresentBox)
+        if (persistPurchases || options.PresentBox || options.CashInbox)
             (workbookRules, workbookTerms) = Kr1256Terms(options, workbook,
                 catalog.Cards.SelectMany(card => card.Stocks).Select(stock => stock.ItemId).Where(id => id > 0).ToHashSet());
         context.Services.TryGet<BubbleFighter.Fantasy.Contracts.Pets.IPetEntitlements>(out var petEntitlements);
@@ -298,6 +307,19 @@ public sealed class ShopPlugin : IPlugin
             MountPresentBox(context, options, presentTables, catalog, giftConditional,
                 Kr1256Resolve(workbookRules!, workbookTerms!), giftInventory, opens, null, routes);
         }
+        if (options.CashInbox)
+        {
+            if (!options.GrantPurchasedItems)
+                throw new ConfigException("cash_inbox requires grant_purchased_items: picking up a cash inbox item grants into the inventory through the purchase path.");
+            var cashTables = tableTables ?? PacketTables.Load(options.PacketsDirectory);
+            MountCashInbox(context, options, cashTables, catalog, Kr1256Resolve(workbookRules!, workbookTerms!),
+                null, routes);
+        }
+        MountMysteryStore(context, options, catalog, items =>
+        {
+            var (rules, terms) = Kr1256Terms(options, workbook, items);
+            return Kr1256Resolve(rules, terms);
+        });
         if (options.HoldEquipUntilInventoryOpen)
             context.Logger.LogInformation(
                 "Equip hold on: a purchase queues one gspInventoryUpdateInventorySlots container-2 record (cap {Cap} per player) and gcpEnterInventory flushes it on {Protocol}.",
@@ -422,8 +444,117 @@ public sealed class ShopPlugin : IPlugin
         }));
     }
 
+    // Cash item inbox rides the shop's catalog, item terms, and atomic character-bag grants; the dialect row owns its frames.
+    private static void MountCashInbox(
+        IPluginContext context,
+        ShopOptions options,
+        PacketTables tables,
+        ShopCatalog catalog,
+        Func<ShopStockRow, Purchasing.PurchaseGrantTerm> resolve,
+        IMessageSender<ShopStateUpdated>? state,
+        IMessageRoutes routes)
+    {
+        if (!tables.CapabilityOf(options.ClientProfile, "cash_inbox"))
+            throw new ConfigException($"cash_inbox requires a build with the cash_inbox capability; '{options.ClientProfile}' has none.");
+        if (!Bound<CashInboxOpenRequested>(context, options.Protocol)
+            || !Bound<CashInboxPickupRequested>(context, options.Protocol)
+            || !Bound<CashInboxCloseRequested>(context, options.Protocol))
+        {
+            throw new ConfigException(
+                $"cash_inbox requires the dialect row of '{options.Protocol}' to bind the cash inbox packets (cash_inbox there).");
+        }
+
+        if (!context.Services.TryGet<ICashInboxStore>(out var cashStore) || cashStore is null)
+            throw new ConfigException($"cash_inbox requires a persistence row that provides {nameof(ICashInboxStore)}.");
+        if (!context.Services.TryGet<IInventoryRepository>(out var cashInventory) || cashInventory is null)
+            throw new ConfigException($"cash_inbox requires a persistence row that provides {nameof(IInventoryRepository)}.");
+        context.Services.TryGet<IInventoryPushService>(out var push);
+        if (state is null && push is null)
+        {
+            throw new ConfigException(
+                $"cash_inbox requires the purchase state sender or the lobby inventory push to publish picked-up items on '{options.Protocol}'.");
+        }
+
+        context.Services.TryGet<ISessionRegistry>(out var sessions);
+        var service = new CashInbox.CashInboxService(
+            options,
+            catalog,
+            resolve,
+            cashInventory,
+            cashStore,
+            state,
+            push,
+            RequireShopSender<ShopBalanceUpdated>(context, options.Protocol),
+            RequireShopSender<CashInventoryPublished>(context, options.Protocol),
+            RequireShopSender<CashInboxPickupReplied>(context, options.Protocol),
+            sessions,
+            TimeProvider.System,
+            context.Logger);
+
+        foreach (var stockKey in options.CashInboxWelcomeStocks)
+        {
+            var reward = service.ResolveCatalogReward(stockKey);
+            if (reward is null || reward.Value.Stocks.Count == 0)
+            {
+                throw new ConfigException(
+                    $"cash_inbox_welcome_stocks key {stockKey} was not found or has no inventory item in '{options.ClientProfile}'.");
+            }
+
+            try
+            {
+                _ = reward.Value.Stocks.Select(resolve).ToArray();
+            }
+            catch (Exception ex) when (ex is Purchasing.PurchaseRejectedException or InvalidOperationException)
+            {
+                throw new ConfigException(
+                    $"cash_inbox_welcome_stocks key {stockKey} has invalid purchase terms in '{options.ClientProfile}': {ex.Message}");
+            }
+        }
+
+        context.Effect(context.Services.Register<ICashInboxService>(service));
+        context.Effect(routes.On<CashInboxOpenRequested>(options.Protocol, service.OpenAsync));
+        context.Effect(routes.On<CashInboxPickupRequested>(options.Protocol, service.PickupAsync));
+        context.Effect(routes.On<CashInboxCloseRequested>(options.Protocol, service.CloseAsync));
+        context.Effect(context.Events.Intercept<CashInboxSnapshotRequested, IReadOnlyList<CashInboxEntryRecord>>(
+            async (request, next, ct) =>
+            {
+                var (handled, entries) = await service.OnSnapshotRequestedAsync(request, ct).ConfigureAwait(false);
+                return handled ? entries! : await next(ct).ConfigureAwait(false);
+            }));
+        if (options.CashInboxWelcomeStocks.Length > 0)
+            context.Effect(context.Events.OnAsync<LoginMenuInstalled>(service.OnLoginWelcomeAsync));
+    }
+
     private static bool Bound<T>(IPluginContext context, string protocol) where T : IMessage =>
         context.Services.GetAll<IInboundMessageBinding<T>>().Any(binding => binding.Protocol == protocol);
+
+    // Mounts the Mysterystore where the dialect bound its request (the build's mystery_store capability and the dialect
+    // option); a bound request without a configured coin item is a configuration error, not a silent dead dialog.
+    private static void MountMysteryStore(IPluginContext context, ShopOptions options, ShopCatalog catalog,
+        Func<IReadOnlySet<int>, Func<ShopStockRow, Purchasing.PurchaseGrantTerm>> resolveFor)
+    {
+        var protocol = options.Protocol;
+        if (!context.Services.GetAll<IInboundMessageBinding<BubbleFighter.Fantasy.Contracts.MysteryStore.MysteryStoreRequested>>()
+            .Any(binding => binding.Protocol == protocol))
+            return;
+        var settings = options.MysteryStore ?? throw new ConfigException("shop.mystery_store is null.");
+        var keys = settings.Validate();
+        var items = keys.Where(catalog.Gifts.ContainsKey).SelectMany(key => catalog.Gifts[key].Stocks)
+            .Select(stock => stock.ItemId).Where(item => item > 0).ToHashSet();
+        var scope = context.Services.Get<IInventoryBuildScope>().Scope;
+        var pool = MysteryStoreFlow.ResolvePool(settings, keys, catalog, resolveFor(items), scope, context.Logger);
+        context.Services.TryGet<BubbleFighter.Fantasy.Contracts.Enhancement.IEquipmentArticleResolver>(out var articles);
+        context.Services.TryGet<BubbleFighter.Fantasy.Contracts.Pets.IPetEntitlements>(out var pets);
+        var flow = new MysteryStoreFlow(settings, scope, pool, MysteryStoreFlow.Fingerprint(settings, pool),
+            context.Services.Get<BubbleFighter.Fantasy.Contracts.MysteryStore.IMysteryStore>(),
+            RequireShopSender<BubbleFighter.Fantasy.Contracts.MysteryStore.MysteryStoreReplied>(context, protocol),
+            RequireShopSender<InventoryReplaced>(context, protocol), TimeProvider.System, Random.Shared.Next, context.Logger,
+            articles, pets);
+        context.Effect(context.Services.Get<IMessageRouter>().For(context)
+            .On<BubbleFighter.Fantasy.Contracts.MysteryStore.MysteryStoreRequested>(protocol, flow.HandleAsync));
+        context.Logger.LogInformation("Mysterystore on {Protocol}: {Offers} offers, coin item {Coin}, card price {Price}, refresh {Refresh}, rotation {Seconds} s.",
+            protocol, pool.Count, settings.CoinItemId, settings.OfferCoinPrice, settings.RefreshCoinCost, settings.RotationSeconds);
+    }
 
     private static IMessageSender<T> RequireShopSender<T>(IPluginContext context, string protocol) where T : IMessage
     {

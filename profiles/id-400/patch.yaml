@@ -1,6 +1,12 @@
 # Profile patch for id-400: applied after the bundle rows (see profiles/kr-1256/patch.yaml
 # for the supported operations).
 - set:
+    id: inventory.couple-catalog
+    config:
+      # id-400 sub_97A6F0 accepts the invitation; sub_805C10 tolerates a missing display ring.
+      # The native workbook omits this stock. Preserve the invitation without borrowing a ring identity.
+      allowed_missing_display_stock_ids: [1002134]
+- set:
     id: dialect.scene-seeds
     config:
       # id-400 sub_4D5870 consumes seed decisions without adding the equipped weapon's chance.

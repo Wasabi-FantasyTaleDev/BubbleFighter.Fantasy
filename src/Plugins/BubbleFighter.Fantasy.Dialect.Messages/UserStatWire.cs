@@ -1,3 +1,4 @@
+using BubbleFighter.Fantasy.Contracts.Couples;
 using BubbleFighter.Fantasy.Packets;
 
 namespace BubbleFighter.Fantasy.Dialect.Messages;
@@ -13,7 +14,7 @@ internal static class UserStatWire
     // The modern family's handler kr-1256 sub_9D8030 reads the whole FighterInfo the modern login codec
     // writes (FighterInfo@kr-1256), so that family carries the identity, character type and name rows.
     internal static byte[] Write(PacketTables tables, string build, string nickname, int level, int lucci, int cash,
-        ushort colorIndex = 0, long userNum = 0)
+        ushort colorIndex = 0, long userNum = 0, CoupleProfileState? couple = null)
     {
         ValidateLayouts(tables, build);
         var values = new Dictionary<string, object?>(StringComparer.Ordinal)
@@ -22,7 +23,7 @@ internal static class UserStatWire
         };
         if (HasModernFighterRows(tables, build))
         {
-            values["fighter"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+            var fighter = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
                 ["user_number"] = checked((int)userNum),
                 ["nickname"] = nickname,
@@ -32,12 +33,15 @@ internal static class UserStatWire
                 // The social block keeps its constructor defaults; its own +4 must not take the identity above.
                 ["social"] = new Dictionary<string, object?>(StringComparer.Ordinal),
             };
+            CoupleProfileWire.AddToFighter(tables, build, fighter, couple);
+            values["fighter"] = fighter;
         }
         else
         {
             // The legacy FighterInfo takes the name and level from the enclosing map.
             values["nickname"] = nickname;
             values["level"] = NativeDisplayLevel.Project(tables, build, level);
+            CoupleProfileWire.AddToFighter(tables, build, values, couple);
         }
         return PacketCodec.Write(tables, build, "UserStat", values);
     }

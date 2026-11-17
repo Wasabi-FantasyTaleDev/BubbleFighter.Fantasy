@@ -43,7 +43,7 @@ public sealed class TitleMedalTests : IDisposable
             Assert.NotNull(committed.Inventory.EquippedBag.Single(row => row.ItemId == 301001).PetIdentity);
             Assert.Equal("3", database.RawScalar("SELECT entitlement_id FROM pet_identity_allocator WHERE singleton=1"));
             Assert.NotNull(committed.GrantedItem.ArticleIdentity);
-            Assert.Equal(13L, database.RawScalar("PRAGMA user_version"));
+            Assert.Equal(18L, database.RawScalar("PRAGMA user_version"));
         }
         using (var database = new SqliteDatabase(Options))
         {
@@ -137,7 +137,7 @@ public sealed class TitleMedalTests : IDisposable
             Assert.Equal(before.EquippedBag, after.EquippedBag);
             Assert.Equal(balances, await store.ReadAsync(user, Scope.Key, default));
             Assert.Equal("0", database.RawScalar("SELECT entitlement_id FROM pet_identity_allocator WHERE singleton=1"));
-            Assert.Equal(13L, database.RawScalar("PRAGMA user_version"));
+            Assert.Equal(18L, database.RawScalar("PRAGMA user_version"));
             committed = Assert.IsType<TitleClaimResult>(await store.TryClaimAsync(Claim(user), default));
         }
         using (var database = new SqliteDatabase(Options))

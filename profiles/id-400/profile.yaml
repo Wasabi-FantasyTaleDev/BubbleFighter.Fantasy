@@ -11,6 +11,9 @@ description: Indonesian 2014 client build, ClientVersion_Major 400, resource VER
 bundles:
   - core
   - legacy
+  - clan
+  - clan-gateway
+  - couples
 # What this build differs in; everything else is the legacy bundle's (kr-812).
 vars:
   # The client builds native feeding dates in its own region's civil time (UTC+7).
@@ -24,6 +27,7 @@ vars:
   LEGACY_SEATS: 8
 patches:
   - patch.yaml
+  - ../bundles/clan-legacy.patch.yaml
   - bomb.patch.yaml
   - captain.patch.yaml
   - ../bundles/shop-supplement-lucci.yaml

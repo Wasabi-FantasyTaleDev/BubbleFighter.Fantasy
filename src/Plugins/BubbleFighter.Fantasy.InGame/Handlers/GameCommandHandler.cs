@@ -44,6 +44,12 @@ internal sealed class GameCommandHandler(RoomRegistry registry,
 
     internal Func<ISession, CancellationToken, ValueTask<bool>>? LeavePlayingMatchToPlaza { get; set; }
 
+    /// <summary>Gets or sets whether <c>!plaza</c> may take a player out of a loading or playing round.</summary>
+    internal bool PlazaDuringRound { get; set; } = true;
+
+    /// <summary>Gets or sets the operation that ends a playing round at once, as its time limit would.</summary>
+    internal Func<PlayRoom, CancellationToken, ValueTask>? EndRoundNow { get; set; }
+
     /// <inheritdoc />
     public string Scope { get; private set; } = "";
 
@@ -178,6 +184,13 @@ internal sealed class GameCommandHandler(RoomRegistry registry,
     {
         var leave = requirePlayingMatch ? LeavePlayingMatchToPlaza : LeaveToPlaza;
         if (leave is null) return new(CommandStatus.InvalidState, "Leaving to the plaza is unavailable in this deployment.");
+        if (!PlazaDuringRound && registry.TryGet(session.Id) is { Phase: not RoomPhase.Waiting and not RoomPhase.Closed } running)
+        {
+            if (running.Phase != RoomPhase.Playing || EndRoundNow is null)
+                return new(CommandStatus.InvalidState, "The round is starting; use !plaza once it has begun or ended.");
+            await EndRoundNow(running, ct).ConfigureAwait(false);
+            return new(CommandStatus.Success, "The round ends now; use !plaza again in the room to go to the plaza.");
+        }
         return await leave(session, ct).ConfigureAwait(false)
             ? new(CommandStatus.Success, "")
             : new(CommandStatus.InvalidState, requirePlayingMatch ? "An ordinary playing match is required." : "A room is required.");

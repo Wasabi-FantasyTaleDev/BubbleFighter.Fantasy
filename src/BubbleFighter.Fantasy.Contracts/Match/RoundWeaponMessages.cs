@@ -15,7 +15,11 @@ namespace BubbleFighter.Fantasy.Contracts.Match;
 /// <param name="Unknown40">The uninterpreted native boolean from the request.</param>
 public sealed record RoundWeaponDropRequested(float X, float Y, float Z,
     float VelocityX, float VelocityY, float VelocityZ, int WeaponSpec,
-    int Unknown32, int Unknown36, bool Unknown40) : IMessage;
+    int Unknown32, int Unknown36, bool Unknown40) : IMessage
+{
+    /// <summary>Gets the weapon slot a build reports beside the flag (kr-1256 drops a slot 0 to 5), or zero when it reports none.</summary>
+    public int WeaponSlot { get; init; }
+}
 
 /// <summary>Creates one dropped weapon using a server-assigned identity and the reported native parameters.</summary>
 /// <param name="ObjectId">The room-owned object identity returned in later pickup requests.</param>

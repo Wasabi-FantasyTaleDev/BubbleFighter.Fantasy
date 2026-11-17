@@ -170,3 +170,238 @@ internal sealed class SqliteSchemaRow
     [SugarColumn(ColumnName = "name")]
     public string Name { get; set; } = "";
 }
+
+/// <summary>A <c>plaza_game_records</c> row (schema version 14): the day as a day number and the paper's 64 bits.</summary>
+[SugarTable("plaza_game_records")]
+internal sealed class PlazaGameRecordRow
+{
+    [SugarColumn(ColumnName = "user_num", IsPrimaryKey = true)]
+    public long UserNum { get; set; }
+
+    [SugarColumn(ColumnName = "record_day")]
+    public int RecordDay { get; set; }
+
+    [SugarColumn(ColumnName = "fishing_count")]
+    public int FishingCount { get; set; }
+
+    [SugarColumn(ColumnName = "fortune_paper")]
+    public long FortunePaper { get; set; }
+}
+
+/// <summary>A <c>cash_inbox_entries</c> row (schema version 16).</summary>
+[SugarTable("cash_inbox_entries")]
+internal sealed class CashInboxEntryRow
+{
+    [SugarColumn(ColumnName = "cash_slot_id", IsPrimaryKey = true, IsIdentity = true)]
+    public long CashSlotId { get; set; }
+
+    [SugarColumn(ColumnName = "profile")]
+    public string Profile { get; set; } = "";
+
+    [SugarColumn(ColumnName = "user_num")]
+    public long UserNum { get; set; }
+
+    [SugarColumn(ColumnName = "stock_key")]
+    public int StockKey { get; set; }
+
+    [SugarColumn(ColumnName = "item_key")]
+    public int ItemKey { get; set; }
+
+    [SugarColumn(ColumnName = "quantity")]
+    public int Quantity { get; set; }
+
+    [SugarColumn(ColumnName = "days")]
+    public int Days { get; set; }
+
+    [SugarColumn(ColumnName = "secondary_id")]
+    public int SecondaryId { get; set; }
+
+    [SugarColumn(ColumnName = "note")]
+    public string Note { get; set; } = "";
+
+    [SugarColumn(ColumnName = "created_at_ms")]
+    public long CreatedAtMs { get; set; }
+
+    [SugarColumn(ColumnName = "expires_at_ms")]
+    public long ExpiresAtMs { get; set; }
+
+    [SugarColumn(ColumnName = "state")]
+    public int State { get; set; }
+}
+
+/// <summary>A <c>cash_inbox_claims</c> idempotency receipt row (schema version 16).</summary>
+[SugarTable("cash_inbox_claims")]
+internal sealed class CashInboxClaimRow
+{
+    [SugarColumn(ColumnName = "profile", IsPrimaryKey = true)]
+    public string Profile { get; set; } = "";
+
+    [SugarColumn(ColumnName = "user_num", IsPrimaryKey = true)]
+    public long UserNum { get; set; }
+
+    [SugarColumn(ColumnName = "claim_key", IsPrimaryKey = true)]
+    public string ClaimKey { get; set; } = "";
+
+    [SugarColumn(ColumnName = "cash_slot_id")]
+    public long CashSlotId { get; set; }
+}
+
+/// <summary>A <c>user_host_escrows</c> row (schema version 17).</summary>
+[SugarTable("user_host_escrows")]
+internal sealed class UserHostEscrowRow
+{
+    [SugarColumn(ColumnName = "profile", IsPrimaryKey = true)]
+    public string Profile { get; set; } = "";
+
+    [SugarColumn(ColumnName = "match_id", IsPrimaryKey = true)]
+    public string MatchId { get; set; } = "";
+
+    [SugarColumn(ColumnName = "node_id")]
+    public string NodeId { get; set; } = "";
+
+    [SugarColumn(ColumnName = "room_id")]
+    public int RoomId { get; set; }
+
+    [SugarColumn(ColumnName = "host_user_num")]
+    public long HostUserNum { get; set; }
+
+    [SugarColumn(ColumnName = "prize_lucci")]
+    public int PrizeLucci { get; set; }
+
+    [SugarColumn(ColumnName = "fee_percent")]
+    public int FeePercent { get; set; }
+
+    [SugarColumn(ColumnName = "state")]
+    public int State { get; set; }
+
+    [SugarColumn(ColumnName = "created_at_ms")]
+    public long CreatedAtMs { get; set; }
+
+    [SugarColumn(ColumnName = "settled_at_ms", IsNullable = true)]
+    public long? SettledAtMs { get; set; }
+}
+
+/// <summary>A <c>user_host_claims</c> row (schema version 17).</summary>
+[SugarTable("user_host_claims")]
+internal sealed class UserHostClaimRow
+{
+    [SugarColumn(ColumnName = "claim_id", IsPrimaryKey = true, IsIdentity = true)]
+    public long ClaimId { get; set; }
+
+    [SugarColumn(ColumnName = "profile")]
+    public string Profile { get; set; } = "";
+
+    [SugarColumn(ColumnName = "user_num")]
+    public long UserNum { get; set; }
+
+    [SugarColumn(ColumnName = "match_id")]
+    public string MatchId { get; set; } = "";
+
+    [SugarColumn(ColumnName = "amount_lucci")]
+    public int AmountLucci { get; set; }
+
+    [SugarColumn(ColumnName = "reason")]
+    public string Reason { get; set; } = "";
+
+    [SugarColumn(ColumnName = "state")]
+    public int State { get; set; }
+
+    [SugarColumn(ColumnName = "created_at_ms")]
+    public long CreatedAtMs { get; set; }
+
+    [SugarColumn(ColumnName = "claimed_at_ms", IsNullable = true)]
+    public long? ClaimedAtMs { get; set; }
+}
+
+/// <summary>A <c>clans</c> row (schema version 18); <c>disband_at</c> is Unix milliseconds or null.</summary>
+[SugarTable("clans")]
+internal sealed class ClanRow
+{
+    [SugarColumn(ColumnName = "clan_id", IsPrimaryKey = true, IsIdentity = true)]
+    public long ClanId { get; set; }
+
+    [SugarColumn(ColumnName = "name")]
+    public string Name { get; set; } = "";
+
+    [SugarColumn(ColumnName = "master_user_num")]
+    public long MasterUserNum { get; set; }
+
+    [SugarColumn(ColumnName = "introduction")]
+    public string Introduction { get; set; } = "";
+
+    [SugarColumn(ColumnName = "notice")]
+    public string Notice { get; set; } = "";
+
+    [SugarColumn(ColumnName = "level")]
+    public int Level { get; set; }
+
+    [SugarColumn(ColumnName = "points")]
+    public int Points { get; set; }
+
+    [SugarColumn(ColumnName = "mark")]
+    public int Mark { get; set; }
+
+    [SugarColumn(ColumnName = "capacity")]
+    public int Capacity { get; set; }
+
+    [SugarColumn(ColumnName = "recruitment")]
+    public int Recruitment { get; set; }
+
+    [SugarColumn(ColumnName = "created_at")]
+    public long CreatedAt { get; set; }
+
+    [SugarColumn(ColumnName = "disband_at", IsNullable = true)]
+    public long? DisbandAt { get; set; }
+}
+
+/// <summary>A <c>clan_members</c> row (schema version 18): one per player, applicants included.</summary>
+[SugarTable("clan_members")]
+internal sealed class ClanMemberRow
+{
+    [SugarColumn(ColumnName = "user_num", IsPrimaryKey = true)]
+    public long UserNum { get; set; }
+
+    [SugarColumn(ColumnName = "clan_id")]
+    public long ClanId { get; set; }
+
+    [SugarColumn(ColumnName = "nickname")]
+    public string Nickname { get; set; } = "";
+
+    [SugarColumn(ColumnName = "level")]
+    public int Level { get; set; }
+
+    [SugarColumn(ColumnName = "role")]
+    public int Role { get; set; }
+
+    [SugarColumn(ColumnName = "joined_at")]
+    public long JoinedAt { get; set; }
+
+    [SugarColumn(ColumnName = "seen_at")]
+    public long SeenAt { get; set; }
+}
+
+/// <summary>A <c>clan_posts</c> row (schema version 18): one board post.</summary>
+[SugarTable("clan_posts")]
+internal sealed class ClanPostRow
+{
+    [SugarColumn(ColumnName = "post_id", IsPrimaryKey = true, IsIdentity = true)]
+    public long PostId { get; set; }
+
+    [SugarColumn(ColumnName = "clan_id")]
+    public long ClanId { get; set; }
+
+    [SugarColumn(ColumnName = "user_num")]
+    public long UserNum { get; set; }
+
+    [SugarColumn(ColumnName = "nickname")]
+    public string Nickname { get; set; } = "";
+
+    [SugarColumn(ColumnName = "level")]
+    public int Level { get; set; }
+
+    [SugarColumn(ColumnName = "body")]
+    public string Body { get; set; } = "";
+
+    [SugarColumn(ColumnName = "created_at")]
+    public long CreatedAt { get; set; }
+}

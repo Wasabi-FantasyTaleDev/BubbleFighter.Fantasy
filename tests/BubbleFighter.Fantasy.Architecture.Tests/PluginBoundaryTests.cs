@@ -79,6 +79,34 @@ public sealed class PluginBoundaryTests
                 .Select(m => $"{t.FullName}.{m.Name}"));
         var expected = new Dictionary<string, int[]>
         {
+            // kr-1256 sub_5C3740 passes 0 as the create request's word after the name, numbered by its position in
+            // the writer's order (packets/clan-server.yaml ClanServerCreate).
+            ["Clans.ClanCreateRequested"] = [1],
+            // kr-1256 sub_517FE0 passes the create result's third word to kr-1256 sub_D9A2A0, which never reads it.
+            ["Clans.ClanCreateAnswered"] = [8],
+            // kr-1256 sub_527910 always writes 1; kr-1256 sub_527AB0 reports two words of unestablished meaning.
+            ["Clans.ClanMemberDetailsRequested"] = [0],
+            ["Clans.ClanMemberReported"] = [0, 4],
+            // kr-1256 sub_5201C0 never reads the withdrawal result's second word.
+            ["Clans.ClanCancelApplicationAnswered"] = [4],
+            // kr-1256 sub_52E640 passes the leave notice's fourth field as a flag its consumers do not read for a leave.
+            ["Clans.ClanMemberLeft"] = [3],
+            // kr-1256 sub_52E000 and the 0x44F case of kr-1256 sub_525170 skip their first word.
+            ["Clans.ClanIntroductionChanged"] = [0],
+            ["Clans.ClanRecruitmentEditAnswered"] = [0],
+            // The transfer offer's word only travels back in the answer (kr-1256 sub_52F620); kr-1256 sub_52E430
+            // skips the master change's first word.
+            ["Clans.ClanTransferOffered"] = [1],
+            ["Clans.ClanTransferAnswerRequested"] = [1],
+            ["Clans.ClanMasterChanged"] = [0],
+            // kr-1256 sub_52E860 acts only when the disband notice's first word is 1; its meaning is not established.
+            ["Clans.ClanDisbandChanged"] = [0],
+            // kr-1256 sub_51B600 sends the local player's +60 word with a post, as the member report does.
+            ["Clans.ClanBoardWriteRequested"] = [0],
+            // kr-1256 sub_5282A0 writes a constant 2; the whisper flag byte comes from an unestablished player field.
+            ["Clans.ClanChatRequested"] = [0],
+            ["Clans.ClanWhisperRequested"] = [3],
+            ["Clans.ClanWhisperReceived"] = [4],
             ["Inventory.EquippedSlotRecord"] = [10, 11, 12, 13],
             ["Inventory.WeaponPresetChangeRequested"] = [0],
             // The persisted page keeps the yaml's unknown_<offset> names: only word 0 is consumed by the
@@ -118,7 +146,12 @@ public sealed class PluginBoundaryTests
         }.SelectMany(pair => pair.Value.Select(n => $"BubbleFighter.Fantasy.Contracts.{pair.Key}.Unknown{n}"))
             // PetEvolveResult's unconsumed words sit at different offsets per build (packets/pet.yaml: legacy 12,
             // tw-454 16, the kr-1256 optional tail at 16), so the build-neutral record names them by position.
-            .Concat(["BubbleFighter.Fantasy.Contracts.Pets.PetEvolved.UnknownOptional",
+            .Concat(["BubbleFighter.Fantasy.Contracts.MysteryStore.MysteryStoreOffer.Unknown4",
+                "BubbleFighter.Fantasy.Contracts.MysteryStore.MysteryStoreOffer.UnknownName",
+                "BubbleFighter.Fantasy.Contracts.MysteryStore.MysteryStoreReplyOffer.Unknown4",
+                "BubbleFighter.Fantasy.Contracts.MysteryStore.MysteryStoreReplyOffer.UnknownName",
+                "BubbleFighter.Fantasy.Contracts.MysteryStore.MysteryStoreOutcome.UnknownOffer",
+                "BubbleFighter.Fantasy.Contracts.Pets.PetEvolved.UnknownOptional",
                 "BubbleFighter.Fantasy.Contracts.Pets.PetEvolved.UnknownLast"]);
         Assert.Equal(expected.Order(StringComparer.Ordinal), actual.Order(StringComparer.Ordinal));
         Assert.DoesNotContain(typeof(IInventoryRepository).Assembly.GetExportedTypes(), t => t.Name.Contains("Unknown", StringComparison.Ordinal));

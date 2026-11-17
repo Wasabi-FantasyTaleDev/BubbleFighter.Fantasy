@@ -8,6 +8,8 @@
     id: pets.entitlements
     config:
       manual_level_up: true
+      # The reset items (functions 21 and 39) regress the pet and clear the chosen skill so it can be picked again.
+      skill_resets_enabled: true
       client_configuration_source: DynamicConfig
       grade_cap_from_pet_parameter: true
       shared_skill_pool: true
@@ -20,6 +22,8 @@
     id: pets
     config:
       manual_level_up: true
+      # The reset items (functions 21 and 39) regress the pet and clear the chosen skill so it can be picked again.
+      skill_resets_enabled: true
       client_configuration_source: DynamicConfig
       grade_cap_from_pet_parameter: true
       shared_skill_pool: true

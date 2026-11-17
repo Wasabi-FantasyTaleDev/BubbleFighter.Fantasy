@@ -25,6 +25,7 @@ Chinese: [README.zh.md](README.zh.md).
 | `user-stat.yaml` | `UserStat` (S2C `gspUserStat`, the wallet and FighterInfo) and its `FighterInfo` and `EloRating`. |
 | `fighter-info.yaml` | `FighterInfoRequest` and `FighterInfoReply`: the player menu's "view info" (C2S `gcpReqFighterInfo`, S2C `gspRepFighterInfo`) of the legacy builds and of the kr-1256 family (`FighterInfoReply@kr-1256`). |
 | `clan.yaml` | The clan game-connection bodies (`ClanPassport`, `ClanMarkInfo`, `ClanGuildInfo`, `ClanAttendanceState`) and the empty clan request frames, with the kr-1256 shapes stated beside the kr-812 baseline. |
+| `clan-server.yaml` | The clan-server connection's handshake bodies (`ClanServerHello`, `ClanServerHeartbeat`, `ClanServerLogin`, `ClanServerLoginResult`); the numbers are the build's `connection: clan` opcode rows. |
 | `udp-peers.yaml` | Native peer discovery, endpoint tables, hole-punch controls and relay membership messages; layouts do not enable listeners or direct movement. |
 | `round-movement.yaml` | Native full/masked movement and UDP relay probe, identity, control and header layouts, including build-specific cookie widths. |
 | `relay-connection.yaml` | Audited native relay endpoints, keys, offers, joins and connection reports. Table presence does not enable a relay listener or handshake. |
@@ -149,7 +150,8 @@ Only the first line is required.
   field whose purpose is not known is called `unknown_<offset>`; rename it when its purpose is proven.
   Names are lower-case letters, digits and underscores, never spaces, and unique within a structure.
 - **type** is `u8`, `u16`, `u32`, `u64`, `bool` (4 bytes), `f32`, `f64`, `wstr` (u32 character count,
-  then UTF-16LE), `list<T>` (u32 count, then that many `T`), `empty_list` (a list the server always
+  then UTF-16LE), `wcstr` (UTF-16LE up to a NUL word, no count: the clan-server connection's strings),
+  `list<T>` (u32 count, then that many `T`), `empty_list` (a list the server always
   sends empty), a fixed run such as `u32[49]` (that many scalars without a count prefix),
   `ScoreRow[16]` (exactly sixteen structures without a count prefix), `optional<0x3A,Tail>` (one tag
   byte, then the structure `Tail` only when the byte is `0x3A`; a writer given no map writes the field's

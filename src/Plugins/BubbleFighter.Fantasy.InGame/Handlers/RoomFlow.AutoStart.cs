@@ -21,7 +21,7 @@ internal sealed partial class RoomFlow
     {
         lock (room.Gate)
         {
-            if (!IsAutoStartMode(room.ModeId) || room.Phase != RoomPhase.Waiting || room.AutoStartArmed
+            if (room.IsUserHost || !IsAutoStartMode(room.ModeId) || room.Phase != RoomPhase.Waiting || room.AutoStartArmed
                 || room.OccupantCount + room.ClosedSlots.Count < room.MaxSeats)
                 return;
             if (room.AutoStartRematchAfter is { } after

@@ -3,4 +3,11 @@
     id: dialect.rooms
     config:
       extreme_racing: true
+      extreme_racing_map_state: true
       result_scoreboard_modes: [1, 5, 6, 8, 19, 20, 23, 24, 25, 28, 30, 32, 45]
+- set:
+    id: ingame
+    config:
+      extreme_racing_map_rounds: true
+      extreme_racing_map_state: true
+      extreme_racing_map_state_selection: random

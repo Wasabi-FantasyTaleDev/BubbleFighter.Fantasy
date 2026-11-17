@@ -1,0 +1,7 @@
+# Dropped weapon objects: Zombie Escape boxes drop weapons through the master's Lua RequestCreateWeaponObject
+# (gcpReqCreateWeaponObject), and players pick them up by walking over them (gcpPickUpWeapon). See the
+# weapon_objects capability in packets/builds.yaml for the audited kr-1256 senders and readers.
+- set:
+    id: dialect.rooms
+    config:
+      weapon_objects: true

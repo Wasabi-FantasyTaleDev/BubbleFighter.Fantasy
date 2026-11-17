@@ -21,7 +21,11 @@ test('each route locale resolves every label to text without cross-language fall
     i18n.global.locale.value = code
     const entries = leaves(messages[code])
     assert.deepEqual(entries.map(([name]) => name).sort(), expected, code)
-    for (const [name, value] of entries) assert.equal(i18n.global.t(name), value, `${code}: ${name}`)
+    // Labels with named placeholders such as {agent} are checked with a sample value for each one.
+    for (const [name, value] of entries) {
+      const params = Object.fromEntries([...value.matchAll(/\{(\w+)\}/g)].map(([, key]) => [key, `<${key}>`]))
+      assert.equal(i18n.global.t(name, params), value.replace(/\{(\w+)\}/g, '<$1>'), `${code}: ${name}`)
+    }
     assert.equal(messages[code].pages.length, 12, code)
     assert.ok(i18n.global.t('download.launcherDownload').length > 0)
     assert.ok(i18n.global.t('releases.title').length > 0)

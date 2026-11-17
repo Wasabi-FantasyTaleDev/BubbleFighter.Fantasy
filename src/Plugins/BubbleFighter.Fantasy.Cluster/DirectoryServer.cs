@@ -47,6 +47,8 @@ internal sealed partial class DirectoryServer(WebApplication app, DirectoryOptio
                 timeout += TimeSpan.FromMilliseconds(Math.Max(25000, options.MigrationRequestTimeoutMs));
             else if (options.PlazaFederation && context.Request.Path.Value?.EndsWith("/plaza", StringComparison.Ordinal) == true)
                 timeout += TimeSpan.FromSeconds(PlazaMaxWaitSeconds);
+            else if (options.ClanFederation && context.Request.Path.Value?.EndsWith("/clan", StringComparison.Ordinal) == true)
+                timeout += TimeSpan.FromSeconds(ClanMaxWaitSeconds);
             deadline.CancelAfter(timeout);
             context.RequestAborted = deadline.Token;
             try { await next(context).ConfigureAwait(false); }
@@ -130,6 +132,7 @@ internal sealed partial class DirectoryServer(WebApplication app, DirectoryOptio
         }
         if (options.Migrations) MapMigrationRoutes(app, directory, options, Authorized);
         if (options.PlazaFederation) MapPlazaRoutes(app, directory, Authorized);
+        if (options.ClanFederation) MapClanRoutes(app, directory, Authorized);
         try
         {
             await app.StartAsync(ct).ConfigureAwait(false);

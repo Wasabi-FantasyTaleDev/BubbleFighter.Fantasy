@@ -127,7 +127,7 @@ internal sealed class MapCatalog
     /// released maps whose <c>MapMeta</c> flag for the mode is set and a <c>Random_Hot</c>
     /// marker from the mode's hot pool (weighted). Returns <see langword="null"/> when nothing fits.
     /// </summary>
-    internal string? Resolve(int mode, MapMetaBlob selection, Random random)
+    internal string? Resolve(int mode, MapMetaBlob selection, Random random, Func<string, bool>? hostable = null)
     {
         var selected = ConcreteSelection(selection);
         ModeWidgets.TryGetValue(mode, out var widget);
@@ -147,10 +147,14 @@ internal sealed class MapCatalog
             return selected;
         if (!IsHotMarker(selection))
         {
-            var pool = ModePool(mode);
+            // A random draw only lands on maps this server can host for the mode.
+            var pool = hostable is null ? ModePool(mode) : ModePool(mode).Where(hostable).ToArray();
             return pool.Count == 0 ? null : pool[random.Next(pool.Count)];
         }
-        if (widget is null || !_hot.TryGetValue(widget, out var hot) || hot.Count == 0)
+        if (widget is null || !_hot.TryGetValue(widget, out var all) || all.Count == 0)
+            return null;
+        IReadOnlyList<(string Map, int Weight)> hot = hostable is null ? all : all.Where(entry => hostable(entry.Map)).ToArray();
+        if (hot.Count == 0)
             return null;
         var pick = random.Next(hot.Sum(entry => entry.Weight));
         foreach (var (map, weight) in hot)

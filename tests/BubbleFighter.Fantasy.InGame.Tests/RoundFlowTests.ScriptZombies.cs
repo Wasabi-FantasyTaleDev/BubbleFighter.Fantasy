@@ -118,6 +118,52 @@ public sealed partial class RoundFlowTests
         finally { await rig.Registry.StopAllAsync(); }
     }
 
+    /// <summary>
+    /// Modern mode 8: a human popping a bubbled zombie kills it, the zombie revives and re-converts every time, and
+    /// killing the only zombie never ends the round.
+    /// </summary>
+    [Fact]
+    public async Task ScriptZombiePoppedZombieRevivesEndlesslyWithoutAHumanWin()
+    {
+        var rig = NewScriptZombieRig();
+        var (teams, _) = EnableScriptZombie(rig);
+        try
+        {
+            var room = await StartScriptZombieAsync(rig);
+            var guest = room.FindByGame(rig.Guest.Id)!;
+            var host = room.FindByGame(rig.Host.Id)!;
+            var selection = new ScriptZombieConversion(guest.Slot, 202, 110288);
+            var peer = new RoundScriptZombieConversionReported(guest.Slot, 34, 0, 202, 110288);
+            await rig.Round.HandleScriptZombieConversionAsync(rig.Host, selection, default);
+            await rig.Round.HandleScriptZombiePeerAsync(rig.Guest, peer, default);
+            var relay = new RecordingSession(92);
+            rig.Registry.BindRelay(relay, guest.Key);
+            var actor = RoomRegistry.SceneEntity(guest.Slot);
+            for (var life = 0; life < 3; life++)
+            {
+                await rig.Round.HandleLifeReportedAsync(rig.Guest, new(RoundLifeEvent.Bubbled, actor), default);
+                await rig.Round.HandleLifeReportedAsync(rig.Host, new(RoundLifeEvent.Finished, actor)
+                    { Initiator = RoomRegistry.SceneEntity(host.Slot) }, default);
+                Assert.Equal(SeatLife.Dead, guest.Life.State);
+                await rig.Round.HandleLifeReportedAsync(rig.Guest, new(RoundLifeEvent.DeathCleaned, actor), default);
+                await rig.Round.HandleSpawnAcceptedAsync(rig.Guest, new(actor, 0)
+                {
+                    Rules = new(RoundRespawnAudience.Requester, RoundRespawnCompletion.MatchConfirmation, RoundRespawnAdmission.CleanedDeath),
+                }, default);
+                await rig.Round.HandleLifeReportedAsync(relay, new(RoundLifeEvent.ResetConfirmed, actor), default);
+                Assert.Equal(SeatLife.Alive, guest.Life.State);
+                // The local Lua OnPostRespawn callback converts the revived zombie again.
+                await rig.Round.HandleScriptZombieConversionAsync(rig.Guest, selection, default);
+                await rig.Round.HandleScriptZombiePeerAsync(rig.Guest, peer, default);
+                Assert.Equal(34, guest.Team);
+            }
+            Assert.Equal(4, teams.To(rig.Host).Length);
+            Assert.Equal(RoomPhase.Playing, room.Phase);
+            Assert.Null(room.DecidedWinnerTeam);
+        }
+        finally { await rig.Registry.StopAllAsync(); }
+    }
+
     /// <summary>Generation, phase and cancellation fences reject stale work, and the disabled mode has no conversion authority.</summary>
     [Fact]
     public async Task ScriptZombieRejectsOldGenerationWrongModeCancelledAndDisabledReports()
@@ -198,10 +244,21 @@ public sealed partial class RoundFlowTests
             var late = CaptainPlayer(33, "late");
             await admissions.HandleJoinAsync(late, new(room.Id, ""), default);
             Assert.Equal(RoomJoinRefusal.Started, Assert.Single(refused.To(late)).Reason);
+            await rig.Round.HandleEndRequestedAsync(rig.Guest, new(), default);
+            Assert.Equal(RoomPhase.Playing, room.Phase);
+            Assert.Empty(rig.Ended.To(rig.Guest));
             await rig.Rooms.HandleLeaveAsync(rig.Host, new(), default);
             Assert.True(room.RoundCancelled);
+            await room.RoundCancelTask.WaitAsync(TimeSpan.FromSeconds(2));
+            Assert.Equal(room.Id, Assert.Single(rig.Left.To(rig.Guest)).RoomId);
+            Assert.Null(rig.Registry.TryGet(rig.Host.Id));
+            Assert.Null(rig.Registry.TryGet(rig.Guest.Id));
+            Assert.Null(rig.Registry.Find(room.Id));
+            Assert.Equal(RoomPhase.Closed, room.Phase);
+            Assert.Empty(room.Seats);
             await rig.Round.HandleEndRequestedAsync(rig.Guest, new(), default);
             Assert.Empty(rig.Ended.To(rig.Guest));
+            Assert.Empty(rig.Ended.To(rig.Host));
         }
         finally { await rig.Registry.StopAllAsync(); }
     }

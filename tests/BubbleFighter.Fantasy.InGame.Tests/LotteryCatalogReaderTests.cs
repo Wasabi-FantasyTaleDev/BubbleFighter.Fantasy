@@ -136,6 +136,21 @@ public sealed class LotteryCatalogReaderTests
         Assert.Throws<ConfigException>(() => LotteryCatalog.Validate(bundles, "Config/ShopItem2.xml", [bundle]));
     }
 
+    /// <summary>A stricter resource limit cannot reuse a successful validation compiled with a larger limit.</summary>
+    [Fact]
+    public void CompiledValidationIncludesTheWorkbookLimit()
+    {
+        var bytes = Encoding.UTF8.GetBytes(Workbook(StockRows));
+        var store = new CompilingStore(bytes);
+        LotteryCatalog.Validate(store, "Config/ShopItem2.xml", [Timed()], bytes.Length);
+        Assert.Throws<ConfigException>(() =>
+            LotteryCatalog.Validate(store, "Config/ShopItem2.xml", [Timed()], bytes.Length - 1));
+        Assert.Equal(2, store.Compiles);
+        Assert.Single(store.Kept);
+        LotteryCatalog.Validate(store, "Config/ShopItem2.xml", [Timed()], bytes.Length);
+        Assert.Equal(2, store.Compiles);
+    }
+
     /// <summary>The kept fact is one byte and reads back only as a passed validation.</summary>
     [Fact]
     public void TheKeptValidationReadsBackEqual()

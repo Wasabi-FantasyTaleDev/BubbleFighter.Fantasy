@@ -15,7 +15,7 @@ namespace BubbleFighter.Fantasy.Dialect.Rooms;
 /// names a result hands the waiting room.
 /// </summary>
 internal sealed class RoomCommandsBinding(string protocol, IOpcodeTable table, PacketTables packets, string build, ILogger logger,
-    bool roundsBound = false, bool roomKicking = false, bool scriptZombies = false)
+    bool roundsBound = false, bool roomKicking = false, bool scriptZombies = false, bool userHost = false)
     : IInboundMessageBinding<RoomCreateRequested>, IInboundMessageBinding<RoomJoinRequested>,
       IInboundMessageBinding<RoomLeaveRequested>, IInboundMessageBinding<RoomReadyRequested>,
       IInboundMessageBinding<RoomTeamChangeRequested>, IInboundMessageBinding<RoomStartUnavailableRequested>,
@@ -56,13 +56,17 @@ internal sealed class RoomCommandsBinding(string protocol, IOpcodeTable table, P
     private IReadOnlyDictionary<string, ushort> _s2c = new Dictionary<string, ushort>();
     public string Protocol => protocol;
 
+    internal static string RoundResetName(IOpcodeTable opcodes) =>
+        opcodes.Find(PacketDirection.ServerToClient, "gspRoundStageReset_") is not null ? "gspRoundStageReset_"
+            : opcodes.Find(PacketDirection.ServerToClient, "gspGameReturnAfterAward_") is not null
+                ? "gspGameReturnAfterAward_" : "Unknown620";
+
     internal void Mount(IPluginContext context)
     {
         _texts = context.Services.TryGet<IGameText>(out var texts) ? texts : null;
         if (roundsBound)
         {
-            _roundReturnNames = ["gspUdpStop", table.Find(PacketDirection.ServerToClient, "gspRoundStageReset_") is not null
-                ? "gspRoundStageReset_" : "Unknown620"];
+            _roundReturnNames = ["gspUdpStop", RoundResetName(table)];
             PacketLayoutContract.RequireEmpty(packets, build, "gspUdpStop", "Round return");
             PacketLayoutContract.RequireEmpty(packets, build, "RoundStageReset", "Round return");
         }
@@ -161,7 +165,7 @@ internal sealed class RoomCommandsBinding(string protocol, IOpcodeTable table, P
                 (string)PacketCodec.ReadScalars(packets, build, "RoomKickRequest", body)["nickname"]));
         }
 
-        Bind(context, "gcpReqCreateSession", body => RoomProjection.Create(packets, build, body));
+        Bind(context, "gcpReqCreateSession", body => RoomProjection.Create(packets, build, body, userHost));
         Bind(context, "gcpReqJoinSession", body => RoomRequests.ReadJoin(packets, build, body));
         Bind(context, "gcpReqLeaveSession", body => { RoomRoutes.RequireEmpty(body, "C2S gcpReqLeaveSession"); return new RoomLeaveRequested(); });
         Bind(context, "gcpRoomReqReadyStatus", body => RoomRequests.ReadReady(packets, build, body));
@@ -199,7 +203,7 @@ internal sealed class RoomCommandsBinding(string protocol, IOpcodeTable table, P
         var room = message.Room;
         var self = room.Seats.Single(seat => seat.Slot == message.YourSlot);
         var profiles = RoomProjection.Members(room);
-        var setting = RoomProjection.Session(packets, build, room);
+        var setting = RoomProjection.Session(packets, build, room, userHost);
         if (message.Reason == RoomEntryReason.Joined
             && table.Find(PacketDirection.ServerToClient, "gspNotifyMatch") is { } waitingDialog)
             await session.SendAsync(waitingDialog, PacketCodec.Write(packets, build, "RoomWaitingDialog", new Dictionary<string, object?> { ["state"] = 0 }), ct).ConfigureAwait(false);
@@ -265,7 +269,7 @@ internal sealed class RoomCommandsBinding(string protocol, IOpcodeTable table, P
         var opcode = _settingsReply
             ?? throw new InvalidOperationException("Room settings notifications require an audited outbound opcode.");
         // kr-1256 sub_9DB8A0 reads one complete GameSetting through sub_113D030 and refreshes the room UI.
-        var setting = RoomProjection.Session(packets, build, message.Room);
+        var setting = RoomProjection.Session(packets, build, message.Room, userHost);
         var game = RoomProjection.Map(setting["game_setting"]);
         return session.SendAsync(opcode, PacketCodec.Write(packets, build, "GameSetting", game), ct);
     }

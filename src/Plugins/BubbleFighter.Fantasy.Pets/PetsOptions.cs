@@ -27,7 +27,7 @@ public sealed class PetsOptions : IValidatableOptions
     /// <summary>Gets or sets whether this row activates native pet persistence or operation handlers.</summary>
     public bool Enabled { get; set; }
 
-    /// <summary>Gets or sets whether level regression and selective skill removal are enabled with complete reward policy.</summary>
+    /// <summary>Gets or sets whether level regression and selective skill removal are enabled; mileage gains follow the mileage policy.</summary>
     public bool SkillResetsEnabled { get; set; }
 
     /// <summary>Gets or sets explicit shared mileage gains and optional catalog rewards for reset operations.</summary>
@@ -108,8 +108,9 @@ public sealed class PetsOptions : IValidatableOptions
     /// <summary>Gets or sets whether normal food is refused when the native hunger meter is full.</summary>
     public bool RefuseNormalFoodWhenFull { get; set; } = true;
 
-    /// <summary>Gets or sets the hunger points assigned when an existing uninitialized pet is first materialized.</summary>
-    [Range(0, 1000000)] public int InitialFullness { get; set; }
+    /// <summary>Gets or sets the hunger points assigned when an existing uninitialized pet is first materialized; omitted
+    /// means the client's native hunger maximum, so a new pet can be worn without feeding first.</summary>
+    [Range(0, 1000000)] public int? InitialFullness { get; set; }
 
     /// <summary>Gets or sets the maximum replanning attempts when concurrent inventory changes invalidate a mutation.</summary>
     [Range(1, 16)] public int MutationAttempts { get; set; } = 3;

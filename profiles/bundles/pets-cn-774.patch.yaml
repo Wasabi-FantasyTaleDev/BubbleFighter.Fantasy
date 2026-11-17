@@ -1,0 +1,24 @@
+# Include after pets.patch.yaml and pets-modern.patch.yaml for cn-774 only.
+# The CN client data's Config/PetConfig.xml states FeedCoolTime=420 minutes; cn-774 sub_E567E0 takes the feeding
+# cooldown from DynamicConfig category 14, which the server publishes with this value.
+- set:
+    id: pets.entitlements
+    config:
+      feed_cooldown_seconds: 25200
+- set:
+    id: pets
+    config:
+      feed_cooldown_seconds: 25200
+- set:
+    id: dialect.messages
+    config:
+      inventory_item_use: true
+- set:
+    id: lobby
+    config:
+      inventory_item_use: true
+# The victim cancellation-table consumer is audited for kr-1256 only; cn-774 keeps pet combat without those seeds.
+- set:
+    id: dialect.scene-seeds
+    config:
+      critical_cancellation_seeds: false

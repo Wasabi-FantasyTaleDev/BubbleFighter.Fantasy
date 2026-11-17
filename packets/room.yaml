@@ -323,7 +323,8 @@ structs:
     - unknown_492: wstr
       offset: 492
       except: [id-400]
-    - unknown_520: bool
+    # kr-812 sub_5BD770 / kr-812 sub_5BCD60 (GameSession +608, id-1809 +592, cn-717 +532): prize-room / user-host mode.
+    - is_user_host: bool
       offset: 520
     # cn-404 sub_620470 ends with the same four fields as cn-706 (at +440, +444, +448, +476).
     - unknown_524: u32
@@ -650,14 +651,15 @@ structs:
       offset: 160
     - unknown_148: bool
       offset: 148
-    - unknown_176: u32                  # constructor value -1
+    # kr-812 sub_8329A0 copies this identity/name pair; sub_6CEF10 matches it to another player's account.
+    - couple_partner_user_num: u32
       offset: 176
       default: -1
-    - unknown_180: wstr                 # a wstr no consumer was found for (id-400 has a u32 here)
+    - couple_partner_name: wstr
       offset: 180
-    - unknown_208: bool
+    - couple_unknown_flag_1: bool
       offset: 208
-    - unknown_209: bool
+    - couple_unknown_flag_2: bool
       offset: 209
     - unknown_212: u32
       offset: 212
@@ -1207,7 +1209,7 @@ structs:
       menu: 0
     - unknown_148: bool
       offset: 148
-    - unknown_176: u32
+    - couple_partner_user_num: u32
       offset: 176
       default: -1
     - unknown_180: u32                  # constructor value 1000: a u32 where kr-812 has a wstr
@@ -1216,12 +1218,12 @@ structs:
       menu: 0
       # cn-404 sub_637E20 reads a wstr here and the 1000 word later, at +212 (reset cn-404 sub_637B10).
       cn-404:
-        - unknown_180: wstr
+        - couple_partner_name: wstr
           offset: 180
     - unknown_184: bool
       offset: 184
       cn-404:
-        - unknown_208: bool
+        - couple_unknown_flag_1: bool
           offset: 208
         - unknown_212: u32
           offset: 212
@@ -1231,9 +1233,9 @@ structs:
           offset: 216
       # cn-408 sub_63B560 reads one more bool after +208, stored at +209 (cn-408 sub_63B350 writes it).
       cn-408:
-        - unknown_208: bool
+        - couple_unknown_flag_1: bool
           offset: 208
-        - unknown_209: bool
+        - couple_unknown_flag_2: bool
           offset: 209
         - unknown_212: u32
           offset: 212
@@ -1351,14 +1353,14 @@ structs:
       menu: 0
     - unknown_148: bool
       offset: 148
-    - unknown_176: u32
+    - couple_partner_user_num: u32
       offset: 176
       default: -1
-    - unknown_180: wstr
+    - couple_partner_name: wstr
       offset: 180
-    - unknown_208: bool
+    - couple_unknown_flag_1: bool
       offset: 208
-    - unknown_209: bool
+    - couple_unknown_flag_2: bool
       offset: 209
     - unknown_212: u32                  # reset value 1000
       offset: 212
@@ -1479,10 +1481,10 @@ structs:
       menu: 0
     - unknown_116: bool
       offset: 116
-    - unknown_136: u32
+    # cn-324 sub_7143F0 copies this account; sub_5DA3F0 uses it to locate the partner actor.
+    - couple_partner_user_num: u32
       offset: 136
       default: -1
-      menu: 0
 
   # cn-279 sub_4496E0 reads the slot. cn-279 sub_77F3F0 creates its actor from the identity and +16
   # character selector; cn-279 sub_685920 renders its +20 level and cn-279 sub_870BC0 installs equipment.
@@ -1660,14 +1662,14 @@ structs:
       menu: 0
     - unknown_148: bool
       offset: 148
-    - unknown_176: u32
+    - couple_partner_user_num: u32
       offset: 176
       default: -1
-    - unknown_180: wstr
+    - couple_partner_name: wstr
       offset: 180
-    - unknown_208: bool
+    - couple_unknown_flag_1: bool
       offset: 208
-    - unknown_209: bool
+    - couple_unknown_flag_2: bool
       offset: 209
     - unknown_212: u32
       offset: 212
@@ -1966,7 +1968,7 @@ structs:
     default: 1
   - unknown_144: bool
     offset: 144
-  - unknown_168: u32
+  - couple_partner_user_num: u32
     offset: 168
     default: -1
   - unknown_172: u32
@@ -2051,11 +2053,12 @@ structs:
   # the room's mode; the main-menu install compares it with 40 (training room)
   - mode: u16
     offset: 4
-  # with the local seat on the seat holder's distinguished seat, kr-1256 sub_96F3A0 disables the team and
-  # ready buttons when it is set, and kr-1256 sub_980730 shows the referee mark
-  - unknown_8: bool
+  # Prize/user-host room flag (GameSession +148): with the local seat on the referee seat (slot 12,
+  # team 36 in kr-1256 sub_980730), kr-1256 sub_96F3A0 hides ready/team controls and kr-1256 sub_9CB9C0 keeps the referee unready.
+  - is_user_host: bool
     offset: 8
-  # both gates above also need this word zero; a room-list row carries the channel key here
+  # kr-1256 sub_5C8AC0 / kr-1256 sub_962200 produce this selection; kr-1256 sub_9DB8A0 installs it at session+160.
+  # Value 1 selects hammer restrictions (kr-1256 sub_494F00 / kr-1256 sub_4954A0); values 3/4 follow separate gameplay paths.
   - unknown_20: u32
     offset: 20
   - unknown_24: u32
@@ -2152,7 +2155,8 @@ structs:
     offset: 4
   - unknown_8: u32
     offset: 8
-  - unknown_12: bool
+  # Prize/user-host room flag (GameSession +148, cn-774 sub_BC70C0, seatsMgr+4 = 12).
+  - is_user_host: bool
     offset: 12
   - unknown_24: u32
     offset: 24
@@ -2251,7 +2255,8 @@ structs:
   - unknown_8: u32
     offset: 8
     menu: 8
-  - unknown_12: bool
+  # Prize/user-host room flag (GameSession +148, tw-454 sub_7D9C30, tw-454 sub_AA5D20, 0xE80F60 team 36 at slot 12).
+  - is_user_host: bool
     offset: 12
   - unknown_13: bool
     offset: 13
@@ -2418,13 +2423,14 @@ structs:
     offset: 112
   - unknown_116: wstr
     offset: 116
-  - unknown_140: u32
+  # kr-1256 sub_9C31C0 copies sub_10E1B20's relationship; sub_921790 requires reciprocal partner IDs.
+  - couple_partner_user_num: u32
     offset: 140
-  - unknown_144: wstr
+  - couple_partner_name: wstr
     offset: 144
-  - unknown_168: bool
+  - couple_unknown_flag_1: bool
     offset: 168
-  - unknown_169: bool
+  - couple_unknown_flag_2: bool
     offset: 169
   # every level icon reader takes the level from here (kr-1256 sub_912A00, sub_783D90, sub_65B190) and
   # kr-1256 sub_EE9550 stores level - 1, so 0 shows no level
@@ -2676,7 +2682,7 @@ structs:
   # i32 (+132), u16 x6 (+44), i32 (+164), i32 (+168), i32-as-bool (+136), wstring (+140), i32 (+172), wstring
   # (+176), i32-as-bool x2 (+200, +201), i32 (+204), i32 (+208), u8 (+212), i32-as-bool (+213), SocialSystemInfo
   # (+216), i32 (+276), i32 (+272), i32-as-bool (+280), i32 x3 (+284..+292). The kr-1256 values carry over where
-  # the reads line up: the u8 slot, the identity and nickname, and the level at +172.
+  # the reads line up: the u8 slot, identity and nickname. +172 is the partner account, not a level.
   UserSlot@cn-774:
   - occupied: bool
     offset: 4
@@ -2745,13 +2751,15 @@ structs:
     offset: 136
   - unknown_140: wstr
     offset: 140
-  - level: u32
+  # cn-774 sub_BC07C0 copies +172/+176; sub_B33980 matches +172 to the other player's +8 account.
+  - couple_partner_user_num: u32
     offset: 172
-  - unknown_176: wstr
+    default: -1                       # cn-774 sub_493760 constructor
+  - couple_partner_name: wstr
     offset: 176
-  - unknown_200: bool
+  - couple_unknown_flag_1: bool
     offset: 200
-  - unknown_201: bool
+  - couple_unknown_flag_2: bool
     offset: 201
   - unknown_204: u32
     offset: 204
@@ -2851,13 +2859,15 @@ structs:
     offset: 148
   - unknown_136: bool
     offset: 136
-  - level: u32
+  # tw-454 sub_A9D8F0 copies +152/+156; sub_8E5500 matches +152 to the other player's +8 account.
+  - couple_partner_user_num: u32
     offset: 152
-  - unknown_156: wstr
+    default: -1                       # tw-454 sub_48B730 constructor
+  - couple_partner_name: wstr
     offset: 156
-  - unknown_180: bool
+  - couple_unknown_flag_1: bool
     offset: 180
-  - unknown_181: bool
+  - couple_unknown_flag_2: bool
     offset: 181
   - unknown_184: u32
     offset: 184
@@ -2962,4 +2972,68 @@ structs:
   - party_transition: bool
   - unknown_n1: u32                   # the word after the party-transition flag; no consumer read yet
   - team_info: ServerTeamInfo
+
+  # kr-812 sub_837170 dispatches gspUpdateCoupleSlot to sub_8329A0. Reader sub_83B900 -> sub_6929F0
+  # consumes a count followed by full UserSlot records; only installed targets receive the relationship fields.
+  CoupleSlotUpdate:
+  - user_slots: "list<UserSlot>"
+
+  # kr-1256 sub_9C31C0 reads the account followed by sub_10E1B20's narrow relationship record.
+  CoupleSlotUpdate@kr-1256:
+  - user_number: u32
+  - couple_partner_user_num: u32
+  - couple_partner_name: wstr
+  - couple_unknown_flag_1: bool
+  - couple_unknown_flag_2: bool
+
+  # cn-774 sub_BC07C0 -> sub_1054EC0: count plus full UserSlot records, then copies +172/+176/+200/+201.
+  CoupleSlotUpdate@cn-774:
+  - user_slots: "list<UserSlot>"
+
+  # tw-454 sub_A9D8F0 -> sub_EBC4C0: count plus full UserSlot records, then copies +152/+156/+180/+181.
+  CoupleSlotUpdate@tw-454:
+  - user_slots: "list<UserSlot>"
+
+  # cn-717 sub_8BAF10 uses cn-717 sub_8C4400: counted cn-717 sub_41B2C0 UserSlot; copies +176/+180/+208.
+  CoupleSlotUpdate@cn-717:
+  - user_slots: "list<UserSlot>"
+
+  # cn-706 sub_7C5B30 uses cn-706 sub_7A0BE0: counted cn-706 sub_61B950 UserSlot; copies +176/+180/+208.
+  CoupleSlotUpdate@cn-706:
+  - user_slots: "list<UserSlot>"
+
+  # cn-406 sub_736630 uses cn-406 sub_714CF0: counted cn-406 sub_57E8A0 UserSlot; copies +168 only.
+  CoupleSlotUpdate@cn-406:
+  - user_slots: "list<UserSlot>"
+
+  # cn-404 sub_7E99A0 uses cn-404 sub_7C60A0: counted cn-404 sub_637E20 UserSlot; copies +176/+180/+208.
+  CoupleSlotUpdate@cn-404:
+  - user_slots: "list<UserSlot>"
+
+  # cn-705 sub_7C4040 uses cn-705 sub_79F6A0: counted cn-705 sub_61AD00 UserSlot; copies +176/+180/+208.
+  CoupleSlotUpdate@cn-705:
+  - user_slots: "list<UserSlot>"
+
+  # id-1809 sub_7DFBE0 uses id-1809 sub_7BE370: counted id-1809 sub_417880 UserSlot; copies +176/+180/+208.
+  CoupleSlotUpdate@id-1809:
+  - user_slots: "list<UserSlot>"
+
+  # cn-408 sub_7ED020 uses cn-408 sub_7C96C0: counted cn-408 sub_63B560 UserSlot; copies +176/+180/+208.
+  CoupleSlotUpdate@cn-408:
+  - user_slots: "list<UserSlot>"
+
+  # id-400 sub_7BC460 uses id-400 sub_798840: counted id-400 sub_5F1FF0 UserSlot; copies +176 only.
+  CoupleSlotUpdate@id-400:
+  - user_slots: "list<UserSlot>"
+
+  # cn-324 sub_714540 dispatches its own gspUpdateCoupleSlot to sub_7143F0; sub_6FD730 -> sub_5902D0
+  # reads a count and full 144-byte local UserSlot objects via sub_58A4D0, copying only partner account +136.
+  CoupleSlotUpdate@cn-324:
+  - user_slots: "list<UserSlot>"
+    except: [cn-279]
+
+  # tw-410 sub_714F00 -> sub_714D20 uses sub_6FD3E0/sub_58F530: counted own UserSlot sub_589780,
+  # copies partner account +136 only, then sub_5D9980 matches the partner actor by account identity.
+  CoupleSlotUpdate@tw-410:
+  - user_slots: "list<UserSlot>"
 

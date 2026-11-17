@@ -179,7 +179,7 @@ internal sealed class LoginBinding : IInboundMessageBinding<LoginRequested>, IMe
                     break;
                 case LoginBurstStep.UserStat:
                     await session.SendAsync(_statOpcode!.Value, UserStatWire.Write(_tables, _build, login.Nickname,
-                        login.Level, lucci, cash, login.ColorIndex, login.UserNumber), ct).ConfigureAwait(false);
+                        login.Level, lucci, cash, login.ColorIndex, login.UserNumber, CoupleProfileWire.Current(session)), ct).ConfigureAwait(false);
                     break;
                 case LoginBurstStep.UserMoneyStat:
                     await session.SendAsync(_moneyOpcode!.Value,

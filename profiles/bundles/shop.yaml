@@ -33,6 +33,19 @@
     # the pair the modern purchase path sends.
     # Enable together with dialect.messages.present_box for native-client acceptance.
     present_box: false
+    # The Mysterystore (packets/mystery-store.yaml), served where the dialect binds its request. Item 100385 is the
+    # workbook's Magic Coin, whose description names this store; kr-1256 sub_E61DC0 pays from its owned count. The
+    # offers are the 121 StockSets the workbook marks as Mysterystore items (all off sale in the ordinary shop).
+    # Prices, refresh cost and rotation are this server's economy: the client reads them from the reply.
+    mystery_store:
+      coin_item_id: 100385
+      offers: ["2001494-2001580", "2001784-2001804", "2001813-2001818", "2002126-2002132"]
+      offer_coin_price: 100
+      refresh_coin_cost: 10
+      rotation_seconds: 21600
+      group_stock_variants: false
     max_presents_per_player: 100
+    cash_inbox: false
+    max_cash_inbox_entries_per_player: 64
     starting_lucci: 100000
     starting_cash: 0

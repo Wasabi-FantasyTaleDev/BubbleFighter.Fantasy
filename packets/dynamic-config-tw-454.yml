@@ -1,0 +1,27 @@
+# The DynamicConfig content tw-454 is served: one entry per registry bit, each naming its schema in
+# packets/dynamic-config.yaml. tw-454 hands the plain bytes of each set bit to the category's decoder (tw-454 sub_628B00),
+# so the server frames exactly the bytes its schema writes. Content, not a layout: it keeps the .yml suffix.
+slots:
+  # tw-454 registers category 3 as the plaza mini-game configuration (tw-454 sub_6336B0, decoder tw-454 sub_633520, the 42
+  # bytes of kr-1256's layout). The prices are the values the booths show and send back as their displayed cost, so the
+  # server charges exactly these.
+  3:
+    schema: LobbyMinigameContext
+    content:
+      flag_a: 1
+      basketball_cost: 50
+      unknown_6: 2000
+      unknown_8: 500
+      unknown_10: 4000
+      flag_12: 1
+      # Fishing is free: a priced cast would cost this times the day's catches plus one.
+      fishing_cost: 0
+      fishing_second_cost: 0
+      unknown_20: 120
+      unknown_22: 10
+      unknown_24: 15
+      unknown_26: 8
+      unknown_28: 190083
+      unknown_32: 101606
+      flag_36: 1
+      fortune_cost: 200

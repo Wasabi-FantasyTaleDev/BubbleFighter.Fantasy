@@ -13,11 +13,12 @@ public sealed class RoomProjectionFields
     private readonly uint _clearMask;
     private readonly string[] _words;
     private readonly string[] _booleans;
+    private readonly Dictionary<string, HashSet<uint>> _preservedWords;
 
     private RoomProjectionFields(string mode, string modeType, string[] maps, string flags, uint clearMask,
-        string[] words, string[] booleans) =>
-        (_mode, _modeType, _maps, _flags, _clearMask, _words, _booleans) =
-        (mode, modeType, maps, flags, clearMask, words, booleans);
+        string[] words, string[] booleans, Dictionary<string, HashSet<uint>> preservedWords) =>
+        (_mode, _modeType, _maps, _flags, _clearMask, _words, _booleans, _preservedWords) =
+        (mode, modeType, maps, flags, clearMask, words, booleans, preservedWords);
 
     /// <summary>Loads the inherited aliases and rejects missing, overlapping or incorrectly typed native fields.</summary>
     /// <param name="tables">The packet layouts and build metadata.</param>
@@ -27,7 +28,9 @@ public sealed class RoomProjectionFields
     {
         var where = $"{build} room_projection_fields";
         if (!tables.ValuesOf(build).TryGetValue("room_projection_fields", out var raw)
-            || raw is not Dictionary<string, object?> map || map.Count != 6
+            || raw is not Dictionary<string, object?> map || map.Count is < 6 or > 7
+            || map.Keys.Any(key => key is not ("mode" or "maps" or "flags" or "clear_mask"
+                or "clear_words" or "clear_booleans" or "preserve_word_values"))
             || map.GetValueOrDefault("mode") is not string mode
             || map.GetValueOrDefault("maps") is not string[] { Length: > 0 } maps
             || map.GetValueOrDefault("flags") is not string flags
@@ -46,13 +49,45 @@ public sealed class RoomProjectionFields
         var names = new[] { mode, flags }.Concat(maps).Concat(words).Concat(booleans).ToArray();
         if (names.Distinct(StringComparer.Ordinal).Count() != names.Length)
             throw new ConfigException($"{where} aliases must name distinct GameSetting fields.");
-        return new(mode, modeType, maps, flags, mask, words, booleans);
+        return new(mode, modeType, maps, flags, mask, words, booleans, ReadPreservedWords(tables, build, map, where));
 
         void Require(IEnumerable<string> names, string type)
         {
             if (names.Any(name => !fields.Any(field => field.Name == name && field.Type == type)))
                 throw new ConfigException($"{where} must name existing {type} GameSetting fields.");
         }
+    }
+
+    private static Dictionary<string, HashSet<uint>> ReadPreservedWords(PacketTables tables, string build,
+        Dictionary<string, object?> projection, string where)
+    {
+        var result = new Dictionary<string, HashSet<uint>>(StringComparer.Ordinal);
+        if (!projection.TryGetValue("preserve_word_values", out var raw)) return result;
+        where += ".preserve_word_values";
+        if (raw is not Dictionary<string, object?> map || map.Count != 2
+            || map.GetValueOrDefault("builds") is not string[] { Length: > 0 } builds
+            || builds.Distinct(StringComparer.Ordinal).Count() != builds.Length
+            || builds.Any(target => !tables.Builds.Contains(target, StringComparer.Ordinal))
+            || map.GetValueOrDefault("fields") is not Dictionary<string, object?> { Count: > 0 } fields)
+            throw new ConfigException($"{where} requires distinct known builds and a nonempty fields map.");
+        foreach (var (field, value) in fields)
+        {
+            if (value is not string[] { Length: > 0 } texts)
+                throw new ConfigException($"{where}.{field} requires a nonempty list of unsigned words.");
+            var allowed = new HashSet<uint>();
+            foreach (var text in texts)
+                if (!uint.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var word) || !allowed.Add(word))
+                    throw new ConfigException($"{where}.{field} requires distinct unsigned 32-bit decimal values.");
+            // An inherited allowance validates its named builds, whose clear-word aliases may differ from the child.
+            foreach (var target in builds)
+                if (tables.ValuesOf(target).GetValueOrDefault("room_projection_fields") is not Dictionary<string, object?> targetMap
+                    || targetMap.GetValueOrDefault("clear_words") is not string[] words
+                    || !words.Contains(field, StringComparer.Ordinal)
+                    || !tables.Resolve(target, "GameSetting").Any(native => native.Name == field && native.Type == "u32"))
+                    throw new ConfigException($"{where}.{field} must name an already-cleared u32 GameSetting field in '{target}'.");
+            if (builds.Contains(build, StringComparer.Ordinal)) result.Add(field, allowed);
+        }
+        return result;
     }
 
     /// <summary>Reads the creator's mode from the native field named by the build metadata.</summary>
@@ -73,7 +108,7 @@ public sealed class RoomProjectionFields
     public void WriteMode(IDictionary<string, object?> setting, int mode) =>
         setting[_mode] = _modeType == "u16" ? checked((ushort)mode) : checked((uint)mode);
 
-    /// <summary>Clears only the declared native stage gates and writes the committed mode, retaining all other values.</summary>
+    /// <summary>Clears declared native stage gates except explicitly admitted word values, then writes the committed mode.</summary>
     /// <param name="setting">The complete retained game setting.</param>
     /// <param name="mode">The committed shared mode identifier.</param>
     public void Apply(IDictionary<string, object?> setting, int mode)
@@ -82,7 +117,9 @@ public sealed class RoomProjectionFields
         var flags = unchecked((uint)Convert.ToInt32(setting[_flags], CultureInfo.InvariantCulture));
         setting[_flags] = unchecked((int)(flags & ~_clearMask));
         foreach (var word in _words)
-            setting[word] = 0;
+            if (!_preservedWords.TryGetValue(word, out var allowed)
+                || !allowed.Contains(unchecked((uint)Convert.ToInt32(setting[word], CultureInfo.InvariantCulture))))
+                setting[word] = 0;
         foreach (var flag in _booleans)
             setting[flag] = false;
         WriteMode(setting, mode);

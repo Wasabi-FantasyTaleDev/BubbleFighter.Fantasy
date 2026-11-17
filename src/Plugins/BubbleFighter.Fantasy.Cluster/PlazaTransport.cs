@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using BubbleFighter.Fantasy.Contracts.Inventory;
+using BubbleFighter.Fantasy.Contracts.Couples;
 using BubbleFighter.Fantasy.Contracts.Progress;
 using BubbleFighter.Fantasy.Contracts.Rooms;
 
@@ -19,6 +20,9 @@ internal sealed record PlazaWireMember(string Nickname, int Level, int Character
 {
     /// <summary>Gets the optional native modifiers; older nodes omit this field, and an empty vector clears them.</summary>
     public RoomItemAttribute[] ItemAttributes { get; init; } = [];
+
+    /// <summary>Gets the committed partner identity; directory and workers must upgrade together before publishing this field.</summary>
+    public CoupleSceneState? Couple { get; init; }
 }
 
 /// <summary>A node's queued local changes.</summary>
@@ -53,10 +57,15 @@ internal static class PlazaTransport
             PlazaFederationEventKind.Entered => change.Position is null && change.Member is { } member
                 && !string.IsNullOrWhiteSpace(member.Nickname) && member.Nickname.Length <= 64 && !member.Nickname.Any(char.IsControl)
                 && member.Level is >= 0 and <= 100000 && member.CharacterItemId >= 0 && member.ColorIndex is >= 0 and <= ushort.MaxValue
-                && ValidEquipment(member),
+                && ValidEquipment(member) && ValidCouple(member.Couple, change.User),
             PlazaFederationEventKind.Moved => change.Member is null && change.Position is { Length: > 0 and <= MaxPositionBytes },
             _ => change.Member is null && change.Position is null,
         };
+
+    private static bool ValidCouple(CoupleSceneState? couple, int user) => couple is null
+        || couple.PartnerUserNum is > 0 and <= int.MaxValue && couple.PartnerUserNum != user
+        && !string.IsNullOrWhiteSpace(couple.PartnerName) && couple.PartnerName.Length <= 64
+        && !couple.PartnerName.Any(char.IsControl);
 
     private static bool ValidEquipment(PlazaWireMember member)
     {
@@ -88,6 +97,7 @@ internal static class PlazaTransport
             appearance = new(member.Nickname, member.Level, member.CharacterItemId, [.. snapshot.WornItemIds], member.ColorIndex)
             {
                 ItemAttributes = [.. snapshot.ItemAttributes],
+                Couple = member.Couple,
             };
         }
         var wire = new PlazaWireEvent(build, change.Kind, change.UserNumber, appearance,
@@ -107,6 +117,7 @@ internal static class PlazaTransport
             {
                 ColorIndex = checked((ushort)member.ColorIndex),
                 ItemAttributes = snapshot.ItemAttributes,
+                Couple = member.Couple,
             };
         }
         return new(change.Kind, change.User, appearance,

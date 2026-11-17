@@ -64,7 +64,10 @@ public sealed record ShopPurchaseCommand(PlayerWallet SeedWallet, int PurchaseKe
     /// </summary>
     public long PresentId { get; init; }
 
-    /// <summary>Rejects invalid inputs before any storage is modified.</summary>
+    /// <summary>
+    /// Rejects invalid inputs before any storage is modified. A command must charge, grant or credit something; a
+    /// charge without a grant (a paid action that wins nothing, such as a missed plaza shot) is valid.
+    /// </summary>
     public void Validate()
     {
         ArgumentNullException.ThrowIfNull(SeedWallet);
@@ -76,7 +79,7 @@ public sealed record ShopPurchaseCommand(PlayerWallet SeedWallet, int PurchaseKe
         if (SeedWallet.Lucci < 0 || SeedWallet.Cash < 0)
             throw new ArgumentException("Starting balances cannot be negative.");
         if (LucciReward is < 0 or > 1000000 || LucciReward > 0 && (Price != 0 || MoneyType != "lucci")
-            || Grants.Count == 0 && LucciReward == 0
+            || Grants.Count == 0 && LucciReward == 0 && Price == 0
             || Grants.Count > InventoryLimits.MaxInventorySlotsPerBag || Grants.Any(g => g.ItemId <= 0))
             throw new ArgumentException("Purchase grants must contain a bounded list of positive item ids.");
         foreach (var grant in Grants)

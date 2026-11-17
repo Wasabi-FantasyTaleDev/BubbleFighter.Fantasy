@@ -37,6 +37,14 @@ internal sealed class ScenarioServer : IAsyncDisposable
     public int RelayPort { get; }
 
     public CancellationToken Ct => _cts.Token;
+    internal async ValueTask DisconnectAsync(string name)
+    {
+        var idx = _clients.FindIndex(c => c.Name == name);
+        if (idx < 0) throw new InvalidOperationException($"No client named '{name}'.");
+        var client = _clients[idx];
+        _clients.RemoveAt(idx);
+        await client.DisposeAsync();
+    }
     private readonly string _build;
 
     public static readonly SimFixtures Fixtures =
@@ -100,7 +108,7 @@ internal sealed class ScenarioServer : IAsyncDisposable
         Row("persistence.memory", "persistence.memory"),
         Row("dialect", "dialect", TestWireDialects.RowConfig("kr-1256")),
         Row("dialect.rooms", "dialect.rooms", TestWireDialects.ModernRoomsConfig()),
-        SharedDialectRows.Kr1256(new() { ["inventory"] = true }),
+        SharedDialectRows.Kr1256(new() { ["inventory"] = true, ["mystery_store"] = false }),
         Row("protocol", "protocol", new() { ["opcode_table_path"] = Path.Combine(AppContext.BaseDirectory, "opcodes.yaml") }),
         // The build's client data: a loose-file tree holding only the synthetic shop workbook. The store is
         // visible to the shop row alone because a visible store makes the in-game row load its map pools
@@ -112,6 +120,8 @@ internal sealed class ScenarioServer : IAsyncDisposable
         Row("relay-listener", "net.tcp", new() { ["listen"] = $"127.0.0.1:{relayPort}", ["protocol"] = "kr-1256/relay" }),
         Row("lobby", "lobby", new()
         {
+            // These room and transport fixtures omit the couple catalog and online-player directory.
+            ["couples"] = false,
             ["protocol"] = "kr-1256/game", ["auto_create_players"] = true, ["fallback_username"] = "guest",
             // The store-backed resolvers, as the MySQL deployment configures them (the value names the resolver, not a database).
             ["inventory_source"] = "mysql", ["money_source"] = "mysql",

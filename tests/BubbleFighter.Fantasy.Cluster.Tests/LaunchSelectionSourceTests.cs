@@ -127,11 +127,32 @@ public sealed class LaunchSelectionSourceTests
         var snapshot = source.Capture("kr-812");
 
         Assert.Equal("a", Assert.Single(snapshot.Servers[0].Targets).NodeId);
-        Assert.Equal(admitted ? 1 : 0, snapshot.Servers[2].Targets.Count);
-        Assert.Equal(admitted ? 1 : 0, source.Refresh("kr-812", snapshot).Servers[2].Targets.Count);
+        // A server with no admitted target is left out of the grant rather than listed empty.
+        int Admitted(LauncherServerSelectionSnapshot value) => value.Servers.SingleOrDefault(entry => entry.Id == 3)?.Targets.Count ?? 0;
+        Assert.Equal(admitted, snapshot.Servers.Any(entry => entry.Id == 3));
+        Assert.Equal(admitted ? 1 : 0, Admitted(snapshot));
+        Assert.Equal(admitted ? 1 : 0, Admitted(source.Refresh("kr-812", snapshot)));
         directory.Entries = [new(1, "Automatic", true, [primary]), new(2, "Primary", false, [primary]),
             new(3, "Independent", false, [independent with { Host = "replacement.example" }])];
-        Assert.Empty(source.Refresh("kr-812", snapshot).Servers[2].Targets);
+        Assert.Equal(0, Admitted(source.Refresh("kr-812", snapshot)));
+    }
+
+    /// <summary>
+    /// Manual servers that are offline or under maintenance are left out of the grant, as Launcher 0.2.0 leaves them
+    /// out of the directory it binds the grant to; the automatic selector keeps its configured membership.
+    /// </summary>
+    [Fact]
+    public void UnavailableManualServersAreLeftOutOfTheGrant()
+    {
+        var clock = new Clock();
+        var a = Target("a", clock.Now);
+        var offline = Target("b", clock.Now) with { Online = false };
+        var maintained = Target("c", clock.Now) with { Maintenance = new(clock.Now, null, "Migrating") };
+        var directory = new Directory { Entries = [new(1, "Automatic", true, [a]), new(2, "A", false, [a]),
+            new(3, "Offline", false, [offline]), new(4, "Maintenance", false, [maintained]), new(5, "Reserved", false, [])] };
+        var snapshot = new LaunchSelectionSource(Options(), directory, clock).Capture("kr-812");
+        Assert.Equal([1, 2], snapshot.Servers.Select(entry => entry.Id));
+        Assert.Equal("a", Assert.Single(snapshot.Servers[1].Targets).NodeId);
     }
 
     [Fact]

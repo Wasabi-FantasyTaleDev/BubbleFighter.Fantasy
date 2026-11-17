@@ -72,6 +72,9 @@
     # present_box capability and the shop row of the modern-commerce bundle.
     # Opt in on both the dialect.messages and shop rows for native-client acceptance.
     present_box: false
+    # Cash item inbox (packets/cash-inbox.yaml, packets/cash-inventory.yaml): cn-774 sub_74EE70/cn-774 sub_752B70 (open),
+    # cn-774 sub_DE26E0 (pickup), cn-774 sub_BAE3F0 (list), cn-774 sub_BB13B0 (pickup reply). Opt in on both dialect.messages and shop.
+    cash_inbox: false
     # The expired-item notice (packets/inventory.yaml ExpiredItems): cn-774 sub_BCF090 case 807 ->
     # cn-774 sub_BAE370 -> cn-774 sub_456D30 reads the counted u32 id list, and its consumer is armed from the startup
     # singletons, so the burst's last step lands after the menu like kr-1256's.

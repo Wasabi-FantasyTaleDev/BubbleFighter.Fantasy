@@ -3,6 +3,7 @@
     <Description>MySQL persistence plugin for Bubble Fighter Fantasy.</Description>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\..\Persistence.Shared\*.cs" Link="Shared\%(Filename)%(Extension)" />
     <PackageReference Include="SqlSugarCoreNoDrive" />
     <PackageReference Include="MySqlConnector" />
   </ItemGroup>

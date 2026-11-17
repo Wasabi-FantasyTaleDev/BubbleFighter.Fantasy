@@ -30,8 +30,9 @@ Bubble Fighter Fantasy 是由 **Fantasy Tale Studio** 维护的「泡泡战士�
 运行这些程序包的机器需要 ASP.NET Core Runtime 10。
 
 - **Windows：**从[最新版本](https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest)下载 `bubblefighter-fantasy-win-x64.zip` 或 `bubblefighter-fantasy-win-arm64.zip`，解压到较短的文件夹（例如 `C:\BubbleFighterFantasy`），然后双击 `BubbleFighter.Fantasy.Host.exe`。安装向导会在浏览器中打开。
-- **Linux：**运行 `curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash`，然后运行 `~/bubblefighter-fantasy/bff` 并打开 `http://127.0.0.1:7300/`。缺少运行时时，脚本会自行安装。
-- **Docker：**`curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash -s -- --docker` 会在容器中运行服务器；加上 `--with-mysql` 可附带 MySQL 8.4。
+- **Windows 脚本：**在 PowerShell 中运行 `irm https://wasabi-fantasytaledev.github.io/install.ps1 | iex`，它会问几个问题，缺少 ASP.NET Core 运行时时自行安装，然后打开安装向导。
+- **Linux：**运行 `curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash`，它会问几个问题（是否用 Docker、是否装为服务、是否立即启动），缺少运行时时自行安装，并可直接启动服务器；安装向导位于 `http://127.0.0.1:7300/`。
+- **Docker：**`curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | sudo bash -s -- --docker --install-docker --with-mysql` 会在缺少 Docker 时先安装，再连同 MariaDB 11.4 容器运行服务器；去掉 `--with-mysql` 则使用 SQLite 或你自己的 MySQL。
 
 全部选项见[安装指南](docs/installation.zh.md#安装预编译包)。
 

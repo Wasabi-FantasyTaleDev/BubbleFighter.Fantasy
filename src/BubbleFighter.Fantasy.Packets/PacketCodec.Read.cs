@@ -112,7 +112,7 @@ public static partial class PacketCodec
         budget.Reserve(count, reader.Offset);
         if (IsStructure(element))
             tables.Resolve(build, element);
-        else if (element is not ("u8" or "u16" or "u32" or "u64" or "bool" or "f32" or "f64" or "wstr"))
+        else if (element is not ("u8" or "u16" or "u32" or "u64" or "bool" or "f32" or "f64" or "wstr" or "wcstr"))
             throw new ConfigException($"'{element}' is not a supported packet collection element type.");
         var width = element switch
         {
@@ -121,6 +121,7 @@ public static partial class PacketCodec
             "u32" or "bool" or "f32" => 4,
             "u64" or "f64" => 8,
             "wstr" or "empty_list" => 4,
+            "wcstr" => 2,
             _ => 0,
         };
         if (width != 0 && count > reader.Remaining / width)

@@ -20,7 +20,9 @@ public sealed class PetDynamicConfigWireTests
         var settings = new PetClientConfiguration(317, 12600);
         Assert.True(wire.SupportsPetConfiguration);
         Assert.False(wire.HasCreationContent);
-        Assert.Empty(wire.ServedBits);
+        // Category 14 comes only with explicit pet settings; the booth configuration (3) and the Mysterystore window (4)
+        // are always served.
+        Assert.Equal(new[] { 3, 4 }, wire.ServedBits.OrderBy(bit => bit));
         Assert.False(TestBuilds.Packets.CapabilityOf("cn-774", "character_creation"));
         wire.Validate(settings);
 
@@ -111,6 +113,9 @@ public sealed class PetDynamicConfigWireTests
         var stamp = wire.StampOf(14, settings);
         var checksums = Enumerable.Range(0, 16).Select(bit => 0x10203000u + (uint)bit).ToArray();
         checksums[14] = stamp;
+        // Categories 3 (the booths) and 4 (the Mysterystore window) are served as well; the client holds their current stamps.
+        checksums[3] = wire.StampOf(3);
+        checksums[4] = wire.StampOf(4);
         var request = PetDynamicConfigTestData.Request(2, ushort.MaxValue, checksums);
         Assert.Equal(66, request.Length);
         var fields = PacketCodec.ReadScalars(TestBuilds.Packets, "cn-774", "DynamicConfigRequest", request);
@@ -172,7 +177,8 @@ public sealed class PetDynamicConfigWireTests
     [Theory]
     [InlineData("cn-735", 2)]
     [InlineData("tw-454", 2)]
-    [InlineData("kr-812", 4)]
+    [InlineData("cn-717", 2)]
+    [InlineData("id-400", 2)]
     public void UnsupportedBuildsRejectPetSettings(string build, int maskBytes)
     {
         var wire = new DynamicConfigWire(TestBuilds.Packets, build);
@@ -182,7 +188,8 @@ public sealed class PetDynamicConfigWireTests
         Assert.Throws<ConfigException>(() => wire.CreationSnapshot(settings));
         Assert.Throws<ConfigException>(() => wire.Reply(PetDynamicConfigTestData.Request(maskBytes, 0), settings));
         Assert.Equal(new byte[maskBytes], wire.CreationSnapshot());
-        Assert.Empty(wire.ServedBits);
+        // Their own categories are served (tw-454's booth category; cn-717 and id-400 serve none).
+        Assert.Equal(build == "tw-454" ? new[] { 3 } : [], wire.ServedBits);
     }
 }
 

@@ -12,7 +12,7 @@ namespace BubbleFighter.Fantasy.Launcher.Http;
 
 /// <summary>Publishes the common launcher account API, its client policy and a one-use game-ticket redemption service; launches also carry a messenger ticket when a messenger ticket issuer is mounted.</summary>
 [Plugin("launcher.http", Category = "launcher", Names = ["en=Launcher service", "zh-Hans=启动器服务", "zh-Hant=啟動器服務", "ko=런처 서비스"], Description = "Public launcher accounts, profiles and client instance catalog.",
-    Requires = [typeof(ILauncherAccountRepository), typeof(ILauncherSessionStore)], Optional = [typeof(IPlayerWalletRepository), typeof(IPlayerProgressRepository), typeof(ISessionRegistry), typeof(IMessengerTicketIssuer), typeof(IHostReadiness), typeof(ICompanionTicketIssuer), typeof(IServerDirectory), typeof(IServerSelectionDirectory), typeof(ILauncherServerSelection), typeof(ILauncherPresenceDirectory)],
+    Requires = [typeof(ILauncherAccountRepository), typeof(ILauncherSessionStore)], Optional = [typeof(IPlayerWalletRepository), typeof(IPlayerProgressRepository), typeof(ISessionRegistry), typeof(IMessengerTicketIssuer), typeof(IHostReadiness), typeof(ICompanionTicketIssuer), typeof(IServerDirectory), typeof(IServerSelectionDirectory), typeof(ILauncherServerSelection), typeof(ILauncherPresenceDirectory), typeof(IOpcodeTableRegistry)],
     Provides = [typeof(ILauncherTicketService), typeof(IClientPolicyView), typeof(ILocalLauncherPresence)])]
 public sealed class LauncherHttpPlugin : IPlugin
 {
@@ -27,17 +27,23 @@ public sealed class LauncherHttpPlugin : IPlugin
         context.Services.TryGet<IServerSelectionDirectory>(out var clusterBuilds);
         context.Services.TryGet<ILauncherServerSelection>(out var serverSelection);
         context.Services.TryGet<ILauncherPresenceDirectory>(out var presenceDirectory);
+        context.Services.TryGet<IOpcodeTableRegistry>(out var opcodeTables);
         var server = await LauncherServer.StartAsync(options, context.Services.Get<ILauncherAccountRepository>(), sessions,
             players: players, matchConnections: null, wallets: wallets, progress: progress,
             ct: cancellationToken, logger: context.Logger, messenger: messenger, readiness: readiness, companion: companion,
             directory: directory, serverSelection: serverSelection, presenceDirectory: presenceDirectory,
-            clusterBuilds: clusterBuilds).ConfigureAwait(false);
+            clusterBuilds: clusterBuilds, servesClans: build => ServesClans(opcodeTables, build)).ConfigureAwait(false);
         context.Effect(() => server.DisposeAsync().AsTask().GetAwaiter().GetResult());
         context.Effect(context.Services.Register<ILauncherTicketService>(sessions));
         context.Effect(context.Services.Register<ILocalLauncherPresence>(server.LocalPresence));
         context.Effect(context.Services.Register<IClientPolicyView>(new PolicyView(options.ClientPolicy.ToContract())));
         context.Logger.LogInformation("Launcher API listening on {Address}.", options.Listen);
     }
+
+    // A build has a clan connection when its opcode table names the clan login, as the clan gateway requires.
+    internal static bool ServesClans(IOpcodeTableRegistry? tables, string build) =>
+        tables is not null && tables.TryGet(build, out var table) && table is not null
+        && table.ForConnection(OpcodeConnection.Clan)?.Find(PacketDirection.ClientToServer, "ClanLogin") is not null;
 
     private sealed class PolicyView(ClientPolicy current) : IClientPolicyView
     {

@@ -2,6 +2,30 @@ profile: cn-324
 # Opcode assignments for the Chinese 324 client. C2S and S2C are separate numeric spaces.
 # Only rows with evidence are listed; see profiles/opcode-policy.md.
 opcodes:
+  - value: 934
+    direction: c2s
+    name: gcpReqCoupleInvite
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_402820 supplies selected=true and target name to sub_404EA0; setter sub_91B110 stamps 934; Packet_gcpReqCoupleInvite reader sub_6FD8F0 reads bool32/name"
+  - value: 935
+    direction: c2s
+    name: gcpReqCoupleConfirmInvite
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_402D60 supplies the Yes/No flag, target, owned invitation item and message to sub_404F10; setter sub_91B110 stamps 935; Packet_gcpReqCoupleConfirmInvite reader sub_402370 consumes the complete body"
+  - value: 937
+    direction: c2s
+    name: gcpReqCoupleInviteAnswer
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_403A40 sends two bool32 values and two names through sub_404F80; setter sub_91B110 stamps 937; Packet_gcpReqCoupleInviteAnswer reader sub_402480"
+  - value: 938
+    direction: c2s
+    name: gcpReqCoupleInviterStatus
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_402800/sub_4043D0 construct Packet_gcpReqCoupleInviterStatus at vtable 0xAC44EC; writer/reader sub_5C7C90 are empty, sender sub_404E30 stamps 938 through sub_91B110"
   - value: 32885
     direction: c2s
     connection: both
@@ -614,6 +638,13 @@ opcodes:
     name_source: label@cn-324
     evidence: inferred
     source: "Packet_gcpReqCashInven class and opcode setter sub_91B110 in sender sub_7E6B80 (cn-324)"
+  - value: 828
+    direction: c2s
+    connection: game
+    name: gcpReqPickup
+    name_source: label@cn-324
+    evidence: verified
+    source: "cn-324 sub_802E10 constructs Packet_gcpReqPickup::vftable and calls cn-324 sub_8042F0, which stamps C2S 828 via cn-324 sub_91B110 with one u32 cash_slot_key"
   - value: 829
     direction: c2s
     name: gcpReqCloseGiftBox
@@ -792,8 +823,8 @@ opcodes:
     direction: c2s
     name: gcpSynthesisProcess
     name_source: label@cn-324
-    evidence: inferred
-    source: "Packet_gcpSynthesisProcess class and opcode setter sub_91B110 in sender sub_8627F0 (cn-324)"
+    evidence: verified
+    source: "cn-324 sub_8627F0 constructs Packet_gcpSynthesisProcess (vtable 0xB3094C) and calls cn-324 sub_91B110(943); cn-324 sub_85ED90 writes SynthesisProcessRequest@cn-324 in packets/laboratory-legacy.yaml."
   - value: 1
     direction: s2c
     name: gspDisconnect
@@ -1339,8 +1370,8 @@ opcodes:
     direction: s2c
     name: gspSynthesisProcess
     name_source: label@cn-324
-    evidence: inferred
-    source: "cn-324 dispatcher sub_714540 case 952: Packet_gspSynthesisProcess"
+    evidence: verified
+    source: "cn-324 dispatcher sub_714540 case 0x3B8 (952) calls cn-324 sub_713DE0, which consumes Packet_gspSynthesisProcess; cn-324 sub_6FD180 reads the 28-byte SynthesisProcessReply@cn-324 in packets/laboratory-legacy.yaml."
 
 # Names mirrored from a sibling build: same value, the class exists here, and both named neighbours agree.
   - value: 105
@@ -3650,7 +3681,7 @@ opcodes:
     name_source: label@cn-324
     evidence: verified
     source: "cn-324 sub_465090 case 744 runs cn-324 sub_45C8F0 (vtable 0xACF1D0)"
-    notes: "Ten u32 words plus a bool32 tail — differs from kr-1256's twelve-word notice; LegacyWeaponCreateNotice@cn-324"
+    notes: "Ten u32 words plus a bool32 tail — differs from kr-1256's twelve-word notice; WeaponCreateNotice@cn-324"
   - value: 745
     direction: s2c
     connection: game

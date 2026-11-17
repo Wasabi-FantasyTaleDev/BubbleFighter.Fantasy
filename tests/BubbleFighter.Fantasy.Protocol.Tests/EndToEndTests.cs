@@ -294,7 +294,8 @@ public sealed class EndToEndTests
     {
         ProbePlugin.State.Clear();
         var port = FreePort();
-        var host = BuildHost(port, throwingHandler: true);
+        var host = BuildHost(port, throwingHandler: true,
+            protocolExtras: new() { ["keep_connection_on_handler_failure"] = false });
         await host.StartAsync(CancellationToken.None);
         try
         {

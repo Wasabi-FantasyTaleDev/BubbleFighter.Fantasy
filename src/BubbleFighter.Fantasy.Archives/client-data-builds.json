@@ -1,7 +1,7 @@
 {
   "_comment": "Known client builds and the rules bfdata.py uses to fill client-data/<build>/data and dataraw. Dates are the client executable's link date.",
   "builds": [
-    {"id": "kr-186", "label": "KR2009", "date": "2009-12-20"},
+    {"id": "kr-186", "label": "KR2009", "date": "2009-12-21"},
     {"id": "cn-279", "label": "CN2011 0.1.5.005", "date": "2011-04-08"},
     {"id": "cn-324", "label": "CN2012", "date": "2012-09-22"},
     {"id": "tw-410", "label": "TW2013", "date": "2013-01-22"},

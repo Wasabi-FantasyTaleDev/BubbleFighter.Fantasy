@@ -110,6 +110,37 @@ public sealed class LauncherServerSelectionTests
         Assert.Equal("player", sessions.Redeem(ordinary.Token, "kr-812"));
     }
 
+    /// <summary>
+    /// A launch grant leaves directory sections out: Launcher 0.2.0 validates a grant's servers as an ungrouped
+    /// directory and refuses one whose selectors name a section, which stopped every launch once sections were set.
+    /// </summary>
+    [Fact]
+    public async Task LaunchGrantsLeaveSectionsOut()
+    {
+        var options = new LauncherOptions { Listen = "127.0.0.1:0", PasswordIterations = 100000,
+            Center = new() { Enabled = true },
+            Instances = [new() { Id = "kr-812", Build = "kr-812", Port = 7110, Name = [new() { Language = "en", Text = "Client" }] }] };
+        var accounts = new MemoryLauncherAccounts(8);
+        Assert.True(await accounts.RegisterAsync("player", "not-used-for-bearer-authentication", default));
+        var sessions = new LauncherSessions(options, new MemoryLauncherSessions(8));
+        var bearer = await sessions.SignInAsync("player", default);
+        var source = new SelectionSource { Sectioned = true };
+        await using var server = await LauncherServer.StartAsync(options, accounts, sessions, players: null, directory: source, serverSelection: source);
+        using var http = new HttpClient { BaseAddress = new(server.Addresses.Single()) };
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", bearer.AccessToken);
+
+        using var launched = await http.PostAsJsonAsync("/v1/launch", new { build = "kr-812", serverSelection = true });
+        launched.EnsureSuccessStatusCode();
+        var launch = await launched.Content.ReadFromJsonAsync<JsonElement>();
+        var selection = launch.GetProperty("serverSelection");
+        Assert.All(selection.GetProperty("servers").EnumerateArray(), entry => Assert.False(entry.TryGetProperty("section", out _)));
+        using var refreshed = await http.PostAsJsonAsync("/v1/launch/servers", new { build = "kr-812",
+            ticket = launch.GetProperty("ticket").GetString(), grantId = selection.GetProperty("grantId").GetString() });
+        refreshed.EnsureSuccessStatusCode();
+        var entries = (await refreshed.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("serverSelection").GetProperty("servers");
+        Assert.All(entries.EnumerateArray(), entry => Assert.False(entry.TryGetProperty("section", out _)));
+    }
+
     [Fact]
     public async Task HttpLaunchAndRefreshAdmitAnIndependentManualNodeWithoutAddingItToAutomatic()
     {
@@ -393,8 +424,12 @@ public sealed class LauncherServerSelectionTests
         internal int Captures { get; private set; }
         internal bool Automatic { get; set; } = true;
         internal bool Independent { get; set; }
-        private LauncherServerSelectionSnapshot Current() => Independent
-            ? WithIndependent(Snapshot(DateTimeOffset.UtcNow), "") : Snapshot(DateTimeOffset.UtcNow);
+        internal bool Sectioned { get; set; }
+        private LauncherServerSelectionSnapshot Current()
+        {
+            var snapshot = Independent ? WithIndependent(Snapshot(DateTimeOffset.UtcNow), "") : Snapshot(DateTimeOffset.UtcNow);
+            return Sectioned ? snapshot with { Servers = snapshot.Servers.Select(server => server with { Section = "main" }).ToArray() } : snapshot;
+        }
         public IReadOnlyList<ServerSelectorEntry> ListServers(string build) => Current().Servers
             .Where(server => Automatic || !server.Automatic).ToArray();
         public IReadOnlyList<FederatedRoom> ListRooms(string node, string build) => throw new NotSupportedException();

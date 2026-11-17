@@ -13,7 +13,7 @@ namespace BubbleFighter.Fantasy.Dialect.Rooms;
 /// Which round runs, when a clock starts and how records are scored is the round flow's decision. The checkpoint
 /// touch is a round-feed route in <c>packets/builds.yaml</c>, not part of this binding.
 /// </summary>
-internal sealed class ExtremeRacingBinding(string protocol, IOpcodeTable table, PacketTables packets, string build, ILogger logger)
+internal sealed partial class ExtremeRacingBinding(string protocol, IOpcodeTable table, PacketTables packets, string build, ILogger logger)
     : IInboundMessageBinding<RoundExtremeRacingGoalReported>, IMessageSender<RoundExtremeRacingTimerChanged>,
       IMessageSender<RoundExtremeRacingRoundChanged>, IMessageSender<RoundExtremeRacingRecordsUpdated>,
       IMessageSender<RoundExtremeRacingInitialized>, IMessageSender<RoundExtremeRacingCannonCommand>

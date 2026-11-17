@@ -2,6 +2,7 @@ using System.Buffers;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Net;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
+using BubbleFighter.Fantasy.Wire;
 using Microsoft.Extensions.Logging;
 
 namespace BubbleFighter.Fantasy.Protocol;
@@ -84,7 +85,7 @@ public sealed class ProtocolPlugin : IPlugin
         var catalog = options.UseCatalogCandidates
             ? CatalogOpcodeFallback.Load(options, runtime, context.Logger) : null;
         IOpcodeTable table = catalog is null ? runtime
-            : new OpcodeTable(profile, runtime.All.Concat(runtime.ForConnection(OpcodeConnection.Relay).All).Concat(runtime.ForConnection(OpcodeConnection.Udp).All).Distinct(), catalog.Resolve);
+            : new OpcodeTable(profile, runtime.All.Concat(runtime.ForConnection(OpcodeConnection.Relay).All).Concat(runtime.ForConnection(OpcodeConnection.Udp).All).Concat(runtime.ForConnection(OpcodeConnection.Clan).All).Distinct(), catalog.Resolve);
         var sessions = context.Services.TryGet<ISessionRegistry>(out var registry) ? registry : null;
         var versionVerified = new VersionVerifiedScope(options.MaxTrackedConnections);
         context.Effect(versionVerified);
@@ -103,14 +104,32 @@ public sealed class ProtocolPlugin : IPlugin
         context.Effect(protocols.Register(new WireProtocol(gameProtocol, dialect, greeting, options, router, table, context.Events, sessions, versionVerified, context.Logger, context.Lifetime, requiresPatchHandshake: true)));
         context.Effect(protocols.Register(new WireProtocol(relayProtocol, dialect, greeting, options, router, table.ForConnection(OpcodeConnection.Relay), context.Events, sessions, versionVerified, context.Logger, context.Lifetime, requiresPatchHandshake: false)));
 
+        // The clan-server connection exists where the build's table has rows for it. The client connects at
+        // startup and waits; the server speaks first with an empty ClanHello frame (dispatcher kr-1256 sub_525170
+        // case 0x3EA), so that frame is the connection's greeting. The frame and its cipher are the same in every
+        // build (kr-1256 sub_1114A80, kr-812 sub_A51A20), and the sessions stay out of the player registry: a clan
+        // connection carries no player of its own, it is bound to a game session by the clan row's login.
+        var clanTable = table.ForConnection(OpcodeConnection.Clan);
+        string? clanProtocol = null;
+        if (clanTable.All.Any())
+        {
+            clanProtocol = profile.Id + "/clan";
+            var clanDialect = profile.CreateClanDialect();
+            if ((long)options.MaxPayloadBytes + clanDialect.MaxFrameOverheadBytes > options.InboundBufferBytes)
+                throw new ConfigException(
+                    $"inbound_buffer_bytes ({options.InboundBufferBytes}) must hold one whole clan frame: max_payload_bytes ({options.MaxPayloadBytes}) plus {clanDialect.MaxFrameOverheadBytes} header bytes.");
+            var hello = clanDialect.EncodeFrame(clanTable.S2C("ClanHello"), []);
+            context.Effect(protocols.Register(new WireProtocol(clanProtocol, clanDialect, hello, options, router, clanTable, context.Events, sessions: null, versionVerified, context.Logger, context.Lifetime, requiresPatchHandshake: false)));
+        }
+
         var centerList = BuildCenterList(options, table);
         var patchRequest = table.C2S(options.PatchRequestName);
         var patchReply = table.S2C("gspRepGamePatch");
         context.Effect(router.Register(gameProtocol, patchRequest, (session, packet, ct) => HandlePatchRequest(session, packet, options, patchReply, centerList, context, ct)));
 
         context.Logger.LogInformation(
-            "Protocol '{ProfileId}' mounted ({Game}, {Relay}); {Count} opcode(s) loaded; version-verified table caps at {Tracked} connections.",
-            profile.Id, gameProtocol, relayProtocol, table.All.Count(), options.MaxTrackedConnections);
+            "Protocol '{ProfileId}' mounted ({Game}, {Relay}, {Clan}); {Count} opcode(s) loaded; version-verified table caps at {Tracked} connections.",
+            profile.Id, gameProtocol, relayProtocol, clanProtocol ?? "no clan connection", table.All.Count(), options.MaxTrackedConnections);
         return ValueTask.CompletedTask;
     }
 

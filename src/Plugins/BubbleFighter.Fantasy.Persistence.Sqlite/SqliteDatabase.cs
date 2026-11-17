@@ -33,8 +33,8 @@ namespace BubbleFighter.Fantasy.Persistence.Sqlite;
 /// </summary>
 internal sealed class SqliteDatabase : IDisposable
 {
-    // Schema v10 stores supplementary practice independently of dismissed onboarding and numbered stages.
-    private const int SchemaVersion = 13;
+    // Schema v18 keeps the shared clan directory.
+    private const int SchemaVersion = 18;
     private const int ApplicationId = 0x42464653;
     private readonly object _gate = new();
     private readonly FileStream _lease;
@@ -79,8 +79,11 @@ internal sealed class SqliteDatabase : IDisposable
         options.CustomizedKeys.Validate();
         ArgumentNullException.ThrowIfNull(options.TitleMedals);
         options.TitleMedals.Validate();
+        ArgumentNullException.ThrowIfNull(options.CoupleInvitations);
+        options.CoupleInvitations.Validate();
         Options = new()
         {
+            CoupleInvitations = options.CoupleInvitations,
             DatabasePath = Path.GetFullPath(options.DatabasePath), MaxDatabaseBytes = options.MaxDatabaseBytes,
             MaxPlayers = options.MaxPlayers, MaxAccounts = options.MaxAccounts,
             MaxMovementActors = options.MaxMovementActors, BusyTimeoutMs = options.BusyTimeoutMs,
@@ -109,7 +112,7 @@ internal sealed class SqliteDatabase : IDisposable
             var version = Convert.ToInt32(RawScalar("PRAGMA user_version"), CultureInfo.InvariantCulture);
             var application = Convert.ToInt32(RawScalar("PRAGMA application_id"), CultureInfo.InvariantCulture);
             var tables = UserTableCount();
-            if (version != SchemaVersion && version is not (1 or 2 or 3 or 4 or 5 or 6 or 7 or 8 or 9 or 10 or 11 or 12) && !(version == 0 && application == 0 && tables == 0))
+            if (version != SchemaVersion && version is not (1 or 2 or 3 or 4 or 5 or 6 or 7 or 8 or 9 or 10 or 11 or 12 or 13 or 14 or 15 or 16 or 17) && !(version == 0 && application == 0 && tables == 0))
                 throw new InvalidDataException($"Unsupported SQLite save schema {version}.");
             if (version != 0 && application != ApplicationId)
                 throw new InvalidDataException("SQLite save belongs to another application.");
@@ -301,6 +304,131 @@ internal sealed class SqliteDatabase : IDisposable
                         PRIMARY KEY(user_num, catalog_scope, grant_key)) WITHOUT ROWID;
                     """, transaction);
                 RawExecute("PRAGMA user_version=13", transaction);
+                transaction.Commit();
+                version = 13;
+            }
+            if (version == 13)
+            {
+                // Version 14 keeps each player's current-day plaza mini-game record (fish landed, fortune paper).
+                using var transaction = _connection.BeginTransaction();
+                RawExecute("""
+                    CREATE TABLE IF NOT EXISTS plaza_game_records(user_num INTEGER NOT NULL PRIMARY KEY,
+                        record_day INTEGER NOT NULL, fishing_count INTEGER NOT NULL DEFAULT 0, fortune_paper INTEGER NOT NULL DEFAULT 0);
+                    """, transaction);
+                RawExecute("PRAGMA user_version=14", transaction);
+                transaction.Commit();
+                version = 14;
+            }
+            if (version == 14)
+            {
+                using var transaction = _connection.BeginTransaction();
+                RawExecute("""
+                    CREATE TABLE couples(id TEXT PRIMARY KEY COLLATE BINARY, authority TEXT NOT NULL COLLATE BINARY,
+                        first_user INTEGER NOT NULL REFERENCES players(user_num) ON DELETE CASCADE,
+                        second_user INTEGER NOT NULL REFERENCES players(user_num) ON DELETE CASCADE,
+                        created_at INTEGER NOT NULL, ring_item INTEGER NOT NULL DEFAULT 0,
+                        CHECK(first_user <> second_user));
+                    CREATE TABLE couple_members(authority TEXT NOT NULL COLLATE BINARY,
+                        user_num INTEGER NOT NULL REFERENCES players(user_num) ON DELETE CASCADE,
+                        couple_id TEXT NOT NULL REFERENCES couples(id) ON DELETE CASCADE,
+                        PRIMARY KEY(authority,user_num));
+                    CREATE INDEX ix_couple_members_pair ON couple_members(couple_id);
+                    """, transaction);
+                RawExecute("PRAGMA user_version=15", transaction);
+                transaction.Commit();
+                version = 15;
+            }
+            if (version == 15)
+            {
+                // Version 16 persists cash inbox slots and idempotency claims so pickups commit alongside regular bags.
+                using var transaction = _connection.BeginTransaction();
+                RawExecute("""
+                    CREATE TABLE IF NOT EXISTS cash_inbox_entries(
+                        cash_slot_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        profile TEXT NOT NULL COLLATE BINARY,
+                        user_num INTEGER NOT NULL REFERENCES players(user_num) ON DELETE CASCADE,
+                        stock_key INTEGER NOT NULL,
+                        item_key INTEGER NOT NULL,
+                        quantity INTEGER NOT NULL,
+                        days INTEGER NOT NULL,
+                        secondary_id INTEGER NOT NULL DEFAULT 0,
+                        note TEXT NOT NULL,
+                        created_at_ms INTEGER NOT NULL,
+                        expires_at_ms INTEGER NOT NULL,
+                        state INTEGER NOT NULL DEFAULT 0);
+                    CREATE INDEX IF NOT EXISTS ix_cash_inbox_owner
+                        ON cash_inbox_entries(profile, user_num, state, cash_slot_id);
+                    CREATE TABLE IF NOT EXISTS cash_inbox_claims(
+                        profile TEXT NOT NULL COLLATE BINARY,
+                        user_num INTEGER NOT NULL REFERENCES players(user_num) ON DELETE CASCADE,
+                        claim_key TEXT NOT NULL COLLATE BINARY,
+                        cash_slot_id INTEGER NOT NULL REFERENCES cash_inbox_entries(cash_slot_id) ON DELETE CASCADE,
+                        PRIMARY KEY(profile, user_num, claim_key)) WITHOUT ROWID;
+                    """, transaction);
+                RawExecute("PRAGMA user_version=16", transaction);
+                transaction.Commit();
+                version = 16;
+            }
+            if (version == 16)
+            {
+                // Version 17 persists sponsor (user_host) prize escrows and offline payout/refund claims.
+                using var transaction = _connection.BeginTransaction();
+                RawExecute("""
+                    CREATE TABLE IF NOT EXISTS user_host_escrows(
+                        profile TEXT NOT NULL COLLATE BINARY,
+                        match_id TEXT NOT NULL COLLATE BINARY,
+                        node_id TEXT NOT NULL DEFAULT '' COLLATE BINARY,
+                        room_id INTEGER NOT NULL,
+                        host_user_num INTEGER NOT NULL REFERENCES players(user_num) ON DELETE CASCADE,
+                        prize_lucci INTEGER NOT NULL,
+                        fee_percent INTEGER NOT NULL,
+                        state INTEGER NOT NULL DEFAULT 0,
+                        created_at_ms INTEGER NOT NULL,
+                        settled_at_ms INTEGER,
+                        PRIMARY KEY(profile, match_id)) WITHOUT ROWID;
+                    CREATE INDEX IF NOT EXISTS ix_user_host_escrows_state
+                        ON user_host_escrows(profile, node_id, state, created_at_ms);
+                    CREATE TABLE IF NOT EXISTS user_host_claims(
+                        claim_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        profile TEXT NOT NULL COLLATE BINARY,
+                        user_num INTEGER NOT NULL REFERENCES players(user_num) ON DELETE CASCADE,
+                        match_id TEXT NOT NULL COLLATE BINARY,
+                        amount_lucci INTEGER NOT NULL,
+                        reason TEXT NOT NULL COLLATE BINARY,
+                        state INTEGER NOT NULL DEFAULT 0,
+                        created_at_ms INTEGER NOT NULL,
+                        claimed_at_ms INTEGER,
+                        UNIQUE(profile, match_id, user_num, reason));
+                    CREATE INDEX IF NOT EXISTS ix_user_host_claims_owner
+                        ON user_host_claims(profile, user_num, state, claim_id);
+                    """, transaction);
+                RawExecute("PRAGMA user_version=17", transaction);
+                transaction.Commit();
+                version = 17;
+            }
+            if (version == 17)
+            {
+                // Version 18 keeps the shared clan directory: clans, one member or applicant row per player, board posts.
+                // Clan ids start at 1000, above the client's reserved training clan 99 (kr-1256 sub_51A3A0).
+                using var transaction = _connection.BeginTransaction();
+                RawExecute("""
+                    CREATE TABLE IF NOT EXISTS clans(clan_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL COLLATE NOCASE UNIQUE, master_user_num INTEGER NOT NULL,
+                        introduction TEXT NOT NULL DEFAULT '', notice TEXT NOT NULL DEFAULT '', level INTEGER NOT NULL DEFAULT 1,
+                        points INTEGER NOT NULL DEFAULT 0, mark INTEGER NOT NULL DEFAULT 0, capacity INTEGER NOT NULL,
+                        recruitment INTEGER NOT NULL DEFAULT 1, created_at INTEGER NOT NULL, disband_at INTEGER NULL);
+                    CREATE TABLE IF NOT EXISTS clan_members(user_num INTEGER NOT NULL PRIMARY KEY,
+                        clan_id INTEGER NOT NULL REFERENCES clans(clan_id) ON DELETE CASCADE, nickname TEXT NOT NULL,
+                        level INTEGER NOT NULL, role INTEGER NOT NULL, joined_at INTEGER NOT NULL, seen_at INTEGER NOT NULL);
+                    CREATE INDEX IF NOT EXISTS ix_clan_members_clan ON clan_members(clan_id);
+                    CREATE TABLE IF NOT EXISTS clan_posts(post_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        clan_id INTEGER NOT NULL REFERENCES clans(clan_id) ON DELETE CASCADE, user_num INTEGER NOT NULL,
+                        nickname TEXT NOT NULL, level INTEGER NOT NULL, body TEXT NOT NULL, created_at INTEGER NOT NULL);
+                    CREATE INDEX IF NOT EXISTS ix_clan_posts_clan ON clan_posts(clan_id, post_id);
+                    INSERT OR IGNORE INTO sqlite_sequence(name, seq) SELECT 'clans', 999
+                        WHERE NOT EXISTS (SELECT 1 FROM sqlite_sequence WHERE name = 'clans');
+                    """, transaction);
+                RawExecute("PRAGMA user_version=18", transaction);
                 transaction.Commit();
             }
             ValidateExistingState();
@@ -541,6 +669,15 @@ internal sealed class SqliteDatabase : IDisposable
             if (loadout is null) throw new InvalidDataException("SQLite build loadout is null.");
             _ = loadout.Copy();
         }
+        if (state.MysteryStores is null || state.MysteryStores.Count > Options.MaxLoadoutsPerPlayer)
+            throw new InvalidDataException("SQLite Mysterystore selections are null or exceed max_loadouts_per_player.");
+        foreach (var (key, selection) in state.MysteryStores)
+        {
+            InventoryLoadoutScope.ValidateKey(key);
+            if (selection is null || selection.Token == 0 || selection.ExpiresAtUnixMilliseconds <= 0
+                || selection.PurchasedMask > 63 || string.IsNullOrEmpty(selection.Board))
+                throw new InvalidDataException("SQLite Mysterystore selection is null, has no token or board, or marks a seventh card.");
+        }
         if (state.CustomizedKeys is null || state.CustomizedKeys.Count > Options.CustomizedKeys.MaxScopes)
             throw new InvalidDataException("SQLite customized-key scopes are null or exceed their capacity.");
         try
@@ -646,4 +783,19 @@ internal sealed class SaveState
     public ClanOpenRecord? ClanOpen { get; set; }
     // The UTC day (yyyy-MM-dd) of the last login the life rule saw; absent in older saves, which read as a first login.
     public string? LastLoginDay { get; set; }
+    // The current Mysterystore selection per build scope key; absent in older saves, which have none.
+    public Dictionary<string, SqliteMysteryStoreSelection> MysteryStores { get; set; } = new(StringComparer.Ordinal);
+}
+
+// One stored Mysterystore selection; the board is the shared JSON document of MysteryStoreSelectionJson.
+internal sealed class SqliteMysteryStoreSelection
+{
+    [JsonRequired]
+    public uint Token { get; set; }
+    [JsonRequired]
+    public long ExpiresAtUnixMilliseconds { get; set; }
+    [JsonRequired]
+    public uint PurchasedMask { get; set; }
+    [JsonRequired]
+    public string Board { get; set; } = "";
 }

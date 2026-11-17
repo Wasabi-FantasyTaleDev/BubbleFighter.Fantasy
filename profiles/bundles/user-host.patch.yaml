@@ -1,0 +1,22 @@
+# Player-hosted tournament/prize rooms (is_user_host) for kr-812, cn-717, id-1809, kr-1256, cn-774, and tw-454.
+# Builds outside that validated set leave user_host disabled by default.
+- set:
+    id: dialect.rooms
+    config:
+      user_host: ${BFF_USER_HOST_ENABLED:-true}
+- set:
+    id: lobby
+    config:
+      user_host_enabled: ${BFF_USER_HOST_ENABLED:-true}
+      user_host_min_prize: ${BFF_USER_HOST_MIN_PRIZE:-1000}
+      user_host_max_prize: ${BFF_USER_HOST_MAX_PRIZE:-100000}
+- set:
+    id: ingame
+    config:
+      user_host_enabled: ${BFF_USER_HOST_ENABLED:-true}
+      user_host_min_prize: ${BFF_USER_HOST_MIN_PRIZE:-1000}
+      user_host_max_prize: ${BFF_USER_HOST_MAX_PRIZE:-100000}
+      user_host_fee_percent: ${BFF_USER_HOST_FEE_PERCENT:-10}
+      user_host_countdown_ms: ${BFF_USER_HOST_COUNTDOWN_MS:-5000}
+      # The cluster node's own id (empty on a single server): startup recovery refunds only this node's escrows.
+      user_host_node_id: "${BFF_CLUSTER_NODE_ID:-}"

@@ -83,17 +83,20 @@ internal sealed partial class RoomFlow
         try
         {
             await Task.Delay(timeoutMs, watch.Source.Token).ConfigureAwait(false);
-            await room.Executor.ExecuteAsync(_ =>
+            await room.Executor.ExecuteAsync(async _ =>
             {
+                var refundUserHost = false;
                 lock (room.Gate)
                 {
                     // An announced countdown means every seat loaded; a later start has its own watch.
                     if (room.StartGeneration != generation || room.CountdownGeneration == generation
                         || room.Phase != RoomPhase.Starting || !TryCancelRoundCore(room))
-                        return ValueTask.CompletedTask;
+                        return;
+                    refundUserHost = room.IsUserHost;
                 }
+                if (refundUserHost)
+                    await SettleUserHostRoundAsync(room, generation, null, null, $"loading exceeded {timeoutMs} ms", CancellationToken.None).ConfigureAwait(false);
                 ReturnCancelledRound(room, $"loading exceeded {timeoutMs} ms");
-                return ValueTask.CompletedTask;
             }, watch.Source.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException)

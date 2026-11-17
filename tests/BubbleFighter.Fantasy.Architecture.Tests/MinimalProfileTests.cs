@@ -20,7 +20,7 @@ public sealed class MinimalProfileTests
         var port = FreePort();
         var rows = Rows(port);
         rows.AddRange([
-            PluginBoundaryTests.Row("lobby", "lobby"),
+            PluginBoundaryTests.Row("lobby", "lobby", new() { ["couples"] = false }),
             // The main-menu probe and the login bindings live on the shared message row since the login slice;
             // this scenario keeps the same row id so the reload/unload checks keep their shape.
             PluginBoundaryTests.Row("messages", "dialect.messages", new()

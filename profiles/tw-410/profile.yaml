@@ -1,9 +1,9 @@
 id: tw-410
 display_names:
-  en: "Taiwan 2013"
-  zh-Hans: "台服 2013"
-  zh-Hant: "台灣 2013"
-  ko: "대만 2013"
+  en: "Taiwan 2013-01-22"
+  zh-Hans: "台服 2013-01-22"
+  zh-Hant: "台灣 2013-01-22"
+  ko: "대만 2013-01-22"
 client_build: tw:410:0
 # Nearest build whose layouts this one reuses when it has no variant of its own; the same
 # base as this build's entry in packets/builds.yaml.
@@ -12,6 +12,7 @@ description: Taiwanese 2013 client build, ClientVersion_Major 410 (tw-410 wWinMa
 bundles:
   - core
   - legacy
+  - couples
 # What this build differs in; everything else is the legacy bundle's (kr-812).
 vars:
   LEGACY_PORT: ${TW_410_GAME_PORT:-7270}

@@ -1,4 +1,5 @@
 using BubbleFighter.Fantasy.Contracts.Rooms;
+using BubbleFighter.Fantasy.Contracts.Sessions;
 using Xunit;
 
 namespace BubbleFighter.Fantasy.InGame.Tests;
@@ -9,6 +10,64 @@ namespace BubbleFighter.Fantasy.InGame.Tests;
 /// </summary>
 public sealed class RoomSessionChatTests
 {
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AMenuLineReachesTheMenuPlayersAsASystemLineWithTheNickname(bool enabled)
+    {
+        // kr-186 speaks in its main, tutorial and lobby menus with the waiting-room packet.
+        var rig = new RoomFlowTests.Rig(options: new InGameOptions { MenuSessionChat = enabled, GameProtocol = "test/game" });
+        var speaker = RoomFlowTests.Rig.Player(11, "speaker");
+        var listener = RoomFlowTests.Rig.Player(22, "listener");
+        var seated = RoomFlowTests.Rig.Player(33, "seated");
+        try
+        {
+            speaker.Features.Get<IPlayerSession>().MoveTo(SessionPhase.MainMenu);
+            listener.Features.Get<IPlayerSession>().MoveTo(SessionPhase.MainMenu);
+            await rig.CreateAsync(seated);
+            rig.Flow.Sessions = () => [speaker, listener, seated];
+
+            await rig.Flow.HandleSessionChatAsync(speaker, new(false, "hi"), default);
+
+            if (!enabled)
+            {
+                Assert.Empty(rig.SessionChat.To(listener));
+                return;
+            }
+            var heard = Assert.Single(rig.SessionChat.To(listener));
+            Assert.Equal(heard, Assert.Single(rig.SessionChat.To(speaker)));
+            Assert.Equal(-1, heard.Slot);
+            Assert.Equal("speaker: hi", heard.Text);
+            Assert.Empty(rig.SessionChat.To(seated));
+        }
+        finally { await rig.Registry.StopAllAsync(); }
+    }
+
+    [Fact]
+    public async Task APlazaLineReachesEveryPlazaPlayerByThePlazaSeat()
+    {
+        // A build without the chat-module packet (kr-186) speaks in the plaza with the waiting-room packet.
+        var rig = new RoomFlowTests.Rig(plaza: true);
+        var first = RoomFlowTests.Rig.Player(11, "first");
+        var second = RoomFlowTests.Rig.Player(22, "second");
+        try
+        {
+            await rig.Flow.HandlePlazaEnterAsync(first, new(), default);
+            await rig.Flow.HandlePlazaEnterAsync(second, new(), default);
+
+            await rig.Flow.HandleSessionChatAsync(second, new(false, "hi"), default);
+
+            var heardByFirst = Assert.Single(rig.SessionChat.To(first));
+            var heardBySecond = Assert.Single(rig.SessionChat.To(second));
+            Assert.Equal(heardByFirst, heardBySecond);
+            Assert.Equal(0, heardByFirst.RoomId);
+            Assert.False(heardByFirst.TeamOnly);
+            Assert.Equal("hi", heardByFirst.Text);
+            Assert.NotEqual(-1, heardByFirst.Slot);
+        }
+        finally { await rig.Registry.StopAllAsync(); }
+    }
+
     [Fact]
     public async Task AnOpenLineReachesEveryMemberIncludingTheSpeaker()
     {

@@ -5,35 +5,43 @@ using Xunit;
 namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
 
 /// <summary>
-/// Pins the host-setting frames: the request (two words, writer kr-812 sub_809110 and
-/// kr-1256 sub_9DFC50), the setting update (four words, reader kr-812 sub_80A400 and
-/// kr-1256 sub_9CBF50) and the default setting (two words, codec kr-812 sub_6DB1B0 and the
-/// inline case kr-1256 0x9D542B). The modern builds read the same bodies into locals, so the
-/// fields are stated at wire offsets. The words' purposes are unproven and stay unknown_<offset>.
+/// Pins the host-setting frames: the prize-setting request (<c>action</c>, <c>prize</c>: writers
+/// kr-812 sub_809110, kr-1256 sub_9DFC50, cn-774 sub_8E8E60, tw-454 sub_A69500), the setting update
+/// (<c>action</c>, <c>prize</c>, <c>min_prize</c>, <c>max_prize</c>: readers kr-812 sub_80A400,
+/// kr-1256 sub_9CBF50, cn-774 sub_BC77E0, tw-454 sub_AA6440), the default prize bounds
+/// (<c>min_prize</c>, <c>max_prize</c>: kr-812 sub_6DB1B0, kr-1256 0x9D542B), and the start reply
+/// (<c>status</c>: kr-812 sub_80A910, kr-1256 sub_9CB9C0, cn-774 sub_BC70C0, tw-454 sub_AA5D20).
 /// </summary>
 public sealed class UserHostSettingTableTests
 {
     private const string TwoWords = "0100000005000000";
     private const string FourWords = "01000000050000000A00000000000000";
 
-    /// <summary>Each host-setting body round-trips at its client-established byte length.</summary>
+    /// <summary>Each host-setting body round-trips at its client-established byte length across enabled builds.</summary>
     [Theory]
     [InlineData("kr-812")]
+    [InlineData("cn-717")]
+    [InlineData("id-1809")]
     [InlineData("kr-1256")]
+    [InlineData("cn-774")]
+    [InlineData("tw-454")]
     public void HostSettingBodiesRoundTripAtTheirPinnedLengths(string build)
     {
         var request = Convert.FromHexString(TwoWords);
         var update = Convert.FromHexString(FourWords);
         var defaults = Convert.FromHexString(TwoWords);
+        var startReply = Convert.FromHexString("FCFFFFFF");
         Assert.Equal(8, request.Length);
         Assert.Equal(16, update.Length);
         Assert.Equal(8, defaults.Length);
+        Assert.Equal(4, startReply.Length);
 
         foreach (var (structure, body, length) in new[]
                  {
                      ("UserHostSettingRequest", request, 8),
                      ("UserHostSettingUpdate", update, 16),
                      ("UserHostDefaultSetting", defaults, 8),
+                     ("UserHostStartReply", startReply, 4),
                  })
         {
             var decoded = PacketCodec.Read(TestBuilds.Packets, build, structure, body);
@@ -42,17 +50,20 @@ public sealed class UserHostSettingTableTests
         }
     }
 
-    /// <summary>Unknown field names preserve the documented positions and widths.</summary>
+    /// <summary>Field names preserve the proven meanings and wire widths.</summary>
     [Theory]
-    [InlineData("kr-812", "unknown_4:u32,unknown_8:u32",
-        "unknown_4:u32,unknown_8:u32,unknown_12:u32,unknown_16:u32", "unknown_4:u32,unknown_8:u32")]
-    [InlineData("kr-1256", "unknown_0:u32,unknown_4:u32",
-        "unknown_0:u32,unknown_4:u32,unknown_8:u32,unknown_12:u32", "unknown_0:u32,unknown_4:u32")]
-    public void FieldsRetainUnknownNamesAndProvenWidths(string build, string request, string update, string defaults)
+    [InlineData("kr-812")]
+    [InlineData("cn-717")]
+    [InlineData("id-1809")]
+    [InlineData("kr-1256")]
+    [InlineData("cn-774")]
+    [InlineData("tw-454")]
+    public void FieldsExposeProvenRolesAndWidths(string build)
     {
-        Assert.Equal(request, Fields(build, "UserHostSettingRequest"));
-        Assert.Equal(update, Fields(build, "UserHostSettingUpdate"));
-        Assert.Equal(defaults, Fields(build, "UserHostDefaultSetting"));
+        Assert.Equal("action:u32,prize:u32", Fields(build, "UserHostSettingRequest"));
+        Assert.Equal("action:u32,prize:u32,min_prize:u32,max_prize:u32", Fields(build, "UserHostSettingUpdate"));
+        Assert.Equal("min_prize:u32,max_prize:u32", Fields(build, "UserHostDefaultSetting"));
+        Assert.Equal("status:u32", Fields(build, "UserHostStartReply"));
     }
 
     /// <summary>Selected truncated and overlong host-setting bodies are rejected.</summary>
@@ -71,6 +82,8 @@ public sealed class UserHostSettingTableTests
                      ("UserHostSettingUpdate", 20),
                      ("UserHostDefaultSetting", 0), ("UserHostDefaultSetting", 4),
                      ("UserHostDefaultSetting", 9),
+                     ("UserHostStartReply", 0), ("UserHostStartReply", 3),
+                     ("UserHostStartReply", 5),
                  })
         {
             Assert.Throws<PacketFormatException>(() =>

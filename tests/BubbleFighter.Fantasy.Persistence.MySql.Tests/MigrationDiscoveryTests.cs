@@ -12,7 +12,7 @@ public sealed class MigrationDiscoveryTests
         var runner = new MigrationRunner(new UnusedFactory(), NullLogger.Instance, typeof(MySqlPlugin).Assembly);
         var versions = runner.DiscoverMigrations().Select(m => m.Version).ToArray();
 
-        Assert.Equal(new[] { 1, 2, 3, 4, 5, 6, 7, 11, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47 }, versions);
+        Assert.Equal(new[] { 1, 2, 3, 4, 5, 6, 7, 11, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 60, 61, 62, 63 }, versions);
     }
 
     [Fact]
@@ -40,12 +40,17 @@ public sealed class MigrationDiscoveryTests
             "clan_opens",
             "weapon_preset_pages",
             "player_loadouts",
+            "mystery_store_selections",
             "player_title_medals",
             "player_title_medal_receipts",
             "player_title_acquisition_receipts",
             "player_battle_records",
             "presents",
             "present_claims",
+            "cash_inbox_entries",
+            "cash_inbox_claims",
+            "user_host_escrows",
+            "user_host_claims",
             "cluster_data_domain",
             "account_write_authorities",
             "account_handoffs",

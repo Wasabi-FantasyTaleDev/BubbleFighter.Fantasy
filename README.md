@@ -45,11 +45,15 @@ The packages need the ASP.NET Core Runtime 10 on the machine that runs them.
   from the [latest release](https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest),
   extract it to a short folder such as `C:\BubbleFighterFantasy` and double-click
   `BubbleFighter.Fantasy.Host.exe`. The setup assistant opens in your browser.
-- **Linux:** `curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash`, then run
-  `~/bubblefighter-fantasy/bff` and open `http://127.0.0.1:7300/`. The script installs the runtime
-  itself when it is missing.
-- **Docker:** `curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash -s -- --docker`
-  runs the server in a container; add `--with-mysql` for a bundled MySQL 8.4.
+- **Windows script:** in PowerShell, `irm https://wasabi-fantasytaledev.github.io/install.ps1 | iex`
+  asks a few questions, installs the ASP.NET Core Runtime when it is missing and opens the setup
+  assistant.
+- **Linux:** `curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash` asks a few
+  questions (Docker, service, start now), installs the runtime itself when it is missing and can start
+  the server; the setup assistant is at `http://127.0.0.1:7300/`.
+- **Docker:** `curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | sudo bash -s -- --docker --install-docker --with-mysql`
+  installs Docker when it is missing and runs the server with a MariaDB 11.4 container; leave out
+  `--with-mysql` to use SQLite or your own MySQL.
 
 [Installation](docs/installation.md#install-a-prebuilt-package) lists every option.
 

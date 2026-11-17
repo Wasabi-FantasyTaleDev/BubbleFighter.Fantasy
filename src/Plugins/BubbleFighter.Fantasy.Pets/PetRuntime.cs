@@ -31,7 +31,10 @@ internal sealed class PetRuntime(PetCatalog catalog, PetsOptions options, PetRul
             var valid = food.Function != 39 || int.TryParse(request.SecondaryParameter, NumberStyles.None,
                 CultureInfo.InvariantCulture, out var selected) && (selector = selected) > 0;
             if (valid)
-                outcome = await MutateAsync(player.Identity.UserNum, target, food.ItemId, !options.ManualLevelUp,
+                // The client offers food while a hungry pet is being put on, before it is worn, and cn-717 sub_8AC4F0 shows
+                // one "not hungry" text for any refusal; feeding never requires the worn flag, a skill reset still does.
+                outcome = await MutateAsync(player.Identity.UserNum, target, food.ItemId,
+                    !options.ManualLevelUp && food.Function is 21 or 39,
                     (state, pet, now) => food.Function is 19 or 20 ? rules.Feed(state, pet, food, now) : rules.Reset(state, selector),
                     ct, reset: food.Function is 21 or 39)
                     .ConfigureAwait(false);
@@ -87,8 +90,6 @@ internal sealed class PetRuntime(PetCatalog catalog, PetsOptions options, PetRul
     {
         if (target == 0 || target >= PetArticleKeys.First && !PetArticleKeys.IsAddressable(target))
             return new(PetFailure.Unavailable, null, null);
-        if (reset && mileage is null && catalog.Items.TryGetValue(PetMileagePolicy.BalanceItemId, out var balance) && balance.Function == 1114)
-            throw new InvalidOperationException("Native mileage resets require a complete mileage policy before mutation.");
         for (var attempt = 0; attempt < options.MutationAttempts; attempt++)
         {
             var rows = entitlements is null

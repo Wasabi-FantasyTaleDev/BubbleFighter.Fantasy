@@ -85,6 +85,7 @@ public sealed class ShopScenarioTests
             // scenario keeps every other feature of the row off, as the shop-only mounts below always did.
             Row("dialect.messages", "dialect.messages", new()
             {
+                ["couples"] = false,
                 ["protocol"] = profile + "/game", ["login"] = false, ["packets_directory"] = RepositoryPackets.Directory(),
             }),
             Row("clientdata", "clientdata", TestClientData.RowConfig(TestClientData.SyntheticShop())),

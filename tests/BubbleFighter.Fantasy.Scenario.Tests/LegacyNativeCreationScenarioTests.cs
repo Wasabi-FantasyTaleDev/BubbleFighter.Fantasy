@@ -145,6 +145,7 @@ public sealed class LegacyNativeCreationScenarioTests
             }),
             Row("lobby", new()
             {
+                ["couples"] = false,
                 ["protocol"] = "kr-812/game", ["character_creation"] = true, ["auto_create_players"] = false,
                 ["inventory_source"] = "mysql", ["money_source"] = "mysql",
                 ["starter_item_ids"] = new object[] { 300001, 201001, 202001, 207001 },

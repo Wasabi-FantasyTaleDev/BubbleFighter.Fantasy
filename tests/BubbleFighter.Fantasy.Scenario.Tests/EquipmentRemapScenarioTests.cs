@@ -73,6 +73,7 @@ public sealed class EquipmentRemapScenarioTests
             Row("protocol", new() { ["opcode_table_path"] = tablePath, ["bootstrap_status"] = 1 }),
             Row("lobby", new()
             {
+                ["couples"] = false,
                 ["inventory_source"] = "mysql", ["money_source"] = "mysql",
                 ["starting_lucci"] = 12345, ["starting_cash"] = 6789,
             }),

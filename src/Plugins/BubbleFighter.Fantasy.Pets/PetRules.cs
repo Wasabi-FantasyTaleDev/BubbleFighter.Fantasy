@@ -13,7 +13,7 @@ internal sealed record PetTransition(PetProgression? State, PetFailure Failure, 
 internal sealed class PetRules(PetCatalog catalog, PetsOptions options, Random random)
 {
     internal PetProgression Initial(DateTimeOffset now) => new(0, 0,
-        Deadline(now, Math.Min(options.InitialFullness, catalog.HungerMaximum)), null, null, null);
+        Deadline(now, Math.Min(options.InitialFullness ?? catalog.HungerMaximum, catalog.HungerMaximum)), null, null, null);
 
     internal int Fullness(PetProgression state, DateTimeOffset now)
     {

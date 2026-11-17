@@ -1,0 +1,45 @@
+version: 1
+structs:
+  # kr-812 sub_512B20 / kr-812 sub_6DB1B0 write/read actor and item; kr-812 sub_577AD0 consumes healing.
+  # kr-1256 sub_496B80 / kr-1256 sub_6D55D0 at 0x6D7364 add the item user's actor after the recipient and item.
+  ItemHealing:
+    - actor: u32
+      offset: 4
+      kr-1256:
+        - actor: u32
+          offset: 0
+    - item: u32
+      offset: 8
+      kr-1256:
+        - item: u32
+          offset: 4
+    - source: u32
+      offset: 8
+      only: [kr-1256]
+
+  # kr-812 sub_512D60 / kr-812 sub_518590 stop the actor's projection; kr-1256 sub_B0B110 sends its timed end.
+  # kr-1256 sub_6D55D0 at 0x6D7479 reads the actor and clears the projection flag, separately from victim thawing.
+  FreezeCannonEnd:
+    - actor: u32
+      offset: 4
+      kr-1256:
+        - actor: u32
+          offset: 0
+
+  # kr-1256 sub_705AA0 writes victim/source after damage; kr-1256 sub_6D55D0 at 0x6D7FFA reads both words.
+  # kr-1256 sub_4A5070 requests the victim's timed reaction state; source is preserved but not used by this reader.
+  StormCloudHit:
+    - actor: u32
+      offset: 0
+      only: [kr-1256]
+    - source: u32
+      offset: 4
+      only: [kr-1256]
+
+  # Modern CN/TW consumers have not been audited for these routes.
+  ItemHealing@cn-774: []
+  ItemHealing@tw-454: []
+  FreezeCannonEnd@cn-774: []
+  FreezeCannonEnd@tw-454: []
+  StormCloudHit@cn-774: []
+  StormCloudHit@tw-454: []

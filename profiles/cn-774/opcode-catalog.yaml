@@ -18,14 +18,14 @@ summary:
   c2s_cross: 1
   c2s_none: 290
   c2s_ordered: 2
-  c2s_pair: 74
-  c2s_reviewed: 59
+  c2s_pair: 73
+  c2s_reviewed: 60
   c2s_runtime: 3
   c2s_shape: 15
   c2s_strong: 12
   c2s_weak: 2
   s2c_label: 248
-  s2c_reviewed: 1
+  s2c_reviewed: 2
 opcodes:
   - {value: 0, direction: c2s, name: Unknown0, grade: none, name_source: none, connection_hint: game}
   - {value: 1, direction: c2s, name: gcpFirstConnect, grade: reviewed, method: own-reviewed-table, name_source: reviewed@cn-774, connection_hint: game}
@@ -486,7 +486,7 @@ opcodes:
   - {value: 38281, direction: c2s, name: Unknown38281, grade: pair, method: s2c-same-number, name_source: pair@cn-774, senders: [8A5760], note: pairs with Unknown38281 at the same number}
   - {value: 38282, direction: c2s, name: Unknown38282, grade: pair, method: s2c-same-number, name_source: pair@cn-774, senders: [8A4980], note: pairs with Unknown38282 at the same number}
   - {value: 38283, direction: c2s, name: Unknown38283, grade: pair, method: s2c-same-number, name_source: pair@cn-774, senders: [89E580], note: pairs with Unknown38283 at the same number}
-  - {value: 38284, direction: c2s, name: Unknown38284, grade: pair, method: s2c-same-number, name_source: pair@cn-774, senders: [ADC7C0], note: pairs with Unknown38284 at the same number}
+  - {value: 38284, direction: c2s, name: gppSetWallHealAllowed_, grade: reviewed, method: own-reviewed-table, name_source: reviewed@cn-774, connection_hint: relay}
   - {value: 1, direction: s2c, name: gspDisconnect, grade: label, name_source: label@cn-774, connection_hint: game}
   - {value: 2, direction: s2c, name: gspRepGamePatch, grade: label, name_source: label@cn-774, connection_hint: game}
   - {value: 3, direction: s2c, name: gspRepLogin, grade: label, name_source: label@cn-774, connection_hint: game}
@@ -736,6 +736,7 @@ opcodes:
   - {value: 1553, direction: s2c, name: gspReqSelectItemExchangeBox, grade: label, name_source: label@cn-774, connection_hint: game}
   - {value: 1554, direction: s2c, name: gspRepOption, grade: label, name_source: label@cn-774, connection_hint: game}
   - {value: 1555, direction: s2c, name: gspCustomGameModeSetting, grade: label, name_source: label@cn-774, connection_hint: game}
+  - {value: 38284, direction: s2c, name: gppSetWallHealAllowed_, grade: reviewed, method: own-reviewed-table, name_source: reviewed@cn-774, connection_hint: relay}
 
 # Transport paths for the packet writers above:
 # cn-774 sub_953C90 sends through the relay session. cn-774 sub_B55270 routes peer

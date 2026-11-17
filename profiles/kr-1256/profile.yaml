@@ -24,7 +24,9 @@ bundles:
   - ingame
   - shop
   - player-settings
+  - couples
   - clan
+  - clan-gateway
 patches:
   - patch.yaml
   - ../bundles/shop-supplement-lucci.yaml
@@ -51,6 +53,9 @@ patches:
   - ../bundles/modern-room-kicking.patch.yaml
   - ../bundles/defence-seeds.patch.yaml
   - weapon-master.patch.yaml
+  - weapon-objects.patch.yaml
+  - horde-lottery.patch.yaml
   - modes.patch.yaml
+  - ../bundles/user-host.patch.yaml
   # Optional developer override; git-ignored and skipped when absent.
   - local.patch.yaml

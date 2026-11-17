@@ -90,6 +90,9 @@ internal sealed partial class PlayRoomCodec(
     /// <summary>Gets the cleanup called when a player creates or joins a multiplayer room.</summary>
     internal Func<ISession, CancellationToken, ValueTask>? MultiplayerRoomEntering { get; init; }
 
+    /// <summary>Gets or sets whether sponsor (<c>user_host</c>) prize-room wire fields are enabled.</summary>
+    public bool UserHost { get; init; }
+
     /// <summary>Registers the request opcodes and publishes the bindings and encoders.</summary>
     /// <param name="context">The dialect row's context.</param>
     internal void Mount(IPluginContext context)
@@ -170,7 +173,7 @@ internal sealed partial class PlayRoomCodec(
         if (table.Find(PacketDirection.ClientToServer, "gcpReqListSession") is { } listRequest
             && table.Find(PacketDirection.ServerToClient, "gspRepListSession") is { } listReply)
             new RoomListCodec(protocol, listRequest, listReply, packetTables, lineage, logger,
-                room => GameSetting(room.BuildSettings)).Mount(context);
+                room => GameSettingFor(room.BuildSettings, room.IsUserHost)).Mount(context);
         else
             logger.LogWarning("dialect.rooms: {Protocol} does not name the room list; its rooms cannot list until the table does.", protocol);
 
@@ -197,8 +200,12 @@ internal sealed partial class PlayRoomCodec(
         On("gcpReqCreateSession", (session, body) =>
         {
             var request = PlazaRoomWire.ReadCreateRoom(body, schema);
+            var isUserHost = UserHost && UserHostBinding.ReadIsUserHost(packetTables, lineage, request.GameSetting);
             return new RoomCreateRequested(request.Title, request.Password, request.Mode, request.MapKey,
-                new RoomBuildSettings(lineage, request.GameSetting));
+                new RoomBuildSettings(lineage, request.GameSetting))
+            {
+                IsUserHost = isUserHost,
+            };
         });
         On("gcpReqLeaveSession", (_, body) =>
         {
@@ -247,7 +254,7 @@ internal sealed partial class PlayRoomCodec(
             On("gcpUserHostStart", (_, body) =>
             {
                 PlazaRoomWire.ReadUserHostStart(body);
-                return new RoomStartRequested();
+                return new RoomStartRequested { FromUserHostPacket = true };
             });
         }
         MountPlaza(context);
@@ -266,11 +273,23 @@ internal sealed partial class PlayRoomCodec(
     /// <summary><c>gspRoomChangeGameSetting</c> (reader <c>sub_80A4F0</c>): the room's <c>GameSetting</c>.</summary>
     public ValueTask SendAsync(ISession session, RoomSettingsChanged message, CancellationToken ct)
     {
-        var settings = GameSetting(message.Room.BuildSettings);
+        var settings = GameSettingFor(message.Room.BuildSettings, message.Room.IsUserHost);
         if (settings.IsEmpty)
             settings = PlazaRoomWire.ApplyGameSettingMode(schema,
                 PlazaRoomWire.ApplyGameSettingChange(schema, packetTables, lineage, default, default), message.Room.ModeId);
+        if (UserHost && message.Room.IsUserHost)
+            settings = UserHostBinding.WriteIsUserHost(packetTables, lineage, settings.Span, true);
         return session.SendAsync(S2C(session, "gspRoomChangeGameSetting"), settings, ct);
+    }
+
+    private ReadOnlyMemory<byte> GameSettingFor(RoomBuildSettings? buildSettings, bool isUserHost)
+    {
+        var settings = GameSetting(buildSettings);
+        if (UserHost && isUserHost && settings.IsEmpty)
+            settings = PlazaRoomWire.ApplyGameSettingChange(schema, packetTables, lineage, default, default);
+        if (UserHost && !settings.IsEmpty && (isUserHost || UserHostBinding.ReadIsUserHost(packetTables, lineage, settings.Span)))
+            settings = UserHostBinding.WriteIsUserHost(packetTables, lineage, settings.Span, isUserHost);
+        return settings;
     }
 
     /// <summary><c>gspGotoRoom</c> kind 2 (reader <c>sub_692A40</c>) with every slot of the room.</summary>
@@ -364,8 +383,11 @@ internal sealed partial class PlayRoomCodec(
                 if (settings.IsEmpty)
                     settings = PlazaRoomWire.ApplyGameSettingMode(schema,
                         PlazaRoomWire.ApplyGameSettingChange(schema, packetTables, lineage, default, default), message.Room.ModeId);
+                var seriesSettings = PlazaRoomWire.ApplyGameSettingSeries(schema, settings.Span, _seriesFields!, series.RoundIndex);
+                if (message.Room.IsUserHost || UserHostBinding.ReadIsUserHost(packetTables, lineage, seriesSettings))
+                    seriesSettings = UserHostBinding.WriteIsUserHost(packetTables, lineage, seriesSettings, UserHost && message.Room.IsUserHost);
                 await session.SendAsync(S2C(session, "gspRoomChangeGameSetting"),
-                    PlazaRoomWire.ApplyGameSettingSeries(schema, settings.Span, _seriesFields!, series.RoundIndex), ct).ConfigureAwait(false);
+                    seriesSettings, ct).ConfigureAwait(false);
             }
         }
         foreach (var seat in message.Room.Seats)
@@ -578,10 +600,18 @@ internal sealed partial class PlayRoomCodec(
         foreach (var seat in room.Seats)
             slots[seat.Slot] = Slot(seat);
         var settings = GameSetting(room.BuildSettings);
+        if (settings.IsEmpty && room.IsUserHost)
+        {
+            settings = PlazaRoomWire.ApplyGameSettingMode(schema,
+                PlazaRoomWire.ApplyGameSettingChange(schema, packetTables, lineage, default, default), room.ModeId);
+        }
+        if (!settings.IsEmpty && (room.IsUserHost || UserHostBinding.ReadIsUserHost(packetTables, lineage, settings.Span)))
+            settings = UserHostBinding.WriteIsUserHost(packetTables, lineage, settings.Span, UserHost && room.IsUserHost);
+        var playableSeats = room.PlayableMaxSeats ?? room.MaxSeats;
         return new RoomValues(RoomCodec.PlayRoomKind, slots)
         {
             Play = true, RoomId = room.RoomId, Title = room.Name, SessionState = sessionState,
-            OpenSeats = room.MaxSeats - room.ClosedSlots.Count, Mode = room.ModeId, MasterSlot = room.MasterSlot,
+            OpenSeats = playableSeats - room.ClosedSlots.Count(slot => slot < playableSeats), Mode = room.ModeId, MasterSlot = room.MasterSlot,
             HasPassword = room.HasPassword,
             MapName = room.MapKey, CurrentMap = room.MapKey, GameSetting = settings,
         };
@@ -601,5 +631,6 @@ internal sealed partial class PlayRoomCodec(
             ControllerSlot = seat.Slot,
             InventorySelection = seat.InventorySelection,
             ItemAttributes = seat.ItemAttributes,
+            Couple = seat.Couple,
         };
 }

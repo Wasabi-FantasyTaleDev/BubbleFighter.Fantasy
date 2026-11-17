@@ -132,7 +132,7 @@ public sealed class PetMutationTests : IDisposable
             command.Parameters.AddWithValue("$user", user);
             var state = JsonNode.Parse((string)command.ExecuteScalar()!)!;
             foreach (var slot in state["Slots"]!.AsArray()) slot!.AsObject().Remove("Pet");
-            command.CommandText = "UPDATE players SET state=$state WHERE user_num=$user; DROP TABLE IF EXISTS pet_identity_allocator; PRAGMA user_version=10;";
+            command.CommandText = "UPDATE players SET state=$state WHERE user_num=$user; DROP TABLE IF EXISTS pet_identity_allocator; DROP TABLE IF EXISTS couple_members; DROP TABLE IF EXISTS couples; PRAGMA user_version=10;";
             command.Parameters.AddWithValue("$state", state.ToJsonString());
             command.ExecuteNonQuery();
         }
@@ -140,7 +140,7 @@ public sealed class PetMutationTests : IDisposable
         {
             var store = new SqliteRepositories(database);
             Assert.All(await store.ListSlotsAsync(user, InventoryBag.CharacterBag, 512, default), row => Assert.Null(row.Pet));
-            Assert.Equal(13L, database.RawScalar("PRAGMA user_version"));
+            Assert.Equal(18L, database.RawScalar("PRAGMA user_version"));
             Assert.NotNull(await store.MutatePetAsync(Command(Pet(user) with { Pet = null }), default));
         }
     }

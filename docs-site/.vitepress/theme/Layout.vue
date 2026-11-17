@@ -8,6 +8,8 @@ import LiquidGlassLink from './LiquidGlassLink.vue'
 import HeaderDropdown from './HeaderDropdown.vue'
 import DownloadSection from './DownloadSection.vue'
 import ReleaseNotes from './ReleaseNotes.vue'
+import TutorialPage from './tutorial/TutorialPage.vue'
+import { tutorialIn, tutorialList } from './tutorial/registry'
 import NoahButton from './noah/components/ui/NoahButton.vue'
 import NoahReveal from './noah/components/ui/NoahReveal.vue'
 import NoahTerminal from './noah/components/ui/NoahTerminal.vue'
@@ -18,7 +20,7 @@ const route = useRoute()
 const { t, locale } = useI18n()
 watch(lang, value => { locale.value = value || 'zh-CN' }, { immediate: true })
 const repositoryUrl = 'https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy'
-const terminalCommand = 'curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash\n~/bubblefighter-fantasy/bff'
+const terminalCommand = 'curl -fsSL https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest/download/install.sh | bash\n~/bubblefighter-fantasy/bff'
 const language = computed(() => languages.find(item => item.code === lang.value) || languages[0])
 const text = computed(() => translatedLabels(t))
 const home = computed(() => frontmatter.value.layout === 'home')
@@ -59,6 +61,14 @@ const groups = computed(() => [
   { title: text.value.guides, items: [2, 3, 4, 5, 6, 7, 8, 9] },
   { title: text.value.project, items: [10, 11] },
 ])
+// Tutorial pages are generated from tutorials.json and drawn by the theme instead of Markdown.
+const tutorialSlug = computed(() => (frontmatter.value.layout === 'tutorial' ? String(frontmatter.value.tutorial) : ''))
+const tutorials = computed(() => tutorialList.filter(item => tutorialIn(item, language.value.code)).map(item => ({ slug: item.slug, path: `tutorials/${item.slug}`, title: item.title[language.value.code] })))
+// A tutorial published in fewer languages switches to that language's home page instead of a missing route.
+function languagePath(code: string) {
+  const entry = tutorialSlug.value ? tutorialList.find(item => item.slug === tutorialSlug.value) : undefined
+  return entry && !tutorialIn(entry, code) ? '' : currentPath.value
+}
 const link = (path = '', prefix = language.value.prefix) => withBase(`/${prefix}${path === 'index' ? '' : path}`)
 const closeMenus = () => { mobileOpen.value = false; openHeaderMenu.value = null }
 function scrollSpy() {
@@ -113,7 +123,11 @@ onUnmounted(() => { media?.removeEventListener('change', updateViewport); motion
           <template #trigger>{{ group.title }}<Icon name="chevron" /></template>
           <a v-for="index in group.items" :key="index" :href="link(routes[index])">{{ text.pages[index] }}</a>
         </HeaderDropdown>
-        <a class="header-download" :href="`${link()}#download`" @pointerenter="openHeaderMenu = null">{{ text.download.nav }}</a>
+        <HeaderDropdown class="nav-group" :label="t('tutorial.nav')" :open="openHeaderMenu === 'tutorials'" @update:open="setHeaderMenu('tutorials', $event)">
+          <template #trigger>{{ t('tutorial.nav') }}<Icon name="chevron" /></template>
+          <a v-for="item in tutorials" :key="item.slug" :href="link(item.path)" :aria-current="currentPath === item.path ? 'true' : undefined">{{ item.title }}</a>
+        </HeaderDropdown>
+        <a class="header-download":href="`${link()}#download`" @pointerenter="openHeaderMenu = null">{{ text.download.nav }}</a>
       </nav>
       <div class="header-search-tools">
         <a class="github-link" :href="repositoryUrl" target="_blank" rel="noopener noreferrer" aria-label="GitHub" title="GitHub" @pointerenter="openHeaderMenu = null"><Icon name="github" /></a>
@@ -123,7 +137,7 @@ onUnmounted(() => { media?.removeEventListener('change', updateViewport); motion
         <NoahButton variant="ghost" class="round-button theme-toggle" :aria-label="text.theme" @click="isDark = !isDark"><Icon :name="isDark ? 'moon' : 'sun'" /></NoahButton>
         <HeaderDropdown class="language-select" :label="text.languages" align="right" :hover="false" :open="openHeaderMenu === 'language'" @update:open="setHeaderMenu('language', $event)">
           <template #trigger><Icon name="language" /><span class="language-label">{{ language.label }}</span><Icon name="chevron" /></template>
-          <a v-for="item in languages" :key="item.key" :href="link(currentPath, item.prefix)" :lang="item.code" :aria-current="item.key === language.key ? 'true' : undefined">{{ item.label }}<span v-if="item.key === language.key" aria-hidden="true">✓</span></a>
+          <a v-for="item in languages" :key="item.key" :href="link(languagePath(item.code), item.prefix)" :lang="item.code" :aria-current="item.key === language.key ? 'true' : undefined">{{ item.label }}<span v-if="item.key === language.key" aria-hidden="true">✓</span></a>
         </HeaderDropdown>
         <button ref="menuButton" class="round-button mobile-toggle" :aria-label="mobileOpen ? text.close : text.menu" :aria-expanded="mobileOpen" aria-controls="site-sidebar" @click="mobileOpen = !mobileOpen"><Icon :name="mobileOpen ? 'close' : 'menu'" /></button>
       </div>
@@ -137,6 +151,10 @@ onUnmounted(() => { media?.removeEventListener('change', updateViewport); motion
       <details v-for="group in groups" :key="group.title" open class="sidebar-group">
         <summary>{{ group.title }}<Icon name="chevron" /></summary>
         <a v-for="index in group.items" :key="index" :href="link(routes[index])" :aria-current="currentIndex === index ? 'page' : undefined">{{ text.pages[index] }}</a>
+      </details>
+      <details open class="sidebar-group">
+        <summary>{{ t('tutorial.nav') }}<Icon name="chevron" /></summary>
+        <a v-for="item in tutorials" :key="item.slug" :href="link(item.path)" :aria-current="currentPath === item.path ? 'page' : undefined">{{ item.title }}</a>
       </details>
     </nav>
     <a class="sidebar-download" :href="`${link()}#download`" @click="closeMenus">{{ text.download.nav }}<Icon name="download" /></a>
@@ -157,14 +175,22 @@ onUnmounted(() => { media?.removeEventListener('change', updateViewport); motion
     </section>
     <NoahReveal as="section" class="landing-terminal" :delay="400" :aria-label="text.pages[1]">
       <NoahTerminal title="Bubble Fighter Fantasy" variant="glass" controls :labels="text.terminal" :content="terminalCommand">
-        <span class="terminal-comment"># {{ text.run.linux }}</span>{{ '\n' }}<span class="terminal-prompt">$</span> curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash{{ '\n' }}<span class="terminal-success">==&gt; Bubble Fighter Fantasy is installed.</span>{{ '\n\n' }}<span class="terminal-comment"># {{ text.run.start }}</span>{{ '\n' }}<span class="terminal-prompt">$</span> ~/bubblefighter-fantasy/bff{{ '\n' }}<span class="terminal-success">WebUI: http://127.0.0.1:7300/</span>{{ '\n\n' }}<span class="terminal-comment"># {{ text.run.windows }}</span>{{ '\n\n' }}<span class="terminal-comment">{{ text.footer }}</span><span class="cursor" />
+        <span class="terminal-comment"># {{ text.run.linux }}</span>{{ '\n' }}<span class="terminal-prompt">$</span> curl -fsSL https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest/download/install.sh | bash{{ '\n' }}<span class="terminal-success">==&gt; Bubble Fighter Fantasy is installed.</span>{{ '\n\n' }}<span class="terminal-comment"># {{ text.run.start }}</span>{{ '\n' }}<span class="terminal-prompt">$</span> ~/bubblefighter-fantasy/bff{{ '\n' }}<span class="terminal-success">WebUI: http://127.0.0.1:7300/</span>{{ '\n\n' }}<span class="terminal-comment"># {{ text.run.windows }}</span>{{ '\n\n' }}<span class="terminal-comment">{{ text.footer }}</span><span class="cursor" />
       </NoahTerminal>
     </NoahReveal>
-    <DownloadSection :content="text.download" :labels="text.terminal" :guide-href="link(routes[0])" />
+    <DownloadSection :content="text.download" :labels="text.terminal" :guide-href="link(routes[0])" :tutorial-href="link('tutorials/install-script')" />
     <section class="landing-cards"><NoahReveal as="a" :delay="index * 90" v-for="(title, index) in text.cards" :key="title" :href="link(routes[[0, 2, 3][index]])"><Icon :name="['book', 'settings', 'layers'][index]"/><h2>{{ title }}</h2><p>{{ text.descriptions[index] }}</p><Icon class="card-arrow" name="arrow" /></NoahReveal></section>
     <Content class="home-content" />
     <footer class="site-footer"><span>Bubble Fighter Fantasy</span><span>© 2026 Fantasy Tale Studio</span><span>MIT</span></footer>
   </main>
+
+  <div v-else-if="tutorialSlug" class="document-frame tutorial-frame" :inert="mobileOpen">
+    <main id="main-content" class="document tutorial-document">
+      <div class="mobile-breadcrumb"><button @click="mobileOpen = true"><Icon name="menu" />{{ text.menu }}</button><span>{{ page.title }}</span></div>
+      <div id="overview" class="document-heading tutorial-heading"><h1>{{ page.title }}</h1><div id="tutorial-heading-platform" /><div id="tutorial-heading-tools" /></div>
+      <TutorialPage :slug="tutorialSlug" :lang="language.code" />
+    </main>
+  </div>
 
   <div v-else class="document-frame" :inert="mobileOpen">
     <main id="main-content" class="document">

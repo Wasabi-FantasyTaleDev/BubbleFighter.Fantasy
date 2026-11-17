@@ -158,6 +158,9 @@ internal sealed partial class RoomFlow
         foreach (var member in group.Followers)
         {
             if (!FollowerIsCurrent(group, member)) continue;
+            // The move runs on the leader's request, but every write it causes (seat equipment, the entered room's
+            // equipment view, scene state) belongs to the follower's account; queued room work captures this scope.
+            using var authority = _mutations?.Enter(member);
             try { await follow(member, ct).ConfigureAwait(false); }
             catch (IOException error)
             {
@@ -242,6 +245,7 @@ internal sealed partial class RoomFlow
 
     internal async Task StopScenesAsync()
     {
+        await StopCoupleChangesAsync().ConfigureAwait(false);
         await _sceneTransitions.StopAsync().ConfigureAwait(false);
         await _plaza.Executor.StopAsync().ConfigureAwait(false);
         foreach (var member in _plaza.Snapshot()) ClearPlazaRecruitment(member);

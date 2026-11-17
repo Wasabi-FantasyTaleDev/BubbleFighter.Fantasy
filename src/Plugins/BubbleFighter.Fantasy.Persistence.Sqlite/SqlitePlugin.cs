@@ -1,4 +1,5 @@
 using BubbleFighter.Fantasy.Contracts.Titles;
+using BubbleFighter.Fantasy.Contracts.Couples;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Contracts.Clans;
 using BubbleFighter.Fantasy.Contracts.Fighters;
@@ -17,11 +18,11 @@ namespace BubbleFighter.Fantasy.Persistence.Sqlite;
 
 /// <summary>Publishes durable local identity and gameplay repositories from one bounded SQLite save.</summary>
 [Plugin("persistence.sqlite", Category = "storage", Names = ["en=SQLite storage", "zh-Hans=SQLite 存储", "zh-Hant=SQLite 儲存", "ko=SQLite 저장소"], Description = "Explicit local SQLite save; mutually exclusive with other persistence providers.",
-    Provides = [typeof(IPlayerRepository), typeof(ILauncherAccountRepository), typeof(ILauncherSessionStore), typeof(BubbleFighter.Fantasy.Contracts.Progress.ITutorialStageStore), typeof(BubbleFighter.Fantasy.Contracts.Progress.ITutorialPracticeStore), typeof(IFighterRepository),
+    Provides = [typeof(ICoupleStore), typeof(IPlayerRepository), typeof(ILauncherAccountRepository), typeof(ILauncherSessionStore), typeof(BubbleFighter.Fantasy.Contracts.Progress.ITutorialStageStore), typeof(BubbleFighter.Fantasy.Contracts.Progress.ITutorialPracticeStore), typeof(BubbleFighter.Fantasy.Contracts.Progress.IPlazaGameRecordStore), typeof(IFighterRepository),
         typeof(IInventoryRepository), typeof(IInventoryLoadoutStore), typeof(IPetMutationStore), typeof(IPetEntitlementStore), typeof(IItemEnhancementStore),
-        typeof(IItemModificationStore), typeof(ILaboratoryInventoryStore), typeof(IRoundTitleMedalSettlementRepository),
+        typeof(IItemModificationStore), typeof(ILaboratoryInventoryStore), typeof(BubbleFighter.Fantasy.Contracts.MysteryStore.IMysteryStore), typeof(IRoundTitleMedalSettlementRepository),
         typeof(IInventoryMetadataStore), typeof(ITitleMedalStore), typeof(IPlayerWalletRepository), typeof(IPlayerProgressRepository), typeof(IPlayerBattleRecordsRepository),
-        typeof(IPlayerInventoryState), typeof(IShopPurchaseStore), typeof(IPresentStore), typeof(IShopSessionStore), typeof(IClanStore),
+        typeof(IPlayerInventoryState), typeof(IShopPurchaseStore), typeof(IPresentStore), typeof(BubbleFighter.Fantasy.Contracts.CashInbox.ICashInboxStore), typeof(BubbleFighter.Fantasy.Contracts.Rooms.IUserHostPrizeStore), typeof(IShopSessionStore), typeof(IClanStore), typeof(BubbleFighter.Fantasy.Contracts.Clans.IClanDirectory),
         typeof(IPlayerMovementState), typeof(IPlayerSettingsRepository), typeof(BubbleFighter.Fantasy.Contracts.Messenger.IMessengerStore)])]
 public sealed class SqlitePlugin : IPlugin
 {
@@ -38,6 +39,8 @@ public sealed class SqlitePlugin : IPlugin
         context.Effect(context.Services.Register<ILauncherSessionStore>(new SqliteLauncherSessions(database)));
         context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Messenger.IMessengerStore>(new SqliteMessengerStore(database)));
         context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Progress.ITutorialStageStore>(new SqliteTutorialStages(database)));
+        context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Progress.IPlazaGameRecordStore>(new SqlitePlazaGameRecords(database)));
+        context.Effect(context.Services.Register<ICoupleStore>(new SqliteCoupleStore(database)));
         context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Progress.ITutorialPracticeStore>(new SqliteTutorialPractice(database)));
         context.Effect(context.Services.Register<IFighterRepository>(repositories));
         context.Effect(context.Services.Register<IInventoryRepository>(repositories));
@@ -47,6 +50,7 @@ public sealed class SqlitePlugin : IPlugin
         context.Effect(context.Services.Register<IItemEnhancementStore>(repositories));
         context.Effect(context.Services.Register<IItemModificationStore>(repositories));
         context.Effect(context.Services.Register<ILaboratoryInventoryStore>(repositories));
+        context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.MysteryStore.IMysteryStore>(repositories));
         context.Effect(context.Services.Register<IRoundTitleMedalSettlementRepository>(repositories));
         context.Effect(context.Services.Register<IInventoryMetadataStore>(repositories));
         context.Effect(context.Services.Register<ITitleMedalStore>(repositories));
@@ -56,8 +60,11 @@ public sealed class SqlitePlugin : IPlugin
         context.Effect(context.Services.Register<IPlayerInventoryState>(repositories));
         context.Effect(context.Services.Register<IShopPurchaseStore>(repositories));
         context.Effect(context.Services.Register<IPresentStore>(repositories));
+        context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.CashInbox.ICashInboxStore>(repositories));
+        context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Rooms.IUserHostPrizeStore>(repositories));
         context.Effect(context.Services.Register<IShopSessionStore>(repositories));
         context.Effect(context.Services.Register<IClanStore>(repositories));
+        context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Clans.IClanDirectory>(new SqliteClanDirectory(database)));
         context.Effect(context.Services.Register<IPlayerMovementState>(new SqliteMovement(database.Options.MaxMovementActors)));
         context.Logger.LogInformation("SQLite save active; capacity {MaxPlayers} players, {MaxAccounts} accounts, {MaxBytes} main-file bytes.",
             database.Options.MaxPlayers, database.Options.MaxAccounts, database.Options.MaxDatabaseBytes);

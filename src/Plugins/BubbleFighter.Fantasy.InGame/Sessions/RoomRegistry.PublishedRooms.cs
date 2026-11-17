@@ -21,10 +21,11 @@ public sealed partial class RoomRegistry
                 if (!room.Listed || room.Phase == RoomPhase.Closed || room.Seats.Count == 0
                     || matchRoomsOnly && !room.IsMatchRoom) continue;
                 var master = room.Seats.FirstOrDefault(seat => seat.Slot == room.MasterSlot)?.Nickname ?? string.Empty;
+                var playableSeats = room.PlayableMaxSeats ?? room.MaxSeats;
                 var entry = new RoomListEntry(room.Id, room.RoomName, master, room.ModeId, room.OccupantCount,
-                    room.MaxSeats - room.ClosedSlots.Count, room.Password.Length > 0,
+                    playableSeats - room.ClosedSlots.Count(slot => slot < playableSeats), room.Password.Length > 0,
                     CopyListSettings(room.BuildSettings, includeSessionPrefix: !matchRoomsOnly))
-                    { MatchInProgress = room.Phase != RoomPhase.Waiting };
+                    { MatchInProgress = room.Phase != RoomPhase.Waiting, IsUserHost = room.IsUserHost };
                 snapshots.Add(new(room.InstanceId, entry,
                     string.IsNullOrEmpty(room.RoundMapKey) ? room.MapKey : room.RoundMapKey, room.Phase.ToString()));
             }

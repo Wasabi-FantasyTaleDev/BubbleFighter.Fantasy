@@ -3,6 +3,12 @@ profile: kr-812
 # Only rows with evidence are listed; see profiles/opcode-policy.md. This build keeps
 # its Packet_gcp*/gsp* class names, so most rows can carry label@kr-812.
 opcodes:
+  - value: 947
+    direction: s2c
+    name: gspUpdateCoupleSlot
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 dispatcher sub_837170 case 947 calls sub_8329A0; Packet_gspUpdateCoupleSlot reader sub_83B900/sub_6929F0 reads full UserSlot records through sub_4196F0; handler copies partner number/name/flag into the matching seat"
   - value: 20005
     direction: c2s
     connection: relay
@@ -1181,6 +1187,12 @@ opcodes:
     name_source: label@kr-812
     evidence: inferred
     source: "Packet_gcpCheatAddTitle is the only class constructed before the calls of the stamping helper sub_7A9F90 (kr-812)"
+  - value: 934
+    direction: c2s
+    name: gcpReqCoupleConfirmInvite
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-812 sub_9FDC70 sends Packet_gcpReqCoupleConfirmInvite with opcode 934; reader kr-812 sub_9FDF00 reads bool32, target name, invitation item, message and complete EquippedItemList"
   - value: 935
     direction: c2s
     name: gcpReqCoupleInviteExpire
@@ -1440,15 +1452,15 @@ opcodes:
     name: gcpUserHostStart
     name_source: label@kr-812
     evidence: verified
-    source: "RoomStage start sub_5BD770 builds Packet_gcpUserHostStart and calls send helper sub_5C85E0 SETOP 2025; deserialize nullsub sub_5C8FC0 (vtable D2CEF8)"
-    notes: "empty body; plaza reply is S2C gspRoomEnterGame, not gspUserHostStart"
+    source: "RoomStage start kr-812 sub_5BD770 builds Packet_gcpUserHostStart and calls send helper kr-812 sub_5C85E0 SETOP 2025; deserialize nullsub kr-812 sub_5C8FC0 (vtable D2CEF8)"
+    notes: "empty body; answered by S2C 991 gspUserHostStart (countdown/status), followed after 5000 ms by gcpRoomReqEnterGame (kr-812 sub_5C3F80)"
   - value: 2026
     direction: c2s
     name: gcpUserHostSetting
     name_source: label@kr-812
-    evidence: inferred
-    source: "sender kr-812 sub_809110 builds Packet_gcpUserHostSetting, stamps 2026 through kr-812 sub_B25E90 and calls the class writer; the class codec kr-812 sub_6DB1B0 reads two words at +4 and +8"
-    notes: "two u32, read at class offsets +4 and +8; their roles are unproven, so the table keeps them unknown_4 and unknown_8."
+    evidence: verified
+    source: "sender kr-812 sub_809110 (called by kr-812 sub_5BCD60 on actions 2/3, kr-812 sub_5BD770 and DlgUserHostCompensationSet) builds Packet_gcpUserHostSetting, stamps 2026 through kr-812 sub_B25E90 and writes action (+4) and prize (+8) via kr-812 sub_6DB1B0"
+    notes: "two u32 words (action, prize); matches packets/user-settings.yaml UserHostSettingRequest@kr-812."
   - value: 2027
     direction: c2s
     name: gcpRoomSendRecMsgTo
@@ -3476,16 +3488,16 @@ opcodes:
     direction: s2c
     name: gspUserHostSetting
     name_source: label@kr-812
-    evidence: inferred
-    source: "dispatcher kr-812 sub_837170 case 992: Packet_gspUserHostSetting constructor path; reader kr-812 sub_80A400 reads four words at +4/+8/+12/+16"
-    notes: "four u32; their roles are unproven, so the table keeps them unknown_4 to unknown_16."
+    evidence: verified
+    source: "handler kr-812 sub_836710 consumes Packet_gspUserHostSetting via reader kr-812 sub_80A400 (action +4, prize +8, min_prize +12, max_prize +16), updating room prize via kr-812 sub_5C6BD0 and default bounds at dword_E82750+1480/1484"
+    notes: "four u32 words (action, prize, min_prize, max_prize); matches packets/user-settings.yaml UserHostSettingResponse@kr-812."
   - value: 993
     direction: s2c
     name: gspUserHostDefaultSetting
     name_source: label@kr-812
-    evidence: inferred
-    source: "dispatcher kr-812 sub_837170 case 993: Packet_gspUserHostDefaultSetting constructor path; the class codec kr-812 sub_6DB1B0 reads two words at +4 and +8"
-    notes: "two u32; their roles are unproven, so the table keeps them unknown_4 and unknown_8."
+    evidence: verified
+    source: "handler kr-812 sub_836CB0 consumes Packet_gspUserHostDefaultSetting via reader kr-812 sub_6DB1B0 and stores min_prize (+4) and max_prize (+8) at dword_E82750+1480 and +1484"
+    notes: "two u32 words (min_prize, max_prize); matches packets/user-settings.yaml UserHostDefaultSetting@kr-812."
   - value: 994
     direction: s2c
     name: gspCaptainEvent
@@ -4406,3 +4418,519 @@ opcodes:
     name_source: label@kr-812
     evidence: verified
     source: kr-812 sub_839C20 stamps the native recruitment-text request; kr-812 sub_5C8FD0 reads one counted UTF-16 message
+  # The clan-server connection (connection: clan): the client's second TCP socket, opened to login.ini
+  # clanServerAddr / clanServerPort (kr-812 sub_8EA9F0) with the same 4-byte frame and cipher as kr-1256. One generic
+  # NxPacket class carries the whole space and no build labels any packet on it, so every name is coined and plain
+  # and matches the kr-1256 row whose reader or writer has the same fields. From 1033 on most numbers are kr-1256's
+  # minus one. Dispatcher kr-812 sub_498790; bodies in packets/clan-server.yaml. kr-812 has no join, recruitment or
+  # mark-edit request on this connection (its mark changes on the game connection, gcpReqChangeClanMark).
+  - value: 1002
+    direction: s2c
+    connection: clan
+    name: ClanHello
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x3EA reads no field and sends the game-connection gcpReqClanPassport (kr-812 sub_498E70)"
+    notes: "Empty body."
+  - value: 1006
+    direction: s2c
+    connection: clan
+    name: ClanLoginResult
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x3EE: kr-812 sub_498F00 reads one word; 1 requests the home (kr-812 sub_499430), -1 and -2 open a notice (kr-812 sub_490C90)"
+    notes: "Body ClanServerLoginResult."
+  - value: 1012
+    direction: s2c
+    connection: clan
+    name: ClanRoster
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x3F4: kr-812 sub_49B580 reads a count, then per member a word, a string and three words"
+    notes: "Body ClanServerRoster."
+  - value: 1014
+    direction: s2c
+    connection: clan
+    name: ClanMemberDetails
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x3F6: kr-812 sub_49B840 reads a word, a count, then per member a word, a string, five words, three 8-byte values and four words"
+    notes: "Body ClanServerMemberDetails."
+  - value: 1016
+    direction: s2c
+    connection: clan
+    name: ClanHome
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x3F8: kr-812 sub_498F50 reads a byte, two words, a string and an 8-byte date compared with 2100-01-01"
+    notes: "Body ClanServerHome."
+  - value: 1018
+    direction: s2c
+    connection: clan
+    name: ClanProfile
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x3FA: kr-812 sub_499140 reads fourteen fields and stores them through kr-812 sub_4905D0"
+    notes: "Body ClanServerProfile."
+  - value: 1020
+    direction: s2c
+    connection: clan
+    name: ClanSearchResult
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x3FC: kr-812 sub_49A800 reads three words, a string, then twelve fields per row"
+    notes: "Body ClanServerSearchResult."
+  - value: 1022
+    direction: s2c
+    connection: clan
+    name: ClanBoard
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x3FE: kr-812 sub_499F60 reads three words, then per post a word, a string, two words, a short, a date and a string"
+    notes: "Body ClanServerBoard."
+  - value: 1024
+    direction: s2c
+    connection: clan
+    name: ClanBoardWriteResult
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x400: kr-812 sub_49A410 reads one word"
+    notes: "Body ClanServerBoardWriteResult."
+  - value: 1026
+    direction: s2c
+    connection: clan
+    name: ClanBoardDeleted
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x402 reads no field and refreshes the board (kr-812 sub_491270)"
+    notes: "Empty body."
+  - value: 1028
+    direction: s2c
+    connection: clan
+    name: ClanCreateResult
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x404: kr-812 sub_49A7C0 reads two words and calls kr-812 sub_48EC20 with them"
+    notes: "Body ClanServerCreateResult."
+  - value: 1030
+    direction: s2c
+    connection: clan
+    name: ClanDisbandResult
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x406: kr-812 sub_49D050 reads two words"
+    notes: "Body ClanServerDisbandResult."
+  - value: 1031
+    direction: s2c
+    connection: clan
+    name: ClanDisbandChanged
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x407: kr-812 sub_49D090 reads two words"
+    notes: "Body ClanServerDisbandChanged."
+  - value: 1033
+    direction: s2c
+    connection: clan
+    name: ClanApplyResult
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x409: kr-812 sub_49CCC0 reads three words and a string (kr-1256 1034)"
+    notes: "Body ClanServerApplyResult."
+  - value: 1036
+    direction: s2c
+    connection: clan
+    name: ClanMemberLeft
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x40C: kr-812 sub_49CF10 reads a string, a word, a string and two words (kr-1256 1037)"
+    notes: "Body ClanServerMemberLeft."
+  - value: 1039
+    direction: s2c
+    connection: clan
+    name: ClanMemberChangeResult
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x40F: kr-812 sub_49C0C0 reads a word, a string and two words (kr-1256 1040)"
+    notes: "Body ClanServerMemberChangeResult."
+  - value: 1040
+    direction: s2c
+    connection: clan
+    name: ClanMemberChanged
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x410: kr-812 sub_49BF80 reads a string, a word, a string and two words (kr-1256 1041)"
+    notes: "Body ClanServerMemberChanged."
+  - value: 1042
+    direction: s2c
+    connection: clan
+    name: ClanWhisperResult
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x412: kr-812 sub_49AE00 reads two words and three strings (kr-1256 1043)"
+    notes: "Body ClanServerWhisperResult."
+  - value: 1043
+    direction: s2c
+    connection: clan
+    name: ClanWhisperMessage
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x413: kr-812 sub_49B1F0 reads a word and three strings (kr-1256 1044 adds a byte)"
+    notes: "Body ClanServerWhisperMessage."
+  - value: 1048
+    direction: s2c
+    connection: clan
+    name: ClanIntroductionEditResult
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x418: kr-812 sub_49C830 reads a word and a string (kr-1256 1049)"
+    notes: "Body ClanServerIntroductionEditResult."
+  - value: 1049
+    direction: s2c
+    connection: clan
+    name: ClanIntroductionChanged
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x419: kr-812 sub_49CB50 reads a word and a string (kr-1256 1050)"
+    notes: "Body ClanServerIntroductionChanged."
+  - value: 1051
+    direction: s2c
+    connection: clan
+    name: ClanNoticeEditResult
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x41B: kr-812 sub_49C440 reads one word (kr-1256 1052)"
+    notes: "Body ClanServerNoticeEditResult."
+  - value: 1052
+    direction: s2c
+    connection: clan
+    name: ClanNoticeChanged
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x41C: kr-812 sub_49C700 reads one string (kr-1256 1053)"
+    notes: "Body ClanServerNoticeChanged."
+  - value: 1055
+    direction: s2c
+    connection: clan
+    name: ClanMasterChanged
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x41F: kr-812 sub_49CE10 reads two words, a string, a word and a string (kr-1256 1056)"
+    notes: "Body ClanServerMasterChanged."
+  - value: 1057
+    direction: s2c
+    connection: clan
+    name: ClanTransferRequestResult
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x421: kr-812 sub_49D370 reads a byte and a word (kr-1256 1058)"
+    notes: "Body ClanServerTransferRequestResult."
+  - value: 1058
+    direction: s2c
+    connection: clan
+    name: ClanTransferOffer
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x422: kr-812 sub_49D550 reads a string and a word (kr-1256 1059)"
+    notes: "Body ClanServerTransferOffer."
+  - value: 1060
+    direction: s2c
+    connection: clan
+    name: ClanTransferAnswerResult
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x424 reads one byte and on a set byte calls kr-812 sub_49DD30 (kr-1256 1061)"
+    notes: "Body ClanServerTransferAnswerResult."
+  - value: 1061
+    direction: s2c
+    connection: clan
+    name: ClanTransferAnswered
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x425: kr-812 sub_49D8F0 reads a byte, a word and a string (kr-1256 1062)"
+    notes: "Body ClanServerTransferAnswered."
+  - value: 1063
+    direction: s2c
+    connection: clan
+    name: ClanCancelApplicationResult
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x427 reads two words and calls kr-812 sub_4941A0 (kr-1256 1064)"
+    notes: "Body ClanServerCancelApplicationResult."
+  - value: 1066
+    direction: s2c
+    connection: clan
+    name: ClanChatResult
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x42A: kr-812 sub_49D0D0 reads one word (kr-1256 1067)"
+    notes: "Body ClanServerChatResult."
+  - value: 1067
+    direction: s2c
+    connection: clan
+    name: ClanChatMessage
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x42B: kr-812 sub_49D1D0 reads a word it discards and two strings (kr-1256 1068 has no word)"
+    notes: "Body ClanServerChatMessage."
+  - value: 1069
+    direction: s2c
+    connection: clan
+    name: ClanApplicants
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x42D: kr-812 sub_49BC30 reads a count, then per applicant a word, a string, two words, an 8-byte value and four words (kr-1256 1070)"
+    notes: "Body ClanServerApplicants."
+  - value: 1096
+    direction: s2c
+    connection: clan
+    name: ClanMarkChanged
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498790 case 0x448: kr-812 sub_49FB30 reads one word (kr-1256 1097)"
+    notes: "Body ClanServerMarkChanged."
+  - value: 1003
+    direction: c2s
+    connection: clan
+    name: ClanHeartbeat
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498690 stamps 1003 and sends it without a body every 3000 ms"
+    notes: "Empty body."
+  - value: 1005
+    direction: c2s
+    connection: clan
+    name: ClanLogin
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498C30 writes a word, a string, three words and the passport bytes (called from kr-812 sub_819690)"
+    notes: "Body ClanServerLogin."
+  - value: 1011
+    direction: c2s
+    connection: clan
+    name: ClanRosterRequest
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_4998D0 stamps the opcode and writes no field"
+    notes: "Empty body."
+  - value: 1013
+    direction: c2s
+    connection: clan
+    name: ClanMemberDetailsRequest
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_499940 writes one word"
+    notes: "Body ClanServerMemberDetailsRequest."
+  - value: 1015
+    direction: c2s
+    connection: clan
+    name: ClanHomeRequest
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_499430 stamps the opcode and writes no field"
+    notes: "Empty body."
+  - value: 1017
+    direction: c2s
+    connection: clan
+    name: ClanProfileRequest
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_4990D0 stamps the opcode and writes no field"
+    notes: "Empty body."
+  - value: 1019
+    direction: c2s
+    connection: clan
+    name: ClanSearch
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498D20 writes two words and a string"
+    notes: "Body ClanServerSearch."
+  - value: 1021
+    direction: c2s
+    connection: clan
+    name: ClanBoardRequest
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_4995B0 writes two words"
+    notes: "Body ClanServerBoardRequest."
+  - value: 1023
+    direction: c2s
+    connection: clan
+    name: ClanBoardWrite
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_499640 writes a word and a string"
+    notes: "Body ClanServerBoardWrite."
+  - value: 1025
+    direction: c2s
+    connection: clan
+    name: ClanBoardDelete
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_4996D0 writes two words"
+    notes: "Body ClanServerBoardDelete."
+  - value: 1027
+    direction: c2s
+    connection: clan
+    name: ClanCreate
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_499760 writes a string, a word, a string and a word (kr-1256 adds the capacity)"
+    notes: "Body ClanServerCreate."
+  - value: 1029
+    direction: c2s
+    connection: clan
+    name: ClanDisband
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_499E50 writes one word"
+    notes: "Body ClanServerDisband."
+  - value: 1032
+    direction: c2s
+    connection: clan
+    name: ClanApply
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_4994A0 writes a word and a string"
+    notes: "Body ClanServerApply."
+  - value: 1035
+    direction: c2s
+    connection: clan
+    name: ClanLeave
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_499CD0 stamps the opcode and writes no field (kr-1256 1036)"
+    notes: "Empty body."
+  - value: 1038
+    direction: c2s
+    connection: clan
+    name: ClanMemberChange
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_499B30 writes a word, a string and two words (kr-1256 1039)"
+    notes: "Body ClanServerMemberChange."
+  - value: 1041
+    direction: c2s
+    connection: clan
+    name: ClanWhisper
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_498DB0 writes a word and two strings (kr-1256 1042 adds a byte)"
+    notes: "Body ClanServerWhisper."
+  - value: 1044
+    direction: c2s
+    connection: clan
+    name: ClanMemberReport
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_499AA0 writes two words (kr-1256 1045)"
+    notes: "Body ClanServerMemberReport."
+  - value: 1047
+    direction: c2s
+    connection: clan
+    name: ClanIntroductionEdit
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_499C50 writes one string (kr-1256 1048)"
+    notes: "Body ClanServerIntroductionEdit."
+  - value: 1050
+    direction: c2s
+    connection: clan
+    name: ClanNoticeEdit
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_499BD0 writes one string (kr-1256 1051)"
+    notes: "Body ClanServerNoticeEdit."
+  - value: 1053
+    direction: c2s
+    connection: clan
+    name: ClanTransferConfirm
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_499DC0 writes a word and a string (kr-1256 1054)"
+    notes: "Body ClanServerTransferConfirm."
+  - value: 1056
+    direction: c2s
+    connection: clan
+    name: ClanTransferRequest
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_499D40 writes one word (kr-1256 1057)"
+    notes: "Body ClanServerTransferRequest."
+  - value: 1059
+    direction: c2s
+    connection: clan
+    name: ClanTransferAnswer
+    name_source: coined
+    evidence: verified
+    source: "the transfer-offer dialog stamps 1059 inline and writes the accept byte and the offer's word (kr-1256 1060)"
+    notes: "Body ClanServerTransferAnswer."
+  - value: 1062
+    direction: c2s
+    connection: clan
+    name: ClanCancelApplication
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_499530 writes one word (kr-1256 1063)"
+    notes: "Body ClanServerCancelApplication."
+  - value: 1065
+    direction: c2s
+    connection: clan
+    name: ClanChat
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_499ED0 writes a word and two strings (kr-1256 1066)"
+    notes: "Body ClanServerChat."
+  - value: 1068
+    direction: c2s
+    connection: clan
+    name: ClanApplicantsRequest
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_4999C0 stamps the opcode and writes no field (kr-1256 1069)"
+    notes: "Empty body."
+  - value: 571
+    direction: c2s
+    connection: game
+    name: gcpLmgRequest_
+    name_source: coined
+    evidence: verified
+    source: "the plaza booth senders kr-812 sub_479090 (subcommand 1, basketball), kr-812 sub_46CA40 (10, fishing start), kr-812 sub_4795A0 (11, rod lift) and kr-812 sub_479660 (12, fortune) stamp 571 through kr-812 sub_B25F20 and write the u16 subcommand first; no build has a label for the outer packet, the subcommands pair with the client's Reply*@LmgProtocol keys (kr-812 sub_4649E0); packets/lobby-minigame.yaml"
+    notes: "Lobby-minigame request family; kr-1256 numbers it 551."
+  - value: 571
+    direction: s2c
+    connection: game
+    name: gspLmgReply_
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_677210 selects 571 and calls kr-812 sub_67D950, which reads the u16 subcommand and runs the registered reader through kr-812 sub_465FC0 / kr-812 sub_46B910 for the local gamer (kr-812 sub_46D4C0, kr-812 sub_46D5B0, kr-812 sub_46D660, kr-812 sub_46D730); packets/lobby-minigame.yaml"
+    notes: "Per-key minigame replies; kr-1256 numbers it 551."
+  - value: 572
+    direction: c2s
+    connection: game
+    name: gcpLmgSync_
+    name_source: coined
+    evidence: verified
+    source: "the minigame state senders kr-812 sub_46CFF0 (100 ShootFire), kr-812 sub_4796D0 (101 ChangeState), kr-812 sub_46D080 (200 CastFishing) and kr-812 sub_46D110 (201 LiftFishing) each stamp 572 and write the u16 subcommand and one u32; packets/lobby-minigame.yaml LmgSyncAction"
+    notes: "kr-1256 numbers it 552."
+  - value: 572
+    direction: s2c
+    connection: game
+    name: gspLmgSyncState_
+    name_source: coined
+    evidence: verified
+    source: "kr-812 sub_677210 selects 572 and calls kr-812 sub_67D9E0, which reads the acting gamer u32 and the u16 subcommand, skips the local gamer and runs the key's reader through kr-812 sub_465FC0 (kr-812 sub_46D410 or kr-812 sub_46D5B0, one u32); packets/lobby-minigame.yaml LmgSyncNotice"
+    notes: "Minigame animation step of another player; kr-1256 numbers it 552."
+  - value: 1500
+    direction: c2s
+    connection: game
+    name: gcpReqDynamicConfig
+    name_source: mirrored
+    evidence: verified
+    source: "kr-812 sub_820060 stamps 1500 through kr-812 sub_B25F20 after the room-entry frame and kr-812 sub_45B500 writes a u16 mask and the stored checksum u32 of each registered category (bits 0 to 3) in ascending order; packets/dynamic-config.yaml DynamicConfigRequest"
+  - value: 1500
+    direction: s2c
+    connection: game
+    name: gspRepDynamicConfig
+    name_source: mirrored
+    evidence: verified
+    source: "kr-812 sub_837170 selects 1500 and calls kr-812 sub_45B5E0, which reads a u16 mask and hands the plain bytes of each set bit (0 to 3) to the category's decoder (kr-812 sub_45B130 registrations); packets/dynamic-config.yaml DynamicConfigReply"

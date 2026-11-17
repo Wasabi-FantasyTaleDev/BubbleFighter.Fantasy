@@ -371,7 +371,8 @@ public sealed partial class RoundFlowTests
         public Rig(int timeLimitMs = 180_000, IPluginContext? resultContext = null, int[]? randomSupplyItemKinds = null,
             int[]? cooperativeStageResultModes = null, int zombieConversionModeId = 0, int[]? countedItemKinds = null, bool rescueMissions = false, int rescueDurationMs = 5000, int rescueCount = 1, int rescueCooldownMs = 25000, int[]? immediateSupplyItemKinds = null, bool pvePoints = false, int rescueStopTimeMs = 0, int[]? cooperativeScoreOutcomeModes = null, int nativeItemSlotCount = 1, int resultRewardDelayMs = 6000, int[]? pvePointUnitValues = null, int[]? countedImmediateItemKinds = null, int[]? directKillModes = null,
             Action<InGameOptions>? configure = null, Func<TimeSpan, CancellationToken, ValueTask>? zombieKingDelay = null,
-            bool observation = false, int[]? observationModes = null, int roundsToWin = 2)
+            bool observation = false, int[]? observationModes = null, int roundsToWin = 2,
+            IMessageSender<RoomEntered>? roundReturnSender = null)
         {
             Starting.RoundsToWin = roundsToWin;
             Observed = new ObservationSink(observationModes ?? [4, 19]);
@@ -405,7 +406,7 @@ public sealed partial class RoundFlowTests
                 options.ResultCloseGraceMs = 1;
             }
             Registry = new RoomRegistry(options);
-            Rooms = new RoomFlow(Registry, new RoomSenders(Entered, SeatUpdated, SeatVacated, MasterChanged, MatchStarting: Starting,
+            Rooms = new RoomFlow(Registry, new RoomSenders(new NativeRoundReturnSink(Entered, roundReturnSender), SeatUpdated, SeatVacated, MasterChanged, MatchStarting: Starting,
                 TeamConverted: TeamConverted, CountedItemsPrepared: CountedItemsPrepared, RescuePrepared: RescuePrepared, Chat: Chat,
                 Left: Left),
                 NullLogger.Instance, null, null, 36, options, default, null, null, null,
@@ -2171,10 +2172,14 @@ public sealed partial class RoundFlowTests
         finally { await rig.Registry.StopAllAsync(); }
     }
 
-    /// <summary>Hurt-dropped boxes retain team ownership through creation and cannot be consumed by an opposing seat.</summary>
+    /// <summary>
+    /// Hurt-dropped boxes retain team ownership through creation and cannot be consumed by an opposing seat; a modern
+    /// drop keeps the victim's raw team (kr-1256 sub_680AA0), so a zombie's team 34 is kept rather than refused.
+    /// </summary>
     [Theory]
     [InlineData(0)]
     [InlineData(2)]
+    [InlineData(34)]
     public async Task HurtDroppedBoxRetainsItsTeamUntilAnEligiblePickup(int team)
     {
         var rig = ItemModeRig();
@@ -2185,7 +2190,7 @@ public sealed partial class RoundFlowTests
             lock (room.Gate)
             {
                 room.FindByGame(rig.Host.Id)!.Team = 1;
-                room.FindByGame(rig.Guest.Id)!.Team = 2;
+                room.FindByGame(rig.Guest.Id)!.Team = team == 0 ? (byte)2 : (byte)team;
             }
             await rig.Round.HandleLoadReportedAsync(rig.Host, new(), default);
             await rig.Round.HandleLoadReportedAsync(rig.Guest, new(), default);
@@ -2759,6 +2764,7 @@ public sealed partial class RoundFlowTests
             var hostRelay = new RecordingSession(91);
             var guestRelay = new RecordingSession(92);
             int hostActor;
+            int guestActor;
             lock (room.Gate)
             {
                 foreach (var seat in room.Seats)
@@ -2767,12 +2773,13 @@ public sealed partial class RoundFlowTests
                     seat.RelayGeneration = room.StartGeneration;
                 }
                 hostActor = RoomRegistry.SceneEntity(room.FindByGame(rig.Host.Id)!.Slot);
+                guestActor = RoomRegistry.SceneEntity(room.FindByGame(rig.Guest.Id)!.Slot);
             }
             var relayed = new Sink<RoundMovementRelayed>();
             await rig.Round.HandleMovementReportedAsync(rig.Host,
                 new RoundMovementReported(hostActor, 0x01, 9f, 0, 0, 0, 0, 0, 1), relayed, CancellationToken.None);
             await rig.Round.HandleMovementReportedAsync(rig.Host,
-                new RoundMovementReported(hostActor + 1, 0x3F, 1f, 2f, 3f, 4, 5, 6, 2), relayed, CancellationToken.None);
+                new RoundMovementReported(guestActor, 0x3F, 1f, 2f, 3f, 4, 5, 6, 2), relayed, CancellationToken.None);
             Assert.Empty(relayed.To(guestRelay));
 
             await rig.Round.HandleMovementReportedAsync(rig.Host,
@@ -2789,6 +2796,80 @@ public sealed partial class RoundFlowTests
                 new RoundMovementReported(hostActor, 0x40, 0, 0, 0, 0, 0, 0, 5), relayed, CancellationToken.None).AsTask());
         }
         finally { await rig.Registry.StopAllAsync(); }
+    }
+
+    /// <summary>
+    /// A client moves the objects it created in its own scene range, such as the NPCs a pirate host runs
+    /// (live pirate rounds report ids just above the host's character). Each object keeps its own merged record and
+    /// reaches the other players; an object in another seat's range is refused, and a new round forgets the records.
+    /// </summary>
+    [Fact]
+    public async Task HostSceneObjectMovementReachesTheOtherPlayersWithItsOwnRecord()
+    {
+        var rig = new Rig();
+        try
+        {
+            await rig.StartAsync();
+            var room = rig.Registry.Find(rig.RoomId)!;
+            var hostRelay = new RecordingSession(91);
+            var guestRelay = new RecordingSession(92);
+            int hostActor;
+            int guestActor;
+            lock (room.Gate)
+            {
+                foreach (var seat in room.Seats)
+                {
+                    seat.Relay = seat.Game.Id == rig.Host.Id ? hostRelay : guestRelay;
+                    seat.RelayGeneration = room.StartGeneration;
+                }
+                hostActor = RoomRegistry.SceneEntity(room.FindByGame(rig.Host.Id)!.Slot);
+                guestActor = RoomRegistry.SceneEntity(room.FindByGame(rig.Guest.Id)!.Slot);
+            }
+            var relayed = new Sink<RoundMovementRelayed>();
+            var npc = hostActor + 12;
+            await rig.Round.HandleMovementReportedAsync(rig.Host,
+                new RoundMovementReported(hostActor, 0x3F, 1f, 2f, 3f, 4, 5, 6, 1), relayed, CancellationToken.None);
+            await rig.Round.HandleMovementReportedAsync(rig.Host,
+                new RoundMovementReported(npc, 0x01, 9f, 0, 0, 0, 0, 0, 2), relayed, CancellationToken.None);
+            await rig.Round.HandleMovementReportedAsync(rig.Host,
+                new RoundMovementReported(npc, 0x3F, 10f, 20f, 30f, 40, 50, 60, 3), relayed, CancellationToken.None);
+            await rig.Round.HandleMovementReportedAsync(rig.Host,
+                new RoundMovementReported(npc, 0x01, 11f, 0, 0, 0, 0, 0, 4), relayed, CancellationToken.None);
+            await rig.Round.HandleMovementReportedAsync(rig.Host,
+                new RoundMovementReported(guestActor + 5, 0x3F, 1f, 1f, 1f, 1, 1, 1, 5), relayed, CancellationToken.None);
+            var frames = relayed.To(guestRelay);
+            Assert.Equal(3, frames.Length);
+            Assert.Equal(new RoundMovementRelayed(hostActor, new(1f, 2f, 3f, 4, 5, 6), 1), frames[0]);
+            Assert.Equal(new RoundMovementRelayed(npc, new(10f, 20f, 30f, 40, 50, 60), 3), frames[1]);
+            Assert.Equal(new RoundMovementRelayed(npc, new(11f, 20f, 30f, 40, 50, 60), 4), frames[2]);
+            Assert.Empty(relayed.To(hostRelay));
+            // The host's NPC popping the guest is the host's own report; the guest cannot report for the host's NPC.
+            await rig.Round.HandleFeedAsync(rig.Host, new RoundFeedSent(38277, new byte[] { 1 }) { ReportedActors = [npc, guestActor] }, default);
+            Assert.Single(rig.Feed.To(rig.Guest));
+            await rig.Round.HandleFeedAsync(rig.Guest, new RoundFeedSent(38277, new byte[] { 2 }) { ReportedActors = [npc, hostActor] }, default);
+            Assert.Empty(rig.Feed.To(rig.Host));
+            lock (room.Gate)
+            {
+                Assert.Equal(1, room.SceneObjects!.Count);
+                Assert.Equal(new(1f, 2f, 3f, 4, 5, 6), room.FindByGame(rig.Host.Id)!.Movement);
+            }
+        }
+        finally { await rig.Registry.StopAllAsync(); }
+    }
+
+    /// <summary>The scene-object records stay bounded: past the capacity the oldest object's record is forgotten.</summary>
+    [Fact]
+    public void SceneObjectMovementsForgetTheOldestRecordPastTheirCapacity()
+    {
+        var objects = new SceneObjectMovements(2);
+        objects.Store(1, new(1f, 0, 0, 0, 0, 0));
+        objects.Store(2, new(2f, 0, 0, 0, 0, 0));
+        objects.Store(1, new(3f, 0, 0, 0, 0, 0));
+        objects.Store(3, new(4f, 0, 0, 0, 0, 0));
+        Assert.Equal(2, objects.Count);
+        Assert.Null(objects.Find(1));
+        Assert.Equal(new(2f, 0, 0, 0, 0, 0), objects.Find(2));
+        Assert.Equal(new(4f, 0, 0, 0, 0, 0), objects.Find(3));
     }
 
     [Fact]

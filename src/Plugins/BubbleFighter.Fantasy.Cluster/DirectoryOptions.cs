@@ -46,6 +46,15 @@ public sealed class DirectoryOptions : IValidatableOptions
     [Range(64, 65536)] public int MaxPlazaEvents { get; set; } = 4096;
     /// <summary>Gets or sets the plaza members held across every scope and build.</summary>
     [Range(1, 65536)] public int MaxPlazaMembers { get; set; } = 4096;
+    /// <summary>
+    /// Gets or sets whether leased nodes of one verified account domain relay clan notices to each other, so a clan
+    /// member connected to another node hears chat, whispers and member changes live. The same scope rule as the
+    /// shared plaza applies. On by default: a node that mounts no relay row never reads or posts, and a deployment
+    /// whose nodes all use one shared clan server has nothing to relay.
+    /// </summary>
+    public bool ClanFederation { get; set; } = true;
+    /// <summary>Gets or sets the retained clan notices; a node further behind skips ahead to the newest one.</summary>
+    [Range(64, 65536)] public int MaxClanNotices { get; set; } = 4096;
     /// <summary>Gets or sets the bounded set of known nodes; unknown node heartbeats are refused.</summary>
     public DirectoryNodeOptions[] Nodes { get; set; } = [];
     /// <summary>Gets or sets selector entries, separately from node membership.</summary>

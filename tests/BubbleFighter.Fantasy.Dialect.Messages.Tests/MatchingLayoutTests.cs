@@ -50,14 +50,14 @@ public sealed class MatchingLayoutTests
             PacketCodec.ReadScalars(TestBuilds.Packets, build, "RoomMatchNotification", new byte[length + 1]));
     }
 
-    /// <summary>The modern request family carries a type byte, a u32 and a per-type tail through one
-    /// serializer, so each type has its own exact body length.</summary>
+    /// <summary>The kr-1256 mystery-store request carries a type byte, a u32 and a per-type tail through one
+    /// serializer (kr-1256 sub_114E2E0), so each type has its own exact body length.</summary>
     [Theory]
-    [InlineData("RoomMatchRequest", 5, 1)]
-    [InlineData("RoomMatchKeepAlive", 7, 2)]
-    [InlineData("RoomMatchPartyJoin", 7, 3)]
-    [InlineData("RoomMatchListingEnter", 11, 4)]
-    public void Kr1256RequestTypeLengthsAreExact(string structure, int length, int type)
+    [InlineData("UserMysteryStoreRequest", 5, 1)]
+    [InlineData("UserMysteryStoreRequestType2", 7, 2)]
+    [InlineData("UserMysteryStoreRequestType3", 7, 3)]
+    [InlineData("UserMysteryStoreRequestType4", 11, 4)]
+    public void Kr1256MysteryStoreRequestTypeLengthsAreExact(string structure, int length, int type)
     {
         var body = new byte[length];
         body[0] = (byte)type;
@@ -69,15 +69,15 @@ public sealed class MatchingLayoutTests
             PacketCodec.ReadScalars(TestBuilds.Packets, "kr-1256", structure, new byte[length + 1]));
     }
 
-    /// <summary>The listing-enter body writes the type byte, the u32 words and the mode word unaligned,
+    /// <summary>The type-4 mystery-store body writes the type byte, the u32 words and the u16 unaligned,
     /// in the serializer's order.</summary>
     [Fact]
-    public void Kr1256ListingEnterWritesFieldsInWireOrder()
+    public void Kr1256MysteryStoreType4WritesFieldsInWireOrder()
     {
-        var body = PacketCodec.Write(TestBuilds.Packets, "kr-1256", "RoomMatchListingEnter",
+        var body = PacketCodec.Write(TestBuilds.Packets, "kr-1256", "UserMysteryStoreRequestType4",
             new Dictionary<string, object?>
             {
-                ["type"] = 4, ["unknown_8"] = 7, ["unknown_16"] = 0x1234, ["unknown_20"] = 5,
+                ["type"] = 4, ["token"] = 7, ["stock_or_stock_set_id"] = 0x1234, ["coin_price"] = 5,
             });
         Assert.Equal(11, body.Length);
         Assert.Equal(4, body[0]);
@@ -125,7 +125,7 @@ public sealed class MatchingLayoutTests
         var body = new byte[length];
         body[0] = (byte)subcmd;
         body[1] = (byte)(subcmd >> 8);
-        foreach (var build in new[] { "cn-774", "tw-454" })
+        foreach (var build in new[] { "kr-1256", "cn-774", "tw-454" })
         {
             var values = PacketCodec.ReadScalars(TestBuilds.Packets, build, structure, body);
             Assert.Equal(subcmd, Convert.ToInt32(values["subcmd"]));
@@ -145,7 +145,7 @@ public sealed class MatchingLayoutTests
         var body = PacketCodec.Write(TestBuilds.Packets, build, "LmgFishingStartRequest",
             new Dictionary<string, object?>
             {
-                ["subcmd"] = 10, ["unknown_6"] = 1, ["unknown_10"] = 0, ["unknown_14"] = 2, ["unknown_16"] = 3,
+                ["subcmd"] = 10, ["second_price"] = 1, ["unknown_10"] = 0, ["displayed_cost"] = 2, ["completed_count"] = 3,
             });
         Assert.Equal(14, body.Length);
         Assert.Equal(10, BitConverter.ToUInt16(body, 0));

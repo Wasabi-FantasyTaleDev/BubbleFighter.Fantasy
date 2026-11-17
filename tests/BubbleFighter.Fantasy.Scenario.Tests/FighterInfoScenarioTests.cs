@@ -61,6 +61,7 @@ public sealed class FighterInfoScenarioTests
             })),
             Row("lobby", new()
             {
+                ["couples"] = false,
                 ["inventory_source"] = "mysql", ["money_source"] = "mysql", ["starting_lucci"] = 1000, ["starting_cash"] = 5000,
                 ["online_players"] = true, ["fighter_info"] = true,
             }),
@@ -181,10 +182,12 @@ public sealed class FighterInfoScenarioTests
             Row("protocol", new() { ["opcode_table_path"] = tablePath, ["bootstrap_status"] = 1, ["patch_request_name"] = "gcpFirstConnect" }),
             Row("dialect.messages", new()
             {
+                ["couples"] = false,
                 ["protocol"] = "kr-812/game", ["inventory"] = true, ["fighter_info"] = true, ["packets_directory"] = RepositoryPackets.Directory(),
             }),
             Row("lobby", new()
             {
+                ["couples"] = false,
                 ["protocol"] = "kr-812/game", ["auto_create_players"] = true, ["online_players"] = true, ["fighter_info"] = true,
                 ["inventory_source"] = "mysql", ["seed_starter_inventory"] = true,
             }),

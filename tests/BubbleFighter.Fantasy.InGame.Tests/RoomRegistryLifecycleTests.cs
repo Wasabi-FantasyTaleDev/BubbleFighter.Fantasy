@@ -46,12 +46,29 @@ public sealed class RoomRegistryLifecycleTests
         Assert.Equal(new byte[] { 2, 36, 1 }, room.Seats.Select(s => s.Team));
     }
 
+    /// <summary>
+    /// BnB and SuddenSurvival are team modes in kr-1256 sub_1150F80 although they spawn by slot: an unassigned
+    /// seat joins the smaller side so both players show a team and can tell an opponent from a teammate.
+    /// </summary>
+    [Theory]
+    [InlineData(25)]
+    [InlineData(41)]
+    public void SlotPlacedTeamModesStillAssignTeams(ushort mode)
+    {
+        var registry = new RoomRegistry(new InGameOptions());
+        var setting = RoomWireSupport.WaitingSetting();
+        var (room, host) = registry.Create(new RoomRegistryTests.FakeSession(1),
+            setting with { Map = setting.Map with { Unknown4 = mode } }, 1, "host");
+        registry.Join(new RoomRegistryTests.FakeSession(2), room.Id, 2, "guest");
+        host.Team = 2;
+        lock (room.Gate) room.AssignSpawnTeams();
+        Assert.Equal(new byte[] { 2, 1 }, room.Seats.OrderBy(seat => seat.Slot).Select(seat => seat.Team));
+    }
+
     [Theory]
     [InlineData(8)]
     [InlineData(23)]
-    [InlineData(25)]
     [InlineData(40)]
-    [InlineData(41)]
     [InlineData(101)]
     public void NonTeamSpawnPathsKeepTheirSeatLabels(ushort mode)
     {

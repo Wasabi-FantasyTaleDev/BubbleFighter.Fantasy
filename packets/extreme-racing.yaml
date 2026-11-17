@@ -112,16 +112,27 @@ structs:
 
   # kr-1256 sub_67F4E0, cn-774 sub_D8BAF0 and tw-454 sub_D546B0 apply three words and a counted vector.
   # cn-738 sub_5096F0 case 766 and cn-742 sub_C78980 case 766 read only the first two selector words.
+  # kr-1256 sub_67E4A0 uses ten bomb patterns; kr-1256 sub_CE5600 stores word 3 at stage+10740.
+  # kr-1256 sub_BF6D50 copies that seed to emitters; kr-1256 sub_BF4A70 seeds their deterministic target RNG.
   ExtremeRacingMapState:
     - unknown_0: u32
+      kr-1256:
+        - second_bomb_pattern: u32
+          offset: 0
       offset: 0
-      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
+      only: [cn-738, cn-742, cn-774, tw-454]
     - unknown_4: u32
+      kr-1256:
+        - third_bomb_pattern: u32
+          offset: 4
       offset: 4
-      only: [kr-1256, cn-738, cn-742, cn-774, tw-454]
+      only: [cn-738, cn-742, cn-774, tw-454]
     - unknown_8: u32
+      kr-1256:
+        - stone_seed: u32
+          offset: 8
       offset: 8
-      only: [kr-1256, cn-774, tw-454]
+      only: [cn-774, tw-454]
     - vanish_selections: "list<u32>"
       only: [kr-1256, cn-774, tw-454]
 

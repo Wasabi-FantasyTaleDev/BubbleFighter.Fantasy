@@ -20,7 +20,8 @@ structs:
   # fighter dialog from the first FighterInfo (kr-812 sub_82C960 calls sub_87DD90 on the block at +8 and copies the
   # first string to the dialog); any other result opens a notice instead (kr-812 sub_82C960 builds a DlgNotice from
   # two string-table keys), and the blocks that follow are read all the same, so a failure carries a whole body with
-  # constructor-default blocks. The second FighterInfo and the second string are read and never used by that handler.
+  # constructor-default blocks. The second FighterInfo populates the partner page: kr-812 sub_82C960 passes it
+  # to sub_881780 (register argument at kr-812 0x82CB13); cn-324 sub_710CC0 passes it to sub_750710.
   # Readers: kr-812 sub_83DD00 (vtable 0xD6F174), cn-717 sub_8C6D90, cn-324 sub_6FCD50, id-400 sub_797D00,
   # id-1809 sub_7BD940, cn-706 sub_7A0050, cn-406 sub_714200, cn-404 sub_7C54C0, cn-408 sub_7C8A40: a u32, two nested
   # FighterInfo, two strings. Offsets are the kr-812 object's; the builds whose objects differ say so beside each field.
@@ -33,7 +34,7 @@ structs:
     - fighter: FighterInfo
       offset: 8
       except: [cn-279, kr-1256]
-    - partner: FighterInfo # read and unused by the handler
+    - partner: FighterInfo # kr-812 sub_82C960 -> sub_881780: persistent partner identity and couple profile
       offset: 432
       except: [cn-279, kr-1256]
       cn-717:
@@ -111,7 +112,7 @@ structs:
       offset: 0
     - fighter: FighterInfo # shown by the handler
       offset: 8
-    - partner: FighterInfo # read and unused by the handler
+    - partner: FighterInfo # kr-1256 sub_9BCE60 -> sub_5DB670: partner-page identity, ring, date and online state
       offset: 584
     - unknown_1160: wstr # read into the first string; not shown by the handler
       offset: 1160

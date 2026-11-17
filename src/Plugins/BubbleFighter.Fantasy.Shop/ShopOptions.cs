@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using BubbleFighter.Fantasy.Abstractions;
+using BubbleFighter.Fantasy.Contracts.CashInbox;
 using BubbleFighter.Fantasy.Contracts.Presents;
 
 namespace BubbleFighter.Fantasy.Shop;
@@ -73,6 +74,51 @@ public sealed class ShopOptions : IValidatableOptions
     public bool CashPresents { get; set; } = true;
 
     /// <summary>
+    /// Gets or sets whether the cash item inbox (<c>gcpReqCashInven</c> on legacy builds, <c>gcpReqPickup</c>,
+    /// <c>gcpReqCloseGiftBox</c>, <c>gspCashInvenUpdateAllInventorySlot</c>, and <c>gspRepPickup</c>) is mounted.
+    /// Defaults to <see langword="false"/>; requires <see cref="GrantPurchasedItems"/>, a build with the
+    /// <c>cash_inbox</c> capability, the dialect row's <c>cash_inbox</c> bindings, and an <c>ICashInboxStore</c>
+    /// persistence row. YAML key <c>cash_inbox</c>.
+    /// </summary>
+    public bool CashInbox { get; set; }
+
+    /// <summary>
+    /// Gets or sets the maximum active cash inbox entries held or loaded per player on one build.
+    /// YAML key <c>max_cash_inbox_entries_per_player</c>.
+    /// </summary>
+    [Range(1, CashInboxLimits.MaxEntriesPerPlayerCap)]
+    public int MaxCashInboxEntriesPerPlayer { get; set; } = CashInboxLimits.DefaultMaxEntriesPerPlayer;
+
+    /// <summary>
+    /// Gets or sets the maximum encoded payload size in bytes for one <c>gspCashInvenUpdateAllInventorySlot</c> frame.
+    /// Older clients replace their whole list when receiving this packet, so entries past the byte budget are truncated
+    /// cleanly with a warning rather than split across packets. YAML key <c>max_cash_inbox_frame_bytes</c>.
+    /// </summary>
+    [Range(CashInboxLimits.MinFrameBytes, CashInboxLimits.MaxFrameBytesCap)]
+    public int MaxCashInboxFrameBytes { get; set; } = CashInboxLimits.DefaultMaxFrameBytes;
+
+    /// <summary>
+    /// Gets or sets the default time-to-live in seconds for newly granted cash inbox items. Zero disables expiration.
+    /// YAML key <c>cash_inbox_ttl_seconds</c>.
+    /// </summary>
+    [Range(0, CashInboxLimits.MaxTtlSeconds)]
+    public int CashInboxTtlSeconds { get; set; } = CashInboxLimits.DefaultTtlSeconds;
+
+    /// <summary>
+    /// Gets or sets optional idempotent Stock or StockSet keys granted once per account into the cash inbox after login
+    /// menu installation when <see cref="CashInbox"/> is enabled. Empty (default) grants nothing on login.
+    /// YAML key <c>cash_inbox_welcome_stocks</c>.
+    /// </summary>
+    public int[] CashInboxWelcomeStocks { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the note attached to entries created via <see cref="CashInboxWelcomeStocks"/>.
+    /// YAML key <c>cash_inbox_welcome_note</c>.
+    /// </summary>
+    [Required, StringLength(CashInboxLimits.MaxNoteChars)]
+    public string CashInboxWelcomeNote { get; set; } = "Welcome";
+
+    /// <summary>
     /// Gets or sets overrides for gifts at attained levels, keyed by level. Empty retains only the native guide's rewards.
     /// Login and level rises recover unclaimed eligible rewards, including levels attained before enablement. A level may
     /// appear once. Needs <see cref="PresentBox"/>; on a row without it the table is ignored with a warning, since a
@@ -108,6 +154,9 @@ public sealed class ShopOptions : IValidatableOptions
     /// <summary>Gets or sets the maximum attempts to replan after an explicit pre-commit inventory conflict.</summary>
     [Range(1, 16)]
     public int MaxPurchaseAttempts { get; set; } = 3;
+
+    /// <summary>Gets or sets the Mysterystore of this row; it is mounted where the build's dialect binds its request.</summary>
+    public ShopMysteryStoreOptions MysteryStore { get; set; } = new();
 
     /// <summary>Gets or sets the game-connection protocol name this row handles.</summary>
     [Required]
@@ -321,6 +370,12 @@ public sealed class ShopOptions : IValidatableOptions
     {
         if (CatalogTree is not ("card_names" or "id_ranges"))
             yield return new ValidationResult("catalog_tree must be card_names or id_ranges.", [nameof(CatalogTree)]);
+        if (CashInbox && InventoryOnly)
+        {
+            yield return new ValidationResult(
+                "cash_inbox is on but inventory_only is on: cash inbox pickups require a catalog workbook.",
+                [nameof(CashInbox), nameof(InventoryOnly)]);
+        }
         if (InventoryOnly)
             yield break;
         if (PermanentDayStockTypes is null || PermanentDayStockTypes.Length is 0 or > 8
@@ -384,6 +439,22 @@ public sealed class ShopOptions : IValidatableOptions
                 "present_box is on but grant_purchased_items is off: a receiver takes a gift through the purchase path, "
                 + "so no gift could ever be delivered.",
                 [nameof(PresentBox), nameof(GrantPurchasedItems)]);
+        }
+
+        if (CashInbox && !GrantPurchasedItems)
+        {
+            yield return new ValidationResult(
+                "cash_inbox is on but grant_purchased_items is off: picking up a cash inbox item grants into the inventory "
+                + "through the purchase path.",
+                [nameof(CashInbox), nameof(GrantPurchasedItems)]);
+        }
+
+        if (CashInboxWelcomeStocks is null || CashInboxWelcomeStocks.Length > CashInboxLimits.MaxEntriesPerPlayerCap
+            || CashInboxWelcomeStocks.Any(key => key <= 0))
+        {
+            yield return new ValidationResult(
+                $"cash_inbox_welcome_stocks allows at most {CashInboxLimits.MaxEntriesPerPlayerCap} positive stock keys.",
+                [nameof(CashInboxWelcomeStocks)]);
         }
 
         if (HoldEquipUntilInventoryOpen && !GrantPurchasedItems)

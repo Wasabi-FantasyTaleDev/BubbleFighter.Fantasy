@@ -186,10 +186,41 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
         return (room, seat);
     }
 
+    /// <summary>
+    /// Creates a user-host prize room, reserves non-playable slots, and seats the creator in the
+    /// dialect-configured referee slot with its referee team byte.
+    /// </summary>
+    public (PlayRoom Room, RoomSeat Seat) CreateUserHostForMode(
+        ISession game, ushort modeId, string mapKey, string roomName, int userNum, string nickname, bool listed,
+        int playableSeats, int refereeSlot, byte refereeTeam, uint initialPrize, int feePercent)
+    {
+        var setting = SessionSettingBlob.ForRoom(new SessionSettingBlob(
+            0, 0, string.Empty, 0, 0, 0, 0, string.Empty,
+            SessionSettingBlob.MainMenuKind, MapMetaBlob.Empty() with { Unknown4 = modeId },
+            0, 0, 0, 0, string.Empty, 0, 0, 0, 0, 0), _options.RoomState);
+        var (room, seat) = Create(
+            game,
+            setting,
+            null,
+            userNum,
+            nickname,
+            listed,
+            minSeats: Math.Max(PlayRoom.RoomSeatCount, refereeSlot + 1),
+            configure: created => created.ConfigureUserHost(
+                playableSeats, refereeSlot, refereeTeam, initialPrize, userNum, feePercent),
+            seatCreator: (created, session, key, id, nick) => created.AddUserHostReferee(session, key, id, nick));
+        room.RoomName = roomName;
+        room.ModeId = modeId;
+        room.MapKey = mapKey;
+        seat.Level = SessionPlayer.ResolveLevel(game);
+        return (room, seat);
+    }
+
     private int NextRoomId() => (int)(unchecked((uint)Interlocked.Increment(ref _nextId) - 1u) % MaxRoomId) + 1;
 
     private (PlayRoom Room, RoomSeat Seat) Create(
-        ISession game, SessionSettingBlob setting, RoomRuleRecord? rules, int userNum, string nickname, bool listed)
+        ISession game, SessionSettingBlob setting, RoomRuleRecord? rules, int userNum, string nickname, bool listed,
+        int minSeats = 0, Action<PlayRoom>? configure = null, Func<PlayRoom, ISession, RelaySessionKey, int, string, RoomSeat>? seatCreator = null)
     {
         if (_sessionToRoom.ContainsKey(game.Id))
             throw new InvalidOperationException($"Session {game.Id} is already in a room.");
@@ -199,6 +230,7 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
         PlayRoom room;
         int id;
         var attempts = 0;
+        var maxSeats = Math.Max(_options.MaxPlayersPerMatch, minSeats);
         while (true)
         {
             if (++attempts > MaxRoomId)
@@ -207,13 +239,14 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
             if (_rooms.ContainsKey(id) || _retiring.ContainsKey(id))
                 continue;
             // The room session's leading u16 is the room id, as on the list row the client echoes in C2S 403.
-            room = new PlayRoom(id, _options.MaxPlayersPerMatch, setting with { Unknown0 = checked((ushort)id) },
+            room = new PlayRoom(id, maxSeats, setting with { Unknown0 = checked((ushort)id) },
                 _options.RoomQueueCapacity)
             {
                 CreateRules = rules,
                 Listed = listed,
                 SceneChanged = NotifyMembers,
             };
+            configure?.Invoke(room);
             room.SetAdmissionClock(_admissionClock);
             if (_rooms.TryAdd(id, room))
             {
@@ -227,7 +260,9 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
 
         lock (room.Gate)
         {
-            var seat = room.Add(game, NewKey(), userNum, nickname);
+            var seat = seatCreator is null
+                ? room.Add(game, NewKey(), userNum, nickname)
+                : seatCreator(room, game, NewKey(), userNum, nickname);
             BindSession(game, id, seat.Slot);
             return (room, seat);
         }
@@ -743,14 +778,17 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
             room.FinalZoneWaterClock?.Cancel();
             room.FinalZoneDroneClock?.Cancel();
             room.CancelResultSequence();
+            room.CancelUserHostCountdown();
         }
         await room.Executor.DisposeAsync().ConfigureAwait(false);
-        Task result, extremeRacing, extremeRacingCannon, extremeRacingCleanup,finalZoneWater, finalZoneDrones, finalZoneCleanup, bnb, bnbCleanup;
+        Task result, extremeRacing, extremeRacingCannon, extremeRacingCleanup,finalZoneWater, finalZoneDrones, finalZoneCleanup, bnb, bnbCleanup, userHostCountdown;
         lock (room.Gate)
         {
             // A running executor operation may have started its result after shutdown began.
             room.CancelResultSequence();
+            room.CancelUserHostCountdown();
             result = room.ResultTask;
+            userHostCountdown = room.UserHostCountdownTask;
             room.BnBClock?.Cancel();
             bnb = room.BnBClock?.Completion ?? Task.CompletedTask;
             bnbCleanup = room.BnBCleanupTask;
@@ -774,6 +812,7 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
         await finalZoneWater.ConfigureAwait(false);
         await finalZoneDrones.ConfigureAwait(false);
         await finalZoneCleanup.ConfigureAwait(false);
+        await userHostCountdown.ConfigureAwait(false);
     }
 
     // A room is usually deleted by the operation running on its own executor, which may not stop itself
@@ -790,6 +829,7 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
             room.AutoStartCancellation?.Cancel();
             room.TutorialCancellation?.Cancel();
             room.CancelLoadTimeout();
+            room.CancelUserHostCountdown();
         }
         Task stop;
         if (ExecutionContext.IsFlowSuppressed())
@@ -799,7 +839,7 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
             using (ExecutionContext.SuppressFlow())
                 stop = Task.Run(() => StopRoomAsync(room));
         }
-        stop = Task.WhenAll(stop, room.AutoStartTask ?? Task.CompletedTask, room.LoadTimeoutTask);
+        stop = Task.WhenAll(stop, room.AutoStartTask ?? Task.CompletedTask, room.LoadTimeoutTask, room.UserHostCountdownTask);
         if (room.Tutorial is not null) stop = Task.WhenAll(stop, room.CountdownTask);
         _retiring[room.Id] = stop;
         _ = stop.ContinueWith(completed =>

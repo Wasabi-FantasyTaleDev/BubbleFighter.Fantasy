@@ -11,6 +11,9 @@ description: Chinese 2015 client build, ClientVersion_Major 717.
 bundles:
   - core
   - legacy
+  - clan
+  - clan-gateway
+  - couples
 # What this build differs in; everything else is the legacy bundle's (kr-812).
 vars:
   # The client builds native feeding dates in its own region's civil time (UTC+8).
@@ -25,9 +28,12 @@ vars:
   LEGACY_GATE_SUB_KEY: 1
 patches:
   - patch.yaml
+  - ../bundles/clan-legacy.patch.yaml
   - bomb.patch.yaml
   - captain.patch.yaml
   - ../bundles/shop-supplement.yaml
   - ../bundles/pets.patch.yaml
+  - ../bundles/science-lab.patch.yaml
+  - ../bundles/user-host.patch.yaml
   # Optional developer override; git-ignored and skipped when absent.
   - local.patch.yaml

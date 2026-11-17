@@ -23,7 +23,7 @@ internal sealed partial class RoomFlow
                     return;
                 }
                 var automatic = request.Selection is RoomAiSelection.Random or RoomAiSelection.Clone;
-                if (_options?.AiModeIds.Contains(room.ModeId) != true || request.Team is < 0 or > 2
+                if (room.IsUserHost || _options?.AiModeIds.Contains(room.ModeId) != true || request.Team is < 0 or > 2
                     || !Enum.IsDefined(request.Selection)
                     || (!automatic && (request.Slot < 0 || request.Slot >= room.MaxSeats))
                     || (automatic && (request.Slot != -1 || request.Difficulty != -1 || request.Preset != -1)))

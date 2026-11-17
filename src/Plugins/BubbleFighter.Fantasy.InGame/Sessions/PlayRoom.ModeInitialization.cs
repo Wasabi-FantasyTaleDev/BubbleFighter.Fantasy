@@ -20,7 +20,10 @@ internal sealed class BnBRuntimeState(int generation, BnBRoundState ledger, Room
 {
     internal int Generation { get; } = generation;
     internal BnBRoundState Ledger { get; set; } = ledger;
-    internal RoomSeat[] Members { get; } = members;
+    /// <summary>Gets or sets the seats still playing; a seat that leaves the round is dropped and the others play on.</summary>
+    internal RoomSeat[] Members { get; set; } = members;
+    /// <summary>Gets every actor the ledger was created with, so a departed player's bombs still go off.</summary>
+    internal int[] Actors { get; } = [.. members.Select(member => RoomRegistry.SceneEntity(member.Slot))];
     /// <summary>Shares this generation's cleanup so nested close events cannot start it twice.</summary>
     internal Task? CleanupTask { get; set; }
 }

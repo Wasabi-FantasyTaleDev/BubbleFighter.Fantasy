@@ -60,11 +60,15 @@ internal sealed class LaunchSelectionSource(LaunchSelectionOptions options, ISer
         foreach (var target in pool.Targets.Where(target => automaticMembers.Contains(target.NodeId)))
             if (entries.Count(entry => !entry.Automatic && entry.Targets.Count == 1 && SameBinding(entry.Targets[0], target)) != 1)
                 throw new InvalidOperationException("Each admitted worker requires exactly one canonical manual selector with the same endpoint binding.");
+        // A manual server with no reachable target (offline, under maintenance, or not issued by this authority) is
+        // left out: Launcher 0.2.0 drops the servers it showed as unavailable from its directory and then refuses a
+        // grant that still names them ("The launch admission does not match the canonical server directory").
         return new(options.AuthorityId, options.DataScope, now, Array.AsReadOnly(entries.Select(entry => entry with
         {
-            Targets = Array.AsReadOnly(entry.Targets.Where(target => members.Contains(target.NodeId) && Authorized(entry, target))
+            Targets = Array.AsReadOnly(entry.Targets.Where(target => members.Contains(target.NodeId) && Authorized(entry, target)
+                    && (entry.Automatic || target.Online && target.Maintenance is null))
                 .Select(target => target with { }).ToArray()),
-        }).ToArray()));
+        }).Where(entry => entry.Automatic || entry.Targets.Count > 0).ToArray()));
     }
 
     public LauncherServerSelectionSnapshot Refresh(string build, LauncherServerSelectionSnapshot original)

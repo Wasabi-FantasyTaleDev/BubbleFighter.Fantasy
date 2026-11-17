@@ -11,6 +11,12 @@
 # catalog rows at those numbers are not promoted. The research catalog for this build is
 # profiles/cn-705/opcode-catalog.yaml.
 opcodes:
+  - value: 934
+    direction: c2s
+    name: gcpReqCoupleConfirmInvite
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_980EE0 stamps 934 through cn-705 sub_AA3A20; native confirmation dialog supplies the complete body matching the kr-812 Packet_gcpReqCoupleConfirmInvite label"
   - value: 10
     direction: s2c
     connection: game
@@ -932,8 +938,8 @@ opcodes:
     direction: c2s
     name: gcpSynthesisProcess
     name_source: label@cn-705
-    evidence: inferred
-    source: cn-705 sub_96DE20 stamps 941 (opcode setter cn-705 sub_AA3A20); value and name agree with cn-706's reviewed row
+    evidence: verified
+    source: "cn-705 sub_96DE20 constructs Packet_gcpSynthesisProcess (vtable 0xCAD1DC) and calls cn-705 sub_AA3A20(941); cn-705 sub_96AB40 writes the SynthesisProcessRequest it inherits from cn-706."
   - value: 943
     direction: c2s
     name: gcpReqLotteryRadomMissionCompensation
@@ -1586,8 +1592,8 @@ opcodes:
     direction: s2c
     name: gspSynthesisProcess
     name_source: label@cn-705
-    evidence: inferred
-    source: cn-705 dispatcher sub_7C6C40 case 951 (the case set is cn-706's whole); value and name agree with cn-706's reviewed row
+    evidence: verified
+    source: "cn-705 dispatcher sub_7C6C40 case 0x3B7 (951) calls cn-705 sub_7C2860, which consumes Packet_gspSynthesisProcess; cn-705 sub_79F020 reads the 28-byte SynthesisProcessReply it inherits from cn-706."
   - value: 952
     direction: s2c
     name: gspResRandomMissionInfo

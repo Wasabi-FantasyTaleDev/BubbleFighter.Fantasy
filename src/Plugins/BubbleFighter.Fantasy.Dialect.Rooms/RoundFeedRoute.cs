@@ -65,8 +65,9 @@ internal sealed record RoundFeedRoute(ushort GameInbound, ushort RelayInbound, u
                 Require(actor, "u32");
             var nested = Flag("nested", false);
             var fields = packets.Resolve(build, structure);
-            if (fields.Count == 0 || (!nested && fields.Any(field => field.Type is not ("u8" or "u16" or "u32" or "bool" or "f32"))))
-                throw new ConfigException($"{where}.structure must be nonempty and scalar unless nested is explicitly enabled.");
+            // A frame with no body (the soccer countdown and restart) is an empty scalar structure read as zero bytes.
+            if (nested ? fields.Count == 0 : fields.Any(field => field.Type is not ("u8" or "u16" or "u32" or "bool" or "f32")))
+                throw new ConfigException($"{where}.structure must be scalar, or nonempty when nested is explicitly enabled.");
             var lifeName = Text("life_event", required: false);
             RoundLifeEvent? life = lifeName switch
             {

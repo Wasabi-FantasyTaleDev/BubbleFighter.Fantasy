@@ -90,6 +90,29 @@ internal sealed class SugarSession : IAsyncDisposable
         }
     }
 
+    /// <summary>Starts a multi-player mutation transaction and verifies write authority for every distinct affected account.</summary>
+    public async ValueTask<SugarTransaction> BeginWriteManyAsync(IEnumerable<long> userNums, IAccountMutationFence? authority,
+        CancellationToken ct)
+    {
+        var transaction = await BeginAsync(IsolationLevel.RepeatableRead).ConfigureAwait(false);
+        try
+        {
+            if (authority is not null)
+            {
+                var dbTx = Db.Ado.Transaction as DbTransaction
+                    ?? throw new InvalidOperationException("A mutation requires an active transaction.");
+                foreach (var userNum in userNums.Distinct().OrderBy(id => id))
+                    await authority.VerifyAsync(_connection, dbTx, userNum, ct).ConfigureAwait(false);
+            }
+            return transaction;
+        }
+        catch
+        {
+            await transaction.DisposeAsync().ConfigureAwait(false);
+            throw;
+        }
+    }
+
     /// <summary>Starts a transaction at the given isolation level.</summary>
     /// <param name="isolation">The isolation level; the launcher credential writes use SERIALIZABLE.</param>
     /// <returns>The transaction; disposing it without a commit rolls it back.</returns>

@@ -45,7 +45,7 @@ internal sealed partial class RoundFlow
             lock (room.Gate)
             {
                 if (room.Phase != RoomPhase.Playing || !SupplyRequestIsCurrent(room, session, stamp)) return;
-                if (request.Point.Kind < 0 || request.Point.Team is < 0 or > 2 || !float.IsFinite(request.Point.X) || !float.IsFinite(request.Point.Y)
+                if (request.Point.Kind < 0 || request.Point.Team is < 0 or > byte.MaxValue || !float.IsFinite(request.Point.X) || !float.IsFinite(request.Point.Y)
                     || !float.IsFinite(request.Point.Z) || !float.IsFinite(request.Velocity.X)
                     || !float.IsFinite(request.Velocity.Y) || !float.IsFinite(request.Velocity.Z))
                     throw new InvalidOperationException("Dropped item kind or position is invalid.");

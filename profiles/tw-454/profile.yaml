@@ -21,8 +21,11 @@ bundles:
   - relay-latency
   - tw-454
   - player-settings
+  - couples
   - modern-plaza
   - modern-commerce
+  - clan
+  - clan-gateway
 patches:
   - patch.yaml
   # Every audited mode is on by default.
@@ -34,5 +37,6 @@ patches:
   - ../bundles/modern-room-kicking.patch.yaml
   - ../bundles/defence-seeds.patch.yaml
   - modes.patch.yaml
+  - ../bundles/user-host.patch.yaml
   # Optional developer override; git-ignored and skipped when absent.
   - local.patch.yaml

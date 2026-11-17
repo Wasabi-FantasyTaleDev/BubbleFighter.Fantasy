@@ -41,7 +41,7 @@ Bubble Fighter Fantasy 的配套桌面应用 **Fantasy Tale Launcher** 正在开
 | --- | --- | --- | --- | --- | --- |
 | `kr-1256` | 韩国 | KR 2026 | 2026-05-08 | 1256 | 实验性 |
 | `kr-812` | 韩国 | KR 2015 | 2015-04-22 | 812 | 已支持 |
-| `kr-186` | 韩国 | KR 2009 | 2009-12-20 | 186 | 实验性 |
+| `kr-186` | 韩国 | KR 2009 | 2009-12-21 | 186 | 实验性 |
 | `cn-279` | 中国 | CN 2011 | 2011-04-08 | 279 | 已支持 |
 | `cn-324` | 中国 | CN 2012 | 2012-09-23 | 324 | 已支持 |
 | `tw-410` | 台湾 | TW 2013 | 2013-01-22 | 410 | 实验性 |
@@ -228,6 +228,7 @@ hook 的预期工作方式：
 | `listen` | API 监听器的 IP 地址与端口。明文 HTTP；远程部署应在其前方终止 HTTPS。 | `127.0.0.1:8090` |
 | `name` | 目录中显示的公开服务器名称。 | `Bubble Fighter Fantasy`，最多 128 个字符 |
 | `host_policy` | 启动器应如何访问游戏端点。 | `auto`、`ip` 或 `domain` |
+| `clan_port` | 共用公会端口，提供给每个有公会连接的版本；启动器据此写入客户端 `login.ini` 的 `clanServerAddr` 和 `clanServerPort`。`0` 表示不提供。 | `${BFF_CLAN_PORT:-7400}` |
 | `region` | 向玩家显示的可选区域。 | 空，或两个大写字母 |
 | `supports_instances` / `supports_plugins` | 公布服务器是否允许选择实例与客户端插件。 | `true` / `true` |
 | `registration_enabled` | 启动器账号是否可以注册。 | `true` |
@@ -402,7 +403,7 @@ Fantasy Tale Nirinsou Link（简称 Nirinsou）是运行中的启动器与其启
 | --- | --- |
 | `companion` | 监听器与启动表。启用后，每个 `/v1/launch` 回复都带有 `companion` 对象：`url`、一次性 `ticket`、`launchId` 和 `expiresAt`。 |
 | `companion.notices` | 启动器弹窗（`ui.notification.show`）与 `popup <文字>` 管理命令，权限为 `game.management.popup`。 |
-| `companion.native_ui` | 游戏原生的消息框、通知、横幅公告和本地聊天行（`ui.native.invoke`/`ui.native.result`）。服务器插件调用 `IClientNativeUi.ShowAsync` 并得到玩家的选择；启动器优先使用客户端原生控件，浮层作为后备。开发测试命令 `clientui <昵称> <box|notice|banner|chat> <文字>`（权限 `game.management.clientui`）向一名玩家显示并输出结果。 |
+| `companion.native_ui` | 游戏原生的消息框、通知、横幅公告和本地聊天行（`ui.native.invoke`/`ui.native.result`）。服务器插件调用 `IClientNativeUi.ShowAsync` 并得到玩家的选择；启动器优先使用客户端原生控件，浮层作为后备。开发测试命令 `clientui <昵称> <box\|notice\|banner\|chat> <文字>`（权限 `game.management.clientui`）向一名玩家显示并输出结果。 |
 | `companion.commands` | 通过共享玩家权限和聊天额度执行已登录游戏命令。 |
 
 三行在 core 包中默认禁用，由 `all` 配置启用。`companion` 的选项：

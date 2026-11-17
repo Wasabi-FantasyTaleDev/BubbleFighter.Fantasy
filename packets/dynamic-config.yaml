@@ -1,6 +1,14 @@
 version: 1
 structs:
-  DynamicConfigRequest: []
+  # kr-812 sub_45B500 (called by kr-812 sub_820060 after the room-entry frame, C2S 1500): a u16 mask placeholder, one
+  # checksum u32 per registered category in ascending bit order, then the mask is written back over the placeholder. The
+  # client registers only categories 2 and 3 (kr-812 sub_4800C0, kr-812 sub_464390), so only bits 0 to 3 exist.
+  DynamicConfigRequest:
+    - mask: u16
+    - checksum_0: 'when<mask&0x1,u32>'
+    - checksum_1: 'when<mask&0x2,u32>'
+    - checksum_2: 'when<mask&0x4,u32>'
+    - checksum_3: 'when<mask&0x8,u32>'
   # kr-1256 sub_99E860 writes a category mask, then one checksum per set bit in ascending order.
   DynamicConfigRequest@kr-1256:
     - mask: u32
@@ -74,6 +82,15 @@ structs:
 
   # kr-1256 sub_9D2FF0 case 1500 reads a mask, not a count. Only the audited category is published.
 
+  # kr-812 sub_837170 case 1500 calls kr-812 sub_45B5E0: a u16 mask, then for each set bit among 0 to 3 ascending the
+  # category's decoder (vtable +4 of the registry entry kr-812 sub_45B130 stored) reads its plain bytes straight from
+  # the packet: there is no length word and no zlib wrapper, and the client restamps the entry with an Adler-32 over
+  # the bytes the decoder consumed (kr-812 sub_A5FB20 -> kr-812 sub_BC81B0, seed 0). A decoder that fails abandons the
+  # rest of the frame. Category 3 is the plaza mini-game configuration (kr-812 sub_464240, 38 bytes).
+  DynamicConfigReply:
+    - mask: u16
+    - slot_3: 'when<mask&0x8,LobbyMinigameContext>'
+
   # kr-1256 sub_9D2FF0 case 1500 reads a mask, not a count, then walks the set bits ascending: per
   # bit kr-1256 sub_65F370 reads one compressed byte count and that many bytes, inflates it, restamps
   # the slot's registry entry and applies the slot decoder. A failed bit abandons the rest of the
@@ -82,50 +99,51 @@ structs:
   # kr-1256 sub_8A0AA0 -> 6, kr-1256 sub_917970 -> 8, kr-1256 sub_92A6E0 -> 4/5/7/9/13,
   # kr-1256 sub_994780 -> 12, kr-1256 sub_728060 -> 16, and three more sites inside the
   # registration init that carry 1, 2 and 11; ids 10 and 15 register at runtime only).
-  DynamicConfigReply:
+  DynamicConfigReply@kr-1256:
     - mask: u32
     - slot_1: 'when<mask&0x2,DynamicConfigBlob>'
-      only: [kr-1256]
     - slot_2: 'when<mask&0x4,DynamicConfigBlob>'
-      only: [kr-1256]
     - slot_3: 'when<mask&0x8,DynamicConfigBlob>'
-      only: [kr-1256]
     - slot_4: 'when<mask&0x10,DynamicConfigBlob>'
-      only: [kr-1256]
     - slot_5: 'when<mask&0x20,DynamicConfigBlob>'
-      only: [kr-1256]
     - slot_6: 'when<mask&0x40,DynamicConfigBlob>'
-      only: [kr-1256]
     - slot_7: 'when<mask&0x80,DynamicConfigBlob>'
-      only: [kr-1256]
     - slot_8: 'when<mask&0x100,DynamicConfigBlob>'
-      only: [kr-1256]
     - slot_9: 'when<mask&0x200,DynamicConfigBlob>'
-      only: [kr-1256]
     - slot_10: 'when<mask&0x400,DynamicConfigBlob>'
-      only: [kr-1256]
     - slot_11: 'when<mask&0x800,DynamicConfigBlob>'
-      only: [kr-1256]
     - slot_12: 'when<mask&0x1000,DynamicConfigBlob>'
-      only: [kr-1256]
     - slot_13: 'when<mask&0x2000,DynamicConfigBlob>'
-      only: [kr-1256]
     - slot_14: 'when<mask&0x4000,DynamicConfigBlob>'
-      only: [kr-1256]
     - slot_15: 'when<mask&0x8000,DynamicConfigBlob>'
-      only: [kr-1256]
     - slot_16: 'when<mask&0x10000,DynamicConfigBlob>'
-      only: [kr-1256]
 
   # cn-735 sub_51B4E0 returns on a zero u16 mask without replacing native configuration.
   DynamicConfigReply@cn-735:
     - mask: u16
   # cn-774 sub_8115F0 walks sixteen bits; cn-774 sub_811660 reads each counted zlib blob.
-  # cn-774 sub_5F6B40 registers category 14. No other CN category is admitted here.
+  # cn-774 sub_5F6B40 registers category 14. Only the categories listed here are admitted for CN.
   DynamicConfigReply@cn-774:
     - mask: u16
+    # cn-774 sub_9D8360 registers category 3 ("xxLMG.dch") through cn-774 sub_810F80 with the decoder cn-774 sub_9D81D0,
+    # which reads the same 42 bytes as kr-1256's decoder: LobbyMinigameContext.
+    - slot_3: 'when<mask&0x8,DynamicConfigBlob>'
+    # cn-774 sub_B1DC00 registers category 4 ("xxMSTY") through cn-774 sub_810F80 with the decoder cn-774 sub_E45AE0
+    # (MysteryStoreServerConfigDecoder), whose body cn-774 sub_E45BD0 reads two eight-byte values: MysteryStoreContext.
+    # The expiry gate cn-774 sub_E45CD0 compares the client's local date with them.
+    - slot_4: 'when<mask&0x10,DynamicConfigBlob>'
     - slot_14: 'when<mask&0x4000,DynamicConfigBlob>'
-      except: [tw-454] # tw-454 sub_A9E440 has only been admitted for the zero-mask reply.
+
+  # tw-454 sub_A9E440 reads a u16 mask and runs tw-454 sub_628B00 for each set bit: that hands the plain packet bytes to the
+  # category's decoder (vtable +4) and stamps the registry entry with an Adler-32 over the bytes the decoder consumed
+  # (tw-454 sub_10DC400, seed 0). There is no length word and no zlib wrapper, unlike cn-774 sub_811660, which reads a
+  # counted zlib blob. tw-454 registers category 3 ("xxLMG.dch") through tw-454 sub_6284B0 in tw-454 sub_6336B0 with the decoder
+  # tw-454 sub_633520 (42 bytes, the same as cn-774 sub_9D81D0), and category 4 ("xxMSTY") with the decoder tw-454
+  # sub_E54D70 (two eight-byte dates, expiry gate tw-454 sub_E54E70); only the booth category is served.
+  DynamicConfigReply@tw-454:
+    - mask: u16
+    - slot_3: 'when<mask&0x8,LobbyMinigameContext>'
+    - slot_4: 'when<mask&0x10,MysteryStoreContext>'
 
   # kr-1256 sub_65F370 and cn-774 sub_811660 read a byte count and wrap those bytes in a zlib stream.
   DynamicConfigBlob:
@@ -233,11 +251,17 @@ structs:
     - flag_block_6: u32
     - unknown_tail: u32
 
-  # Slot 3, xxLMG.dch, LobbyMinigameConfig (decoder kr-1254 sub_83D970). Forty-two bytes.
+  # Slot 3 of kr-812, xxLMG.dch, LobbyMinigameConfig::ConfigDecoder (kr-812 sub_464240, registered by kr-812
+  # sub_464390 through kr-812 sub_45B130(3, ...)). Thirty-eight bytes: kr-1256's layout without the second item word.
+  # The decoder reads bool32, four u16, bool32, six u16, one i32 (default 190083), bool32 and one u16 and stores them
+  # at config +64, +76, +92 and +96. kr-812 sub_4779E0 sends config +66 as the basketball shot's displayed cost,
+  # kr-812 sub_466680 / kr-812 sub_478620 send config +78 (or +80 when the player owns the item of config +92,
+  # kr-812 sub_978140) as a cast's displayed cost, and kr-812 sub_478AE0 sends config +98 as the fortune paper's
+  # displayed cost; kr-812 sub_468BB0 refuses the booth while config +96 is zero.
   LobbyMinigameContext:
     - flag_a: u32
       offset: 0
-    - unknown_4: u16
+    - basketball_cost: u16
       offset: 4
     - unknown_6: u16
       offset: 6
@@ -247,9 +271,47 @@ structs:
       offset: 10
     - flag_12: u32
       offset: 12
-    - unknown_16: u16
+    - fishing_cost: u16
       offset: 16
-    - unknown_18: u16
+    - fishing_second_cost: u16
+      offset: 18
+    - unknown_20: u16
+      offset: 20
+    - unknown_22: u16
+      offset: 22
+    - unknown_24: u16
+      offset: 24
+    - unknown_26: u16
+      offset: 26
+    - unknown_28: u32 # the item whose ownership selects the second price (kr-812 sub_978140)
+      offset: 28
+    - flag_32: u32
+      offset: 32
+    - fortune_cost: u16
+      offset: 36
+
+  # Slot 3, xxLMG.dch, LobbyMinigameConfig (decoder kr-1254 sub_83D970; kr-1256 sub_83DBF0 stores it packed
+  # from dword_18E55F4 +64). Forty-two bytes. The four prices are the values the booths show and send back as
+  # their displayed cost, so the server charges exactly these (Dialect.Rooms PlazaGamesBinding reads them).
+  LobbyMinigameContext@kr-1256:
+    - flag_a: u32
+      offset: 0
+    # kr-1256 sub_845050 sends config +66 as the basketball shot's displayed cost.
+    - basketball_cost: u16
+      offset: 4
+    - unknown_6: u16
+      offset: 6
+    - unknown_8: u16
+      offset: 8
+    - unknown_10: u16
+      offset: 10
+    - flag_12: u32
+      offset: 12
+    # kr-1256 sub_842600 sends config +78 as a cast's displayed cost, or config +80 when the request's
+    # second_price flag is set, and shows that price times the day's catches plus one.
+    - fishing_cost: u16
+      offset: 16
+    - fishing_second_cost: u16
       offset: 18
     - unknown_20: u16
       offset: 20
@@ -265,11 +327,12 @@ structs:
       offset: 32
     - flag_36: u32
       offset: 36
-    - unknown_40: u16
+    # kr-1256 sub_D66DE0 sends config +102 as the fortune paper's displayed cost.
+    - fortune_cost: u16
       offset: 40
 
-  # Slot 4, xxMSTY, MysteryStore (decoder kr-1254 sub_E5E360). Two OLE automation dates
-  # (1899-12-30 epoch) read as two eight-byte blocks.
+  # Slot 4, xxMSTY, MysteryStore (decoder kr-1254 sub_E5E360; cn-774 sub_E45BD0 and tw-454 sub_E54D70 read the same two
+  # eight-byte blocks). Two OLE automation dates (1899-12-30 epoch).
   MysteryStoreContext:
     - start: f64
       offset: 0

@@ -34,6 +34,34 @@ public sealed class MemoryCoupleStoreTests
         Assert.False(store.PersistsState);
     }
 
+    /// <summary>Replaying a retained invitation reports its current ring without reverting the accepted pair.</summary>
+    [Fact]
+    public async Task CompletedInvitationReplaysReturnTheCurrentRing()
+    {
+        var store = Store();
+        var draft = Draft(B) with { RingItemId = 100604 };
+        await store.CreateInvitationAsync(A, draft, default);
+        var accepted = await store.AnswerInvitationAsync(B, draft.Id, true, Now.AddSeconds(1), default);
+        var changed = await store.ChangeRingAsync(A, draft.Id, 100984, default);
+        var current = Assert.IsType<CoupleRelationship>(changed.Relationship);
+        Assert.Equal(100984, current.RingItemId);
+        Assert.Equal(accepted.Relationship!.CreatedAt, current.CreatedAt);
+
+        var replays = new[]
+        {
+            await store.AnswerInvitationAsync(B, draft.Id, true, Now.AddSeconds(2), default),
+            await store.CancelInvitationAsync(A, draft.Id, Now.AddSeconds(2), default),
+            await store.CreateInvitationAsync(A, draft, default),
+        };
+        Assert.All(replays, replay =>
+        {
+            Assert.Equal(CoupleStoreResult.Accepted, replay.Result);
+            Assert.Equal(current, replay.Relationship);
+        });
+        Assert.Same(current, await store.FindRelationshipAsync(A, default));
+        Assert.Same(current, await store.FindRelationshipAsync(B, default));
+    }
+
     /// <summary>An invitation's recipient and sender independently own answer and cancellation, including after completion.</summary>
     [Fact]
     public async Task ForgedAnswersAndCancellationsCannotChangeEitherAccount()

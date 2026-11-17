@@ -9,32 +9,41 @@ namespace BubbleFighter.Fantasy.Dialect.Messages;
 /// <summary>
 /// The clan game-connection packets (layouts in <c>packets/clan.yaml</c>, numbers from the build's opcode table by
 /// name): the three empty client requests in; the passport, mark list, guild info and the attendance state out. The
-/// three open snapshots share one typed message so their order stays beside the bytes the client reads
-/// (kr-1256 sub_99C1D0, kr-1256 sub_99CFA0, kr-1256 sub_9B2690; attendance reader kr-1256 sub_10C5590).
+/// two open snapshots share one typed message so their order stays beside the bytes the client reads
+/// (kr-1256 sub_99CFA0, kr-1256 sub_9B2690; attendance reader kr-1256 sub_10C5590); the passport answers the
+/// passport request alone, because the client forwards it as a clan login (kr-1256 sub_9D2FF0 case 21).
 /// </summary>
 internal sealed class ClanBinding(string protocol, IOpcodeTable opcodes, PacketTables tables, string build)
     : IInboundMessageBinding<ClanServerAckReceived>, IInboundMessageBinding<ClanMainOpened>,
       IInboundMessageBinding<ClanAttendanceCheckedIn>, IMessageSender<ClanOpened>,
-      IMessageSender<ClanAttendanceStateUpdated>
+      IMessageSender<ClanAttendanceStateUpdated>, IMessageSender<ClanPassportIssued>
 {
-    /// <summary>The C2S names the binding reads; <c>Unknown25</c> is optional because not every build has the sender.</summary>
-    internal static readonly string[] Requests = ["Unknown25", "Unknown2040", "Unknown2041"];
+    /// <summary>
+    /// The C2S names the binding reads. Each is optional: not every build has the passport sender, and kr-812 has neither
+    /// the clan-main open (kr-1256 sub_5A9410) nor the attendance check-in (kr-1256 sub_57F010).
+    /// </summary>
+    internal static readonly string[] Requests = ["gcpReqClanPassport", "gcpReqClanMainOpen_", "gcpReqClanAttendanceCheckIn_"];
 
-    /// <summary>The S2C names the binding writes, in the order the client consumes the three open snapshots.</summary>
+    /// <summary>
+    /// The S2C names the binding writes: the passport, and the two open snapshots in the client's order. The snapshots
+    /// answer the clan-main open only, so a build without <c>gcpReqClanMainOpen_</c> (kr-812 and the builds based on it) needs
+    /// neither; the attendance state (<c>gspClanAttendanceState</c>) likewise exists only with the check-in.
+    /// </summary>
     internal static readonly string[] Replies =
     [
-        "gspClanPassport", "gspReqClanMarkInfo", "gspResGuildInfo", "gspClanAttendanceState",
+        "gspClanPassport", "gspReqClanMarkInfo", "gspResGuildInfo",
     ];
 
     /// <summary>
-    /// The empty body each structure must write for this build; the lengths are the client readers' own: the
-    /// passport 20 (kr-1256 sub_99C1D0, whose leading word the raw .text bytes pin before the name), mark list 8
-    /// (kr-1256 sub_99CFA0), guild info 16 (kr-1256 sub_9B2690) and attendance state 4 (kr-1256 sub_10C5590).
-    /// A layout that disagrees is a configuration error, not a client surprise.
+    /// The empty body each structure may write; the lengths are the client readers' own: the passport 20
+    /// (kr-1256 sub_99C1D0, whose leading word the raw .text bytes pin before the name; kr-812 sub_844AB0), mark list 8
+    /// (kr-1256 sub_99CFA0, one table) or 12 (kr-812 sub_844FB0, two tables), guild info 16 (kr-1256 sub_9B2690,
+    /// kr-812 sub_8407F0) and attendance state 14 (kr-1256 sub_10C5590 list, then kr-1256 sub_113F1F0 4+4+2) or 0 where the build has no attendance packet.
+    /// A layout that matches none is a configuration error, not a client surprise.
     /// </summary>
-    private static readonly (string Structure, int Length)[] EmptyBodies =
+    private static readonly (string Structure, int[] Lengths)[] EmptyBodies =
     [
-        ("ClanPassport", 20), ("ClanMarkInfo", 8), ("ClanGuildInfo", 16), ("ClanAttendanceState", 4),
+        ("ClanPassport", [20]), ("ClanMarkInfo", [8, 12]), ("ClanGuildInfo", [16]), ("ClanAttendanceState", [0, 14]),
     ];
 
     public string Protocol => protocol;
@@ -47,24 +56,42 @@ internal sealed class ClanBinding(string protocol, IOpcodeTable opcodes, PacketT
         context.Effect(context.Services.RegisterMany<IInboundMessageBinding<ClanAttendanceCheckedIn>>(this));
         context.Effect(context.Services.RegisterMany<IMessageSender<ClanOpened>>(this));
         context.Effect(context.Services.RegisterMany<IMessageSender<ClanAttendanceStateUpdated>>(this));
+        context.Effect(context.Services.RegisterMany<IMessageSender<ClanPassportIssued>>(this));
         var router = context.Services.Get<IPacketRouter>();
-        // The clan-server bounce sender is per build and absent where the client has no clan server (kr-812's
-        // gcpReqClanPassport exists, the modern game port stamps it from the server dispatcher instead).
-        if (opcodes.Find(PacketDirection.ClientToServer, "Unknown25") is not null)
-            Route<ClanServerAckReceived>(context, router, messages, "Unknown25");
-        Route<ClanMainOpened>(context, router, messages, "Unknown2040");
-        Route<ClanAttendanceCheckedIn>(context, router, messages, "Unknown2041");
+        // The passport request is per build and absent where the client has no clan connection.
+        if (opcodes.Find(PacketDirection.ClientToServer, "gcpReqClanPassport") is not null)
+            Route<ClanServerAckReceived>(context, router, messages, "gcpReqClanPassport");
+        // The clan-main open and the attendance check-in exist only where the build has them (not kr-812).
+        if (opcodes.Find(PacketDirection.ClientToServer, "gcpReqClanMainOpen_") is not null)
+            Route<ClanMainOpened>(context, router, messages, "gcpReqClanMainOpen_");
+        if (opcodes.Find(PacketDirection.ClientToServer, "gcpReqClanAttendanceCheckIn_") is not null)
+            Route<ClanAttendanceCheckedIn>(context, router, messages, "gcpReqClanAttendanceCheckIn_");
     }
 
     public async ValueTask SendAsync(ISession session, ClanOpened message, CancellationToken ct)
     {
-        await session.SendAsync(opcodes.S2C("gspClanPassport"), WritePassport(tables, build), ct).ConfigureAwait(false);
         await session.SendAsync(opcodes.S2C("gspReqClanMarkInfo"), WriteMarkInfo(tables, build), ct).ConfigureAwait(false);
         await session.SendAsync(opcodes.S2C("gspResGuildInfo"), WriteGuildInfo(tables, build), ct).ConfigureAwait(false);
     }
 
     public ValueTask SendAsync(ISession session, ClanAttendanceStateUpdated message, CancellationToken ct) =>
         session.SendAsync(opcodes.S2C("gspClanAttendanceState"), WriteAttendanceState(tables, build), ct);
+
+    public ValueTask SendAsync(ISession session, ClanPassportIssued message, CancellationToken ct) =>
+        session.SendAsync(opcodes.S2C("gspClanPassport"), WritePassport(tables, build, message), ct);
+
+    /// <summary>
+    /// The <c>gspClanPassport</c> body the client echoes as its clan login (reader kr-1256 sub_99C1D0, forwarded
+    /// by kr-1256 sub_9D2FF0 case 21): the account id, the nickname and the ticket; the two words between are
+    /// echoed unused and keep the table default.
+    /// </summary>
+    internal static byte[] WritePassport(PacketTables tables, string build, ClanPassportIssued message) =>
+        PacketCodec.Write(tables, build, "ClanPassport", new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            ["user_number"] = message.UserNumber,
+            ["nickname"] = message.Nickname,
+            ["ticket"] = message.Ticket.ToArray().Select(value => (object?)value).ToArray(),
+        });
 
     /// <summary>The empty <c>gspClanPassport</c> body (S2C 21; reader kr-1256 sub_99C1D0).</summary>
     internal static byte[] WritePassport(PacketTables tables, string build) => Write(tables, build, "ClanPassport");
@@ -98,27 +125,31 @@ internal sealed class ClanBinding(string protocol, IOpcodeTable opcodes, PacketT
     {
         // The three routed requests are zero-field structures: the clients stamp the opcode on an empty packet.
         PacketLayoutContract.RequireEmpty(tables, build, "ClanPassportRequest", "Clan");
-        PacketLayoutContract.RequireEmpty(tables, build, "Unknown2040Request", "Clan");
-        PacketLayoutContract.RequireEmpty(tables, build, "Unknown2041Request", "Clan");
-        // The four open snapshots are defaults-only writes: the binding supplies no field value, the codec lifts the
+        PacketLayoutContract.RequireEmpty(tables, build, "ClanMainOpenRequest", "Clan");
+        PacketLayoutContract.RequireEmpty(tables, build, "ClanAttendanceCheckInRequest", "Clan");
+        PacketLayoutContract.RequireFields(tables, build, "ClanPassport", "Clan",
+            ("user_number", "u32"), ("nickname", "wstr"), ("ticket", "list<u8>"));
+        // The four game-port bodies are checked as defaults-only writes: the binding supplies no field value, the codec lifts the
         // table defaults, and the structure states the fields the client reads (their names and types differ between
         // the baseline and the @kr-1256 restatements). RequireEmpty would reject a correct table and RequireFields
         // cannot name build-varying fields, so the checked property is the byte length of the empty write. There is
         // no consumed scalar field to retype, so this binding has no wrong-type rejection test.
-        foreach (var (structure, length) in EmptyBodies)
+        foreach (var (structure, lengths) in EmptyBodies)
         {
             var body = Write(tables, build, structure);
-            if (body.Length != length)
+            if (!lengths.Contains(body.Length))
                 throw new ConfigException(
-                    $"Invalid {structure} layout for '{build}': the empty body is {body.Length} bytes, the client reads {length}.");
+                    $"Invalid {structure} layout for '{build}': the empty body is {body.Length} bytes, the client reads {string.Join(" or ", lengths)}.");
         }
-        foreach (var name in Replies)
-            _ = opcodes.S2C(name);
-        foreach (var name in Requests)
+        _ = opcodes.S2C("gspClanPassport");
+        if (opcodes.Find(PacketDirection.ClientToServer, "gcpReqClanMainOpen_") is not null)
         {
-            if (name is "Unknown25" && opcodes.Find(PacketDirection.ClientToServer, name) is null)
-                continue;
-            _ = opcodes.C2S(name);
+            _ = opcodes.S2C("gspReqClanMarkInfo");
+            _ = opcodes.S2C("gspResGuildInfo");
         }
+        // The attendance check-in and its state come together: a build has both rows or neither.
+        var attendance = opcodes.Find(PacketDirection.ClientToServer, "gcpReqClanAttendanceCheckIn_") is not null;
+        if (attendance != opcodes.Find(PacketDirection.ServerToClient, "gspClanAttendanceState") is not null)
+            throw new ConfigException($"Opcode table '{opcodes.Profile.Id}' must state both gcpReqClanAttendanceCheckIn_ and gspClanAttendanceState or neither.");
     }
 }

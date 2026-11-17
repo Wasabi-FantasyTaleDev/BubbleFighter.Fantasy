@@ -1,6 +1,12 @@
 # Profile patch for cn-408: applied after the bundle rows (see profiles/kr-1256/patch.yaml
 # for the supported operations).
 - set:
+    id: inventory.couple-catalog
+    config:
+      # cn-408 sub_9B9800 accepts the invitation; sub_83A950 tolerates a missing display ring.
+      # The native workbook omits this stock. Preserve the invitation without borrowing a ring identity.
+      allowed_missing_display_stock_ids: [1004192]
+- set:
     id: dialect.scene-seeds
     config:
       # cn-408 sub_505330 consumes seed decisions without adding the equipped weapon's chance.

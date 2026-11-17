@@ -19,6 +19,11 @@ public sealed class LauncherOptions : IValidatableOptions
     public string HostPolicy { get; set; } = "auto";
     /// <summary>Gets or sets the deployment region, or empty when unspecified.</summary>
     public string Region { get; set; } = "";
+    /// <summary>
+    /// Gets or sets the shared clan TCP port the catalog hands to every instance whose build has a clan connection, so the
+    /// launcher can write the client's <c>login.ini</c> <c>clanServerPort</c>; 0 publishes none. YAML key <c>clan_port</c>.
+    /// </summary>
+    [Range(0, 65535)] public int ClanPort { get; set; }
     /// <summary>Gets or sets whether users may choose between installed instances.</summary>
     public bool SupportsInstances { get; set; } = true;
     /// <summary>Gets or sets whether client plugins are allowed by this service.</summary>

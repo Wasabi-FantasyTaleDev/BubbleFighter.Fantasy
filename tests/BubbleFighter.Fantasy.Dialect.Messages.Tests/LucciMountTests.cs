@@ -24,7 +24,7 @@ public sealed class LucciMountTests
     [InlineData("cn-324", false, false)]
     [InlineData("cn-406", false, false)]
     [InlineData("cn-279", false, false)]
-    [InlineData("kr-1256", false, false)]
+    [InlineData("kr-1256", true, false)]
     [InlineData("tw-454", false, false)]
     public async Task LucciRoutesAndRepliesUseTheBuildTableAndUnload(string build, bool award, bool remap)
     {
@@ -95,7 +95,7 @@ public sealed class LucciMountTests
     [InlineData("cn-324", 736, 735, 720, 721, 0)]
     [InlineData("cn-406", 736, 735, 720, 721, 0)]
     [InlineData("cn-279", 733, 732, 717, 718, 0)]
-    [InlineData("kr-1256", 636, 635, 645, 646, 0)]
+    [InlineData("kr-1256", 636, 635, 645, 646, 2027)]
     [InlineData("cn-774", 636, 635, 618, 619, 2025)]
     [InlineData("tw-454", 636, 635, 618, 619, 0)]
     public void OpcodeNumbersMatchTheClientDispatchers(string build, int create, int eat, int created, int eaten, int award)

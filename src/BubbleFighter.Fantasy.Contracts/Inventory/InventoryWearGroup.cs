@@ -4,7 +4,7 @@ namespace BubbleFighter.Fantasy.Contracts.Inventory;
 /// <param name="FirstItemId">Lowest item id accepted by this position.</param>
 /// <param name="LastItemId">Highest item id accepted by this position.</param>
 /// <param name="LegacyDefaultItemId">Preferred owned item when repairing an ambiguous legacy equipped snapshot.</param>
-/// <param name="RequireEquipped">Whether an empty position returns to its owned initial item.</param>
+/// <param name="RequireEquipped">Whether an empty position returns to its owned initial item, or to the first owned item that fits it.</param>
 public sealed record InventoryWearGroup(int FirstItemId, int LastItemId, int LegacyDefaultItemId, bool RequireEquipped = false)
 {
     /// <summary>Gets the explicit item identities sharing a client body part or accessory slot, or null for a numeric position.</summary>
@@ -36,7 +36,7 @@ public static class InventoryWearSelection
     /// <returns>Every input row with its worn bit rewritten, or null when ownership or an occupied-position rule refuses the request.</returns>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when the row or bag bounds are exceeded.</exception>
     /// <exception cref="ArgumentException">Thrown when a position range is invalid or overlaps another numeric position.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when a required position lacks its initial item in the character bag.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the character bag owns no item for a required position.</exception>
     public static IReadOnlyList<InventorySlotRecord>? Apply(
         IReadOnlyList<InventorySlotRecord> rows, IReadOnlyList<InventoryWearGroup> groups, int? itemId, bool worn)
     {
@@ -79,9 +79,12 @@ public static class InventoryWearSelection
             }
             if (itemId is { } id && group.Contains(id))
                 selected = worn ? id : selected == id ? 0 : selected;
+            // A build whose catalog has no legacy default (id-1809 and id-400 have no 201001) refills the position
+            // with the first owned item that fits it; only an account owning nothing for the position is refused.
             if (selected == 0 && group.RequireEquipped)
                 selected = bag.Any(row => row.ItemId == group.LegacyDefaultItemId) ? group.LegacyDefaultItemId
-                    : throw new InvalidOperationException($"Required equipment position lacks its initial item {group.LegacyDefaultItemId}.");
+                    : bag.FirstOrDefault(row => group.Contains(row.ItemId))?.ItemId
+                    ?? throw new InvalidOperationException($"Required equipment position lacks its initial item {group.LegacyDefaultItemId}.");
             selections.Add(group, selected);
         }
         var locationGroups = groups.Where(group => group.ItemIds is not null).ToArray();

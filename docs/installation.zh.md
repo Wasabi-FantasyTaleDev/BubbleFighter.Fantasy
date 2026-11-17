@@ -41,6 +41,7 @@ Bubble Fighter Fantasy 是 Fantasy Tale Studio 维护的游戏「泡泡战士」
 | --- | --- | --- |
 | Windows x64 构建包 | 可用 | Windows x64，希望使用现成构建 |
 | Windows ARM64 构建包 | 可用 | Windows on ARM，希望使用现成构建 |
+| Windows 安装脚本 | 可用 | 想用一条 PowerShell 命令下载、校验并安装 Windows 程序包 |
 | Linux 安装脚本 | 可用 | 不使用 Docker 的 Linux 发行方式 |
 | Docker 一键安装 | 可用 | 无需检出仓库，在容器中运行服务器，可选附带 MySQL |
 | 从本仓库构建 Docker | 可用 | 已有检出与 Docker，在容器中运行服务器和 MySQL |
@@ -65,10 +66,40 @@ Bubble Fighter Fantasy 是 Fantasy Tale Studio 维护的游戏「泡泡战士」
 2. 下载与处理器匹配的 ZIP，解压到较短的文件夹，例如 `C:\BubbleFighterFantasy`。完整路径达到约 259 个字符的插件文件无法在 Windows 上加载；从这么深的文件夹启动时，服务器会拒绝启动并指出最长的文件。
 3. 双击 `BubbleFighter.Fantasy.Host.exe`。安装向导随即启动，WebUI 会在默认浏览器中打开；接着按下文“首次运行设置”操作。关闭控制台窗口即停止服务器。启动失败时窗口会保持打开并显示错误，按任意键后才关闭。
 
+### Windows 安装脚本
+
+```powershell
+irm https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest/download/install.ps1 | iex
+```
+
+在 PowerShell 中运行。脚本会检测 x64 或 ARM64，从最新版本下载对应的 ZIP 和 `SHA256SUMS` 并校验；系统没有 ASP.NET Core Runtime 10 时，会在安装文件夹中装一份私有运行时；默认安装到 `C:\BubbleFighterFantasy`（`releases\<tag>\`、`current` 链接、`state\`、`settings.env` 和用于启动服务器的 `bff.cmd`）。在控制台中不带选项运行时，它会询问安装文件夹、是否允许其他机器打开 WebUI（默认是）、设置向导是否需要令牌（默认否）、是否随 Windows 启动（仅管理员 PowerShell）以及是否立即启动；选择立即启动时会在浏览器中打开设置页面。请在那里自己完成设置向导；在自己的电脑上，数据库步骤请选择 SQLite，不需要数据库服务器。
+
+要传入选项，请以脚本块方式运行，例如随 Windows 启动的服务器（管理员 PowerShell）：
+
+```powershell
+& ([scriptblock]::Create((irm https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest/download/install.ps1))) -NoPrompt -Service
+```
+
+| 选项 | 作用 |
+| --- | --- |
+| `-Version <tag>` | 安装指定版本而不是最新版本 |
+| `-Dir <path>` | 安装文件夹（默认 `C:\BubbleFighterFantasy`，请保持路径简短） |
+| `-Arch x64` / `-Arch arm64` | 要安装的程序包（默认按本机处理器） |
+| `-AdminPort <n>` | 安装向导与 WebUI 的端口（默认 7300） |
+| `-RemoteAdmin` / `-LocalAdmin` | 允许其他机器打开 WebUI（默认）/ 只在本机打开 |
+| `-SetupToken` / `-NoSetupToken` | 设置向导使用前需要生成的令牌 / 不需要（默认） |
+| `-Service` | 以管理员运行时：创建计划任务 `BubbleFighterFantasy`，以 SYSTEM 运行并随 Windows 启动 |
+| `-Start` | 在单独窗口中启动服务器并打开设置页面 |
+| `-NoPrompt` | 不提问，使用给出的选项和默认值（没有控制台时也是如此，例如 AI 智能体的命令行） |
+| `-NoRuntime` | 缺少运行时时直接失败，而不是安装它 |
+| `-From <dir>` | 从存放版本文件的文件夹安装（需要 `-Version`） |
+
+再次运行同一条命令即可升级；`state\` 与 `settings.env` 会保留。
+
 ### Linux 安装脚本
 
 ```bash
-curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash
+curl -fsSL https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest/download/install.sh | bash
 ```
 
 脚本会识别 x86_64 或 aarch64，从最新版本下载对应的程序包和 `SHA256SUMS` 并校验。系统没有 ASP.NET Core Runtime 10 时，它会用 Microsoft 的 `dotnet-install.sh` 将运行时安装到安装目录中，不改动系统级 .NET。安装目录为 `~/bubblefighter-fantasy`，以 root 运行时为 `/opt/bubblefighter-fantasy`：
@@ -82,21 +113,23 @@ curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash
 | `bff` | 启动器；不带参数时启动安装向导 |
 | `settings.env` | 安装脚本选择的 WebUI 访问方式、安装令牌和端口；升级时保留 |
 
-用 `~/bubblefighter-fantasy/bff` 启动服务器，然后在服务器本机上打开 `http://127.0.0.1:7300/`。安装脚本会问两个问题，默认都是否：是否允许其他机器打开 WebUI（`--remote-admin`），以及首次运行向导是否需要安装令牌（`--setup-token`）。WebUI 只在本机时，从自己的电脑通过隧道打开：`ssh -L 7300:127.0.0.1:7300 <user>@<server>`，然后打开 `http://127.0.0.1:7300/`。开启远程访问时，打开 `http://<server>:7300/`，并在防火墙或云安全组中放行 TCP 7300 端口。这些选择保存在安装目录的 `settings.env` 中，升级时保留；环境变量中已设置的值优先。
+用 `~/bubblefighter-fantasy/bff` 启动服务器，然后在服务器本机上打开 `http://127.0.0.1:7300/`。在终端中不带选项运行时，安装脚本会先询问安装方式（直接安装或 Docker；选择 Docker 时询问是否安装 Docker、是否附带数据库容器；以 root 运行时询问是否创建 systemd 服务，否则询问是否立即启动），再询问是否允许其他机器打开 WebUI（默认是，`--remote-admin`），允许时再询问首次运行向导是否需要安装令牌（默认否，`--setup-token`）。命令行中给出任何选项都会跳过关于安装方式的问题。从其他电脑访问时，可以不开放任何端口，通过隧道打开：`ssh -L 7300:127.0.0.1:7300 <user>@<server>`，然后打开 `http://127.0.0.1:7300/`；也可以在防火墙或云安全组中放行 TCP 7300 后打开 `http://<server>:7300/`。第一个管理员创建之前，任何能访问该端口的人都能完成设置，所以请尽快完成。这些选择保存在安装目录的 `settings.env` 中，升级时保留；环境变量中已设置的值优先。
 
-选项写在 `bash -s --` 之后，例如 `curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash -s -- --service`：
+选项写在 `bash -s --` 之后，例如 `curl -fsSL https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest/download/install.sh | bash -s -- --service`：
 
 | 选项 | 作用 |
 | --- | --- |
 | `--version <tag>` | 安装指定版本而不是最新版本 |
 | `--dir <path>` | 安装目录 |
 | `--admin-port <n>` | 安装向导与 WebUI 的端口（默认 7300） |
-| `--remote-admin` | 允许其他机器打开 WebUI；不加时 WebUI 只接受服务器本机 |
+| `--remote-admin` / `--local-admin` | 允许其他机器打开 WebUI（默认）/ 只接受服务器本机 |
 | `--setup-token` | 生成首次运行向导要求输入的令牌，安装脚本会打印它 |
-| `--local-admin`、`--no-setup-token` | 明确指定默认值 |
+| `--no-setup-token` | 明确指定默认值 |
 | `--no-prompt` | 不提问，使用给出的选项和默认值（没有终端时也是如此） |
 | `--service` | 以 root 运行时：创建并启动 `bubblefighter-fantasy` systemd 服务，以 `bff` 系统用户运行 |
 | `--start` | 安装完成后启动服务器 |
+| `--docker` | 用 Docker Compose 运行服务器（见下文） |
+| `--install-docker` | 以 root 运行时：缺少时用 Docker 官方脚本安装 Docker Engine 与 Compose 插件；隐含 `--docker` |
 | `--no-runtime` | 缺少运行时时直接失败，而不是安装它 |
 | `--from <dir>` | 从存放版本文件的目录安装，不下载 |
 
@@ -105,15 +138,15 @@ curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash
 ### Docker 一键安装
 
 ```bash
-curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash -s -- --docker
+curl -fsSL https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest/download/install.sh | bash -s -- --docker
 ```
 
-需要 Docker Engine 与 Compose 插件。安装脚本会把 Linux 程序包解压到 `~/bubblefighter-fantasy/docker`，用它构建本地镜像，并通过 Docker Compose 启动服务器容器。容器使用主机网络，因此你选择的客户端所用的游戏端口都可以访问。默认不启动数据库容器：在安装向导中选择 SQLite（数据文件保存在 `bff-state` 卷中），或填写已有的 MySQL 服务器。
+以 root 运行并加上 `--install-docker` 时，安装脚本会先用 Docker 官方脚本安装 Docker Engine 与 Compose 插件，并启用 docker 服务。需要 Docker Engine 与 Compose 插件。安装脚本会把 Linux 程序包解压到 `~/bubblefighter-fantasy/docker`，用它构建本地镜像，并通过 Docker Compose 启动服务器容器。容器使用主机网络，因此你选择的客户端所用的游戏端口都可以访问。默认不启动数据库容器：在安装向导中选择 SQLite（数据文件保存在 `bff-state` 卷中），或填写已有的 MySQL 服务器。
 
 如需同时运行内置数据库，请加上 `--with-mysql`。新建的部署使用 MariaDB 11.4，服务器把它当作 MySQL 使用；用 MySQL 8.4 创建的旧部署在升级时保留 MySQL，因为 MariaDB 无法打开它的数据：
 
 ```bash
-curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash -s -- --docker --with-mysql
+curl -fsSL https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest/download/install.sh | bash -s -- --docker --with-mysql
 ```
 
 此时 MySQL 只监听 `127.0.0.1:3306`（可用 `--mysql-port` 修改），生成的 `.env` 保存随机生成的数据库密码，只有其所有者可以读取。在安装向导中选择 MySQL，主机填 `127.0.0.1`，端口填安装脚本输出的端口，数据库 `bf_game_db`，用户 `bff`，密码为 `~/bubblefighter-fantasy/docker/.env` 中 `BFF_MYSQL_PASSWORD` 的值。

@@ -25,10 +25,12 @@
     id: dialect.messages
     config:
       present_box: true
+      cash_inbox: true
 - set:
     id: shop
     config:
       present_box: true
+      cash_inbox: true
 
 # cn-774 sub_89E020 / cn-774 sub_8D7D20 establish the score-unit request and point delta.
 - set:
@@ -73,3 +75,30 @@
     id: ingame
     config:
       plaza_recruitment: true
+
+# The clan window: the clan bundle mounts the row on the game listener's protocol and this option binds the
+# game-connection clan routes (packets/clan.yaml); the pair lands together, as on kr-1256.
+- set:
+    id: dialect.messages
+    config:
+      clan: true
+# Like kr-1256, this build asks for a clan passport on every clan-server hello, so none is sent unasked.
+- set:
+    id: clan
+    config:
+      passport_on_login: false
+
+# The Mysterystore (packets/mystery-store.yaml, packets/builds.yaml mystery_store). The coin is item 100386, this build's
+# Magic Coin (魔法币), and the offers are the 115 StockSets that cn-774's ShopItem2 workbook files under the Mystery main
+# category and that are off sale in the ordinary shop (15 more Mystery-category sets are on sale there and stay out of the
+# pool). Prices, refresh cost and rotation are this server's economy; the client reads them from the reply.
+- set:
+    id: shop
+    config:
+      mystery_store:
+        coin_item_id: 100386
+        offers: ["2100682", "2110020-2110024", "2110090-2110096", "2110099-2110119", "2110168-2110181", "2110267-2110273", "2110507-2110513", "2111114-2111121", "2111330", "2111334-2111340", "2111486", "2111489-2111495", "2111658-2111659", "2111685-2111698", "2111790", "2112052", "2112264", "2112277", "2112389-2112390", "2112399", "2112521-2112522", "2112599", "2112603", "2112607", "2112615"]
+        offer_coin_price: 100
+        refresh_coin_cost: 10
+        rotation_seconds: 21600
+        group_stock_variants: false

@@ -1,0 +1,51 @@
+version: 1
+structs:
+  # kr-812 sub_512A80 builds gppSetAttribute; kr-812 sub_8416E0 / kr-812 sub_80A400 write/read four words.
+  # id-400 sub_795CF0 / id-400 sub_481C20 retain four words; kr-1256 sub_6E55F0 / kr-1256 sub_6EC3C0 use stream offsets.
+  CharacterAttributeSet:
+    - actor: u32
+      offset: 4
+      kr-1256:
+        - actor: u32
+          offset: 0
+    - attribute: u32
+      offset: 8
+      kr-1256:
+        - attribute: u32
+          offset: 4
+    - item: u32
+      offset: 12
+      # cn-324 sub_45F060 / cn-324 sub_6EB8B0 and cn-279 sub_4046D0 / cn-279 sub_405360 omit the item.
+      except: [cn-324]
+      kr-1256:
+        - item: u32
+          offset: 8
+    # kr-812 sub_717170 / kr-1256 sub_6EC3C0 consume this native state word; preserve all bits.
+    - unknown_16: u32
+      offset: 16
+      # cn-324 sub_470520 and cn-279 sub_81BA10 consume the third word, stored at packet object +12.
+      cn-324:
+        - unknown_12: u32
+          offset: 12
+      kr-1256:
+        - unknown_12: u32
+          offset: 12
+  # These modern readers have not been matched to the KR attribute stream.
+  CharacterAttributeSet@cn-774: []
+  CharacterAttributeSet@tw-454: []
+
+  # kr-812 sub_512950 builds gppResetChrAttr; kr-812 sub_840530 / kr-812 sub_6DB1B0 write/read two words.
+  # kr-1256 sub_6E54D0 / kr-1256 sub_6D55D0 dispatch to kr-1256 sub_48D3E0 for attribute-specific cleanup.
+  CharacterAttributeReset:
+    - actor: u32
+      offset: 4
+      kr-1256:
+        - actor: u32
+          offset: 0
+    - attribute: u32
+      offset: 8
+      kr-1256:
+        - attribute: u32
+          offset: 4
+  CharacterAttributeReset@cn-774: []
+  CharacterAttributeReset@tw-454: []

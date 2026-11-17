@@ -169,7 +169,8 @@ button, summary, a { touch-action:manipulation; }
 .install-tabs { display:inline-flex; align-items:center; gap:4px; padding:4px; border:1px solid var(--ff-line); border-radius:999px; background:var(--ff-soft); }
 .install-tabs button { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:38px; padding:0 18px; border:0; border-radius:999px; color:var(--ff-muted); background:transparent; font:500 13px var(--vp-font-family-base); cursor:pointer; transition:color .18s,background .18s,box-shadow .18s; }
 .install-tabs button[aria-selected='true'] { color:var(--ff-ink); background:var(--ff-paper); box-shadow:0 2px 7px rgba(20,30,40,.09); }
-.install-tabs button img { display:block; width:20px; height:20px; object-fit:contain; }
+.install-tabs button img, .install-tabs button svg { display:block; width:20px; height:20px; object-fit:contain; }
+.install-tabs button svg { width:16px; height:16px; }
 .dark .install-tabs button img { filter:invert(1); }
 .install-tabs button:focus-visible { outline-offset:1px; }
 .install-command-panel { margin-top:18px; }
@@ -209,7 +210,7 @@ button, summary, a { touch-action:manipulation; }
   .landing { padding:105px 18px 0; }.hero { padding:56px 0 44px; }.hero::before { inset:30px 0 76px; }.hero h1 { font-size:clamp(43px,14vw,69px); }.hero p { font-size:15px; }.hero-actions { flex-direction:column; align-items:stretch; margin-inline:24px; }.hero-actions a { justify-content:center; }
   .sdk-options { flex-direction:column; gap:8px; }
   .download-section { margin-top:32px; padding:30px 18px 20px; border-radius:18px; }.download-heading h2 { font-size:27px; }.download-heading p { font-size:13px; }.download-grid { grid-template-columns:1fr; gap:12px; margin-top:24px; }.download-card { padding:20px; }
-  .install-panel { min-height:640px; margin-top:26px; padding:60px 18px 48px; border-radius:18px; }.install-headline { font-size:clamp(35px,10vw,62px); gap:10px; }.install-controls { margin-top:30px; }.install-tabs { max-width:100%; }.install-tabs button { padding-inline:12px; font-size:12px; }.install-tabs button img { width:18px; height:18px; }.install-command-panel .noah-terminal-pre { padding:24px 18px; font-size:12px; }.install-guide { margin-top:20px; }
+  .install-panel { min-height:640px; margin-top:26px; padding:60px 18px 48px; border-radius:18px; }.install-headline { font-size:clamp(35px,10vw,62px); gap:10px; }.install-controls { margin-top:30px; }.install-tabs { max-width:100%; }.install-tabs button { padding-inline:12px; font-size:12px; }.install-tabs button img { width:18px; height:18px; }.install-tabs button svg { width:15px; height:15px; }.install-command-panel .noah-terminal-pre { padding:24px 18px; font-size:12px; }.install-guide { margin-top:20px; }
   .landing-cards { grid-template-columns:1fr; margin-top:30px; }.site-footer { flex-direction:column; gap:6px; }
 
 }
@@ -251,3 +252,9 @@ button, summary, a { touch-action:manipulation; }
 @media (max-width: 640px) { .launcher-card { grid-template-columns:1fr; } }
 .release-body h1, .release-body h2, .release-body h3 { margin:18px 0 8px; padding-top:0; border-top:0; font-size:15px; line-height:1.4; letter-spacing:0; }
 .release-body > :first-child { margin-top:0; }
+
+/* Tutorial pages use the full width beside the sidebar; the player needs room more than an outline. */
+.tutorial-frame { grid-template-columns:minmax(0,1080px); }
+.tutorial-document .document-heading { margin-bottom:16px; padding-bottom:14px; }
+.tutorial-document .document-heading h1 { font-size:26px; letter-spacing:-.02em; }
+@media (min-width:1680px) { .tutorial-frame { grid-template-columns:minmax(0,1200px); } }

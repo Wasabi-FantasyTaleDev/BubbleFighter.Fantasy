@@ -15,3 +15,18 @@
           # kr-1256 sub_109A880 bounds the original TileLayer vertices; kr-1256 sub_7AEBB0 adds the JSON offset later.
           tile_layer_minimum_x: 163.96731567382812
           tile_layer_maximum_z: 392.6912841796875
+        # The other native villages place their TileLayer at the same scene position (track.wb TileLayer node
+        # 282.0775, 168.0015, 290.3291) with the same 15 x 13 grid of 15.748 units in CustomMap.json, so the centre
+        # minus half the grid width and plus half its height reproduces the village06 bounds bit for bit.
+        - stage_directory: rel_bnb02_village11
+          tile_layer_minimum_x: 163.96731567382812
+          tile_layer_maximum_z: 392.6912841796875
+        - stage_directory: rel_bnb03_village101
+          tile_layer_minimum_x: 163.96731567382812
+          tile_layer_maximum_z: 392.6912841796875
+        - stage_directory: rel_bnb04_village102
+          tile_layer_minimum_x: 163.96731567382812
+          tile_layer_maximum_z: 392.6912841796875
+        - stage_directory: rel_bnb05_village103
+          tile_layer_minimum_x: 163.96731567382812
+          tile_layer_maximum_z: 392.6912841796875

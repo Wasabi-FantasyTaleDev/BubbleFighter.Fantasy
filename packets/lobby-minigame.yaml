@@ -1,82 +1,273 @@
 version: 1
-# The lobby-minigame sub-packet channel of the modern CN and TW builds. The stage gates read a
-# subcommand and dispatch into a per-key handler registry: cn-774 builds it in cn-774 sub_9D8810
-# (the LobbyMinigameContext constructor, RTTI SubPacketDispatchEntry1Impl entries) and dispatches
-# through cn-774 sub_9E52D0; tw-454 builds the same eight keys in its LobbyMinigameContext ctor and
-# dispatches the same way. The keys pair with the RTTI handler names Reply*@LmgProtocol and
-# *@LmgSync, so the request names below take their nouns from those handlers. The field meanings
-# inside each body are unknown; the layouts are pinned by the byte-length tests.
+# The lobby-minigame sub-packet channel of every build that has the plaza booths. kr-812 reads and writes it on
+# C2S/S2C 571 (the four request writers kr-812 sub_479090, kr-812 sub_46CA40, kr-812 sub_4795A0 and kr-812 sub_479660
+# stamp 571; the gate kr-812 sub_677210 hands S2C 571 to kr-812 sub_67D950 and S2C 572 to kr-812 sub_67D9E0, which
+# run the registered reader through kr-812 sub_465FC0 / kr-812 sub_4660C0 -> kr-812 sub_46B910) and C2S/S2C 572
+# (the animation writers kr-812 sub_46CFF0, kr-812 sub_4796D0, kr-812 sub_46D080 and kr-812 sub_46D110). kr-1256
+# uses 551 and 552 for the same bodies. The stage gates read a subcommand and dispatch into a per-key handler
+# registry: kr-812 builds it in kr-812 sub_4649E0 (the LobbyMinigameContext constructor, RTTI
+# SubPacketDispatchEntry1Impl entries); cn-774 builds it in cn-774 sub_9D8810 and dispatches through cn-774
+# sub_9E52D0; tw-454 builds the same eight keys in its LobbyMinigameContext ctor and dispatches the same way. The
+# keys pair with the RTTI handler names Reply*@LmgProtocol and *@LmgSync, so the request names below take their
+# nouns from those handlers. The field meanings inside each body are unknown unless named below; the layouts are
+# pinned by the byte-length tests. The named fields are kr-1256's: kr-1256 sub_845050 writes the configured
+# basketball price and the gauge's hit flag, kr-1256 sub_424570 packs the fishing terms (two flags, the configured
+# price, the day's catch count), kr-1256 sub_D66970 adds the hooked flag, and kr-1256 sub_D66DE0 writes the
+# configured fortune price and the paper it drew.
+# kr-1256 writes the same bodies (kr-1256 sub_D67580 basketball, kr-1256 sub_842600 fishing start, kr-1256
+# sub_D67720 rod lift, kr-1256 sub_D678A0 fortune, kr-1256 sub_D67400 sync; opcodes 551 and 552) and reads them in
+# its lobby stage kr-1256 sub_853CF0 (registry kr-1256 sub_83E1C0, replies kr-1256 sub_841B40, sync kr-1256
+# sub_8419E0). Where the two builds write the same body the structure below is stated once for kr-812; the
+# fishing start, rod lift and rod-lift reply differ and are restated for kr-1256. cn-774 and tw-454 follow kr-1256.
 structs:
-  # C2S 551 subcommand 1 pairs with the ReplyShootBasketball@LmgProtocol key. cn-774 sub_E32F70
-  # re-sends it periodically while the minigame runs; tw-454 sub_DC2290 does the same.
-  LmgBasketballRequest@kr-812: []
-  LmgBasketballRequest@cn-774:
+  # C2S 551 (kr-812 571) subcommand 1 pairs with the ReplyShootBasketball@LmgProtocol key. cn-774 sub_E32F70
+  # re-sends it periodically while the minigame runs; tw-454 sub_DC2290 does the same. kr-812 sub_4779E0 packs the
+  # shot for kr-812 sub_479090: the subcommand 1, config +66 as the displayed cost, the gauge's hit byte widened to
+  # u32 and a zero word.
+  LmgBasketballRequest:
     - subcmd: u16
       offset: 4
-    - unknown_6: u16
+    - displayed_cost: u16
       offset: 6
-    - unknown_8: u32
+    - hit: u32
       offset: 8
     - unknown_12: u32
       offset: 12
-  # C2S 551 subcommand 10 pairs with the ReplyStartFishing@LmgProtocol key. cn-774 sub_9DCAA0
+  # C2S 551 (kr-812 571) subcommand 10 pairs with the ReplyStartFishing@LmgProtocol key. cn-774 sub_9DCAA0
   # (packed writer cn-774 sub_47AE10) and tw-454 sub_637390 write the same 12-byte options block:
   # tw-454 sub_46C330 widens two bytes to u32, then writes two u16 values in that order.
-  LmgFishingStartRequest@kr-812: []
-  LmgFishingStartRequest@cn-774:
+  LmgFishingStartRequest:
     - subcmd: u16
       offset: 4
-    - unknown_6: u32
+    # kr-812 sub_466680 packs the cast: the byte widened to u32 is set when the player owns the item the
+    # configuration names (kr-812 sub_978140 on config +92), the price is config +78 or, with that byte set,
+    # config +80, and the count is the day's fish count at config +40. kr-812 sub_46CA40 writes these three after
+    # the subcommand and has no further word, unlike kr-1256's sender.
+    - second_price: u32
+      offset: 6
+    - displayed_cost: u16
+      offset: 10
+    - completed_count: u16
+      offset: 12
+  LmgFishingStartRequest@kr-1256:
+    - subcmd: u16
+      offset: 4
+    # kr-1256 sub_842600 writes this flag first and sends config +80 (fishing_second_cost) as the displayed cost
+    # when it is set, config +78 (fishing_cost) otherwise.
+    - second_price: u32
       offset: 6
     - unknown_10: u32
       offset: 10
-    - unknown_14: u16
+    - displayed_cost: u16
       offset: 14
-    - unknown_16: u16
+    - completed_count: u16
       offset: 16
-  # C2S 551 subcommand 11 pairs with the ReplyLiftFishingRod@LmgProtocol key. cn-774 sub_E34210
+  # C2S 551 (kr-812 571) subcommand 11 pairs with the ReplyLiftFishingRod@LmgProtocol key. cn-774 sub_E34210
   # and tw-454 sub_DC3380 write that options block, followed by one byte widened to u32.
-  LmgRodLiftRequest@kr-812: []
-  LmgRodLiftRequest@cn-774:
+  LmgRodLiftRequest:
     - subcmd: u16
       offset: 4
-    - unknown_6: u32
+    # kr-812 sub_478620 packs the lift for kr-812 sub_4795A0: the same cast terms as the fishing start (the
+    # byte-widened flag, config +78 or +80 as the displayed cost, config +40 as the day's count), then the hooked
+    # byte (the fish object's byte +142, kr-812 sub_478620) widened to u32 and a zero word.
+    - second_price: u32
       offset: 6
-    - unknown_10: u32
+    - displayed_cost: u16
       offset: 10
-    - unknown_14: u16
+    - completed_count: u16
+      offset: 12
+    - hooked: u32
       offset: 14
-    - unknown_16: u16
-      offset: 16
     - unknown_18: u32
       offset: 18
-  # C2S 551 subcommand 12 pairs with the ReplyFortune@LmgProtocol key. cn-774 sub_E34770 and
-  # tw-454 sub_DC3A70: the 64-bit pair is the client-state value the senders resolve.
-  LmgFortuneRequest@kr-812: []
-  LmgFortuneRequest@cn-774:
+  LmgRodLiftRequest@kr-1256:
     - subcmd: u16
       offset: 4
-    - unknown_6: u16
+    - second_price: u32
       offset: 6
-    - unknown_8: u64
+    - unknown_10: u32
+      offset: 10
+    - displayed_cost: u16
+      offset: 14
+    - completed_count: u16
+      offset: 16
+    - hooked: u32
+      offset: 18
+  # C2S 551 (kr-812 571) subcommand 12 pairs with the ReplyFortune@LmgProtocol key. cn-774 sub_E34770 and
+  # tw-454 sub_DC3A70: the 64-bit pair is the client-state value the senders resolve. kr-812 sub_478AE0 packs the
+  # request for kr-812 sub_479660 (which writes kr-812 sub_40DC80's u16, u64 and u32): config +98 as the displayed
+  # cost, the drawn paper, and a zero word; it sends it only while the stored paper (config +48) is zero.
+  LmgFortuneRequest:
+    - subcmd: u16
+      offset: 4
+    - displayed_cost: u16
+      offset: 6
+    - paper: u64
       offset: 8
     - unknown_16: u32
       offset: 16
-  # The C2S 552 state actions, subcommands 100, 101, 200 and 201 (ShootFire, ChangeState,
+  # The C2S 552 (kr-812 572) state actions: kr-812 sub_46CFF0 (100), kr-812 sub_4796D0 (101), kr-812 sub_46D080 (200)
+  # and kr-812 sub_46D110 (201) each write the u16 subcommand and one u32. Subcommands 100, 101, 200 and 201 (ShootFire, ChangeState,
   # CastFishing and LiftFishing@LmgSync): cn-774 sub_9E3240 / cn-774 sub_E34EC0 / cn-774 sub_9E3BF0 / cn-774 sub_9E3E80
   # and tw-454 sub_63D7E0 / tw-454 sub_DC41B0 / tw-454 sub_63E1A0 / tw-454 sub_63E430, each the u16 subcommand and one
   # u32 argument. The 552 senders are themselves the registered minigame handlers.
-  LmgSyncAction@kr-812: []
-  LmgSyncAction@cn-774:
+  LmgSyncAction:
     - subcmd: u16
       offset: 4
     - unknown_6: u32
       offset: 6
   # The S2C 552 state body: the gates read a u32 and a u16 into cn-774 sub_9F24C0 and
   # tw-454 sub_8A0CB0 before the per-key dispatch.
-  LmgSyncState@kr-812: []
-  LmgSyncState@cn-774:
+  LmgSyncState:
     - unknown_4: u32
       offset: 4
     - unknown_8: u16
+      offset: 8
+
+  # S2C 551 (kr-812 571) replies: the u16 subcommand, then the branch the key's reader takes. kr-812 sub_67D950
+  # reads the subcommand and hands the rest to the reader kr-812 sub_46D4C0 (basketball), kr-812 sub_46D5B0 (fishing
+  # start), kr-812 sub_46D660 (lift) or kr-812 sub_46D730 (fortune); kr-1256 sub_841B40 reads the
+  # subcommand and hands the rest to the registered reader. A reply that ends after the result word is the error
+  # (or plain) branch; the readers read the wallet and item words only for the result codes that carry them.
+  # Basketball (key 1): kr-1256 sub_84D7E0 reads the result, the wallet when the result is at least 10 and the
+  # prize item when it is 12; kr-1256 sub_849EC0 plays 10 miss, 11 hit and 12 item.
+  LmgReplyResult:
+    - subcmd: u16
+      offset: 4
+    - result: u32
+      offset: 6
+  LmgBasketballReplyWallet:
+    - subcmd: u16
+      offset: 4
+    - result: u32
+      offset: 6
+    - wallet: u32
+      offset: 10
+  LmgBasketballReplyItem:
+    - subcmd: u16
+      offset: 4
+    - result: u32
+      offset: 6
+    - wallet: u32
+      offset: 10
+    - item_id: u32
+      offset: 14
+  # Rod lift (key 11): kr-1256 sub_84D5E0 reads the result, then on success the paid amount, the wallet and the
+  # day's fish count, then one prize item (kr-1256 results 21 and 23) or two (22). kr-1256 sub_84AD60 consumes them.
+  # kr-812 reads the lift reply with kr-812 sub_40DC10 (through kr-812 sub_46D660): the result, then for results of
+  # 10 or more one u32 (kr-812 sub_46A630 stores it as the Lucci balance, dword_E82888 +120) and one u16 (the
+  # day's fish count, stored at config +40), then one item for results 11 and 13 and two for 12. There is no paid-out
+  # amount word as in kr-1256.
+  LmgRodLiftReplyCatch:
+    - subcmd: u16
+      offset: 4
+    - result: u32
+      offset: 6
+    - wallet: u32
+      offset: 10
+    - fishing_count: u16
+      offset: 14
+  LmgRodLiftReplyOneItem:
+    - subcmd: u16
+      offset: 4
+    - result: u32
+      offset: 6
+    - wallet: u32
+      offset: 10
+    - fishing_count: u16
+      offset: 14
+    - item_id: u32
+      offset: 16
+  LmgRodLiftReplyTwoItems:
+    - subcmd: u16
+      offset: 4
+    - result: u32
+      offset: 6
+    - wallet: u32
+      offset: 10
+    - fishing_count: u16
+      offset: 14
+    - item_id: u32
+      offset: 16
+    - item_id_2: u32
+      offset: 20
+  # kr-1256 sub_84D5E0 adds the paid-out amount before the balance.
+  LmgRodLiftReplyCatch@kr-1256:
+    - subcmd: u16
+      offset: 4
+    - result: u32
+      offset: 6
+    - paid: u32
+      offset: 10
+    - wallet: u32
+      offset: 14
+    - fishing_count: u16
+      offset: 18
+  LmgRodLiftReplyOneItem@kr-1256:
+    - subcmd: u16
+      offset: 4
+    - result: u32
+      offset: 6
+    - paid: u32
+      offset: 10
+    - wallet: u32
+      offset: 14
+    - fishing_count: u16
+      offset: 18
+    - item_id: u32
+      offset: 20
+  LmgRodLiftReplyTwoItems@kr-1256:
+    - subcmd: u16
+      offset: 4
+    - result: u32
+      offset: 6
+    - paid: u32
+      offset: 10
+    - wallet: u32
+      offset: 14
+    - fishing_count: u16
+      offset: 18
+    - item_id: u32
+      offset: 20
+    - item_id_2: u32
+      offset: 24
+  # Fortune (key 12): kr-1256 sub_84D4D0 always reads the result and the paper; result 10 adds the wallet and the
+  # prize item. kr-1256 sub_84B7D0 shows 0, 1, 2 and 9 as errors, 10 as paper plus item and 11 as paper only.
+  LmgFortuneReply:
+    - subcmd: u16
+      offset: 4
+    - result: u32
+      offset: 6
+    - paper: u64
+      offset: 10
+  LmgFortuneReplyItem:
+    - subcmd: u16
+      offset: 4
+    - result: u32
+      offset: 6
+    - paper: u64
+      offset: 10
+    - wallet: u32
+      offset: 18
+    - item_id: u32
+      offset: 22
+  # The S2C 552 (kr-812 572) notice with its value: kr-812 sub_67D9E0 reads the acting gamer (u32) and the
+  # subcommand (u16) and skips the local gamer; the visual readers kr-812 sub_46D410 and kr-812 sub_46D5B0 read one
+  # u32. kr-1256 sub_853CF0 reads the acting gamer (u32) and the subcommand (u16),
+  # skips the local gamer, and the key's reader (kr-1256 sub_84D8E0) reads one u32 value.
+  LmgSyncNotice:
+    - gamer: u32
+      offset: 4
+    - subcmd: u16
+      offset: 8
+    - value: u32
+      offset: 10
+  # S2C gspRepLmgUserRecord: the day's fish count and fortune paper. kr-812 sub_837170 case 133 -> kr-812
+  # sub_83A780 reads a u16 at +4 and a u64 at +8; kr-1256 sub_9D2FF0 case 142 reads the same two values and stores
+  # them in the minigame state, and the fortune booth sends a request only while that paper is zero
+  # (kr-1256 sub_D66DE0).
+  LmgUserRecord:
+    - fishing_count: u16
+      offset: 4
+    - paper: u64
       offset: 8

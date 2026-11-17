@@ -23,6 +23,9 @@ public sealed record RoomListEntry(int RoomId, string Name, string MasterNicknam
 {
     /// <summary>Gets whether the room has left the waiting phase and must display its active-match state.</summary>
     public bool MatchInProgress { get; init; }
+
+    /// <summary>Gets whether the room is a sponsor (<c>user_host</c>) prize room.</summary>
+    public bool IsUserHost { get; init; }
 }
 
 /// <summary>The lobby's open-room list sent in answer to <see cref="RoomListRequested"/>.</summary>

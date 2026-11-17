@@ -65,6 +65,9 @@ internal sealed class RoundResultSender : IMessageSender<RoundScoreUpdated>, IMe
     /// <summary>Gets whether the native scoreboard carries rewards in one publication.</summary>
     public bool SingleScoreboard => _maskedRows is not null;
 
+    /// <summary>Reports whether this sender's configured native result surface includes the requested mode.</summary>
+    public bool SupportsScoreboard(int modeId) => _fixedRows is not null || _scoreboardModes.Contains(modeId);
+
     /// <summary>Sends native live-score vectors, full-board restatements or separate team totals.</summary>
     public async ValueTask SendAsync(ISession session, RoundScoreUpdated message, CancellationToken ct)
     {

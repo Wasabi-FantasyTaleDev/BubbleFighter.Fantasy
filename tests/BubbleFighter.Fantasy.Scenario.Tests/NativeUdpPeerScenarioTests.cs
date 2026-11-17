@@ -369,7 +369,7 @@ public sealed class NativeUdpPeerScenarioTests
             Add("dialect.rooms", "dialect.rooms", new() { ["protocol"] = build + "/game", ["packets_directory"] = packets,
                 ["select_match_relay"] = true, ["udp_enabled"] = bypass, ["udp_protocol"] = bypass ? build + "/udp" : "" });
             Add("lobby", "lobby", new() { ["protocol"] = build + "/game", ["auto_create_players"] = true,
-                ["authentication"] = "open", ["inventory_source"] = "mysql", ["money_source"] = "mysql" });
+                ["authentication"] = "open", ["inventory_source"] = "mysql", ["money_source"] = "mysql", ["couples"] = false });
             Add("equipment", "equipment", new() { ["protocol"] = build + "/game", ["client_profile"] = build,
                 ["version_major"] = profile.ClientVersionMajor });
             Add("inventoryview", "inventoryview", new() { ["protocol"] = build + "/game", ["client_profile"] = build,

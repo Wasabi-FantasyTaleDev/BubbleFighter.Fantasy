@@ -44,7 +44,9 @@ public sealed partial class MatchActionRelayTests
         { 32782, 4, 0, false }, { 32783, 8, 4, false }, { 32786, 9, 0, false },
         { 32811, 8, 0, false }, { 32821, 6, 0, false }, { 32834, 8, 0, false },
         { 32884, 16, 0, false }, { 32907, 4, -1, true }, { 32925, 32, 0, false },
-        { 33286, 12, 0, false }, { 33301, 24, 16, false }, { 38284, 8, 0, false },
+        { 33286, 12, 0, false }, { 33301, 24, 16, false },
+        // gppSetWallHealAllowed_: kr-1256 sub_6D8832 applies the reporting character's healing permission.
+        { 38284, 8, 0, true },
     };
 
     [Theory]

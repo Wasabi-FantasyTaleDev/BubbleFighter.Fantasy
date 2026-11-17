@@ -196,6 +196,30 @@ internal sealed class TutorialHandler : IDisposable
         await SendTutorialSelectAsync(session, player, ct).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Handles <c>gcpReqGotoClan</c> (writer <c>cn-717 sub_44CE60</c>: the client's clan id as an i64, then its clan
+    /// name as a wstr), sent when the main menu's clan entry is clicked by a player who has a clan
+    /// (<c>cn-717 sub_44CF70</c>). The answer is the one-seat <c>gspGotoRoom</c> of the clan-scene kind, which moves
+    /// the client to its <c>ClanStage</c>; the room carries no mode or map.
+    /// </summary>
+    public async ValueTask HandleGotoClanAsync(ISession session, InboundPacket packet, CancellationToken ct)
+    {
+        var payload = packet.Payload.Span;
+        if (payload.Length < 12)
+            throw new PacketFormatException($"gcpReqGotoClan needs a clan id and a name; got {payload.Length} byte(s).", 0);
+        var characters = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload[8..]);
+        if (characters < 0 || payload.Length != 12 + 2L * characters)
+            throw new PacketFormatException($"gcpReqGotoClan names {characters} character(s) in {payload.Length} byte(s).", 8);
+        await ClearTutorialStateAsync(session, ct).ConfigureAwait(false);
+        var player = await ResolvePlayerAsync(session, ct).ConfigureAwait(false);
+        var table = _tables.Get(session.Profile.Id);
+        var body = RoomCodec.WriteSingleRoomEnvelope(player.Room, _packetTables, _build, _room, RoomCodec.ClanSceneKind);
+        await session.SendAsync(table.S2C("gspGotoRoom"), body, ct).ConfigureAwait(false);
+        player.Session.MoveTo(SessionPhase.Room);
+        _logger.LogInformation("Session {Id} clan scene: S2C gspGotoRoom kind {Kind} ({Bytes} bytes).",
+            session.Id, RoomCodec.ClanSceneKind, body.Length);
+    }
+
     // Opens the tutorial select scene: gspGotoRoom of the build's select kind with no tutorial mode or map.
     private async ValueTask SendTutorialSelectAsync(ISession session, PlayerContext player, CancellationToken ct)
     {

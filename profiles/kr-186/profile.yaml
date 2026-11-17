@@ -1,10 +1,12 @@
 id: kr-186
 display_names:
-  en: "Korea 2009-12-20"
-  zh-Hans: "韩服 2009-12-20"
-  zh-Hant: "韓國 2009-12-20"
-  ko: "한국 2009-12-20"
+  en: "Korea 2009-12-21"
+  zh-Hans: "韩服 2009-12-21"
+  zh-Hant: "韓國 2009-12-21"
+  ko: "한국 2009-12-21"
 client_build: kr:186:0
+# Not released: the WebUI does not list it among the clients to install. Set true to list it.
+setup_visible: false
 # Nearest build whose layouts this one reuses when it has no variant of its own.
 parent: cn-279
 description: Korean 2009 client, ClientVersion_Major 186 (kr-186 sub_676C80 writes 186 into gcpFirstConnect).

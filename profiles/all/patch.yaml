@@ -15,6 +15,8 @@
       ticket_seconds: ${BFF_LAUNCHER_TICKET_SECONDS:-600}
       host_policy: "${BFF_LAUNCHER_HOST_POLICY:-auto}"
       region: "${BFF_LAUNCHER_REGION:-}"
+      # The shared clan port (clan-gateway bundle), handed to builds with a clan connection.
+      clan_port: ${BFF_CLAN_PORT:-7400}
       # The all-builds deployment exposes the catalog through its configured reverse proxy.
       # Game endpoints are data; the launcher still decides whether to use native login.
       supports_instances: true

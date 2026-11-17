@@ -41,7 +41,7 @@ namespace BubbleFighter.Fantasy.Persistence.Memory;
 [Plugin("persistence.memory", Category = "storage", Names = ["en=Memory storage", "zh-Hans=内存存储", "zh-Hant=記憶體儲存", "ko=메모리 저장소"], 
     Description = "Bounded in-process persistence for deployments without a database. State resets on restart.",
     Provides = [
-        typeof(IClanStore),
+        typeof(IClanStore), typeof(BubbleFighter.Fantasy.Contracts.Clans.IClanDirectory),
         typeof(ICoupleStore),
         typeof(ILauncherAccountRepository),
         typeof(ILauncherSessionStore),
@@ -50,16 +50,18 @@ namespace BubbleFighter.Fantasy.Persistence.Memory;
         typeof(IInventoryRepository),
         typeof(IInventoryLoadoutStore), typeof(IPetMutationStore), typeof(IPetEntitlementStore), typeof(IItemEnhancementStore),
         typeof(IItemModificationStore), typeof(ILaboratoryInventoryStore), typeof(IRoundTitleMedalSettlementRepository),
-        typeof(IInventoryMetadataStore), typeof(ITitleMedalStore),
+        typeof(IInventoryMetadataStore), typeof(ITitleMedalStore), typeof(BubbleFighter.Fantasy.Contracts.MysteryStore.IMysteryStore),
         typeof(IPlayerWalletRepository),
         typeof(IPlayerRepository),
         typeof(IPlayerSettingsRepository),
         typeof(BubbleFighter.Fantasy.Contracts.Progress.IPlayerProgressRepository),
         typeof(BubbleFighter.Fantasy.Contracts.Progress.IPlayerBattleRecordsRepository),
-        typeof(BubbleFighter.Fantasy.Contracts.Progress.ITutorialStageStore), typeof(BubbleFighter.Fantasy.Contracts.Progress.ITutorialPracticeStore),
+        typeof(BubbleFighter.Fantasy.Contracts.Progress.ITutorialStageStore), typeof(BubbleFighter.Fantasy.Contracts.Progress.ITutorialPracticeStore), typeof(BubbleFighter.Fantasy.Contracts.Progress.IPlazaGameRecordStore),
         typeof(IPlayerInventoryState),
         typeof(IShopPurchaseStore),
         typeof(IPresentStore),
+        typeof(BubbleFighter.Fantasy.Contracts.CashInbox.ICashInboxStore),
+        typeof(BubbleFighter.Fantasy.Contracts.Rooms.IUserHostPrizeStore),
         typeof(IPlayerMovementState),
         typeof(BubbleFighter.Fantasy.Contracts.Messenger.IMessengerStore)])]
 public sealed class MemoryPersistencePlugin : IPlugin
@@ -75,6 +77,7 @@ public sealed class MemoryPersistencePlugin : IPlugin
         context.Effect(context.Services.Register<ILauncherAccountRepository>(new MemoryLauncherAccounts(options.MaxPlayers)));
         context.Effect(context.Services.Register<ILauncherSessionStore>(new MemoryLauncherSessions(options.MaxPlayers)));
         context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Progress.ITutorialStageStore>(new MemoryTutorialStages(options.MaxPlayers)));
+        context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Progress.IPlazaGameRecordStore>(new MemoryPlazaGameRecords(table)));
         context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Progress.ITutorialPracticeStore>(new MemoryTutorialPractice(options.MaxPlayers)));
         var players = new MemoryPlayerRepository(table);
         var presents = new MemoryPresentStore(table, players);
@@ -82,6 +85,7 @@ public sealed class MemoryPersistencePlugin : IPlugin
         context.Effect(context.Services.Register<IPlayerSettingsRepository>(settings));
         context.Effect(context.Services.Register<IShopSessionStore>(new MemoryShopSessionStore(table)));
         context.Effect(context.Services.Register<IClanStore>(new MemoryClanStore(table)));
+        context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Clans.IClanDirectory>(new MemoryClanDirectory()));
         context.Effect(context.Services.Register<ICoupleStore>(new MemoryCoupleStore(
             options.Couples.MaxRelationships, options.Couples.MaxPendingInvitations,
             options.Couples.MaxPendingPerAccount, options.Couples.MaxCompletedInvitations,
@@ -96,6 +100,7 @@ public sealed class MemoryPersistencePlugin : IPlugin
         context.Effect(context.Services.Register<IItemModificationStore>(inventory));
         context.Effect(context.Services.Register<ILaboratoryInventoryStore>(inventory));
         context.Effect(context.Services.Register<IInventoryMetadataStore>(inventory));
+        context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.MysteryStore.IMysteryStore>(inventory));
         context.Effect(context.Services.Register<ITitleMedalStore>(inventory));
         context.Effect(context.Services.Register<IPlayerWalletRepository>(new MemoryPlayerWalletRepository(table)));
         var progress = new MemoryPlayerProgressRepository(table, options.MaxBattleSettlementsPerPlayer, options.MaxBattleModesPerPlayer,
@@ -106,6 +111,8 @@ public sealed class MemoryPersistencePlugin : IPlugin
         context.Effect(context.Services.Register<IPlayerInventoryState>(new MemoryPlayerInventoryState(table)));
         context.Effect(context.Services.Register<IShopPurchaseStore>(new MemoryShopPurchaseStore(table, presents)));
         context.Effect(context.Services.Register<IPresentStore>(presents));
+        context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.CashInbox.ICashInboxStore>(new MemoryCashInboxStore(table)));
+        context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Rooms.IUserHostPrizeStore>(new MemoryUserHostPrizeStore(table)));
         context.Effect(context.Services.Register<IPlayerMovementState>(movement));
         context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Messenger.IMessengerStore>(new MemoryMessengerStore(options.MaxPlayers)));
 

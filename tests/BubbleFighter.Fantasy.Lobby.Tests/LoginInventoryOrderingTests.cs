@@ -107,6 +107,27 @@ public sealed class LoginInventoryOrderingTests
         Assert.Empty(await fixture.Store.ListSlotsAsync(fixture.User, InventoryBag.CharacterBag, 512, default));
     }
 
+    /// <summary>
+    /// id-1809's catalog has no 201001: a bag whose sidearm position is empty but owns 201003 and 201004 logs in
+    /// wearing the first owned sidearm instead of being refused.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RequiredPositionWithoutItsLegacyDefaultWearsAnOwnedItemThatFits(bool sqlite)
+    {
+        using var fixture = await Fixture.CreateAsync(sqlite);
+        int[] owned = [300001, 201003, 201004, 202004, 207001];
+        foreach (var bag in new[] { InventoryBag.CharacterBag, InventoryBag.EquippedBag })
+            await fixture.Store.ReplaceSlotsAsync(fixture.User, bag, owned.Select((id, index) =>
+                new InventorySlotRecord(fixture.User, bag, 20 + index, id, 1, (byte)(id == 201003 || id == 201004 ? 0 : 1))).ToArray(), default);
+
+        var (_, snapshot) = await LoginAsync(fixture.Store, fixture.User, seed: false);
+        Assert.Equal([201003, 202004, 207001, 300001],
+            snapshot.CharacterBag.Where(row => (row.Flags & 1) != 0).Select(row => row.ItemId).Order());
+        Assert.Equal(snapshot.CharacterBag, snapshot.EquippedBag);
+    }
+
     private static async Task<(IReadOnlyList<int> Expired, InventorySnapshot Snapshot)> LoginAsync(
         IInventoryRepository store, long user, bool seed = true)
     {

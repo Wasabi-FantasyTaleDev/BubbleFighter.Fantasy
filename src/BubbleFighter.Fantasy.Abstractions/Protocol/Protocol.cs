@@ -81,6 +81,9 @@ public enum OpcodeConnection
 
     /// <summary>Connectionless UDP datagrams; never inherits rows marked Both for the two TCP connections.</summary>
     Udp,
+
+    /// <summary>The clan-server TCP connection.</summary>
+    Clan,
 }
 
 /// <summary>

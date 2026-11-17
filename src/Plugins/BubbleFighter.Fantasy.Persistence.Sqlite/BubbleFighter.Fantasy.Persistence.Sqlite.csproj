@@ -3,6 +3,7 @@
     <Description>Bounded local SQLite persistence for independently managed server saves.</Description>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\..\Persistence.Shared\*.cs" Link="Shared\%(Filename)%(Extension)" />
     <ProjectReference Include="..\..\BubbleFighter.Fantasy.Contracts\BubbleFighter.Fantasy.Contracts.csproj" />
     <PackageReference Include="Microsoft.Data.Sqlite" />
     <PackageReference Include="SqlSugarCoreNoDrive" />

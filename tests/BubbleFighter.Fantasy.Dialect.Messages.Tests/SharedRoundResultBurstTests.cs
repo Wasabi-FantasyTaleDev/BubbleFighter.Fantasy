@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
@@ -187,13 +188,26 @@ public sealed class SharedRoundResultBurstTests
                     Assert.Equal(beforeIgnored, session.Sent.Count);
                 }
                 Assert.NotEmpty(session.Sent);
-                var digest = Convert.ToHexString(SHA256.HashData(Encoding.ASCII.GetBytes(
-                    string.Join('/', session.Sent.Select(frame => Convert.ToHexString(frame.Body))))));
                 var codes = string.Join(',', session.Sent.Select(frame => frame.Opcode - (remap ? 5000 : 0)));
                 var lengths = string.Join(',', session.Sent.Select(frame => frame.Body.Length));
                 var expected = PinnedBursts[build + ":" + variant];
                 Assert.Equal(expected.Codes, codes);
                 Assert.Equal(expected.Lengths, lengths);
+                var bodies = session.Sent.Select(frame => frame.Body).ToArray();
+                if (build == "kr-1256" && variant != "live")
+                {
+                    var scoreboard = bodies[1].ToArray();
+                    // kr-1256 sub_429620 stores these words at row +476; Beta and Localized Alpha have different wire lengths.
+                    // Pin their newly supplied awards, then retain the original digest for every other result byte.
+                    foreach (var offset in new[] { 187, 459 })
+                    {
+                        Assert.Equal(203001u, BinaryPrimitives.ReadUInt32LittleEndian(scoreboard.AsSpan(offset, sizeof(uint))));
+                        scoreboard.AsSpan(offset, sizeof(uint)).Clear();
+                    }
+                    bodies[1] = scoreboard;
+                }
+                var digest = Convert.ToHexString(SHA256.HashData(Encoding.ASCII.GetBytes(
+                    string.Join('/', bodies.Select(body => Convert.ToHexString(body))))));
                 Assert.Equal(expected.Digest, digest);
 
                 RoundScoreboard Board(bool rewards) => new(7, winner, totals,

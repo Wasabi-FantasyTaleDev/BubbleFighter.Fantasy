@@ -72,6 +72,62 @@ public sealed class RoomModeCommandTests
         await rig.Registry.StopAllAsync();
     }
 
+    [Fact]
+    public async Task AChangeWithoutAModeKeepsTheModeTheTitleForced()
+    {
+        // kr-186 sub_419210: the settings change carries no mode, so it reaches the room as KeepMode.
+        var rig = new RoomFlowTests.Rig();
+        var host = RoomFlowTests.Rig.Player(11, "host");
+        await rig.Flow.HandleCreateAsync(host, new RoomCreateRequested("#8#", "", 1, "rel_Village07_Easy02",
+            new RoomBuildSettings("test", new byte[] { 1 })), default);
+        await rig.Flow.HandleSettingsChangeAsync(host, new RoomSettingsChangeRequested(RoomSettingsChangeRequested.KeepMode, "",
+            new RoomBuildSettings("test", default, new byte[] { 9 })), default);
+        var room = rig.Registry.TryGet(host.Id)!;
+        Assert.Equal(8, room.ModeId);
+        Assert.Equal(8, room.BuildSettings!.Mode);
+        await rig.Registry.StopAllAsync();
+    }
+
+    [Fact]
+    public async Task AClientRestatingTheForcedModeKeepsIt()
+    {
+        // kr-186: '#8#' created from a mode 1 dialog; the client then sends mode 8, the mode the room reply carried.
+        var rig = new RoomFlowTests.Rig();
+        var host = RoomFlowTests.Rig.Player(11, "host");
+        await rig.Flow.HandleCreateAsync(host, new RoomCreateRequested("#8#", "", 1, "rel_Village07_Easy02",
+            new RoomBuildSettings("test", new byte[] { 1 })), default);
+        await rig.Flow.HandleSettingsChangeAsync(host,
+            new RoomSettingsChangeRequested(8, "", new RoomBuildSettings("test", default, new byte[] { 9 })), default);
+        var room = rig.Registry.TryGet(host.Id)!;
+        Assert.Equal(8, room.ModeId);
+        Assert.Equal(8, room.BuildSettings!.Mode);
+        await rig.Registry.StopAllAsync();
+    }
+
+    [Fact]
+    public async Task AClientRestatingItsDialogModeKeepsTheModeTheTitleForced()
+    {
+        var rig = new RoomFlowTests.Rig();
+        var host = RoomFlowTests.Rig.Player(11, "host");
+        await rig.Flow.HandleCreateAsync(host, new RoomCreateRequested("#8# room", "", 4, "rel_Village07_Easy02",
+            new RoomBuildSettings("test", new byte[] { 1 })), default);
+
+        // The client sends the mode its create dialog held right after entering.
+        await rig.Flow.HandleSettingsChangeAsync(host,
+            new RoomSettingsChangeRequested(4, "", new RoomBuildSettings("test", default, new byte[] { 9 })), default);
+        var room = rig.Registry.TryGet(host.Id)!;
+        Assert.Equal(8, room.ModeId);
+        Assert.Equal(8, room.BuildSettings!.Mode);
+        Assert.Equal(new byte[] { 9 }, room.BuildSettings.Change.ToArray());
+
+        // A mode the master really picks still wins.
+        await rig.Flow.HandleSettingsChangeAsync(host,
+            new RoomSettingsChangeRequested(3, "", new RoomBuildSettings("test", default, new byte[] { 7 })), default);
+        Assert.Equal(3, room.ModeId);
+        Assert.Null(room.BuildSettings!.Mode);
+        await rig.Registry.StopAllAsync();
+    }
+
     [Theory]
     [InlineData("!set")]
     [InlineData("!set abc")]

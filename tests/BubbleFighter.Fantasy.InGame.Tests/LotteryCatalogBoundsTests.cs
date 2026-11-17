@@ -37,6 +37,51 @@ public sealed class LotteryCatalogBoundsTests
         Assert.Throws<ConfigException>(() => LotteryCatalog.Validate(Bytes(document), [Prize()]));
     }
 
+    /// <summary>Every source accepts the inclusive limit and refuses the same workbook one byte above it.</summary>
+    [Fact]
+    public void ConfiguredByteLimitAppliesToEveryWorkbookSource()
+    {
+        var bytes = Bytes(Workbook());
+        var path = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllBytes(path, bytes);
+            var store = new BoundedStore(bytes);
+            LotteryCatalog.Validate(bytes, [Prize()], bytes.Length);
+            LotteryCatalog.Validate(path, [Prize()], bytes.Length);
+            LotteryCatalog.Validate(store, "Config/ShopItem2.xml", [Prize()], bytes.Length);
+            Assert.Equal(bytes.Length, store.OpenedWithLimit);
+            Assert.Throws<ConfigException>(() => LotteryCatalog.Validate(bytes, [Prize()], bytes.Length - 1));
+            Assert.Throws<ConfigException>(() => LotteryCatalog.Validate(path, [Prize()], bytes.Length - 1));
+            Assert.Throws<ConfigException>(() => LotteryCatalog.Validate(store, "Config/ShopItem2.xml", [Prize()], bytes.Length - 1));
+            Assert.Equal(1, store.Opens);
+        }
+        finally { File.Delete(path); }
+    }
+
+    /// <summary>Zero and negative parser limits cannot disable the XML or resource bounds.</summary>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void InvalidByteLimitIsRejected(int maximumBytes) =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => LotteryCatalog.Validate(Bytes(Workbook()), [Prize()], maximumBytes));
+
+    private sealed class BoundedStore(byte[] bytes) : BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore
+    {
+        internal long OpenedWithLimit { get; private set; }
+        internal int Opens { get; private set; }
+        public bool Exists(string path) => true;
+        public long Length(string path) => bytes.Length;
+        public byte[] Read(string path) => throw new InvalidOperationException("The workbook must be streamed.");
+        public Stream OpenRead(string path) => throw new InvalidOperationException("The stream must have a byte limit.");
+        public Stream OpenRead(string path, long maximumBytes)
+        {
+            OpenedWithLimit = maximumBytes;
+            Opens++;
+            return new MemoryStream(bytes, writable: false);
+        }
+    }
+
     private static LotteryItem Prize() => new() { ItemId = 100207, DisplayId = 1000920, Days = 3 };
 
     private static XDocument Workbook() => new(new XElement(Spreadsheet + "Workbook",

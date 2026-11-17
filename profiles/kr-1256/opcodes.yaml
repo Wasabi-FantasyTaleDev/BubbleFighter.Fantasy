@@ -64,6 +64,34 @@ opcodes:
     evidence: verified
     source: "kr-1256 sub_E881A0 stamps 932 and writes two bool32 values then two counted UTF-16 names from the invitation dialog kr-1256 sub_E83FE0; matched to kr-812 Packet_gcpReqCoupleInviteAnswer reader kr-812 sub_9FDE70 and dialog kr-812 sub_9FB200"
     notes: "Complete layout in packets/couple.yaml; no native couple handler is registered. Client names are not authenticated account identities."
+  - value: 930
+    direction: c2s
+    connection: game
+    name: gcpReqCoupleConfirmInvite
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_E880A0 stamps 930 and writes a bool32, a counted UTF-16 name, a u32 and a second counted name; its callers kr-1256 sub_E821B0 and kr-1256 sub_E81990 send it after a yes/no box. Matched to kr-812 C2S 934 Packet_gcpReqCoupleConfirmInvite (sender kr-812 sub_9FDC70), whose body adds the equipment record kr-1256 leaves out"
+  - value: 931
+    direction: c2s
+    connection: game
+    name: gcpReqCoupleInviteExpire
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_E849D0 stamps 931 and writes one bool32; matched to kr-812 C2S 935 Packet_gcpReqCoupleInviteExpire (sender kr-812 sub_9FBD20), one bool32"
+  - value: 933
+    direction: c2s
+    connection: game
+    name: gcpReqCoupleBreakUp
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_E86B50 stamps 933 after a Yes (257) answer of its confirmation box and writes one counted UTF-16 name; matched to kr-812 C2S 937 Packet_gcpReqCoupleBreakUp (sender kr-812 sub_9FDD50), one counted name"
+  - value: 945
+    direction: c2s
+    connection: game
+    name: gcpReqChangeCouplering
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 DlgCoupleItemChoice2 vtable 161E678 slot 66, sub_EA0430, sends selected owned invitation item then zero word with opcode 945 only when already coupled; matched to kr-812 Packet_gcpReqChangeCouplering in sub_4CC410"
   - value: 510
     direction: c2s
     connection: game
@@ -1034,6 +1062,20 @@ opcodes:
     evidence: captured
     source: "client 0x10F3990 -> 0x6F1180"
     notes: "32 bytes: i32 actor, u8 weapon slot, 6*u16 unknown0..5 (binary16), i32 unknown6, u8 unknown7, i32 unknown8, u32 unknown9, u16 unknown10"
+  - value: 33283
+    direction: c2s
+    connection: both
+    name: gppSmartPing_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_A3F3E0 (the character's ping input, 1000 ms local cooldown, ray to a world point) calls kr-1256 sub_6E9D40, which writes the character, the target object or -1, the ping kind, three hit-position floats and three unresolved words and sends them through kr-1256 sub_7AB190; its display reads the client's SmartPing resources (kr-1256 sub_A41940); packets/round-feed.yaml SmartPing"
+  - value: 33283
+    direction: s2c
+    connection: both
+    name: gppSmartPing_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_6D55D0 case 33283 runs kr-1256 sub_6FDFA0, which reads the nine words and passes them to kr-1256 sub_A40FC0 (native mode gates, 10000 ms marker); packets/round-feed.yaml SmartPing"
   - value: 33286
     direction: c2s
     connection: both
@@ -1066,22 +1108,54 @@ opcodes:
     evidence: captured
     source: "client 0x6F4EF0; writer 0x706840"
     notes: "24 bytes: i32 damager key, 3*f32 hit position, i32 owner actor, i32 target actor"
+  - value: 38278
+    direction: c2s
+    connection: both
+    name: gppResetChrAttr
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_6E54D0 writes and kr-1256 sub_48D3E0 consumes the attribute words; matched kr-812 Packet_gppResetChrAttr at kr-812 sub_512950 / kr-812 sub_5244C0"
+    notes: "8 bytes: u32 actor, u32 attribute; kr-1256 sub_7AA3D0 omits the local queued copy, so this route returns to its sender"
+  - value: 38278
+    direction: s2c
+    connection: both
+    name: gppResetChrAttr
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_6E54D0 writes and kr-1256 sub_48D3E0 consumes the attribute words; matched kr-812 Packet_gppResetChrAttr at kr-812 sub_512950 / kr-812 sub_5244C0"
+    notes: "8 bytes: u32 actor, u32 attribute; kr-1256 sub_7AA3D0 omits the local queued copy, so this route returns to its sender"
+  - value: 38279
+    direction: c2s
+    connection: both
+    name: gppSetAttribute
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_6E55F0 writes and kr-1256 sub_6EC3C0 consumes the attribute words; matched kr-812 Packet_gppSetAttribute at kr-812 sub_512A80 / kr-812 sub_518200"
+    notes: "16 bytes: u32 actor, u32 attribute, u32 item, u32 unknown_12; kr-1256 sub_7AA3D0 omits the local queued copy, so this route returns to its sender"
+  - value: 38279
+    direction: s2c
+    connection: both
+    name: gppSetAttribute
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_6E55F0 writes and kr-1256 sub_6EC3C0 consumes the attribute words; matched kr-812 Packet_gppSetAttribute at kr-812 sub_512A80 / kr-812 sub_518200"
+    notes: "16 bytes: u32 actor, u32 attribute, u32 item, u32 unknown_12; kr-1256 sub_7AA3D0 omits the local queued copy, so this route returns to its sender"
   - value: 38284
     direction: c2s
     connection: both
-    name: Unknown38284
-    name_source: none
-    evidence: captured
-    source: "client 0x6D8832"
-    notes: "8 bytes: i32 actor, bool32 unknown0 (render flag)"
+    name: gppSetWallHealAllowed_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_8EC3C0 writes the wall-contact permission through kr-1256 sub_7AB190"
+    notes: "8 bytes: u32 actor, bool32 allowed; native mode, delay and interval checks remain local"
   - value: 38284
     direction: s2c
     connection: both
-    name: Unknown38284
-    name_source: none
-    evidence: captured
-    source: "client 0x6D8832"
-    notes: "8 bytes: i32 actor, bool32 unknown0 (render flag)"
+    name: gppSetWallHealAllowed_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_6D55D0 at kr-1256 sub_6D8832 sets the permission read by kr-1256 sub_4EFBD0 and kr-1256 sub_482F70"
+    notes: "8 bytes: u32 actor, bool32 allowed; native mode, delay and interval checks remain local"
   - value: 505
     direction: c2s
     name: gcpRoomReqReadyStatus
@@ -1490,11 +1564,11 @@ opcodes:
     notes: "c2s_builders in dispatch export"
   - value: 128
     direction: c2s
-    name: gcpReqMatch
-    name_source: mirrored
+    name: gcpReqUserMysteryStore
+    name_source: label@cn-717
     evidence: verified
-    source: "kr-1256 sub_E651C0 stamps 128 and the request-object serializer kr-1256 sub_114E2E0 (vftable 0x163BDD8, RTTI RequestUserMysteryStore) writes a u8 type plus a u32 and a per-type tail before kr-1256 sub_961940 sends it; the senders are kr-1256 sub_E5F070 (type 1), kr-1256 sub_E64FC0 (type 2), kr-1256 sub_E33FD0 (type 3) and kr-1256 sub_E6CE80 (type 4). The reply S2C 128 opens DlgWaiting on result 0 exactly as the kr-812 gcpReqMatch to gspNotifyMatch pair does, so the kr-812 label mirrors"
-    notes: "Typed bodies live in packets/room-matching.yaml (kr-1256): type 1 match start, type 2 five-second keepalive, type 3 party join, type 4 listing enter. Distinct from the C2S 401..404 room-list family."
+    source: "kr-1256 sub_E651C0 stamps 128; kr-1256 sub_114E2E0 (RequestUserMysteryStore, vtable 0x163BDD8) writes u8 type/u32 token and a type-specific tail. kr-1256 sub_E5F070 sends type 1 to open/bootstrap; kr-1256 sub_930130 calls kr-1256 sub_E64FC0 for type 2 with remaining seconds from kr-1256 sub_E61E20; kr-1256 sub_E33FD0 sends type 3 with configured refresh coin cost; kr-1256 sub_E6CE80 sends type 4 with the selected Stock/StockSet ID and quoted coin price."
+    notes: "KR1256 bodies are 5/7/7/11 bytes in packets/mystery-store.yaml. The token is opaque echoed state; no generation or authorization semantics are assigned. S2C 148 gspRepUserMysteryStore is the reply; S2C 128 gspNotifyMatch remains a separate stage-gate notification."
     connection: game
   - value: 1500
     direction: c2s
@@ -1579,7 +1653,7 @@ opcodes:
     name_source: mirrored
     evidence: verified
     source: "Two stage handlers consume it outside the sub_9D2FF0 jumptable: MainMenuStage kr-1256 sub_8925A0 case 128, and the LobbyStage handler kr-1256 sub_853CF0 through kr-1256 sub_853E90 case 0x80. Both parse through kr-1256 sub_84F6C0 (u32 result, u32 unknown, wstr) and result 0 opens DlgWaiting (kr-1256 sub_8926C0 into kr-1256 sub_65B5A0, or kr-1256 sub_858250), which is the kr-812 sub_687640 gate's own semantics, so the kr-812 label mirrors"
-    notes: "Both-table miss resolved: the stage OnPacket handlers, not the main dispatcher, consume it. Pairs with C2S 128 gcpReqMatch; the body is RoomMatchNotification, identical to the kr-812 baseline."
+    notes: "Both-table miss resolved: the stage OnPacket handlers, not the main dispatcher, consume it. The body is RoomMatchNotification, identical to the kr-812 baseline; no kr-1256 request for it is identified (C2S 128 is gcpReqUserMysteryStore)."
   - value: 135
     direction: s2c
     name: gspRepEvent
@@ -1884,10 +1958,12 @@ opcodes:
     notes: "Empty reply sets the NPC completion state to 1."
   - value: 2027
     direction: c2s
-    name: Unknown2027
-    name_source: none
-    evidence: captured
-    notes: "six f32, i32 kind, i32 unknown0 (0 in every recording); 32 bytes; a drop the host round spawned; horde-wave family, HordeWaveWire"
+    connection: game
+    name: gcpReqCreateHordeAward
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_6E8D30 stamps 2027 and writes six f32, the constant 5 and one caller word, the body kr-812 sub_514B60 writes for Packet_gcpReqCreateHordeAward. Its one caller is the HordeModeMgr kill callback kr-1256 sub_7D61A0 (registered by kr-1256 sub_7C1050): outside modes 102 and 106, when kr-1256 sub_49DE00 accepts the victim, kr-1256 sub_7C5D90 resolves the victim to a mob and the killer to none, it reports the award drop at the victim's position"
+    notes: "32 bytes; the server picks the award kind and answers with gspGameCreateLucci kinds 3/4/5 (kr-1256 sub_6EFD00)"
   - value: 645
     direction: s2c
     connection: game
@@ -2130,7 +2206,8 @@ opcodes:
     name: gspRepUserMysteryStore
     name_source: label@kr-1256
     evidence: verified
-    source: "dispatcher sub_9D2FF0 jumptable case 148 stores \"gspRepUserMysteryStore\""
+    source: "kr-1256 sub_9D2FF0 case 148 names gspRepUserMysteryStore and calls kr-1256 sub_9CAC20. ReplyUserMysteryStore reader kr-1256 sub_114E4E0 (vtable 0x163BDFC) reads signed action/status bytes and a section mask: 0x01 config through kr-1256 sub_114E110, 0x02 countdown through kr-1256 sub_114E180, 0x04 counted Stock/StockSet rows through kr-1256 sub_114E820 and kr-1256 sub_114E220, and 0x08 purchased mask. It appends a u32 receipt Stock/StockSet ID only for action 4/status 0, independent of the mask."
+    notes: "packets/mystery-store.yaml separates the common UserMysteryStoreReply prefix from UserMysteryStorePurchaseTail. Header bytes preserve signed native bits as u8; config Boolean is four bytes, rows contain counted UTF-16 and explicit u16 coin prices. kr-1256 sub_114E600 rebuilds purchased state from this response's ordered row vector, so full purchased-state publication includes both 0x04 and 0x08."
   - value: 149
     direction: s2c
     name: gspRepUserBubblePointStore
@@ -2850,15 +2927,15 @@ opcodes:
     name: gspUserHostSetting
     name_source: label@kr-1256
     evidence: verified
-    source: "kr-1256 sub_9D2FF0 jumptable case 991 stores \"gspUserHostSetting\"; case kr-1256 0x9D5411 calls handler kr-1256 sub_9CBF50, which reads four words through stream slot +44"
-    notes: "four u32; their roles are unproven, so the table keeps unknown_0 to unknown_12."
+    source: "kr-1256 sub_9D2FF0 jumptable case 991 stores \"gspUserHostSetting\"; case kr-1256 0x9D5411 calls handler kr-1256 sub_9CBF50, which reads four u32 words (action, prize, min_prize, max_prize)"
+    notes: "four u32 words (action, prize, min_prize, max_prize); matches packets/user-settings.yaml UserHostSettingResponse@kr-1256."
   - value: 992
     direction: s2c
     name: gspUserHostDefaultSetting
     name_source: label@kr-1256
     evidence: verified
-    source: "kr-1256 sub_9D2FF0 jumptable case 992 stores \"gspUserHostDefaultSetting\"; the inline case kr-1256 0x9D542B reads two words and stores them at manager +0x380 and +0x384"
-    notes: "two u32; their roles are unproven, so the table keeps unknown_0 and unknown_4."
+    source: "kr-1256 sub_9D2FF0 jumptable case 992 stores \"gspUserHostDefaultSetting\"; the inline case kr-1256 0x9D542B reads two u32 words (min_prize, max_prize) into manager +0x380 and +0x384"
+    notes: "two u32 words (min_prize, max_prize); matches packets/user-settings.yaml UserHostDefaultSetting@kr-1256."
   - value: 996
     direction: s2c
     name: gspBingoData
@@ -2883,6 +2960,34 @@ opcodes:
     name_source: label@kr-1256
     evidence: verified
     source: "dispatcher sub_9D2FF0 jumptable case 1000 stores \"gspAfreeCaTv\""
+  - value: 551
+    direction: c2s
+    connection: game
+    name: gcpLmgRequest_
+    name_source: coined
+    evidence: verified
+    source: "the plaza booth senders kr-1256 sub_D67580 (subcommand 1, basketball), kr-1256 sub_842600 (10, fishing start), kr-1256 sub_D67720 (11, rod lift) and kr-1256 sub_D678A0 (12, fortune) stamp 551 and write the u16 subcommand first; no build has a label for the outer packet, the subcommands pair with the client's Reply*@LmgProtocol keys (kr-1256 sub_83E1C0); packets/lobby-minigame.yaml"
+  - value: 551
+    direction: s2c
+    connection: game
+    name: gspLmgReply_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_853CF0 case 551 reads the u16 subcommand and hands the rest to the registered reader through kr-1256 sub_841B40 (kr-1256 sub_84D7E0, sub_84D720, sub_84D5E0, sub_84D4D0); the reply is for the local gamer; packets/lobby-minigame.yaml"
+  - value: 552
+    direction: c2s
+    connection: game
+    name: gcpLmgSync_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_D67400 stamps 552 with the u16 subcommand (100 ShootFire, 101 ChangeState, 200 CastFishing, 201 LiftFishing@LmgSync) and one u32; packets/lobby-minigame.yaml LmgSyncAction"
+  - value: 552
+    direction: s2c
+    connection: game
+    name: gspLmgSyncState_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_853CF0 case 552 reads the acting gamer u32 and the u16 subcommand, skips the local gamer, and kr-1256 sub_8419E0 runs the key's reader (kr-1256 sub_84D8E0, one u32); packets/lobby-minigame.yaml LmgSyncNotice"
   - value: 1001
     direction: s2c
     connection: game
@@ -3416,20 +3521,20 @@ opcodes:
   - value: 656
     direction: s2c
     connection: game
-    name: gspGameCreateWeaponObject_
-    name_source: coined
+    name: gspGameCreateWeaponObject
+    name_source: label@cn-324
     evidence: verified
-    source: "kr-1256 sub_C1BBB0 constructs the WeaponObject from twelve u32 words"
-    notes: "Weapon object create notice"
+    source: "kr-1256 sub_6D55D0 case 656 runs kr-1256 sub_6ED290, which reads twelve u32 words and constructs the WeaponObject with kr-1256 sub_C1BBB0; matched to cn-324 sub_45C8F0 / cn-324 sub_471630 Packet_gspGameCreateWeaponObject; packets/object-economy.yaml WeaponCreateNotice"
+    notes: "48 bytes; cn-324's notice with the request's slot word added"
 
   - value: 657
     direction: s2c
     connection: game
-    name: gspPickUpWeapon_
-    name_source: coined
+    name: gspPickUpWeapon
+    name_source: label@cn-324
     evidence: verified
-    source: "kr-1256 sub_C1C400 reads two u32 words; the weapon pickup notice"
-    notes: "Weapon pickup notice"
+    source: "kr-1256 sub_6D55D0 case 657 runs kr-1256 sub_6ED460: [u32 weapon object] keys the room's weapon object map, [u32 actor] resolves the character (kr-1256 sub_6D3940); matched to cn-324 sub_408DF0 Packet_gspPickUpWeapon; packets/object-economy.yaml WeaponPickup"
+    notes: "8 bytes, weapon object first"
 
   - value: 922
     direction: c2s
@@ -3461,9 +3566,9 @@ opcodes:
     direction: c2s
     name: gcpUserHostSetting
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder kr-1256 sub_9DFC50 stamps 2032 and appends two words; name aligned from cn-717 C2S 2026 Packet_gcpUserHostSetting (label alignment; via cn-774 C2S 2030, run cn-717 C2S 2019..2026 -> 2023..2030, shape [4 4], similarity 1.0)"
-    notes: "two u32; kr-1256 sub_9731A0 and kr-1256 sub_973220 pass one and a stored member, kr-1256 sub_974530 passes two zeros and kr-1256 sub_968A50 passes two stored members, so the first word is a small selector but the roles are unproven; the table keeps unknown_0 and unknown_4."
+    evidence: verified
+    source: "builder kr-1256 sub_9DFC50 stamps 2032 and appends two u32 words; callers kr-1256 sub_974530 (0, 0), kr-1256 sub_9731A0 / kr-1256 sub_973220 (1, prize), and kr-1256 sub_968A50 (2/3, 0); name aligned from cn-717 C2S 2026 Packet_gcpUserHostSetting"
+    notes: "two u32 words (action, prize): 0 open edit dialog, 1 commit prize amount, 2 non-host query, 3 host query; matches packets/user-settings.yaml UserHostSettingRequest@kr-1256."
   - value: 2007
     direction: c2s
     connection: game
@@ -3635,13 +3740,54 @@ opcodes:
     evidence: verified
     source: "kr-1256 sub_9E2FE0 case 0x267 reads one byte and calls sub_9E9EF0 with its low bit"
     notes: "result close into the reward stage; u8, sent as zero"
+  - value: 519
+    direction: c2s
+    connection: game
+    name: gcpReqSelectAward
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_5E37E0 writes card then seat, matching kr-812 sub_840530 and the kr-812 sub_A02980 sender of gcpReqSelectAward."
+    notes: "Two u32 words, 8 bytes."
+  - value: 617
+    direction: s2c
+    connection: game
+    name: gspGameAwardDialog
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_9E2FE0 case 0x269 raises event 169 without reading a body; kr-1256 sub_7C1050 registers kr-1256 sub_7D1840, which creates DlgHordeAward through kr-1256 sub_5E1690 and resets it through kr-1256 sub_5E33C0. Matches the award-dialog event from kr-812 sub_7FBBB0."
+    notes: "Empty body; mode 101 uses the ten-card dialog."
+  - value: 618
+    direction: s2c
+    connection: game
+    name: gspHordeModeRewardList
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_9E2FE0 case 0x26A reads a counted u32 vector through kr-1256 sub_998FB0 and kr-1256 sub_999C00, matching kr-812 sub_840820; event 173 passes it to kr-1256 sub_7D2340."
+    notes: "Ten Stock/StockSet ids, 44 bytes; zero preserves an already selected card."
   - value: 620
     direction: s2c
-    name: Unknown620
-    name_source: none
+    connection: game
+    name: gspGameReturnAfterAward_
+    name_source: coined
     evidence: verified
-    source: "kr-1256 sub_9E2FE0 case 0x26C calls sub_9EA690 without reading the stream"
-    notes: "stage reset back to the waiting room; empty body"
+    source: "kr-1256 sub_9E2FE0 case 0x26C calls kr-1256 sub_9EA690 without reading the stream; that path restores room state 2 and raises event 170, whose kr-1256 sub_7D1D40 consumer frees the award dialog."
+    notes: "Empty body; one frame closes the award dialog and returns to the waiting room."
+  - value: 621
+    direction: s2c
+    connection: game
+    name: gspRepAwardSelectSuccess
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_9E1EB0 case 0x26D raises event 172 with card, seat and optional second card, consumed by kr-1256 sub_7D2230; matches the three-word kr-812 sub_7AA780/kr-812 sub_9D95D0 reader."
+    notes: "Three u32 words, 12 bytes; second_card is -1 when absent."
+  - value: 622
+    direction: s2c
+    connection: game
+    name: gspRepAwardSelectFail
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_9E1EB0 case 0x26E takes the empty award-selection failure arm beside the success arm, matching gspRepAwardSelectFail."
+    notes: "Empty body; the native arm reads no fields."
   - value: 625
     direction: c2s
     name: Unknown625
@@ -3791,6 +3937,14 @@ opcodes:
     source: "kr-1256 sub_940530 stamps 115 on the accept of the gspAskedInvitation prompt (sub_9A8DF0); kr-812 Packet_gcpReqMoveToInviter (sub_6DA4C0) carries the inviter and its NetAddress"
     notes: "wstr inviter, u32 ip, u16 port, u8 kind; only kind 1 accepts the prompt, kinds 0 and 2 come from sub_9A9710 and sub_9396F0"
     connection: game
+  - value: 828
+    direction: c2s
+    connection: game
+    name: gcpReqCashInven
+    name_source: label@kr-812
+    evidence: inferred
+    source: "kr-1256 sub_5F4C90 and kr-1256 sub_5F8A50 stamp C2S 828 with an empty body; matched to kr-812 gcpReqCashInven"
+    notes: "Requests a full refresh of the cash item inbox (gspCashInvenUpdateAllInventorySlot)."
   - value: 829
     direction: c2s
     connection: game
@@ -3800,33 +3954,34 @@ opcodes:
     source: "kr-1256 sender sub_9D79E0 stamps C2S 829 and writes one u32 from the purchase confirmation; matched to kr-812 Packet_gcpReqPickup reader sub_80A910 and sender sub_985660 by the one-word purchase pickup path"
     notes: "Game request only. The selected value is cash_slot_key in packets/cash-inventory.yaml. kr-1256 S2C 835 handler sub_9B2900 consumes the cash-slot key and result, then removes the cash slot through sub_8055F0 on result 1. No grant route is enabled by this row."
   # Clan requests. The clan plugin answers three client frames on the game connection; the numbers and the
-  # empty bodies are read from the client's own writers, so the assignment is verified. The names stay
-  # UnknownNNN because profiles/opcode-policy.md allows a client label, a matched other-build label or a
-  # coined name only when the client's own code proves the purpose: these frames are sent by a dialog click,
-  # a session start and an attendance card check-in, and no kr-1256 label, reader or handler says what the
-  # server is asked to do, so the purpose stays unproven and no name is invented. The body rows are
-  # ClanPassportRequest, Unknown2040Request and Unknown2041Request in packets/clan.yaml.
+  # empty bodies are read from the client's own writers, so the assignment is verified. C2S 25 is the passport
+  # request: the client sends it when the clan server's ClanHello arrives and forwards the passport it is
+  # answered with as its clan login. 2040 and 2041 stay UnknownNNN because profiles/opcode-policy.md allows a
+  # client label, a matched other-build label or a coined name only when the client's own code proves the
+  # purpose: they are sent by a dialog click, a session start and an attendance card check-in, and no kr-1256
+  # label, reader or handler says what the server is asked to do. The body rows are ClanPassportRequest,
+  # ClanMainOpenRequest and ClanAttendanceCheckInRequest in packets/clan.yaml.
   - value: 25
     direction: c2s
     connection: game
-    name: Unknown25
-    name_source: none
+    name: gcpReqClanPassport
+    name_source: label@kr-812
     evidence: verified
-    source: "kr-1256 sub_525170 case 0x3EA builds a Lambda::TcpPacket, stamps 25 and sends it on the game connection without a body; kr-812's C2S 25 is the labelled Packet_gcpReqClanPassport (kr-812 sub_498E70), but the kr-1256 send runs from the clan-server dispatcher, so no label is borrowed"
-    notes: "Empty body; the client writes no field. The clan plugin treats it as a clan-server bounce: it records the open and sends no frame."
+    source: "kr-1256 sub_525170 case 0x3EA (the clan connection's ClanHello) builds a Lambda::TcpPacket, stamps 25 and sends it on the game connection without a body; the answer S2C 21 gspClanPassport is forwarded as the clan login by kr-1256 sub_9D2FF0 case 21 -> kr-1256 sub_525DF0. Matched to kr-812 Packet_gcpReqClanPassport: kr-812 sub_498790 case 0x3EA calls its sender kr-812 sub_498E70 on the same clan hello, and kr-812 sub_819690 forwards the passport through kr-812 sub_498C30"
+    notes: "Empty body; the client writes no field. The clan plugin answers a logged-in session with gspClanPassport and sends nothing to a session that has not logged in."
   - value: 2040
     direction: c2s
     connection: game
-    name: Unknown2040
-    name_source: none
+    name: gcpReqClanMainOpen_
+    name_source: coined
     evidence: verified
     source: "kr-1256 sub_5A9410 stamps 2040 on an empty Lambda::TcpPacket when the DlgClanMain open is clicked; kr-1256 sub_516EE0 stamps the same empty frame during session start once its lookup of local key 196 finds an entry"
     notes: "Empty body. Both writers send on the game connection; the client code proves when it is sent, not what the server must answer."
   - value: 2041
     direction: c2s
     connection: game
-    name: Unknown2041
-    name_source: none
+    name: gcpReqClanAttendanceCheckIn_
+    name_source: coined
     evidence: verified
     source: "kr-1256 sub_57F010 stamps 2041 on an empty Lambda::TcpPacket from FrmClanAttendance only while the card word at +1468 is 1 and the request byte at +1452 is 0, and sets +1452 after the send"
     notes: "Empty body. The dialog proves the trigger, not the reply."
@@ -4642,10 +4797,11 @@ opcodes:
   - value: 2031
     direction: c2s
     connection: game
-    name: Unknown2031
-    name_source: none
+    name: gcpUserHostStart
+    name_source: label@kr-812
     evidence: verified
-    source: "kr-1256 sub_970590 stamps 2031 into an empty TcpPacket and sends it through kr-1256 sub_961940 after kr-1256 sub_9EE1B0 reports matching user counts and its dialog flag is set"
+    source: "kr-1256 sub_970590 stamps 2031 into an empty TcpPacket and sends it through kr-1256 sub_961940 when GameSession+148 (is_user_host) is set, teams match (kr-1256 sub_9EE1B0), ticket 101164/101859 is present, and prize dialog confirmation is set; matched to kr-812 C2S 2025 Packet_gcpUserHostStart"
+    notes: "empty body; prize-room start request answered by S2C 990 gspUserHostStart (kr-1256 sub_9CB9C0)."
   - value: 2083
     direction: c2s
     connection: game
@@ -4933,3 +5089,656 @@ opcodes:
     evidence: verified
     source: "kr-1256 sub_6D55D0 case 32902 dispatches to kr-1256 sub_6F0650, which read actor u32, weapon u16, six f32 values and two u32 words"
     notes: "packets/extreme-racing.yaml ExtremeRacingCannonShot; 38 bytes; the extreme_racing_cannon round_feed route (opt-in) forwards it once to the other initialized participants, never to the sender; no serial rewrite and no traffic schedule."
+  - value: 32878
+    direction: c2s
+    connection: both
+    name: gppSoccerModeGoal
+    name_source: label@cn-279
+    evidence: verified
+    source: "kr-1256 sub_6E6F90 (the soccer host's update) writes it; consumer kr-1256 sub_6D55D0 case 32878; kr-812 sub_514150 builds the same frame as Packet_gppSoccerModeGoal"
+    notes: "one byte, the index of the goal box the ball entered. The host executes it locally and relays it (packets/round-feed.yaml)."
+  - value: 32878
+    direction: s2c
+    connection: both
+    name: gppSoccerModeGoal
+    name_source: label@cn-279
+    evidence: verified
+    source: "kr-1256 sub_6E6F90 (the soccer host's update) writes it; consumer kr-1256 sub_6D55D0 case 32878; kr-812 sub_514150 builds the same frame as Packet_gppSoccerModeGoal"
+    notes: "one byte, the index of the goal box the ball entered. The host executes it locally and relays it (packets/round-feed.yaml)."
+  - value: 32879
+    direction: c2s
+    connection: both
+    name: gppSoccerModeCountDown
+    name_source: label@cn-279
+    evidence: verified
+    source: "kr-1256 sub_6E6F90 (the soccer host's update) writes it; consumer kr-1256 sub_6D55D0 case 32879; kr-812 sub_514150 builds the same frame as Packet_gppSoccerModeCountDown"
+    notes: "empty body; the receivers start the restart countdown. The host executes it locally and relays it (packets/round-feed.yaml)."
+  - value: 32879
+    direction: s2c
+    connection: both
+    name: gppSoccerModeCountDown
+    name_source: label@cn-279
+    evidence: verified
+    source: "kr-1256 sub_6E6F90 (the soccer host's update) writes it; consumer kr-1256 sub_6D55D0 case 32879; kr-812 sub_514150 builds the same frame as Packet_gppSoccerModeCountDown"
+    notes: "empty body; the receivers start the restart countdown. The host executes it locally and relays it (packets/round-feed.yaml)."
+  - value: 32880
+    direction: c2s
+    connection: both
+    name: gppSoccerModeContinueGame
+    name_source: label@cn-279
+    evidence: verified
+    source: "kr-1256 sub_6E6F90 (the soccer host's update) writes it; consumer kr-1256 sub_6D55D0 case 32880; kr-812 sub_514150 builds the same frame as Packet_gppSoccerModeContinueGame"
+    notes: "empty body; the receivers resume play. The host executes it locally and relays it (packets/round-feed.yaml)."
+  - value: 32880
+    direction: s2c
+    connection: both
+    name: gppSoccerModeContinueGame
+    name_source: label@cn-279
+    evidence: verified
+    source: "kr-1256 sub_6E6F90 (the soccer host's update) writes it; consumer kr-1256 sub_6D55D0 case 32880; kr-812 sub_514150 builds the same frame as Packet_gppSoccerModeContinueGame"
+    notes: "empty body; the receivers resume play. The host executes it locally and relays it (packets/round-feed.yaml)."
+  - value: 33293
+    direction: c2s
+    connection: both
+    name: gppSetCharEffectVisible_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_4A2180 (Lua SetCharEffectVisibleBySync) calls kr-1256 sub_6E0AF0, which stamps 33293 with the character, a counted UTF-16 effect path and the visibility word and sends it through kr-1256 sub_7AB190; packets/round-feed.yaml CharacterEffectVisible"
+  - value: 33293
+    direction: s2c
+    connection: both
+    name: gppSetCharEffectVisible_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_6D55D0 case 33293 runs kr-1256 sub_6E15C0, which reads the character, the effect path and the visibility word and shows or hides the effect; packets/round-feed.yaml CharacterEffectVisible"
+  - value: 34275
+    direction: c2s
+    connection: both
+    name: Unknown34275
+    name_source: none
+    evidence: verified
+    source: "kr-1256 sub_6E8050 builds 34275 with kr-1256 sub_708EC0 (character, two bytes, counted byte blob) from character skill routines and sends it through kr-1256 sub_7AB190; packets/round-feed.yaml Unknown34275"
+  - value: 34275
+    direction: s2c
+    connection: both
+    name: Unknown34275
+    name_source: none
+    evidence: verified
+    source: "kr-1256 sub_6D97D0 reads the character, two bytes and the counted blob and passes them to kr-1256 sub_6E82A0; packets/round-feed.yaml Unknown34275"
+  - value: 34276
+    direction: c2s
+    connection: both
+    name: Unknown34276
+    name_source: none
+    evidence: verified
+    source: "kr-1256 sub_6E8130 stamps 34276 with the character, one byte and a counted byte blob and sends it through kr-1256 sub_7AB190; packets/round-feed.yaml Unknown34276"
+  - value: 34276
+    direction: s2c
+    connection: both
+    name: Unknown34276
+    name_source: none
+    evidence: verified
+    source: "kr-1256 sub_6D97D0 reads the character, one byte and the counted blob, resolves the Character and applies the blob; packets/round-feed.yaml Unknown34276"
+  # The clan-server connection (connection: clan): a separate TCP socket with its own 4-byte frame and
+  # per-frame cipher (kr-1256 sub_1114A80, kr-1256 sub_11143A0). One generic NxPacket class carries the whole
+  # space and no build labels any packet on it, so every name here is coined and plain (profiles/opcode-policy.md).
+  # Bodies are in packets/clan-server.yaml.
+  - value: 1002
+    direction: s2c
+    connection: clan
+    name: ClanHello
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x3EA reads no field and sends the empty game-connection gcpReqClanPassport (C2S 25) when the game connection exists"
+    notes: "Empty body. Sent when the connection opens and again on every heartbeat until the connection has logged in, because the client can only answer once its game connection is logged in."
+  - value: 1003
+    direction: c2s
+    connection: clan
+    name: ClanHeartbeat
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525050 stamps 1003 through kr-1256 sub_1114A10 and sends it without a body every 3000 ms while the connection is up"
+    notes: "Empty body."
+  - value: 1005
+    direction: c2s
+    connection: clan
+    name: ClanLogin
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525DF0 stamps 1005 and writes the passport it was handed by kr-1256 sub_9D2FF0 case 21: a word, a NUL-terminated wide string (kr-1256 sub_1114AF0), two words, a byte count and the bytes"
+    notes: "Body ClanServerLogin. Every field is the server's own gspClanPassport echoed back."
+  - value: 1006
+    direction: s2c
+    connection: clan
+    name: ClanLoginResult
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x3EE reads one word: 1 requests the clan home (kr-1256 sub_526E90) and sets the logged-in byte at +65625; -1 and -2 open a notice through kr-1256 sub_51AC70 (authentication not completed, login failed); any other value is ignored"
+    notes: "Body ClanServerLoginResult."
+  - value: 1015
+    direction: c2s
+    connection: clan
+    name: ClanHomeRequest
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_526E90 stamps 1015 and sends it without a body; called when the login result is 1 (kr-1256 sub_525170 case 0x3EE) and after the create result 1 (kr-1256 sub_517FE0)"
+    notes: "Empty body."
+  - value: 1016
+    direction: s2c
+    connection: clan
+    name: ClanHome
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x3F8 -> kr-1256 sub_526330 reads a byte, two words, a NUL-terminated wide string and 8 bytes, and stores them through kr-1256 sub_51A3A0"
+    notes: "Body ClanServerHome."
+  - value: 1017
+    direction: c2s
+    connection: clan
+    name: ClanProfileRequest
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_526F50 stamps 1017 and sends it without a body; called by kr-1256 sub_526330 when the home's first byte is non-zero"
+    notes: "Empty body."
+  - value: 1018
+    direction: s2c
+    connection: clan
+    name: ClanProfile
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x3FA -> kr-1256 sub_5268A0 reads sixteen fields and stores them through kr-1256 sub_51A5F0"
+    notes: "Body ClanServerProfile."
+  - value: 1027
+    direction: c2s
+    connection: clan
+    name: ClanCreate
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_5275B0 stamps 1027 and writes a wide string, a word, a wide string and two words; called from the create dialog (kr-1256 sub_5C3740)"
+    notes: "Body ClanServerCreate."
+  - value: 1028
+    direction: s2c
+    connection: clan
+    name: ClanCreateResult
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x404 reads three words and calls kr-1256 sub_517FE0, which switches on the first (1, 2, -100 to -105)"
+    notes: "Body ClanServerCreateResult."
+  - value: 1011
+    direction: c2s
+    connection: clan
+    name: ClanRosterRequest
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_527890 stamps 1011 and sends it without a body (callers kr-1256 sub_5A9410, kr-1256 sub_5B55A0)"
+    notes: "Empty body."
+  - value: 1012
+    direction: s2c
+    connection: clan
+    name: ClanRoster
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x3F4 -> kr-1256 sub_52B4B0 reads a count, then an id, a wide string and three words per member into 40-byte records"
+    notes: "Body ClanServerRoster."
+  - value: 1013
+    direction: c2s
+    connection: clan
+    name: ClanMemberDetailsRequest
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_527910 stamps 1013 and writes one word, always 1 (callers kr-1256 sub_51A830, kr-1256 sub_5A9410)"
+    notes: "Body ClanServerMemberDetailsRequest."
+  - value: 1014
+    direction: s2c
+    connection: clan
+    name: ClanMemberDetails
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x3F6 -> kr-1256 sub_52C010 skips a word, reads a count at offset 4, then per member an id, a wide string and the rest of a 96-byte record"
+    notes: "Body ClanServerMemberDetails."
+  - value: 1045
+    direction: c2s
+    connection: clan
+    name: ClanMemberReport
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_527AB0 stamps 1045 and writes two words passed by kr-1256 sub_517E70"
+    notes: "Body ClanServerMemberReport."
+  - value: 1019
+    direction: c2s
+    connection: clan
+    name: ClanSearch
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_526020 stamps 1019 and writes two words and a wide string: the search dialog's mode, page and text (kr-1256 sub_57BA90)"
+    notes: "Body ClanServerSearch."
+  - value: 1020
+    direction: s2c
+    connection: clan
+    name: ClanSearchResult
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x3FC -> kr-1256 sub_5290A0 reads a count, two words, a wide string, then per clan the fields kr-1256 sub_57CFE0 shows in the search list"
+    notes: "Bodies ClanServerSearchResult and ClanServerSearchEntry."
+  - value: 1032
+    direction: c2s
+    connection: clan
+    name: ClanApply
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_527010 stamps 1032 and writes a word and a wide string: the selected search row's clan id and name (sender kr-1256 sub_57BA90)"
+    notes: "Body ClanServerApply."
+  - value: 1033
+    direction: c2s
+    connection: clan
+    name: ClanJoin
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_527130 stamps 1033 and writes a word and two wide strings: the row's clan id and name and the sender's nickname; kr-1256 sub_57BA90 sends it instead of 1032 for a row whose recruitment word is 2"
+    notes: "Body ClanServerJoin."
+  - value: 1034
+    direction: s2c
+    connection: clan
+    name: ClanApplyResult
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x40A -> kr-1256 sub_52E2A0 reads three words and a wide string for kr-1256 sub_51F920, which shows one notice per result"
+    notes: "Body ClanServerApplyResult."
+  - value: 1063
+    direction: c2s
+    connection: clan
+    name: ClanCancelApplication
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_527250 stamps 1063 and writes one word, the clan id applied to (sender kr-1256 sub_57BA90)"
+    notes: "Body ClanServerCancelApplication."
+  - value: 1064
+    direction: s2c
+    connection: clan
+    name: ClanCancelApplicationResult
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x428 reads two words for kr-1256 sub_5201C0, which on 1 shows the cancel notice and clears the stored clan"
+    notes: "Body ClanServerCancelApplicationResult."
+  - value: 1069
+    direction: c2s
+    connection: clan
+    name: ClanApplicantsRequest
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_5279B0 stamps 1069 and sends it without a body"
+    notes: "Empty body."
+  - value: 1070
+    direction: s2c
+    connection: clan
+    name: ClanApplicants
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x42E -> kr-1256 sub_52C750 reads a count, then per applicant an id, a wide string and the rest of a 64-byte record for kr-1256 sub_588480"
+    notes: "Bodies ClanServerApplicants and ClanServerApplicant."
+  - value: 1036
+    direction: c2s
+    connection: clan
+    name: ClanLeave
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_527DC0 stamps 1036 and sends it without a body"
+    notes: "Empty body."
+  - value: 1037
+    direction: s2c
+    connection: clan
+    name: ClanMemberLeft
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x40D -> kr-1256 sub_52E640 reads a wide string, a word, a wide string and two words and passes the last two swapped to kr-1256 sub_51D330 / kr-1256 sub_51EA80"
+    notes: "Body ClanServerMemberLeft."
+  - value: 1039
+    direction: c2s
+    connection: clan
+    name: ClanMemberChange
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_527B80 stamps 1039 and writes a word, a wide string and two words: a row's id, name, stored role and the new role"
+    notes: "Body ClanServerMemberChange."
+  - value: 1040
+    direction: s2c
+    connection: clan
+    name: ClanMemberChangeResult
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x410 -> kr-1256 sub_52D090 reads a word, a wide string and two words for kr-1256 sub_51E2C0, which shows one notice per result"
+    notes: "Body ClanServerMemberChangeResult."
+  - value: 1041
+    direction: s2c
+    connection: clan
+    name: ClanMemberChanged
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x411 -> kr-1256 sub_52CE70 reads a wide string, a word, a wide string and two words for kr-1256 sub_51D330 / kr-1256 sub_51EA80"
+    notes: "Body ClanServerMemberChanged."
+  - value: 1048
+    direction: c2s
+    connection: clan
+    name: ClanIntroductionEdit
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_527D30 stamps 1048 and writes a wide string, the introduction typed in the clan management dialog (kr-1256 sub_5BAC70)"
+    notes: "Body ClanServerIntroductionEdit."
+  - value: 1049
+    direction: s2c
+    connection: clan
+    name: ClanIntroductionEditResult
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x419 -> kr-1256 sub_52DC60 reads a word and a wide string; 1 stores the text at clan state +200"
+    notes: "Body ClanServerIntroductionEditResult."
+  - value: 1050
+    direction: s2c
+    connection: clan
+    name: ClanIntroductionChanged
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x41A -> kr-1256 sub_52E000 skips a word, reads a wide string and shows the introduction-changed notice"
+    notes: "Body ClanServerIntroductionChanged."
+  - value: 1051
+    direction: c2s
+    connection: clan
+    name: ClanNoticeEdit
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_527CA0 stamps 1051 and writes a wide string, the notice dialog's text (kr-1256 sub_5B82C0)"
+    notes: "Body ClanServerNoticeEdit."
+  - value: 1052
+    direction: s2c
+    connection: clan
+    name: ClanNoticeEditResult
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x41C -> kr-1256 sub_52D7A0 reads one word; -1 shows the forbidden-word notice"
+    notes: "Body ClanServerNoticeEditResult."
+  - value: 1053
+    direction: s2c
+    connection: clan
+    name: ClanNoticeChanged
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x41D -> kr-1256 sub_52DA40 reads a wide string, shows the notice-changed notice and stores it at clan state +176"
+    notes: "Body ClanServerNoticeChanged."
+  - value: 1096
+    direction: c2s
+    connection: clan
+    name: ClanMarkEdit
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_530C50 stamps 1096 and writes two words, the clan id and the chosen mark (sender kr-1256 sub_9CA450)"
+    notes: "Body ClanServerMarkEdit."
+  - value: 1097
+    direction: s2c
+    connection: clan
+    name: ClanMarkChanged
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x449 -> kr-1256 sub_5335F0 reads one word, stores it at clan state +224 and shows the mark-updated notice"
+    notes: "Body ClanServerMarkChanged."
+  - value: 1102
+    direction: c2s
+    connection: clan
+    name: ClanRecruitmentEdit
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_528460 stamps 1102 and writes two words, the clan id and the recruitment word (sender kr-1256 sub_51C750)"
+    notes: "Body ClanServerRecruitmentEdit."
+  - value: 1103
+    direction: s2c
+    connection: clan
+    name: ClanRecruitmentEditResult
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x44F reads three words; a non-zero second word stores the third at clan state +160"
+    notes: "Body ClanServerRecruitmentEditResult."
+  - value: 1054
+    direction: c2s
+    connection: clan
+    name: ClanTransferConfirm
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_528070 stamps 1054 and writes a word and a wide string; kr-1256 sub_52FB70 sends it after the member accepted"
+    notes: "Body ClanServerTransferConfirm."
+  - value: 1056
+    direction: s2c
+    connection: clan
+    name: ClanMasterChanged
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x420 -> kr-1256 sub_52E430 skips a word and reads two id and name pairs for kr-1256 sub_51A830"
+    notes: "Body ClanServerMasterChanged."
+  - value: 1057
+    direction: c2s
+    connection: clan
+    name: ClanTransferRequest
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_527F60 stamps 1057 and writes one word, the member offered the clan"
+    notes: "Body ClanServerTransferRequest."
+  - value: 1058
+    direction: s2c
+    connection: clan
+    name: ClanTransferRequestResult
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x422 -> kr-1256 sub_52F320 reads a byte and a word"
+    notes: "Body ClanServerTransferRequestResult."
+  - value: 1059
+    direction: s2c
+    connection: clan
+    name: ClanTransferOffer
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x423 -> kr-1256 sub_52F620 reads a wide string and a word and asks whether to accept"
+    notes: "Body ClanServerTransferOffer."
+  - value: 1060
+    direction: c2s
+    connection: clan
+    name: ClanTransferAnswer
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_52F620 stamps 1060 and writes a byte (accept) and the offer's word"
+    notes: "Body ClanServerTransferAnswer."
+  - value: 1061
+    direction: s2c
+    connection: clan
+    name: ClanTransferAnswerResult
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x425 -> kr-1256 sub_5300C0 reads one byte"
+    notes: "Body ClanServerTransferAnswerResult."
+  - value: 1062
+    direction: s2c
+    connection: clan
+    name: ClanTransferAnswered
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x426 -> kr-1256 sub_52FB70 reads a byte, a word and a wide string"
+    notes: "Body ClanServerTransferAnswered."
+  - value: 1029
+    direction: c2s
+    connection: clan
+    name: ClanDisband
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_528190 stamps 1029 and writes one word: 1 request a disband, 2 cancel it (sender kr-1256 sub_5BAC70)"
+    notes: "Body ClanServerDisband."
+  - value: 1030
+    direction: s2c
+    connection: clan
+    name: ClanDisbandResult
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x406 reads two words for kr-1256 sub_520680, which shows a failure notice per kind"
+    notes: "Body ClanServerDisbandResult."
+  - value: 1031
+    direction: s2c
+    connection: clan
+    name: ClanDisbandChanged
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x407 -> kr-1256 sub_52E860 reads two words and shows the disband scheduled or cancelled notice"
+    notes: "Body ClanServerDisbandChanged."
+  - value: 1021
+    direction: c2s
+    connection: clan
+    name: ClanBoardRequest
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_527360 stamps 1021 and writes two words, the page mode and a post-id cursor (senders kr-1256 sub_583F60, kr-1256 sub_584A80)"
+    notes: "Body ClanServerBoardRequest."
+  - value: 1022
+    direction: s2c
+    connection: clan
+    name: ClanBoard
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x3FE -> kr-1256 sub_5285B0 reads a count, two words and per post a word, a wide string, two words, a 16-bit flag, a date and a wide string"
+    notes: "Bodies ClanServerBoard and ClanServerBoardPost."
+  - value: 1023
+    direction: c2s
+    connection: clan
+    name: ClanBoardWrite
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_527430 stamps 1023 and writes a word and a wide string, the post (sender kr-1256 sub_51B600)"
+    notes: "Body ClanServerBoardWrite."
+  - value: 1024
+    direction: s2c
+    connection: clan
+    name: ClanBoardWriteResult
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x400 -> kr-1256 sub_528BD0 reads one word with a notice for -1 and -2"
+    notes: "Body ClanServerBoardWriteResult."
+  - value: 1025
+    direction: c2s
+    connection: clan
+    name: ClanBoardDelete
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_5274E0 stamps 1025 and writes the sender's id and a post id (sender kr-1256 sub_584750)"
+    notes: "Body ClanServerBoardDelete."
+  - value: 1026
+    direction: s2c
+    connection: clan
+    name: ClanBoardDeleted
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x402 reads no field and asks for the board again"
+    notes: "Empty body."
+  - value: 1042
+    direction: c2s
+    connection: clan
+    name: ClanWhisper
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_526160 stamps 1042 and writes a word, two wide strings and a byte: kind, target name, text, flag"
+    notes: "Body ClanServerWhisper."
+  - value: 1043
+    direction: s2c
+    connection: clan
+    name: ClanWhisperResult
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x413 -> kr-1256 sub_529D30 reads two words and three wide strings, with a notice per result"
+    notes: "Body ClanServerWhisperResult."
+  - value: 1044
+    direction: s2c
+    connection: clan
+    name: ClanWhisperMessage
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x414 -> kr-1256 sub_52A8A0 reads a word, three wide strings and a byte"
+    notes: "Body ClanServerWhisperMessage."
+  - value: 1066
+    direction: c2s
+    connection: clan
+    name: ClanChat
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_5282A0 stamps 1066 and writes the constant 2 and two wide strings, the sender's name and the line (sender kr-1256 sub_518F70)"
+    notes: "Body ClanServerChat."
+  - value: 1067
+    direction: s2c
+    connection: clan
+    name: ClanChatResult
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x42B -> kr-1256 sub_52EDC0 reads one word; 3 shows the forbidden-word notice"
+    notes: "Body ClanServerChatResult."
+  - value: 1068
+    direction: s2c
+    connection: clan
+    name: ClanChatMessage
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_525170 case 0x42C -> kr-1256 sub_52EFC0 reads two wide strings, the name and the line"
+    notes: "Body ClanServerChatMessage."
+
+  - value: 32829
+    direction: c2s
+    connection: both
+    name: gppHitByItem
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_496B80 writes three words; kr-1256 sub_6D55D0 at 0x6D7364 reads them for kr-1256 sub_496CF0; matched kr-812 Packet_gppHitByItem at kr-812 sub_512B20 / kr-812 sub_518350"
+    notes: "12 bytes: u32 actor, u32 item, u32 source; actor is the locally controlled healing recipient, source is the item user; peer-only"
+  - value: 32829
+    direction: s2c
+    connection: both
+    name: gppHitByItem
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_496B80 writes three words; kr-1256 sub_6D55D0 at 0x6D7364 reads them for kr-1256 sub_496CF0; matched kr-812 Packet_gppHitByItem at kr-812 sub_512B20 / kr-812 sub_518350"
+    notes: "12 bytes: u32 actor, u32 item, u32 source; actor is the locally controlled healing recipient, source is the item user; peer-only"
+  - value: 32831
+    direction: c2s
+    connection: both
+    name: gppEndFreezeCannon
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_B0B110 writes the cannon owner; kr-1256 sub_6D55D0 at 0x6D7479 clears its projection flag; matched kr-812 Packet_gppEndFreezeCannon at kr-812 sub_512D60 / kr-812 sub_518590"
+    notes: "4 bytes: u32 actor; ends the projection separately from removing the victim freeze attribute; peer-only"
+  - value: 32831
+    direction: s2c
+    connection: both
+    name: gppEndFreezeCannon
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_B0B110 writes the cannon owner; kr-1256 sub_6D55D0 at 0x6D7479 clears its projection flag; matched kr-812 Packet_gppEndFreezeCannon at kr-812 sub_512D60 / kr-812 sub_518590"
+    notes: "4 bytes: u32 actor; ends the projection separately from removing the victim freeze attribute; peer-only"
+  - value: 32932
+    direction: c2s
+    connection: both
+    name: gppStormCloudHit_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_705AA0 writes the surviving victim and source after damage; kr-1256 sub_6D55D0 at 0x6D7FFA reads both, then kr-1256 sub_4A5070 requests timed reaction state 121"
+    notes: "8 bytes: u32 actor, u32 source; actor is the controlled victim; source is not used after reading; peer-only"
+  - value: 32932
+    direction: s2c
+    connection: both
+    name: gppStormCloudHit_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_705AA0 writes the surviving victim and source after damage; kr-1256 sub_6D55D0 at 0x6D7FFA reads both, then kr-1256 sub_4A5070 requests timed reaction state 121"
+    notes: "8 bytes: u32 actor, u32 source; actor is the controlled victim; source is not used after reading; peer-only"
+  - value: 33280
+    direction: c2s
+    connection: both
+    name: gppTryRescued_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_6E40C0 writes victim u32, rescuer u32 and unknown_8 u8; kr-1256 sub_50A4D0 supplies the bubbled target then rescuer. The modern nine-byte request is distinct from the retained older gppTryRescued frame."
+  - value: 33280
+    direction: s2c
+    connection: both
+    name: gppTryRescued_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_6D97D0 case 0x8200 reads victim u32, rescuer u32 and unknown_8 u8 and calls victim virtual +640. kr-1256 sub_5103F0 checks local control and bubble state before kr-1256 sub_85CB70 emits the release report."

@@ -622,6 +622,13 @@ opcodes:
   name_source: label@cn-324
   evidence: inferred
   source: tw-410 stamps this class as cn-324 does; Packet_gcpReqCashInven class and opcode setter sub_91B110 in sender sub_7E6B80 (cn-324)
+- value: 828
+  direction: c2s
+  connection: game
+  name: gcpReqPickup
+  name_source: label@cn-324
+  evidence: verified
+  source: "tw-410 sub_809DD0 constructs Packet_gcpReqPickup::vftable and calls tw-410 sub_80B550, which stamps C2S 828 with one u32 cash_slot_key and matches cn-324 sub_8042F0"
 - value: 829
   direction: c2s
   name: gcpReqCloseGiftBox
@@ -775,15 +782,15 @@ opcodes:
 - value: 936
   direction: c2s
   name: gcpReqCoupleInviteExpire
-  name_source: label@cn-324
-  evidence: inferred
-  source: tw-410 stamps this class as cn-324 does; Packet_gcpReqCoupleInviteExpire class and opcode setter sub_91B110 in sender sub_404FF0 (cn-324)
+  name_source: label@tw-410
+  evidence: verified
+  source: "tw-410 sub_405050 stamps through sub_918A90; own Packet_gcpReqCoupleInviteExpire reader sub_589B30 consumes one bool32."
 - value: 939
   direction: c2s
   name: gcpReqCoupleBreakUp
-  name_source: label@cn-324
-  evidence: inferred
-  source: tw-410 stamps this class as cn-324 does; Packet_gcpReqCoupleBreakUp class and opcode setter sub_91B110 in sender sub_4050D0 (cn-324)
+  name_source: label@tw-410
+  evidence: verified
+  source: "tw-410 sub_405130 stamps through sub_918A90; own Packet_gcpReqCoupleBreakUp reader sub_6FDB60 consumes one name."
 - value: 941
   direction: c2s
   name: gcpResClientDamageData
@@ -800,8 +807,8 @@ opcodes:
   direction: c2s
   name: gcpSynthesisProcess
   name_source: label@cn-324
-  evidence: inferred
-  source: tw-410 stamps this class as cn-324 does; Packet_gcpSynthesisProcess class and opcode setter sub_91B110 in sender sub_8627F0 (cn-324)
+  evidence: verified
+  source: "tw-410 sub_860A20 constructs Packet_gcpSynthesisProcess (vtable 0xB2E4E4) and calls tw-410 sub_918A90(943); tw-410 sub_8601A0 writes the SynthesisProcessRequest it inherits from cn-324."
 - value: 1
   direction: s2c
   name: gspDisconnect
@@ -1290,45 +1297,45 @@ opcodes:
 - value: 938
   direction: s2c
   name: gspResCoupleInvite
-  name_source: label@cn-324
-  evidence: inferred
-  source: 'tw-410 stamps this class as cn-324 does; cn-324 dispatcher sub_714540 case 938: Packet_gspResCoupleInvite'
+  name_source: label@tw-410
+  evidence: verified
+  source: "tw-410 dispatcher sub_714F00 calls sub_712C40; own Packet_gspResCoupleInvite reader sub_6FCFB0 consumes bool32, three names, equipment and FighterInfo."
 - value: 939
   direction: s2c
   name: gspResCoupleInviteResult
-  name_source: label@cn-324
-  evidence: inferred
-  source: 'tw-410 stamps this class as cn-324 does; cn-324 dispatcher sub_714540 case 939: Packet_gspResCoupleInviteResult'
+  name_source: label@tw-410
+  evidence: verified
+  source: "tw-410 dispatcher sub_714F00 calls sub_712E80; own Packet_gspResCoupleInviteResult reader sub_6FD100 consumes a result word and name."
 - value: 940
   direction: s2c
   name: gspResCoupleInviteAnswer
-  name_source: label@cn-324
-  evidence: inferred
-  source: 'tw-410 stamps this class as cn-324 does; cn-324 dispatcher sub_714540 case 940: Packet_gspResCoupleInviteAnswer'
+  name_source: label@tw-410
+  evidence: verified
+  source: "tw-410 dispatcher sub_714F00 calls sub_713D00; own Packet_gspResCoupleInviteAnswer reader sub_6FD1E0 consumes bool32 and two names."
 - value: 941
   direction: s2c
   name: gspResCoupleInviterStatus
-  name_source: label@cn-324
-  evidence: inferred
-  source: 'tw-410 stamps this class as cn-324 does; cn-324 dispatcher sub_714540 case 941: Packet_gspResCoupleInviterStatus'
+  name_source: label@tw-410
+  evidence: verified
+  source: "tw-410 dispatcher sub_714F00 calls sub_713AB0; own Packet_gspResCoupleInviterStatus reader sub_6EB2B0 consumes one status word."
 - value: 942
   direction: s2c
   name: gspResCoupleBreakUp
-  name_source: label@cn-324
-  evidence: inferred
-  source: 'tw-410 stamps this class as cn-324 does; cn-324 dispatcher sub_714540 case 942: Packet_gspResCoupleBreakUp'
+  name_source: label@tw-410
+  evidence: verified
+  source: "tw-410 dispatcher sub_714F00 calls sub_7141B0; own Packet_gspResCoupleBreakUp reader sub_6FD1E0 consumes bool32 and two names."
 - value: 943
   direction: s2c
   name: gspResCoupleNotifyPartner
-  name_source: label@cn-324
-  evidence: inferred
-  source: 'tw-410 stamps this class as cn-324 does; cn-324 dispatcher sub_714540 case 943: Packet_gspResCoupleNotifyPartner'
+  name_source: label@tw-410
+  evidence: verified
+  source: "tw-410 dispatcher sub_714F00 calls sub_714440; own Packet_gspResCoupleNotifyPartner reader sub_6FD390 consumes online bool32, partner number and name."
 - value: 948
   direction: s2c
   name: gspUpdateCoupleSlot
-  name_source: label@cn-324
-  evidence: inferred
-  source: 'tw-410 stamps this class as cn-324 does; cn-324 dispatcher sub_714540 case 948: Packet_gspUpdateCoupleSlot'
+  name_source: label@tw-410
+  evidence: verified
+  source: "tw-410 dispatcher sub_714F00 calls sub_714D20; own Packet_gspUpdateCoupleSlot reader sub_6FD3E0 uses sub_58F530 to read full UserSlot records, whose partner number is at +136."
 - value: 951
   direction: s2c
   name: gspDebugClientDamageData
@@ -1339,8 +1346,8 @@ opcodes:
   direction: s2c
   name: gspSynthesisProcess
   name_source: label@cn-324
-  evidence: inferred
-  source: 'tw-410 stamps this class as cn-324 does; cn-324 dispatcher sub_714540 case 952: Packet_gspSynthesisProcess'
+  evidence: verified
+  source: "tw-410 dispatcher sub_714F00 case 0x3B8 (952) calls tw-410 sub_714710, which consumes Packet_gspSynthesisProcess; tw-410 sub_6FCE50 reads the 28-byte SynthesisProcessReply it inherits from cn-324."
 - value: 105
   direction: c2s
   name: gcpReqGotoMenu
@@ -3641,7 +3648,7 @@ opcodes:
   name_source: label@cn-324
   evidence: verified
   source: tw-410 stamps this class as cn-324 does; cn-324 sub_465090 case 744 runs cn-324 sub_45C8F0 (vtable 0xACF1D0)
-  notes: Ten u32 words plus a bool32 tail — differs from kr-1256's twelve-word notice; LegacyWeaponCreateNotice@cn-324
+  notes: Ten u32 words plus a bool32 tail — differs from kr-1256's twelve-word notice; WeaponCreateNotice@cn-324
 - value: 745
   direction: s2c
   connection: game
@@ -3755,3 +3762,27 @@ opcodes:
   name_source: label@cn-324
   evidence: verified
   source: tw-410 stamps this class as cn-324 does; cn-324 sub_7186B0 stamps the native recruitment-text request; cn-324 sub_6FDDF0 reads one counted UTF-16 message
+- value: 934
+  direction: c2s
+  name: gcpReqCoupleInvite
+  name_source: label@tw-410
+  evidence: verified
+  source: "tw-410 sub_4028B0 calls sub_404F00, which stamps through sub_918A90; own Packet_gcpReqCoupleInvite reader sub_5A59D0 consumes bool32 and target name."
+- value: 935
+  direction: c2s
+  name: gcpReqCoupleConfirmInvite
+  name_source: label@tw-410
+  evidence: verified
+  source: "tw-410 sub_402DF0 calls sub_404F70 after Yes; own Packet_gcpReqCoupleConfirmInvite reader sub_4023E0 consumes bool32, target, item and message."
+- value: 937
+  direction: c2s
+  name: gcpReqCoupleInviteAnswer
+  name_source: label@tw-410
+  evidence: verified
+  source: "tw-410 sub_404FE0 stamps through sub_918A90; own Packet_gcpReqCoupleInviteAnswer reader sub_4024F0 consumes two bool32 values and two names."
+- value: 938
+  direction: c2s
+  name: gcpReqCoupleInviterStatus
+  name_source: label@tw-410
+  evidence: verified
+  source: "tw-410 sub_402890 calls sub_404E90; own Packet_gcpReqCoupleInviterStatus writer and reader sub_6B0840 are empty."

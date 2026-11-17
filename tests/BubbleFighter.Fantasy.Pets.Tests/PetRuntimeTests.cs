@@ -127,14 +127,14 @@ public sealed partial class PetRuntimeTests
         Assert.Equal(other, await rig.SnapshotAsync(2));
     }
 
-    /// <summary>Refuses feeding an unequipped legacy pet without consuming food or changing progression.</summary>
+    /// <summary>Feeds an unequipped legacy pet, because the client offers food while a hungry pet is being put on.</summary>
     [Fact]
-    public async Task UnequippedLegacyPetRejectsFoodWithoutMutation()
+    public async Task UnequippedLegacyPetCanBeFed()
     {
         var rig = await Rig.CreateAsync(PetTestData.Options(), PetTestData.State(0, 5), worn: false);
-        var before = await rig.SnapshotAsync();
         await rig.Runtime.UseAsync(rig.Session, Use(PetTestData.NormalFood), default);
-        await AssertRefusedAsync(rig, before);
+        Assert.Equal(0, Assert.Single(rig.Uses.Messages).Result);
+        Assert.Equal(2, await rig.QuantityAsync(PetTestData.NormalFood));
     }
 
     /// <summary>Allows an unequipped ordinary modern pet to gain experience from one consumed food item.</summary>

@@ -3,6 +3,7 @@ using System.IO.Pipelines;
 using System.Net;
 using BubbleFighter.Fantasy.Abstractions.Net;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
+using BubbleFighter.Fantasy.Cluster;
 using BubbleFighter.Fantasy.Contracts.Sessions;
 using BubbleFighter.Fantasy.Tests.Shared;
 using Microsoft.Extensions.Logging;
@@ -270,13 +271,112 @@ public sealed class DuplicateLoginTests
         Assert.Empty(logger.Messages);
     }
 
-    private static (FakeSession Session, FakeConnection Connection) NewSession(long id)
+    [Fact]
+    public async Task KickOldClosesTheAccountOnAnotherBuild()
     {
-        var connection = new FakeConnection(id);
-        return (new FakeSession(id, connection), connection);
+        var (builds, kr812, cn717, logger) = TwoBuilds(DuplicateLoginBehavior.KickOld);
+        var (first, firstConnection) = NewSession(1, "kr-812");
+        var (second, secondConnection) = NewSession(2, "cn-717");
+        builds.Add(first);
+        builds.Add(second);
+        await kr812.ClaimAsync(first, Player);
+
+        var claim = await cn717.ClaimAsync(second, Player);
+
+        Assert.Equal(LoginClaimStatus.Attached, claim.Status);
+        Assert.Null(claim.Replaced);
+        var reason = Assert.Single(firstConnection.CloseReasons);
+        Assert.Contains("taken over on build cn-717 by session 2", reason);
+        Assert.Empty(secondConnection.CloseReasons);
+        Assert.Equal(7, second.Feature<IPlayerSession>().Identity.UserNum);
+        Assert.Contains(logger.Messages, message => message.Contains("from build kr-812"));
     }
 
-    private sealed class FakeSession(long id, FakeConnection connection) : ISessionWithFeatures
+    [Fact]
+    public async Task RejectNewRefusesALoginOnAnotherBuild()
+    {
+        var (builds, kr812, cn717, logger) = TwoBuilds(DuplicateLoginBehavior.RejectNew);
+        var (first, firstConnection) = NewSession(1, "kr-812");
+        var (second, secondConnection) = NewSession(2, "cn-717");
+        builds.Add(first);
+        builds.Add(second);
+        var held = await kr812.ClaimAsync(first, Player);
+
+        var claim = await cn717.ClaimAsync(second, Player);
+
+        Assert.Equal(LoginClaimStatus.RefusedDuplicate, claim.Status);
+        Assert.Same(first, claim.Replaced);
+        Assert.Empty(firstConnection.CloseReasons);
+        Assert.Empty(secondConnection.CloseReasons);
+        Assert.Same(held.Session, first.Feature<IPlayerSession>());
+        Assert.False(second.TryFeature<IPlayerSession>(out _));
+        Assert.Contains(logger.Messages, message => message.Contains("already live on build kr-812"));
+    }
+
+    [Fact]
+    public async Task AnAccountClosedOnAnotherBuildDoesNotCount()
+    {
+        var (builds, kr812, cn717, _) = TwoBuilds(DuplicateLoginBehavior.RejectNew);
+        var (first, firstConnection) = NewSession(1, "kr-812");
+        var (second, _) = NewSession(2, "cn-717");
+        builds.Add(first);
+        builds.Add(second);
+        await kr812.ClaimAsync(first, Player);
+        await firstConnection.CloseAsync("logged out");
+
+        var claim = await cn717.ClaimAsync(second, Player);
+
+        Assert.Equal(LoginClaimStatus.Attached, claim.Status);
+    }
+
+    [Fact]
+    public async Task ASecondLoginOnTheSameBuildIsLeftToThatBuild()
+    {
+        var builds = new SessionList();
+        using var scope = new PlayerSessionScope();
+        var guard = new DuplicateLoginGuard(scope, DuplicateLoginBehavior.KickOld, new RecordingLogger(), new AccountBuildLock(builds));
+        var (first, firstConnection) = NewSession(1, "kr-812");
+        var (second, _) = NewSession(2, "kr-812");
+        builds.Add(first);
+        builds.Add(second);
+        await guard.ClaimAsync(first, Player);
+
+        var claim = await guard.ClaimAsync(second, Player);
+
+        Assert.Same(first, claim.Replaced);
+        // Closed once, by the build's own takeover, not again as a session on another build.
+        Assert.Single(firstConnection.CloseReasons);
+    }
+
+    /// <summary>Two builds' lobby guards sharing one server-wide account lock over one session list.</summary>
+    private static (SessionList Sessions, DuplicateLoginGuard Kr812, DuplicateLoginGuard Cn717, RecordingLogger Logger) TwoBuilds(
+        DuplicateLoginBehavior behavior)
+    {
+        var sessions = new SessionList();
+        var logger = new RecordingLogger();
+        var shared = new AccountBuildLock(sessions);
+        return (sessions, new DuplicateLoginGuard(new PlayerSessionScope(), behavior, logger, shared),
+            new DuplicateLoginGuard(new PlayerSessionScope(), behavior, logger, shared), logger);
+    }
+
+    private sealed class SessionList : ISessionRegistry
+    {
+        private readonly List<ISession> _sessions = [];
+
+        public IReadOnlyList<ISession> All => [.. _sessions];
+
+        public void Add(ISession session) => _sessions.Add(session);
+
+        public void Remove(ISession session) => _sessions.Remove(session);
+    }
+
+    private static (FakeSession Session, FakeConnection Connection) NewSession(long id, string build = "test")
+    {
+        var connection = new FakeConnection(id);
+        return (new FakeSession(id, connection, build), connection);
+    }
+
+    private sealed class FakeSession(long id, FakeConnection connection, string build) : ISessionWithFeatures
     {
         public ISessionFeatures Features { get; } = new TestSessionFeatures();
 
@@ -284,7 +384,7 @@ public sealed class DuplicateLoginTests
 
         public IConnection Connection { get; } = connection;
 
-        public ClientProfile Profile { get; } = new("test", "kr", 812, 0, 0, "test");
+        public ClientProfile Profile { get; } = new(build, "kr", 812, 0, 0, "test");
 
         public ConcurrentDictionary<string, object> Items { get; } = new();
 

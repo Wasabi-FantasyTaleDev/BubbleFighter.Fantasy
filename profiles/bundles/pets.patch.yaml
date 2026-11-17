@@ -12,7 +12,6 @@
         enabled: ${BFF_PETS_ENABLED:-true}
         protocol: "${BFF_PROFILE_ID}/game"
         build_key: "${BFF_PROFILE_ID}"
-        initial_fullness: ${BFF_PET_INITIAL_FULLNESS:-0}
         client_utc_offset_minutes: ${PET_CLIENT_UTC_OFFSET_MINUTES:-null}
         manual_level_up: false
         client_configuration_source: None
@@ -42,7 +41,6 @@
         max_held_rooms: 128
         protocol: "${BFF_PROFILE_ID}/game"
         build_key: "${BFF_PROFILE_ID}"
-        initial_fullness: ${BFF_PET_INITIAL_FULLNESS:-0}
         client_utc_offset_minutes: ${PET_CLIENT_UTC_OFFSET_MINUTES:-null}
         manual_level_up: false
         client_configuration_source: None

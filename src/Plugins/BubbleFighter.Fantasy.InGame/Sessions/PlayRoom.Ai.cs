@@ -61,6 +61,18 @@ public sealed partial class PlayRoom
         || _bots.Values.Any(bot => RoomRegistry.SceneEntity(bot.Appearance.Slot) == actor
             && bot.Appearance.Ai is { } ai && ai.ControllerSlot == human.Slot && ai.ControllerUserNum == human.UserNum);
 
+    /// <summary>
+    /// Whether the actor is an object the seat's client created in its own scene range, above its character's id and
+    /// below the next seat's: kr-1256 sub_6D2040 starts seat s's id counter at 1000000 + 100000 s and ends it at
+    /// 1099999 + 100000 s, and kr-1256 sub_6EE310 takes each created object's id from that counter (the soccer host's
+    /// ball, kr-1256 sub_6DDE20, and the NPCs a horde host runs). Seat and bot characters sit at the range starts.
+    /// </summary>
+    internal static bool OwnsSceneObject(RoomSeat seat, int actor)
+    {
+        var own = RoomRegistry.SceneEntity(seat.Slot);
+        return actor > own && actor < RoomRegistry.SceneEntity(seat.Slot + 1);
+    }
+
     /// <summary>Whether the actor is a seat's or a bot's character, as opposed to an NPC a client runs.</summary>
     internal bool IsMemberCharacter(int actor) => Seats.Any(seat => RoomRegistry.SceneEntity(seat.Slot) == actor)
         || _bots.Values.Any(bot => RoomRegistry.SceneEntity(bot.Appearance.Slot) == actor);

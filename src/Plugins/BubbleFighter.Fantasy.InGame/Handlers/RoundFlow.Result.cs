@@ -78,9 +78,11 @@ internal sealed partial class RoundFlow
             {
                 if (room.Phase != RoomPhase.Playing || room.FindByGame(session.Id) is not { } controller)
                     return;
-                var reporter = ScoreReporter(room, controller, report.ReporterSlot, report.RequiresReporterOwnership);
+                var reporter = ScoreReporter(room, controller, report.ReporterSlot,
+                    report.RequiresReporterOwnership || IsWeaponMasterMode(room));
                 if (reporter is null) return;
-                if (report.RequiresReporterOwnership && (report.ReporterSlot != reporter.Slot || report.Victim == reporter.Slot))
+                if ((report.RequiresReporterOwnership || IsWeaponMasterMode(room))
+                    && (report.ReporterSlot != reporter.Slot || report.Victim == reporter.Slot))
                     return;
                 if (report.IsRescue && report.ReporterSlot != reporter.Slot)
                     return;
@@ -134,7 +136,7 @@ internal sealed partial class RoundFlow
                 if (finalZoneGeneration is { } generation && !FinalZoneReportIsCurrent(room, session, generation)) return;
                 var reporter = ScoreReporter(room, controller, report.ReporterSlot,
                     report.RequiresReporterOwnership || report.RequiresDirectKillMode || IsCaptainMode(room)
-                        || IsFinalZoneMode(room) || _options.ZombiePvpModeIds.Contains(room.ModeId));
+                        || IsFinalZoneMode(room) || IsWeaponMasterMode(room) || _options.ZombiePvpModeIds.Contains(room.ModeId));
                 if (reporter is null) return;
                 if (report.RequiresReporterOwnership && (report.ReporterSlot != reporter.Slot
                     || !report.HasVictimReference || report.Victim == reporter.Slot))
@@ -275,6 +277,17 @@ internal sealed partial class RoundFlow
             if (!await SendToMembersAsync(room, generation, (seat, sendCt) =>
                 result.Stage.SendAsync(seat.Game, new ResultStageAdvanced(room.Id, ResultStage.Reward), sendCt), token)
                 .ConfigureAwait(false)) return false;
+            if (UserHostSettlement is not null)
+            {
+                int? prizeWinnerTeam;
+                IReadOnlySet<int>? prizeWinnerSlots;
+                lock (room.Gate)
+                {
+                    prizeWinnerTeam = room.StartGeneration == generation ? WinnerTeam(room) : null;
+                    prizeWinnerSlots = room.StartGeneration == generation ? room.DecidedWinnerSlots : null;
+                }
+                await UserHostSettlement(room, generation, prizeWinnerTeam, prizeWinnerSlots, null, token).ConfigureAwait(false);
+            }
             await SendWalletsAsync(room, generation, rewards, token).ConfigureAwait(false);
             lock (room.Gate)
                 foreach (var seat in room.Seats)

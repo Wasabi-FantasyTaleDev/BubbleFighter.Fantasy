@@ -1,0 +1,125 @@
+version: 1
+structs:
+  # C2S gcpReqUserMysteryStore on kr-1256. kr-1256 sub_E651C0 stamps 128; kr-1256 sub_114E2E0
+  # serializes the type byte, an opaque echoed token and the type-specific tail without alignment.
+  # kr-1256 sub_E5F6B0 copies the response token into local state; its lifecycle is not established.
+  # These layouts are audited for kr-1256 and, field for field, for cn-774 and tw-454: the request readers cn-774
+  # sub_47FC10 / tw-454 sub_471DA0 (C2S 127, stamped by cn-774 sub_E4B1E0 / tw-454 sub_E5A280), the reply reader cn-774
+  # sub_47FD90 / tw-454 sub_471F20 (S2C 148 / 146), and the section readers cn-774 sub_47FA30, sub_47FAA0, sub_47FB40 /
+  # tw-454 sub_471BC0, sub_471C30, sub_471CD0. Both inherit kr-1256's tables; kr-812 and its other descendants have no
+  # Mysterystore class and keep none.
+  UserMysteryStoreRequest@kr-812: []
+  UserMysteryStoreRequest@kr-1256:
+    # Type 1: kr-1256 sub_E5F070 opens/bootstrap-loads the store, sending zero without local config.
+    - type: u8
+      offset: 4
+    - token: u32
+      offset: 8
+
+  UserMysteryStoreRequestType2@kr-812: []
+  UserMysteryStoreRequestType2@kr-1256:
+    - type: u8
+      offset: 4
+    - token: u32
+      offset: 8
+    # kr-1256 sub_930130 passes the countdown from kr-1256 sub_E61E20 to kr-1256 sub_E64FC0.
+    - remaining_seconds: u16
+      offset: 12
+
+  UserMysteryStoreRequestType3@kr-812: []
+  UserMysteryStoreRequestType3@kr-1256:
+    - type: u8
+      offset: 4
+    - token: u32
+      offset: 8
+    # kr-1256 sub_E33FD0 checks owned coins and echoes the configured refresh cost after confirmation.
+    - refresh_cost: u16
+      offset: 14
+
+  UserMysteryStoreRequestType4@kr-812: []
+  UserMysteryStoreRequestType4@kr-1256:
+    - type: u8
+      offset: 4
+    - token: u32
+      offset: 8
+    # kr-1256 sub_E6CE80 copies the selected Stock/StockSet key and quoted coin price from its dialog.
+    - stock_or_stock_set_id: u32
+      offset: 16
+    - coin_price: u16
+      offset: 20
+
+  # kr-1256 sub_114E110 reads 4 + 4 + 2 + 4 bytes. kr-1256 sub_E5F6B0 installs these values;
+  # kr-1256 sub_E61DC0 uses coin_item_id as the owned-inventory key, not the Lucci balance.
+  MysteryStorePacketConfig@kr-812: []
+  MysteryStorePacketConfig@kr-1256:
+    - token: u32
+      offset: 4
+    - coin_item_id: u32
+      offset: 8
+    - refresh_cost: u16
+      offset: 12
+    # Four bytes on the wire, normalized into one native byte. kr-1256 sub_E60E50 groups Stock variants.
+    - group_stock_variants: bool
+      offset: 14
+
+  # kr-1256 sub_114E180 reads the remaining countdown; kr-1256 sub_E61E20 subtracts elapsed seconds.
+  MysteryStorePacketUserData@kr-812: []
+  MysteryStorePacketUserData@kr-1256:
+    - remaining_seconds: u16
+      offset: 4
+
+  # kr-1256 sub_114E220 reads 14 fixed bytes plus two bytes per UTF-16 code unit; native stride is 40.
+  # kr-1256 sub_1119C10 -> kr-1256 sub_1126430 reads the string's u32 code-unit count and UTF-16LE data.
+  MysteryStorePacketStock@kr-812: []
+  MysteryStorePacketStock@kr-1256:
+    # kr-1256 sub_E0BAC0 compares this metadata when choosing a grouped variant; its full role is unknown.
+    - unknown_4: u32
+      offset: 4
+    - unknown_8: wstr
+      offset: 8
+    # kr-1256 sub_E60E50 resolves Stock and StockSet keys; native catalog data supplies duration/quantity.
+    - stock_or_stock_set_id: u32
+      offset: 32
+    # kr-1256 sub_E635B0 displays this as signed16. Nonnegative UI prices therefore fit 0..32767.
+    # This explicit coin quote is independent of the native ordinary-shop price fields.
+    - coin_price: u16
+      offset: 36
+
+  # Wrapper for the u32 count and packed rows read by kr-1256 sub_114E820; it adds no wire header.
+  MysteryStoreStockList@kr-812: []
+  MysteryStoreStockList@kr-1256:
+    - stocks: 'list<MysteryStorePacketStock>'
+
+  # S2C 148 gspRepUserMysteryStore: kr-1256 sub_9D2FF0 dispatches to kr-1256 sub_9CAC20;
+  # kr-1256 sub_114E4E0 reads this common prefix. The flags add no presence bytes of their own.
+  UserMysteryStoreReply@kr-812: []
+  UserMysteryStoreReply@kr-1256:
+    # Both bytes are sign-extended natively (kr-1256 0x114E529 and 0x114E530); u8 preserves their bits.
+    # Consumers must interpret action/status as signed bytes. Status 1 is not generic failure.
+    - action: u8
+      offset: 4
+    - status: u8
+      offset: 8
+    - fields: u8
+      offset: 12
+    - config: 'when<fields&0x01,MysteryStorePacketConfig>'
+      offset: 16
+    - user_data: 'when<fields&0x02,MysteryStorePacketUserData>'
+      offset: 32
+    - offers: 'when<fields&0x04,MysteryStoreStockList>'
+      offset: 40
+    # kr-1256 sub_114E600 pairs bit 0 with the first row, bit 1 with the second, etc., in THIS packet.
+    # Full purchased-state publication must include flag 0x04 and the same ordered rows; flag 0x08 alone
+    # replaces the client's saved purchased map with an empty map (kr-1256 sub_E5F6B0).
+    - purchased_mask: 'when<fields&0x08,u32>'
+      offset: 52
+
+  # Append exactly once after UserMysteryStoreReply only when action == 4 AND status == 0.
+  # kr-1256 sub_114E4E0 reads this word independently of fields, including fields == 0;
+  # kr-1256 sub_E601C0 passes it to kr-1256 sub_E4D6A0 for the purchase receipt.
+  # This is a separate suffix, not a mask bit. Use ReadPrefix for the common body, select the
+  # suffix using action/status, then require end-of-body. Other actions/statuses have no suffix.
+  UserMysteryStorePurchaseTail@kr-812: []
+  UserMysteryStorePurchaseTail@kr-1256:
+    - reward_stock_or_stock_set_id: u32
+      offset: 56

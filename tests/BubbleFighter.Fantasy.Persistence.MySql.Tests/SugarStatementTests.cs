@@ -312,7 +312,7 @@ public sealed class SugarStatementTests
             }));
         var db = Client();
         var entities = assembly.GetTypes().Where(t => t.GetCustomAttribute<SugarTable>() is not null).ToArray();
-        Assert.Equal(30, entities.Length);
+        Assert.Equal(38, entities.Length);
         foreach (var entity in entities)
         {
             var info = db.EntityMaintenance.GetEntityInfo(entity);

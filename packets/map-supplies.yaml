@@ -321,7 +321,10 @@ structs:
       offset: 20
     - kind: u32
       offset: 24
-    - unknown_28: u8
+    # The hurt drop copies the victim character's team word (+548, the word kr-1256 sub_7E0690 compares) into
+    # this byte (kr-1256 sub_680AA0 before its sub_708C10 call); cn-774 sub_8C8140 and tw-454 sub_71AE40 write
+    # the same byte at the same place.
+    - team: u8
       offset: 28
     - creation_class: u32
       offset: 32

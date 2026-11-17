@@ -119,6 +119,42 @@ public sealed partial class RoundFlowTests
         finally { await rig.Registry.StopAllAsync(); }
     }
 
+    /// <summary>A human popping a bubbled zombie kills it, so its cleaned death admits the reset again and again.</summary>
+    [Fact]
+    public async Task ZombieEscapePoppedZombieRevivesEndlessly()
+    {
+        var rig = new Rig();
+        EnableZombieEscape(rig);
+        try
+        {
+            var room = await StartZombieEscapeAsync(rig);
+            var guest = room.FindByGame(rig.Guest.Id)!;
+            var host = room.FindByGame(rig.Host.Id)!;
+            await rig.Round.HandleZombieEscapeConversionAsync(rig.Host, new(guest.Slot, 202, 110289), default);
+            await rig.Round.HandleZombieEscapePeerAsync(rig.Guest, new(guest.Slot, 34, 0, 202, 110289), default);
+            var relay = new RecordingSession(92);
+            rig.Registry.BindRelay(relay, guest.Key);
+            var actor = RoomRegistry.SceneEntity(guest.Slot);
+            for (var life = 0; life < 3; life++)
+            {
+                await rig.Round.HandleLifeReportedAsync(rig.Guest, new(RoundLifeEvent.Bubbled, actor), default);
+                await rig.Round.HandleLifeReportedAsync(rig.Host, new(RoundLifeEvent.Finished, actor)
+                    { Initiator = RoomRegistry.SceneEntity(host.Slot) }, default);
+                Assert.Equal(SeatLife.Dead, guest.Life.State);
+                await rig.Round.HandleLifeReportedAsync(rig.Guest, new(RoundLifeEvent.DeathCleaned, actor), default);
+                await rig.Round.HandleSpawnAcceptedAsync(rig.Guest, new(actor, 0)
+                {
+                    Rules = new(RoundRespawnAudience.Requester, RoundRespawnCompletion.MatchConfirmation, RoundRespawnAdmission.CleanedDeath),
+                }, default);
+                Assert.Equal(SeatLife.ResetPending, guest.Life.State);
+                await rig.Round.HandleLifeReportedAsync(relay, new(RoundLifeEvent.ResetConfirmed, actor), default);
+                Assert.Equal(SeatLife.Alive, guest.Life.State);
+            }
+            Assert.Equal(RoomPhase.Playing, room.Phase);
+        }
+        finally { await rig.Registry.StopAllAsync(); }
+    }
+
     /// <summary>The native infection gauge may convert its living owner; once every human converts the shared result runs once.</summary>
     [Fact]
     public async Task ZombieEscapeInfectionWithoutDeathEndsOnceAfterOwnedPeerEcho()

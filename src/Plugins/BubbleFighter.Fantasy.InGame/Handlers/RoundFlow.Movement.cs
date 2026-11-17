@@ -33,20 +33,31 @@ internal sealed partial class RoundFlow
             var seat = room.Seats.FirstOrDefault(seat => seat.Game.Id == session.Id || seat.Relay?.Id == session.Id);
             if (seat is null)
                 return;
-            if (!room.ControlsActor(seat, report.ActorId))
+            // The soccer host moves its ball as well as its character; the ball keeps its own record.
+            var ball = room.SoccerBall == report.ActorId && seat.Slot == room.MasterSlot;
+            // A client also moves the objects it created in its own scene range, such as the NPCs a pirate or horde
+            // host runs; each keeps a record of its own so the other players see them move.
+            var sceneObject = !ball && PlayRoom.OwnsSceneObject(seat, report.ActorId);
+            if (!ball && !sceneObject && !room.ControlsActor(seat, report.ActorId))
             {
                 _logger.LogWarning("Session {Id} slot {Slot} reported movement for actor {Actor}, which is not its own; dropped.",
                     session.Id, seat.Slot, report.ActorId);
                 return;
             }
-            var bot = room.Bots.FirstOrDefault(candidate => RoomRegistry.SceneEntity(candidate.Appearance.Slot) == report.ActorId);
-            if (Merge(bot is null ? seat.Movement : bot.Movement, report) is not { } next)
+            var bot = ball || sceneObject ? null
+                : room.Bots.FirstOrDefault(candidate => RoomRegistry.SceneEntity(candidate.Appearance.Slot) == report.ActorId);
+            var objects = sceneObject ? room.SceneObjects ??= new SceneObjectMovements(_options.MaxSceneObjectMovements) : null;
+            var previous = ball ? room.SoccerBallMovement : objects is not null ? objects.Find(report.ActorId)
+                : bot is null ? seat.Movement : bot.Movement;
+            if (Merge(previous, report) is not { } next)
             {
                 _logger.LogDebug("Session {Id} slot {Slot} sent partial movement before a full record; dropped.", session.Id, seat.Slot);
                 return;
             }
             merged = next;
-            if (bot is null) seat.Movement = next;
+            if (ball) room.SoccerBallMovement = next;
+            else if (objects is not null) objects.Store(report.ActorId, next);
+            else if (bot is null) seat.Movement = next;
             else bot.Movement = next;
             targets = [.. room.Seats.Where(other => other != seat).Select(other => MatchLink(room, other)).OfType<ISession>()];
         }

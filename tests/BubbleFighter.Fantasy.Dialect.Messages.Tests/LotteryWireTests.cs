@@ -1,6 +1,9 @@
 using BubbleFighter.Fantasy.Abstractions.Protocol;
+using BubbleFighter.Fantasy.Contracts.Match;
 using BubbleFighter.Fantasy.Dialect.Rooms;
 using BubbleFighter.Fantasy.Packets;
+using BubbleFighter.Fantasy.Protocol;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
@@ -8,6 +11,54 @@ namespace BubbleFighter.Fantasy.Dialect.Messages.Tests;
 /// <summary>Pins native card selection and reveal bodies to the CN2012 consuming paths.</summary>
 public sealed class LotteryWireTests
 {
+    /// <summary>The mounted modern scoreboard sender supplies only the KR dialog's proven primary reward field.</summary>
+    [Theory]
+    [InlineData("kr-1256", 244, 17, true)]
+    [InlineData("cn-774", 250, 32, false)]
+    [InlineData("tw-454", 243, 16, false)]
+    public async Task MaskedScoreboardCarriesTheProvenAwardIdentity(string build, int rowLength, int tailLength, bool hasAward)
+    {
+        var profile = new ClientProfile(build, build[..2], int.Parse(build[3..]), 0, 0, build);
+        var root = Directory.GetParent(TestBuilds.PacketsDirectory())!.FullName;
+        var table = OpcodeTableLoader.Load(Path.Combine(root, "profiles", build, "opcodes.yaml"), profile)
+            .ForConnection(OpcodeConnection.Game);
+        using var fixture = new MatchMessagesMountTests.Fixture(table);
+        var protocol = build + "/game";
+        var context = fixture.Context(build, protocol, "dialect.rooms");
+        try
+        {
+            new RoundResultBinding(protocol, table, TestBuilds.All.Tables, build, [101], NullLogger.Instance).Mount(context);
+            var sender = Assert.Single(fixture.Services.GetAll<IMessageSender<RoundScoreboard>>());
+            var row = new RoundScoreboardRow(0, "P", 1, 1, new(0, 0, 0, 0, 0), null) { UserNumber = 7 };
+            var board = new RoundScoreboard(7, 0, [0, 0], [row], WithRewards: true) { ModeId = 101 };
+            var empty = new MatchMessagesMountTests.Session(profile);
+            var awarded = new MatchMessagesMountTests.Session(profile);
+            await sender.SendAsync(empty, board, default);
+            await sender.SendAsync(awarded, board with { Rows = [row with { AwardDisplayId = 1000711 }] }, default);
+            var body = Assert.Single(awarded.Bodies);
+            Assert.Equal(38 + rowLength + 8 + tailLength, body.Length);
+            if (hasAward)
+            {
+                Assert.Equal(476, TestBuilds.All.Tables.Resolve(build, "ScoreRow")
+                    .Single(field => field.Name == "award_display_id").Offset);
+                var values = PacketCodec.Read(TestBuilds.All.Tables, build, "ScoreRow", body.AsSpan(38, rowLength));
+                Assert.Equal(1000711, values["award_display_id"]);
+                var before = PacketCodec.Read(TestBuilds.All.Tables, build, "ScoreRow",
+                    Assert.Single(empty.Bodies).AsSpan(38, rowLength));
+                Assert.Equal(0, before["award_display_id"]);
+                var expected = Assert.Single(empty.Bodies).ToArray();
+                System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(expected.AsSpan(181), 1000711);
+                Assert.Equal(expected, body);
+            }
+            else
+            {
+                Assert.DoesNotContain(TestBuilds.All.Tables.Resolve(build, "ScoreRow"), field => field.Name == "award_display_id");
+                Assert.Equal(Assert.Single(empty.Bodies), body);
+            }
+        }
+        finally { await context.UnwindAsync(); }
+    }
+
     /// <summary>The reward icon comes from each build's primary ScoreData field consumed by its award dialog.</summary>
     [Theory]
     [InlineData("cn-279", 124)]
@@ -33,6 +84,7 @@ public sealed class LotteryWireTests
     /// <summary>Reads the clicked card followed by the claimed seat and rejects extra or missing words.</summary>
     [Theory]
     [InlineData("kr-812")]
+    [InlineData("kr-1256")]
     [InlineData("cn-324")]
     [InlineData("cn-279")]
     [InlineData("cn-717")]

@@ -123,10 +123,12 @@ public sealed class MigrationBundleCompositionTests
             var composer = Composer(profiles);
             var builds = composer.Compose("all", []).Where(row => row.Id.EndsWith(".lobby", StringComparison.Ordinal))
                 .Select(row => row.Id[..^".lobby".Length]).ToArray();
-            Assert.Equal(15, builds.Length);
-            // Builds whose native move is not audited stay out of the node-wide migration rows; kr-186 has no
-            // server list at all, and tw-410's move reply is not yet checked against its own channel table.
-            string[] unaudited = ["kr-186", "tw-410"];
+            // kr-186 is an optional build (profiles/all optional_builds) and is not composed unless included.
+            Assert.Equal(14, builds.Length);
+            Assert.DoesNotContain("kr-186", builds);
+            // Builds whose native move is not audited stay out of the node-wide migration rows: tw-410's move reply is
+            // not yet checked against its own channel table (kr-186, when included, has no server list at all).
+            string[] unaudited = ["tw-410"];
             Assert.All(unaudited, build => Assert.Contains(build, builds));
             builds = [.. builds.Except(unaudited)];
             Assert.DoesNotContain(composer.Compose("all", []), row => row.Plugin.StartsWith("cluster.migration-", StringComparison.Ordinal));

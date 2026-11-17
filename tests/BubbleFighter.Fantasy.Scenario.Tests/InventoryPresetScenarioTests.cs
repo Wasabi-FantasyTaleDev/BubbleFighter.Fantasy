@@ -64,9 +64,10 @@ public sealed class InventoryPresetScenarioTests
             Row("persistence.memory"), Row("dialect", TestWireDialects.RowConfig("kr-812")),
             Row("protocol", new() { ["opcode_table_path"] = tablePath, ["bootstrap_status"] = 1, ["patch_request_name"] = "gcpFirstConnect" }),
             Row("clientdata", TestClientData.RowConfig(TestClientData.SyntheticShop())),
-            Row("dialect.messages", new() { ["protocol"] = "kr-812/game", ["enable_purchases"] = true, ["packets_directory"] = RepositoryPackets.Directory() }),
+            Row("dialect.messages", new() { ["protocol"] = "kr-812/game", ["couples"] = false, ["enable_purchases"] = true, ["packets_directory"] = RepositoryPackets.Directory() }),
             Row("lobby", new()
             {
+                ["couples"] = false,
                 ["protocol"] = "kr-812/game", ["auto_create_players"] = true,
                 ["inventory_source"] = "mysql", ["money_source"] = "mysql",
                 ["starter_item_ids"] = StarterIds.Select(id => (object)id).ToArray(),

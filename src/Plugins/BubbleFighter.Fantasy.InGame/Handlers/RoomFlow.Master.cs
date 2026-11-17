@@ -25,7 +25,7 @@ internal sealed partial class RoomFlow
                 // kr-812 sub_801D00's native notices identify results 1/2/3; modern consumers retain the same cases.
                 if (requester is null || !ReferenceEquals(requester.Game, session) || requester.Slot != room.MasterSlot)
                     result = 2;
-                else if (room.Phase != RoomPhase.Waiting || target is null)
+                else if (room.Phase != RoomPhase.Waiting || room.IsUserHost || target is null)
                     result = 1;
                 else if (target.Slot == room.MasterSlot)
                     result = 3;

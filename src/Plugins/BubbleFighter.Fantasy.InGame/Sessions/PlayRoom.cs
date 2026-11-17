@@ -1,6 +1,7 @@
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Match;
 using BubbleFighter.Fantasy.Contracts.Progress;
+using BubbleFighter.Fantasy.Contracts.Movement;
 using BubbleFighter.Fantasy.RoomCore;
 
 namespace BubbleFighter.Fantasy.InGame.Sessions;
@@ -145,6 +146,13 @@ public sealed partial class PlayRoom
     public BubbleFighter.Fantasy.Contracts.Rooms.RoomBuildSettings? BuildSettings { get; set; }
 
     /// <summary>
+    /// Gets or sets the mode the master's client still holds after the server forced another one from the room title,
+    /// or null. A settings change that only restates this mode is the client repeating its dialog, not the master
+    /// choosing, so the forced mode stays.
+    /// </summary>
+    public ushort? ClientHeldMode { get; set; }
+
+    /// <summary>
     /// Gets or sets the create mode id. The S2C 101 room-list row writes it
     /// into the nested MapMeta's <c>u16</c> slot, and the row label reads it.
     ///
@@ -205,6 +213,94 @@ public sealed partial class PlayRoom
 
     /// <summary>Whether every seat is taken. Read under <see cref="Gate"/>.</summary>
     internal bool IsFull { get { ExpireAdmissions(); return _members.IsFull; } }
+
+    /// <summary>Gets whether this room is a user-host prize room.</summary>
+    public bool IsUserHost { get; private set; }
+
+    /// <summary>Gets or sets the configured gross Lucci prize for the current prize room.</summary>
+    public uint UserHostPrize { get; internal set; }
+
+    /// <summary>Gets the playable competitor slot cap when a prize room reserves upper slots for the referee.</summary>
+    public int? PlayableMaxSeats { get; private set; }
+
+    /// <summary>Gets the fixed referee seat index for a prize room, or -1 otherwise.</summary>
+    public int UserHostRefereeSlot { get; private set; } = -1;
+
+    /// <summary>Gets the wire team byte required for the referee seat in a prize room.</summary>
+    public byte UserHostRefereeTeam { get; private set; }
+
+    /// <summary>Gets the creator account id that owns prize escrow and host privileges in a prize room.</summary>
+    public long UserHostHostUserNum { get; private set; }
+
+    /// <summary>Gets the server fee percentage captured for settled prize payouts.</summary>
+    public int UserHostFeePercent { get; private set; }
+
+    /// <summary>Gets or sets whether an active escrow hold exists for the current round.</summary>
+    internal bool UserHostMatchEscrowed { get; set; }
+
+    /// <summary>Gets or sets the latest round generation whose user-host escrow has settled or refunded.</summary>
+    internal int UserHostSettledGeneration { get; set; }
+
+    /// <summary>Gets the monotonic generation used to discard cancelled pre-start prize countdowns.</summary>
+    internal int UserHostCountdownGeneration { get; private set; }
+
+    internal CancellationTokenSource? UserHostCountdownCancellation { get; set; }
+
+    /// <summary>Gets or sets the active pre-start prize countdown task retained for bounded shutdown.</summary>
+    internal Task UserHostCountdownTask { get; set; } = Task.CompletedTask;
+
+    /// <summary>Gets or sets the snapshot of non-referee starting seats captured when user-host escrow begins.</summary>
+    internal IReadOnlyList<UserHostCompetitor>? UserHostStartingCompetitors { get; set; }
+
+    /// <summary>Gets whether a prize-room pre-start countdown is currently armed.</summary>
+    internal bool UserHostCountdownActive => UserHostCountdownCancellation is { IsCancellationRequested: false };
+
+    /// <summary>Returns whether <paramref name="seat"/> is the reserved referee seat in a prize room.</summary>
+    public bool IsRefereeSeat(RoomSeat seat) => IsUserHost && seat.Slot == UserHostRefereeSlot;
+
+    internal void ConfigureUserHost(int playableSeats, int refereeSlot, byte refereeTeam, uint prize, long hostUserNum, int feePercent)
+    {
+        lock (Gate)
+        {
+            if (playableSeats < 2 || refereeSlot < playableSeats || refereeSlot >= _maxSeats)
+                throw new ArgumentOutOfRangeException(nameof(playableSeats));
+            IsUserHost = true;
+            PlayableMaxSeats = playableSeats;
+            UserHostRefereeSlot = refereeSlot;
+            UserHostRefereeTeam = refereeTeam;
+            UserHostPrize = prize;
+            UserHostHostUserNum = hostUserNum;
+            UserHostFeePercent = feePercent;
+            for (var slot = playableSeats; slot < _maxSeats; slot++)
+            {
+                if (!_members.Reserve(slot))
+                    throw new InvalidOperationException($"Room {Id} could not reserve slot {slot} for user-host layout.");
+            }
+        }
+    }
+
+    internal RoomSeat AddUserHostReferee(ISession game, RelaySessionKey key, int userNum, string nickname)
+    {
+        if (!IsUserHost || UserHostRefereeSlot < 0)
+            throw new InvalidOperationException($"Room {Id} is not configured as a user-host room.");
+        var seat = _members.AddReserved(UserHostRefereeSlot, slot => new RoomSeat(slot, game, key, userNum, nickname));
+        seat.Team = UserHostRefereeTeam;
+        seat.Ready = false;
+        return seat;
+    }
+
+    internal int CancelUserHostCountdown()
+    {
+        UserHostCountdownGeneration++;
+        var cts = UserHostCountdownCancellation;
+        UserHostCountdownCancellation = null;
+        if (cts is not null)
+        {
+            try { cts.Cancel(); }
+            catch (ObjectDisposedException) { }
+        }
+        return UserHostCountdownGeneration;
+    }
 
     /// <summary>The number of seats the room was created with.</summary>
     internal int MaxSeats => _maxSeats;
@@ -357,7 +453,10 @@ public sealed partial class PlayRoom
     }
 
     /// <summary>Marks the room starting. Throws if not <see cref="RoomPhase.Waiting"/>.</summary>
-    public void MarkStarting()
+    public void MarkStarting() => MarkStarting(null);
+
+    /// <summary>Marks the room starting using an optional pre-allocated match identifier. Throws if not <see cref="RoomPhase.Waiting"/>.</summary>
+    public void MarkStarting(string? matchId)
     {
         if (Phase != RoomPhase.Waiting)
             throw new InvalidOperationException($"Room {Id} cannot start from phase {Phase}.");
@@ -365,7 +464,7 @@ public sealed partial class PlayRoom
             Snapshot: new RoundEquipmentSnapshot(seat.EquippedItemIds ?? [], seat.ItemAttributes))).ToArray();
         ClearAdmissions();
         CancelResultSequence();
-        MatchId = Guid.NewGuid().ToString("N");
+        MatchId = string.IsNullOrWhiteSpace(matchId) ? Guid.NewGuid().ToString("N") : matchId;
         BattleSettlements = null;
         foreach (var entry in equipment) entry.Seat.FreezeRewardEquipment(MatchId, entry.Snapshot);
         BlueScore = RedScore = 0;
@@ -419,6 +518,10 @@ public sealed partial class PlayRoom
     {
         CancelLoadTimeout();
         Captains = new CaptainRoster();
+        SoccerGoals = new int[2];
+        SoccerBall = null;
+        SoccerBallMovement = null;
+        SceneObjects = null;
         CancelModeClocks();
         ExtremeRacing = new ExtremeRacingRoundState();
         RacingInitialization = null;
@@ -460,6 +563,18 @@ public sealed partial class PlayRoom
 
     /// <summary>Gets the Captains of this round's Captain mode; empty in any other round.</summary>
     internal CaptainRoster Captains { get; private set; } = new();
+
+    /// <summary>Gets this round's soccer goals by team (index 0 is team 1); zero in any other round.</summary>
+    internal int[] SoccerGoals { get; private set; } = new int[2];
+
+    /// <summary>Gets or sets the soccer ball the host added this round, or null before it is added.</summary>
+    internal int? SoccerBall { get; set; }
+
+    /// <summary>Gets or sets the soccer ball's last reported movement, kept apart from the host's own character.</summary>
+    internal PlayerMovementState? SoccerBallMovement { get; set; }
+
+    /// <summary>Gets or sets this round's movement records of client-created scene objects, or null before the first.</summary>
+    internal SceneObjectMovements? SceneObjects { get; set; }
 
     /// <summary>Gets this round's ExtremeRacing rounds and points; idle in any other round.</summary>
     internal ExtremeRacingRoundState ExtremeRacing { get; private set; } = new();
@@ -580,9 +695,12 @@ public sealed partial class PlayRoom
     /// <summary>Gets or sets the single countdown task retained for this bounded room.</summary>
     public Task CountdownTask { get; set; } = Task.CompletedTask;
 
-    /// <summary>Gets whether the current mode requires a red or blue team for seat and spawn placement.</summary>
-    internal bool RequiresSpawnTeams => Setting.Map.Unknown4 is 1 or 3 or 6 or 9 or 11 or 12 or 14 or 16 or 18 or 19
-        or 20 or 21 or 24 or 27 or 29 or 31 or 33 or 34 or 35 or 36 or 37 or 38 or 39;
+    /// <summary>
+    /// Gets whether the current mode is a red-or-blue team mode: kr-1256 sub_1150F80 and kr-1256 sub_1150E10. BnB (41)
+    /// and SuddenSurvival (25) are team modes there too; kr-1256 sub_C80220 only places their seats by slot.
+    /// </summary>
+    internal bool RequiresSpawnTeams => ModeId is 1 or 3 or 6 or 9 or 11 or 12 or 14 or 16 or 18 or 19
+        or 20 or 21 or 24 or 25 or 27 or 29 or 31 or 33 or 34 or 35 or 36 or 37 or 38 or 39 or 41;
 
     /// <summary>
     /// Assigns unassigned players to the smaller team before publishing waiting or start rosters.
@@ -593,7 +711,7 @@ public sealed partial class PlayRoom
     /// </summary>
     public void AssignSpawnTeams()
     {
-        // kr-1256 sub_1150F80, excluding the earlier special-mode branches in kr-1256 sub_C80220.
+        // kr-1256 sub_1150F80; a seat without a team shows no team and cannot be told apart from an opponent.
         if (!RequiresSpawnTeams)
             return;
         var first = Seats.Count(seat => seat.Team == 1) + Bots.Count(bot => bot.Appearance.Team == 1);
@@ -710,6 +828,9 @@ public sealed partial class PlayRoom
         {
             CancelResultSequence();
             CancelLoadTimeout();
+            CancelUserHostCountdown();
+            UserHostMatchEscrowed = false;
+            UserHostStartingCompetitors = null;
             Phase = RoomPhase.Waiting;
             ZombieEscape?.RestoreWaitingTeams(Seats);
             ZombieEscape = null;
@@ -787,9 +908,16 @@ public sealed partial class PlayRoom
             CancelResultSequence();
             CancelBattleSettlement();
             CancelLoadTimeout();
+            CancelUserHostCountdown();
             TutorialCancellation?.Cancel();
             Phase = RoomPhase.Closed;
             CancelModeClocks();
         }
     }
 }
+
+/// <summary>Snapshot of a non-referee participant present at prize-match start for deterministic settlement.</summary>
+/// <param name="UserNum">Participant account number.</param>
+/// <param name="Team">Assigned match team (<c>1</c> or <c>2</c>).</param>
+/// <param name="Slot">Assigned room slot ordering deterministic remainder distribution.</param>
+internal readonly record struct UserHostCompetitor(long UserNum, byte Team, int Slot);

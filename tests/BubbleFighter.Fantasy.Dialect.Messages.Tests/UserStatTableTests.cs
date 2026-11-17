@@ -80,7 +80,7 @@ public sealed class UserStatTableTests
         value["unknown_36"] = "A漢";
         var fighter = Fighter(value);
         fighter["nickname"] = "B";
-        fighter["unknown_76"] = false;
+        fighter["couple_partner_online"] = false;
         fighter["unknown_284"] = new[] { Rating(-1, 1000), Rating(17, 2000) };
         fighter["unknown_392"] = "\U00020000";
         var bytes = PacketCodec.Write(Tables, "kr-812", "UserStat", value);
@@ -139,8 +139,8 @@ public sealed class UserStatTableTests
         ["fighter"] = new Dictionary<string, object?>
         {
             ["user_number"] = 101, ["nickname"] = "", ["character_type"] = 103, ["level"] = 104, ["primary_escapes"] = 105,
-            ["unknown_48"] = 0x0102030405060708L, ["unknown_56"] = 107, ["unknown_64"] = unchecked((long)0xFEDCBA9876543210),
-            ["unknown_72"] = 109, ["unknown_76"] = true, ["unknown_80"] = 111,
+            ["unknown_48"] = 0x0102030405060708L, ["couple_present"] = 107, ["couple_since"] = unchecked((long)0xFEDCBA9876543210),
+            ["couple_ring_item"] = 109, ["couple_partner_online"] = true, ["unknown_80"] = 111,
             ["primary_wins"] = 112, ["primary_losses"] = 113, ["primary_draws"] = 114,
             ["primary_knockdowns"] = 115, ["primary_kills"] = 116, ["primary_rescues"] = 117,
             ["unknown_108"] = Enumerable.Range(118, 42).ToArray(),

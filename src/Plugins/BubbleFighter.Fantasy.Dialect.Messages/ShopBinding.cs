@@ -1,6 +1,7 @@
 using System.Globalization;
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
+using BubbleFighter.Fantasy.Contracts.Couples;
 using BubbleFighter.Fantasy.Contracts.Inventory;
 using BubbleFighter.Fantasy.Contracts.Shop;
 using BubbleFighter.Fantasy.Packets;
@@ -39,13 +40,14 @@ internal sealed class ShopBinding(string protocol, IOpcodeTable table,
             throw new InvalidOperationException("Balance publication contains another player's wallet.");
         // 0x81A820 -> 0x96FB40 -> 0x96F710 enables the waiting cash dialog on a fresh S105.
         return session.SendAsync(_stat, WriteStat(tables, build, message.Player.Nickname, message.Player.Level,
-            message.Wallet.Lucci, message.Wallet.Cash, message.Player.ColorIndex, message.Player.UserNum), ct);
+            message.Wallet.Lucci, message.Wallet.Cash, message.Player.ColorIndex, message.Player.UserNum,
+            CoupleProfileWire.Current(session)), ct);
     }
 
     // Login and shop refreshes use the same audited UserStat fields.
     internal static byte[] WriteStat(PacketTables tables, string build, string nickname, int level, int lucci, int cash,
-        ushort colorIndex = 0, long userNum = 0) =>
-        UserStatWire.Write(tables, build, nickname, level, lucci, cash, colorIndex, userNum);
+        ushort colorIndex = 0, long userNum = 0, CoupleProfileState? couple = null) =>
+        UserStatWire.Write(tables, build, nickname, level, lucci, cash, colorIndex, userNum, couple);
 
     internal static ShopPurchaseRequested ReadPurchase(PacketTables tables, string build, ReadOnlySpan<byte> body)
     {
@@ -69,7 +71,7 @@ internal sealed class ShopBinding(string protocol, IOpcodeTable table,
         var slots = message.Slots.Select(s => InventoryBinding.Map(s, baseline)).ToArray();
         var inventory = _inventory.RepInventoryAll(slots);
         var stat = WriteStat(tables, build, message.Player.Nickname, message.Player.Level, message.Wallet.Lucci,
-            message.Wallet.Cash, message.Player.ColorIndex, message.Player.UserNum);
+            message.Wallet.Cash, message.Player.ColorIndex, message.Player.UserNum, CoupleProfileWire.Current(session));
         publication.ThrowIfInvalid();
         if (message.FullInventory) publication.Reset(baseline);
         await publication.SendAsync(session, message.FullInventory ? _full : _update, inventory).ConfigureAwait(false);

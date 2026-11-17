@@ -95,6 +95,25 @@ public sealed class ServerDirectoryApiTests
         Assert.Equal("build_not_served", (await refused.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error").GetString());
     }
 
+    /// <summary>The shared clan port is published only for instances whose build has a clan connection.</summary>
+    [Theory]
+    [InlineData(7400)]
+    [InlineData(0)]
+    public async Task CatalogPublishesTheClanPortForClanBuildsOnly(int clanPort)
+    {
+        var options = Options();
+        options.ClanPort = clanPort;
+        options.Instances = [.. options.Instances,
+            new() { Id = "kr-186", Build = "kr-186", Port = 7280, Name = [new() { Language = "en", Text = "No clans" }] }];
+        await using var server = await LauncherServer.StartAsync(options, new MemoryLauncherAccounts(4),
+            new LauncherSessions(options, new MemoryLauncherSessions(4)), players: null, servesClans: build => build != "kr-186");
+        using var http = new HttpClient { BaseAddress = new(server.Addresses.Single()) };
+        var instances = (await http.GetFromJsonAsync<JsonElement>("/v1/catalog")).GetProperty("instances");
+        Assert.Equal(clanPort > 0, instances[0].TryGetProperty("clanPort", out var port));
+        if (clanPort > 0) Assert.Equal(clanPort, port.GetInt32());
+        Assert.False(instances[1].TryGetProperty("clanPort", out _));
+    }
+
     /// <summary>Without a cluster the catalog says nothing about cluster service, as before.</summary>
     [Fact]
     public async Task StandaloneCatalogHasNoClusterBuilds()

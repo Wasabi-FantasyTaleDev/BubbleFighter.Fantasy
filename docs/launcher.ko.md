@@ -41,7 +41,7 @@ Bubble Fighter Fantasy의 동반 데스크톱 애플리케이션 **Fantasy Tale 
 | --- | --- | --- | --- | --- | --- |
 | `kr-1256` | 한국 | KR 2026 | 2026-05-08 | 1256 | 실험적 |
 | `kr-812` | 한국 | KR 2015 | 2015-04-22 | 812 | 지원됨 |
-| `kr-186` | 한국 | KR 2009 | 2009-12-20 | 186 | 실험적 |
+| `kr-186` | 한국 | KR 2009 | 2009-12-21 | 186 | 실험적 |
 | `cn-279` | 중국 | CN 2011 | 2011-04-08 | 279 | 지원됨 |
 | `cn-324` | 중국 | CN 2012 | 2012-09-23 | 324 | 지원됨 |
 | `tw-410` | 대만 | TW 2013 | 2013-01-22 | 410 | 실험적 |
@@ -228,6 +228,7 @@ Bubble Fighter 클라이언트 패치는 훅 플러그인으로 제공됩니다.
 | `listen` | API 리스너의 IP 주소와 포트입니다. 일반 HTTP이며, 원격 배포에서는 앞단에서 HTTPS를 종료하는 것을 전제로 합니다. | `127.0.0.1:8090` |
 | `name` | 카탈로그에 표시되는 공개 서버 이름입니다. | `Bubble Fighter Fantasy`, 최대 128자 |
 | `host_policy` | 런처가 게임 엔드포인트에 도달하는 방식입니다. | `auto`, `ip`, `domain` |
+| `clan_port` | 클랜 연결이 있는 모든 빌드에 전달하는 공용 클랜 포트입니다. 런처는 이 값으로 클라이언트 `login.ini`의 `clanServerAddr`와 `clanServerPort`를 씁니다. `0`이면 전달하지 않습니다. | `${BFF_CLAN_PORT:-7400}` |
 | `region` | 플레이어에게 표시되는 선택적 지역입니다. | 비어 있음 또는 대문자 두 글자 |
 | `supports_instances` / `supports_plugins` | 서버가 인스턴스 선택과 클라이언트 플러그인을 허용하는지 광고합니다. | `true` / `true` |
 | `registration_enabled` | 런처 계정 등록을 허용하는지 여부입니다. | `true` |
@@ -402,7 +403,7 @@ WebSocket 채널입니다. 게임 위에 뜨는 런처 팝업처럼 원래 게�
 | --- | --- |
 | `companion` | 리스너와 실행 표. 켜면 모든 `/v1/launch` 응답에 `companion` 객체(`url`, 일회용 `ticket`, `launchId`, `expiresAt`)가 들어갑니다. |
 | `companion.notices` | 런처 팝업(`ui.notification.show`)과 `popup <텍스트>` 관리 명령, 권한 `game.management.popup`. |
-| `companion.native_ui` | 게임 자체의 메시지 상자, 알림, 배너 공지, 로컬 채팅 줄(`ui.native.invoke`/`ui.native.result`). 서버 플러그인은 `IClientNativeUi.ShowAsync`를 호출해 플레이어의 선택을 받습니다. 런처는 클라이언트의 네이티브 컨트롤을 먼저 쓰고 오버레이를 대체 수단으로 씁니다. 개발 테스트 명령 `clientui <닉네임> <box|notice|banner|chat> <텍스트>`(권한 `game.management.clientui`)는 한 플레이어에게 표시하고 결과를 출력합니다. |
+| `companion.native_ui` | 게임 자체의 메시지 상자, 알림, 배너 공지, 로컬 채팅 줄(`ui.native.invoke`/`ui.native.result`). 서버 플러그인은 `IClientNativeUi.ShowAsync`를 호출해 플레이어의 선택을 받습니다. 런처는 클라이언트의 네이티브 컨트롤을 먼저 쓰고 오버레이를 대체 수단으로 씁니다. 개발 테스트 명령 `clientui <닉네임> <box\|notice\|banner\|chat> <텍스트>`(권한 `game.management.clientui`)는 한 플레이어에게 표시하고 결과를 출력합니다. |
 | `companion.commands` | 공유 플레이어 권한과 채팅 제한을 사용하는 인증된 게임 명령 요청. |
 
 세 행은 core 번들에서 꺼져 있고 `all` 프로필이 켭니다. `companion` 옵션:

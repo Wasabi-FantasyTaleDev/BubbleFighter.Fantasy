@@ -1,0 +1,36 @@
+# The DynamicConfig content cn-774 is served beside its category-14 creation template (dynamic-config-cn-pets.yml): one
+# entry per registry bit, each naming its schema in packets/dynamic-config.yaml. cn-774 reads each set bit as a counted
+# zlib blob (cn-774 sub_811660), so the server frames the deflated body. Content, not a layout: it keeps the .yml suffix.
+slots:
+  # cn-774 registers category 3 as the plaza mini-game configuration (cn-774 sub_9D8360, decoder cn-774 sub_9D81D0, the
+  # 42 bytes of kr-1256's layout). The prices are the values the booths show and send back as their displayed cost, so the
+  # server charges exactly these.
+  3:
+    schema: LobbyMinigameContext
+    content:
+      flag_a: 1
+      basketball_cost: 50
+      unknown_6: 2000
+      unknown_8: 500
+      unknown_10: 4000
+      flag_12: 1
+      # Fishing is free: a priced cast would cost this times the day's catches plus one.
+      fishing_cost: 0
+      fishing_second_cost: 0
+      unknown_20: 120
+      unknown_22: 10
+      unknown_24: 15
+      unknown_26: 8
+      unknown_28: 190083
+      unknown_32: 101606
+      flag_36: 1
+      fortune_cost: 200
+
+  # cn-774 registers category 4 as the Mysterystore window (cn-774 sub_B1DC00 -> cn-774 sub_E45AE0). cn-774 sub_E45CD0 opens
+  # the store only while the client's local date lies inside this window, so a wide window keeps it open in every time
+  # zone; the server times the card rotations itself in UTC.
+  4:
+    schema: MysteryStoreContext
+    content:
+      start: "2020-01-01 00:00:00"
+      end: "2099-12-31 00:00:00"

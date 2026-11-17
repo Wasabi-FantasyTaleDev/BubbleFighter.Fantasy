@@ -3,7 +3,7 @@ using Xunit;
 
 namespace BubbleFighter.Fantasy.Persistence.Sqlite.Tests;
 
-/// <summary>Checks that Favorite weapon points commit with an enhancement and survive reopening in SQLite schema 13.</summary>
+/// <summary>Checks that Favorite weapon points commit with an enhancement and survive reopening in SQLite schema 14.</summary>
 public sealed class ItemFavoriteTests : IDisposable
 {
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "bff-favorite-" + Guid.NewGuid().ToString("N"));
@@ -37,7 +37,7 @@ public sealed class ItemFavoriteTests : IDisposable
         using (var database = new SqliteDatabase(Options))
         {
             var store = new SqliteRepositories(database);
-            Assert.Equal(13L, database.RawScalar("PRAGMA user_version"));
+            Assert.Equal(18L, database.RawScalar("PRAGMA user_version"));
             var reopened = await store.ReadEnhancementInventoryAsync(user, Scope, default);
             Assert.Equal(saved.CharacterBag, reopened.CharacterBag);
             Assert.Equal(saved.EquippedBag, reopened.EquippedBag);

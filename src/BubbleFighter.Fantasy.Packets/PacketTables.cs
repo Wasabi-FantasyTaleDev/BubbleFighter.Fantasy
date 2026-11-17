@@ -40,7 +40,7 @@ public sealed class PacketTables
 
     private static readonly HashSet<string> Scalars = new(StringComparer.Ordinal)
     {
-        "u8", "u16", "u32", "u64", "bool", "f32", "f64", "wstr", "empty_list",
+        "u8", "u16", "u32", "u64", "bool", "f32", "f64", "wstr", "wcstr", "empty_list",
     };
 
     // The scalars a fixed run (`u32[49]`) may repeat.

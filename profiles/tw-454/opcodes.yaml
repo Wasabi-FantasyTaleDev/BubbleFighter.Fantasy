@@ -4,6 +4,36 @@ profile: tw-454
 # packet name through an address into the image (dispatcher sub_AACF80
 # --exe). See profiles/opcode-policy.md.
 opcodes:
+  - value: 930
+    direction: c2s
+    name: gcpReqCoupleConfirmInvite
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_C7C3D0 stamps 930 and writes bool32, target name, invitation item, message and own-build EquippedItemList; matched to kr-812 Packet_gcpReqCoupleConfirmInvite in sub_9FDC70"
+  - value: 931
+    direction: c2s
+    name: gcpReqCoupleInviteExpire
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_C76860 stamps 931 and writes one bool32; matched to kr-812 Packet_gcpReqCoupleInviteExpire in sub_9FBD20"
+  - value: 932
+    direction: c2s
+    name: gcpReqCoupleInviteAnswer
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_C7C550 stamps 932 and writes two bool32 values followed by inviter and recipient names; matched to kr-812 Packet_gcpReqCoupleInviteAnswer in sub_9FDCE0"
+  - value: 933
+    direction: c2s
+    name: gcpReqCoupleBreakUp
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_C7B5A0 stamps 933 and writes one partner name after the Yes confirmation; matched to kr-812 Packet_gcpReqCoupleBreakUp in sub_9FDD50"
+  - value: 945
+    direction: c2s
+    name: gcpReqChangeCouplering
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 DlgCoupleItemChoice2 vtable 13448FC slot 62, sub_6D0EE0, sends selected owned invitation item then zero word only when already coupled; matched to kr-812 Packet_gcpReqChangeCouplering in sub_4CC410"
   - value: 17
     direction: c2s
     connection: relay
@@ -2360,6 +2390,14 @@ opcodes:
     evidence: verified
     source: "tw-454 sub_716E50 writer and sub_70B3F0 -> sub_726000 consumer; kr-812 Packet_gppNearDamager at sub_511160 / sub_51C5C0 (kr-812 number 32773); tw-454 builds GoNearDamager, handBell effect"
     notes: "packets/damagers.yaml NearDamager; relayed unchanged with the damager spawns"
+  - value: 828
+    direction: c2s
+    connection: game
+    name: gcpReqCashInven
+    name_source: label@kr-812
+    evidence: inferred
+    source: "tw-454 sub_BCDBA0 (called by tw-454 sub_8DA850 and tw-454 sub_BC5770) stamps C2S 828 with an empty body; matched to kr-812 gcpReqCashInven"
+    notes: "Requests a full refresh of the cash item inbox (gspCashInvenUpdateAllInventorySlot)."
   - value: 829
     direction: c2s
     connection: game
@@ -3563,17 +3601,19 @@ opcodes:
   - value: 33274
     direction: c2s
     connection: both
-    name: Unknown33274
-    name_source: none
+    name: gppSetNightVision_
+    name_source: coined
     evidence: verified
-    source: "tw-454 sub_C5F0B0 writes actor and Boolean render word"
+    source: "tw-454 sub_C5F0B0 writes the actor and Boolean consumed by the night-vision path"
+    notes: "8 bytes: u32 actor, bool32 enabled; separate from passive wall healing"
   - value: 33274
     direction: s2c
     connection: both
-    name: Unknown33274
-    name_source: none
+    name: gppSetNightVision_
+    name_source: coined
     evidence: verified
-    source: "tw-454 sub_70E250 consumes actor and Boolean render word in case 33274"
+    source: "tw-454 sub_70E250 calls tw-454 sub_778970 to update the night-vision byte, character effect and local UI"
+    notes: "8 bytes: u32 actor, bool32 enabled; separate from passive wall healing"
   - value: 32796
     direction: c2s
     connection: both
@@ -3863,6 +3903,22 @@ opcodes:
     evidence: verified
     source: "tw-454 sub_7D37C0 stamps 2011 with an EMPTY body - zero appends between the packet ctor and the send through the game connection dword_163FD20 - gated on a config value fetched by a fixed key comparing equal to the built string (equality test tw-454 sub_453030) and a seat state dword != 36"
     notes: "The purpose is unknown: no name evidence; a config-gated, state-checked empty request sent per entry of a room-member list. The state dword is the seat record's +116 field (base dword_163DEAC + 280 * user_number + 20168), the same field the S2C 511 gspRoomLeaveSlot fill path copies from the parsed UserSlot (tw-454 sub_A5A0B0); packets/room.yaml documents no UserSlot field at +116, and what state 36 means is unestablished."
+  - value: 2028
+    direction: c2s
+    connection: game
+    name: gcpUserHostStart
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_7D9C30 stamps 2028 into an empty TcpPacket when GameSetting+148 (is_user_host) is set, teams match (tw-454 sub_A69360), ticket check (tw-454 sub_C06710) and dialog confirmation pass; matched to kr-812 C2S 2025 Packet_gcpUserHostStart and kr-1256 C2S 2031"
+    notes: "empty body; prize-room start request answered by S2C 989 gspUserHostStart (tw-454 sub_AA5D20)."
+  - value: 2029
+    direction: c2s
+    connection: game
+    name: gcpUserHostSetting
+    name_source: label@cn-717
+    evidence: verified
+    source: "tw-454 sub_A69500 stamps 2029 and appends two u32 words (action, prize); matched to kr-812 C2S 2026 and cn-774 C2S 2030 gcpUserHostSetting"
+    notes: "two u32 words (action, prize); matches packets/user-settings.yaml UserHostSettingRequest@kr-1256."
   - value: 2021
     direction: c2s
     connection: game
@@ -4345,3 +4401,586 @@ opcodes:
     evidence: verified
     source: "tw-454 sub_70B3F0 case 32902 dispatches to tw-454 sub_724810, which read actor u32, weapon u16, six f32 values and two u32 words"
     notes: "packets/extreme-racing.yaml ExtremeRacingCannonShot; 38 bytes; table coverage does not register an echo or traffic schedule."
+  - value: 32878
+    direction: c2s
+    connection: both
+    name: gppSoccerModeGoal
+    name_source: label@cn-279
+    evidence: verified
+    source: "tw-454 sub_71A9A0 (the soccer host's update) writes it; consumer tw-454 sub_732380; kr-812 sub_514150 builds the same frame as Packet_gppSoccerModeGoal"
+    notes: "one byte, the index of the goal box the ball entered. The host executes it locally and relays it (packets/round-feed.yaml)."
+  - value: 32878
+    direction: s2c
+    connection: both
+    name: gppSoccerModeGoal
+    name_source: label@cn-279
+    evidence: verified
+    source: "tw-454 sub_71A9A0 (the soccer host's update) writes it; consumer tw-454 sub_732380; kr-812 sub_514150 builds the same frame as Packet_gppSoccerModeGoal"
+    notes: "one byte, the index of the goal box the ball entered. The host executes it locally and relays it (packets/round-feed.yaml)."
+  - value: 32879
+    direction: c2s
+    connection: both
+    name: gppSoccerModeCountDown
+    name_source: label@cn-279
+    evidence: verified
+    source: "tw-454 sub_71A9A0 (the soccer host's update) writes it; consumer tw-454 sub_732520; kr-812 sub_514150 builds the same frame as Packet_gppSoccerModeCountDown"
+    notes: "empty body; the receivers start the restart countdown. The host executes it locally and relays it (packets/round-feed.yaml)."
+  - value: 32879
+    direction: s2c
+    connection: both
+    name: gppSoccerModeCountDown
+    name_source: label@cn-279
+    evidence: verified
+    source: "tw-454 sub_71A9A0 (the soccer host's update) writes it; consumer tw-454 sub_732520; kr-812 sub_514150 builds the same frame as Packet_gppSoccerModeCountDown"
+    notes: "empty body; the receivers start the restart countdown. The host executes it locally and relays it (packets/round-feed.yaml)."
+  - value: 32880
+    direction: c2s
+    connection: both
+    name: gppSoccerModeContinueGame
+    name_source: label@cn-279
+    evidence: verified
+    source: "tw-454 sub_71A9A0 (the soccer host's update) writes it; consumer tw-454 sub_7326C0; kr-812 sub_514150 builds the same frame as Packet_gppSoccerModeContinueGame"
+    notes: "empty body; the receivers resume play. The host executes it locally and relays it (packets/round-feed.yaml)."
+  - value: 32880
+    direction: s2c
+    connection: both
+    name: gppSoccerModeContinueGame
+    name_source: label@cn-279
+    evidence: verified
+    source: "tw-454 sub_71A9A0 (the soccer host's update) writes it; consumer tw-454 sub_7326C0; kr-812 sub_514150 builds the same frame as Packet_gppSoccerModeContinueGame"
+    notes: "empty body; the receivers resume play. The host executes it locally and relays it (packets/round-feed.yaml)."
+  # The clan-server connection (connection: clan), numbered as in kr-1256: dispatcher tw-454 sub_685A10,
+  # stamper tw-454 sub_EB5470; every row's reader or writer was read against kr-1256's field by field.
+  # Bodies in packets/clan-server.yaml.
+  - value: 1002
+    direction: s2c
+    connection: clan
+    name: ClanHello
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_685A10 case 0x3EA: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Empty body. Sent when the connection opens and again on every heartbeat until the connection has logged in, because the client can only answer once its game connection is logged in."
+  - value: 1003
+    direction: c2s
+    connection: clan
+    name: ClanHeartbeat
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_6858F0: the same fields as kr-1256 (kr-1256 sub_525050)"
+    notes: "Empty body."
+  - value: 1005
+    direction: c2s
+    connection: clan
+    name: ClanLogin
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_686F20: the same fields as kr-1256 (kr-1256 sub_525DF0)"
+    notes: "Body ClanServerLogin. Every field is the server's own gspClanPassport echoed back."
+  - value: 1006
+    direction: s2c
+    connection: clan
+    name: ClanLoginResult
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_685A10 case 0x3EE: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerLoginResult."
+  - value: 1015
+    direction: c2s
+    connection: clan
+    name: ClanHomeRequest
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_6878C0: the same fields as kr-1256 (kr-1256 sub_526E90)"
+    notes: "Empty body."
+  - value: 1016
+    direction: s2c
+    connection: clan
+    name: ClanHome
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_687290: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerHome."
+  - value: 1017
+    direction: c2s
+    connection: clan
+    name: ClanProfileRequest
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_687950: the same fields as kr-1256 (kr-1256 sub_526F50)"
+    notes: "Empty body."
+  - value: 1018
+    direction: s2c
+    connection: clan
+    name: ClanProfile
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_6874C0: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerProfile."
+  - value: 1027
+    direction: c2s
+    connection: clan
+    name: ClanCreate
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_687E90: the same fields as kr-1256 (kr-1256 sub_5275B0)"
+    notes: "Body ClanServerCreate."
+  - value: 1028
+    direction: s2c
+    connection: clan
+    name: ClanCreateResult
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_685A10 case 0x404 -> tw-454 sub_679D20: two words, without kr-1256's third (packets/clan-server.yaml except: [tw-454])"
+    notes: "Body ClanServerCreateResult."
+  - value: 1011
+    direction: c2s
+    connection: clan
+    name: ClanRosterRequest
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_688040: the same fields as kr-1256 (kr-1256 sub_527890)"
+    notes: "Empty body."
+  - value: 1012
+    direction: s2c
+    connection: clan
+    name: ClanRoster
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_68AAE0: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerRoster."
+  - value: 1013
+    direction: c2s
+    connection: clan
+    name: ClanMemberDetailsRequest
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_6880C0: the same fields as kr-1256 (kr-1256 sub_527910)"
+    notes: "Body ClanServerMemberDetailsRequest."
+  - value: 1014
+    direction: s2c
+    connection: clan
+    name: ClanMemberDetails
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_68B4A0: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerMemberDetails."
+  - value: 1045
+    direction: c2s
+    connection: clan
+    name: ClanMemberReport
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_688270: the same fields as kr-1256 (kr-1256 sub_527AB0)"
+    notes: "Body ClanServerMemberReport."
+  - value: 1019
+    direction: c2s
+    connection: clan
+    name: ClanSearch
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_6870D0: the same fields as kr-1256 (kr-1256 sub_526020)"
+    notes: "Body ClanServerSearch."
+  - value: 1020
+    direction: s2c
+    connection: clan
+    name: ClanSearchResult
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_685A10: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Bodies ClanServerSearchResult and ClanServerSearchEntry."
+  - value: 1032
+    direction: c2s
+    connection: clan
+    name: ClanApply
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_6879D0: the same fields as kr-1256 (kr-1256 sub_527010)"
+    notes: "Body ClanServerApply."
+  - value: 1033
+    direction: c2s
+    connection: clan
+    name: ClanJoin
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_687A80: the same fields as kr-1256 (kr-1256 sub_527130)"
+    notes: "Body ClanServerJoin."
+  - value: 1034
+    direction: s2c
+    connection: clan
+    name: ClanApplyResult
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_685A10: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerApplyResult."
+  - value: 1063
+    direction: c2s
+    connection: clan
+    name: ClanCancelApplication
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_687B40: the same fields as kr-1256 (kr-1256 sub_527250)"
+    notes: "Body ClanServerCancelApplication."
+  - value: 1064
+    direction: s2c
+    connection: clan
+    name: ClanCancelApplicationResult
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_685A10: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerCancelApplicationResult."
+  - value: 1069
+    direction: c2s
+    connection: clan
+    name: ClanApplicantsRequest
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_688170: the same fields as kr-1256 (kr-1256 sub_5279B0)"
+    notes: "Empty body."
+  - value: 1070
+    direction: s2c
+    connection: clan
+    name: ClanApplicants
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_68BAA0: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Bodies ClanServerApplicants and ClanServerApplicant."
+  - value: 1036
+    direction: c2s
+    connection: clan
+    name: ClanLeave
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_6885B0: the same fields as kr-1256 (kr-1256 sub_527DC0)"
+    notes: "Empty body."
+  - value: 1037
+    direction: s2c
+    connection: clan
+    name: ClanMemberLeft
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_68CAC0: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerMemberLeft."
+  - value: 1039
+    direction: c2s
+    connection: clan
+    name: ClanMemberChange
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_688360: the same fields as kr-1256 (kr-1256 sub_527B80)"
+    notes: "Body ClanServerMemberChange."
+  - value: 1040
+    direction: s2c
+    connection: clan
+    name: ClanMemberChangeResult
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_67F330: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerMemberChangeResult."
+  - value: 1041
+    direction: s2c
+    connection: clan
+    name: ClanMemberChanged
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_68C0E0: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerMemberChanged."
+  - value: 1048
+    direction: c2s
+    connection: clan
+    name: ClanIntroductionEdit
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_688520: the same fields as kr-1256 (kr-1256 sub_527D30)"
+    notes: "Body ClanServerIntroductionEdit."
+  - value: 1049
+    direction: s2c
+    connection: clan
+    name: ClanIntroductionEditResult
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_68C870: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerIntroductionEditResult."
+  - value: 1050
+    direction: s2c
+    connection: clan
+    name: ClanIntroductionChanged
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_685A10 case 0x41A (inline): the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerIntroductionChanged."
+  - value: 1051
+    direction: c2s
+    connection: clan
+    name: ClanNoticeEdit
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_688490: the same fields as kr-1256 (kr-1256 sub_527CA0)"
+    notes: "Body ClanServerNoticeEdit."
+  - value: 1052
+    direction: s2c
+    connection: clan
+    name: ClanNoticeEditResult
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_68C670: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerNoticeEditResult."
+  - value: 1053
+    direction: s2c
+    connection: clan
+    name: ClanNoticeChanged
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_685A10 case 0x41D (inline): the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerNoticeChanged."
+  - value: 1096
+    direction: c2s
+    connection: clan
+    name: ClanMarkEdit
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_68E0A0: the same fields as kr-1256 (kr-1256 sub_530C50)"
+    notes: "Body ClanServerMarkEdit."
+  - value: 1097
+    direction: s2c
+    connection: clan
+    name: ClanMarkChanged
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_68FE70: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerMarkChanged."
+  - value: 1102
+    direction: c2s
+    connection: clan
+    name: ClanRecruitmentEdit
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_688AF0: the same fields as kr-1256 (kr-1256 sub_528460)"
+    notes: "Body ClanServerRecruitmentEdit."
+  - value: 1103
+    direction: s2c
+    connection: clan
+    name: ClanRecruitmentEditResult
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_685A10 case 0x44F (inline): the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerRecruitmentEditResult."
+  - value: 1054
+    direction: c2s
+    connection: clan
+    name: ClanTransferConfirm
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_688820: the same fields as kr-1256 (kr-1256 sub_528070)"
+    notes: "Body ClanServerTransferConfirm."
+  - value: 1056
+    direction: s2c
+    connection: clan
+    name: ClanMasterChanged
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_67BF20: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerMasterChanged."
+  - value: 1057
+    direction: c2s
+    connection: clan
+    name: ClanTransferRequest
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_688770: the same fields as kr-1256 (kr-1256 sub_527F60)"
+    notes: "Body ClanServerTransferRequest."
+  - value: 1058
+    direction: s2c
+    connection: clan
+    name: ClanTransferRequestResult
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_68CC40: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerTransferRequestResult."
+  - value: 1059
+    direction: s2c
+    connection: clan
+    name: ClanTransferOffer
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_68CE60: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerTransferOffer."
+  - value: 1060
+    direction: c2s
+    connection: clan
+    name: ClanTransferAnswer
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_68CE60: the same fields as kr-1256 (kr-1256 sub_52F620)"
+    notes: "Body ClanServerTransferAnswer."
+  - value: 1061
+    direction: s2c
+    connection: clan
+    name: ClanTransferAnswerResult
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_68D5F0: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerTransferAnswerResult."
+  - value: 1062
+    direction: s2c
+    connection: clan
+    name: ClanTransferAnswered
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_68D250: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerTransferAnswered."
+  - value: 1029
+    direction: c2s
+    connection: clan
+    name: ClanDisband
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_6888D0: the same fields as kr-1256 (kr-1256 sub_528190)"
+    notes: "Body ClanServerDisband."
+  - value: 1030
+    direction: s2c
+    connection: clan
+    name: ClanDisbandResult
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_6812A0: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerDisbandResult."
+  - value: 1031
+    direction: s2c
+    connection: clan
+    name: ClanDisbandChanged
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_681540: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerDisbandChanged."
+  - value: 1021
+    direction: c2s
+    connection: clan
+    name: ClanBoardRequest
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_687BF0: the same fields as kr-1256 (kr-1256 sub_527360)"
+    notes: "Body ClanServerBoardRequest."
+  - value: 1022
+    direction: s2c
+    connection: clan
+    name: ClanBoard
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_685A10 case 0x3FE -> tw-454 sub_688C60: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Bodies ClanServerBoard and ClanServerBoardPost."
+  - value: 1023
+    direction: c2s
+    connection: clan
+    name: ClanBoardWrite
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_687CE0: the same fields as kr-1256 (kr-1256 sub_527430)"
+    notes: "Body ClanServerBoardWrite."
+  - value: 1024
+    direction: s2c
+    connection: clan
+    name: ClanBoardWriteResult
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_689130: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerBoardWriteResult."
+  - value: 1025
+    direction: c2s
+    connection: clan
+    name: ClanBoardDelete
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_687DA0: the same fields as kr-1256 (kr-1256 sub_5274E0)"
+    notes: "Body ClanServerBoardDelete."
+  - value: 1026
+    direction: s2c
+    connection: clan
+    name: ClanBoardDeleted
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_685A10 case 0x402 -> tw-454 sub_67CA10: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Empty body."
+  - value: 1042
+    direction: c2s
+    connection: clan
+    name: ClanWhisper
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_6871C0: the word and the two strings, without kr-1256's trailing byte (except: [tw-454])"
+    notes: "Body ClanServerWhisper."
+  - value: 1043
+    direction: s2c
+    connection: clan
+    name: ClanWhisperResult
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_68A060: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerWhisperResult."
+  - value: 1044
+    direction: s2c
+    connection: clan
+    name: ClanWhisperMessage
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_68A520: the word and three strings, without kr-1256's trailing byte (except: [tw-454])"
+    notes: "Body ClanServerWhisperMessage."
+  - value: 1066
+    direction: c2s
+    connection: clan
+    name: ClanChat
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_688980: the same fields as kr-1256 (kr-1256 sub_5282A0)"
+    notes: "Body ClanServerChat."
+  - value: 1067
+    direction: s2c
+    connection: clan
+    name: ClanChatResult
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_685A10: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerChatResult."
+  - value: 1068
+    direction: s2c
+    connection: clan
+    name: ClanChatMessage
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_685A10 case 0x42C: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerChatMessage."
+  # Game-connection clan requests (packets/clan.yaml); bodies and triggers read against kr-1256's writers.
+  - value: 25
+    direction: c2s
+    name: gcpReqClanPassport
+    name_source: label@kr-1256
+    evidence: verified
+    source: "tw-454 sub_685A10 case 0x3EA (the clan connection's hello) stamps 25 on an empty TcpPacket and sends it on the game connection, as kr-1256 sub_525170 case 0x3EA"
+    notes: "Empty body. The clan plugin answers a logged-in session with gspClanPassport."
+  - value: 2037
+    direction: c2s
+    name: gcpReqClanMainOpen_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_682760 (called by the clan setup tw-454 sub_678E60 after its lookup of local key 196 and by the click state machine tw-454 sub_6C97B0) stamps 2037 on an empty frame, as kr-1256 sub_5A9410 / kr-1256 sub_516EE0 stamp 2040"
+    notes: "Empty body."
+  - value: 2038
+    direction: c2s
+    name: gcpReqClanAttendanceCheckIn_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_69EFE0 (FrmClanAttendance, card word +1020 == 1 and byte +1004 == 0) stamps 2038 on an empty frame, as kr-1256 sub_57F010 stamps 2041"
+    notes: "Empty body."
+  - value: 2022
+    direction: c2s
+    name: gcpReqClanInfo
+    name_source: label@cn-717
+    evidence: inferred
+    source: "tw-454 sub_67AC80 writes a word, a counted wide string and a word, as kr-1256 sub_519160 (2025) and cn-774 sub_5D7FE0 (2023)"
+  - value: 127
+    direction: c2s
+    connection: game
+    name: gcpReqUserMysteryStore
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_E5A280 stamps 127 on a TcpPacket for RequestUserMysteryStore and runs its serializer; the request reader tw-454 sub_471DA0 reads the u8 type, the u32 token and the type-specific tail (u16 for types 2 and 3, u32 and u16 for type 4) exactly as kr-1256 sub_114E2E0 writes them (kr-1256 stamps 128, which is a different request in this build); packets/mystery-store.yaml"
+    notes: "Bodies are 5/7/7/11 bytes as in kr-1256. Do not inherit kr-1256's 128: this build's 128 is another request."

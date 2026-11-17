@@ -3,8 +3,9 @@ version: 1
 # weapon table of its own for the mode: the server assigns every weapon with the equipment frame below, and the
 # client applies it through the equipment applier that every mode shares. The one request the client makes for
 # the mode is the empty revival request below. Layout coverage does not enable the mode, choose a weapon or
-# establish client acceptance. cn-774 and tw-454 carry the strategy class too, but their readers and senders are
-# not audited, so the structures are used for kr-1256 only (packets/builds.yaml capability weapon_master).
+# establish client acceptance. cn-774 reads and sends both frames the same way (cn-774 sub_89F3D0, cn-774 sub_529F60,
+# cn-774 sub_50F6A0); tw-454 carries the strategy class too, but its reader and sender are not audited, so it states
+# neither (packets/builds.yaml capability weapon_master).
 structs:
 
   # S2C 1001 on the game connection: kr-1256 sub_9D2FF0 hands each game packet to kr-1256 sub_6D55D0 first, whose
@@ -26,20 +27,20 @@ structs:
   EquipmentApply:
     - seat: u32
       offset: 0
-      only: [kr-1256]
-      except: [cn-774, tw-454]    # the cn-774 and tw-454 readers are not audited
+      only: [kr-1256, cn-774]
+      except: [tw-454]    # the tw-454 reader is not audited
     - slots: "list<u32>"
       offset: 4
-      only: [kr-1256]
-      except: [cn-774, tw-454]
+      only: [kr-1256, cn-774]
+      except: [tw-454]
     - items: "list<u32>"
       offset: 16
-      only: [kr-1256]
-      except: [cn-774, tw-454]
+      only: [kr-1256, cn-774]
+      except: [tw-454]
     - reason: u32
       offset: 28
-      only: [kr-1256]
-      except: [cn-774, tw-454]
+      only: [kr-1256, cn-774]
+      except: [tw-454]
 
   # C2S 765 on the game connection, with no body. kr-1256 sub_4A73A0, the character's death handler, adds one to
   # the character's death counter (dword 849) on every death; for the local character in mode 26 it reads the

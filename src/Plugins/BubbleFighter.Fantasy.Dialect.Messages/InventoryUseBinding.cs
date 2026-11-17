@@ -26,6 +26,8 @@ internal sealed class InventoryUseBinding(string protocol, IOpcodeTable opcodes,
     private readonly bool _listParameters = tables.Resolve(build, "InventoryUseRequest")
         .Single(field => field.Name == "parameters").Type.StartsWith("list<", StringComparison.Ordinal);
 
+    private readonly UserStatSender _userStat = new(protocol, opcodes, tables, build);
+
     public string Protocol => protocol;
 
     internal void Bind(IPluginContext context, IMessageRouter messages)
@@ -91,12 +93,6 @@ internal sealed class InventoryUseBinding(string protocol, IOpcodeTable opcodes,
             new Dictionary<string, object?> { ["result"] = message.Result, ["item_id"] = message.ItemId, ["parameters"] = parameters }), ct);
     }
 
-    public ValueTask SendAsync(ISession session, UserStatUpdated message, CancellationToken ct)
-    {
-        if (message.Player.UserNum != message.Wallet.UserNum)
-            throw new InvalidOperationException("Local user state contains another player's wallet.");
-        return session.SendAsync(opcodes.S2C("gspUserStat"), UserStatWire.Write(tables, build,
-            message.Player.Nickname, message.Player.Level, message.Wallet.Lucci, message.Wallet.Cash,
-            message.Player.ColorIndex, message.Player.UserNum), ct);
-    }
+    public ValueTask SendAsync(ISession session, UserStatUpdated message, CancellationToken ct) =>
+        _userStat.SendAsync(session, message, ct);
 }

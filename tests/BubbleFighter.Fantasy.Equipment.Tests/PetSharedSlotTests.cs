@@ -7,7 +7,6 @@ using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.ClientData;
 using BubbleFighter.Fantasy.Contracts.Inventory;
 using BubbleFighter.Fantasy.Equipment.Data;
-using BubbleFighter.Fantasy.Equipment.Selection;
 using BubbleFighter.Fantasy.Kernel;
 using BubbleFighter.Fantasy.Lobby;
 using BubbleFighter.Fantasy.Lobby.Data;
@@ -21,7 +20,7 @@ namespace BubbleFighter.Fantasy.Equipment.Tests;
 
 /// <summary>
 /// Pins the default-off shared pet slot: the loader reads the workbook's own function
-/// column, the policy refuses a second worn pet through the selection's denial path, and
+/// column, wearing a second pet takes the first one off in the same selection, and
 /// a pet never conflicts with ordinary equipment.
 /// </summary>
 public sealed class PetSharedSlotTests
@@ -141,16 +140,16 @@ public sealed class PetSharedSlotTests
     }
 
     [Fact]
-    public async Task FirstPetWearsAndSecondPetIsRefused()
+    public async Task SecondPetReplacesTheWornPet()
     {
         using var h = await Harness.CreateAsync();
         var first = await h.Selection.ApplyAsync(42, 301001, true, default);
         Assert.NotNull(first);
         Assert.Contains(301001, Worn(first));
-        Assert.Null(await h.Selection.ApplyAsync(42, 301002, true, default));
+        Assert.NotNull(await h.Selection.ApplyAsync(42, 301002, true, default));
         var worn = Worn(await h.Selection.ReadAsync(42, default));
-        Assert.Contains(301001, worn);
-        Assert.DoesNotContain(301002, worn);
+        Assert.Contains(301002, worn);
+        Assert.DoesNotContain(301001, worn);
     }
 
     [Fact]
@@ -173,24 +172,22 @@ public sealed class PetSharedSlotTests
         await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
         var second = h.Selection.ApplyAsync(42, 301002, true, default).AsTask();
         release.SetResult();
-        var results = await Task.WhenAll(first, second);
+        await Task.WhenAll(first, second);
 
-        Assert.Single(results, result => result is not null);
         Assert.Single(Worn(await h.Selection.ReadAsync(42, default)), item => item is 301001 or 301002);
     }
 
     [Fact]
-    public async Task RetargetedRequestCannotBypassThePetSlot()
+    public async Task RetargetedRequestStillKeepsOnePet()
     {
         using var h = await Harness.CreateAsync();
         Assert.NotNull(await h.Selection.ApplyAsync(42, 301001, true, default));
         using var retarget = h.Events.Intercept<EquipmentSelectionApplying, EquipmentSelectionDecision>(
             (_, _, _) => ValueTask.FromResult(new EquipmentSelectionDecision(true, 301002, true)));
 
-        Assert.Null(await h.Selection.ApplyAsync(42, 203073, true, default));
+        await h.Selection.ApplyAsync(42, 203073, true, default);
         var stored = await h.Store.ListSlotsAsync(42, InventoryBag.CharacterBag, InventoryLimits.MaxInventorySlotsPerBag, default);
-        Assert.Contains(301001, Worn(stored));
-        Assert.DoesNotContain(301002, Worn(stored));
+        Assert.Single(Worn(stored), item => item is 301001 or 301002);
     }
 
     [Fact]
@@ -215,24 +212,24 @@ public sealed class PetSharedSlotTests
         var two = second.Selection.ApplyAsync(42, 301002, true, default).AsTask();
         try { await bothEntered.Task.WaitAsync(TimeSpan.FromSeconds(5)); }
         finally { release.TrySetResult(); }
-        var results = await Task.WhenAll(one, two);
+        await Task.WhenAll(one, two);
 
-        Assert.Single(results, result => result is not null);
         var stored = await first.Store.ListSlotsAsync(42, InventoryBag.CharacterBag, InventoryLimits.MaxInventorySlotsPerBag, default);
         Assert.Single(Worn(stored), item => item is 301001 or 301002);
     }
 
     [Fact]
-    public async Task RefusedSecondPetRepliesFailureOnTheWire()
+    public async Task SwitchingPetsRepliesSuccessOnTheWire()
     {
         using var h = await Harness.CreateAsync();
         await h.WearAsync(301001);
         h.Session.Sent.Clear();
         await h.WearAsync(301002);
-        Assert.Single(h.Session.Sent);
-        Assert.Equal(811, h.Session.Sent[0].Opcode);
-        Assert.NotEqual(0, BinaryPrimitives.ReadInt32LittleEndian(h.Session.Sent[0].Payload));
-        Assert.DoesNotContain(301002, Worn(await h.Selection.ReadAsync(42, default)));
+        var reply = Assert.Single(h.Session.Sent, frame => frame.Opcode == 811);
+        Assert.Equal(0, BinaryPrimitives.ReadInt32LittleEndian(reply.Payload));
+        var worn = Worn(await h.Selection.ReadAsync(42, default));
+        Assert.Contains(301002, worn);
+        Assert.DoesNotContain(301001, worn);
     }
 
     [Fact]
@@ -275,7 +272,9 @@ public sealed class PetSharedSlotTests
         var restored = Worn(await nextSession.Selection.ReadAsync(42, default));
         Assert.DoesNotContain(301001, restored);
         Assert.Contains(301002, restored);
-        Assert.Null(await nextSession.Selection.ApplyAsync(42, 301001, true, default));
+        var switched = Worn(Assert.IsAssignableFrom<IReadOnlyList<InventorySlotRecord>>(await nextSession.Selection.ApplyAsync(42, 301001, true, default)));
+        Assert.Contains(301001, switched);
+        Assert.DoesNotContain(301002, switched);
     }
 
     [Fact]
@@ -322,7 +321,7 @@ public sealed class PetSharedSlotTests
     }
 
     [Fact]
-    public async Task RefusalShortCircuitsWhileAllowedWearsKeepTheChain()
+    public async Task PetSwitchesKeepTheSelectionChain()
     {
         using var h = await Harness.CreateAsync();
         var calls = 0;
@@ -332,11 +331,9 @@ public sealed class PetSharedSlotTests
             return next(ct);
         });
         Assert.NotNull(await h.Selection.ApplyAsync(42, 301001, true, default));
-        Assert.Equal(1, calls);
-        Assert.Null(await h.Selection.ApplyAsync(42, 301002, true, default));
-        Assert.Equal(1, calls);
+        Assert.NotNull(await h.Selection.ApplyAsync(42, 301002, true, default));
         Assert.NotNull(await h.Selection.ApplyAsync(42, 203073, true, default));
-        Assert.Equal(2, calls);
+        Assert.Equal(3, calls);
     }
 
     [Fact]

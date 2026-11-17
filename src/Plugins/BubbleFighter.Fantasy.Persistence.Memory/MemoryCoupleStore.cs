@@ -84,13 +84,13 @@ public sealed class MemoryCoupleStore : ICoupleStore
         if (sender == invitation.Recipient || !StringComparer.Ordinal.Equals(sender.Authority, invitation.Recipient.Authority))
             return ValueTask.FromResult(new CoupleStoreOutcome(CoupleStoreResult.Forbidden));
         var pending = new CoupleInvitation(invitation.Id, sender, invitation.Recipient,
-            invitation.Message, invitation.CreatedAt, invitation.ExpiresAt);
+            invitation.Message, invitation.CreatedAt, invitation.ExpiresAt) { RingItemId = invitation.RingItemId };
         lock (_gate)
         {
             Expire(invitation.CreatedAt);
             if (Lookup(invitation.Id) is { } retained)
                 return ValueTask.FromResult(retained.Invitation == pending
-                    ? retained : new CoupleStoreOutcome(CoupleStoreResult.Conflict));
+                    ? Current(retained) : new CoupleStoreOutcome(CoupleStoreResult.Conflict));
             if (_relationships.ContainsKey(invitation.Id))
                 return ValueTask.FromResult(new CoupleStoreOutcome(CoupleStoreResult.Conflict));
             if (_members.ContainsKey(sender) || _members.ContainsKey(invitation.Recipient))
@@ -127,7 +127,8 @@ public sealed class MemoryCoupleStore : ICoupleStore
                 return ValueTask.FromResult(Finish(new(CoupleStoreResult.AlreadyPaired, invitation)));
             if (_relationships.Count >= _maxRelationships)
                 return ValueTask.FromResult(new CoupleStoreOutcome(CoupleStoreResult.CapacityReached, invitation));
-            var relationship = new CoupleRelationship(invitation.Id, invitation.Sender, recipient, now);
+            var relationship = new CoupleRelationship(invitation.Id, invitation.Sender, recipient, now)
+                { RingItemId = invitation.RingItemId };
             _relationships.Add(relationship.Id, relationship);
             _members.Add(relationship.First, relationship);
             _members.Add(relationship.Second, relationship);
@@ -180,13 +181,38 @@ public sealed class MemoryCoupleStore : ICoupleStore
         }
     }
 
+    /// <inheritdoc />
+    public ValueTask<CoupleStoreOutcome> ChangeRingAsync(
+        CoupleAccount member, Guid relationshipId, int ringItemId, CancellationToken cancellationToken)
+    {
+        Validate(member);
+        Validate(relationshipId);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(ringItemId);
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_gate)
+        {
+            if (!_members.TryGetValue(member, out var relationship))
+                return ValueTask.FromResult(new CoupleStoreOutcome(CoupleStoreResult.NotFound));
+            if (relationship.Id != relationshipId)
+                return ValueTask.FromResult(new CoupleStoreOutcome(CoupleStoreResult.Conflict));
+            var changed = relationship with { RingItemId = ringItemId };
+            _relationships[changed.Id] = changed;
+            _members[changed.First] = changed;
+            _members[changed.Second] = changed;
+            return ValueTask.FromResult(new CoupleStoreOutcome(CoupleStoreResult.Accepted, Relationship: changed));
+        }
+    }
+
     private CoupleStoreOutcome? Lookup(Guid id) => _pending.TryGetValue(id, out var invitation)
         ? new(CoupleStoreResult.Pending, invitation) : _completed.GetValueOrDefault(id);
 
-    private CoupleStoreOutcome Current(CoupleStoreOutcome outcome) =>
-        outcome.Relationship is { } relationship
-        && (!_members.TryGetValue(relationship.First, out var active) || active.Id != relationship.Id)
-            ? outcome with { Result = CoupleStoreResult.BrokenUp, Relationship = null } : outcome;
+    private CoupleStoreOutcome Current(CoupleStoreOutcome outcome)
+    {
+        if (outcome.Relationship is not { } relationship) return outcome;
+        return _members.TryGetValue(relationship.First, out var active) && active.Id == relationship.Id
+            ? outcome with { Relationship = active }
+            : outcome with { Result = CoupleStoreResult.BrokenUp, Relationship = null };
+    }
 
     private CoupleStoreOutcome Finish(CoupleStoreOutcome outcome)
     {

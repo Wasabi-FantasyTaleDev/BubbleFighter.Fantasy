@@ -117,9 +117,9 @@ public sealed class LoginRemapScenarioTests
                     },
                 },
             }),
-            Row("dialect.messages", new() { ["protocol"] = profile + "/game", ["inventory"] = true, ["packets_directory"] = PacketsDirectory() }),
+            Row("dialect.messages", new() { ["protocol"] = profile + "/game", ["couples"] = false, ["inventory"] = true, ["packets_directory"] = PacketsDirectory() }),
             Row("dialect.rooms", new() { ["protocol"] = profile + "/game", ["packets_directory"] = PacketsDirectory() }),
-            Row("lobby", new() { ["protocol"] = profile + "/game" }),
+            Row("lobby", new() { ["protocol"] = profile + "/game", ["couples"] = false }),
             Row("net.tcp", new() { ["listen"] = $"127.0.0.1:{port}", ["protocol"] = profile + "/game" }),
         ], PluginCatalog.Discover([Path.Combine(AppContext.BaseDirectory, "plugins")]), NullLoggerFactory.Instance);
         try
@@ -169,6 +169,7 @@ public sealed class LoginRemapScenarioTests
             (986, "s2c", "gspUpdateScoreData"), (729, "s2c", "gspGameBroadcastPlayerScoreData"),
             (732, "s2c", "gspGameTimeOverEnd"), (733, "s2c", "gspGameShowResult_"),
             (948, "c2s", "gcpPortalMove"), (958, "s2c", "gspPortalMove"),
+            (947, "s2c", "gspUpdateCoupleSlot"),
         };
         if (build is 812 or 717)
             entries.AddRange(
@@ -180,6 +181,14 @@ public sealed class LoginRemapScenarioTests
                 (908, "s2c", "Unknown908"), (909, "s2c", "gspRepWaveAllSpawnMobs"),
                 (32836, "c2s", "gppDead"), (32836, "s2c", "gppDead"),
                 (32892, "c2s", "gppCreateAIObject"), (32862, "c2s", "gppCreateSpawnGroupMemberMob"),
+            ]);
+        // kr-812 serves the plaza booths (plaza_games), so its rooms row needs their rows too.
+        if (build is 812)
+            entries.AddRange(
+            [
+                (571, "c2s", "gcpLmgRequest_"), (571, "s2c", "gspLmgReply_"),
+                (572, "c2s", "gcpLmgSync_"), (572, "s2c", "gspLmgSyncState_"),
+                (121, "c2s", "gcpReqLmgUserRecord"), (133, "s2c", "gspRepLmgUserRecord"),
             ]);
         // The protocol row resolves the bootstrap frames by name; they stay at 1 and 2 in every remap.
         var handshake = $"  - value: 1\n    direction: c2s\n    name: gcpFirstConnect\n    name_source: label@{profile}\n    evidence: verified\n"
@@ -241,6 +250,7 @@ public sealed class LoginRemapScenarioTests
             // A stored wallet proves the binding passes the login's wallet into the S2C 106 words.
             Row("lobby", new()
             {
+                ["couples"] = false,
                 ["inventory_source"] = "mysql", ["money_source"] = "mysql",
                 ["starting_lucci"] = 12345, ["starting_cash"] = 6789,
             }),

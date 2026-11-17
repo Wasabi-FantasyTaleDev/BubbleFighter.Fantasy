@@ -12,6 +12,14 @@ internal sealed class WeaponObjectsBinding(string protocol, IOpcodeTable table, 
 {
     public string Protocol => protocol;
 
+    // kr-1256 adds a weapon slot word to both the request and the create notice; a build's tables say whether it has one.
+    private bool Slotted => tables.Resolve(build, "WeaponDropRequest").Any(entry => entry.Name == "weapon_slot");
+
+    // The launch vector then the position, six words that start after the slot word when there is one.
+    private string[] VectorWords => Slotted
+        ? ["unknown_24", "unknown_28", "unknown_32", "unknown_36", "unknown_40", "unknown_44"]
+        : ["unknown_20", "unknown_24", "unknown_28", "unknown_32", "unknown_36", "unknown_40"];
+
     internal void Mount(IPluginContext context, IMessageRouter messages)
     {
         if (!tables.CapabilityOf(build, "weapon_objects"))
@@ -20,15 +28,19 @@ internal sealed class WeaponObjectsBinding(string protocol, IOpcodeTable table, 
         _ = table.C2S("gcpPickUpWeapon");
         _ = table.S2C("gspGameCreateWeaponObject");
         _ = table.S2C("gspPickUpWeapon");
-        PacketLayoutContract.RequireFields(tables, build, "WeaponDropRequest", "Weapon objects",
-            ("x", "f32"), ("y", "f32"), ("z", "f32"), ("velocity_x", "f32"),
-            ("velocity_y", "f32"), ("velocity_z", "f32"), ("weapon_spec", "u32"),
-            ("unknown_32", "u32"), ("unknown_36", "u32"), ("unknown_40", "bool"));
-        PacketLayoutContract.RequireFields(tables, build, "LegacyWeaponCreateNotice", "Weapon objects",
-            ("unknown_4", "u32"), ("unknown_8", "u32"), ("unknown_12", "u32"), ("unknown_16", "u32"),
-            ("unknown_20", "u32"), ("unknown_24", "u32"), ("unknown_28", "u32"),
-            ("unknown_32", "u32"), ("unknown_36", "u32"), ("unknown_40", "u32"), ("armed", "bool"));
-        PacketLayoutContract.RequireFields(tables, build, "LegacyWeaponPickupNotice", "Weapon objects",
+        (string, string)[] request =
+        [
+            ("x", "f32"), ("y", "f32"), ("z", "f32"), ("velocity_x", "f32"), ("velocity_y", "f32"), ("velocity_z", "f32"),
+            ("weapon_spec", "u32"), ("unknown_32", "u32"), ("unknown_36", "u32"), ("armed", "bool"),
+        ];
+        (string, string)[] slot = Slotted ? [("weapon_slot", "u32")] : [];
+        PacketLayoutContract.RequireFields(tables, build, "WeaponDropRequest", "Weapon objects", [.. request, .. slot]);
+        PacketLayoutContract.RequireFields(tables, build, "WeaponCreateNotice", "Weapon objects",
+        [
+            ("unknown_4", "u32"), ("unknown_8", "u32"), ("unknown_12", "u32"), ("unknown_16", "u32"), ("armed", "bool"),
+            .. slot, .. VectorWords.Select(name => (name, "u32")),
+        ]);
+        PacketLayoutContract.RequireFields(tables, build, "WeaponPickup", "Weapon objects",
             ("weapon_object", "u32"), ("actor", "u32"));
         context.Effect(context.Services.RegisterMany<IInboundMessageBinding<RoundWeaponDropRequested>>(this));
         context.Effect(context.Services.RegisterMany<IInboundMessageBinding<RoundWeaponPickupRequested>>(this));
@@ -42,8 +54,8 @@ internal sealed class WeaponObjectsBinding(string protocol, IOpcodeTable table, 
         }));
         context.Effect(router.Register(protocol, table.C2S("gcpPickUpWeapon"), async (session, packet, ct) =>
         {
-            // cn-324 sub_4CB0F0 passes the character and weapon ids to cn-324 sub_46D1D0; its writer puts weapon first.
-            var fields = PacketCodec.ReadScalars(tables, build, "LegacyWeaponPickupNotice", packet.Payload.Span);
+            // cn-324 sub_4CB0F0 and kr-1256 sub_498F50 write the weapon object first and the character second.
+            var fields = PacketCodec.ReadScalars(tables, build, "WeaponPickup", packet.Payload.Span);
             var actor = (int)fields["actor"];
             var request = new RoundWeaponPickupRequested((int)fields["weapon_object"], actor, PlayRoomCodec.PlayerSeatOf(actor));
             if (!await messages.DispatchAsync(protocol, session, request, ct).ConfigureAwait(false))
@@ -56,7 +68,10 @@ internal sealed class WeaponObjectsBinding(string protocol, IOpcodeTable table, 
         var fields = PacketCodec.ReadScalars(tables, build, "WeaponDropRequest", body);
         var result = new RoundWeaponDropRequested((float)fields["x"], (float)fields["y"], (float)fields["z"],
             (float)fields["velocity_x"], (float)fields["velocity_y"], (float)fields["velocity_z"],
-            (int)fields["weapon_spec"], (int)fields["unknown_32"], (int)fields["unknown_36"], (bool)fields["unknown_40"]);
+            (int)fields["weapon_spec"], (int)fields["unknown_32"], (int)fields["unknown_36"], (bool)fields["armed"])
+        {
+            WeaponSlot = fields.TryGetValue("weapon_slot", out var slot) ? (int)slot! : 0,
+        };
         if (!float.IsFinite(result.X) || !float.IsFinite(result.Y) || !float.IsFinite(result.Z)
             || !float.IsFinite(result.VelocityX) || !float.IsFinite(result.VelocityY) || !float.IsFinite(result.VelocityZ)
             || result.WeaponSpec < 0)
@@ -68,19 +83,22 @@ internal sealed class WeaponObjectsBinding(string protocol, IOpcodeTable table, 
     {
         var drop = message.Drop;
         static int Bits(float value) => BitConverter.SingleToInt32Bits(value);
-        // cn-324 sub_471630 supplies identity/spec, launch vector and weapon words to cn-324 sub_61BD60, then sets position.
+        // cn-324 sub_471630 supplies identity/spec, launch vector and weapon words to cn-324 sub_61BD60, then sets
+        // position; kr-1256 sub_6ED290 reads the same order with the request's slot word after the two weapon words.
+        var values = new Dictionary<string, object?>
+        {
+            ["unknown_4"] = message.ObjectId, ["unknown_8"] = drop.WeaponSpec,
+            ["unknown_12"] = drop.Unknown32, ["unknown_16"] = drop.Unknown36,
+            ["armed"] = drop.Unknown40,
+        };
+        int[] vector = [Bits(drop.VelocityX), Bits(drop.VelocityY), Bits(drop.VelocityZ), Bits(drop.X), Bits(drop.Y), Bits(drop.Z)];
+        foreach (var (name, word) in VectorWords.Zip(vector)) values[name] = word;
+        if (Slotted) values["weapon_slot"] = drop.WeaponSlot;
         return session.SendAsync(table.S2C("gspGameCreateWeaponObject"),
-            PacketCodec.Write(tables, build, "LegacyWeaponCreateNotice", new Dictionary<string, object?>
-            {
-                ["unknown_4"] = message.ObjectId, ["unknown_8"] = drop.WeaponSpec,
-                ["unknown_12"] = drop.Unknown32, ["unknown_16"] = drop.Unknown36,
-                ["unknown_20"] = Bits(drop.VelocityX), ["unknown_24"] = Bits(drop.VelocityY), ["unknown_28"] = Bits(drop.VelocityZ),
-                ["unknown_32"] = Bits(drop.X), ["unknown_36"] = Bits(drop.Y), ["unknown_40"] = Bits(drop.Z),
-                ["armed"] = drop.Unknown40,
-            }), ct);
+            PacketCodec.Write(tables, build, "WeaponCreateNotice", values), ct);
     }
 
     public ValueTask SendAsync(ISession session, RoundWeaponPicked message, CancellationToken ct) =>
-        session.SendAsync(table.S2C("gspPickUpWeapon"), PacketCodec.Write(tables, build, "LegacyWeaponPickupNotice",
+        session.SendAsync(table.S2C("gspPickUpWeapon"), PacketCodec.Write(tables, build, "WeaponPickup",
             new Dictionary<string, object?> { ["weapon_object"] = message.ObjectId, ["actor"] = message.Actor }), ct);
 }

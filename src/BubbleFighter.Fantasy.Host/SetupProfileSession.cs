@@ -26,7 +26,7 @@ internal sealed class SetupProfileSession : IInstallationRuntime, IPluginExecuti
         _profilesDirectory = profilesDirectory; _stateDirectory = stateDirectory; _patches = patches;
         Profiles = new ProfileComposer(profilesDirectory).ListProfiles()
             .Where(p => p.IsClientBuild || p.Id == "management")
-            .Select(p => new InstallationProfile(p.Id, p.Description) { DisplayNames = p.DisplayNames, SetupEnabled = p.SetupEnabled, ActivationEnabled = p.ActivationEnabled, Experimental = p.Experimental })
+            .Select(p => new InstallationProfile(p.Id, p.Description) { DisplayNames = p.DisplayNames, SetupEnabled = p.SetupEnabled, ActivationEnabled = p.ActivationEnabled, Experimental = p.Experimental, SetupVisible = p.SetupVisible })
             .OrderBy(p => p.DisplayNames.GetValueOrDefault("en") ?? p.Id, StringComparer.Ordinal).ToArray();
     }
 

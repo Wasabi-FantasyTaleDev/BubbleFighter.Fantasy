@@ -25,10 +25,12 @@
     id: dialect.messages
     config:
       present_box: true
+      cash_inbox: true
 - set:
     id: shop
     config:
       present_box: true
+      cash_inbox: true
 
 # tw-454 sub_CB9140 dispatches ordinary horde replies; tw-454 sub_C87FC0 waits for each wave.
 # tw-454 sub_710EB0 / tw-454 sub_A578B0 establish the score-unit request and point delta.
@@ -73,3 +75,22 @@
     id: ingame
     config:
       plaza_recruitment: true
+
+# The clan window: the clan bundle mounts the row on the game listener's protocol and this option binds the
+# game-connection clan routes (packets/clan.yaml); the pair lands together, as on kr-1256.
+- set:
+    id: dialect.messages
+    config:
+      clan: true
+
+# tw-454's item table has a third creation card, 101826 (a one-use ticket), whose ShopItem parameter states no member
+# count, beside 100819 (30) and 101979 (10); a clan founded with it holds the server's capacity, as on kr-812.
+- set:
+    id: clan.creation-cards
+    config:
+      capacity_without_parameter: ${BFF_CLAN_CAPACITY_WITHOUT_PARAMETER:-30}
+# Like kr-1256, this build asks for a clan passport on every clan-server hello, so none is sent unasked.
+- set:
+    id: clan
+    config:
+      passport_on_login: false

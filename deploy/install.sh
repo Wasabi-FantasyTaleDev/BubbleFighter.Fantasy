@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Install or upgrade the prebuilt Bubble Fighter Fantasy server on Linux (x64 or arm64).
 #
-#   curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash
-#   curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash -s -- --docker
+#   curl -fsSL https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest/download/install.sh | bash
+#   curl -fsSL https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest/download/install.sh | bash -s -- --docker
+#
+# Started with no options on a terminal, it asks how to install; --no-prompt (or any option) skips the questions.
 #
 # Layout under the install directory (native mode):
 #   releases/<tag>/   one unpacked package per installed release
@@ -21,6 +23,7 @@ INSTALL_RUNTIME=1
 SERVICE=0
 START=0
 DOCKER=0
+INSTALL_DOCKER=0
 WITH_MYSQL=0
 ADMIN_PORT=""
 MYSQL_PORT=3306
@@ -28,6 +31,7 @@ FROM=""
 REMOTE_ADMIN=""
 SETUP_TOKEN=""
 PROMPT=1
+ARGUMENT_COUNT=$#
 
 usage() {
     cat <<'EOF'
@@ -39,16 +43,23 @@ Usage: install.sh [options]
   --service         as root: install and enable a systemd unit (bubblefighter-fantasy.service)
   --start           start the server in the foreground when the installation finishes
   --docker          run the server with Docker Compose instead
+  --install-docker  as root: install Docker Engine and the Compose plugin when missing (implies --docker)
   --with-mysql      with --docker: also run a MySQL-compatible database container (MariaDB 11.4) for the server's data
   --admin-port <n>  port of the setup assistant and administration WebUI (default 7300)
-  --remote-admin    let other machines open the WebUI (default: only this machine; use an SSH tunnel)
-  --local-admin     keep the WebUI on this machine only (the default)
+  --remote-admin    let other machines open the WebUI (the default)
+  --local-admin     keep the WebUI on this machine only; open it from elsewhere through an SSH tunnel
   --setup-token     require a generated token before the first-run setup wizard can be used (default: off)
   --no-setup-token  do not require a setup token (the default)
   --no-prompt       do not ask questions; use the options given and the defaults
+                    (with no options at all on a terminal, the script asks how to install)
   --mysql-port <n>  with --with-mysql: loopback port of the bundled database (default 3306)
   --from <dir>      install from a directory holding the release assets instead of downloading them
   -h, --help        show this help
+
+Unattended examples:
+  install.sh --no-prompt --service                         native, systemd service, as root
+  install.sh --no-prompt --docker --install-docker --with-mysql
+                                                           Docker with a bundled database, as root
 
 Upgrading: run the script again. The state directory and earlier releases are kept.
 EOF
@@ -62,6 +73,7 @@ while [ $# -gt 0 ]; do
         --service) SERVICE=1; shift ;;
         --start) START=1; shift ;;
         --docker) DOCKER=1; shift ;;
+        --install-docker) DOCKER=1; INSTALL_DOCKER=1; shift ;;
         --with-mysql) WITH_MYSQL=1; shift ;;
         --admin-port) ADMIN_PORT="${2:?--admin-port needs a port}"; shift 2 ;;
         --mysql-port) MYSQL_PORT="${2:?--mysql-port needs a port}"; shift 2 ;;
@@ -79,14 +91,21 @@ done
 fail() { echo "error: $*" >&2; exit 1; }
 step() { printf '==> %s\n' "$*"; }
 secret() { head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'; }
-# Asks a yes/no question on the terminal, also when the script itself is piped into bash; no terminal means the default.
+has_terminal() { [ "$PROMPT" -eq 1 ] && { : </dev/tty; } 2>/dev/null; }
+# Asks a yes/no question on the terminal, also when the script itself is piped into bash; no terminal or an empty
+# answer means the default, which is "no" unless the second argument is 1.
 ask() {
-    local answer=""
-    if [ "$PROMPT" -eq 1 ] && { : </dev/tty; } 2>/dev/null; then
-        printf '%s [y/N] ' "$1" >/dev/tty
+    local answer="" default="${2:-0}" hint="[y/N]"
+    [ "$default" -eq 0 ] || hint="[Y/n]"
+    if has_terminal; then
+        printf '%s %s ' "$1" "$hint" >/dev/tty
         read -r answer </dev/tty || answer=""
     fi
-    case "$answer" in [yY]|[yY][eE][sS]) echo 1 ;; *) echo 0 ;; esac
+    case "$answer" in
+        [yY]|[yY][eE][sS]) echo 1 ;;
+        [nN]|[nN][oO]) echo 0 ;;
+        *) echo "$default" ;;
+    esac
 }
 # The WebUI choices are kept in a settings file next to the installation, so an upgrade keeps them.
 saved_setting() { [ -f "$1" ] && sed -n "s/^$2=//p" "$1" | tail -n 1; }
@@ -96,7 +115,7 @@ choose_admin_access() {
     saved_token="$(saved_setting "$file" BFF_SETUP_TOKEN)"
     if [ -z "$REMOTE_ADMIN" ]; then
         if [ -n "$saved_host" ]; then [ "$saved_host" = "0.0.0.0" ] && REMOTE_ADMIN=1 || REMOTE_ADMIN=0
-        else REMOTE_ADMIN="$(ask "Allow other machines to open the WebUI (setup and administration)?")"; fi
+        else REMOTE_ADMIN="$(ask "Allow other machines to open the WebUI (setup and administration)?" 1)"; fi
     fi
     if [ -z "$SETUP_TOKEN" ]; then
         if [ -n "$saved_host" ]; then [ -n "$saved_token" ] && SETUP_TOKEN=1 || SETUP_TOKEN=0
@@ -139,9 +158,39 @@ esac
 for tool in curl tar sha256sum; do
     command -v "$tool" >/dev/null 2>&1 || fail "'$tool' is required."
 done
+has_docker() { command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; }
+
+# With no options on a terminal the script asks the few questions that change the installation; options skip them.
+if [ "$ARGUMENT_COUNT" -eq 0 ] && has_terminal; then
+    echo "Bubble Fighter Fantasy installer. Press Enter to take the answer in capitals." >/dev/tty
+    DOCKER="$(ask "Run the server in Docker (no: install it directly on this system)?")"
+    if [ "$DOCKER" -eq 1 ]; then
+        if ! has_docker; then
+            [ "$(id -u)" -eq 0 ] || fail "Docker Engine with the Compose plugin is missing; install it or run the installer as root."
+            INSTALL_DOCKER="$(ask "Docker is not installed. Install Docker Engine and the Compose plugin now?" 1)"
+            [ "$INSTALL_DOCKER" -eq 1 ] || fail "Docker mode needs Docker Engine with the Compose plugin."
+        fi
+        WITH_MYSQL="$(ask "Also run a database container (MariaDB 11.4) for the server's data (no: SQLite or your own MySQL)?" 1)"
+    else
+        if [ "$(id -u)" -eq 0 ] && command -v systemctl >/dev/null 2>&1; then
+            SERVICE="$(ask "Install a systemd service so the server starts at boot?" 1)"
+        fi
+        [ "$SERVICE" -eq 1 ] || START="$(ask "Start the server when the installation finishes?" 1)"
+    fi
+fi
+
+if [ "$INSTALL_DOCKER" -eq 1 ] && ! has_docker; then
+    [ "$(id -u)" -eq 0 ] || fail "--install-docker needs root."
+    step "Installing Docker Engine and the Compose plugin (get.docker.com)"
+    DOCKER_SCRIPT="$(mktemp)"
+    curl -fsSL --retry 3 -o "$DOCKER_SCRIPT" https://get.docker.com || fail "could not download Docker's install script."
+    sh "$DOCKER_SCRIPT" || { rm -f "$DOCKER_SCRIPT"; fail "Docker's install script failed."; }
+    rm -f "$DOCKER_SCRIPT"
+    if command -v systemctl >/dev/null 2>&1; then systemctl enable --now docker >/dev/null 2>&1 || true; fi
+fi
 if [ "$DOCKER" -eq 1 ]; then
-    command -v docker >/dev/null 2>&1 || fail "--docker needs Docker Engine."
-    docker compose version >/dev/null 2>&1 || fail "--docker needs the Docker Compose plugin."
+    command -v docker >/dev/null 2>&1 || fail "--docker needs Docker Engine (add --install-docker as root to install it)."
+    docker compose version >/dev/null 2>&1 || fail "--docker needs the Docker Compose plugin (add --install-docker as root to install it)."
     [ "$SERVICE" -eq 0 ] || fail "--service and --docker cannot be combined; Compose restarts the containers."
 elif [ "$WITH_MYSQL" -eq 1 ]; then
     fail "--with-mysql needs --docker."

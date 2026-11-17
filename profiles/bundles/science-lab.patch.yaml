@@ -17,6 +17,13 @@
         synthesis_survivor: first
         synthesis_maximum_days: 729
         synthesis_permanent_at_days: 730
+        # A successful synthesis also grants one random timed bonus item. The pool is server policy, not client data: the
+        # client resolves the returned Stock id in kr-812 sub_9DCA60. Both configured items have native 1-day Stock rows
+        # on every admitted build; the configured duration and weights are deployment policy.
+        synthesis_bonus_basis_points: 10000
+        synthesis_bonus_pool:
+          - { item_id: 100140, days: 1, weight: 1 }
+          - { item_id: 100172, days: 1, weight: 1 }
 - set:
     id: dialect.messages
     config:

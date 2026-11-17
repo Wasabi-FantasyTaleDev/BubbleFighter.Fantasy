@@ -41,6 +41,7 @@ Bubble Fighter Fantasy 是 Fantasy Tale Studio 維護的遊戲《泡泡大亂鬥
 | --- | --- | --- |
 | Windows x64 建置套件 | 可用 | Windows x64，希望使用現成建置 |
 | Windows ARM64 建置套件 | 可用 | Windows on ARM，希望使用現成建置 |
+| Windows 安裝指令碼 | 可用 | 想用一個 PowerShell 命令下載、校驗並安裝 Windows 套件 |
 | Linux 安裝指令碼 | 可用 | 不使用 Docker 的 Linux 發行方式 |
 | Docker 一鍵安裝 | 可用 | 無需取出儲存庫，在容器中執行伺服器，可選附帶 MySQL |
 | 從本儲存庫建置 Docker | 可用 | 已有取出與 Docker，在容器中執行伺服器與 MySQL |
@@ -65,10 +66,40 @@ Bubble Fighter Fantasy 是 Fantasy Tale Studio 維護的遊戲《泡泡大亂鬥
 2. 下載符合處理器的 ZIP，解壓縮到較短的資料夾，例如 `C:\BubbleFighterFantasy`。完整路徑達到約 259 個字元的模組檔案無法在 Windows 上載入；從這麼深的資料夾啟動時，伺服器會拒絕啟動並指出最長的檔案。
 3. 按兩下 `BubbleFighter.Fantasy.Host.exe`。安裝助理隨即啟動，WebUI 會在預設瀏覽器中開啟；接著依照下文「首次執行設定」操作。關閉主控台視窗即停止伺服器。啟動失敗時視窗會保持開啟並顯示錯誤，按任意鍵後才關閉。
 
+### Windows 安裝指令碼
+
+```powershell
+irm https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest/download/install.ps1 | iex
+```
+
+在 PowerShell 中執行。指令碼會偵測 x64 或 ARM64，從最新版本下載對應的 ZIP 和 `SHA256SUMS` 並校驗；系統沒有 ASP.NET Core Runtime 10 時，會在安裝資料夾中裝一份私有執行階段；預設安裝到 `C:\BubbleFighterFantasy`（`releases\<tag>\`、`current` 連結、`state\`、`settings.env` 和用來啟動伺服器的 `bff.cmd`）。在主控台中不帶選項執行時，它會詢問安裝資料夾、是否允許其他機器開啟 WebUI（預設是）、設定精靈是否需要權杖（預設否）、是否隨 Windows 啟動（僅限系統管理員 PowerShell）以及是否立即啟動；選擇立即啟動時會在瀏覽器中開啟設定頁面。請在那裡自己完成設定精靈；在自己的電腦上，資料庫步驟請選擇 SQLite，不需要資料庫伺服器。
+
+要傳入選項，請以指令碼區塊方式執行，例如隨 Windows 啟動的伺服器（系統管理員 PowerShell）：
+
+```powershell
+& ([scriptblock]::Create((irm https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest/download/install.ps1))) -NoPrompt -Service
+```
+
+| 選項 | 作用 |
+| --- | --- |
+| `-Version <tag>` | 安裝指定版本而非最新版本 |
+| `-Dir <path>` | 安裝資料夾（預設 `C:\BubbleFighterFantasy`，請保持路徑簡短） |
+| `-Arch x64` / `-Arch arm64` | 要安裝的套件（預設依本機處理器） |
+| `-AdminPort <n>` | 安裝助理與 WebUI 的連接埠（預設 7300） |
+| `-RemoteAdmin` / `-LocalAdmin` | 允許其他機器開啟 WebUI（預設）/ 只在本機開啟 |
+| `-SetupToken` / `-NoSetupToken` | 設定精靈使用前需要產生的權杖 / 不需要（預設） |
+| `-Service` | 以系統管理員執行時：建立排程工作 `BubbleFighterFantasy`，以 SYSTEM 執行並隨 Windows 啟動 |
+| `-Start` | 在獨立視窗中啟動伺服器並開啟設定頁面 |
+| `-NoPrompt` | 不提問，使用給定的選項與預設值（沒有主控台時也是如此，例如 AI 代理的命令列） |
+| `-NoRuntime` | 缺少執行階段時直接失敗，而不是安裝它 |
+| `-From <dir>` | 從存放版本檔案的資料夾安裝（需要 `-Version`） |
+
+再次執行同一個命令即可升級；`state\` 與 `settings.env` 會保留。
+
 ### Linux 安裝指令碼
 
 ```bash
-curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash
+curl -fsSL https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest/download/install.sh | bash
 ```
 
 指令碼會辨識 x86_64 或 aarch64，從最新版本下載對應的套件與 `SHA256SUMS` 並校驗。系統沒有 ASP.NET Core Runtime 10 時，它會用 Microsoft 的 `dotnet-install.sh` 將執行階段安裝到安裝目錄中，不更動系統層級的 .NET。安裝目錄為 `~/bubblefighter-fantasy`，以 root 執行時為 `/opt/bubblefighter-fantasy`：
@@ -82,21 +113,23 @@ curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash
 | `bff` | 啟動器；不帶參數時啟動安裝助理 |
 | `settings.env` | 安裝指令碼選擇的 WebUI 存取方式、安裝權杖與連接埠；升級時保留 |
 
-用 `~/bubblefighter-fantasy/bff` 啟動伺服器，然後在伺服器本機上開啟 `http://127.0.0.1:7300/`。安裝指令碼會問兩個問題，預設都是否：是否允許其他機器開啟 WebUI（`--remote-admin`），以及首次執行助理是否需要安裝權杖（`--setup-token`）。WebUI 只在本機時，從自己的電腦透過通道開啟：`ssh -L 7300:127.0.0.1:7300 <user>@<server>`，然後開啟 `http://127.0.0.1:7300/`。開啟遠端存取時，開啟 `http://<server>:7300/`，並在防火牆或雲端安全群組中開放 TCP 7300 連接埠。這些選擇儲存在安裝目錄的 `settings.env` 中，升級時保留；環境變數中已設定的值優先。
+用 `~/bubblefighter-fantasy/bff` 啟動伺服器，然後在伺服器本機上開啟 `http://127.0.0.1:7300/`。在終端機中不帶選項執行時，安裝指令碼會先詢問安裝方式（直接安裝或 Docker；選擇 Docker 時詢問是否安裝 Docker、是否附帶資料庫容器；以 root 執行時詢問是否建立 systemd 服務，否則詢問是否立即啟動），再詢問是否允許其他機器開啟 WebUI（預設是，`--remote-admin`），允許時再詢問首次執行助理是否需要安裝權杖（預設否，`--setup-token`）。命令列中給出任何選項都會略過關於安裝方式的問題。從其他電腦存取時，可以不開放任何連接埠，透過通道開啟：`ssh -L 7300:127.0.0.1:7300 <user>@<server>`，然後開啟 `http://127.0.0.1:7300/`；也可以在防火牆或雲端安全群組中開放 TCP 7300 後開啟 `http://<server>:7300/`。第一個管理員建立之前，任何能存取該連接埠的人都能完成設定，所以請盡快完成。這些選擇儲存在安裝目錄的 `settings.env` 中，升級時保留；環境變數中已設定的值優先。
 
-選項寫在 `bash -s --` 之後，例如 `curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash -s -- --service`：
+選項寫在 `bash -s --` 之後，例如 `curl -fsSL https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest/download/install.sh | bash -s -- --service`：
 
 | 選項 | 作用 |
 | --- | --- |
 | `--version <tag>` | 安裝指定版本而非最新版本 |
 | `--dir <path>` | 安裝目錄 |
 | `--admin-port <n>` | 安裝助理與 WebUI 的連接埠（預設 7300） |
-| `--remote-admin` | 允許其他機器開啟 WebUI；不加時 WebUI 只接受伺服器本機 |
+| `--remote-admin` / `--local-admin` | 允許其他機器開啟 WebUI（預設）/ 只接受伺服器本機 |
 | `--setup-token` | 產生首次執行助理要求輸入的權杖，安裝指令碼會列印它 |
-| `--local-admin`、`--no-setup-token` | 明確指定預設值 |
+| `--no-setup-token` | 明確指定預設值 |
 | `--no-prompt` | 不提問，使用給定的選項與預設值（沒有終端機時也是如此） |
 | `--service` | 以 root 執行時：建立並啟動 `bubblefighter-fantasy` systemd 服務，以 `bff` 系統使用者執行 |
 | `--start` | 安裝完成後啟動伺服器 |
+| `--docker` | 用 Docker Compose 執行伺服器（見下文） |
+| `--install-docker` | 以 root 執行時：缺少時用 Docker 官方指令碼安裝 Docker Engine 與 Compose 模組；隱含 `--docker` |
 | `--no-runtime` | 缺少執行階段時直接失敗，而不是安裝它 |
 | `--from <dir>` | 從存放版本檔案的目錄安裝，不下載 |
 
@@ -105,15 +138,15 @@ curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash
 ### Docker 一鍵安裝
 
 ```bash
-curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash -s -- --docker
+curl -fsSL https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest/download/install.sh | bash -s -- --docker
 ```
 
-需要 Docker Engine 與 Compose 外掛。安裝指令碼會把 Linux 套件解壓縮到 `~/bubblefighter-fantasy/docker`，用它建置本機映像檔，並透過 Docker Compose 啟動伺服器容器。容器使用主機網路，因此你選擇的用戶端所用的遊戲連接埠都可以連線。預設不啟動資料庫容器：在安裝助理中選擇 SQLite（資料檔儲存在 `bff-state` 磁碟區中），或填寫既有的 MySQL 伺服器。
+以 root 執行並加上 `--install-docker` 時，安裝指令碼會先用 Docker 官方指令碼安裝 Docker Engine 與 Compose 模組，並啟用 docker 服務。需要 Docker Engine 與 Compose 模組。安裝指令碼會把 Linux 套件解壓縮到 `~/bubblefighter-fantasy/docker`，用它建置本機映像檔，並透過 Docker Compose 啟動伺服器容器。容器使用主機網路，因此你選擇的用戶端所用的遊戲連接埠都可以連線。預設不啟動資料庫容器：在安裝助理中選擇 SQLite（資料檔儲存在 `bff-state` 磁碟區中），或填寫既有的 MySQL 伺服器。
 
 如需同時執行內建資料庫，請加上 `--with-mysql`。新建的部署使用 MariaDB 11.4，伺服器把它當作 MySQL 使用；以 MySQL 8.4 建立的舊部署在升級時保留 MySQL，因為 MariaDB 無法開啟它的資料：
 
 ```bash
-curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash -s -- --docker --with-mysql
+curl -fsSL https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest/download/install.sh | bash -s -- --docker --with-mysql
 ```
 
 此時 MySQL 只監聽 `127.0.0.1:3306`（可用 `--mysql-port` 修改），產生的 `.env` 儲存隨機產生的資料庫密碼，只有其擁有者可以讀取。在安裝助理中選擇 MySQL，主機填 `127.0.0.1`，連接埠填安裝指令碼輸出的連接埠，資料庫 `bf_game_db`，使用者 `bff`，密碼為 `~/bubblefighter-fantasy/docker/.env` 中 `BFF_MYSQL_PASSWORD` 的值。

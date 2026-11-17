@@ -14,6 +14,7 @@ namespace BubbleFighter.Fantasy.Dialect.Rooms;
 /// </summary>
 internal sealed class CaptainModeBinding(string protocol, IOpcodeTable table, PacketTables packets, string build, ILogger logger)
     : IInboundMessageBinding<RoundCaptainDropped>, IInboundMessageBinding<RoundFinishingBlowReported>,
+      IInboundMessageBinding<RoundSoccerGoalReported>,
       IMessageSender<RoundCaptainAppointed>
 {
     /// <summary>Gets the game connection whose opcode table and typed routes this binding uses.</summary>
@@ -35,19 +36,37 @@ internal sealed class CaptainModeBinding(string protocol, IOpcodeTable table, Pa
         {
             // kr-1256 sub_46FB10 / cn-774 sub_4EB780 / tw-454 sub_56E420 use the separate full-score route.
             var scores = new CaptainScoreCodec(packets, build);
+            // The soccer host reports its goals on the same full-score route (kr-1256 sub_6E6F90 kind 42; cn-774
+            // sub_8A75F0 and tw-454 sub_71A9A0 kind 21): the goal box at unknown_8, the last toucher's seat as reporter.
+            var soccerGoal = PlayValues.Of(packets, build).Score.SoccerGoal;
             context.Effect(services.RegisterMany<IInboundMessageBinding<RoundFinishingBlowReported>>(this));
+            if (soccerGoal > 0)
+                context.Effect(services.RegisterMany<IInboundMessageBinding<RoundSoccerGoalReported>>(this));
             context.Effect(router.Register(protocol, table.C2S("gcpGameUpdateScore"), async (session, packet, ct) =>
             {
-                RoundFinishingBlowReported? report;
-                try { report = scores.Read(packet.Payload.Span); }
+                IMessage? report;
+                try
+                {
+                    var fields = PacketCodec.ReadScalars(packets, build, "RoundScoreReport", packet.Payload.Span);
+                    report = soccerGoal > 0 && Convert.ToInt32(fields["kind"]) == soccerGoal
+                        ? new RoundSoccerGoalReported(unchecked((int)fields["unknown_8"]), Convert.ToInt32(fields["reporter_slot"]))
+                        : scores.Read(fields);
+                }
                 catch (PacketFormatException ex)
                 {
-                    logger.LogWarning("Session {Id} Captain score does not match the expected layout ({Reason}); ignored.",
+                    logger.LogWarning("Session {Id} full score report does not match the expected layout ({Reason}); ignored.",
                         session.Id, ex.Message);
                     return;
                 }
-                if (report is not null && !await messages.DispatchAsync(protocol, session, report, ct).ConfigureAwait(false))
-                    throw new InvalidOperationException("No Captain score handler is installed.");
+                var handled = report switch
+                {
+                    null => true,
+                    RoundSoccerGoalReported goal => await messages.DispatchAsync(protocol, session, goal, ct).ConfigureAwait(false),
+                    RoundFinishingBlowReported kill => await messages.DispatchAsync(protocol, session, kill, ct).ConfigureAwait(false),
+                    _ => throw new InvalidOperationException("The full score route decoded an unsupported report."),
+                };
+                if (!handled)
+                    throw new InvalidOperationException("No handler is installed for the full score report.");
             }));
         }
         logger.LogInformation("dialect.rooms: Captain exchange of {Build} mounted for {Protocol}.", build, protocol);

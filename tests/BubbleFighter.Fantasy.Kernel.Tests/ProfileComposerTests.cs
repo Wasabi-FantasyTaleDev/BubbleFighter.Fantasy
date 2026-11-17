@@ -54,6 +54,19 @@ public sealed class ProfileComposerTests : IDisposable
         Assert.Throws<ConfigException>(() => new ProfileComposer(_root).ListProfiles());
     }
 
+    /// <summary>A build is listed for installation unless its profile hides it; hiding does not make it unselectable.</summary>
+    [Fact]
+    public void SetupVisibleHidesWithoutDisabling()
+    {
+        WriteProfile("client_build: kr:186:0\n");
+        Assert.True(Assert.Single(new ProfileComposer(_root).ListProfiles()).SetupVisible);
+        WriteProfile("client_build: kr:186:0\nsetup_visible: false\n");
+        var hidden = Assert.Single(new ProfileComposer(_root).ListProfiles());
+        Assert.Equal((false, true, true), (hidden.SetupVisible, hidden.SetupEnabled, hidden.ActivationEnabled));
+        WriteProfile("client_build: kr:186:0\nsetup_visible: sometimes\n");
+        Assert.Contains("setup_visible", Assert.Throws<ConfigException>(() => new ProfileComposer(_root).ListProfiles()).Message);
+    }
+
     [Fact]
     public void SelectedBuildsReuseSharedRowsAndResolveIndependentDataRoots()
     {
@@ -294,6 +307,63 @@ public sealed class ProfileComposerTests : IDisposable
         Write("bundles/client.yaml", "- id: listener\n  plugin: p.listener\n  activation: later\n");
         WriteProfile("bundles: [core]\nbuilds: [one]\n");
         Assert.Contains("activation", Assert.Throws<ConfigException>(() => composer.Compose("demo", [])).Message);
+    }
+
+    /// <summary>
+    /// A server profile's <c>exclude_builds</c> leaves listed builds out entirely, whether stated as a list or as one
+    /// environment value; an empty value excludes nothing, and a name outside the builds list fails composition.
+    /// </summary>
+    [Fact]
+    public void ExcludedBuildsComposeNoRows()
+    {
+        Write("bundles/core.yaml", "- id: shared\n  plugin: p.shared\n");
+        Write("bundles/client.yaml", "- id: listener\n  plugin: p.listener\n");
+        Write("one/profile.yaml", "client_build: kr:812:0\nbundles: [client]\n");
+        Write("two/profile.yaml", "client_build: cn:324:0\nbundles: [client]\n");
+        Write("three/profile.yaml", "client_build: tw:410:0\nbundles: [client]\n");
+        var composer = new ProfileComposer(_root);
+        string[] Ids() => composer.Compose("demo", []).Select(row => row.Id).Order(StringComparer.Ordinal).ToArray();
+
+        WriteProfile("bundles: [core]\nexclude_builds: ${EXCLUDE_UNDER_TEST:-two, three}\nbuilds: [one, two, three]\n");
+        Assert.Equal(["one.listener", "shared"], Ids());
+        WriteProfile("bundles: [core]\nexclude_builds: [two]\nbuilds: [one, two, three]\n");
+        Assert.Equal(["one.listener", "shared", "three.listener"], Ids());
+        WriteProfile("bundles: [core]\nexclude_builds: ${EXCLUDE_UNDER_TEST:-}\nbuilds: [one, two, three]\n");
+        Assert.Equal(["one.listener", "shared", "three.listener", "two.listener"], Ids());
+
+        WriteProfile("bundles: [core]\nexclude_builds: [tow]\nbuilds: [one, two]\n");
+        Assert.Contains("'tow'", Assert.Throws<ConfigException>(() => composer.Compose("demo", [])).Message);
+        WriteProfile("bundles: [core]\nexclude_builds: one,two\nbuilds: [one, two]\n");
+        Assert.Contains("no build", Assert.Throws<ConfigException>(() => composer.Compose("demo", [])).Message);
+    }
+
+    /// <summary>
+    /// An optional build is composed only when the deployment includes it, so a server without that client's data
+    /// starts without it; an include outside the optional list, or an optional build outside the builds, is an error.
+    /// </summary>
+    [Fact]
+    public void OptionalBuildsComposeOnlyWhenIncluded()
+    {
+        Write("bundles/core.yaml", "- id: shared\n  plugin: p.shared\n");
+        Write("bundles/client.yaml", "- id: listener\n  plugin: p.listener\n");
+        Write("one/profile.yaml", "client_build: kr:812:0\nbundles: [client]\n");
+        Write("two/profile.yaml", "client_build: kr:186:0\nbundles: [client]\n");
+        var composer = new ProfileComposer(_root);
+        string[] Ids() => composer.Compose("demo", []).Select(row => row.Id).Order(StringComparer.Ordinal).ToArray();
+
+        WriteProfile("bundles: [core]\noptional_builds: [two]\ninclude_builds: ${INCLUDE_UNDER_TEST:-}\nbuilds: [one, two]\n");
+        Assert.Equal(["one.listener", "shared"], Ids());
+        WriteProfile("bundles: [core]\noptional_builds: [two]\ninclude_builds: ${INCLUDE_UNDER_TEST:-two}\nbuilds: [one, two]\n");
+        Assert.Equal(["one.listener", "shared", "two.listener"], Ids());
+        WriteProfile("bundles: [core]\noptional_builds: [two]\ninclude_builds: two\nexclude_builds: two\nbuilds: [one, two]\n");
+        Assert.Equal(["one.listener", "shared"], Ids());
+
+        WriteProfile("bundles: [core]\noptional_builds: [two]\ninclude_builds: one\nbuilds: [one, two]\n");
+        Assert.Contains("optional_builds list", Assert.Throws<ConfigException>(() => composer.Compose("demo", [])).Message);
+        WriteProfile("bundles: [core]\noptional_builds: [three]\nbuilds: [one, two]\n");
+        Assert.Contains("'three'", Assert.Throws<ConfigException>(() => composer.Compose("demo", [])).Message);
+        WriteProfile("bundles: [core]\noptional_builds: [two]\nexclude_builds: one\nbuilds: [one, two]\n");
+        Assert.Contains("no build", Assert.Throws<ConfigException>(() => composer.Compose("demo", [])).Message);
     }
 
     /// <summary>Preserves runtime parents and isolation across patches and emits their effective configuration.</summary>

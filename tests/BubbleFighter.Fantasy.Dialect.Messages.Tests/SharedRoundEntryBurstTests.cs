@@ -77,11 +77,11 @@ public sealed class SharedRoundEntryBurstTests
         "30DE6CFC8311CF026CBDE29F81CC80886E32B2F1EEB7A17D811481AAFCEEAAA2",
         "81C5EBDEE656B73D952A679FFDEAE9D0A7E70B93D52B87B8410C6FCDF7B0ADF2")]
     [InlineData("cn-774", true, "279,281,7,67",
-        "3B42271108B98108298FCB8A431EC65C666CF1DFE8340E68B5A4DBC10E382990",
-        "E348B192F200DA8A24184460CAFB24925CC0894C39259D2BC0B4F0CDE669FFA3")]
+        "A14099DAB5624C1F8B2B912F4E5C4427AD37AC2AF88616A269F981B934FD5DB1",
+        "FC3CF1814F6DF8096D2C75FA8F102DA931A32F877FB813268DA7B425B57805C2")]
     [InlineData("tw-454", true, "254,256,7,67",
-        "14176F27166474173020D98E1E67DE1743DC08E3DE85D494556A09F390A6655D",
-        "D58698A88C7943A67EAD1F7B26D6649EFFBC119E03F19477B2553538A9EBCA6A")]
+        "19CAAFBF624EDBEDA038141D2A3387045CED132A45E22069FD63CCACF466CA4F",
+        "5C701E40FB0FBF57D4CF5097C6946B50366CBD39A9F77209ABF3C06EAB7056F4")]
     public async Task RosterSignatureAndStageRetainTheirNativeBodies(string build, bool modern,
         string lengths, string ordinaryDigest, string missionDigest)
     {
@@ -125,7 +125,7 @@ public sealed class SharedRoundEntryBurstTests
                 }
             }
             Assert.True(string.Equals(mission ? missionDigest : ordinaryDigest, digest, StringComparison.Ordinal),
-                $"Native burst digest for {build}: {digest}");
+                $"Native burst digest for {build}, mission={mission}: {digest}");
         }
     }
 

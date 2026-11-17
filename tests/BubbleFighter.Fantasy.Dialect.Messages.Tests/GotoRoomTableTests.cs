@@ -51,7 +51,7 @@ public sealed class GotoRoomTableTests
     {
         var schema = TestBuilds.Of(build).Schema;
         var player = new MainMenuRoomOpened(42, "ab", 300003, [300003, 201001]);
-        foreach (var kind in new[] { 1, 2, 5, 8 })
+        foreach (var kind in new[] { 1, 2, 5, 6, 8 })
         {
             var expected = RoomCodec.WriteRoom(player, schema, kind, 103, "tutorial",
                 "directory", "current", 3, "npc");
@@ -62,6 +62,35 @@ public sealed class GotoRoomTableTests
         }
         Assert.Equal(RoomCodec.WriteMainMenu(player, schema),
             RoomCodec.WriteMainMenuEnvelope(player, TestBuilds.Packets, build, schema));
+    }
+
+    /// <summary>
+    /// The clan scene is the tutorial select's one-seat room with kind 6 (kr-812 sub_820060 and cn-717 sub_8A6D50 case 6
+    /// SetStage(15)): neither carries the main menu's menu values, the bodies have the same length and differ only in
+    /// the kind's four bytes.
+    /// </summary>
+    [Theory]
+    [InlineData("kr-812")]
+    [InlineData("cn-717")]
+    [InlineData("cn-324")]
+    [InlineData("cn-279")]
+    [InlineData("id-400")]
+    [InlineData("id-1809")]
+    [InlineData("cn-706")]
+    [InlineData("cn-735")]
+    public void ClanSceneIsTheMenuRoomWithKindSix(string build)
+    {
+        var schema = TestBuilds.Of(build).Schema;
+        var player = new MainMenuRoomOpened(42, "ab", 300003, [300003, 201001]);
+        var select = RoomCodec.WriteSingleRoomEnvelope(player, TestBuilds.Packets, build, schema, RoomCodec.TutorialSelectKind);
+        var clan = RoomCodec.WriteSingleRoomEnvelope(player, TestBuilds.Packets, build, schema, RoomCodec.ClanSceneKind,
+            101, "map", "directory", "current", 3, "npc");
+        Assert.Equal(6, RoomCodec.ClanSceneKind);
+        Assert.Equal(select.Length, clan.Length);
+        var differ = Enumerable.Range(0, select.Length).Where(i => select[i] != clan[i]).ToArray();
+        var at = Assert.Single(differ);
+        Assert.Equal(5, BitConverter.ToInt32(select, at));
+        Assert.Equal(6, BitConverter.ToInt32(clan, at));
     }
 
     [Theory]

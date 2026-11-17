@@ -29,6 +29,9 @@ internal sealed partial class RoundFlow
             || !context.Services.TryGet<IInventoryRepository>(out _lotteryInventory)
             || !context.Services.TryGet<IInventoryPushService>(out _lotteryPush))
             throw new ConfigException("Reward cards require result, wallet, transactional grant storage and inventory push services.");
+        if (_result.Scoreboard is IRoundResultSequencePolicy policy
+            && _options.LotteryModes.Any(mode => !policy.SupportsScoreboard(mode)))
+            throw new ConfigException("Every lottery mode requires an enabled result scoreboard.");
         _lotteryOpened = PlaySenders.Optional<RoundLotteryOpened>(context, _options.GameProtocol)
             ?? throw new ConfigException("Reward cards require a dialog sender.");
         _lotteryClosed = PlaySenders.Optional<RoundLotteryClosed>(context, _options.GameProtocol)
@@ -38,9 +41,9 @@ internal sealed partial class RoundFlow
         _lotteryRevealed = PlaySenders.Optional<RoundLotteryRevealed>(context, _options.GameProtocol)
             ?? throw new ConfigException("Reward cards require a reveal sender.");
         if (_options.LotteryWorkbookClientPath.Length == 0)
-            LotteryCatalog.Validate(_options.LotteryWorkbookPath, _options.LotteryItems);
+            LotteryCatalog.Validate(_options.LotteryWorkbookPath, _options.LotteryItems, _options.LotteryMaximumFileBytes);
         else if (context.Services.TryGet<BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore>(out var data) && data is not null)
-            LotteryCatalog.Validate(data, _options.LotteryWorkbookClientPath, _options.LotteryItems);
+            LotteryCatalog.Validate(data, _options.LotteryWorkbookClientPath, _options.LotteryItems, _options.LotteryMaximumFileBytes);
         else
             throw new ConfigException("lottery_workbook_client_path requires a clientdata row for this build.");
     }

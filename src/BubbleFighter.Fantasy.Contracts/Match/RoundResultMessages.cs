@@ -212,6 +212,11 @@ public interface IRoundResultSequencePolicy
     /// another with them.
     /// </summary>
     bool SingleScoreboard => false;
+
+    /// <summary>Returns whether the configured sender publishes a full scoreboard for the given game mode.</summary>
+    /// <param name="modeId">The native game mode requiring result data.</param>
+    /// <returns>True for an enabled mode; the default preserves senders without a mode restriction.</returns>
+    bool SupportsScoreboard(int modeId) => true;
 }
 
 /// <summary>Where the client's result screen goes next.</summary>

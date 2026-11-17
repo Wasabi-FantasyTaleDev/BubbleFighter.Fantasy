@@ -59,6 +59,13 @@ public sealed class ProtocolOptions
     public int InboundBufferBytes { get; set; } = 2 * (ushort.MaxValue + 1);
 
     /// <summary>
+    /// Gets or sets whether a handler that fails after game admission drops only that request and keeps the player
+    /// connected. The failure is still logged as an error; malformed packets, relay handler failures and failures
+    /// before game admission always end the connection. YAML key <c>keep_connection_on_handler_failure</c>.
+    /// </summary>
+    public bool KeepConnectionOnHandlerFailure { get; set; } = true;
+
+    /// <summary>
     /// Gets or sets how long a new connection may take to send its first complete frame, in seconds, before it is
     /// closed. Every supported client sends its first frame as soon as it has the greeting, so only a connection
     /// that is not a game client waits this long; without the limit such a connection holds its socket, its

@@ -326,6 +326,7 @@ public sealed class NativeCreationScenarioTests
             // (the validation requires it) and the kr-1256 starter set the row already defaults to.
             Row("lobby", new()
             {
+                ["couples"] = false,
                 ["character_creation"] = true, ["auto_create_players"] = false,
                 ["build_values"] = true,
                 ["packets_directory"] = RepositoryPackets.Directory(),

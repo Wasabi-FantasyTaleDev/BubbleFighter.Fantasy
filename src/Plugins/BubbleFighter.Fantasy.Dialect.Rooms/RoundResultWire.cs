@@ -442,6 +442,7 @@ internal static class RoundResultWire
         ["exp_next_level"] = checked((int)(row.Reward?.NextLevelFloorExp ?? 0)),
         ["exp_gained"] = row.Reward?.ExpEarned ?? 0,
         ["lucci_gained"] = row.Reward?.LucciEarned ?? 0,
+        ["award_display_id"] = row.AwardDisplayId,
     };
 
 }

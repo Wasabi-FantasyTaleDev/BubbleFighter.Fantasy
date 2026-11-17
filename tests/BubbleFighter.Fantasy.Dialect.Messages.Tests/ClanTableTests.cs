@@ -52,16 +52,20 @@ public sealed class ClanTableTests
         ReadSub9B2690(body);
     }
 
-    /// <summary>The empty attendance state is 4 bytes: one card count, zero cards.</summary>
+    /// <summary>
+    /// The empty attendance state is 14 bytes: a card count of zero, then the Attendance object's 4, 4 and 2 bytes that
+    /// kr-1256 sub_9CD440 reads through kr-1256 sub_113F1F0 after the list.
+    /// </summary>
     [Theory]
     [InlineData("kr-1256")]
     [InlineData("cn-774")]
-    public void EmptyClanAttendanceStateIsFourBytes(string build)
+    [InlineData("tw-454")]
+    public void EmptyClanAttendanceStateIsFourteenBytes(string build)
     {
         var body = ClanBinding.WriteAttendanceState(Tables, build);
-        Assert.Equal(4, body.Length);
-        Assert.Equal("00000000", Convert.ToHexString(body));
-        ReadSub10C5590(body);
+        Assert.Equal(14, body.Length);
+        Assert.Equal(new string('0', 28), Convert.ToHexString(body));
+        ReadSub9CD440(body);
     }
 
     /// <summary>The clan tables are written empty on every enabled field and leave nothing unread.</summary>
@@ -101,10 +105,14 @@ public sealed class ClanTableTests
     }
 
     /// <summary>Walks the attendance state as kr-1256 sub_10C5590 reads it: a u32 card count, then the cards.</summary>
-    private static void ReadSub10C5590(byte[] body)
+    // kr-1256 sub_9CD440: the card list (kr-1256 sub_10C5590), then kr-1256 sub_113F1F0 reads 4, 4 and 2 bytes.
+    private static void ReadSub9CD440(byte[] body)
     {
         var reader = new PacketReader(body);
         Assert.Equal(0u, reader.ReadUInt32());
+        reader.ReadUInt32();
+        reader.ReadUInt32();
+        reader.ReadUInt16();
         Assert.Equal(0, reader.Remaining);
     }
 
@@ -117,28 +125,28 @@ public sealed class ClanTableTests
         Assert.Equal(140, (int)table.S2C("gspReqClanMarkInfo"));
         Assert.Equal(918, (int)table.S2C("gspResGuildInfo"));
         Assert.Equal(1508, (int)table.S2C("gspClanAttendanceState"));
-        Assert.Equal(25, (int)table.C2S("Unknown25"));
-        Assert.Equal(2040, (int)table.C2S("Unknown2040"));
-        Assert.Equal(2041, (int)table.C2S("Unknown2041"));
+        Assert.Equal(25, (int)table.C2S("gcpReqClanPassport"));
+        Assert.Equal(2040, (int)table.C2S("gcpReqClanMainOpen_"));
+        Assert.Equal(2041, (int)table.C2S("gcpReqClanAttendanceCheckIn_"));
     }
 
     /// <summary>The three client requests are stated as structures with no fields, so they write zero bytes.</summary>
     [Theory]
     [InlineData("ClanPassportRequest")]
-    [InlineData("Unknown2040Request")]
-    [InlineData("Unknown2041Request")]
+    [InlineData("ClanMainOpenRequest")]
+    [InlineData("ClanAttendanceCheckInRequest")]
     public void EmptyRequestStructuresWriteNoBytes(string structure)
     {
         Assert.Empty(Tables.Resolve("kr-1256", structure));
         Assert.Empty(PacketCodec.Write(Tables, "kr-1256", structure, new Dictionary<string, object?>()));
     }
 
-    /// <summary>Only kr-1256 has the clan readers verified; the other builds stay off until theirs are read.</summary>
+    /// <summary>kr-1256 and kr-812 have their clan readers verified; cn-774 and tw-454 stay off until theirs are read.</summary>
     [Theory]
     [InlineData("kr-1256", true)]
-    [InlineData("kr-812", false)]
-    [InlineData("cn-774", false)]
-    [InlineData("tw-454", false)]
-    public void ClanCapabilityIsEnabledOnTheReadBuildOnly(string build, bool expected) =>
+    [InlineData("kr-812", true)]
+    [InlineData("cn-774", true)]
+    [InlineData("tw-454", true)]
+    public void ClanCapabilityIsEnabledOnTheReadBuildsOnly(string build, bool expected) =>
         Assert.Equal(expected, Tables.CapabilityOf(build, "clan"));
 }

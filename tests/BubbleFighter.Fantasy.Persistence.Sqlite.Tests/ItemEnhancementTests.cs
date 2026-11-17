@@ -87,7 +87,7 @@ public sealed class ItemEnhancementTests : IDisposable
         using (var database = new SqliteDatabase(Options))
         {
             var store = new SqliteRepositories(database);
-            Assert.Equal(13L, database.RawScalar("PRAGMA user_version"));
+            Assert.Equal(18L, database.RawScalar("PRAGMA user_version"));
             var reopened = await store.ReadEnhancementInventoryAsync(user, Scope, default);
             Assert.Equal(saved.CharacterBag, reopened.CharacterBag);
             Assert.Equal(saved.EquippedBag, reopened.EquippedBag);

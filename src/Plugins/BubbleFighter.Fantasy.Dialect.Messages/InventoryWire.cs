@@ -19,6 +19,7 @@ internal sealed class InventoryWire(PacketTables tables, string build)
 {
     // Whether the build's slot carries the string extension (cn-324 and cn-279 do not).
     private readonly bool _hasExtension = CheckedExtension(tables, build);
+    private readonly string _cashTailField = CheckedCashSlotTailField(tables, build);
 
     /// <summary>Gets whether this build reads owned Article rows in its full replacement.</summary>
     internal bool SupportsArticles { get; } = tables.Resolve(build, "ArticleSlots")[0].Type == "list<ArticleSlot>";
@@ -66,9 +67,69 @@ internal sealed class InventoryWire(PacketTables tables, string build)
         });
     }
 
-    /// <summary>Writes the always-empty cash inventory of <c>gspCashInvenUpdateAllInventorySlot</c>.</summary>
+    /// <summary>Writes the cash inventory entries of <c>gspCashInvenUpdateAllInventorySlot</c> (kr-812 <c>sub_842980</c>).</summary>
+    /// <param name="entries">Optional ordered active cash inbox entries; empty writes an empty slot list.</param>
+    /// <param name="maxBytes">Maximum encoded body length allowed before truncation check.</param>
     /// <returns>The plain body.</returns>
-    internal byte[] RepCashInventory() => PacketCodec.Write(tables, build, "CashInventoryUpdate", new Dictionary<string, object?>(StringComparer.Ordinal));
+    internal byte[] RepCashInventory(
+        IReadOnlyList<BubbleFighter.Fantasy.Contracts.CashInbox.CashInboxEntryRecord>? entries = null,
+        int maxBytes = BubbleFighter.Fantasy.Contracts.CashInbox.CashInboxLimits.DefaultMaxFrameBytes) =>
+        WriteCashInventory(tables, build, _cashTailField, entries, maxBytes);
+
+    internal static byte[] WriteCashInventory(
+        PacketTables tables,
+        string build,
+        IReadOnlyList<BubbleFighter.Fantasy.Contracts.CashInbox.CashInboxEntryRecord>? entries = null,
+        int maxBytes = BubbleFighter.Fantasy.Contracts.CashInbox.CashInboxLimits.DefaultMaxFrameBytes) =>
+        WriteCashInventory(tables, build, CheckedCashSlotTailField(tables, build), entries, maxBytes);
+
+    internal static string CheckedCashSlotTailField(PacketTables tables, string build)
+    {
+        PacketLayoutContract.RequireFields(tables, build, "CashInventoryUpdate", "Cash inventory wire",
+            ("slots", "list<CashInventorySlot>"));
+        var fields = tables.Resolve(build, "CashInventorySlot");
+        var tailField = fields.Any(field => field.Name == "unknown_48") ? "unknown_48" : "unknown_52";
+        PacketLayoutContract.RequireFields(tables, build, "CashInventorySlot", "Cash inventory wire",
+            ("cash_slot_id", "u32"), ("unknown_8", "u32"), ("unknown_12", "u16"),
+            ("unknown_14", "u16"), ("unknown_16", "u32"), ("item_key", "u32"),
+            ("unknown_24", "wstr"), (tailField, "u8"));
+        return tailField;
+    }
+
+    private static byte[] WriteCashInventory(
+        PacketTables tables,
+        string build,
+        string cashTailField,
+        IReadOnlyList<BubbleFighter.Fantasy.Contracts.CashInbox.CashInboxEntryRecord>? entries,
+        int maxBytes)
+    {
+        if (entries is null || entries.Count == 0)
+            return PacketCodec.Write(tables, build, "CashInventoryUpdate", Slots([]), maxBytes);
+
+        var slots = new IReadOnlyDictionary<string, object?>[entries.Count];
+        for (var i = 0; i < entries.Count; i++)
+        {
+            var entry = entries[i];
+            if (entry.CashSlotId is <= 0 or > BubbleFighter.Fantasy.Contracts.CashInbox.CashInboxLimits.MaxCashSlotId)
+                throw new ArgumentOutOfRangeException(nameof(entries), entry.CashSlotId, "Cash slot id must fit 32 bits.");
+            if (entry.StockKey <= 0 || entry.ItemKey <= 0)
+                throw new ArgumentOutOfRangeException(nameof(entries), "Cash inbox entry keys must be positive.");
+
+            slots[i] = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["cash_slot_id"] = checked((uint)entry.CashSlotId),
+                ["unknown_8"] = unchecked((uint)entry.SecondaryId),
+                ["unknown_12"] = checked((ushort)entry.Quantity),
+                ["unknown_14"] = checked((ushort)entry.Days),
+                ["unknown_16"] = checked((uint)entry.StockKey),
+                ["item_key"] = checked((uint)entry.ItemKey),
+                ["unknown_24"] = entry.Note,
+                [cashTailField] = (byte)0,
+            };
+        }
+
+        return PacketCodec.Write(tables, build, "CashInventoryUpdate", Slots(slots), maxBytes);
+    }
 
     private static Dictionary<string, object?> Slots(IReadOnlyList<IReadOnlyDictionary<string, object?>> slots) =>
         new(StringComparer.Ordinal)

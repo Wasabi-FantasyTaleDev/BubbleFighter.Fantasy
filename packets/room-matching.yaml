@@ -94,51 +94,6 @@ structs:
     - unknown_8: u32
       offset: 8
       except: [kr-186] # kr-186 sub_423A80 writes the mode word alone
-  # kr-1256 sends the quick-match request through one request-object serializer, kr-1256 sub_114E2E0
-  # (vftable kr-1256 0x163BDD8 slot 0, RTTI RequestUserMysteryStore): a u8 type, then a u32, then a
-  # type-specific tail. kr-1256 sub_E651C0 stamps C2S 128 on the packet and the serializer writes the
-  # body before kr-1256 sub_961940 sends it. The base body below is the complete type 1 wire, the
-  # party-dialog match start (kr-1256 sub_E5F070): the u32 stays zero and no mode word rides this type.
-  RoomMatchRequest@kr-1256:
-    - type: u8
-      offset: 4
-    # Every type writes it; the sites fill it from their context object or leave it zero. Whether it
-    # names a party or a board listing is inferred from usage, not proven, so the meaning stays unknown.
-    - unknown_8: u32
-      offset: 8
-  # Type 2 is the five-second re-request the stage tick sends while queued (kr-1256 sub_930130 through
-  # kr-1256 sub_E64FC0, at most ten attempts): the u16 is the matching-window duration in seconds,
-  # validated by the sender against the threshold table kr-1256 0x1642450 = {90, 120, 300, 1800}.
-  RoomMatchKeepAlive@kr-812: []
-  RoomMatchKeepAlive@kr-1256:
-    - type: u8
-      offset: 4
-    - unknown_8: u32
-      offset: 8
-    - duration: u16
-      offset: 12
-  # Type 3 is the confirmed party join (kr-1256 sub_E33FD0): the u16 is the party member limit the
-  # send branch compared against the current member count.
-  RoomMatchPartyJoin@kr-812: []
-  RoomMatchPartyJoin@kr-1256:
-    - type: u8
-      offset: 4
-    - unknown_8: u32
-      offset: 8
-    - member_limit: u16
-      offset: 14
-  # Type 4 enters one board listing (kr-1256 sub_E6CE80): the u32 is the selected row's identity word
-  # and the u16 its mode word, both copied from the row entry, whose walk is not decoded yet.
-  RoomMatchListingEnter@kr-812: []
-  RoomMatchListingEnter@kr-1256:
-    - type: u8
-      offset: 4
-    - unknown_8: u32
-      offset: 8
-    - unknown_16: u32
-      offset: 16
-    - unknown_20: u16
-      offset: 20
   # kr-812 sub_8B9660 reads; kr-812 sub_687640 opens waiting for result 0 and refuses for 1.
   # cn-717 sub_6D6290, id-400 sub_5EF130, id-1809 sub_62E6B0 and cn-406 sub_573350 agree.
   # kr-1256 sub_84F6C0 reads the same three fields for the MainMenuStage handler kr-1256 sub_8925A0

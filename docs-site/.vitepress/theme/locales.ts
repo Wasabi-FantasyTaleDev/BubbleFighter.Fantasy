@@ -127,7 +127,11 @@ export function translatedLabels(t: (key: string) => string) {
       dockerDescription: t("download.dockerDescription"),
       scriptCommand: t("download.scriptCommand"),
       dockerCommand: t("download.dockerCommand"),
+      windowsTab: t("download.windowsTab"),
+      windowsDescription: t("download.windowsDescription"),
+      windowsCommand: t("download.windowsCommand"),
       guide: t("download.guide"),
+      tutorial: t("download.tutorial"),
       download: t("download.download"),
     },
     run: {

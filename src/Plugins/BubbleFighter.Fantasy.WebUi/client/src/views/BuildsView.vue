@@ -59,7 +59,7 @@ async function openAdd() {
     const [status, configuration] = await Promise.all([api('setup/status'), api('setup/configuration')])
     const clients = configuredClients(configuration.settings)
     const existing = new Set([...allBuilds.value.map(build => build.id), ...clients.map(client => client.profile)])
-    profileChoices.value = (status.profiles || []).filter(profile => profile.setupEnabled && !existing.has(profile.id))
+    profileChoices.value = (status.profiles || []).filter(profile => profile.setupEnabled && profile.setupVisible !== false && !existing.has(profile.id))
       .map(profile => ({ value: profile.id, label: profile.displayNames?.[ui.lang] || profile.id }))
     draft.value.profile = profileChoices.value[0]?.value || ''
   } catch (error) { draftError.value = error.message }

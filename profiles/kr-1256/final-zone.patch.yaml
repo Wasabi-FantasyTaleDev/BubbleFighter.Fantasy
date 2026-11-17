@@ -5,3 +5,10 @@
     config:
       final_zone: true
       result_scoreboard_modes: [1, 5, 6, 8, 19, 20, 23, 24, 25, 28, 30, 32, 45]
+# Manual rooms keep solo entrants apart and current two-person parties together; team clicks may form another pair.
+- set:
+    id: ingame
+    config:
+      survival_team_assignments: true
+      survival_maximum_groups: 12
+      survival_pair_parties: true

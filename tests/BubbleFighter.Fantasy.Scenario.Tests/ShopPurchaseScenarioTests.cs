@@ -74,8 +74,8 @@ public sealed class ShopPurchaseScenarioTests
             Row("persistence.memory"), Row("dialect", TestWireDialects.RowConfig(profile)),
             Row("protocol", new() { ["opcode_table_path"] = tablePath, ["bootstrap_status"] = 1, ["patch_request_name"] = "gcpFirstConnect" }),
             Row("clientdata", clientData),
-            Row("dialect.messages", new() { ["protocol"] = profile + "/game", ["enable_purchases"] = true, ["packets_directory"] = RepositoryPackets.Directory() }),
-            Row("lobby", new() { ["protocol"] = profile + "/game", ["auto_create_players"] = true }),
+            Row("dialect.messages", new() { ["protocol"] = profile + "/game", ["couples"] = false, ["enable_purchases"] = true, ["packets_directory"] = RepositoryPackets.Directory() }),
+            Row("lobby", new() { ["protocol"] = profile + "/game", ["couples"] = false, ["auto_create_players"] = true }),
             Row("shop", new()
             {
                 ["protocol"] = profile + "/game", ["client_profile"] = profile, ["version_major"] = build,

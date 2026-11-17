@@ -12,6 +12,7 @@ description: Chinese 2012 client build, ClientVersion_Major 324.
 bundles:
   - core
   - legacy
+  - couples
 # What this build differs in; everything else is the legacy bundle's (kr-812).
 vars:
   LEGACY_PORT: ${CN_324_GAME_PORT:-7140}
@@ -39,5 +40,6 @@ patches:
   # Optional CN2012 auxiliary CenterStatus responder; explicitly add this bundle for deployments that need it.
   # - ../bundles/cn-324-center-responder.yaml
   - ../bundles/shop-supplement.yaml
+  - ../bundles/science-lab.patch.yaml
   # Optional developer override; git-ignored and skipped when absent.
   - local.patch.yaml

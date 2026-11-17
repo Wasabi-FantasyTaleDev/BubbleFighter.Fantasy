@@ -143,6 +143,17 @@ public sealed class FeatureProfileTests
     ];
 
     /// <summary>The rows a clan-only host needs: the clan row is served by a mounted message row with <c>clan: true</c>.</summary>
+    // One clan creation card (ShopItem function 22, capacity 30), the columns clan.creation-cards reads.
+    private const string ClanCardsWorkbook = """
+        <?xml version="1.0"?>
+        <Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+          <Worksheet ss:Name="ShopItem"><Table>
+            <Row><Cell><Data ss:Type="String">itemId</Data></Cell><Cell><Data ss:Type="String">function</Data></Cell><Cell><Data ss:Type="String">parameter</Data></Cell></Row>
+            <Row><Cell><Data ss:Type="Number">100819</Data></Cell><Cell><Data ss:Type="Number">22</Data></Cell><Cell><Data ss:Type="Number">30</Data></Cell></Row>
+          </Table></Worksheet>
+        </Workbook>
+        """;
+
     private static List<PluginRow> ClanRows() =>
     [
         PluginBoundaryTests.Row("core.protocol-registry", "core.protocol-registry"),
@@ -163,6 +174,11 @@ public sealed class FeatureProfileTests
             ["equipment_view"] = false,
         }),
         PluginBoundaryTests.Row("protocol", "protocol", new() { ["opcode_table_path"] = Path.Combine(AppContext.BaseDirectory, "opcodes.yaml") }),
+        // The kr-1256 opcode table names the clan-connection packets, so the clan row mounts creation and needs its cards.
+        PluginBoundaryTests.Row("clientdata", "clientdata", TestClientData.RowConfig(TestClientData.Tree("clan-cards",
+            ("Config/ShopItem2.xml", System.Text.Encoding.UTF8.GetBytes(ClanCardsWorkbook))))),
+        PluginBoundaryTests.Row("clan.creation-cards", "clan.creation-cards"),
+        PluginBoundaryTests.Row("clan.connections", "clan.connections"),
         PluginBoundaryTests.Row("clan", "clan"),
     ];
 
@@ -173,6 +189,7 @@ public sealed class FeatureProfileTests
         // Both rows handle a C2S 25, on different connections: the clan binding answers it on the game
         // connection, the post-swap report on the match connection.
         var rows = Rows(clan: true);
+        rows.Add(PluginBoundaryTests.Row("clan.connections", "clan.connections"));
         rows.Add(PluginBoundaryTests.Row("clan", "clan"));
         var host = new PluginHost(rows, PluginBoundaryTests.Discover(), NullLoggerFactory.Instance);
         try
@@ -237,7 +254,7 @@ public sealed class FeatureProfileTests
             PluginBoundaryTests.Row("core.wire-dialects", "core.wire-dialects"),
             PluginBoundaryTests.Row("dialect", "dialect", TestWireDialects.RowConfig("kr-1256")),
             PluginBoundaryTests.Row("protocol", "protocol", new() { ["opcode_table_path"] = Path.Combine(AppContext.BaseDirectory, "opcodes.yaml") }),
-            PluginBoundaryTests.Row("dialect.messages", "dialect.messages", TestWireDialects.MessagesConfig(new() { ["protocol"] = "kr-1256/game", ["login"] = false })),
+            PluginBoundaryTests.Row("dialect.messages", "dialect.messages", TestWireDialects.MessagesConfig(new() { ["protocol"] = "kr-1256/game", ["login"] = false, ["mystery_store"] = false })),
             PluginBoundaryTests.Row(consumerId, "test.shop-open-consumer"),
         };
         if (reverse)

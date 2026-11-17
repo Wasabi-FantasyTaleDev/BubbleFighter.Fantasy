@@ -59,6 +59,55 @@ public sealed class RoomExecutor : IAsyncDisposable
     }
 
     /// <summary>
+    /// Waits for queue capacity before accepting an operation, then observes its completion with the same
+    /// cancellation and execution-context semantics as <see cref="ExecuteAsync"/>. The owner must bound
+    /// concurrent callers waiting for admission; an active room callback cannot wait for any executor.
+    /// </summary>
+    /// <param name="operation">Room work that awaits all of its state mutations and honors its cancellation token.</param>
+    /// <param name="cancellationToken">Cancels admission or this operation without stopping unrelated room work.</param>
+    /// <returns>A task completed after admission fails, cancellation prevents execution, or the callback finishes.</returns>
+    /// <exception cref="InvalidOperationException">This call originates in an active room callback.</exception>
+    /// <exception cref="ObjectDisposedException">Shutdown begins before the operation is accepted.</exception>
+    public Task ExecuteWhenAvailableAsync(Func<CancellationToken, ValueTask> operation, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        ThrowIfReentrant();
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(!_accepting, this);
+            // Capture the caller's context before waiting; admission may resume on another thread.
+            var item = new WorkItem(operation, cancellationToken);
+            return _queue.Writer.TryWrite(item) ? item.Completion : AdmitWhenAvailableAsync(item, cancellationToken);
+        }
+    }
+
+    private async Task AdmitWhenAvailableAsync(WorkItem item, CancellationToken cancellationToken)
+    {
+        var accepted = false;
+        try
+        {
+            while (await _queue.Writer.WaitToWriteAsync(cancellationToken).ConfigureAwait(false))
+            {
+                lock (_gate)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    ObjectDisposedException.ThrowIf(!_accepting, this);
+                    if (!_queue.Writer.TryWrite(item)) continue;
+                    accepted = true;
+                    break;
+                }
+            }
+            ObjectDisposedException.ThrowIf(!accepted, this);
+        }
+        finally
+        {
+            if (!accepted) item.Release();
+        }
+        await item.Completion.ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Rejects new work, cancels queued work, signals cancellation to running work, and waits for the consumer.
     /// Canceling the wait does not undo shutdown. A callback that ignores cancellation must finish before shutdown completes.
     /// </summary>
@@ -134,7 +183,7 @@ public sealed class RoomExecutor : IAsyncDisposable
             Current.Value = scope;
             try
             {
-                await item.RunAsync(_stopping.Token).ConfigureAwait(false);
+                await item.RunAsync(_stopping.Token, scope).ConfigureAwait(false);
             }
             finally
             {
@@ -170,6 +219,9 @@ public sealed class RoomExecutor : IAsyncDisposable
         private readonly CancellationToken _callerToken;
         private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly CancellationTokenRegistration _registration;
+        // The caller's context, so ambient per-call state (the session's account mutation scope among it) reaches the
+        // room callback as it would an awaited call; null when the caller suppressed flow.
+        private readonly ExecutionContext? _context = ExecutionContext.Capture();
         private int _state;
 
         internal WorkItem(Func<CancellationToken, ValueTask> operation, CancellationToken callerToken)
@@ -192,13 +244,13 @@ public sealed class RoomExecutor : IAsyncDisposable
                 _completion.TrySetCanceled(token);
         }
 
-        internal async ValueTask RunAsync(CancellationToken stoppingToken)
+        internal async ValueTask RunAsync(CancellationToken stoppingToken, ExecutionScope scope)
         {
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(_callerToken, stoppingToken);
             try
             {
                 linked.Token.ThrowIfCancellationRequested();
-                await _operation(linked.Token).ConfigureAwait(false);
+                await Start(linked.Token, scope).ConfigureAwait(false);
                 _completion.TrySetResult();
             }
             catch (OperationCanceledException exception) when (linked.IsCancellationRequested)
@@ -216,5 +268,26 @@ public sealed class RoomExecutor : IAsyncDisposable
         }
 
         internal void Release() => _registration.Dispose();
+
+        // Starts the callback inside the caller's context; the executor's own scope is set there too, so reentrancy is
+        // still detected. Continuations keep the context the callback started in.
+        private ValueTask Start(CancellationToken token, ExecutionScope scope)
+        {
+            if (_context is null) return _operation(token);
+            var start = new Starter(_operation, token, scope);
+            ExecutionContext.Run(_context, static state => ((Starter)state!).Run(), start);
+            return start.Pending;
+        }
+
+        private sealed class Starter(Func<CancellationToken, ValueTask> operation, CancellationToken token, ExecutionScope scope)
+        {
+            internal ValueTask Pending;
+
+            internal void Run()
+            {
+                Current.Value = scope;
+                Pending = operation(token);
+            }
+        }
     }
 }

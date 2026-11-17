@@ -10,9 +10,27 @@
 # kr-1256 sub_10C5590; legacy baselines kr-812 sub_844AB0 / kr-812 sub_844FB0 / kr-812 sub_8407F0
 # and cn-774 sub_BA3C80 / cn-774 sub_BB0F60. Search and roster bodies arrive on the clan-server
 # NxPacket connection, not on this game port, so they are not invented here.
+
+# The clan creation cards (ShopItem function 22, capacity in parameter) from the build's client data: the create
+# dialog opens only for such an item (kr-1256 sub_51BA40) and the clan holds as many members as the card states.
+- id: clan.creation-cards
+  plugin: clan.creation-cards
+  # Inside the inventory view with the clan row: a legacy build's client data is visible only within its own
+  # subtree (bundles/legacy.yaml isolates IClientDataStore under the clientdata row). The inventoryview row isolates
+  # IClanCreationCards, so every clan build in the all-builds profile publishes its own cards.
+  parent_id: inventoryview
+  config:
+    shop_item_client_path: "Config/ShopItem2.xml"
+    max_shop_item_bytes: 134217728
+    max_cards: 64
 - id: clan
   plugin: clan
+  # Inside the inventory view, like the shop: founding a clan consumes the card from this build's bag.
+  parent_id: inventoryview
   config:
-    protocol: "kr-1256/game"
+    protocol: "${BFF_PROFILE_ID}/game"
     max_snapshot_entries: 4096
     max_tracked_opens: 512
+    # The kr-812 family asks for a passport only once it is logged in to the clan server, so the server sends
+    # one after the game login; kr-1256 and its builds ask by themselves and turn this off.
+    passport_on_login: true

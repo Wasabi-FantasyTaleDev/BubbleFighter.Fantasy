@@ -31,6 +31,8 @@
   # Every build keeps its appearance, publication and online-player services in its own subtree.
   isolated_services:
     - BubbleFighter.Fantasy.Contracts.Lobby.IRetainedPlayerAdmission
+    - BubbleFighter.Fantasy.Contracts.Couples.ICoupleRingCatalog
+    - BubbleFighter.Fantasy.Contracts.Clans.IClanCreationCards
     - BubbleFighter.Fantasy.Contracts.Inventory.IInventoryPushService
     - BubbleFighter.Fantasy.Contracts.Inventory.IEquipmentSelection
     - BubbleFighter.Fantasy.Contracts.Inventory.IInventoryExpiry
@@ -38,6 +40,7 @@
     - BubbleFighter.Fantasy.Contracts.Inventory.IEquippedViewPush
     - BubbleFighter.Fantasy.Contracts.Inventory.IWeaponPresetPageSource
     - BubbleFighter.Fantasy.Contracts.Shop.IShopGiftService
+    - BubbleFighter.Fantasy.Contracts.CashInbox.ICashInboxService
     - BubbleFighter.Fantasy.Contracts.Players.IOnlinePlayers
     - BubbleFighter.Fantasy.Contracts.Party.IPartyDirectory
   config:

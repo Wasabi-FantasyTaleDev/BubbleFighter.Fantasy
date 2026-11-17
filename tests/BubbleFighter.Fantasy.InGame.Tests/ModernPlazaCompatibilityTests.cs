@@ -128,7 +128,9 @@ public sealed class ModernPlazaCompatibilityTests
         Assert.Equal(25, local["character_type"]);
         // cn-774 sub_894B80 hands seat +36 to the actor constructor; a zero there is not an actor kind.
         Assert.Equal(1, Convert.ToInt32(local["unknown_36"], System.Globalization.CultureInfo.InvariantCulture));
-        Assert.Equal(17, local["level"]);
+        // cn-774 sub_BC07C0 and tw-454 sub_A9D8F0 copy this account word into the relationship state.
+        Assert.False(local.ContainsKey("level"));
+        Assert.Equal(-1, local["couple_partner_user_num"]);
         Assert.Equal(-1, local["party_marker_index"]);
         // cn-774 sub_52E090 / tw-454 sub_791C10 treat a controller above -1 as a bot seat owned by that account; a
         // player seat that carried 0 there left the local actor uncontrolled (it could turn but not act).

@@ -106,7 +106,8 @@ public static partial class Program
 
         if (options.DumpConfig)
         {
-            Console.Out.Write(ProfileComposer.Dump(rows));
+            using var stdout = Console.OpenStandardOutput();
+            ConfigDumpOutput.Write(ProfileComposer.Dump(rows), Console.IsOutputRedirected, stdout, Console.Out);
             return 0;
         }
 

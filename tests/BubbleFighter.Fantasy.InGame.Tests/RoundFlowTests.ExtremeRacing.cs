@@ -290,6 +290,48 @@ public sealed partial class RoundFlowTests
         finally { await rig.Registry.StopAllAsync(); }
     }
 
+    /// <summary>
+    /// A racer who falls while another player's finish countdown runs, or in the pause before the next stage, still
+    /// gets back on the course: the fall's expiry and cleanup reports leave the character alive, and its reset is granted.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ExtremeRacingFallAfterTheFirstFinishStillResets(bool stageOver)
+    {
+        var (rig, racing) = ExtremeRacingRig(2, 60_000, nativeLife: true);
+        try
+        {
+            var room = await StartExtremeRacingRoundAsync(rig);
+            var seat = room.FindByGame(rig.Guest.Id)!;
+            var relay = new RecordingSession(92);
+            rig.Registry.BindRelay(relay, seat.Key);
+            var actor = RoomRegistry.SceneEntity(seat.Slot);
+            await rig.Round.HandleExtremeRacingGoalAsync(rig.Host, new(1), default);
+            Assert.Equal(ExtremeRacingPhase.Finishing, room.ExtremeRacing.Phase);
+            if (stageOver)
+            {
+                // The guest's goal closes the stage; its pause runs until stage two relocates everyone.
+                await rig.Round.HandleExtremeRacingGoalAsync(rig.Guest, new(1), default);
+                Assert.Equal(ExtremeRacingPhase.Intermission, room.ExtremeRacing.Phase);
+                Assert.Empty(racing.Rounds.To(rig.Guest));
+            }
+            await rig.Round.HandleLifeReportedAsync(relay, new(RoundLifeEvent.BubbleExpired, actor), default);
+            await rig.Round.HandleLifeReportedAsync(relay, new(RoundLifeEvent.DeathCleaned, actor), default);
+            var request = new RoundSpawnAccepted(actor, 0)
+            {
+                ActorSeat = seat.Slot, Request = (byte[])[.. BitConverter.GetBytes(actor), 0xBA, 0xBA, 0, 0, 0, 0],
+                Rules = new(RoundRespawnAudience.Requester, RoundRespawnCompletion.MatchConfirmation, RoundRespawnAdmission.CleanedDeath),
+            };
+            await rig.Round.HandleSpawnAcceptedAsync(rig.Guest, request, default);
+            Assert.Single(rig.Respawned.To(rig.Guest));
+            Assert.Equal(SeatLife.ResetPending, seat.Life.State);
+            await rig.Round.HandleLifeReportedAsync(relay, new(RoundLifeEvent.ResetConfirmed, actor), default);
+            Assert.Equal(SeatLife.Alive, seat.Life.State);
+        }
+        finally { await rig.Registry.StopAllAsync(); }
+    }
+
     /// <summary>A reset queued for a stage cannot authorize a different life or stage when the queue resumes.</summary>
     [Theory]
     [InlineData(false)]

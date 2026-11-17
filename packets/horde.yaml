@@ -85,9 +85,10 @@ structs:
     - unknown_58: u8
       offset: 58
       only: [kr-1256]
-  # C2S 2027: a drop the host's round spawned. kr-1256 sub_6E8D30 writes three position floats,
-  # three velocity floats, the constant 5 and one caller word. The 5 word is the drop kind: the
-  # S2C 645 reader switches on it (see HordeDropSpawn), and this writer always stamps 5.
+  # C2S 2027 gcpReqCreateHordeAward: the award drop of a killed mob. kr-1256 sub_6E8D30 writes three
+  # position floats, three velocity floats, the constant 5 and one caller word. The server binds it
+  # with HordeAwardRequest (packets/lucci-drops.yaml), the same body kr-812 sub_514B60 writes, and
+  # picks the award kind itself; whether the client means the constant 5 as a kind is not proven.
   HordeDropReport:
     - x: f32
       offset: 0

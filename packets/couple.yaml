@@ -10,61 +10,77 @@ structs:
   # C2S expiry: kr-812 sub_80C160, cn-324 sub_798810, id-400 sub_63B780,
   # cn-404 sub_8A2A80, cn-406 sub_7151D0, cn-408 sub_9B68E0, cn-706 sub_87EC00,
   # cn-717 sub_8C3780 and id-1809 sub_7BEBE0 all read one bool32, without a string.
+  # kr-1256 sub_E849D0, cn-774 sub_4D66B0 and tw-454 sub_C76860 each write a single bool32.
   CoupleInviteExpire:
     - unknown_4: bool
       offset: 4
-      except: [cn-279, kr-1256, cn-735, cn-705]
+      except: [cn-279, cn-735]
+      kr-1256:
+        - unknown_0: bool
+          offset: 0
 
   # C2S answer: kr-812 sub_9FDE70, id-400 sub_977C60, cn-404 sub_9AEB80,
   # cn-406 sub_8E2EF0, cn-408 sub_9B6930, cn-706 sub_97D9B0, cn-717 sub_AB0BD0,
   # id-1809 sub_995530; cn-324 sub_402480 stores the second string at +12.
   # kr-1256 sub_E881A0 writes opcode 932 from the invitation dialog kr-1256 sub_E83FE0.
-  # Its two bool32 values precede two counted UTF-16LE names; the second flag is not interpreted here.
+  # cn-774 sub_4DD000 and tw-454 sub_C7C550 write the same two bool32/name sequence; the second flag is acceptance.
   CoupleInviteAnswerRequest:
     - unknown_4: bool
       offset: 4
-      except: [cn-279, cn-774, cn-735, cn-705]
+      except: [cn-279, cn-735]
       kr-1256:
         - unknown_0: bool
           offset: 0
-    - unknown_5: bool
+    - accepted: bool
       offset: 5
-      except: [cn-279, cn-774, cn-735, cn-705]
+      except: [cn-279, cn-735]
       kr-1256:
-        - unknown_1: bool
+        - accepted: bool
           offset: 1
-    - unknown_8: wstr
+    - inviter: wstr
       offset: 8
-      except: [cn-279, cn-774, cn-735, cn-705]
+      except: [cn-279, cn-735]
       kr-1256:
-        - unknown_4: wstr
+        - inviter: wstr
           offset: 4
-    - unknown_36: wstr
+    - recipient: wstr
       offset: 36
-      except: [cn-279, cn-774, cn-735, cn-705]
+      except: [cn-279, cn-735]
       cn-324:
-        - unknown_12: wstr
+        - recipient: wstr
           offset: 12
       kr-1256:
-        - unknown_28: wstr
+        - recipient: wstr
           offset: 28
 
   # C2S breakup: kr-812 sub_5C8FD0, cn-324 sub_6FDDF0, id-400 sub_89DD10,
   # cn-404 sub_68E480, cn-406 sub_75A200, cn-408 sub_7B1F10, cn-706 sub_567230,
   # cn-717 sub_740F00 and id-1809 sub_68D480 read one counted name.
+  # kr-1256 sub_E86B50, cn-774 sub_4DB6C0 and tw-454 sub_C7B5A0 each send one counted name after Yes (257).
   CoupleBreakUpRequest:
-    - unknown_4: wstr
+    - partner: wstr
       offset: 4
-      except: [cn-279, kr-1256, cn-735, cn-705]
+      except: [cn-279, cn-735]
+      kr-1256:
+        - partner: wstr
+          offset: 0
 
   # C2S ring change: kr-812 sub_80A910, cn-706 sub_4BBB70 and id-1809 sub_4D60C0
   # read one word. cn-717 sub_8C4260 additionally reads a bool32 into +8.
   # cn-324 and id-400/cn-404/cn-406/cn-408 have no matched ring-change packet class.
+  # The modern DlgCoupleItemChoice2 handlers kr-1256 sub_EA0430, cn-774 sub_6B2940 and tw-454 sub_6D0EE0
+  # send the selected owned item then a zero word. The similarly shaped Bingo request is unrelated.
   CoupleChangeRingRequest:
+    - ring_item: u32
+      offset: 4
+      except: [cn-324, id-400, cn-735]
+      also: [cn-706]
+      kr-1256:
+        - ring_item: u32
+          offset: 0
     - unknown_4: u32
       offset: 4
-      except: [cn-324, id-400, kr-1256, cn-735, cn-705]
-      also: [cn-706]
+      only: [kr-1256]
     - unknown_8: bool
       offset: 8
       only: [cn-717]
@@ -74,69 +90,180 @@ structs:
   # kr-812 sub_9FA680/sub_9FA190 install EquippedItemList there before kr-812 sub_9FDC70 sends it.
   # id-400 sub_977BE0, cn-404 sub_9AEB00, cn-406 sub_8E2E70, cn-408 sub_9B68A0,
   # cn-706 sub_97D910 and cn-717 sub_AB0C50 stop after the fourth field.
-  # cn-324 sub_402370 uses compact strings. id-1809 has an unverified nested record and is excluded.
+  # cn-705 sub_97C3A0 likewise stops after the fourth field; cn-324 sub_402370 uses compact strings.
+  # id-1809 sub_996730/sub_996BF0 install EquippedItemList at +68 and copy the native seat before
+  # id-1809 sub_99A1B0 writes the complete request. Its equipment suffix must not be discarded.
+  # kr-1256 sub_E880A0 (C2S 930) writes the first four fields from its 24-byte-string record and no equipment
+  # record; its callers kr-1256 sub_E821B0 and kr-1256 sub_E81990 send it after a yes/no box, the flag being
+  # cleared when the answer is not Yes (257). cn-774 sub_4DCEF0 and tw-454 sub_C7C3D0 instead append their own
+  # EquippedItemList record at +56 (constructors cn-774 sub_496D10 / tw-454 sub_4A0360).
   CoupleConfirmInviteRequest:
-    - unknown_4: bool
+    - confirmed: bool
       offset: 4
-      except: [cn-279, kr-1256, id-1809, cn-735, cn-705]
-    - unknown_8: wstr
+      except: [cn-279, cn-735]
+      kr-1256:
+        - confirmed: bool
+          offset: 0
+    - target: wstr
       offset: 8
-      except: [cn-279, kr-1256, id-1809, cn-735, cn-705]
-    - unknown_36: u32
+      except: [cn-279, cn-735]
+      kr-1256:
+        - target: wstr
+          offset: 4
+    - ring_item: u32
       offset: 36
-      except: [cn-279, kr-1256, id-1809, cn-735, cn-705]
+      except: [cn-279, cn-735]
       cn-324:
-        - unknown_12: u32
+        - ring_item: u32
           offset: 12
-    - unknown_40: wstr
+      kr-1256:
+        - ring_item: u32
+          offset: 28
+    - message: wstr
       offset: 40
-      except: [cn-279, kr-1256, id-1809, cn-735, cn-705]
+      except: [cn-279, cn-735]
       cn-324:
-        - unknown_16: wstr
+        - message: wstr
           offset: 16
+      kr-1256:
+        - message: wstr
+          offset: 32
     - equipped_items: EquippedItemList
       offset: 68
-      except: [cn-324, id-400, id-1809, cn-717, kr-1256]
+      except: [cn-324, id-400, cn-717, kr-1256]
+    - equipped_items: EquippedObjectEntry
+      offset: 56
+      only: [cn-774]
 
   # S2C invitation: kr-812 sub_83C260 reads all six fields; kr-812 sub_83C2C0
   # identifies EquippedItemList at +92 and FighterInfo at +176 through kr-812 sub_40B3F0.
-  # Other builds are excluded until their entire nested invitation shape is verified.
+  # Own constructors also install EquippedItemList +92 and FighterInfo +176:
+  # cn-717 sub_8C4E70 (read sub_8C4E10), cn-706 sub_7A0A00 (read sub_7A09A0),
+  # cn-406 sub_714B10 (read sub_714AB0), cn-404 sub_7C5EC0 (read sub_7C5E60),
+  # cn-705 sub_79F4C0 (read sub_79F460), id-1809 sub_7BE130 (read sub_7BE0D0).
+  # id-400 sub_798660 and cn-408 sub_7C94E0 retain those complete nested records.
+  # Each nested FighterInfo keeps its own build's counters, vectors and final fields in user-stat.yaml.
   CoupleInvite:
-    - unknown_4: bool
+    - shown: bool
       offset: 4
-      except: [cn-324, id-400, id-1809, cn-717, kr-1256]
-    - unknown_8: wstr
+      except: [cn-324, kr-1256]
+    - inviter: wstr
       offset: 8
-      except: [cn-324, id-400, id-1809, cn-717, kr-1256]
-    - unknown_36: wstr
+      except: [cn-324, kr-1256]
+    - recipient: wstr
       offset: 36
-      except: [cn-324, id-400, id-1809, cn-717, kr-1256]
-    - unknown_64: wstr
+      except: [cn-324, kr-1256]
+    - message: wstr
       offset: 64
-      except: [cn-324, id-400, id-1809, cn-717, kr-1256]
+      except: [cn-324, kr-1256]
     - equipped_items: EquippedItemList
       offset: 92
-      except: [cn-324, id-400, id-1809, cn-717, kr-1256]
+      except: [cn-324, kr-1256]
     - fighter_info: FighterInfo
       offset: 176
-      except: [cn-324, id-400, id-1809, cn-717, kr-1256]
+      except: [cn-324, kr-1256]
+
+  # cn-324 sub_6FD330 reads bool32, three counted names, then virtual records at +20 and +64.
+  # cn-324 sub_6FD390 constructs EquippedItemList at +20 and FighterInfo through sub_6FB9A0 at +64;
+  # their own readers sub_45B640/sub_6FBD60 include the byte-vector and all 36 final counter words.
+  # tw-410 sub_6FCFB0/sub_6FD010 independently construct the same records; its own sub_45AFC0/sub_6FB910
+  # retain the equipment byte-vector and all 36 final fighter words after the compact names.
+  CoupleInvite@cn-324:
+    - shown: bool
+      offset: 4
+      except: [cn-279]
+    - inviter: wstr
+      offset: 8
+      except: [cn-279]
+    - recipient: wstr
+      offset: 12
+      except: [cn-279]
+    - message: wstr
+      offset: 16
+      except: [cn-279]
+    - equipped_items: EquippedItemList
+      offset: 20
+      except: [cn-279]
+    - fighter_info: FighterInfo
+      offset: 64
+      except: [cn-279]
+
+  # kr-1256 S2C 936 reader kr-1256 sub_10E17C0 (handler kr-1256 sub_9BEEF0, which opens the proposal box
+  # kr-1256 sub_E83FE0 when both name strings are set): bool32, three counted names, the equipment block of
+  # RoomProfileEntry without its user number, then the nested record at +144, read by its own deserializer as
+  # kr-812 reads FighterInfo at +176.
+  CoupleInvite@kr-1256:
+    - shown: bool
+      offset: 0
+    - inviter: wstr
+      offset: 4
+    - recipient: wstr
+      offset: 28
+    - message: wstr
+      offset: 52
+    - equipped_items: CoupleInviteEquipment
+      offset: 76
+    - fighter_info: FighterInfo
+      offset: 144
+  # cn-774 sub_BBCE80 reads its EquippedItemList at +76 and FighterInfo at +160 (constructors sub_496D10/sub_466960).
+  # tw-454 sub_A99E80 reads the smaller native equipment record at +76 and FighterInfo at +144 (sub_4A0360/sub_45E770).
+  CoupleInvite@cn-774:
+    - shown: bool
+      offset: 0
+    - inviter: wstr
+      offset: 4
+    - recipient: wstr
+      offset: 28
+    - message: wstr
+      offset: 52
+    - equipped_items: EquippedObjectEntry
+      offset: 76
+    - fighter_info: FighterInfo
+      offset: 160
+      tw-454:
+        - fighter_info: FighterInfo
+          offset: 144
+
+  # The kr-1256 invitation's equipment block (kr-1256 sub_10E17C0 +76..+143): the character item, the worn item
+  # vector and two more word vectors (kr-1256 sub_998FB0), a byte vector (kr-1256 sub_10BE7B0) and the ItemAttr
+  # vector (kr-1256 sub_10D9050), in RoomProfileEntry's order.
+  CoupleInviteEquipment:
+    - character_id: u32
+      offset: 0
+      only: [kr-1256]
+    - equipped_items: "list<u32>"
+      offset: 4
+      only: [kr-1256]
+    - unknown_16: "list<u32>"
+      offset: 16
+      only: [kr-1256]
+    - unknown_28: "list<u32>"
+      offset: 28
+      only: [kr-1256]
+    - unknown_40: "list<u8>"
+      offset: 40
+      only: [kr-1256]
+    - unknown_52: "list<ItemAttr>"
+      offset: 52
+      only: [kr-1256]
+      except: [cn-774]
 
   # S2C invitation result: kr-812 sub_844570, cn-324 sub_6FD230, id-400 sub_798DF0,
   # cn-404 sub_43E890, cn-406 sub_713EA0, cn-408 sub_7CACD0, cn-706 sub_7A1330,
   # cn-717 sub_8CEE00 and id-1809 sub_7BE230 read word then name.
   # Modern consumers: kr-1256 sub_9BFAA0, cn-774 sub_BBD850, tw-454 sub_A9A7D0.
   CoupleInviteResult:
-    - unknown_4: u32
+    - result: u32
       offset: 4
-      except: [cn-279, cn-735, cn-705]
+      except: [cn-279, cn-735]
       kr-1256:
-        - unknown_0: u32
+        - result: u32
           offset: 0
-    - unknown_8: wstr
+    - name: wstr
       offset: 8
-      except: [cn-279, cn-735, cn-705]
+      except: [cn-279, cn-735]
       kr-1256:
-        - unknown_4: wstr
+        - name: wstr
           offset: 4
 
   # S2C answer: kr-812 sub_83C1D0, cn-324 sub_6FD5F0, id-400 sub_798760,
@@ -144,61 +271,63 @@ structs:
   # cn-717 sub_8C4CF0 and id-1809 sub_7BE290 read bool32 then two names.
   # Modern: kr-1256 sub_99CBB0 via kr-1256 sub_9C1210, cn-774 sub_BBED80, tw-454 sub_A9BCF0.
   CoupleInviteAnswerReply:
-    - unknown_4: bool
+    - accepted: bool
       offset: 4
-      except: [cn-279, cn-735, cn-705]
+      except: [cn-279, cn-735]
       kr-1256:
-        - unknown_0: bool
+        - accepted: bool
           offset: 0
-    - unknown_8: wstr
+    - inviter: wstr
       offset: 8
-      except: [cn-279, cn-735, cn-705]
+      except: [cn-279, cn-735]
       kr-1256:
-        - unknown_4: wstr
+        - inviter: wstr
           offset: 4
-    - unknown_36: wstr
+    - recipient: wstr
       offset: 36
-      except: [cn-279, cn-735, cn-705]
+      except: [cn-279, cn-735]
       cn-324:
-        - unknown_12: wstr
+        - recipient: wstr
           offset: 12
       kr-1256:
-        - unknown_28: wstr
+        - recipient: wstr
           offset: 28
 
   # S2C breakup shares the preceding legacy answer readers except cn-717 sub_88F4D0,
   # which reads two names then a status word. kr-1256 sub_9C15C0 reads a word and ONE name.
   # cn-774 sub_BBF1A0 and tw-454 sub_A9C220 instead read two names then a word; status 1
-  # selects the wait message in all three modern consumers. No success semantics are assigned here.
+  # selects the wait message in all three modern consumers. CN/TW compare the actor name to the local nickname
+  # on status 0 and use the second name as the former partner; other non-refusal statuses clear couple state.
+  # kr-812 sub_830340 treats true as success and false as the one-day refusal; its two names are read then unused.
   CoupleBreakUpReply:
-    - unknown_4: bool
+    - status: bool
       offset: 4
-      except: [cn-279, cn-735, cn-705]
+      except: [cn-279, cn-735]
       cn-717:
         - unknown_4: wstr
           offset: 4
         - unknown_32: wstr
           offset: 32
-        - unknown_60: u32
+        - status: u32
           offset: 60
       kr-1256:
-        - unknown_0: u32
+        - status: u32
           offset: 0
-        - unknown_4: wstr
+        - name: wstr
           offset: 4
       cn-774:
-        - unknown_0: wstr
+        - actor: wstr
           offset: 0
-        - unknown_24: wstr
+        - partner: wstr
           offset: 24
-        - unknown_48: u32
+        - status: u32
           offset: 48
     - unknown_8: wstr
       offset: 8
-      except: [cn-279, cn-717, kr-1256, cn-705]
+      except: [cn-279, cn-717, kr-1256]
     - unknown_36: wstr
       offset: 36
-      except: [cn-279, cn-717, kr-1256, cn-705]
+      except: [cn-279, cn-717, kr-1256]
       cn-324:
         - unknown_12: wstr
           offset: 12
@@ -208,23 +337,23 @@ structs:
   # cn-717 sub_8C4C90 and id-1809 sub_7BE2F0 read bool32, word, name.
   # Modern consumers: kr-1256 sub_9C1BD0, cn-774 sub_BBF620, tw-454 sub_A9C7D0.
   CoupleNotifyPartner:
-    - unknown_4: bool
+    - partner_online: bool
       offset: 4
-      except: [cn-279, cn-735, cn-705]
+      except: [cn-279, cn-735]
       kr-1256:
-        - unknown_0: bool
+        - partner_online: bool
           offset: 0
-    - unknown_8: u32
+    - partner_user_number: u32
       offset: 8
-      except: [cn-279, cn-735, cn-705]
+      except: [cn-279, cn-735]
       kr-1256:
-        - unknown_4: u32
+        - partner_user_number: u32
           offset: 4
-    - unknown_12: wstr
+    - partner_name: wstr
       offset: 12
-      except: [cn-279, cn-735, cn-705]
+      except: [cn-279, cn-735]
       kr-1256:
-        - unknown_8: wstr
+        - partner_name: wstr
           offset: 8
 
   # S2C ring change: kr-812 sub_6DB1B0, cn-706 sub_733050 and id-1809 sub_4D7F70
@@ -232,19 +361,19 @@ structs:
   # Modern consumers kr-1256 sub_9BF1D0, cn-774 sub_BBD210 and tw-454 sub_A9A190
   # all read two words AND a bool32. The third field must not be omitted.
   CoupleChangeRingReply:
-    - unknown_4: u32
+    - ring_result: u32
       offset: 4
-      except: [cn-324, id-400, cn-735, cn-705]
+      except: [cn-324, id-400, cn-735]
       also: [cn-706]
       kr-1256:
-        - unknown_0: u32
+        - ring_result: u32
           offset: 0
-    - unknown_8: u32
+    - ring_item: u32
       offset: 8
-      except: [cn-324, id-400, cn-735, cn-705]
+      except: [cn-324, id-400, cn-735]
       also: [cn-706]
       kr-1256:
-        - unknown_4: u32
+        - ring_item: u32
           offset: 4
     - unknown_12: bool
       offset: 12
@@ -256,17 +385,22 @@ structs:
 
   # The cn-324 initial invitation request and inviter-status response are separate from confirmation.
   # cn-324 sub_6FD8F0 reads bool32/name; cn-324 sub_410910 reads one word.
+  # cn-324 Packet_gcpReqCoupleInviterStatus vtable 0xAC44EC uses nullsub_3 (sub_5C7C90)
+  # for both body writer and reader; sub_404E30 sends this empty request before target selection.
+  # tw-410 sub_404E90 likewise sends an empty body (own writer/reader sub_6B0840); sub_5A59D0 reads the
+  # initial bool32/name and sub_6EB2B0 reads the status word before sub_402DF0 opens confirmation.
+  CoupleInviterStatusRequest: []
   CoupleInitialInviteRequest:
-    - unknown_4: bool
+    - selected: bool
       offset: 4
       only: [cn-324]
       except: [cn-279]
-    - unknown_8: wstr
+    - target: wstr
       offset: 8
       only: [cn-324]
       except: [cn-279]
   CoupleInviterStatusReply:
-    - unknown_4: u32
+    - status: u32
       offset: 4
       only: [cn-324]
       except: [cn-279]

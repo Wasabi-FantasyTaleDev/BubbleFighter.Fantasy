@@ -71,6 +71,9 @@
     # vector). Needs the build's present_box capability and the shop row of the modern-commerce bundle.
     # Opt in on both the dialect.messages and shop rows for native-client acceptance.
     present_box: false
+    # Cash item inbox (packets/cash-inbox.yaml, packets/cash-inventory.yaml): tw-454 sub_BCDBA0 (open),
+    # tw-454 sub_D87B40 (pickup), tw-454 sub_A8BA40 (list), tw-454 sub_A8EBB0 (pickup reply). Opt in on both dialect.messages and shop.
+    cash_inbox: false
     # The expired-item notice (packets/inventory.yaml ExpiredItems): tw-454 sub_AACF80 case 807 ->
     # tw-454 sub_A8B9C0 -> tw-454 sub_45AA50 reads the counted u32 id list (cn-774's chain verbatim), and its consumer
     # is armed from the startup singletons; the burst is cn-774's, so the step lands last.

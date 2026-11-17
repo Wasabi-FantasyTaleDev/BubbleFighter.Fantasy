@@ -47,10 +47,11 @@ public sealed class ShopReloadStateScenarioTests
             // The login burst, the main-menu install and the bag senders the lobby needs (packets/builds.yaml).
             Row("dialect.messages", TestWireDialects.MessagesConfig(new()
             {
-                ["protocol"] = "kr-1256/game", ["login"] = true, ["main_menu_init"] = true, ["inventory"] = true,
+                ["protocol"] = "kr-1256/game", ["login"] = true, ["main_menu_init"] = true, ["inventory"] = true, ["mystery_store"] = false,
             })),
             Row("lobby", new()
             {
+                ["couples"] = false,
                 ["inventory_source"] = "mysql", ["money_source"] = "mysql",
                 ["starting_lucci"] = 1000, ["starting_cash"] = 5000,
             }),

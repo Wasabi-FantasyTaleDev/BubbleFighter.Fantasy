@@ -65,6 +65,7 @@ public static partial class PacketCodec
             "f32" => reader.ReadSingle(),
             "f64" => reader.ReadDouble(),
             "wstr" => ReadBoundedString(ref reader, maxStringCharacters),
+            "wcstr" => ReadBoundedCString(ref reader, maxStringCharacters),
             _ => throw new ConfigException($"'{type}' is not a supported scalar field type."),
         };
 
@@ -82,6 +83,16 @@ public static partial class PacketCodec
         if (length > maximum)
             throw new PacketFormatException($"String exceeds {maximum} characters.", reader.Offset);
         return System.Text.Encoding.Unicode.GetString(reader.ReadBytes(checked((int)length * 2)));
+    }
+
+    // The clan-server connection's strings carry no count: UTF-16LE up to a NUL word (reader kr-1256 sub_1114B60).
+    private static string ReadBoundedCString(ref PacketReader reader, int maximum)
+    {
+        var start = reader.Offset;
+        var text = reader.ReadWideCString();
+        if (text.Length > maximum)
+            throw new PacketFormatException($"String exceeds {maximum} characters.", start);
+        return text;
     }
 
     /// <summary>Writes one structure as one build has it.</summary>
@@ -244,7 +255,7 @@ public static partial class PacketCodec
             Write(writer, tables, build, type, value as IReadOnlyDictionary<string, object?> ?? scope);
             return;
         }
-        WriteScalar(writer, type, value ?? (type == "wstr" ? "" : field.Default), field, structure);
+        WriteScalar(writer, type, value ?? (type is "wstr" or "wcstr" ? "" : field.Default), field, structure);
     }
 
     private static void WriteScalar(PacketWriter writer, string type, object? value, PacketField field, string structure)
@@ -265,6 +276,15 @@ public static partial class PacketCodec
                     if (text.Length > (ushort.MaxValue - 4) / 2)
                         throw new ArgumentOutOfRangeException(nameof(value), "String exceeds the native packet body bound.");
                     writer.WriteWideStringPrefixed(text);
+                    break;
+                case "wcstr":
+                    var terminated = value as string ?? throw new InvalidCastException("not a string");
+                    // The terminator is the only end mark (writer kr-1256 sub_1114AF0), so an embedded NUL would cut the field short.
+                    if (terminated.Contains('\0'))
+                        throw new ArgumentException($"{structure}.{field.Name} cannot carry a NUL character.", nameof(value));
+                    if (terminated.Length > (ushort.MaxValue - 4) / 2)
+                        throw new ArgumentOutOfRangeException(nameof(value), "String exceeds the native packet body bound.");
+                    writer.WriteWideCString(terminated);
                     break;
                 default: throw new ConfigException($"{structure}.{field.Name} has the type '{type}', which this codec cannot write.");
             }

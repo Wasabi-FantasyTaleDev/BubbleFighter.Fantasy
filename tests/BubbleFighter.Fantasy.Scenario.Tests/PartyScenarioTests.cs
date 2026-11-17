@@ -95,6 +95,7 @@ public sealed class PartyScenarioTests
             })),
             Row("lobby", new()
             {
+                ["couples"] = false,
                 ["inventory_source"] = "mysql", ["money_source"] = "mysql", ["starting_lucci"] = 1000, ["starting_cash"] = 5000,
                 ["online_players"] = true,
             }),
@@ -203,8 +204,8 @@ public sealed class PartyScenarioTests
             Row("core.message-router"), Row("core.client-profiles"), Row("core.opcode-tables"), Row("core.wire-dialects"),
             Row("persistence.memory"), Row("dialect", TestWireDialects.RowConfig("kr-812")),
             Row("protocol", new() { ["opcode_table_path"] = tablePath, ["bootstrap_status"] = 1, ["patch_request_name"] = "gcpFirstConnect" }),
-            Row("dialect.messages", new() { ["protocol"] = "kr-812/game", ["inventory"] = true, ["party"] = true, ["packets_directory"] = RepositoryPackets.Directory() }),
-            Row("lobby", new() { ["protocol"] = "kr-812/game", ["auto_create_players"] = true, ["online_players"] = true }),
+            Row("dialect.messages", new() { ["protocol"] = "kr-812/game", ["couples"] = false, ["inventory"] = true, ["party"] = true, ["packets_directory"] = RepositoryPackets.Directory() }),
+            Row("lobby", new() { ["protocol"] = "kr-812/game", ["couples"] = false, ["auto_create_players"] = true, ["online_players"] = true }),
             Row("party", new() { ["protocol"] = "kr-812/game" }),
             Row("test.party-menu-scene", new() { ["protocol"] = "kr-812/game" }),
             Row("net.tcp", new() { ["listen"] = $"127.0.0.1:{port}", ["protocol"] = "kr-812/game" }),

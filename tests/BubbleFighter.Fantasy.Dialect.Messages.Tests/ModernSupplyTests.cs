@@ -123,6 +123,26 @@ public sealed class ModernSupplyTests
         Assert.Throws<PacketFormatException>(() => SupplyBinding.ReadDrop(tables, build, drop));
     }
 
+    /// <summary>
+    /// A hurt drop carries the victim's raw team in its byte (kr-1256 sub_680AA0), so the dropped box keeps that team
+    /// and a zombie's team 34 passes through instead of being refused.
+    /// </summary>
+    [Theory]
+    [InlineData("kr-1256", "01", 1)]
+    [InlineData("kr-1256", "02", 2)]
+    [InlineData("kr-1256", "22", 34)]
+    [InlineData("cn-774", "02", 2)]
+    [InlineData("tw-454", "01", 1)]
+    public void ModernDropsKeepTheVictimsTeam(string build, string teamByte, int team)
+    {
+        var drop = Convert.FromHexString("0000803F000000C0000040400000000000000000000000006D000000" + teamByte + "10270000");
+        Assert.Equal(33, drop.Length);
+        var request = SupplyBinding.ReadDrop(TestBuilds.All.Tables, build, drop);
+        Assert.Equal(team, request.Point.Team);
+        Assert.Equal(109, request.Point.Kind);
+        Assert.Equal(10000, request.CreationClass);
+    }
+
     private static byte[] MapReport(byte team = 2, float x = 1, int kindCount = 1)
     {
         var buffer = new ArrayBufferWriter<byte>();

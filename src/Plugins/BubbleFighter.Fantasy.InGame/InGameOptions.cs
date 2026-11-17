@@ -332,6 +332,14 @@ public sealed partial class InGameOptions : IValidatableOptions
     /// <summary>Gets or sets the maximum number of unconsumed dropped item boxes retained by one round.</summary>
     [Range(1, 4096)]
     public int MaxDroppedSupplies { get; set; } = 512;
+
+    /// <summary>
+    /// Gets or sets how many client-created scene objects (a horde host's NPCs, a soccer host's ball) one round keeps a
+    /// movement record for; past it the oldest record is forgotten. A host keeps at most 64 NPCs alive at once
+    /// (kr-1256 sub_6D2790), so the default leaves room for every object of a long round.
+    /// </summary>
+    [Range(64, 65536)]
+    public int MaxSceneObjectMovements { get; set; } = 4096;
     /// <summary>Gets or sets the game-connection protocol name (port 7100 for the 1256 dialect).</summary>
     [Required]
     public string GameProtocol { get; set; } = "kr-1256/game";
@@ -408,6 +416,22 @@ public sealed partial class InGameOptions : IValidatableOptions
     /// cancels it; the others play on. YAML key <c>cancel_round_on_disconnect</c>.
     /// </summary>
     public bool CancelRoundOnDisconnect { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets whether <c>!plaza</c> may take a player out of a loading or playing round. A build whose client
+    /// faults when the server moves it out of a running round (kr-186 faults at 0x71A9C1 in its round renderer) turns
+    /// this off: the command then ends a playing round at once, as its time limit would, and the player leaves from
+    /// the room afterwards. YAML key <c>plaza_command_during_round</c>.
+    /// </summary>
+    public bool PlazaCommandDuringRound { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets whether a waiting-room chat line sent from the menus reaches the players of this build in the menus.
+    /// A build without a chat-module packet (kr-186) speaks in its main, tutorial and lobby menus with the waiting-room
+    /// packet, and outside a room its client names a speaker only by room seat (kr-186 sub_684E80), so the line goes out
+    /// as a system line that carries the speaker's nickname. YAML key <c>menu_session_chat</c>.
+    /// </summary>
+    public bool MenuSessionChat { get; set; }
 
     /// <summary>Gets or sets the maximum supply points retained for one map.</summary>
     [Range(32, 1024)]
@@ -1011,6 +1035,7 @@ public sealed partial class InGameOptions : IValidatableOptions
     {
         foreach (var result in ValidateAi()) yield return result;
         foreach (var result in ValidateExtremeRacingInitialization()) yield return result;
+        foreach (var result in ValidateExtremeRacingMapState()) yield return result;
         foreach (var result in ValidateBnB()) yield return result;
         if (LotteryModes.Length > 0)
         {
@@ -1025,6 +1050,7 @@ public sealed partial class InGameOptions : IValidatableOptions
         foreach (var result in ValidateRescue()) yield return result;
         foreach (var result in ValidateWeaponMaster()) yield return result;
         foreach (var result in ValidatePvePoints()) yield return result;
+        foreach (var result in ValidateUserHost()) yield return result;
         if (NativeLifeModeIds.Any(mode => mode is <= 0 or > ushort.MaxValue) || NativeLifeModeIds.Distinct().Count() != NativeLifeModeIds.Length)
             yield return new ValidationResult("native_life_mode_ids must be distinct mode ids from 1 to 65535.", [nameof(NativeLifeModeIds)]);
         if (DirectKillModes.Any(mode => mode is <= 0 or > ushort.MaxValue)

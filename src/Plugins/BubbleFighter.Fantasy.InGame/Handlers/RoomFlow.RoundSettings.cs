@@ -41,6 +41,8 @@ internal sealed partial class RoomFlow
                 if (selections.Length > 3)
                     throw new InvalidOperationException("The retained native round selection count exceeds three.");
                 room.BuildSettings = held with { RoundSelections = selections };
+                if (room.IsUserHost && room.UserHostCountdownActive)
+                    room.CancelUserHostCountdown();
                 members = [.. room.Seats];
                 changed = new(View(room));
             }

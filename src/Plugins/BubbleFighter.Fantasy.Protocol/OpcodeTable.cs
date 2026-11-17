@@ -16,6 +16,7 @@ public sealed class OpcodeTable : IOpcodeTable, IOpcodeNameFallback
     private readonly OpcodeTable _game;
     private readonly OpcodeTable _relay;
     private readonly OpcodeTable _udp;
+    private readonly OpcodeTable _clan;
 
     /// <summary>Creates the table.</summary>
     /// <param name="profile">The profile the table belongs to.</param>
@@ -30,6 +31,7 @@ public sealed class OpcodeTable : IOpcodeTable, IOpcodeNameFallback
         _game = this;
         _relay = new OpcodeTable(profile, all, OpcodeConnection.Relay, this);
         _udp = new OpcodeTable(profile, all, OpcodeConnection.Udp, this);
+        _clan = new OpcodeTable(profile, all, OpcodeConnection.Clan, this);
         Profile = profile;
         Connection = OpcodeConnection.Game;
         _entries = Index(profile, all, OpcodeConnection.Game);
@@ -41,6 +43,7 @@ public sealed class OpcodeTable : IOpcodeTable, IOpcodeNameFallback
         _fallback = game._fallback;
         _relay = game;
         _udp = game;
+        _clan = game;
         Profile = profile;
         Connection = connection;
         _entries = Index(profile, all, connection);
@@ -50,7 +53,7 @@ public sealed class OpcodeTable : IOpcodeTable, IOpcodeNameFallback
     {
         var byValue = new Dictionary<(PacketDirection, ushort), OpcodeEntry>();
         var names = new HashSet<(PacketDirection, string)>();
-        foreach (var entry in all.Where(e => e.Connection == connection || (connection != OpcodeConnection.Udp && e.Connection == OpcodeConnection.Both)))
+        foreach (var entry in all.Where(e => e.Connection == connection || (connection is not OpcodeConnection.Udp and not OpcodeConnection.Clan && e.Connection == OpcodeConnection.Both)))
         {
             if (!byValue.TryAdd((entry.Direction, entry.Value), entry))
                 throw new ConfigException($"Opcode table '{profile.Id}': {connection} {entry.Direction} {entry.Value} is claimed by both {byValue[(entry.Direction, entry.Value)].Name} and {entry.Name}.");
@@ -72,7 +75,8 @@ public sealed class OpcodeTable : IOpcodeTable, IOpcodeNameFallback
         OpcodeConnection.Game => _game,
         OpcodeConnection.Relay => _game._relay,
         OpcodeConnection.Udp => _game._udp,
-        _ => throw new ArgumentOutOfRangeException(nameof(connection), connection, "A view resolves the game, relay or UDP opcode space."),
+        OpcodeConnection.Clan => _game._clan,
+        _ => throw new ArgumentOutOfRangeException(nameof(connection), connection, "A view resolves the game, relay, UDP or clan opcode space."),
     };
 
     /// <inheritdoc />
@@ -139,8 +143,8 @@ public static class OpcodeTableLoader
             var evidence = RequiredEvidence(map, path, line);
             var source = map.TryGetValue("source", out var s) ? s?.ToString() : null;
             var notes = map.TryGetValue("notes", out var n) ? n?.ToString() : null;
-            var nameSource = OptionalNameSource(map, name, path, line);
             var connection = OptionalConnection(map, path, line);
+            var nameSource = OptionalNameSource(map, name, connection, path, line);
             foreach (var scope in connection == OpcodeConnection.Both ? new[] { OpcodeConnection.Game, OpcodeConnection.Relay } : [connection])
             {
                 if (!seen.Add((scope, direction, value)))
@@ -164,7 +168,8 @@ public static class OpcodeTableLoader
             "relay" => OpcodeConnection.Relay,
             "udp" => OpcodeConnection.Udp,
             "both" => OpcodeConnection.Both,
-            _ => throw new ConfigException($"Opcode table file '{path}': entry {line} 'connection' must be 'game', 'relay', 'udp', or 'both'."),
+            "clan" => OpcodeConnection.Clan,
+            _ => throw new ConfigException($"Opcode table file '{path}': entry {line} 'connection' must be 'game', 'relay', 'udp', 'both', or 'clan'."),
         };
     }
 
@@ -204,10 +209,14 @@ public static class OpcodeTableLoader
 
     // name_source is optional while the table is being classified; when present it must be
     // one of the four forms. UnknownNNN names pair only with 'none', and names ending in '_'
-    // (ours, not the client's) pair only with 'coined', so a reader can tell them apart.
-    private static string? OptionalNameSource(IReadOnlyDictionary<string, object?> map, string name, string path, int line)
+    // (ours, not the client's) pair only with 'coined', so a reader can tell them apart. The clan-server
+    // connection is the exception: no build labels any of its packets, so every name there is coined and the
+    // suffix would mark nothing; its rows are plain names with 'coined'.
+    private static string? OptionalNameSource(IReadOnlyDictionary<string, object?> map, string name, OpcodeConnection connection, string path, int line)
     {
-        var coinedName = name.EndsWith('_');
+        var coinedName = connection == OpcodeConnection.Clan
+            ? map.TryGetValue("name_source", out var declared) && declared?.ToString() == "coined"
+            : name.EndsWith('_');
         if (!map.TryGetValue("name_source", out var raw) || raw?.ToString() is not { Length: > 0 } text)
             return coinedName
                 ? throw new ConfigException($"Opcode table file '{path}': entry {line} name '{name}' ends in '_' and must declare name_source 'coined'.")
@@ -225,6 +234,10 @@ public static class OpcodeTableLoader
             throw new ConfigException(
                 $"Opcode table file '{path}': entry {line} pairs name '{name}' with name_source '{text}'; "
                 + "coined names end in '_' and only they do.");
+        if (connection == OpcodeConnection.Clan && (name.EndsWith('_') || text is not ("coined" or "none")))
+            throw new ConfigException(
+                $"Opcode table file '{path}': entry {line} pairs clan-connection name '{name}' with name_source '{text}'; "
+                + "clan-connection names are plain coined names without a trailing '_', or UnknownNNN with 'none'.");
         return text;
     }
 

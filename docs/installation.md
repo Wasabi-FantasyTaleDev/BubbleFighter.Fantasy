@@ -41,6 +41,7 @@ The repository states no minimum Windows or Linux version; use a system that the
 | --- | --- | --- |
 | Windows x64 build package | Available | You are on Windows x64 and want a ready build |
 | Windows ARM64 build package | Available | You are on Windows on ARM and want a ready build |
+| Windows installation script | Available | You want one PowerShell command that downloads, checks and installs the Windows package |
 | Linux installation script | Available | You want a prepared Linux release without Docker |
 | Docker one-command install | Available | You want the server in a container without a checkout, optionally with MySQL |
 | Docker built from this repository | Available | You have a checkout and Docker; server and MySQL run in containers |
@@ -65,10 +66,40 @@ The newest release's files are always at `https://github.com/Wasabi-FantasyTaleD
 2. Download the ZIP for your processor and extract it to a short folder such as `C:\BubbleFighterFantasy`. Windows cannot load a plugin file whose full path reaches about 259 characters; the server refuses to start from a folder that deep and names the longest file.
 3. Double-click `BubbleFighter.Fantasy.Host.exe`. The setup assistant starts and the WebUI opens in your default browser; continue with First-run setup below. Closing the console window stops the server. If startup fails, the window stays open and shows the error until you press a key.
 
+### Windows installation script
+
+```powershell
+irm https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest/download/install.ps1 | iex
+```
+
+Run it in PowerShell. The script detects x64 or ARM64, downloads the matching ZIP and `SHA256SUMS` from the latest release, checks the checksum, installs a private ASP.NET Core Runtime 10 into the install folder when the system has none, and installs into `C:\BubbleFighterFantasy` (`releases\<tag>\`, a `current` junction, `state\`, `settings.env` and `bff.cmd`, which starts the server). Started without options in a console it asks for the folder, whether other machines may open the WebUI (default yes), whether the setup wizard needs a token (default no), whether to start with Windows (administrator PowerShell only) and whether to start now; with **Start now** it opens the setup page in your browser. Finish the setup wizard there yourself; on your own PC, choose SQLite at the database step, which needs no database server.
+
+To pass options, run the script as a script block, for example a server that starts with Windows (administrator PowerShell):
+
+```powershell
+& ([scriptblock]::Create((irm https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest/download/install.ps1))) -NoPrompt -Service
+```
+
+| Option | Effect |
+| --- | --- |
+| `-Version <tag>` | Install that release instead of the latest |
+| `-Dir <path>` | Install folder (default `C:\BubbleFighterFantasy`; keep it short) |
+| `-Arch x64` / `-Arch arm64` | Package to install (default: this processor) |
+| `-AdminPort <n>` | Port of the setup assistant and WebUI (default 7300) |
+| `-RemoteAdmin` / `-LocalAdmin` | Let other machines open the WebUI (the default) / keep it on this PC only |
+| `-SetupToken` / `-NoSetupToken` | Require a generated token before the setup wizard can be used / do not (the default) |
+| `-Service` | As administrator: scheduled task `BubbleFighterFantasy`, runs as SYSTEM and starts with Windows |
+| `-Start` | Start the server in its own window and open the setup page |
+| `-NoPrompt` | Ask nothing; use the options given and the defaults (also without a console, as in an AI agent's shell) |
+| `-NoRuntime` | Fail instead of installing the runtime |
+| `-From <dir>` | Install from a folder holding the release files (needs `-Version`) |
+
+Run the same command again to upgrade; `state\` and `settings.env` are kept.
+
 ### Linux installation script
 
 ```bash
-curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash
+curl -fsSL https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest/download/install.sh | bash
 ```
 
 The script detects x86_64 or aarch64, downloads the matching package and `SHA256SUMS` from the latest release, and checks the checksum. When the system has no ASP.NET Core Runtime 10, it installs one into the installation directory with Microsoft's `dotnet-install.sh` and leaves the system-wide .NET alone. It installs into `~/bubblefighter-fantasy`, or `/opt/bubblefighter-fantasy` as root:
@@ -82,21 +113,23 @@ The script detects x86_64 or aarch64, downloads the matching package and `SHA256
 | `bff` | The launcher; with no arguments it starts the setup assistant |
 | `settings.env` | WebUI access, setup token and port chosen by the installer; kept across upgrades |
 
-Start the server with `~/bubblefighter-fantasy/bff` and open `http://127.0.0.1:7300/` on the server itself. The installer asks two questions, and both answers default to no: whether other machines may open the WebUI (`--remote-admin`), and whether the first-run wizard needs a setup token (`--setup-token`). With the WebUI kept local, open it from your own computer through a tunnel: `ssh -L 7300:127.0.0.1:7300 <user>@<server>`, then `http://127.0.0.1:7300/`. With remote access on, open `http://<server>:7300/` and allow TCP port 7300 in the firewall or cloud security group. The answers are saved in `settings.env` in the install directory and kept by upgrades; a variable set in the environment overrides them.
+Start the server with `~/bubblefighter-fantasy/bff` and open `http://127.0.0.1:7300/` on the server itself. Run without options on a terminal, the installer asks how to install (directly or in Docker; for Docker, whether to install Docker and whether to add a database container; as root, whether to create the systemd service; otherwise, whether to start now), then whether other machines may open the WebUI (default yes, `--remote-admin`) and, when they may, whether the first-run wizard needs a setup token (default no, `--setup-token`). Any option on the command line skips the questions about how to install. From another computer, open the WebUI through a tunnel without opening any port: `ssh -L 7300:127.0.0.1:7300 <user>@<server>`, then `http://127.0.0.1:7300/`; or open `http://<server>:7300/` after allowing TCP port 7300 in the firewall or cloud security group. Until the first administrator exists, anyone who reaches the port can complete the setup, so finish it right away. The answers are saved in `settings.env` in the install directory and kept by upgrades; a variable set in the environment overrides them.
 
-Pass options after `bash -s --`, for example `curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash -s -- --service`:
+Pass options after `bash -s --`, for example `curl -fsSL https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest/download/install.sh | bash -s -- --service`:
 
 | Option | Effect |
 | --- | --- |
 | `--version <tag>` | Install that release instead of the latest |
 | `--dir <path>` | Install directory |
 | `--admin-port <n>` | Port of the setup assistant and WebUI (default 7300) |
-| `--remote-admin` | Let other machines open the WebUI; without it the WebUI only accepts the server itself |
+| `--remote-admin` / `--local-admin` | Let other machines open the WebUI (the default) / accept only the server itself |
 | `--setup-token` | Generate a token the first-run wizard asks for before it can be used; the installer prints it |
-| `--local-admin`, `--no-setup-token` | State the defaults explicitly |
+| `--no-setup-token` | State the default explicitly |
 | `--no-prompt` | Ask nothing; use the options given and the defaults (also used when no terminal is attached) |
 | `--service` | As root: create and start the `bubblefighter-fantasy` systemd service, running as the `bff` system user |
 | `--start` | Start the server when the installation finishes |
+| `--docker` | Run the server with Docker Compose (see below) |
+| `--install-docker` | As root: install Docker Engine and the Compose plugin with Docker's official script when missing; implies `--docker` |
 | `--no-runtime` | Fail instead of installing the runtime |
 | `--from <dir>` | Install from a directory holding the release files, without downloading |
 
@@ -105,15 +138,15 @@ To upgrade, run the same command again. The new release is unpacked beside the o
 ### Docker one-command install
 
 ```bash
-curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash -s -- --docker
+curl -fsSL https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest/download/install.sh | bash -s -- --docker
 ```
 
-This needs Docker Engine with the Compose plugin. The installer unpacks the Linux package into `~/bubblefighter-fantasy/docker`, builds a local image from it, and starts the server container with Docker Compose. The container uses host networking, so the game ports of the clients you select are reachable. No database container is started: in the setup assistant, choose SQLite, which keeps its file in the `bff-state` volume, or enter an existing MySQL server.
+With `--install-docker`, run as root, the installer first installs Docker Engine and the Compose plugin with Docker's official script and enables the docker service. This needs Docker Engine with the Compose plugin. The installer unpacks the Linux package into `~/bubblefighter-fantasy/docker`, builds a local image from it, and starts the server container with Docker Compose. The container uses host networking, so the game ports of the clients you select are reachable. No database container is started: in the setup assistant, choose SQLite, which keeps its file in the `bff-state` volume, or enter an existing MySQL server.
 
 To run a bundled database as well, add `--with-mysql`. A new stack gets MariaDB 11.4, which the server uses as MySQL; a stack that was created with MySQL 8.4 keeps it on upgrade, because MariaDB cannot open its data:
 
 ```bash
-curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash -s -- --docker --with-mysql
+curl -fsSL https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest/download/install.sh | bash -s -- --docker --with-mysql
 ```
 
 MySQL then listens on `127.0.0.1:3306` only (`--mysql-port` changes it), and the generated `.env` holds random database passwords that only its owner can read. In the assistant, choose MySQL with host `127.0.0.1`, the port the installer printed, database `bf_game_db`, user `bff`, and the `BFF_MYSQL_PASSWORD` value from `~/bubblefighter-fantasy/docker/.env`.

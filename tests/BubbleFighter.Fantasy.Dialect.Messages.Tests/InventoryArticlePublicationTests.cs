@@ -127,8 +127,6 @@ public sealed class InventoryArticlePublicationTests
     [Theory]
     [InlineData("kr-1256", false)]
     [InlineData("kr-1256", true)]
-    [InlineData("cn-774", true)]
-    [InlineData("tw-454", true)]
     public async Task UnpreparedAdmittedArticlesFailBeforeAnyPacket(string build, bool pet)
     {
         var row = pet ? Pet(301001, 1, 100000001, true) : EquipmentArticle();
@@ -137,6 +135,21 @@ public sealed class InventoryArticlePublicationTests
             var session = new Session();
             await Assert.ThrowsAsync<InvalidOperationException>(() => Publish(publication, Binding(build), session, row).AsTask());
             Assert.Empty(session.Sent);
+        }
+    }
+
+    /// <summary>A pet Article from another build reaches a build without a pet row as an ordinary item, never a failed login.</summary>
+    [Theory]
+    [InlineData("cn-774")]
+    [InlineData("tw-454")]
+    public async Task UnpreparedPetArticlesPublishAsOrdinaryItemsWithoutOrdinaryAdmission(string build)
+    {
+        var row = Pet(301001, 1, 100000001, true);
+        foreach (var publication in new[] { "replacement", "purchase", "delta" })
+        {
+            var session = new Session();
+            await Publish(publication, Binding(build), session, row);
+            Assert.NotEmpty(session.Sent);
         }
     }
 

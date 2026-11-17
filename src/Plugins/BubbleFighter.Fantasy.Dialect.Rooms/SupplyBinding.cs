@@ -148,9 +148,15 @@ internal sealed class SupplyBinding(string protocol, IOpcodeTable table, PacketT
         // other builds send for an ordinary throw (kr-812 sub_5145F0); cn-279 sub_81FF70 only tests the word against 14.
         var classified = values.TryGetValue("creation_class", out var creationClass)
             || values.TryGetValue("unknown_36", out creationClass);
-        var team = values.TryGetValue("team", out var nativeTeam) ? (int)nativeTeam : 0;
-        if (team is < 0 or > 2)
-            throw new PacketFormatException("Dropped item team is not 0, 1 or 2.", body.Length);
+        // Legacy drops carry a red/blue team word. Modern drops narrow the victim's raw team to a byte (kr-1256
+        // sub_708C10), and the box admits any character whose team equals it (kr-1256 sub_C13F30), zombies' 34 included.
+        var team = !values.TryGetValue("team", out var nativeTeam) ? 0 : nativeTeam switch
+        {
+            int word when word is >= 0 and <= 2 => word,
+            int => throw new PacketFormatException("Dropped item team is not 0, 1 or 2.", body.Length),
+            byte octet => octet,
+            _ => throw new PacketFormatException("Dropped item team is neither a word nor a byte.", body.Length),
+        };
         return new(new(x, y, z, (int)values["kind"], 0, 0, team), classified ? (int)creationClass! : OrdinaryCreationClass)
             { Velocity = velocity };
     }

@@ -103,8 +103,8 @@ internal sealed class FighterInfoBinding(string protocol, IOpcodeTable opcodes, 
 
     private byte[] Encode(FighterInfoReplied message, FighterBattleProjection? statistics)
     {
-        // The partner block and both strings are read and unused by the handler (kr-812 sub_82C960); they keep their
-        // constructor defaults. An empty map under a nested field stops it from inheriting the parent's nickname.
+        // kr-812 sub_82C960 -> sub_881780 and kr-1256 sub_9BCE60 -> sub_5DB670 populate the couple panel
+        // from the second fighter record. An absent partner must not inherit the inspected fighter's nickname.
         // cn-279's reply has no partner row; its awards vector keeps its empty default (count 0).
         var fields = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
@@ -114,9 +114,26 @@ internal sealed class FighterInfoBinding(string protocol, IOpcodeTable opcodes, 
                 : new Dictionary<string, object?>(StringComparer.Ordinal),
         };
         if (tables.Resolve(build, "FighterInfoReply").Any(candidate => candidate.Name == "partner"))
-            fields["partner"] = new Dictionary<string, object?>(StringComparer.Ordinal);
+        {
+            var partner = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                // Keep the nested social record independent of the partner's optional relationship block.
+                ["social"] = new Dictionary<string, object?>(StringComparer.Ordinal),
+            };
+            if (message.Fighter is not null && message.CouplePartner is { } couple)
+            {
+                partner["user_number"] = checked((uint)couple.Partner.PartnerUserNum);
+                partner["nickname"] = couple.Partner.PartnerName;
+                CoupleProfileWire.AddToFighter(tables, build, partner, couple.Relationship);
+            }
+            fields["partner"] = partner;
+        }
         return PacketCodec.Write(tables, build, "FighterInfoReply", fields);
     }
+
+    /// <summary>The build's fighter record fields for one player, as the fighter info reply writes them.</summary>
+    internal Dictionary<string, object?> FighterRecord(PlayerIdentity fighter, FighterAppearance appearance) =>
+        FighterValues(fighter, appearance, null);
 
     // kr-812 sub_87DD90 passes +4/+36 to its preview; cn-279 sub_83B330 uses +4/+12 and cn-774
     // sub_6C8420 uses +4/+32. Their common names resolve to those offsets through the packet tables.

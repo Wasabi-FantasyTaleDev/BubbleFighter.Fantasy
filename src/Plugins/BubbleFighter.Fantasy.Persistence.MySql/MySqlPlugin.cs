@@ -1,4 +1,5 @@
 using BubbleFighter.Fantasy.Contracts.Titles;
+using BubbleFighter.Fantasy.Contracts.Couples;
 using BubbleFighter.Fantasy.Contracts.Launcher;
 using BubbleFighter.Fantasy.Contracts.Clans;
 using BubbleFighter.Fantasy.Contracts.Fighters;
@@ -33,24 +34,26 @@ namespace BubbleFighter.Fantasy.Persistence.MySql;
 /// </summary>
 [Plugin("persistence.mysql", Category = "storage", Names = ["en=MySQL storage", "zh-Hans=MySQL 存储", "zh-Hant=MySQL 儲存", "ko=MySQL 저장소"], Description = "MySQL persistence via MySqlConnector and SqlSugar.",
     Optional = [typeof(IAccountMutationFence)],
-    Provides = [
+    Provides = [typeof(ICoupleStore),
         typeof(IDbConnectionFactory),
         typeof(IMigrationRunner),
-        typeof(IClanStore),
+        typeof(IClanStore), typeof(BubbleFighter.Fantasy.Contracts.Clans.IClanDirectory),
         typeof(ILauncherAccountRepository),
         typeof(ILauncherSessionStore),
-        typeof(BubbleFighter.Fantasy.Contracts.Progress.ITutorialStageStore), typeof(BubbleFighter.Fantasy.Contracts.Progress.ITutorialPracticeStore),
+        typeof(BubbleFighter.Fantasy.Contracts.Progress.ITutorialStageStore), typeof(BubbleFighter.Fantasy.Contracts.Progress.ITutorialPracticeStore), typeof(BubbleFighter.Fantasy.Contracts.Progress.IPlazaGameRecordStore),
         typeof(IShopSessionStore),
         typeof(IFighterRepository),
         typeof(IInventoryRepository),
         typeof(IInventoryLoadoutStore), typeof(IPetMutationStore), typeof(IPetEntitlementStore), typeof(IItemEnhancementStore),
-        typeof(IItemModificationStore), typeof(ILaboratoryInventoryStore), typeof(IRoundTitleMedalSettlementRepository),
+        typeof(IItemModificationStore), typeof(ILaboratoryInventoryStore), typeof(BubbleFighter.Fantasy.Contracts.MysteryStore.IMysteryStore), typeof(IRoundTitleMedalSettlementRepository),
         typeof(IInventoryMetadataStore), typeof(ITitleMedalStore),
         typeof(IPlayerWalletRepository),
         typeof(BubbleFighter.Fantasy.Contracts.Progress.IPlayerProgressRepository),
         typeof(BubbleFighter.Fantasy.Contracts.Progress.IPlayerBattleRecordsRepository),
         typeof(IShopPurchaseStore),
         typeof(IPresentStore),
+        typeof(BubbleFighter.Fantasy.Contracts.CashInbox.ICashInboxStore),
+        typeof(BubbleFighter.Fantasy.Contracts.Rooms.IUserHostPrizeStore),
         typeof(BubbleFighter.Fantasy.Contracts.Messenger.IMessengerStore),
         typeof(IPlayerInventoryState), typeof(IPlayerSettingsRepository), typeof(IPersistentDataDomainIdentity)])]
 public sealed class MySqlPlugin : IPlugin
@@ -85,9 +88,12 @@ public sealed class MySqlPlugin : IPlugin
         context.Effect(context.Services.Register<ILauncherAccountRepository>(new MySqlLauncherAccounts(factory)));
         context.Effect(context.Services.Register<ILauncherSessionStore>(new MySqlLauncherSessions(factory)));
         context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Progress.ITutorialStageStore>(new MySqlTutorialStages(factory, authority)));
+        context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Progress.IPlazaGameRecordStore>(new MySqlPlazaGameRecords(factory, authority)));
+        context.Effect(context.Services.Register<ICoupleStore>(new MySqlCoupleStore(factory, options.CoupleInvitations, authority)));
         context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Progress.ITutorialPracticeStore>(new MySqlTutorialPractice(factory, authority)));
         context.Effect(context.Services.Register<IShopSessionStore>(new MySqlShopSessionStore(factory, authority)));
         context.Effect(context.Services.Register<IClanStore>(new MySqlClanStore(factory, authority)));
+        context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Clans.IClanDirectory>(new MySqlClanDirectory(factory)));
         context.Effect(context.Services.Register<IFighterRepository>(new MySqlFighterRepository(factory, authority)));
         var inventory = new MySqlInventoryRepository(factory, authority, options.MaxLoadoutsPerPlayer, options.TitleMedals);
         context.Effect(context.Services.Register<IInventoryRepository>(inventory));
@@ -97,6 +103,7 @@ public sealed class MySqlPlugin : IPlugin
         context.Effect(context.Services.Register<IItemEnhancementStore>(inventory));
         context.Effect(context.Services.Register<IItemModificationStore>(inventory));
         context.Effect(context.Services.Register<ILaboratoryInventoryStore>(inventory));
+        context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.MysteryStore.IMysteryStore>(inventory));
         context.Effect(context.Services.Register<IInventoryMetadataStore>(inventory));
         context.Effect(context.Services.Register<ITitleMedalStore>(inventory));
         context.Effect(context.Services.Register<IPlayerWalletRepository>(new MySqlPlayerWalletRepository(factory, authority)));
@@ -107,6 +114,8 @@ public sealed class MySqlPlugin : IPlugin
         context.Effect(context.Services.Register<IPlayerInventoryState>(new MySqlPlayerInventoryState(factory, authority)));
         context.Effect(context.Services.Register<IShopPurchaseStore>(new MySqlShopPurchaseStore(factory, authority)));
         context.Effect(context.Services.Register<IPresentStore>(new MySqlPresentStore(factory, authority)));
+        context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.CashInbox.ICashInboxStore>(new MySqlCashInboxStore(factory, authority)));
+        context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Rooms.IUserHostPrizeStore>(new MySqlUserHostPrizeStore(factory, authority)));
         context.Effect(context.Services.Register<BubbleFighter.Fantasy.Contracts.Messenger.IMessengerStore>(new MySqlMessengerStore(factory)));
 
         if (options.AutoMigrate)
@@ -121,6 +130,10 @@ public sealed class MySqlPlugin : IPlugin
 /// <summary>Configuration for the <see cref="MySqlPlugin"/> row.</summary>
 public sealed class MySqlOptions : IValidatableOptions
 {
+    /// <summary>Gets or sets the bounded process-local couple invitations; relationships are durable.</summary>
+    [Required]
+    public BubbleFighter.Fantasy.Contracts.Couples.CoupleInvitationLimits CoupleInvitations { get; set; } = new();
+
     /// <summary>Gets or sets catalogue medal balances and credit receipt budgets per account.</summary>
     [System.ComponentModel.DataAnnotations.Required]
     public TitleMedalLimits TitleMedals { get; set; } = new();

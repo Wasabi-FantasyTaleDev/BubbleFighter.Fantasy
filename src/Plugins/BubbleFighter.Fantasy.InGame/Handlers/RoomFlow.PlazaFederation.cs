@@ -106,6 +106,8 @@ internal sealed partial class RoomFlow
                             .ConfigureAwait(false);
                 }
             }
+            if (previousView?.Couple != updated.Couple)
+                await PublishPlazaCoupleAsync(entered.Seat, ct).ConfigureAwait(false);
             if (_recruitmentChanged is not null && previousView?.Recruitment != entered.Seat.Recruitment)
                 await PublishPlazaRecruitmentAsync(entered.Seat, ct, federate: false).ConfigureAwait(false);
             return;

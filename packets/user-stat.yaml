@@ -87,6 +87,8 @@ structs:
   # cn-717 sub_909DE0); character_type is the character inventory identity minus 300000.
   # Primary counters also consumed independently by cn-717 sub_909DE0, cn-404 sub_833330,
   # cn-408 sub_837760 and cn-706 sub_809B90. Their own Page1/tab resources identify No Item/Item.
+  # cn-717 sub_90DB50 independently proves the same coupled/date/ring/presence fields,
+  # using sub_B3C1F0 for date conversion, sub_A3E210 for ring lookup and sub_90E160 for presence.
   FighterInfo:
     - user_number: u32
       offset: 4
@@ -100,13 +102,13 @@ structs:
       offset: 44
     - unknown_48: u64 # eight raw bytes (kr-812 sub_A56C30)
       offset: 48
-    - unknown_56: u32
+    - couple_present: u32 # kr-812 sub_881780 shows the couple page only when +56 equals 1.
       offset: 56
-    - unknown_64: u64
+    - couple_since: u64 # kr-812 sub_881780 -> sub_A7CC40 interprets this double as an OLE date.
       offset: 64
-    - unknown_72: u32
+    - couple_ring_item: u32 # kr-812 sub_881780 looks up the display ring through sub_992D60.
       offset: 72
-    - unknown_76: bool # kr-812 sub_A56BD0
+    - couple_partner_online: bool # kr-812 sub_881780 -> sub_881C50 selects "Online" (English: "Online") when true.
       offset: 76
     - unknown_80: u32
       offset: 80
@@ -157,6 +159,9 @@ structs:
   # id-400 sub_796CC0: kr-812's fields up to the rating list, which sits at +288; then three u32 whose
   # constructor (id-400 sub_7966E0) sets 1000, 0 and 1, a bool, eight u32 and a string.
   # id-400 sub_802B10 selects the target cache with +4 and passes character_type to the model preview.
+  # Coupled state: id-400 sub_805C10, cn-404 sub_836510, cn-408 sub_83A950,
+  # cn-706 sub_80CCC0 and cn-705 sub_80B600 test +56 == 1; +64 is an OLE DATE,
+  # +72 is a display-item lookup and +76 selects partner presence. Unknown +80 is preserved.
   FighterInfo@id-400:
     - user_number: u32
       offset: 4
@@ -170,13 +175,13 @@ structs:
       offset: 44
     - unknown_48: u64
       offset: 48
-    - unknown_56: u32
+    - couple_present: u32
       offset: 56
-    - unknown_64: u64
+    - couple_since: u64
       offset: 64
-    - unknown_72: u32
+    - couple_ring_item: u32
       offset: 72
-    - unknown_76: bool
+    - couple_partner_online: bool
       offset: 76
     - unknown_80: u32
       offset: 80
@@ -226,11 +231,11 @@ structs:
       offset: 20
     - unknown_24: u64 # cn-324 sub_8A36E0, eight raw bytes
       offset: 24
-    - unknown_32: u64
+    - couple_since: u64 # cn-324 sub_750710 -> sub_8C54E0 reads the raw double as an OLE date.
       offset: 32
-    - unknown_40: u32
+    - couple_ring_item: u32 # cn-324 sub_750710 guards the display-ring lookup through sub_810A00.
       offset: 40
-    - unknown_44: bool # cn-324 sub_8A3680
+    - couple_partner_online: bool # cn-324 sub_750710 -> sub_750C50 selects the partner presence text.
       offset: 44
     - unknown_48: u32
       offset: 48
@@ -282,6 +287,8 @@ structs:
   # reader id-1809 sub_9F5870, where id-400 has a bool), eight u32 at +312, the string at +344, and
   # +308 read last.
   # id-1809 sub_8237A0 selects the target cache with +4 and passes character_type to the model preview.
+  # id-1809 sub_826D50 tests +56 == 1, converts +64 through sub_A175D0, looks up +72
+  # through sub_92EB20 and passes +76 to the online/offline helper sub_827220.
   FighterInfo@id-1809:
     - user_number: u32
       offset: 4
@@ -295,13 +302,13 @@ structs:
       offset: 44
     - unknown_48: u64
       offset: 48
-    - unknown_56: u32
+    - couple_present: u32
       offset: 56
-    - unknown_64: u64
+    - couple_since: u64
       offset: 64
-    - unknown_72: u32
+    - couple_ring_item: u32
       offset: 72
-    - unknown_76: bool # id-1809 sub_9F5830, the bool reader
+    - couple_partner_online: bool # id-1809 sub_9F5830, the bool reader
       offset: 76
     - unknown_80: u32
       offset: 80
@@ -340,6 +347,8 @@ structs:
 
   # cn-406 sub_713260 reads only the prefix, 44 words and the final word; constructor sub_712E40 sets the final word to 1000.
   # cn-406 sub_77C510 selects the target cache with +4 and passes character_type to the model preview.
+  # cn-406 sub_77EF00 tests +56 == 1, converts +64 through sub_963BE0, looks up +72
+  # through sub_87B1D0 and passes +76 to the online/offline helper sub_77F3A0.
   FighterInfo@cn-406:
   - user_number: u32
     offset: 4
@@ -353,13 +362,13 @@ structs:
     offset: 44
   - unknown_48: u64
     offset: 48
-  - unknown_56: u32
+  - couple_present: u32
     offset: 56
-  - unknown_64: u64
+  - couple_since: u64
     offset: 64
-  - unknown_72: u32
+  - couple_ring_item: u32
     offset: 72
-  - unknown_76: bool
+  - couple_partner_online: bool
     offset: 76
   - unknown_80: u32
     offset: 80
@@ -401,14 +410,18 @@ structs:
     - unknown_48: "optional<0x3A,FighterInfoTail48>"
       offset: 48
       cn-774:
-        # cn-774 sub_4682B0 reads one more word, then eight plain bytes without a tag, then two words.
-        - unknown_44: u32
+        # cn-774 sub_4682B0 / tw-454 sub_45F700: presence word, OLE-date double, display ring and bool32.
+        # cn-774 sub_6CC190 / tw-454 sub_AEFDC0 show the couple panel only for presence 1.
+        - couple_present: u32
           offset: 44
-        - unknown_48: u64
+        # cn-774 sub_6CC190 loads +48 then calls sub_1092400; tw-454 sub_AEFDC0 calls sub_E982F0.
+        # Both date helpers call VariantTimeToSystemTime before formatting the displayed date.
+        - couple_since: u64
           offset: 48
-        - unknown_56: u32
+        - couple_ring_item: u32 # cn-774 sub_6CC190 / tw-454 sub_AEFDC0 guard their ShopItem lookup before showing its name.
           offset: 56
-        - unknown_60: u32
+        # cn-774 sub_6CCF20 / tw-454 sub_AF0B00 select "Online" (English: "Online") or "Offline" (English: "Offline").
+        - couple_partner_online: bool
           offset: 60
     - primary_wins: u32 # kr-1256 sub_5D7BD0: primary No Item/Item wins.
       offset: 80
@@ -509,18 +522,25 @@ structs:
     - unknown_564: empty_list
       offset: 564
 
+  # kr-1256 sub_9C33C0 (gspUpdateMyCoupledInfo) reads the same optional body as FighterInfo +48.
+  # kr-1256 sub_10E1CF0 stores presence at +72; sub_E807F0 checks that byte before proposing or changing a ring.
+  CoupleProfileUpdate:
+    - unknown_48: "optional<0x3A,FighterInfoTail48>"
+      only: [kr-1256]
+
   # kr-1256 sub_10E1CF0: the block after FighterInfo +48's tag.
   FighterInfoTail48:
-    - unknown_48: u64
+    # kr-1256 sub_5DB670 reads +48 as a double; sub_1116B70 uses VarUdateFromDate to display its date.
+    - couple_since: u64
       offset: 48
       only: [kr-1256]
-    - unknown_56: u32
+    - couple_ring_item: u32 # kr-1256 sub_5DB670 / sub_E807F0 resolve this display-ring id through sub_A01310.
       offset: 56
       only: [kr-1256]
     - unknown_60: u32
       offset: 60
       only: [kr-1256]
-    - unknown_64: bool # stored as a byte flag
+    - couple_partner_online: bool # kr-1256 sub_5DB670 -> sub_5DC4E0: partner online; false renders "Offline" (English: "Offline").
       offset: 64
       only: [kr-1256]
 
@@ -562,3 +582,42 @@ structs:
       only: [kr-1256]
     - unknown_value: u32
       only: [kr-1256]
+
+  # tw-410 sub_6FB910 independently reads this complete record. Its partner consumer sub_752E60
+  # gates on +4 user number, reads +32 through sub_8C21D0 (OLE DATE), resolves +40 through sub_817BF0
+  # with a null guard, and passes +44 to sub_7533A0. There is no separate couple-present word.
+  FighterInfo@tw-410:
+    - user_number: u32
+      offset: 4
+    - nickname: wstr
+      offset: 8
+    - character_type: u32
+      offset: 12
+    - level: u32
+      offset: 16
+    - primary_escapes: u32
+      offset: 20
+    - unknown_24: u64
+      offset: 24
+    - couple_since: u64
+      offset: 32
+    - couple_ring_item: u32
+      offset: 40
+    - couple_partner_online: bool
+      offset: 44
+    - unknown_48: u32
+      offset: 48
+    - primary_wins: u32
+      offset: 52
+    - primary_losses: u32
+      offset: 56
+    - primary_draws: u32
+      offset: 60
+    - primary_knockdowns: u32
+      offset: 64
+    - primary_kills: u32
+      offset: 68
+    - primary_rescues: u32
+      offset: 72
+    - unknown_76: "u32[36]"
+      offset: 76

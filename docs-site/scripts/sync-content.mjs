@@ -3,11 +3,49 @@ import { dirname, join, posix, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 export const locales = [
-  { directory: '', suffix: '.zh.md' },
-  { directory: 'zh-tw', suffix: '.zh-tw.md' },
-  { directory: 'ko', suffix: '.ko.md' },
-  { directory: 'en', suffix: '.md' },
+  { directory: '', suffix: '.zh.md', code: 'zh-CN' },
+  { directory: 'zh-tw', suffix: '.zh-tw.md', code: 'zh-TW' },
+  { directory: 'ko', suffix: '.ko.md', code: 'ko' },
+  { directory: 'en', suffix: '.md', code: 'en' },
 ]
+
+/**
+ * Tutorials are theme-rendered pages. Each needs a slug and a one-line title and description in
+ * every language it is published in; `languages` limits that set (by default, every language).
+ */
+export function validateTutorials(tutorials) {
+  if (!Array.isArray(tutorials)) throw new Error('The tutorial list must be an array')
+  const codes = locales.map(locale => locale.code)
+  const slugs = new Set()
+  for (const tutorial of tutorials) {
+    const keys = tutorial ? Object.keys(tutorial).filter(key => key !== 'languages').sort().join(',') : ''
+    if (!tutorial || keys !== 'description,slug,title' || !/^[a-z][a-z0-9-]*$/.test(tutorial.slug) || slugs.has(tutorial.slug)) {
+      throw new Error('Invalid or duplicate tutorial')
+    }
+    const languages = tutorialLanguages(tutorial)
+    if (!languages.length || new Set(languages).size !== languages.length || !languages.every(code => codes.includes(code))) {
+      throw new Error(`Tutorial ${tutorial.slug} lists unknown or duplicate languages`)
+    }
+    for (const field of ['title', 'description']) {
+      const value = tutorial[field]
+      if (!value || Object.keys(value).sort().join(',') !== [...languages].sort().join(',')
+          || !Object.values(value).every(text => typeof text === 'string' && text.trim() && !/[\r\n]/.test(text))) {
+        throw new Error(`Tutorial ${tutorial.slug} needs a one-line ${field} in each of its languages`)
+      }
+    }
+    slugs.add(tutorial.slug)
+  }
+}
+
+/** The page languages a tutorial is published in. */
+export function tutorialLanguages(tutorial) {
+  return tutorial.languages ?? locales.map(locale => locale.code)
+}
+
+/** The generated page only names the tutorial; the theme draws the player from its data module. */
+export function tutorialPage(tutorial, code) {
+  return `---\nlayout: tutorial\ntutorial: ${tutorial.slug}\ntitle: ${JSON.stringify(tutorial.title[code])}\ndescription: ${JSON.stringify(tutorial.description[code])}\n---\n\n${tutorial.description[code]}\n`
+}
 
 /** Refuse traversal, duplicate outputs and undeclared metadata before reading any guide. */
 export function validatePages(pages) {
@@ -51,9 +89,15 @@ export function syncContent(siteRoot) {
   rejectLink(contentRoot)
   const pages = JSON.parse(readFileSync(join(siteRoot, 'pages.json'), 'utf8'))
   validatePages(pages)
+  const tutorialList = join(siteRoot, 'tutorials.json')
+  const tutorials = rejectLink(tutorialList)?.isFile() ? JSON.parse(readFileSync(tutorialList, 'utf8')) : []
+  validateTutorials(tutorials)
   const planned = new Map()
   for (const locale of locales) {
     planned.set(join(contentRoot, locale.directory, 'index.md'), '---\nlayout: home\ntitle: Bubble Fighter Fantasy\n---\n')
+    for (const tutorial of tutorials.filter(item => tutorialLanguages(item).includes(locale.code))) {
+      planned.set(join(contentRoot, locale.directory, 'tutorials', `${tutorial.slug}.md`), tutorialPage(tutorial, locale.code))
+    }
     for (const page of pages) {
       const source = join(docsRoot, `${page.source}${locale.suffix}`)
       if (!rejectLink(source)?.isFile()) throw new Error(`Missing public guide: ${source}`)

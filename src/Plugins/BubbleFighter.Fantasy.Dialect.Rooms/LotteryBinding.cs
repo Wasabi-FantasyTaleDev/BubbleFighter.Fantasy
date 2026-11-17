@@ -1,6 +1,7 @@
 using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Match;
+using BubbleFighter.Fantasy.Contracts.Rooms;
 using BubbleFighter.Fantasy.Packets;
 
 namespace BubbleFighter.Fantasy.Dialect.Rooms;
@@ -17,12 +18,28 @@ internal sealed class LotteryBinding(string protocol, IOpcodeTable table, Packet
     : IInboundMessageBinding<RoundLotteryRequested>, IMessageSender<RoundLotteryOpened>, IMessageSender<RoundLotteryClosed>,
       IMessageSender<RoundLotterySelected>, IMessageSender<RoundLotteryRevealed>
 {
+    private bool _closeOnRoomReturn;
+
     public string Protocol => protocol;
 
     internal void Mount(IPluginContext context, IMessageRouter messages)
     {
         if (!tables.CapabilityOf(build, "horde_lottery"))
             throw new ConfigException("horde_lottery requires an audited native award dialog, selection and close path.");
+        _closeOnRoomReturn = tables.CapabilityOf(build, "horde_lottery_close_on_room_return");
+        _ = table.C2S("gcpReqSelectAward");
+        foreach (var name in new[] { "gspGameAwardDialog", "gspGameReturnAfterAward_", "gspRepAwardSelectFail",
+            "gspRepAwardSelectSuccess", "gspHordeModeRewardList" })
+            _ = table.S2C(name);
+        if (_closeOnRoomReturn)
+        {
+            if (context.Services.GetAll<IMessageSender<RoomEntered>>().Count(sender => sender.Protocol == protocol) != 1)
+                throw new ConfigException("Deferred reward-card close requires one room-return sender for this protocol.");
+            PacketLayoutContract.RequireEmpty(tables, build, "RoundStageReset", "Reward-card room return");
+            if (table.S2C(RoomCommandsBinding.RoundResetName(table)) != table.S2C("gspGameReturnAfterAward_"))
+                throw new ConfigException("Deferred reward-card close must use the native room-return opcode.");
+            PacketLayoutContract.RequireFields(tables, build, "ScoreRow", "Horde lottery", ("award_display_id", "u32"));
+        }
         // The request card and seat this handler casts, the selection it writes, and the reveal vector it sizes.
         PacketLayoutContract.RequireFields(tables, build, "HordeLotteryRequest", "Horde lottery", ("card", "u32"), ("seat", "u32"));
         PacketLayoutContract.RequireFields(tables, build, "HordeLotterySelected", "Horde lottery", ("card", "u32"), ("seat", "u32"));
@@ -50,8 +67,10 @@ internal sealed class LotteryBinding(string protocol, IOpcodeTable table, Packet
         session.SendAsync(table.S2C("gspGameAwardDialog"), ReadOnlyMemory<byte>.Empty, ct);
 
     public ValueTask SendAsync(ISession session, RoundLotteryClosed message, CancellationToken ct) =>
-        // cn-324 sub_6F2390 dispatches event 177 before restoring the room stage.
-        session.SendAsync(table.S2C("gspGameReturnAfterAward_"), ReadOnlyMemory<byte>.Empty, ct);
+        // kr-1256 sub_9EA690 closes the dialog through event 170 and restores the room in one frame.
+        // Its room-return sender owns that frame; legacy clients still close here before room entry.
+        _closeOnRoomReturn ? ValueTask.CompletedTask
+            : session.SendAsync(table.S2C("gspGameReturnAfterAward_"), ReadOnlyMemory<byte>.Empty, ct);
 
     public ValueTask SendAsync(ISession session, RoundLotterySelected message, CancellationToken ct) =>
         message.Rejected

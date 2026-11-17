@@ -4,6 +4,9 @@ using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.ClientData;
 using BubbleFighter.Fantasy.Contracts.Inventory;
 using BubbleFighter.Fantasy.Contracts.Match;
+using BubbleFighter.Fantasy.Contracts.Progress;
+using BubbleFighter.Fantasy.Contracts.Wallet;
+using BubbleFighter.Fantasy.Persistence.Memory;
 using BubbleFighter.Fantasy.Contracts.Rooms;
 using BubbleFighter.Fantasy.Dialect.Rooms;
 using BubbleFighter.Fantasy.InGame.Sessions;
@@ -115,6 +118,29 @@ public sealed class RoomCustomRulesActivationTests
         Assert.DoesNotContain(rig.Messages.Handlers, row => row.MessageType == typeof(RoomCustomRulesChangeRequested));
     }
 
+    /// <summary>The booths refuse to start without their stores, mount with them, and unmount with the row.</summary>
+    [Fact]
+    public async Task PlazaBoothsNeedTheirStoresAndUnloadWithTheRow()
+    {
+        await using (var bare = await Rig.CreateAsync())
+        {
+            var failure = await Assert.ThrowsAsync<ConfigException>(() => bare.ActivateInGameAsync(plazaGames: true));
+            Assert.Contains("plaza_games", failure.Message, StringComparison.Ordinal);
+            await bare.InGame!.UnwindAsync();
+            Assert.DoesNotContain(bare.Messages.Handlers, row => row.MessageType == typeof(PlazaGameRequested));
+        }
+        await using var rig = await Rig.CreateAsync();
+        var players = new MemoryPlayerTable(8);
+        rig.Services.Register<IPlazaGameRecordStore>(new MemoryPlazaGameRecords(players));
+        rig.Services.Register<IPlayerWalletRepository>(new MemoryPlayerWalletRepository(players));
+        await rig.ActivateInGameAsync(plazaGames: true);
+        Assert.Contains(rig.Messages.Handlers, row => row.MessageType == typeof(PlazaGameRequested) && row.Protocol == "kr-1256/game");
+        Assert.Contains(rig.Messages.Handlers, row => row.MessageType == typeof(PlazaGameSyncRequested));
+        await rig.InGame!.UnwindAsync();
+        Assert.DoesNotContain(rig.Messages.Handlers, row => row.MessageType == typeof(PlazaGameRequested));
+        Assert.DoesNotContain(rig.Messages.Handlers, row => row.MessageType == typeof(PlazaGameSyncRequested));
+    }
+
     private static Dictionary<string, object?> Map(object? value) => Assert.IsType<Dictionary<string, object?>>(value);
 
     private static RoomCustomRuleValue[] Rules(Dictionary<string, object?> game) =>
@@ -170,12 +196,13 @@ public sealed class RoomCustomRulesActivationTests
             catch { await rig.DisposeAsync(); throw; }
         }
 
-        internal async Task ActivateInGameAsync(bool enabled = true)
+        // The plaza booths are a separate feature of the same rows; only the plaza activation test turns them on.
+        internal async Task ActivateInGameAsync(bool enabled = true, bool plazaGames = false)
         {
             InGame = Context("ingame", new()
             {
                 ["game_protocol"] = "kr-1256/game", ["relay_protocol"] = "kr-1256/relay",
-                ["custom_room_rules"] = enabled, ["max_players_per_match"] = 4,
+                ["custom_room_rules"] = enabled, ["max_players_per_match"] = 4, ["plaza_games"] = plazaGames,
             });
             InGame.BindServices(typeof(InGamePlugin).GetCustomAttribute<PluginAttribute>()!);
             await new InGamePlugin().ActivateAsync(InGame, default);

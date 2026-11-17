@@ -52,3 +52,184 @@ structs:
     - unknown_40: u32              # kr-812 sub_830A20 reserves 9999 for its repeated diagnostic path.
       offset: 40
       default: 0
+
+
+  # The 2012-2015 Chinese and 2013 Taiwanese clients send an older request: no secondary-password text and no
+  # grouped-set flag, with the trailing word (0 on the normal path, 9999 on the repeat probe) after the two lists.
+  # Their reply is 28 bytes and one word carries both the negative failure and the duration outcome: each
+  # handler tests it below zero, then 3 (permanent) and 4 (capped); a single second slot follows the days.
+
+  # cn-324 Packet_gcpSynthesisProcess (vtable 0xB3094C): cn-324 sub_8627F0 fills it and cn-324 sub_85ED90 writes it. tw-410 inherits it; tw-410 sub_8601A0 writes and tw-410 sub_6FCE50 reads the same words (sender tw-410 sub_860A20, handler tw-410 sub_714710).
+  SynthesisProcessRequest@cn-324:
+    - card_item_id: u32
+      offset: 4
+    - operation: u32               # Synthesis 1 or decomposition 2.
+      offset: 8
+    - material_category: u32       # Weapons 0 (subCategory 302-306), clothing/sets 1 (102-110), accessories 2 (202-205), from the first occupied slot.
+      offset: 12
+    - materials: list<u32>
+      offset: 16
+    - additives: list<u32>
+      offset: 28
+    - unknown_40: u32
+      offset: 40
+      default: 0
+
+  # cn-324 Packet_gspSynthesisProcess: cn-324 sub_6FD180 reads it; dispatcher cn-324 sub_714540 case 0x3B8 (952) calls cn-324 sub_713DE0, which consumes it.
+  SynthesisProcessReply@cn-324:
+    - operation: u32
+      offset: 4
+    - result: u32                  # Negative fails; 0 ordinary, 3 permanent, 4 capped.
+      offset: 8
+    - primary_reference: u32
+      offset: 12
+      default: 0
+    - remaining_days: f64
+      offset: 16
+      default: 0
+    - second_reference: u32        # Resolved as Stock or StockSet for the window's second slot.
+      offset: 24
+      default: 0
+    - unknown_28: u32              # 9999 marks the repeat probe.
+      offset: 28
+      default: 0
+
+  # cn-406 Packet_gcpSynthesisProcess (vtable 0xC2C6DC): cn-406 sub_8D47C0 fills it and cn-406 sub_8D1550 writes it.
+  SynthesisProcessRequest@cn-406:
+    - card_item_id: u32
+      offset: 4
+    - operation: u32               # Synthesis 1 or decomposition 2.
+      offset: 8
+    - material_category: u32       # Weapons 0 (subCategory 302-306), clothing/sets 1 (102-110), accessories 2 (202-205), from the first occupied slot.
+      offset: 12
+    - materials: list<u32>
+      offset: 16
+    - additives: list<u32>
+      offset: 32
+    - unknown_48: u32
+      offset: 48
+      default: 0
+
+  # cn-406 Packet_gspSynthesisProcess: cn-406 sub_714760 reads it; dispatcher cn-406 sub_738290 case 0x3B7 (951) calls cn-406 sub_7356D0, which consumes it.
+  SynthesisProcessReply@cn-406:
+    - operation: u32
+      offset: 4
+    - result: u32                  # Negative fails; 0 ordinary, 3 permanent, 4 capped.
+      offset: 8
+    - primary_reference: u32
+      offset: 12
+      default: 0
+    - remaining_days: f64
+      offset: 16
+      default: 0
+    - second_reference: u32        # Resolved as Stock or StockSet for the window's second slot.
+      offset: 24
+      default: 0
+    - unknown_28: u32              # 9999 marks the repeat probe.
+      offset: 28
+      default: 0
+
+  # cn-404 Packet_gcpSynthesisProcess (vtable 0xD14B2C): cn-404 sub_9A05A0 fills it and cn-404 sub_99D2E0 writes it. cn-408 inherits it; cn-408 sub_9A4F50 writes and cn-408 sub_7C9030 reads the same words (handler cn-408 sub_7EB840).
+  SynthesisProcessRequest@cn-404:
+    - card_item_id: u32
+      offset: 4
+    - operation: u32               # Synthesis 1 or decomposition 2.
+      offset: 8
+    - material_category: u32       # Weapons 0 (subCategory 302-306), clothing/sets 1 (102-110), accessories 2 (202-205), from the first occupied slot.
+      offset: 12
+    - materials: list<u32>
+      offset: 16
+    - additives: list<u32>
+      offset: 32
+    - unknown_48: u32
+      offset: 48
+      default: 0
+
+  # cn-404 Packet_gspSynthesisProcess: cn-404 sub_7C5AB0 reads it; dispatcher cn-404 sub_7EC320 case 0x3B7 (951) calls cn-404 sub_7E81C0, which consumes it.
+  SynthesisProcessReply@cn-404:
+    - operation: u32
+      offset: 4
+    - result: u32                  # Negative fails; 0 ordinary, 3 permanent, 4 capped.
+      offset: 8
+    - primary_reference: u32
+      offset: 12
+      default: 0
+    - remaining_days: f64
+      offset: 16
+      default: 0
+    - second_reference: u32        # Resolved as Stock or StockSet for the window's second slot.
+      offset: 24
+      default: 0
+    - unknown_28: u32              # 9999 marks the repeat probe.
+      offset: 28
+      default: 0
+
+  # cn-706 Packet_gcpSynthesisProcess (vtable 0xCB05A4): cn-706 sub_96F410 fills it and cn-706 sub_96C130 writes it. cn-705 inherits it; cn-705 sub_96AB40 writes and cn-705 sub_79F020 reads the same words (handler cn-705 sub_7C2860).
+  SynthesisProcessRequest@cn-706:
+    - card_item_id: u32
+      offset: 4
+    - operation: u32               # Synthesis 1 or decomposition 2.
+      offset: 8
+    - material_category: u32       # Weapons 0 (subCategory 302-306), clothing/sets 1 (102-110), accessories 2 (202-205), from the first occupied slot.
+      offset: 12
+    - materials: list<u32>
+      offset: 16
+    - additives: list<u32>
+      offset: 32
+    - unknown_48: u32
+      offset: 48
+      default: 0
+
+  # cn-706 Packet_gspSynthesisProcess: cn-706 sub_7A0630 reads it; dispatcher cn-706 sub_7C8720 case 0x3B7 (951) calls cn-706 sub_7C4390, which consumes it.
+  SynthesisProcessReply@cn-706:
+    - operation: u32
+      offset: 4
+    - result: u32                  # Negative fails; 0 ordinary, 3 permanent, 4 capped.
+      offset: 8
+    - primary_reference: u32
+      offset: 12
+      default: 0
+    - remaining_days: f64
+      offset: 16
+      default: 0
+    - second_reference: u32        # Resolved as Stock or StockSet for the window's second slot.
+      offset: 24
+      default: 0
+    - unknown_28: u32              # 9999 marks the repeat probe.
+      offset: 28
+      default: 0
+
+  # cn-717 Packet_gcpSynthesisProcess (vtable 0xEB96AC): cn-717 sub_A99FF0 fills it and cn-717 sub_A9C5C0 writes it.
+  SynthesisProcessRequest@cn-717:
+    - card_item_id: u32
+      offset: 4
+    - operation: u32               # Synthesis 1 or decomposition 2.
+      offset: 8
+    - material_category: u32       # Weapons 0 (subCategory 302-306), clothing/sets 1 (102-110), accessories 2 (202-205), from the first occupied slot.
+      offset: 12
+    - materials: list<u32>
+      offset: 16
+    - additives: list<u32>
+      offset: 32
+    - unknown_48: u32
+      offset: 48
+      default: 0
+
+  # cn-717 Packet_gspSynthesisProcess: cn-717 sub_8C4C10 reads it; dispatcher cn-717 sub_8C0080 case 0x3B7 (951) calls cn-717 sub_8B9120, which consumes it.
+  SynthesisProcessReply@cn-717:
+    - operation: u32
+      offset: 4
+    - result: u32                  # Negative fails; 0 ordinary, 3 permanent, 4 capped.
+      offset: 8
+    - primary_reference: u32
+      offset: 12
+      default: 0
+    - remaining_days: f64
+      offset: 16
+      default: 0
+    - second_reference: u32        # Resolved as Stock or StockSet for the window's second slot.
+      offset: 24
+      default: 0
+    - unknown_28: u32              # 9999 marks the repeat probe.
+      offset: 28
+      default: 0

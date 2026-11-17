@@ -116,18 +116,20 @@ public sealed class ContractSchemaTests
         // Handoff storage retains the same native handle; migration addresses and owned broker callbacks have no adapter.
         // Room migration binding owns asynchronous source callbacks and their drain lifetime; it stays in-process.
         // Plaza links and UDP status registrations also own native callbacks and IDisposable lifetimes, with no remote adapter.
+        // Clan relay forwarding is generic over the typed message, which the RPC adapter cannot name, and binding the relay
+        // returns an owned IDisposable lifetime like the plaza link.
         // Battle records and atomic round medals inherit the same native settlement callback, which is not transportable.
         // Ban-pick and room policies register native policy callbacks with owned lifetimes; the hub hands out native
         // service references, and the scope's companion seam takes a native caller and raw JSON.
-        // Pet combat-effect resolution returns its effects through an out parameter, which the RPC adapter cannot transport.
+        // Pet combat effects and native couple-ring lookup return out parameters, which the RPC adapter cannot transport.
         // Client data opens as a native stream that unpacks while it is read; a remote plugin reads the same file
         // through the byte-array reads and asks its size with Length, which are transportable. The workbook cache takes
         // a parse callback and is reached only through WorkbookFile inside the host; a remote store simply has none.
         // Compiled client data takes a compile callback and writes through native streams; a store without it (any
         // remote store) builds the catalog on every load, which CompiledClientData.Load does by itself.
         string[] reviewed = ["ICompiledCatalog`1.Read", "ICompiledCatalog`1.Write", "ICompiledCatalog`1.get_Name", "ICompiledClientData.Load",
-            "IClientDataStore.OpenRead", "IClientDataStore.OpenRead", "IClientWorkbookCache.Sheets", "IPetCombatEffects.TryResolve", "IBanPickHub.Register", "IBanPickHub.get_Companion", "IBanPickHub.get_Store", "IBanPickScope.CompanionAsync",
-            "IRoomPolicyHost.Register", "IAccountHandoffStore.HandOffAsync", "IAccountHandoffStore.TryClaimAsync", "IAccountHandoffStore.TryWithdrawAsync",
+            "ICoupleRingCatalog.TryGetDisplayRing", "IClientDataStore.OpenRead", "IClientDataStore.OpenRead", "IClientWorkbookCache.Sheets", "IPetCombatEffects.TryResolve", "IBanPickHub.Register", "IBanPickHub.get_Companion", "IBanPickHub.get_Store", "IBanPickScope.CompanionAsync",
+            "IRoomPolicyHost.Register", "IAccountBuildLock.Claim", "IClanConnections.Attach", "IClanConnections.Forward", "IClanConnections.Release", "IClanConnections.TryGet", "IClanCreationCards.TryGetCapacity", "IClanDelivery.SendAsync", "IClanRelayEndpoint.Bind", "IAccountHandoffStore.HandOffAsync", "IAccountHandoffStore.TryClaimAsync", "IAccountHandoffStore.TryWithdrawAsync",
             "IAccountMutationFence.VerifyAsync", "IAccountMutationScopes.Bind", "IAccountMutationScopes.Enter", "IAccountOwnershipStore.TryAcquireAsync", "IAdminWebContent.TryGetFile", "IBuildReleaseLabels.TryGetRelease", "ICommandRegistry.Register",
             "ICompanionFederation.RedirectAsync", "ICompanionFederation.TrustAuthority",
             "ICompanionHub.Offer", "ICompanionHub.Route", "ICompanionHub.Send", "IGameCommandEndpoints.Register", "IGameText.TryFormat", "IGameText.TryFormat", "IGameText.TryFormat",

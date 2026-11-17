@@ -19,6 +19,9 @@ builds:
 
   # KR 2015. The baseline of every build whose packet classes keep their names.
   kr-812:
+    # The clan connection's packet object holds 65536 bytes, the 4-byte frame header (length, opcode) and the body:
+    # kr-812 sub_A51B70 checks every read against its cursor at +65552. The clan writers never send a larger frame.
+    clan_packet_bytes: 65536
     # kr-812 sub_804850 replaces row +64/+44/+48/+56; retain the legacy combat projection.
     # kr-812 sub_5521F0 consumes stars at +112; kr-812 sub_7527C0 consumes collected Lucci at +128.
     live_score_kinds: { score: 29, knockdowns: 0, kills: 24, deaths: 10, stars: 35, collected_lucci: 13 }
@@ -26,7 +29,12 @@ builds:
     # cn-738 sub_A3B960 and cn-742 sub_97E7C0 match; membership does not enable either plugin row.
     relay_latency_builds: [kr-1256, cn-738, cn-742, cn-774, tw-454]
     # kr-812 sub_9EA920 sends synthesis; kr-812 sub_830A20 consumes the result after inventory publication.
-    legacy_laboratory_builds: [kr-812]
+    # The older Chinese and Taiwanese clients send the shorter request and read the 28-byte reply; each build's
+    # writer, reader, sender and handler are named beside its restatement in packets/laboratory-legacy.yaml.
+    # id-1809 sub_986EF0 builds kr-812's request and id-1809 sub_7DDDE0 tests kr-812's outcome, 100 and 200 values.
+    # tw-410 shares cn-324's packets and its ShopItem2 sells the synthesis cards (100622-100624, using 1), but its
+    # installed client ships no Config/SynthesisSystem.ini, which the card and additive checks need, so it stays out.
+    legacy_laboratory_builds: [kr-812, cn-324, cn-406, cn-404, cn-408, cn-706, cn-705, cn-717, id-1809]
     # kr-812 sub_462D30 initializes queue mode 1; kr-812 sub_8E1470 restores it on stage changes.
     # kr-812 sub_6E1350 -> kr-812 sub_463080 queues a local copy; kr-812 sub_6DE5B0 expands only on the master.
     # The tutorial's special-local gate bypasses this queue (kr-812 sub_7FF340), so it keeps its reply.
@@ -142,6 +150,31 @@ builds:
       third_string: unknown_60
       first_flag: unknown_116
       second_flag: unknown_117
+    # kr-812 sub_82EEE0: case 8 opens the wait box (sub_9FB600); cases 11/12 refuse an unavailable recipient.
+    # "메시지에 올바른 말을 사용해 주세요." (kr-812 0xD6C3E0) = "Please use proper words in the message."
+    # "커플이 이미 있어서 커플 신청을 하실 수 없습니다." (kr-812 0xD19820) = "You already have a couple, so you cannot propose."
+    couple_proposal_results: { sent: 8, self: 1, not_found: 2, offline: 3, playing: 4, no_ring: 6, recipient_paired: 9, sender_paired: 10, busy: 11, bad_message: 13, unavailable: 11 }
+    # kr-812 sub_830340: false displays "You have to wait for at least one day before you can break up."
+    # (kr-812 0xD6CC90, already English); true clears the relationship through kr-812 sub_9FD550.
+    couple_breakup_statuses: { done: 1, refused: 0, left: 1 }
+    # Legacy sponsor/referee seat placement (kr-812 sub_5BD770, kr-812 sub_A34010: team 16 at slot 12 inside 16 slots;
+    # cn-717 and id-1809 inherit both values).
+    user_host_referee: { team: 16, slot_index: 12 }
+    # Plaza mini-game reply results (packets/lobby-minigame.yaml). Basketball: kr-812 sub_469C30 plays 10 miss, 11 hit,
+    # 12 item (the same codes as kr-1256). Fishing start: kr-812 sub_46A430 starts the cast for 10 or more. Rod lift:
+    # kr-812 sub_46A630 treats 10 as a catch without a prize, 11 and 13 as one prize item and 12 as two. Fortune:
+    # kr-812 sub_46B060 shows 10 as paper plus a prize item (the reply carries the wallet and the item) and 11 as paper
+    # only; both store the reply's fifth word as the client's Lucci, which the reader leaves 0 for 11, so a paper-only
+    # reply zeroes the Lucci the client shows until its next money update. Anything below 10 is a refusal; 0 is
+    # the first refusal text every reader has.
+    plaza_game_results: { refused: 0, basketball_miss: 10, basketball_hit: 11, basketball_item: 12, fishing_started: 10, catch: 10, catch_one_item: 11, catch_two_items: 12, fortune_item: 10, fortune_paper: 11 }
+    # kr-812 sub_45B130 registers each category by its bit; kr-812 sub_45B500 requests the stored checksums (C2S 1500)
+    # and kr-812 sub_45B5E0 (dispatcher kr-812 sub_837170, S2C 1500) hands the plain, uncompressed bytes of each set
+    # bit to the category's decoder. The category content is in the file named here, marshaled through the schemas of
+    # packets/dynamic-config.yaml. A request with nothing stale needs no answer in kr-812 (nothing waits for one).
+    dynamic_config:
+      content_file: dynamic-config-kr-812.yml
+      unchanged_reply: none
     capabilities:
       room_custom_rules: false
       # Native title request and reply consumers are audited only for the two Korean baselines.
@@ -180,16 +213,27 @@ builds:
       # (S2C 124 in kr-812 sub_837170). A build without the class turns this off.
       fighter_info: true
       # Clan game-connection frames are read in this build: kr-812 sub_844AB0 (passport), kr-812 sub_844FB0
-      # (mark info) and kr-812 sub_8407F0 (guild info). Its bodies differ from the modern table (the passport
-      # carries a leading word before the name and the mark info two counted tables), and no clan row runs on
-      # the legacy builds, so the capability stays off until a legacy profile states that shape; the legacy
-      # shapes are written beside the modern ones in packets/clan.yaml.
-      clan: false
+      # (mark info) and kr-812 sub_8407F0 (guild info); their shapes are the base tables of packets/clan.yaml. The
+      # clan-server connection (dispatcher kr-812 sub_498790) is in packets/clan-server.yaml. kr-812 has no clan-main
+      # open or attendance packet. A build based on this one needs its own `connection: clan` opcode rows before a
+      # profile includes bundles/clan-legacy.patch.yaml.
+      clan: true
       # Map supply layouts and build-specific readers are in packets/map-supplies.yaml.
       weapon_objects: false
       map_supplies: true
       # Enables the award lottery and its event 176/177 consumers.
+      # kr-812 runs the plaza booths on C2S/S2C 571 and 572 (packets/lobby-minigame.yaml; kr-812 sub_677210 gates
+      # them) from the mini-game configuration in dynamic-config slot 3 (kr-812 sub_464390 registers it under client
+      # feature 601, which kr-812 sub_A62430 enables for the Korean region); the builds based on it stay off until
+      # their own clients are audited.
+      plaza_games: true
+      # kr-812 sub_881780 consumes the couple fields published by the ordinary UserStat path (sub_81A820).
+      # Requests, proposal results and breakup success are independently audited in couple.yaml.
+      couple: true
+      # kr-812 has no Mysterystore: no request, reply or dialog class exists in this client.
+      mystery_store: false
       horde_lottery: true
+      horde_lottery_close_on_room_return: false
       # kr-812 sub_7FED80 updates live rows; sub_806790 sorts the HUD locally.
       pve_points: true
       # Mission consumers and resource groups are in packets/pve-rescue-missions.yaml.
@@ -256,6 +300,7 @@ builds:
       # Extreme Racing (round mode 24): kr-812 has no ExtremeRacingGameStage or race strategy, so no build inherits
       # the race frames of packets/extreme-racing.yaml from this baseline.
       extreme_racing: false
+      extreme_racing_map_state: false
       extreme_racing_initialization: false
       extreme_racing_cannon: false
       # WeaponMaster (round mode 26) assigns weapons with packets/weapon-master.yaml EquipmentApply; kr-812 has no
@@ -273,6 +318,13 @@ builds:
       # packets/present.yaml. cn-324 and cn-279 number the family one higher; every build but the cn-735
       # family has the same classes (the task-bar count words differ and are annotated in the table).
       present_box: true
+      # Cash item inbox (gcpReqCashInven / gcpReqPickup / gcpReqCloseGiftBox, gspCashInvenUpdateAllInventorySlot /
+      # gspRepPickup). Inherited across builds that carry cash-inbox codecs; disabled explicitly on cn-279 (covering
+      # kr-186) and cn-735 (covering cn-738, cn-742).
+      cash_inbox: true
+      # Sponsor / prize host rooms (kr-812 C2S 2025/2026, S2C 991/992/993; cn-717 and id-1809 inherit).
+      # Explicitly disabled below on unaudited lineages (id-400, cn-324, cn-735 and their descendants).
+      user_host: true
       # Life-counted items. kr-812 sub_993080 (called by the ShopItem loader sub_9A04D0) maps durationType
       # "endurance" to item kind 3 when feature switch 1210 is on, and sub_A62430 case 0, the default region,
       # turns 1210 on. A kind 3 bag slot carries its life in the slot count (+8): kr-812 sub_6D6480 announces
@@ -467,6 +519,43 @@ builds:
     # kr-1256 sub_67E8B0 selects these three logical race clocks.
     extreme_racing_timers: { RoundOver: 2500, FinishCountdown: 20000, RaceRunning: 210000 }
     # kr-1256 sub_DF5130 selects errorCloseMsg for result 5.
+    # Plaza mini-game reply results (packets/lobby-minigame.yaml). Basketball: kr-1256 sub_849EC0 plays 10 miss,
+    # 11 hit, 12 item. Fishing start: kr-1256 sub_84A990 starts the cast for 30 or more. Rod lift: kr-1256 sub_84AD60
+    # treats 20 as a catch without a prize, 21 and 23 as one prize item, 22 as two. Fortune: kr-1256 sub_84B7D0 shows
+    # 10 as paper plus a prize item and 11 as paper only. Anything below the success codes is a refusal; 0 is the
+    # first refusal text every reader has.
+    plaza_game_results: { refused: 0, basketball_miss: 10, basketball_hit: 11, basketball_item: 12, fishing_started: 30, catch: 20, catch_one_item: 21, catch_two_items: 22, fortune_item: 10, fortune_paper: 11 }
+    # Couple proposal results the proposer's client shows (kr-1256 sub_9BFAA0 switches on 1..15). The client's own
+    # message for a code is quoted with its translation where the case names one:
+    #   2  "존재 하지 않는 파이터명입니다." - "This fighter name does not exist." (kr-1256 0x15B56D4)
+    #   4  "현재 %s님이 플레이 중이어서 커플 신청을 할 수 없습니다." - "%s is playing now, so you cannot propose."
+    #      (kr-1256 0x15B5DB0)
+    #   8  opens the waiting box (kr-1256 sub_E83F60 / sub_E82A60): the proposal was sent
+    #   10 "커플이 이미 있어서 커플 신청을 하실 수 없습니다." - "You already have a couple, so you cannot propose."
+    #      (kr-1256 0x15B5C44)
+    #   13 "메시지에 올바른 말을 사용해 주세요." - "Please use proper words in the message." (kr-1256 0x15B56F8)
+    #   14 "이벤트가 종료되어 클로버 커플링으로 커플을 맺을 수 없습니다." - "The event has ended, so you cannot
+    #      become a couple with the Clover couple ring." (kr-1256 0x15B5CE0; not sent by this server)
+    #   15 "커플을 맺을 수 없는 상태입니다. 잠시 후 다시 시도해 주세요." - "You cannot become a couple right now.
+    #      Please try again later." (kr-1256 0x15B5D28)
+    # Codes 1, 3, 6, 7, 9 and 11 take their message from the game text keys their cases look up; their meanings
+    # (self, offline, no ring, unavailable, recipient paired, busy) follow the server results that send them.
+    couple_proposal_results: { sent: 8, self: 1, not_found: 2, offline: 3, playing: 4, no_ring: 6, recipient_paired: 9, sender_paired: 10, busy: 11, bad_message: 13, unavailable: 15 }
+    # Breakup reply statuses (kr-1256 sub_9C15C0): 1 shows
+    #   "You have to wait for at least one day before you can break up." (kr-1256 0x15B5EE0, in English in the client)
+    # and every other status goes to the couple state update kr-1256 sub_E870A0; 0 also clears the requester's state.
+    couple_breakup_statuses: { done: 0, refused: 1, left: 2 }
+    # Mysterystore reply statuses. kr-1256 sub_E601C0 handles 0 and the positive store notices (1: the list was
+    # replaced after its time ran out; 5: unavailable). kr-1256 sub_E5F940 shows, for the negative ones:
+    #   -70 "상점 리스트가 변경되어 아이템을 구매할 수 없습니다." (The store list changed, so the item cannot be bought.)
+    #   -71 "이미 구매한 아이템은 다시 구매할 수 없습니다." (An item already bought cannot be bought again.)
+    #   -74 "가질 수 있는 최대 기간을 초과했습니다." (Exceeds the maximum duration you can hold.)
+    #   -75 "라이프 제한." (Life limit.)
+    #   -76 "가질 수 있는 최대 수량을 초과했습니다." (Exceeds the maximum quantity you can hold.)
+    #   -77 "잘못된 상품입니다." (Invalid product.)
+    #   -78 the missing Magic Coins dialog (kr-1256 sub_E62CF0)
+    #   -79 "잘못된 요청입니다." (Invalid request.)
+    mystery_store_statuses: { done: 0, rotated: 1, unavailable: 5, list_changed: -70, already_purchased: -71, already_owned: -71, duration_limit: -74, life_limit: -75, quantity_limit: -76, invalid_product: -77, insufficient_coins: -78, invalid_request: -79 }
     laboratory_closed_result: 5
     # kr-1256 sub_DF7CD0 displays success 0 or failure 16 using the third result vector.
     # Descendants require their own consumer audit before completion is advertised.
@@ -494,10 +583,12 @@ builds:
       entry_attacker: unknown_80
       entry_state: room_state
       team_wins: unknown_308
-    # kr-1256 sub_46FB10 -> sub_6DDBA0 sends the Captain kill as kind 75 on the full score route.
+    # kr-1256 sub_46FB10 -> sub_6DDBA0 sends the Captain kill as kind 75 on the full score route; the soccer host
+    # kr-1256 sub_6E6F90 sends a goal as kind 42 on the same route.
     play:
       score:
         captain_kill: 75
+        soccer_goal: 42
         # Star modes: the client reports its own count in gcpGameUpdateScoreOptimze (C2S 2029) with kind 21 for a
         # small star taken and 24 for a big one; 22 and 25 for a dropped small or big star await native acceptance.
         star_report: Optimized
@@ -559,6 +650,10 @@ builds:
       NpcMotion: { builds: [kr-1256, cn-774, tw-454], opcode: gppDummyUnitMotion, structure: NpcDummyMotion, actors: [actor], nested: true }
       NpcMove: { builds: [kr-1256, cn-774, tw-454], opcode: gppAgentMoveTo, structure: NpcAgentMove, actors: [actor] }
       NpcDirectItem: { builds: [kr-1256, cn-774, tw-454], opcode: gppUseItemDirect, structure: NpcDirectItem, actors: [actor] }
+      # Soccer (mode 11): the host's client sends these and runs them itself, so the other players receive them.
+      SoccerGoal: { builds: [kr-1256, cn-774, tw-454], opcode: gppSoccerModeGoal, structure: SoccerModeGoal, actors: [] }
+      SoccerCountDown: { builds: [kr-1256, cn-774, tw-454], opcode: gppSoccerModeCountDown, structure: SoccerModeCountDown, actors: [] }
+      SoccerContinueGame: { builds: [kr-1256, cn-774, tw-454], opcode: gppSoccerModeContinueGame, structure: SoccerModeContinueGame, actors: [] }
       # Turret and breakable-object identities are map objects, never seated characters (packets/npc-feed.yaml).
       NpcKill: { builds: [kr-1256, cn-774, tw-454], opcode: gppKillObject, structure: NpcObjectKill, actors: [actor] }
       NpcTurret: { builds: [kr-1256, cn-774, tw-454], opcode: gppChangeTurretState, structure: NpcTurretState, actors: [actor] }
@@ -593,6 +688,8 @@ builds:
       # kr-1256 sub_50AFC0 requests; kr-1256 sub_50B470 confirms. kr-1256 sub_7AA3D0 queues each sender's own copy.
       OneKillRequest: { builds: [kr-1256], opcode: gppOneKillRequest_, structure: OneKillRequest, actors: [attacker], echo_sender: false, one_kill: request }
       OneKillConfirmation: { builds: [kr-1256], opcode: gppOneKillConfirmation_, structure: OneKillConfirmation, actors: [victim], echo_sender: false, one_kill: confirmation }
+      # kr-1256 sub_6D97D0 asks the victim to confirm rescue; kr-1256 sub_7AA3D0 queues the sender's local copy.
+      TryRescued: { builds: [kr-1256], opcode: gppTryRescued_, structure: TryRescued, actors: [victim, rescuer], echo_sender: false }
       Unknown33286: { opcode: Unknown33286, structure: Unknown33286, actors: [actor] }
       Unknown33301: { opcode: Unknown33301, structure: Unknown33301, actors: [actor] }
       Unknown38271: { opcode: Unknown38271, structure: Unknown38271, actors: [actor, victim], echo_sender: true }
@@ -606,7 +703,21 @@ builds:
       # kr-1256 sub_6F8280, cn-774 sub_8B7CA0 and tw-454 sub_72BEE0 resolve the second word as the source character.
       Unknown38282: { opcode: Unknown38282, structure: Unknown38282, actors: [victim], echo_sender: true, life_event: bubbled, life_actor: victim, life_initiator: source, life_death_flag: unknown_24 }
       Unknown38283: { opcode: Unknown38283, structure: Unknown38283, actors: [], echo_sender: true }
-      Unknown38284: { opcode: Unknown38284, structure: Unknown38284, actors: [actor] }
+      # kr-1256 sub_6D8832 and cn-774 sub_897E80 set the passive-heal permission; their send queues
+      # (kr-1256 sub_7AA3D0, cn-774 sub_952A90) omit its local copy in queue mode 1, so the sender needs the echo.
+      WallHealAllowed: { builds: [kr-1256, cn-774], opcode: gppSetWallHealAllowed_, structure: WallHealAllowed, actors: [actor], echo_sender: true }
+      # kr-1256 sub_6E55F0 / kr-1256 sub_6E54D0 bypass the local queue in kr-1256 sub_7AA3D0;
+      # their consumers kr-1256 sub_6EC3C0 / kr-1256 sub_48D3E0 need the reporting character's returned copy.
+      CharacterAttributeSet: { builds: [kr-1256], opcode: gppSetAttribute, structure: CharacterAttributeSet, actors: [actor], echo_sender: true }
+      CharacterAttributeReset: { builds: [kr-1256], opcode: gppResetChrAttr, structure: CharacterAttributeReset, actors: [actor], echo_sender: true }
+      # The pinging client keeps its own marker (kr-1256 sub_7AB190 queues the sender's copy), so only the others get it;
+      # the receivers choose team or enemy presentation themselves (kr-1256 sub_A41C90).
+      SmartPing: { builds: [kr-1256, cn-774], opcode: gppSmartPing_, structure: SmartPing, actors: [actor], echo_sender: false }
+      # kr-1256 sub_496B80 / kr-1256 sub_B0B110 / kr-1256 sub_705AA0 run their own low packets locally.
+      # Only the recipient reports; a different source actor is valid for healing and storm-hit reactions.
+      ItemHealing: { builds: [kr-1256], opcode: gppHitByItem, structure: ItemHealing, actors: [actor], echo_sender: false }
+      FreezeCannonEnd: { builds: [kr-1256], opcode: gppEndFreezeCannon, structure: FreezeCannonEnd, actors: [actor], echo_sender: false }
+      StormCloudHit: { builds: [kr-1256], opcode: gppStormCloudHit_, structure: StormCloudHit, actors: [actor], echo_sender: false }
       # Only the peer reader kr-1256 sub_6D97D0 advances a mark (kr-1256 sub_D134A0 only resets marks to the start),
       # so the sender needs its own copy.
       ExtremeRacingCheckPoint: { builds: [kr-1256], opcode: gppExtremeRacingCheckPoint_, structure: ExtremeRacingCheckPoint, actors: [actor], echo_sender: true, extreme_racing_checkpoint: true }
@@ -614,6 +725,11 @@ builds:
       # sender's own copy locally, so a delivery back to the sender would create a second bullet there. The route is
       # claimed only when dialect.rooms extreme_racing_cannon is on.
       ExtremeRacingCannon: { builds: [kr-1256], opcode: gppExtremeRacingCannon_, structure: ExtremeRacingCannonShot, actors: [actor], echo_sender: false, extreme_racing_cannon: true }
+      # Character effects and skill visuals the sender already shows itself (kr-1256 sub_7AB190); the other players need
+      # them to see a zombie's skill. packets/round-feed.yaml states the writers and readers.
+      CharacterEffectVisible: { builds: [kr-1256], opcode: gppSetCharEffectVisible_, structure: CharacterEffectVisible, actors: [actor], nested: true, echo_sender: false }
+      Unknown34275: { builds: [kr-1256], opcode: Unknown34275, structure: Unknown34275, actors: [actor], nested: true, echo_sender: false }
+      Unknown34276: { builds: [kr-1256], opcode: Unknown34276, structure: Unknown34276, actors: [actor], nested: true, echo_sender: false }
     # kr-1256 sub_9E5E70 initializes this row word for a seated player.
     round_score_row_marker: unknown_500
     # kr-1256 sub_9E9160 writes held stars through kind19; kr-1256 sub_9E8B20 replaces the third-list totals.
@@ -635,7 +751,11 @@ builds:
       flags: unknown_0
       clear_mask: 4294967295
       clear_words: [unknown_20]
-      clear_booleans: [unknown_8]
+      clear_booleans: [is_user_host]
+      # kr-1256 sub_962200 sets +20; kr-1256 sub_494F00 / kr-1256 sub_4954A0 consume value 1 for the hammer selection.
+      preserve_word_values:
+        builds: [kr-1256]
+        fields: { unknown_20: [0, 1] }
     # kr-1256 sub_10E59B0 retains this prologue; kr-1256 sub_1134540 maps wgtHordeTutor to 103.
     # MapMeta.xml supplies Difficulty=1 and TimeAttackTimeLimit=99999 seconds.
     # The automatic prompt requests kr-1256 sub_10E5A80's startup map; route selection is server policy.
@@ -768,7 +888,14 @@ builds:
       target: unknown_328
       key: unknown_0
       values: unknown_4
+    # Modern sponsor/referee seat placement (kr-1256 sub_980730 case 36 and kr-1256 sub_96F3A0: team 36 at slot 12;
+    # cn-774 and tw-454 inherit both values).
+    user_host_referee: { team: 36, slot_index: 12 }
     capabilities:
+      user_host: true
+      # kr-1256 sub_708D50 (request), kr-1256 sub_6ED290 (create notice), kr-1256 sub_498F50 and kr-1256 sub_6ED460
+      # (pickup): Zombie Escape boxes drop weapons through the master's Lua RequestCreateWeaponObject.
+      weapon_objects: true
       room_custom_rules: true
       # Native title request and reply consumers are audited only for the two Korean baselines.
       title_operations: true
@@ -791,6 +918,8 @@ builds:
       # game dispatcher kr-1256 sub_9E1EB0 defaults to; the goal touch is C2S 711 (kr-1256 sub_B0D760 kind 5) and the
       # checkpoint touch the 32934 feed route. Layouts in packets/extreme-racing.yaml; not native-client acceptance.
       extreme_racing: true
+      # kr-1256 sub_CE5600 case 0x2CC, kr-1256 sub_67F4E0 and kr-1256 sub_BF6D50 consume shared map choices.
+      extreme_racing_map_state: true
       # kr-1256 sub_CE6F80 initializes native racing objects once the stage has loaded.
       extreme_racing_initialization: true
       # kr-1256 sub_67B6E0 consumes S2C 718 and kr-1256 sub_6E1E90 writes the relay shot 32902; opt-in, no scheduler.
@@ -823,7 +952,18 @@ builds:
       life_items: false # The modern family's item kinds are not audited.
       # kr-1256 sub_6DA5D0 / kr-1256 sub_6ED050 and kr-1256 sub_6D55D0 prove the map, creation and slots.
       map_supplies: true
-      horde_lottery: false
+      # kr-1256 sub_853CF0 runs the plaza basketball, fishing and fortune booths on C2S/S2C 551 and 552
+      # (packets/lobby-minigame.yaml); cn-774 sub_9ECF50 and tw-454 sub_89BD50 do the same and inherit this.
+      plaza_games: true
+      # Couple proposal, answer, breakup and ring change (packets/couple.yaml; codes above).
+      couple: true
+      # kr-1256 sub_E5F070 opens the Mysterystore (C2S 128, S2C 148; packets/mystery-store.yaml) once the
+      # slot-4 window of packets/dynamic-config-content.yml contains the client's local date (kr-1256 sub_E5EF10).
+      mystery_store: true
+      # kr-1256 sub_7D1840 opens mode 101's DlgHordeAward; kr-1256 sub_7D2230 consumes selection.
+      horde_lottery: true
+      # kr-1256 sub_9EA690 restores the room and dispatches event 170 to kr-1256 sub_7D1D40.
+      horde_lottery_close_on_room_return: true
       # kr-1256 sub_6DC720 reports the unit; kr-1256 sub_9E1EB0 case 925 applies three point words.
       pve_points: true
       rescue_missions: false
@@ -837,7 +977,9 @@ builds:
       # constructors kr-1256 sub_C16880/sub_C0A050 are the anchors; packets/object-economy.yaml.
       lucci_drops: true
       star_items: true
-      horde_award_items: false
+      # kr-1256 sub_7D61A0 sends gcpReqCreateHordeAward when a mob dies; the S2C 645 reader kr-1256 sub_6EFD00
+      # builds GoHordeAward1/5/10LucciItem for kinds 3/4/5, as kr-812 sub_51AD80 does.
+      horde_award_items: true
       direct_item_effect_echo: false
       relay_validation_report: false
       native_scene_seed_tables: false
@@ -857,12 +999,11 @@ builds:
       server_notice: true
       # kr-1256 sub_9D2FF0 case 836 and sub_9C3880 (837) read the tabled reply and list (packets/weapon-presets.yaml).
       weapon_presets: true
-      # The typed request family (serializer kr-1256 sub_114E2E0 through kr-1256 sub_E651C0;
-      # packets/room-matching.yaml) and the stage-gate notification (kr-1256 sub_84F6C0 through the
-      # MainMenuStage and LobbyStage handlers) are audited. The modern binding serves the start and
-      # its keepalive with a configured default mode and refuses the party and listing types until
-      # their flows are mounted.
-      quick_matching: true
+      # No kr-1256 matching request is identified. The serializer once read as one (kr-1256 sub_114E2E0
+      # through kr-1256 sub_E651C0) is RequestUserMysteryStore: kr-1256 sub_E5F070 builds it and opens
+      # the Mysterystore dialog (packets/mystery-store.yaml). The stage-gate notification
+      # (kr-1256 sub_84F6C0) has no request on this build yet.
+      quick_matching: false
       # The modern revival family: kr-1256 sub_511450 writes the one-u32 revival request (the item
       # 100443 count checked through kr-1256 sub_808040), kr-1256 sub_6E3940/kr-1256 sub_6E3730 the respawn requests
       # and sub_7D0BB0 the extend; the grant returns on S2C 632 (kr-1256 sub_6F5E50). cn-774 and
@@ -896,12 +1037,15 @@ builds:
     # from the lobby block so the stage and the wire stay one decision.
     dynamic_config:
       content_file: dynamic-config-content.yml
+      unchanged_reply: ack
       # kr-1256 sub_53CDF0 reads both words; descendants require their own consumer audit.
       pet_configuration_builds: [kr-1256]
 
   # CN 2019 (ClientVersion_Major 774), kr-1256's lineage. Named so a capability can be stated for it; its layouts are
   # kr-1256's unless a table says otherwise.
   cn-774:
+    # 8192-byte clan packet object: cn-774 sub_5E2F70 reads against its cursor at +8208 (tw-454 sub_685A10 the same).
+    clan_packet_bytes: 8192
     # cn-774 sub_7086D0 and cn-774 sub_70B180 render score/Bubble/Pang at +80/+60/+64; cn-774 sub_8E3720 assigns these kinds.
     # cn-774 sub_717AA0 and cn-774 sub_71D800 bind lblPangedCount to +156; optional star and coin projections remain unaudited.
     live_score_kinds: { score: 30, kills: 25, deaths: 27, stars: null }
@@ -917,10 +1061,12 @@ builds:
       skipped_items: [300006, 300007] # cn-774 sub_BEFAB0 returns before applying these characters' rows.
     # cn-774 sub_E975C0 selects errorCloseMsg for result 4.
     laboratory_closed_result: 4
-    # cn-774 sub_4EB780 -> sub_8C7C40 sends kind 27, independently of KR's later kind 75.
+    # cn-774 sub_4EB780 -> sub_8C7C40 sends kind 27, independently of KR's later kind 75; the soccer host
+    # cn-774 sub_8A75F0 -> sub_8C7C40 sends a goal as kind 21.
     play:
       score:
         captain_kill: 27
+        soccer_goal: 21
     plaza_recruitment_field: unknown_128
     plaza_recruitment_active_field: unknown_136
     plaza_recruitment_text_field: unknown_140
@@ -928,9 +1074,10 @@ builds:
     display_level_max: 240
 
     # cn-774 sub_5F67F0 independently reads category 14; cn-774 sub_8115F0 uses a u16 mask.
-    # The CN template is published only with explicit pet settings; other inherited slots stay off.
+    # The CN template is published only with explicit pet settings; the other categories served here are the ones
+    # named in dynamic-config-cn-774.yml (category 4, the Mysterystore window); other inherited slots stay off.
     dynamic_config:
-      content_file: null
+      content_file: dynamic-config-cn-774.yml
       pet_configuration_builds: [cn-774]
       pet_content_file: dynamic-config-cn-pets.yml
 
@@ -1013,7 +1160,33 @@ builds:
       envelope: plain
       # cn-774 sub_BAE150 -> cn-774 sub_F3CD00 -> cn-774 sub_F3CB90 unwraps S2C 808 as counted zlib.
       article_envelope: zlib
+    # cn-774 sub_9E3BF0 starts the cast for 20 or more and cn-774 sub_9E3E80 reads the lift results 10 (catch),
+    # 11 and 13 (one item) and 12 (two items); basketball and fortune keep the kr-1256 codes. tw-454 (tw-454
+    # sub_63E1A0, tw-454 sub_63E430) uses the same numbers and inherits this map.
+    plaza_game_results: { refused: 0, basketball_miss: 10, basketball_hit: 11, basketball_item: 12, fishing_started: 20, catch: 10, catch_one_item: 11, catch_two_items: 12, fortune_item: 10, fortune_paper: 11 }
     capabilities:
+      # The booth packets are the kr-1256 ones (packets/lobby-minigame.yaml) and cn-774 sub_9D8360 registers the
+      # mini-game configuration as category 3 with cn-774 sub_9D81D0, which reads kr-1256's 42 bytes; the server publishes
+      # the prices in packets/dynamic-config-cn-774.yml, so the booths charge exactly what the client shows.
+      plaza_games: true
+      # cn-774 sub_BBD850 and tw-454 sub_A9A7D0 independently retain the modern proposal result map;
+      # their breakup readers sub_BBF1A0/sub_A9C220 use the same 0/1/2 statuses, after two names.
+      # Case 15: "커플을 맺을 수 없는 상태입니다. 잠시 후 다시 시도해 주세요."
+      # (A couple cannot be formed now. Please try again shortly.) Native request and invitation bodies: couple.yaml.
+      # cn-774 sub_BA58D0 / tw-454 sub_A82F50 copy the full UserStat FighterInfo into local player state.
+      couple: true
+      # cn-774 sub_E4B1E0 sends the store request as C2S 127 (kr-1256's 128 is another request here) and cn-774 sub_BCF090
+      # case 148 reads the reply; the readers cn-774 sub_47FC10 / sub_47FD90 match kr-1256 and the reply statuses are the
+      # kr-1256 ones (cn-774 sub_E46880 switches -79 to -70). The store opens while the slot-4 window of
+      # packets/dynamic-config-cn-774.yml contains the client's date (cn-774 sub_E45CD0). The coin is item 100386
+      # (this build's Magic Coin, 魔法币) and the pool is the workbook's Mystery-category StockSets that are off sale
+      # (profiles/cn-774/patch.yaml).
+      mystery_store: true
+      # Its weapon object notices (S2C 645/646) still carry coined names and need their own reader audit.
+      weapon_objects: false
+      # cn-774 sub_64DCD0 writes the lobby-state request (packets/room-matching.yaml) whose matching start pairs
+      # with the shared gspNotifyMatch gate; tw-454 sub_4DCE50 inherits it.
+      quick_matching: true
       room_custom_rules: false
       # Native title request and reply consumers are audited only for the two Korean baselines.
       title_operations: false
@@ -1033,10 +1206,14 @@ builds:
       # Frame layouts are audited; complete racing runtime activation remains unverified for cn-774 and tw-454.
       extreme_racing: false
       final_zone: false
+      extreme_racing_map_state: false
       extreme_racing_initialization: false
       extreme_racing_cannon: false
-      # cn-774 and tw-454 carry the strategy class (vtable only); their equipment reader is not audited.
-      weapon_master: false
+      # cn-774 sub_897E80 hands S2C 1001 to cn-774 sub_89F3D0, which reads the seat, the two counted lists and the
+      # trailing word exactly as kr-1256 sub_6DD900 does and pairs them into the same entries for the applier
+      # cn-774 sub_529F60 (mode 26 skips slots 1 and 2 for reasons 2 and 3, as kr-1256 sub_4996C0); the death
+      # handler cn-774 sub_50F6A0 sends the empty C2S 765 in mode 26 once WeaponMasterNoPangDeadCount is reached.
+      weapon_master: true
       bnb: false
       native_one_kill: false # The build's own OneKill consumers have not been audited.
       # cn-774 sub_897E80 -> cn-774 sub_8ACC60: own 37-byte item boxes and native slot replies.
@@ -1057,10 +1234,11 @@ builds:
       present_box: true
       # cn-774 sub_B04050 invites; sub_B009A0/sub_105A3C0 install members and appearance records.
       party: true
-      # The clan passport (cn-774 sub_BA3C80) and guild info (cn-774 sub_BB0F60) readers agree with kr-1256, but the
-      # mark-info and attendance bodies are parsed through container objects (cn-774 sub_105B970) and are not
-      # established, so the inherited capability is turned off here until they are read (packets/clan.yaml).
-      clan: false
+      # Every game-connection clan body agrees with kr-1256: passport cn-774 sub_BA3C80, guild info cn-774 sub_BB0F60,
+      # mark info cn-774 sub_105B040 (a word, a count, four words per record), attendance cn-774 sub_105B970 then
+      # cn-774 sub_453200 (the card list, then 4+4+2 bytes). Its clan connection is kr-1256's message set
+      # (dispatcher cn-774 sub_5E2F70; packets/clan-server.yaml). Its clan packet body is 8192 bytes.
+      clan: true
       # cn-774 sender sub_B277C0 (C2S 117), reader sub_BBA7A0 (S2C 133: a result, two FighterInfo, two strings and
       # four words, the kr-1256 shape with cn-774's own FighterInfo).
       fighter_info: true
@@ -1080,6 +1258,9 @@ builds:
       # notice constructs only the plain and big Lucci items - no award kinds. Mounting the Lucci
       # binding here would fail the horde-award guard until that row is resolved.
       lucci_drops: false
+      horde_award_items: false # The create notice above builds no award kinds.
+      horde_lottery: false # The KR award-dialog audit does not establish this build's consuming path.
+      horde_lottery_close_on_room_return: false
       star_items: false
 
   # TW 2019 (ClientVersion_Major 454), cn-774's lineage.
@@ -1096,10 +1277,12 @@ builds:
       bb_owner_items: [100240, 100712]
       skipped_items: [300006, 300007] # tw-454 sub_C31FF0 returns without applying these characters' rows.
     # tw-454 sub_E09730 confirms the inherited laboratory closed result 4.
-    # tw-454 sub_56E420 -> sub_73B320 sends kind 27 with victim/killer seat bytes.
+    # tw-454 sub_56E420 -> sub_73B320 sends kind 27 with victim/killer seat bytes; the soccer host
+    # tw-454 sub_71A9A0 -> sub_73B320 sends a goal as kind 21.
     play:
       score:
         captain_kill: 27
+        soccer_goal: 21
     plaza_recruitment_field: unknown_128
     plaza_recruitment_active_field: unknown_136
     plaza_recruitment_text_field: ""
@@ -1109,9 +1292,10 @@ builds:
     # Images/Icons/LevelMark.smf contains 220 native rank frames.
     display_level_max: 220
 
-    # TW category bodies are not admitted; neither the KR generation nor CN pet template is inherited.
+    # tw-454 reads its categories as plain bytes (tw-454 sub_628B00); only the categories named in
+    # dynamic-config-tw-454.yml are served, and neither the KR generation nor the CN pet template is inherited.
     dynamic_config:
-      content_file: null
+      content_file: dynamic-config-tw-454.yml
       pet_configuration_builds: []
       pet_content_file: null
 
@@ -1129,7 +1313,8 @@ builds:
       # tw-454 sub_70B3F0's 32776 consumer uses full floats, not the inherited compact record;
       # no native C2S producer for that branch is established, so it must not mount as Korean 38283.
       Unknown38283: { enabled: false }
-      Unknown38284: { opcode: Unknown33274 }
+      # tw-454 sub_70E250 calls tw-454 sub_778970 for night vision, a separate state from wall healing.
+      NightVisionState: { builds: [tw-454], opcode: gppSetNightVision_, structure: NightVisionState, actors: [actor] }
       # tw-454 sub_718700 / sub_72F6F0 use a separate seven-word impact record without a life verdict.
       Unknown32796: { opcode: Unknown32796, structure: Unknown32796, actors: [unknown_0, unknown_4], echo_sender: true }
     # tw-454 sub_4F6A40 tests the row's +492 word; cn-774 sub_6FA5D0 uses +500 instead.
@@ -1187,6 +1372,14 @@ builds:
       # tw-454 sub_A8B870 -> tw-454 sub_EBFE20 reads the S2C 808 article count directly.
       article_envelope: plain
     capabilities:
+      # tw-454 sub_6336B0 registers the mini-game configuration as category 3 with tw-454 sub_633520, which reads
+      # kr-1256's 42 bytes as plain packet bytes (tw-454 sub_628B00); the server publishes the prices in
+      # packets/dynamic-config-tw-454.yml, so the booths charge exactly what the client shows.
+      plaza_games: true
+      # tw-454 has the store's request and reply classes (C2S 127 from tw-454 sub_E5A280, S2C 146) and the slot-4 decoder
+      # (tw-454 sub_E54C80, plain bytes), but its ShopItem2 workbook carries no Mystery-category StockSet, so there is no
+      # store pool to offer and no category-4 content is authored for it; the store stays off.
+      mystery_store: false
       # tw-454 sub_DCFEC0 writes level-up; no dedicated ability-change path is established.
       pet_ability_change: false
       # tw-454 sub_A79210 relay 5 -> tw-454 sub_704180 installs the 1000 bytes consumed by tw-454 sub_7684C0.
@@ -1202,6 +1395,8 @@ builds:
       map_portals: true
       # tw-454 sub_70B3F0 -> tw-454 sub_720F80: own 37-byte item boxes and native slot replies.
       map_supplies: true
+      # tw-454's equipment reader is not audited.
+      weapon_master: false
       # tw-454 sub_70B3F0 case613 -> tw-454 sub_784AE0 preserves the held slot for direct effects.
       direct_supply_effects: true
       # tw-454 sub_710EB0 reports the unit; tw-454 sub_A578B0 case 925 applies three point words.
@@ -1217,8 +1412,9 @@ builds:
       present_box: true
       # tw-454 sub_B9C350/sub_EBC1A0 install parties; sub_A854A0/sub_A87B50 select this build's failure codes.
       party: true
-      # As cn-774: its clan readers were not read, so this build does not inherit the enabled capability.
-      clan: false
+      # As cn-774 (mark info tw-454 sub_EC7400, attendance tw-454 sub_EC7D30 then tw-454 sub_452FF0); its clan
+      # connection (dispatcher tw-454 sub_685A10) has a shorter create result and whispers (packets/clan-server.yaml).
+      clan: true
       # tw-454 sub_8D91C0 sends 117; tw-454 sub_A97DD0 reads the full two-block reply on 131.
       # The bundle's BFF_TW_454_FIGHTER_INFO opt-in separates native-client acceptance from layout coverage.
       fighter_info: true
@@ -1234,6 +1430,10 @@ builds:
       star_items: true
 
   cn-406:
+    # cn-406 sub_7339E0: own invitation result cases 1..13; no unaudited modern result codes.
+    couple_proposal_results: { sent: 8, self: 1, not_found: 2, offline: 3, playing: 4, no_ring: 6, recipient_paired: 9, sender_paired: 10, busy: 11, bad_message: 13, unavailable: 11 }
+    # cn-406 sub_734FF0: true completes breakup; false is the one-day refusal.
+    couple_breakup_statuses: { done: 1, refused: 0, left: 1 }
     # cn-406 sub_472BB0 uses the double 100 product; cn-406 sub_9B85B0 preserves the FPU with 0x42/0x82/0x22.
     defence_seed:
       precision: double
@@ -1261,6 +1461,12 @@ builds:
       # cn-406's own creation pair (Dao/Dizni), correcting the inherited id-400 [11, 12].
       creation_character_types: [1, 2]
     capabilities:
+      couple: true
+      # No clan connection to serve: cn-406 sub_7D7260 opens its clan session to the hard-coded 127.0.0.1:7400 (not
+      # login.ini), only under feature flag 75, with a plain frame; its five readers (dispatcher cn-406 sub_40DF60)
+      # match neither kr-812's nor kr-1256's bodies and no dialog consumes what they store. Its guild features use
+      # the game connection instead.
+      clan: false
       map_portals: true
       bomb_mission: false # cn-406 sub_453840 has no specialized mode-19 factory branch.
       bomb_round_series: false
@@ -1328,6 +1534,10 @@ builds:
   # cites have matching bodies here (cn-404 sub_6946D0, sub_4B9410, sub_5D8330, sub_4C78B0, sub_88E720,
   # sub_5887F0, sub_7B7AA0; cn-404 sub_7AF3F0 reads the nested ScoreData of gspGameTimeOverEnd).
   cn-404:
+    # cn-404 sub_7E66C0: own invitation result cases 1..13; no unaudited modern result codes.
+    couple_proposal_results: { sent: 8, self: 1, not_found: 2, offline: 3, playing: 4, no_ring: 6, recipient_paired: 9, sender_paired: 10, busy: 11, bad_message: 13, unavailable: 11 }
+    # cn-404 sub_7E7AE0: true completes breakup; false is the one-day refusal.
+    couple_breakup_statuses: { done: 1, refused: 0, left: 1 }
     # cn-404 sub_502CC0 uses the double 100 product; cn-404 sub_A6E060 preserves the FPU with 0x42/0x82/0x22.
     defence_seed:
       precision: double
@@ -1348,6 +1558,7 @@ builds:
     display_level_max: 180
     base: id-400
     capabilities:
+      couple: true
       map_portals: true
       udp_peer_setup: true # cn-404 sub_7AFA70/cn-404 sub_7BDDD0: native controls and peer table.
       udp_peer_discovery_in_room: false # cn-404 sub_6150C0 also pumps discovery in GameStage.
@@ -1378,6 +1589,10 @@ builds:
   # bool (cn-408 sub_4B0470; relayed as the peer sent it). ScoreData keeps its wire order and only moves
   # in memory (cn-408 sub_7B0C60). Other values inherit from cn-404.
   cn-408:
+    # cn-408 sub_7E9D40 and sub_7EB160 independently establish these result and bool32 breakup codes.
+    # Only the profile's explicitly missing Stock row may project display ring zero; ownership remains required.
+    couple_proposal_results: { sent: 8, self: 1, not_found: 2, offline: 3, playing: 4, no_ring: 6, recipient_paired: 9, sender_paired: 10, busy: 11, bad_message: 13, unavailable: 11 }
+    couple_breakup_statuses: { done: 1, refused: 0, left: 1 }
     # cn-408 sub_503AE0 uses the double 100 product; cn-408 sub_A770E0 preserves the FPU with 0x42/0x82/0x22.
     defence_seed:
       precision: double
@@ -1395,6 +1610,7 @@ builds:
     display_level_max: 200
     base: cn-404
     capabilities:
+      couple: true
       map_portals: true
       udp_peer_setup: true # cn-408 sub_7B2F40/cn-408 sub_7C12A0: native controls and peer table.
       udp_peer_optimized_movement: true # cn-408 sub_7C2470/cn-408 sub_7C4020: full and compressed direct movement.
@@ -1406,6 +1622,13 @@ builds:
 
   # Indonesia 2014.
   id-400:
+    # 8192-byte clan packet object: id-400 sub_9CF480 reads against its cursor at +8208 (and so cn-404, cn-406,
+    # cn-408, cn-706 built on it).
+    clan_packet_bytes: 8192
+    # id-400 sub_7B8B20 and sub_7B9F40 independently establish these result and bool32 breakup codes.
+    # Only the profile's explicitly missing Stock row may project display ring zero; ownership remains required.
+    couple_proposal_results: { sent: 8, self: 1, not_found: 2, offline: 3, playing: 4, no_ring: 6, recipient_paired: 9, sender_paired: 10, busy: 11, bad_message: 13, unavailable: 11 }
+    couple_breakup_statuses: { done: 1, refused: 0, left: 1 }
     # id-400 sub_4D4AC0 uses the double 100 product; id-400 sub_A5CF80 preserves the FPU with 0x42/0x82/0x22.
     defence_seed:
       precision: double
@@ -1464,7 +1687,14 @@ builds:
       creation_character_types: [11, 12]
       starter_item_ids: [300001, 201003, 202003, 203003, 204003, 207001]
       starter_worn_ids: [300001, 202003, 201003, 207001]
+    # The mini-game configuration and the lobby-minigame packets of kr-812 are not audited for this build.
+    dynamic_config:
+      content_file: null
+      unchanged_reply: ack
     capabilities:
+      plaza_games: false
+      # Own invitation, result, nested profile and catalog paths are audited above.
+      couple: true
       # Native title request and reply consumers are audited only for the two Korean baselines.
       title_operations: false
       map_portals: true
@@ -1495,6 +1725,7 @@ builds:
       # id-400 sub_4992A0 builds only kinds 1 and 2 of S2C 720 and returns for 3/4/5; the
       # build has no GoHordeAward*LucciItem class and no C2S horde-award request.
       horde_award_items: false
+      user_host: false # Native UserHost codecs remain disabled on id-400 and its descendants (cn-404..cn-408, cn-705, cn-706).
     play:
       wire:
         # id-400 sub_65EC10 -> sub_48B020 sends and queues a copy while session+10214 is clear;
@@ -1527,6 +1758,12 @@ builds:
 
   # Indonesia 2015. Its packets are kr-812's almost everywhere; only the seat is closer to id-400's.
   id-1809:
+    # 8192-byte clan packet object: id-1809 sub_9ECAE0 reads against its cursor at +8208.
+    clan_packet_bytes: 8192
+    # id-1809 sub_7DC2E0: own invitation result cases 1..13; no unaudited modern result codes.
+    couple_proposal_results: { sent: 8, self: 1, not_found: 2, offline: 3, playing: 4, no_ring: 6, recipient_paired: 9, sender_paired: 10, busy: 11, bad_message: 13, unavailable: 11 }
+    # id-1809 sub_7DD700: true completes breakup; false is the one-day refusal.
+    couple_breakup_statuses: { done: 1, refused: 0, left: 1 }
     # id-1809 sub_5279B0 uses the double 100 product; id-1809 sub_A530D0 preserves the FPU with 0x42/0x82/0x22.
     defence_seed:
       precision: double
@@ -1548,10 +1785,21 @@ builds:
         page_type: main
         trailer: ids
     # The Indonesian creation stage offers Leo (item 300011) and Lavi (300012); id-1809 sub_81BD80
-    # handles selections 11 and 12 beside 1 and 2, as id-400 sub_7FBB80 does.
+    # handles selections 11 and 12 beside 1 and 2, as id-400 sub_7FBB80 does. The ShopItem table has no 201001,
+    # 203001, 204001 or 205001, and id-1809 sub_4CD8C0 seeds the empty weapon positions with 202004, 201004,
+    # 203004, 204004 and 207001 (cn-404's defaults), so the kr-812 starter bag left the sidearm position empty.
     lobby:
       creation_character_types: [11, 12]
+      starter_item_ids: [300001, 201003, 201004, 202001, 202003, 202004, 203003, 203004, 204003, 204004, 207001]
+      starter_worn_ids: [300001, 202004, 201004, 207001]
+    # The mini-game configuration and the lobby-minigame packets of kr-812 are not audited for this build.
+    dynamic_config:
+      content_file: null
+      unchanged_reply: ack
     capabilities:
+      plaza_games: false
+      # Own invitation, result, nested profile and catalog paths are audited above.
+      couple: true
       # Native title request and reply consumers are audited only for the two Korean baselines.
       title_operations: false
       map_portals: true
@@ -1589,6 +1837,10 @@ builds:
 
   # China 2015.
   cn-717:
+    # cn-717 sub_8B6FC0: own invitation result cases 1..13; no unaudited modern result codes.
+    couple_proposal_results: { sent: 8, self: 1, not_found: 2, offline: 3, playing: 4, no_ring: 6, recipient_paired: 9, sender_paired: 10, busy: 11, bad_message: 13, unavailable: 11 }
+    # cn-717 sub_8B88D0: two unused names followed by status 0/1/2.
+    couple_breakup_statuses: { done: 0, refused: 1, left: 2 }
     # cn-717 sub_988130 enables FPU preservation in cn-717 sub_B830A0, retaining the double endpoint product.
     defence_seed:
       precision: double
@@ -1614,7 +1866,14 @@ builds:
       score:
         npc_team_outcome: false # Pending this build's horde result consumer audit.
 
+    # The mini-game configuration and the lobby-minigame packets of kr-812 are not audited for this build.
+    dynamic_config:
+      content_file: null
+      unchanged_reply: ack
     capabilities:
+      plaza_games: false
+      # Own invitation, result, nested profile and catalog paths are audited above.
+      couple: true
       # Native title request and reply consumers are audited only for the two Korean baselines.
       title_operations: false
       map_portals: true
@@ -1638,6 +1897,7 @@ builds:
     # not read yet. cn-738 and cn-742 inherit it.
     room_list_paging: false
     capabilities:
+      couple: false # Requires its own complete feature activation; do not inherit it.
       pet_evolution: false
       pet_equipment: false # This unmounted lineage has not had its pet consumer audited.
       map_portals: false
@@ -1667,6 +1927,9 @@ builds:
       expired_item_notice: false
       # No Packet_gspRepPresent* or Packet_gcpReqPresent* class is labelled in cn-735, whose packets are the modern family's.
       present_box: false
+      # Modern cn-735 / cn-738 / cn-742 cash-inbox codecs are not audited; keep disabled.
+      cash_inbox: false
+      user_host: false # Modern cn-735 / cn-738 / cn-742 UserHost paths remain disabled pending audit.
       life_items: false # The modern family's item kinds are not audited.
       weapon_presets: false
       instant_revival: false
@@ -1712,6 +1975,19 @@ builds:
 
   # China 2012.
   cn-324:
+    # cn-324 sub_7133D0: 5 opens the selector; 7 says "You're getting ready to play Game. Please try again later."
+    # (English: "You are entering a game. Please try again later."); 10 says "You already have a partner."
+    # (English: "You already have a partner."); 11 says "You've already sent an invitation. You can't send another
+    # invitation until the previous one's approved/rejected." (English: "Wait for the previous invitation's answer.").
+    couple_inviter_statuses: { ready: 5, unavailable: 7, paired: 10, busy: 11 }
+    # cn-324 sub_7127A0 case 5 invokes sub_402D60; its Yes/No dialog sends the final confirmation through sub_404F10.
+    couple_confirmation_result: 5
+    # cn-324 sub_7127A0 independently handles all thirteen legacy proposal results.
+    couple_proposal_results: { sent: 8, self: 1, not_found: 2, offline: 3, playing: 4, no_ring: 6, recipient_paired: 9, sender_paired: 10, busy: 11, bad_message: 13, unavailable: 11 }
+    # cn-324 sub_7139D0 clears on true and ignores false; no later refusal dialog is assumed.
+    couple_breakup_statuses: { done: 1, refused: 0, left: 1 }
+    # cn-324 sub_750710 tests partner FighterInfo+4 instead of a separate couple-present word.
+    couple_presence_from_user_number: true
     # cn-324 sub_806A50 adds the KR minimum only for 100237 and the BB pair only for 100240, each once its count
     # reaches its threshold (cn-324 sub_808210); 190044 and 100712 appear nowhere in this build.
     defence_seed:
@@ -1777,11 +2053,21 @@ builds:
       second_flag: unknown_21
       # cn-324 sub_59DEA0 (cn-279 sub_79B090, tw-410 sub_59D420) fills the request's difficulty from GameSetting+68.
       difficulty_target: unknown_68
+    # The mini-game configuration and the lobby-minigame packets of kr-812 are not audited for this build.
+    dynamic_config:
+      content_file: null
+      unchanged_reply: ack
     capabilities:
+      plaza_games: false
+      # Native preflight, complete invitation, partner profile and own ring catalog are audited.
+      couple: true
       # Native title request and reply consumers are audited only for the two Korean baselines.
       title_operations: false
       pet_evolution: false
       pet_equipment: false # No native follower selection path is established for this lineage; cn-279 inherits it.
+      # No clan-server connection: this lineage's export has no ClanSession class and no clan dispatcher (checked for
+      # cn-324, cn-279, kr-186 and tw-410), so there is nothing for a clan row to answer.
+      clan: false
       map_portals: false
       weapon_objects: true # cn-324 sub_45D090, cn-324 sub_45C8F0, cn-324 sub_471630 and cn-324 sub_4716F0.
       bomb_mission: false # Pending this lineage's bomb state and outcome consumer audit.
@@ -1809,6 +2095,7 @@ builds:
       # handler cn-324 sub_70B280 drives the bag UI from the one-i32 result. cn-279 carries both
       # classes at 808/809 in its own label map.
       equip_result_reply: true
+      user_host: false # Native UserHost codecs remain disabled on cn-324 and its descendants (cn-279, kr-186, tw-410).
     base: kr-812
     play:
       tutorial:
@@ -1879,6 +2166,7 @@ builds:
       refusal_codes:
         cash_short: 36
     capabilities:
+      couple: false # This build has no complete native couple activation audit.
       # cn-279 sub_6FB0C0 stores event 23; cn-279 sub_787290 draws its completion marker.
       tutorial_practice_progress: true
       map_portals: false
@@ -1919,6 +2207,8 @@ builds:
       # cn-279 sub_818D80/sub_81FAB0 use ordinary two-word gcpRespawn, not a consumable request.
       # No own consumable sender or item-count path is established; keep the later binding disabled.
       instant_revival: false
+      # kr-186 carries no cash-inbox codecs and cn-279 C2S 826..829 are unaudited; keep disabled.
+      cash_inbox: false
     base: cn-324
     play:
       wire:
@@ -1944,7 +2234,7 @@ builds:
         # an empty and a rel_Tutorial_01 room body; its own GotoRoom reader needs pinning before
         # another attempt. The stage's UI (Ui/TutorialRoomStage.ui) exists in Ui0000.pkn.
 
-  # Korea 2009 (linked 2009-12-20, ClientVersion_Major 186), older than cn-279. It shares cn-279's ten-byte frame
+  # Korea 2009 (built 2009-12-21 Korea time, ClientVersion_Major 186), older than cn-279. It shares cn-279's ten-byte frame
   # and cipher tables; its numbering is cn-279's with a few blocks shifted down (kr-186 has no GPK or
   # uniqueness check, so gcpReqLogin is 2). Login goes through nmcogame NMCO_CallNMFunc and login.ini
   # (kr-186 sub_65B370), as on kr-812.
@@ -1969,9 +2259,29 @@ builds:
   # cipher tables. Login goes through nmcogame NMCO_CallNMFunc2 and login.ini (tw-410 sub_790010), as on kr-812.
   tw-410:
     base: cn-324
+    # tw-410 sub_713AB0: 5 opens the selector; 7 says "You're getting ready to play Game. Please try again later."
+    # (English: "You are entering a game. Please try again later."); 10 says "You already have a partner."
+    # (English: "You already have a partner."); 11 says "You've already sent an invitation. You can't send another
+    # invitation until the previous one's approved/rejected." (English: "Wait for the previous invitation's answer.").
+    couple_inviter_statuses: { ready: 5, unavailable: 7, paired: 10, busy: 11 }
+    # tw-410 sub_712E80 case 5 invokes sub_402DF0; Yes (257) sends the full confirmation through sub_404F70.
+    couple_confirmation_result: 5
+    # tw-410 sub_712E80 independently handles all thirteen legacy proposal results.
+    couple_proposal_results: { sent: 8, self: 1, not_found: 2, offline: 3, playing: 4, no_ring: 6, recipient_paired: 9, sender_paired: 10, busy: 11, bad_message: 13, unavailable: 11 }
+    # tw-410 sub_7141B0 accepts true; false shows "You have to wait for at least one day before you can break up."
+    # (English: "Wait at least one day before breaking up.").
+    couple_breakup_statuses: { done: 1, refused: 0, left: 1 }
+    # tw-410 sub_752E60 tests partner FighterInfo+4 instead of a separate couple-present word.
+    couple_presence_from_user_number: true
+    capabilities:
+      couple: true
 
   # China 2014 (0.2.51.002). Uses id-400's layout base with audited differences below.
   cn-706:
+    # cn-706 sub_7C2840: own invitation result cases 1..13; no unaudited modern result codes.
+    couple_proposal_results: { sent: 8, self: 1, not_found: 2, offline: 3, playing: 4, no_ring: 6, recipient_paired: 9, sender_paired: 10, busy: 11, bad_message: 13, unavailable: 11 }
+    # cn-706 sub_7C3C60: true completes breakup; false is the one-day refusal.
+    couple_breakup_statuses: { done: 1, refused: 0, left: 1 }
     # cn-706 sub_90EAD0 applies the character then distinct ascending items; cn-706 sub_91B8C0 registers RC/KR/BB.
     # cn-706 sub_90E640 uses the inherited owners; cn-706 sub_924690 skips the inherited characters.
     defence_seed:
@@ -2013,6 +2323,7 @@ builds:
       starter_item_ids: [300001, 201001, 201003, 201004, 202001, 202003, 202004, 203001, 203003, 203004, 204001, 204003, 204004, 205001, 207001]
       starter_worn_ids: [300001, 202001, 201001, 205001, 207001]
     capabilities:
+      couple: true
       # cn-706 sub_5350D0 -> cn-706 sub_4E2AF0; cn-706 sub_7C6B60 starts native map motion.
       map_portals: true
       udp_peer_setup: true # cn-706 sub_7890E0/cn-706 sub_798520: native controls and peer table.
@@ -2084,6 +2395,10 @@ builds:
   # labels on 728/733/924 are score-update call sites feeding the shared sender cn-705 sub_4E6BC0, which
   # stamps 710 with Packet_gcpGameUpdateScore, and this client's own Packet_gcpReqPingUser stamps 517.
   cn-705:
+    # cn-705 sub_7C0D60: own invitation result cases 1..13; no unaudited modern result codes.
+    couple_proposal_results: { sent: 8, self: 1, not_found: 2, offline: 3, playing: 4, no_ring: 6, recipient_paired: 9, sender_paired: 10, busy: 11, bad_message: 13, unavailable: 11 }
+    # cn-705 sub_7C2180: true completes breakup; false is the one-day refusal.
+    couple_breakup_statuses: { done: 1, refused: 0, left: 1 }
     # cn-705 sub_90D3E0, cn-705 sub_90CF50 and cn-705 sub_923370 confirm the inherited aggregation and owners.
     defence_seed:
       # cn-705 sub_50C020 uses the double product; cn-705 sub_A3AF10 passes 0x42/0x82/0x22 with FPU preservation.
@@ -2099,6 +2414,7 @@ builds:
     base: cn-706
 
     capabilities:
+      couple: true
       pet_evolution: false
       pet_equipment: false # This unmounted build has not had its pet consumer audited.
       map_portals: true

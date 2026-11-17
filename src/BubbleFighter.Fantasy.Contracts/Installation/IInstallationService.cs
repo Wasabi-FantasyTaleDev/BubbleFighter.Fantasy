@@ -211,6 +211,9 @@ public sealed record InstallationProfile(string Id, string? Description)
 
     /// <summary>Gets whether the profile is an experimental client integration.</summary>
     public bool Experimental { get; init; }
+
+    /// <summary>Gets whether the WebUI lists this build among the clients to install; a hidden build stays installable.</summary>
+    public bool SetupVisible { get; init; } = true;
 }
 
 /// <summary>Provider-owned database validation and initialization, shared with the native persistence implementation.</summary>

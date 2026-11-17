@@ -48,6 +48,29 @@ public sealed class PartySceneFlowTests
         Assert.False(member.Connection.IsClosed);
     }
 
+    /// <summary>
+    /// The entered-room publication drives each member's equipment view, which writes that member's loadout; a follower
+    /// moved by the leader's create must be published under its own authority, not the leader's.
+    /// </summary>
+    [Fact]
+    public async Task FollowerRoomEntryIsPublishedUnderTheFollowersAuthority()
+    {
+        var scopes = new EquipmentScopes();
+        await using var rig = new Rig(selection: new AuthorizedEquipment(scopes), mutations: scopes);
+        var (leader, member) = rig.Pair();
+        var publishers = new List<(ISession Target, ISession? Authority)>();
+        rig.Entered.BeforeSend = (target, _) =>
+        {
+            lock (publishers) publishers.Add((target, scopes.Current));
+            return ValueTask.CompletedTask;
+        };
+        using (scopes.Enter(leader))
+            await rig.Flow.HandleCreateAsync(leader, new("party", "", 1, "map"), default);
+        Assert.Same(rig.Registry.TryGet(leader.Id), rig.Registry.TryGet(member.Id));
+        Assert.Contains(publishers, row => ReferenceEquals(row.Target, member));
+        Assert.All(publishers, row => Assert.Same(row.Target, row.Authority));
+    }
+
     private sealed class EquipmentScopes : IAccountMutationScopes
     {
         private readonly AsyncLocal<ISession?> _current = new();

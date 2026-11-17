@@ -1315,7 +1315,8 @@ structs:
       offset: 440
     - unknown_236: u32
       offset: 236
-    - unknown_476: u32
+    # kr-1256 sub_429620 stores the primary Stock/StockSet id here; kr-1256 sub_5E39A0/kr-1256 sub_5E40B0 display it.
+    - award_display_id: u32
       offset: 476
     - unknown_480: u32
       offset: 480

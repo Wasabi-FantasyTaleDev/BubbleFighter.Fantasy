@@ -73,10 +73,8 @@ internal sealed class PetMileagePolicy
 
     internal static PetMileagePolicy? Create(PetsOptions options, PetCatalog catalog, InventoryLoadoutScope scope)
     {
-        if (options.Mileage.Enabled) return new(options.Mileage, catalog, scope);
-        if (options.SkillResetsEnabled && catalog.Items.TryGetValue(BalanceItemId, out var balance) && balance.Function == 1114)
-            throw new ConfigException("Skill resets in a mileage-capable client require an enabled, complete mileage policy.");
-        return null;
+        // Without an enabled mileage policy a reset still regresses the pet; it simply earns no mileage.
+        return options.Mileage.Enabled ? new(options.Mileage, catalog, scope) : null;
     }
 
     internal PetMileageEffect Plan(long userNum, int consumableItemId,

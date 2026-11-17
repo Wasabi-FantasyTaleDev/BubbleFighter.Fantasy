@@ -23,6 +23,12 @@ public sealed record ProfileInfo(string Id, string? Description)
 
     /// <summary>Gets whether the profile is an experimental client integration.</summary>
     public bool Experimental { get; init; }
+
+    /// <summary>
+    /// Gets whether the WebUI lists this build among the clients to install. A hidden build stays installable and
+    /// runnable; it is only left out of the list until its profile says <c>setup_visible: true</c>.
+    /// </summary>
+    public bool SetupVisible { get; init; } = true;
 }
 
 /// <summary>
@@ -137,6 +143,13 @@ public sealed partial class ProfileComposer
                     throw new ConfigException($"Profile '{Path.GetFileName(dir)}' experimental must be a boolean.");
                 experimental = experimentalValue;
             }
+            var setupVisible = true;
+            if (doc?.TryGetValue("setup_visible", out var rawSetupVisible) == true)
+            {
+                if (rawSetupVisible is not bool visibleValue && !(rawSetupVisible is string visibleText && bool.TryParse(visibleText, out visibleValue)))
+                    throw new ConfigException($"Profile '{Path.GetFileName(dir)}' setup_visible must be a boolean.");
+                setupVisible = visibleValue;
+            }
             result.Add(new ProfileInfo(Path.GetFileName(dir), doc is not null && doc.TryGetValue("description", out var d) ? d?.ToString() : null)
             {
                 IsClientBuild = doc?.ContainsKey("client_build") == true && !doc.ContainsKey("builds"),
@@ -144,6 +157,7 @@ public sealed partial class ProfileComposer
                 SetupEnabled = setupEnabled,
                 ActivationEnabled = activationEnabled,
                 Experimental = experimental,
+                SetupVisible = setupVisible,
             });
         }
         return result;
@@ -292,8 +306,45 @@ public sealed partial class ProfileComposer
             result.Add(row.ToPluginRow() with { ClientBuild = clientBuild, Lineage = lineage, Family = family });
         }
         var buildActivation = ReadBuildActivation(doc, profileFile, profileId);
-        foreach (var buildId in AsStringList(doc, "builds", profileFile))
+        var builds = AsStringList(doc, "builds", profileFile);
+        var excluded = ReadBuildNames(doc, "exclude_builds", builds, "its builds list", profileFile, profileId);
+        // An optional build (one not every deployment has, such as an unreleased client) is composed only when the
+        // deployment names it in include_builds; a server without that client's data then starts without it.
+        var optionalBuilds = doc.ContainsKey("optional_builds") ? AsStringList(doc, "optional_builds", profileFile) : [];
+        foreach (var name in optionalBuilds.Where(name => !builds.Contains(name, StringComparer.Ordinal)))
+            throw new ConfigException($"Profile file '{profileFile}': optional_builds names '{name}', which is not in its builds list.");
+        var included = ReadBuildNames(doc, "include_builds", optionalBuilds, "its optional_builds list", profileFile, profileId);
+        var composed = builds.Where(id => !excluded.Contains(id) && (!optionalBuilds.Contains(id, StringComparer.Ordinal) || included.Contains(id))).ToList();
+        if (builds.Count > 0 && composed.Count == 0)
+            throw new ConfigException($"Profile file '{profileFile}': exclude_builds and optional_builds leave no build in the profile.");
+        foreach (var buildId in composed)
             AddBuildRows(profileId, buildId, ids, result, buildActivation);
+        return result;
+    }
+
+    /// <summary>
+    /// Reads a server profile's list of build names under <paramref name="key"/> (<c>exclude_builds</c>: builds this
+    /// deployment does not compose; <c>include_builds</c>: optional builds it does compose), as a list or as one comma-
+    /// or space-separated value that may come from the environment. A name outside <paramref name="allowed"/> is an
+    /// error, so a misspelt name cannot leave a build running, or missing, unnoticed.
+    /// </summary>
+    private static IReadOnlySet<string> ReadBuildNames(IReadOnlyDictionary<string, object?> doc, string key, IReadOnlyList<string> allowed,
+        string allowedName, string file, string profileId)
+    {
+        if (!doc.TryGetValue(key, out var value) || value is null) return new HashSet<string>(StringComparer.Ordinal);
+        IEnumerable<string> names = value switch
+        {
+            IList<object?> list => list.Select(v => v is null ? throw new ConfigException($"Profile file '{file}': {key} entries must be build ids.")
+                : InterpolateScalar(Scalar(v), file, profileId) ?? ""),
+            _ => [InterpolateScalar(Scalar(value), file, profileId) ?? ""],
+        };
+        var result = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var name in names.SelectMany(text => text.Split([',', ' ', '\t'], StringSplitOptions.RemoveEmptyEntries)))
+        {
+            if (!allowed.Contains(name, StringComparer.Ordinal))
+                throw new ConfigException($"Profile file '{file}': {key} names '{name}', which is not in {allowedName}.");
+            result.Add(name);
+        }
         return result;
     }
 

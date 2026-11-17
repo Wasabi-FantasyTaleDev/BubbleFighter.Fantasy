@@ -3,7 +3,7 @@
 Every package is a framework-dependent publish of the host with its plugins, profiles and packet tables; the
 machine that runs it needs the ASP.NET Core Runtime 10. The asset names carry no version, so the stable
 address .../releases/latest/download/<asset> always names the newest release. The output directory also
-receives install.sh and SHA256SUMS, which the installer checks every download against.
+receives install.sh, install.ps1 and SHA256SUMS, which the installers check every download against.
 """
 
 import argparse
@@ -133,7 +133,8 @@ def main() -> None:
             write_tar(archive, files, executable)
         print(f"{archive.name}: {len(files)} files, {archive.stat().st_size:,} bytes")
     shutil.rmtree(staging)
-    shutil.copy2(repo / "deploy/install.sh", output / "install.sh")
+    for installer in ("install.sh", "install.ps1"):
+        shutil.copy2(repo / "deploy" / installer, output / installer)
     sums = [f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}"
             for path in sorted(output.iterdir()) if path.is_file()]
     (output / "SHA256SUMS").write_text("\n".join(sums) + "\n", encoding="utf-8", newline="\n")

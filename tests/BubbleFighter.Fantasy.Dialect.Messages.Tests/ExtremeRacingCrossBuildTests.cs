@@ -114,6 +114,7 @@ public sealed class ExtremeRacingCrossBuildTests
             ["unknown_0"] = 7,
             ["unknown_4"] = 9,
             ["unknown_8"] = 0x11223344u,
+            ["second_bomb_pattern"] = 7, ["third_bomb_pattern"] = 9, ["stone_seed"] = 0x11223344u,
             ["vanish_selections"] = new object[] { 3u, 0u, 1u },
         });
         Assert.Equal(hasVector ? 28 : 8, body.Length);

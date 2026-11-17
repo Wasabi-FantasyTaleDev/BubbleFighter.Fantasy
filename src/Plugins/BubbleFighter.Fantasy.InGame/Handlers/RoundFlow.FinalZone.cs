@@ -18,8 +18,15 @@ internal sealed partial class RoundFlow
         && (GameModeId)room.ModeId is GameModeId.Area32 or GameModeId.SuddenSurvival
             or GameModeId.FinalZone or GameModeId.ZombieSurvival;
 
-    private static FinalZoneRoundState CreateFinalZoneState(PlayRoom room) =>
-        new(room.StartGeneration, room.Seats, room.ModeId == (int)GameModeId.SuddenSurvival);
+    private bool UsesFinalZoneGroups(PlayRoom room) => _options.SurvivalTeamAssignments
+        && room.ModeId == (int)GameModeId.FinalZone;
+
+    private FinalZoneRoundState CreateFinalZoneState(PlayRoom room) =>
+        new(room.StartGeneration,
+            _options.SurvivalTeamAssignments && room.ModeId is (int)GameModeId.Area32 or (int)GameModeId.FinalZone
+                ? room.Seats.Where(seat => seat.Team != 36).ToArray() : room.Seats,
+            room.ModeId == (int)GameModeId.SuddenSurvival || UsesFinalZoneGroups(room),
+            requireAssignedTeams: UsesFinalZoneGroups(room));
 
     private static bool FinalZoneReportIsCurrent(PlayRoom room, ISession session, int generation) =>
         room.Phase == RoomPhase.Playing && !room.RoundCancelled && !room.IsStopping

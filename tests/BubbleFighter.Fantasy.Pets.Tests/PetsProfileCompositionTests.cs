@@ -15,12 +15,11 @@ public sealed class PetsProfileCompositionTests
     /// <summary>Lists the builds whose profiles mount the pet rows.</summary>
     public static IEnumerable<object[]> AuditedBuilds => new[]
     {
-        "kr-812", "cn-717", "cn-404", "cn-406", "cn-408", "cn-706", "id-400", "id-1809", "kr-1256",
+        "kr-812", "cn-717", "cn-404", "cn-406", "cn-408", "cn-706", "id-400", "id-1809", "kr-1256", "cn-774",
     }.Select(build => new object[] { build });
 
-    /// <summary>cn-774 and tw-454 mount no native inventory-use handler, so their profiles do not include the pet rows yet.</summary>
+    /// <summary>tw-454 mounts no native inventory-use handler, so its profile does not include the pet rows yet.</summary>
     [Theory]
-    [InlineData("cn-774")]
     [InlineData("tw-454")]
     public void BuildsWithoutInventoryUseDoNotMountPets(string build) =>
         Assert.DoesNotContain(Composer().Compose(build, []), row => row.Plugin is "pets" or "pets.entitlements" or "pets.combat-effects");
@@ -72,7 +71,7 @@ public sealed class PetsProfileCompositionTests
             : IsModern(build) ? PetClientConfigurationSource.DynamicConfig : PetClientConfigurationSource.None,
             left.ClientConfigurationSource);
         Assert.Equal(build == "tw-454" ? "Config/PetConfig.xml" : null, left.NativePetConfigPath);
-        Assert.Equal(build == "kr-1256" ? 110 : (int?)null, left.Mileage.DisplayMaximum);
+        Assert.Equal(build is "kr-1256" or "cn-774" ? 110 : (int?)null, left.Mileage.DisplayMaximum);
         Assert.Equal(build.StartsWith("kr-", StringComparison.Ordinal) ? 540 : build.StartsWith("id-", StringComparison.Ordinal) ? 420 : 480,
             left.ClientUtcOffsetMinutes);
         foreach (var row in rows)
@@ -113,11 +112,13 @@ public sealed class PetsProfileCompositionTests
     [Fact]
     public void DynamicActivationNeedsExplicitSettingsAndCivilClock()
     {
-        var row = One(Composer().Compose("cn-774", Patches("cn-774")), "pets");
+        var row = One(Composer().Compose("cn-774", []), "pets");
         var config = row.Config!.ToDictionary(pair => pair.Key, pair => pair.Value);
         Assert.Equal(110, Assert.IsType<Dictionary<string, object?>>(config["mileage"])["display_maximum"] is { } maximum
             ? Convert.ToInt32(maximum, System.Globalization.CultureInfo.InvariantCulture) : 0);
+        Assert.Equal(25200, new PluginConfig(row).Bind<PetsOptions>().FeedCooldownSeconds);
         config.Remove("client_utc_offset_minutes");
+        config["feed_cooldown_seconds"] = null;
         var missing = Assert.Throws<ConfigException>(() => new PluginConfig(row with { Config = config }).Bind<PetsOptions>());
         Assert.Contains("feed_cooldown_seconds", missing.Message);
         Assert.Contains("client_utc_offset_minutes", missing.Message);

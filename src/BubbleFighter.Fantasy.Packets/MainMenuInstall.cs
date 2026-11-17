@@ -43,7 +43,14 @@ public static class MainMenuInstall
             + "unknown_104:bool,unknown_108:u32,unknown_112:u32,unknown_116:u32,unknown_120:u16");
         PacketLayoutContract.RequireFields(tables, build, "UserSlot", "Main menu install",
             ("occupied", "bool"), ("user_number", "u32"), ("nickname", "wstr"),
-            ("level", "u32"), ("social", "SocialSystemInfo"));
+            ("social", "SocialSystemInfo"));
+        if (!tables.Resolve(build, "gspGotoRoom").Any(field => field.Name == "equipped_objects"))
+            PacketLayoutContract.RequireFields(tables, build, "UserSlot", "Main menu install", ("level", "u32"));
+        else
+            // cn-774 sub_BC07C0 / tw-454 sub_A9D8F0 copy these words as partner identity, not level.
+            PacketLayoutContract.RequireFields(tables, build, "UserSlot", "Main menu install",
+                ("couple_partner_user_num", "u32"), ("couple_partner_name", "wstr"),
+                ("couple_unknown_flag_1", "bool"), ("couple_unknown_flag_2", "bool"));
         if (tables.Resolve(build, "UserSlot").Any(field => field.Name == "team"))
             PacketLayoutContract.RequireFields(tables, build, "UserSlot", "Main menu install", ("team", "u8"));
         if (tables.Resolve(build, "UserSlot").Any(field => field.Name == "character_type"))

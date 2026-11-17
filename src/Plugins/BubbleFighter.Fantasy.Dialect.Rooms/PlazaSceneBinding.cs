@@ -121,7 +121,8 @@ internal sealed class PlazaSceneBinding(string protocol, IOpcodeTable table, Pac
 
     private static RoomMemberView Seat(PlazaMember member) =>
         new(member.Slot, member.UserNumber, member.Nickname, member.Level, 0, false, member.CharacterItemId, member.EquippedItemIds)
-            { ColorIndex = member.ColorIndex, Recruitment = member.Recruitment, ItemAttributes = member.ItemAttributes };
+            { ColorIndex = member.ColorIndex, Recruitment = member.Recruitment, ItemAttributes = member.ItemAttributes,
+                Couple = member.Couple };
 
     private ushort S2C(string name) => _s2c[name];
     private async ValueTask PublishViewAsync(ISession session, PlazaMember member, bool remote, CancellationToken ct)

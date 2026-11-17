@@ -41,6 +41,7 @@ Bubble Fighter Fantasy는 Fantasy Tale Studio가 유지 관리하는 게임 *버
 | --- | --- | --- |
 | Windows x64 빌드 패키지 | 사용 가능 | Windows x64에서 준비된 빌드를 사용할 때 |
 | Windows ARM64 빌드 패키지 | 사용 가능 | Windows on ARM에서 준비된 빌드를 사용할 때 |
+| Windows 설치 스크립트 | 사용 가능 | PowerShell 명령 하나로 Windows 패키지를 내려받고 확인하고 설치할 때 |
 | Linux 설치 스크립트 | 사용 가능 | Docker 없이 준비된 Linux 배포를 사용할 때 |
 | Docker 원클릭 설치 | 사용 가능 | 저장소 없이 서버를 컨테이너로 실행할 때(MySQL은 선택) |
 | 이 저장소에서 빌드한 Docker | 사용 가능 | 저장소와 Docker가 있고 서버와 MySQL을 컨테이너로 실행할 때 |
@@ -65,10 +66,40 @@ Bubble Fighter Fantasy는 Fantasy Tale Studio가 유지 관리하는 게임 *버
 2. 프로세서에 맞는 ZIP을 내려받아 `C:\BubbleFighterFantasy`처럼 짧은 폴더에 압축을 푸세요. 전체 경로가 약 259자에 이르는 플러그인 파일은 Windows에서 불러올 수 없습니다. 그렇게 깊은 폴더에서 실행하면 서버는 가장 긴 파일을 알려 주고 시작하지 않습니다.
 3. `BubbleFighter.Fantasy.Host.exe`를 더블클릭하세요. 설치 도우미가 시작되고 기본 브라우저에서 WebUI가 열립니다. 이어서 아래 "첫 실행 설정"을 따르세요. 콘솔 창을 닫으면 서버가 멈춥니다. 시작에 실패하면 창이 열린 채로 오류를 보여 주며, 아무 키나 누르면 닫힙니다.
 
+### Windows 설치 스크립트
+
+```powershell
+irm https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest/download/install.ps1 | iex
+```
+
+PowerShell에서 실행하세요. 스크립트는 x64 또는 ARM64를 확인하고, 최신 릴리스에서 맞는 ZIP과 `SHA256SUMS`를 내려받아 체크섬을 검사합니다. 시스템에 ASP.NET Core Runtime 10이 없으면 설치 폴더에 전용 런타임을 설치하고, 기본적으로 `C:\BubbleFighterFantasy`에 설치합니다(`releases\<tag>\`, `current` 연결, `state\`, `settings.env`, 서버를 시작하는 `bff.cmd`). 콘솔에서 옵션 없이 실행하면 설치 폴더, 다른 컴퓨터에서 WebUI를 열 수 있게 할지(기본값 예), 설정 마법사에 토큰이 필요한지(기본값 아니요), Windows와 함께 시작할지(관리자 PowerShell에서만), 지금 시작할지를 묻습니다. 지금 시작하면 브라우저에서 설정 페이지가 열립니다. 설정 마법사는 그곳에서 직접 마치세요. 내 PC라면 데이터베이스 단계에서 SQLite를 선택하세요. 데이터베이스 서버가 필요 없습니다.
+
+옵션을 넘기려면 스크립트 블록으로 실행하세요. 예를 들어 Windows와 함께 시작되는 서버(관리자 PowerShell):
+
+```powershell
+& ([scriptblock]::Create((irm https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest/download/install.ps1))) -NoPrompt -Service
+```
+
+| 옵션 | 효과 |
+| --- | --- |
+| `-Version <tag>` | 최신 대신 해당 릴리스를 설치 |
+| `-Dir <path>` | 설치 폴더(기본값 `C:\BubbleFighterFantasy`, 경로는 짧게) |
+| `-Arch x64` / `-Arch arm64` | 설치할 패키지(기본값: 이 프로세서) |
+| `-AdminPort <n>` | 설정 도우미와 WebUI 포트(기본값 7300) |
+| `-RemoteAdmin` / `-LocalAdmin` | 다른 컴퓨터에서 WebUI 열기 허용(기본값) / 이 PC에서만 열기 |
+| `-SetupToken` / `-NoSetupToken` | 설정 마법사 사용 전에 생성된 토큰 요구 / 요구하지 않음(기본값) |
+| `-Service` | 관리자로 실행할 때: 예약 작업 `BubbleFighterFantasy`를 만들어 SYSTEM으로 실행하고 Windows와 함께 시작 |
+| `-Start` | 서버를 별도 창에서 시작하고 설정 페이지 열기 |
+| `-NoPrompt` | 묻지 않고 지정한 옵션과 기본값 사용(AI 에이전트의 셸처럼 콘솔이 없을 때도 마찬가지) |
+| `-NoRuntime` | 런타임이 없으면 설치하지 않고 실패 |
+| `-From <dir>` | 릴리스 파일이 있는 폴더에서 설치(`-Version` 필요) |
+
+업그레이드하려면 같은 명령을 다시 실행하세요. `state\`와 `settings.env`는 유지됩니다.
+
 ### Linux 설치 스크립트
 
 ```bash
-curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash
+curl -fsSL https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest/download/install.sh | bash
 ```
 
 스크립트는 x86_64 또는 aarch64를 감지하고, 최신 릴리스에서 맞는 패키지와 `SHA256SUMS`를 내려받아 체크섬을 확인합니다. 시스템에 ASP.NET Core Runtime 10이 없으면 Microsoft의 `dotnet-install.sh`로 설치 디렉터리 안에 런타임을 설치하며, 시스템 전체의 .NET은 건드리지 않습니다. 설치 위치는 `~/bubblefighter-fantasy`이며, root로 실행하면 `/opt/bubblefighter-fantasy`입니다.
@@ -82,21 +113,23 @@ curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash
 | `bff` | 실행기, 인수 없이 실행하면 설치 도우미 시작 |
 | `settings.env` | 설치 스크립트가 고른 WebUI 접근, 설치 토큰, 포트. 업그레이드해도 유지 |
 
-`~/bubblefighter-fantasy/bff`로 서버를 시작하고 서버 자체에서 `http://127.0.0.1:7300/`을 여세요. 설치 스크립트는 두 가지를 묻고, 기본 답은 모두 아니요입니다. 다른 컴퓨터에서 WebUI를 열 수 있게 할지(`--remote-admin`), 첫 실행 마법사에 설치 토큰이 필요한지(`--setup-token`)입니다. WebUI를 로컬로만 둔 경우 내 컴퓨터에서 터널로 여세요: `ssh -L 7300:127.0.0.1:7300 <user>@<server>` 후 `http://127.0.0.1:7300/`. 원격 접근을 켠 경우 `http://<server>:7300/`을 열고 방화벽이나 클라우드 보안 그룹에서 TCP 7300 포트를 허용하세요. 답은 설치 디렉터리의 `settings.env`에 저장되고 업그레이드해도 유지됩니다. 환경 변수에 설정한 값이 우선합니다.
+`~/bubblefighter-fantasy/bff`로 서버를 시작하고 서버 자체에서 `http://127.0.0.1:7300/`을 여세요. 터미널에서 옵션 없이 실행하면 설치 스크립트는 먼저 설치 방식을 묻고(직접 설치 또는 Docker, Docker라면 Docker 설치 여부와 데이터베이스 컨테이너 추가 여부, root라면 systemd 서비스 생성 여부, 아니면 지금 시작할지), 이어서 다른 컴퓨터에서 WebUI를 열 수 있게 할지(기본값 예, `--remote-admin`), 허용한 경우 첫 실행 마법사에 설치 토큰이 필요한지(기본값 아니요, `--setup-token`)를 묻습니다. 명령줄에 옵션을 하나라도 주면 설치 방식 질문은 건너뜁니다. 다른 컴퓨터에서는 포트를 열지 않고 터널로 여세요: `ssh -L 7300:127.0.0.1:7300 <user>@<server>` 후 `http://127.0.0.1:7300/`. 또는 방화벽이나 클라우드 보안 그룹에서 TCP 7300 포트를 허용한 뒤 `http://<server>:7300/`을 여세요. 첫 관리자가 만들어지기 전에는 포트에 접속하는 누구나 설정을 마칠 수 있으므로 바로 마치세요. 답은 설치 디렉터리의 `settings.env`에 저장되고 업그레이드해도 유지됩니다. 환경 변수에 설정한 값이 우선합니다.
 
-옵션은 `bash -s --` 뒤에 씁니다. 예: `curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash -s -- --service`
+옵션은 `bash -s --` 뒤에 씁니다. 예: `curl -fsSL https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest/download/install.sh | bash -s -- --service`
 
 | 옵션 | 효과 |
 | --- | --- |
 | `--version <tag>` | 최신 대신 해당 릴리스를 설치 |
 | `--dir <path>` | 설치 디렉터리 |
 | `--admin-port <n>` | 설치 도우미와 WebUI 포트(기본값 7300) |
-| `--remote-admin` | 다른 컴퓨터에서 WebUI를 열 수 있게 합니다. 없으면 서버 자체에서만 접근합니다 |
+| `--remote-admin` / `--local-admin` | 다른 컴퓨터에서 WebUI 열기 허용(기본값) / 서버 자체에서만 허용 |
 | `--setup-token` | 첫 실행 마법사가 요구하는 토큰을 생성하고 출력합니다 |
-| `--local-admin`, `--no-setup-token` | 기본값을 명시합니다 |
+| `--no-setup-token` | 기본값을 명시합니다 |
 | `--no-prompt` | 묻지 않고 지정한 옵션과 기본값을 사용합니다(터미널이 없을 때도 동일) |
 | `--service` | root로 실행 시 `bubblefighter-fantasy` systemd 서비스를 만들고 `bff` 시스템 사용자로 시작 |
 | `--start` | 설치가 끝나면 서버 시작 |
+| `--docker` | Docker Compose로 서버 실행(아래 참고) |
+| `--install-docker` | root로 실행할 때: 없으면 Docker 공식 스크립트로 Docker Engine과 Compose 플러그인을 설치합니다. `--docker` 포함 |
 | `--no-runtime` | 런타임을 설치하지 않고 실패 |
 | `--from <dir>` | 내려받지 않고 릴리스 파일이 있는 디렉터리에서 설치 |
 
@@ -105,15 +138,15 @@ curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash
 ### Docker 원클릭 설치
 
 ```bash
-curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash -s -- --docker
+curl -fsSL https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest/download/install.sh | bash -s -- --docker
 ```
 
-Docker Engine과 Compose 플러그인이 필요합니다. 설치 스크립트는 Linux 패키지를 `~/bubblefighter-fantasy/docker`에 풀고, 이를 바탕으로 로컬 이미지를 빌드한 뒤 Docker Compose로 서버 컨테이너를 시작합니다. 컨테이너는 호스트 네트워크를 사용하므로 선택한 클라이언트의 게임 포트에 접속할 수 있습니다. 기본적으로 데이터베이스 컨테이너는 시작하지 않습니다. 설치 도우미에서 `bff-state` 볼륨에 파일을 저장하는 SQLite를 선택하거나, 기존 MySQL 서버를 입력하세요.
+root로 실행하면서 `--install-docker`를 붙이면 설치 스크립트가 먼저 Docker 공식 스크립트로 Docker Engine과 Compose 플러그인을 설치하고 docker 서비스를 활성화합니다. Docker Engine과 Compose 플러그인이 필요합니다. 설치 스크립트는 Linux 패키지를 `~/bubblefighter-fantasy/docker`에 풀고, 이를 바탕으로 로컬 이미지를 빌드한 뒤 Docker Compose로 서버 컨테이너를 시작합니다. 컨테이너는 호스트 네트워크를 사용하므로 선택한 클라이언트의 게임 포트에 접속할 수 있습니다. 기본적으로 데이터베이스 컨테이너는 시작하지 않습니다. 설치 도우미에서 `bff-state` 볼륨에 파일을 저장하는 SQLite를 선택하거나, 기존 MySQL 서버를 입력하세요.
 
 내장 데이터베이스도 함께 실행하려면 `--with-mysql`을 추가하세요. 새 스택은 MariaDB 11.4를 사용하며 서버는 이를 MySQL로 사용합니다. MySQL 8.4로 만든 기존 스택은 MariaDB가 그 데이터를 열 수 없으므로 업그레이드 후에도 MySQL을 유지합니다.
 
 ```bash
-curl -fsSL https://wasabi-fantasytaledev.github.io/install.sh | bash -s -- --docker --with-mysql
+curl -fsSL https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy/releases/latest/download/install.sh | bash -s -- --docker --with-mysql
 ```
 
 이 경우 MySQL은 `127.0.0.1:3306`에서만 대기하며(`--mysql-port`로 변경), 생성된 `.env`에는 소유자만 읽을 수 있는 무작위 데이터베이스 비밀번호가 들어 있습니다. 설치 도우미에서 MySQL을 선택하고 호스트 `127.0.0.1`, 설치 스크립트가 출력한 포트, 데이터베이스 `bf_game_db`, 사용자 `bff`, 그리고 `~/bubblefighter-fantasy/docker/.env`의 `BFF_MYSQL_PASSWORD` 값을 입력하세요.

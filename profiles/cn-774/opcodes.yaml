@@ -4,6 +4,36 @@ profile: cn-774
 # case's packet name string (jumptable 00BCF218, the case number is the opcode); S2C names
 # below come from there. See profiles/opcode-policy.md.
 opcodes:
+  - value: 930
+    direction: c2s
+    name: gcpReqCoupleConfirmInvite
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_4DCEF0 stamps 930 and writes bool32, target name, invitation item, message and own-build EquippedItemList; matched to kr-812 Packet_gcpReqCoupleConfirmInvite in sub_9FDC70"
+  - value: 931
+    direction: c2s
+    name: gcpReqCoupleInviteExpire
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_4D66B0 stamps 931 and writes one bool32; matched to kr-812 Packet_gcpReqCoupleInviteExpire in sub_9FBD20"
+  - value: 932
+    direction: c2s
+    name: gcpReqCoupleInviteAnswer
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_4DD000 stamps 932 and writes two bool32 values followed by inviter and recipient names; matched to kr-812 Packet_gcpReqCoupleInviteAnswer in sub_9FDCE0"
+  - value: 933
+    direction: c2s
+    name: gcpReqCoupleBreakUp
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_4DB6C0 stamps 933 and writes one partner name after the Yes confirmation; matched to kr-812 Packet_gcpReqCoupleBreakUp in sub_9FDD50"
+  - value: 945
+    direction: c2s
+    name: gcpReqChangeCouplering
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 DlgCoupleItemChoice2 vtable 142CEDC slot 72, sub_6B2940, sends selected owned invitation item then zero word only when already coupled; matched to kr-812 Packet_gcpReqChangeCouplering in sub_4CC410"
   - value: 17
     direction: c2s
     connection: relay
@@ -2505,12 +2535,22 @@ opcodes:
     name_source: label@cn-717
     evidence: inferred
     source: "builder sub_5F1D10; name aligned from cn-717 C2S 2022 Packet_gcpReqGotoClan (label alignment, run cn-717 C2S 2019..2026 -> 2023..2030, shape [8 S], similarity 1.0)"
+  - value: 2029
+    direction: c2s
+    connection: game
+    name: gcpUserHostStart
+    name_source: label@kr-812
+    evidence: verified
+    source: "cn-774 sub_B72E70 stamps 2029 into an empty TcpPacket when GameSetting+148 (is_user_host) is set, matching teams/ticket/confirmation checks pass; matched to kr-812 C2S 2025 Packet_gcpUserHostStart and kr-1256 C2S 2031"
+    notes: "empty body; prize-room start request answered by S2C 990 gspUserHostStart (cn-774 sub_BC70C0)."
   - value: 2030
     direction: c2s
+    connection: game
     name: gcpUserHostSetting
     name_source: label@cn-717
-    evidence: inferred
-    source: "builder sub_8E8E60; name aligned from cn-717 C2S 2026 Packet_gcpUserHostSetting (label alignment, run cn-717 C2S 2019..2026 -> 2023..2030, shape [4 4], similarity 1.0)"
+    evidence: verified
+    source: "builder cn-774 sub_8E8E60 stamps 2030 and appends two u32 words (action, prize); name aligned from cn-717 C2S 2026 Packet_gcpUserHostSetting (run cn-717 C2S 2019..2026 -> 2023..2030, shape [4 4], similarity 1.0)"
+    notes: "two u32 words (action, prize); matches packets/user-settings.yaml UserHostSettingRequest@kr-1256."
 
   - value: 816
     direction: c2s
@@ -2838,6 +2878,14 @@ opcodes:
     evidence: verified
     source: "cn-774 sub_8A3B30 writer and sub_897E80 -> sub_8B1EE0 consumer; kr-812 Packet_gppNearDamager at sub_511160 / sub_51C5C0 (kr-812 number 32773); cn-774 builds GoNearDamager, handBell effect"
     notes: "packets/damagers.yaml NearDamager; relayed unchanged with the damager spawns"
+  - value: 828
+    direction: c2s
+    connection: game
+    name: gcpReqCashInven
+    name_source: label@kr-812
+    evidence: inferred
+    source: "cn-774 sub_752B70 stamps C2S 828 with an empty body; matched to kr-812 gcpReqCashInven"
+    notes: "Requests a full refresh of the cash item inbox (gspCashInvenUpdateAllInventorySlot)."
   - value: 829
     direction: c2s
     connection: game
@@ -3030,7 +3078,7 @@ opcodes:
     name: gspLmgReply_
     name_source: coined
     evidence: verified
-    source: "gate cn-774 sub_9ECF50 case 551 reads the gamer name and a u16 subId, resolves the gamer by name and dispatches through cn-774 sub_9E52D0 into the SubPacketDispatchEntry1Impl registry the LobbyMinigameContext constructor cn-774 sub_9D8810 built"
+    source: "gate cn-774 sub_9ECF50 case 551 takes the local gamer (cn-774 sub_491CB0 decodes it from protected memory; the packet carries no name), reads a u16 subId and dispatches through cn-774 sub_9E52D0 into the SubPacketDispatchEntry1Impl registry the LobbyMinigameContext constructor cn-774 sub_9D8810 built"
     notes: "Per-key minigame replies whose bodies the handlers read conditionally on the subId; no body table until a binding consumes them. No packet-name strings exist in this build."
   - value: 552
     direction: s2c
@@ -3576,6 +3624,35 @@ opcodes:
     name_source: none
     evidence: verified
     source: "cn-774 sub_8B5960 consumes 13-byte native reset confirmation"
+  - value: 1001
+    direction: s2c
+    connection: game
+    name: gspApplyEquipment_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_897E80 case 1001 calls cn-774 sub_89F3D0, which reads the seat u32, the slot list, the item list and the reason u32 like kr-1256 sub_6DD900 and passes the paired entries to cn-774 sub_529F60"
+    notes: "packets/weapon-master.yaml EquipmentApply; the weapon assignment of mode 26."
+  - value: 765
+    direction: c2s
+    connection: game
+    name: gcpReqWeaponMasterRevival_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_50F6A0 (character death) in mode 26, once the character's death counter reaches the Config/GameOption.xml value WeaponMasterNoPangDeadCount (cn-774 sub_8CE640 case 26), stamps 765 into an empty TcpPacket and sends it through the game connection dword_177D9C4"
+  - value: 33283
+    direction: c2s
+    connection: both
+    name: gppSmartPing_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_8A9520 writes the same nine words as kr-1256 sub_6E9D40 and sends them through cn-774 sub_953C90; packets/round-feed.yaml SmartPing"
+  - value: 33283
+    direction: s2c
+    connection: both
+    name: gppSmartPing_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_897E80 case 33283 runs cn-774 sub_8BE180, which reads nine words and passes them to cn-774 sub_C21D30; packets/round-feed.yaml SmartPing"
   - value: 33286
     direction: c2s
     connection: both
@@ -3733,17 +3810,19 @@ opcodes:
   - value: 38284
     direction: c2s
     connection: both
-    name: Unknown38284
-    name_source: none
+    name: gppSetWallHealAllowed_
+    name_source: coined
     evidence: verified
-    source: "cn-774 sub_ADC7C0 writes actor and Boolean render word"
+    source: "cn-774 sub_ADC7C0 writes the wall-contact permission through cn-774 sub_953C90"
+    notes: "8 bytes: u32 actor, bool32 allowed; native mode, delay and interval checks remain local"
   - value: 38284
     direction: s2c
     connection: both
-    name: Unknown38284
-    name_source: none
+    name: gppSetWallHealAllowed_
+    name_source: coined
     evidence: verified
-    source: "cn-774 sub_897E80 consumes actor and Boolean render word in case 38284"
+    source: "cn-774 sub_897E80 calls cn-774 sub_4B9C40 to set the permission read by cn-774 sub_581EA0 and cn-774 sub_502F20"
+    notes: "8 bytes: u32 actor, bool32 allowed; native mode, delay and interval checks remain local"
 
   - value: 578
     direction: c2s
@@ -4268,14 +4347,6 @@ opcodes:
     evidence: verified
     source: "cn-774 sub_785D10 stamps 831 and sends through the game connection global when the sorted map at cn-774 dword_177D114 holds the node with key 702"
     notes: "Empty request; no appends between the stamp and the send."
-  - value: 931
-    direction: c2s
-    name: Unknown931
-    name_source: none
-    evidence: verified
-    source: "cn-774 sub_4D66B0 stamps 931 and sends one constant dword through the game connection global"
-    notes: "Body: one u32, the constant 1."
-
   - value: 2071
     direction: c2s
     name: gcpReqRheaForm_
@@ -4524,3 +4595,580 @@ opcodes:
     evidence: verified
     source: "cn-774 sub_897E80 case 32902 dispatches to cn-774 sub_8B0090, which read actor u32, weapon u16, six f32 values and two u32 words"
     notes: "packets/extreme-racing.yaml ExtremeRacingCannonShot; 38 bytes; table coverage does not register an echo or traffic schedule."
+  - value: 32878
+    direction: c2s
+    connection: both
+    name: gppSoccerModeGoal
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-774 sub_8A75F0 (the soccer host's update) writes it; consumer cn-774 sub_8BE740; kr-812 sub_514150 builds the same frame as Packet_gppSoccerModeGoal"
+    notes: "one byte, the index of the goal box the ball entered. The host executes it locally and relays it (packets/round-feed.yaml)."
+  - value: 32878
+    direction: s2c
+    connection: both
+    name: gppSoccerModeGoal
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-774 sub_8A75F0 (the soccer host's update) writes it; consumer cn-774 sub_8BE740; kr-812 sub_514150 builds the same frame as Packet_gppSoccerModeGoal"
+    notes: "one byte, the index of the goal box the ball entered. The host executes it locally and relays it (packets/round-feed.yaml)."
+  - value: 32879
+    direction: c2s
+    connection: both
+    name: gppSoccerModeCountDown
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-774 sub_8A75F0 (the soccer host's update) writes it; consumer cn-774 sub_8BE8E0; kr-812 sub_514150 builds the same frame as Packet_gppSoccerModeCountDown"
+    notes: "empty body; the receivers start the restart countdown. The host executes it locally and relays it (packets/round-feed.yaml)."
+  - value: 32879
+    direction: s2c
+    connection: both
+    name: gppSoccerModeCountDown
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-774 sub_8A75F0 (the soccer host's update) writes it; consumer cn-774 sub_8BE8E0; kr-812 sub_514150 builds the same frame as Packet_gppSoccerModeCountDown"
+    notes: "empty body; the receivers start the restart countdown. The host executes it locally and relays it (packets/round-feed.yaml)."
+  - value: 32880
+    direction: c2s
+    connection: both
+    name: gppSoccerModeContinueGame
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-774 sub_8A75F0 (the soccer host's update) writes it; consumer cn-774 sub_8BEAD0; kr-812 sub_514150 builds the same frame as Packet_gppSoccerModeContinueGame"
+    notes: "empty body; the receivers resume play. The host executes it locally and relays it (packets/round-feed.yaml)."
+  - value: 32880
+    direction: s2c
+    connection: both
+    name: gppSoccerModeContinueGame
+    name_source: label@cn-279
+    evidence: verified
+    source: "cn-774 sub_8A75F0 (the soccer host's update) writes it; consumer cn-774 sub_8BEAD0; kr-812 sub_514150 builds the same frame as Packet_gppSoccerModeContinueGame"
+    notes: "empty body; the receivers resume play. The host executes it locally and relays it (packets/round-feed.yaml)."
+  # The clan-server connection (connection: clan), numbered as in kr-1256: dispatcher cn-774 sub_5E2F70,
+  # stamper cn-774 sub_1089270; every row's reader or writer was read against kr-1256's field by field.
+  # Bodies in packets/clan-server.yaml.
+  - value: 1002
+    direction: s2c
+    connection: clan
+    name: ClanHello
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E2F70 case 0x3EA: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Empty body. Sent when the connection opens and again on every heartbeat until the connection has logged in, because the client can only answer once its game connection is logged in."
+  - value: 1003
+    direction: c2s
+    connection: clan
+    name: ClanHeartbeat
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E2E50: the same fields as kr-1256 (kr-1256 sub_525050)"
+    notes: "Empty body."
+  - value: 1005
+    direction: c2s
+    connection: clan
+    name: ClanLogin
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E4490: the same fields as kr-1256 (kr-1256 sub_525DF0)"
+    notes: "Body ClanServerLogin. Every field is the server's own gspClanPassport echoed back."
+  - value: 1006
+    direction: s2c
+    connection: clan
+    name: ClanLoginResult
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E2F70 case 0x3EE: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerLoginResult."
+  - value: 1015
+    direction: c2s
+    connection: clan
+    name: ClanHomeRequest
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E4EB0: the same fields as kr-1256 (kr-1256 sub_526E90)"
+    notes: "Empty body."
+  - value: 1016
+    direction: s2c
+    connection: clan
+    name: ClanHome
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E4880: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerHome."
+  - value: 1017
+    direction: c2s
+    connection: clan
+    name: ClanProfileRequest
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E4F40: the same fields as kr-1256 (kr-1256 sub_526F50)"
+    notes: "Empty body."
+  - value: 1018
+    direction: s2c
+    connection: clan
+    name: ClanProfile
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E4AB0: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerProfile."
+  - value: 1027
+    direction: c2s
+    connection: clan
+    name: ClanCreate
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E5480: the same fields as kr-1256 (kr-1256 sub_5275B0)"
+    notes: "Body ClanServerCreate."
+  - value: 1028
+    direction: s2c
+    connection: clan
+    name: ClanCreateResult
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E2F70 case 0x404 -> cn-774 sub_5D7040: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerCreateResult."
+  - value: 1011
+    direction: c2s
+    connection: clan
+    name: ClanRosterRequest
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E5630: the same fields as kr-1256 (kr-1256 sub_527890)"
+    notes: "Empty body."
+  - value: 1012
+    direction: s2c
+    connection: clan
+    name: ClanRoster
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E7F10: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerRoster."
+  - value: 1013
+    direction: c2s
+    connection: clan
+    name: ClanMemberDetailsRequest
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E56B0: the same fields as kr-1256 (kr-1256 sub_527910)"
+    notes: "Body ClanServerMemberDetailsRequest."
+  - value: 1014
+    direction: s2c
+    connection: clan
+    name: ClanMemberDetails
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E88C0: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerMemberDetails."
+  - value: 1045
+    direction: c2s
+    connection: clan
+    name: ClanMemberReport
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E5860: the same fields as kr-1256 (kr-1256 sub_527AB0)"
+    notes: "Body ClanServerMemberReport."
+  - value: 1019
+    direction: c2s
+    connection: clan
+    name: ClanSearch
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E4640: the same fields as kr-1256 (kr-1256 sub_526020)"
+    notes: "Body ClanServerSearch."
+  - value: 1020
+    direction: s2c
+    connection: clan
+    name: ClanSearchResult
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E2F70: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Bodies ClanServerSearchResult and ClanServerSearchEntry."
+  - value: 1032
+    direction: c2s
+    connection: clan
+    name: ClanApply
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E4FC0: the same fields as kr-1256 (kr-1256 sub_527010)"
+    notes: "Body ClanServerApply."
+  - value: 1033
+    direction: c2s
+    connection: clan
+    name: ClanJoin
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E5070: the same fields as kr-1256 (kr-1256 sub_527130)"
+    notes: "Body ClanServerJoin."
+  - value: 1034
+    direction: s2c
+    connection: clan
+    name: ClanApplyResult
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E2F70: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerApplyResult."
+  - value: 1063
+    direction: c2s
+    connection: clan
+    name: ClanCancelApplication
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E5130: the same fields as kr-1256 (kr-1256 sub_527250)"
+    notes: "Body ClanServerCancelApplication."
+  - value: 1064
+    direction: s2c
+    connection: clan
+    name: ClanCancelApplicationResult
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E2F70: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerCancelApplicationResult."
+  - value: 1069
+    direction: c2s
+    connection: clan
+    name: ClanApplicantsRequest
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E5760: the same fields as kr-1256 (kr-1256 sub_5279B0)"
+    notes: "Empty body."
+  - value: 1070
+    direction: s2c
+    connection: clan
+    name: ClanApplicants
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E8EC0: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Bodies ClanServerApplicants and ClanServerApplicant."
+  - value: 1036
+    direction: c2s
+    connection: clan
+    name: ClanLeave
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E5BA0: the same fields as kr-1256 (kr-1256 sub_527DC0)"
+    notes: "Empty body."
+  - value: 1037
+    direction: s2c
+    connection: clan
+    name: ClanMemberLeft
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E9EE0: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerMemberLeft."
+  - value: 1039
+    direction: c2s
+    connection: clan
+    name: ClanMemberChange
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E5950: the same fields as kr-1256 (kr-1256 sub_527B80)"
+    notes: "Body ClanServerMemberChange."
+  - value: 1040
+    direction: s2c
+    connection: clan
+    name: ClanMemberChangeResult
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5DC990: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerMemberChangeResult."
+  - value: 1041
+    direction: s2c
+    connection: clan
+    name: ClanMemberChanged
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E9500: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerMemberChanged."
+  - value: 1048
+    direction: c2s
+    connection: clan
+    name: ClanIntroductionEdit
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E5B10: the same fields as kr-1256 (kr-1256 sub_527D30)"
+    notes: "Body ClanServerIntroductionEdit."
+  - value: 1049
+    direction: s2c
+    connection: clan
+    name: ClanIntroductionEditResult
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E9C90: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerIntroductionEditResult."
+  - value: 1050
+    direction: s2c
+    connection: clan
+    name: ClanIntroductionChanged
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E2F70 case 0x41A (inline): the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerIntroductionChanged."
+  - value: 1051
+    direction: c2s
+    connection: clan
+    name: ClanNoticeEdit
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E5A80: the same fields as kr-1256 (kr-1256 sub_527CA0)"
+    notes: "Body ClanServerNoticeEdit."
+  - value: 1052
+    direction: s2c
+    connection: clan
+    name: ClanNoticeEditResult
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E9A90: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerNoticeEditResult."
+  - value: 1053
+    direction: s2c
+    connection: clan
+    name: ClanNoticeChanged
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E2F70 case 0x41D (inline): the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerNoticeChanged."
+  - value: 1096
+    direction: c2s
+    connection: clan
+    name: ClanMarkEdit
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5EB4D0: the same fields as kr-1256 (kr-1256 sub_530C50)"
+    notes: "Body ClanServerMarkEdit."
+  - value: 1097
+    direction: s2c
+    connection: clan
+    name: ClanMarkChanged
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5ED2A0: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerMarkChanged."
+  - value: 1102
+    direction: c2s
+    connection: clan
+    name: ClanRecruitmentEdit
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E60E0: the same fields as kr-1256 (kr-1256 sub_528460)"
+    notes: "Body ClanServerRecruitmentEdit."
+  - value: 1103
+    direction: s2c
+    connection: clan
+    name: ClanRecruitmentEditResult
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E2F70 case 0x44F (inline): the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerRecruitmentEditResult."
+  - value: 1054
+    direction: c2s
+    connection: clan
+    name: ClanTransferConfirm
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E5E10: the same fields as kr-1256 (kr-1256 sub_528070)"
+    notes: "Body ClanServerTransferConfirm."
+  - value: 1056
+    direction: s2c
+    connection: clan
+    name: ClanMasterChanged
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5D93D0: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerMasterChanged."
+  - value: 1057
+    direction: c2s
+    connection: clan
+    name: ClanTransferRequest
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E5D60: the same fields as kr-1256 (kr-1256 sub_527F60)"
+    notes: "Body ClanServerTransferRequest."
+  - value: 1058
+    direction: s2c
+    connection: clan
+    name: ClanTransferRequestResult
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5EA060: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerTransferRequestResult."
+  - value: 1059
+    direction: s2c
+    connection: clan
+    name: ClanTransferOffer
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5EA280: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerTransferOffer."
+  - value: 1060
+    direction: c2s
+    connection: clan
+    name: ClanTransferAnswer
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5EA280: the same fields as kr-1256 (kr-1256 sub_52F620)"
+    notes: "Body ClanServerTransferAnswer."
+  - value: 1061
+    direction: s2c
+    connection: clan
+    name: ClanTransferAnswerResult
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5EAA20: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerTransferAnswerResult."
+  - value: 1062
+    direction: s2c
+    connection: clan
+    name: ClanTransferAnswered
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5EA680: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerTransferAnswered."
+  - value: 1029
+    direction: c2s
+    connection: clan
+    name: ClanDisband
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E5EC0: the same fields as kr-1256 (kr-1256 sub_528190)"
+    notes: "Body ClanServerDisband."
+  - value: 1030
+    direction: s2c
+    connection: clan
+    name: ClanDisbandResult
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5DE800: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerDisbandResult."
+  - value: 1031
+    direction: s2c
+    connection: clan
+    name: ClanDisbandChanged
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5DEAA0: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerDisbandChanged."
+  - value: 1021
+    direction: c2s
+    connection: clan
+    name: ClanBoardRequest
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E51E0: the same fields as kr-1256 (kr-1256 sub_527360)"
+    notes: "Body ClanServerBoardRequest."
+  - value: 1022
+    direction: s2c
+    connection: clan
+    name: ClanBoard
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E2F70 case 0x3FE -> cn-774 sub_5E6250: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Bodies ClanServerBoard and ClanServerBoardPost."
+  - value: 1023
+    direction: c2s
+    connection: clan
+    name: ClanBoardWrite
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E52D0: the same fields as kr-1256 (kr-1256 sub_527430)"
+    notes: "Body ClanServerBoardWrite."
+  - value: 1024
+    direction: s2c
+    connection: clan
+    name: ClanBoardWriteResult
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E6730: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerBoardWriteResult."
+  - value: 1025
+    direction: c2s
+    connection: clan
+    name: ClanBoardDelete
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E5390: the same fields as kr-1256 (kr-1256 sub_5274E0)"
+    notes: "Body ClanServerBoardDelete."
+  - value: 1026
+    direction: s2c
+    connection: clan
+    name: ClanBoardDeleted
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E2F70 case 0x402 -> cn-774 sub_5D9EC0: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Empty body."
+  - value: 1042
+    direction: c2s
+    connection: clan
+    name: ClanWhisper
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E4730: the same fields as kr-1256 (kr-1256 sub_526160)"
+    notes: "Body ClanServerWhisper."
+  - value: 1043
+    direction: s2c
+    connection: clan
+    name: ClanWhisperResult
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E7660: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerWhisperResult."
+  - value: 1044
+    direction: s2c
+    connection: clan
+    name: ClanWhisperMessage
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E7A00: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerWhisperMessage."
+  - value: 1066
+    direction: c2s
+    connection: clan
+    name: ClanChat
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E5F70: the same fields as kr-1256 (kr-1256 sub_5282A0)"
+    notes: "Body ClanServerChat."
+  - value: 1067
+    direction: s2c
+    connection: clan
+    name: ClanChatResult
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E2F70: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerChatResult."
+  - value: 1068
+    direction: s2c
+    connection: clan
+    name: ClanChatMessage
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_5E2F70 case 0x42C: the same fields as kr-1256 (kr-1256 sub_525170)"
+    notes: "Body ClanServerChatMessage."
+  # Game-connection clan requests (packets/clan.yaml); bodies and triggers read against kr-1256's writers.
+  - value: 25
+    direction: c2s
+    name: gcpReqClanPassport
+    name_source: label@kr-1256
+    evidence: verified
+    source: "cn-774 sub_5E2F70 case 0x3EA (the clan connection's hello) stamps 25 on an empty TcpPacket and sends it on the game connection, as kr-1256 sub_525170 case 0x3EA"
+    notes: "Empty body. The clan plugin answers a logged-in session with gspClanPassport."
+  - value: 2038
+    direction: c2s
+    name: gcpReqClanMainOpen_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_6681D0 (from the clan-main click handler cn-774 sub_690D20) and cn-774 sub_5D60A0 (session start, after its lookup of local key 196) stamp 2038 on an empty frame, as kr-1256 sub_5A9410 / kr-1256 sub_516EE0 stamp 2040"
+    notes: "Empty body."
+  - value: 2039
+    direction: c2s
+    name: gcpReqClanAttendanceCheckIn_
+    name_source: coined
+    evidence: verified
+    source: "cn-774 sub_667950 (FrmClanAttendance, card word +1316 == 1 and byte +1300 == 0) stamps 2039 on an empty frame, as kr-1256 sub_57F010 stamps 2041"
+    notes: "Empty body."
+  - value: 127
+    direction: c2s
+    connection: game
+    name: gcpReqUserMysteryStore
+    name_source: mirrored
+    evidence: verified
+    source: "cn-774 sub_E4B1E0 stamps 127 on a TcpPacket for RequestUserMysteryStore and runs its serializer; the request reader cn-774 sub_47FC10 reads the u8 type, the u32 token and the type-specific tail (u16 for types 2 and 3, u32 and u16 for type 4) exactly as kr-1256 sub_114E2E0 writes them (kr-1256 stamps 128, which is a different request in this build); packets/mystery-store.yaml"
+    notes: "Bodies are 5/7/7/11 bytes as in kr-1256. Do not inherit kr-1256's 128: this build's 128 is another request."

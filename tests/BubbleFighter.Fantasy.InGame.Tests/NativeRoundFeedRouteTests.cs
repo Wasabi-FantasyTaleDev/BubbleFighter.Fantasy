@@ -26,6 +26,17 @@ public sealed class NativeRoundFeedRouteTests
     [InlineData("tw-454", "gppDash", 32779, "40420F0001000000", 8)]
     [InlineData("tw-454", "gppRoll", 32780, "40420F0078563412E7A5", 10)]
     [InlineData("tw-454", "gppJump", 32781, "40420F000000A03F01000000", 12)]
+    // Character effects and skill visuals: counted UTF-16 effect path, and counted byte blobs (kr-1256 sub_6E0AF0,
+    // kr-1256 sub_708EC0, kr-1256 sub_6E8130).
+    [InlineData("kr-1256", "gppSetCharEffectVisible_", 33293, "40420F00020000004100420001000000", 16)]
+    [InlineData("kr-1256", "Unknown34275", 34275, "40420F00070103000000AABBCC", 13)]
+    [InlineData("kr-1256", "Unknown34276", 34276, "40420F000703000000AABBCC", 12)]
+    // Smart ping: character, no target, kind 1, the hit point (1, 2, 3) and three unresolved words; the sender keeps
+    // its own copy (kr-1256 sub_6E9D40, cn-774 sub_8A9520).
+    [InlineData("kr-1256", "gppSmartPing_", 33283,
+        "40420F00FFFFFFFF010000000000803F0000004000004040000000000000000000000000", 36)]
+    [InlineData("cn-774", "gppSmartPing_", 33283,
+        "40420F00FFFFFFFF010000000000803F0000004000004040000000000000000000000000", 36)]
     public async Task NamedNativeActionsKeepTheirWireIdentityAndRouting(string build, string name,
         int opcode, string hex, int length)
     {
@@ -54,7 +65,10 @@ public sealed class NativeRoundFeedRouteTests
             TestWireDialects.Get(build).Profile);
         var relay = game.ForConnection(OpcodeConnection.Relay);
         var routes = RoundFeedRoute.Load(tables, build, game, relay);
-        Assert.Equal(48, routes.Length);
+        // 48 shared actions, the three soccer frames (goal, countdown, continue) and, on cn-774, the smart ping;
+        // tw-454 has no smart ping: its 33283 is a different action.
+        Assert.Equal(build == "cn-774" ? 52 : 51, routes.Length);
+        Assert.Equal(build == "cn-774", routes.Any(route => route.Structure == "SmartPing"));
         Assert.Equal(new[] { "NpcAgentMove", "NpcDirectItem", "NpcDummyMotion", "NpcIni", "NpcLuaMessage", "NpcObjectDelete",
             "NpcObjectKill", "NpcTurretState" },
             routes.Where(route => route.Structure.StartsWith("Npc", StringComparison.Ordinal)).Select(route => route.Structure).Order());
@@ -80,7 +94,7 @@ public sealed class NativeRoundFeedRouteTests
             Assert.Equal("Unknown32796", routes.Single(route => route.GameInbound == 32796).Structure);
             foreach (var (code, structure) in new[] { (32794, "Unknown38271"), (32806, "Unknown38272"),
                 (32805, "Unknown38274"), (32795, "Unknown38277"), (32789, "Unknown38281"),
-                (32787, "Unknown38282"), (33274, "Unknown38284") })
+                (32787, "Unknown38282"), (33274, "NightVisionState") })
                 Assert.Equal(structure, routes.Single(route => route.GameInbound == code).Structure);
         }
     }

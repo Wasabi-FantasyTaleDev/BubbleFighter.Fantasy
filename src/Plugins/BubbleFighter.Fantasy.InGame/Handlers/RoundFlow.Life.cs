@@ -127,6 +127,7 @@ internal sealed partial class RoundFlow
                 await ZombiePvpOutcomeAsync(room, operationCt).ConfigureAwait(false);
             await SynchronizeFinalZoneAsync(room, operationCt).ConfigureAwait(false);
             await ScriptZombieOutcomeAsync(room, operationCt).ConfigureAwait(false);
+            await BnBOutcomeAsync(room, operationCt).ConfigureAwait(false);
         }, ct).ConfigureAwait(false);
     }
 

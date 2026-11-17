@@ -74,7 +74,6 @@ public sealed partial class PetRuntimeTests
 
     /// <summary>Rejects mileage activation when gains, limits, reward lifetime or remainder policy are incomplete or contradictory.</summary>
     [Theory]
-    [InlineData("disabled")]
     [InlineData("missing_gain")]
     [InlineData("missing_maximum")]
     [InlineData("wrong_lifetime")]
@@ -86,7 +85,6 @@ public sealed partial class PetRuntimeTests
         var options = MileageOptions();
         switch (failure)
         {
-            case "disabled": options.Mileage.Enabled = false; break;
             case "missing_gain": options.Mileage.Grants = [options.Mileage.Grants[0]]; break;
             case "missing_maximum": options.Mileage.DisplayMaximum = null; break;
             case "wrong_lifetime": options.Mileage.Conversion!.Rewards[0].Kind = InventoryGrantKind.Days; break;
@@ -100,6 +98,16 @@ public sealed partial class PetRuntimeTests
         var catalog = MileageCatalog();
         Assert.Throws<ConfigException>(() => PetMileagePolicy.Create(options, catalog,
             new(options.BuildKey, catalog.Items.Keys.ToArray())));
+    }
+
+    /// <summary>Skill resets stay available without a mileage policy; they simply earn no mileage.</summary>
+    [Fact]
+    public void DisabledMileageLeavesResetsWithoutAPolicy()
+    {
+        var options = MileageOptions();
+        options.Mileage.Enabled = false;
+        var catalog = MileageCatalog();
+        Assert.Null(PetMileagePolicy.Create(options, catalog, new(options.BuildKey, catalog.Items.Keys.ToArray())));
     }
 
     /// <summary>Copies mileage gains and conversion rewards so later changes to configuration cannot change an existing policy.</summary>

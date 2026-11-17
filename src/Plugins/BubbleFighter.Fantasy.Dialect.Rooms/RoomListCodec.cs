@@ -14,7 +14,7 @@ namespace BubbleFighter.Fantasy.Dialect.Rooms;
 /// The optional row-settings function supplies the native game setting a row shows; without one a row shows its mode.
 /// </summary>
 internal sealed class RoomListCodec(string protocol, ushort request, ushort reply, PacketTables tables, string build, ILogger logger,
-    Func<RoomListEntry, ReadOnlyMemory<byte>>? rowSettings = null)
+    Func<RoomListEntry, ReadOnlyMemory<byte>>? rowSettings = null, bool userHost = false)
     : IInboundMessageBinding<RoomListRequested>, IMessageSender<RoomListSnapshot>
 {
     /// <summary>The main-menu session kind a room-list row carries (kr-1256 sub_9AC490's kind switch).</summary>
@@ -53,7 +53,7 @@ internal sealed class RoomListCodec(string protocol, ushort request, ushort repl
     public ValueTask SendAsync(ISession session, RoomListSnapshot message, CancellationToken ct)
     {
         var pageSize = session.Items.TryGetValue(PageSizeItem, out var stored) && stored is int size ? size : 0;
-        return session.SendAsync(reply, Write(tables, build, message, pageSize, rowSettings), ct);
+        return session.SendAsync(reply, Write(tables, build, message, pageSize, rowSettings, userHost), ct);
     }
 
     /// <summary>
@@ -64,7 +64,7 @@ internal sealed class RoomListCodec(string protocol, ushort request, ushort repl
     /// row colour key on it) or 4 for a match in progress (kr-812 sub_679670), and the occupants over the capacity.
     /// </summary>
     internal static byte[] Write(PacketTables tables, string build, RoomListSnapshot message, int pageSize = 0,
-        Func<RoomListEntry, ReadOnlyMemory<byte>>? rowSettings = null)
+        Func<RoomListEntry, ReadOnlyMemory<byte>>? rowSettings = null, bool userHost = false)
     {
         RequireReplyLayout(tables, build);
         if (UsesPageHeader(tables, build))
@@ -106,7 +106,7 @@ internal sealed class RoomListCodec(string protocol, ushort request, ushort repl
                 ["has_password"] = room.HasPassword,
                 ["master_nickname"] = room.MasterNickname,
                 ["kind"] = ListRowKind,
-                ["game_setting"] = Mode(tables, build, room.ModeId),
+                ["game_setting"] = Mode(tables, build, room.ModeId, userHost && room.IsUserHost),
             }).ToArray(),
         });
     }
@@ -141,10 +141,12 @@ internal sealed class RoomListCodec(string protocol, ushort request, ushort repl
         }
     }
 
-    private static Dictionary<string, object?> Mode(PacketTables tables, string build, int mode)
+    private static Dictionary<string, object?> Mode(PacketTables tables, string build, int mode, bool isUserHost = false)
     {
         var game = new Dictionary<string, object?>();
         RoomProjectionFields.Load(tables, build).WriteMode(game, mode);
+        if (isUserHost && tables.CapabilityOf(build, "user_host"))
+            game["is_user_host"] = true;
         return game;
     }
 }

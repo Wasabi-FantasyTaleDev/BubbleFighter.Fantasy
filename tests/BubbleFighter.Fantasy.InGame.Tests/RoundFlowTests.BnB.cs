@@ -899,7 +899,6 @@ public sealed partial class RoundFlowTests
     [Theory]
     [InlineData("actor")]
     [InlineData("position")]
-    [InlineData("missing-position")]
     [InlineData("nonfinite-position")]
     [InlineData("same-id-session")]
     [InlineData("stale-link")]
@@ -919,7 +918,6 @@ public sealed partial class RoundFlowTests
             {
                 case "actor": actor = BnBGuestActor; break;
                 case "position": test.Move(test.Rig.Host, 8); break;
-                case "missing-position": seat.Movement = null; break;
                 case "nonfinite-position": seat.Movement = new(float.NaN, 0, 99.5f, 0, 0, 0); break;
                 case "same-id-session": session = new RecordingSession(test.HostLink.Id); break;
                 case "stale-link": seat.GameLinkGeneration = room.StartGeneration - 1; break;
@@ -933,6 +931,59 @@ public sealed partial class RoundFlowTests
         Assert.Empty(test.Game.Placement.To(test.GuestLink));
         Assert.Equal(0, room.BnBRound!.Ledger.NextGeneration);
         Assert.False(room.RoundCancelled);
+    }
+
+    /// <summary>
+    /// The kr-1256 client reports no movement during mode 41, so a seat without a position report places within the
+    /// map; a cell outside the map is still refused.
+    /// </summary>
+    [Fact]
+    public async Task BnBPlacementWithoutAPositionReportStaysWithinTheMap()
+    {
+        await using var test = new BnBTestRig();
+        var room = await test.StartAsync();
+        lock (room.Gate) room.FindByGame(test.Rig.Host.Id)!.Movement = null;
+        await test.Rig.Round.HandleBnBPlacementAsync(test.HostLink, new(BnBHostActor, -1), default);
+        Assert.Empty(test.Game.Placement.To(test.HostLink));
+        await test.Rig.Round.HandleBnBPlacementAsync(test.HostLink, new(BnBHostActor, 0), default);
+        Assert.Single(test.Game.Placement.To(test.HostLink));
+        Assert.Single(test.Game.Placement.To(test.GuestLink));
+        Assert.False(room.RoundCancelled);
+    }
+
+    /// <summary>
+    /// BnB has no respawn, so the round ends once one side is left standing: a bubbled member still stands, a dead one
+    /// does not, and the last standing seat (or team) is the declared winner.
+    /// </summary>
+    [Fact]
+    public async Task BnBEndsWhenOneSideIsLeftStanding()
+    {
+        await using var test = new BnBTestRig();
+        var room = await test.StartAsync(endsOnElimination: true);
+        await test.Rig.Round.HandleLifeReportedAsync(test.GuestLink, new(RoundLifeEvent.Bubbled, BnBGuestActor), default);
+        Assert.Equal(RoomPhase.Playing, room.Phase);
+        Assert.Null(room.DecidedWinnerSlots);
+        await test.Rig.Round.HandleLifeReportedAsync(test.GuestLink, new(RoundLifeEvent.Died, BnBGuestActor), default);
+        var host = room.Seats.Single(seat => ReferenceEquals(seat.Game, test.Rig.Host)).Slot;
+        Assert.True(room.Phase != RoomPhase.Playing || room.DecidedWinnerTeam is not null || room.DecidedWinnerSlots is not null);
+        Assert.True(room.DecidedWinnerTeam is not null || room.DecidedWinnerSlots!.SetEquals([host]));
+    }
+
+    /// <summary>
+    /// A player leaving a BnB round is dropped from it instead of cancelling it: the player who stays keeps both
+    /// connections and, as the last side standing, wins the round.
+    /// </summary>
+    [Fact]
+    public async Task BnBLeaverIsDroppedAndTheRemainingPlayerWinsWithoutADisconnect()
+    {
+        await using var test = new BnBTestRig();
+        var room = await test.StartAsync(endsOnElimination: true);
+        var guest = room.Seats.Single(seat => ReferenceEquals(seat.Game, test.Rig.Guest)).Slot;
+        await test.Rig.Rooms.HandleLeaveAsync(test.Rig.Host, new(), default);
+        Assert.False(room.RoundCancelled);
+        Assert.False(test.Rig.Guest.Connection.IsClosed);
+        Assert.False(test.GuestLink.Connection.IsClosed);
+        Assert.True(room.DecidedWinnerTeam is not null || room.DecidedWinnerSlots!.SetEquals([guest]));
     }
 
     /// <summary>The match-link ownership fence remains active even when the general native readiness option is disabled.</summary>
@@ -1476,8 +1527,10 @@ public sealed partial class RoundFlowTests
             Rig.Rooms.MapSeedPreparing = Rig.Round.PrepareBnBRound;
         }
 
-        internal async Task<PlayRoom> StartAsync(bool relay = false, bool load = true)
+        internal async Task<PlayRoom> StartAsync(bool relay = false, bool load = true, bool endsOnElimination = false)
         {
+            // Most tests follow a dead actor's later reports in a two-player room, where one death decides the round.
+            Rig.Round.BnBEndsOnElimination = endsOnElimination;
             await Rig.Rooms.HandleCreateAsync(Rig.Host, new("BnB room", "", (int)GameModeId.BnB, "test"), default);
             var roomId = Assert.Single(Rig.Entered.To(Rig.Host)).Room.RoomId;
             await Rig.Rooms.HandleJoinAsync(Rig.Guest, new(roomId, ""), default);

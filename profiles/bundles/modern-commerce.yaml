@@ -33,6 +33,10 @@
     # Enable together with dialect.messages.present_box for native-client acceptance.
     present_box: false
     max_presents_per_player: 100
+    # Cash item inbox (packets/cash-inbox.yaml, packets/cash-inventory.yaml): stores granted cash stock items and commits
+    # pickups atomically into the character bag; enable together with dialect.messages.cash_inbox.
+    cash_inbox: false
+    max_cash_inbox_entries_per_player: 64
     starting_lucci: 100000
     starting_cash: 0
 - id: equipment

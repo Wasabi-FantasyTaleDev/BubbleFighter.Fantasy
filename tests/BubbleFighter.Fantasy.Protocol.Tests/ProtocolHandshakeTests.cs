@@ -242,6 +242,8 @@ public sealed class ProtocolHandshakeTests
                         Row("lobby", "lobby", new()
                         {
                             ["protocol"] = "kr-1256/game", ["authentication"] = "ticket", ["character_creation_preview"] = true,
+                            // This handshake-only fixture has no online directory, inventory, or couple persistence.
+                            ["couples"] = false,
                         }),
                     } : [],
                     .. nativeMigration ? new[] { Row("migration-dispatch", "test.migration-dispatch") } : [],
@@ -465,6 +467,79 @@ public sealed class ProtocolHandshakeTests
                 await connection.SendAsync(EncryptFrame(cipher, 3, [1]), ct);
             Assert.True(await WaitForAsync(() => connection.IsClosed));
             lock (harness.Received) Assert.DoesNotContain(harness.Received, e => e.Packet.Opcode == 3);
+        });
+    }
+
+    /// <summary>
+    /// After the version handshake a failed handler drops its request and the player stays connected, so the next
+    /// request is still served; with the option off the connection ends as before.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AdmittedHandlerFailureKeepsTheConnectionWhenAllowed(bool keep)
+    {
+        await using var harness = await ProtocolHarness.StartAsync();
+        var dialect = TestWireDialects.Get("kr-1256");
+        var root = Path.GetDirectoryName((string)TestWireDialects.MessagesConfig()["packets_directory"]!)!;
+        var table = OpcodeTableLoader.Load(Path.Combine(root, "profiles", "kr-1256", "opcodes.yaml"), dialect.Profile);
+        using var verified = new VersionVerifiedScope(1);
+        var options = new ProtocolOptions { KeepConnectionOnHandlerFailure = keep };
+        var protocol = new WireProtocol("kr-1256/game", dialect, dialect.BuildServerPreamble(0, ""),
+            options, harness.Packets, table, new EventBus(NullLogger.Instance), harness.Sessions,
+            verified, NullLogger.Instance, CancellationToken.None, requiresPatchHandshake: true);
+        var calls = 0;
+        var second = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var handler = harness.Packets.Register("kr-1256/game", 521, (_, _, _) =>
+        {
+            if (Interlocked.Increment(ref calls) == 1)
+                throw new InvalidOperationException("intentional handler failure after admission");
+            second.TrySetResult();
+            return ValueTask.CompletedTask;
+        });
+        await WithProtocolAsync(protocol, async (connection, ct) =>
+        {
+            _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
+            var cipher = SimpleCipher.ClientToServer();
+            await connection.SendAsync(EncryptFrame(cipher, 1, WirePins.GamePatchPayload()), ct);
+            _ = await connection.ReceiveExactlyAsync(WirePins.RepGamePatchFrameSize, ct);
+            await connection.SendAsync(EncryptFrame(cipher, 521, [1]), ct);
+            if (keep)
+            {
+                await connection.SendAsync(EncryptFrame(cipher, 521, [2]), ct);
+                await second.Task.WaitAsync(TimeSpan.FromSeconds(10), ct);
+                Assert.False(connection.IsClosed);
+            }
+            else
+                Assert.True(await WaitForAsync(() => connection.IsClosed));
+        });
+    }
+
+    /// <summary>Relay handler failures close the transport even when game requests may recover after their patch handshake.</summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task HandlerFailureOnRelayClosesConnection(bool keep)
+    {
+        await using var harness = await ProtocolHarness.StartAsync();
+        var dialect = TestWireDialects.Get("kr-1256");
+        var root = Path.GetDirectoryName((string)TestWireDialects.MessagesConfig()["packets_directory"]!)!;
+        var table = OpcodeTableLoader.Load(Path.Combine(root, "profiles", "kr-1256", "opcodes.yaml"), dialect.Profile)
+            .ForConnection(OpcodeConnection.Relay);
+        using var verified = new VersionVerifiedScope(1);
+        var protocol = new WireProtocol("kr-1256/relay", dialect, dialect.BuildServerPreamble(0, ""),
+            new ProtocolOptions { KeepConnectionOnHandlerFailure = keep }, harness.Packets, table,
+            new EventBus(NullLogger.Instance), harness.Sessions, verified, NullLogger.Instance,
+            CancellationToken.None, requiresPatchHandshake: false);
+        var opcode = table.C2S("rcpReqJoinRelaySession");
+        using var handler = harness.Packets.Register("kr-1256/relay", opcode,
+            (_, _, _) => throw new InvalidOperationException("Relay authentication handler is unavailable."));
+        await WithProtocolAsync(protocol, async (connection, ct) =>
+        {
+            _ = await connection.ReceiveExactlyAsync(WirePins.GreetingSize, ct);
+            await connection.SendAsync(EncryptFrame(SimpleCipher.ClientToServer(), opcode, [1]), ct);
+            Assert.True(await WaitForAsync(() => connection.IsClosed));
+            Assert.False(verified.IsVerified(connection.Id));
         });
     }
 

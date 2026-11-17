@@ -57,6 +57,16 @@ public sealed class ScienceLabOptions : IValidatableOptions
     public LaboratoryRewardOptions? PermanentFailureReward { get; set; }
     /// <summary>Gets or sets explicit decomposition card/category reward pools and their weights.</summary>
     public LaboratoryDecompositionOptions[] Decomposition { get; set; } = [];
+    /// <summary>
+    /// Gets or sets the chance, in basis points, that a successful synthesis also grants one random item from
+    /// <see cref="SynthesisBonusPool"/>; null leaves the bonus unconfigured and 10000 grants it every time a candidate exists.
+    /// </summary>
+    [Range(0, 10000)] public int? SynthesisBonusBasisPoints { get; set; }
+    /// <summary>
+    /// Gets or sets the server-policy pool of timed bonus items. The client only resolves the Stock id it receives, so the
+    /// pool is deployment policy rather than native data; decomposition never draws from it.
+    /// </summary>
+    public LaboratoryBonusOptions[] SynthesisBonusPool { get; set; } = [];
 
     /// <summary>Requires complete explicit policy before activating any destructive recipe.</summary>
     public IEnumerable<ValidationResult> Validate()
@@ -92,6 +102,42 @@ public sealed class ScienceLabOptions : IValidatableOptions
             }
         foreach (var reward in new[] { BonusReward, PermanentFailureReward }.OfType<LaboratoryRewardOptions>())
             foreach (var result in reward.Validate()) yield return result;
+        if (SynthesisBonusPool is null || SynthesisBonusPool.Any(entry => entry is null))
+            yield return new("synthesis_bonus_pool must be a list of entries.");
+        else
+        {
+            if (SynthesisBonusPool.Length > 0 && SynthesisBonusBasisPoints is null)
+                yield return new("A synthesis bonus pool requires explicit synthesis_bonus_basis_points.");
+            if (SynthesisBonusBasisPoints > 0 && (SynthesisBonusPool.Length == 0 || SynthesisCardItemId == 0))
+                yield return new("A synthesis bonus chance requires a nonempty pool and enabled synthesis.");
+            if (SynthesisBonusPool.Length > MaxRewardsPerRecipe)
+                yield return new("The synthesis bonus pool exceeds max_rewards_per_recipe.");
+            if (SynthesisBonusPool.Select(entry => entry.ItemId).Distinct().Count() != SynthesisBonusPool.Length)
+                yield return new("Synthesis bonus items must be distinct.");
+            // Random.Next uses an Int32 exclusive upper bound for the cumulative weighted pool.
+            if (SynthesisBonusPool.Sum(entry => (long)entry.Weight) > int.MaxValue)
+                yield return new("Synthesis bonus total weight exceeds the Int32 random-sampling range.");
+            foreach (var entry in SynthesisBonusPool)
+                foreach (var result in entry.Validate()) yield return result;
+        }
+    }
+}
+
+/// <summary>Names one timed item that a synthesis may add as its bonus, by item and whole days rather than by native Stock.</summary>
+public sealed class LaboratoryBonusOptions
+{
+    /// <summary>Gets or sets the native item granted by this bonus.</summary>
+    public int ItemId { get; set; }
+    /// <summary>Gets or sets the whole number of days granted; the catalog must hold a Stock row with exactly this duration.</summary>
+    public int Days { get; set; }
+    /// <summary>Gets or sets this entry's positive weight among the eligible candidates.</summary>
+    public int Weight { get; set; } = 1;
+    /// <summary>Reports malformed bonus terms before the plugin accepts requests.</summary>
+    public IEnumerable<ValidationResult> Validate()
+    {
+        if (ItemId <= 0) yield return new("Synthesis bonus item_id must be positive.");
+        if (Days <= 0) yield return new("Synthesis bonus days must be positive.");
+        if (Weight < 1) yield return new("Synthesis bonus weight must be positive.");
     }
 }
 

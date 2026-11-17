@@ -38,7 +38,7 @@ internal static class PlazaRecords
         {
             ["occupied"] = true, ["user_number"] = member.UserNum,
             ["nickname"] = RoomNames.Resolve(member.Nickname, member.Ai?.NicknameKey ?? "", recipient, texts),
-            ["character_type"] = member.CharacterItemId - 300000, ["level"] = NativeDisplayLevel.Project(tables, build, member.Level),
+            ["character_type"] = member.CharacterItemId - 300000,
             // cn-774 sub_8DB6B0 / tw-454 sub_A5B220 install the team and the ready/shop/inventory state.
             ["slot"] = checked((byte)member.Slot), ["team"] = checked((byte)member.Team),
             ["ready"] = member.Ready, ["in_shop"] = member.InShop, ["in_inventory"] = member.InInventory,
@@ -57,6 +57,7 @@ internal static class PlazaRecords
             values["ai_preset"] = ai.Preset;
         }
         NativePlazaRecruitment.Project(tables, build, values, member.Recruitment);
+        NativeCoupleScene.Project(tables, build, values, member.Couple);
         return values;
     }
 

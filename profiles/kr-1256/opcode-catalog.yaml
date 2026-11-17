@@ -17,17 +17,17 @@ summary:
   c2s_conflict: 3
   c2s_cross: 6
   c2s_label: 2
-  c2s_none: 287
+  c2s_none: 286
   c2s_ordered: 2
   c2s_pair: 30
-  c2s_reviewed: 39
+  c2s_reviewed: 41
   c2s_runtime: 3
   c2s_shape: 24
   c2s_strong: 4
   c2s_verified: 1
   c2s_weak: 3
   s2c_label: 233
-  s2c_reviewed: 3
+  s2c_reviewed: 9
 opcodes:
   - {value: 0, direction: c2s, name: Unknown0, grade: none, name_source: none, connection_hint: game, senders: [4FC150, 5F09B0, 9A2770, 9E1EB0, E5B8A0]}
   - {value: 1, direction: c2s, name: gcpReqGamePatch, grade: reviewed, method: own-reviewed-table, name_source: reviewed@kr-1256, connection_hint: game}
@@ -133,7 +133,7 @@ opcodes:
   - {value: 515, direction: c2s, name: Unknown515, grade: none, name_source: none, connection_hint: game, senders: [4A1EB0, 4B3AC0, ADEF30]}
   - {value: 517, direction: c2s, name: Unknown517, grade: none, name_source: none, connection_hint: game, senders: [708310]}
   - {value: 518, direction: c2s, name: gcpRepPingUser, grade: shape, method: shape-global, name_source: 'shape@kr-812,cn-717,id-400,id-1809', note: 'monotone assignment, score 1.0'}
-  - {value: 519, direction: c2s, name: Unknown519, grade: none, name_source: none, connection_hint: game, senders: [5E37E0]}
+  - {value: 519, direction: c2s, name: gcpReqSelectAward, grade: reviewed, method: own-reviewed-table, name_source: reviewed@kr-1256, connection_hint: game, senders: [5E37E0]}
   - {value: 520, direction: c2s, name: gcpRoomSendAmpMsg, grade: shape, method: shape-single, name_source: shape@id-400, note: 'monotone assignment, score 0.89'}
   - {value: 521, direction: c2s, name: Unknown521, grade: none, name_source: none, connection_hint: game, senders: [937560, 937920]}
   - {value: 522, direction: c2s, name: gcpGameReportMapLoadingComplete, grade: shape, method: shape-global, name_source: 'shape@kr-812,cn-717,id-400,id-1809', note: 'monotone assignment, score 1.0'}
@@ -341,9 +341,9 @@ opcodes:
   - {value: 32809, direction: c2s, name: Unknown32809, grade: none, name_source: none, connection_hint: relay, senders: [6E5040]}
   - {value: 32818, direction: c2s, name: Unknown32818, grade: none, name_source: none, connection_hint: relay, senders: [79C3B0]}
   - {value: 32824, direction: c2s, name: Unknown32824, grade: none, name_source: none, connection_hint: relay, senders: [497EA0]}
-  - {value: 32829, direction: c2s, name: Unknown32829, grade: none, name_source: none, connection_hint: relay, senders: [496B80]}
+  - {value: 32829, direction: c2s, name: gppHitByItem, grade: reviewed, method: own-reviewed-table, name_source: reviewed@kr-1256, connection_hint: relay}
   - {value: 32830, direction: c2s, name: Unknown32830, grade: none, name_source: none, connection_hint: relay, senders: [B0B450]}
-  - {value: 32831, direction: c2s, name: Unknown32831, grade: none, name_source: none, connection_hint: relay, senders: [B0B110]}
+  - {value: 32831, direction: c2s, name: gppEndFreezeCannon, grade: reviewed, method: own-reviewed-table, name_source: reviewed@kr-1256, connection_hint: relay}
   - {value: 32832, direction: c2s, name: Unknown32832, grade: none, name_source: none, connection_hint: relay, senders: [6E92F0]}
   - {value: 32833, direction: c2s, name: Unknown32833, grade: none, name_source: none, connection_hint: relay, senders: [6E94C0]}
   - {value: 32840, direction: c2s, name: Unknown32840, grade: none, name_source: none, connection_hint: relay, senders: [7629A0], note: kr-1256 sub_7629A0 sends the packet through kr-1256 sub_95B0B0}
@@ -389,7 +389,7 @@ opcodes:
   - {value: 32928, direction: c2s, name: Unknown32928, grade: none, name_source: none, connection_hint: relay, senders: [B05210], note: empty body; mirrored boolean branch of the same sender as C2S 32927; the sender is invoked through a pointer and has no direct callers}
   - {value: 32929, direction: c2s, name: Unknown32929, grade: none, name_source: none, connection_hint: relay, senders: [EEBBD0]}
   - {value: 32930, direction: c2s, name: Unknown32930, grade: none, name_source: none, connection_hint: relay, senders: [4915C0]}
-  - {value: 32932, direction: c2s, name: Unknown32932, grade: none, name_source: none, connection_hint: relay, senders: [705AA0]}
+  - {value: 32932, direction: c2s, name: gppStormCloudHit_, grade: reviewed, method: own-reviewed-table, name_source: reviewed@kr-1256, connection_hint: relay}
   - {value: 32933, direction: c2s, name: Unknown32933, grade: none, name_source: none, connection_hint: relay, senders: [501780]}
   - {value: 33269, direction: c2s, name: Unknown33269, grade: none, name_source: none, connection_hint: relay, senders: [4FE000]}
   - {value: 33270, direction: c2s, name: Unknown33270, grade: none, name_source: none, connection_hint: relay, senders: [6E8470]}
@@ -399,7 +399,7 @@ opcodes:
   - {value: 33274, direction: c2s, name: Unknown33274, grade: none, name_source: none, connection_hint: relay, senders: [B4A110]}
   - {value: 33275, direction: c2s, name: gppArea32TrapLink_, grade: reviewed, method: own-reviewed-table, name_source: reviewed@kr-1256, connection_hint: relay, senders: [6E4850]}
   - {value: 33276, direction: c2s, name: Unknown33276, grade: none, name_source: none, connection_hint: relay, senders: [708FB0], note: packet builder; kr-1256 sub_6E99B0 sends through kr-1256 sub_7AB190}
-  - {value: 33280, direction: c2s, name: Unknown33280, grade: none, name_source: none, connection_hint: relay, senders: [6E40C0]}
+  - {value: 33280, direction: c2s, name: gppTryRescued_, grade: reviewed, method: own-reviewed-table, name_source: "reviewed@kr-1256", connection_hint: relay}
   - {value: 33283, direction: c2s, name: Unknown33283, grade: none, name_source: none, connection_hint: relay, senders: [6E9D40]}
   - {value: 33284, direction: c2s, name: Unknown33284, grade: none, name_source: none, connection_hint: relay, senders: [6E30F0]}
   - {value: 33287, direction: c2s, name: Unknown33287, grade: none, name_source: none, connection_hint: relay, senders: [AD2060]}
@@ -428,8 +428,9 @@ opcodes:
   - {value: 38270, direction: c2s, name: Unknown38270, grade: none, name_source: none, connection_hint: relay, senders: [4FE000]}
   - {value: 38275, direction: c2s, name: Unknown38275, grade: none, name_source: none, connection_hint: relay, senders: [8EE470]}
   - {value: 38276, direction: c2s, name: Unknown38276, grade: none, name_source: none, connection_hint: relay, senders: [6E43D0]}
-  - {value: 38278, direction: c2s, name: Unknown38278, grade: none, name_source: none, connection_hint: relay, senders: [6E54D0]}
-  - {value: 38279, direction: c2s, name: Unknown38279, grade: none, name_source: none, connection_hint: relay, senders: [6E55F0]}
+  - {value: 38278, direction: c2s, name: gppResetChrAttr, grade: reviewed, method: own-reviewed-table, name_source: reviewed@kr-1256, connection_hint: relay}
+  - {value: 38279, direction: c2s, name: gppSetAttribute, grade: reviewed, method: own-reviewed-table, name_source: reviewed@kr-1256, connection_hint: relay}
+  - {value: 38284, direction: c2s, name: gppSetWallHealAllowed_, grade: reviewed, method: own-reviewed-table, name_source: reviewed@kr-1256, connection_hint: relay}
   - {value: 38285, direction: c2s, name: Unknown38285, grade: none, name_source: none, connection_hint: relay, senders: [B43E40]}
   - {value: 38286, direction: c2s, name: Unknown38286, grade: none, name_source: none, connection_hint: relay, senders: [6E78A0]}
   - {value: 38287, direction: c2s, name: Unknown38287, grade: none, name_source: none, connection_hint: relay, senders: [B44490]}
@@ -529,6 +530,11 @@ opcodes:
   - {value: 571, direction: s2c, name: gspConnectToRelayServer, grade: label, name_source: label@kr-1256, connection_hint: game}
   - {value: 573, direction: s2c, name: gspConnectToSuperPeer, grade: label, name_source: label@kr-1256, connection_hint: game}
   - {value: 576, direction: s2c, name: gspUdpStop, grade: label, name_source: label@kr-1256, connection_hint: game}
+  - {value: 617, direction: s2c, name: gspGameAwardDialog, grade: reviewed, method: own-reviewed-table, name_source: reviewed@kr-1256, connection_hint: game}
+  - {value: 618, direction: s2c, name: gspHordeModeRewardList, grade: reviewed, method: own-reviewed-table, name_source: reviewed@kr-1256, connection_hint: game}
+  - {value: 620, direction: s2c, name: gspGameReturnAfterAward_, grade: reviewed, method: own-reviewed-table, name_source: reviewed@kr-1256, connection_hint: game}
+  - {value: 621, direction: s2c, name: gspRepAwardSelectSuccess, grade: reviewed, method: own-reviewed-table, name_source: reviewed@kr-1256, connection_hint: game}
+  - {value: 622, direction: s2c, name: gspRepAwardSelectFail, grade: reviewed, method: own-reviewed-table, name_source: reviewed@kr-1256, connection_hint: game}
   - {value: 750, direction: s2c, name: gspChangeSkillSlot, grade: label, name_source: label@kr-1256, connection_hint: game}
   - {value: 751, direction: s2c, name: gspChangePirateAssaultAbilityLevel, grade: label, name_source: label@kr-1256, connection_hint: game}
   - {value: 754, direction: s2c, name: gspHonorUserState, grade: label, name_source: label@kr-1256, connection_hint: game}
@@ -669,3 +675,10 @@ opcodes:
   - {value: 1557, direction: s2c, name: gspRepOption, grade: label, name_source: label@kr-1256, connection_hint: game}
   - {value: 1558, direction: s2c, name: gspCustomGameModeSetting, grade: label, name_source: label@kr-1256, connection_hint: game}
   - {value: 1560, direction: s2c, name: gspApplyGridMapSync, grade: label, name_source: label@kr-1256, connection_hint: game}
+  - {value: 38278, direction: s2c, name: gppResetChrAttr, grade: reviewed, method: own-reviewed-table, name_source: reviewed@kr-1256, connection_hint: relay}
+  - {value: 38279, direction: s2c, name: gppSetAttribute, grade: reviewed, method: own-reviewed-table, name_source: reviewed@kr-1256, connection_hint: relay}
+  - {value: 38284, direction: s2c, name: gppSetWallHealAllowed_, grade: reviewed, method: own-reviewed-table, name_source: reviewed@kr-1256, connection_hint: relay}
+  - {value: 32829, direction: s2c, name: gppHitByItem, grade: reviewed, method: own-reviewed-table, name_source: reviewed@kr-1256, connection_hint: relay}
+  - {value: 32831, direction: s2c, name: gppEndFreezeCannon, grade: reviewed, method: own-reviewed-table, name_source: reviewed@kr-1256, connection_hint: relay}
+  - {value: 32932, direction: s2c, name: gppStormCloudHit_, grade: reviewed, method: own-reviewed-table, name_source: reviewed@kr-1256, connection_hint: relay}
+  - {value: 33280, direction: s2c, name: gppTryRescued_, grade: reviewed, method: own-reviewed-table, name_source: "reviewed@kr-1256", connection_hint: relay}

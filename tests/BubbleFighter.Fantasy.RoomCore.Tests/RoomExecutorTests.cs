@@ -35,6 +35,41 @@ public sealed class RoomExecutorTests
         Assert.Equal([1, 2, 3], sequence);
     }
 
+    private static readonly AsyncLocal<string?> Ambient = new();
+
+    /// <summary>
+    /// A room callback sees the caller's ambient state across its awaits (a session's account mutation scope is held
+    /// this way, and without it every room write was refused), and enqueuing from inside a callback is still refused.
+    /// </summary>
+    [Fact]
+    public async Task CallbacksRunInTheCallersContextAndStayNonReentrant()
+    {
+        await using var executor = new RoomExecutor(4);
+        string? before = null, after = null;
+        Exception? reentry = null;
+        Ambient.Value = "session-7";
+        await executor.ExecuteAsync(async token =>
+        {
+            before = Ambient.Value;
+            await Task.Yield();
+            after = Ambient.Value;
+            try { _ = executor.ExecuteAsync(inner => ValueTask.CompletedTask, token); }
+            catch (InvalidOperationException error) { reentry = error; }
+        }).WaitAsync(Timeout);
+        Ambient.Value = null;
+        Assert.Equal(("session-7", "session-7"), (before, after));
+        Assert.NotNull(reentry);
+
+        string? unflowed = "unset";
+        using (ExecutionContext.SuppressFlow())
+            Ambient.Value = "hidden";
+        Task suppressed;
+        using (ExecutionContext.SuppressFlow())
+            suppressed = executor.ExecuteAsync(_ => { unflowed = Ambient.Value; return ValueTask.CompletedTask; });
+        await suppressed.WaitAsync(Timeout);
+        Assert.Null(unflowed);
+    }
+
     [Fact]
     public async Task ConcurrentProducersNeverOverlapAcrossAwait()
     {
