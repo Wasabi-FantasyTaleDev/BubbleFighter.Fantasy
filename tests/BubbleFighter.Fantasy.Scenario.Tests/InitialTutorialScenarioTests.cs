@@ -101,7 +101,7 @@ public sealed class InitialTutorialScenarioTests
         Assert.Equal(member, (await player.WaitFor(32862, wave)).Payload);
         foreach (var (opcode, structure, values) in new (ushort, string, Dictionary<string, object?>)[]
         {
-            (32892, "NpcSpawnActor", new() { ["unknown_0"] = new[] { 7, 3, 1, 2, 5, 0, 0, 0, 0 } }),
+            (32892, "NpcSpawnActor", new() { ["unknown_0"] = 7, ["property_index"] = 3, ["unknown_8"] = new[] { 1, 2, 5, 0, 0, 0, 0 } }),
             (32866, "NpcActorReplay", new() { ["unknown_0"] = 7, ["unknown_4"] = 3, ["unknown_8"] = "npc-replay", ["unknown_32"] = 1 }),
             (32873, "NpcWaveMobGroup", new() { ["unknown_0"] = (byte)1, ["unknown_1"] = (byte)2, ["unknown_2"] = 7 }),
             (32876, "TutorialSpawnPointReplay", new() { ["unknown_0"] = 7, ["unknown_4"] = true }),

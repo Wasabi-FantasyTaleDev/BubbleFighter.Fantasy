@@ -63,6 +63,7 @@
 
       # Own mode-16 hotkeys select 1..3; this three-item selection is configurable server policy.
       counted_item_mode_id: 16
+      zombie_pve_opening: true
       counted_item_slot_count: 3
       counted_item_kinds: [229, 146, 136]
       # Other enabled cooperative pickups apply their native effect without occupying a numbered slot.

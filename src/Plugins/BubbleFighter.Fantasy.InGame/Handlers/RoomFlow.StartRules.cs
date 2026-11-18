@@ -9,6 +9,9 @@ namespace BubbleFighter.Fantasy.InGame.Handlers;
 /// </summary>
 internal sealed partial class RoomFlow
 {
+    private bool UsesZombiePveOpening(PlayRoom room) => !room.IsUserHost && _options?.ZombiePveOpening == true
+        && room.ModeId == (int)Contracts.Rooms.GameModeId.ZombiePve;
+
     // Under the room's gate, before the start changes any team. Null when the start may go ahead.
     private string? StartRuleRefusal(PlayRoom room)
     {
@@ -17,7 +20,7 @@ internal sealed partial class RoomFlow
         var players = room.Seats.Count + room.Bots.Count;
         if (players < options.StartMinPlayers)
             return $"{players} player(s), {options.StartMinPlayers} required";
-        if (!options.StartRequiresTeamBalance || !room.RequiresSpawnTeams || IsZombiePvp(room)
+        if (!options.StartRequiresTeamBalance || !room.RequiresSpawnTeams || IsZombiePvp(room) || UsesZombiePveOpening(room)
             || (options.ZombieConversionModeId > 0 && room.ModeId == options.ZombieConversionModeId))
             return null;
         // A player without a team counts as red, the team every seat of an untouched room shows, unless the start

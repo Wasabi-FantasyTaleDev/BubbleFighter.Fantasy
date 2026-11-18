@@ -2,6 +2,7 @@ using BubbleFighter.Fantasy.Abstractions;
 using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Lobby;
 using BubbleFighter.Fantasy.Contracts.Match;
+using BubbleFighter.Fantasy.Contracts.Rooms;
 using BubbleFighter.Fantasy.Packets;
 
 namespace BubbleFighter.Fantasy.Dialect.Rooms;
@@ -18,6 +19,7 @@ internal sealed class RoundResultSender : IMessageSender<RoundScoreUpdated>, IMe
     private readonly IReadOnlyCollection<int> _scoreboardModes = [];
     private readonly IGameText? _texts;
     private readonly StarScoreFields? _starScores;
+    private readonly bool _zombieOrigin;
 
     /// <summary>Uses the build's fixed-row result settings and recipient-local opcode table.</summary>
     internal RoundResultSender(string protocol, PacketTables packets, string build, Func<ISession, IOpcodeTable> opcodes,
@@ -35,7 +37,7 @@ internal sealed class RoundResultSender : IMessageSender<RoundScoreUpdated>, IMe
 
     /// <summary>Uses the audited mask-row grammar and the deployment's existing scoreboard mode selection.</summary>
     internal RoundResultSender(string protocol, PacketTables packets, string build, Func<ISession, IOpcodeTable> opcodes,
-        IReadOnlyCollection<int> scoreboardModes, RoundResultWire.MaskedRows maskedRows, IGameText? texts)
+        IReadOnlyCollection<int> scoreboardModes, RoundResultWire.MaskedRows maskedRows, IGameText? texts, bool zombieOrigin = false)
     {
         Protocol = protocol;
         _packets = packets;
@@ -44,6 +46,7 @@ internal sealed class RoundResultSender : IMessageSender<RoundScoreUpdated>, IMe
         _scoreboardModes = scoreboardModes;
         _maskedRows = maskedRows;
         _texts = texts;
+        _zombieOrigin = zombieOrigin;
         _starScores = StarScoreFields.Load(packets, build);
         _ = LiveScoreKinds.Require(packets, build);
         PacketLayoutContract.RequireFields(packets, build, "RoundLiveScore", "Round result sender",
@@ -107,21 +110,28 @@ internal sealed class RoundResultSender : IMessageSender<RoundScoreUpdated>, IMe
     /// <summary>Sends the existing recipient outcome or the native result-open event.</summary>
     public async ValueTask SendAsync(ISession session, RoundEnded message, CancellationToken ct)
     {
+        ArgumentNullException.ThrowIfNull(message);
         if (_fixedRows is { } fixedRows)
         {
-            ArgumentNullException.ThrowIfNull(message);
             if (RoundResultWire.HordeOutcomeNotification(fixedRows, message) is { } notification)
                 await session.SendAsync(Resolve(session, notification), ReadOnlyMemory<byte>.Empty, ct).ConfigureAwait(false);
             await session.SendAsync(Resolve(session, "gspGameEndGame"),
                 RoundResultWire.WriteGameEndForRecipient(_packets, _build, fixedRows, message), ct).ConfigureAwait(false);
             return;
         }
-        // kr-1256 sub_9E88C0 installs the two result-open words before the masked scoreboard.
+        // kr-1256 sub_787000 selects the result by these two words and the local role; both sides receive the same pair.
+        var (word0, word1) = _zombieOrigin && message.ModeId == (int)GameModeId.ZombieOrigin ? message.ZombieOriginOutcome switch
+        {
+            ZombieOriginOutcome.ZombiesConvertedAllFighters => (1u, 0u),
+            ZombieOriginOutcome.FightersPerfectWin => (1u, 1u),
+            ZombieOriginOutcome.FightersSurvivedTimeout or ZombieOriginOutcome.Undecided => (0u, 0u),
+            _ => throw new InvalidOperationException($"Unknown Zombie Battle G outcome {message.ZombieOriginOutcome}."),
+        } : (0u, 0u);
         await session.SendAsync(Resolve(session, "gspRoundResultOpen_", "Unknown612"),
             PacketCodec.Write(_packets, _build, "RoundResultOpen", new Dictionary<string, object?>
             {
-                ["unknown_n0"] = 0,
-                ["unknown_n1"] = 0,
+                ["unknown_n0"] = word0,
+                ["unknown_n1"] = word1,
             }), ct).ConfigureAwait(false);
     }
 

@@ -2,7 +2,9 @@ using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Match;
 using BubbleFighter.Fantasy.Contracts.Rooms;
 using BubbleFighter.Fantasy.Contracts.Sessions;
+using BubbleFighter.Fantasy.InGame.Data;
 using BubbleFighter.Fantasy.InGame.Sessions;
+using Microsoft.Extensions.Logging;
 
 namespace BubbleFighter.Fantasy.InGame.Handlers;
 
@@ -19,7 +21,7 @@ internal sealed partial class RoomFlow
         }, ct);
 
     internal async ValueTask HandleInitialTutorialAsync(ISession session, InitialTutorialRequested request,
-        IMessageSender<InitialTutorialEntered> sender, CancellationToken ct)
+        IMessageSender<InitialTutorialEntered> sender, Lazy<StageMainTutorialTable?> numberedStages, CancellationToken ct)
     {
         if (!SessionPlayer.IsPastLoginBurst(session))
             throw new InvalidOperationException("Initial tutorial admission requires the completed login burst.");
@@ -27,7 +29,16 @@ internal sealed partial class RoomFlow
             throw new InvalidOperationException("Initial tutorial admission requires the main menu.");
         if (_registry.TryGet(session.Id) is not null)
             throw new InvalidOperationException("Initial tutorial admission requires an unseated player.");
-        if (request.Team == 0)
+        if (request.ModeId == (int)GameModeId.SinglePlay)
+        {
+            // A missing map table, spoofed directory, wrong clock or nonselectable row cannot create a room.
+            if (numberedStages.Value?.Accepts(request) != true)
+            {
+                _logger.LogWarning("Session {Id} tutorial selection did not match a numbered stage in the client's map table.", session.Id);
+                return;
+            }
+        }
+        else if (request.Team == 0)
             throw new InvalidOperationException("Initial tutorial admission requires an assigned player team.");
         var (user, _) = SessionPlayer.RequireIdentity(session);
         var equipment = await ResolveEquipmentAsync(session, user, ct).ConfigureAwait(false);
@@ -45,7 +56,11 @@ internal sealed partial class RoomFlow
             await room.Executor.ExecuteAsync(async operationCt =>
             {
                 ScenePhase.Entered(session, SessionPhase.Room, _logger);
-                await sender.SendAsync(session, new InitialTutorialEntered(View(room), request.NativeRequest), operationCt).ConfigureAwait(false);
+                await sender.SendAsync(session, new InitialTutorialEntered(View(room), request.NativeRequest)
+                {
+                    StageDirectory = request.StageDirectory,
+                    Difficulty = request.Difficulty,
+                }, operationCt).ConfigureAwait(false);
                 ScenePhase.Entered(session, SessionPhase.Match, _logger);
             }, ct).ConfigureAwait(false);
         }
@@ -73,6 +88,25 @@ internal sealed partial class RoomFlow
         if (_registry.TryGet(session.Id) is not { Tutorial.GameConnectionOnly: true })
             throw new InvalidOperationException("Initial tutorial exit requires its active solo room.");
         return HandlePlazaMenuReturnAsync(session, new PlazaMenuReturnRequested(), ct);
+    }
+
+    internal ValueTask HandleSoloStageResultAsync(ISession session, RoundStageResultReported result,
+        TutorialRoomFlow numbered, CancellationToken ct)
+    {
+        // The numbered stage's own goal emits 1; time-out and the confirmed quit control emit 0.
+        // Other modes reuse the wire word differently. Only this player's active numbered round can earn a clear.
+        if (result.Outcome != 1 || _registry.TryGet(session.Id) is not { Tutorial.GameConnectionOnly: true } room
+            || room.ModeId != (int)GameModeId.SinglePlay)
+            return HandleInitialTutorialExitAsync(session, new(), ct);
+        return HandlePlazaMenuReturnAsync(session, new(), token => new ValueTask(room.Executor.ExecuteAsync(async roundToken =>
+        {
+            lock (room.Gate)
+            {
+                if (room.Phase != RoomPhase.Playing || room.Seats.Count != 1
+                    || room.FindByGame(session.Id)?.Slot != room.MasterSlot) return;
+            }
+            await numbered.ClearedAsync(session, new(room.MapKey), roundToken).ConfigureAwait(false);
+        }, token)), ct);
     }
 
     internal ValueTask HandleInitialTutorialNpcAsync(ISession session, InitialTutorialNpcReported request,

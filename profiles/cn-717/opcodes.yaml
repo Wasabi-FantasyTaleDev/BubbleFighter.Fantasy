@@ -4047,6 +4047,20 @@ opcodes:
     name_source: mirrored
     evidence: inferred
     source: "Packet_gspEventAwardDialog class exists in cn-717; kr-812 assigns it 749, and the named neighbours 708 and 800 match kr-812"
+  - value: 750
+    direction: s2c
+    name: gspBFRunnerOver
+    name_source: label@cn-717
+    evidence: verified
+    source: "cn-717 sub_540B30 case 750; Packet_gspBFRunnerOver reads one u32 through cn-717 sub_8C4210"
+    notes: "Same layout as kr-812"
+  - value: 751
+    direction: s2c
+    name: gspBFRunnerCheckPointValue
+    name_source: label@cn-717
+    evidence: verified
+    source: "cn-717 sub_540B30 case 751; Packet_gspBFRunnerCheckPointValue reads two u32 through cn-717 sub_538B70"
+    notes: "Same layout as kr-812"
   - value: 924
     direction: s2c
     name: gspMapMissionInfo

@@ -402,7 +402,8 @@ public sealed partial class NativeMatchRoundTests
         internal Session Guest { get; }
         internal PlayRoom Room => Registry.TryGet(Host.Id)!;
         internal Rig(string build, int length, bool enabled = true, int countdownMs = 60000, bool fallback = false,
-            IMatchSeedInputValidator? seedInputs = null, bool weaponObjects = false, IMatchCriticalSeedAuthority? criticalAuthority = null)
+            IMatchSeedInputValidator? seedInputs = null, bool weaponObjects = false, IMatchCriticalSeedAuthority? criticalAuthority = null,
+            IMessageSender<RoundPlayerRespawned>? respawned = null, IMessageSender<RoundEnded>? ended = null)
         {
             Host = new(11, build); Host.SetLobbyPlayer(11, "host");
             Guest = new(22, build); Guest.SetLobbyPlayer(22, "guest");
@@ -414,7 +415,7 @@ public sealed partial class NativeMatchRoundTests
             Rooms = new(Registry, new RoomSenders(new Sink<RoomEntered>(), new Sink<RoomSeatUpdated>(), new Sink<RoomSeatVacated>(),
                 new Sink<RoomMasterChanged>(), Left: Departures, MatchStarting: new Sink<RoomMatchStarting>()), NullLogger.Instance, options: options);
             Round = new(Registry, options, new RoundSenders(new Sink<RoundPlayerLoaded>(), Countdowns, Started, Feed,
-                    WeaponCreated: weaponObjects ? WeaponDrops : null, WeaponPicked: weaponObjects ? WeaponPickups : null),
+                    Respawned: respawned, Ended: ended, WeaponCreated: weaponObjects ? WeaponDrops : null, WeaponPicked: weaponObjects ? WeaponPickups : null),
                 NullLogger.Instance, _lifetime.Token, Rooms.ReturnToRoomAsync, capabilityOffers: Offers, seedTables: Seeds,
                 seedInputs: seedInputs, criticalAuthority: criticalAuthority);
         }

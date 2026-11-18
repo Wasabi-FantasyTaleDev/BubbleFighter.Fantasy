@@ -29,7 +29,7 @@ internal sealed class PvePointsBinding(string protocol, IOpcodeTable table, Pack
         PacketLayoutContract.RequireFields(tables, build, "PveGamePoint", "Cooperative points",
             ("seat", "u32"), ("subtract", "u32"), ("amount", "u32"));
         PacketLayoutContract.RequireFields(tables, build, "PveRankInfo", "Cooperative ranking",
-            ("rows", "list<PveRankRow>"));
+            ("selected_display_id", "u32"), ("other_display_ids", "list<u32>"), ("rows", "list<PveRankRow>"));
         PacketLayoutContract.RequireFields(tables, build, "PveRankRow", "Cooperative ranking",
             ("seat", "u32"), ("unknown_8", "u32"), ("rank", "u32"));
         foreach (var name in new[] { "PvePangUnit", "PveGamePoint", "PveRankRow", "PveRankInfo" }) _ = tables.Resolve(build, name);
@@ -54,12 +54,31 @@ internal sealed class PvePointsBinding(string protocol, IOpcodeTable table, Pack
             await session.SendAsync(table.S2C("gspNotifyRankInfo"), EncodeRanks(tables, build, message.Rows), ct).ConfigureAwait(false);
     }
 
-    internal static byte[] EncodeRanks(PacketTables tables, string build, IReadOnlyList<RoundPvePointRow> rows)
+    internal static byte[] EncodeRanks(PacketTables tables, string build, IReadOnlyList<RoundPvePointRow> rows) =>
+        WriteRankSnapshot(tables, build, rows, 0, []);
+
+    /// <summary>Encodes one recipient's already-determined prize and the three other box displays in a terminal rank snapshot.</summary>
+    internal static byte[] EncodeZombiePveVictoryRanks(PacketTables tables, string build, IReadOnlyList<RoundPvePointRow> rows,
+        int selectedDisplayId, ReadOnlySpan<int> otherDisplayIds)
+    {
+        // kr-812 sub_7A2320 fills the other three boxes in order, regardless of which of the four is clicked.
+        if (selectedDisplayId <= 0 || otherDisplayIds.Length != 3)
+            throw new InvalidOperationException("A Zombie PvE victory reveal requires a selected display ID and three other display IDs.");
+        foreach (var otherDisplayId in otherDisplayIds)
+            if (otherDisplayId <= 0)
+                throw new InvalidOperationException("A Zombie PvE victory reveal cannot contain an empty alternative display.");
+        return WriteRankSnapshot(tables, build, rows, selectedDisplayId, otherDisplayIds.ToArray());
+    }
+
+    private static byte[] WriteRankSnapshot(PacketTables tables, string build, IReadOnlyList<RoundPvePointRow> rows,
+        int selectedDisplayId, int[] otherDisplayIds)
     {
         if (rows.Count > 32 || rows.Any(row => row.Slot is < 0 or >= 32 || row.Points < 0 || row.Rank is < 1 or > 32))
             throw new InvalidOperationException("Cooperative ranking exceeds the native seat bound.");
         return PacketCodec.Write(tables, build, "PveRankInfo", new Dictionary<string, object?>
         {
+            ["selected_display_id"] = selectedDisplayId,
+            ["other_display_ids"] = otherDisplayIds,
             ["rows"] = rows.Select(row => new Dictionary<string, object?>
             {
                 ["seat"] = row.Slot, ["unknown_8"] = row.Points, ["rank"] = row.Rank,

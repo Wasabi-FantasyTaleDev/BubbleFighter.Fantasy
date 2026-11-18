@@ -6,6 +6,7 @@ namespace BubbleFighter.Fantasy.InGame.Handlers;
 internal sealed partial class RoundFlow
 {
     private bool UsesNativeLife(PlayRoom room) => _options.NativeLifeModeIds.Contains(room.ModeId)
+        || IsZombieOriginMode(room)
         || IsFinalZoneMode(room)
         || IsZombieEscapeMode(room)
         || _options.NativeLifeEveryMode

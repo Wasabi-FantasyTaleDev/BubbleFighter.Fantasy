@@ -34,8 +34,8 @@ structs:
   # kr-1256 (S2C 21): leading word (4), counted name, word (4), word (4), byte list. kr-1256 sub_99C1D0 fills
   # the leading word at object +0 (the stream call at kr-1256 0x99C267-0x99C26F reads 4 bytes there before the
   # name), then the pieces at +4, +28, +32 and the byte vector at +36. An empty passport is 20 bytes.
-  # cn-774 sub_BA3C80 reads the same five pieces in this order and inherits this table; tw-454's reader was
-  # not read.
+  # cn-774 sub_BA3C80 and tw-454 sub_A81440 read the same five pieces in this order, then forward them to
+  # cn-774 sub_5E4490 and tw-454 sub_686F20 respectively. Both builds inherit this table.
   ClanPassport@kr-1256:
     - user_number: u32      # kr-1256 sub_99C1D0 reads 4 bytes into the object at +0 before the name (stream->Read at slot +0x2C, 0x99C267-0x99C26F)
       offset: 0

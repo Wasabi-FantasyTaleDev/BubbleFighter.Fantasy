@@ -67,6 +67,7 @@ namespace BubbleFighter.Fantasy.InGame;
         typeof(IInboundMessageBinding<PlazaGameRequested>), typeof(IInboundMessageBinding<PlazaGameSyncRequested>), typeof(IInboundMessageBinding<PlazaGameRecordRequested>),
         typeof(IMessageSender<PlazaGameReplied>), typeof(IMessageSender<PlazaGameSyncNotified>), typeof(IMessageSender<PlazaGameRecordPublished>),
         typeof(IInboundMessageBinding<InitialTutorialRequested>), typeof(IMessageSender<InitialTutorialEntered>),
+        typeof(IInboundMessageBinding<TutorialStageListRequested>), typeof(IMessageSender<TutorialStageListReceived>),
         typeof(IInboundMessageBinding<InitialTutorialExitRequested>),
         typeof(IInboundMessageBinding<InitialTutorialNpcReported>), typeof(IMessageSender<InitialTutorialNpcAcknowledged>),
         typeof(IInboundMessageBinding<RoundNpcReported>), typeof(IMessageSender<RoundNpcAcknowledged>),
@@ -78,6 +79,12 @@ namespace BubbleFighter.Fantasy.InGame;
         typeof(IInboundMessageBinding<RoundCharacterFormRequested>), typeof(IMessageSender<RoundCharacterFormChanged>),
         typeof(IInboundMessageBinding<RoundCaptainDropped>), typeof(IMessageSender<RoundCaptainAppointed>),
         typeof(IInboundMessageBinding<RoundSoccerGoalReported>),
+        typeof(IInboundMessageBinding<RoundBfRunnerGoalReported>), typeof(IInboundMessageBinding<RoundBfRunnerCheckpointReported>),
+        typeof(IInboundMessageBinding<RoundBfRunnerProgressReported>), typeof(IMessageSender<RoundBfRunnerCheckpointReached>),
+        typeof(IMessageSender<RoundBfRunnerFinished>), typeof(IInboundMessageBinding<RoundBfRunnerItemTouched>),
+        typeof(IMessageSender<RoundBfRunnerItemGranted>),
+        typeof(IInboundMessageBinding<RoundControlPointChanged>), typeof(IMessageSender<RoundControlPointsUpdated>),
+        typeof(IInboundMessageBinding<RoundZombieOriginPrototypeRequested>), typeof(IMessageSender<RoundZombieOriginPrototypeRoll>),
         typeof(IInboundMessageBinding<RoundScriptZombieConversionReported>), typeof(IMessageSender<RoundScriptZombieConversionReported>),
         typeof(IMessageSender<RoundScriptZombieTeamChanged>),
         typeof(IInboundMessageBinding<RoundExtremeRacingGoalReported>), typeof(IMessageSender<RoundExtremeRacingTimerChanged>),
@@ -334,9 +341,10 @@ public sealed partial class InGamePlugin : IPlugin
         {
             // The same pools the packet-wire start draws from, with the same fallback to the shipped keys.
             if (context.Services.TryGet<BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore>(out var mapData) && mapData is not null)
-                rooms.Maps = Data.MapCatalog.Load(mapData);
+                rooms.Maps = Data.MapCatalog.Load(mapData, options.ZombiePveOpening
+                    ? (options.ZombiePveMaximumWorldBytes, options.ZombiePveMaximumHelpers) : null);
             else
-                context.Logger.LogWarning("InGame server_map_draw has no client data (clientdata row): random selections draw from the shipped keys, whatever the mode.");
+                context.Logger.LogWarning("InGame server_map_draw has no client data (clientdata row): random selections use shipped keys. Resource-checked Zombie PvE starts are unavailable.");
         }
         context.Effect(context.Events.OnAsync<BubbleFighter.Fantasy.Contracts.Lobby.PlayerNicknameChanged>(async (change, ct) =>
         {
@@ -515,6 +523,12 @@ public sealed partial class InGamePlugin : IPlugin
                 rooms.ReturnToRoomAsync, context, continueSeries: rooms.ContinueSeriesAsync)
                 { UserHostSettlement = rooms.SettleUserHostRoundAsync };
             rooms.EndRoundNow = round.EndRoundNowAsync;
+            if (options.ZombiePveOpening)
+            {
+                if (rooms.Maps is not { } maps || !Bound<RoundStageResultReported>() || !Bound<RoundNpcReported>())
+                    throw new ConfigException("Zombie PvE requires regional stage resources, concrete NPCs and a stage-result binding.");
+                round.ZombiePveBossFor = maps.ZombiePveBossFor;
+            }
             if (options.MenuSessionChat && context.Services.TryGet<ISessionRegistry>(out var sessionRegistry) && sessionRegistry is not null)
                 rooms.Sessions = () => sessionRegistry.All;
             if (round.SupportsPreparedRewards)
@@ -546,17 +560,29 @@ public sealed partial class InGamePlugin : IPlugin
                 }
             }
             var tutorials = new TutorialRoomFlow(registry, stageTable?.Numbers, tutorialStages, context.Logger, tutorialGifts, giftService);
+            // The modern picker proves stage records. Its clear confirmation does not itself grant merchandise.
+            var numbered = new TutorialRoomFlow(registry, stageTable?.Numbers, tutorialStages, context.Logger);
+            if (Bound<TutorialStageListRequested>())
+            {
+                var list = PlaySenders.Required<TutorialStageListReceived>(context, game);
+                context.Effect(messages.On<TutorialStageListRequested>(game, gate.Expect<TutorialStageListRequested>(
+                    (session, _, ct) => numbered.SendStageMainListAsync(session, list, ct), Menu)));
+            }
             if (Bound<InitialTutorialRequested>())
             {
                 var entered = PlaySenders.Required<InitialTutorialEntered>(context, game);
+                var numberedStages = new Lazy<Data.StageMainTutorialTable?>(() => rooms.Maps?.StageMainTutorials()
+                    ?? (tutorialData is null ? null : new(Data.MapMetaTable.Parse(tutorialData.Read(Data.MapMetaTable.Path)))));
                 context.Effect(messages.On<InitialTutorialRequested>(game,
-                    gate.Expect<InitialTutorialRequested>((session, request, ct) => rooms.HandleInitialTutorialAsync(session, request, entered, ct), Menu)));
+                    gate.Expect<InitialTutorialRequested>((session, request, ct) =>
+                        rooms.HandleInitialTutorialAsync(session, request, entered, numberedStages, ct), Menu)));
             }
+            round.PirateAssaultTerminalReports = Bound<RoundNpcReported>() && Bound<RoundStageResultReported>();
             if (Bound<RoundStageResultReported>())
                 context.Effect(messages.On<RoundStageResultReported>(game,
                     gate.Expect<RoundStageResultReported>((session, request, ct) => rooms.PlaysSoloTutorial(session)
-                        ? rooms.HandleInitialTutorialExitAsync(session, new InitialTutorialExitRequested(), ct)
-                        : round.HandleStageResultAsync(session, request, ct), Room, SessionPhase.Match)));
+                        ? rooms.HandleSoloStageResultAsync(session, request, numbered, ct)
+                        : round.HandleMultiplayerStageResultAsync(session, request, ct), Room, SessionPhase.Match)));
             if (Bound<InitialTutorialNpcReported>())
             {
                 var npc = PlaySenders.Required<InitialTutorialNpcAcknowledged>(context, game);
@@ -601,6 +627,45 @@ public sealed partial class InGamePlugin : IPlugin
             // Mode 11 keeps the score of the host's goals where the build's full score route reads them.
             if (Bound<RoundSoccerGoalReported>())
                 context.Effect(messages.On<RoundSoccerGoalReported>(game, round.HandleSoccerGoalAsync));
+            if (Bound<RoundZombieOriginPrototypeRequested>())
+            {
+                round.ZombieOriginRolls = PlaySenders.Required<RoundZombieOriginPrototypeRoll>(context, game);
+                var zombieOriginData = context.Services.Get<BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore>();
+                round.ZombieOriginRules = new(() => ZombieOriginPrototypeRules.Load(zombieOriginData));
+                context.Effect(messages.On<RoundZombieOriginPrototypeRequested>(game, round.HandleZombieOriginPrototypeAsync));
+            }
+            if (Bound<RoundControlPointChanged>())
+            {
+                round.ControlPointUpdates = PlaySenders.Required<RoundControlPointsUpdated>(context, game) as IControlPointSnapshotSender
+                    ?? throw new ConfigException("Control Point requires a sender with a native node count.");
+                var pointData = context.Services.Get<BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore>();
+                var nodeCount = round.ControlPointUpdates.NodeCount;
+                var pointMaps = new Lazy<ControlPointStageCatalog>(() =>
+                {
+                    var catalog = rooms.Maps ?? Data.MapCatalog.Load(pointData);
+                    return new(catalog.ModePool((int)GameModeId.ControlPoint).Select(catalog.StageKey),
+                        stage => ControlPointMapNodes.Load(pointData, stage, nodeCount),
+                        (stage, ex) => context.Logger.LogWarning(ex, "Control Point stage {Stage} is unavailable for {Protocol}.", stage, game));
+                });
+                round.ControlPointMapMask = (stage, _) => pointMaps.Value.Nodes(stage);
+                context.Effect(messages.On<RoundControlPointChanged>(game, round.HandleControlPointAsync));
+            }
+            if (Bound<RoundBfRunnerGoalReported>())
+            {
+                // Mode 21 races to the host's goal report only where the build's exchange is mounted.
+                round.BfRunnerCheckpointReached = PlaySenders.Required<RoundBfRunnerCheckpointReached>(context, game);
+                round.BfRunnerFinished = PlaySenders.Required<RoundBfRunnerFinished>(context, game);
+                round.BfRunnerItemGranted = PlaySenders.Required<RoundBfRunnerItemGranted>(context, game);
+                // The item box pool is the build's own ItemSpecBFRunner sheet (Config/ItemSpec4.xml).
+                if (!context.Services.TryGet<BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore>(out var runnerData)
+                    || runnerData is null)
+                    throw new ConfigException("The BFRunner exchange needs the build's client data for its item boxes.");
+                round.BfRunnerItems = Data.BfRunnerItemPool.Load(runnerData);
+                context.Effect(messages.On<RoundBfRunnerItemTouched>(game, round.HandleBfRunnerItemAsync));
+                context.Effect(messages.On<RoundBfRunnerGoalReported>(game, round.HandleBfRunnerGoalAsync));
+                context.Effect(messages.On<RoundBfRunnerCheckpointReported>(game, round.HandleBfRunnerCheckpointAsync));
+                context.Effect(messages.On<RoundBfRunnerProgressReported>(game, round.HandleBfRunnerProgressAsync));
+            }
             if (Bound<RoundExtremeRacingGoalReported>())
             {
                 // Mode 24 runs its race rounds only where the build's exchange is mounted.

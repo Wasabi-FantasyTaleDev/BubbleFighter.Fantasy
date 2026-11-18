@@ -29,6 +29,7 @@ bundles:
   - clan-gateway
 patches:
   - patch.yaml
+  - ../bundles/bf-runner.patch.yaml
   - ../bundles/shop-supplement-lucci.yaml
   - ../bundles/pets.patch.yaml
   - ../bundles/pets-modern.patch.yaml

@@ -2,6 +2,8 @@ version: 1
 structs:
   # The stage result has mode-specific meaning. kr-1256 sub_AD1F50 passes humanWon xor 1
   # through kr-1256 sub_6E5840 to kr-1256 sub_708B60, which writes one word and false bool32.
+  # In mode 16 the boss reports 1 (kr-1256 sub_B38850, cn-774 sub_5D28D0, tw-454 sub_83A310);
+  # the last human's conversion reports 0 (kr-1256 sub_ADF940, cn-774 sub_CD4580, tw-454 sub_9BD6A0).
   ScriptStageResult:
     - outcome: u32
       only: [kr-1256]

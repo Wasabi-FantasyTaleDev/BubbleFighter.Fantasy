@@ -1,0 +1,9 @@
+version: 1
+structs:
+  # The ability-level notification is a UserAbilityInfos vector. kr-1256 sub_9D2050 uses
+  # kr-1256 sub_11529A0, cn-774 sub_BCE060 uses cn-774 sub_49C1F0, and tw-454 sub_AAC980
+  # uses tw-454 sub_47FDD0. Each reads a u32 count and (u16 ability, u32 level) per entry.
+  # This describes the notification; it does not establish a purchase or an earned level.
+  PirateAssaultAbilityLevels:
+    - abilities: "list<FighterInfoAbility>"
+      only: [kr-1256]

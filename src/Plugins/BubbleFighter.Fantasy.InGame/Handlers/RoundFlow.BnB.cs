@@ -95,11 +95,14 @@ internal sealed partial class RoundFlow
 
     /// <summary>Whether this server holds the per-map data the room's mode needs on <paramref name="stage"/>.</summary>
     internal bool HostsModeMap(PlayRoom room, string stage) =>
-        (!IsBnBMode(room) || _bnbMaps?.ContainsKey(stage) == true)
+        HostsControlPointStage(room, stage)
+        && (!IsBnBMode(room) || _bnbMaps?.ContainsKey(stage) == true)
         && (!IsExtremeRacingMode(room) || !_options.ExtremeRacingInitialization || _racingMaps?.ContainsKey(stage) == true);
 
     internal void ValidateModeMap(PlayRoom room, string stage)
     {
+        if (!HostsControlPointStage(room, stage))
+            throw new InvalidOperationException($"Control Point requires a released stage with playable objectives: '{stage}'.");
         if (!room.BnBCleanupTask.IsCompleted)
             throw new InvalidOperationException("A match cannot start while its previous BnB connection cleanup is pending.");
         if (!room.FinalZoneCleanupTask.IsCompleted)

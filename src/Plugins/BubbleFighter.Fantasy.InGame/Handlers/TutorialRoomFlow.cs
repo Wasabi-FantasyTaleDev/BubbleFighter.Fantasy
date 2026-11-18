@@ -2,6 +2,7 @@ using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Match;
 using BubbleFighter.Fantasy.Contracts.Rooms;
 using BubbleFighter.Fantasy.Contracts.Progress;
+using BubbleFighter.Fantasy.Contracts.Sessions;
 using BubbleFighter.Fantasy.Contracts.Shop;
 using BubbleFighter.Fantasy.InGame.Sessions;
 using Microsoft.Extensions.Logging;
@@ -97,6 +98,18 @@ internal sealed class TutorialRoomFlow(RoomRegistry registry, IReadOnlyDictionar
         // The gift is granted once: the store reports a first clear only when no clear of the stage was stored.
         if (first && giftService is not null && gifts is not null && gifts.TryGetValue(request.MapKey, out var gift))
             await giftService.GrantAsync(session, user, gift, ct).ConfigureAwait(false);
+    }
+
+    internal async ValueTask SendStageMainListAsync(ISession session, IMessageSender<TutorialStageListReceived> sender,
+        CancellationToken ct)
+    {
+        if (!session.TryFeature<IPlayerSession>(out var player) || player.Phase != SessionPhase.MainMenu
+            || registry.TryGet(session.Id) is not null) return;
+        var (user, _) = SessionPlayer.RequireIdentity(session);
+        var clears = stages is null ? [] : await stages.ListAsync(user, ct).ConfigureAwait(false);
+        // Eight categories on three tabs. Stage zero is the separate unnumbered prologue.
+        await sender.SendAsync(session, new(clears.Where(row => row.Stage is >= 1 and <= 28
+            && row.Stage % 10 is >= 1 and <= 8).ToArray()), ct).ConfigureAwait(false);
     }
 
     internal async ValueTask CloseAsync(ISession session, TutorialRoundClosed request, CancellationToken ct)

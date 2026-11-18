@@ -370,6 +370,7 @@ internal static class RoundResultWire
         // kr-1256 sub_429620 keeps any winner up to 36; kr-1256 sub_9E9710 and cn-774 sub_A91FB0 compare it with the
         // local team, so the zombie allegiances (14 against human 1, 15 against human 2) reach the win/lose result.
         if (message.WithRewards && message.WinnerTeam is not (0 or 1 or 2 or 14 or 15)
+            && !((GameModeId)message.ModeId == GameModeId.ZombiePve && message.WinnerTeam == 35)
             && !((GameModeId)message.ModeId is (GameModeId.Zombie or GameModeId.ZombieGhost or GameModeId.ZombieEscape) && message.WinnerTeam == 34))
             throw new InvalidOperationException("A final team scoreboard requires a supported winner allegiance for its mode.");
         var rows = message.Rows.OrderBy(row => row.Slot).ToArray();

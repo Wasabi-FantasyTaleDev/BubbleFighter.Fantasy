@@ -62,7 +62,17 @@ internal sealed class RoundRespawnBinding(string protocol, IOpcodeTable table, P
         if (_body == RespawnBody.SpawnIndex)
             return ReadSpawnAcceptance(packets, build, body) with { Rules = _rules };
         var values = ReadTagged(packets, build, "RoundResetRequest", body);
-        return new RoundSpawnAccepted((int)values["actor"]!, 0) { Request = body.ToArray(), Rules = _rules };
+        return new RoundSpawnAccepted((int)values["actor"]!, 0) { Request = body.ToArray(), Rules = _rules, TaggedReset = TaggedReset(values) };
+    }
+
+    // CN/TW store plain words at these offsets. Only a tagged field decodes to a marker byte or a nested value.
+    internal static RoundTaggedReset? TaggedReset(IReadOnlyDictionary<string, object?> values)
+    {
+        if (!values.TryGetValue("unknown_4", out var first) || !values.TryGetValue("unknown_12", out var second)
+            || first is not (byte or IReadOnlyDictionary<string, object?>) || second is not (byte or IReadOnlyDictionary<string, object?>))
+            return null;
+        return new(Value(first), Value(second));
+        static int? Value(object? field) => field is IReadOnlyDictionary<string, object?> tail ? (int?)tail["unknown_0"] : null;
     }
 
     public ValueTask SendAsync(ISession session, RoundPlayerRespawned message, CancellationToken ct) =>

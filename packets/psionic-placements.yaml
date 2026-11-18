@@ -1,0 +1,33 @@
+version: 1
+structs:
+  # kr-1256 sub_4915C0 / kr-1256 sub_6FEAE0; cn-774 sub_5213A0 / cn-774 sub_8BF180.
+  # The turret grenade uses positioned item 137 after landing.
+  PsionicPositionedItem: []
+  PsionicPositionedItem@kr-1256:
+    - actor: u32
+      offset: 0
+    - item: u32
+      offset: 4
+    - position_x: f32
+      offset: 8
+    - position_y: f32
+      offset: 12
+    - position_z: f32
+      offset: 16
+  PsionicPositionedItem@tw-454: []
+
+  # kr-1256 sub_6E7690 / kr-1256 sub_6D97D0 and cn-774 sub_945880 / cn-774 sub_89B780 spawn GoBlackHole.
+  PsionicBlackHole: []
+  PsionicBlackHole@kr-1256:
+    - actor: u32
+      offset: 0
+    - position_x: f32
+      offset: 4
+    - position_y: f32
+      offset: 8
+    - position_z: f32
+      offset: 12
+    - unknown_16: "list<u32>"
+      offset: 16
+      except: [cn-774]
+  PsionicBlackHole@tw-454: []

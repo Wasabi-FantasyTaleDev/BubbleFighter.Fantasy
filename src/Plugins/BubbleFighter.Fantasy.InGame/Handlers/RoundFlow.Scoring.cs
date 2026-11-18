@@ -35,12 +35,15 @@ internal sealed partial class RoundFlow
                 : reporter.Slot == target.Slot ? LifeCheck.PopOfSelf
                 : target.Life.State != (claim.Evidence == KillEvidence.BubbleContact ? SeatLife.Bubble : SeatLife.Dead)
                     ? LifeCheck.PopOfUnbubbled
-                : !AreOpponents(room, reporter.Team, target.Team)
+                : !AreScoringOpponents(room, reporter.Slot, reporter.Team, target.Slot, target.Team)
                     ? LifeCheck.PopWithoutOpposingTeams
                 : null;
             if (ignored is not null)
                 return (null, ignored, victim);
-            if (claim.Evidence == KillEvidence.BubbleContact) target!.Life.Burst();
+            if (claim.Evidence == KillEvidence.BubbleContact && target!.Life.Burst()
+                && room.ZombieOrigin is { } origin && room.Seats.FirstOrDefault(s => s.Slot == target.Slot) is { } popped
+                && origin.MemberFor(popped) is { Role: ZombieOriginRole.Prototype or ZombieOriginRole.ConvertedFighter } zombie)
+                zombie.PoppedLife = target.Life.Generation;
             if (!target!.Life.CreditDeath()) return (null, null, victim);
         }
         else if (reporter is not null)
@@ -92,6 +95,11 @@ internal sealed partial class RoundFlow
         : IsFinalZoneMode(room) && !UsesFinalZoneGroups(room)
             || first != second && IsScoringTeam(room, first) && IsScoringTeam(room, second);
 
+    private bool AreScoringOpponents(PlayRoom room, int firstSlot, int firstTeam, int secondSlot, int secondTeam) =>
+        room.ZombieOrigin is { } origin
+            ? origin.AreOpponents(room, firstSlot, secondSlot) == true
+            : AreOpponents(room, firstTeam, secondTeam);
+
     // kr-1256 sub_6F8280, cn-774 sub_8B7CA0 and tw-454 sub_72BEE0 identify the source and victim.
     // Native life evidence and confirmed score reports share counters; release routes name their rescuer in build data.
     private RoundScoreUpdated? CreditAction(PlayRoom room, int? reporterSlot, int? victimSlot, bool rescue, bool lifeEvidence)
@@ -99,13 +107,14 @@ internal sealed partial class RoundFlow
         if (reporterSlot is not { } slot || ScoreMember(room, slot) is not { } reporter)
             return null;
         var victim = victimSlot is { } targetSlot ? ScoreMember(room, targetSlot) : null;
-        if (rescue && (victim is null || victim.Slot == slot || victim.Team != reporter.Team))
+        if (rescue && (victim is null || victim.Slot == slot || (room.ZombieOrigin is { } origin
+            ? origin.AreOpponents(room, slot, victim.Slot) != false : victim.Team != reporter.Team)))
             return null;
         if (lifeEvidence || IsWeaponMasterMode(room))
         {
             if (victim is null || victim.Slot == slot || (rescue
-                ? !IsScoringTeam(room, reporter.Team) || !IsScoringTeam(room, victim.Team)
-                : !AreOpponents(room, reporter.Team, victim.Team)))
+                ? room.ZombieOrigin is null && (!IsScoringTeam(room, reporter.Team) || !IsScoringTeam(room, victim.Team))
+                : !AreScoringOpponents(room, slot, reporter.Team, victim.Slot, victim.Team)))
                 return null;
             var life = LifeActor(room, RoomRegistry.SceneEntity(victim.Slot))!.Life;
             if (!(rescue ? life.CreditRescue() : life.CreditKnockdown())) return null;

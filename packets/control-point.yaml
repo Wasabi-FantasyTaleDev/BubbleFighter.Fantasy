@@ -1,0 +1,46 @@
+version: 1
+structs:
+  ControlPointChange: []
+  ControlPointInitialChange: []
+  ControlPointInitialChange@tw-454: []
+  ControlPointNode: []
+  ControlPointSnapshot: []
+
+  # Only the local character reports a change. The client sends -1 when leaving; see control_point_nodes for the range.
+  # kr-1256 sub_497380 -> kr-1256 sub_7043F0; cn-774 sub_527EE0 -> cn-774 sub_8C47A0; tw-454 sub_78BF10.
+  ControlPointChange@kr-1256:
+    - node: u32
+      offset: 0
+
+  # The KR and CN senders choose this form when the second argument is nonnegative. TW has no audited opcode for it.
+  ControlPointInitialChange@kr-1256:
+    - node: u32
+      offset: 0
+    - stage_max_node: u32
+      offset: 4
+
+  # kr-1256 sub_115BBA0, cn-774 sub_46E530, tw-454 sub_466830: two counted word vectors,
+  # then two words and two four-byte booleans. The 48-byte in-memory stride is not the wire width.
+  ControlPointNode@kr-1256:
+    - owner_team: u32
+      offset: 4
+    - capturing_team: u32
+      offset: 8
+    - team_two_seats: list<u32>
+      offset: 12
+    - team_one_seats: list<u32>
+      offset: 24
+    - team_two_progress: u32
+      offset: 36
+    - team_one_progress: u32
+      offset: 40
+    - contested: bool
+      offset: 44
+    - owner_highlight: bool
+      offset: 45
+
+  # kr-1256 sub_CE1810 -> kr-1256 sub_10C1440; cn-774 sub_D87040; tw-454 sub_D50040.
+  # Always send the build's full record count even for a map with fewer active nodes (tw-454 sub_D60DB0 requires three).
+  ControlPointSnapshot@kr-1256:
+    - nodes: list<ControlPointNode>
+      offset: 0

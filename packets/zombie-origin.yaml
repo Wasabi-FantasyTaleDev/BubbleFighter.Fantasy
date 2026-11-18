@@ -1,0 +1,26 @@
+version: 1
+structs:
+  ZombieOriginPrototypeRequest: []
+  ZombieOriginPrototypeRequest@cn-774: []
+  ZombieOriginPrototypeRoll: []
+  ZombieOriginPrototypeRoll@cn-774: []
+  ZombieOriginPrototype: []
+  ZombieOriginPrototype@cn-774: []
+
+  # kr-1256 sub_CE90F0 sends character +748; kr-1256 sub_CD8F70 branches on this field's zombie kinds.
+  ZombieOriginPrototypeRequest@kr-1256:
+    - character_kind: u32
+
+  # Game S2C 722: kr-1256 sub_CF1B40 -> kr-1256 sub_CEAEB0 -> kr-1256 sub_B524C0.
+  # At kr-1256 0xB52674 the draw scales the total prototype weight by roll / 10000.
+  ZombieOriginPrototypeRoll@kr-1256:
+    - roll: u32
+
+  # Peer 34277: kr-1256 sub_CEAEB0 writes the scene actor and tagged role; kr-1256 sub_CF1C10
+  # reads both and kr-1256 sub_CF3270 applies the selected role to that actor.
+  ZombieOriginPrototype@kr-1256:
+    - actor: u32
+      offset: 0
+    - prototype: "optional<0x3A,ScriptZombieKind>"
+      offset: 4
+      default: 186

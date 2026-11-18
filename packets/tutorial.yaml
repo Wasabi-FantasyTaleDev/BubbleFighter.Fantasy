@@ -3,6 +3,8 @@ version: 1
 structs:
   # Own list readers: kr-812 sub_840770, cn-717 sub_8CA190, cn-324 sub_6FE8F0
   # -> cn-324 sub_718330, id-400 sub_799F20, id-1809 sub_7BFD20, cn-706 sub_7A2510.
+  # Modern picker readback: cn-774 sub_BB0FD0 reads a count and sSINGLESTAGECLOEARINFO rows, with
+  # cn-774 sub_495D20 reading their three words; tw-454 sub_A8E7E0 / tw-454 sub_47ECE0 do the same.
   TutorialStageInfo:
     - cleared: list<TutorialStageClear>
       offset: 4
@@ -123,6 +125,7 @@ structs:
       offset: 152
   # kr-1256 sub_9D7440 writes kr-1256 sub_10D26C0's thirteen words and packed flags,
   # then the directory, display name, selected map and difficulty from kr-1256 sub_99F580.
+  # cn-774 sub_BD6290 / cn-774 sub_105F2C0 and tw-454 sub_AB2360 / tw-454 sub_EBE7E0 write the same record.
   TutorialPlayRequest@kr-1256:
     - end_game_time_over_tick: u32
       offset: 0

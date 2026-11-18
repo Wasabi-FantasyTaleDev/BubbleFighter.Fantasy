@@ -87,6 +87,9 @@ public sealed record RoundFeedSent(ushort Code, ReadOnlyMemory<byte> Payload) : 
     /// <summary>Gets game session ids whose direct peer path replaces this relay delivery; actor and round validation still apply.</summary>
     public IReadOnlySet<long>? DirectPeerRecipients { get; init; }
 
+    /// <summary>Gets the two optional words of a tagged native character reset confirmation, when the build carries them.</summary>
+    public RoundTaggedReset? TaggedReset { get; init; }
+
     /// <summary>Gets an audited installed weapon specification reported by this frame, before room ownership checks.</summary>
     public RoundCriticalWeaponState? CriticalWeaponState { get; init; }
 
@@ -101,6 +104,15 @@ public sealed record RoundFeedSent(ushort Code, ReadOnlyMemory<byte> Payload) : 
 
     /// <summary>Gets the OneKill participants whose current ownership and mode must be admitted before forwarding or death credit.</summary>
     public RoundOneKillAction? OneKill { get; init; }
+
+    /// <summary>Gets the grenade owner's fighter and positioned item, or a null item for a black-hole field.</summary>
+    public (int Actor, int? Item)? PsionicPlacement { get; init; }
+
+    /// <summary>Gets the source object and struck fighter of a native Snowfight slip report.</summary>
+    public (int SourceObject, int Fighter)? SnowfightSlip { get; init; }
+
+    /// <summary>Gets the requesting actor and its optional prototype chosen from its private draw.</summary>
+    public (int Actor, int? Kind)? ZombieOriginPrototype { get; init; }
 }
 
 /// <summary>A feed packet from another player of the round, passed on unread.</summary>
@@ -144,6 +156,9 @@ public sealed record RoundSpawnOffered(int Actor, int SpawnIndex) : IMessage
     /// <summary>Gets whether the client explicitly requested an index reply rather than a server revival prompt.</summary>
     public bool IndexRequested { get; init; }
 }
+
+/// <summary>The two tagged reset values. In a KR Zombie Origin fighter conversion only the second is present and names the form.</summary>
+public sealed record RoundTaggedReset(int? FirstValue, int? CharacterKind);
 
 /// <summary>Who receives the grant that answers a <see cref="RoundSpawnAccepted"/>.</summary>
 public enum RoundRespawnAudience
@@ -199,6 +214,9 @@ public sealed record RoundSpawnAccepted(int Actor, int SpawnIndex) : IMessage
 {
     /// <summary>Gets the player seat decoded by the dialect, or null when that build has no proven actor mapping.</summary>
     public int? ActorSeat { get; init; }
+
+    /// <summary>Gets the two optional words of a tagged native character reset request, when the build carries them.</summary>
+    public RoundTaggedReset? TaggedReset { get; init; }
 
     /// <summary>Gets the native request body for a build whose grant repeats it; empty otherwise.</summary>
     public ReadOnlyMemory<byte> Request { get; init; }

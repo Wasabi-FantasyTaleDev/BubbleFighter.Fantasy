@@ -1,6 +1,7 @@
 using System.Text;
 using BubbleFighter.Fantasy.RoomCore;
 using BubbleFighter.Fantasy.Contracts.ClientData;
+using BubbleFighter.Fantasy.Contracts.Rooms;
 using BubbleFighter.Fantasy.InGame.Sessions;
 
 namespace BubbleFighter.Fantasy.InGame.Data;
@@ -17,7 +18,7 @@ namespace BubbleFighter.Fantasy.InGame.Data;
 /// and a concrete map is drawn at every start: S2C 505 echoes the
 /// markers and S2C 510 carries a map from the room mode's pool.
 /// </summary>
-internal sealed class MapCatalog
+internal sealed partial class MapCatalog
 {
     /// <summary>Client path of the hot random map list.</summary>
     internal const string HotRandomListPath = "ServerShared/HotRandomMapList.csv";
@@ -83,6 +84,8 @@ internal sealed class MapCatalog
     /// <summary>Gets how many modes have a hot random pool.</summary>
     internal int HotModeCount => _hot.Count;
 
+    internal StageMainTutorialTable StageMainTutorials() => new(_meta);
+
     /// <summary>Gets how many modes draw from the difficulty list.</summary>
     internal int DifficultyModeCount => _byDifficulty.Count;
 
@@ -90,7 +93,7 @@ internal sealed class MapCatalog
     internal int MapCount => _meta.Maps.Count();
 
     /// <summary>Loads the random tables and <c>MapMeta</c> from the client data. A missing table is an error.</summary>
-    internal static MapCatalog Load(IClientDataStore store)
+    internal static MapCatalog Load(IClientDataStore store, (int Bytes, int Helpers)? zombiePveLimits = null)
     {
         var hot = new Dictionary<string, List<(string, int)>>(StringComparer.OrdinalIgnoreCase);
         foreach (var row in Rows(store.Read(HotRandomListPath), HotRandomListPath, "Mode", "MapKey", "Weight", "Usable"))
@@ -116,7 +119,9 @@ internal sealed class MapCatalog
             maps.Add(row[2]);
         }
 
-        return new MapCatalog(hot, byDifficulty, MapMetaTable.Parse(store.Read(MapMetaTable.Path)));
+        var catalog = new MapCatalog(hot, byDifficulty, MapMetaTable.Parse(store.Read(MapMetaTable.Path)));
+        if (zombiePveLimits is { } limits) catalog.LoadZombiePveStages(store, limits.Bytes, limits.Helpers);
+        return catalog;
     }
 
     /// <summary>
@@ -143,6 +148,13 @@ internal sealed class MapCatalog
             var lowest = levels.First().Value;
             return lowest[random.Next(lowest.Count)];
         }
+        if (selected is not null && mode == (int)GameModeId.PirateAssaultSeason3)
+        {
+            // Several difficulty variants share one scene directory. The original map key selects the 106 row;
+            // kr-1256 sub_9E5E70 selects the pirate setup from that row's isPirateAssault flag.
+            return new[] { selection.Unknown68, selection.Unknown44, selection.Unknown92, selection.Unknown116 }
+                .FirstOrDefault(key => !string.IsNullOrEmpty(key) && _meta.IsSet(key, "isRelease") && _meta.IsSet(key, "isPirateAssault"));
+        }
         if (selected is not null)
             return selected;
         if (!IsHotMarker(selection))
@@ -156,6 +168,11 @@ internal sealed class MapCatalog
         IReadOnlyList<(string Map, int Weight)> hot = hostable is null ? all : all.Where(entry => hostable(entry.Map)).ToArray();
         if (hot.Count == 0)
             return null;
+        return PickWeighted(hot, random);
+    }
+
+    private static string PickWeighted(IReadOnlyList<(string Map, int Weight)> hot, Random random)
+    {
         var pick = random.Next(hot.Sum(entry => entry.Weight));
         foreach (var (map, weight) in hot)
         {

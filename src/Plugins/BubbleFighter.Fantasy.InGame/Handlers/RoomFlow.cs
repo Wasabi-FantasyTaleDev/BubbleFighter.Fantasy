@@ -1043,7 +1043,14 @@ internal sealed partial class RoomFlow
                 room.RoundMapKey = draw?.Map ?? (request.MapKey.Length > 0 ? request.MapKey : room.MapKey);
                 room.RoundStageKey = draw?.Stage ?? "";
                 room.RoundTimeLimits = request.TimeLimits;
-                if (_options?.AssignSpawnTeamsOnStart == true)
+                if (UsesZombiePveOpening(room))
+                {
+                    // kr-1256 sub_ADF940, cn-774 sub_CD4580 and tw-454 sub_9BD6A0 count surviving humans on team 2.
+                    // Each native start roster supplies the team before any local or remote character is placed.
+                    foreach (var member in room.Seats)
+                        if (member.Team != 36) member.Team = 2;
+                }
+                else if (_options?.AssignSpawnTeamsOnStart == true)
                     room.AssignSpawnTeams();
                 if (_options?.ZombieConversionModeId > 0 && room.ModeId == _options.ZombieConversionModeId)
                     foreach (var member in room.Seats)
@@ -1601,11 +1608,18 @@ internal sealed partial class RoomFlow
     // Called under the room gate. Null when the selection is empty or no map of the room's mode fits it.
     private (string Map, string Stage, bool IsMission)? DrawRoundMap(PlayRoom room, RoomStartRequested request)
     {
+        if (UsesZombiePveOpening(room))
+        {
+            if (Maps is not { } catalog || room.Bots.Count != 0) return null;
+            var players = room.Seats.Count(seat => seat.Team != 36);
+            var key = catalog.ZombiePveMap(request.MapKey, request.MapSelection, players, Random.Shared);
+            return key is null ? null : (key, catalog.StageKey(key), false);
+        }
         var selection = room.Setting.Map with
         {
             Unknown44 = request.MapSelection, Unknown68 = request.MapKey, Unknown92 = request.MapKey, Unknown116 = request.MapName,
         };
-        if (!MapCatalog.HasSelection(selection))
+        if (!MapCatalog.HasSelection(selection) || Maps is null && room.ModeId == (int)GameModeId.PirateAssaultSeason3)
             return null;
         var map = Maps is { } maps
             ? maps.Resolve(room.ModeId, selection, Random.Shared,

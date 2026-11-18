@@ -17,6 +17,9 @@ export default defineConfig({
   srcDir: 'content',
   base: process.env.DOCS_BASE || '/',
   cleanUrls: true,
+  // Prefetching every visible link's page script (about 20 per page) fills the browser's six HTTP/1.1
+  // connections on slow networks, so the page a reader clicks waits behind pages they never open.
+  router: { prefetchLinks: false },
   lastUpdated: false,
   appearance: true,
   locales,

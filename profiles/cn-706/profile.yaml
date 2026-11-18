@@ -26,6 +26,7 @@ vars:
   LEGACY_RELAY_PUBLIC_PORT: ${CN_706_PUBLIC_RELAY_PORT:-7221}
 patches:
   - patch.yaml
+  - ../bundles/bf-runner.patch.yaml
   - ../bundles/clan-legacy.patch.yaml
   - bomb.patch.yaml
   - captain.patch.yaml

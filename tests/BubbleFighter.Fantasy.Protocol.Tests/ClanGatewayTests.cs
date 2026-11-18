@@ -13,8 +13,8 @@ using Xunit;
 namespace BubbleFighter.Fantasy.Protocol.Tests;
 
 /// <summary>
-/// The shared clan port: a connection is greeted and answered without a build, and its login hands it, and every
-/// later frame, to the clan protocol of the build its account's game session is on.
+/// The shared clan port: a connection is answered without a build, and its login hands it, and every later frame, to
+/// the clan protocol of the build its account's game session is on. A build listed as unserved never gets a hello.
 /// </summary>
 public sealed class ClanGatewayTests
 {
@@ -24,8 +24,8 @@ public sealed class ClanGatewayTests
     public async Task LoginHandsTheConnectionToTheBuildOfItsGameSession()
     {
         await using var rig = await Rig.StartAsync("kr-812");
-        Assert.Equal([0, 0, 0xEA, 0x03], await rig.Client.ReceiveExactlyAsync(4, rig.Timeout));
 
+        // Nothing is written at connect: the first heartbeat, due when the client's connection completes, is answered.
         await rig.SendAsync(ClanGatewayPlugin.HeartbeatOpcode, []);
         Assert.Equal([0, 0, 0xEA, 0x03], await rig.Client.ReceiveExactlyAsync(4, rig.Timeout));
 
@@ -40,6 +40,35 @@ public sealed class ClanGatewayTests
             [("clan", 1003), ("clan", 1005), ("kr-812/clan", 1005), ("kr-812/clan", home), ("kr-812/clan", 1003)],
             rig.Router.Dispatched.Select(d => (d.Protocol, (int)d.Opcode)).ToArray());
         Assert.Equal("kr-812", rig.Router.Sessions.Last().Profile.Id);
+        Assert.False(rig.Client.IsClosed);
+    }
+
+    [Fact]
+    public async Task AHeartbeatFromAnUnservedBuildClosesTheConnectionWithoutAHello()
+    {
+        await using var rig = await Rig.StartAsync("cn-774", ["cn-774", "tw-454"]);
+        await rig.SendAsync(ClanGatewayPlugin.HeartbeatOpcode, []);
+        await rig.WaitForCloseAsync();
+        Assert.Equal("clan connection not served for build cn-774", rig.Client.CloseReason);
+        Assert.Equal([("clan", 1003)], rig.Router.Dispatched.Select(d => (d.Protocol, (int)d.Opcode)).ToArray());
+    }
+
+    [Fact]
+    public async Task ALoginFromAnUnservedBuildIsClosedAndNotHandedOn()
+    {
+        await using var rig = await Rig.StartAsync("tw-454", ["cn-774", "tw-454"]);
+        await rig.SendAsync(ClanGatewayPlugin.LoginOpcode, Login(UserNumber));
+        await rig.WaitForCloseAsync();
+        Assert.Equal("clan connection not served for build tw-454", rig.Client.CloseReason);
+        Assert.DoesNotContain(rig.Router.Dispatched, d => d.Protocol != "clan");
+    }
+
+    [Fact]
+    public async Task ABuildOutsideTheUnservedListKeepsItsHello()
+    {
+        await using var rig = await Rig.StartAsync("kr-812", ["cn-774", "tw-454"]);
+        await rig.SendAsync(ClanGatewayPlugin.HeartbeatOpcode, []);
+        Assert.Equal([0, 0, 0xEA, 0x03], await rig.Client.ReceiveExactlyAsync(4, rig.Timeout));
         Assert.False(rig.Client.IsClosed);
     }
 
@@ -84,7 +113,7 @@ public sealed class ClanGatewayTests
         public IOpcodeTable Table { get; private set; } = null!;
         public CancellationToken Timeout => _timeout.Token;
 
-        public static async Task<Rig> StartAsync(string build)
+        public static async Task<Rig> StartAsync(string build, string[]? unserved = null)
         {
             var rig = new Rig();
             var dialect = TestWireDialects.Get(build);
@@ -94,7 +123,7 @@ public sealed class ClanGatewayTests
                 dialect.CreateEncryptor(PacketDirection.ServerToClient), events, 4, 4, NullLogger.Instance);
             rig._registrations.Add(rig._game.RegisterFeature<IPlayerSession>(new PlayerSession(new PlayerIdentity(UserNumber, "user", "clanner", 1))));
             rig._registrations.AddRange(ClanGatewayPlugin.RegisterHandlers("clan", rig.Router, new Sessions(rig._game), new Tables(rig.Table),
-                NullLogger.Instance));
+                NullLogger.Instance, unserved));
             // The build's own clan protocol is the recording router's: it records what reaches it.
             rig._verified = new VersionVerifiedScope(4);
             var protocol = ClanGatewayPlugin.CreateProtocol("clan", new ProtocolOptions(), rig.Router, events, rig._verified,

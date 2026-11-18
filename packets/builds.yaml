@@ -19,6 +19,8 @@ builds:
 
   # KR 2015. The baseline of every build whose packet classes keep their names.
   kr-812:
+    # Mode 16 result dialog: kr-812 sub_789C30, kr-1256 sub_ADD1E0, cn-774 sub_CD0540, tw-454 sub_9B9610.
+    zombie_pve_victory_choice_builds: [kr-812, kr-1256, cn-774, tw-454]
     # The clan connection's packet object holds 65536 bytes, the 4-byte frame header (length, opcode) and the body:
     # kr-812 sub_A51B70 checks every read against its cursor at +65552. The clan writers never send a larger frame.
     clan_packet_bytes: 65536
@@ -512,6 +514,8 @@ builds:
   # round layouts are restated as `Name@kr-1256` where they differ. Nothing below kr-812's capabilities is
   # audited for it yet, so each is off until its consumer is read in this build.
   kr-1256:
+    # kr-1256 sub_CE0EE0 and cn-774 sub_D876C0 iterate five fixed snapshot records.
+    control_point_nodes: 5
     # kr-1256 sub_C45700 and kr-1256 sub_C49880 label and render score, Bubble and Pang from +84/+60/+64.
     # kr-1256 sub_C4B1B0 and kr-1256 sub_C50B50 render lblPangedCount from +236; kr-1256 sub_9E9160 assigns these kinds.
     # Held stars retain star_live_stat_kind below; collected Lucci has no audited projection for this build.
@@ -684,6 +688,12 @@ builds:
       Unknown32907: { opcode: Unknown32907, structure: Unknown32907, actors: [], echo_sender: true }
       Unknown32921: { opcode: Unknown32921, structure: Unknown32921, actors: [actor] }
       Unknown32925: { opcode: Unknown32925, structure: Unknown32925, actors: [actor] }
+      # kr-1256 sub_6E20F0, cn-774 sub_8A33C0 and tw-454 sub_7167C0 use the same local-send path as their short shot.
+      ExtendedSlotProjectile: { builds: [kr-1256, cn-774, tw-454], opcode: gppExtendedSlotProjectile_, structure: ExtendedSlotProjectile, actors: [actor], nested: true }
+      # kr-1256 sub_485BE0 reports its own hit with object -1; the positive-object trap variant needs separate ownership.
+      SnowfightSlip: { builds: [kr-1256, cn-774, tw-454], opcode: gppStepOnBanana, structure: SnowfightSlip, actors: [actor], nested: true, snowfight_slip: true }
+      # kr-1256 sub_CEAEB0 -> kr-1256 sub_7AB190: the sender queues its own 0x85E5 copy below 0x957C in normal queue mode.
+      ZombieOriginPrototype: { builds: [kr-1256], opcode: gppZombieOriginPrototype_, structure: ZombieOriginPrototype, actors: [actor], nested: true, zombie_origin_prototype: true }
       RoundResetConfirmation: { opcode: Unknown32926, structure: RoundResetConfirmation, actors: [actor], nested: true, life_event: reset_confirmed, life_actor: actor }
       # kr-1256 sub_50AFC0 requests; kr-1256 sub_50B470 confirms. kr-1256 sub_7AA3D0 queues each sender's own copy.
       OneKillRequest: { builds: [kr-1256], opcode: gppOneKillRequest_, structure: OneKillRequest, actors: [attacker], echo_sender: false, one_kill: request }
@@ -708,14 +718,19 @@ builds:
       WallHealAllowed: { builds: [kr-1256, cn-774], opcode: gppSetWallHealAllowed_, structure: WallHealAllowed, actors: [actor], echo_sender: true }
       # kr-1256 sub_6E55F0 / kr-1256 sub_6E54D0 bypass the local queue in kr-1256 sub_7AA3D0;
       # their consumers kr-1256 sub_6EC3C0 / kr-1256 sub_48D3E0 need the reporting character's returned copy.
-      CharacterAttributeSet: { builds: [kr-1256], opcode: gppSetAttribute, structure: CharacterAttributeSet, actors: [actor], echo_sender: true }
-      CharacterAttributeReset: { builds: [kr-1256], opcode: gppResetChrAttr, structure: CharacterAttributeReset, actors: [actor], echo_sender: true }
+      # cn-774 sub_952A90 likewise skips local delivery for these two opcodes.
+      CharacterAttributeSet: { builds: [kr-1256, cn-774], opcode: gppSetAttribute, structure: CharacterAttributeSet, actors: [actor], echo_sender: true }
+      CharacterAttributeReset: { builds: [kr-1256, cn-774], opcode: gppResetChrAttr, structure: CharacterAttributeReset, actors: [actor], echo_sender: true }
+      # The locally simulated grenade reports one of two placements. Its sender already queues a local copy.
+      PsionicTurret: { builds: [kr-1256, cn-774], opcode: gppUseItemDirectAtPos, structure: PsionicPositionedItem, actors: [actor], psionic_placement: true }
+      PsionicBlackHole: { builds: [kr-1256, cn-774], opcode: gppSpawnBlackHole_, structure: PsionicBlackHole, actors: [actor], nested: true, psionic_placement: true }
       # The pinging client keeps its own marker (kr-1256 sub_7AB190 queues the sender's copy), so only the others get it;
       # the receivers choose team or enemy presentation themselves (kr-1256 sub_A41C90).
       SmartPing: { builds: [kr-1256, cn-774], opcode: gppSmartPing_, structure: SmartPing, actors: [actor], echo_sender: false }
       # kr-1256 sub_496B80 / kr-1256 sub_B0B110 / kr-1256 sub_705AA0 run their own low packets locally.
       # Only the recipient reports; a different source actor is valid for healing and storm-hit reactions.
-      ItemHealing: { builds: [kr-1256], opcode: gppHitByItem, structure: ItemHealing, actors: [actor], echo_sender: false }
+      # cn-774 sub_613820 reports for the locally controlled recipient; cn-774 sub_952A90 also queues 32829 locally.
+      ItemHealing: { builds: [kr-1256, cn-774], opcode: gppHitByItem, structure: ItemHealing, actors: [actor], echo_sender: false }
       FreezeCannonEnd: { builds: [kr-1256], opcode: gppEndFreezeCannon, structure: FreezeCannonEnd, actors: [actor], echo_sender: false }
       StormCloudHit: { builds: [kr-1256], opcode: gppStormCloudHit_, structure: StormCloudHit, actors: [actor], echo_sender: false }
       # Only the peer reader kr-1256 sub_6D97D0 advances a mark (kr-1256 sub_D134A0 only resets marks to the start),
@@ -818,6 +833,7 @@ builds:
       # The picked map's Difficulty column (kr-1256 sub_96CF30 parses it into request +100) becomes the
       # room's mission difficulty, GameSetting +140, which kr-1256 sub_7EEB80 hands to Lua GetDifficulty.
       word_copies: { targets: [unknown_140], sources: [unknown_100] }
+      tutorial_difficulty_target: unknown_140
       mission_prefix: npc_
     # The custom AI-war rooms (modes 38 and 39, wgtNoItemCustomAiWar and wgtTeamSurvivalCustomAiWar) let the master
     # add computer players: kr-1256 sub_9681C0 builds the add panel only while the room's session byte +72 is set,
@@ -909,6 +925,11 @@ builds:
       pet_equipment: true
       script_zombies: true # Own mode-8 Lua registration, qualified515, full504 and owned33287 are audited.
       ghost_zombies: true # kr-1256 sub_AD1600 loads mode28; kr-1256 sub_AC5110 handles its king cleanup.
+      # Numbered solo requests: kr-1256 sub_99F580, cn-774 sub_B9FAD0, tw-454 sub_A7D470.
+      # Separate from the optional first-run prompt and its server-selected route.
+      stage_main_tutorial: true
+      # No numbered-picker list request is established here. In KR the purported catalog number belongs to a PvE request.
+      stage_main_tutorial_list: false
       map_portals: true
       # kr-1256 sub_9601E0 and sub_95FAE0: cookie/probe and movement; no listener enablement.
       bomb_mission: true
@@ -1139,6 +1160,7 @@ builds:
       # Mission difficulty: cn-774 sub_B6F7C0 parses the map's Difficulty column into request +124, and
       # cn-774 sub_98CB90 hands GameSetting +172 to Lua GetDifficulty.
       word_copies: { targets: [unknown_172], sources: [unknown_124] }
+      tutorial_difficulty_target: unknown_172
       mission_prefix: npc_
     room_ai_seat: ~
     base: kr-1256
@@ -1165,6 +1187,8 @@ builds:
     # sub_63E1A0, tw-454 sub_63E430) uses the same numbers and inherits this map.
     plaza_game_results: { refused: 0, basketball_miss: 10, basketball_hit: 11, basketball_item: 12, fishing_started: 20, catch: 10, catch_one_item: 11, catch_two_items: 12, fortune_item: 10, fortune_paper: 11 }
     capabilities:
+      # CN and its TW derivative request the cleared numbered stages from the picker; their views are cn-774 sub_809980 and tw-454 sub_52B400.
+      stage_main_tutorial_list: true
       # The booth packets are the kr-1256 ones (packets/lobby-minigame.yaml) and cn-774 sub_9D8360 registers the
       # mini-game configuration as category 3 with cn-774 sub_9D81D0, which reads kr-1256's 42 bytes; the server publishes
       # the prices in packets/dynamic-config-cn-774.yml, so the booths charge exactly what the client shows.
@@ -1265,6 +1289,8 @@ builds:
 
   # TW 2019 (ClientVersion_Major 454), cn-774's lineage.
   tw-454:
+    # tw-454 sub_D60DB0 refuses to draw the gauge unless the vector contains exactly three records.
+    control_point_nodes: 3
     # tw-454 sub_6E2140 and tw-454 sub_6E7110 render the inherited +80/+60/+64 score/Bubble/Pang counters.
     # tw-454 sub_512780 and tw-454 sub_518050 bind lblPangedCount to +156; tw-454 sub_A63CA0 confirms the inherited kinds.
     # tw-454 sub_C15030 and tw-454 sub_C153F0 apply the character then ordered distinct items; tw-454 sub_C28430 sums effects.
@@ -1366,6 +1392,7 @@ builds:
       # Mission difficulty: tw-454 sub_7D62F0 parses the map's Difficulty column into request +124, and tw-454 0xCBAAD5 copies
       # GameSetting +156 into the field Lua GetDifficulty returns.
       word_copies: { targets: [unknown_156], sources: [unknown_124] }
+      tutorial_difficulty_target: unknown_156
       mission_prefix: npc_
     base: cn-774
     inventory:

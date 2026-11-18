@@ -45,8 +45,22 @@ public class RandomMapResolutionTests
             ("isRelease", ["1", "1", "0", "1", "1"]),
             ("isNotemTeamModeMap", ["1", "1", "1", "0", "1"]),
             ("isZombieModeMap", ["0", "1", "0", "0", "0"]),
+            ("isPirateAssault", ["1", "0", "1", "0", "0"]),
             ("isHordeModeMap", ["0", "0", "0", "1", "0"])),
     }));
+
+    [Fact]
+    public void PirateAssaultSelectsOnlyReleasedModeMapsAndKeepsTheVariantKeyAcrossSlots()
+    {
+        var catalog = Catalog();
+        var random = new Random(1);
+        Assert.Null(catalog.Resolve(106, Blob("", "npc_Village07_Easy01", ""), random));
+        Assert.Null(catalog.Resolve(106, Blob("", "rel_Meta_Unreleased", ""), random));
+        Assert.Null(catalog.Resolve(106, Blob("", "unlisted", ""), random));
+        Assert.Equal("rel_Meta_A", catalog.Resolve(106, Blob("rel_Meta_A", "rel_Meta_B", ""), random));
+        Assert.Equal("rel_Meta_A", catalog.Resolve(106, Blob("Random", "", ""), random));
+        Assert.Equal("npc_Village07_Easy01", catalog.Resolve(101, Blob("", "npc_Village07_Easy01", ""), random));
+    }
 
     [Fact]
     public void HotMarkersDrawFromTheModesOwnUsablePool()

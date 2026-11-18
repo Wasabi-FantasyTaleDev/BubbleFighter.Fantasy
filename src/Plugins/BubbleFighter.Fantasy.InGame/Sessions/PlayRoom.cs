@@ -12,6 +12,7 @@ public sealed partial class PlayRoom
     internal BubbleFighter.Fantasy.Contracts.Match.TutorialRoundOpened? Tutorial { get; set; }
     internal CancellationTokenSource? TutorialCancellation { get; set; }
     internal BubbleFighter.Fantasy.InGame.Handlers.RoundRescueState? Rescues { get; set; }
+    internal (int Generation, ISession Master, int EarliestMapTimeMs)? ZombiePveBossSpawn { get; set; }
     internal ushort BlueScore { get; set; }
     internal bool AutoStartArmed { get; set; }
     // Room-only bindings log an unavailable start once; the marker dies with the bounded room.
@@ -175,7 +176,13 @@ public sealed partial class PlayRoom
     public int MasterSlot => _members.MasterSlot;
 
     // The room executor and gate serialize this with joins, departures and starts.
-    internal bool TransferMaster(int slot) => _members.TransferMaster(slot);
+    internal bool TransferMaster(int slot)
+    {
+        if (!_members.TransferMaster(slot)) return false;
+        ++PirateAssaultMasterRevision;
+        PirateAssaultResult = null;
+        return true;
+    }
 
     /// <summary>Checks readiness for a start click; the master needs no ready toggle (client <c>0x96DD20</c>).</summary>
     public bool CanStart => _members.CanStart;
@@ -517,13 +524,19 @@ public sealed partial class PlayRoom
     private void ResetRoundParticipants()
     {
         CancelLoadTimeout();
+        PirateAssaultResult = null;
         Captains = new CaptainRoster();
         SoccerGoals = new int[2];
+        BfRunner = new BfRunnerRoundState();
         SoccerBall = null;
         SoccerBallMovement = null;
         SceneObjects = null;
         CancelModeClocks();
         ExtremeRacing = new ExtremeRacingRoundState();
+        ControlPoints = null;
+        ZombieOrigin?.RestoreWaitingTeams(Seats);
+        ZombieOrigin = null;
+        ControlPointPlayableNodes = 0;
         RacingInitialization = null;
         BnBRound = null;
         FinalZone = null;
@@ -566,6 +579,13 @@ public sealed partial class PlayRoom
 
     /// <summary>Gets this round's soccer goals by team (index 0 is team 1); zero in any other round.</summary>
     internal int[] SoccerGoals { get; private set; } = new int[2];
+
+    /// <summary>Gets this round's BFRunner race; unused in any other round.</summary>
+    internal BfRunnerRoundState BfRunner { get; private set; } = new();
+
+    internal ControlPointRoundState? ControlPoints { get; set; }
+    internal int ControlPointPlayableNodes { get; set; }
+    internal RoomDeadlineClock? ControlPointClock { get; set; }
 
     /// <summary>Gets or sets the soccer ball the host added this round, or null before it is added.</summary>
     internal int? SoccerBall { get; set; }
@@ -832,8 +852,12 @@ public sealed partial class PlayRoom
             UserHostMatchEscrowed = false;
             UserHostStartingCompetitors = null;
             Phase = RoomPhase.Waiting;
+            PirateAssaultResult = null;
+            ZombiePveBossSpawn = null;
             ZombieEscape?.RestoreWaitingTeams(Seats);
             ZombieEscape = null;
+            ZombieOrigin?.RestoreWaitingTeams(Seats);
+            ZombieOrigin = null;
             CancelModeClocks();
             AutoStartArmed = false;
             Rescues = null;

@@ -1,0 +1,7 @@
+# Included by the builds whose opcode tables name all five BFRunner packets (round mode 21): the host's goal report,
+# the checkpoint report, the progress list and the checkpoint and race-over notices of packets/bfrunner.yaml.
+# Native-client acceptance remains required.
+- set:
+    id: dialect.rooms
+    config:
+      bf_runner: true

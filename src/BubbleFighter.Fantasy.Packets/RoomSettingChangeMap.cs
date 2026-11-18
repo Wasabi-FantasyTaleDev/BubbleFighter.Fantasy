@@ -26,12 +26,13 @@ public sealed class RoomSettingChangeMap
     private readonly string _missionPrefix;
     private readonly IReadOnlyDictionary<string, string> _copies;
     private readonly IReadOnlyDictionary<string, string> _wordCopies;
+    private readonly string? _tutorialDifficulty;
 
     private RoomSettingChangeMap(PacketTables tables, string build, IReadOnlyDictionary<string, string> request,
         IReadOnlyDictionary<string, string> targets, string missionPrefix, IReadOnlyDictionary<string, string> copies,
-        IReadOnlyDictionary<string, string> wordCopies) =>
-        (_tables, _build, _request, _targets, _missionPrefix, _copies, _wordCopies) =
-            (tables, build, request, targets, missionPrefix, copies, wordCopies);
+        IReadOnlyDictionary<string, string> wordCopies, string? tutorialDifficulty) =>
+        (_tables, _build, _request, _targets, _missionPrefix, _copies, _wordCopies, _tutorialDifficulty) =
+            (tables, build, request, targets, missionPrefix, copies, wordCopies, tutorialDifficulty);
 
     /// <summary>Loads a build's value, or returns null when the build states none.</summary>
     /// <param name="tables">The packet tables the build is named in.</param>
@@ -48,18 +49,23 @@ public sealed class RoomSettingChangeMap
             return null;
         var where = $"{build} room_setting_change_map";
         if (raw is not Dictionary<string, object?> map
-            || map.Keys.Any(key => key is not ("request" or "targets" or "mission_prefix" or "string_copies" or "word_copies"))
+            || map.Keys.Any(key => key is not ("request" or "targets" or "mission_prefix" or "string_copies" or "word_copies" or "tutorial_difficulty_target"))
             || map.GetValueOrDefault("request") is not Dictionary<string, object?> request
             || map.GetValueOrDefault("targets") is not Dictionary<string, object?> targets
             || map.GetValueOrDefault("mission_prefix") is not string { Length: > 0 } prefix)
             throw new ConfigException($"{where} must state request, targets and mission_prefix.");
         var requestFields = tables.Resolve(build, "RoomGameSettingChangeRequest");
         var settingFields = tables.Resolve(build, "GameSetting");
+        var words = Copies(map, "word_copies", "u32", requestFields, settingFields, where);
+        var difficulty = map.GetValueOrDefault("tutorial_difficulty_target") as string;
+        if ((map.ContainsKey("tutorial_difficulty_target") || tables.CapabilityOf(build, "stage_main_tutorial"))
+            && (difficulty is null || !words.ContainsKey(difficulty)))
+            throw new ConfigException($"{where}.tutorial_difficulty_target must name the audited difficulty word in word_copies.");
         return new(tables, build,
             Names(request, RequestKeys, requestFields, key => key == "mode" ? "u32" : "wstr", $"{where}.request"),
             Names(targets, TargetKeys, settingFields, _ => "wstr", $"{where}.targets"),
             prefix, Copies(map, "string_copies", "wstr", requestFields, settingFields, where),
-            Copies(map, "word_copies", "u32", requestFields, settingFields, where));
+            words, difficulty);
     }
 
     // Pairs of GameSetting targets and request sources of one wire type, each target named once.
@@ -134,6 +140,20 @@ public sealed class RoomSettingChangeMap
 
     private bool IsMission(RoomSettingChange change) =>
         change.Scene.StartsWith(_missionPrefix, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Installs a solo stage from its selected map row, physical directory and validated difficulty.</summary>
+    /// <param name="setting">The new solo game settings.</param>
+    /// <param name="map">The selected MapMeta key.</param>
+    /// <param name="directory">The physical stage directory.</param>
+    /// <param name="difficulty">The stage's authored difficulty.</param>
+    public void ApplyTutorial(IDictionary<string, object?> setting, string map, string directory, int difficulty)
+    {
+        setting[_targets["selection"]] = map;
+        setting[_targets["key"]] = map;
+        setting[_targets["current"]] = directory;
+        setting[_targets["name"]] = map;
+        setting[_tutorialDifficulty ?? throw new ConfigException($"{_build} has no tutorial difficulty target.")] = difficulty;
+    }
 
     private static Dictionary<string, string> Names(Dictionary<string, object?> map, string[] keys,
         IReadOnlyList<PacketField> fields, Func<string, string> type, string where)

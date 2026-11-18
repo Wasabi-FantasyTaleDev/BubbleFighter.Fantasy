@@ -85,17 +85,37 @@ internal sealed partial class RoundFlow
         lock (room.Gate) generation = room.StartGeneration;
         await room.Executor.ExecuteAsync(operationCt =>
         {
+            var reason = RoundEndReason.WinCondition;
             lock (room.Gate)
             {
-                if (!ZombieEscapeReportIsCurrent(room, session, generation)
-                    || !ReferenceEquals(room.ZombieEscape!.Master, session) || room.ZombieEscape.InitialZombies == 0
-                    || report.Outcome is not (0 or 1))
-                    return ValueTask.CompletedTask;
-                if (report.Outcome == 0 && !room.Seats.Any(seat => seat.Team == 1 && !seat.Game.Connection.IsClosed))
-                    return ValueTask.CompletedTask;
-                room.DecidedWinnerTeam = report.Outcome == 0 ? 1 : 34;
+                if (room.ModeId == (int)GameModeId.ZombiePve && ZombiePveBossFor is not null)
+                {
+                    if (room.Tutorial is not null || room.IsUserHost || room.Phase != RoomPhase.Playing
+                        || room.IsStopping || room.RoundCancelled || room.StartGeneration != generation
+                        || session.Connection.IsClosed || report.Outcome is not (0 or 1)
+                        || !room.Seats.Any(seat => seat.Slot == room.MasterSlot && ReferenceEquals(seat.Game, session)))
+                        return ValueTask.CompletedTask;
+                    // ChrZombieBoss reports 1: kr-1256 sub_B38850, cn-774 sub_5D28D0, tw-454 sub_83A310.
+                    // Zero is loss, not the human-escape result used by mode 32.
+                    if (report.Outcome == 1 && (room.ZombiePveBossSpawn is not { } boss
+                        || boss.Generation != generation || !ReferenceEquals(boss.Master, session)
+                        || Environment.TickCount64 - room.PlayingSince + _options.StartTimerMs < boss.EarliestMapTimeMs))
+                        return ValueTask.CompletedTask;
+                    reason = report.Outcome == 1 ? RoundEndReason.WavesCleared : RoundEndReason.CooperativeFailed;
+                    room.DecidedWinnerTeam = report.Outcome == 1 ? 2 : 35;
+                }
+                else
+                {
+                    if (!ZombieEscapeReportIsCurrent(room, session, generation)
+                        || !ReferenceEquals(room.ZombieEscape!.Master, session) || room.ZombieEscape.InitialZombies == 0
+                        || report.Outcome is not (0 or 1))
+                        return ValueTask.CompletedTask;
+                    if (report.Outcome == 0 && !room.Seats.Any(seat => seat.Team == 1 && !seat.Game.Connection.IsClosed))
+                        return ValueTask.CompletedTask;
+                    room.DecidedWinnerTeam = report.Outcome == 0 ? 1 : 34;
+                }
             }
-            return EndRoundAsync(room, RoundEndReason.WinCondition, operationCt);
+            return EndRoundAsync(room, reason, operationCt);
         }, ct).ConfigureAwait(false);
     }
 

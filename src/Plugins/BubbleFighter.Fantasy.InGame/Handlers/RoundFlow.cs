@@ -3,6 +3,7 @@ using BubbleFighter.Fantasy.Abstractions.Protocol;
 using BubbleFighter.Fantasy.Contracts.Match;
 using BubbleFighter.Fantasy.Contracts.Inventory;
 using BubbleFighter.Fantasy.Contracts.Cluster;
+using BubbleFighter.Fantasy.Contracts.Rooms;
 using BubbleFighter.Fantasy.InGame.Data;
 using BubbleFighter.Fantasy.InGame.Sessions;
 using Microsoft.Extensions.Logging;
@@ -369,13 +370,15 @@ internal sealed partial class RoundFlow
         var raceReset = CaptureExtremeRacingReset(room, session, request);
         int? zombieGeneration;
         lock (room.Gate) zombieGeneration = (_options.ScriptZombies || _options.GhostZombies || ZombieEscapeEnabled) ? room.StartGeneration : null;
-        await GrantRespawnAsync(session, room, request, request.SpawnIndex, ct, raceReset, zombieGeneration).ConfigureAwait(false);
+        ZombieOriginStamp? origin;
+        lock (room.Gate) origin = CaptureZombieOrigin(room, session);
+        await GrantRespawnAsync(session, room, request, request.SpawnIndex, ct, raceReset, zombieGeneration, origin).ConfigureAwait(false);
     }
 
     // Without a spawn point from the client the grant names the player's start position, which every build's start
     // burst sets to the seat index.
     private Task GrantRespawnAsync(ISession session, PlayRoom room, RoundSpawnAccepted request, int? spawnIndex,
-        CancellationToken ct, ExtremeRacingResetStamp? raceReset = null, int? zombieGeneration = null)
+        CancellationToken ct, ExtremeRacingResetStamp? raceReset = null, int? zombieGeneration = null, ZombieOriginStamp? origin = null)
     {
         if (IsBnBMode(room)) return RemoveBnBActorAsync(session, room, request, spawnIndex, ct).AsTask();
         var observation = CaptureObservationRequest(room, session, request);
@@ -387,12 +390,14 @@ internal sealed partial class RoundFlow
             LifeParticipant character;
             ISession[] audience;
             int slot;
+            ZombieOriginRoundState.ResetGrant? originGrant = null;
             var stageResetTaken = false;
             var lifeBeforeGrant = SeatLife.Dead;
             lock (room.Gate)
             {
                 if (room.Phase != RoomPhase.Playing || room.FindByGame(session.Id) is not { } seat)
                     return;
+                if ((origin is not null || IsZombieOriginMode(room)) && !ZombieOriginResetAdmitted(room, session, request, origin)) return;
                 if (IsScriptZombieMode(room) && (zombieGeneration is not { } generation
                     || !ScriptZombieReportIsCurrent(room, session, generation))) return;
                 if (IsZombieEscapeMode(room) && (zombieGeneration is not { } escapeGeneration
@@ -438,7 +443,11 @@ internal sealed partial class RoundFlow
                 if (rules.Completion == RoundRespawnCompletion.Grant)
                     character.Life.Revive();
                 else if ((link ??= MatchLink(room, seat)) is { } confirming)
+                {
                     character.Life.Grant(confirming);
+                    if (origin is not null)
+                        origin.Member.Pending = originGrant = new(origin.Life, confirming, request.TaggedReset!);
+                }
                 else
                     return;
                 slot = seat.Slot;
@@ -457,7 +466,13 @@ internal sealed partial class RoundFlow
                 // A grant that never left cannot be confirmed; restore the state from before the grant.
                 lock (room.Gate)
                 {
-                    character.Life.GrantFailed(lifeBeforeGrant);
+                    if (origin is null) character.Life.GrantFailed(lifeBeforeGrant);
+                    else if (ReferenceEquals(origin.Member.Pending, originGrant) && character.Life.Generation == origin.Life
+                        && ReferenceEquals(room.ZombieOrigin, origin.Round))
+                    {
+                        origin.Member.Pending = null;
+                        character.Life.GrantFailed(lifeBeforeGrant);
+                    }
                     if (stageResetTaken && raceReset is not null && room.StartGeneration == raceReset.Generation
                         && ReferenceEquals(room.ExtremeRacing, raceReset.Race) && room.ExtremeRacing.Round == raceReset.Round
                         && room.Seats.Contains(raceReset.Seat) && character.Life.Generation == raceReset.Life)
@@ -582,7 +597,10 @@ internal sealed partial class RoundFlow
                     _logger.LogDebug("Room {Room}: race goals and deadlines own completion; ordinary stage report ignored.", room.Id);
                     return ValueTask.CompletedTask;
                 }
-                if (IsFinalZoneMode(room) || IsScriptZombieMode(room) || IsZombieEscapeMode(room))
+                if (PirateAssaultTerminalReports && room.ModeId == (int)GameModeId.PirateAssaultSeason3)
+                    return ValueTask.CompletedTask; // The host's paired wave notice and stage word own this result.
+                if (IsFinalZoneMode(room) || IsScriptZombieMode(room) || IsZombieEscapeMode(room) || IsZombieOriginMode(room)
+                    || ControlPointUpdates is not null && room.ModeId == (int)GameModeId.ControlPoint || IsModernZombiePve(room))
                     return ValueTask.CompletedTask;
                 if (room.Tutorial is not null)
                 {
@@ -663,6 +681,11 @@ internal sealed partial class RoundFlow
             // A cancelled round has no result: its players are on their way to the plaza.
             if (room.Phase != RoomPhase.Playing || room.RoundCancelled)
                 return;
+            if (IsModernZombiePve(room) && reason == RoundEndReason.TimeLimit)
+            {
+                room.DecidedWinnerTeam = 35;
+                reason = RoundEndReason.CooperativeFailed;
+            }
             if (room.BombSeries is { } series)
             {
                 // kr-812 sub_4245B0 gives an armed bomb its own clock; ordinary round expiry cannot cancel it.
@@ -684,6 +707,12 @@ internal sealed partial class RoundFlow
                 room.DecidedWinnerTeam ??= RoomFlow.ZombiePvpHumanTeam;
             if (reason == RoundEndReason.TimeLimit && IsZombieEscapeMode(room))
                 room.DecidedWinnerTeam ??= 34;
+            if (reason == RoundEndReason.TimeLimit && room.ZombieOrigin is { } origin)
+            {
+                origin.Decide(room, timeExpired: true);
+                // A solo or incomplete opening has no proven competitive winner. Never fall back to ordinary kill totals.
+                room.DecidedWinnerSlots ??= new HashSet<int>();
+            }
             if (IsStarMode(room))
                 DecideStarRound(room);
             if (IsWeaponMasterMode(room))
@@ -733,9 +762,14 @@ internal sealed partial class RoundFlow
             await UserHostSettlement(room, generation, prizeWinnerTeam, prizeWinnerSlots, null, ct).ConfigureAwait(false);
         }
         var outcome = OutcomeOf(room, generation, reason);
+        ZombieOriginOutcome originOutcome;
+        lock (room.Gate)
+            originOutcome = room.ZombieOrigin is { } state && state.Generation == generation
+                ? state.Outcome : ZombieOriginOutcome.Undecided;
         RememberOutcomes(room, generation, outcome);
         foreach (var member in members)
-            await _ended.SendAsync(member.Game, new RoundEnded(room.Id, outcome(member), reason) { ModeId = room.ModeId, RecipientTeam = member.Team }, ct).ConfigureAwait(false);
+            await _ended.SendAsync(member.Game, new RoundEnded(room.Id, outcome(member), reason)
+                { ModeId = room.ModeId, RecipientTeam = member.Team, ZombieOriginOutcome = originOutcome }, ct).ConfigureAwait(false);
         _logger.LogInformation("Room {Room}: round ended; back to the room in {Ms} ms.", room.Id, _options.ResultCloseGraceMs);
         room.CountdownTask = BackgroundWork.Detached(() => ReturnAfterResultAsync(room, generation));
     }
@@ -803,6 +837,16 @@ internal sealed partial class RoundFlow
     {
         if (_feed is null || _registry.TryGet(session.Id) is not { } room)
             return;
+        if (packet.TaggedReset is not null && RouteZombieOriginResetConfirmation(room, session, packet, ct) is { } reset)
+        {
+            await reset.ConfigureAwait(false);
+            return;
+        }
+        if (packet.ZombieOriginPrototype is not null)
+        {
+            await HandleZombieOriginConfirmationAsync(room, session, packet, ct).ConfigureAwait(false);
+            return;
+        }
         if (packet.OneKill is not null)
         {
             await HandleOneKillAsync(room, session, packet, ct).ConfigureAwait(false);
@@ -837,6 +881,15 @@ internal sealed partial class RoundFlow
                 return;
             var sender = room.Seats.FirstOrDefault(seat => seat.Game.Id == session.Id || seat.Relay?.Id == session.Id);
             if (sender is null)
+                return;
+            // The grenade owner places item 137 (turret) or a black-hole field when the thrown object lands.
+            if (packet.PsionicPlacement is { } placement && (room.Phase != RoomPhase.Playing
+                || room.ModeId != (int)GameModeId.Psionic || placement.Actor != RoomRegistry.SceneEntity(sender.Slot)
+                || placement.Item is not (null or 137)))
+                return;
+            // kr-1256 sub_485BE0 reports a direct slip against the local fighter; kr-1256 sub_6ECBC0 retires any named source object.
+            if (packet.SnowfightSlip is { } slip && (room.Phase != RoomPhase.Playing || room.ModeId != (int)GameModeId.Snowfight
+                || slip.SourceObject != -1 || slip.Fighter != RoomRegistry.SceneEntity(sender.Slot)))
                 return;
             // A negative actor word names no character (cn-324 sub_464FB0 treats -1 as absent): nothing to pass on.
             if (packet.ReportedActors is { Count: > 0 } named && named.All(actor => actor < 0))
@@ -913,6 +966,7 @@ internal sealed partial class RoundFlow
         var seeds = _seedTables is null ? [] : PrepareSeedTables(room, members, generation);
         PrepareFinalZoneItems(room);
         PrepareExtremeRacingInitialization(room);
+        PrepareControlPoints(room, generation);
         lock (room.Gate)
         {
             if (room.CountdownGeneration == generation) return;
@@ -995,6 +1049,7 @@ internal sealed partial class RoundFlow
                         throw new InvalidOperationException("Native match transport was lost during the round countdown.");
                     }
                     room.MarkPlaying();
+                    StartZombieOrigin(room);
                     InitializeFinalZone(room);
                     StartWeaponMaster(room, generation);
                     members = [.. room.Seats];
@@ -1005,7 +1060,8 @@ internal sealed partial class RoundFlow
                     : IsScriptZombieMode(room) ? _options.ScriptZombieRoundTimeLimitMs
                     : IsZombieEscapeMode(room) ? _options.ZombieEscapeRoundTimeLimitMs
                     : IsStarMode(room) ? _options.StarRoundTimeLimitMs
-                    : RuleRecordLength(room) ?? _options.RoundUnknown0);
+                    : RuleRecordLength(room) ?? (room.ZombieOrigin is not null
+                        ? GameMode.Resolve(room.ModeId).TimeAttackTimeOverrideMs : _options.RoundUnknown0));
                 // A race ends by its own rounds (RoundFlow.ExtremeRacing), so the common clock does not end it.
                 var unlimited = room.Tutorial is null && (room.RoundTimeLimits is not null && room.ModeId == RoomRegistry.TrainingModeId
                     || IsExtremeRacingMode(room));
@@ -1016,6 +1072,7 @@ internal sealed partial class RoundFlow
                 else
                     foreach (var member in members)
                         await _started.SendAsync(member.Game, started, operationCt).ConfigureAwait(false);
+                await PublishOpeningZombieOriginAsync(room, generation, operationCt).ConfigureAwait(false);
                 if (room.Tutorial is null)
                     await InitializePvePointsAsync(room, members, operationCt).ConfigureAwait(false);
                 await PublishWeaponMasterAsync(room, operationCt).ConfigureAwait(false);
@@ -1035,6 +1092,7 @@ internal sealed partial class RoundFlow
                 if (room.Tutorial is null) await PushStarCountsAsync(room, operationCt).ConfigureAwait(false);
                 if (room.Tutorial is null) await AppointCaptainsAsync(room, operationCt).ConfigureAwait(false);
                 await StartExtremeRacingAsync(room, racingRound, operationCt).ConfigureAwait(false);
+                await StartControlPointAsync(room, generation, operationCt).ConfigureAwait(false);
                 await StartBnBAsync(room).ConfigureAwait(false);
                 await StartFinalZoneItemsAsync(room, finalZoneRound, operationCt).ConfigureAwait(false);
             }, token).ConfigureAwait(false);

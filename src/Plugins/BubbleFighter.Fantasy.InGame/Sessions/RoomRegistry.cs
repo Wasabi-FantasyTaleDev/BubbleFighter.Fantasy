@@ -771,6 +771,7 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
         lock (room.Gate)
         {
             room.IsStopping = true;
+            room.ControlPointClock?.Cancel();
             room.BnBClock?.Cancel();
             room.CancelBattleSettlement();
             room.ExtremeRacingClock?.Cancel();
@@ -781,13 +782,15 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
             room.CancelUserHostCountdown();
         }
         await room.Executor.DisposeAsync().ConfigureAwait(false);
-        Task result, extremeRacing, extremeRacingCannon, extremeRacingCleanup,finalZoneWater, finalZoneDrones, finalZoneCleanup, bnb, bnbCleanup, userHostCountdown;
+        Task result, controlPoint, extremeRacing, extremeRacingCannon, extremeRacingCleanup,finalZoneWater, finalZoneDrones, finalZoneCleanup, bnb, bnbCleanup, userHostCountdown;
         lock (room.Gate)
         {
             // A running executor operation may have started its result after shutdown began.
             room.CancelResultSequence();
             room.CancelUserHostCountdown();
             result = room.ResultTask;
+            room.ControlPointClock?.Cancel();
+            controlPoint = room.ControlPointClock?.Completion ?? Task.CompletedTask;
             userHostCountdown = room.UserHostCountdownTask;
             room.BnBClock?.Cancel();
             bnb = room.BnBClock?.Completion ?? Task.CompletedTask;
@@ -804,6 +807,7 @@ public sealed partial class RoomRegistry : IMatchConnectionTracker, IMatchCapabi
             finalZoneDrones = room.FinalZoneDroneClock?.Completion ?? Task.CompletedTask;
         }
         await result.ConfigureAwait(false);
+        await controlPoint.ConfigureAwait(false);
         await extremeRacing.ConfigureAwait(false);
         await extremeRacingCannon.ConfigureAwait(false);
         await extremeRacingCleanup.ConfigureAwait(false);

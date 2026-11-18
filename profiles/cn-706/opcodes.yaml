@@ -3276,6 +3276,20 @@ opcodes:
     name_source: mirrored
     evidence: inferred
     source: "Packet_gspEventAwardDialog class exists in cn-706; kr-812 assigns it 749, and the named neighbours 708 and 800 match kr-812"
+  - value: 750
+    direction: s2c
+    name: gspBFRunnerOver
+    name_source: label@cn-706
+    evidence: verified
+    source: "cn-706 sub_4C32D0 case 750; Packet_gspBFRunnerOver reads one u32 through cn-706 sub_4BBB70"
+    notes: "Same layout as kr-812"
+  - value: 751
+    direction: s2c
+    name: gspBFRunnerCheckPointValue
+    name_source: label@cn-706
+    evidence: verified
+    source: "cn-706 sub_4C32D0 case 751; Packet_gspBFRunnerCheckPointValue reads two u32 through cn-706 sub_733050"
+    notes: "Same layout as kr-812"
   - value: 904
     direction: s2c
     name: gspRepStartNewWave

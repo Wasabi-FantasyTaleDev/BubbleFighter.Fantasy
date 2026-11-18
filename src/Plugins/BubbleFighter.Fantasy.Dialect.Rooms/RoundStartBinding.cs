@@ -141,8 +141,11 @@ internal sealed class RoundStartBinding(string protocol, IOpcodeTable table, Pac
             }
         }
         var profiles = RoomProjection.Members(room);
+        // kr-1256 sub_CE74E0 selects the Psionic skill from the account equipment installed by kr-1256 sub_81D010.
+        var requireAccountEquipment = room.ModeId == (int)GameModeId.Psionic;
         foreach (var seat in profiles)
-            await session.SendAsync(S2C("gspRoomSetSlot"), RoomRecords.SeatUpdate(packets, build, seat, profiles, session, _texts), ct).ConfigureAwait(false);
+            await session.SendAsync(S2C("gspRoomSetSlot"), RoomRecords.SeatUpdate(packets, build, seat, profiles, session, _texts,
+                requireAccountEquipment), ct).ConfigureAwait(false);
         await session.SendAsync(S2C("gspSessionSignatureData"),
             RoundEntryWire.WriteSignature(packets, build, room.ModeId), ct).ConfigureAwait(false);
         var stage = message.StageKey.Length > 0 ? message.StageKey : message.MapKey;

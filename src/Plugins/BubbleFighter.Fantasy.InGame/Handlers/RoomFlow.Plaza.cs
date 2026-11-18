@@ -159,11 +159,16 @@ internal sealed partial class RoomFlow
     /// control, gated on its own connection and channel state; the move-to-menu answer alone is
     /// what switches its stage back.
     /// </summary>
-    public async ValueTask HandlePlazaMenuReturnAsync(ISession session, PlazaMenuReturnRequested request, CancellationToken ct)
+    public ValueTask HandlePlazaMenuReturnAsync(ISession session, PlazaMenuReturnRequested request, CancellationToken ct) =>
+        HandlePlazaMenuReturnAsync(session, request, null, ct);
+
+    private async ValueTask HandlePlazaMenuReturnAsync(ISession session, PlazaMenuReturnRequested request,
+        Func<CancellationToken, ValueTask>? beforeClose, CancellationToken ct)
     {
         long? returnGeneration = null;
         await RunSceneAsync(session, async (group, token) =>
         {
+            if (beforeClose is not null) await beforeClose(token).ConfigureAwait(false);
             await CloseTutorialForSceneAsync(session, token).ConfigureAwait(false);
             var fromPlaza = _plaza.Find(session.Id) is not null;
             await ReturnMenuSceneAsync(session, request with { PartyTransition = fromPlaza && group is not null }, token).ConfigureAwait(false);

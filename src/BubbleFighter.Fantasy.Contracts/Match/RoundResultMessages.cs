@@ -199,6 +199,9 @@ public sealed record RoundEnded(int RoomId, RoundOutcome Outcome, RoundEndReason
 
     /// <summary>Gets this recipient's team; zero retains the dialect's unassigned-seat wire policy.</summary>
     public int RecipientTeam { get; init; }
+
+    /// <summary>Gets the shared Zombie Battle G objective, independently of this recipient's win or loss.</summary>
+    public ZombieOriginOutcome ZombieOriginOutcome { get; init; }
 }
 
 /// <summary>Declares a client's ordering dependency between its result gate and scoreboard scene.</summary>

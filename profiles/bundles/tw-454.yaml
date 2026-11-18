@@ -21,7 +21,9 @@
     bootstrap_status: 2
     # A crash report (19) after a crashed session, and a 30-byte opcode 1500 on every
     # launch (local run), arrive ahead of gcpFirstConnect.
-    pre_handshake_opcodes: [gcpReportLastCrash, gcpReqDynamicConfig]
+    # tw-454 sub_685A10 can ask for a passport whenever the game socket exists. Before login the clan row
+    # has no identity to issue one for; dispatching this empty request must not complete the version handshake.
+    pre_handshake_opcodes: [gcpReportLastCrash, gcpReqDynamicConfig, gcpReqClanPassport]
     bootstrap_command_line: "http://bf.dn.nexoncdn.co.kr/PatchData"
     # The address and port the client reaches this listener on (its login.ini or launch
     # arguments). The gate values follow cn-324, the same client family.

@@ -137,9 +137,9 @@ internal static class RoomRecords
     internal static Dictionary<string, object?>[] Profiles(IReadOnlyList<RoomMemberView> seats) =>
         seats.Select((seat, position) => Profile(seat, position)).ToArray();
 
-    private static Dictionary<string, object?>[] SlotProfiles(IReadOnlyList<RoomMemberView> seats)
+    private static Dictionary<string, object?>[] SlotProfiles(IReadOnlyList<RoomMemberView> seats, bool separateAccounts = false)
     {
-        if (!seats.Any(seat => seat.Ai is not null))
+        if (!separateAccounts && !seats.Any(seat => seat.Ai is not null))
             return Profiles(seats);
         // kr-1256 sub_81D060 keys the first appearance map by seat, including computer players.
         return seats.Select((seat, position) =>
@@ -150,9 +150,9 @@ internal static class RoomRecords
         }).ToArray();
     }
 
-    private static Dictionary<string, object?>[] HumanProfiles(IReadOnlyList<RoomMemberView> seats) =>
+    private static Dictionary<string, object?>[] HumanProfiles(IReadOnlyList<RoomMemberView> seats, bool separateAccounts = false) =>
         // kr-1256 sub_81D010 keys the second map by account, separately from the bot slot map.
-        seats.Any(seat => seat.Ai is not null) ? Profiles([.. seats.Where(seat => seat.Ai is null)]) : [];
+        separateAccounts || seats.Any(seat => seat.Ai is not null) ? Profiles([.. seats.Where(seat => seat.Ai is null)]) : [];
 
     internal static byte[] Install(PacketTables tables, string build, IReadOnlyDictionary<string, object?> setting,
         IReadOnlyList<RoomMemberView> seats, int masterSlot, int localSlot, bool partyTransition = false,
@@ -202,19 +202,21 @@ internal static class RoomRecords
     }
 
     internal static byte[] SeatUpdate(PacketTables tables, string build, RoomMemberView seat, IReadOnlyList<RoomMemberView> seats,
-        ISession? recipient = null, IGameText? texts = null)
+        ISession? recipient = null, IGameText? texts = null, bool requireAccountEquipment = false)
     {
         ValidateLayouts(tables, build);
         if (UsesEquippedLists(tables, build))
             return RoomCodec.WriteSeatEnvelope(tables, build, EquippedListSchema(tables, build), seat.Slot,
                 EquippedListSeat(seat, recipient, texts));
+        var equippedObject = UsesEquippedObjects(tables, build);
+        var separateAccounts = requireAccountEquipment && !equippedObject;
         return PacketCodec.Write(tables, build, "RoomSeatUpdate", new Dictionary<string, object?>
         {
             ["slot"] = seat.Slot,
-            ["user"] = UsesEquippedObjects(tables, build) ? PlazaRecords.Seat(tables, build, seat, recipient, texts) : Seat(tables, build, seat, recipient, texts),
-            ["equipment"] = UsesEquippedObjects(tables, build) ? EquippedObject(tables, build, seat) : null,
-            ["profile_entries"] = SlotProfiles(seats),
-            ["unknown_n3"] = HumanProfiles(seats),
+            ["user"] = equippedObject ? PlazaRecords.Seat(tables, build, seat, recipient, texts) : Seat(tables, build, seat, recipient, texts),
+            ["equipment"] = equippedObject ? EquippedObject(tables, build, seat) : null,
+            ["profile_entries"] = SlotProfiles(seats, separateAccounts),
+            ["unknown_n3"] = HumanProfiles(seats, separateAccounts),
         });
     }
 

@@ -1,0 +1,85 @@
+version: 1
+# BFRunner is round mode 21 (wgtBFRunner): two teams race through the maps whose MapMeta.xml column sets
+# isBFRunner (rel_event_CrazyRacing00..02). The structures carry the opcode's own class name.
+# kr-812 is the baseline. The legacy builds use the same codecs, every word four bytes (kr-812 sub_A56A80 and
+# kr-812 sub_A56C10 write and read four bytes):
+#   cn-705: cn-705 sub_905720, cn-705 sub_4BAA30, cn-705 sub_4BBF70, cn-705 sub_4BA7A0, cn-705 sub_787480.
+#   cn-706: cn-706 sub_4BBD50, cn-706 sub_4BBB70, cn-706 sub_4B9600, cn-706 sub_733050, cn-706 sub_4B9DC0.
+#   cn-717: cn-717 sub_88E6C0, cn-717 sub_8C4210, cn-717 sub_891C60, cn-717 sub_538B70, cn-717 sub_567CC0,
+#           cn-717 sub_8C8880.
+# The modern C2S senders keep the kr-812 shapes except the goal byte below: kr-1256 sub_B0D760 (zone kind 4),
+# kr-1256 sub_6DC130 and kr-1256 sub_6DBFF0; cn-774 sub_5BE4A0, cn-774 sub_89DAB0, cn-774 sub_89D9B0;
+# tw-454 sub_4CB190, tw-454 sub_7108D0, tw-454 sub_7107B0. The modern S2C notices reuse the C2S numbers 761 and
+# 762 on the game connection (kr-1256 sub_6D55D0, cn-774 sub_897E80, tw-454 sub_70B3F0).
+structs:
+
+  # The host's goal report. Only the host's client tests the goal box (kr-812 sub_513DE0, behind the same
+  # room-identity check kr-812 sub_514150 uses for the soccer host); the first actor inside it latches the
+  # race and kr-812 sub_50DEA0 sends that actor's +408 through kr-812 sub_844A30.
+  gcpBFRunnerOver:
+    # Actor +408, the side code: kr-812 sub_73A400 picks one of each red/blue resource pair by it being 1,
+    # and kr-812 sub_52AC10 plays action 502 for every actor whose +408 equals the announced winner.
+    - team: u32
+      offset: 4
+      # The modern host narrows the team to one byte: kr-1256 sub_6E6A90, cn-774 sub_8A6FC0 and tw-454
+      # sub_71A3B0 write the low byte of the finishing seat's team word (kr-1256 seat record +548) with a
+      # one-byte write after stamping 761.
+      kr-1256:
+        - team: u8
+          offset: 0
+
+  # kr-812 sub_580E10 (local player only) sends the region's first word when the character enters a type-4
+  # region of the map that differs from the last one it reported; kr-812 sub_50DF30 writes it through
+  # kr-812 sub_844A30.
+  gcpBFRunnerCheckPoint:
+    - region: u32
+      offset: 4
+
+  # sBFRUNNERCHECKPOINT, serialized by kr-812 sub_840530 and read by kr-812 sub_6DB1B0.
+  BFRunnerSeatValue:
+    # The room seat index: kr-812 sub_50DFC0 stores its loop index 0..31; kr-812 sub_5295D0 looks the
+    # actor up by it through the room's seat accessor.
+    - seat: u32
+      offset: 4
+    - value: u32
+      offset: 8
+
+  # Every client sends this once a second (kr-812 sub_513DE0 re-arms a 1000 ms timer and calls
+  # kr-812 sub_50DFC0): one element per live seat, its value the actor's +276, which kr-812 sub_513DE0
+  # computes as 10000 * current checkpoint region + the distance to that region's box centre.
+  gcpBFRunnerCheckPointValue:
+    - progress: "list<BFRunnerSeatValue>"
+      offset: 4
+
+  # kr-812 sub_50DE00 through kr-812 sub_7AA780; kr-812 sub_580E10 sends it for the local player only.
+  gcpBFRunnerEatItem:
+    # Always -1 at both kr-812 sub_580E10 call sites.
+    - unknown_4: u32
+      offset: 4
+    # 101 for a booster pad (region type 2), 0 for an item box (region type 3).
+    - kind: u32
+      offset: 8
+    # The item box region's first word; -1 for a booster pad. The word is the number in the map object's name:
+    # kr-812 sub_AD6FE0 reads run_item<N> as a type-3 region, booster<N> as type 2 and check_point<N> as type 4,
+    # so a box carries no item: the answer (gspAddItemToSlot) names the item from the build's ItemSpecBFRunner sheet.
+    - region: u32
+      offset: 12
+
+  # Read by kr-812 sub_80A910 in handler kr-812 sub_529590 (dispatcher kr-812 sub_50B8C0 case 750): the
+  # winner is stored at scene +0xA00 and the race is marked over at scene +0x9E5.
+  gspBFRunnerOver:
+    - team: u32
+      offset: 4
+      # The modern builds read one sign-extended byte at S2C 761: kr-1256 sub_6D55D0, cn-774 sub_897E80 and
+      # tw-454 sub_70B3F0 store it as the winner and set the race-over flag.
+      kr-1256:
+        - team: u8
+          offset: 0
+
+  # Read by kr-812 sub_6DB1B0 in handler kr-812 sub_5295D0 (dispatcher kr-812 sub_50B8C0 case 751): the
+  # region is written to the seat's actor +0x118, the checkpoint kr-812 sub_513DE0 ranks every actor by.
+  gspBFRunnerCheckPointValue:
+    - seat: u32
+      offset: 4
+    - region: u32
+      offset: 8

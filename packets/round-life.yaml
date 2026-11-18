@@ -14,7 +14,9 @@ structs:
   # 18 bytes, and the reply adds one i32 for 14, 18 or 22.
   #
   # CN/TW have independently audited plain-word restatements below; they must not inherit these tags.
-  # The optional values' purpose is not traced: kr-1256 sub_6F5E50 stores them, but their consumer is not named.
+  # In KR mode 43 only, kr-1256 sub_5159C0 sends a fighter's selected zombini kind in the second tagged value.
+  # kr-1256 sub_6F5E50 copies both into the peer confirmation; kr-1256 sub_4A73A0 passes the second to kr-1256 sub_B530F0.
+  # Keep the shared field names neutral: the reset is also used outside Zombie Origin.
 
   # C2S 602 (profiles/kr-1256/opcodes.yaml Unknown602): actor, two tagged optional i32 values, bool32
   # item reset. The item-reset bool32 is proven by the reply's reader: when it is set, kr-1256

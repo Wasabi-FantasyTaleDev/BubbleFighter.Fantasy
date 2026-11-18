@@ -36,8 +36,14 @@ structs:
       offset: 4
       only: [kr-1256]
 
-  # Modern CN/TW consumers have not been audited for these routes.
-  ItemHealing@cn-774: []
+  # cn-774 sub_5272E0 writes recipient, item and source; cn-774 sub_897E80 reads them for cn-774 sub_527440.
+  ItemHealing@cn-774:
+    - actor: u32
+      offset: 0
+    - item: u32
+      offset: 4
+    - source: u32
+      offset: 8
   ItemHealing@tw-454: []
   FreezeCannonEnd@cn-774: []
   FreezeCannonEnd@tw-454: []

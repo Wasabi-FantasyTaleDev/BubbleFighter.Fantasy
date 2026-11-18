@@ -21,10 +21,11 @@ namespace BubbleFighter.Fantasy.Dialect.Rooms;
 /// </summary>
 [Plugin("dialect.rooms", Category = "network", Names = ["en=Room messages", "zh-Hans=房间消息", "zh-Hant=房間訊息", "ko=방 메시지"], Description = "Main-menu room, tutorial select/start, and plaza create/ready/start adapters, with per-build layouts from the packet tables.",
     Requires = [typeof(IOpcodeTableRegistry), typeof(IPacketRouter)],
-    Optional = [typeof(BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore), typeof(IMessageRouter), typeof(IInventoryRepository), typeof(IGameText), typeof(BubbleFighter.Fantasy.Contracts.Progress.ITutorialStageStore)],
+    Optional = [typeof(IPirateAssaultRankingSource), typeof(BubbleFighter.Fantasy.Contracts.ClientData.IClientDataStore), typeof(IMessageRouter), typeof(IInventoryRepository), typeof(IGameText), typeof(BubbleFighter.Fantasy.Contracts.Progress.ITutorialStageStore)],
     OptionalMany = [typeof(IOpcodeTable), typeof(IUdpDatagramEndpoint), typeof(IMatchUdpRelayDirectory)],
     Provides = [], ProvidesMany = [],
     ConditionalProvidesMany = [
+        typeof(IInboundMessageBinding<PirateAssaultRankingRequested>), typeof(IMessageSender<PirateAssaultRankingPage>),
         typeof(IMessageSender<RoomCoupleUpdated>), typeof(IMessageSender<PlazaCoupleUpdated>),
         typeof(IInboundMessageBinding<RoundStageResultReported>), typeof(IScriptZombieModes),
         typeof(IInboundMessageBinding<RoundBombStateReported>), typeof(IInboundMessageBinding<RoundBombMissionOverReported>),
@@ -32,6 +33,12 @@ namespace BubbleFighter.Fantasy.Dialect.Rooms;
         typeof(IInboundMessageBinding<RoundPortalMoveRequested>), typeof(IMessageSender<RoundPortalMoved>),
         typeof(IInboundMessageBinding<RoundCharacterFormRequested>), typeof(IMessageSender<RoundCharacterFormChanged>),
         typeof(IInboundMessageBinding<RoundCaptainDropped>), typeof(IMessageSender<RoundCaptainAppointed>),
+        typeof(IInboundMessageBinding<RoundBfRunnerGoalReported>), typeof(IInboundMessageBinding<RoundBfRunnerCheckpointReported>),
+        typeof(IInboundMessageBinding<RoundBfRunnerProgressReported>), typeof(IMessageSender<RoundBfRunnerCheckpointReached>),
+        typeof(IMessageSender<RoundBfRunnerFinished>), typeof(IInboundMessageBinding<RoundBfRunnerItemTouched>),
+        typeof(IMessageSender<RoundBfRunnerItemGranted>),
+        typeof(IInboundMessageBinding<RoundControlPointChanged>), typeof(IMessageSender<RoundControlPointsUpdated>),
+        typeof(IInboundMessageBinding<RoundZombieOriginPrototypeRequested>), typeof(IMessageSender<RoundZombieOriginPrototypeRoll>),
         typeof(IInboundMessageBinding<RoundScriptZombieConversionReported>), typeof(IMessageSender<RoundScriptZombieConversionReported>),
         typeof(IMessageSender<RoundScriptZombieTeamChanged>),
         typeof(IInboundMessageBinding<RoundExtremeRacingGoalReported>), typeof(IMessageSender<RoundExtremeRacingTimerChanged>),
@@ -60,11 +67,14 @@ namespace BubbleFighter.Fantasy.Dialect.Rooms;
         typeof(IInboundMessageBinding<RoomInventoryChangeRequested>), typeof(IMessageSender<RoomInventoryChanged>),
         typeof(IInboundMessageBinding<RoomAiAddRequested>), typeof(IInboundMessageBinding<RoomAiRemoveRequested>),
         typeof(IMessageSender<MainMenuRoomOpened>), typeof(IMessageSender<RoundPvePointsChanged>),
+        typeof(IMessageSender<RoundZombiePveVictoryRanks>), typeof(IMessageSender<RoundZombiePveVictoryOpened>),
+        typeof(IMessageSender<RoundZombiePveVictoryFollowUp>),
         typeof(IInboundMessageBinding<InitialTutorialNpcReported>), typeof(IMessageSender<InitialTutorialNpcAcknowledged>),
         typeof(IInboundMessageBinding<RoundNpcReported>), typeof(IMessageSender<RoundNpcAcknowledged>),
         typeof(IInboundMessageBinding<TutorialScoreReported>), typeof(IMessageSender<TutorialScoreUpdated>),
         typeof(IMessageSender<TutorialPracticeProgress>),
         typeof(IInboundMessageBinding<InitialTutorialRequested>), typeof(IMessageSender<InitialTutorialEntered>), typeof(IInboundMessageBinding<InitialTutorialExitRequested>),
+        typeof(IInboundMessageBinding<TutorialStageListRequested>), typeof(IMessageSender<TutorialStageListReceived>),
         typeof(IMessageSender<RoomTeamConverted>), typeof(IInboundMessageBinding<RoomMatchRequested>), typeof(IMessageSender<RoomMatchNotified>), typeof(IMessageSender<RoomAutoStartNotified>),
         typeof(IInboundMessageBinding<RoomListRequested>), typeof(IInboundMessageBinding<RoomCreateRequested>), typeof(IInboundMessageBinding<RoomJoinRequested>), typeof(IInboundMessageBinding<RoomLeaveRequested>),
         typeof(IInboundMessageBinding<RoomReadyRequested>), typeof(IInboundMessageBinding<RoomTeamChangeRequested>), typeof(IInboundMessageBinding<RoomStartRequested>), typeof(IMessageSender<RoomListSnapshot>),
@@ -112,6 +122,10 @@ public sealed class RoomsPlugin : IPlugin
     public ValueTask ActivateAsync(IPluginContext context, CancellationToken cancellationToken)
     {
         var options = context.Config.Bind<RoomsOptions>();
+        if (options.PirateAssaultRankings && (!options.ModernRooms || options.PlazaOnly || options.MenuOnly || options.BrowserOnly))
+            throw new ConfigException("pirate_assault_rankings requires the modern room and lobby bindings.");
+        if (options.PirateAssaultRankings && !context.Services.TryGet<IPirateAssaultRankingSource>(out _))
+            throw new ConfigException("pirate_assault_rankings requires an authoritative IPirateAssaultRankingSource before binding its queries.");
         if (context.Row.ClientBuild is null)
             throw new ConfigException("dialect.rooms requires an explicit client_build.");
         if (options.CustomRoomRules && (!options.ModernRooms || options.PlazaOnly || options.MenuOnly || options.BrowserOnly))
@@ -129,9 +143,12 @@ public sealed class RoomsPlugin : IPlugin
             throw new ConfigException("Modern horde_lottery requires the complete round and room-return surface.");
         if (options.NpcRounds && (!options.ModernRooms || options.PlazaOnly || options.WaitingRoomsOnly))
             throw new ConfigException("npc_rounds requires modern_rooms with round bindings.");
-        if ((options.BombMission || options.CaptainMode) && (options.MenuOnly || options.BrowserOnly
+        if (options.ZombiePveStageResults && (!options.NpcRounds || options.MenuOnly || options.BrowserOnly
+            || !options.ResultScoreboardModes.Contains((int)GameModeId.ZombiePve)))
+            throw new ConfigException("zombie_pve_stage_results requires NPC rounds and the mode 16 scoreboard.");
+        if ((options.BombMission || options.CaptainMode || options.BfRunner) && (options.MenuOnly || options.BrowserOnly
             || options.PlazaOnly || options.WaitingRoomsOnly || !options.ModernRooms && !options.TypedPlayRooms))
-            throw new ConfigException("bomb_mission and captain_mode require the complete typed round surface.");
+            throw new ConfigException("bomb_mission, captain_mode and bf_runner require the complete typed round surface.");
         if (options.ExtremeRacing && (!options.ModernRooms || options.PlazaOnly || options.WaitingRoomsOnly))
             throw new ConfigException("extreme_racing requires modern_rooms with round bindings.");
         if (options.ExtremeRacingMapState && !options.ExtremeRacing)
@@ -143,6 +160,12 @@ public sealed class RoomsPlugin : IPlugin
         if (options.WeaponMaster && (!options.ModernRooms || options.PlazaOnly || options.WaitingRoomsOnly
             || !options.ResultScoreboardModes.Contains((int)GameModeId.WeaponMaster)))
             throw new ConfigException("weapon_master requires modern round bindings and result_scoreboard_modes including mode 26.");
+        if (options.ControlPoint && (!options.ModernRooms || options.MenuOnly || options.BrowserOnly || options.PlazaOnly
+            || options.WaitingRoomsOnly || !options.ResultScoreboardModes.Contains((int)GameModeId.ControlPoint)))
+            throw new ConfigException("control_point requires modern round bindings and the mode 29 scoreboard.");
+        if (options.ZombieOrigin && (!options.ModernRooms || options.MenuOnly || options.BrowserOnly || options.PlazaOnly
+            || options.WaitingRoomsOnly || !options.ResultScoreboardModes.Contains((int)GameModeId.ZombieOrigin)))
+            throw new ConfigException("zombie_origin requires modern round bindings and the mode 43 scoreboard.");
         if (options.BnB && (!options.ModernRooms || options.PlazaOnly || options.WaitingRoomsOnly
             || !options.ResultScoreboardModes.Contains((int)GameModeId.BnB)))
             throw new ConfigException("bnb requires modern round bindings and result_scoreboard_modes including mode 41.");
@@ -353,6 +376,8 @@ public sealed class RoomsPlugin : IPlugin
                 }
                 if (options.CaptainMode)
                     new CaptainModeBinding(options.Protocol, table, builds.Tables, room.Profile, context.Logger).Mount(context);
+                if (options.BfRunner)
+                    new BfRunnerBinding(options.Protocol, table, builds.Tables, room.Profile, context.Logger).Mount(context);
                 if (options.QuickMatching)
                     new MatchingBinding(options.Protocol, table, builds.Tables, room.Profile).Mount(context, messageRouter);
                 if (options.ZombieConversion)
@@ -445,6 +470,8 @@ public sealed class RoomsPlugin : IPlugin
         if (options.UserHost)
             new UserHostBinding(options.Protocol, table, packets, tableBuild, context.Logger, bindModernStart: true).Mount(context);
         customRules?.Mount(context);
+        if (options.PirateAssaultRankings)
+            new PirateAssaultRankingBinding(options.Protocol, table, packets, tableBuild).Mount(context);
         if (table.Find(PacketDirection.ClientToServer, "gcpRoomAddNpcBot_") is not null)
             new RoomAiBinding(options.Protocol, table, packets, tableBuild, context.Logger).Mount(context);
         new PlazaSceneBinding(options.Protocol, table, packets, tableBuild, context.Logger).Mount(context);
@@ -460,15 +487,19 @@ public sealed class RoomsPlugin : IPlugin
         {
             MapReportBound = options.SupplyItems || options.StarItems,
         }.Mount(context);
-        if (options.InitialTutorial)
-        {
+        var stageMainTutorial = table.Profile.Id == tableBuild && packets.CapabilityOf(tableBuild, "stage_main_tutorial");
+        if (options.InitialTutorial || stageMainTutorial)
             new TutorialEntryBinding(options.Protocol, table, packets, tableBuild,
-                InitialTutorialRoute.Load(packets, tableBuild, context.Row.ClientBuild
-                    ?? throw new ConfigException("Initial tutorial requires an explicit client build."), options.InitialTutorialKind), context.Logger).Mount(context);
+                options.InitialTutorial ? InitialTutorialRoute.Load(packets, tableBuild, context.Row.ClientBuild
+                    ?? throw new ConfigException("Initial tutorial requires an explicit client build."), options.InitialTutorialKind) : null,
+                context.Logger, stageMainTutorial).Mount(context);
+        if (options.InitialTutorial)
             new TutorialNpcBinding(options.Protocol, table, packets, tableBuild, context.Logger).Mount(context);
-        }
-        if (options.InitialTutorial || options.ZombieEscape)
+        if (options.InitialTutorial || stageMainTutorial || options.ZombieEscape || options.ZombiePveStageResults
+            || options.NpcRounds && NpcBinding.HasWaveFailure(table))
             new StageResultBinding(options.Protocol, table, packets, tableBuild, context.Logger).Mount(context);
+        if (stageMainTutorial && packets.CapabilityOf(tableBuild, "stage_main_tutorial_list"))
+            new StageMainTutorialListBinding(options.Protocol, table, packets, tableBuild, context.Logger).Mount(context);
         // The tutorial's waves and spawns are ordinary NPC operations; its round decides who is answered.
         if (options.InitialTutorial || options.NpcRounds)
             new NpcBinding(options.Protocol, table, packets, tableBuild, context.Logger)
@@ -498,11 +529,18 @@ public sealed class RoomsPlugin : IPlugin
             new PortalMoveBinding(options.Protocol, table, packets, tableBuild).Mount(context);
         if (options.RheaCharacterSkill)
             new CharacterFormBinding(options.Protocol, table, packets, tableBuild).Mount(context);
-        new RoundResultBinding(options.Protocol, table, packets, tableBuild, options.ResultScoreboardModes, context.Logger).Mount(context);
+        new RoundResultBinding(options.Protocol, table, packets, tableBuild, options.ResultScoreboardModes, context.Logger,
+            options.ZombieOrigin).Mount(context);
         if (options.BombMission)
             new BombModeBinding(options.Protocol, table, packets, tableBuild, context.Logger).Mount(context);
         if (options.CaptainMode)
             new CaptainModeBinding(options.Protocol, table, packets, tableBuild, context.Logger).Mount(context);
+        if (options.BfRunner)
+            new BfRunnerBinding(options.Protocol, table, packets, tableBuild, context.Logger).Mount(context);
+        if (options.ControlPoint)
+            new ControlPointBinding(options.Protocol, table, packets, tableBuild).Mount(context);
+        if (options.ZombieOrigin)
+            new ZombieOriginBinding(options.Protocol, table, packets, tableBuild).Mount(context);
         if (options.ExtremeRacing)
         {
             var racing = new ExtremeRacingBinding(options.Protocol, table, packets, tableBuild, context.Logger);
@@ -575,7 +613,10 @@ public sealed class RoomsPlugin : IPlugin
         if (options.InstantRevival)
             new RevivalBinding(options.Protocol, table, packets, build).Mount(context, messageRouter);
         if (options.PvePoints)
+        {
             new PvePointsBinding(options.Protocol, table, packets, build).Mount(context, messageRouter);
+            new ZombiePveVictoryChoiceBinding(options.Protocol, table, packets, build).MountIfAudited(context);
+        }
         if (options.RescueMissions)
             new RescueBinding(options.Protocol, table, packets, build).Mount(context, messageRouter);
         if (options.CountedPveItems)
@@ -662,6 +703,9 @@ public sealed class RoomsOptions
     /// </summary>
     public bool ModernRooms { get; set; }
 
+    /// <summary>Gets or sets whether to expose the Pirate Assault lobby rankings. The lobby must have an authoritative page source.</summary>
+    public bool PirateAssaultRankings { get; set; }
+
     /// <summary>Gets or sets whether modern rooms mount only audited plaza entry, return and movement,
     /// without requiring waiting-room or round layouts. Requires <c>modern_rooms</c>.</summary>
     public bool PlazaOnly { get; set; }
@@ -681,6 +725,9 @@ public sealed class RoomsOptions
     /// </summary>
     public bool NpcRounds { get; set; }
 
+    /// <summary>Mounts the modern stage-result reader so the cooperative round can accept the boss master's report.</summary>
+    public bool ZombiePveStageResults { get; set; }
+
     /// <summary>
     /// Gets or sets whether the bomb-mission round's state exchange is mounted for the typed legacy round
     /// surface: the acting client's <c>gcpBombState</c> report is relayed to the room as <c>gspBombState</c> and
@@ -696,6 +743,19 @@ public sealed class RoomsOptions
     /// report kind. Needs the build's <c>captain_mode</c> capability. YAML key <c>captain_mode</c>.
     /// </summary>
     public bool CaptainMode { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether the BFRunner round's exchange (round mode 21) is mounted: the host's goal report, the
+    /// checkpoint report, the progress list and the checkpoint and race-over notices of <c>packets/bfrunner.yaml</c>.
+    /// The profile's opcode table must name all five packets. YAML key <c>bf_runner</c>.
+    /// </summary>
+    public bool BfRunner { get; set; }
+
+    /// <summary>Mounts local objective reports and the build's full three- or five-record snapshot for mode 29.</summary>
+    public bool ControlPoint { get; set; }
+
+    /// <summary>Mounts the private prototype draw for Zombie Battle G where the build has its strategy.</summary>
+    public bool ZombieOrigin { get; set; }
 
     /// <summary>
     /// Gets or sets whether the audited Rhea transformation request and reply are mounted for modern rounds.

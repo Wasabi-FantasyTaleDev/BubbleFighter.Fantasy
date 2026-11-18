@@ -74,7 +74,7 @@ public sealed class SecondaryItemRouteTests
         Assert.False(Assert.Single(routes, route => route.GameInbound == game.C2S("gppUseItemDirect")).EchoSender);
         foreach (var structure in new[] { "ItemHealing", "FreezeCannonEnd", "StormCloudHit" })
         {
-            if (build == "kr-1256")
+            if (build == "kr-1256" || (build == "cn-774" && structure == "ItemHealing"))
             {
                 var route = Assert.Single(routes, route => route.Structure == structure);
                 Assert.False(route.EchoSender);

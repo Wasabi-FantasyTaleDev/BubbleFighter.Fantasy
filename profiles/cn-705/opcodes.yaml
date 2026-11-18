@@ -3224,6 +3224,20 @@ opcodes:
     name_source: mirrored
     evidence: inferred
     source: cn-706's reviewed row for gspEventAwardDialog; cn-705 dispatcher sub_7C6C40 holds the same case
+  - value: 750
+    direction: s2c
+    name: gspBFRunnerOver
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_4C2CD0 case 750; Packet_gspBFRunnerOver reads one u32 through cn-705 sub_4BAA30"
+    notes: "Same layout as kr-812"
+  - value: 751
+    direction: s2c
+    name: gspBFRunnerCheckPointValue
+    name_source: label@cn-705
+    evidence: verified
+    source: "cn-705 sub_4C2CD0 case 751; Packet_gspBFRunnerCheckPointValue reads two u32 through cn-705 sub_4BA7A0"
+    notes: "Same layout as kr-812"
   - value: 904
     direction: s2c
     name: gspRepStartNewWave

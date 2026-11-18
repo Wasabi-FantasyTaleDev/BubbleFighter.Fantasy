@@ -97,6 +97,9 @@ public sealed class InventoryItemUseTests
     [InlineData(100104, 1, "ChangeUserName=new-name", 1)]
     [InlineData(100104, 1, "changeUserName=x", 11)]
     [InlineData(100104, 1, "changeUserName=1234567890123", 11)]
+    // The optional KR shot-side 806 names the active weapon + 200000. A Snowfight slot is not a durable grenade debit.
+    [InlineData(205077, 1, "", 1)]
+    [InlineData(205082, 1, "", 1)]
     public async Task InvalidUseCannotConsumeCard(int itemId, int quantity, string parameters, int result)
     {
         var rig = new Rig(0);

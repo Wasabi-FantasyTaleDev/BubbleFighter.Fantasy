@@ -37,14 +37,32 @@ public static class WorldBlockFile
     /// <returns>Helper records without filtering by name or changing their coordinates.</returns>
     public static IReadOnlyList<WorldBlockHelper> ReadHelpers(ReadOnlySpan<byte> bytes, int maximumBytes, int maximumHelpers)
     {
-        ArgumentOutOfRangeException.ThrowIfLessThan(maximumBytes, 8);
         ArgumentOutOfRangeException.ThrowIfLessThan(maximumHelpers, 1);
+        List<WorldBlockHelper> helpers = [];
+        Walk(bytes, maximumBytes, helpers, maximumHelpers, null);
+        return helpers.AsReadOnly();
+    }
+
+    /// <summary>Visits each kind-zero mesh material's counted property string, excluding record properties,
+    /// texture names and animation data. Validates the entire world block, including records after the final material.</summary>
+    /// <param name="bytes">The uncompressed version-two world block.</param>
+    /// <param name="maximumBytes">The inclusive byte limit for the resource.</param>
+    /// <param name="visit">Receives one property string per textured mesh material in resource order.</param>
+    public static void VisitMeshMaterialProperties(ReadOnlySpan<byte> bytes, int maximumBytes, Action<string> visit)
+    {
+        ArgumentNullException.ThrowIfNull(visit);
+        Walk(bytes, maximumBytes, null, 0, visit);
+    }
+
+    private static void Walk(ReadOnlySpan<byte> bytes, int maximumBytes, List<WorldBlockHelper>? helpers,
+        int maximumHelpers, Action<string>? materialProperty)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(maximumBytes, 8);
         if (bytes.Length > maximumBytes) throw new InvalidDataException("World-block resource exceeds its byte limit.");
         var reader = new Reader(bytes);
         // cn-279 sub_5649C0 reads version 2, a float, then named records until EOF; sub_4EC180 reads u8-counted strings.
         if (reader.Integer() != 2) throw new InvalidDataException("World-block helper reading requires a version-2 resource.");
         _ = reader.Single();
-        List<WorldBlockHelper> helpers = [];
         while (!reader.AtEnd)
         {
             var offset = reader.Offset;
@@ -53,8 +71,10 @@ public static class WorldBlockFile
             var properties = reader.String();
             if (kind == 1)
             {
-                if (helpers.Count == maximumHelpers) throw new InvalidDataException("World-block helper count exceeds its limit.");
-                helpers.Add(new(name, reader.Vector(), reader.Vector(), offset, properties));
+                if (helpers?.Count == maximumHelpers) throw new InvalidDataException("World-block helper count exceeds its limit.");
+                var position = reader.Vector();
+                var rotation = reader.Vector();
+                helpers?.Add(new(name, position, rotation, offset, properties));
             }
             else
             {
@@ -68,7 +88,8 @@ public static class WorldBlockFile
                     reader.Skip(4);
                     _ = reader.String();
                     reader.Skip(36);
-                    _ = reader.String();
+                    var materialProperties = reader.String();
+                    if (kind == 0) materialProperty?.Invoke(materialProperties);
                     if (reader.Integer() == 1) _ = reader.String();
                     reader.Skip(36);
                     for (var track = 0; track < 6; track++)
@@ -79,7 +100,6 @@ public static class WorldBlockFile
                 }
             }
         }
-        return helpers.AsReadOnly();
     }
 
     private ref struct Reader(ReadOnlySpan<byte> bytes)

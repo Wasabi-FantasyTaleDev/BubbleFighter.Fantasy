@@ -29,6 +29,7 @@ vars:
   LEGACY_SHOP_NAME_COLUMN: nameKr
 patches:
   - patch.yaml
+  - ../bundles/bf-runner.patch.yaml
   - ../bundles/clan-legacy.patch.yaml
   - bomb.patch.yaml
   - ../bundles/shop-supplement-lucci.yaml

@@ -329,6 +329,7 @@ internal sealed partial class RoundFlow
     // stars as its total; every other round carries its combat totals.
     private int[] LiveTeamTotals(PlayRoom room)
     {
+        if (room.ControlPoints is { } objectives) return objectives.Totals;
         if (!IsStarMode(room) || !room.Scoring.CountsStars)
             return [.. room.Scoring.TeamTotals];
         var totals = new int[2];

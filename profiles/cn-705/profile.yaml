@@ -23,6 +23,7 @@ vars:
   LEGACY_SEATS: 8
 patches:
   - patch.yaml
+  - ../bundles/bf-runner.patch.yaml
   - ../bundles/science-lab.patch.yaml
   # Optional developer override; git-ignored and skipped when absent.
   - local.patch.yaml

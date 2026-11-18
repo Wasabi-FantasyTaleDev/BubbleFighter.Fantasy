@@ -119,7 +119,9 @@ public sealed class ModernNpcBodyTests
         var table = OpcodeTableLoader.Load(Path.Combine(root, "profiles", "cn-774", "opcodes.yaml"), profile)
             .ForConnection(OpcodeConnection.Game);
         Assert.Equal(903, table.C2S("gcpReqStartNewWave"));
-        Assert.Equal(906, table.C2S("Unknown906"));
+        // cn-774 sub_959650 writes the empty wave-failure notice before sending a zero stage result.
+        Assert.Equal(906, table.C2S("gcpFailTutorialWaves_"));
+        Assert.Null(table.Find(PacketDirection.ClientToServer, "Unknown906"));
         Assert.Null(table.Find(PacketDirection.ClientToServer, "gcpReqManufactureStart"));
         Assert.Null(table.Find(PacketDirection.ClientToServer, "gcpReqManufactureImmediate"));
     }
@@ -131,11 +133,12 @@ public sealed class ModernNpcBodyTests
     [InlineData("tw-454", 8)]
     public void PresetActorLengthIsSelectedByThePacketTable(string build, int words)
     {
-        var values = new Dictionary<string, object?> { ["unknown_0"] = Enumerable.Range(1, words).Cast<object?>().ToArray() };
+        var values = new Dictionary<string, object?> { ["unknown_0"] = 1, ["property_index"] = 2,
+            ["unknown_8"] = Enumerable.Range(3, words - 2).Cast<object?>().ToArray() };
         var body = PacketCodec.Write(TestBuilds.Packets, build, "NpcSpawnActor", values);
         Assert.Equal(words * 4, body.Length);
         Assert.Equal(Enumerable.Range(1, words).SelectMany(word => BitConverter.GetBytes(word)), body);
-        _ = PacketCodec.Read(TestBuilds.Packets, build, "NpcSpawnActor", body);
+        Assert.Equal(2, PacketCodec.Read(TestBuilds.Packets, build, "NpcSpawnActor", body)["property_index"]);
         Assert.Throws<PacketFormatException>(() => PacketCodec.Read(TestBuilds.Packets, build, "NpcSpawnActor", body[..^4]));
         Assert.Throws<PacketFormatException>(() => PacketCodec.Read(TestBuilds.Packets, build, "NpcSpawnActor", [.. body, 0, 0, 0, 0]));
     }

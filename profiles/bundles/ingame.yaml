@@ -79,6 +79,8 @@
   plugin: ingame
   parent_id: inventoryview
   config:
+    # Room chat reaches the shared command service (!bp, plugin commands) and launcher commands find the room.
+    shared_chat_commands: true
     mode_name_table_path: data/room-modes.json
     game_protocol: "kr-1256/game"
     relay_protocol: "kr-1256/relay"

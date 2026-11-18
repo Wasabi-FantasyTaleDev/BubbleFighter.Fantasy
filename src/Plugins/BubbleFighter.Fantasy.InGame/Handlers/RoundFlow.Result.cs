@@ -211,10 +211,13 @@ internal sealed partial class RoundFlow
         if (_result is not { } result) return false;
         string? lifeChecks;
         bool continues;
+        ZombieOriginOutcome zombieOriginOutcome;
         lock (room.Gate)
         {
             lifeChecks = room.LifeChecks.Any ? room.LifeChecks.Summary() : null;
             continues = room.BombSeries is { CanContinue: true };
+            zombieOriginOutcome = room.ZombieOrigin is { } origin && origin.Generation == generation
+                ? origin.Outcome : ZombieOriginOutcome.Undecided;
         }
         if (lifeChecks is not null)
             _logger.LogInformation("Room {Room} match {Match}: ignored life reports {Checks}.", room.Id, room.MatchId, lifeChecks);
@@ -222,22 +225,22 @@ internal sealed partial class RoundFlow
         var rewardStartedAt = Environment.TickCount64 - (settlementOnly ? _options.ResultRewardDelayMs : 0);
         var outcome = OutcomeOf(room, generation, reason);
         if (!continues) RememberOutcomes(room, generation, outcome);
+        ValueTask SendEndAsync(RoomSeat seat, CancellationToken sendCt) =>
+            result.Ended.SendAsync(seat.Game, new RoundEnded(room.Id, outcome(seat), reason)
+                { ModeId = room.ModeId, RecipientTeam = seat.Team, ZombieOriginOutcome = zombieOriginOutcome }, sendCt);
+
         var scoreDelay = 0;
         if (!settlementOnly && !await TypedResultStepAsync(room, generation, async token =>
         {
             if (reason == RoundEndReason.TimeLimit)
             {
                 scoreDelay = Math.Min(_options.ResultTimeOverDelayMs, _options.ResultRewardDelayMs);
-                return await SendToMembersAsync(room, generation, (seat, sendCt) =>
-                    result.Ended.SendAsync(seat.Game, new RoundEnded(room.Id, outcome(seat), reason)
-                        { ModeId = room.ModeId, RecipientTeam = seat.Team }, sendCt), token).ConfigureAwait(false);
+                return await SendToMembersAsync(room, generation, SendEndAsync, token).ConfigureAwait(false);
             }
             var endFirst = result.Ended is IRoundResultSequencePolicy { EndBeforeScoreboard: true };
             if (!endFirst && !await SendScoreboardAsync(room, generation, rewards, false, token, reason).ConfigureAwait(false))
                 return false;
-            if (!await SendToMembersAsync(room, generation, (seat, sendCt) =>
-                result.Ended.SendAsync(seat.Game, new RoundEnded(room.Id, outcome(seat), reason)
-                    { ModeId = room.ModeId, RecipientTeam = seat.Team }, sendCt), token).ConfigureAwait(false))
+            if (!await SendToMembersAsync(room, generation, SendEndAsync, token).ConfigureAwait(false))
                 return false;
             if (endFirst) scoreDelay = Math.Min(_options.ResultScoreboardDelayMs, _options.ResultRewardDelayMs);
             return true;

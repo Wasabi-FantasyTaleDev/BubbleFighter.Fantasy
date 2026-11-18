@@ -12,7 +12,10 @@ internal sealed record RoundFeedRoute(ushort GameInbound, ushort RelayInbound, u
 {
     internal bool ExtremeRacingCheckpoint { get; init; }
     internal bool ExtremeRacingCannon { get; init; }
+    internal bool PsionicPlacement { get; init; }
     internal RoundOneKillKind? OneKill { get; init; }
+    internal bool SnowfightSlip { get; init; }
+    internal bool ZombieOriginPrototype { get; init; }
 
     internal static RoundFeedRoute[] Load(PacketTables packets, string build, IOpcodeTable game, IOpcodeTable relay,
         bool extremeRacingCannon = false)
@@ -33,7 +36,7 @@ internal sealed record RoundFeedRoute(ushort GameInbound, ushort RelayInbound, u
                 throw new ConfigException($"{where} must be a route map.");
             if (map.Keys.FirstOrDefault(name => name is not ("enabled" or "opcode" or "structure" or "actors" or "echo_sender"
                 or "builds" or "nested" or "life_event" or "life_actor" or "life_initiator" or "life_success" or "life_death_flag"
-                or "extreme_racing_checkpoint" or "extreme_racing_cannon" or "one_kill")) is { } unknown)
+                or "extreme_racing_checkpoint" or "extreme_racing_cannon" or "one_kill" or "psionic_placement" or "snowfight_slip" or "zombie_origin_prototype")) is { } unknown)
                 throw new ConfigException($"{where} has unknown key '{unknown}'.");
             if (!Flag("enabled", true))
                 continue;
@@ -132,10 +135,37 @@ internal sealed record RoundFeedRoute(ushort GameInbound, ushort RelayInbound, u
                         ? "attacker:u32,victim:u32,position_x:f32,position_y:f32,position_z:f32"
                         : "victim:u32,direction_x:f32,direction_y:f32,direction_z:f32,attacker:u32");
             }
+            var placement = Flag("psionic_placement", false);
+            if (placement)
+            {
+                if (structure is not ("PsionicPositionedItem" or "PsionicBlackHole") || !actors.SequenceEqual(["actor"])
+                    || Flag("echo_sender", false) || life is not null || nested != (structure == "PsionicBlackHole"))
+                    throw new ConfigException($"{where}.psionic_placement requires a peer-only player placement.");
+                foreach (var coordinate in new[] { "position_x", "position_y", "position_z" }) Require(coordinate, "f32");
+                if (structure == "PsionicPositionedItem") Require("item", "u32");
+            }
+            var slip = Flag("snowfight_slip", false);
+            if (slip)
+            {
+                if (life is not null || !nested || oneKill is not null || extremeRacingCheckpoint || cannon
+                    || Flag("echo_sender", false) || structure != "SnowfightSlip" || !actors.SequenceEqual(["actor"]))
+                    throw new ConfigException($"{where}.snowfight_slip requires a SnowfightSlip actor route without life events or echo.");
+                Require("source_object", "u32");
+            }
+            var zombieOrigin = Flag("zombie_origin_prototype", false);
+            if (zombieOrigin)
+            {
+                if (life is not null || !nested || Flag("echo_sender", false) || !actors.SequenceEqual(["actor"])
+                    || structure != "ZombieOriginPrototype")
+                    throw new ConfigException($"{where}.zombie_origin_prototype requires a tagged actor and prototype without echo.");
+                PacketLayoutContract.RequireSignature(packets, build, structure, where, "actor:u32,prototype:optional<0x3A,ScriptZombieKind>");
+                PacketLayoutContract.RequireSignature(packets, build, "ScriptZombieKind", where, "zombie_kind:u32");
+            }
             result.Add(new(inbound, relayInbound, outbound, structure, actors, Flag("echo_sender", false), nested,
                 life, lifeActor, initiator, success, deathFlag)
             {
-                ExtremeRacingCheckpoint = extremeRacingCheckpoint, ExtremeRacingCannon = cannon, OneKill = oneKill,
+                ExtremeRacingCheckpoint = extremeRacingCheckpoint, ExtremeRacingCannon = cannon, OneKill = oneKill, SnowfightSlip = slip,
+                ZombieOriginPrototype = zombieOrigin, PsionicPlacement = placement,
             });
 
             string? Text(string field, bool required)
@@ -165,18 +195,23 @@ internal sealed record RoundFeedRoute(ushort GameInbound, ushort RelayInbound, u
     {
         var values = Nested ? RoundRespawnBinding.ReadTagged(packets, build, Structure, body)
             : PacketCodec.ReadScalars(packets, build, Structure, body).ToDictionary(pair => pair.Key, pair => (object?)pair.Value);
-        if (OneKill is not null)
+        if (OneKill is not null || PsionicPlacement)
             foreach (var (field, value) in values)
                 if (value is float coordinate && !float.IsFinite(coordinate))
                     throw new PacketFormatException($"{Structure}.{field} must be finite.", 0);
         var feed = new RoundFeedSent(Outbound, body.ToArray())
         {
             OnRelay = true, IncludeSender = EchoSender,
+            PsionicPlacement = PsionicPlacement ? ((int)values["actor"]!, values.TryGetValue("item", out var item) ? (int?)item : null) : null,
+            TaggedReset = LifeEvent == RoundLifeEvent.ResetConfirmed ? RoundRespawnBinding.TaggedReset(values) : null,
             ReportedActors = Actors.Length == 0 ? null : Actors.Select(field => (int)values[field]!).ToArray(),
             ExtremeRacingCheckpoint = ExtremeRacingCheckpoint
                 ? new((int)values["actor"]!, (int)values["round"]!, (int)values["marker"]!) : null,
             ExtremeRacingCannonShot = ExtremeRacingCannon ? ExtremeRacingBinding.ReadCannonShot(packets, build, body) : null,
             OneKill = OneKill is { } action ? new(action, (int)values["attacker"]!, (int)values["victim"]!) : null,
+            SnowfightSlip = SnowfightSlip ? ((int)values["source_object"]!, (int)values["actor"]!) : null,
+            ZombieOriginPrototype = ZombieOriginPrototype ? ((int)values["actor"]!,
+                values["prototype"] is IReadOnlyDictionary<string, object?> role ? (int?)role["zombie_kind"] : null) : null,
         };
         if (LifeEvent is not { } kind || (Success is not null && !Truthy(Success)))
             return (feed, null);

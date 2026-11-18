@@ -4,6 +4,27 @@ profile: tw-454
 # packet name through an address into the image (dispatcher sub_AACF80
 # --exe). See profiles/opcode-policy.md.
 opcodes:
+  - value: 2075
+    direction: c2s
+    connection: game
+    name: gcpReqPirateAssaultTopRanking_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_D96BD0 and the cache refresh in tw-454 sub_D972D0 select tw-454 sub_5EECF0; its lambda tw-454 sub_5F0FA0 writes the board ID as one word"
+  - value: 2076
+    direction: c2s
+    connection: game
+    name: gcpReqPirateAssaultUserRanking_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_D96BD0 selects tw-454 sub_5EEEB0 after rendering the cached top page; its lambda tw-454 sub_5F11D0 writes the board ID as one word"
+  - value: 107
+    direction: c2s
+    connection: game
+    name: gcpReqPlayTutorial
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_529C40 invokes tw-454 sub_A7D470 with the selected tutorial category and level; tw-454 sub_AB2360 stamps 107 and writes tw-454 sub_EBE7E0's rules, three counted wide strings and difficulty; matched to kr-812 Packet_gcpReqPlayTutorial"
   - value: 930
     direction: c2s
     name: gcpReqCoupleConfirmInvite
@@ -1042,13 +1063,35 @@ opcodes:
     source: "the peer consumer tw-454 sub_70E250 case 32934 reads three 4-byte words into tw-454 sub_72FCC0; matched to kr-1256 gppExtremeRacingCheckPoint_"
     notes: "The client consumes the peer echo; the server relays the sender's payload to the peers."
   - value: 763
-    direction: c2s
+    direction: s2c
     connection: game
-    name: gcpExtremeRacingCheckPointList_
+    name: gspControlPointSnapshot_
     name_source: coined
     evidence: verified
-    source: "tw-454 sub_7108D0 builds the counted sBFRUNNERCHECKPOINT list (value at record+268) and stamps 763 at buffer+2; the kr-1256 peer frame has no tw analog of this list form"
-    notes: "The checkpoint-list form: cn-774's catalog records the same sender (cn-774 sub_89DAB0, untabled there) and kr-1256 states no row at 763 either."
+    source: "tw-454 sub_D50040 accepts 763, reads the count and invokes tw-454 sub_466830 for each node."
+  - value: 766
+    direction: c2s
+    connection: game
+    name: gcpControlPointChange_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_78BF10 checks the local actor's Control Point strategy, stamps 766 and writes its changed node as one word."
+  - value: 763
+    direction: c2s
+    connection: game
+    name: gcpBFRunnerCheckPointValue
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_7108D0 stamps 763 with a u32 count of sBFRUNNERCHECKPOINT elements (seat, value), the class kr-812 sub_50DFC0 sends as gcpBFRunnerCheckPointValue"
+    notes: "every client, once a second"
+  - value: 764
+    direction: c2s
+    connection: game
+    name: gcpBFRunnerEatItem
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_7107B0 stamps 764 with three dwords (-1, kind, region), the call shape of kr-812 sub_50DE00 gcpBFRunnerEatItem (kind 101 booster, 0 item box)"
+    notes: "u32 -1, u32 kind, u32 region"
   - value: 712
     direction: c2s
     connection: game
@@ -1057,6 +1100,22 @@ opcodes:
     evidence: verified
     source: "tw-454 sub_D39130 stamps 712 with one dword (the coin id at ExtremeCoin+572); mirrored to the baseline's kr-1256 row, whose builder kr-1256 sub_BF45D0 matches this one field for field"
     notes: "One dword: the picked coin's id."
+  - value: 761
+    direction: c2s
+    connection: game
+    name: gcpBFRunnerOver
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_71A3B0 stamps 761 after the host latches the goal and writes one byte, the finishing seat's team; kr-812 sub_513DE0 sends gcpBFRunnerOver from the same goal test"
+    notes: "u8 team; the host only"
+  - value: 762
+    direction: c2s
+    connection: game
+    name: gcpBFRunnerCheckPoint
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_4CB190 zone kind 4 stamps 762 with one dword, the zone entry value, skipped until it differs from the last one sent; kr-812 sub_580E10 sends gcpBFRunnerCheckPoint from the same region type"
+    notes: "u32 checkpoint region; same zone sender as the kind-5 race goal"
   - value: 749
     direction: s2c
     name: gspChangePirateAssaultSkillLevel
@@ -1081,6 +1140,22 @@ opcodes:
     name_source: label@tw-454
     evidence: verified
     source: "dispatcher sub_AACF80 jumptable case 754 stores \"gspHonorUserState\""
+  - value: 761
+    direction: s2c
+    connection: game
+    name: gspBFRunnerOver
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_70B3F0 case 761 reads one byte into scene +2280 and sets byte +2253; kr-812 sub_529590 handles gspBFRunnerOver the same way"
+    notes: "u8 winning team; the race is over"
+  - value: 762
+    direction: s2c
+    connection: game
+    name: gspBFRunnerCheckPointValue
+    name_source: mirrored
+    evidence: verified
+    source: "tw-454 sub_70B3F0 case 762 reads two u32 and writes the region to the seat record +272 (dword_163DEAC + 20168 + 280 * seat); kr-812 sub_5295D0 handles gspBFRunnerCheckPointValue the same way"
+    notes: "u32 seat, u32 checkpoint region"
   - value: 801
     direction: s2c
     name: gspRepEnterTCShop
@@ -3444,6 +3519,34 @@ opcodes:
     name_source: none
     evidence: verified
     source: "tw-454 sub_724920 consumes 32-byte packed motion via tw-454 sub_476080 / tw-454 sub_4761B0"
+  - value: 33295
+    direction: c2s
+    connection: both
+    name: gppExtendedSlotProjectile_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_7167C0 stamps 33295 when its selector is one; tw-454 sub_476080 writes the packed shot and the sender appends one word without a vector."
+  - value: 33295
+    direction: s2c
+    connection: both
+    name: gppExtendedSlotProjectile_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_70B3F0 case 33295 calls tw-454 sub_724A20, which reads the packed shot and one word; tw-454 sub_724FE0 resolves the character and slot and creates its projectile."
+  - value: 32833
+    direction: c2s
+    connection: both
+    name: gppStepOnBanana
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_76AB70 reports a direct hit with source -1 and the affected character; tw-454 sub_71C910 writes seven words at 32833. Matched to kr-812 sub_514E80, Packet_gppStepOnBanana."
+  - value: 32833
+    direction: s2c
+    connection: both
+    name: gppStepOnBanana
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_71FDD0 consumes seven words; tw-454 sub_774600 applies the BananaSlip reaction and tw-454 sub_774840 checks snow grenades. Matched to kr-812 sub_514E80, Packet_gppStepOnBanana."
   - value: 32926
     direction: c2s
     connection: both
@@ -3723,10 +3826,10 @@ opcodes:
   - value: 916
     direction: c2s
     connection: game
-    name: Unknown916
-    name_source: none
+    name: gcpReqSingleStageInfo
+    name_source: label@kr-812
     evidence: verified
-    source: "tw-454 sub_8F2830 stamps 916 with no body write; the request purpose is not established"
+    source: "tw-454 DlgTutorialChoice tw-454 sub_526C40 clears its records then calls tw-454 sub_8E47D0 -> tw-454 sub_8F2830, which sends empty 916. S2C 919 tw-454 sub_A8E7E0 reloads the picker. Matches kr-812 Packet_gcpReqSingleStageInfo."
 
 
   - value: 923
@@ -4026,6 +4129,22 @@ opcodes:
     evidence: verified
     source: "tw-454 sub_C895C0 -> tw-454 sub_EC42B0 / tw-454 sub_EC3DC0; matched kr-812 sub_A092B0"
     notes: "u32 wave, u16, u32 and counted spawn records; only the local host sends the table."
+  - value: 906
+    direction: c2s
+    connection: game
+    name: gcpFailTutorialWaves_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_C87FC0 stamps 906 without a payload, then invokes tw-454 sub_7192C0(0), which emits the four-byte stage result on C2S 624."
+    notes: "The shared wave-failure notice. In multiplayer Pirate Assault it precedes the same host's zero stage result."
+  - value: 907
+    direction: s2c
+    connection: game
+    name: gspFailTutorialWaves_
+    name_source: coined
+    evidence: verified
+    source: "tw-454 sub_CB9140 case 0x38B reads no payload and sets the wave manager's stage result to 2; the adjacent 0x38A sets cleared state 1."
+    notes: "Empty failure-state notification for the shared wave engine."
   - value: 908
     direction: s2c
     connection: game
@@ -4984,3 +5103,17 @@ opcodes:
     evidence: verified
     source: "tw-454 sub_E5A280 stamps 127 on a TcpPacket for RequestUserMysteryStore and runs its serializer; the request reader tw-454 sub_471DA0 reads the u8 type, the u32 token and the type-specific tail (u16 for types 2 and 3, u32 and u16 for type 4) exactly as kr-1256 sub_114E2E0 writes them (kr-1256 stamps 128, which is a different request in this build); packets/mystery-store.yaml"
     notes: "Bodies are 5/7/7/11 bytes as in kr-1256. Do not inherit kr-1256's 128: this build's 128 is another request."
+  - value: 632
+    direction: s2c
+    connection: game
+    name: gspGameAwardDialog
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A58BB0 case 0x278 dispatches empty event 178 to the mode-16 opener tw-454 sub_9B9610; matches kr-812 sub_7FBBB0."
+  - value: 643
+    direction: s2c
+    connection: game
+    name: gspRepAwardSelectSuccess
+    name_source: label@kr-812
+    evidence: verified
+    source: "tw-454 sub_A578B0 case 0x283 dispatches three words as event 181 to tw-454 sub_9B9C60; matches kr-812 sub_806E20."

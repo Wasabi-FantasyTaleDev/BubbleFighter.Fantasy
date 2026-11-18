@@ -13,7 +13,7 @@ namespace BubbleFighter.Fantasy.Dialect.Rooms;
 /// rows and trailing arrays are mask-gated (kr-1256 sub_429620, cn-774 sub_490F80, tw-454 sub_47E640).
 /// </summary>
 internal sealed class RoundResultBinding(string protocol, IOpcodeTable table, PacketTables packets, string build,
-    IReadOnlyCollection<int> scoreboardModes, ILogger logger)
+    IReadOnlyCollection<int> scoreboardModes, ILogger logger, bool zombieOrigin = false)
     : IInboundMessageBinding<RoundEndRequested>
 {
     public string Protocol => protocol;
@@ -24,6 +24,7 @@ internal sealed class RoundResultBinding(string protocol, IOpcodeTable table, Pa
         var texts = context.Services.TryGet<IGameText>(out var value) ? value : null;
         _ = Resolve(PacketDirection.ServerToClient, "gspUpdateScoreData");
         _ = Resolve(PacketDirection.ServerToClient, "gspRoundResultOpen_", "Unknown612");
+        if (zombieOrigin) _ = Resolve(PacketDirection.ServerToClient, "gspZombieOriginPrototypeRoll_");
         _ = Resolve(PacketDirection.ServerToClient, "gspRoundScoreboard_", "Unknown614");
         _ = Resolve(PacketDirection.ServerToClient, "gspRoundRewardStage_", "Unknown615");
         PacketLayoutContract.RequireFields(packets, build, "RoundLiveScore", "Typed results", ("team", "u8"), ("total", "u16"));
@@ -54,7 +55,7 @@ internal sealed class RoundResultBinding(string protocol, IOpcodeTable table, Pa
                 tailValues[gate] = source.Default;
             }
         var sender = new RoundResultSender(protocol, packets, build, _ => table, scoreboardModes,
-            new RoundResultWire.MaskedRows(markerName, tailValues), texts);
+            new RoundResultWire.MaskedRows(markerName, tailValues), texts, zombieOrigin);
         context.Effect(context.Services.RegisterMany<IInboundMessageBinding<RoundEndRequested>>(this));
         context.Effect(context.Services.RegisterMany<IMessageSender<RoundScoreUpdated>>(sender));
         context.Effect(context.Services.RegisterMany<IMessageSender<RoundScoreboard>>(sender));

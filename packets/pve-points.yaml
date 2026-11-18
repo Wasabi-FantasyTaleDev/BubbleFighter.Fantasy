@@ -40,10 +40,29 @@ structs:
   # Own entries: kr-812 sub_80BE00, cn-717 sub_890BC0, id-400 sub_782C00,
   # id-1809 sub_7A6080, cn-406 sub_700810 and cn-324 sub_6EB940.
   # kr-812 sub_80BDC0 and cn-324 sub_6F5300 read the nested row vector.
+  # kr-812 sub_7FEE30 installs the first word and vector; kr-812 sub_7A2320 shows the word
+  # under the clicked box and the three vector entries in order under the other boxes.
+  # The same producer/consumer pairs are kr-1256 sub_9E59D0 / kr-1256 sub_8BC7D0,
+  # cn-774 sub_8DD5D0 / cn-774 sub_A66BB0 and tw-454 sub_A5D060 / tw-454 sub_9E5C70.
+  # Other result-state writers and four-box readers:
+  # cn-324 sub_6EE890 / cn-324 sub_6A0E10, tw-410 sub_6EE520 / tw-410 sub_6A0790,
+  # cn-406 sub_7039E0 / cn-406 sub_6AEB60, cn-404 sub_7B2540 / cn-404 sub_756BC0,
+  # cn-408 sub_7B5A00 / cn-408 sub_75A4A0, id-400 sub_786070 / id-400 sub_72B0F0,
+  # cn-705 sub_78A7F0 / cn-705 sub_72EA90, cn-706 sub_78BC80 / cn-706 sub_72FB70,
+  # id-1809 sub_7A9700 / id-1809 sub_74DEC0 and cn-717 sub_8825E0 / cn-717 sub_81E370.
+  # cn-735 sub_9F44B0 / cn-735 sub_97E890, cn-738 sub_A22400 / cn-738 sub_9AA0B0
+  # and cn-742 sub_962650 / cn-742 sub_8E5870 use S2C 930; their five-word row readers
+  # are cn-735 sub_40F0F0, cn-738 sub_4101A0 and cn-742 sub_975660.
   PveRankInfo:
-    - unknown_4: u32 # Native result-state field; zero is provisional until a consumer is found.
+    - selected_display_id: u32
       offset: 4
-    - unknown_8: empty_list # Native u32 vector, consumed separately by presentation code. cn-406 sub_700810 reads the same counted vector; the server always sends it empty.
+    - other_display_ids: list<u32>
       offset: 8
     - rows: list<PveRankRow>
       offset: 20
+  # C2S kr-812 sub_78A0B0 (writer kr-812 sub_92ABC0), kr-1256 sub_ADD820,
+  # cn-774 sub_CD0B90 and tw-454 sub_9B9C60 send formatted text, not a choice or grant request.
+  # C2S 927 writers cn-735 sub_CCDB30, cn-738 sub_CF2A40 and cn-742 sub_8C7E10 also write only a counted string.
+  ZombiePveCompensationText:
+    - message: wstr
+      offset: 4

@@ -26,8 +26,9 @@ structs:
   # -------------------------------------------------------------------------------------------------
 
   # S2C 612: kr-1256 sub_9E2FE0 case 0x264 reads two words and passes them to kr-1256 sub_9E88C0, which
-  # opens the result scene and sends the C2S 103 statistics request. No read site names either word; every
-  # emit recipe carries zeros. cn-774 sub_8D9000 / tw-454 sub_A58BB0 also read two words for 603.
+  # opens the result scene and sends the C2S 103 statistics request. For Zombie Battle G, kr-1256 sub_787000
+  # selects zombie victory for (1, non-1), fighters killing the zombies for (1, 1), and fighter survival for
+  # (non-1, any); each recipient then uses its local role. cn-774 sub_8D9000 / tw-454 sub_A58BB0 read two words for 603.
   RoundResultOpen:
     - unknown_n0: u32
       only: [kr-1256]

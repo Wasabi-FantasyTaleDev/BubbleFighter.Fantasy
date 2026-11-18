@@ -108,7 +108,7 @@ public sealed class CharacterAttributeRouteTests
     [InlineData("kr-1256")]
     [InlineData("cn-774")]
     [InlineData("tw-454")]
-    public void AttributeRoutesAreLimitedToTheAuditedBuildAndLeaveDirectUsePeerOnly(string build)
+    public void AttributeRoutesAreLimitedToTheAuditedBuildsAndLeaveDirectUsePeerOnly(string build)
     {
         var tables = PacketTables.Load(SharedDialectRows.PacketsDirectory());
         var root = Directory.GetParent(SharedDialectRows.PacketsDirectory())!.FullName;
@@ -121,7 +121,7 @@ public sealed class CharacterAttributeRouteTests
             ("gppSetAttribute", "CharacterAttributeSet"), ("gppResetChrAttr", "CharacterAttributeReset"),
         })
         {
-            if (build == "kr-1256")
+            if (build is "kr-1256" or "cn-774")
             {
                 var route = Assert.Single(routes, candidate => candidate.Structure == structure);
                 Assert.Equal(game.C2S(name), route.GameInbound);

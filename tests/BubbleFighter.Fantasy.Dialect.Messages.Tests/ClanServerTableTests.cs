@@ -17,16 +17,19 @@ public sealed class ClanServerTableTests
     private static PacketTables Tables => TestBuilds.Packets;
 
     /// <summary>
-    /// The login as kr-1256 sub_525DF0 writes it: a word, a NUL-terminated wide string, two words, a byte count
+    /// The login in kr-1256 sub_525DF0, cn-774 sub_5E4490 and tw-454 sub_686F20: a word, a NUL-terminated wide string, two words, a byte count
     /// and the bytes. 4 + (2 * 2 + 2) + 4 + 4 + 4 + 3 = 25 bytes.
     /// </summary>
-    [Fact]
-    public void LoginReadsTheEchoedPassport()
+    [Theory]
+    [InlineData("kr-1256")]
+    [InlineData("cn-774")]
+    [InlineData("tw-454")]
+    public void LoginReadsTheEchoedPassport(string build)
     {
         var body = Convert.FromHexString("2A000000" + "480069000000" + "01000000" + "01000000" + "03000000" + "AABBCC");
         Assert.Equal(25, body.Length);
 
-        var login = ClanServerBinding.ReadLogin(Tables, "kr-1256", body);
+        var login = ClanServerBinding.ReadLogin(Tables, build, body);
 
         Assert.Equal(42, login.UserNumber);
         Assert.Equal("Hi", login.Nickname);
@@ -52,10 +55,13 @@ public sealed class ClanServerTableTests
     /// The passport carries what the login must echo, in the reader's order (kr-1256 sub_99C1D0): the account id,
     /// the counted nickname, two zero words, the counted ticket. 4 + (4 + 4) + 4 + 4 + (4 + 2) = 26 bytes.
     /// </summary>
-    [Fact]
-    public void PassportStatesTheAccountAndTheTicket()
+    [Theory]
+    [InlineData("kr-1256")]
+    [InlineData("cn-774")]
+    [InlineData("tw-454")]
+    public void PassportStatesTheAccountAndTheTicket(string build)
     {
-        var body = ClanBinding.WritePassport(Tables, "kr-1256", new ClanPassportIssued(42, "Hi", new byte[] { 0xAA, 0xBB }));
+        var body = ClanBinding.WritePassport(Tables, build, new ClanPassportIssued(42, "Hi", new byte[] { 0xAA, 0xBB }));
 
         Assert.Equal("2A000000" + "02000000" + "48006900" + "00000000" + "00000000" + "02000000" + "AABB", Convert.ToHexString(body));
     }

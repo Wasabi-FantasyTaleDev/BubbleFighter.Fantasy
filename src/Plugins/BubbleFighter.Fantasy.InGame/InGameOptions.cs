@@ -1,4 +1,5 @@
 using BubbleFighter.Fantasy.Contracts.Movement;
+using BubbleFighter.Fantasy.InGame.Sessions;
 using BubbleFighter.Fantasy.RoomCore;
 using System.ComponentModel.DataAnnotations;
 using System.Net;
@@ -13,6 +14,17 @@ namespace BubbleFighter.Fantasy.InGame;
 /// </summary>
 public sealed partial class InGameOptions : IValidatableOptions
 {
+    /// <summary>Server policy: interval in milliseconds between Control Point objective updates.</summary>
+    [Range(100, 60000)]
+    public int ControlPointTickMs { get; set; } = 1000;
+
+    /// <summary>Server policy: gauge units one uncontested fighter earns per interval, up to the native full gauge.</summary>
+    [Range(1, ControlPointRoundState.FullGauge)]
+    public int ControlPointGaugePerFighter { get; set; } = 12;
+
+    /// <summary>Server policy: team score earned per uncontested owned node per interval.</summary>
+    [Range(1, ControlPointRoundState.WinScore)]
+    public int ControlPointScorePerNode { get; set; } = 1;
     /// <summary>Gets or sets native Zombie Escape selection, infection and stage completion; disabled by default.</summary>
     public bool ZombieEscape { get; set; }
 
@@ -378,6 +390,17 @@ public sealed partial class InGameOptions : IValidatableOptions
     ///
     /// </summary>
     public bool ServerMapDraw { get; set; }
+
+    /// <summary>Uses this profile's Zombie PvE map data and starts its participating fighters together on the human side.</summary>
+    public bool ZombiePveOpening { get; set; }
+
+    /// <summary>Largest stage world block inspected for cooperative human spawn helpers.</summary>
+    [Range(1024, 67108864)]
+    public int ZombiePveMaximumWorldBytes { get; set; } = 8388608;
+
+    /// <summary>Maximum number of helper transforms in one cooperative stage world block.</summary>
+    [Range(1, 65536)]
+    public int ZombiePveMaximumHelpers { get; set; } = 4096;
 
     /// <summary>
     /// Gets or sets whether a typed start places the players without a team on the smaller team before the
@@ -1033,6 +1056,9 @@ public sealed partial class InGameOptions : IValidatableOptions
     /// <inheritdoc />
     public IEnumerable<ValidationResult> Validate()
     {
+        if (ZombiePveOpening && (!ServerMapDraw || ZombieConversionModeId == (int)Contracts.Rooms.GameModeId.ZombiePve
+            || ZombiePvpModeIds.Contains((int)Contracts.Rooms.GameModeId.ZombiePve)))
+            yield return new ValidationResult("zombie_pve_opening requires server_map_draw and exclusive ownership of the opening teams.");
         foreach (var result in ValidateAi()) yield return result;
         foreach (var result in ValidateExtremeRacingInitialization()) yield return result;
         foreach (var result in ValidateExtremeRacingMapState()) yield return result;

@@ -11,6 +11,7 @@ public sealed partial class PlayRoom
 
     private void CancelModeClocks()
     {
+        ControlPointClock?.Cancel();
         ExtremeRacingClock?.Cancel();
         ExtremeRacingCannonClock?.Cancel();
         BnBClock?.Cancel();

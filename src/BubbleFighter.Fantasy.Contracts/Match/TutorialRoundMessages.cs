@@ -40,9 +40,9 @@ public sealed record TutorialRoundOpened(int ModeId, string MapKey, int Characte
     public bool GameConnectionOnly { get; init; }
 }
 
-/// <summary>Requests the initial solo tutorial from a fully initialized main menu.</summary>
+/// <summary>Requests a numbered solo stage or the configured first-run tutorial from a fully initialized main menu.</summary>
 /// <param name="ModeId">The native mode selected by the dialect's audited tutorial policy.</param>
-/// <param name="MapKey">The startup tutorial map selected by the client.</param>
+/// <param name="MapKey">The selected numbered map or the configured first-run destination.</param>
 /// <param name="TimeLimitMs">The map's tutorial clock in milliseconds.</param>
 /// <param name="NativeRequest">The complete dialect-validated request, retained without interpreting its wire layout.</param>
 public sealed record InitialTutorialRequested(int ModeId, string MapKey, int TimeLimitMs,
@@ -50,12 +50,25 @@ public sealed record InitialTutorialRequested(int ModeId, string MapKey, int Tim
 {
     /// <summary>Gets the assigned native player team selected by the dialect's tutorial route.</summary>
     public byte Team { get; init; }
+
+    /// <summary>Gets the selected stage's claimed physical directory for validation against the map table.</summary>
+    public string StageDirectory { get; init; } = "";
+
+    /// <summary>Gets the selected numbered stage's claimed difficulty.</summary>
+    public int Difficulty { get; init; }
 }
 
 /// <summary>Installs the hidden solo room and starts loading its native tutorial scene.</summary>
 /// <param name="Room">The admitted room and its resolved player appearance.</param>
 /// <param name="NativeRequest">The dialect's original validated tutorial selection.</param>
-public sealed record InitialTutorialEntered(RoomView Room, ReadOnlyMemory<byte> NativeRequest) : IMessage;
+public sealed record InitialTutorialEntered(RoomView Room, ReadOnlyMemory<byte> NativeRequest) : IMessage
+{
+    /// <summary>Gets the installed stage directory when the selected map has a distinct physical scene.</summary>
+    public string StageDirectory { get; init; } = Room.MapKey;
+
+    /// <summary>Gets the stage difficulty used by the native scene.</summary>
+    public int Difficulty { get; init; } = 1;
+}
 
 /// <summary>Leaves an active initial tutorial after the client's native exit confirmation.</summary>
 public sealed record InitialTutorialExitRequested : IMessage;
@@ -69,3 +82,10 @@ public sealed record TutorialRoundClosed : IMessage;
 /// </summary>
 /// <param name="MapKey">The stage's MapMeta row, the map key the stage was started with.</param>
 public sealed record TutorialStageCleared(string MapKey) : IMessage;
+
+/// <summary>The main-menu tutorial picker requests the current player's numbered clear records.</summary>
+public sealed record TutorialStageListRequested : IMessage;
+
+/// <summary>The per-player stage records reloaded when the main-menu tutorial picker opens.</summary>
+/// <param name="Clears">The player's stored map-stage numbers and best records.</param>
+public sealed record TutorialStageListReceived(IReadOnlyList<BubbleFighter.Fantasy.Contracts.Progress.TutorialStageClear> Clears) : IMessage;

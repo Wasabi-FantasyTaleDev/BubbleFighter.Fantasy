@@ -21,6 +21,8 @@ internal sealed class NpcBinding(string protocol, IOpcodeTable table, PacketTabl
 
     public string Protocol => protocol;
 
+    internal static bool HasWaveFailure(IOpcodeTable game) => game.Find(PacketDirection.ClientToServer, "gcpFailTutorialWaves_") is not null;
+
     internal void Mount(IPluginContext context)
     {
         var peerTransport = false;
@@ -43,6 +45,9 @@ internal sealed class NpcBinding(string protocol, IOpcodeTable table, PacketTabl
         Bind(RoundNpcOperation.StartWave, "gcpReqStartNewWave", "gspRepStartNewWave", "HordeWaveStartRequest");
         Bind(RoundNpcOperation.ClearWave, "gcpReqEndWave", "gspRepEndWave", "HordeWaveEndRequest");
         Bind(RoundNpcOperation.CompleteWaves, "gcpReqEndAllWave", "gspRepEndAllWave", "HordeAllWavesEndRequest");
+        // The audited KR route is common to solo tutorial and Pirate Assault; registering both would claim 906 twice.
+        if (HasWaveFailure(table))
+            Bind(RoundNpcOperation.FailWaves, "gcpFailTutorialWaves_", "gspFailTutorialWaves_", "HordeAllWavesEndRequest");
         Bind(RoundNpcOperation.SpawnTable, "gcpReqWaveAllSpawnMobs", "gspRepWaveAllSpawnMobs", "HordeWaveTable");
         Bind(RoundNpcOperation.SpawnGroup, "gppCreateMobsFromSpawnGroup", "gppCreateMobsFromSpawnGroup", "NpcSpawnGroup");
         Bind(RoundNpcOperation.SpawnMember, "gppCreateSpawnGroupMemberMob", "gppCreateSpawnGroupMemberMob", "NpcSpawnMember");
@@ -62,10 +67,11 @@ internal sealed class NpcBinding(string protocol, IOpcodeTable table, PacketTabl
             var peerCode = peerTransport && peerOperation ? (RelayTable ?? table).S2C(reply) : (ushort?)null;
             RoundNpcReported Decode(ReadOnlySpan<byte> body)
             {
-                _ = PacketCodec.Read(packets, build, structure, body);
+                var fields = PacketCodec.Read(packets, build, structure, body);
                 var payload = body.ToArray();
                 return new RoundNpcReported(operation, payload)
                 {
+                    MapPropertyIndex = operation == RoundNpcOperation.SpawnActor ? (int)fields["property_index"]! : null,
                     // kr-1256 sub_8F8C40 expands groups only on the master. kr-1256 sub_87CB30 restores the
                     // local+transport queue before each scene; concrete frames must not echo their sender.
                     PeerFeed = peerCode is { } code && operation != RoundNpcOperation.SpawnGroup

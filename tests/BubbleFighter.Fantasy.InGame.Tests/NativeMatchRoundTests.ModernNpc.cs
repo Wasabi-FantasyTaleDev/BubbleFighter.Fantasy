@@ -27,6 +27,7 @@ public sealed partial class NativeMatchRoundTests
     [InlineData("tw-454", 101, true, true)]
     [InlineData("tw-454", 106, true, true)]
     [InlineData("kr-1256", 101, true, true)]
+    [InlineData("kr-1256", 106, true, true)]
     public async Task ModernPirateRequestsReachTheSharedRoundOnGameConnections(
         string build, int mode, bool nativeRelay, bool playing)
     {
@@ -80,6 +81,7 @@ public sealed partial class NativeMatchRoundTests
             await Request(rig.Guest, "gcpReqStartNewWave", wave);
             await Request(rig.Guest, "gcpReqWaveAllSpawnMobs", spawnTable);
             await Request(new Session(999, build), "gcpReqStartNewWave", wave);
+            if (mode == 106) await Request(new Session(rig.Host.Id, build), "gcpReqStartNewWave", wave);
             lock (rig.Room.Gate) rig.Room.ModeId = 1;
             await Request(rig.Host, "gcpReqStartNewWave", wave);
             Assert.Empty(rig.Host.Sent);
@@ -106,9 +108,25 @@ public sealed partial class NativeMatchRoundTests
             await Request(rig.Guest, "gcpReqEndAllWave", []);
             Assert.Equal(4, rig.Host.Sent.Count);
             await Request(rig.Host, "gcpReqEndAllWave", []);
+            if (mode == 106)
+            {
+                Assert.Equal(4, rig.Host.Sent.Count);
+                Assert.Equal(4, rig.Guest.Sent.Count);
+                var stage = Context("stage");
+                new StageResultBinding(build + "/game", table, packets, build, NullLogger.Instance).Mount(stage);
+                stage.Effect(services.Get<IMessageRouter>().For(stage).On<RoundStageResultReported>(build + "/game",
+                    rig.Round.HandleMultiplayerStageResultAsync));
+                byte[] clear = build == "kr-1256" ? [1, 0, 0, 0, 0, 0, 0, 0] : [1, 0, 0, 0];
+                await Request(rig.Guest, "gcpReqEndStage", clear);
+                Assert.Equal(4, rig.Guest.Sent.Count);
+                await Request(rig.Host, "gcpReqEndStage", clear);
+                Assert.Equal(5, rig.Guest.Sent.Count);
+                Assert.Equal(table.S2C("gspRepEndAllWave"), rig.Guest.Sent[^1].Opcode);
+                Assert.Empty(rig.Guest.Sent[^1].Body);
+            }
+            else Assert.Equal(4, rig.Guest.Sent.Count);
             Assert.Equal(table.S2C("gspRepEndAllWave"), rig.Host.Sent[^1].Opcode);
             Assert.Empty(rig.Host.Sent[^1].Body);
-            Assert.Equal(4, rig.Guest.Sent.Count);
             Assert.All(relays, relay => Assert.Empty(relay.Sent));
 
             rig.Host.Sent.Clear();

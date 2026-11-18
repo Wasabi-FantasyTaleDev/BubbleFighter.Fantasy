@@ -16,9 +16,13 @@ internal sealed partial class RoundFlow
     {
         if (_registry.TryGet(session.Id) is not { } room)
             return;
+        ZombieOriginStamp? origin;
         BnBParticipantStamp? bnbParticipant;
         lock (room.Gate)
         {
+            origin = CaptureZombieOrigin(room, session);
+            // The tagged peer reset validates and applies the grant before forwarding; the ordinary life notice lacks its values.
+            if (IsZombieOriginMode(room) && (origin is null || report.Event == RoundLifeEvent.ResetConfirmed)) return;
             bnbParticipant = IsBnBMode(room) ? CaptureBnBParticipant(room, session, gameOnly: false) : null;
             if (IsBnBMode(room) && bnbParticipant is null) return;
         }
@@ -38,6 +42,8 @@ internal sealed partial class RoundFlow
             {
                 if (room.Phase != RoomPhase.Playing || (!UsesNativeLife(room) && !_options.ZombiePvpModeIds.Contains(room.ModeId)))
                     return;
+                if ((origin is not null || IsZombieOriginMode(room)) && (origin is null || origin != CaptureZombieOrigin(room, session)
+                    || report.Event == RoundLifeEvent.ResetConfirmed)) return;
                 if (bnbParticipant is not null ? !BnBParticipantIsCurrent(room, bnbParticipant) : IsBnBMode(room)) return;
                 if (finalZoneState is not null ? !ReferenceEquals(room.FinalZone, finalZoneState) : IsFinalZoneMode(room)) return;
                 if (finalZoneGeneration is { } generation && !FinalZoneReportIsCurrent(room, session, generation)) return;
@@ -128,6 +134,7 @@ internal sealed partial class RoundFlow
             await SynchronizeFinalZoneAsync(room, operationCt).ConfigureAwait(false);
             await ScriptZombieOutcomeAsync(room, operationCt).ConfigureAwait(false);
             await BnBOutcomeAsync(room, operationCt).ConfigureAwait(false);
+            if (origin is not null) await CheckZombieOriginOutcomeAsync(room, operationCt).ConfigureAwait(false);
         }, ct).ConfigureAwait(false);
     }
 

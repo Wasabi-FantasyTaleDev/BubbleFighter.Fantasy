@@ -1094,6 +1094,57 @@ public sealed class ProtocolHandshakeTests
         });
     }
 
+    /// <summary>The startup clan request can reach its anonymous handler without admitting the game connection.</summary>
+    [Theory]
+    [InlineData("cn-774")]
+    [InlineData("tw-454")]
+    public async Task ClanPassportBeforePatchDoesNotReplaceGameVersionVerification(string build)
+    {
+        var root = Directory.GetParent((string)TestWireDialects.MessagesConfig()["packets_directory"]!)!.FullName;
+        var profiles = Path.Combine(root, "profiles");
+        var protocol = new ProfileComposer(profiles, _ => null, unsetReadsEmpty: true).Compose(build, [])
+            .Single(row => row.Id == "protocol");
+        var dialect = TestWireDialects.Get(build);
+        var table = OpcodeTableLoader.Load(Path.Combine(profiles, build, "opcodes.yaml"), dialect.Profile)
+            .ForConnection(OpcodeConnection.Game);
+        var request = table.C2S("gcpReqClanPassport");
+        await using var harness = await ProtocolHarness.StartAsync(new()
+        {
+            ["pre_handshake_opcodes"] = protocol.Config!["pre_handshake_opcodes"],
+        }, build: build);
+        var reached = 0;
+        using var handler = harness.Packets.Register(build + "/game", request, (session, packet, _) =>
+        {
+            Assert.Empty(packet.Payload.ToArray());
+            Assert.True(session.TryFeature<IInitialHandshakeContinuation>(out var pending) && pending is not null);
+            Assert.False(session.TryFeature<IPlayerSession>(out var player) && player is not null);
+            Interlocked.Increment(ref reached);
+            return ValueTask.CompletedTask;
+        });
+        await WithProtocolAsync(harness.Game, async (connection, ct) =>
+        {
+            _ = await connection.ReceiveExactlyAsync(dialect.PreambleLength(PacketDirection.ServerToClient), ct);
+            var cipher = dialect.CreateEncryptor(PacketDirection.ClientToServer);
+            var frame = dialect.EncodeFrame(request, []);
+            Assert.Equal(5, frame.Length);
+            cipher.Apply(frame);
+            await connection.SendAsync(frame, ct);
+            Assert.True(await WaitForAsync(() => Volatile.Read(ref reached) == 1 || connection.IsClosed));
+            Assert.False(connection.IsClosed, connection.CloseReason);
+            Assert.Equal(1, Volatile.Read(ref reached));
+            lock (harness.Sent) Assert.Empty(harness.Sent);
+
+            var patch = dialect.EncodeFrame(table.C2S("gcpFirstConnect"), WirePins.GamePatchPayload(dialect.Profile.ClientVersionMajor));
+            cipher.Apply(patch);
+            await connection.SendAsync(patch, ct);
+            Assert.True(await WaitForAsync(() =>
+            {
+                lock (harness.Sent) return harness.Sent.Any(e => e.Opcode == table.S2C("gspRepGamePatch"));
+            }));
+            Assert.False(connection.IsClosed);
+        });
+    }
+
     [Fact]
     public async Task PreHandshakeOpcodePassesButTheHandshakeIsStillRequired()
     {

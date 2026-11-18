@@ -30,8 +30,16 @@ structs:
       kr-1256:
         - unknown_12: u32
           offset: 12
-  # These modern readers have not been matched to the KR attribute stream.
-  CharacterAttributeSet@cn-774: []
+  # cn-774 sub_8A5CC0 writes these four words; cn-774 sub_8ABCC0 applies them to the character.
+  CharacterAttributeSet@cn-774:
+    - actor: u32
+      offset: 0
+    - attribute: u32
+      offset: 4
+    - item: u32
+      offset: 8
+    - unknown_12: u32
+      offset: 12
   CharacterAttributeSet@tw-454: []
 
   # kr-812 sub_512950 builds gppResetChrAttr; kr-812 sub_840530 / kr-812 sub_6DB1B0 write/read two words.
@@ -47,5 +55,10 @@ structs:
       kr-1256:
         - attribute: u32
           offset: 4
-  CharacterAttributeReset@cn-774: []
+  # cn-774 sub_8A5BC0 writes both words; cn-774 sub_897E80 reads them and calls cn-774 sub_51C990.
+  CharacterAttributeReset@cn-774:
+    - actor: u32
+      offset: 0
+    - attribute: u32
+      offset: 4
   CharacterAttributeReset@tw-454: []

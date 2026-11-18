@@ -305,10 +305,10 @@ slots:
                       op_name: "multiply"
                       second_operand: 0.0020000000949949026
                       second_op_name: "add"
-              binding_flag: 1
-              binding_map_key: 1001
-              binding_map_name: "rel_NPCpirateclassic02_portVillage04"
-              binding_count: 4
+              bindings:
+                - map_key: 1001
+                  map_name: "rel_NPCpirateclassic02_portVillage04"
+                  unknown_28: 4
 
           9:
             schema: TwirlingRouletteContext

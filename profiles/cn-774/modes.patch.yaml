@@ -3,4 +3,6 @@
 - set:
     id: dialect.rooms
     config:
-      result_scoreboard_modes: [1, 8, 11, 19, 20, 23, 24, 25, 26, 28, 30, 32, 45]
+      control_point: true
+      zombie_pve_stage_results: true
+      result_scoreboard_modes: [1, 8, 11, 16, 19, 20, 23, 24, 25, 26, 27, 28, 29, 30, 32, 37, 45]

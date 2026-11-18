@@ -23,6 +23,8 @@ public enum RoundNpcOperation
     ReplayActor,
     /// <summary>Assigns a wave NPC to its native spawn group.</summary>
     AssignSpawnGroup,
+    /// <summary>The wave engine reported failure, ahead of its stage-result word.</summary>
+    FailWaves,
 }
 
 /// <summary>A dialect-validated NPC operation from a round's host.</summary>
@@ -35,6 +37,9 @@ public sealed record RoundNpcReported(RoundNpcOperation Operation, ReadOnlyMemor
     /// Solo tutorials still acknowledge the operation on their game connection.
     /// </summary>
     public RoundFeedSent? PeerFeed { get; init; }
+
+    /// <summary>Gets the regional map's character-property index for a concrete preset actor; absent on other operations.</summary>
+    public int? MapPropertyIndex { get; init; }
 }
 
 /// <summary>Applies a validated NPC operation to one member of the host's round.</summary>

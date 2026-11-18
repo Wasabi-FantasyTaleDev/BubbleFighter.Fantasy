@@ -19,7 +19,8 @@ internal sealed class TutorialNpcBinding(string protocol, IOpcodeTable table, Pa
 
     internal void Mount(IPluginContext context)
     {
-        Bind(InitialTutorialNpcOperation.FailWaves, "gcpFailTutorialWaves_", "gspFailTutorialWaves_", "HordeAllWavesEndRequest");
+        // The failure route is shared with Pirate Assault and is owned by NpcBinding.
+        _replies.Add(InitialTutorialNpcOperation.FailWaves, table.S2C("gspFailTutorialWaves_"));
         Bind(InitialTutorialNpcOperation.SetSpawnPointReplay, "gppSetTutorialSpawnPointReplay_", "gppSetTutorialSpawnPointReplay_", "TutorialSpawnPointReplay");
         context.Effect(context.Services.RegisterMany<IInboundMessageBinding<InitialTutorialNpcReported>>(this));
         context.Effect(context.Services.RegisterMany<IMessageSender<InitialTutorialNpcAcknowledged>>(this));

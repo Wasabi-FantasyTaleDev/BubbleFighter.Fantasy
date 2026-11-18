@@ -65,9 +65,8 @@ public sealed class NativeRoundFeedRouteTests
             TestWireDialects.Get(build).Profile);
         var relay = game.ForConnection(OpcodeConnection.Relay);
         var routes = RoundFeedRoute.Load(tables, build, game, relay);
-        // 48 shared actions, the three soccer frames (goal, countdown, continue) and, on cn-774, the smart ping;
-        // tw-454 has no smart ping: its 33283 is a different action.
-        Assert.Equal(build == "cn-774" ? 52 : 51, routes.Length);
+        // CN additionally has smart ping, item healing, character attribute set/reset and two Psionic placements.
+        Assert.Equal(build == "cn-774" ? 59 : 53, routes.Length);
         Assert.Equal(build == "cn-774", routes.Any(route => route.Structure == "SmartPing"));
         Assert.Equal(new[] { "NpcAgentMove", "NpcDirectItem", "NpcDummyMotion", "NpcIni", "NpcLuaMessage", "NpcObjectDelete",
             "NpcObjectKill", "NpcTurretState" },

@@ -2377,9 +2377,29 @@ public sealed partial class RoundFlowTests
             Assert.Equal(RoundNpcOperation.SpawnTable, sent[1].Operation);
             Assert.Equal(table, sent[1].Payload.ToArray());
         }
-        Assert.Equal(3, npc.To(rig.Host).Length);
-        Assert.Equal(RoundNpcOperation.CompleteWaves, npc.To(rig.Host)[2].Operation);
-        Assert.Equal(2, npc.To(rig.Guest).Length);
+        if (mode == (ushort)GameModeId.PirateAssaultSeason3)
+        {
+            // A wave-number body is invalid for Assault's terminal notice. A subsequent bare stage win cannot use it.
+            await rig.Round.HandleMultiplayerStageResultAsync(rig.Host, new(1), default);
+            Assert.Equal(RoomPhase.Playing, room.Phase);
+            await rig.Round.HandleNpcAsync(rig.Host, new(RoundNpcOperation.CompleteWaves, ReadOnlyMemory<byte>.Empty), npc, default);
+            foreach (var member in new[] { rig.Host, rig.Guest })
+                Assert.Equal(2, npc.To(member).Length);
+            await rig.Round.HandleMultiplayerStageResultAsync(rig.Host, new(1), default);
+            foreach (var member in new[] { rig.Host, rig.Guest })
+            {
+                var sent = npc.To(member);
+                Assert.Equal(3, sent.Length);
+                Assert.Equal(RoundNpcOperation.CompleteWaves, sent[2].Operation);
+                Assert.True(sent[2].Payload.IsEmpty);
+            }
+        }
+        else
+        {
+            Assert.Equal(3, npc.To(rig.Host).Length);
+            Assert.Equal(RoundNpcOperation.CompleteWaves, npc.To(rig.Host)[2].Operation);
+            Assert.Equal(2, npc.To(rig.Guest).Length);
+        }
     }
 
     [Fact]

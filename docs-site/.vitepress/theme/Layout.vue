@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { Content, useData, useRoute, withBase } from 'vitepress'
+import { Content, useData, useRoute, useRouter, withBase } from 'vitepress'
 import { useI18n } from 'vue-i18n'
 import VPNavBarSearch from 'vitepress/dist/client/theme-default/components/VPNavBarSearch.vue'
 import Icon from './Icon.vue'
@@ -17,6 +17,7 @@ import { languages, translatedLabels, routes } from './locales'
 
 const { lang, frontmatter, isDark, page } = useData()
 const route = useRoute()
+const router = useRouter()
 const { t, locale } = useI18n()
 watch(lang, value => { locale.value = value || 'zh-CN' }, { immediate: true })
 const repositoryUrl = 'https://github.com/Wasabi-FantasyTaleDev/BubbleFighter.Fantasy'
@@ -29,8 +30,24 @@ const backgroundVideo = ref<HTMLVideoElement>()
 const videoReady = ref(false)
 const allowMotion = ref(false)
 let motionMedia: MediaQueryList
+// The background video is 15 MB. On a slow or data-saving connection it is skipped, and before every
+// navigation its download is stopped, so the small page files a language or page switch needs are not
+// left waiting behind it.
+const slowConnection = () => {
+  const connection = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection
+  return !!connection && (connection.saveData === true || /(^|-)2g$/.test(connection.effectiveType || ''))
+}
+function releaseVideo() {
+  const video = backgroundVideo.value
+  if (!video) return
+  video.pause()
+  video.removeAttribute('src')
+  video.load()
+  videoReady.value = false
+}
+let previousBeforeRouteChange: typeof router.onBeforeRouteChange
 function updateMotion() {
-  allowMotion.value = !motionMedia.matches
+  allowMotion.value = !motionMedia.matches && !slowConnection()
   if (!allowMotion.value) backgroundVideo.value?.pause()
 }
 function updateVideoPlayback() {
@@ -107,8 +124,8 @@ watch(mobileOpen, async value => {
     sidebar.value?.querySelector<HTMLElement>('button, summary, a')?.focus()
   } else if (previousFocus?.isConnected) previousFocus.focus()
 })
-onMounted(() => { media = window.matchMedia('(max-width: 799px)'); updateViewport(); media.addEventListener('change', updateViewport); motionMedia = window.matchMedia('(prefers-reduced-motion: reduce)'); updateMotion(); motionMedia.addEventListener('change', updateMotion); document.addEventListener('visibilitychange', updateVideoPlayback); updateOutline(); window.addEventListener('scroll', scrollSpy, { passive: true }); window.addEventListener('keydown', keydown) })
-onUnmounted(() => { media?.removeEventListener('change', updateViewport); motionMedia?.removeEventListener('change', updateMotion); document.removeEventListener('visibilitychange', updateVideoPlayback); window.removeEventListener('scroll', scrollSpy); window.removeEventListener('keydown', keydown); document.documentElement.classList.remove('menu-open') })
+onMounted(() => { previousBeforeRouteChange = router.onBeforeRouteChange; router.onBeforeRouteChange = to => { releaseVideo(); return previousBeforeRouteChange?.(to) }; media = window.matchMedia('(max-width: 799px)'); updateViewport(); media.addEventListener('change', updateViewport); motionMedia = window.matchMedia('(prefers-reduced-motion: reduce)'); updateMotion(); motionMedia.addEventListener('change', updateMotion); document.addEventListener('visibilitychange', updateVideoPlayback); updateOutline(); window.addEventListener('scroll', scrollSpy, { passive: true }); window.addEventListener('keydown', keydown) })
+onUnmounted(() => { router.onBeforeRouteChange = previousBeforeRouteChange; media?.removeEventListener('change', updateViewport); motionMedia?.removeEventListener('change', updateMotion); document.removeEventListener('visibilitychange', updateVideoPlayback); window.removeEventListener('scroll', scrollSpy); window.removeEventListener('keydown', keydown); document.documentElement.classList.remove('menu-open') })
 </script>
 
 <template>
@@ -164,7 +181,7 @@ onUnmounted(() => { media?.removeEventListener('change', updateViewport); motion
 
   <main v-if="home" id="main-content" class="landing" :inert="mobileOpen">
     <div class="landing-video" :class="{ 'is-ready': videoReady }" aria-hidden="true">
-      <video v-if="allowMotion" ref="backgroundVideo" :src="withBase('/media/boom-hill-background.mp4')" autoplay muted loop playsinline preload="metadata" @loadeddata="videoReady = true" @error="videoReady = false" />
+      <video v-if="allowMotion" :key="route.path" ref="backgroundVideo" :src="withBase('/media/boom-hill-background.mp4')" autoplay muted loop playsinline preload="metadata" @loadeddata="videoReady = true" @error="videoReady = false" />
     </div>
     <section class="hero">
 

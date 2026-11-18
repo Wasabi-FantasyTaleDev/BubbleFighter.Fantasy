@@ -385,10 +385,9 @@ structs:
     - entries: "list<MatchDeskEntry>"
       offset: 0
 
-  # Slot 8, xxPA, PirateAssaultMgr (decoder kr-1254 sub_917490; entry vector kr-1254 sub_11535F0,
-  # op record kr-1254 sub_1153F30). The op code picks add (1) or multiply (2) and the wide names
-  # repeat it in the served content. The four trailing fields' reader-level names are not
-  # established; the byte split is exact.
+  # PirateAssaultMgr: kr-1256 sub_917C00 -> kr-1256 sub_11540A0 -> kr-1256 sub_11549E0 reads
+  # the keyed curves. cn-774 sub_B13FD0 -> cn-774 sub_46FD30 and tw-454 sub_5F0500 ->
+  # tw-454 sub_467FD0 use the same operation record with a wider outer key.
   PirateAssaultOp:
     - op_code: u32
       offset: 0
@@ -401,17 +400,25 @@ structs:
     - second_op_name: wstr
 
   PirateAssaultTier:
+    # cn-774 sub_881650 and tw-454 sub_5BDF10 look up the curve by the selected account ability.
     - tier_key: u16
       offset: 0
+      cn-774:
+        - tier_key: u32
+          offset: 0
     - ops: "list<PirateAssaultOp>"
+
+  # kr-1256 sub_1153DC0 reads a count, then kr-1256 sub_1154470 reads each map row.
+  # cn-774 sub_46F1B0 and tw-454 sub_467460 read the same vector. Its last word's meaning is unknown.
+  PirateAssaultMapBinding:
+    - map_key: u32
+    - map_name: wstr
+    - unknown_28: u32
 
   PirateAssaultContext:
     - tiers: "list<PirateAssaultTier>"
       offset: 0
-    - binding_flag: u32
-    - binding_map_key: u32
-    - binding_map_name: wstr
-    - binding_count: u32
+    - bindings: "list<PirateAssaultMapBinding>"
 
   # Slot 9, xxTR, TwirlingRoulette (decoder kr-1254 sub_E688B0). Two OLE automation dates and a
   # bool.

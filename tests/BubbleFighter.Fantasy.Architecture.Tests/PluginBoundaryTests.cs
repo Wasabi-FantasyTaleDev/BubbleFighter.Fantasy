@@ -109,6 +109,9 @@ public sealed class PluginBoundaryTests
             ["Clans.ClanWhisperReceived"] = [4],
             ["Inventory.EquippedSlotRecord"] = [10, 11, 12, 13],
             ["Inventory.WeaponPresetChangeRequested"] = [0],
+            // kr-1256 sub_10DD7E0 reads three words of the 44-byte ranking row that no traced consumer interprets
+            // (packets/pirate-assault-rankings.yaml PirateAssaultRankingRow); the source preserves them verbatim.
+            ["Lobby.PirateAssaultRankingRow"] = [0, 28, 32],
             // The persisted page keeps the yaml's unknown_<offset> names: only word 0 is consumed by the
             // clients (kr-1256 sub_808F10's family check, kr-812 sub_97A8D0's /1000 gate); words 4 and 8
             // stay unknown until their consuming paths establish their purpose.

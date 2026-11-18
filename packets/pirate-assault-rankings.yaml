@@ -1,0 +1,43 @@
+version: 1
+structs:
+  # The top and personal senders both write only the selected dynamic-config RankId:
+  # kr-1256 sub_91A880 / kr-1256 sub_91A6C0; cn-774 sub_B165E0 / cn-774 sub_B167E0;
+  # tw-454 sub_5F0FA0 / tw-454 sub_5F11D0. No account, map index or session is sent.
+  PirateAssaultRankingRequest:
+    - rank_id: u32
+      only: [kr-1256]
+
+  # Each pair reads four bytes, the same counted vector in that build, then eight bytes:
+  # kr-1256 sub_9D2360 / kr-1256 sub_9D2500; cn-774 sub_BCE380 / cn-774 sub_BCE460;
+  # tw-454 sub_AACD10 / tw-454 sub_AACDF0. The top-cache age checks use the date as a double.
+  PirateAssaultRankingReply:
+    - rank_id: u32
+      only: [kr-1256]
+    - rows: "list<PirateAssaultRankingRow>"
+      only: [kr-1256]
+    - table_time: f64
+      only: [kr-1256]
+
+  # kr-1256 sub_10DD7E0, cn-774 sub_1065AC0 and tw-454 sub_ECA250 read 44-byte native rows;
+  # the variable wire string carries its UTF-16 unit count. Each build's UiPirateAssaultTab.ui
+  # labels +36 as clear time in seconds; kr-1256 sub_D505C0, cn-774 sub_DF5680 and
+  # tw-454 sub_D97590 divide this millisecond count by 1000 and render +40 as rank.
+  PirateAssaultRankingRow:
+    - unknown_0: u32
+      offset: 0
+      only: [kr-1256]
+    - name: wstr
+      offset: 4
+      only: [kr-1256]
+    - unknown_28: u32
+      offset: 28
+      only: [kr-1256]
+    - unknown_32: u32
+      offset: 32
+      only: [kr-1256]
+    - clear_time_ms: u32
+      offset: 36
+      only: [kr-1256]
+    - rank: u32
+      offset: 40
+      only: [kr-1256]

@@ -119,7 +119,7 @@ button, summary, a { touch-action:manipulation; }
 .page-neighbours strong { font-size:16px; font-weight:500; }
 .next-page { text-align:right; }
 .landing { position:relative; isolation:isolate; max-width:1020px; margin:0 auto; padding:142px 28px 0; }
-.landing-video { position:absolute; z-index:-1; top:80px; left:50%; width:min(1320px,100vw); height:740px; transform:translateX(-50%); pointer-events:none; opacity:0; transition:opacity 1.4s ease; mask-image:radial-gradient(ellipse 60% 49% at 50% 46%,#000 15%,rgba(0,0,0,.75) 46%,transparent 84%); -webkit-mask-image:radial-gradient(ellipse 60% 49% at 50% 46%,#000 15%,rgba(0,0,0,.75) 46%,transparent 84%); }
+.landing-video { position:absolute; z-index:-1; top:80px; left:50%; width:min(1320px,100%); height:740px; transform:translateX(-50%); pointer-events:none; opacity:0; transition:opacity 1.4s ease; mask-image:radial-gradient(ellipse 60% 49% at 50% 46%,#000 15%,rgba(0,0,0,.75) 46%,transparent 84%); -webkit-mask-image:radial-gradient(ellipse 60% 49% at 50% 46%,#000 15%,rgba(0,0,0,.75) 46%,transparent 84%); }
 .landing-video.is-ready { opacity:.60; }
 .landing-video video { width:100%; height:100%; object-fit:cover; filter:saturate(.62); }
 .dark .landing-video.is-ready { opacity:.60; }
@@ -197,7 +197,7 @@ button, summary, a { touch-action:manipulation; }
 @media (min-width:800px) and (max-width:1023px) { :root { --docs-rail:256px; }.sidebar { padding-inline:20px; }.document { padding-inline:28px; }.document-heading { margin-inline:-28px; padding-inline:28px; } }
 @media (max-width:799px) {
   .liquid-glass-plugin-action { width:100%; justify-content:center; }
-  .landing-video { top:88px; width:100vw; height:620px; mask-image:radial-gradient(ellipse 75% 46% at 50% 45%,#000 8%,rgba(0,0,0,.6) 50%,transparent 88%); -webkit-mask-image:radial-gradient(ellipse 75% 46% at 50% 45%,#000 8%,rgba(0,0,0,.6) 50%,transparent 88%); }
+  .landing-video { top:88px; width:100%; height:620px; mask-image:radial-gradient(ellipse 75% 46% at 50% 45%,#000 8%,rgba(0,0,0,.6) 50%,transparent 88%); -webkit-mask-image:radial-gradient(ellipse 75% 46% at 50% 45%,#000 8%,rgba(0,0,0,.6) 50%,transparent 88%); }
   .topbar { padding-inline:8px; }.topbar-inner { gap:8px; padding:0 10px 0 16px; }.brand { flex:0 1 auto; min-width:0; font-size:13px; max-width:155px; line-height:1.2; letter-spacing:-.025em; }.brand-docs { display:none; }
   .VPNavBarSearch .DocSearch-Button { width:36px; min-width:36px; padding:0; justify-content:center; border:0; }.VPNavBarSearch .DocSearch-Button-Placeholder, .VPNavBarSearch .DocSearch-Button-Keys { display:none; }
   .preferences { flex:none; gap:1px; padding-left:0; border-left:0; }.language-label { display:none; }.language-select .header-dropdown-trigger { justify-content:center; width:36px; padding:0; }.language-select .header-dropdown-trigger svg:last-child { display:none; }.mobile-toggle { display:inline-flex !important; }

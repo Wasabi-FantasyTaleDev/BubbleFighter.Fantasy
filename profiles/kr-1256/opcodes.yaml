@@ -2,6 +2,20 @@ profile: kr-1256
 # Opcode assignments for the Korean 1256 client. C2S and S2C are separate numeric spaces.
 # Only rows with evidence are listed; see profiles/opcode-policy.md.
 opcodes:
+  - value: 2081
+    direction: c2s
+    connection: game
+    name: gcpReqPirateAssaultTopRanking_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_D4FD60 and the cache refresh in kr-1256 sub_D502D0 select kr-1256 sub_917F00; kr-1256 sub_91A880 writes the board ID as one word"
+  - value: 2082
+    direction: c2s
+    connection: game
+    name: gcpReqPirateAssaultUserRanking_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_D4FD60 selects kr-1256 sub_9180D0 after rendering the cached top page; kr-1256 sub_91A6C0 writes the board ID as one word"
   - value: 17
     direction: c2s
     connection: relay
@@ -1038,6 +1052,34 @@ opcodes:
     evidence: captured
     source: "client 0x6D6577; writer 0x6DD310"
     notes: "4 bytes: i32 damager key; sender echo also observed"
+  - value: 33295
+    direction: c2s
+    connection: both
+    name: gppExtendedSlotProjectile_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_483960 passes the current slot to kr-1256 sub_6E20F0; it stamps 33295 and writes the packed shot, an extra word and a counted word vector."
+  - value: 33295
+    direction: s2c
+    connection: both
+    name: gppExtendedSlotProjectile_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_6D55D0 at 0x6D8316 reads the packed shot through kr-1256 sub_10F3990, a word and a vector through kr-1256 sub_1137C30; kr-1256 sub_6F1180 resolves the shooting character and slot."
+  - value: 32833
+    direction: c2s
+    connection: both
+    name: gppStepOnBanana
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_6E94C0 writes the source, affected character, reaction flag, weapon, three words and a counted word list; kr-1256 sub_485BE0 uses -1 for a hit with no map object. Matched to kr-812 sub_514E80, Packet_gppStepOnBanana."
+  - value: 32833
+    direction: s2c
+    connection: both
+    name: gppStepOnBanana
+    name_source: label@kr-812
+    evidence: verified
+    source: "kr-1256 sub_6ECBC0 consumes the optional object and struck character; kr-1256 sub_4A87D0 checks the Snowfight weapon and enters reaction 120 or 306. Matched to kr-812 sub_514E80, Packet_gppStepOnBanana."
   - value: 32907
     direction: s2c
     connection: both
@@ -1766,6 +1808,22 @@ opcodes:
     evidence: verified
     source: "S2C dispatch label 0x15b9494; handler sub_9D2660; case_ea 0x9d5165"
     notes: "S2C 754 dispatcher entry; body semantics remain unverified."
+  - value: 761
+    direction: s2c
+    connection: game
+    name: gspBFRunnerOver
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_9D2FF0 hands it to kr-1256 sub_6D55D0 case 761 reads one byte into scene +0xA80 and sets +0xA65; kr-812 sub_529590 handles gspBFRunnerOver the same way"
+    notes: "u8 winning team; the race is over"
+  - value: 762
+    direction: s2c
+    connection: game
+    name: gspBFRunnerCheckPointValue
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_9D2FF0 hands it to kr-1256 sub_6D55D0 case 762 reads two u32 and writes the region to the seat record +0x138 (*dword_18E55AC + 592 + 320 * seat); kr-812 sub_5295D0 handles gspBFRunnerCheckPointValue the same way"
+    notes: "u32 seat, u32 checkpoint region"
   - value: 802
     direction: s2c
     name: gspInventoryUpdateAllInventorySlot
@@ -4075,7 +4133,7 @@ opcodes:
     name_source: coined
     evidence: verified
     source: "kr-1256 sub_7B9820"
-    notes: "Empty request when the local tutorial actor has failed."
+    notes: "Empty wave-failure notice. The KR mode-106 host update follows it with C2S 624 [0, false] through kr-1256 sub_6E5840/kr-1256 sub_708B60. The solo tutorial also uses this route."
   - value: 907
     direction: s2c
     connection: game
@@ -4517,6 +4575,14 @@ opcodes:
     evidence: verified
     source: "the coin pickup's timer-gated sender kr-1256 sub_BF45D0 word-writes 712 into the TcpPacket opcode slot and one dword - the coin object's field at +588 (dword index 147) - then sends it on the game connection, gated by the one-shot byte at +580 (set on send), the elapsed check at +604/+608 and the round check this+592 == ExtremeRacingGameStage+3160; the aLucciEat effect the same sender triggers after the write identifies `this` as the coin object"
     notes: "One dword: the collected coin's field at +588. Mirrors cn-774 sub_D3ADA0's one-dword report (cn field at +572)."
+  - value: 761
+    direction: c2s
+    connection: game
+    name: gcpBFRunnerOver
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_6E6A90 stamps 761 after the host latches the goal and writes one byte, the finishing seat's team; kr-812 sub_513DE0 sends gcpBFRunnerOver from the same goal test"
+    notes: "u8 team; the host only"
   - value: 32934
     direction: c2s
     connection: both
@@ -4757,11 +4823,76 @@ opcodes:
   - value: 762
     direction: c2s
     connection: game
-    name: gcpZoneTouchReport_
+    name: gcpBFRunnerCheckPoint
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_B0D760 zone kind 4 stamps 762 with one dword, the zone entry value, skipped until it differs from the last one sent; kr-812 sub_580E10 sends gcpBFRunnerCheckPoint from the same region type"
+    notes: "u32 checkpoint region; same zone sender as the kind-5 race goal"
+  - value: 763
+    direction: s2c
+    connection: game
+    name: gspControlPointSnapshot_
     name_source: coined
     evidence: verified
-    source: "kr-1256 sub_B0D760 zone kind 4 stamps 762 with one dword, the zone entry value, skipped until it differs from the previously sent value kept at ChrLogic +13712, and sends it on the game connection dword_18E7F48"
-    notes: "same zone sender as C2S 711 (kind 5) and 32934 (kind 10); the kind-4 branch is not gated on the extreme racing stage, so the name keeps to the zone evidence"
+    source: "kr-1256 sub_CE1810 accepts 763 on the Control Point strategy; kr-1256 sub_10C1440 reads the count, kr-1256 sub_115BBA0 reads each node and kr-1256 sub_CE1B60 applies the list."
+  - value: 766
+    direction: c2s
+    connection: game
+    name: gcpControlPointChange_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_497380 compares the local character's new node with the last node; kr-1256 sub_7043F0 sends one word when the second argument is negative."
+  - value: 767
+    direction: c2s
+    connection: game
+    name: gcpControlPointInitialChange_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_497380 supplies the extra value before the first change has been sent; kr-1256 sub_7043F0 writes two words when that value is nonnegative."
+  - value: 722
+    direction: c2s
+    connection: game
+    name: gcpZombieOriginPrototypeRequest_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_CF1C90 calls kr-1256 sub_CE90F0, which writes the controlled character's kind at +748 (kr-1256 sub_CD8F70)."
+  - value: 722
+    direction: s2c
+    connection: game
+    name: gspZombieOriginPrototypeRoll_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_CF1B40 reads one word; kr-1256 sub_CF3220 -> kr-1256 sub_CEAEB0 -> kr-1256 sub_B524C0 uses it as the normalized draw for the local prototype."
+  - value: 34277
+    direction: c2s
+    connection: both
+    name: gppZombieOriginPrototype_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_CEAEB0 sends the local scene actor and a tagged optional prototype via kr-1256 sub_7AB190."
+  - value: 34277
+    direction: s2c
+    connection: both
+    name: gppZombieOriginPrototype_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_CF1C10 reads the actor and optional prototype via kr-1256 sub_10C0640; kr-1256 sub_CF3270 applies it to the scene actor."
+  - value: 763
+    direction: c2s
+    connection: game
+    name: gcpBFRunnerCheckPointValue
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_6DC130 stamps 763 with a u32 count of sBFRUNNERCHECKPOINT elements (seat, value), the class kr-812 sub_50DFC0 sends as gcpBFRunnerCheckPointValue"
+    notes: "every client, once a second"
+  - value: 764
+    direction: c2s
+    connection: game
+    name: gcpBFRunnerEatItem
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_6DBFF0 stamps 764 with three dwords (-1, kind, region), the call shape of kr-812 sub_50DE00 gcpBFRunnerEatItem (kind 101 booster, 0 item box)"
+    notes: "u32 -1, u32 kind, u32 region"
   - value: 765
     direction: c2s
     connection: game
@@ -5151,6 +5282,34 @@ opcodes:
     name_source: coined
     evidence: verified
     source: "kr-1256 sub_6D55D0 case 33293 runs kr-1256 sub_6E15C0, which reads the character, the effect path and the visibility word and shows or hides the effect; packets/round-feed.yaml CharacterEffectVisible"
+  - value: 32930
+    direction: c2s
+    connection: both
+    name: gppUseItemDirectAtPos
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_79F730 -> kr-1256 sub_4915C0 writes actor, positioned item 137 and three coordinates; kr-812 sub_5255C0 names Packet_gppUseItemDirectAtPos at the earlier number 32929"
+  - value: 32930
+    direction: s2c
+    connection: both
+    name: gppUseItemDirectAtPos
+    name_source: mirrored
+    evidence: verified
+    source: "kr-1256 sub_6FEAE0 resolves ChrLogic and invokes item virtual +8 with the three coordinates; matched kr-812 Packet_gppUseItemDirectAtPos"
+  - value: 34274
+    direction: c2s
+    connection: both
+    name: gppSpawnBlackHole_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_79F730 -> kr-1256 sub_6E7690 writes the grenade owner's actor, position, and a counted word list"
+  - value: 34274
+    direction: s2c
+    connection: both
+    name: gppSpawnBlackHole_
+    name_source: coined
+    evidence: verified
+    source: "kr-1256 sub_6D97D0 resolves the owner, calls GoBlackHole constructor kr-1256 sub_C0A820 and inserts it with kr-1256 sub_6CE650"
   - value: 34275
     direction: c2s
     connection: both

@@ -1,0 +1,6 @@
+# Opt in only on an isolated loopback Host with isolated-memory.patch.yaml.
+# Without this CLI patch, cn-774 and tw-454 retain the shared gateway's mitigation.
+- set:
+    id: clan-gateway
+    config:
+      unserved_builds: []

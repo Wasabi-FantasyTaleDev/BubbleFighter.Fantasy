@@ -7,13 +7,16 @@ using Microsoft.Extensions.Logging;
 
 namespace BubbleFighter.Fantasy.Dialect.Rooms;
 
-/// <summary>Adapts the first-run tutorial selection to the configured native solo scene.</summary>
+/// <summary>Adapts direct main-menu tutorial selection and the separately configured first-run route.</summary>
 internal sealed class TutorialEntryBinding(string protocol, IOpcodeTable table, PacketTables packets, string build,
-    InitialTutorialRoute route, ILogger logger)
+    InitialTutorialRoute? route, ILogger logger, bool stageMain = false)
     : IInboundMessageBinding<InitialTutorialRequested>,
       IMessageSender<InitialTutorialEntered>
 {
     private IReadOnlyDictionary<string, ushort> _s2c = new Dictionary<string, ushort>();
+    private readonly RoomProjectionFields _projection = RoomProjectionFields.Load(packets, build);
+    private readonly RoomSettingChangeMap _maps = RoomSettingChangeMap.Load(packets, build)
+        ?? throw new ConfigException("Solo entry requires the build's native map and difficulty fields.");
 
     public string Protocol => protocol;
 
@@ -22,9 +25,6 @@ internal sealed class TutorialEntryBinding(string protocol, IOpcodeTable table, 
         PacketLayoutContract.RequireFields(packets, build, "TutorialPlayRequest", "Initial tutorial",
             ("map_key", "wstr"), ("map_directory", "wstr"), ("map_name", "wstr"),
             ("unknown_52", "u8"), ("difficulty", "u32"), ("time_attack_time_limit_ms", "u32"));
-        PacketLayoutContract.RequireFields(packets, build, "GameSetting", "Initial tutorial game setting",
-            ("mode", "u16"), ("unknown_44", "wstr"), ("unknown_68", "wstr"), ("unknown_92", "wstr"), ("unknown_116", "wstr"),
-            ("unknown_140", "u32"));
         PacketLayoutContract.RequireFields(packets, build, "SessionSetting", "Initial tutorial session",
             ("room_id", "u16"), ("session_state", "u32"), ("occupants", "u16"), ("open_seats", "u16"),
             ("master_nickname", "wstr"), ("kind", "u32"), ("game_setting", "GameSetting"));
@@ -42,29 +42,34 @@ internal sealed class TutorialEntryBinding(string protocol, IOpcodeTable table, 
     private InitialTutorialRequested Read(ReadOnlySpan<byte> body)
     {
         var fields = PacketCodec.ReadScalars(packets, build, "TutorialPlayRequest", body);
-        if ((string)fields["map_key"]! != route.RequestMap || (string)fields["map_directory"]! != route.RequestMap
-            || ((byte)fields["unknown_52"]! & 0x10) == 0 || (int)fields["difficulty"]! != 1)
-            throw new NotSupportedException("Only the initial tutorial map is enabled.");
+        var key = (string)fields["map_key"]!;
+        var directory = (string)fields["map_directory"]!;
+        var difficulty = (int)fields["difficulty"]!;
         var limit = (int)fields["time_attack_time_limit_ms"]!;
+        var firstRun = ((byte)fields["unknown_52"]! & 0x10) != 0;
+        // The default map ORs 0x10 into the map rules; its sender does not clear pre-existing rule bits.
+        // Numbered stages are authenticated by their selected key and MapMeta row, independently of this bit.
+        if (stageMain && key.StartsWith("sin_mission_", StringComparison.Ordinal)
+            && difficulty is >= 1 and <= 3 && limit > 0)
+            return new((int)GameModeId.SinglePlay, key, limit, body.ToArray())
+                { StageDirectory = directory, Difficulty = difficulty };
+        if (route is null || key != route.RequestMap || directory != route.RequestMap || !firstRun || difficulty != 1)
+            throw new NotSupportedException("The selection does not match an enabled tutorial route.");
         if (limit <= 0)
             throw new PacketFormatException("Initial tutorial requires a positive map clock.", 32);
-        return new(route.Mode, route.Map, route.TimeLimitMs, body.ToArray()) { Team = route.PlayerTeam };
+        return new(route.Mode, route.Map, route.TimeLimitMs, body.ToArray())
+            { Team = route.PlayerTeam, StageDirectory = route.Map, Difficulty = route.Difficulty };
     }
 
     public async ValueTask SendAsync(ISession session, InitialTutorialEntered message, CancellationToken ct)
     {
         var room = message.Room;
         var seat = room.Seats.Single();
-        var game = new Dictionary<string, object?>
-        {
-            ["mode"] = checked((ushort)room.ModeId),
-            ["unknown_44"] = room.MapKey, ["unknown_68"] = room.MapKey,
-            ["unknown_92"] = room.MapKey, ["unknown_116"] = room.MapKey,
-            // kr-1256 sub_9E5E70 publishes GameSetting to event 287; kr-1256 sub_7EEB80 copies +140 to Lua difficulty.
-            ["unknown_140"] = route.Difficulty,
-        };
-        // kr-1256 sub_9AC490 / kr-1256 sub_11511C0 keep native solo modes out of the waiting-room stage;
-        // kr-1256 sub_9D9930 case 0x1FE then enters the map through kr-1256 sub_9E5E70.
+        var game = new Dictionary<string, object?>();
+        _projection.WriteMode(game, room.ModeId);
+        _maps.ApplyTutorial(game, room.MapKey, message.StageDirectory, message.Difficulty);
+        // Native goto-room bypasses the waiting room for mode 15: kr-1256 sub_11511C0,
+        // cn-774 sub_47F1C0 and tw-454 sub_471110. RoomEnterGame then installs the selected scene.
         var setting = new Dictionary<string, object?>
         {
             ["room_id"] = checked((ushort)room.RoomId), ["session_state"] = 3,
@@ -78,7 +83,7 @@ internal sealed class TutorialEntryBinding(string protocol, IOpcodeTable table, 
         await session.SendAsync(_s2c["gspRoomEnterGame"], PacketCodec.Write(packets, build, "RoomEnterGame",
             new Dictionary<string, object?>
             {
-                ["map_key"] = room.MapKey, ["stage_key"] = room.MapKey,
+                ["map_key"] = room.MapKey, ["stage_key"] = message.StageDirectory,
                 ["map_selection"] = room.MapKey, ["room_state"] = 3,
             }), ct).ConfigureAwait(false);
     }

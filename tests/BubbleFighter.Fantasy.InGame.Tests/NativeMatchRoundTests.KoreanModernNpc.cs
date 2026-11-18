@@ -34,10 +34,24 @@ public sealed partial class NativeMatchRoundTests
     [InlineData("tw-454", true, true, false, false)]
     [InlineData("tw-454", true, true, false, true)]
     [InlineData("tw-454", true, true, true, true)]
-    public async Task ModernAuditedPirateNpcsReachPeersOnce(string build, bool nativeRelay, bool relayInput, bool guestFallback, bool playing)
+    public Task ModernAuditedPirateNpcsReachPeersOnce(string build, bool nativeRelay, bool relayInput, bool guestFallback, bool playing)
+        => CheckNpcRoutingAsync(build, nativeRelay, relayInput, guestFallback, playing, 101);
+
+    /// <summary>Only the master's map actors reach the other zombie PvE seat; no horde wave messages are acknowledged.</summary>
+    [Theory]
+    [InlineData("kr-1256", true, true)]
+    [InlineData("kr-1256", false, false)]
+    [InlineData("cn-774", true, true)]
+    [InlineData("cn-774", false, false)]
+    [InlineData("tw-454", true, true)]
+    [InlineData("tw-454", false, false)]
+    public Task ModernZombiePveMapActorsReachPeersOnce(string build, bool nativeRelay, bool relayInput)
+        => CheckNpcRoutingAsync(build, nativeRelay, relayInput, false, true, 16);
+
+    private static async Task CheckNpcRoutingAsync(string build, bool nativeRelay, bool relayInput, bool guestFallback, bool playing, int mode)
     {
         await using var rig = new Rig(build, 20, fallback: !nativeRelay || guestFallback);
-        await rig.StartAsync(101);
+        await rig.StartAsync(mode);
         await rig.LoadAsync(rig.Host);
         await rig.LoadAsync(rig.Guest);
         var hostRelay = new Session(101, build);
@@ -111,6 +125,18 @@ public sealed partial class NativeMatchRoundTests
             var inputOnRelay = relayInput;
             await Request(input, inputOnRelay, "gppCreateMobsFromSpawnGroup", Words(7));
             Assert.Empty(rig.Feed.Sent);
+            if (mode == 16)
+            {
+                foreach (var frame in creations.Skip(1))
+                    await Request(input, inputOnRelay, frame.Name, frame.Body);
+                await Request(rig.Host, false, "gcpReqStartNewWave", Words(1));
+                await Request(rig.Host, false, "gcpReqEndAllWave", []);
+                Assert.Empty(rig.Feed.Sent);
+                Assert.Empty(rig.Host.Sent);
+                Assert.Empty(rig.Guest.Sent);
+                Assert.Equal(RoomPhase.Playing, rig.Room.Phase);
+                creations = [creations[0]];
+            }
             foreach (var frame in creations)
             {
                 await Request(rig.Guest, false, frame.Name, frame.Body);

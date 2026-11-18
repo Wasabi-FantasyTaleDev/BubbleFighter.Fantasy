@@ -1,0 +1,55 @@
+version: 1
+structs:
+  # This modern shot extends the 32-byte packed slot shot (32925). kr-1256 sub_10F3990 reads its prefix;
+  # kr-1256 sub_6D55D0 expands both half-float triples before the receiver resolves the installed weapon.
+  ExtendedSlotProjectile: []
+  ExtendedSlotProjectile@kr-1256:
+    # kr-1256 sub_6F1180, cn-774 sub_8B09F0 and tw-454 sub_724FE0 resolve the actor and its weapon slot.
+    - actor: u32
+      offset: 0
+    - weapon_slot: u8
+      offset: 4
+    - unknown_6: "u16[6]"
+      offset: 6
+    - unknown_20: u32
+      offset: 20
+    - unknown_24: u8
+      offset: 24
+    - damager_key: u32
+      offset: 28
+    - unknown_32: u32
+      offset: 32
+    - unknown_36: u16
+      offset: 36
+    # kr-1256 sub_6E20F0 / kr-1256 sub_6D55D0 case 33295 and cn-774 sub_8A33C0 / cn-774 sub_8B0340
+    # write/read an extra word followed by a counted word list. tw-454 sub_7167C0 / tw-454 sub_724A20 stop at the word.
+    - unknown_40: u32
+      offset: 40
+    - unknown_44: "list<u32>"
+      offset: 44
+      except: [tw-454]
+
+  # kr-1256 sub_485BE0 reports the struck character with no source object. kr-1256 sub_6ECBC0
+  # otherwise retires the first named object before applying the reaction to the second character.
+  SnowfightSlip: []
+  SnowfightSlip@kr-1256:
+    - source_object: u32
+      offset: 0
+    - actor: u32
+      offset: 4
+    - unknown_8: bool
+      offset: 8
+    # kr-1256 sub_4A87D0 compares this word with native Snowfight weapons through kr-1256 sub_B4C4A0.
+    - weapon_id: u32
+      offset: 12
+    - unknown_16: u32
+      offset: 16
+    - unknown_20: u32
+      offset: 20
+    - unknown_24: u32
+      offset: 24
+    # kr-1256 sub_6E94C0 / kr-1256 sub_6ECBC0 append the list after seven words.
+    # cn-774 sub_8A8DD0 / cn-774 sub_8AC330 and tw-454 sub_71C910 / tw-454 sub_71FDD0 stop at seven words.
+    - unknown_28: "list<u32>"
+      offset: 28
+      except: [cn-774]

@@ -51,7 +51,7 @@ public sealed class ModernNpcRoundActivationTests
             Assert.Equal(npcRounds ? 1 : 0, fixture.Services.GetAll<IMessageSender<RoundNpcAcknowledged>>().Count);
             Assert.Empty(fixture.Services.GetAll<IMessageSender<InitialTutorialNpcAcknowledged>>());
             if (game.Find(PacketDirection.ClientToServer, "gcpFailTutorialWaves_") is { } tutorialFailure)
-                Assert.False(fixture.Packets.Handlers.ContainsKey((build + "/game", tutorialFailure)));
+                Assert.Equal(npcRounds, fixture.Packets.Handlers.ContainsKey((build + "/game", tutorialFailure)));
         }
         finally { await context.UnwindAsync(); }
         Assert.Empty(fixture.Packets.Handlers);
